@@ -1477,6 +1477,7 @@
         "**/*.test-d.ts",
         "src/components/claim-receipt/runtime.ts",
         "src/components/computer-use/runtime.ts",
+        "src/components/device-service/runtime.ts",
         "src/components/feedback/runtime.ts",
         "src/components/memory/commands/runtime.ts",
         "src/components/memory/device-session/account-runtime.ts",
@@ -2277,8 +2278,6 @@
         "src/components/thread/gateway/author.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) BINDING_SCHEMA_VERSION, BINDING_PLATFORMS, BINDING_STATUSES, COMPLETION_OUTCOMES, BINDING_MAX_TTL_SECONDS, BINDING_DEFAULT_POLICY_ID
         "src/components/thread/gateway/bindings.ts": ["exports"],
-        // pre-existing at origin dev 4686e425b5: unused export(s) reaches
-        "src/components/thread/gateway/causal.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) completionOutcome
         "src/components/thread/gateway/completion.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_SCHEMA_VERSION
@@ -3997,6 +3996,7 @@
         "extensions/omo-memory-palace.js",
         "extensions/omo-memory-sync.js",
         "extensions/omo-recall-store.js",
+        "extensions/omo-device-service.js",
         "extensions/omo-session-history.js",
         "extensions/omo-task.js",
         "extensions/omo-telemetry-otlp.js",

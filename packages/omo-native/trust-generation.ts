@@ -6,6 +6,7 @@ import { basename, dirname, join, resolve } from "node:path"
 import type { EngineTrustMarker } from "@code-yeongyu/senpi/engine-trust"
 import type { TrustDiagnosticEntry } from "./trust-diagnostics"
 import { pidAnswersSignalZero, sweepTrustRetention } from "./trust-retention"
+import { attestedOverflowRoot, readUsernsView, type UsernsView } from "./trust-userns"
 
 const MAX_BYTES = 8 * 1024 * 1024
 const GENERATION_PREFIX = "# omo-engine-trust-generation"
@@ -15,7 +16,7 @@ const leases = new Set<string>()
 const bootAtMs = Date.now() - uptime() * 1000
 
 export class TrustStorageError extends Error {
-  constructor(readonly code: "trust-user-extras-unrecoverable" | "trust-path-unrepresentable") {
+  constructor(readonly code: "trust-user-extras-unrecoverable" | "trust-path-unrepresentable" | "trust-userns-unattested") {
     super(code)
   }
 }
@@ -55,18 +56,47 @@ function owned(stat: { uid: number; mode: number }, mode: number): boolean {
   return process.platform === "win32" || (stat.uid === process.getuid?.() && (stat.mode & 0o777) === mode)
 }
 
+export interface AncestorStat {
+  readonly directory: boolean
+  readonly symlink: boolean
+  readonly mode: number
+  readonly uid: number
+  readonly dev: bigint
+  readonly ino: bigint
+}
+
+export type AncestorVerdict = "ok" | "unsafe-directory" | "unsafe-ancestor" | "unattested"
+
+/**
+ * One ancestor of a trust directory: a real directory, never a link, not group/other-writable unless
+ * sticky, and owned by root or the current uid. Inside a user namespace an overflow-owned ancestor counts
+ * as root only when the launcher attested that exact path and inode (senpi#5334); any other unmapped owner
+ * there is the named refusal, because the real owner cannot be seen.
+ */
+export function judgeAncestor(view: UsernsView | null, path: string, stat: AncestorStat, selfUid: number | undefined,
+  platform: NodeJS.Platform): AncestorVerdict {
+  if (!stat.directory || stat.symlink) return "unsafe-directory"
+  if (platform === "win32") return "ok"
+  if ((stat.mode & 0o022) !== 0 && (stat.mode & 0o1000) === 0) return "unsafe-ancestor"
+  if (stat.uid === 0 || stat.uid === selfUid) return "ok"
+  if (view !== null && attestedOverflowRoot(view, path, stat)) return "ok"
+  if (view?.namespaced && (view.overflowUid === null || stat.uid === view.overflowUid)) return "unattested"
+  return "unsafe-ancestor"
+}
+
 /** Ancestors may be system-owned (/home, /tmp); none may redirect through a link. */
 async function ancestors(path: string): Promise<void> {
   let current = resolve(path)
+  const view = process.platform === "linux" ? readUsernsView(process.env) : null
   for (;;) {
-    const stat = await fs.lstat(current)
-    if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error("unsafe trust directory")
-    if (process.platform !== "win32") {
-      const sticky = (stat.mode & 0o1000) !== 0
-      if ((stat.uid !== 0 && stat.uid !== process.getuid?.()) || ((stat.mode & 0o022) !== 0 && !sticky)) {
-        throw new Error("unsafe trust ancestor")
-      }
-    }
+    const stat = await fs.lstat(current, { bigint: true })
+    const verdict = judgeAncestor(view, current, {
+      directory: stat.isDirectory(), symlink: stat.isSymbolicLink(), mode: Number(stat.mode), uid: Number(stat.uid),
+      dev: stat.dev, ino: stat.ino,
+    }, process.getuid?.(), process.platform)
+    if (verdict === "unsafe-directory") throw new Error("unsafe trust directory")
+    if (verdict === "unsafe-ancestor") throw new Error("unsafe trust ancestor")
+    if (verdict === "unattested") throw new TrustStorageError("trust-userns-unattested")
     const parent = dirname(current)
     if (parent === current) return
     current = parent
@@ -110,6 +140,12 @@ export async function prepareTrustDirectory(requested: string, platform: NodeJS.
     directory = await temporaryTrustDirectory(platform)
     codes.push({ code: "trust-dir-unsafe" })
   }
+  if (directory === requested && platform === "linux") {
+    try { await fs.access(requested, constants.W_OK) } catch {
+      directory = await temporaryTrustDirectory(platform)
+      codes.push({ code: "trust-dir-readonly" })
+    }
+  }
   if (directory.includes(platform === "win32" ? ";" : ":")) throw new TrustStorageError("trust-path-unrepresentable")
   return { directory, codes }
 }
@@ -144,7 +180,7 @@ async function atomicWrite(path: string, text: string): Promise<void> {
   try { await fs.rename(temporary, path) } finally { await fs.unlink(temporary).catch(() => {}) }
 }
 
-async function immutableFile(directory: string, prefix: string, text: string): Promise<{ file: string; sha256: string }> {
+async function immutableFile(directory: string, prefix: string, text: string): Promise<{ file: string; sha256: string; codes: TrustDiagnosticEntry[] }> {
   if (Buffer.byteLength(text) > MAX_BYTES) throw new Error("trust generation exceeds 8 MiB")
   const sha256 = digest(text)
   const file = join(directory, `${prefix}${sha256}.pem`)
@@ -152,14 +188,15 @@ async function immutableFile(directory: string, prefix: string, text: string): P
     if (await readOwnedTrustFile(file) === text) {
       // Reuse is use: retention ranks by mtime, and the caller is about to hand this path out (5.3).
       const now = new Date()
-      await fs.utimes(file, now, now).catch(() => {})
-      return { file, sha256 }
+      // A failed refresh leaves this generation ranked as old, so it is reported like a failed lease.
+      const codes: TrustDiagnosticEntry[] = await fs.utimes(file, now, now).then(() => [], () => [{ code: "trust-lease-failed" }])
+      return { file, sha256, codes }
     }
   } catch (error) {
     if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error
   }
   await atomicWrite(file, text)
-  return { file, sha256 }
+  return { file, sha256, codes: [] }
 }
 
 export async function recoverUserExtras(incoming: string | undefined, loaded: () => readonly string[], knownGeneration = false) {
@@ -200,7 +237,11 @@ export async function recoverUserExtras(incoming: string | undefined, loaded: ()
 export async function writeTrustGeneration(directory: string, automatic: readonly string[], extras: readonly string[], user: readonly string[]) {
   const userFile = user.length === 0 ? null : await immutableFile(directory, "u-", USER_HEADER + serializeCertificates(user))
   const header = `${GENERATION_PREFIX} v1 user=${userFile?.sha256 ?? "none"}\n`
-  return { ...await immutableFile(directory, "", header + serializeCertificates([...automatic, ...extras, ...user])), user: userFile?.sha256 ?? null }
+  const generation = await immutableFile(directory, "", header + serializeCertificates([...automatic, ...extras, ...user]))
+  return {
+    file: generation.file, sha256: generation.sha256, user: userFile?.sha256 ?? null,
+    codes: [...userFile?.codes ?? [], ...generation.codes],
+  }
 }
 
 export async function verifyTrustGeneration(marker: EngineTrustMarker) {
