@@ -5,6 +5,7 @@ import { TeamModeConfigSchema, type TeamModeConfig } from "@oh-my-opencode/team-
 import { log } from "@oh-my-opencode/utils/logger"
 
 import { createTaskRecordStore } from "../../store"
+import { readSessionContext } from "../../runners/rpc-host/session-role"
 import { MEMBER_EXTENSION_BUNDLE_NAME, WORKPOOL_STATE_DIR_ENV, WORKPOOL_TASK_ID_ENV } from "./identity"
 import { createMemberWakeSource, resolveMemberExtensionConfig, type MemberWakeSource } from "./member-session"
 import { createMemberSelfPoller, type MemberSelfPoller } from "./self-poller"
@@ -43,11 +44,17 @@ export function resolveMemberExtensionEntryPath(extensionUrl = import.meta.url):
 }
 
 export default async function registerMemberExtension(pi: ExtensionAPI): Promise<void> {
+  const context = readSessionContext(pi)
+  const workpoolStateDir = context?.["workpool_state_dir"]
+  const workpoolTaskId = context?.["workpool_task_id"]
+  const workpoolEnv = workpoolStateDir !== undefined || workpoolTaskId !== undefined
+    ? { [WORKPOOL_STATE_DIR_ENV]: workpoolStateDir, [WORKPOOL_TASK_ID_ENV]: workpoolTaskId }
+    : process.env
   // The shared extension boots before RPC switch_session can acknowledge. Ordinary team
   // members must not evaluate the workpool host-policy graph just to reject absent identity.
-  if (process.env[WORKPOOL_STATE_DIR_ENV] !== undefined || process.env[WORKPOOL_TASK_ID_ENV] !== undefined) {
+  if (workpoolEnv[WORKPOOL_STATE_DIR_ENV] !== undefined || workpoolEnv[WORKPOOL_TASK_ID_ENV] !== undefined) {
     const { registerProcessWorkpoolWorker } = await import("../../workpool/process-worker")
-    if (registerProcessWorkpoolWorker(pi)) return
+    if (registerProcessWorkpoolWorker(pi, workpoolEnv)) return
   }
   if (activeRuntimes.has(pi)) return
   // Not a member session: on the shared daemon this same bundle is loaded for every session, so an

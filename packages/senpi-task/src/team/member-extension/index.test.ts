@@ -8,6 +8,10 @@ import { TeamModeConfigSchema } from "@oh-my-opencode/team-core/config"
 import { sendMessage } from "@oh-my-opencode/team-core/team-mailbox"
 
 import registerMemberExtension from "./index"
+import { buildChildContext } from "../../runners/rpc-host/session-context"
+import { createWorkpoolStore } from "../../workpool/store"
+import type { WorkpoolSpec } from "../../workpool/types"
+import { WORKPOOL_STATE_DIR_ENV, WORKPOOL_TASK_ID_ENV } from "./identity"
 
 const TEAM_RUN_ID = "77777777-7777-4777-8777-777777777777"
 const MESSAGE_ID = "88888888-8888-4888-8888-888888888888"
@@ -18,6 +22,55 @@ afterEach(() => {
 })
 
 describe("member extension lifecycle", () => {
+  test("#given bound host workpool sessions and stale process identity #when their extensions load #then each session registers its own yield tool", async () => {
+    const root = mkdtempSync(join(tmpdir(), "senpi-workpool-extension-"))
+    roots.push(root)
+    const names = [WORKPOOL_STATE_DIR_ENV, WORKPOOL_TASK_ID_ENV]
+    const previous = new Map(names.map(name => [name, process.env[name]] as const))
+    try {
+      for (const [index, taskId] of ["st_00000001", "st_00000002"].entries()) {
+        const stateDir = join(root, `session-${index}`)
+        const parent = `parent-${index}`
+        const store = createWorkpoolStore(stateDir)
+        const spec: WorkpoolSpec = {
+          plan: { model: "test/model" },
+          start: { prompt: "work", parent_session_id: parent, root_session_id: parent, depth: 1, cwd: root, execution_mode: "process" },
+        }
+        const pool = store.create(
+          { sessionId: parent, rootSessionId: parent, depth: 0, cwd: root },
+          { name: "work", agent: { category: "quick", prompt: "work" }, mode: "keep_alive" },
+          spec,
+        )
+        store.mutate(pool.pool_id, current => ({
+          ...current,
+          workers: [{ task_id: taskId, run_epoch: 0, status: "busy", completed_turns: 0, idle_since: 0 }],
+        }))
+        const { context } = buildChildContext({
+          task_id: taskId, cwd: root, state_dir: join(stateDir, "children", taskId), prompt: "work",
+          memberEnv: { [WORKPOOL_STATE_DIR_ENV]: stateDir, [WORKPOOL_TASK_ID_ENV]: taskId },
+        })
+        const tools: string[] = []
+        const api = { sessionContext: context, registerTool(tool: { name: string }) { tools.push(tool.name) } } as unknown as ExtensionAPI
+        Object.assign(process.env, {
+          [WORKPOOL_STATE_DIR_ENV]: join(root, "unassigned"),
+          [WORKPOOL_TASK_ID_ENV]: "st_deadbeef",
+        })
+
+        await registerMemberExtension(api)
+
+        expect(tools).toEqual(["workpool"])
+        Object.assign(process.env, { [WORKPOOL_STATE_DIR_ENV]: stateDir, [WORKPOOL_TASK_ID_ENV]: taskId })
+        const partialApi = { ...api, sessionContext: { role: "member", workpool_state_dir: stateDir } } as unknown as ExtensionAPI
+        await expect(registerMemberExtension(partialApi)).rejects.toMatchObject({ code: "worker_unassigned" })
+      }
+    } finally {
+      for (const [name, value] of previous) {
+        if (value === undefined) delete process.env[name]
+        else process.env[name] = value
+      }
+    }
+  })
+
   test("#given unread mail during extension loading #when session_start fires #then inbound team mail steers at the lifecycle edge", async () => {
     const root = mkdtempSync(join(tmpdir(), "senpi-member-extension-"))
     roots.push(root)

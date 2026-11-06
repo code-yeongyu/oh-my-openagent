@@ -5,7 +5,7 @@ import { messageability, nextRunEpoch, type TaskRecord } from "../state"
 import { oneShotPolicyDenial } from "../steering/engine-policy"
 import { isColdRevivalCandidate } from "../lifecycle/revive-policy"
 import { createWorkpoolStore } from "../workpool/store"
-import { acknowledgeWorkerTurn, appendAssignedMessages, beginWorkerTurn, WORKPOOL_TURN_MESSAGE } from "../workpool/worker-turn"
+import { acknowledgeWorkerTurn, appendAssignedMessages, WORKPOOL_TURN_MESSAGE } from "../workpool/worker-turn"
 import type { ReviveReservation, SendOutcome } from "../steering/types"
 import { WorkpoolError, type WorkpoolAgent, type WorkpoolCaller, type WorkpoolSpec } from "../workpool/types"
 import type { WorkpoolAdmission, WorkpoolRequest } from "../workpool/ports"
@@ -85,6 +85,18 @@ export function createWorkpoolAdmission(ports: PoolManagerPorts): WorkpoolAdmiss
     const release = (): void => concurrency.releaseLease(taskId, epoch)
     const current = (): boolean => !cancelled && admission.check().kind === "allowed" && input.current()
     const event = (kind: "granted" | "dispatched"): void => input.event({ kind, pool_id: pool.pool_id, item_id: item.item_id, task_id: taskId, run_epoch: epoch })
+    // A refused bind fails the turn only while the item still waits, undispatched, for this worker under another epoch:
+    // nothing can bind it any more, so fail it like a refused recheck and let the dispatcher clear its pending entry.
+    // A refusal because another owner already began the turn stays quiet, so that owner's item is left alone.
+    const awaitsAnotherEpoch = (): boolean => {
+      const anchor = stores.pools.load(pool.pool_id).items.find(candidate => candidate.item_id === item.item_id)
+      return anchor?.status === "assigned" && anchor.delivery?.phase === "queued" && anchor.binding?.task_id === taskId && anchor.binding.run_epoch !== epoch
+    }
+    const bindTurn = (): boolean => {
+      if (input.bind(taskId, epoch)) return true
+      if (current() && awaitsAnotherEpoch()) throw new WorkpoolError("worker_not_continuable", "The item's binding no longer matches this turn.")
+      return false
+    }
 
     async function launch(): Promise<void> {
       try {
@@ -98,9 +110,9 @@ export function createWorkpoolAdmission(ports: PoolManagerPorts): WorkpoolAdmiss
             oneShotPolicyDenial(record) !== undefined || (ports.pending(taskId) && (record.pending_steering ?? []).some(entry => entry.workpool?.pool_id !== pool.pool_id))) {
             throw new WorkpoolError("worker_not_continuable", "Worker is no longer eligible for reuse.")
           }
-          if (!input.bind(taskId, epoch)) return
+          if (!bindTurn()) return
           appendAssignedMessages(stores, turn)
-          if (beginWorkerTurn(stores, turn) === undefined) return
+          if (input.begin(taskId, epoch) === undefined) return
           const result = await ports.revive(record, WORKPOOL_TURN_MESSAGE, { ok: true, release, commit: () => { transferred = true; ports.trackRevive(taskId, epoch) } })
           if (result.kind !== "revived") {
             if (options.store.load(taskId)?.revive_delivery_uncertain?.run_epoch === epoch) {
@@ -128,7 +140,7 @@ export function createWorkpoolAdmission(ports: PoolManagerPorts): WorkpoolAdmiss
               ? await workpoolProcessLaunch(options.store.stateDir, taskId, options.resolveInheritedExtensions)
               : undefined
             if (!current()) return
-            if (!input.bind(taskId, epoch)) return
+            if (!bindTurn()) return
             context = prepareWorkpoolLaunch({ options, workerSpec: pool.worker_spec, taskId, hostPid: ports.hostPid,
               taskSeq: ports.nextSequence(pool.parent_session_id),
               spec: { ...pool.worker_spec.start,
@@ -141,7 +153,7 @@ export function createWorkpoolAdmission(ports: PoolManagerPorts): WorkpoolAdmiss
           } finally { acquired.lease.release() }
           if (!current()) { await ports.cancel(taskId); return }
           appendAssignedMessages(stores, turn)
-          const captured = beginWorkerTurn(stores, turn, context.managedSpec.prompt)
+          const captured = input.begin(taskId, epoch, context.managedSpec.prompt)
           if (captured === undefined) return
           const result = await ports.launch({ ...context, managedSpec: { ...context.managedSpec, prompt: captured.message } })
           if (!result.ok) throw new WorkpoolError("spawn_failed", result.error)
