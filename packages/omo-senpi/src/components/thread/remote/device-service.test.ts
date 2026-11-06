@@ -52,6 +52,15 @@ describe("device-service adapter of the thread tools' account surface", () => {
     expect(await port.endpointCommand("b", { type: "open_session" })).toEqual({ kind: "uncertain", reason: "reply_lost" })
   })
 
+  test("#given b's engine applied a command but its reply says success false #when the outcome maps to the port #then it is refused with the reply's errorCode, else its error, else engine_failed, never ok", async () => {
+    const failed = (extra: Record<string, unknown>) => state({ state: "engine_applied" }, { type: "response", command: "set_model", success: false, ...extra })
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => ({ ...fakeService([failed({ error: "no such model", errorCode: "x" }), failed({ error: "no such model" }), failed({})], []), endpointCommand: async () => failed({ error: "bad cwd", errorCode: "cwd_missing" }) }) as unknown as DeviceService })
+    expect(await port.sessionCommand("b", "s1", { type: "set_model", provider: "p", modelId: "m" })).toEqual({ kind: "refused", reason: "x" })
+    expect(await port.sessionCommand("b", "s1", { type: "set_model", provider: "p", modelId: "m" })).toEqual({ kind: "refused", reason: "no such model" })
+    expect(await port.sessionCommand("b", "s1", { type: "set_model", provider: "p", modelId: "m" })).toEqual({ kind: "refused", reason: "engine_failed" })
+    expect(await port.endpointCommand("b", { type: "open_session", cwd: "/gone" })).toEqual({ kind: "refused", reason: "cwd_missing" })
+  })
+
   test("#given the default surface #when the sidecar fails to load #then the call rejects, the failure is not cached, and the next call loads again", async () => {
     let loads = 0
     const surface = createLazyRemoteSurface({ version: "0.0.0-test", loadRuntime: async () => { loads += 1; if (loads === 1) throw new Error("sidecar missing"); return { createDeviceServiceSessions: () => createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => fakeService([], []) }) } } })

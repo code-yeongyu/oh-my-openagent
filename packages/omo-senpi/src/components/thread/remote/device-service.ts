@@ -45,7 +45,15 @@ function outcomeOf(result: CommandResult): RemoteCommandOutcome {
   if (outcome.state === "engine_refused") return { kind: "refused", reason: outcome.reason }
   if (outcome.state === "uncertain") return { kind: "uncertain", reason: outcome.reason }
   if (outcome.state === "engine_stale") return { kind: "uncertain", reason: "engine_stale" }
-  return { kind: "ok", response: result.response ?? {} }
+  const response = result.response ?? {}
+  // The engine ran the command and answered it failed (senpi's `{success: false, error, errorCode}` envelope): a typed
+  // refusal, so no caller reads `data` from a failed reply.
+  if (response["success"] === false) {
+    const code = response["errorCode"]
+    const error = response["error"]
+    return { kind: "refused", reason: typeof code === "string" && code.length > 0 ? code : typeof error === "string" && error.length > 0 ? error : "engine_failed" }
+  }
+  return { kind: "ok", response }
 }
 
 /**
