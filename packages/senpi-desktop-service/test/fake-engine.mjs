@@ -7,6 +7,9 @@
 // FAKE_ENGINE_FEATURES is the JSON `features` value of the hello reply (unset omits the key, like a
 // pre-features engine); a session opened with `reportMode: "object"` then answers a `null` desktop exec reply
 // with an ActionReport, and FAKE_ENGINE_EXEC_REPLY (JSON) replaces every such reply.
+// FAKE_ENGINE_TCC_FILE names a file holding "granted" or "denied"; it is read once at startup and that
+// answer is kept for the process's life, the way macOS caches a TCC answer per process.
+// FAKE_ENGINE_SPAWN_LOG names a file each fake engine appends its pid to at startup.
 // Every received line is echoed first as an `engine.log` notification ("recv <line>") so tests observe the wire.
 // Any other method is steered by `params.fake`:
 //   "hold"        - reply only after a "release" request arrives (after the release reply)
@@ -18,6 +21,7 @@
 //   "notify"      - emit one audit and one stopPath.changed notification, then reply
 //   "exit"        - exit with code 7 without replying
 //   otherwise     - reply { method, params, pid }
+import { appendFileSync, readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { createDesktop } from "./fake-desktop.mjs";
 
@@ -47,19 +51,24 @@ if (!process.argv.includes("--stdio")) {
 	process.exit(2);
 }
 
+if (process.env.FAKE_ENGINE_SPAWN_LOG !== undefined) appendFileSync(process.env.FAKE_ENGINE_SPAWN_LOG, `${process.pid}\n`);
+const tccFile = process.env.FAKE_ENGINE_TCC_FILE;
+const tcc = tccFile === undefined ? "granted" : readFileSync(tccFile, "utf8").trim();
+const trusted = tcc === "granted";
+
 const capabilities = {
 	backend: "fake",
 	displayServer: null,
-	capture: true,
-	input: true,
-	ax: true,
-	backgroundWindowInput: true,
+	capture: trusted,
+	input: trusted,
+	ax: trusted,
+	backgroundWindowInput: trusted,
 	...(process.env.FAKE_ENGINE_CURSOR_OMITTED === "1" ? {} : { cursorOverlay: false }),
 	deliveryModes: ["background", "foreground"],
-	capturePermission: "granted",
-	inputPermission: "granted",
-	axPermission: "granted",
-	displayCount: 1,
+	capturePermission: tcc,
+	inputPermission: tcc,
+	axPermission: tcc,
+	displayCount: trusted ? 1 : 0,
 	focusGuard: true,
 	stopPath: "global",
 	stopReason: null,
