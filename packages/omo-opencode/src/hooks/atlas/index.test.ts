@@ -2478,14 +2478,14 @@ session_id: ses_untrusted_999
         Date.now = originalDateNow
       })
 
-      // A timer that reschedules itself lands back in capturedTimers, which this loop is iterating, so a
-      // self-rescheduling chain would never end; fail at the cap instead of spinning until the host runs
-      // out of memory (#10474).
+      // Fire only the timers pending when the call starts: a timer that reschedules itself lands back in
+      // capturedTimers, and iterating the live map would never end (#10474, #10770). The cap stays as a
+      // second guard on the snapshot size.
       const MAX_TIMERS_PER_FIRE = 20
 
       async function firePendingTimers(): Promise<void> {
         let fired = 0
-        for (const [id, entry] of capturedTimers) {
+        for (const [id, entry] of [...capturedTimers]) {
           if (++fired > MAX_TIMERS_PER_FIRE) {
             throw new Error(`runaway: more than ${MAX_TIMERS_PER_FIRE} captured timers fired in one pass`)
           }

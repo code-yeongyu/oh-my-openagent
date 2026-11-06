@@ -5,7 +5,7 @@ import type { AdmissionBarrier, ResumeCredential } from "../../../../senpi-task/
 import type { EnginePauseState, RunRef, RunPauseOwner } from "../../../../senpi-task/src/pause/ports"
 import { PauseRegistry, type PauseParticipant } from "../../../../senpi-task/src/pause/registry"
 import { RunPauseController, type RunPauseEffects } from "../../../../senpi-task/src/pause/run-controller"
-import { EngineRunPauseBridge } from "./run-pause-bridge"
+import { EngineRunPauseBridge, type LostParticipantRecovery } from "./run-pause-bridge"
 import { createWorkpoolRunPauseSource } from "./workpool-run-pause-source"
 
 export type RunPauseSource = {
@@ -18,12 +18,21 @@ export type RunPauseSource = {
   cancel?(parentSessionId: string, runRef: RunRef): Promise<void>
 }
 
+// A restore that failed while the task host was changing generations usually succeeds a little later.
+const LOST_PARTICIPANT_RETRY_DELAYS_MS = [5_000, 30_000, 120_000] as const
+
+const lostParticipantRecovery: LostParticipantRecovery = {
+  delaysMs: LOST_PARTICIPANT_RETRY_DELAYS_MS,
+  sleep: ms => new Promise(resolve => { setTimeout(resolve, ms).unref?.() }),
+}
+
 export function createEngineRunPause(ports: {
   readonly stateDir: string
   readonly barrier: AdmissionBarrier
   readonly manager: TaskManager & TaskPauseMethods
   readonly runtime: { getPauseState(): EnginePauseState | undefined; fenceRun(runRef: RunRef): void }
   readonly resumeAdmission?: RunPauseEffects["resume"]
+  readonly lostRecovery?: LostParticipantRecovery
 }) {
   const registry = new PauseRegistry(ports.stateDir, ports.barrier)
   const sources = new Set<RunPauseSource>()
@@ -135,6 +144,12 @@ export function createEngineRunPause(ports: {
       for (const source of sources) await source.install?.(parentSessionId, pauseSeq, credential)
     },
     async acknowledgeInstalled(parentSessionId, pauseSeq, resumeId) { registry.markInstalled(parentSessionId, pauseSeq, resumeId) },
+    async endLost(participant, reason) {
+      if (participant.taskId === undefined || participant.kind === "held_admission") return false
+      const record = ports.manager.get(participant.taskId)
+      if (record?.notification.run_epoch !== participant.runEpoch) return true
+      return ports.manager.endLostPausedTask(participant.taskId, reason)
+    },
     async cancel(participant, parentSessionId) {
       if (participant.taskId !== undefined) {
         const record = ports.manager.get(participant.taskId)
@@ -151,7 +166,7 @@ export function createEngineRunPause(ports: {
   return {
     registry, controller, bridge: new EngineRunPauseBridge(controller, ports.runtime, async parent => {
       for (const source of sources) await source.released?.(parent)
-    }),
+    }, ports.lostRecovery ?? lostParticipantRecovery),
     notePausedChild(record: TaskRecord, owner: RunPauseOwner, childSeq: number): void {
       const prior = registry.require(owner.parentSessionId).participants[record.task_id]
       const allocation = admission(record) ?? prior?.admission

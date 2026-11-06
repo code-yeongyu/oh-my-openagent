@@ -7,6 +7,7 @@ import { bootstrapDeviceService, type BootstrapDependencies, forgetDeviceService
 import { connectDeviceService, type DeviceCredential, type DeviceService } from "../src/index.ts"
 import type { AccountShowResult } from "../src/account-state.ts"
 import { writeToken } from "../src/local-api/access.ts"
+import { LocalApiError } from "../src/local-api/errors.ts"
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "./local-api/conformance/world.ts"
 import { testSecure } from "./local-api/support.ts"
@@ -96,6 +97,18 @@ describe("device service bootstrap", () => {
     expect([...(owner?.state.endpoints ?? [])]).toEqual([AGENT_DIR])
   })
 
+  // D1 (#12051): the per-device opt-out belongs to the user; starting omo must never turn remote control back on.
+  test("a connected bootstrap leaves a detached host detached", async () => {
+    const stateDir = home()
+    const owner = await ownerAt(stateDir, PIN)
+    const { deps } = harness(stateDir)
+    const setter = await deps.connect()
+    await setter.setAttachControl(false)
+    expect(await bootstrapDeviceService(deps)).toMatchObject({ kind: "connected" })
+    expect(owner.state.attach.attached).toBe(false)
+    expect(owner.state.log.filter(type => type === "control.attach.set")).toHaveLength(1)
+  })
+
   test("acquisition runs again when welcome.service_version is older than the pin", async () => {
     const stateDir = home()
     const old = await ownerAt(stateDir, "1.3.9")
@@ -116,7 +129,10 @@ describe("device service bootstrap", () => {
   test.each([
     ["signedIn false stops with omo login hint", { exitCode: 0, stdout: JSON.stringify({ signedIn: false }) }, "signed_out", "omo login"],
     ["locked store reports keychain_locked and installs nothing", { exitCode: 7, stdout: JSON.stringify({ keychain: "locked" }) }, "keychain_locked", "Unlock"],
-    ["store unavailable reports service_degraded", { exitCode: 9, stdout: JSON.stringify({ error: "store-unavailable" }) }, "service_degraded", "credential store"],
+    // No store means no proof of a sign-in: its own state, which the start-up component keeps quiet (a never-signed-in
+    // machine without a keyring must not warn at every start).
+    ["store unavailable reports store_unavailable", { exitCode: 9, stdout: JSON.stringify({ error: "store-unavailable" }) }, "store_unavailable", "credential store"],
+    ["keychain unavailable (exit 8) reports store_unavailable", { exitCode: 8, stdout: JSON.stringify({ keychain: "unavailable" }) }, "store_unavailable", "credential store"],
     ["invalid json is account_unavailable", { exitCode: 0, stdout: "{signedIn: true" }, "account_unavailable", "omo login"],
   ])("%s", async (_name, account, state, hint) => {
     const { deps, calls } = harness(home(), { accountShow: async () => account })
@@ -137,6 +153,41 @@ describe("device service bootstrap", () => {
       exitCode: 3,
     })
     expect(calls.connect).toBe(0)
+  })
+
+  test.skipIf(process.platform === "win32")("a running service that only times out its handshake is never reinstalled", async () => {
+    const stateDir = home()
+    const owner = await ownerAt(stateDir, PIN)
+    const { deps, calls } = harness(stateDir, {
+      connect: async () => {
+        calls.connect += 1
+        throw new LocalApiError("handshake_timeout", "the owner did not complete the handshake")
+      },
+    })
+    expect(await bootstrapDeviceService(deps)).toMatchObject({ kind: "stopped", state: "service_degraded" })
+    expect(calls).toEqual({ install: 0, connect: 2 })
+    expect(owner.state.adoptions).toBe(0)
+  })
+
+  test.skipIf(process.platform === "win32")("one slow handshake is retried and the running service is used, not replaced", async () => {
+    const stateDir = home()
+    const owner = await ownerAt(stateDir, PIN)
+    let slow = true
+    const { deps, calls } = harness(stateDir, {
+      connect: async () => {
+        calls.connect += 1
+        if (slow) {
+          slow = false
+          throw new LocalApiError("handshake_timeout", "the owner did not complete the handshake")
+        }
+        const service = await connectDeviceService({ version: REFRESHER.version, stateDir })
+        services.push(service)
+        return service
+      },
+    })
+    expect((await bootstrapDeviceService(deps)).kind).toBe("connected")
+    expect(calls).toEqual({ install: 0, connect: 2 })
+    expect(owner.state.adoptions).toBe(1)
   })
 
   test("a bad server_proof drops the connection with zero adopts and installs nothing", async () => {

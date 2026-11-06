@@ -10,7 +10,9 @@ import type { SyncSession } from "../engine/open.ts"
 import type { Transport } from "../engine/ports.ts"
 import type { DeviceKeyring } from "../keyring-port.ts"
 import { openAccountChain } from "./account-chain.ts"
+import { createFreezeSettler } from "./freeze-settler.ts"
 import { createAccountHttp, type AccountHttp } from "./http.ts"
+import { createRevocationView, type RevocationView } from "./revocation-view.ts"
 import { createChainSealer } from "./sealer.ts"
 import { createChainVerifier } from "./verifier.ts"
 
@@ -31,6 +33,11 @@ interface AccountSessionShared {
   readonly peer?: () => string
   readonly log?: (line: string) => void
   readonly now?: () => number
+  /**
+   * The account's device list as a rotator reads it (rotation on revoke). The CLI shape builds it
+   * from `baseUrl` and `token` when absent; without one the session has no freeze settler.
+   */
+  readonly revocationView?: (() => Promise<RevocationView>) | undefined
 }
 
 export type AccountSessionOptions = AccountSessionShared & (
@@ -46,9 +53,18 @@ export async function openAccountSession(options: AccountSessionOptions): Promis
   const rejections = createRejectionCounter(options.log)
   const chain = await openAccountChain({ account: options.account, anchor: pin.anchor, keyring: options.keyring, http, rejections })
   if (!chain.isMember()) return { ok: false, reason: "not_member" }
+  const revocationView = options.revocationView ??
+    (options.baseUrl === undefined ? undefined : createRevocationView({ baseUrl: options.baseUrl, token: options.token, ...(options.fetch === undefined ? {} : { fetch: options.fetch }) }))
+  const log = options.log
+  const freeze = revocationView === undefined ? undefined : createFreezeSettler({
+    chain, http, keyring: options.keyring, revocationView,
+    scope: JSON.stringify([options.pinDir, options.account, options.keyring.principal().id]),
+    ...(log === undefined ? {} : { onEvent: (event: string) => log(`memory sync: ${event}`) }),
+  })
   return {
     ok: true,
     session: {
+      ...(freeze === undefined ? {} : { freeze }),
       transport: options.transport ?? createHttpTransport({ baseUrl: options.baseUrl, token: options.token, ...(options.fetch === undefined ? {} : { fetch: options.fetch }) }),
       verifier: createChainVerifier({ chain, spaceId: options.spaceId, rejections }),
       sealer: createChainSealer({ chain, keyring: options.keyring, spaceId: options.spaceId, ...(options.peer === undefined ? {} : { peer: options.peer }), ...(options.now === undefined ? {} : { now: options.now }) }),

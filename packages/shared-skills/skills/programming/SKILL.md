@@ -78,7 +78,7 @@ Apply unless the per-language reference overrides with something stricter.
 | Exhaustive variant matching | `match` + `assert_never` | `match` (compiler-enforced) | `switch` + `assertNever` | sealed interface + type switch + **`exhaustive` linter** (the compiler will not help) |
 | No untyped escape hatches | no `Any` in public sigs, no `cast`, no `# type: ignore` | no `unwrap`/`expect` outside tests (invariant `expect` only behind `#[expect(clippy::expect_used, reason)]`), no numeric `as`, no `#[allow]` (silence with `#[expect(lint, reason)]`) | no `any`, no `as` (except `as const`, `satisfies`), no `!`, no `@ts-ignore`, no `@ts-expect-error` | no `interface{}` / bare `any` in domain sigs; no `_ = err`; no `//nolint` without reason |
 | No bare error strings | typed exception dataclass with `__str__` | `thiserror` enum (lib) or `anyhow` with `.context(...)` (app) | `Error` subclass with typed fields | sentinel `errors.New` + typed `*XError` struct; wrap with `%w`; check via `errors.Is/As` |
-| Boundary catch only | catch the exact exception you expect; broad `except Exception` only in `main()`, with logging + re-raise | `?` everywhere; never `panic!` in library code | `catch` must narrow with `instanceof` and re-throw or convert; no empty catch | every `(T, error)` checked; `panic` only in `main`/tests; one `httperr.Write` funnel in handlers |
+| Boundary catch only | catch the exact exception you expect; broad `except Exception` only at a top-level boundary (`main()`/CLI entry, HTTP handler), with logging + re-raise | `?` everywhere; never `panic!` in library code | `catch` must narrow with `instanceof` and re-throw or convert; no empty catch | every `(T, error)` checked; `panic` only in `main`/tests; one `httperr.Write` funnel in handlers |
 | Resources via RAII | `with` (sync) / `async with` (async) | `Drop` impl or RAII guard | `using`/`await using` (TC39 explicit resource management) | `defer x.Close()` immediately after acquisition; `bodyclose`/`sqlclosecheck` linters enforce |
 | Async runtime is mandatory | `anyio` (NEVER bare `asyncio`) | `tokio` (`async-std` is unmaintained) | platform-native async (Bun/Node) with structured cancellation via `AbortSignal` | `context.Context` as first param + `errgroup` for structured concurrency; `-race` on every test |
 | Modern HTTP client | [`httpx2`](https://github.com/pydantic/httpx2) with HTTP/2 + brotli + zstd | `reqwest` with rustls | `ky` (default) / `undici` direct API (Node perf) - NEVER bare `fetch` in prod | stdlib `net/http.Client` with tuned `Transport` + `go-retryablehttp` for retry/backoff |
@@ -140,13 +140,13 @@ Full rationale, measurement methods, workaround detection, and split examples: *
 
 A source file past 250 non-blank, non-comment lines has outgrown a single reviewer's working memory. The module is almost certainly doing more than one thing. Measure: `awk '!/^[[:space:]]*$/ && !/^[[:space:]]*(\/\/|#|--)/' <file> | wc -l`.
 
-**When detected:** Name what the file owns in one short noun phrase. If the answer needs "and", the file needs splitting. Load `/refactor` and split by responsibility. If the file genuinely cannot be split (generated parser, indivisible state machine), mark with `// allow: SIZE_OK — <reason>`.
+**When detected:** Name what the file owns in one short noun phrase. If the answer needs "and", the file needs splitting. Load `/refactor` and split by responsibility. If the file genuinely cannot be split (generated parser, indivisible state machine), mark it in the first 10 lines with `# noqa: SIZE_OK — <reason>` in Python (the form `scripts/python/check-no-excuse-rules.py` reads) or `// allow: SIZE_OK — <reason>` in `//`-comment languages.
 
 ### Smell 2 — Function with more than 3 parameters
 
 More than 3 arguments signals the function is doing too much, or that related parameters belong in a typed struct. **Workarounds count as the same smell** — passing `dict`/`Record<string, unknown>`/`map[string]any`/`**kwargs`/`...args` to smuggle parameters through one argument, or a throwaway "config" object with 6+ fields that exists solely to wrap what would otherwise be positional args (genuine reusable domain types like `HttpClientConfig` are fine).
 
-**When detected:** Group related parameters into a typed value object with a domain name. If 4+ independent inputs are genuinely required, the justification must be SPECIFIC. See [`references/code-smells.md` Smell 2](references/code-smells.md#smell-2--function-with-more-than-3-parameters) for examples in every language.
+**When detected:** Group related parameters into a typed value object with a domain name. If 4+ independent inputs are genuinely required, the justification must be SPECIFIC. See [`references/code-smells.md` Smell 2](references/code-smells.md#smell-2--function-with-more-than-3-parameters) for Python, TypeScript, and Go examples.
 
 ### Smell 3 — Redundant verification after a destructive action
 
@@ -242,9 +242,9 @@ These two skills are not optional cosmetics. They are the recovery path for the 
 
 | Trigger | Skill to load | Why |
 |---|---|---|
-| Any [code smell](#code-smells--automatic-review-triggers) fires (250+ LOC, >3 params, redundant verification), OR the post-write loop surfaces 2+ issues, OR the user says "reshape this", "extract this", "clean this up" | `refactor` | Safe codemap-driven multi-step refactor with LSP + tests after each step. Never improvise a structural change. |
+| Any [code smell](#code-smells--automatic-review-triggers) fires (250+ LOC, >3 params, redundant verification, negative naming), OR the post-write loop surfaces more than two issues, OR the user says "reshape this", "extract this", "clean this up" | `refactor` | Safe codemap-driven multi-step refactor with LSP + tests after each step. Never improvise a structural change. |
 | Recent branch contains AI-authored patterns (broad except, dead helpers, vague comments, oversized files, redundant post-action verification, junk tests), OR the user says "remove slop", "clean AI code", "deslop" | `remove-ai-slops` | Behavior locked by gate-passing tests FIRST, then categorized parallel cleanup (junk tests included, each cut proven by a mutation), then quality gates. Behavior-preserving. |
-| Rust code touches `unsafe`, `*mut`, `*const`, `MaybeUninit`, FFI, `unsafe impl Send/Sync`, or a custom lock-free primitive | `references/rust-ub/` | Full UB taxonomy + Miri strictness escalation. Every `unsafe` block must survive Miri Level 3 (strict provenance + symbolic alignment + preemption) before it ships. |
+| Rust code touches `unsafe`, `*mut`, `*const`, `MaybeUninit`, FFI, `unsafe impl Send/Sync`, or a custom lock-free primitive | `references/rust-ub/` | Full UB taxonomy + Miri strictness escalation. Every `unsafe` block must survive Miri Level 3 (strict provenance + symbolic alignment + preemption) and the Level 4 Tree Borrows pass before it ships. |
 
 ---
 

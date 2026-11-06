@@ -51,6 +51,7 @@ fn ax_window(app: &str, pid: i32, title: &str) -> Option<DesktopWindow> {
         let bounds = ax::element::bounds(&window)?;
         let id = ax::element::window_id(&window)?;
         return Some(DesktopWindow {
+            identity: None,
             id: id.to_string(),
             title: title.to_string(),
             app: app.to_string(),
@@ -163,6 +164,7 @@ pub(super) fn close_focused_window(pid: i32) {
         return;
     };
     let window = DesktopWindow {
+        identity: None,
         id: id.to_string(),
         title: String::new(),
         app: "Terminal".to_string(),
