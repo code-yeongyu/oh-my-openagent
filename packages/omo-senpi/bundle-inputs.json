@@ -299,6 +299,7 @@
     "packages/memory-core/src/reflection/assets/assets.ts",
     "packages/memory-core/src/reflection/assets/dream-persona.md",
     "packages/memory-core/src/reflection/assets/reflection-persona.md",
+    "packages/memory-core/src/reflection/completion-links.ts",
     "packages/memory-core/src/reflection/completion-repair.ts",
     "packages/memory-core/src/reflection/completion-secret-scan.ts",
     "packages/memory-core/src/reflection/completion-validation.ts",
