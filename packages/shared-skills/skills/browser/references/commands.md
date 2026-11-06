@@ -90,7 +90,7 @@ Traps:
 const { tabs } = await session.tabList({ scope: "user" })   // "user" | "agent" | "all"
 await session.tabBorrow(tabId)                                // the user confirms in the browser (60 s)
 await session.tabReturn(tabId)                                // stop() returns anything still borrowed
-await session.tabCreate({ url }); await session.tabSelect(id); await session.tabClose(id)
+await session.tabCreate({ url }); await session.tabSelect(id); await session.tabClose(id, { context: (await session.cooperate("sync")).context_id })
 ```
 
 Never invent tab ids and never repeat a denied borrow.
