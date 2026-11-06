@@ -146,12 +146,16 @@ describe("verified acquisition of the device service", () => {
     expect(result).toMatchObject({ ok: true, version: PIN_VERSION })
   })
 
-  test("a set holding the placeholder next to a real key, or repeating a key, is refused before any download", async () => {
+  test("a set holding the placeholder next to a real key, or repeating a key, is refused before any download and names a build defect instead of an update", async () => {
     const key = releaseKey()
     for (const releaseKeys of [[key.publicHex, "00".repeat(32)], [key.publicHex, key.publicHex], []]) {
       const state = stateDir()
       const served = serveRelease(buildRelease({ key, host: HOST }))
-      expect(await acquireDeviceService({ ...options(state, served, ""), releaseKeys })).toMatchObject({ ok: false, refusal: "release_key_invalid" })
+      const result = await acquireDeviceService({ ...options(state, served, ""), releaseKeys })
+      expect(result).toMatchObject({ ok: false, refusal: "release_key_invalid" })
+      expect(result.ok ? "" : result.action).toBe(
+        "This omo build carries no usable device service release key, so it cannot verify device service releases. That is a defect in this build: report it with /bug.",
+      )
       expect(served.requested).toEqual([])
     }
   })
