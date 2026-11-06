@@ -98,7 +98,7 @@ MIRIFLAGS="\
 **Interpret results:**
 - Fails at Level 1 → Definite UB. Fix immediately.
 - Passes Level 1, fails Level 2 → Provenance or alignment UB. Fix.
-- Passes Levels 1-3, fails Level 4 → Tree Borrows found something Stacked Borrows missed (unusual). Investigate — may be a Tree Borrows false positive, but usually indicates fragile aliasing.
+- Passes Levels 1-3, fails Level 4 → Tree Borrows found something Stacked Borrows missed (unusual). Investigate — may be a Tree Borrows false positive, but usually indicates fragile aliasing. It does not ship until the aliasing is fixed or the false positive is proven and recorded with the Miri output.
 - Passes all 4 → Miri-clean. Proceed to supplementary tools.
 
 ### Phase 3: Supplementary Scans
