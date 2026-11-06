@@ -9,7 +9,7 @@ import {
   LockContentionError,
   createLockRecord,
   memoryMaintenanceLockPath,
-  retentionResumePending,
+  retentionCursorPath,
   sweepEmptyTranscriptJournals,
   withLock,
   type RuntimeRetentionPolicy,
@@ -129,7 +129,14 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
    * a cap resume point whose pass could not even measure waits for the interval (#12538 review r5 L1).
    */
   async function retentionDue(context: MemoryIdentityContext, repo: GitMemoryRepo): Promise<boolean> {
-    if (await retentionResumePending(context.identityPaths.runtime)) return true
+    if (existsSync(retentionCursorPath(context.identityPaths.runtime))) {
+      // A failed sidecar load counts as due, so retain() runs and logs that failure as before.
+      const resumePending = await loadMemoryCommandsRuntime().then(
+        (runtime) => runtime.retentionResumePending(context.identityPaths.runtime),
+        () => true,
+      )
+      if (resumePending) return true
+    }
     const last = Number(await repo.configGet(RETENTION_STAMP_CONFIG_KEY) ?? Number.NaN)
     return !(Number.isFinite(last) && now() - last < intervalMs)
   }

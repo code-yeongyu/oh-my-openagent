@@ -8,6 +8,7 @@ import {
   DEFAULT_RUNTIME_RETENTION,
   RETENTION_STAMP_CONFIG_KEY,
   createRetentionHostSweepStep,
+  retentionResumePending,
   runRuntimeRetention,
   summarizeRuntimeRetention,
   sweepHostIdentities,
@@ -17,7 +18,7 @@ import {
   type RuntimeRetentionPolicy,
 } from "@oh-my-opencode/memory-core"
 
-export { createRetentionHostSweepStep, runRuntimeRetention, summarizeRuntimeRetention, sweepHostIdentities }
+export { createRetentionHostSweepStep, retentionResumePending, runRuntimeRetention, summarizeRuntimeRetention, sweepHostIdentities }
 
 type Log = (message: string, data?: Record<string, unknown>) => void
 

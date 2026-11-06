@@ -16,7 +16,7 @@ import type { RuntimeCapCursor } from "./cap"
 export const RETENTION_STAMP_CONFIG_KEY = "omo.retentionAt"
 const CURSOR_FILE = "retention.json"
 
-function retentionCursorPath(runtimeDir: string): string {
+export function retentionCursorPath(runtimeDir: string): string {
   return join(runtimeDir, CURSOR_FILE)
 }
 
