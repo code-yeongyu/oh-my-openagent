@@ -176,10 +176,10 @@ class TerminalWaitDeadlineError extends HubTransportError {
 }
 
 // ../protocol/src/capability.ts
-import { Type as Type2 } from "@sinclair/typebox";
+import { Type as Type2 } from "#bunshin-ts-dep/@sinclair/typebox";
 
 // ../protocol/src/schema-primitives.ts
-import { Type } from "@sinclair/typebox";
+import { Type } from "#bunshin-ts-dep/@sinclair/typebox";
 var protocolVersion = "0.0.0";
 var IdSchema = Type.String({ minLength: 1 });
 var OperationSchema = Type.String({ minLength: 1 });
@@ -355,7 +355,7 @@ var ArtifactGetRequestSchema = Type2.Object({ sha256: Sha256HexSchema }, { addit
 var ArtifactGetResultSchema = Type2.Object({ downloadUrl: ArtifactUrlSchema, sha256: Sha256HexSchema }, { additionalProperties: false, title: "ArtifactGetResult" });
 var ArtifactRefSchema = Type2.Object({ kind: Type2.Literal("artifact"), sha256: Sha256HexSchema, size: ArtifactSizeSchema, url: ArtifactUrlSchema }, { additionalProperties: false, title: "ArtifactRef" });
 // ../protocol/src/doctor.ts
-import { Type as Type3 } from "@sinclair/typebox";
+import { Type as Type3 } from "#bunshin-ts-dep/@sinclair/typebox";
 var DoctorStatusSchema = Type3.Union([Type3.Literal("ok"), Type3.Literal("warn"), Type3.Literal("error")]);
 var CpuReportSchema = Type3.Object({
   cores: NonNegativeIntegerSchema,
@@ -441,13 +441,13 @@ var DoctorReportSchema = Type3.Object({
   network: Type3.Optional(NetworkReportSchema)
 }, { $id: SchemaId.doctorReport, title: "DoctorReport" });
 // ../protocol/src/envelopes.ts
-import { Type as Type7 } from "@sinclair/typebox";
+import { Type as Type7 } from "#bunshin-ts-dep/@sinclair/typebox";
 
 // ../protocol/src/mesh.ts
-import { Type as Type6 } from "@sinclair/typebox";
+import { Type as Type6 } from "#bunshin-ts-dep/@sinclair/typebox";
 
 // ../protocol/src/error-plane.ts
-import { Type as Type4 } from "@sinclair/typebox";
+import { Type as Type4 } from "#bunshin-ts-dep/@sinclair/typebox";
 var errorSchemaId = (name) => `https://bunshin.local/schema/${name}.json`;
 var ERROR_FRAMES_FEATURE = "error_frames:v2";
 var ERROR_FRAME_VERSION = 2;
@@ -482,7 +482,7 @@ var ProtocolErrorFrameSchema = Type4.Object({
 }, { $id: errorSchemaId("protocol-error"), title: "ProtocolErrorFrame" });
 
 // ../protocol/src/terminal.ts
-import { Type as Type5 } from "@sinclair/typebox";
+import { Type as Type5 } from "#bunshin-ts-dep/@sinclair/typebox";
 var ShellRequestSchema = Type5.Object({
   kind: Type5.Literal("shell"),
   command: Type5.String({ minLength: 1 }),
@@ -1536,8 +1536,8 @@ var protocolOpRegistry = {
   }
 };
 // ../protocol/src/parser.ts
-import { Errors } from "@sinclair/typebox/errors";
-import { Check } from "@sinclair/typebox/value";
+import { Errors } from "#bunshin-ts-dep/@sinclair/typebox/errors";
+import { Check } from "#bunshin-ts-dep/@sinclair/typebox/value";
 // ../protocol/src/schemas.ts
 var protocolSchemaArtifacts = [
   { fileName: "capability-manifest.json", schema: CapabilityManifestSchema },
@@ -1575,7 +1575,7 @@ var protocolSchemaArtifacts = [
 ];
 var schemaFileNames = protocolSchemaArtifacts.map((artifact) => artifact.fileName);
 // src/terminal-frame.ts
-import { Value } from "@sinclair/typebox/value";
+import { Value } from "#bunshin-ts-dep/@sinclair/typebox/value";
 var field = (value, key) => typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
 var stringField = (value, key) => {
   const found = field(value, key);
@@ -3988,7 +3988,7 @@ class MachineOfflineSkippedError extends MachineWireError {
   }
 }
 // src/result-shape.ts
-import { Value as Value2 } from "@sinclair/typebox/value";
+import { Value as Value2 } from "#bunshin-ts-dep/@sinclair/typebox/value";
 var isBridgeEnvelope = (value) => Value2.Check(meshOperationContracts.bridgeInvoke[1], value);
 var field2 = (value, key) => typeof value === "object" && value !== null ? Reflect.get(value, key) : undefined;
 var isString = (value) => typeof value === "string";
