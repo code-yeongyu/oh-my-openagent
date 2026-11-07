@@ -16,8 +16,10 @@ pub const PROTOCOL_VERSION: &str = "1";
 pub const ABI: &str = "senpi-desktop/1";
 /// Opt-in behaviours this engine supports, reported in `engine.hello`
 /// `features`. A host sends `reportMode: "object"` only to an engine that
-/// lists `action-report`.
-pub const FEATURES: &[&str] = &["action-report"];
+/// lists `action-report`. `frame-identity`: window frames are re-checked
+/// against the captured window's owning process; `frame-consume`: pointer
+/// options take `consume`.
+pub const FEATURES: &[&str] = &["action-report", "frame-identity", "frame-consume"];
 
 /// Standard JSON-RPC 2.0 error codes the engine emits.
 pub const PARSE_ERROR: i64 = -32_700;
