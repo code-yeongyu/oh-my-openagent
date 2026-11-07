@@ -6,6 +6,10 @@ import type { PrometheusExecutionArguments } from "../hooks/prometheus-md-only/h
 import { isTrackedBtwSideSession } from "../features/btw-side"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { log, replaceToolArgs } from "../shared"
+import {
+  applyExclusiveTaskTarget,
+  normalizeExclusiveTaskTarget,
+} from "../tools/delegate-task/normalize-task-target"
 import { resolveSessionAgent } from "./session-agent-resolver"
 import { stopContinuation } from "./stop-continuation"
 
@@ -137,9 +141,18 @@ export function createToolExecuteBeforeHandler(args: {
       const subagentType = typeof output.args.subagent_type === "string" ? output.args.subagent_type : undefined
       const taskId = typeof output.args.task_id === "string" ? output.args.task_id : undefined
 
-      if (category) {
-        replaceToolArgs(output, { subagent_type: "sisyphus-junior" })
-      } else if (!subagentType && taskId) {
+      if (category || subagentType) {
+        const normalized = normalizeExclusiveTaskTarget({
+          category,
+          subagent_type: subagentType,
+        })
+        // Category routing still uses sisyphus-junior internally; OpenCode's
+        // task() registry key is the config id, not the display name.
+        const hookTarget = normalized.category
+          ? { ...normalized, subagent_type: "sisyphus-junior" }
+          : normalized
+        output.args = applyExclusiveTaskTarget(output.args, hookTarget)
+      } else if (taskId) {
         const resolvedAgent = await resolveSessionAgent(ctx.client, taskId)
         replaceToolArgs(output, { subagent_type: resolvedAgent ?? "continue" })
       }
