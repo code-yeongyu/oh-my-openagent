@@ -9,6 +9,7 @@
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use parking_lot::Mutex;
@@ -28,8 +29,9 @@ pub const SCHEMA: u32 = 1;
 /// Longest string a trace line keeps before it is cut.
 const MAX_CHARS: usize = 256;
 
-/// Members the redaction table covers; `text` is typed text.
-const REDACTED: [&str; 5] = ["text", "value", "title", "label", "url"];
+/// Members the redaction table covers; `text` is typed text. `note` is
+/// free-form; `warning` is a token set today but is covered the same way.
+const REDACTED: [&str; 7] = ["text", "value", "title", "label", "url", "note", "warning"];
 
 pub struct TraceSink {
     started_unix_ms: u64,
@@ -119,7 +121,7 @@ impl TraceSink {
         if let Some(members) = line.as_object_mut() {
             members.insert("atMs".to_owned(), json!(unix_now_ms()));
         }
-        if let Err(error) = writeln!(opened, "{line}") {
+        if let Err(error) = write_line(opened, &line) {
             eprintln!("senpi-desktop-engine: trace write failed ({}): {error}", path.display());
         }
     }
@@ -146,26 +148,52 @@ fn open(path: &Path, started_unix_ms: u64) -> std::io::Result<File> {
         builder.create(dir)?;
     }
     let mut options = OpenOptions::new();
-    options.create(true).append(true);
+    options.append(true);
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
-    let mut file = options.open(path)?;
-    if file.metadata()?.len() == 0 {
-        let meta = json!({
-            "type": "trace.meta",
-            "schema": SCHEMA,
-            "pid": std::process::id(),
-            "startedAtMs": started_unix_ms,
-            "engineVersion": env!("CARGO_PKG_VERSION"),
-            "protocolVersion": PROTOCOL_VERSION,
-            "abi": ABI,
-        });
-        writeln!(file, "{meta}")?;
+    if !path.exists() {
+        publish_meta(path, &options, started_unix_ms)?;
     }
-    Ok(file)
+    options.open(path)
+}
+
+/// Writes `trace.meta` to a staged file and hard-links it into place, so
+/// the trace never exists without its first line and two engines sharing
+/// a name write it once: the second link fails with `AlreadyExists`.
+fn publish_meta(path: &Path, options: &OpenOptions, started_unix_ms: u64) -> std::io::Result<()> {
+    static STAGED: AtomicU64 = AtomicU64::new(0);
+    let staged = path.with_extension(format!(
+        "{}-{}.meta",
+        std::process::id(),
+        STAGED.fetch_add(1, Ordering::Relaxed)
+    ));
+    let mut file = options.clone().create_new(true).open(&staged)?;
+    let meta = json!({
+        "type": "trace.meta",
+        "schema": SCHEMA,
+        "pid": std::process::id(),
+        "startedAtMs": started_unix_ms,
+        "engineVersion": env!("CARGO_PKG_VERSION"),
+        "protocolVersion": PROTOCOL_VERSION,
+        "abi": ABI,
+    });
+    let linked = write_line(&mut file, &meta).and_then(|()| std::fs::hard_link(&staged, path));
+    std::fs::remove_file(&staged)?;
+    match linked {
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
+        linked => linked,
+    }
+}
+
+/// Writes `line` and its newline with one `write_all`, so lines from
+/// writers appending to the same file never interleave.
+fn write_line(file: &mut File, line: &Value) -> std::io::Result<()> {
+    let mut text = line.to_string();
+    text.push('\n');
+    file.write_all(text.as_bytes())
 }
 
 /// Applies the redaction table to every member of `value`.
