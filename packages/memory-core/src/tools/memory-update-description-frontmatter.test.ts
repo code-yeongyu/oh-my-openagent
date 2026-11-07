@@ -23,7 +23,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })
 
-setDefaultTimeout(process.platform === "win32" ? 30000 : 10000)
+if (process.platform === "win32") setDefaultTimeout(30000)
 
 async function fixture() {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-update-description-")))
