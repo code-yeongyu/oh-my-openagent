@@ -201,8 +201,8 @@ impl WaylandBackend {
     /// current AT-SPI origin: `FrameGeometry::map_point` re-anchors a window
     /// frame on the window `windows()` lists now, and AX clicks use AT-SPI
     /// coordinates. So that origin is the one subtracted, and the remaining
-    /// offset is placed on the Hyprland rect. A window capture crops at that
-    /// same Hyprland rect (see [`WaylandBackend::capture`]), so pixel
+    /// offset is placed on the Hyprland (or KWin) rect. A window capture crops
+    /// at that same rect (see [`WaylandBackend::capture`]), so pixel
     /// `(px, py)` of the frame lands at the rect's origin plus `(px, py)`.
     pub(crate) fn hyprland_pointer(
         &mut self,
@@ -212,6 +212,18 @@ impl WaylandBackend {
     ) -> CoreResult<()> {
         let placement = hyprland.placement(window)?;
         self.placed_pointer(&placement, window, event)
+    }
+
+    /// The compositor that places a window capture: the same
+    /// [`WaylandBackend::window_geometry`] dispatch window pointer input is
+    /// placed through, so on Hyprland and on KWin a window frame is cropped
+    /// at the rect its clicks land on. Where no compositor path is usable,
+    /// window pointer input is refused anyway and the crop stays at AT-SPI.
+    pub(crate) fn capture_geometry(&mut self, target: &Target) -> Option<WindowGeometry> {
+        match target {
+            Target::Window(_) => self.window_geometry().ok().flatten(),
+            Target::Desktop | Target::Display(_) => None,
+        }
     }
 
     fn placed_pointer(
@@ -226,25 +238,58 @@ impl WaylandBackend {
     }
 }
 
-/// The frame of a window capture Hyprland could not place: its pixels are
-/// shown, but no coordinate input is mapped through them, because a click
-/// would be placed at a rect the crop was not taken from.
-pub(crate) fn unplaced_frame(image: RgbaImage, error: &DesktopError) -> (RgbaImage, FrameGeometry) {
+/// The frame of a window capture its compositor could not place: its pixels
+/// are shown, but no coordinate input is mapped through them, because a
+/// click would be placed at a rect the crop was not taken from.
+pub(crate) fn unplaced_frame(
+    image: RgbaImage,
+    compositor: &str,
+    error: &DesktopError,
+) -> (RgbaImage, FrameGeometry) {
     let frame = FrameGeometry::pixels_only(
         image.width(),
         image.height(),
         format!(
-            "Hyprland could not place this window ({}), so the crop is not known to show where window \
-             pointer input would land",
+            "{compositor} could not place this window ({}), so the crop is not known to show where \
+             window pointer input would land",
             error.message
         ),
     );
     (image, frame)
 }
 
-enum WindowGeometry {
+/// `windows` with the captured window moved onto the rect its compositor
+/// places window pointer input at; the refusal names the compositor that
+/// could not place it. Display and desktop captures are left alone.
+pub(crate) fn place_captured(
+    geometry: Option<&WindowGeometry>,
+    windows: Vec<DesktopWindow>,
+    target: &Target,
+) -> (Vec<DesktopWindow>, Option<(&'static str, DesktopError)>) {
+    match (geometry, target) {
+        (Some(geometry), Target::Window(id)) => {
+            let (windows, refused) = match geometry {
+                WindowGeometry::Hyprland(hyprland) => hyprland.place_in(windows, id),
+                WindowGeometry::Kwin(kwin) => kwin.place_in(windows, id),
+            };
+            (windows, refused.map(|error| (geometry.compositor(), error)))
+        }
+        _ => (windows, None),
+    }
+}
+
+pub(crate) enum WindowGeometry {
     Hyprland(hyprland::Hyprland),
     Kwin(kwin::Kwin),
+}
+
+impl WindowGeometry {
+    const fn compositor(&self) -> &'static str {
+        match self {
+            Self::Hyprland(_) => "Hyprland",
+            Self::Kwin(_) => "KWin",
+        }
+    }
 }
 
 const LAYOUT_CHANGED: &str = "the Wayland display layout changed since the last capture, whose pixels were \
@@ -285,22 +330,17 @@ impl Backend for WaylandBackend {
 
     /// Reads the layout of an already connected libei session only; capture
     /// never opens an input session. A layout that cannot be read leaves the
-    /// geometry unproven, so the frame refuses coordinate input. On Hyprland a
-    /// window is cropped at its Hyprland rect (one `clients` + `monitors` read
-    /// per capture), the rect window pointer input is placed at; a window
-    /// Hyprland cannot place gets a frame that refuses coordinate input.
+    /// geometry unproven, so the frame refuses coordinate input. On Hyprland
+    /// and KWin a window is cropped at its compositor rect (one `clients` +
+    /// `monitors` read, or one KWin script run, per capture), the rect window
+    /// pointer input is placed at; a window the compositor cannot place gets
+    /// a frame that refuses coordinate input.
     fn capture(&mut self, target: &Target, _caps: &CaptureCaps, _exclude_window_titles: &[String]) -> CoreResult<(RgbaImage, FrameGeometry)> {
         let layout = match &mut self.input {
             Input::Connected(libei) => libei.regions().ok(),
             Input::Untried | Input::Failed(_) => None,
         };
-        let hyprland = match target {
-            Target::Window(_) => match self.compositor() {
-                Detection::Ipc(hyprland) => Some(hyprland.clone()),
-                Detection::NotHyprland | Detection::IpcMissing => None,
-            },
-            Target::Desktop | Target::Display(_) => None,
-        };
+        let geometry = self.capture_geometry(target);
         let mut unplaced = None;
         let ax = &mut self.ax;
         let captured = self.capture.capture(target, layout.as_deref(), || {
@@ -308,18 +348,13 @@ impl Backend for WaylandBackend {
                 Ok(ax) => ax.windows(),
                 Err(error) => Err(error.clone()),
             }?;
-            Ok(match (&hyprland, target) {
-                (Some(hyprland), Target::Window(id)) => {
-                    let (windows, refused) = hyprland.place_in(windows, id);
-                    unplaced = refused;
-                    windows
-                }
-                _ => windows,
-            })
+            let (windows, refused) = place_captured(geometry.as_ref(), windows, target);
+            unplaced = refused;
+            Ok(windows)
         })?;
         self.frame_layout = layout.filter(|_| self.capture.eis_derived);
         Ok(match unplaced {
-            Some(error) => unplaced_frame(captured.0, &error),
+            Some((compositor, error)) => unplaced_frame(captured.0, compositor, &error),
             None => captured,
         })
     }
