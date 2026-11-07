@@ -20,7 +20,8 @@ try {
   const inventory = await detectHarnesses({ home, env })
   const path = join(canonicalAgentDir(env, home), CACHE_FILENAME)
   const temporary = `${path}.tmp-${process.pid}`
-  mkdirSync(dirname(path), { recursive: true })
+  // The cache lives in the agent dir itself, so this may be what creates it: owner-only (#12546).
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 })
   writeFileSync(temporary, `${JSON.stringify({
     version: CACHE_VERSION,
     writtenAt: Date.now(),
