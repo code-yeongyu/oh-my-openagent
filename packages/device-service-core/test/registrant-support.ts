@@ -62,18 +62,24 @@ export const within = <T>(promise: Promise<T>, what: string | (() => string), ms
 
 export function recorder() {
   const events: RegistrantEvent[] = []
+  const stamps: number[] = []
   const waiters: { readonly match: (event: RegistrantEvent) => boolean; readonly resolve: (event: RegistrantEvent) => void }[] = []
   const onEvent = (event: RegistrantEvent): void => {
     events.push(event)
+    stamps.push(performance.now())
     for (const waiter of [...waiters])
       if (waiter.match(event)) {
         waiters.splice(waiters.indexOf(waiter), 1)
         waiter.resolve(event)
       }
   }
-  // A wait that runs out names every event the registrant emitted, so a flake shows which branch it stopped in (#12733).
-  const next = (match: (event: RegistrantEvent) => boolean, what: string): Promise<RegistrantEvent> =>
-    within(new Promise<RegistrantEvent>(resolve => waiters.push({ match, resolve })), () => `${what} (events so far: ${JSON.stringify(events)})`)
+  // A wait that runs out names every event the registrant emitted, each with its time relative to the wait's start,
+  // so a flake shows which branch it stopped in and whether it was slow rather than stuck (#12733).
+  const next = (match: (event: RegistrantEvent) => boolean, what: string): Promise<RegistrantEvent> => {
+    const armed = performance.now()
+    const timeline = () => events.map((event, index) => `${Math.round((stamps[index] ?? armed) - armed)}ms ${JSON.stringify(event)}`).join(", ")
+    return within(new Promise<RegistrantEvent>(resolve => waiters.push({ match, resolve })), () => `${what} (events so far: ${timeline()})`)
+  }
   return { events, onEvent, next }
 }
 
