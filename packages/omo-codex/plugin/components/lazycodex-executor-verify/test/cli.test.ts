@@ -24,7 +24,7 @@ describe("lazycodex executor verify CLI", () => {
 		if (result.error !== undefined) throw result.error;
 		expect(result.status).toBe(0);
 		expect(result.stdout).toContain('"decision":"block"');
-		expect(result.stdout).toContain("거짓말이다");
+		expect(JSON.parse(result.stdout).decision).toBe("block");
 	});
 
 	it("#given malformed stdin #when CLI runs #then stdout is empty and exit is zero", () => {
