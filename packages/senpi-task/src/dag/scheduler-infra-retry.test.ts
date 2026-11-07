@@ -1,14 +1,36 @@
 import { afterEach, expect, test } from "bun:test"
+import { existsSync, readdirSync } from "node:fs"
+import { join } from "node:path"
 import { dagNode, infraFixture, infrastructureFailure, success, RetryClock } from "./infra-retry-fixture"
 import { createDagScheduler } from "./scheduler"
 import { RunnerError } from "../runners/in-process/runner-error"
 
 const fixtures: ReturnType<typeof infraFixture>[] = []
-// Every journal commit takes the run lock, appends the WAL, and rewrites the checkpoint on disk. Hosted
-// Windows runners measured ~110-160 ms per commit (#10711), so a case's commit count is its CI cost.
+// The journal is in memory here (#11621), so this budget is no longer about per-commit disk cost. It
+// bounds the EVENT VOLUME a case produces: #10711 shrank this case from 306 commits to ~112 by keeping
+// the fan-in and dropping the incident's 54 dependents, and a case that regrows its node count would
+// bring the same cost straight back to any file-backed caller (hosted Windows measured ~110-160 ms per
+// commit). The assertion fails before that can happen unnoticed.
 const MAX_JOURNAL_COMMITS_PER_CASE = 150
+function journalFilesOnDisk(fixture: ReturnType<typeof infraFixture>): readonly string[] {
+  return ["events", "runs", "locks", "keys"].flatMap((directory) => {
+    const path = join(fixture.dagDirectory, directory)
+    return existsSync(path) ? readdirSync(path).map((entry) => `${directory}/${entry}`) : []
+  })
+}
+
 afterEach(() => {
+  // These cases assert retry semantics, never crash durability, so their journal stays in memory. A
+  // file-backed journal charges contended host I/O per commit - run lock, WAL append, WAL rescans and a
+  // checkpoint rewrite - which is what pushed two of them past the 5 s default under host load (#11621).
+  // Read the evidence before cleanup and assert after it, so a regression reports the disk journal
+  // instead of leaking the temp directory it failed on. Result artifacts and skill manifests are written
+  // by callers that bypass the store (results.ts, skills materialization), so <dag>/results and
+  // <dag>/skills may exist; no case here reads them, and routing those writers through the store is
+  // #11629.
+  const journaled = fixtures.map(journalFilesOnDisk)
   for (const fixture of fixtures.splice(0)) fixture.cleanup()
+  for (const files of journaled) expect(files).toEqual([])
 })
 
 test("retries seven infrastructure-failed roots so all their fan-in dependents run", async () => {
