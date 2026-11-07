@@ -235,6 +235,10 @@ pub(crate) fn restore_front_window(front: &FrontWindow) -> CoreResult<()> {
 /// document text was wiped), so the restore instead re-activates the previous
 /// application - which is the frontmost one, so nothing raises or changes -
 /// and then marks its window main/focused through AX as belt-and-braces.
+/// When the engine made another application key, the previous window is
+/// also given key focus back without raising ([`rekey`]): making the target
+/// key resigns the front application's activation in AppKit, which leaves an
+/// Electron window with no focused element until it is key again (#12701).
 pub(crate) fn restore_key_focus(input: &mut MacInput, front: &FrontWindow) -> CoreResult<()> {
     let Ok(prev_pid) = libc::pid_t::try_from(front.pid) else {
         return Ok(());
@@ -247,7 +251,40 @@ pub(crate) fn restore_key_focus(input: &mut MacInput, front: &FrontWindow) -> Co
         // choice wins over the snapshot (as on X11 and Windows).
         HandBack::UserMovedOn => return Ok(()),
     }
+    if activated.is_some_and(|pid| pid != prev_pid) {
+        rekey(prev_pid, activated, front);
+    }
     mark_key_window(front)
+}
+
+/// Whether the hand-back re-keys `previous`: the engine made another
+/// application key, `previous` reports no focused element, and it is still
+/// the front application (the user did not move on during the AX read).
+pub(crate) fn should_rekey(
+    previous: libc::pid_t,
+    activated: Option<libc::pid_t>,
+    has_focused_element: bool,
+    front: Option<libc::pid_t>,
+) -> bool {
+    activated.is_some_and(|pid| pid != previous) && !has_focused_element && front == Some(previous)
+}
+
+/// Gives `front`'s window key focus back once the application reports no
+/// focused element; an application that kept one is left untouched. Best
+/// effort like the rest of the hand-back: a refused record is logged, and the
+/// input that already went out is not reported as failed.
+fn rekey(pid: libc::pid_t, activated: Option<libc::pid_t>, front: &FrontWindow) {
+    let Some(wid) = front.window_id.as_deref().and_then(|id| id.parse::<u32>().ok()) else {
+        return;
+    };
+    let focused = ax::has_focused_element(pid);
+    if !should_rekey(pid, activated, focused, current_front_pid()) {
+        return;
+    }
+    let still_front = || current_front_pid() == Some(pid);
+    if let Err(error) = skylight::rekey_without_raise(pid, wid, &still_front) {
+        eprintln!("senpi-desktop-backend-macos: focus: key focus hand-back to window {wid} failed: {error}");
+    }
 }
 
 /// What key-focus hand-back does, from the snapshot, the application the
@@ -277,10 +314,16 @@ pub(crate) fn hand_back(
 
 /// The AX belt-and-braces half: mark `front`'s window main and focused.
 pub(crate) fn mark_key_window(front: &FrontWindow) -> CoreResult<()> {
-    let Some(id) = front.window_id.as_deref() else {
-        return Ok(());
-    };
-    let window = DesktopWindow {
+    if let Some(window) = key_window(front) {
+        let _ = ax::focus_key_window(&window);
+    }
+    Ok(())
+}
+
+/// `front`'s captured window as a lookup key for AX.
+fn key_window(front: &FrontWindow) -> Option<DesktopWindow> {
+    let id = front.window_id.as_deref()?;
+    Some(DesktopWindow {
         identity: None,
         id: id.to_string(),
         title: String::new(),
@@ -293,9 +336,7 @@ pub(crate) fn mark_key_window(front: &FrontWindow) -> CoreResult<()> {
         focused: false,
         is_on_screen: None,
         elevated: None,
-    };
-    let _ = ax::focus_key_window(&window);
-    Ok(())
+    })
 }
 
 /// Re-activates the previous application so global keys land there; this
