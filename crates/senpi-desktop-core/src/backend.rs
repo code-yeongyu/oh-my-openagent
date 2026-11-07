@@ -6,14 +6,15 @@
 
 use image::RgbaImage;
 
-use crate::ax::{AxHandle, AxProps};
+use crate::ax::{AxHandle, AxObserved, AxProps};
 use crate::error::{CoreResult, DesktopError, TccPermission};
 use crate::frame::FrameGeometry;
 use crate::keys::KeyName;
 pub use crate::protocol_results::AxInputMethod;
+use crate::report::ReportMode;
 use crate::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector, FrontWindow,
-    ScreenState, Target,
+    KeyPriming, ScreenState, Target,
 };
 use crate::user_input::{UserInputFeed, UserPresses};
 
@@ -122,8 +123,23 @@ pub trait Backend: Send {
 
     fn capabilities(&mut self) -> DesktopCapabilities;
 
+    /// The accessibility element at a global logical point, read just before
+    /// coordinate input (the object-mode `hit`); `None` where the backend
+    /// cannot tell.
+    fn hit_at(&mut self, _x: f64, _y: f64) -> CoreResult<Option<crate::frame::PointHit>> {
+        Ok(None)
+    }
+
     /// Updates the display-only virtual cursor without changing admission.
     fn set_show_cursor(&mut self, _enabled: bool) {}
+
+    /// The session's `macosKeyPriming` option; backends without key priming
+    /// ignore it.
+    fn set_key_priming(&mut self, _mode: KeyPriming) {}
+
+    /// The session's `reportMode`; backends whose input does not depend on it
+    /// ignore it.
+    fn set_report_mode(&mut self, _mode: ReportMode) {}
 
     fn displays(&mut self) -> CoreResult<Vec<DesktopDisplay>>;
     fn windows(&mut self) -> CoreResult<Vec<DesktopWindow>>;
@@ -346,6 +362,13 @@ pub trait AxBackend {
     fn element_at(&mut self, x: f64, y: f64) -> CoreResult<Option<AxHandle>>;
     fn focused_element(&mut self) -> CoreResult<Option<AxHandle>>;
     fn attributes(&mut self, h: &AxHandle) -> CoreResult<Vec<(String, String)>>;
+
+    /// [`Self::props`] for object-mode sessions, with how each field was read
+    /// and whether the element is a secure text field. Backends that cannot
+    /// tell keep this default: no evidence, never secure.
+    fn observe(&mut self, h: &AxHandle) -> CoreResult<AxObserved> {
+        self.props(h).map(AxObserved::plain)
+    }
 
     /// The window that owns `h`, read live from the platform and named as
     /// `windows` (the live [`Backend::windows`]) lists it. Backends that

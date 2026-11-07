@@ -10,6 +10,7 @@ use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::parse_modifiers;
 use senpi_desktop_core::report::ReportMode;
 use senpi_desktop_core::types::{PointerOptions, Target};
+use senpi_desktop_safety::FrameRefusal;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct ParsedPointerOptions {
@@ -42,6 +43,10 @@ impl ParsedPointerOptions {
 struct CapturedFrame {
     id: String,
     geometry: FrameGeometry,
+    /// Set once an action sent with `consume: true` delivered through this
+    /// frame. It lives in the cache entry, so restoring a checkpoint taken
+    /// after the consume keeps it.
+    consumed: bool,
 }
 
 /// Captures recorded by this engine process, across every session and
@@ -98,6 +103,7 @@ impl FrameCache {
         let frame = CapturedFrame {
             id: id.clone(),
             geometry,
+            consumed: false,
         };
         self.latest.insert(target.key().to_owned(), frame);
         id
@@ -106,6 +112,51 @@ impl FrameCache {
     /// The id of the latest capture of the target keyed `target_key`.
     pub(crate) fn latest_id(&self, target_key: &str) -> Option<&str> {
         self.latest.get(target_key).map(|frame| frame.id.as_str())
+    }
+
+    /// The geometry of the target's latest capture.
+    pub(crate) fn latest_geometry(&self, target_key: &str) -> Option<&FrameGeometry> {
+        self.latest.get(target_key).map(|frame| &frame.geometry)
+    }
+
+    /// Why the frame a request names (`frame_id`, else the target's latest)
+    /// cannot take input, in the order the object-mode gate reports it.
+    pub(crate) fn refusal(&self, target_key: &str, frame_id: Option<&str>) -> Option<FrameRefusal> {
+        let latest = self.latest.get(target_key);
+        let Some(requested) = frame_id else {
+            return match latest {
+                None => Some(FrameRefusal::FrameRequired),
+                Some(frame) if frame.consumed => Some(FrameRefusal::Consumed),
+                Some(_) => None,
+            };
+        };
+        let elsewhere = self
+            .latest
+            .iter()
+            .any(|(key, frame)| key != target_key && frame.id == requested);
+        match latest {
+            _ if elsewhere => Some(FrameRefusal::WrongTarget),
+            None => Some(FrameRefusal::NoCapture),
+            Some(frame) if frame.id != requested => Some(FrameRefusal::Superseded),
+            Some(frame) if frame.consumed => Some(FrameRefusal::Consumed),
+            Some(_) => None,
+        }
+    }
+
+    /// Whether the frame a request maps through was consumed: today's
+    /// latest-capture check runs in a `reportMode: "null"` session, plus this.
+    pub(crate) fn consumed(&self, target_key: &str, frame_id: Option<&str>) -> bool {
+        self.latest
+            .get(target_key)
+            .is_some_and(|frame| frame.consumed && frame_id.is_none_or(|requested| requested == frame.id))
+    }
+
+    /// Marks the target's capture `frame_id` consumed; a later capture has
+    /// already replaced it when the ids differ, so nothing is marked.
+    pub(crate) fn consume(&mut self, target_key: &str, frame_id: &str) {
+        if let Some(frame) = self.latest.get_mut(target_key).filter(|frame| frame.id == frame_id) {
+            frame.consumed = true;
+        }
     }
 
     /// The geometry of `target`'s latest capture; a named `frame_id` must be

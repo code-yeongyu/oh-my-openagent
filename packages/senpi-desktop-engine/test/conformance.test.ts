@@ -8,6 +8,8 @@ import { EngineProcess, isMessage, type Message, REPO_ROOT, TEST_TIMEOUT_MS } fr
 // exactly as the Rust twin `crates/senpi-desktop-engine/tests/conformance_replay.rs` does: each step's messages
 // deep-equal the expected ones modulo the declared `variable` JSON pointers (present, any value), in any order
 // within the step, and nothing is left over after the last step. Both report `<case>: steps/<i>/expect/<j>`.
+// An expectation's `bind` names values of the matched message (`{"frame": "/result/frameId"}`); a later `send`
+// string that is exactly `{{frame}}` is replaced by the bound value.
 // `SENPI_DESKTOP_CONFORMANCE_DIR` replays another corpus directory.
 
 const CORPUS =
@@ -17,6 +19,7 @@ const CORPUS =
 interface Expected {
 	readonly message: Message;
 	readonly variable: readonly string[];
+	readonly bind: Readonly<Record<string, string>>;
 }
 
 interface Step {
@@ -50,7 +53,11 @@ function parseCase(file: string): Case {
 		if (!isMessage(step)) throw new Error(`${file}: a step is not an object`);
 		const expected = field(step, "expect", isArray).map((slot): Expected => {
 			if (!isMessage(slot)) throw new Error(`${file}: an expectation is not an object`);
-			return { message: field(slot, "message", isMessage), variable: field(slot, "variable", isStringArray, []) };
+			return {
+				message: field(slot, "message", isMessage),
+				variable: field(slot, "variable", isStringArray, []),
+				bind: field(slot, "bind", isStringRecord, {}),
+			};
 		});
 		return { send: field(step, "send", isMessage), expect: expected };
 	});
@@ -60,6 +67,28 @@ function parseCase(file: string): Case {
 		env: field(parsed, "env", isStringRecord, {}),
 		steps,
 	};
+}
+
+/** The member a JSON pointer names, or `undefined`. */
+function at(message: Message, pointer: string): unknown {
+	let member: unknown = message;
+	for (const raw of pointer.split("/").slice(1)) {
+		const key = raw.replaceAll("~1", "/").replaceAll("~0", "~");
+		if (!(isMessage(member) || isArray(member)) || !(key in member)) return undefined;
+		member = Reflect.get(member, key);
+	}
+	return member;
+}
+
+/** `value` with every string `{{name}}` replaced by the bound `name`. */
+function substituted(value: unknown, bound: ReadonlyMap<string, unknown>): unknown {
+	if (typeof value === "string") {
+		const name = /^\{\{(.+)\}\}$/.exec(value)?.[1];
+		return name !== undefined && bound.has(name) ? bound.get(name) : value;
+	}
+	if (isArray(value)) return value.map((item) => substituted(item, bound));
+	if (isMessage(value)) return Object.fromEntries(Object.entries(value).map(([key, member]) => [key, substituted(member, bound)]));
+	return value;
 }
 
 /** `message` with every `variable` member nulled; `undefined` when one is absent. */
@@ -90,14 +119,22 @@ async function replay(testCase: Case): Promise<string | null> {
 	if (!existsSync(scenario)) return `${testCase.name}: scenario ${testCase.scenario} does not exist`;
 	const engine = new EngineProcess({ SENPI_DESKTOP_BACKEND: `fake:${scenario}`, ...testCase.env });
 	try {
+		const bound = new Map<string, unknown>();
 		for (const [index, step] of testCase.steps.entries()) {
-			engine.send(step.send);
+			const send = substituted(step.send, bound);
+			if (!isMessage(send)) throw new Error(`${testCase.name}: steps/${index}/send is not an object`);
+			engine.send(send);
 			const actual: Message[] = [];
 			while (actual.length < step.expect.length) actual.push(await engine.next());
 			for (const [slot, expected] of step.expect.entries()) {
 				const found = actual.findIndex((message) => matches(expected, message));
 				if (found === -1) {
 					return `${testCase.name}: steps/${index}/expect/${slot}: no message matched ${JSON.stringify(expected.message)}; got ${JSON.stringify(actual)}`;
+				}
+				for (const [name, pointer] of Object.entries(expected.bind)) {
+					const value = at(actual[found] ?? {}, pointer);
+					if (value === undefined) return `${name}: steps/${index}/expect/${slot}: bind ${pointer} is absent`;
+					bound.set(name, value);
 				}
 				actual.splice(found, 1);
 			}

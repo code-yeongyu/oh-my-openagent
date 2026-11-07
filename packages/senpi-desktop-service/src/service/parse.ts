@@ -115,10 +115,19 @@ export function parseAuditEvent(value: unknown): AuditEvent | undefined {
 	return { ...value, action, code: ERROR_CODES.find((name) => name === code) ?? UNKNOWN_AUDIT_VALUE };
 }
 
+export interface ParsedHello {
+	readonly abi: string;
+	readonly protocolVersion: string;
+	/** `[]` when the engine predates the list (absent or `null`). */
+	readonly features: readonly string[];
+}
+
 /** The contract fields of an `engine.hello` result, or `undefined` when it is malformed. */
-export function parseHello(value: unknown): { readonly abi: string; readonly protocolVersion: string } | undefined {
+export function parseHello(value: unknown): ParsedHello | undefined {
 	if (!isRecord(value) || typeof value.abi !== "string" || typeof value.protocolVersion !== "string") return undefined;
-	return { abi: value.abi, protocolVersion: value.protocolVersion };
+	const { features } = value;
+	if (features !== undefined && features !== null && !isStringArray(features)) return undefined;
+	return { abi: value.abi, protocolVersion: value.protocolVersion, features: features ?? [] };
 }
 
 export interface SessionOpened {
@@ -146,6 +155,7 @@ export function parseErrorData(value: unknown): JsonRpcErrorData | null {
 			code,
 			hint: typeof value.hint === "string" ? value.hint : null,
 			...(permission === undefined ? {} : { permission }),
+			...(typeof value.reason === "string" ? { reason: value.reason } : {}),
 		};
 	}
 	const reason = METHOD_REJECTIONS.find((name) => name === value.reason);

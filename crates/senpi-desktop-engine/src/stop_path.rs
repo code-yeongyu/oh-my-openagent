@@ -211,6 +211,13 @@ impl StopPaths {
         self.status()
     }
 
+    /// The stop generation: every stop moves it. A request stamps it when it
+    /// starts, so a reply that arrives under a newer one came back across a
+    /// stop and is quarantined (G15).
+    pub fn generation(&self) -> u64 {
+        self.supervisor.stop_epoch()
+    }
+
     /// `stopPath.resume`.
     ///
     /// # Errors
