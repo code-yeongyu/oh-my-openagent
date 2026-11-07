@@ -6,7 +6,6 @@ mock.module("../../shared/logger", () => ({ log: mockLog }))
 afterAll(() => { mock.restore() })
 
 const { isActiveSessionStatus, isTerminalSessionStatus } = await import("./session-status-classifier")
-mock.restore()
 
 describe("isActiveSessionStatus", () => {
   describe("#given a known active session status", () => {

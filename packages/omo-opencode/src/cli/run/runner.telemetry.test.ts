@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { isolateTelemetryEnv } from "../../../../../test-support/telemetry-env.test-helpers"
 import type { TelemetryCaptureMessage, TelemetryTransportFactory } from "@oh-my-opencode/telemetry-core"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
@@ -69,6 +69,8 @@ mock.module("./timestamp-output", () => ({
 const runnerModulePath = ["./runner?telemetry", "isolation"].join("-")
 const runnerModule: typeof runnerModuleType = await import(runnerModulePath)
 const { run } = runnerModule
+
+afterAll(() => mock.restore())
 
 function enableTelemetryEnv(): void {
   process.env.OMO_DISABLE_POSTHOG = "0"

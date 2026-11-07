@@ -46,7 +46,7 @@ installHermeticHome()
 delete process.env.OPENCODE_SERVER_PASSWORD
 
 let isGlobalMockCleanup = false
-const { restoreModuleMocks } = installModuleMockLifecycle(mock, {
+const { beginTest, restoreModuleMocks } = installModuleMockLifecycle(mock, {
   shouldPreserveActiveMocksOnRestore: () => isGlobalMockCleanup,
   registerGlobalRestore: true,
 })
@@ -68,6 +68,7 @@ function cleanupRulesInjectorStorage(): void {
 }
 
 beforeEach(() => {
+  beginTest()
   resetTestDeadline()
   environmentSnapshot = { ...process.env }
   workingDirectorySnapshot = process.cwd()
