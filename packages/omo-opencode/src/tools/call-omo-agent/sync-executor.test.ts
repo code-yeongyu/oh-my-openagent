@@ -593,6 +593,7 @@ describe("executeSync", () => {
     const spawnReservation = {
       commit: mock(() => 1),
       rollback: mock(() => {}),
+      release: mock(() => {}),
     }
 
     const args = {
@@ -624,6 +625,7 @@ describe("executeSync", () => {
     //#then
     expect(spawnReservation.commit).toHaveBeenCalledTimes(1)
     expect(spawnReservation.rollback).toHaveBeenCalledTimes(0)
+    expect(spawnReservation.release).toHaveBeenCalledTimes(1)
   })
 
   test("strips legacy ZWSP-prefixed agent names from persisted sync prompt body (GH-3259)", async () => {

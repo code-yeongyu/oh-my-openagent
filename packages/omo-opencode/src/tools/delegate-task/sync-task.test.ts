@@ -137,6 +137,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
       descendantCount: 1,
       commit,
       rollback,
+      release: mock(() => {}),
     }))
 
     const deps = {
@@ -569,6 +570,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
 
     const commit = mock(() => 1)
     const rollback = mock(() => {})
+    const release = mock(() => {})
 
     const mockExecutorCtx = {
       manager: {
@@ -577,6 +579,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
           descendantCount: 1,
           commit,
           rollback,
+          release,
         })),
       },
       client: mockClient,
@@ -603,6 +606,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     expect(mockExecutorCtx.manager.reserveSubagentSpawn).toHaveBeenCalledWith("parent-session")
     expect(commit).toHaveBeenCalledTimes(1)
     expect(rollback).toHaveBeenCalledTimes(0)
+    expect(release).toHaveBeenCalledTimes(1)
     expect(removeTaskCalls.length).toBe(1)
     expect(removeTaskCalls[0]).toBe("sync_ses_test")
     expect(deleteCalls.length).toBe(1)
@@ -1137,6 +1141,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
         descendantCount: 5,
         commit,
         rollback,
+        release: mock(() => {}),
       }
     })
 
