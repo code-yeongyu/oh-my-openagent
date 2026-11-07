@@ -6,5 +6,5 @@ const BASENAME_EXTENSIONS: Record<string, string> = {
 };
 
 export function effectiveExtension(filePath: string): string {
-	return BASENAME_EXTENSIONS[basename(filePath)] ?? extname(filePath);
+	return BASENAME_EXTENSIONS[basename(filePath)] ?? extname(filePath).toLowerCase();
 }
