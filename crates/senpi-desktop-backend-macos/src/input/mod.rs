@@ -20,6 +20,7 @@ mod remote;
 pub(crate) use keymap::run_helper as run_keymap_helper;
 mod release;
 mod user_monitor;
+pub(crate) use user_monitor::process_started;
 
 #[cfg(test)]
 mod tests;
@@ -43,6 +44,7 @@ use crate::skylight;
 use held::{Held, KeyRoute};
 
 pub(crate) use self::canary::CANARY_STOP_REASON;
+pub(crate) use self::guard::{set_key_priming, set_key_report_mode};
 pub use self::canary::{CanaryMode, CanaryResult};
 pub(crate) use self::cgevent::{modifier_flags, mouse_event, probe_event};
 pub(crate) use self::keys::{key_code, update_modifier};
