@@ -426,4 +426,53 @@ describe("applyToolConfig", () => {
       )
     })
   })
+
+  describe("#given the prometheus agent", () => {
+    describe("#when applying tool config", () => {
+      it("#then should scope bash to the ulw-plan scaffold script with a deny catch-all", () => {
+        const params = createParams({ agents: ["prometheus"] })
+
+        applyToolConfig(params)
+
+        const agent = params.agentResult["prometheus"] as {
+          permission: Record<string, unknown>
+        }
+        expect(agent.permission.bash).toEqual({
+          "*": "deny",
+          "node *scaffold-plan.mjs*": "allow",
+          "bun *scaffold-plan.mjs*": "allow",
+        })
+        expect(agent.permission.interactive_bash).toBe("deny")
+      })
+
+      it("#then should order the wildcard deny before the scoped allows so opencode keeps the tool visible", () => {
+        const params = createParams({ agents: ["prometheus"] })
+
+        applyToolConfig(params)
+
+        const agent = params.agentResult["prometheus"] as {
+          permission: Record<string, unknown>
+        }
+        const keys = Object.keys(agent.permission.bash as Record<string, string>)
+        expect(keys[0]).toBe("*")
+        expect(keys.slice(1)).toEqual(["node *scaffold-plan.mjs*", "bun *scaffold-plan.mjs*"])
+      })
+
+      it("#then should override a pre-existing agent bash permission with the scoped map", () => {
+        const params = createParams({ agents: ["prometheus"] })
+        const agent = params.agentResult["prometheus"] as {
+          permission: Record<string, unknown>
+        }
+        agent.permission = { bash: "allow" }
+
+        applyToolConfig(params)
+
+        expect(agent.permission.bash).toEqual({
+          "*": "deny",
+          "node *scaffold-plan.mjs*": "allow",
+          "bun *scaffold-plan.mjs*": "allow",
+        })
+      })
+    })
+  })
 })
