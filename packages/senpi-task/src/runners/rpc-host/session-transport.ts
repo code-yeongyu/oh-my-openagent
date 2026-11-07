@@ -46,9 +46,6 @@ export interface HostRetryFallbackProfile {
   readonly fallbackChains: Readonly<Record<string, readonly string[]>>
 }
 
-/** The capability a host advertises when it honors `open_session.retryFallback`. */
-export const RETRY_FALLBACK_PROFILE_CAPABILITY = "retry_fallback_profile"
-
 /** The wire shape of `open_session`, in the engine's names. */
 export interface HostOpenSessionWire {
   readonly spawnedBy?: NewSessionOptions["spawnedBy"]
@@ -76,7 +73,7 @@ export interface HostSessionOpenInput {
   readonly context: Readonly<Record<string, string>>
   readonly retainOnDisconnect: boolean
   readonly autoTitle: boolean
-  /** Sent only to a host advertising `retry_fallback_profile`; an older host opens without it. */
+  /** Every host that opens a child advertises `retry_fallback_profile` (a required capability). */
   readonly retryFallback?: HostRetryFallbackProfile
 }
 

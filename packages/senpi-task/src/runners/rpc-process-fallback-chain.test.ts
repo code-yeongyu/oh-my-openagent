@@ -35,7 +35,6 @@ function spec(taskId: string, overrides: Partial<RpcRunnerSpec> = {}): RpcRunner
 
 interface FakeEngine {
   readonly runner: RpcProcessRunner
-  readonly warnings: string[]
   commands(): Array<{ readonly type: string; readonly retryFallback?: unknown }>
 }
 
@@ -47,12 +46,10 @@ function processRunner(
     readonly fallbackChainDeadlineMs?: number
   } = {},
 ): FakeEngine {
-  const warnings: string[] = []
   const log = join(tempDir(), "commands.jsonl")
   const runner = new RpcProcessRunner({
     // Model admission probes a real catalog (seconds on a cold Windows runner); it is not what these tests cover.
     modelAdmission: async () => {},
-    onWarning: (message) => void warnings.push(message),
     ...(options.fallbackChainDeadlineMs === undefined ? {} : { fallbackChainDeadlineMs: options.fallbackChainDeadlineMs }),
     spawnChild: (descriptor) => {
       const child = spawnFakeChild({
@@ -68,7 +65,6 @@ function processRunner(
   })
   return {
     runner,
-    warnings,
     commands: () =>
       readFileSync(log, "utf8")
         .split("\n")
@@ -80,7 +76,7 @@ function processRunner(
 const CHAINED = { model: "anthropic/claude-opus-5-5", fallbackModels: ["openai/gpt-5.6-sol", "kimi-coding/kimi-k3"] }
 
 describe("a process-runner child's own fallback chain (#9582)", () => {
-  test("#given an engine that takes a fallback chain #when a child with fallback models starts #then its chain is sent before its first prompt and nothing is reported", async () => {
+  test("#given an engine that takes a fallback chain #when a child with fallback models starts #then its chain is sent before its first prompt", async () => {
     // given
     const engine = processRunner(["retry_fallback_command"])
 
@@ -98,7 +94,6 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
         "kimi-coding/kimi-k3": [],
       },
     })
-    expect(engine.warnings).toEqual([])
   })
 
   test("#given a resumed child with fallback models #when it starts #then its chain is set before the old session is switched in", async () => {
@@ -127,77 +122,65 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
     const commands = engine.commands()
     expect(commands.map((command) => command.type)).toEqual(["get_protocol_info", "set_retry_fallback", "prompt"])
     expect(commands[1]?.retryFallback).toEqual({ modelFallback: false, fallbackChains: { "anthropic/claude-opus-5-5": [] } })
-    expect(engine.warnings).toEqual([])
   })
 
-  test("#given an older engine without the command #when two children with fallback models start #then neither is sent a chain and the user is told once", async () => {
+  // A child whose chain the engine does not hold would run on the engine's own fallback settings (the user's
+  // chains, senpi's shipped chains), i.e. on models outside its designated chain. It is never prompted at all:
+  // no prompt means no model, the parent's included, receives a request for it (#12006).
+  test("#given an older engine without the command #when two children start #then neither is prompted and each start fails naming the missing command", async () => {
     // given
     const engine = processRunner([])
 
     // when
-    await engine.runner.start(spec("st_p4", CHAINED))
-    await engine.runner.start(spec("st_p5", CHAINED))
+    const first = engine.runner.start(spec("st_p4", CHAINED))
+    await expect(first).rejects.toMatchObject({ failure: { kind: "child-prompt-failed" } })
+    const second = engine.runner.start(spec("st_p5", { model: "anthropic/claude-opus-5-5" }))
 
     // then
+    await expect(second).rejects.toThrow("retry_fallback_command")
+    expect(engine.commands().map((command) => command.type)).not.toContain("prompt")
     expect(engine.commands().map((command) => command.type)).not.toContain("set_retry_fallback")
-    expect(engine.warnings).toHaveLength(1)
-    expect(engine.warnings[0]).toContain("retry_fallback_command")
   })
 
-  test("#given an engine that refuses the chain #when a child with fallback models starts #then it still gets its first prompt and the user is told why the chain is missing", async () => {
+  test("#given an engine that refuses the chain #when a child with fallback models starts #then it is never prompted and the start fails saying the chain was refused", async () => {
     // given
     const engine = processRunner(["retry_fallback_command"], { retryFallback: "refuse" })
 
     // when
-    const handle = await engine.runner.start(spec("st_p6", CHAINED))
+    const started = engine.runner.start(spec("st_p6", CHAINED))
 
     // then
-    await handle.waitForIdle()
-    expect(handle.lastAssistantText()).toBe("hello")
-    expect(engine.commands().map((command) => command.type)).toEqual(["get_protocol_info", "set_retry_fallback", "prompt"])
-    expect(engine.warnings).toHaveLength(1)
-    expect(engine.warnings[0]).toContain("st_p6")
-    expect(engine.warnings[0]).toContain("refused")
+    await expect(started).rejects.toThrow("refused")
+    expect(engine.commands().map((command) => command.type)).toEqual(["get_protocol_info", "set_retry_fallback"])
   })
 
-  test("#given an engine that never answers the chain #when a child with fallback models starts #then its first prompt goes out after the deadline instead of waiting forever", async () => {
+  test("#given an engine that never answers the chain #when a child with fallback models starts #then after the deadline the start fails and the child is never prompted", async () => {
     // given
     const engine = processRunner(["retry_fallback_command"], { retryFallback: "hang", fallbackChainDeadlineMs: 300 })
 
     // when
-    const handle = await engine.runner.start(spec("st_p7", CHAINED))
+    const started = engine.runner.start(spec("st_p7", CHAINED))
 
     // then
-    await handle.waitForIdle()
-    expect(handle.lastAssistantText()).toBe("hello")
-    // A cold child can answer the capability probe after the deadline too; either way the chain is never
-    // sent once the prompt is out (#9582 flake on windows-latest).
-    const types = engine.commands().map((command) => command.type)
-    expect(types.slice(0, 1)).toEqual(["get_protocol_info"])
-    expect(types.at(-1)).toBe("prompt")
-    expect(engine.warnings).toHaveLength(1)
-    expect(engine.warnings[0]).toContain("st_p7")
-    expect(engine.warnings[0]).toContain("no answer")
+    await expect(started).rejects.toThrow("no answer")
+    expect(engine.commands().map((command) => command.type)).not.toContain("prompt")
   })
 
-  test("#given an engine that answers the capability probe only after the deadline #when a child with fallback models starts #then the chain is never sent after its first prompt", async () => {
+  test("#given an engine that answers the capability probe only after the deadline #when a child with fallback models starts #then the start fails and neither the chain nor a prompt is sent", async () => {
     // given
     const engine = processRunner(["retry_fallback_command"], { protocolInfo: "after-prompt", fallbackChainDeadlineMs: 50 })
 
     // when
-    const handle = await engine.runner.start(spec("st_p9", CHAINED))
+    const started = engine.runner.start(spec("st_p9", CHAINED))
 
     // then
-    await handle.waitForIdle()
-    expect(handle.lastAssistantText()).toBe("hello")
-    // A round trip after the turn: the child reads stdin in order, so a chain written late is logged before it.
-    await handle.getEntries?.()
-    expect(engine.commands().map((command) => command.type)).toEqual(["get_protocol_info", "prompt", "get_entries"])
-    expect(engine.warnings).toHaveLength(1)
-    expect(engine.warnings[0]).toContain("no answer")
+    await expect(started).rejects.toThrow("no answer")
+    const types = engine.commands().map((command) => command.type)
+    expect(types).not.toContain("prompt")
+    expect(types).not.toContain("set_retry_fallback")
   })
 
-  test("#given a child that exits while its chain is being sent #when it starts #then the start fails on the dead child and the warning says it exited, not that the chain was refused", async () => {
+  test("#given a child that exits while its chain is being sent #when it starts #then the start fails on the dead child and says it exited, not that the chain was refused", async () => {
     // given
     const engine = processRunner(["retry_fallback_command"], { retryFallback: "exit" })
 
@@ -206,10 +189,8 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
 
     // then
     await expect(started).rejects.toMatchObject({ failure: { kind: "child-prompt-failed", rejected_while: "exited" } })
-    expect(engine.warnings).toHaveLength(1)
-    expect(engine.warnings[0]).toContain("st_p8")
-    expect(engine.warnings[0]).toContain("exited")
-    expect(engine.warnings[0]).not.toContain("refused")
+    await expect(started).rejects.toThrow("exited")
+    await expect(started).rejects.not.toThrow("refused")
   })
 })
 

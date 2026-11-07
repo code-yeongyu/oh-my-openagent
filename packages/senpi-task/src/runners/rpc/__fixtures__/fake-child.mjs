@@ -4,7 +4,8 @@
 //   FAKE_IGNORE_TERM=1   install a SIGTERM handler that ignores it (proves SIGKILL escalation)
 //   FAKE_EMIT_UI=1       emit an extension_ui_request confirm at startup
 //   FAKE_EMIT_MALFORMED=1 emit one malformed line then a valid event at startup
-//   FAKE_CAPABILITIES=a,b get_protocol_info advertises these capabilities
+//   FAKE_CAPABILITIES=a,b get_protocol_info advertises these capabilities (unset: retry_fallback_command,
+//                        as the pinned engine does; set it empty for an engine without it)
 //   FAKE_COMMAND_LOG=path append every received command as one JSON line
 //   FAKE_RETRY_FALLBACK=refuse|hang|exit answer set_retry_fallback with an error, never answer it, or exit on it
 //   FAKE_PROTOCOL_INFO=after-prompt hold the get_protocol_info answer until a prompt arrives (a probe answered late)
@@ -141,7 +142,7 @@ function handleCommand(cmd) {
       return respond("get_protocol_info", cmd.id, {
         data: {
           protocolVersion: 1,
-          capabilities: (process.env.FAKE_CAPABILITIES ?? "").split(",").filter((entry) => entry.length > 0),
+          capabilities: (process.env.FAKE_CAPABILITIES ?? "retry_fallback_command").split(",").filter((entry) => entry.length > 0),
         },
       })
     case "set_retry_fallback":
