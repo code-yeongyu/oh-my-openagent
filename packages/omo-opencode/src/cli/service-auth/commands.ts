@@ -179,8 +179,13 @@ export function configureServiceAuthCommands(program: Command, open = serviceAcc
   }
 }
 
-export async function runServiceAuthCommand(args: readonly string[]): Promise<void> {
+/** The root program the service-auth bundle parses `omo login|logout|whoami` with. */
+export function serviceAuthProgram(open = serviceAccountsOpen()): Command {
   const program = new Command("omo")
-  configureServiceAuthCommands(program)
-  await program.parseAsync([...args], { from: "user" })
+  configureServiceAuthCommands(program, open)
+  return program
+}
+
+export async function runServiceAuthCommand(args: readonly string[]): Promise<void> {
+  await serviceAuthProgram().parseAsync([...args], { from: "user" })
 }
