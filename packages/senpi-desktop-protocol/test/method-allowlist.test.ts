@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { DESKTOP_METHODS, DISPLAY_METHODS, ELEMENT_METHODS, WINDOW_METHODS } from "../src/index";
 
-/** Every helper a model-facing computer call chain may name; a new one is a deliberate edit here. */
+/** Every helper a model-facing computer call chain may name, generated from the prelude's facade-manifest copy. */
+// <generated:facade> from facade-manifest.json by scripts/generate-assets.ts; edit CHAIN_BINDINGS there, then `bun run generate`
 const CHAIN_METHOD_SNAPSHOT = [
 	"actions",
 	"attributes",
@@ -44,6 +45,7 @@ const CHAIN_METHOD_SNAPSHOT = [
 	"windows",
 	"zoom",
 ];
+// </generated:facade>
 
 /**
  * Engine controls only the host process may reach: stop-path lifecycle, resume, session ownership, and
