@@ -38,6 +38,37 @@ describe("2026-08 reasoning unification migration", () => {
     expect(journal).not.toContain('kept reasoningEffort="xhigh"')
   })
 
+  test("#given a category with a canonical chain and legacy fallbacks #when transformed #then the chain keeps its primary and the fallbacks are appended", () => {
+    // given
+    const input = {
+      categories: {
+        quick: {
+          models: ["primary/model", { model: "second/model", variant: "high" }],
+          fallback_models: ["legacy/fallback"],
+        },
+      },
+    }
+
+    // when
+    const result = transformReasoningUnification(input)
+
+    // then
+    expect(result.document.categories?.quick).toEqual({
+      models: ["primary/model", { model: "second/model", reasoning: "high" }, "legacy/fallback"],
+    })
+  })
+
+  test("#given a category chain with an empty fallback list #when transformed #then the chain survives instead of becoming empty", () => {
+    // given
+    const input = { categories: { deep: { models: [{ model: "a/b", reasoning: "high" }], fallback_models: [] } } }
+
+    // when
+    const result = transformReasoningUnification(input)
+
+    // then
+    expect(result.document.categories?.deep).toEqual({ models: [{ model: "a/b", reasoning: "high" }] })
+  })
+
   test("#given an existing user omo config #when planned and executed #then dry-run, backup, journaled execution, and marker use the existing engine", () => {
     // given
     const root = mkdtempSync(join(tmpdir(), "omo-reasoning-migration-"))
