@@ -3,7 +3,7 @@ import type { ParentWakePromptContext } from "./parent-wake-dedupe"
 
 type ParentWakePromptBody = ParentWakePromptContext & {
   readonly noReply?: boolean
-  readonly parts: { readonly type: "text"; readonly text: string }[]
+  readonly parts: { readonly type: "text"; readonly text: string; readonly synthetic?: boolean }[]
 }
 
 type ParentWakePromptAsyncInput = {
@@ -38,6 +38,12 @@ export type ParentWakeNotifierOptions = {
   readonly acceptedMessageSkewMs: number
   readonly toolCallDeferMaxMs: number
   readonly failureRequeueWindowMs: number
+  /**
+   * Upper bound on how long a wake may stay held by the stale tool-call
+   * deferral before it is force-delivered. `undefined` keeps the historical
+   * unbounded hold.
+   */
+  readonly staleToolBlockMaxHoldMs?: number
   /**
    * If the latest message in the parent session is a `user` message added
    * within this window, the parent-wake injection is deferred. Prevents the
