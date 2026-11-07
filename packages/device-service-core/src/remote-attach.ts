@@ -20,7 +20,8 @@ export type AttachEnd = DetachReason | "closed" | "detached" | "listener_failed"
 export type RemoteAttachEvent =
   | { readonly kind: "pending"; readonly reason: AttachPendingReason }
   | { readonly kind: "snapshot"; readonly snapshot: SnapshotBody }
-  | { readonly kind: "records"; readonly attach_id: number; readonly records: readonly JsonObject[] }
+  /** `seqs`: each record's stream seq, when the service sends them (one per record, increasing within the attach_id). */
+  | { readonly kind: "records"; readonly attach_id: number; readonly records: readonly JsonObject[]; readonly seqs?: readonly number[] }
   | { readonly kind: "detached"; readonly reason: DetachReason }
 
 /** A forwarded record's outcome: its final command state, and the engine's own reply when the host sent one. */
@@ -92,7 +93,7 @@ const toRemote = (event: AttachEvent): RemoteAttachEvent => {
       return { kind: "snapshot", snapshot }
     }
     case "session.records":
-      return { kind: "records", attach_id: event.attach_id, records: event.records }
+      return { kind: "records", attach_id: event.attach_id, records: event.records, ...(event.seqs === undefined ? {} : { seqs: event.seqs }) }
     case "session.attach_pending":
       return { kind: "pending", reason: event.reason }
     case "session.detached":

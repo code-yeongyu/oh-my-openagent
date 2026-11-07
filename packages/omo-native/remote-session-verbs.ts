@@ -3,9 +3,9 @@ import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contra
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
 import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { setModelRemote } from "../omo-senpi/src/components/thread/remote/remote-controls"
+import { followRemote, type RemoteWatchEvent, watchRemote } from "../omo-senpi/src/components/thread/remote/remote-follow"
 import {
   closeRemote,
-  followRemote,
   interruptRemote,
   openRemote,
   promptRemote,
@@ -15,15 +15,25 @@ import {
 } from "../omo-senpi/src/components/thread/remote/remote-ops"
 import type { RemoteCommandDependencies } from "./remote-cli"
 import { REMOTE_EXIT } from "./remote-exit"
-import { sessionVerbLines } from "./remote-render"
+import { sessionVerbLines, watchEndLine, watchLines } from "./remote-render"
 import type { SessionArgs } from "./remote-session-args"
 
-// The surface the agent's thread tools reach other devices through, on this command's own connection. The chain count
-// (K8) starts at its first hop: a person at a terminal is no thread chain.
-const deviceServiceSurface = (service: DeviceService): RemoteThreadSurface => ({
-  sessions: createDeviceServiceSessions({ version: service.serviceVersion, connect: async () => service }),
-  chain: { stamp: record => record },
-})
+// The surface the agent's thread tools reach other devices through, on this command's own connection, and on a new one
+// when it closes (a device-service restart under a `watch`). The chain count (K8) starts at its first hop: a person at
+// a terminal is no thread chain.
+function deviceServiceSurface(service: DeviceService, reconnect: () => Promise<DeviceService>, opened: DeviceService[]): RemoteThreadSurface {
+  let first = true
+  const connect = async (): Promise<DeviceService> => {
+    if (first) {
+      first = false
+      return service
+    }
+    const next = await reconnect()
+    opened.push(next)
+    return next
+  }
+  return { sessions: createDeviceServiceSessions({ version: service.serviceVersion, connect }), chain: { stamp: record => record } }
+}
 
 const CHAIN_START = 1
 
@@ -34,7 +44,16 @@ type Show = (result: ThreadToolResult, label: string) => number
  * reach another device's session the same way. --json prints the op's typed result as is.
  */
 export async function runSession(service: DeviceService, args: SessionArgs, json: boolean, dependencies: RemoteCommandDependencies): Promise<number> {
-  const remote = (dependencies.remote ?? deviceServiceSurface)(service)
+  const reconnected: DeviceService[] = []
+  try {
+    const remote = dependencies.remote?.(service) ?? deviceServiceSurface(service, dependencies.connect, reconnected)
+    return await runOnSurface(remote, args, json, dependencies)
+  } finally {
+    for (const connection of reconnected) connection.close()
+  }
+}
+
+async function runOnSurface(remote: RemoteThreadSurface, args: SessionArgs, json: boolean, dependencies: RemoteCommandDependencies): Promise<number> {
   const show: Show = (result, label) => {
     if (json) dependencies.output(JSON.stringify(result))
     if (result.kind === "error") {
@@ -66,7 +85,34 @@ export async function runSession(service: DeviceService, args: SessionArgs, json
       return show(await closeRemote(remote, row), label)
     case "send":
       return sendTo(remote, row, args, { label, json, show }, dependencies)
+    case "watch":
+      return watchOn(remote, row, { label, json, show }, dependencies)
   }
+}
+
+// Until the session closes or the access ends; a relay drop or a device-service restart is re-watched and resynced.
+// --json: one line per watch event (the SDK's RemoteWatchEvent), then the end.
+async function watchOn(
+  remote: RemoteThreadSurface,
+  row: RemoteSessionRow,
+  { label, json, show }: { readonly label: string; readonly json: boolean; readonly show: Show },
+  dependencies: RemoteCommandDependencies,
+): Promise<number> {
+  // Events can arrive before the watch resolves with where it starts; they print after that first line.
+  const early: RemoteWatchEvent[] = []
+  let started = false
+  const print = (event: RemoteWatchEvent) => {
+    if (json) dependencies.output(JSON.stringify(event))
+    else for (const line of watchLines(label, row.device, event)) dependencies.output(line)
+  }
+  const watched = await watchRemote(remote, row, event => (started ? print(event) : early.push(event)))
+  if ("kind" in watched) return show(watched, label)
+  dependencies.output(json ? JSON.stringify({ kind: "watching", state: watched.initial }) : `Watching ${label} (${watched.initial.status}).`)
+  started = true
+  for (const event of early.splice(0)) print(event)
+  const end = await watched.ended
+  dependencies.output(json ? JSON.stringify({ kind: "ended", end }) : watchEndLine(label, end))
+  return end === "stopped" || end === "session_closed" || end === "session_replaced" ? REMOTE_EXIT.ok : REMOTE_EXIT.failed
 }
 
 async function openOn(

@@ -42,6 +42,14 @@ export const eventFields = (
   optional: readonly string[] = [],
 ): Fields => exactly(v, ["type", "kind", ...names], optional, "event");
 export const attachOf = (m: Fields): string => localId(m["attach"], "attach");
+// omo addition over the vendored client (relay daemon omo#12719, `seqs` on session.records): one stream seq per record,
+// strictly increasing, so a client drops a record it already applied.
+const recordSeqs = (value: unknown, count: number): readonly number[] => {
+  if (!Array.isArray(value) || value.length !== count) return fail("seqs");
+  const seqs = value.map((seq) => uint(seq, 1, Number.MAX_SAFE_INTEGER, "seq"));
+  if (seqs.some((seq, index) => index > 0 && seq <= (seqs[index - 1] ?? 0))) return fail("seqs");
+  return seqs;
+};
 export const queryOf = (m: Fields): string => localId(m["query_id"], "query_id");
 const blobIdOf = (m: Fields): string => localId(m["id"], "blob id");
 
@@ -82,16 +90,18 @@ export const STREAM_EVENT_VALIDATORS: EventValidators<StreamKind> = {
     };
   },
   "session.records": (v) => {
-    const m = eventFields(v, ["attach", "attach_id", "records"]);
+    const m = eventFields(v, ["attach", "attach_id", "records"], ["seqs"]);
     const records = m["records"];
     if (!Array.isArray(records) || records.length === 0) return fail("records");
     const attach_id = attachId(m["attach_id"]);
+    const seqs = m["seqs"] === undefined ? undefined : recordSeqs(m["seqs"], records.length);
     return {
       type: "event",
       kind: "session.records",
       attach: attachOf(m),
       attach_id,
       records: records.map((r) => jsonObject(r, "record")),
+      ...(seqs === undefined ? {} : { seqs }),
     };
   },
   "session.blob_open": (v) => {

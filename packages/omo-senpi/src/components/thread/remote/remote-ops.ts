@@ -109,6 +109,9 @@ export function replyData(response: JsonObject): JsonObject {
   return typeof data === "object" && data !== null && !Array.isArray(data) ? data as JsonObject : {}
 }
 
+/** The `monitor` rpc target that wakes the caller on this session's status changes and turn ends. */
+export const monitorTarget = (device: string, sessionId: string): string => `${device}/${sessionId}`
+
 const nonEmpty = (value: unknown): string | undefined => (typeof value === "string" && value.length > 0 ? value : undefined)
 
 // The engine session id the open_session reply names: its durable session id, else the relay session id. It is in no
@@ -160,6 +163,7 @@ export async function openRemote(remote: RemoteThreadSurface, request: RemoteOpe
     kind: "ok",
     thread: { thread_id: threadId, name: title, status: "live", cwd: request.kind === "open" ? request.row.project : (request.cwd ?? ""), created_at: now, updated_at: now, device, link: threadLink(threadId, title) },
     deduplicated: false,
+    monitor_target: monitorTarget(device, threadId),
   }
 }
 
@@ -203,7 +207,7 @@ export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessi
     const steered = await remote.sessions.sessionCommand(row.device, row.session_id, steer)
     if (steered.kind === "refused" && (steered.reason === "turn_conflict" || steered.reason === "not_steerable")) return fail(REFUSAL_CODES[steered.reason].code, `A steer to ${row.session_id} was refused: ${steered.reason}.`, REFUSAL_CODES[steered.reason].next, { device: row.device })
     if (steered.kind !== "ok") return outcomeFailure(steered, row.device)
-    return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "steered", turn_id: current }, deduplicated: false, device: row.device }
+    return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "steered", turn_id: current }, deduplicated: false, device: row.device, monitor_target: monitorTarget(row.device, row.session_id) }
   }
   // One round trip (#12320): no get_state goes first. The engine itself starts a followUp prompt on an idle session and
   // queues it behind a running turn, deciding both in one step (senpi agent-session `_prompt`, 2026.11.2-3 and later),
@@ -213,15 +217,15 @@ export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessi
   if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
   const reply = replyData(sent.response)
   const turnId = reply["turnId"]
-  if (reply["disposition"] === "started" && typeof turnId === "string" && turnId.length > 0) return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "started", turn_id: turnId }, deduplicated: false, device: row.device }
+  if (reply["disposition"] === "started" && typeof turnId === "string" && turnId.length > 0) return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "started", turn_id: turnId }, deduplicated: false, device: row.device, monitor_target: monitorTarget(row.device, row.session_id) }
   const after = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
   const settled = after.kind === "ok" ? replyData(after.response) : {}
   // An engine whose prompt reply names no turn (senpi through 2026.11.5-1) reports the running turn in get_state.
   const current = settled["currentTurnId"]
-  if (reply["disposition"] === "started" && typeof current === "string" && current.length > 0) return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "started", turn_id: current }, deduplicated: false, device: row.device }
+  if (reply["disposition"] === "started" && typeof current === "string" && current.length > 0) return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "started", turn_id: current }, deduplicated: false, device: row.device, monitor_target: monitorTarget(row.device, row.session_id) }
   const pending = settled["pendingMessageCount"]
   if (typeof pending !== "number" || !Number.isInteger(pending) || pending < 1) return fail("idempotency_uncertain", `Device ${row.device} accepted the message but did not report where it waits.`, "Read the thread before deciding whether to send again.", { device: row.device })
-  return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "queued", queue_position: pending }, deduplicated: false, device: row.device }
+  return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "queued", queue_position: pending }, deduplicated: false, device: row.device, monitor_target: monitorTarget(row.device, row.session_id) }
 }
 
 /** The turn running in another device's session (`get_state.currentTurnId`), for a caller that steers whatever runs. */
@@ -232,43 +236,6 @@ export async function runningTurnRemote(remote: RemoteThreadSurface, row: Remote
   if (state.kind !== "ok") return outcomeFailure(state, row.device)
   const current = nonEmpty(replyData(state.response)["currentTurnId"])
   return current === undefined ? { kind: "ok" } : { kind: "ok", turn_id: current }
-}
-
-export type RemoteFollow = {
-  /** "settled" once the session's run settles (`agent_settled`), "session_closed" when its close cut the run short, else the reason its attach ended first. */
-  readonly settled: Promise<string>
-  readonly stop: () => void
-}
-
-const isRecord = (value: unknown): value is JsonObject => typeof value === "object" && value !== null && !Array.isArray(value)
-
-/**
- * Follows another device's session from now on: each assistant text delta (`message_update` / `text_delta`) goes to
- * `onText` in the order the session wrote it, until its run settles, with a line break between the text of separate
- * messages or content blocks. Start it before the send it follows.
- */
-export async function followRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, onText: (text: string) => void): Promise<RemoteFollow | Failure> {
-  const offline = await deviceOnline(remote, row.device)
-  if (offline !== undefined) return offline
-  let settle!: (end: string) => void
-  const settled = new Promise<string>((resolve) => { settle = resolve })
-  let last: { readonly index: unknown; readonly endsLine: boolean } | undefined
-  let newMessage = false
-  const watched = await remote.sessions.watch(row.device, row.session_id, (record) => {
-    // senpi settles a turn the session's close cut short with reason session_closed: that turn never finished.
-    if (record["type"] === "agent_settled") return settle(record["reason"] === "session_closed" ? "session_closed" : "settled")
-    if (record["type"] === "message_start" || record["type"] === "message_end") newMessage = true
-    const event = record["assistantMessageEvent"]
-    if (record["type"] !== "message_update" || !isRecord(event) || event["type"] !== "text_delta" || typeof event["delta"] !== "string" || event["delta"] === "") return
-    const delta = event["delta"]
-    if (last !== undefined && !last.endsLine && (newMessage || event["contentIndex"] !== last.index)) onText("\n")
-    newMessage = false
-    last = { index: event["contentIndex"], endsLine: delta.endsWith("\n") }
-    onText(delta)
-  })
-  if (watched.kind !== "ok") return outcomeFailure(watched, row.device)
-  void watched.watch.ended.then(settle)
-  return { settled, stop: watched.watch.stop }
 }
 
 /** The local engine's own `interrupt` record, so an idle session answers interrupted:false exactly as on this device. */

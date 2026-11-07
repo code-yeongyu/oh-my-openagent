@@ -50,7 +50,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
   test("#given a thread on b #when thread_create names it by id #then b opens that session file; no device is passed or needed", async () => {
     const a = account()
     const { run } = surface(a.remote)
-    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread: { thread_id: "dur-on-b", device: "b" } })
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread: { thread_id: "dur-on-b", device: "b" }, monitor_target: "b/dur-on-b" })
     expect(a.sent).toEqual([{ via: "endpoint", device: "b", rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_ROW.path } }])
   })
 

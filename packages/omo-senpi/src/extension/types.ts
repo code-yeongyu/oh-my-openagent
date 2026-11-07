@@ -38,6 +38,26 @@ export interface ExtensionRpcRequestContext {
   readonly admit: <T>(dispatch: () => T) => T
 }
 
+/** senpi's `monitor` rpc remote-target seam (oh-my-openagent#12719): a `<device>/<session>` or `<device>/*` target. */
+export type RpcRemoteTarget = { readonly device: string; readonly session: string }
+export type RpcRemoteRow = { readonly sessionId: string; readonly durableSessionId?: string; readonly status: string }
+export type RpcRemoteState = {
+  readonly rows: readonly RpcRemoteRow[]
+  readonly settledTurns?: readonly { readonly sessionId: string; readonly turnId: string }[]
+  readonly cursor?: string
+}
+export type RpcRemoteHandlers = {
+  readonly record: (record: Readonly<Record<string, unknown>>) => void
+  readonly resynced: (state: RpcRemoteState) => void
+  readonly lost: (reason: string) => void
+  readonly ended: (reason: string) => void
+  readonly cursor?: (cursor: string) => void
+}
+export type RpcRemoteOpenOptions = { readonly events?: readonly string[]; readonly resumeFrom?: string }
+export type RpcRemoteSource = {
+  open(target: RpcRemoteTarget, options: RpcRemoteOpenOptions, handlers: RpcRemoteHandlers): Promise<{ readonly initial: RpcRemoteState; readonly stop: () => void }>
+}
+
 export interface SenpiExtensionAPI {
   readonly sessionKind?: "interactive" | "worker"
   /**
@@ -98,6 +118,8 @@ export interface SenpiExtensionAPI {
   /** Feature-detected until the pinned Senpi runtime exports read classifiers. */
   registerReadClassifier?(classifier: ReadClassifier): () => void
   registerRemovedToolHint?(name: string, hint: string): void
+  /** Serves `monitor` rpc remote targets; feature-detected until the pinned senpi ships the seam. */
+  registerRpcRemoteSource?(source: RpcRemoteSource): (() => void) | void
   /** Feature-detected: senpi runtimes before 2026.10.7 have no eval-handle capability slot. */
   provideEvalHandleHost?(host: EvalHandleHost): void
   registerMessageRenderer?(customType: string, renderer: unknown): void
