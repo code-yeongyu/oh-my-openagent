@@ -10,7 +10,7 @@ import {
 import { getServerBasicAuthHeader } from "../../shared"
 import { getAllSessions, getMainSessions, getSessionInfo, readSessionMessages, readSessionTodos, sessionExists, setStorageClient } from "./storage"
 import {
-  filterSessionsByDate,
+  filterSessionsByUpdatedDate,
   formatSessionInfo,
   formatSessionList,
   formatSessionMessages,
@@ -69,7 +69,7 @@ type SessionManagerToolDeps = {
   readSessionTodos: typeof readSessionTodos
   sessionExists: typeof sessionExists
   setStorageClient: typeof setStorageClient
-  filterSessionsByDate: typeof filterSessionsByDate
+  filterSessionsByUpdatedDate: typeof filterSessionsByUpdatedDate
   formatSessionInfo: typeof formatSessionInfo
   formatSessionList: typeof formatSessionList
   formatSessionMessages: typeof formatSessionMessages
@@ -85,7 +85,7 @@ const defaultSessionManagerToolDeps: SessionManagerToolDeps = {
   readSessionTodos,
   sessionExists,
   setStorageClient,
-  filterSessionsByDate,
+  filterSessionsByUpdatedDate,
   formatSessionInfo,
   formatSessionList,
   formatSessionMessages,
@@ -117,11 +117,12 @@ export function createSessionManagerTools(
         const directory = args.project_path ?? ctx.directory
         const limit = !args.from_date && !args.to_date && args.limit && args.limit > 0 ? args.limit : undefined
         let sessions = await resolvedDeps.getMainSessions({ directory, limit })
-        let sessionIDs = sessions.map((s) => s.id)
 
         if (args.from_date || args.to_date) {
-          sessionIDs = await resolvedDeps.filterSessionsByDate(sessionIDs, args.from_date, args.to_date, _context.abort)
+          sessions = resolvedDeps.filterSessionsByUpdatedDate(sessions, args.from_date, args.to_date)
         }
+
+        let sessionIDs = sessions.map((s) => s.id)
 
         if (args.limit && args.limit > 0) {
           sessionIDs = sessionIDs.slice(0, args.limit)

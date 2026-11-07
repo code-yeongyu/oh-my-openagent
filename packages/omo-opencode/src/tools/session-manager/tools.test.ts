@@ -36,7 +36,7 @@ function createTestTools() {
         time: { created: Date.now(), updated: Date.now() },
       },
     ],
-    filterSessionsByDate: async (sessionIDs) => sessionIDs,
+    filterSessionsByUpdatedDate: (sessions) => sessions,
     formatSessionList: async (sessionIDs) => `sessions:${sessionIDs.join(",")}`,
     sessionExists: async (sessionID) => sessionID === "ses_test123",
     readSessionMessages: async (sessionID): Promise<SessionMessage[]> =>
@@ -127,19 +127,23 @@ describe("session-manager tools", () => {
     expect(typeof result).toBe("string")
   })
 
-  test("#given newer sessions outside the to_date window #when session_list runs with to_date and limit #then the limit applies after the date filter", async () => {
+  test("#given newer sessions outside the to_date window #when session_list runs with to_date and limit #then the limit applies after the date filter and no session body is read", async () => {
     //#given
-    const newestFirst: SessionMetadata[] = ["ses_new_1", "ses_new_2", "ses_old_1", "ses_old_2"].map((id, index) => ({
-      id,
-      projectID: "project-1",
-      directory: projectDir,
-      time: { created: 4 - index, updated: 4 - index },
-    }))
+    const newestFirst: SessionMetadata[] = [
+      { id: "ses_new_1", projectID: "project-1", directory: projectDir, time: { created: 1, updated: Date.parse("2025-12-15T00:00:00Z") } },
+      { id: "ses_new_2", projectID: "project-1", directory: projectDir, time: { created: 1, updated: Date.parse("2025-12-10T00:00:00Z") } },
+      { id: "ses_old_1", projectID: "project-1", directory: projectDir, time: { created: 1, updated: Date.parse("2025-11-20T00:00:00Z") } },
+      { id: "ses_old_2", projectID: "project-1", directory: projectDir, time: { created: 1, updated: Date.parse("2025-11-10T00:00:00Z") } },
+    ]
+    let infoCalls = 0
     const { session_list } = createSessionManagerTools(mockCtx, {
       setStorageClient: () => {},
-      getMainSessions: async ({ limit }) => newestFirst.slice(0, limit),
-      filterSessionsByDate: async (sessionIDs) => sessionIDs.filter((id) => id.startsWith("ses_old_")),
+      getMainSessions: async () => newestFirst,
       formatSessionList: async (sessionIDs) => `sessions:${sessionIDs.join(",")}`,
+      getSessionInfo: async () => {
+        infoCalls++
+        return null
+      },
     })
 
     //#when
@@ -147,6 +151,7 @@ describe("session-manager tools", () => {
 
     //#then
     expect(result).toBe("sessions:ses_old_1,ses_old_2")
+    expect(infoCalls).toBe(0)
   })
 
   test("session_read handles non-existent session", async () => {
