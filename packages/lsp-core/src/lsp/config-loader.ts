@@ -41,11 +41,80 @@ function getUserConfigPath(): string {
 function loadJsonFile(path: string): ConfigJson | null {
 	if (!existsSync(path)) return null;
 	try {
-		const parsed: unknown = JSON.parse(readFileSync(path, "utf-8"));
+		const text = readFileSync(path, "utf-8");
+		const parsed: unknown = path.endsWith(".jsonc") ? JSON.parse(stripJsonc(text)) : JSON.parse(text);
 		return isConfigJson(parsed) ? parsed : null;
 	} catch {
 		return null;
 	}
+}
+
+// Minimal JSONC reader for config files: strips line/block comments and
+// trailing commas outside string literals. `.json` files keep strict
+// JSON.parse above; only `.jsonc` paths go through this pass, so a
+// malformed file still yields null instead of a partial config.
+function stripJsonc(text: string): string {
+	let out = "";
+	let i = 0;
+	let inString = false;
+	while (i < text.length) {
+		const char = text[i] ?? "";
+		if (inString) {
+			out += char;
+			if (char === "\\") {
+				out += text[i + 1] ?? "";
+				i += 2;
+				continue;
+			}
+			if (char === '"') inString = false;
+			i += 1;
+			continue;
+		}
+		if (char === '"') {
+			inString = true;
+			out += char;
+			i += 1;
+			continue;
+		}
+		if (char === "/" && text[i + 1] === "/") {
+			while (i < text.length && text[i] !== "\n") i += 1;
+			continue;
+		}
+		if (char === "/" && text[i + 1] === "*") {
+			i += 2;
+			while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i += 1;
+			i += 2;
+			continue;
+		}
+		if (char === ",") {
+			let j = i + 1;
+			while (j < text.length) {
+				const next = text[j] ?? "";
+				if (next === " " || next === "\t" || next === "\n" || next === "\r") {
+					j += 1;
+					continue;
+				}
+				if (next === "/" && text[j + 1] === "/") {
+					while (j < text.length && text[j] !== "\n") j += 1;
+					continue;
+				}
+				if (next === "/" && text[j + 1] === "*") {
+					j += 2;
+					while (j < text.length && !(text[j] === "*" && text[j + 1] === "/")) j += 1;
+					j += 2;
+					continue;
+				}
+				break;
+			}
+			if (text[j] === "}" || text[j] === "]") {
+				i += 1;
+				continue;
+			}
+		}
+		out += char;
+		i += 1;
+	}
+	return out;
 }
 
 export function loadAllConfigs(): Map<ConfigSource, ConfigJson> {
