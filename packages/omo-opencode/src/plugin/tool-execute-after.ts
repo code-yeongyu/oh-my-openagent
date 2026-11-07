@@ -114,6 +114,7 @@ export function createToolExecuteAfterHandler(args: {
       await hooks.hashlineReadEnhancer?.["tool.execute.after"]?.(hookInput, output)
       await hooks.webfetchRedirectGuard?.["tool.execute.after"]?.(hookInput, output)
       await hooks.fsyncSkipWarning?.["tool.execute.after"]?.(hookInput, output)
+      await hooks.bashFileReadGuard?.["tool.execute.after"]?.(hookInput, output)
       await hooks.jsonErrorRecovery?.["tool.execute.after"]?.(hookInput, output)
       await hooks.planFormatValidator?.["tool.execute.after"]?.(hookInput, output)
     }

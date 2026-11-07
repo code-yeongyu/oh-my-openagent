@@ -63,7 +63,7 @@ Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated
 | `rulesInjector` | tool.execute.before | Conditional rules injection (AGENTS.md, .rules) |
 | `tasksTodowriteDisabler` | tool.execute.before | Disable TodoWrite when Sisyphus task system active |
 | `writeExistingFileGuard` | tool.execute.before | Require Read before Write/Edit on existing files |
-| `bashFileReadGuard` | tool.execute.before | Guard bash commands that read files (cat/head/tail) |
+| `bashFileReadGuard` | tool.execute.after | Guard bash commands that read files (cat/head/tail) |
 | `readImageResizer` | tool.execute.after | Resize large images for context efficiency |
 | `todoDescriptionOverride` | tool.execute.before | Override todo item descriptions |
 | `webfetchRedirectGuard` | tool.execute.before | Guard webfetch redirect behavior |
