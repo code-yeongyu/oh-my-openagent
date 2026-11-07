@@ -149,7 +149,9 @@ describe("redactUrl", () => {
       const hostile = `-----BEGIN ${"A".repeat(100_000)}-----${"B".repeat(100_000)}`
       const started = performance.now()
       const redacted = redactUrl(hostile)
-      expect(performance.now() - started).toBeLessThan(500)
+      // The bound guards against backtracking, not speed (#12693): the linear scan took 586 ms on a loaded macOS
+      // runner (about 10 ms idle), while a quadratic label matcher over these 200k chars takes about 8 s.
+      expect(performance.now() - started).toBeLessThan(2_000)
       expect(redacted).toBe(hostile)
 
       const pem = "-----BEGIN PRIVATE KEY-----secret-----END PRIVATE KEY-----"
