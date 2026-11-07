@@ -106,7 +106,7 @@ impl Worker {
                 mode,
                 &HoldControl { check: &check, wait: &wait },
             ))?;
-            worker.judge(&target, &frame, true)?;
+            worker.judge(&target, &frame)?;
             Ok(Response::Unit)
         })
     }
