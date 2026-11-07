@@ -144,7 +144,8 @@ export async function openRemote(remote: RemoteThreadSurface, request: RemoteOpe
   else {
     const engineId = openedEngineId(outcome.response)
     if (engineId === undefined) return fail("internal_error", `Device ${device} opened a session but did not name it.`, "Call thread_list with all_scope to find the new thread.", { device })
-    const located = await remote.sessions.locate(device, engineId)
+    // A host that names the session's listing key beside the engine's reply (`session_key`) spares the locate.
+    const located = await remote.sessions.locate(device, engineId, nonEmpty(outcome.response["session_key"]))
     if (located.kind !== "ok") return fail("unsupported", `Device ${device} created a session but its id there could not be found (${located.reason}).`, "Call thread_list with all_scope to find the new thread, or update omo on that device.", { device, reason: located.reason })
     threadId = located.sessionId
   }
