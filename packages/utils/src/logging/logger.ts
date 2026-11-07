@@ -1,10 +1,11 @@
 import * as fs from "fs"
 import * as os from "os"
 import * as path from "path"
+import { clearTimeout as clearNativeTimeout, setTimeout as setNativeTimeout } from "node:timers"
 
-// Buffered logging owns its scheduler independently of a caller's virtual clock.
-const scheduleTimeout = globalThis.setTimeout
-const cancelTimeout = globalThis.clearTimeout
+// Buffered logging owns its scheduler independently of a caller's virtual clock, so it schedules
+// through node:timers instead of globalThis: a fake clock installed over globalThis (or a logger
+// module first imported while one is installed) can never capture the flush timer.
 
 export const DEFAULT_MAX_LOG_FILE_SIZE_BYTES = 50 * 1024 * 1024
 export const DEFAULT_MAX_LOG_FILE_BACKUPS = 2
@@ -89,7 +90,7 @@ export function createLogger(options: LoggerOptions): BoundLogger {
 
   function scheduleFlush(): void {
     if (flushTimer) return
-    flushTimer = scheduleTimeout(() => {
+    flushTimer = setNativeTimeout(() => {
       flushTimer = null
       flush()
     }, flushIntervalMs)
@@ -117,7 +118,7 @@ export function createLogger(options: LoggerOptions): BoundLogger {
   function _setLoggerForTesting(overrides: LoggerTestOverrides): void {
     buffer = []
     if (flushTimer) {
-      cancelTimeout(flushTimer)
+      clearNativeTimeout(flushTimer)
       flushTimer = null
     }
     if (overrides.filePath !== undefined) logFile = overrides.filePath
@@ -131,14 +132,14 @@ export function createLogger(options: LoggerOptions): BoundLogger {
     maxLogFileBackups = maxLogFileBackupsDefault
     buffer = []
     if (flushTimer) {
-      cancelTimeout(flushTimer)
+      clearNativeTimeout(flushTimer)
       flushTimer = null
     }
   }
 
   function _flushForTesting(): void {
     if (flushTimer) {
-      cancelTimeout(flushTimer)
+      clearNativeTimeout(flushTimer)
       flushTimer = null
     }
     flush()
