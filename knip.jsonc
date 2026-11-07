@@ -3,14 +3,18 @@
   // Exported types are part of our contracts even before they have consumers.
   "rules": { "types": "off", "nsTypes": "off" },
   // pre-existing at origin dev 4686e425b5: executables root scripts and tests run that no package declares (OS and platform tools)
-  "ignoreBinaries": ["file", "icacls", "notepad.exe", "tasklist"],
+  // busctl, hyprctl: Linux session tools run by script/qa/desktop/hyprland.ts
+  // kdotool: KWin window tool run by script/qa/desktop/kwin.ts
+  "ignoreBinaries": ["busctl", "file", "gdbus", "gnome-extensions", "hyprctl", "icacls", "kdotool", "notepad.exe", "tasklist"],
   // Findings marked "pre-existing at origin dev 4686e425b5" were already present when this check was added. Each ignore is
   // scoped to one file (and its issue types) or one dependency, so new dead code anywhere else still fails the check.
   // Remove an entry when its finding is fixed. Root-workspace file ignores live at the top level (knip reads the root
   // workspace's ignoreIssues only there).
   // Third-party projects vendored as git submodules; the build materializes them, they are not this repository's code.
   // The bunshin-ts build output, vendored with only its dependency imports rewritten (pinned by packages/omo-senpi/vendor/PIN.json) is upstream code too.
-  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**"],
+  // The GNOME Shell extension entry runs inside gnome-shell's GJS (gi:// and resource:// imports, a default-exported
+  // Extension class the shell loads); its pure window-rects.js stays checked through window-rects.test.mjs.
+  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**", "crates/senpi-desktop-gnome-extension/extension.js"],
   // Unused exports already present at origin dev 4686e425b5, named per symbol. knip has no per-symbol ignore and a file-wide
   // ignoreIssues "exports" entry would also hide a new unused export in that file, so script/knip-preexisting-exports.ts
   // (shared byte for byte with omo-relay-daemon, sha256-pinned by script/knip-coverage.test.ts) drops exactly these names, and
@@ -1437,6 +1441,11 @@
       "packages/senpi-desktop-prelude/test/python-setup.ts": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/senpi-desktop-prelude/vitest.config.ts": ["default"],
+      // computer-use v2 row 15: the SDK's public delivery-mode constants (consumed by name from rows 24/26 and by SDK users)
+      "packages/senpi-desktop-sdk/src/index.ts": ["BACKGROUND", "FOREGROUND", "SEMANTIC"],
+      "packages/senpi-desktop-sdk/src/types.ts": ["BACKGROUND", "FOREGROUND", "SEMANTIC"],
+      // same shape as the sibling desktop packages: vitest config default export
+      "packages/senpi-desktop-sdk/vitest.config.ts": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) STANDARD_RPC_ERRORS
       "packages/senpi-desktop-protocol/src/index.ts": ["STANDARD_RPC_ERRORS"],
       // pre-existing at origin dev 4686e425b5: unused export(s) STANDARD_RPC_ERRORS
@@ -2137,6 +2146,10 @@
         "script/oxlint/biome-ports.ts",
         "script/patch-node-require-shim.ts",
         "script/print-release-notes.ts",
+        "script/qa/desktop/hyprland.ts",
+        "script/qa/desktop/kwin.ts",
+        // run by path as the live GNOME Wayland window-input QA (docs/guide/computer-use.md)
+        "script/qa/desktop/gnome.ts",
         "script/qa/desktop/linux.ts",
         "script/qa/desktop/linux/expect-sabotage.ts",
         "script/qa/desktop/windows.ts",
@@ -2295,6 +2308,9 @@
         "test-support/held-test-root.d.mts",
       ],
       "ignoreDependencies": [
+        // computer-use v2 row 15: the package-registration audit requires the workspace as a root devDependency; its first
+        // consumers by name land in rows 24 (spawn transport) and 26 (kernel globals), which remove this entry
+        "@oh-my-opencode/senpi-desktop-sdk",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
         "@clack/prompts",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
@@ -2917,6 +2933,8 @@
         "scripts/qa/fused-equivalence-e2e.mjs",
         // run by path as the bunshin-ts eval SDK's live QA driver (scripts/qa/AGENTS.md)
         "scripts/qa/bunshin-ts-eval-sdk-qa.mjs",
+        // run by path as computer-use v2 row 9's live macOS capture-consent and SkyLight measurement
+        "scripts/qa/capture-consent-probe-macos.mjs",
         "src/components/claim-receipt/runtime.ts",
         "src/components/computer-use/runtime.ts",
         "src/components/device-service/runtime.ts",
@@ -3388,7 +3406,8 @@
         "@oh-my-opencode/prompts-core",
       ],
       // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
-      "ignoreBinaries": ["icacls", "pgrep", "taskkill.exe", "vmmap"],
+      // plutil, screencapture: macOS tools run by scripts/qa/capture-consent-probe-macos.mjs
+      "ignoreBinaries": ["icacls", "pgrep", "plutil", "screencapture", "taskkill.exe", "vmmap"],
       "ignoreIssues": {
         // pre-existing at origin dev 4686e425b5: imports of undeclared packages @code-yeongyu/comment-checker
         "scripts/qa/drive.mjs": ["unlisted"],
@@ -3503,6 +3522,21 @@
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/prelude.js",
+      ],
+    },
+    "packages/senpi-desktop-sdk": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), the manifest generator run by path from
+      // package.json scripts, and the test, config and helper files plugins report with exports unchecked: listing them
+      // export-checks them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "scripts/generate-facade-manifest.ts",
+        "test/fake-port.ts",
+        "vitest.config.ts",
       ],
     },
     "packages/senpi-desktop-service": {

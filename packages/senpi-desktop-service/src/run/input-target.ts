@@ -1,6 +1,6 @@
 import type { EngineMethod } from "@oh-my-opencode/senpi-desktop-protocol";
 import { ComputerRunError, type FacadeMethod, facadeMethod, type MethodTiers, type RunScope } from "./context";
-import type { CaptureRegion } from "./engine-results";
+import { type CaptureRegion, expectResult, isExecResult } from "./engine-results";
 import { callHold } from "./hold-call";
 import { captureScreenshot, type ScreenshotOptions, type ScreenshotResult } from "./screenshot";
 
@@ -51,10 +51,10 @@ function chordKeys(chord: string | readonly string[]): readonly string[] {
 		.filter((key) => key.length > 0);
 }
 
-/** Facade `method` sending one engine request whose result carries nothing. */
-export function send(method: FacadeMethod, name: string, engineMethod: EngineMethod, params: object): Promise<void> {
+/** Facade `method` sending one exec request; its reply must be `null` or an `ActionReport`. */
+function send(method: FacadeMethod, name: string, engineMethod: EngineMethod, params: object): Promise<void> {
 	return method(name, async ({ call }) => {
-		await call(engineMethod, params);
+		expectResult(engineMethod, await call(engineMethod, params), isExecResult);
 	});
 }
 

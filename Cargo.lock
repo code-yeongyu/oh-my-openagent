@@ -2514,6 +2514,8 @@ dependencies = [
  "senpi-desktop-backend-atspi",
  "senpi-desktop-core",
  "senpi-desktop-safety",
+ "serde",
+ "serde_json",
  "tempfile",
  "tokio",
  "xkeysym",
@@ -2610,6 +2612,7 @@ version = "0.0.0"
 dependencies = [
  "flume",
  "image",
+ "libc",
  "parking_lot",
  "senpi-desktop-backend-fake",
  "senpi-desktop-backend-macos",
@@ -2625,6 +2628,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "ulid",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
