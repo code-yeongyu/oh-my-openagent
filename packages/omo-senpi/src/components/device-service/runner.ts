@@ -7,6 +7,9 @@ const REPORT_MAX_BYTES = 64 * 1024
 // The worker's own steps are each bounded: two download rounds of up to 120 s, then up to 120 s of install-service, plus
 // a 5 s account read and the local handshakes. Ten minutes outlasts all of them with room; past it the child is stopped.
 const BOOTSTRAP_DEADLINE_MS = 10 * 60_000
+// Grace after the deadline's SIGTERM before escalating to SIGKILL: the account read turns SIGTERM into an abort while
+// its `run()` is active, so a cooperative child needs a moment to stop; a child that ignores SIGTERM is killed anyway.
+const SIGKILL_GRACE_MS = 5_000
 
 /** Schedules `expire` and returns its cancel; the default is an unref'd timer at the deadline. */
 export type DeadlineScheduler = (expire: () => void) => () => void
@@ -64,9 +67,15 @@ export function runBootstrapWorker(
   return new Promise((resolve, reject) => {
     const child = spawn(command ?? omoBin, args, { stdio: ["ignore", "pipe", "ignore"], windowsHide: true })
     let timedOut = false
+    let exited = false
+    let killTimer: ReturnType<typeof setTimeout> | undefined
     const cancel = (options.schedule ?? atDeadline)(() => {
       timedOut = true
       child.kill()
+      killTimer = setTimeout(() => {
+        if (!exited) child.kill("SIGKILL")
+      }, SIGKILL_GRACE_MS)
+      killTimer.unref()
     })
     const chunks: Buffer[] = []
     let bytes = 0
@@ -77,10 +86,13 @@ export function runBootstrapWorker(
     })
     child.once("error", error => {
       cancel()
+      if (killTimer !== undefined) clearTimeout(killTimer)
       reject(error)
     })
     child.once("close", () => {
+      exited = true
       cancel()
+      if (killTimer !== undefined) clearTimeout(killTimer)
       if (timedOut) reject(new BootstrapWorkerTimeout())
       else resolve(parseBootstrapReport(Buffer.concat(chunks).toString("utf8")))
     })

@@ -57,6 +57,26 @@ describe("the omo remote bootstrap worker", () => {
     await expect(runBootstrapWorker(omoBin, { schedule: atOnce })).rejects.toBeInstanceOf(BootstrapWorkerTimeout)
   })
 
+  // A child that ignores SIGTERM (the account read turns it into an abort while `run()` is active)
+  // must still be stopped: the deadline escalates to SIGKILL after a short grace period. Without
+  // the escalation the promise never settles, so this test fails by timeout on the pre-fix code.
+  // The deadline fires 500 ms after spawn so the child has registered its SIGTERM handler first:
+  // a signal sent during startup kills the child before the handler exists and the test would
+  // pass without proving anything. The 15 s budget covers the 500 ms delay plus the 5 s SIGKILL
+  // grace; Bun resets the default timeout to 5 s for later files of a multi-file run.
+  test(
+    "a worker that ignores SIGTERM is killed at its deadline and rejects as timed out",
+    async () => {
+      const omoBin = launcherScript("process.on('SIGTERM', () => {})\nsetInterval(() => {}, 1000)\n")
+      const afterStart = (expire: () => void) => {
+        const timer = setTimeout(expire, 500)
+        return () => clearTimeout(timer)
+      }
+      await expect(runBootstrapWorker(omoBin, { schedule: afterStart })).rejects.toBeInstanceOf(BootstrapWorkerTimeout)
+    },
+    15_000,
+  )
+
   // Bun words a missing executable differently per OS (POSIX "ENOENT", Windows "Executable not found in $PATH").
   test("an omo binary that cannot start rejects with the spawn error", async () => {
     const failure = await runBootstrapWorker(join(scratch(), "missing-omo")).then(
