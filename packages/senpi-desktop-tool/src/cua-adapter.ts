@@ -64,7 +64,7 @@ export function createComputerActionsTool(deps: ComputerToolDeps) {
 			const code = actionsScript(actionsOf(params), bounds);
 			let result: ComputerToolResult;
 			try {
-				result = await runComputer(deps, context, { code, readOnly, timeoutSeconds }, signal);
+				result = await runComputer(deps, context, { code, readOnly, timeoutSeconds, origin: "host" }, signal);
 			} catch (error) {
 				if (!(error instanceof Error)) throw error;
 				if (error instanceof DesktopLaunchContextError) {
