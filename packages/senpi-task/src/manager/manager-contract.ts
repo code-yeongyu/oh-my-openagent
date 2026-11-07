@@ -23,6 +23,8 @@ export type TaskManager = {
   settleLaunchesForShutdown?(boundMs: number): Promise<void>
   startOwned(spec: ManagerStartSpec, owner: DagTaskOwner): Promise<OwnedStartResult>
   findOwnedTask(owner: DagTaskOwnerKey): TaskRecord | undefined
+  /** Every record the owner key ever claimed, oldest first; findOwnedTask is the last of them. */
+  findOwnedTasks(owner: DagTaskOwnerKey): readonly TaskRecord[]
   continueTask(taskIdOrName: string, prompt: string, deliverAs?: "steer" | "followUp"): Promise<ContinueResult>
   sendToTask(input: SendInput): Promise<SendOutcome>
   interruptTask(idOrName: string): Promise<InterruptOutcome>

@@ -57,6 +57,7 @@ export function owner(context: SchedulerContext, nodeId: DagNodeId): DagTaskOwne
     kind: "dag",
     runId: record.runId,
     nodeId,
+    execAttempt: execAttempt ?? 0,
     // execAttempt (NOT the display attempt) scopes the owner identity: a retried or
     // amend-invalidated node claims a new one, while an untouched node keeps the legacy value.
     fingerprint: dagFingerprint(ownerFingerprintInput({

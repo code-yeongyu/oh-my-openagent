@@ -154,6 +154,11 @@ class LongRunningTaskManager implements TaskManager {
     )?.record
   }
 
+  findOwnedTasks(owner: Pick<DagTaskOwner, "kind" | "runId" | "nodeId">): readonly TaskRecord[] {
+    return [...this.#tasks.values()].map(({ record }) => record).filter((record) =>
+      record.owner?.kind === owner.kind && record.owner.runId === owner.runId && record.owner.nodeId === owner.nodeId)
+  }
+
   get(taskId: string): TaskRecord | undefined {
     return this.#tasks.get(taskId)?.record
   }
