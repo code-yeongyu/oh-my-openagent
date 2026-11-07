@@ -1,8 +1,8 @@
 import { homedir } from "node:os"
-import { withCredentialLock } from "./credential-lock"
+import { heldCredentialLease, withCredentialLock } from "./credential-lock"
 import { signInHint } from "./accounts-gate"
 import type { CredentialOwner } from "./credential-owner"
-import { CredentialIdentityChanged, credentialId, type CredentialStore, CredentialStoreError, InvalidCredentialState } from "./keystore"
+import { CredentialIdentityChanged, credentialId, type CredentialStore, CredentialStoreError, InvalidCredentialState, type LockedStore } from "./keystore"
 import {
   ApiRefusal, type ChooseDevice, type Credentials, deviceListSchema, jsonRequest, parseReply,
   refusalGuidance, refusalMessage, requestApi, RequestFailure, serviceOrigin, SignInError, tokenSchema,
@@ -52,13 +52,16 @@ export function createSession(options: {
   const now = options.now ?? Date.now
   const { store, signal, beforeKeysDiscarded } = options
   const markerPath = signedOutMarkerPath(options.home ?? homedir(), credentialId(api))
-  async function locked<T>(action: () => Promise<T>): Promise<T> {
+  // Any approval dialog happens in prepare(), before the lock: no access dialog is ever open while it is held. Inside,
+  // every section first converges an interrupted migration (#11262 design 3.2, 3.4); a nested section reuses the outer one.
+  async function locked<T>(action: (view: LockedStore<Credentials> | null) => Promise<T>): Promise<T> {
     signal?.throwIfAborted()
+    if (heldCredentialLease(api, options.home) === undefined) await store.prepare?.()
     return withCredentialLock(
       api,
-      async () => {
+      async lease => {
         signal?.throwIfAborted()
-        return action()
+        return action((await store.underLock?.(lease)) ?? null)
       },
       options.home,
     )
@@ -106,9 +109,11 @@ export function createSession(options: {
     }
   }
   async function snapshot(): Promise<Credentials | null> {
-    return locked(async () => {
+    return locked(async view => {
       const current = await store.read()
-      return current === null ? null : refreshed(current)
+      if (current === null) return null
+      await view?.settle()
+      return refreshed(current)
     })
   }
   return {
@@ -127,7 +132,8 @@ export function createSession(options: {
           stored = null
         }
         if (stored !== null && stored.device.id !== value.device.id) await beforeKeysDiscarded(discardedOf(stored, "replaced"))
-        await store.write(value)
+        // An item nobody here can read reads as missing above; row 8b moving it aside is still a discard, reported first.
+        await store.write(value, "fresh-sign-in", () => beforeKeysDiscarded({ kind: "unreadable" }))
         await clearSignedOutMarker(markerPath)
       })
     },
@@ -197,11 +203,14 @@ export function createSession(options: {
       // Account-bound callers compare their captured keys, account and generation through `expect`.
       if (snapshot !== null && snapshot.refreshState !== "uncertain" && snapshot.refreshAttempt === undefined
           && Date.parse(snapshot.accessTokenExpiresAt) > now() + 30_000
-          && (expect === undefined || expect(snapshot))) return snapshot.accessToken
-      return locked(async () => {
+          && (expect === undefined || expect(snapshot))
+          // A value the keychain helper does not own yet takes the lock once, so its section can migrate it (3.3).
+          && !(await store.migrationPending?.())) return snapshot.accessToken
+      return locked(async view => {
         const current = await store.readAuthoritative()
         if (current === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
         if (expect !== undefined && !expect(current)) throw new CredentialIdentityChanged()
+        await view?.settle()
         return (await refreshed(current)).accessToken
       })
     },
