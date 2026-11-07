@@ -161,6 +161,96 @@ fn a_window_click_on_a_point_a_higher_window_covers_sends_nothing() {
     assert!(eis.wait_for(|log| log.connected).events.is_empty());
 }
 
+/// The terminal alone on the active workspace, with GNOME Shell's own state
+/// set by `shell` and its input-taking chrome by `chrome`.
+macro_rules! shell_reply {
+    ($shell:literal, $chrome:literal) => {
+        concat!(
+            r#"{"shell":"#,
+            $shell,
+            r#","chrome":"#,
+            $chrome,
+            r#","windows":[{"id":"17","pid":1201,"title":"~ : bash","x":10,"y":48,"width":1260,"height":1012,"shown":true,"desktopWindow":false}]}"#
+        )
+    };
+}
+
+const OVERVIEW_OPEN: &str = shell_reply!(r#"{"overview":true,"modal":false,"locked":false}"#, "[]");
+const MODAL_DIALOG: &str = shell_reply!(r#"{"overview":false,"modal":true,"locked":false}"#, "[]");
+const LOCKED: &str = shell_reply!(r#"{"overview":false,"modal":true,"locked":true}"#, "[]");
+/// A notification banner over the terminal's top-left corner.
+const BANNER: &str = shell_reply!(
+    r#"{"overview":false,"modal":false,"locked":false}"#,
+    r#"[{"x":0,"y":40,"width":400,"height":100}]"#
+);
+
+#[test]
+fn with_the_overview_a_shell_modal_or_the_lock_screen_up_a_window_click_sends_nothing() {
+    let _env = env_lock();
+    for (state, reply) in [
+        ("overview", OVERVIEW_OPEN),
+        ("modal dialog", MODAL_DIALOG),
+        ("lock screen", LOCKED),
+    ] {
+        // Given: GNOME Shell's own UI is over every window
+        let shell = FakeGnome::serve(reply);
+        let Detection::Extension(gnome) = extension(&shell) else {
+            panic!("gnome extension not detected");
+        };
+        let dir = tempfile::tempdir().expect("socket dir");
+        let (eis, _libei) = fake_eis(&dir);
+        let mut backend = backend_without_services();
+
+        // When: a click inside the terminal
+        let clicked =
+            backend.gnome_pointer(&gnome, &window(Some(1201), "~ : bash"), click(100.0, 20.0));
+
+        // Then: refused as unresolved, and libei sent nothing
+        let error = clicked.expect_err(state);
+        assert_eq!(error.code, ErrorCode::BackgroundUnavailable, "{state}");
+        assert!(
+            error.message.contains("gnome-window-unresolved"),
+            "{state}: {}",
+            error.message
+        );
+        // gnome_pointer returned without connecting libei, so this snapshot is final
+        let log = eis.wait_for(|_| true);
+        assert!(
+            !log.connected && log.events.is_empty(),
+            "{state}: libei was never connected and nothing was sent"
+        );
+    }
+}
+
+#[test]
+fn a_click_under_a_shell_banner_sends_nothing_and_one_beside_it_lands() {
+    // Given: a notification banner over the terminal's top-left corner
+    let _env = env_lock();
+    let shell = FakeGnome::serve(BANNER);
+    let Detection::Extension(gnome) = extension(&shell) else {
+        panic!("gnome extension not detected");
+    };
+    let terminal = window(Some(1201), "~ : bash");
+    let dir = tempfile::tempdir().expect("socket dir");
+    let (eis, _libei) = fake_eis(&dir);
+    let mut backend = backend_without_services();
+
+    // When: one click under the banner, then one beside it
+    let covered = backend.gnome_pointer(&gnome, &terminal, click(100.0, 20.0));
+    let beside = backend.gnome_pointer(&gnome, &terminal, click(600.0, 500.0));
+
+    // Then: the banner refuses the first with nothing sent; the second lands
+    let error = covered.expect_err("a point under shell chrome must be refused");
+    assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
+    assert_eq!(beside, Ok(()));
+    let log = eis.wait_for(|log| log.bursts >= 1);
+    assert_eq!(
+        log.events.first(),
+        Some(&Recorded::Motion { x: 610.0, y: 548.0 }),
+        "the first event libei saw is the beside click"
+    );
+}
+
 #[test]
 fn keyboard_input_at_a_window_stays_refused_on_gnome() {
     let _env = env_lock();

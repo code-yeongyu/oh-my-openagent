@@ -5,7 +5,7 @@
 //
 //   bun script/qa/desktop/gnome.ts --json [--engine BIN]
 //
-// Facts come from `gnome-extensions` and `gdbus` (the window list read straight from the shell), never from
+// Facts come from `gnome-extensions`, `busctl` and `gdbus` (the window list read straight from the shell), never from
 // the engine's own report. GNOME Wayland exposes no cursor position to clients, so the landing point is not
 // observed here; the fake-EIS unit suite proves the libei coordinates. One JSON line per scenario
 // `{scenario, pass, facts, observer: {before, after}}`, then the engine teardown receipt; exit 0 iff every
@@ -68,26 +68,43 @@ function remoteDesktopPortal(): boolean {
 	);
 }
 
-type ShellWindow = { id: string; pid: number; title: string; x: number; y: number; width: number; height: number; shown: boolean; desktopWindow: boolean };
+type Rect = { x: number; y: number; width: number; height: number };
+type ShellWindow = Rect & { id: string; pid: number; title: string; shown: boolean; desktopWindow: boolean };
+type ShellReply = { shell: { overview: boolean; modal: boolean; locked: boolean }; chrome: Rect[]; windows: ShellWindow[] };
 
 /** `gdbus call` prints `('<json>',)`; the JSON is the extension's own reply. */
-function shellWindows(): ShellWindow[] | null {
+function shellReply(): ShellReply | null {
 	const call = run("gdbus", ["call", "--session", "--dest", "org.gnome.Shell", "--object-path", RECTS_PATH, "--method", `${RECTS_IFACE}.List`]);
 	if (call.status !== 0) return null;
 	const quoted = /^\('(.*)',\)\s*$/s.exec(call.stdout.trim())?.[1];
 	if (quoted === undefined) return null;
-	return JSON.parse(quoted.replace(/\\(.)/gs, "$1")) as ShellWindow[];
+	return JSON.parse(quoted.replace(/\\(.)/gs, "$1")) as ShellReply;
 }
 
-/** The first engine window that exactly one shown shell window matches by pid and exact title. */
-function pickWindow(windows: Json, shell: ShellWindow[]): { window: JsonObject; shellWindow: ShellWindow } | null {
-	if (!Array.isArray(windows)) return null;
+function contains(rect: Rect, x: number, y: number): boolean {
+	return x >= rect.x && y >= rect.y && x < rect.x + rect.width && y < rect.y + rect.height;
+}
+
+/**
+ * The first engine window that exactly one shown shell window matches by pid and exact title, and whose frame
+ * centre (where the move lands) no higher shown window and no shell chrome covers; none while the shell's own
+ * UI is over every window.
+ */
+function pickWindow(windows: Json, reply: ShellReply): { window: JsonObject; shellWindow: ShellWindow } | null {
+	if (!Array.isArray(windows) || reply.shell.overview || reply.shell.modal || reply.shell.locked) return null;
+	const shell = reply.windows;
+	const uncovered = (target: ShellWindow): boolean => {
+		const x = target.x + Math.floor(target.width / 2);
+		const y = target.y + Math.floor(target.height / 2);
+		const above = shell.slice(shell.indexOf(target) + 1).filter((entry) => entry.shown && !entry.desktopWindow);
+		return ![...above, ...reply.chrome].some((rect) => contains(rect, x, y));
+	};
 	for (const candidate of windows) {
 		const window = asObject(candidate);
 		const title = String(window.title ?? "");
 		if (title === "" || typeof window.pid !== "number") continue;
 		const matches = shell.filter((entry) => entry.shown && !entry.desktopWindow && entry.pid === window.pid && entry.title === title);
-		if (matches.length === 1 && matches[0] !== undefined) return { window, shellWindow: matches[0] };
+		if (matches.length === 1 && matches[0] !== undefined && uncovered(matches[0])) return { window, shellWindow: matches[0] };
 	}
 	return null;
 }
@@ -97,7 +114,7 @@ async function windowMove(engine: Engine): Promise<Result> {
 	const libeiSocket = process.env.LIBEI_SOCKET !== undefined;
 	const portal = remoteDesktopPortal();
 	const state = extensionState();
-	const shell = shellWindows();
+	const shell = shellReply();
 	const windowInput = caps.windowInput === undefined ? null : asObject(caps.windowInput);
 	const inputPath = libeiSocket || portal;
 	const before = { libeiSocket, remoteDesktopPortal: portal, extensionState: state, shellAnswers: shell !== null };
@@ -116,7 +133,11 @@ async function windowMove(engine: Engine): Promise<Result> {
 	if (picked === null) {
 		return result(
 			"gnome-window-move",
-			{ window_input_matches_input_paths: windowInput?.available === inputPath, a_matched_window_exists: false },
+			{
+				window_input_matches_input_paths: windowInput?.available === inputPath,
+				shell_ui_closed: !shell.shell.overview && !shell.shell.modal && !shell.shell.locked,
+				an_uncovered_matched_window_exists: false,
+			},
 			{ capabilities: caps },
 			{ before, after: {} },
 		);
@@ -142,6 +163,9 @@ if (spawnSync("gnome-extensions", ["--help"], { encoding: "utf8" }).error !== un
 }
 if (spawnSync("gdbus", ["--help"], { encoding: "utf8" }).error !== undefined) {
 	usage("gdbus is not installed: it is this script's independent observer");
+}
+if (spawnSync("busctl", ["--help"], { encoding: "utf8" }).error !== undefined) {
+	usage("busctl is not installed: it is this script's independent observer");
 }
 
 const engineBinary = (() => {

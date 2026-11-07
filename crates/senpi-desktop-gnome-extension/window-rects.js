@@ -31,3 +31,36 @@ export function describeWindows(windows, workspace, isDesktopWindow) {
 		};
 	});
 }
+
+/**
+ * GNOME Shell's own state that puts shell UI over every window: the Activities
+ * overview (and its app grid), a shell modal (polkit or end-session dialog, an open
+ * panel menu) and the lock screen. Window input is refused while any is true.
+ */
+export function describeShell({ overviewVisible, modalCount, locked }) {
+	return { overview: Boolean(overviewVisible), modal: modalCount > 0, locked: Boolean(locked) };
+}
+
+/**
+ * Shell chrome that takes pointer input above windows (the top bar, a showing
+ * notification banner), from Main.layoutManager's tracked actors: only mapped actors
+ * in the shell's input region, as stage rects. Window input under one is refused.
+ */
+export function describeChrome(tracked) {
+	return tracked.flatMap(({ actor, affectsInputRegion }) => {
+		if (!affectsInputRegion || !actor.is_mapped()) return [];
+		const [x, y] = actor.get_transformed_position();
+		const [width, height] = actor.get_transformed_size();
+		const rect = { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) };
+		return rect.width > 0 && rect.height > 0 ? [rect] : [];
+	});
+}
+
+/** The whole `List` reply: shell state, input-taking chrome, then the window stack. */
+export function describeReply({ windows, workspace, isDesktopWindow, shell, tracked }) {
+	return {
+		shell: describeShell(shell),
+		chrome: describeChrome(tracked),
+		windows: describeWindows(windows, workspace, isDesktopWindow),
+	};
+}

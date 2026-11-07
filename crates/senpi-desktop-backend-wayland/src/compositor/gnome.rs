@@ -2,10 +2,13 @@
 //! GNOME Shell extension (`crates/senpi-desktop-gnome-extension`), probed
 //! only when `XDG_CURRENT_DESKTOP` names GNOME. Mutter offers clients no way
 //! to list other windows, so the extension serves one method, `List`, on
-//! GNOME Shell's own bus name (`org.gnome.Shell`): the window stack, bottom
-//! first, as JSON. It changes nothing: input never goes through the shell,
-//! pointer input stays on libei, and this module only says where a target
-//! window is and which shown windows are stacked above it.
+//! GNOME Shell's own bus name (`org.gnome.Shell`), as JSON: the shell's own
+//! state (overview, modal, lock screen), the shell chrome that takes pointer
+//! input above windows, and the window stack, bottom first. GNOME Shell's UI is
+//! Clutter actors rather than Mutter windows, so without the first two a click
+//! "at a window" could land on the overview, a dialog or a banner. It changes
+//! nothing: input never goes through the shell, pointer input stays on libei,
+//! and this module only says where a target window is and what covers it.
 
 use std::ffi::OsString;
 use std::future::Future;
@@ -52,22 +55,70 @@ pub struct GnomeWindow {
 
 impl GnomeWindow {
     fn rect(&self) -> Option<WindowRect> {
-        let width = u32::try_from(self.width).ok().filter(|width| *width > 0)?;
-        let height = u32::try_from(self.height)
-            .ok()
-            .filter(|height| *height > 0)?;
-        Some(WindowRect {
-            x: self.x,
-            y: self.y,
-            width,
-            height,
-        })
+        nonempty_rect(self.x, self.y, self.width, self.height)
     }
 }
 
+fn nonempty_rect(x: i32, y: i32, width: i32, height: i32) -> Option<WindowRect> {
+    let width = u32::try_from(width).ok().filter(|width| *width > 0)?;
+    let height = u32::try_from(height).ok().filter(|height| *height > 0)?;
+    Some(WindowRect {
+        x,
+        y,
+        width,
+        height,
+    })
+}
+
+/// GNOME Shell's own UI that sits over every window.
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+pub struct ShellState {
+    /// The Activities overview (and its app grid) is open.
+    pub overview: bool,
+    /// A shell modal holds input: a polkit or end-session dialog, a panel menu.
+    pub modal: bool,
+    /// The lock screen is up.
+    pub locked: bool,
+}
+
+impl ShellState {
+    /// Why no window can take input now, if shell UI is over all of them.
+    fn over_every_window(self) -> Option<&'static str> {
+        if self.locked {
+            Some("the GNOME lock screen is over every window")
+        } else if self.overview {
+            Some("the GNOME Activities overview is open over every window")
+        } else if self.modal {
+            Some("a GNOME Shell modal dialog or menu holds the input")
+        } else {
+            None
+        }
+    }
+}
+
+/// Shell chrome that takes pointer input above windows (the top bar, a
+/// notification banner), in stage coordinates.
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+pub struct ChromeRect {
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
+/// The extension's whole `List` reply.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct GnomeStack {
+    pub shell: ShellState,
+    pub chrome: Vec<ChromeRect>,
+    /// Mutter's stacking order, bottom first.
+    pub windows: Vec<GnomeWindow>,
+}
+
 /// # Errors
-/// `Internal` when the reply is not the extension's JSON array.
-pub fn parse_windows(json: &str) -> CoreResult<Vec<GnomeWindow>> {
+/// `Internal` when the reply is not the extension's JSON object, including
+/// the bare window array of an older extension that reports no shell state.
+pub fn parse_stack(json: &str) -> CoreResult<GnomeStack> {
     serde_json::from_str(json)
         .map_err(|err| DesktopError::internal(format!("gnome windows reply: {err}")))
 }
@@ -80,13 +131,18 @@ fn refuse(window: &DesktopWindow, why: &str) -> DesktopError {
 }
 
 /// Matches the AT-SPI `window` to one GNOME window (same pid, and same
-/// title when the pid owns several) and lists the shown windows stacked
-/// above it.
+/// title when the pid owns several) and lists what covers it: the shown
+/// windows stacked above it and the shell chrome that takes input.
 ///
 /// # Errors
-/// `BackgroundUnavailable` when the window has no pid, matches no GNOME
+/// `BackgroundUnavailable` when the overview, a shell modal or the lock
+/// screen is over every window, or the window has no pid, matches no GNOME
 /// window or more than one, or is minimized, hidden or on another workspace.
-pub fn place(windows: &[GnomeWindow], window: &DesktopWindow) -> CoreResult<Placement> {
+pub fn place(stack: &GnomeStack, window: &DesktopWindow) -> CoreResult<Placement> {
+    if let Some(why) = stack.shell.over_every_window() {
+        return Err(refuse(window, why));
+    }
+    let windows = stack.windows.as_slice();
     let pid = window.pid.ok_or_else(|| {
         refuse(
             window,
@@ -106,7 +162,7 @@ pub fn place(windows: &[GnomeWindow], window: &DesktopWindow) -> CoreResult<Plac
     } else {
         owned
     };
-    let (stack, target) = match candidates.as_slice() {
+    let (index, target) = match candidates.as_slice() {
         [one] => *one,
         [] => return Err(refuse(window, "no GNOME window matches its pid and title")),
         _ => {
@@ -125,11 +181,15 @@ pub fn place(windows: &[GnomeWindow], window: &DesktopWindow) -> CoreResult<Plac
     let rect = target
         .rect()
         .ok_or_else(|| refuse(window, "GNOME reports an empty window size"))?;
-    let covering = windows[stack + 1..]
-        .iter()
-        .filter(|above| above.shown && !above.desktop_window)
-        .filter_map(GnomeWindow::rect)
-        .collect();
+    let covering =
+        windows[index + 1..]
+            .iter()
+            .filter(|above| above.shown && !above.desktop_window)
+            .filter_map(GnomeWindow::rect)
+            .chain(stack.chrome.iter().filter_map(|chrome| {
+                nonempty_rect(chrome.x, chrome.y, chrome.width, chrome.height)
+            }))
+            .collect();
     Ok(Placement {
         address: target.id.clone(),
         rect,
@@ -235,20 +295,21 @@ impl Gnome {
         Ok(json)
     }
 
-    /// Every GNOME window in stacking order, read fresh from the shell.
+    /// The shell state, its chrome and every GNOME window in stacking order,
+    /// read fresh from the shell.
     ///
     /// # Errors
     /// `Internal` when the extension fails or does not answer in time.
-    pub fn windows(&self) -> CoreResult<Vec<GnomeWindow>> {
-        parse_windows(&portal_runtime()?.block_on(self.list())?)
+    pub fn stack(&self) -> CoreResult<GnomeStack> {
+        parse_stack(&portal_runtime()?.block_on(self.list())?)
     }
 
     /// Where `window` is now, read fresh from the compositor.
     ///
     /// # Errors
-    /// See [`place`] and [`Gnome::windows`].
+    /// See [`place`] and [`Gnome::stack`].
     pub fn placement(&self, window: &DesktopWindow) -> CoreResult<Placement> {
-        place(&self.windows()?, window)
+        place(&self.stack()?, window)
     }
 }
 
@@ -260,8 +321,9 @@ pub(crate) mod tests {
     use crate::compositor::hyprland::tests::window;
     use crate::test_support::fake_gnome::FakeGnome;
 
-    /// What the extension reports on GNOME 47 (stacking order, bottom first):
-    /// the desktop icons, a terminal and an editor side by side, the editor's
+    /// What the extension reports on GNOME 47: the shell idle with its top bar
+    /// taking input, and the windows (stacking order, bottom first): the
+    /// desktop icons, a terminal and an editor side by side, the editor's
     /// Save As dialog over it, a minimized window, a window on another
     /// workspace, and an always-on-top picture-in-picture window. The
     /// extension's own test renders this file from fake Mutter windows.
@@ -269,14 +331,33 @@ pub(crate) mod tests {
 
     fn placed(pid: Option<u32>, title: &str) -> CoreResult<Placement> {
         place(
-            &parse_windows(WINDOWS).expect("windows parse"),
+            &parse_stack(WINDOWS).expect("windows parse"),
             &window(pid, title),
         )
     }
 
     #[test]
-    fn the_extension_reply_parses_geometry_identity_and_visibility() {
-        let windows = parse_windows(WINDOWS).expect("windows parse");
+    fn the_extension_reply_parses_shell_state_chrome_geometry_identity_and_visibility() {
+        let stack = parse_stack(WINDOWS).expect("windows parse");
+        let windows = &stack.windows;
+
+        assert_eq!(
+            stack.shell,
+            ShellState {
+                overview: false,
+                modal: false,
+                locked: false
+            }
+        );
+        assert_eq!(
+            stack.chrome,
+            vec![ChromeRect {
+                x: 0,
+                y: 0,
+                width: 2560,
+                height: 32
+            }]
+        );
 
         assert_eq!(windows.len(), 7);
         assert_eq!(windows[2].id, "21");
@@ -297,13 +378,16 @@ pub(crate) mod tests {
 
     #[test]
     fn a_malformed_reply_is_an_internal_error() {
-        let error = parse_windows("{\"windows\":[]}").expect_err("an object is not the reply");
-        assert_eq!(error.code, ErrorCode::Internal);
-        assert!(
-            error.message.starts_with("gnome windows reply"),
-            "{}",
-            error.message
-        );
+        // an object without shell state, and an older extension's bare array
+        for reply in ["{\"windows\":[]}", "[]"] {
+            let error = parse_stack(reply).expect_err("not the reply object");
+            assert_eq!(error.code, ErrorCode::Internal, "{reply}");
+            assert!(
+                error.message.starts_with("gnome windows reply"),
+                "{}",
+                error.message
+            );
+        }
     }
 
     #[test]
@@ -322,9 +406,9 @@ pub(crate) mod tests {
         );
         assert_eq!(
             placement.covering.len(),
-            3,
-            "the editor, its dialog and the picture-in-picture window; not the \
-             minimized window, the other workspace or the desktop"
+            4,
+            "the editor, its dialog, the picture-in-picture window and the top \
+             bar; not the minimized window, the other workspace or the desktop"
         );
     }
 
@@ -336,14 +420,69 @@ pub(crate) mod tests {
         assert_eq!(dialog.address, "22");
         assert_eq!(
             dialog.covering.len(),
-            1,
-            "only the picture-in-picture window"
+            2,
+            "only the picture-in-picture window and the top bar"
         );
         assert_eq!(
             editor.covering.len(),
-            2,
-            "the dialog and the picture-in-picture window"
+            3,
+            "the dialog, the picture-in-picture window and the top bar"
         );
+    }
+
+    #[test]
+    fn shell_ui_over_every_window_refuses_even_a_shown_unambiguous_window() {
+        let mut stack = parse_stack(WINDOWS).expect("windows parse");
+        for (state, shell) in [
+            (
+                "overview",
+                ShellState {
+                    overview: true,
+                    modal: false,
+                    locked: false,
+                },
+            ),
+            (
+                "modal",
+                ShellState {
+                    overview: false,
+                    modal: true,
+                    locked: false,
+                },
+            ),
+            (
+                "locked",
+                ShellState {
+                    overview: false,
+                    modal: true,
+                    locked: true,
+                },
+            ),
+        ] {
+            stack.shell = shell;
+            let error = place(&stack, &window(Some(1201), "~ : bash")).expect_err(state);
+            assert_eq!(error.code, ErrorCode::BackgroundUnavailable, "{state}");
+            assert!(
+                error.message.contains("gnome-window-unresolved"),
+                "{state}: {}",
+                error.message
+            );
+        }
+    }
+
+    #[test]
+    fn empty_chrome_rects_cover_nothing() {
+        let mut stack = parse_stack(WINDOWS).expect("windows parse");
+        stack.chrome.push(ChromeRect {
+            x: 5,
+            y: 5,
+            width: 0,
+            height: 40,
+        });
+
+        let placement = place(&stack, &window(Some(1605), "Picture-in-Picture")).expect("placed");
+
+        assert_eq!(placement.covering.len(), 1, "only the top bar");
     }
 
     #[test]
@@ -419,7 +558,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn a_reply_that_is_not_the_window_array_is_refused() {
+    fn a_reply_that_is_not_the_reply_object_is_refused() {
         let shell = FakeGnome::serve("not json");
         let Detection::Extension(gnome) = detect_with(Some("GNOME".into()), || shell.connect())
         else {

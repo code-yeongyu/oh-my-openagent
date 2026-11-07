@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-import { describeWindows, INTERFACE_XML, OBJECT_PATH } from "./window-rects.js";
+import { describeChrome, describeReply, describeShell, describeWindows, INTERFACE_XML, OBJECT_PATH } from "./window-rects.js";
 
 const BACKEND = new URL("../senpi-desktop-backend-wayland/", import.meta.url);
 const FIXTURE = JSON.parse(readFileSync(new URL("testdata/gnome-windows.json", BACKEND), "utf8"));
@@ -9,6 +9,20 @@ const GNOME_RS = readFileSync(new URL("src/compositor/gnome.rs", BACKEND), "utf8
 
 const ACTIVE = { name: "workspace 1" };
 const OTHER = { name: "workspace 2" };
+
+/** A Clutter actor as Main.layoutManager tracks it: stage position and size, mapped or not. */
+function trackedActor({ x, y, width, height, mapped = true, affectsInputRegion = true }) {
+	return {
+		affectsInputRegion,
+		actor: {
+			is_mapped: () => mapped,
+			get_transformed_position: () => [x, y],
+			get_transformed_size: () => [width, height],
+		},
+	};
+}
+
+const IDLE = { overviewVisible: false, modalCount: 0, locked: false };
 
 function metaWindow({ sequence, pid, title, rect, minimized = false, hidden = false, workspace = ACTIVE, desktop = false }) {
 	return {
@@ -36,8 +50,16 @@ describe("describeWindows", () => {
 			metaWindow({ sequence: 31, pid: 1605, title: "Picture-in-Picture", rect: { x: 2200, y: 1100, width: 320, height: 180 } }),
 		];
 
+		// and the shell idle, its top bar taking input, the message tray's full-width box
+		// not taking input, and the banner bin unmapped (no notification showing)
+		const tracked = [
+			trackedActor({ x: 0, y: 0, width: 2560, height: 32 }),
+			trackedActor({ x: 0, y: 0, width: 2560, height: 1440, affectsInputRegion: false }),
+			trackedActor({ x: 980, y: 40, width: 600, height: 120, mapped: false }),
+		];
+
 		// When
-		const described = describeWindows(windows, ACTIVE, (window) => window.desktop);
+		const described = describeReply({ windows, workspace: ACTIVE, isDesktopWindow: (window) => window.desktop, shell: IDLE, tracked });
 
 		// Then
 		expect(described).toEqual(FIXTURE);
@@ -61,6 +83,24 @@ describe("describeWindows", () => {
 			shown: false,
 			desktopWindow: false,
 		});
+	});
+
+	test("the overview, a shell modal and the lock screen are each reported as shell state", () => {
+		expect(describeShell(IDLE)).toEqual({ overview: false, modal: false, locked: false });
+		expect(describeShell({ ...IDLE, overviewVisible: true })).toEqual({ overview: true, modal: false, locked: false });
+		expect(describeShell({ ...IDLE, modalCount: 2 })).toEqual({ overview: false, modal: true, locked: false });
+		expect(describeShell({ overviewVisible: false, modalCount: 1, locked: true })).toEqual({ overview: false, modal: true, locked: true });
+	});
+
+	test("a showing notification banner is reported as chrome; unmapped, input-transparent and empty actors are not", () => {
+		const chrome = describeChrome([
+			trackedActor({ x: 980.4, y: 39.6, width: 600, height: 120.2 }),
+			trackedActor({ x: 0, y: 0, width: 2560, height: 32, mapped: false }),
+			trackedActor({ x: 0, y: 0, width: 2560, height: 1440, affectsInputRegion: false }),
+			trackedActor({ x: 5, y: 5, width: 0, height: 10 }),
+		]);
+
+		expect(chrome).toEqual([{ x: 980, y: 40, width: 600, height: 120 }]);
 	});
 
 	test("cross-language D-Bus contract: the exported path and interface are the ones the Rust backend calls", () => {
