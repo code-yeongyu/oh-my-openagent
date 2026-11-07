@@ -1,6 +1,9 @@
 import { homedir } from "node:os";
 import { findProjectRoot, findRuleFiles } from "./finder";
-import { appendInjectedRulesToOutput } from "./injection-output";
+import {
+	appendInjectedRulesToOutput,
+	formatRuleForInjection,
+} from "./injection-output";
 import type {
 	RuleFileReader,
 	RuleInjectionProcessorDeps,
@@ -43,6 +46,11 @@ export type CreateRuleInjectionProcessorDeps = RuleInjectionProcessorDeps & {
 	transcriptHydration?: TranscriptHydrationHook;
 };
 
+export type RuleContextCollector = (entry: {
+	id: string;
+	content: string;
+}) => void;
+
 export function createRuleInjectionProcessor(
 	deps: CreateRuleInjectionProcessorDeps,
 ): {
@@ -50,6 +58,7 @@ export function createRuleInjectionProcessor(
 		filePath: string,
 		sessionID: string,
 		output: ToolExecuteOutput,
+		collectContext?: RuleContextCollector,
 	) => Promise<void>;
 } {
 	const {
@@ -81,6 +90,7 @@ export function createRuleInjectionProcessor(
 		filePath: string,
 		sessionID: string,
 		output: ToolExecuteOutput,
+		collectContext?: RuleContextCollector,
 	): Promise<void> {
 		const resolved = resolveFilePath(workspaceDirectory, filePath);
 		if (!resolved) return;
@@ -166,7 +176,19 @@ export function createRuleInjectionProcessor(
 			return;
 		}
 
-		await appendInjectedRulesToOutput(output, toInject, sessionID, truncator);
+		if (collectContext) {
+			toInject.sort((a, b) => a.distance - b.distance);
+			for (const rule of toInject) {
+				const content = await formatRuleForInjection(
+					rule,
+					sessionID,
+					truncator,
+				);
+				collectContext({ id: rule.relativePath, content });
+			}
+		} else {
+			await appendInjectedRulesToOutput(output, toInject, sessionID, truncator);
+		}
 
 		if (dirty) {
 			saveInjectedRulesImpl(sessionID, cache);
