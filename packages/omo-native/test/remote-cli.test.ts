@@ -504,7 +504,7 @@ describe("omo remote session verbs", () => {
     [["model", "b/dur-on-b", "anthropic/claude-opus"], "b/dur-on-b now uses anthropic/claude-opus.", ["status", "devices", "command:get_available_models", "command:set_model"]],
     [["interrupt", "b/dur-on-b"], "Nothing was running on b/dur-on-b.", ["status", "devices", "command:interrupt"]],
     [["close", "b/dur-on-b"], "Closed b/dur-on-b.", ["status", "devices", "command:unload_session"]],
-    [["send", "b/dur-on-b", "hi", "--no-wait"], "Sent to b/dur-on-b: turn turn-b started.", ["status", "devices", "command:get_state", "command:prompt"]],
+    [["send", "b/dur-on-b", "hi", "--no-wait"], "Sent to b/dur-on-b: turn turn-b started.", ["status", "devices", "command:prompt"]],
     [["open", "b"], "b/dur-new-on-b", ["status", "devices", "endpoint:open_session", "locate"]],
   ])("%p makes only its remote op's calls and reports the answer", async (args, line, calls) => {
     const port = recorded(fixture.account().remote)
@@ -532,11 +532,13 @@ describe("omo remote session verbs", () => {
     expect(err[0]).toBe(message)
   })
 
-  test("a session its device does not hold is named as unknown, and no message is sent to it", async () => {
+  // A send is one round trip (#12320): the prompt is the first frame, and the device that does not hold the session
+  // refuses it, so the message reaches no session and nothing else is sent.
+  test("a session its device does not hold is named as unknown from the device's refusal of the one prompt, and nothing else is sent to it", async () => {
     const a = fixture.account()
     const { code, err } = await run(["send", "b/dur-unknown", "hi"], undefined, SIGNED_IN, testBootstrap(), a.remote)
     expect([code, err]).toEqual([REMOTE_EXIT.failed, ["omo remote: no session b/dur-unknown on this account.", "Run omo remote sessions to see them."]])
-    expect(types(a.sent, "prompt")).toEqual([])
+    expect(a.sent.flatMap(entry => entry.rpc === undefined ? [] : [entry.rpc["type"]])).toEqual(["prompt"])
   })
 
   test("a refusal from the remote op is reported with its next step, and nothing is followed", async () => {
