@@ -45,7 +45,7 @@ On macOS the engine keeps the display awake while the agent operates: the first 
 
 ## Error codes
 
-A failed call carries one engine error code (`crates/senpi-desktop-core/src/error.rs`). The ones a user or model acts on:
+A failed call carries one engine error code (`crates/senpi-desktop-core/src/error.rs`), and some codes also carry a `data.reason` naming the cause (for example `consumed` for `InvalidCoordinateFrame`); the tool's recovery hint follows that reason when it knows it. The ones a user or model acts on:
 
 | Code | Meaning | What to do |
 |------|---------|------------|
@@ -64,6 +64,9 @@ A failed call carries one engine error code (`crates/senpi-desktop-core/src/erro
 | `UserIntervened` | The user was using the target app, or brought another window forward, so the action stopped; the message says whether any input was sent | Read the window again once the user pauses; never repeat the action as it was |
 | `AxUnconfirmed` | An accessibility request was made but the app did not confirm it (no reply in time, or a modal dialog opened). On macOS, `ax.perform` (press and the other named actions), `ax.setValue` and `ax.focus` report it when the app answers `kAXErrorCannotComplete`; a refused request stays `AxFailed`, and so does a value the app answered but did not take | It may already have taken effect: read the element back before any retry |
 | `SpaceUnsupported`, `SpaceMoveDenied` | A window could not be moved to the current Space (macOS), because the platform lacks support or the window server refused or could not verify the move | Ask the user to bring the window to the current Space |
+| `AmbiguousTarget` | Several windows or elements match the request | List them again and target one by its id or ref |
+| `CaptureConsentRequired` | The system needs the user to approve screen capture first | Ask the user to approve capture, then capture again |
+| `ProtectedProcess` | The target app is protected from automation | Do not retry; ask the user to act in that app |
 | `CaptureFailed`, `InputFailed`, `Timeout`, `Cancelled`, `Closed`, `TransactionFailed`, `Internal` | The platform call failed, took too long, was aborted, or the session ended. On macOS a `CaptureFailed`, `InputFailed` or `Timeout` message that ends `(the screen is locked)` or `(the display is asleep)` names the likely cause | Observe again before retrying; stop after repeated failures; for a lock or sleep note, ask the user to unlock or wake the Mac |
 
 Engine start failures are reported by `/computer status` as `engine: native-unavailable`, `quarantined` or `abi-mismatch`, and are described in [Troubleshooting](../guide/computer-use.md#troubleshooting).

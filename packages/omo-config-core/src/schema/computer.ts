@@ -31,6 +31,16 @@ export const OmoComputerSettingsLayerSchema = z
       .strict(),
     engine_path: z.string().min(1),
     cua_adapter: z.boolean(),
+    run_sandbox: z
+      .enum(["vm", "quickjs"])
+      .describe("Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"),
+    intervention: z
+      .enum(["continue", "pause"])
+      .describe("What a background action does while the user uses the target app (default: pause)"),
+    macos_key_priming: z
+      .enum(["on", "off"])
+      .describe("macOS background keys first make the target window key (default: off)"),
+    trace: z.boolean().describe("Per-request timing traces (default: false)"),
   })
   .partial()
   .strict()
@@ -59,4 +69,8 @@ export const COMPUTER_HARNESS_SUPPORT: Record<ComputerSettingPath, readonly OmoH
   "computer.screenshot_gc": ["native"],
   "computer.engine_path": ["native"],
   "computer.cua_adapter": ["native"],
+  "computer.run_sandbox": ["native"],
+  "computer.intervention": ["native"],
+  "computer.macos_key_priming": ["native"],
+  "computer.trace": ["native"],
 } as const

@@ -4,12 +4,14 @@
 //! Every [`MutatingAction`] passes [`gate`] before a backend is touched. The
 //! checks run in a fixed order and the first failure wins: suspension, a live
 //! and fresh stop path under the policy, the lock screen, the input
-//! permission, then (coordinate actions only) the expected frame. The gate
-//! only reads the state it is handed; it performs no I/O.
+//! permission, then (coordinate actions only) the expected frame and the
+//! captured window's identity. The gate only reads the state it is handed;
+//! it performs no I/O.
 
 use std::fmt;
 
 use senpi_desktop_core::error::{DesktopError, ErrorCode, TccPermission};
+use senpi_desktop_core::frame::frame_reason;
 
 use crate::{
     action::MutatingAction,
@@ -58,11 +60,71 @@ pub trait PermissionGate {
     fn input_granted(&self) -> bool;
 }
 
+/// Why a coordinate request's frame cannot take input, checked in this
+/// order before today's latest-capture check.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FrameRefusal {
+    /// No `frameId` was named and the target has no capture to default to.
+    FrameRequired,
+    /// The named frame is another target's capture.
+    WrongTarget,
+    /// The named frame exists, but this target has no capture at all.
+    NoCapture,
+    /// The named frame is an earlier capture of this target, or comes from
+    /// an earlier engine instance.
+    Superseded,
+    /// The frame was used by an action sent with `consume: true`.
+    Consumed,
+}
+
+impl FrameRefusal {
+    /// The wire token of `data.reason`.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::FrameRequired => "frame_required",
+            Self::WrongTarget => "wrong_target",
+            Self::NoCapture => "no_capture",
+            Self::Superseded => "superseded",
+            Self::Consumed => "consumed",
+        }
+    }
+
+    const fn message(self) -> &'static str {
+        match self {
+            Self::FrameRequired => {
+                "this target has no capture yet; capture it first, coordinates are pixels of that capture"
+            }
+            Self::WrongTarget => {
+                "the frame is another target's capture; capture this target and use its frame"
+            }
+            Self::NoCapture => "this target has no capture yet; capture it before coordinate input",
+            Self::Superseded => {
+                "the frame is not the target's latest capture; capture it again before coordinate input"
+            }
+            Self::Consumed => {
+                "the frame was consumed by an earlier action; capture the target again before coordinate input"
+            }
+        }
+    }
+}
+
 /// The target's frame and session state the gate checks against.
 pub trait FrameContext {
     fn screen_locked(&self) -> LockState;
     /// Whether `frame` is the target's latest capture.
     fn is_latest(&self, frame: &FrameId) -> bool;
+    /// Why the request's frame (`frame`, or the target's latest when `None`)
+    /// cannot take input; `None` when it can, or when the session answers
+    /// with today's single latest-capture check.
+    fn frame_refusal(&self, _frame: Option<&FrameId>) -> Option<FrameRefusal> {
+        None
+    }
+    /// Whether the captured window now belongs to another process (object
+    /// mode, window frames that recorded an identity).
+    fn identity_changed(&self) -> bool {
+        false
+    }
 }
 
 /// Why no stop path may authorize input.
@@ -142,6 +204,10 @@ pub enum GateError {
     PermissionDenied { permission: TccPermission },
     #[error("the frame is not the target's latest capture; capture it again before coordinate input")]
     InvalidCoordinateFrame,
+    #[error("{}", .reason.message())]
+    FrameRefused { reason: FrameRefusal },
+    #[error("the captured window now belongs to another process; find the window again before coordinate input")]
+    IdentityChanged,
 }
 
 impl GateError {
@@ -152,14 +218,29 @@ impl GateError {
             Self::StopPathUnavailable { .. } => ErrorCode::StopPathUnavailable,
             Self::ScreenLocked => ErrorCode::ScreenLocked,
             Self::PermissionDenied { .. } => ErrorCode::PermissionDenied,
-            Self::InvalidCoordinateFrame => ErrorCode::InvalidCoordinateFrame,
+            Self::InvalidCoordinateFrame | Self::FrameRefused { .. } => ErrorCode::InvalidCoordinateFrame,
+            Self::IdentityChanged => ErrorCode::WindowNotFound,
+        }
+    }
+
+    /// The object-mode `data.reason` token, when the refusal has one.
+    #[must_use]
+    pub const fn reason(self) -> Option<&'static str> {
+        match self {
+            Self::FrameRefused { reason } => Some(reason.as_str()),
+            Self::IdentityChanged => Some("identity_changed"),
+            _ => None,
         }
     }
 }
 
 impl From<GateError> for DesktopError {
     fn from(error: GateError) -> Self {
-        Self::new(error.code(), error.to_string())
+        let refused = Self::new(error.code(), error.to_string());
+        match error.reason() {
+            Some(reason) => frame_reason(refused, reason),
+            None => refused,
+        }
     }
 }
 
@@ -191,8 +272,17 @@ pub fn gate(
     if !perms.input_granted() {
         return Err(GateError::PermissionDenied { permission: TccPermission::Accessibility });
     }
-    if action.is_coordinate() && expected_frame.is_some_and(|expected| !frames.is_latest(&expected)) {
+    if !action.is_coordinate() {
+        return Ok(());
+    }
+    if let Some(reason) = frames.frame_refusal(expected_frame.as_ref()) {
+        return Err(GateError::FrameRefused { reason });
+    }
+    if expected_frame.is_some_and(|expected| !frames.is_latest(&expected)) {
         return Err(GateError::InvalidCoordinateFrame);
+    }
+    if frames.identity_changed() {
+        return Err(GateError::IdentityChanged);
     }
     Ok(())
 }
