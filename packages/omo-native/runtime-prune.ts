@@ -37,7 +37,9 @@ export function pruneProvisionedRuntimes(options: {
     return result
   }
   // A prune interrupted between its rename and its delete leaves a renamed tree that nothing runs from.
+  // A live pruner's tree is skipped: it may still rename that tree back to a runtime in use.
   for (const entry of entries.filter((name) => name.startsWith(PRUNE_PREFIX))) {
+    if (pruneOwnerAlive(entry)) continue
     try {
       rmSync(join(options.root, entry), { recursive: true, force: true })
     } catch {
@@ -72,6 +74,11 @@ export function pruneProvisionedRuntimes(options: {
       renameSync(directory, pruning)
       renamed.push({ version, directory, pruning })
     } catch (error) {
+      // Gone since the listing: a concurrent pruner renamed it first and is removing it.
+      if (errorCode(error) === "ENOENT") {
+        result.removed.push(version)
+        continue
+      }
       result.kept.push(version)
       if (!(platform === "win32" && isBusy(error))) result.failed.push({ version, reason: errorMessage(error) })
     }
@@ -125,8 +132,24 @@ function listRunningCommands(): readonly string[] | undefined {
   return commands.length === 0 ? undefined : commands
 }
 
+// `.prune-<version>-<pid>`: signal 0 probes the pid without touching it; EPERM means it exists.
+function pruneOwnerAlive(entry: string): boolean {
+  const pid = Number(/-(\d+)$/.exec(entry)?.[1])
+  if (!Number.isSafeInteger(pid) || pid <= 0 || pid === process.pid) return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return errorCode(error) === "EPERM"
+  }
+}
+
+function errorCode(error: unknown): string | undefined {
+  return (error as NodeJS.ErrnoException | undefined)?.code
+}
+
 function isBusy(error: unknown): boolean {
-  const code = (error as NodeJS.ErrnoException | undefined)?.code
+  const code = errorCode(error)
   return code === "EBUSY" || code === "EPERM" || code === "EACCES"
 }
 
