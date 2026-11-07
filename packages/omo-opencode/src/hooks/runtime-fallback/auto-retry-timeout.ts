@@ -1,4 +1,4 @@
-import type { AutoRetryDispatchOutcome, HookDeps, RuntimeFallbackTimeout } from "./types"
+import type { AutoRetryDispatchOutcome, FallbackState, HookDeps, RuntimeFallbackTimeout } from "./types"
 import { COMPACTION_WATCHDOG_BUDGET_MS, HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { getFallbackModelsForSession } from "./fallback-models"
@@ -9,6 +9,11 @@ import { getCompaction, recordCompactionEnd } from "../../shared/compaction-in-f
 
 declare function setTimeout(callback: () => void | Promise<void>, delay?: number): RuntimeFallbackTimeout
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
+
+// Deliberately absent from the internal-abort source list in auto-retry-abort.ts:
+// this abort must reach the caller as a real cancellation instead of being
+// consumed as a silent fallback handoff.
+const TERMINAL_ABORT_SOURCE = "session.timeout.fallback-exhausted"
 
 export function createFallbackTimeoutHelpers(
   deps: HookDeps,
@@ -50,6 +55,61 @@ export function createFallbackTimeoutHelpers(
       sessionFallbackTimeouts.delete(sessionID)
     }
     sessionResolvedAgents.delete(sessionID)
+  }
+
+  // Ends the fallback lifecycle with a failure the caller can observe. Without
+  // this the session keeps waiting on a fallback that will never arrive (#6637).
+  const failSessionFallbackTerminally = async (
+    sessionID: string,
+    expectedState: FallbackState,
+    reason: string,
+    details: Record<string, unknown> = {},
+    watchdogMessage = "Runtime fallback dispatch was not accepted",
+  ) => {
+    clearSessionFallbackTimeout(sessionID)
+    sessionRetryInFlight.delete(sessionID)
+    const wasAwaitingFallbackResult = deps.sessionAwaitingFallbackResult.delete(sessionID)
+
+    log(`[${HOOK_NAME}] Session fallback exhausted`, { sessionID, reason, ...details })
+
+    // The timeout path already marked this session as internally aborted. Leaving
+    // that marker behind would make a later real abort look like our own fallback
+    // handoff and preserve fallback state that no longer has an owner.
+    deps.internallyAbortedSessions.delete(sessionID)
+    if (!wasAwaitingFallbackResult) return
+
+    // The user learns once that control came back: the detailed error toast when
+    // fallback notifications are on, otherwise the watchdog warning.
+    if (!config.notify_on_fallback) {
+      void showWatchdogToast(sessionID, watchdogMessage)
+    } else {
+      // Best effort, not awaited: a showToast() call that never settles must
+      // not block the terminal abort below, or the caller is left hanging on
+      // the very rejected-fallback path this function exists to bound.
+      void deps.ctx.client.tui
+        .showToast({
+          body: {
+            title: "Model Fallback Failed",
+            message: `No fallback model could be reached (${reason})`,
+            variant: "error",
+            duration: 5000,
+          },
+        })
+        .catch(() => {})
+    }
+
+    // The caller already awaited a dispatch or a prepare step before reaching
+    // this function, which is enough time for a newer fallback generation to
+    // take over the session. Aborting that generation would cancel a retry
+    // this call never owned, so ownership is revalidated before the abort.
+    if (sessionStates.get(sessionID) !== expectedState) {
+      log(`[${HOOK_NAME}] Session fallback terminal abort skipped for superseded generation`, {
+        sessionID,
+      })
+      return
+    }
+
+    await abortSessionRequest(sessionID, TERMINAL_ABORT_SOURCE)
   }
 
   const scheduleSessionFallbackTimeout = (sessionID: string, resolvedAgent?: string, delayOverride?: number) => {
@@ -134,11 +194,18 @@ export function createFallbackTimeoutHelpers(
           sessionID,
           fallbackModels: fallbackModels.length,
         })
-        await abortSessionRequest(sessionID, "session.timeout")
-        await showWatchdogToast(sessionID, "Runtime fallback could not prepare a replacement")
-        deps.sessionAwaitingFallbackResult.delete(sessionID)
-        sessionRetryInFlight.delete(sessionID)
-        sessionResolvedAgents.delete(sessionID)
+        // An awaiting caller gets exactly one observable terminal abort (#6637);
+        // without one, the stuck stream is returned with a plain timeout abort.
+        if (!deps.sessionAwaitingFallbackResult.has(sessionID)) {
+          await abortSessionRequest(sessionID, "session.timeout")
+        }
+        await failSessionFallbackTerminally(
+          sessionID,
+          state,
+          fallbackModels.length === 0 ? "no fallback models configured" : "max fallback attempts reached",
+          { attemptCount: state.attemptCount },
+          "Runtime fallback could not prepare a replacement",
+        )
         // Same window as the budget branch: nothing may stay armed once control is returned.
         clearSessionFallbackTimeout(sessionID)
         return
@@ -152,9 +219,6 @@ export function createFallbackTimeoutHelpers(
         return
       }
       sessionRetryInFlight.delete(sessionID)
-      // The timed-out generation is no longer live. A new accepted dispatch
-      // will acquire awaiting ownership again; exhaustion/refusal must not keep it.
-      deps.sessionAwaitingFallbackResult.delete(sessionID)
 
       if (state.pendingFallbackModel) {
         state.pendingFallbackModel = undefined
@@ -169,25 +233,68 @@ export function createFallbackTimeoutHelpers(
       })
 
       const result = prepareFallback(sessionID, state, fallbackModels, config)
-      if (result.success && result.newModel) {
-        const dispatchOutcome = await autoRetryWithFallback(sessionID, result.newModel, effectiveResolvedAgent, "session.timeout")
-        if (!dispatchOutcome.accepted) {
-          restoreFallbackState(state, stateSnapshot)
-          state.pendingFallbackModel = undefined
-          state.pendingFallbackPromptMayHaveBeenAccepted = false
-          deps.sessionAwaitingFallbackResult.delete(sessionID)
-          deps.sessionRetryInFlight.delete(sessionID)
-          sessionResolvedAgents.delete(sessionID)
-          clearSessionFallbackTimeout(sessionID)
-          await showWatchdogToast(sessionID, "Runtime fallback dispatch was not accepted")
-          log(`[${HOOK_NAME}] Session timeout fallback dispatch was not accepted`, {
-            sessionID,
-            status: dispatchOutcome.status,
-            reason: dispatchOutcome.reason,
-            clearedPendingFallbackState: true,
-          })
-        }
+      if (!result.success || !result.newModel) {
+        await failSessionFallbackTerminally(
+          sessionID,
+          state,
+          result.maxAttemptsReached ? "max fallback attempts reached" : "no available fallback models",
+          { attemptCount: state.attemptCount },
+        )
+        return
       }
+
+      const preparedOwnership = {
+        currentModel: state.currentModel,
+        fallbackIndex: state.fallbackIndex,
+        attemptCount: state.attemptCount,
+      }
+
+      const dispatchOutcome = await autoRetryWithFallback(sessionID, result.newModel, effectiveResolvedAgent, "session.timeout")
+      if (dispatchOutcome.accepted) return
+
+      // Identity alone is not ownership: a superseding retry can advance the same
+      // FallbackState object without replacing it. Only the dispatch that still
+      // owns exactly what prepareFallback produced may roll that preparation back.
+      const stillOwnsPreparedState =
+        sessionStates.get(sessionID) === state &&
+        state.currentModel === preparedOwnership.currentModel &&
+        state.fallbackIndex === preparedOwnership.fallbackIndex &&
+        state.attemptCount === preparedOwnership.attemptCount
+      if (!stillOwnsPreparedState) {
+        log(`[${HOOK_NAME}] Session timeout fallback rejection skipped for superseded dispatch`, {
+          sessionID,
+        })
+        return
+      }
+
+      // A rejected dispatch still burned an attempt. Restoring the snapshot
+      // verbatim would rewind attemptCount as well, leaving the guard in
+      // prepareFallback unreachable and the timeout loop unbounded (#6637).
+      const attemptsUsed = state.attemptCount
+      restoreFallbackState(state, stateSnapshot)
+      state.attemptCount = attemptsUsed
+
+      log(`[${HOOK_NAME}] Session timeout fallback dispatch was not accepted`, {
+        sessionID,
+        status: dispatchOutcome.status,
+        reason: dispatchOutcome.reason,
+        attemptCount: attemptsUsed,
+      })
+
+      if (attemptsUsed >= config.max_fallback_attempts) {
+        await failSessionFallbackTerminally(sessionID, state, "max fallback attempts reached", {
+          attemptCount: attemptsUsed,
+        })
+        return
+      }
+
+      if (deps.sessionAwaitingFallbackResult.has(sessionID)) {
+        scheduleSessionFallbackTimeout(sessionID, effectiveResolvedAgent)
+        return
+      }
+
+      // Nobody awaits a retry, so this refusal ends the lifecycle: tell the user once.
+      await showWatchdogToast(sessionID, "Runtime fallback dispatch was not accepted")
     }, delayMs)
 
     sessionFallbackTimeouts.set(sessionID, timer)

@@ -121,7 +121,10 @@ describe("dispatchFallbackRetry", () => {
   })
 
   for (const refusal of [false, true]) {
-    test(`timeout releases recovery ownership after ${refusal ? "refused dispatch" : "model exhaustion"}`, async () => {
+    // A refused dispatch below max_fallback_attempts keeps the awaiting caller and
+    // re-arms the watchdog so the next attempt can run (bounded by the cap, #6637);
+    // exhaustion releases ownership at once.
+    test(`timeout ${refusal ? "keeps recovery ownership and re-arms after a refused dispatch below the cap" : "releases recovery ownership after model exhaustion"}`, async () => {
       const deps = createDeps([])
       const sessionID = "session-timeout-release"
       const state = createFallbackState("openai/gpt-5.4")
@@ -141,8 +144,8 @@ describe("dispatchFallbackRetry", () => {
         }))
         helpers.scheduleSessionFallbackTimeout(sessionID, "oracle")
         await fireTimeout?.()
-        expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
-        expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(false)
+        expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(refusal)
+        expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(refusal)
       } finally {
         timer.mockRestore()
       }

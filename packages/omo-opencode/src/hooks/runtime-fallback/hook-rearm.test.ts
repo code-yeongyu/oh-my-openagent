@@ -223,7 +223,7 @@ describe("runtime fallback hook compaction re-arm guards", () => {
     hook.dispose?.()
   })
 
-  test("#given stream progress lands while a refused fallback dispatch is pending #when the re-armed window elapses #then no second abort or fallback dispatch follows", async () => {
+  test("#given stream progress lands while a refused fallback dispatch is pending #when the re-armed window elapses #then exactly one bounded retry follows", async () => {
     const abortCalls: string[] = []
     const toastCalls: string[] = []
     let promptCalls = 0
@@ -271,16 +271,20 @@ describe("runtime fallback hook compaction re-arm guards", () => {
     await hook.event(progressEvent)
     await clock.advanceBy(10_000)
 
+    // The progress event during the pending abort re-arms one watchdog, and the
+    // refused dispatch keeps the awaiting caller below the cap.
     expect(abortCalls).toEqual([sessionID])
     expect(promptCalls).toBe(1)
-    expect(deps?.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
-    expect(deps?.sessionFallbackTimeouts.has(sessionID)).toBe(false)
+    expect(deps?.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
+    expect(deps?.sessionFallbackTimeouts.has(sessionID)).toBe(true)
 
     await clock.advanceBy(10_000)
 
-    expect(abortCalls).toEqual([sessionID])
-    expect(promptCalls).toBe(1)
-    expect(toastCalls).toEqual(["Runtime fallback dispatch was not accepted"])
+    // One window, one retry: no extra abort from the re-arm, and no toast while
+    // the caller is still awaiting a fallback.
+    expect(abortCalls).toEqual([sessionID, sessionID])
+    expect(promptCalls).toBe(2)
+    expect(toastCalls).toEqual([])
     hook.dispose?.()
   })
 })
