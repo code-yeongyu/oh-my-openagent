@@ -9,7 +9,7 @@ import { BrowserUnavailable, loginLoopback } from "./loopback"
 import { type ChooseDevice, type ListedDevice, RequestFailure, serviceOrigin, SignInError } from "./protocol"
 import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
 
-import { createSession, type Session } from "./session"
+import { createSession, type DeviceServiceHandoff, type Session } from "./session"
 import { retireSyncPinOnDiscard } from "./sync-pin-retire"
 import { terminalText } from "./terminal-text"
 
@@ -30,6 +30,9 @@ async function ensureServiceAvailable(session: Pick<Session, "request">, api: st
 }
 
 type Options = { readonly api?: string; readonly accounts?: string; readonly device?: boolean; readonly browser?: boolean }
+
+/** What the host adds to the account commands: its device service for an API origin (design D r9 sections 4-5). */
+export type ServiceAuthHooks = { readonly deviceService?: (api: string) => DeviceServiceHandoff }
 
 export function deviceChoices(devices: readonly ListedDevice[]) {
   return devices.map(device => ({ value: device.id, label: terminalText(device.name) }))
@@ -57,7 +60,7 @@ export function accountsOrigin(options: Pick<Options, "accounts">, env: Record<s
   return serviceOrigin(options.accounts ?? env.OMO_SERVICE_ACCOUNTS_URL ?? DEFAULT_ACCOUNTS_ORIGIN)
 }
 
-async function run(action: "login" | "logout" | "whoami", options: Options): Promise<void> {
+async function run(action: "login" | "logout" | "whoami", options: Options, hooks: ServiceAuthHooks = {}): Promise<void> {
   const controller = new AbortController()
   const cancel = () => controller.abort()
   process.once("SIGINT", cancel)
@@ -65,8 +68,9 @@ async function run(action: "login" | "logout" | "whoami", options: Options): Pro
   try {
     const api = serviceOrigin(options.api ?? process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
     const store = createCredentialStore(api, { wait: INTERACTIVE_READ_WAIT })
+    const deviceService = hooks.deviceService?.(api)
     const session = createSession({
-      api, store, signal: controller.signal,
+      api, store, signal: controller.signal, ...(deviceService === undefined ? {} : { deviceService }),
       beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())), log: (line) => console.error(line) }),
     })
     if (action === "logout") {
@@ -127,10 +131,10 @@ function refuseClosedServiceAuth(): never {
   process.exit(1)
 }
 
-function configureClosedServiceAuthCommands(program: Command): void {
+function configureClosedServiceAuthCommands(program: Command, hooks: ServiceAuthHooks): void {
   for (const name of SERVICE_AUTH_COMMANDS) {
     if (name === "login") {
-      configureClosedDeviceLogin(program)
+      configureClosedDeviceLogin(program, hooks)
       continue
     }
     const command = program.command(name, { hidden: true }).helpOption(false).allowUnknownOption().allowExcessArguments()
@@ -146,7 +150,7 @@ function configureClosedServiceAuthCommands(program: Command): void {
 // While accounts are closed, the one terminal sign-in is the device code, for a computer with no browser or desktop app
 // (#12639). The approval page keeps the service's own access policy, so this admits nobody the service does not admit.
 // Every other closed argv (plain login, --accounts, a stray option or argument) refuses exactly as before.
-function configureClosedDeviceLogin(program: Command): void {
+function configureClosedDeviceLogin(program: Command, hooks: ServiceAuthHooks): void {
   const command = program.command("login", { hidden: true }).helpOption(false).allowUnknownOption().allowExcessArguments()
     .option("--device").option("--no-browser").option("--api <url>")
     .action((options: Options) => {
@@ -155,14 +159,14 @@ function configureClosedDeviceLogin(program: Command): void {
         process.exitCode = 1
         return
       }
-      return run("login", { ...options, device: true })
+      return run("login", { ...options, device: true }, hooks)
     })
   command.help = refuseClosedServiceAuth
 }
 
-export function configureServiceAuthCommands(program: Command, open = serviceAccountsOpen()): void {
+export function configureServiceAuthCommands(program: Command, open = serviceAccountsOpen(), hooks: ServiceAuthHooks = {}): void {
   if (!open) {
-    configureClosedServiceAuthCommands(program)
+    configureClosedServiceAuthCommands(program, hooks)
     return
   }
   program.command("login").description("Sign in to OmO using the OS credential store")
@@ -170,17 +174,17 @@ export function configureServiceAuthCommands(program: Command, open = serviceAcc
     .option("--no-browser", "Sign in by device code without opening a browser")
     .option("--api <url>", "OmO API origin (or OMO_SERVICE_API_URL)")
     .option("--accounts <url>", "OmO sign-in page origin (or OMO_SERVICE_ACCOUNTS_URL)")
-    .action((options: Options) => run("login", options))
+    .action((options: Options) => run("login", options, hooks))
   for (const action of ["logout", "whoami"] as const) {
     program.command(action)
       .description(action === "logout" ? "Remove stored OmO credentials and device keys" : "Show the current OmO device sign-in")
       .option("--api <url>", "OmO API origin (or OMO_SERVICE_API_URL)")
-      .action((options: Options) => run(action, options))
+      .action((options: Options) => run(action, options, hooks))
   }
 }
 
-export async function runServiceAuthCommand(args: readonly string[]): Promise<void> {
+export async function runServiceAuthCommand(args: readonly string[], hooks: ServiceAuthHooks = {}): Promise<void> {
   const program = new Command("omo")
-  configureServiceAuthCommands(program)
+  configureServiceAuthCommands(program, serviceAccountsOpen(), hooks)
   await program.parseAsync([...args], { from: "user" })
 }

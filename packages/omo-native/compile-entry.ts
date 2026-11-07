@@ -11,7 +11,8 @@ import {
   type EmbeddedFile,
   type EmbeddedManifest,
 } from "./compile-runtime"
-import { handOffToProvisionedRuntime, planProvisionedLaunch } from "./provisioned-handoff"
+import { handOffToProvisionedRuntime, planProvisionedLaunch, type ProvisionedLaunch } from "./provisioned-handoff"
+import { pruneProvisionedRuntimes, removeReplacedLauncher, type RuntimePruneResult } from "./runtime-prune"
 import { parseBuildInfo, parseEngineBuildStamp, versionLines } from "./build-info"
 import { compiledUpdate, fetchGitHubReleases, probePackageOwner, releaseAssetName, RELEASES_URL } from "./compiled-update"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
@@ -19,7 +20,8 @@ import { removeLegacyServiceCredentials } from "./bin/lib/legacy-service-credent
 import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { readJson, releaseBanner } from "./bin/lib/package-paths.js"
 import { remapSenpiEnvironment } from "./compiled-environment"
-import { runServiceAuthCommand, SERVICE_ACCOUNTS_OPEN } from "../omo-opencode/src/cli/service-auth/commands"
+import { SERVICE_ACCOUNTS_OPEN } from "../omo-opencode/src/cli/service-auth/commands"
+import { runServiceAuthCommand } from "./service-auth-command"
 import { runDaemonCommand } from "./bin/lib/daemon.js"
 import { runThreadCommand } from "./bin/lib/thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./bin/lib/host-status.js"
@@ -45,6 +47,7 @@ import { ExtraCaCertificatesError, parseExtraCaCertificates } from "./compiled-c
 import { adoptedEngineTrust, buildTrustLaunchEnvironment } from "@code-yeongyu/senpi/engine-trust"
 import { runTrustStage } from "./trust-stage"
 import { resolveEngineTrustHelperPath } from "./engine-trust-helper-path"
+import { claimMemorySyncAtBoot } from "./memory-sync-boot"
 
 // The engine is imported via a RELATIVE string LITERAL, inlined at both import
 // sites, and both properties are load-bearing:
@@ -275,6 +278,23 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
 
 export { reexecProvisionedRuntime } from "./provisioned-handoff"
 
+/**
+ * Whether this launch prunes old runtimes: only the runtime a launcher handed a real launch to.
+ * Never a static answer or self-update (the installers run `omo --version`), never the launcher
+ * that is about to hand off, and never the engine's own re-runs of the runtime copy (no launcher).
+ */
+export function launchPrunesRuntimes(args: readonly string[], launch: Pick<ProvisionedLaunch, "handOff" | "launcher">): boolean {
+  if (launch.launcher === undefined || launch.handOff) return false
+  return trustLaunchKind(args) !== "static" && !isSelfUpdate([...args])
+}
+
+// Pruning old runtimes never blocks a launch, but a runtime that could not be removed is reported.
+function reportRuntimePrune(result: RuntimePruneResult): void {
+  for (const { version, reason } of result.failed) {
+    process.stderr.write(`omo: could not remove the old runtime ${version}: ${reason}\n`)
+  }
+}
+
 /** A refusal is 78 (5.2) and a malformed `trust` argv the launcher's usage status 2; an exec keeps the status it propagated. */
 function setTrustExitCode(action: "static" | "import-exec" | "ensure" | "usage" | "refuse"): void {
   if (action === "refuse") process.exitCode = 78
@@ -356,6 +376,7 @@ async function main(): Promise<void> {
     if (await runCompiledLauncher(process.argv.slice(2), execDir)) return
     process.argv.splice(2, process.argv.length - 2, ...buildSenpiArgs(process.argv.slice(2), execDir))
     Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))
+    await claimMemorySyncAtBoot(process.argv.slice(2))
     await registerEngineRuntimeModules()
     await import("../../node_modules/@code-yeongyu/senpi/dist/cli.js") // literal: see import note above
     return
@@ -391,7 +412,9 @@ async function main(): Promise<void> {
     args,
     executable: launch.handOff ? expected : process.execPath,
     helper: helperPath !== null && helperEntry !== undefined ? { path: helperPath, sha256: helperEntry.sha256 } : undefined,
-    ...(launch.handOff ? { exec: (file: string, argv: string[], env: NodeJS.ProcessEnv) => handOffToProvisionedRuntime(file, { argv, env }) } : {}),
+    ...(launch.handOff
+      ? { exec: (file: string, argv: string[], env: NodeJS.ProcessEnv) => handOffToProvisionedRuntime(file, { argv, env, launcher: launch.launcher }) }
+      : {}),
   })
   if (trust.action !== "adopt") {
     setTrustExitCode(trust.action)
@@ -401,7 +424,9 @@ async function main(): Promise<void> {
     const result = await compiledUpdate({
       omoAiVersion: manifest.omoAiVersion,
       releaseTarget: manifest.releaseTarget,
-      destination: runningExecutable,
+      // The handed-off runtime copy answers here; the binary to replace is the one the user launched.
+      destination: launch.launcher ?? runningExecutable,
+      provisioned: expected,
       platform: process.platform,
       arch: process.arch,
       fetchReleases: fetchGitHubReleases,
@@ -413,11 +438,16 @@ async function main(): Promise<void> {
     return
   }
   if (answerCompiledFastPath(process.argv.slice(2), manifest)) return
+  if (launchPrunesRuntimes(process.argv.slice(2), launch) && launch.launcher !== undefined) {
+    reportRuntimePrune(pruneProvisionedRuntimes({ root: dirname(dirname(expected)), current: manifest.omoAiVersion }))
+    removeReplacedLauncher(launch.launcher)
+  }
   if (launch.handOff) {
     const marker = adoptedEngineTrust()
     if (marker === undefined) throw new Error("trust stage did not record its adopted generation")
     await handOffToProvisionedRuntime(expected, {
       env: buildTrustLaunchEnvironment(process.env, { marker, hop: false, platform: process.platform }),
+      launcher: launch.launcher,
     })
     return
   }
@@ -433,6 +463,7 @@ async function main(): Promise<void> {
   Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))
   applyCachedClaudeCode(process.env, execDir)
   if (isInternalSupervisorLaunch(process.argv.slice(2)) && await runInternalSupervisor(process.argv.slice(2))) return
+  await claimMemorySyncAtBoot(process.argv.slice(2))
   await registerEngineRuntimeModules()
   await import("../../node_modules/@code-yeongyu/senpi/dist/cli.js") // literal: see import note above
 }

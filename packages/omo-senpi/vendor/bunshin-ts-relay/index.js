@@ -1294,6 +1294,7 @@ var reasonOf = (error) => error instanceof Error ? error.message : String(error)
 var createDirectory = (deps) => {
   const descriptions = new Map;
   const unreachable = new Map;
+  let listedUnsupported = new Set;
   let localDevice;
   const describe = async (device) => {
     const cached = descriptions.get(device);
@@ -1340,6 +1341,7 @@ var createDirectory = (deps) => {
     listMachines: async () => {
       const [listed, status] = await Promise.all([deps.request("machine.list"), deps.status()]);
       const rows = machineRowsOf(listed);
+      listedUnsupported = new Set(rows.filter((row) => row.state === "unsupported").map((row) => row.device));
       const records = await Promise.all(rows.map(recordFor));
       const self = status.device;
       localDevice = self?.id;
@@ -1348,6 +1350,8 @@ var createDirectory = (deps) => {
       return [...records, localRecordOf(self)];
     },
     listTools: async (machineId) => {
+      if (listedUnsupported.has(machineId))
+        return [];
       const cached = descriptions.get(machineId);
       if (cached !== undefined)
         return toolsOf(cached);
