@@ -21,8 +21,11 @@ pub const ABI: &str = "senpi-desktop/1";
 /// options take `consume`; `ax-partial`: an object-mode `ax.snapshot` past its
 /// deadline (`timeoutMs`, default 3000) returns the nodes it read with
 /// `complete: false` and its `cuts`; `trace`: `trace: true` adds per-stage `timings`
-/// to action reports and a redacted JSONL trace beside the audit log; `epoch`: an
-/// object-mode session supersedes its frames and refs and announces
+/// to action reports and a redacted JSONL trace beside the audit log;
+/// `key-priming`: a session may set `macosKeyPriming`, under which background
+/// keys into a macOS application with several windows first make the target
+/// window key (advertised on every platform, acted on by the macOS backend only);
+/// `epoch`: an object-mode session supersedes its frames and refs and announces
 /// `epoch.changed` when the desktop changes; `interaction-lock`: input from this
 /// user's engines in every process is serialized by a machine-wide lock, and a lock
 /// held past its wait budget answers `InputBusy`.
