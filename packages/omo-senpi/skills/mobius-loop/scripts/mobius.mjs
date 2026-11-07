@@ -25,8 +25,9 @@ export function createMobius(config) {
   return {
     start(input) {
       return envelope("start", async () => {
-        shape(input, methodContracts.start);
-        const { title, focus = "discover" } = input;
+        const capturedInput = structuredClone(input);
+        shape(capturedInput, methodContracts.start);
+        const { title, focus = "discover" } = capturedInput;
         return locked(config, true, async store => {
           const existing = await load(store);
           if (existing) return statusResult(existing);
@@ -52,9 +53,9 @@ export function createMobius(config) {
         object(input);
         requireValue(Object.keys(input).length === 2, "record requires expectedRevision and event");
         shape({ expectedRevision: input.expectedRevision }, { expectedRevision: "revision" });
-        event(input.event);
         const { expectedRevision } = input;
         const recordedEvent = structuredClone(input.event);
+        event(recordedEvent);
         return locked(config, false, async store => {
           const snapshot = await load(store);
           requireValue(snapshot, "Initiative has not been started", "NOT_FOUND");

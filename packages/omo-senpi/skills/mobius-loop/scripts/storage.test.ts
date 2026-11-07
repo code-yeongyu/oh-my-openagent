@@ -101,3 +101,33 @@ test("captures caller events before asynchronous storage work", async () => {
   result(await write);
   expect(result(await sdk.status()).snapshot.events[0]?.event).toEqual(event);
 });
+
+test("rejects captured events missing required fields without corrupting durable state", async () => {
+  const { cwd, sdk, store } = await fixture();
+  class Pause {
+    readonly type = "pause";
+    get reason() { return "Wait for observed feedback"; }
+  }
+  const file = join(store, "initiative.json");
+  const before = await readFile(file, "utf8");
+
+  expect(await sdk.record({ expectedRevision: 0, event: new Pause() }))
+    .toMatchObject({ ok: false, error: { code: "INVALID_INPUT" } });
+
+  expect(await readFile(file, "utf8")).toBe(before);
+  const reopened = createMobius({ cwd, slug: "test-loop" });
+  expect(result(await reopened.status()).snapshot.revision).toBe(0);
+});
+
+test("persists the captured start input so a successful initiative remains replayable", async () => {
+  const { cwd } = await fixture();
+  const sdk = createMobius({ cwd, slug: "captured-start" });
+  let reads = 0;
+  const input = { get title() { return ++reads === 1 ? "Captured title" : ""; } };
+
+  const started = result(await sdk.start(input));
+
+  expect(started.snapshot.title).toBe("Captured title");
+  const reopened = createMobius({ cwd, slug: "captured-start" });
+  expect(result(await reopened.status()).snapshot.title).toBe("Captured title");
+});
