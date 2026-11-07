@@ -228,7 +228,7 @@
       // pre-existing at origin dev 4686e425b5: unused export(s) isGitConfigLockError
       "packages/memory-core/src/git/config-lock.ts": ["isGitConfigLockError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GIT_ACTIVITY_LOCK_NAME, GIT_ACTIVITY_SHARED_WAIT_MS, GitActivityLockError
-      "packages/memory-core/src/git/git-activity-lock.ts": ["GIT_ACTIVITY_LOCK_NAME", "GIT_ACTIVITY_SHARED_WAIT_MS", "GitActivityLockError"],
+      "packages/memory-core/src/git/git-activity-lock.ts": ["GIT_ACTIVITY_LOCK_NAME"],
       // pre-existing at origin dev 4686e425b5: unused export(s) listProcPids
       "packages/memory-core/src/git/proc-view.ts": ["listProcPids"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GIT_LOCK_SETTLE_MS
