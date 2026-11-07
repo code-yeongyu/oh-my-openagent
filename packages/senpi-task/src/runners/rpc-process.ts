@@ -222,7 +222,8 @@ async function withDeadline<T>(work: Promise<T>, ms: number, expired: AbortContr
 async function engineAcceptsFallbackChain(client: RpcProtocolClient): Promise<boolean> {
   const response = await client.send({ type: "get_protocol_info" })
   if (!response.success || response.command !== "get_protocol_info") return false
-  const capabilities = (response.data as { readonly capabilities?: unknown }).capabilities
+  const data: unknown = response.data
+  const capabilities: unknown = typeof data === "object" && data !== null ? Reflect.get(data, "capabilities") : undefined
   return Array.isArray(capabilities) && capabilities.includes(RETRY_FALLBACK_COMMAND_CAPABILITY)
 }
 

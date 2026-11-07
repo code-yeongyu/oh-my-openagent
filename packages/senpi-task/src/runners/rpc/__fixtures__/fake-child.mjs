@@ -9,6 +9,7 @@
 //   FAKE_COMMAND_LOG=path append every received command as one JSON line
 //   FAKE_RETRY_FALLBACK=refuse|hang|exit answer set_retry_fallback with an error, never answer it, or exit on it
 //   FAKE_PROTOCOL_INFO=after-prompt hold the get_protocol_info answer until a prompt arrives (a probe answered late)
+//   FAKE_PROTOCOL_INFO=no-data answer get_protocol_info with success and no data (an engine that names no capabilities)
 //   FAKE_PROMPT_REFUSAL=<json> refuse every prompt with this payload merged into the failed response
 //                        (e.g. {"error":"...","errorCode":"provider_credentials_missing","errorData":{...}})
 import { appendFileSync } from "node:fs"
@@ -139,6 +140,7 @@ function handleCommand(cmd) {
         heldProtocolInfo = cmd
         return
       }
+      if (process.env.FAKE_PROTOCOL_INFO === "no-data") return respond("get_protocol_info", cmd.id)
       return respond("get_protocol_info", cmd.id, {
         data: {
           protocolVersion: 1,

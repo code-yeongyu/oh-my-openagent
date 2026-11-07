@@ -42,7 +42,7 @@ function processRunner(
   capabilities: readonly string[],
   options: {
     readonly retryFallback?: "refuse" | "hang" | "exit"
-    readonly protocolInfo?: "after-prompt"
+    readonly protocolInfo?: "after-prompt" | "no-data"
     readonly fallbackChainDeadlineMs?: number
   } = {},
 ): FakeEngine {
@@ -142,6 +142,18 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
     await expect(second).rejects.toThrow("(anthropic/claude-opus-5-5)")
     expect(engine.commands().map((command) => command.type)).not.toContain("prompt")
     expect(engine.commands().map((command) => command.type)).not.toContain("set_retry_fallback")
+  })
+
+  test("#given an engine whose protocol answer carries no data #when a child starts #then it is read as an engine without the command and the child is never prompted", async () => {
+    // given
+    const engine = processRunner(["retry_fallback_command"], { protocolInfo: "no-data" })
+
+    // when
+    const started = engine.runner.start(spec("st_p10", CHAINED))
+
+    // then
+    await expect(started).rejects.toThrow("no retry_fallback_command")
+    expect(engine.commands().map((command) => command.type)).toEqual(["get_protocol_info"])
   })
 
   test("#given an engine that refuses the chain #when a child with fallback models starts #then it is never prompted and the start fails saying the chain was refused", async () => {
