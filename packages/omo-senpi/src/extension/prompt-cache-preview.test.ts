@@ -168,12 +168,12 @@ async function runPrefixScenario(options: {
   let homeEntries: string[] = []
   const ownsProcess = (): boolean => owner !== undefined && baseline === owner
   try {
-    // Dispose aborts in-flight connects but does not wait for them; with the pinned senpi the aborted connect can
-    // fail after dispose returns and log into this HOME (logs/mcp/<server>.log) after the HOME is gone. So wait,
-    // bounded, for the attach connects to settle first. This narrows the window rather than closing it:
-    // whenAttachSettled can report "settled" before a just-backgrounded connect is tracked. Upstream, senpi#4028
-    // fixes that report and senpi#4020 stops an aborted connect from logging or degrading after dispose; neither is
-    // in the pinned release yet.
+    // Wait, bounded, for the attach connects to settle before the quit; this narrows the window, it does not close
+    // it. senpi#4028 (pinned since 2026.10.23-1) makes whenAttachSettled wait for a running attach, and senpi#4020
+    // silences a connect that dispose supersedes. Two paths remain until senpi#4642 is pinned: a stdio child that never
+    // answered discovery restarts and logs from its close handler after dispose (stdio-probe restart), and a reconnect
+    // on its backoff timer is not covered by "settled". Either can write <HOME>/agent/logs/mcp/<server>.log after the
+    // HOME is removed: the omo-prefix leftover in #11090.
     try {
       const settled = await mcp?.whenAttachSettled(stepMs)
       if (settled !== undefined && settled !== "settled") errors.push(new Error(`MCP attach still pending at teardown (${String(settled)})`))
@@ -209,9 +209,9 @@ test("#given a real OmO session #when the engine builds its prewarm prefix #then
   expect(run.observed?.serversAfter).toEqual(run.observed?.serversBefore)
   expect(run.observed?.connectionsAfter).toBe(run.observed?.connectionsBefore ?? -1)
   expect(run.observed?.settledAfterPreview).toBe("settled")
-  // The quit disposes the MCP service, which aborts connects still in flight, but with the pinned senpi an aborted
-  // connect can fail after dispose returns and log into HOME (senpi#4020 silences that). This asserts the dispose
-  // ran, not that nothing writes afterwards.
+  // The quit disposes the MCP service, which aborts connects still in flight. This asserts the dispose ran, not that
+  // nothing writes afterwards: until senpi#4642 is pinned, a late write shows as an omo-prefix entry in the run's
+  // #9766 temp-root check (#11090).
   expect(run.teardown.mcpDisposed).toBe(true)
   expect(run.teardown.homeEntries.filter((entry) => /(^|[\\/])goals?([\\/.-]|$)/.test(entry))).toEqual([])
   expect(run.teardown.homeRemoved).toBe(true)
@@ -219,14 +219,14 @@ test("#given a real OmO session #when the engine builds its prewarm prefix #then
 
 // The bound itself is the behaviour here, so it runs on a clock the test controls: the attach wait reports that the
 // bound elapsed before anything settled, which is what an attach that never settles looks like to the scenario. On
-// real time this flaked on a loaded runner: the startup race tracks a backgrounded connect only after its 0 ms timer,
-// and a whenAttachSettled call that lands before that sees nothing pending and reports "settled".
+// real time this flaked on a loaded runner before senpi#4028 (pinned since 2026.10.23-1), when a whenAttachSettled
+// call that landed before the startup race tracked its backgrounded connect reported "settled".
 const boundElapsedBeforeSettle: AttachWait = async () => "timeout"
 
 test("#given an MCP attach that never settles within the bound #when the prefix scenario fails #then the process env, cwd and temp HOME are restored before it reports", async () => {
   // given: an eager stdio server that is spawned but never answers initialize. Its connect times out at 3 s, which is
   // meant to land inside teardown's bounded settle wait, so the dispose normally finds nothing still connecting; on a
-  // loaded host, or when the settle wait answers early (the race senpi#4028 fixes), it can still be connecting.
+  // loaded host it can still be connecting, and until senpi#4642 is pinned its close can still log (stdio-probe restart).
   const neverReady = { command: process.execPath, args: ["-e", "setInterval(() => {}, 1 << 30)"], lifecycle: "eager", connectTimeoutMs: 3_000 }
   // when
   const run = await runPrefixScenario({ attachSettleMs: 1_000, attachWait: boundElapsedBeforeSettle, extraMcpServers: { "never-ready": neverReady } })
