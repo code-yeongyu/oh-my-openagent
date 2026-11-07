@@ -46,6 +46,36 @@ const notSentReason = (error: unknown): string => (error instanceof LocalApiErro
 // Like the port's read, every failure of one is a typed refusal: there is nothing that may have run.
 const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages"])
 
+// The one read a session's attach holds: its model catalog (`get_available_models`). The catalog does not change with
+// what the session does, so it is held until the attach shows a new snapshot (the host re-established it) or ends, and
+// is bounded in age; it only decides an exact provider/id that set_model then confirms (remote-controls.ts). Status and
+// transcript reads (`get_state`, `get_messages`) are never held: the engine's in-memory state changes with no record on
+// the attach (a live run held isStreaming false for 17 s of a running turn), so they always go to the device.
+const CATALOG_RECORD = "get_available_models"
+const CATALOG_MAX_AGE_MS = 600_000
+
+/** One remote session's held catalog; a catalog read that a new snapshot raced is not kept. */
+function createCatalogHold(attached: RemoteAttach) {
+  let held: { readonly key: string; readonly response: JsonObject; readonly at: number } | undefined
+  let snapshots = 0
+  attached.onEvent((event) => {
+    if (event.kind !== "snapshot") return
+    snapshots += 1
+    held = undefined
+  })
+  return {
+    snapshots: () => snapshots,
+    get: (key: string): JsonObject | undefined => (held !== undefined && held.key === key && Date.now() - held.at <= CATALOG_MAX_AGE_MS ? held.response : undefined),
+    keep: (key: string, response: JsonObject, sentAt: number): void => {
+      if (sentAt === snapshots) held = { key, response, at: Date.now() }
+    },
+  }
+}
+
+type Session = { readonly attached: RemoteAttach; readonly catalog: ReturnType<typeof createCatalogHold> }
+
+const recordKey = (record: WireRpc): string => JSON.stringify(Object.entries(record).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
+
 function outcomeOf(result: CommandResult): RemoteCommandOutcome {
   const { outcome } = result
   if (outcome.state === "engine_refused") return { kind: "refused", reason: outcome.reason }
@@ -64,11 +94,12 @@ function outcomeOf(result: CommandResult): RemoteCommandOutcome {
 
 /**
  * The account half of the thread tools over this device's device service: one proven connection, rebuilt after it
- * closes or fails, and one attach per remote session, dropped when it ends.
+ * closes or fails, and one attach per remote session, kept across ops and dropped when it ends (the next op attaches
+ * again), with the session's model catalog held on it: a command costs one round trip, and a held catalog none.
  */
 export function createDeviceServiceSessions(options: DeviceServiceSessionsOptions): RemoteSessionsPort {
   let service: Promise<DeviceService> | undefined
-  const attaches = new Map<string, Promise<RemoteAttach>>()
+  const attaches = new Map<string, Promise<Session>>()
   const connect = options.connect ?? (() => connectDeviceService({ version: options.version }))
   const retryDelay = options.retryDelay ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
   const svc = (): Promise<DeviceService> => service ??= connect().then(
@@ -78,12 +109,15 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     },
     (error: unknown) => { service = undefined; throw error },
   )
-  const attach = (device: string, sessionId: string): Promise<RemoteAttach> => {
+  const attach = (device: string, sessionId: string): Promise<Session> => {
     const key = `${device}\u0000${sessionId}`
     const known = attaches.get(key)
     if (known !== undefined) return known
     const opened = svc().then((connected) => connected.attach(device, sessionId)).then(
-      (attached) => { void attached.detached.then(() => attaches.delete(key)); return attached },
+      (attached) => {
+        void attached.detached.then(() => { if (attaches.get(key) === opened) attaches.delete(key) })
+        return { attached, catalog: createCatalogHold(attached) }
+      },
       (error: unknown) => { attaches.delete(key); throw error },
     )
     attaches.set(key, opened)
@@ -119,10 +153,10 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         return { kind: "uncertain", reason: "reply_lost" }
       }
     },
-    sessionCommand: async (device, sessionId, rpc) => {
+    sessionCommand: async (device, sessionId, rpc, commandOptions) => {
       // Before the command goes out nothing can have run: an attach that fails (session_not_found, peer_not_found,
       // host_not_answering, a lost connection) or a record that is not JSON is refused with its code, typed.
-      let attached: RemoteAttach
+      let session: Session
       let record: WireRpc
       try {
         record = wireRecord(rpc)
@@ -130,13 +164,22 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         return { kind: "refused", reason: "invalid_record" }
       }
       try {
-        attached = await attach(device, sessionId)
+        session = await attach(device, sessionId)
       } catch (error) {
         return { kind: "refused", reason: notSentReason(error) }
       }
+      const { attached, catalog } = session
       const readOnly = READ_ONLY_RECORDS.has(String(rpc["type"]))
+      const isCatalog = rpc["type"] === CATALOG_RECORD
+      const key = recordKey(record)
+      if (isCatalog && commandOptions?.fresh !== true) {
+        const held = catalog.get(key)
+        if (held !== undefined) return { kind: "ok", response: held, local: true }
+      }
+      const sentAt = catalog.snapshots()
       try {
         const outcome = outcomeOf(await attached.command(record))
+        if (isCatalog && outcome.kind === "ok") catalog.keep(key, outcome.response, sentAt)
         return readOnly && outcome.kind === "uncertain" ? { kind: "refused", reason: outcome.reason } : outcome
       } catch (error) {
         // The attach succeeded, so a failure without a local API code is a lost reply, not a failed attach.
@@ -151,22 +194,24 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       // A read changes nothing on the other device, so every failure is a typed refusal, never uncertain.
       let page: Awaited<ReturnType<RemoteAttach["read"]>>
       try {
-        page = await (await attach(device, sessionId)).read({ tail })
+        page = await (await attach(device, sessionId)).attached.read({ tail })
       } catch (error) {
         return { kind: "refused", reason: notSentReason(error) }
       }
       const entries: JsonObject[] = page.entries.flatMap((item) => ("entry" in item && typeof item.entry === "object" && item.entry !== null && !Array.isArray(item.entry) ? [item.entry as JsonObject] : []))
       return { kind: "ok", response: { entries } }
     },
-    locate: async (device, engineId) => {
+    locate: async (device, engineId, knownKey) => {
       let connected: DeviceService
       try {
         connected = await svc()
       } catch (error) {
         return { kind: "refused", reason: notSentReason(error) }
       }
+      // A create reply that already names the session's listing key needs no session.locate round trip.
       let key: string
-      try {
+      if (knownKey !== undefined) key = knownKey
+      else try {
         key = (await connected.locate(device, engineId)).key
       } catch (error) {
         return { kind: "refused", reason: error instanceof LocalApiError ? error.code : "locate_failed" }

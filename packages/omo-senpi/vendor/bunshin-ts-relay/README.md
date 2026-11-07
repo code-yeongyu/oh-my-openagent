@@ -35,7 +35,7 @@ device that does not describe itself within `describeTimeoutMs`, or whose descri
 unsupported with `attention` naming why and after how long (`unreachable after <ms> ms: <reason>`), and the others list
 as described; only a failure of the connection itself fails the listing. This device is listed unsupported, since the
 service runs no machine operation on its own device, so fanout skips it. `listTools()` answers `[]` at once for a device
-the latest listing could not describe. `listTools(machineId)` returns the operations that device advertises; this package fixes no
+the latest listing could not describe or reported unsupported, without describing it again. `listTools(machineId)` returns the operations that device advertises; this package fixes no
 operation list.
 
 The target device runs an op only while it is attached and this device is in its account's roster; its user can
