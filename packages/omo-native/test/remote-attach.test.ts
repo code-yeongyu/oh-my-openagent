@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url"
 
 import { defaultWorld, SESSION_ID, type World } from "../../device-service-core/test/local-api/conformance/world.ts"
 import { LOCAL_SESSION_ID, pipeAddress } from "../remote-attach"
-import { cleanupAttachFixtures, endpointFor, type Line, ownerState, TuiPeer, within } from "./remote-attach-support"
+import { cleanupAttachFixtures, detachAll, endpointFor, type Line, ownerState, TuiPeer, within } from "./remote-attach-support"
 
 // Every inbound record type the pinned engine knows, from its own method table (senpi#4319), never a list kept here.
 const engineDist = dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi")))
@@ -144,6 +144,33 @@ describe.skipIf(process.platform === "win32")("omo remote attach endpoint", () =
     expect(statSync(`${endpoint.socketPath}.secret`).mode & 0o777).toBe(0o600)
     await endpoint.close()
     expect(existsSync(dir)).toBe(false)
+  })
+})
+
+// B2 (two-device proof case 5): another client closed the attached session and the TUI kept running on "Disconnected".
+// peer_detached is what a session close reaches this client as while the relay daemon's version gate withholds
+// session_closed (relayd B1), so both have to end the attach cleanly; a revoked peer ends it as a failure.
+describe.skipIf(process.platform === "win32")("omo remote attach endpoint when the remote side ends the attach", () => {
+  test.each([
+    ["session_closed", 0],
+    ["peer_detached", 0],
+    ["peer_revoked", 1],
+  ] as const)("tells the TUI on a connection it leaves open, and ends the attach on %s with exit %d", async (reason, exitCode) => {
+    const endpoint = await endpointFor()
+    const tui = await TuiPeer.connect(endpoint.socketPath)
+    await tui.request({ type: "subscribe_sessions", sessions: { ids: [LOCAL_SESSION_ID] }, mirror: "all" })
+    await tui.record(line => line.method === "notify" && String(line.message).startsWith("Attached to"), "the attached notice")
+
+    detachAll(reason)
+
+    await tui.record(line => line.method === "notify" && line.message === `The remote session ended (${reason})`, "the ended notice")
+    expect(await within(endpoint.ended, "the attach end")).toEqual({
+      reason,
+      exitCode,
+      message: `The remote session Studio/${SESSION_ID} ended (${reason}).`,
+    })
+    // The TUI leaves on its own terms: its release still gets an answer, so the notice is not replaced by "Disconnected".
+    expect((await tui.request({ type: "release_attachment", sessionId: LOCAL_SESSION_ID })).success).toBe(true)
   })
 })
 
