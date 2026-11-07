@@ -11,6 +11,7 @@ import { GitMemoryRepo, buildDefaultSeedFiles, buildIdentityPaths, type FactsPeo
 import { createMemoryIdentityContext } from "./context"
 import { applyMemoryFacts } from "./facts-apply-runtime"
 import { applyFactsWithRetriesUnderLock, withFactsWriterLock } from "./facts-batch-apply"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const PEOPLE: FactsPeopleRouting = { enabled: true, maxEntries: 40, maxEntryChars: 200 }
 const PROJECT = { scope: "project" as const, text: "The project runs tests with bun.", date: "2026-10-18" }
@@ -39,7 +40,7 @@ function runChild(root: string): Promise<{ readonly code: number | null; readonl
     let output = ""
     child.stdout.on("data", (chunk: Buffer) => { output += chunk.toString() })
     child.stderr.on("data", (chunk: Buffer) => { output += chunk.toString() })
-    const timer = setTimeout(() => { child.kill(); rejectRun(new Error(`reconcile child did not exit within 25s: ${output}`)) }, 25_000)
+    const timer = setTimeout(() => { child.kill(); rejectRun(new Error(`reconcile child did not exit within the test budget: ${output}`)) }, remainingTestTime())
     child.on("error", (error) => { clearTimeout(timer); rejectRun(error) })
     child.on("exit", (code) => { clearTimeout(timer); resolveRun({ code, output }) })
   })
@@ -58,6 +59,7 @@ describe("facts/applied recovery envelopes", () => {
   }, 60_000)
 
   test("#given an apply that throws mid-write #when a fresh process reconciles memory #then the kept envelope settles into one commit and is removed", async () => {
+    useTestTimeout(60_000)
     const { root, identity, repo } = await memory()
     const hooks = join(root, "failing-hooks")
     await mkdir(hooks)
@@ -82,6 +84,7 @@ describe("facts/applied recovery envelopes", () => {
   }, 60_000)
 
   test("#given a kept envelope #when a same-batchId retry finds the memory-write lock busy #then the envelope and its recovery survive for maintenance to finish", async () => {
+    useTestTimeout(60_000)
     const { root, identity, repo } = await memory()
     const hooks = join(root, "failing-hooks")
     await mkdir(hooks)
