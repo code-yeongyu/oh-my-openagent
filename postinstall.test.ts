@@ -2,11 +2,12 @@
 
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { randomUUID } from "node:crypto"
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { delimiter } from "node:path"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 const postinstallPath = fileURLToPath(new URL("./postinstall.mjs", import.meta.url))
 const RENAME_NOTICE =
@@ -35,6 +36,9 @@ function runPostinstallInFixtureEnv(options: { readonly pathPrefix?: string; rea
         HOME: fixtureHome,
         USERPROFILE: fixtureHome,
         XDG_CACHE_HOME: join(fixtureHome, "cache"),
+        TMPDIR: fixtureHome,
+        TMP: fixtureHome,
+        TEMP: fixtureHome,
       },
     })
     return { status: result.status, stdout: result.stdout ?? "", stderr: result.stderr ?? "" }
@@ -43,12 +47,14 @@ function runPostinstallInFixtureEnv(options: { readonly pathPrefix?: string; rea
   }
 }
 
-function writeHangingOpencodeShim(): string {
+function writeOpencodeShim(source: string): string {
   const binDir = mkdtempSync(join(tmpdir(), "omo-postinstall-hanging-opencode-"))
-  const hang = `${JSON.stringify(process.execPath)} -e "setTimeout(() => {}, ${HANGING_OPENCODE_MS})"`
-  writeFileSync(join(binDir, "opencode"), `#!/bin/sh\nexec ${hang}\n`)
+  const script = join(binDir, "opencode.mjs")
+  writeFileSync(script, source)
+  const command = `${JSON.stringify(process.execPath)} ${JSON.stringify(script)}`
+  writeFileSync(join(binDir, "opencode"), `#!/bin/sh\nexec ${command}\n`)
   chmodSync(join(binDir, "opencode"), 0o755)
-  writeFileSync(join(binDir, "opencode.cmd"), `@${hang}\r\n`)
+  writeFileSync(join(binDir, "opencode.cmd"), `@${command}\r\n`)
   return binDir
 }
 
@@ -70,6 +76,58 @@ function countNativeNotices(output: string): number {
 }
 
 describe("postinstall rename notice", () => {
+  test("#given a formatter import #when evaluated #then installation does not run", () => {
+    const root = mkdtempSync(join(tmpdir(), "omo-postinstall-import-"))
+    const marker = join(root, "probe-called")
+    const binDir = writeOpencodeShim(`import { writeFileSync } from "node:fs"; writeFileSync(${JSON.stringify(marker)}, "called"); console.log("1.4.0")`)
+    const cache = join(root, "cache", "opencode", "oh-my-openagent@fixture")
+    mkdirSync(cache, { recursive: true })
+    const script = join(root, "import.mjs")
+    writeFileSync(script, `import { nativeNotice } from ${JSON.stringify(pathToFileURL(postinstallPath).href)}; if (!nativeNotice("5.0.0").endsWith("omo-ai")) throw new Error("wrong channel")`)
+    try {
+      const result = spawnSync(process.execPath, [script], {
+        encoding: "utf8",
+        env: {
+          ...inheritedPlatformEnv(),
+          PATH: `${binDir}${delimiter}${process.env.PATH ?? ""}`,
+          HOME: root,
+          USERPROFILE: root,
+          XDG_CACHE_HOME: join(root, "cache"),
+          TMPDIR: root,
+          TMP: root,
+          TEMP: root,
+        },
+      })
+      expect(result.status).toBe(0)
+      expect(result.stdout).toBe("")
+      expect(existsSync(marker)).toBe(false)
+      expect(existsSync(cache)).toBe(true)
+    } finally {
+      rmSync(binDir, { recursive: true, force: true })
+      rmSync(root, { recursive: true, force: true })
+    }
+  }, SUBPROCESS_TEST_TIMEOUT_MS)
+
+  test("#given a version probe using temporary storage #when installation ends #then its artifacts are removed", () => {
+    const artifact = `omo-postinstall-native-probe-${randomUUID()}`
+    const leakedPath = join(tmpdir(), artifact)
+    const binDir = writeOpencodeShim(`
+      import { writeFileSync } from "node:fs"
+      import { tmpdir } from "node:os"
+      import { join } from "node:path"
+      writeFileSync(join(tmpdir(), ${JSON.stringify(artifact)}), "runtime artifact")
+      console.log("1.4.0")
+    `)
+    try {
+      const run = runPostinstallInFixtureEnv({ pathPrefix: binDir })
+      expect(run.status).toBe(0)
+      expect(existsSync(leakedPath)).toBe(false)
+    } finally {
+      rmSync(leakedPath, { force: true })
+      rmSync(binDir, { recursive: true, force: true })
+    }
+  }, SUBPROCESS_TEST_TIMEOUT_MS)
+
   test("names the install line of the package's own channel", async () => {
     const { nativeNotice } = await import("./postinstall.mjs")
     expect(nativeNotice("5.0.0")).toEndWith("bun add -g omo-ai")
@@ -101,7 +159,7 @@ describe("postinstall rename notice", () => {
 
   test("finishes when the opencode version probe never returns", () => {
     // #given
-    const hangingBinDir = writeHangingOpencodeShim()
+    const hangingBinDir = writeOpencodeShim(`setTimeout(() => {}, ${HANGING_OPENCODE_MS})`)
 
     try {
       // #when
