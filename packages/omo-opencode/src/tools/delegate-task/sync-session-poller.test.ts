@@ -500,6 +500,86 @@ describe("pollSyncSession", () => {
     })
   })
 
+  describe("originating user outside the latest-100 message window", () => {
+    function createLongSessionClient(assistantCount: number) {
+      const fullHistory = [
+        { info: { id: "msg_0000", role: "user", time: { created: 1000 } }, parts: [] },
+        ...Array.from({ length: assistantCount }, (_, index) => ({
+          info: {
+            id: `msg_${String(index + 1).padStart(4, "0")}`,
+            role: "assistant",
+            time: { created: 2000 + index },
+            finish: "stop",
+          },
+          parts: [{ type: "text", text: "Done" }],
+        })),
+      ]
+      const limits: Array<number | undefined> = []
+      const client = {
+        session: {
+          abort: async () => ({}),
+          messages: async (args: { query?: { limit?: number } }) => {
+            const limit = args?.query?.limit
+            limits.push(limit)
+            return { data: limit === undefined ? fullHistory : fullHistory.slice(-limit) }
+          },
+          status: async () => ({ data: { ses_long: { type: "idle" } } }),
+        },
+      }
+      return { client, limits }
+    }
+
+    test("#given 100 assistant messages after the only user message #then poll completes instead of timing out", async () => {
+      const { pollSyncSession } = require("./sync-session-poller")
+      const { client } = createLongSessionClient(100)
+
+      const result = await pollSyncSession(createMockCtx(), client, {
+        sessionID: "ses_long",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      }, 300)
+
+      expect(result).toBeNull()
+    })
+
+    test("#given 99 assistant messages after the user #then poll still completes from the bounded window", async () => {
+      const { pollSyncSession } = require("./sync-session-poller")
+      const { client, limits } = createLongSessionClient(99)
+
+      const result = await pollSyncSession(createMockCtx(), client, {
+        sessionID: "ses_long",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      }, 300)
+
+      expect(result).toBeNull()
+      expect(limits.every((limit) => limit === 100)).toBe(true)
+    })
+
+    test("#given parent abort after a 100-assistant task already completed #then returns completion not abort", async () => {
+      const { pollSyncSession } = require("./sync-session-poller")
+      const { client } = createLongSessionClient(100)
+      let abortCount = 0
+      client.session.abort = async () => {
+        abortCount++
+        return {}
+      }
+
+      const result = await pollSyncSession(createMockCtx(true), client, {
+        sessionID: "ses_long",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+        anchorMessageCount: 1,
+      }, 300)
+
+      expect(result).toBeNull()
+      expect(abortCount).toBe(0)
+    })
+  })
+
   describe("timeout handling", () => {
     test("returns error string on timeout", async () => {
       // given: no terminal finish and short timeout
