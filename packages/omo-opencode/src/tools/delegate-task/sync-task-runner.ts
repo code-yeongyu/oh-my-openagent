@@ -166,6 +166,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
             parentContext,
             startTime,
             textContent: recoveredResult.textContent,
+            endState: recoveredResult.endState,
           })
         }
       }
@@ -222,6 +223,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
       parentContext,
       startTime,
       textContent: result.textContent,
+      endState: result.endState,
     })
   }
 }
