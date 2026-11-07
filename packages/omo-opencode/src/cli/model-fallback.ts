@@ -26,6 +26,23 @@ export type { GeneratedOmoConfig } from "./model-fallback-types"
 export const ULTIMATE_FALLBACK = "opencode/gpt-5-nano"
 const SCHEMA_URL = "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json"
 
+// Ultimate-fallback gap rungs: the sisyphus chain misses google (Gemini) and the MiniMax
+// coding plans. Every installer-selectable provider must resolve in this chain, or
+// single-provider installs fall through to the unresolvable ULTIMATE_FALLBACK literal (#6799).
+const ULTIMATE_FALLBACK_GAP_RUNGS: FallbackEntry[] = [
+  { providers: ["google"], model: "gemini-3.1-pro", variant: "high" },
+  { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
+]
+
+function getUltimateFallbackChain(): FallbackEntry[] {
+  return [...getSisyphusFallbackChain(), ...ULTIMATE_FALLBACK_GAP_RUNGS]
+}
+
+function resolveUltimateFallbackConfig(availability: ReturnType<typeof toProviderAvailability>): AgentConfig {
+  const resolved = resolveModelFromChain(getUltimateFallbackChain(), availability)
+  return resolved ? toCompatibleModelConfig(resolved.model, {}) : { model: ULTIMATE_FALLBACK }
+}
+
 type CompatibleFallbackSettings = {
   variant?: string
   reasoningEffort?: FallbackModelObject["reasoningEffort"]
@@ -205,7 +222,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       } else if (avail.native.claude) {
         agentConfig = { model: `anthropic/${LATEST_MODEL_BY_FAMILY.claudeHaiku}`, variant: "medium" }
       } else if (avail.opencodeZen) {
-        agentConfig = { model: "opencode/gpt-5-nano" }
+        agentConfig = { model: "opencode/big-pickle" }
       } else if (avail.opencodeGo) {
         agentConfig = { model: "opencode-go/qwen3.7-plus" }
       } else if (avail.copilot) {
@@ -216,7 +233,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
           const variant = resolved.variant ?? req.variant
           agentConfig = toCompatibleModelConfig(resolved.model, { variant })
         } else {
-          agentConfig = { model: "opencode/gpt-5-nano" }
+          agentConfig = resolveUltimateFallbackConfig(avail)
         }
       }
       agents[role] = attachAllFallbackModels(agentConfig, req.fallbackChain, avail)
@@ -250,7 +267,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       const agentConfig = toCompatibleModelConfig(resolved.model, { variant })
       agents[role] = attachFallbackModels(agentConfig, req.fallbackChain, avail)
     } else {
-      agents[role] = { model: ULTIMATE_FALLBACK }
+      agents[role] = resolveUltimateFallbackConfig(avail)
     }
   }
 
@@ -277,7 +294,7 @@ export function generateModelConfig(config: InstallConfig): GeneratedOmoConfig {
       const categoryConfig = toCompatibleModelConfig(resolved.model, { variant })
       categories[cat] = attachFallbackModels(categoryConfig, fallbackChain, avail)
     } else {
-      categories[cat] = { model: ULTIMATE_FALLBACK }
+      categories[cat] = resolveUltimateFallbackConfig(avail)
     }
   }
 
