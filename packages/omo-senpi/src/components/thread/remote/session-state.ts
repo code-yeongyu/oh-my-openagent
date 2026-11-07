@@ -18,7 +18,16 @@ export function sessionStateOf(sessionId: string, data: JsonObject): RemoteSessi
   const status = data["isCompacting"] === true ? "compacting" : Array.isArray(questions) && questions.length > 0 ? "waiting_input" : data["isStreaming"] === true ? "running" : "idle"
   const durableSessionId = nonEmpty(data["durableSessionId"])
   const currentTurnId = nonEmpty(data["currentTurnId"])
-  return { status, sessionId, ...(durableSessionId === undefined ? {} : { durableSessionId }), ...(currentTurnId === undefined ? {} : { currentTurnId }) }
+  // The requests the session waits on: senpi lists dialogs and questions apart; an engine that lists neither says nothing.
+  const listed = [data["pendingDialogs"], questions].filter(Array.isArray)
+  const pendingRequests = listed.length === 0 ? undefined : listed.flat().filter(isJsonObject)
+  return {
+    status,
+    sessionId,
+    ...(durableSessionId === undefined ? {} : { durableSessionId }),
+    ...(currentTurnId === undefined ? {} : { currentTurnId }),
+    ...(pendingRequests === undefined ? {} : { pendingRequests }),
+  }
 }
 
 /**

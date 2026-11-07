@@ -149,6 +149,11 @@ export type ThreadSetModelResult =
   | { readonly kind: "ok"; readonly thread_id: string; readonly model: { readonly provider: string; readonly id: string }; readonly device?: string }
   | ThreadDataError
 
+/** A dialog on another device's session answered by its uiRequestId (`omo remote answer`). */
+export type ThreadRemoteAnswerResult =
+  | { readonly kind: "ok"; readonly thread_id: string; readonly answered: { readonly ui_request_id: string }; readonly device: string }
+  | ThreadDataError
+
 export type ThreadSetReasoningResult =
   | { readonly kind: "ok"; readonly thread_id: string; readonly level: ThreadThinkingLevel; readonly scope: ThreadReasoningScope }
   | ThreadDataError
@@ -232,3 +237,4 @@ export type ThreadToolResult =
   | ThreadRenameResult
   | ThreadSetModelResult
   | ThreadSetReasoningResult
+  | ThreadRemoteAnswerResult
