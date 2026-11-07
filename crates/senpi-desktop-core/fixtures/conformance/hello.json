@@ -21,7 +21,11 @@
               "buildSha": "unknown",
               "abi": "senpi-desktop/1",
               "features": [
-                "action-report"
+                "action-report",
+                "frame-identity",
+                "frame-consume",
+                "ax-partial",
+                "trace"
               ]
             }
           },
@@ -50,7 +54,11 @@
               "buildSha": "unknown",
               "abi": "senpi-desktop/1",
               "features": [
-                "action-report"
+                "action-report",
+                "frame-identity",
+                "frame-consume",
+                "ax-partial",
+                "trace"
               ]
             }
           },

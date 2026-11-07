@@ -13,6 +13,7 @@ mod front_app;
 mod launch_gate;
 mod launch_services;
 mod overlay;
+mod parent_death;
 mod power;
 mod release_helper;
 mod responsible;

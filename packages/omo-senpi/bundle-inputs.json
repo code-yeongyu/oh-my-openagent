@@ -1661,6 +1661,7 @@
     "packages/senpi-desktop-service/src/service/global-input.ts",
     "packages/senpi-desktop-service/src/service/notifications.ts",
     "packages/senpi-desktop-service/src/service/parse.ts",
+    "packages/senpi-desktop-service/src/service/permission-preflight.ts",
     "packages/senpi-desktop-service/src/service/rpc-client.ts",
     "packages/senpi-desktop-service/src/service/service.ts",
     "packages/senpi-desktop-service/src/service/timeouts.ts",

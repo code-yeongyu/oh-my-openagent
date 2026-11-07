@@ -121,8 +121,20 @@ impl Backend for MacosBackend {
         MacosBackend::capabilities(self)
     }
 
+    fn hit_at(&mut self, x: f64, y: f64) -> CoreResult<Option<senpi_desktop_core::frame::PointHit>> {
+        crate::ax::element::hit_at(x, y)
+    }
+
     fn set_show_cursor(&mut self, enabled: bool) {
         MacosBackend::set_show_cursor(self, enabled);
+    }
+
+    fn set_key_priming(&mut self, mode: senpi_desktop_core::types::KeyPriming) {
+        crate::input::set_key_priming(mode);
+    }
+
+    fn set_report_mode(&mut self, mode: senpi_desktop_core::report::ReportMode) {
+        crate::input::set_key_report_mode(mode);
     }
 
     fn displays(&mut self) -> CoreResult<Vec<DesktopDisplay>> {
