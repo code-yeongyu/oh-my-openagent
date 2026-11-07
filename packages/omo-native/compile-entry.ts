@@ -166,9 +166,9 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   }
   if (args[0] === "remote" && args[1] === "attach") {
     // The compiled binary is the engine: the attach TUI runs in this process, beside the endpoint it attaches to.
-    const engineArgs = await runRemoteAttachCommand(args)
-    if (engineArgs === undefined) return true
-    process.argv.splice(2, process.argv.length - 2, ...engineArgs)
+    const launch = await runRemoteAttachCommand(args)
+    if (launch === undefined) return true
+    process.argv.splice(2, process.argv.length - 2, ...launch.engineArgs)
     return false
   }
   if (args[0] === "remote") {
