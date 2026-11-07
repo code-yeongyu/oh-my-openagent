@@ -6,7 +6,6 @@ import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { buildDreamTriggerWiring } from "./dream-runtime-wiring"
 import { resolveMemorySettings } from "./identity-runtime"
 import { createMemoryMaintenance } from "./memory-maintenance"
-import { resolveRuntimeRetentionPolicy } from "./memory-runtime-retention"
 import { resolveAgentReflectionSettings } from "./reflection-settings"
 import { encodeKibitzerSessionId } from "./kibitzer/observe-paths"
 import { createMemoryNudgeWiring } from "./nudge-wiring"
@@ -166,8 +165,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   const kibitzerRef: { current?: KibitzerComposition } = {}
   const maintenance = (options.createMaintenance ?? createMemoryMaintenance)({
     isLiveSession: (sessionId) => options.sessions.has(sessionId),
-    resolveRetention: (context) =>
-      resolveRuntimeRetentionPolicy(resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory), context.identity),
+    memorySettings: () => resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory),
     reflectionEnabled: (context) =>
       resolveAgentReflectionSettings(options.loadConfig({ cwd: options.cwd() }).config.memory, context.identity).enabled,
     ownedSidecars: () => new Set([...options.sessions.keys()].map(encodeKibitzerSessionId)),

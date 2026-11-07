@@ -240,6 +240,8 @@ const OmoMemoryRuntimeSchema = z.object({
   completions_days: z.number().int().min(1).default(30),
   pass_budget_ms: z.number().int().min(1).default(60000),
   discard_unreflected_journals: z.boolean().default(false),
+  /** Per-identity runtime size cap in bytes (design 3); `0` = unbounded. */
+  max_bytes: z.number().int().min(0).default(2 * 1024 * 1024 * 1024),
 }).strict()
 
 const OmoMemoryRuntimeLayerSchema = z.object({
@@ -248,6 +250,7 @@ const OmoMemoryRuntimeLayerSchema = z.object({
   completions_days: z.number().int().min(1).optional(),
   pass_budget_ms: z.number().int().min(1).optional(),
   discard_unreflected_journals: z.boolean().optional(),
+  max_bytes: z.number().int().min(0).optional(),
 }).strict()
 
 // ---------------------------------------------------------------------------
@@ -324,7 +327,7 @@ export const OmoMemorySettingsSchema = z.object({
   }),
   project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
   projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 0, max_bytes: 40960 }),
-  runtime: OmoMemoryRuntimeSchema.default({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30, pass_budget_ms: 60000, discard_unreflected_journals: false }),
+  runtime: OmoMemoryRuntimeSchema.default({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30, pass_budget_ms: 60000, discard_unreflected_journals: false, max_bytes: 2 * 1024 * 1024 * 1024 }),
   compile_warn_tokens: z.number().int().positive().default(30000),
   agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).default({}),
 }).strict()

@@ -19,7 +19,7 @@ export interface ReflectionRetentionGuard {
  * removed (H1 Guard 2). Contention means a reservation is in progress: the reflection stores are
  * skipped for this pass rather than waited on.
  */
-async function readReflectionRetentionGuard(context: RetentionContext): Promise<ReflectionRetentionGuard | undefined> {
+export async function readReflectionRetentionGuard(context: RetentionContext): Promise<ReflectionRetentionGuard | undefined> {
   await mkdir(context.paths.locks, { recursive: true, mode: 0o700 })
   const record = await createLockRecord("reflection-scheduler", { runId: "runtime-retention" })
   try {
@@ -40,7 +40,8 @@ export async function reservedRunIds(reflectionDir: string): Promise<ReadonlySet
   return (await readReservations(reflectionDir)).runIds
 }
 
-async function readReservations(reflectionDir: string): Promise<{ readonly runIds: Set<string>; readonly conversationIds: Set<string> }> {
+/** Run ids and conversation ids named by `active.lock` and `pending.json`, read lock-free (the doctors' estimate). */
+export async function readReservations(reflectionDir: string): Promise<{ readonly runIds: Set<string>; readonly conversationIds: Set<string> }> {
   const runIds = new Set<string>()
   const conversationIds = new Set<string>()
   for (const name of ["active.lock", "pending.json"]) {
