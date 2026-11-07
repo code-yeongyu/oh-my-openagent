@@ -37,7 +37,7 @@ Generate hierarchical AGENTS.md files: root + complexity-scored subdirectories, 
 
 Measure and compute in ONE eval cell - code, not mental arithmetic:
 
-```js
+```text
 # Measure (tracked files minus vendored/generated: node_modules, .git, dist,
 # build, out, vendor, target, coverage, lockfiles, minified and binary files)
 S        = total source bytes after exclusions
@@ -146,6 +146,8 @@ The main session reads the verify node's output and nothing else. Each FAIL line
 | Export count | 2x | >10 exports | LSP/sg |
 | Reference centrality | 3x | >20 refs | LSP/sg |
 
+**Score** = sum over factors of `weight x level`, where level is 0 (below half the threshold), 1 (at least half), or 2 (above the threshold; for yes/no factors, 2 = yes). Maximum 34.
+
 ### Decision Rules
 
 | Score | Action |
@@ -175,7 +177,7 @@ NEVER use Write to overwrite an existing file. ALWAYS check existence first via 
 
 ### Root AGENTS.md (Full Treatment)
 
-```markdown
+~~~~markdown
 # PROJECT KNOWLEDGE BASE
 
 **Generated:** {TIMESTAMP}
@@ -218,7 +220,7 @@ NEVER use Write to overwrite an existing file. ALWAYS check existence first via 
 
 ## NOTES
 {Gotchas}
-```
+~~~~
 
 **Quality gates**: 50-150 lines, no generic advice, no obvious info.
 
@@ -237,7 +239,7 @@ Capture the answer as `USER_MODE_CHOICE`. The explicit answer is authoritative:
 - `committed` lands the generated guidance through a reviewed PR, via the committed-mode PR handoff at the end of this phase.
 - If no explicit answer is available, tracked `AGENTS.md` status is the fallback.
 
-Run these commands after the review is complete:
+Run these commands once the verify node reports all PASS (inline path: once every file is written):
 
 ```bash
 # Snapshot — create complete JSON with all fields, milliseconds timestamp
@@ -245,7 +247,7 @@ mkdir -p .omo
 SHA=$(git rev-parse HEAD)
 # Count tracked files (NUL byte counting, chunk-boundary safe)
 FILES=$(git ls-files -z | node -e 'let c=0;process.stdin.on("data",d=>{for(let i=0;i<d.length;i++)if(d[i]===0)c++});process.stdin.on("end",()=>process.stdout.write(String(c)))')
-LOC=$(git ls-files -z -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.go' '*.rs' '*.java' '*.kt' '*.swift' '*.rb' '*.php' '*.c' '*.cpp' '*.cs' '*.scala' '*.lua' '*.ex' '*.exs' '*.zig' '*.dart' | xargs -0 wc -l 2>/dev/null | tail -1 | awk '{print $1}')
+LOC=$(git ls-files -z -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.go' '*.rs' '*.java' '*.kt' '*.swift' '*.rb' '*.php' '*.c' '*.cpp' '*.cs' '*.scala' '*.lua' '*.ex' '*.exs' '*.zig' '*.dart' | xargs -0 cat 2>/dev/null | wc -l | tr -d ' ')
 NOW=$(node -e 'console.log(Date.now())')
 USER_MODE_CHOICE="${USER_MODE_CHOICE:-}" && if [ "$USER_MODE_CHOICE" = "committed" ]; then MODE=committed; elif [ "$USER_MODE_CHOICE" = "local" ]; then MODE=local; elif git ls-files --error-unmatch AGENTS.md >/dev/null 2>&1; then MODE=committed; else MODE=local; fi
 cat > .omo/init-deep.json <<EOF
