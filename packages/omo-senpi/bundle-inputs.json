@@ -952,6 +952,7 @@
     "packages/omo-senpi/src/components/memory/consent-exchange.ts",
     "packages/omo-senpi/src/components/memory/context.ts",
     "packages/omo-senpi/src/components/memory/desktop-sync/bootClaim.ts",
+    "packages/omo-senpi/src/components/memory/desktop-sync/bootGate.ts",
     "packages/omo-senpi/src/components/memory/desktop-sync/channel.ts",
     "packages/omo-senpi/src/components/memory/desktop-sync/desktopClaim.ts",
     "packages/omo-senpi/src/components/memory/desktop-sync/desktopSyncAccount.ts",
