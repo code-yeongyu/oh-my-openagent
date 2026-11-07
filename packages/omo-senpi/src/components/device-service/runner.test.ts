@@ -60,19 +60,32 @@ describe("the omo remote bootstrap worker", () => {
   // A child that ignores SIGTERM (the account read turns it into an abort while `run()` is active)
   // must still be stopped: the deadline escalates to SIGKILL after a short grace period. Without
   // the escalation the promise never settles, so this test fails by timeout on the pre-fix code.
-  // The deadline fires 500 ms after spawn so the child has registered its SIGTERM handler first:
-  // a signal sent during startup kills the child before the handler exists and the test would
-  // pass without proving anything. The 15 s budget covers the 500 ms delay plus the 5 s SIGKILL
-  // grace; Bun resets the default timeout to 5 s for later files of a multi-file run.
+  // The child prints "ready" only after its SIGTERM handler is installed, and the deadline fires
+  // on that signal rather than after a fixed delay: a fixed delay assumes the handler is ready by
+  // then, and on a slow start SIGTERM alone kills the child before the handler exists, so the test
+  // would pass without ever proving the SIGKILL step. The grace is injected at 100 ms so the test
+  // no longer waits out the production 5 s. The 15 s budget is headroom for a slow start; Bun
+  // resets the default timeout to 5 s for later files of a multi-file run.
   test(
     "a worker that ignores SIGTERM is killed at its deadline and rejects as timed out",
     async () => {
-      const omoBin = launcherScript("process.on('SIGTERM', () => {})\nsetInterval(() => {}, 1000)\n")
-      const afterStart = (expire: () => void) => {
-        const timer = setTimeout(expire, 500)
-        return () => clearTimeout(timer)
+      const omoBin = launcherScript(
+        "process.on('SIGTERM', () => {})\nconsole.log(\"ready\")\nsetInterval(() => {}, 1000)\n",
+      )
+      const afterReady = (expire: () => void, ready?: Promise<void>) => {
+        let timer: ReturnType<typeof setTimeout> | undefined
+        let cancelled = false
+        void ready?.then(() => {
+          if (!cancelled) timer = setTimeout(expire, 0)
+        })
+        return () => {
+          cancelled = true
+          if (timer !== undefined) clearTimeout(timer)
+        }
       }
-      await expect(runBootstrapWorker(omoBin, { schedule: afterStart })).rejects.toBeInstanceOf(BootstrapWorkerTimeout)
+      await expect(
+        runBootstrapWorker(omoBin, { schedule: afterReady, readySignal: "ready", sigkillGraceMs: 100 }),
+      ).rejects.toBeInstanceOf(BootstrapWorkerTimeout)
     },
     15_000,
   )

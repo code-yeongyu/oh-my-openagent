@@ -11,8 +11,10 @@ const BOOTSTRAP_DEADLINE_MS = 10 * 60_000
 // its `run()` is active, so a cooperative child needs a moment to stop; a child that ignores SIGTERM is killed anyway.
 const SIGKILL_GRACE_MS = 5_000
 
-/** Schedules `expire` and returns its cancel; the default is an unref'd timer at the deadline. */
-export type DeadlineScheduler = (expire: () => void) => () => void
+/** Schedules `expire` and returns its cancel; the default is an unref'd timer at the deadline. `ready` resolves once
+ * the child signals readiness (see `runBootstrapWorker`'s `readySignal`); a scheduler that waits on it must not fire
+ * the deadline before the child's SIGTERM handler is installed. */
+export type DeadlineScheduler = (expire: () => void, ready?: Promise<void>) => () => void
 
 const atDeadline: DeadlineScheduler = expire => {
   const timer = setTimeout(expire, BOOTSTRAP_DEADLINE_MS)
@@ -56,11 +58,17 @@ function parseBootstrapReport(stdout: string): BootstrapReport | undefined {
  * Starts `<omo> remote bootstrap --json` and resolves with its report. An npm launcher (`bin/omo.js`) runs under
  * this runtime; a compiled omo runs directly. The child never keeps the engine alive: a session that ends first
  * simply leaves it to finish. Rejects when the binary cannot be started, and with BootstrapWorkerTimeout once the child
- * was stopped at its deadline.
+ * was stopped at its deadline. `options.sigkillGraceMs` overrides the SIGKILL grace; `options.readySignal` names a
+ * stdout line that resolves the readiness promise handed to the scheduler.
  */
 export function runBootstrapWorker(
   omoBin: string,
-  options: { readonly execPath?: string; readonly schedule?: DeadlineScheduler } = {},
+  options: {
+    readonly execPath?: string
+    readonly schedule?: DeadlineScheduler
+    readonly sigkillGraceMs?: number
+    readonly readySignal?: string
+  } = {},
 ): Promise<BootstrapReport | undefined> {
   const execPath = options.execPath ?? process.execPath
   const [command, ...args] = omoBin.endsWith(".js") ? [execPath, omoBin, ...BOOTSTRAP_ARGS] : [omoBin, ...BOOTSTRAP_ARGS]
@@ -69,17 +77,47 @@ export function runBootstrapWorker(
     let timedOut = false
     let exited = false
     let killTimer: ReturnType<typeof setTimeout> | undefined
-    const cancel = (options.schedule ?? atDeadline)(() => {
-      timedOut = true
-      child.kill()
-      killTimer = setTimeout(() => {
-        if (!exited) child.kill("SIGKILL")
-      }, SIGKILL_GRACE_MS)
-      killTimer.unref()
-    })
+    // Resolves when the child's stdout carries a line equal to `readySignal`, if one is named; the scheduler
+    // receives it so a test can wait for the child's SIGTERM handler instead of guessing a fixed delay.
+    const readySignal = options.readySignal
+    let resolveReady: (() => void) | undefined
+    const ready =
+      readySignal === undefined
+        ? undefined
+        : new Promise<void>(resolve => {
+            resolveReady = resolve
+          })
+    let lineBuffer = ""
+    const noteReadyLine = (text: string): void => {
+      if (readySignal === undefined || resolveReady === undefined) return
+      lineBuffer += text
+      const lines = lineBuffer.split("\n")
+      lineBuffer = lines.pop() ?? ""
+      for (const line of lines) {
+        if (line.trim() === readySignal) {
+          const resolve = resolveReady
+          resolveReady = undefined
+          resolve()
+          return
+        }
+      }
+      if (lineBuffer.length > 4096) lineBuffer = lineBuffer.slice(-1024)
+    }
+    const cancel = (options.schedule ?? atDeadline)(
+      () => {
+        timedOut = true
+        child.kill()
+        killTimer = setTimeout(() => {
+          if (!exited) child.kill("SIGKILL")
+        }, options.sigkillGraceMs ?? SIGKILL_GRACE_MS)
+        killTimer.unref()
+      },
+      ready,
+    )
     const chunks: Buffer[] = []
     let bytes = 0
     child.stdout.on("data", (chunk: Buffer) => {
+      noteReadyLine(chunk.toString("utf8"))
       if (bytes >= REPORT_MAX_BYTES) return
       bytes += chunk.length
       chunks.push(chunk)
