@@ -90,13 +90,15 @@ export class PermissionPreflight {
 		const { result } = message;
 		const capabilities = request?.opens === true && isRecord(result) ? result.capabilities : result;
 		if (!isDesktopCapabilities(capabilities)) return line;
+		// Whether the next open probes follows the child's OWN answer: its cached denial outlives a merged grant,
+		// so the merged result must not clear the flag (or the open after a successful re-probe skips the probe
+		// and hands the caller the stale denial again).
 		this.#lastDenied = hasDenial(capabilities);
 		const probe = request?.probe;
 		if (probe === undefined || !isRecord(result)) return line;
 		return probe.then((fresh) => {
 			if (fresh === undefined) return line;
 			const merged = merge(capabilities, fresh);
-			this.#lastDenied = hasDenial(merged);
 			return JSON.stringify({ ...message, result: { ...result, capabilities: merged } });
 		});
 	}
