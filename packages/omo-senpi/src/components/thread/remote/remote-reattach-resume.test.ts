@@ -26,6 +26,7 @@ function fakeRelayd(options: { readonly resume: boolean; readonly replay: "histo
   const adopted: Array<() => void> = []
   let attachId = 3
   let whileHeld: (() => void) | undefined
+  let failNext = false
   const recordsEvent = (attach: string, records: readonly Held[], seqs: boolean): Event => ({ type: "event", kind: "session.records", attach, attach_id: attachId, records: records.map((held) => held.record), ...(seqs ? { seqs: records.map((held) => held.seq) } : {}) })
   const snapshotEvent = (attach: string): Event => ({ type: "event", kind: "session.snapshot", attach, attach_id: attachId, cursor: { marker_id: "m", last_entry_id: null }, state: { durableSessionId: "dur-1" }, entries: [], history_truncated: false, oldest_entry_id: null })
   const host = (...records: WireObject[]): void => {
@@ -46,6 +47,10 @@ function fakeRelayd(options: { readonly resume: boolean; readonly replay: "histo
       attaches.push(params)
       const { seqs, resume } = params
       if (!options.resume && (seqs !== undefined || resume !== undefined)) throw new LocalApiError("invalid_request", "request has an unknown field")
+      if (failNext) {
+        failNext = false
+        throw new LocalApiError("host_not_answering", "the host did not answer")
+      }
       whileHeld?.()
       const handle = `a${attaches.length}`
       const keeps = options.resume && (seqs === true || resume !== undefined)
@@ -95,6 +100,7 @@ function fakeRelayd(options: { readonly resume: boolean; readonly replay: "histo
     drop: () => connections.at(-1)?.(),
     moveAttachment: (id: number) => { attachId = id; held.length = 0 },
     duringAttach: (run: () => void) => { whileHeld = () => { whileHeld = undefined; run() } },
+    failNextAttach: () => { failNext = true },
   }
 }
 
@@ -167,11 +173,26 @@ describe("watch v2 re-attach after a drop (relay daemon #774, parity row 11)", (
     expect([seen.log, relayd.attaches.length]).toEqual([[...lines(1, 5), "lost closed", "resync running", ...lines(9, 10)], 4])
   })
 
-  test("#given a relayd whose held attachment moved to another attach_id while omo was away #when the watch resumes #then the full replay's snapshot resets it and it resyncs once, with no record twice", async () => {
-    const relayd = fakeRelayd({ resume: true, replay: "history" })
+  // Review of #12771 at 37b5af3936 (MEDIUM): the lost line depended on whether the fallback snapshot landed in the same
+  // read as the attach answer. What relayd sent decides it now: its snapshot means a gap, whichever read carries it.
+  test.each(["history", "live"] as const)("#given a relayd whose held attachment moved to another attach_id while omo was away, replay landing as %s #when the watch resumes #then the full replay's snapshot reports the gap lost once, resets the watch and resyncs once, and the new attachment's records arrive once", async (replay) => {
+    const relayd = fakeRelayd({ resume: true, replay })
     const { seen, watch } = await dropAndReattach(relayd, 7, () => relayd.moveAttachment(4))
-    await seen.until(9)
+    await seen.until(12)
     watch.stop()
-    expect([seen.log, relayd.attaches.at(-1)]).toEqual([[...lines(1, 5), "lost closed", "resync running", ...lines(9, 10)], { device: "b", session_id: "s1", resume: { attach_id: 3, seq: 5 } }])
+    expect([seen.log, relayd.attaches.at(-1)]).toEqual([[...lines(1, 5), "lost closed", "resync running", ...lines(6, 10)], { device: "b", session_id: "s1", resume: { attach_id: 3, seq: 5 } }])
+  })
+
+  // Review of #12771 at 37b5af3936 (LOW): a resumed attach after a failed pass still read the session afresh, ahead of
+  // the records it had resumed.
+  test("#given the first re-attach fails and the next one resumes #when relayd serves the resume #then the failure is reported lost once and the records after the last applied seq arrive once, with no resync", async () => {
+    const relayd = fakeRelayd({ resume: true, replay: "history" })
+    const { seen, watch } = await dropAndReattach(relayd, 9, () => relayd.failNextAttach())
+    await seen.until(11)
+    watch.stop()
+    expect([seen.log, relayd.attaches.slice(1)]).toEqual([
+      [...lines(1, 5), "lost closed", ...lines(6, 10)],
+      [{ device: "b", session_id: "s1", resume: { attach_id: 3, seq: 5 } }, { device: "b", session_id: "s1", resume: { attach_id: 3, seq: 5 } }],
+    ])
   })
 })

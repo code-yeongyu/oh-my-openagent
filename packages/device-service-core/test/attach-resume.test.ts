@@ -6,7 +6,7 @@ import { defaultWorld } from "./local-api/conformance/world.ts"
 
 // relay daemon #774 / #782: session.attach takes `seqs: true` and `resume {attach_id, seq}`; a service before it answers
 // either field invalid_request. `supports` picks which service answers; every session.attach's fields are kept as sent.
-function service(supports: boolean) {
+function service(supports: boolean, refuse?: string) {
   const sent: Array<Readonly<Record<string, unknown>>> = []
   const client: LocalApiClient = {
     welcome: { type: "welcome", v: 1, service_version: "1.4.0", owner: "service", server_proof: "p", server_nonce: "n", capabilities: [], state: defaultWorld().status },
@@ -14,6 +14,7 @@ function service(supports: boolean) {
       if (type !== "session.attach") throw new Error(`unexpected request ${type}`)
       sent.push(params)
       if (!supports && (params["seqs"] !== undefined || params["resume"] !== undefined)) throw new LocalApiError("invalid_request", "request has an unknown field")
+      if (refuse !== undefined && params["resume"] !== undefined) throw new LocalApiError("invalid_request", refuse)
       return { attach: `a${sent.length}` }
     }) as LocalApiClient["request"],
     onEvent: () => () => {},
@@ -51,5 +52,14 @@ describe("attach record seqs and resume (relay daemon #774)", () => {
       ["a2", false, undefined],
       ["a3", false],
     ])
+  })
+
+  // Review of #12771 at 37b5af3936 (LOW): every invalid_request was read as a service before #774, so a #774 service
+  // refusing a malformed resume (a client bug) was hidden behind a plain attach. Only the unknown-field refusal is.
+  test("#given a service with #774 #when it refuses a malformed resume invalid_request #then the attach fails with that refusal and is not retried plain", async () => {
+    const svc = service(true, "resume.seq")
+    const connected = await svc.connect()
+    const failed = await connected.attach("dev-peer-1", "s1", { resume: { attach_id: 3, seq: -1 } }).then(() => undefined, (error: unknown) => error)
+    expect([failed instanceof LocalApiError ? [failed.code, failed.reason] : failed, svc.sent.length]).toEqual([["invalid_request", "resume.seq"], 1])
   })
 })
