@@ -86,6 +86,34 @@ describe("createSessionStatusHandler", () => {
     expect(statusFallbackPatterns).toBe(canonicalPatterns)
   })
 
+  for (const [label, message] of [
+    ["session", "You've hit your session limit · resets 12:40am (Africa/Cairo) · limit resets in 12m (2026-10-16T21:40:00.000Z)"],
+    ["weekly", "You've hit your weekly limit · resets Oct 20, 9am (UTC)"],
+  ] as const) {
+    it(`#given a Claude ${label}-limit retry status #when the handler receives it #then it aborts native retry once and dispatches the fallback (#10368)`, async () => {
+      // given
+      SessionCategoryRegistry.clear()
+      const sessionID = `session-status-claude-${label}-limit`
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      const deps = createDeps()
+      const abortCalls: string[] = []
+      const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+      const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)
+
+      // when
+      await handler({
+        sessionID,
+        model: "anthropic/claude-opus-4-6",
+        status: { type: "retry", attempt: 2, message },
+      })
+
+      // then
+      expect(abortCalls).toEqual([sessionID])
+      expect(retryCalls).toEqual([{ sessionID, model: "openai/gpt-5.4", source: "session.status" }])
+    })
+  }
+
   it("#given a free usage retry status #when the handler receives it #then it dispatches the fallback immediately", async () => {
     // given
     SessionCategoryRegistry.clear()
