@@ -11,27 +11,17 @@ import {
   type SessionFilter,
   type SessionRowState,
 } from "../device-service-core/src/index.ts"
-import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
-import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
-import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
-import { setModelRemote } from "../omo-senpi/src/components/thread/remote/remote-controls"
-import {
-  closeRemote,
-  followRemote,
-  interruptRemote,
-  openRemote,
-  promptRemote,
-  remoteAvailable,
-  type RemoteSendRequest,
-  runningTurnRemote,
-} from "../omo-senpi/src/components/thread/remote/remote-ops"
+import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { serveRemoteAttach } from "./remote-attach"
 import { type BootstrapSetup, runBootstrapVerb } from "./remote-bootstrap"
-import { controlLines, deviceLines, sessionLines, sessionVerbLines, statusLines } from "./remote-render"
+import { REMOTE_EXIT, UsageError } from "./remote-exit"
+import { controlLines, deviceLines, sessionLines, statusLines } from "./remote-render"
+import { isSessionVerb, parseSession, SESSION_VERBS, type SessionArgs } from "./remote-session-args"
+import { runSession } from "./remote-session-verbs"
 
 // `omo remote`: the sessions on this account's other devices, through this device's service. A thin CLI over the
 // device-service SDK: every command has a human table and a --json form that prints the SDK's typed value as is.
-export const REMOTE_EXIT = { ok: 0, failed: 1, usage: 2, unavailable: 3 } as const
+export { REMOTE_EXIT } from "./remote-exit"
 
 const REMOTE_USAGE = `usage: omo remote <command> [--json]
   status                                   the device service's connection state
@@ -70,15 +60,10 @@ export interface RemoteVerbDependencies extends RemoteCommandDependencies {
   readonly bootstrap: BootstrapSetup
 }
 
-const SESSION_VERBS = ["open", "send", "model", "interrupt", "close"] as const
 const VERBS = ["status", "devices", "sessions", "enable", "disable", "control", "bootstrap", ...SESSION_VERBS] as const
-type SessionVerb = (typeof SESSION_VERBS)[number]
-const isSessionVerb = (value: string): value is SessionVerb => SESSION_VERBS.some(verb => verb === value)
 const CONTROL_VALUES = ["on", "off"] as const
 type ControlValue = (typeof CONTROL_VALUES)[number]
 const isControlValue = (value: string | undefined): value is ControlValue => CONTROL_VALUES.some(v => v === value)
-
-class UsageError extends Error {}
 
 type Parsed = {
   readonly command: string
@@ -86,72 +71,6 @@ type Parsed = {
   readonly filter: SessionFilter
   readonly control: ControlValue | undefined
   readonly session?: SessionArgs
-}
-
-/** `<device>/<session>`: the SESSION column of `omo remote sessions`. */
-type Target = { readonly device: string; readonly session: string }
-
-type SessionArgs =
-  | { readonly verb: "open"; readonly device: string; readonly project?: string; readonly model?: string }
-  | { readonly verb: "send"; readonly target: Target; readonly text: string; readonly delivery: "auto" | "steer" | "follow_up"; readonly wait: boolean }
-  | { readonly verb: "model"; readonly target: Target; readonly model: string }
-  | { readonly verb: "interrupt" | "close"; readonly target: Target }
-
-function parseTarget(verb: string, value: string | undefined): Target {
-  const slash = value?.indexOf("/") ?? -1
-  if (value === undefined || slash <= 0 || slash === value.length - 1)
-    throw new UsageError(`omo remote ${verb}: name the session as <device>/<session> (the SESSION column of omo remote sessions)`)
-  return { device: value.slice(0, slash), session: value.slice(slash + 1) }
-}
-
-const SESSION_FLAGS: Readonly<Record<SessionVerb, { readonly values: readonly string[]; readonly switches: readonly string[] }>> = {
-  open: { values: ["--project", "--model"], switches: [] },
-  send: { values: [], switches: ["--steer", "--follow-up", "--no-wait"] },
-  model: { values: [], switches: [] },
-  interrupt: { values: [], switches: [] },
-  close: { values: [], switches: [] },
-}
-
-function parseSession(verb: SessionVerb, rest: readonly string[]): { readonly json: boolean; readonly session: SessionArgs } {
-  let json = false
-  const values = new Map<string, string>()
-  const switches = new Set<string>()
-  const positional: string[] = []
-  const { values: valueFlags, switches: switchFlags } = SESSION_FLAGS[verb]
-  for (let index = 0; index < rest.length; index++) {
-    const arg = rest[index] ?? ""
-    if (arg === "--json") json = true
-    else if (valueFlags.includes(arg)) {
-      const value = rest[++index]
-      if (value === undefined || value === "") throw new UsageError(`omo remote ${verb}: ${arg} needs a value`)
-      values.set(arg, value)
-    } else if (switchFlags.includes(arg)) switches.add(arg)
-    else if (arg.startsWith("--")) throw new UsageError(`omo remote ${verb}: unknown argument ${arg}`)
-    else positional.push(arg)
-  }
-  const arity = verb === "send" || verb === "model" ? 2 : 1
-  if (positional.length > arity) throw new UsageError(`omo remote ${verb}: unknown argument ${positional[arity]}`)
-  if (verb === "open") {
-    const device = positional[0]
-    if (device === undefined) throw new UsageError("omo remote open: the device is required (the DEVICE column of omo remote devices)")
-    const project = values.get("--project")
-    const model = values.get("--model")
-    return { json, session: { verb, device, ...(project === undefined ? {} : { project }), ...(model === undefined ? {} : { model }) } }
-  }
-  const target = parseTarget(verb, positional[0])
-  if (verb === "send") {
-    const text = positional[1]
-    if (text === undefined || text === "") throw new UsageError("omo remote send: the message text is required")
-    if (switches.has("--steer") && switches.has("--follow-up")) throw new UsageError("omo remote send: pass --steer or --follow-up, not both")
-    const delivery = switches.has("--steer") ? "steer" : switches.has("--follow-up") ? "follow_up" : "auto"
-    return { json, session: { verb, target, text, delivery, wait: !switches.has("--no-wait") } }
-  }
-  if (verb === "model") {
-    const model = positional[1]
-    if (model === undefined || model === "") throw new UsageError("omo remote model: the model is required (provider/id)")
-    return { json, session: { verb, target, model } }
-  }
-  return { json, session: { verb, target } }
 }
 
 const isRowState = (value: string): value is SessionRowState => (SESSION_ROW_STATES as readonly string[]).includes(value)
@@ -276,106 +195,6 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
     return reportFailure(dependencies, error)
   } finally {
     service.close()
-  }
-}
-
-// The surface the agent's thread tools reach other devices through, on this command's own connection. The chain count
-// (K8) starts at its first hop: a person at a terminal is no thread chain.
-const deviceServiceSurface = (service: DeviceService): RemoteThreadSurface => ({
-  sessions: createDeviceServiceSessions({ version: service.serviceVersion, connect: async () => service }),
-  chain: { stamp: record => record },
-})
-
-const CHAIN_START = 1
-
-/**
- * The session verbs: each is one of the thread tools' remote ops (omo-senpi thread/remote), so the agent and this CLI
- * reach another device's session the same way. --json prints the op's typed result as is.
- */
-async function runSession(service: DeviceService, args: SessionArgs, json: boolean, dependencies: RemoteCommandDependencies): Promise<number> {
-  const remote = (dependencies.remote ?? deviceServiceSurface)(service)
-  const show = (result: ThreadToolResult, label: string): number => {
-    if (json) dependencies.output(JSON.stringify(result))
-    if (result.kind === "error") {
-      if (!json) {
-        dependencies.error(`omo remote: ${result.error.message}`)
-        dependencies.error(result.error.next_action)
-      }
-      return REMOTE_EXIT.failed
-    }
-    if (!json) for (const line of sessionVerbLines(args.verb, label, result)) dependencies.output(line)
-    return REMOTE_EXIT.ok
-  }
-  const unavailable = await remoteAvailable(remote)
-  if (unavailable !== undefined) return show(unavailable, "")
-  if (args.verb === "open") {
-    const opened = await openRemote(remote, { kind: "create", device: args.device, ...(args.project === undefined ? {} : { cwd: args.project }) })
-    if (opened.kind !== "ok" || !("thread" in opened) || args.model === undefined) return show(opened, "")
-    const created: RemoteSessionRow = { device: args.device, session_id: opened.thread.thread_id, title: opened.thread.name, project: opened.thread.cwd, path: "", state: "idle", updated_ms: 0 }
-    const model = await setModelRemote(remote, created, { model: args.model })
-    if (model.kind !== "ok" || !("model" in model)) return show(model, `${args.device}/${created.session_id}`)
-    return show({ ...opened, model: model.model } as ThreadToolResult, "")
-  }
-  const label = `${args.target.device}/${args.target.session}`
-  const row = (await remote.sessions.sessions()).find(candidate => candidate.device === args.target.device && candidate.session_id === args.target.session)
-  if (row === undefined) {
-    dependencies.error(`omo remote: no session ${label} on this account.`)
-    dependencies.error("Run omo remote sessions to see them.")
-    return REMOTE_EXIT.failed
-  }
-  switch (args.verb) {
-    case "model":
-      return show(await setModelRemote(remote, row, { model: args.model }), label)
-    case "interrupt":
-      return show(await interruptRemote(remote, row, undefined), label)
-    case "close":
-      return show(await closeRemote(remote, row), label)
-    case "send":
-      return sendTo(remote, row, args, { label, json, show }, dependencies)
-  }
-}
-
-async function sendTo(
-  remote: RemoteThreadSurface,
-  row: RemoteSessionRow,
-  args: Extract<SessionArgs, { readonly verb: "send" }>,
-  { label, json, show }: { readonly label: string; readonly json: boolean; readonly show: (result: ThreadToolResult, label: string) => number },
-  dependencies: RemoteCommandDependencies,
-): Promise<number> {
-  let request: RemoteSendRequest = { message: args.text, delivery: args.delivery }
-  // A person steers whatever runs; the op still checks that turn, and the engine checks it again on arrival.
-  if (args.delivery === "steer") {
-    const running = await runningTurnRemote(remote, row)
-    if (running.kind === "error") return show(running, label)
-    if (!("turn_id" in running) || running.turn_id === undefined) {
-      dependencies.error(`omo remote: nothing is running on ${label} to steer.`)
-      dependencies.error("Send without --steer to start a turn.")
-      return REMOTE_EXIT.failed
-    }
-    request = { ...request, expected_turn_id: running.turn_id }
-  }
-  if (!args.wait) return show(await promptRemote(remote, row, request, CHAIN_START), label)
-  // Followed before the send, so no delta of the turn it starts can arrive unseen.
-  let reply = ""
-  const follow = await followRemote(remote, row, text => {
-    reply += text
-    if (!json) dependencies.write(text)
-  })
-  if ("kind" in follow) return show(follow, label)
-  try {
-    const sent = await promptRemote(remote, row, request, CHAIN_START)
-    if (sent.kind === "error") return show(sent, label)
-    const end = await follow.settled
-    if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")
-    // --json: the send's typed result, with the answer it streamed.
-    if (json && end === "settled") dependencies.output(JSON.stringify({ ...sent, reply }))
-    if (end !== "settled") {
-      dependencies.error(`omo remote: the session on ${row.device} ended before its turn settled (${end}).`)
-      return REMOTE_EXIT.failed
-    }
-    return REMOTE_EXIT.ok
-  } finally {
-    follow.stop()
   }
 }
 

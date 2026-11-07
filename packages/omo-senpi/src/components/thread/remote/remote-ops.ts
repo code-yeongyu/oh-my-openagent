@@ -234,7 +234,7 @@ export async function runningTurnRemote(remote: RemoteThreadSurface, row: Remote
 }
 
 export type RemoteFollow = {
-  /** "settled" once the session's run settles (`agent_settled`), else the reason its attach ended first. */
+  /** "settled" once the session's run settles (`agent_settled`), "session_closed" when its close cut the run short, else the reason its attach ended first. */
   readonly settled: Promise<string>
   readonly stop: () => void
 }
@@ -254,7 +254,8 @@ export async function followRemote(remote: RemoteThreadSurface, row: RemoteSessi
   let last: { readonly index: unknown; readonly endsLine: boolean } | undefined
   let newMessage = false
   const watched = await remote.sessions.watch(row.device, row.session_id, (record) => {
-    if (record["type"] === "agent_settled") return settle("settled")
+    // senpi settles a turn the session's close cut short with reason session_closed: that turn never finished.
+    if (record["type"] === "agent_settled") return settle(record["reason"] === "session_closed" ? "session_closed" : "settled")
     if (record["type"] === "message_start" || record["type"] === "message_end") newMessage = true
     const event = record["assistantMessageEvent"]
     if (record["type"] !== "message_update" || !isRecord(event) || event["type"] !== "text_delta" || typeof event["delta"] !== "string" || event["delta"] === "") return

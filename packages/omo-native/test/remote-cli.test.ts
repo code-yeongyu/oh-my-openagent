@@ -10,7 +10,7 @@ import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/l
 import { buildRelease, RELEASE_ORIGIN, releaseKey, serveRelease } from "../../device-service-core/test/release-fixture.ts"
 import { defaultWorld, OFFLINE_PEER, PEER, SESSION_ID } from "../../device-service-core/test/local-api/conformance/world.ts"
 import { createCredentialStore } from "../../omo-opencode/src/cli/service-auth/keystore"
-import type { RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
+import type { RemoteSessionsPort, RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
 import { createRemoteThreadFixture, ENGINE } from "../../omo-senpi/src/components/thread/thread-remote-fixture"
 import { runAccountVerb } from "../account-cli"
 import { type BootstrapSetup, deviceServiceBootstrapSetup } from "../remote-bootstrap"
@@ -401,6 +401,27 @@ describe("omo remote session verbs", () => {
   const fixture = createRemoteThreadFixture()
   afterEach(fixture.cleanup)
   const types = <Entry extends { readonly rpc?: Record<string, unknown> }>(sent: readonly Entry[], type: string) => sent.filter(entry => entry.rpc?.["type"] === type)
+  // Every call a verb makes on the account surface, in order: a command names its engine record.
+  const recorded = (remote: RemoteThreadSurface) => {
+    const calls: string[] = []
+    const port = remote.sessions
+    const note = <T>(call: string, result: Promise<T>): Promise<T> => {
+      calls.push(call)
+      return result
+    }
+    const sessions: RemoteSessionsPort = {
+      status: () => note("status", port.status()),
+      thisDevice: () => note("thisDevice", port.thisDevice()),
+      devices: () => note("devices", port.devices()),
+      sessions: () => note("sessions", port.sessions()),
+      endpointCommand: (device, rpc) => note(`endpoint:${String(rpc["type"])}`, port.endpointCommand(device, rpc)),
+      locate: (device, engineId, knownKey) => note("locate", port.locate(device, engineId, knownKey)),
+      sessionCommand: (device, sessionId, rpc, options) => note(`command:${String(rpc["type"])}`, port.sessionCommand(device, sessionId, rpc, options)),
+      read: (device, sessionId, tail) => note("read", port.read(device, sessionId, tail)),
+      watch: (device, sessionId, listener) => note("watch", port.watch(device, sessionId, listener)),
+    }
+    return { calls, remote: { ...remote, sessions } }
+  }
 
   test("open creates a session on the device in the project and prints <device>/<session>", async () => {
     const a = fixture.account()
@@ -426,18 +447,41 @@ describe("omo remote session verbs", () => {
     expect(a.sent.findIndex(entry => entry.via === "watch")).toBeLessThan(a.sent.findIndex(entry => entry.rpc?.["type"] === "prompt"))
   })
 
+  test("open --model that the new session cannot use names the session it opened, which is still open, in human and --json output", async () => {
+    const human = await run(["open", "b", "--model", "nope/none"], undefined, SIGNED_IN, testBootstrap(), fixture.account().remote)
+    expect([human.code, human.out]).toEqual([REMOTE_EXIT.failed, ["b/dur-new-on-b"]])
+    expect(human.err[0]).toStartWith("omo remote: opened b/dur-new-on-b, but its model was not set: ")
+    expect(human.err[1]).toEndWith("The session is still open; end it with omo remote close b/dur-new-on-b.")
+    const json = await run(["open", "b", "--model", "nope/none", "--json"], undefined, SIGNED_IN, testBootstrap(), fixture.account().remote)
+    expect(json.code).toBe(REMOTE_EXIT.failed)
+    expect(JSON.parse(json.out.join(""))).toMatchObject({ kind: "error", error: { code: "model_not_found" }, thread: { thread_id: "dur-new-on-b", device: "b" } })
+  })
+
+  test("send whose session closes before its turn finishes fails, though senpi settles that turn", async () => {
+    const a = fixture.account({ records: [{ type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "O" } }, { type: "agent_settled", reason: "session_closed" }] })
+    const { code, err } = await run(["send", "b/dur-on-b", "hi"], undefined, SIGNED_IN, testBootstrap(), a.remote)
+    expect([code, err]).toEqual([REMOTE_EXIT.failed, ["omo remote: the session on b ended before its turn settled (session_closed)."]])
+  })
+
+  test("send to a session that cannot be followed is refused before the message is sent", async () => {
+    const a = fixture.account({ refuse: "host_not_answering" })
+    const { code, err } = await run(["send", "b/dur-on-b", "hi"], undefined, SIGNED_IN, testBootstrap(), a.remote)
+    expect([code, err[0]]).toEqual([REMOTE_EXIT.failed, "omo remote: Device b did not answer (host_not_answering); this call changed nothing there."])
+    expect(types(a.sent, "prompt")).toEqual([])
+  })
+
+  test("send puts a line break between the text of two content blocks of one message", async () => {
+    const delta = (index: number, text: string) => ({ type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: index, delta: text } })
+    const a = fixture.account({ records: [delta(0, "first"), delta(1, "second"), { type: "agent_settled" }] })
+    const { code, written } = await run(["send", "b/dur-on-b", "hi"], undefined, SIGNED_IN, testBootstrap(), a.remote)
+    expect([code, written.join("")]).toEqual([REMOTE_EXIT.ok, "first\nsecond\n"])
+  })
+
   test("send puts a line break between the text of two messages, so they never run together", async () => {
     const delta = (text: string) => ({ type: "message_update", message: null, assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: text } })
     const a = fixture.account({ records: [delta("OK"), { type: "message_end" }, { type: "message_start" }, delta("Done."), { type: "agent_settled" }] })
     const { code, written } = await run(["send", "b/dur-on-b", "hi"], undefined, SIGNED_IN, testBootstrap(), a.remote)
     expect([code, written.join("")]).toEqual([REMOTE_EXIT.ok, "OK\nDone.\n"])
-  })
-
-  test("send --no-wait returns after admission without following the session", async () => {
-    const a = fixture.account()
-    const { code, out } = await run(["send", "b/dur-on-b", "hi", "--no-wait"], undefined, SIGNED_IN, testBootstrap(), a.remote)
-    expect([code, out]).toEqual([REMOTE_EXIT.ok, ["Sent to b/dur-on-b: turn turn-b started."]])
-    expect(a.sent.filter(entry => entry.via === "watch")).toEqual([])
   })
 
   test("send --steer steers the running turn, which the engine checks again", async () => {
@@ -454,15 +498,18 @@ describe("omo remote session verbs", () => {
     expect(types(a.sent, "prompt").map(entry => entry.rpc?.["streamingBehavior"])).toEqual(["followUp"])
   })
 
+  // A verb costs its remote op's round trips and nothing account-wide: the session is addressed directly, never looked
+  // up in the account listing, whose round waits for the account's slowest device (#12709: ~10 s live).
   test.each([
-    [["model", "b/dur-on-b", "anthropic/claude-opus"], "set_model", "b/dur-on-b now uses anthropic/claude-opus."],
-    [["interrupt", "b/dur-on-b"], "interrupt", "Nothing was running on b/dur-on-b."],
-    [["close", "b/dur-on-b"], "unload_session", "Closed b/dur-on-b."],
-  ])("%p sends its one engine record and reports the answer", async (args, type, line) => {
-    const a = fixture.account()
-    const { code, out } = await run(args, undefined, SIGNED_IN, testBootstrap(), a.remote)
-    expect([code, out]).toEqual([REMOTE_EXIT.ok, [line]])
-    expect(types(a.sent, type)).toHaveLength(1)
+    [["model", "b/dur-on-b", "anthropic/claude-opus"], "b/dur-on-b now uses anthropic/claude-opus.", ["status", "devices", "command:get_available_models", "command:set_model"]],
+    [["interrupt", "b/dur-on-b"], "Nothing was running on b/dur-on-b.", ["status", "devices", "command:interrupt"]],
+    [["close", "b/dur-on-b"], "Closed b/dur-on-b.", ["status", "devices", "command:unload_session"]],
+    [["send", "b/dur-on-b", "hi", "--no-wait"], "Sent to b/dur-on-b: turn turn-b started.", ["status", "devices", "command:get_state", "command:prompt"]],
+    [["open", "b"], "b/dur-new-on-b", ["status", "devices", "endpoint:open_session", "locate"]],
+  ])("%p makes only its remote op's calls and reports the answer", async (args, line, calls) => {
+    const port = recorded(fixture.account().remote)
+    const { code, out } = await run(args, undefined, SIGNED_IN, testBootstrap(), port.remote)
+    expect([code, out, port.calls]).toEqual([REMOTE_EXIT.ok, [line], calls])
   })
 
   test("--json prints the remote op's typed result as is", async () => {
@@ -485,11 +532,11 @@ describe("omo remote session verbs", () => {
     expect(err[0]).toBe(message)
   })
 
-  test("a session the account does not list is refused before any command is sent", async () => {
+  test("a session its device does not hold is named as unknown, and no message is sent to it", async () => {
     const a = fixture.account()
     const { code, err } = await run(["send", "b/dur-unknown", "hi"], undefined, SIGNED_IN, testBootstrap(), a.remote)
     expect([code, err]).toEqual([REMOTE_EXIT.failed, ["omo remote: no session b/dur-unknown on this account.", "Run omo remote sessions to see them."]])
-    expect(a.sent).toEqual([])
+    expect(types(a.sent, "prompt")).toEqual([])
   })
 
   test("a refusal from the remote op is reported with its next step, and nothing is followed", async () => {
