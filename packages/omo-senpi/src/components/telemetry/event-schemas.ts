@@ -34,8 +34,8 @@ export const BUILTIN_SKILL_NAMES = Object.freeze([
   "ast-grep", "browser", "coding-agent-sessions", "dag-library", "data-scientist", "debugging", "eval-integrity",
   "frontend", "git-master",
   "give-me-tips", "hyperplan", "init-deep", "lsp-setup", "mass-ulw", "onboarding", "programming", "refactor",
-  "remove-ai-slops",
-  "review-work", "ulw-execute", "ultimate-browsing", "ultrawork", "ulw-loop", "ulw-plan", "ulw-research",
+  "remove-ai-slops", "repo-map",
+  "review-work", "security", "ulw-execute", "ultimate-browsing", "ultrawork", "ulw-loop", "ulw-plan", "ulw-research",
   "visual-qa", "visualize",
 ] as const)
 export const COMPUTER_USE_ACTIVATION_SOURCES = Object.freeze([

@@ -3059,7 +3059,9 @@
           "programming",
           "refactor",
           "remove-ai-slops",
+          "repo-map",
           "review-work",
+          "security",
           "ulw-execute",
           "ultimate-browsing",
           "ultrawork",
@@ -3857,5 +3859,5 @@
       }
     }
   },
-  "sha256": "77a2567eb70626bfbfc79838a559bce33102ef7112c3efd39846595ab943df20"
+  "sha256": "21cac3bc8afc84879ec89836d1007f833d45a3747ad11d6ad09ebdfb6b832e15"
 }
