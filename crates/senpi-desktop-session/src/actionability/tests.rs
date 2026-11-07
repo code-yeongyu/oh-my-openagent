@@ -263,7 +263,7 @@ fn a_background_unavailable_chord_suggests_the_foreground_rung() {
 }
 
 #[test]
-fn background_unavailable_typing_suggests_reading_the_focused_element_without_the_text() {
+fn background_unavailable_typing_suggests_reading_the_target_windows_tree_without_the_text() {
     // Given
     let mut harness = opened(&no_background_input(), ReportMode::Object);
     // When
@@ -272,6 +272,8 @@ fn background_unavailable_typing_suggests_reading_the_focused_element_without_th
         .expect_err("refused");
     // Then
     let next = report(&error).next_call.expect("nextCall on BackgroundUnavailable");
-    assert_eq!(next.method, Method::AxFocused);
+    // The target window's tree, never the system-wide `ax.focused` (the frontmost app's field).
+    assert_eq!(next.method, Method::AxSnapshot);
+    assert_eq!(next.args["target"], json!("101"));
     assert!(!serde_json::to_string(&next).expect("serializes").contains("hunter2"));
 }

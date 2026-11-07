@@ -11,10 +11,9 @@ use senpi_desktop_core::protocol_params::{
     DragParams, KeyChordParams, PointParams, ScrollParams, TypeTextParams,
 };
 use senpi_desktop_core::report::{ActionEffect, ActionHit, Disposition, NextCall, ReportMode};
-use serde_json::{Map, Value};
 use senpi_desktop_core::types::{DesktopWindow, PointerOptions, Target};
-
 use senpi_desktop_safety::{GateError, MutatingAction, StopPolicy, Supervisor};
+use serde_json::{Map, Value};
 
 use crate::mutate::Mutation;
 use crate::pointer::ParsedPointerOptions;
@@ -215,7 +214,7 @@ impl Worker {
                     &check_stop,
                     &mut || mutation.text_delivered.set(mutation.text_delivered.get().saturating_add(1)),
                 )
-                .map_err(|error| with_next_call(error, focused_element))?;
+                .map_err(|error| with_next_call(error, || target_tree(&target)))?;
             Ok(Response::Unit)
         })?;
         if !secure.get() {
@@ -318,7 +317,7 @@ impl Worker {
         let audited = self.mutate(&mutation, cancelled, |worker| {
             let keys = parse_keys(&params.keys)?;
             let mode = delivery(params.opts.as_ref())?;
-            worker.refuse_dangerous_chord(&keys, params.force)?;
+            worker.refuse_dangerous_chord(&keys, params.force, "it is sent only with force: true")?;
             worker.takeover_gate(&target, mode)?;
             baseline.set(worker.surface_baseline(&target));
             let epoch = worker.epochs.probe();
@@ -341,8 +340,10 @@ impl Worker {
     }
 
     /// DESIGN 2 A13, object mode: `cmd+q`, `alt+f4` and `win+l` are sent
-    /// only with `force: true`; without it nothing is sent.
-    fn refuse_dangerous_chord(&self, keys: &[KeyName], force: bool) -> CoreResult<()> {
+    /// only with `force: true`; without it nothing is sent. `remedy` says
+    /// how the request could send it (a hold has no `force` and points to
+    /// `keyChord`).
+    pub(crate) fn refuse_dangerous_chord(&self, keys: &[KeyName], force: bool, remedy: &str) -> CoreResult<()> {
         if force || self.registry.report_mode() != ReportMode::Object {
             return Ok(());
         }
@@ -350,8 +351,7 @@ impl Worker {
             return Ok(());
         };
         Err(DesktopError::invalid_key(format!(
-            "{chord} quits an app, closes a window or locks the screen, so it is sent only with force: true; \
-             nothing was sent"
+            "{chord} quits an app, closes a window or locks the screen, so {remedy}; nothing was sent"
         ))
         .with_report(ErrorReport {
             reason: Some("dangerous_chord".to_owned()),
@@ -476,7 +476,9 @@ pub(crate) fn with_next_call(mut error: DesktopError, next: impl FnOnce() -> Nex
 }
 
 /// The element-action rung below a background click: read the element
-/// under the point, whose ref takes `ax.perform`.
+/// under the point, whose ref takes `ax.perform`. `ax.elementAt` returns the
+/// topmost element there, so where another window covers the target the
+/// element belongs to that window: check its owner before acting on it.
 fn element_at(target: &Target, x: f64, y: f64) -> NextCall {
     let mut args = Map::new();
     args.insert("target".to_owned(), Value::from(target.key()));
@@ -485,10 +487,15 @@ fn element_at(target: &Target, x: f64, y: f64) -> NextCall {
     NextCall { method: Method::AxElementAt, args }
 }
 
-/// The element-action rung below background typing: read the focused
-/// element, whose ref takes `ax.typeText`. The text never enters the hint.
-fn focused_element() -> NextCall {
-    NextCall { method: Method::AxFocused, args: Map::new() }
+/// The element-action rung below background typing: read the target
+/// window's tree, whose `(focused)` element's ref takes `ax.typeText`. Never
+/// `ax.focused`: that reads the system-wide focused element, the frontmost
+/// app's field, not the refused background target. The text never enters
+/// the hint.
+fn target_tree(target: &Target) -> NextCall {
+    let mut args = Map::new();
+    args.insert("target".to_owned(), Value::from(target.key()));
+    NextCall { method: Method::AxSnapshot, args }
 }
 
 /// The foreground rung above background keys: the same chord, delivered in

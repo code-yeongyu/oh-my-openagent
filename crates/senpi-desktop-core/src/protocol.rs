@@ -200,8 +200,8 @@ pub struct EngineErrorData {
     /// `key_route_unproven`, `user_active_in_target`,
     /// `pointer_reading_toolkit`, `electron_select`,
     /// `wayland_window_targeting`; `InvalidKey`: `dangerous_chord`;
-/// `AxUnsupported`: `disabled`, `action_unsupported`, `not_visible`,
-/// `unstable`, `occluded` (the actionability battery);
+    /// `AxUnsupported`: `disabled`, `action_unsupported`, `not_visible`,
+    /// `unstable`, `occluded` (the actionability battery);
     /// `ControlRequired`: `headless_host`, `spawn_inside_session`,
     /// `lease_missing`; `Suspended`: `stop_marker`; `Internal`:
     /// `request_too_large`, `other`.
