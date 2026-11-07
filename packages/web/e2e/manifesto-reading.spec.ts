@@ -25,7 +25,7 @@ for (const locale of ["en", "ko"]) {
               (block) =>
                 Number.parseFloat(getComputedStyle(block).getPropertyValue("--lit-p")) === 1,
             ),
-            allTextHi: words.every((word) => getComputedStyle(word).color === "rgb(245, 245, 247)"),
+            allTextHi: words.every((word) => getComputedStyle(word).color === "rgb(238, 238, 239)"),
             noneBlurred: words.every((word) => {
               const filter = getComputedStyle(word).filter
               return filter === "none" || filter === "blur(0px)"
