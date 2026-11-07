@@ -2,6 +2,7 @@
 //! typing, and the secure-field warning, replayed over the
 //! `v2-user-active-in-target.json` and `typetext-interrupted.json` scenarios.
 
+use std::cell::Cell;
 use std::sync::Arc;
 
 use image::RgbaImage;
@@ -17,6 +18,7 @@ use senpi_desktop_core::report::{ActionReport, Delivered, Disposition, ReportMod
 use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, FrontWindow, Target,
 };
+use senpi_desktop_core::user_input::UserPressKind;
 use senpi_desktop_safety::{Clock, FakeClock, StopPathId, StopSource, Supervisor};
 use serde_json::{json, Value};
 
@@ -359,3 +361,25 @@ fn type_text_of_10_stopped_after_4_reports_delivered_4_of_10_unverified_unsafe()
     assert_eq!(typed(&sink), "abcd");
 }
 
+#[test]
+fn type_text_of_10_with_a_user_press_after_4_reports_delivered_4_of_10_unverified() {
+    // Given: the user presses a key in Notes (pid 4242) once 4 scalars are out
+    let (mut worker, sink, _supervisor, feed) = scalar_session();
+    let probe = sink.clone();
+    let pressed = Cell::new(false);
+    let press_after_4 = move || {
+        if !pressed.get() && typed(&probe).chars().count() >= 4 {
+            pressed.set(true);
+            feed.press(4242, UserPressKind::Key);
+        }
+        false
+    };
+    // When
+    let error = worker.process(type_text("abcdefghij"), &press_after_4).expect_err("intervened");
+    // Then: the press check refuses the 5th scalar and the report counts the 4 sent
+    let report = report(&error);
+    assert_eq!(error.code, ErrorCode::UserIntervened);
+    assert_eq!(report.delivered, Some(Delivered { count: 4, of: 10 }));
+    assert_eq!(report.disposition, Some(Disposition::DELIVERED_UNVERIFIED));
+    assert_eq!(typed(&sink), "abcd");
+}
