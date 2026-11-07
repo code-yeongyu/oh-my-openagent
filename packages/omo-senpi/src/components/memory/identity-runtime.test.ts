@@ -645,8 +645,10 @@ test("#given a pass that left every run reconciled #when later passes may skip a
   expect(passes.mock.calls.length).toBe(latched)
   // A reservation another process took and then died holding: no run directory was created.
   await writeFile(join(identity.identityPaths.reflection, "pending.json"), "")
-  // The pass reads the reservation through this stub, so the planted file is only the on-disk signal.
+  // The pass reads the reservation through these stubs (readState, and the lone-pending promotion prelaunch
+  // tries first), so the planted file is only the on-disk signal.
   passes.mockImplementation(async () => ({}))
+  const promotes = spyOn(runtime.store, "promotePending").mockImplementation(async () => undefined)
   await runtime.reconcile(undefined, { skipUnchanged: true })
   await rm(join(identity.identityPaths.reflection, "pending.json"))
 
@@ -661,5 +663,6 @@ test("#given a pass that left every run reconciled #when later passes may skip a
 
   // then: the latch was not set, so the next turn-end call runs a pass
   expect(passes.mock.calls.length).toBeGreaterThan(afterHeld)
+  promotes.mockRestore()
   passes.mockRestore()
 })
