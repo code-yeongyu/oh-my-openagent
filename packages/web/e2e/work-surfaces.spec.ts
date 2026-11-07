@@ -65,7 +65,7 @@ test.describe("Work surface readability", () => {
         overflow,
         "Stationary profiles must wrap rather than extend offscreen",
       ).toBeLessThanOrEqual(1)
-      const labels = profiles.locator('.marquee-track:not([aria-hidden="true"]) li')
+      const labels = profiles.locator("li")
       expect(await labels.count()).toBeGreaterThan(0)
       const clippedLabels = await labels.evaluateAll(
         (rows) =>
