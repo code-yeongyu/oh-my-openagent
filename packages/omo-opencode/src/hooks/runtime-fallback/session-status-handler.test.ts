@@ -540,4 +540,47 @@ describe("createSessionStatusHandler", () => {
     expect(state.pendingFallbackModel).toBe("google/gemini-2.5-pro")
     SessionCategoryRegistry.clear()
   })
+
+  it("#given service-unavailable provider retry messages #when the handler receives them #then it dispatches fallback", async () => {
+    // given
+    const messages = [
+      "Streaming response failed: [503] The request queue is full.",
+      '{"message":"Streaming response failed: [503] The request queue is full.","type":"server_error","param":null}',
+      "Upstream request failed: Endpoint is unavailable.",
+    ]
+
+    for (const message of messages) {
+      SessionCategoryRegistry.clear()
+      const sessionID = `session-status-service-${message.length}`
+      SessionCategoryRegistry.register(sessionID, "test")
+
+      const deps = createDeps()
+      const abortCalls: string[] = []
+      const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+      const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)
+
+      // when
+      await handler({
+        sessionID,
+        model: "opencode/big-pickle",
+        status: {
+          type: "retry",
+          attempt: 1,
+          message,
+        },
+      })
+
+      // then
+      expect(abortCalls).toEqual([sessionID])
+      expect(retryCalls).toEqual([
+        {
+          sessionID,
+          model: "openai/gpt-5.4",
+          source: "session.status",
+        },
+      ])
+    }
+
+    SessionCategoryRegistry.clear()
+  })
 })
