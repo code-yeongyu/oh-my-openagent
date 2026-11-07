@@ -20,6 +20,9 @@ pub struct FakeAxNode {
     pub enabled: bool,
     #[serde(default)]
     pub focused: bool,
+    /// A secure text field (macOS `AXSecureTextField`).
+    #[serde(default)]
+    pub secure: bool,
     /// Global logical bounds.
     #[serde(default)]
     pub bounds: Option<FakeBounds>,
