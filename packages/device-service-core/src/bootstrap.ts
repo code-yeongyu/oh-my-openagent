@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs"
 import { type AccountShowResult, type AccountState, accountStateNotice, classifyAccountShow } from "./account-state.ts"
-import { type DeviceCredential, type DeviceService, deviceServiceEndpointPath, LocalApiError, type Status } from "./device-service.ts"
+import { type DeviceService, deviceServiceEndpointPath, LocalApiError, type Status } from "./device-service.ts"
 import type { InstallOutcome } from "./install.ts"
 import { compareVersions } from "./release/version.ts"
 
@@ -26,8 +26,6 @@ export type BootstrapDependencies = {
   readonly pinVersion: string
   readonly install: () => Promise<InstallOutcome>
   readonly connect: () => Promise<DeviceService>
-  /** The stored sign-in's device and keys, read only after `omo account show` reported signed in. */
-  readonly credential: () => Promise<DeviceCredential | null>
   readonly refresher: { readonly binaryPath: string; readonly version: string }
   readonly agentDir: string
 }
@@ -95,20 +93,17 @@ const connectInstalled = async (deps: BootstrapDependencies): Promise<DeviceServ
 
 /**
  * The device service bootstrap of every omo start: `omo account show` first; only when signed in, ensure the pinned
- * service is installed, connect (mutual proof), register the refresher, adopt the device, register this agent dir, and
- * read the status.
+ * service is installed, connect (mutual proof), register the refresher, register this agent dir, and read the status.
+ * It reads no credential and adopts nothing (design D r9 section 3): device keys reach the service only from a
+ * credential a client already holds in memory for its own work (a fresh sign-in, or the memory device session).
  */
 export const bootstrapDeviceService = async (deps: BootstrapDependencies): Promise<BootstrapOutcome> => {
   const account = classifyAccountShow(await deps.accountShow())
   if (account.kind !== "signed_in") return stopped(ACCOUNT_STOP[account.kind], accountStateNotice(account) ?? "")
-  const credential = await deps.credential()
-  if (credential === null)
-    return stopped("account_unavailable", accountStateNotice({ kind: "account_unavailable", reason: "no device keys are stored" }) ?? "")
   const service = await connectInstalled(deps)
   if ("kind" in service) return service
   try {
     await service.registerRefresher(deps.refresher.binaryPath, deps.refresher.version)
-    await service.adopt(credential)
     await service.registerEndpoints(deps.agentDir)
     return { kind: "connected", status: await service.status(), service }
   } catch (error) {
