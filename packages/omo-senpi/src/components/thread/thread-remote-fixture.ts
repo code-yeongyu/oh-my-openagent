@@ -30,7 +30,7 @@ export function createRemoteThreadFixture() {
     for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
   }
 
-  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[] } = {}) {
+  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[] } = {}) {
     const engine = options.engine ?? ENGINE
     const sent: Sent[] = []
     // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
@@ -67,6 +67,7 @@ export function createRemoteThreadFixture() {
       if (rpc["type"] === "get_state") return ok({ isStreaming: engine.streaming, pendingMessageCount: engine.pending, ...(engine.currentTurnId === undefined ? {} : { currentTurnId: engine.currentTurnId }) })
       if (rpc["type"] === "get_messages") return ok({ messages: [...engine.messages] })
       if (rpc["type"] === "interrupt") return ok(engine.interrupt)
+      if (rpc["type"] === "prompt" && options.promptOutcome !== undefined) return options.promptOutcome
       if (rpc["type"] === "prompt") return ok(options.promptResponse ?? (engine.streaming ? { disposition: "queued" } : { disposition: "started", turnId: "turn-b" }))
       if (rpc["type"] === "get_available_models") return ok({ models: [{ provider: "anthropic", id: "claude-opus", name: "Opus" }, { provider: "openai", id: "gpt-6" }] })
       if (rpc["type"] === "set_model") return ok({ provider: rpc["provider"] ?? null, id: rpc["modelId"] ?? null })
