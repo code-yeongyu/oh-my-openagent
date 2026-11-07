@@ -37,9 +37,15 @@
 		return JSON.stringify(value) ?? "undefined";
 	};
 	// The tool result is `{ text, details?, images?, hasError? }`: images display, `details.value` is the return value.
+	// A failed call's `details.value.code` (COMPUTER_*) rides on the thrown error as `error.code`.
 	const invoke = async args => {
 		const result = await globalThis.tool.computer(args);
-		if (result.hasError) throw new Error(result.text);
+		if (result.hasError) {
+			const error = new Error(result.text);
+			const code = result.details?.value?.code;
+			if (typeof code === "string") error.code = code;
+			throw error;
+		}
 		for (const image of result.images ?? []) globalThis.display(image);
 		return result.details?.value;
 	};
@@ -164,7 +170,7 @@
 					return expectation.exists ?? true;
 				} catch (error) {
 					// A ref that no longer resolves answers the question (the element is gone); other failures do not.
-					if (/\bStaleRef\b/.test(String(error?.message))) return !(expectation.exists ?? true);
+					if (error?.code === "COMPUTER_STALE_REF") return !(expectation.exists ?? true);
 					throw error;
 				}
 			case "elementValue":

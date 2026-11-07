@@ -3,7 +3,6 @@
 # calls until its deadline. The method tuples in the generated region come from facade-manifest.json.
 def _make_computer():
     import os
-    import re
     import time
 
     # Children a cell starts inherit the marker, so an SDK inside them refuses to spawn a second engine.
@@ -28,9 +27,15 @@ def _make_computer():
 
     def _invoke(arguments):
         # The tool result is {text, details?, images?, hasError?}: images display, details.value is the return value.
+        # A failed call's details.value.code (COMPUTER_*) rides on the raised RuntimeError as `error.code`.
         result = tool.computer(**arguments)
         if result.get("hasError"):
-            raise RuntimeError(result["text"])
+            details = result.get("details")
+            value = details.get("value") if isinstance(details, dict) else None
+            code = value.get("code") if isinstance(value, dict) else None
+            error = RuntimeError(result["text"])
+            error.code = code if isinstance(code, str) else None
+            raise error
         for image in result.get("images") or []:
             display(image)
         details = result.get("details")
@@ -198,7 +203,7 @@ def _make_computer():
                 return wanted
             except RuntimeError as error:
                 # A ref that no longer resolves answers the question (the element is gone); other failures do not.
-                if re.search(r"\bStaleRef\b", str(error)):
+                if getattr(error, "code", None) == "COMPUTER_STALE_REF":
                     return not wanted
                 raise
         if kind == "elementValue":
