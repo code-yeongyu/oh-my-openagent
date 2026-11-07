@@ -50,6 +50,7 @@ export type {
   TrustedRespawnLaunchResolver,
   SpawnAdmission,
   StartResult,
+  TaskLeaseHolderView,
   TaskManager,
   TaskManagerOptions,
 } from "./types"

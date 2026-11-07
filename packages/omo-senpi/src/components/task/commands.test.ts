@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test"
 import type { CancelOutcome, ListedTask, TaskRecord, TaskStatus } from "@oh-my-opencode/senpi-task"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { registerTaskCommands, type CommandManager } from "./commands"
+import { registerTaskCommands, type CommandManager, type LeaseHolderRow } from "./commands"
 
 function record(overrides: Partial<TaskRecord> & { task_id: string; status: TaskStatus }): TaskRecord {
   return {
@@ -255,5 +255,40 @@ describe("registerTaskCommands", () => {
     expect(ui.selectCalls).toHaveLength(0)
     expect(manager.cancelled).toEqual([])
     expect(ui.notifications.join("\n")).toContain("No cancellable")
+  })
+
+  it("#given limiter leases, one behind a run that already ended #when /tasks --leases runs #then every holder prints and the ended run's lease is marked orphaned", async () => {
+    // given
+    const holders: LeaseHolderRow[] = [
+      { task_id: "st_live", run_epoch: 1, model: "anthropic/claude", phase: "held", status: "running", residency_state: "resident", record_run_epoch: 1, live: true },
+      { task_id: "st_ended", run_epoch: 2, model: "anthropic/claude", phase: "held", status: "running", residency_state: "resident", record_run_epoch: 3, live: true },
+    ]
+    const pi = new FakeExtensionAPI()
+    registerTaskCommands(pi, { ...fakeManager([]), leaseHolders: () => holders })
+    const { ctx, ui } = commandCtx("session-a", "tui")
+
+    // when
+    await invoke(pi, "tasks", "--leases", ctx)
+
+    // then
+    const [printed] = ui.notifications
+    expect(printed?.split("\n")).toEqual([
+      "2 task limiter leases held, 1 with no live run behind it:",
+      "st_live epoch 1 held (running resident, live) anthropic/claude",
+      "st_ended epoch 2 held (running resident, live, run 3 is current) anthropic/claude ORPHANED",
+    ])
+  })
+
+  it("#given an engine that reports no lease view #when /tasks --leases runs #then it says so instead of listing tasks", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    registerTaskCommands(pi, fakeManager([record({ task_id: "st_mine", status: "running" })]))
+    const { ctx, ui } = commandCtx("session-a", "tui")
+
+    // when
+    await invoke(pi, "tasks", "--leases", ctx)
+
+    // then
+    expect(ui.notifications).toEqual(["This task engine does not report its limiter leases."])
   })
 })
