@@ -119,11 +119,14 @@ function launchHost(entry: Entry, table: string | undefined) {
       }
       return bounded(client.requestExtension("fixture.memory-sync.selection", {}), STEP_MS, () => `selection call never answered; ${log()}`)
     },
-    syncStatus: () => bounded(client!.requestExtension("omo.memory.sync.status", {}), STEP_MS, () => `sync status never answered; ${log()}`),
+    syncStatus: () => {
+      if (!client) throw new Error("sync status requested before the session opened")
+      return bounded(client.requestExtension("omo.memory.sync.status", {}), STEP_MS, () => `sync status never answered; ${log()}`)
+    },
     async close() {
       await client?.stop().catch(() => undefined)
       channel.destroy()
-      if (child.exitCode === null && child.signalCode === null) process.kill(-child.pid!, "SIGKILL")
+      if (child.exitCode === null && child.signalCode === null && child.pid !== undefined) process.kill(-child.pid, "SIGKILL")
       await bounded(exited, 30_000, () => `pid ${child.pid} did not exit`)
       rmSync(home, { recursive: true, force: true })
     },
