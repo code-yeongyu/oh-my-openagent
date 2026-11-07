@@ -67,7 +67,13 @@ export type ThreadTranscriptItem = {
 }
 
 export type ThreadCreateResult =
-  | { readonly kind: "ok"; readonly thread: ThreadResultSummary; readonly deduplicated: boolean }
+  | {
+      readonly kind: "ok"
+      readonly thread: ThreadResultSummary
+      readonly deduplicated: boolean
+      /** A thread on another device: the `monitor` rpc target (`<device>/<session>`) that wakes the caller on it. */
+      readonly monitor_target?: string
+    }
   | ThreadDataError
 
 export type ThreadListResult =
@@ -106,6 +112,8 @@ export type ThreadSendResult =
       readonly message_seq?: number
       readonly deduplicated: boolean
       readonly device?: string
+      /** A thread on another device: the `monitor` rpc target (`<device>/<session>`) that wakes the caller on it. */
+      readonly monitor_target?: string
     } & ThreadGatewayDeliveryFacts)
   | ThreadDataError
 

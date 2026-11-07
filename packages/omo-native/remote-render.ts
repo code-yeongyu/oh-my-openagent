@@ -1,5 +1,7 @@
 import type { ControlAttachState, DeviceRow, ListingResult, Status, StatusState } from "../device-service-core/src/index.ts"
 import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
+import type { RemoteWatchEnd } from "../omo-senpi/src/components/thread/remote/ports"
+import type { RemoteWatchEvent } from "../omo-senpi/src/components/thread/remote/remote-follow"
 
 // The human forms of `omo remote`; every command also has a --json form that prints the SDK's typed value as is.
 const STATE_LABELS: Readonly<Record<StatusState, string>> = {
@@ -78,8 +80,38 @@ export function sessionLines(result: ListingResult, labels: ReadonlyMap<string, 
   return lines
 }
 
+/** `omo remote watch`'s lines, in the words of senpi's monitor lines for the same events. */
+export function watchLines(label: string, device: string, event: RemoteWatchEvent): string[] {
+  switch (event.kind) {
+    case "status": {
+      const { from, to, cause } = event.change
+      return [`${label} status ${from ?? "unknown"} -> ${to}${cause === undefined ? "" : ` (${cause})`}`]
+    }
+    case "settled":
+      return [`${label} ${event.reason === "session_closed" ? "session_closed" : "agent_settled"}${event.turnId === undefined ? "" : ` turn ${event.turnId}`}`]
+    case "resynced": {
+      const { from, state, settledTurns, restarted } = event.resync
+      return [
+        ...(restarted ? [`device ${device} host restarted`] : []),
+        ...(from !== state.status ? [`${label} status ${from ?? "unknown"} -> ${state.status} (changed while detached)`] : []),
+        ...settledTurns.map(turn => `${label} turn ${turn} settled while detached`),
+        `${label} resynced (${state.status})`,
+      ]
+    }
+    case "lost":
+      return [`device ${device} unreachable (${event.reason}); re-watching`]
+    case "record":
+      return [`${label} ${String(event.record["type"])}`]
+  }
+}
+
+export function watchEndLine(label: string, end: RemoteWatchEnd): string {
+  if (end.startsWith("access:")) return `${label} access ended (${end.slice("access:".length)})`
+  return end === "stopped" ? `${label} watch stopped` : `${label} watch ended (${end})`
+}
+
 /** The human answer of a session verb that succeeded; `label` is the `<device>/<session>` it named. */
-export function sessionVerbLines(verb: "open" | "send" | "model" | "interrupt" | "close", label: string, result: ThreadToolResult): string[] {
+export function sessionVerbLines(verb: "open" | "send" | "model" | "interrupt" | "close" | "watch", label: string, result: ThreadToolResult): string[] {
   if (result.kind !== "ok") return []
   if (verb === "open" && "thread" in result) return [`${result.thread.device ?? ""}/${result.thread.thread_id}`]
   if (verb === "send" && "delivery" in result) {

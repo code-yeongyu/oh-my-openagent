@@ -74,7 +74,13 @@ export type SnapshotLoading = EventOf<
 >;
 export type SessionRecords = EventOf<
   "session.records",
-  { readonly attach: string; readonly attach_id: number; readonly records: readonly JsonObject[] }
+  {
+    readonly attach: string;
+    readonly attach_id: number;
+    readonly records: readonly JsonObject[];
+    /** omo addition (relay daemon omo#12719): each record's stream seq, in order, increasing within the attach_id. */
+    readonly seqs?: readonly number[];
+  }
 >;
 
 // Where a reassembled blob applies: a snapshot of one attach generation, one record of its ordered stream, or one
