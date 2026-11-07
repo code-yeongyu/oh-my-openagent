@@ -34,6 +34,7 @@ export const THREAD_ERROR_CODES = [
   "model_ambiguous",
   "thinking_level_unsupported",
   "loop_detected",
+  "chain_count_limit",
   "binding_conflict",
   "binding_mismatch",
   "binding_inactive",
