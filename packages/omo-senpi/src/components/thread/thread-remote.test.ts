@@ -119,6 +119,12 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
     expect(await run("thread_read", { thread: "dur-on-b" })).toMatchObject({ kind: "error", error: { code: "host_unavailable", details: { device: "b", reason: "closed" } } })
   })
 
+  test("#given b's engine refuses a thread_send past its user's chain count limit #when it runs #then the refusal is typed chain_count_limit, names device b and b's own setting, never unsupported (the update-omo answer)", async () => {
+    const a = account({ refuse: "chain_count_limit" })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "next hop" })).toMatchObject({ kind: "error", error: { code: "chain_count_limit", details: { device: "b", reason: "chain_count_limit", setting: "threads.chainCountLimit" } } })
+  })
+
   // Every reason the device service can end a read-only record uncertain with, from its own vocabulary (not a copy).
   test.each(COMMAND_UNCERTAIN_REASONS.map((reason) => [reason]))("#given b's thread_read ends with the relay's %s #when it runs #then the answer is a typed retry, or for an oversized transcript a typed refusal, never update-omo", async (reason) => {
     const a = account({ refuse: reason })
