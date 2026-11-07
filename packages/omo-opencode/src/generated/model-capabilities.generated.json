@@ -8652,7 +8652,7 @@
         ]
       },
       "limit": {
-        "context": 372000,
+        "context": 1050000,
         "input": 922000,
         "output": 128000
       }
@@ -8931,7 +8931,7 @@
         ]
       },
       "limit": {
-        "context": 372000,
+        "context": 1050000,
         "input": 922000,
         "output": 128000
       }
@@ -53143,7 +53143,7 @@
         ]
       },
       "limit": {
-        "context": 372000,
+        "context": 1050000,
         "input": 922000,
         "output": 128000
       }
