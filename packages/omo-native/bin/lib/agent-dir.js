@@ -75,7 +75,7 @@ function followedDirMode(path, io) {
   }
 }
 
-/** @typedef {{ action: "created" | "normalized" | "unchanged" | "left" | "skipped", path: string, reason?: string, from?: number, to?: number, symlink?: boolean }} AgentDirPreparation */
+/** @typedef {{ action: "created" | "normalized" | "unchanged" | "left" | "skipped" | "absent", path: string, reason?: string, from?: number, to?: number, symlink?: boolean }} AgentDirPreparation */
 
 /**
  * Makes the agent directory one the RPC socket host accepts before the engine starts (#12546).
@@ -89,6 +89,7 @@ function followedDirMode(path, io) {
  * @returns {AgentDirPreparation}
  */
 export function prepareAgentDir(env = process.env, home = runtimeHome(env), io = {}) {
+  const create = io.create ?? true
   const path = canonicalAgentDir(env, home)
   if ((io.platform ?? process.platform) === "win32") return { action: "skipped", path, reason: "win32" }
   let stat
@@ -96,6 +97,7 @@ export function prepareAgentDir(env = process.env, home = runtimeHome(env), io =
     stat = (io.lstat ?? lstatSync)(path)
   } catch (error) {
     if (!isMissing(error)) throw error
+    if (!create) return { action: "absent", path }
     ensureAgentDir(path)
     return { action: "created", path }
   }
@@ -125,24 +127,33 @@ export function agentDirRemedy(preparation) {
   return `omo: ${preparation.path} is group/world-writable (${mode}) and was left as it is (${preparation.reason}); the RPC socket host refuses it. Fix: chmod go-w ${preparation.path}`
 }
 
+const reportedRemedies = new Set()
+
 /**
- * The entry points' one call (#12546): runs before ANY command is dispatched, because several verbs
- * (`setup`, `login`/`logout`/`whoami`, `sync`, `account`, `remote`) return before the engine starts
- * and can still create the directory with the umask, e.g. the settings write in `omo setup`.
- * Fail-open: a failure is reported and never blocks the command.
+ * The entry points' call (#12546), fail-open: a failure is reported and never blocks the command.
  *
- * @param {(line: string) => void} report
+ * Before ANY command dispatch the entries call it with `create: false`: verbs that return early
+ * (`setup`, `login`/`logout`/`whoami`, `sync`, `account`, `remote`) still get an existing
+ * group-writable directory tightened, but a command that writes nothing (a refused `omo login`)
+ * must not leave a new directory behind. Right before the engine starts it runs with
+ * `create: true`. Each remedy line is printed once per process, however often it is called.
+ *
+ * @param {{ create?: boolean, report?: (line: string) => void, env?: NodeJS.ProcessEnv }} [options]
  */
-export function prepareAgentDirForLaunch(report = (line) => process.stderr.write(`${line}\n`), env = process.env) {
+export function prepareAgentDirForLaunch(options = {}) {
+  const report = options.report ?? ((line) => process.stderr.write(`${line}\n`))
   let preparation
   try {
-    preparation = prepareAgentDir(env)
+    preparation = prepareAgentDir(options.env ?? process.env, undefined, { create: options.create ?? true })
   } catch (error) {
     report(`omo: could not prepare the agent directory: ${error instanceof Error ? error.message : String(error)}`)
     return
   }
   const remedy = agentDirRemedy(preparation)
-  if (remedy) report(remedy)
+  if (remedy && !reportedRemedies.has(remedy)) {
+    reportedRemedies.add(remedy)
+    report(remedy)
+  }
 }
 
 function timestamp() {

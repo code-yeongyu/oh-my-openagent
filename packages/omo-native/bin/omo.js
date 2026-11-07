@@ -25,9 +25,10 @@ try {
   if (!reexeced) {
     // The #10697 plaintext file goes before ANY command runs: several verbs return before runLauncher.
     removeLegacyServiceCredentials()
-    // Same reason (#12546): `setup` and the service verbs below return before runLauncher, and the
-    // first of them on a fresh host would otherwise create ~/.omo/agent with the umask.
-    prepareAgentDirForLaunch()
+    // #12546: `setup` and the service verbs below return before runLauncher, so an existing
+    // group-writable agent dir is tightened here; a missing one is created by the launch or by the
+    // writer that needs it (owner-only), never by a command that writes nothing.
+    prepareAgentDirForLaunch({ create: false })
     if (["login", "logout", "whoami"].includes(process.argv[2])) {
       const { runServiceAuthCommand } = await import("./lib/service-auth.generated.js")
       await runServiceAuthCommand(process.argv.slice(2))

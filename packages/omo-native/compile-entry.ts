@@ -141,9 +141,9 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
     process.exitCode = await runLoroSmoke()
     return true
   }
-  // Before ANY command dispatch: the service verbs below return before the engine starts, and the
-  // engine would create the agent dir with the umask, which the RPC socket host refuses (#12546).
-  prepareAgentDirForLaunch()
+  // #12546: the service verbs below return before the engine starts, so an existing group-writable
+  // agent dir is tightened here; creating a missing one waits for the launch below.
+  prepareAgentDirForLaunch({ create: false })
   if (["login", "logout", "whoami"].includes(args[0] ?? "")) {
     await runServiceAuthCommand(args)
     return true
@@ -169,6 +169,8 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   }
   const packageJson = readJson(join(execDir, "package.json")) as { version: string; omoBuild?: unknown }
   migrateLegacyBunGlobalManifest(execDir)
+  // Before the engine can create the agent dir with the umask, which the RPC socket host refuses (#12546).
+  prepareAgentDirForLaunch()
   adoptLegacyFlatState()
   const command = args[0]
   // The toolkit CLI is no longer shipped in the Native payload: the loop runs in-process behind the
