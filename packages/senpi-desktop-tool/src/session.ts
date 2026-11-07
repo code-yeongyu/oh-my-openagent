@@ -12,6 +12,24 @@ export interface ComputerModel {
 	readonly compat?: unknown;
 }
 
+/** The capture policy sent with a hand's call, decided where the loop's model is (brain/hand split). */
+export interface ComputerCapturePolicy {
+	readonly coordinateSafe: boolean;
+	readonly maxWidth: number;
+	readonly maxHeight: number;
+	readonly maxBytes: number;
+	readonly screenshotGc: { readonly staleMs: number; readonly scanIntervalMs: number };
+}
+
+/** The execution scope a hand runs the call in: it owns the audit file and the capture policy there. */
+export interface ComputerExecutionScope {
+	/** The calling session's id, stamped on audit records; the hand routes with it and never interprets it. */
+	readonly sessionId: string;
+	/** The scope owner's runtime audit directory on this device. */
+	readonly auditDir: string;
+	readonly capture: ComputerCapturePolicy;
+}
+
 /** What the host knows about the agent session; a structural subset of coding-agent's `ExtensionContext`. */
 export interface ComputerHostContext {
 	readonly cwd: string;
@@ -24,6 +42,8 @@ export interface ComputerHostContext {
 		notify?(message: string, level: "info" | "warning" | "error"): void;
 		confirm?(title: string, body: string, options?: { signal?: AbortSignal; timeout?: number }): Promise<boolean>;
 	};
+	/** Set on a hand: `sessionManager` and `model` are then never read (the hand has no transcript or model). */
+	readonly executionScope?: ComputerExecutionScope;
 }
 
 export const AUDIT_FILE_NAME = ".computer-audit.jsonl";
@@ -48,6 +68,25 @@ export function usesCoordinateSafeImageSizing(model: ComputerModel | undefined):
 /** `session.open` params from the settings, the active model, and the session directory. */
 export function sessionOpenParams(settings: ComputerSettings, context: ComputerHostContext): DesktopSessionOpenParams {
 	const { auditLog, screenshotGc } = settings;
+	const scope = context.executionScope;
+	if (scope !== undefined) {
+		const { capture } = scope;
+		return {
+			display: settings.display,
+			macosCanary: settings.macosCanary,
+			showCursor: settings.showCursor,
+			allowHostRelayOnlyStop: settings.allowHostRelayOnlyStop,
+			auditPath: auditLog.enabled ? join(scope.auditDir, AUDIT_FILE_NAME) : null,
+			artifactDir: tmpdir(),
+			screenshotGc: { staleMs: capture.screenshotGc.staleMs, scanIntervalMs: capture.screenshotGc.scanIntervalMs },
+			captureCaps: {
+				maxWidth: capture.maxWidth,
+				maxHeight: capture.maxHeight,
+				coordinateSafe: capture.coordinateSafe,
+				maxBytes: capture.maxBytes,
+			},
+		};
+	}
 	return {
 		display: settings.display,
 		macosCanary: settings.macosCanary,
@@ -74,12 +113,13 @@ export function runSnapshot(
 	context: ComputerHostContext,
 	readOnly: boolean,
 ): ComputerSessionSnapshot {
+	const scope = context.executionScope;
 	return {
 		cwd: context.cwd,
-		sessionId: context.sessionManager.getSessionId(),
-		captureMaxWidth: settings.maxWidth,
-		captureMaxHeight: settings.maxHeight,
-		captureMaxBytes: settings.screenshotMaxBytes,
+		sessionId: scope === undefined ? context.sessionManager.getSessionId() : scope.sessionId,
+		captureMaxWidth: scope === undefined ? settings.maxWidth : scope.capture.maxWidth,
+		captureMaxHeight: scope === undefined ? settings.maxHeight : scope.capture.maxHeight,
+		captureMaxBytes: scope === undefined ? settings.screenshotMaxBytes : scope.capture.maxBytes,
 		display: settings.display,
 		readOnly,
 		stopHotkey: settings.stopHotkey,

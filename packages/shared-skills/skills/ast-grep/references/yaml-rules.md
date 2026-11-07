@@ -488,14 +488,14 @@ ignores:
   - '**/__generated__/**'
 ```
 
-If omitted, the rule runs on every file matching its `language`. These globs override `sgconfig.yml`-level globs for this rule only.
+If omitted, the rule runs on every file matching its `language`. `sgconfig.yml` has no project-wide `files`/`ignores` to override; its `languageGlobs` only changes which language a file parses as. To narrow a whole scan, pass `--globs` to `sg scan`.
 
 Object form (rare):
 
 ```yaml
 files:
-  - pattern: 'src/**/*.ts'
-    case_sensitive: true
+  - glob: 'src/**/*.ts'
+    caseInsensitive: true
 ```
 
 ---
