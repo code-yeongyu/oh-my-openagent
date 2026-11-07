@@ -2,6 +2,7 @@ import type { PendingCall } from "./types"
 import { existsSync } from "fs"
 
 import { runCommentChecker, getCommentCheckerPath, startBackgroundInit, type HookInput } from "./cli"
+import { readCheckerEdits, type CheckerStringEdit } from "./checker-edits"
 
 let cliPathPromise: Promise<string | null> | null = null
 let isRunning = false
@@ -33,6 +34,79 @@ function hasNewCommentsOnly(oldText: string | undefined, newText: string | undef
     const trimmed = l.trim()
     return trimmed && hasCommentSyntax(trimmed) && !oldLines.has(trimmed)
   })
+}
+
+interface CommentCheckPlan {
+  toolName: string
+  toolInput: HookInput["tool_input"]
+  shouldCheck: boolean
+}
+
+function capitalizedToolName(tool: PendingCall["tool"]): string {
+  if (tool === "multiedit") return "MultiEdit"
+  return tool.charAt(0).toUpperCase() + tool.slice(1)
+}
+
+function editsHaveNewComments(edits: readonly CheckerStringEdit[]): boolean {
+  return edits.some((edit) => hasNewCommentsOnly(edit.old_string, edit.new_string))
+}
+
+/**
+ * `write` carries `content`. A write over an existing file is checked as Edit
+ * against the text it replaces, so comments it keeps are not reported as new.
+ * An `edit` may carry `oldString`/`newString` or an `edits` array (camelCase
+ * or snake_case). The checker reads `content` for
+ * Write, `old_string`/`new_string` for Edit, and snake_case `edits` for MultiEdit.
+ */
+function planCommentCheck(pendingCall: PendingCall): CommentCheckPlan {
+  const edits = readCheckerEdits(pendingCall.edits)
+  const hasPair = pendingCall.oldString !== undefined || pendingCall.newString !== undefined
+
+  if (!hasPair && edits) {
+    return {
+      toolName: "MultiEdit",
+      toolInput: {
+        file_path: pendingCall.filePath,
+        edits,
+      },
+      shouldCheck: editsHaveNewComments(edits),
+    }
+  }
+
+  if (!hasPair && pendingCall.content !== undefined && pendingCall.previousContent !== undefined) {
+    return {
+      toolName: "Edit",
+      toolInput: {
+        file_path: pendingCall.filePath,
+        old_string: pendingCall.previousContent,
+        new_string: pendingCall.content,
+      },
+      shouldCheck: hasNewCommentsOnly(pendingCall.previousContent, pendingCall.content),
+    }
+  }
+
+  if (!hasPair && pendingCall.content !== undefined) {
+    return {
+      toolName: "Write",
+      toolInput: {
+        file_path: pendingCall.filePath,
+        content: pendingCall.content,
+      },
+      shouldCheck: hasNewCommentsOnly(undefined, pendingCall.content),
+    }
+  }
+
+  return {
+    toolName: capitalizedToolName(pendingCall.tool),
+    toolInput: {
+      file_path: pendingCall.filePath,
+      content: pendingCall.content,
+      old_string: pendingCall.oldString,
+      new_string: pendingCall.newString,
+      edits,
+    },
+    shouldCheck: hasNewCommentsOnly(pendingCall.oldString, pendingCall.newString),
+  }
 }
 
 async function withCommentCheckerLock<T>(
@@ -84,24 +158,19 @@ export async function processWithCli(
     void input
     debugLog("using CLI mode with path:", cliPath)
 
+    const plan = planCommentCheck(pendingCall)
     const hookInput: HookInput = {
       session_id: pendingCall.sessionID,
-      tool_name: pendingCall.tool.charAt(0).toUpperCase() + pendingCall.tool.slice(1),
+      tool_name: plan.toolName,
       transcript_path: "",
       cwd: process.cwd(),
       hook_event_name: "PostToolUse",
-      tool_input: {
-        file_path: pendingCall.filePath,
-        content: pendingCall.content,
-        old_string: pendingCall.oldString,
-        new_string: pendingCall.newString,
-        edits: pendingCall.edits,
-      },
+      tool_input: plan.toolInput,
     }
 
-    // --- Fix #4292 Issue 1: skip if comment was already in oldString ---
-    if (!hasNewCommentsOnly(pendingCall.oldString, pendingCall.newString)) {
-      debugLog("skipping: no net-new comments in edit (oldString/newString)")
+    // Skip when the changed text adds no comment. Write uses `content`; an edits array is checked per hunk.
+    if (!plan.shouldCheck) {
+      debugLog("skipping: no net-new comments in", plan.toolName)
       return
     }
 
