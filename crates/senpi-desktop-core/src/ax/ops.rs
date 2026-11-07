@@ -1,21 +1,30 @@
 //! `ax.query` / `ax.elementAt` / ref registration and the press action.
 
-use super::walk::{label, walk_raw, WalkState};
-use super::{AxBackend, AxHandle, AxProps, AxRegistry};
+use super::walk::{label, walk_observed, walk_raw, WalkState};
+use super::{AxBackend, AxHandle, AxObserved, AxRegistry};
 use crate::error::CoreResult;
+use crate::report::ReportMode;
 use crate::types::{AxNode, AxQuery, DesktopWindow};
 
 const QUERY_MAX_NODES: u32 = 5_000;
 const QUERY_MAX_DEPTH: u32 = 24;
 
-fn node_to_wire(reference: String, props: AxProps) -> AxNode {
+/// The wire node for `reference`. `observed` carries evidence and `secure`
+/// only when an object-mode read produced it, so null-mode nodes keep today's
+/// members.
+pub fn node_to_wire(reference: String, observed: AxObserved, subtree_truncated: bool) -> AxNode {
+    let AxObserved {
+        props,
+        evidence,
+        secure,
+    } = observed;
     let (x, y, width, height) = props.bounds.map_or((None, None, None, None), |b| {
         (Some(b.x), Some(b.y), Some(b.width), Some(b.height))
     });
     AxNode {
-        evidence: None,
-        subtree_truncated: false,
-        secure: false,
+        evidence,
+        subtree_truncated,
+        secure,
         ref_: reference,
         role: props.role,
         native_role: props.native_role,
@@ -45,7 +54,12 @@ pub fn query(
     let generation = registry.current_generation(target);
     let root = backend.window_root(window)?;
     let mut state = WalkState::new(QUERY_MAX_NODES, QUERY_MAX_DEPTH);
-    let Some(root) = walk_raw(backend, root, 0, &mut state)? else {
+    let root = if registry.report_mode() == ReportMode::Object {
+        walk_observed(backend, root, 0, 0, &mut state)?
+    } else {
+        walk_raw(backend, root, 0, &mut state)?
+    };
+    let Some(root) = root else {
         return Ok(Vec::new());
     };
     let role = query.role.as_deref().map(str::to_lowercase);
@@ -64,7 +78,12 @@ pub fn query(
             && contains(node.props.value.as_deref(), value.as_ref())
         {
             let reference = registry.register(target, generation, node.handle);
-            result.push(node_to_wire(reference, node.props));
+            let observed = AxObserved {
+                props: node.props,
+                evidence: node.evidence,
+                secure: node.secure,
+            };
+            result.push(node_to_wire(reference, observed, false));
             if result.len() >= limit {
                 break;
             }
@@ -79,10 +98,20 @@ pub fn register_node(
     target: &str,
     handle: AxHandle,
 ) -> CoreResult<AxNode> {
-    let props = backend.props(&handle)?;
+    let observed = observe(backend, registry, &handle)?;
     let generation = registry.current_generation(target);
     let reference = registry.register(target, generation, handle);
-    Ok(node_to_wire(reference, props))
+    Ok(node_to_wire(reference, observed, false))
+}
+
+/// Reads `handle` as the session's report mode asks: with evidence in object
+/// mode, plain props otherwise.
+pub fn observe(backend: &mut dyn AxBackend, registry: &AxRegistry, handle: &AxHandle) -> CoreResult<AxObserved> {
+    if registry.report_mode() == ReportMode::Object {
+        backend.observe(handle)
+    } else {
+        backend.props(handle).map(AxObserved::plain)
+    }
 }
 
 /// Hit-test at global logical desktop coordinates; needs no prior capture.
