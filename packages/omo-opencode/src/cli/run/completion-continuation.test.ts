@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, spyOn, afterEach } from "bun:test"
+import { describe, it, expect, mock, spyOn, beforeEach, afterEach } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -8,6 +8,13 @@ import { writeState as writeRalphLoopState } from "../../hooks/ralph-loop/storag
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 const testDirs: string[] = []
+
+beforeEach(() => {
+  const directory = createTempDir()
+  process.env.TMPDIR = directory
+  process.env.TMP = directory
+  process.env.TEMP = directory
+})
 
 afterEach(() => {
   _resetForTesting()
