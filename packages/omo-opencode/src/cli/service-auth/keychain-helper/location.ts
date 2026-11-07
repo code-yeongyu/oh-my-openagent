@@ -1,4 +1,4 @@
-import { dirname, join } from "node:path"
+import { dirname, join, posix } from "node:path"
 import { fileURLToPath } from "node:url"
 import type { SignatureVerdict } from "./signature"
 
@@ -19,14 +19,15 @@ export function bundleCandidates(moduleUrl: string): readonly string[] {
 
 /**
  * Other signature-valid copies on this machine, tried after the bundle's own (addendum rows 9 and 10): the desktop
- * app's copies and a bun-global omo-ai install.
+ * app's copies and a bun-global omo-ai install. These are macOS paths, so they are joined with POSIX separators on
+ * every host.
  */
 export function machineCandidates(home: string, arch: string = process.arch): readonly string[] {
   const runtimeArch = arch === "arm64" ? "arm64" : "x64"
   return [
     `/Applications/OmO.app/Contents/Resources/omo-runtime/darwin-${runtimeArch}/omo-keychain`,
-    join(home, "Applications", "OmO.app", "Contents", "Resources", "omo-runtime", `darwin-${runtimeArch}`, "omo-keychain"),
-    join(home, ".bun", "install", "global", "node_modules", "omo-ai", "bin", "darwin", "omo-keychain"),
+    posix.join(home, "Applications", "OmO.app", "Contents", "Resources", "omo-runtime", `darwin-${runtimeArch}`, "omo-keychain"),
+    posix.join(home, ".bun", "install", "global", "node_modules", "omo-ai", "bin", "darwin", "omo-keychain"),
   ]
 }
 
