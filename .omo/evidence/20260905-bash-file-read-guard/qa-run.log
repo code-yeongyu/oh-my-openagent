@@ -1,0 +1,57 @@
+[2026-09-05T20:08:06.016Z] Starting OpenCode QA for bash-file-read-guard...
+[2026-09-05T20:08:06.480Z] Real DB path: /home/cye/.local/share/opencode/opencode.db
+[2026-09-05T20:08:06.480Z] Real DB session count before: 585
+[2026-09-05T20:08:06.480Z] Fixture written to /tmp/oqa-bash-guard-U92MfE/proj/package.json
+[2026-09-05T20:08:06.483Z] Fake OpenAI server listening on 127.0.0.1:33153
+[2026-09-05T20:08:06.484Z] Configurations written to /tmp/oqa-bash-guard-U92MfE/config
+[2026-09-05T20:08:06.484Z] Starting opencode serve on port 47334...
+[2026-09-05T20:08:06.990Z] health check attempt 0 error: fetch failed
+[2026-09-05T20:08:07.122Z] [serve:stdout] opencode server listening on http://127.0.0.1:47334
+[2026-09-05T20:08:07.499Z] opencode serve is HEALTHY at http://127.0.0.1:47334
+[2026-09-05T20:08:07.499Z] 
+=== SCENARIO 1: Shell file-read (cat package.json) ===
+[2026-09-05T20:08:11.332Z] Created session for cat test: ses_f8cd072c2ffeqH6RT948oIu084
+[2026-09-05T20:08:11.358Z] Prompt sent, waiting for session completion...
+[2026-09-05T20:08:12.615Z] [fake-llm] call #1: isCat=true isEcho=false hasToolOutput=false
+[2026-09-05T20:08:12.736Z] [fake-llm] call #2: isCat=true isEcho=false hasToolOutput=true
+[2026-09-05T20:08:12.736Z] [fake-llm] Captured cat tool output (274 chars)
+[2026-09-05T20:08:12.870Z] Session 1 idle.
+[2026-09-05T20:08:12.871Z] 
+=== SCENARIO 2: Unrelated Bash command (echo hello world) ===
+[2026-09-05T20:08:12.876Z] Created session for echo test: ses_f8cd06cb6ffeikadxioGhsHULy
+[2026-09-05T20:08:12.885Z] Prompt sent, waiting for session completion...
+[2026-09-05T20:08:12.919Z] [fake-llm] call #3: isCat=false isEcho=true hasToolOutput=false
+[2026-09-05T20:08:12.984Z] [fake-llm] call #4: isCat=false isEcho=true hasToolOutput=true
+[2026-09-05T20:08:12.984Z] [fake-llm] Captured echo tool output (12 chars)
+[2026-09-05T20:08:13.391Z] Session 2 idle.
+[2026-09-05T20:08:13.391Z] Sandbox DB path: /tmp/oqa-bash-guard-U92MfE/data/opencode/opencode.db
+[2026-09-05T20:08:13.403Z] 
+=== OUTPUT VERIFICATION ===
+[2026-09-05T20:08:13.404Z] Cat tool output captured:
+---
+[WARNING: Prefer the Read tool over `cat`/`head`/`tail` for reading file contents. The Read tool provides line numbers and hash anchors for precise editing.]
+
+{
+  "name": "bash-guard-qa-fixture",
+  "version": "1.0.0",
+  "description": "fixture for bash-file-read-guard QA"
+}
+---
+[2026-09-05T20:08:13.404Z] Echo tool output captured:
+---
+hello world
+
+---
+[2026-09-05T20:08:13.404Z] ASSERTION 1 PASSED: cat tool output starts with [WARNING: ...]
+[2026-09-05T20:08:13.404Z] ASSERTION 2 PASSED: warning guidance is prefixed EXACTLY ONCE in cat tool output
+[2026-09-05T20:08:13.404Z] ASSERTION 3 PASSED: cat tool output contains the original file content following the warning
+[2026-09-05T20:08:13.404Z] ASSERTION 4 PASSED: unrelated command (echo) does NOT contain warning guidance
+[2026-09-05T20:08:13.404Z] ASSERTION 5 PASSED: unrelated command (echo) output is completely unchanged ('hello world')
+[2026-09-05T20:08:13.408Z] Real DB session count before=585, after=585
+[2026-09-05T20:08:13.412Z] ASSERTION 6 PASSED: Real host DB was completely untouched. Sandbox isolation verified.
+[2026-09-05T20:08:13.412Z] 
+==========================================
+[2026-09-05T20:08:13.413Z] 🎉 ALL REAL OPENCODE QA ASSERTIONS PASSED!
+[2026-09-05T20:08:13.413Z] ==========================================
+[2026-09-05T20:08:13.413Z] Cleaning up processes...
+[2026-09-05T20:08:13.443Z] Cleanup complete.
