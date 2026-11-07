@@ -33,17 +33,18 @@ export class DesktopEngineUnavailableError extends Error {
 
 /**
  * The engine spawn contract: the binary at `enginePath` (default: the one the engine package locates)
- * with the single argument `--stdio` and piped stdio. The child inherits the environment, which carries
- * `SENPI_DESKTOP_BACKEND` and, on Linux, the display and session-bus variables.
+ * with the single argument `--stdio` and piped stdio. With no explicit environment the child inherits
+ * the host environment, including the backend, display and session-bus variables.
  */
-export function engineChildFactory(enginePath?: string): ChildFactory {
-	return () => spawnEngine(enginePath ?? locateEnginePath());
+export function engineChildFactory(enginePath?: string, env?: NodeJS.ProcessEnv): ChildFactory {
+	return () => spawnEngine(enginePath ?? locateEnginePath(), env);
 }
 
 export interface AcquiringEngineChildOptions {
 	/** The omo release whose GitHub assets carry this host's engine. */
 	readonly version: string;
 	readonly host?: string;
+	readonly env?: NodeJS.ProcessEnv;
 	readonly acquire?: (options: AcquireDesktopEngineOptions) => Promise<AcquiredDesktopEngine>;
 	readonly spawnEngine?: (enginePath: string) => ChildProcessWithoutNullStreams;
 }
@@ -54,7 +55,7 @@ export interface AcquiringEngineChildOptions {
  */
 export function acquiringEngineChildFactory(options: AcquiringEngineChildOptions): ChildFactory {
 	const acquire = options.acquire ?? acquireDesktopEngine;
-	const start = options.spawnEngine ?? spawnEngine;
+	const start = options.spawnEngine ?? ((path: string) => spawnEngine(path, options.env));
 	return async () => {
 		const result = await launchDesktopEngine(
 			{ version: options.version, host: options.host ?? getDesktopEngineHost() },
@@ -66,8 +67,8 @@ export function acquiringEngineChildFactory(options: AcquiringEngineChildOptions
 	};
 }
 
-function spawnEngine(enginePath: string): ChildProcessWithoutNullStreams {
-	return spawn(enginePath, ["--stdio"], { stdio: "pipe", windowsHide: true });
+function spawnEngine(enginePath: string, env?: NodeJS.ProcessEnv): ChildProcessWithoutNullStreams {
+	return spawn(enginePath, ["--stdio"], { stdio: "pipe", windowsHide: true, env });
 }
 
 function locateEnginePath(): string {

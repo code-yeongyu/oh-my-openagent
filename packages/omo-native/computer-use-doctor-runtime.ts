@@ -9,7 +9,7 @@ import {
 } from "@oh-my-opencode/senpi-desktop-engine"
 import type { DesktopCapabilities } from "@oh-my-opencode/senpi-desktop-protocol"
 import { isSupportedHost } from "@oh-my-opencode/senpi-desktop-tool"
-import { resolveOmoComputerSettings } from "../omo-senpi/src/components/computer-use/settings"
+import { resolveComputerEngineEnv, resolveOmoComputerSettings } from "../omo-senpi/src/components/computer-use/settings"
 import { resolveInstalledEngine } from "../omo-senpi/src/components/computer-use/installed-engine"
 import {
   COMPUTER_USE_DOCTOR_TIMEOUT_MS,
@@ -109,9 +109,10 @@ export async function computerUseDoctorReport(input: ComputerUseDoctorInput): Pr
   const resolved = resolveInstalledEngine(settings.enginePath, input.env, input.version, locatorOptions)
   if ("notInstalled" in resolved) return { ...base, kind: "not-installed", attemptedPaths: resolved.notInstalled.attemptedPaths }
   if ("diagnostic" in resolved) return unavailable(base, resolved.diagnostic)
+  const engineEnv = resolveComputerEngineEnv(settings.env, input.env)
   const probe = (path: string) => ({ probe: probeComputerUseEngine(
     path,
-    input.env,
+    engineEnv,
     input.timeoutMs ?? COMPUTER_USE_DOCTOR_TIMEOUT_MS,
     input.launchEngine,
   ) })

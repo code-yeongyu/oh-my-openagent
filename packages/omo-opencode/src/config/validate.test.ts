@@ -199,6 +199,81 @@ describe("validatePluginConfig", () => {
     })
   })
 
+  for (const { name, user, expected } of [
+    {
+      name: "user top-level allowlist",
+      user: { mcp_env_allowlist: ["USER_ROOT_TOKEN"] },
+      expected: ["USER_ROOT_TOKEN"],
+    },
+    {
+      name: "user harness allowlist overriding top-level",
+      user: {
+        mcp_env_allowlist: ["USER_ROOT_TOKEN"],
+        "[opencode]": { mcp_env_allowlist: ["USER_HARNESS_TOKEN"] },
+      },
+      expected: ["USER_HARNESS_TOKEN"],
+    },
+    {
+      name: "user profile allowlist overriding base harness",
+      user: {
+        mcp_env_allowlist: ["USER_ROOT_TOKEN"],
+        "[opencode]": { mcp_env_allowlist: ["USER_HARNESS_TOKEN"] },
+        profiles: { kimi: { mcp_env_allowlist: ["USER_PROFILE_TOKEN"] } },
+      },
+      expected: ["USER_PROFILE_TOKEN"],
+    },
+    {
+      name: "user profile harness allowlist overriding profile top-level",
+      user: {
+        mcp_env_allowlist: ["USER_ROOT_TOKEN"],
+        "[opencode]": { mcp_env_allowlist: ["USER_HARNESS_TOKEN"] },
+        profiles: {
+          kimi: {
+            mcp_env_allowlist: ["USER_PROFILE_TOKEN"],
+            "[opencode]": { mcp_env_allowlist: ["USER_PROFILE_HARNESS_TOKEN"] },
+          },
+        },
+      },
+      expected: ["USER_PROFILE_HARNESS_TOKEN"],
+    },
+    {
+      name: "empty user profile allowlist clearing base harness",
+      user: {
+        "[opencode]": { mcp_env_allowlist: ["USER_HARNESS_TOKEN"] },
+        profiles: { kimi: { mcp_env_allowlist: [] } },
+      },
+      expected: [],
+    },
+    {
+      name: "project-only allowlists",
+      user: {},
+      expected: [],
+    },
+  ]) {
+    it(`#given ${name} #when project scopes attempt overrides #then preserves the user-only allowlist`, () => {
+      withOmoConfig("allowlist-scopes", (fixture) => {
+        writeUserConfig(fixture, user)
+        writeProjectConfig(fixture, {
+          mcp_env_allowlist: ["PROJECT_ROOT_TOKEN"],
+          "[opencode]": { mcp_env_allowlist: ["PROJECT_HARNESS_TOKEN"] },
+          profiles: {
+            kimi: {
+              mcp_env_allowlist: ["PROJECT_PROFILE_TOKEN"],
+              "[opencode]": { mcp_env_allowlist: ["PROJECT_PROFILE_HARNESS_TOKEN"] },
+            },
+          },
+        })
+        process.env.OCX_PROFILE = "kimi"
+
+        const result = validatePluginConfig(fixture.project)
+
+        expect(result.messages).toEqual([])
+        expect(result.valid).toBe(true)
+        expect(result.config.mcp_env_allowlist).toEqual(expected)
+      })
+    })
+  }
+
   it("#given unknown opencode keys #when validating #then reports and strips every unknown path without losing known values", () => {
     withOmoConfig("unknown-keys", (fixture) => {
       writeProjectConfig(fixture, {

@@ -102,7 +102,7 @@ function readConfigSource(
     }
   }
 
-  const layer = validateConfigLayer(path, parsed.data)
+  const layer = validateConfigLayer(path, parsed.data, scope)
   return layer.loaded
     ? { diagnostics: layer.diagnostics, source: { exists: true, loaded: true, path, scope }, value: layer.value }
     : { diagnostics: layer.diagnostics, source: { exists: true, loaded: false, path, scope } }

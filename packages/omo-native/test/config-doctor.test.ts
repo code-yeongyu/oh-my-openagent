@@ -36,6 +36,16 @@ function captureDoctor(options: Record<string, unknown>): string {
 }
 
 describe("omo doctor config lines", () => {
+  test("#given a forbidden computer environment variable #when doctor reports config #then it names the dropped key without leaking its value", () => {
+    const home = homeWithUserConfig(JSON.stringify({
+      "[native]": { computer: { env: { DISPLAY: ":98", LD_PRELOAD: "/private/secret.so" } } },
+    }))
+
+    expect(configDoctorLines({ cwd: home, env: { HOME: home } })).toEqual([
+      "WARN config: ~/.omo/omo.jsonc: [native].computer.env.LD_PRELOAD ignored (invalid value)",
+    ])
+  })
+
   test("#given a user omo.jsonc with one invalid value beside a valid one #when the config report runs #then one WARN line names the home-relative file and the dotted key", () => {
     const home = homeWithUserConfig(`{ "task": { "host_engine_policy": "sometimes", "default_concurrency": 3 } }`)
 

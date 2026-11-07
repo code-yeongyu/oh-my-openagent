@@ -64,6 +64,7 @@ describe("resolveComputerSettings", () => {
 			auditLog: { enabled: true },
 			screenshotGc: { enabled: true, staleMs: 43_200_000, scanIntervalMs: 1_800_000 },
 			enginePath: undefined,
+			env: undefined,
 			cuaAdapter: false,
 		});
 	});
@@ -71,6 +72,15 @@ describe("resolveComputerSettings", () => {
 	it.each(["all", "screen-2"])("preserves explicit display %s", (display) => {
 		const settings = resolveComputerSettings({ display });
 		expect(settings.display).toBe(display);
+	});
+
+	it("preserves literal engine environment overrides and removals", () => {
+		// Given
+		const env = { DISPLAY: ":98", XAUTHORITY: "/tmp/Xauthority", WAYLAND_DISPLAY: null };
+		// When
+		const settings = resolveComputerSettings({ env }, "linux");
+		// Then
+		expect(settings.env).toEqual(env);
 	});
 
 	it("defaults enabled off on an unsupported host", () => {
