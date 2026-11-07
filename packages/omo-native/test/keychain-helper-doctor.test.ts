@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { join } from "node:path"
 import { keychainHelperDoctorLines, KEYCHAIN_HELPER_REQUIREMENT } from "../bin/lib/keychain-helper-doctor.js"
 import { KEYCHAIN_HELPER_REQUIREMENT as BUILT_REQUIREMENT } from "../keychain-helper/build"
 
@@ -26,7 +27,7 @@ describe("omo doctor: keychain helper line (#11262 addendum Q1, row 9)", () => {
       },
       verify: () => false,
     })
-    expect(seen).toEqual(["/opt/omo/omo-keychain"])
+    expect(seen).toEqual([join("/opt/omo", "omo-keychain")])
     expect(lines[0]).toContain("missing omo-keychain")
   })
 
