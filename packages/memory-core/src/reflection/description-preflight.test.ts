@@ -52,6 +52,18 @@ describe("reflection description preflight", () => {
       .toBe(before.replace(`description: ${oversized}`, `description: ${"summary ".repeat(127)}summary…`))
   })
 
+  it("#given the maintenance stamp lands in the common config mid-run #when preflight runs #then the oversized description is still trimmed", async () => {
+    const before = `---\r\nkind: note\r\nlimit: 5000\r\nprovenance: "legacy receipt"\r\ndescription: ${oversized}\r\nname: 'x'\r\n---\r\n${body}`
+    const { worktree } = await fixture(before)
+    await worktree.parent.configSet("omo.maintenanceAt", String(Date.now()))
+
+    const trimmed = await preflightReflectionDescriptions(worktree, worktree.baseSha)
+
+    expect(trimmed).toHaveLength(1)
+    expect(await readFile(join(worktree.dir, path), "utf8"))
+      .toBe(before.replace(`description: ${oversized}`, `description: ${"summary ".repeat(127)}summary…`))
+  })
+
   it("#given a body-only edit to a legacy oversized header #when preflight runs #then the accepted header and tip stay unchanged", async () => {
     const baseContent = renderMemoryFile({ description: oversized }, body)
     const content = `${baseContent}new body line\n`
