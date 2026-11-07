@@ -309,8 +309,6 @@
       "packages/memory-core/src/sync/crypto/vendor/sync-format/stream.ts": ["PLAINTEXT_LIMIT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) SyncCommitError
       "packages/memory-core/src/sync/engine/adapters/git-sync-repo.ts": ["SyncCommitError"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) OversizedItemError
-      "packages/memory-core/src/sync/engine/batches.ts": ["OversizedItemError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ManualClock, inProcessLock
       "packages/memory-core/src/sync/engine/engine-harness.test-support.ts": ["ManualClock", "inProcessLock"],
       // pre-existing at origin dev 4686e425b5: unused export(s) POLL_MS
@@ -835,8 +833,6 @@
       "packages/omo-opencode/src/hooks/runtime-fallback/agent-resolver.ts": ["AGENT_NAMES"],
       // pre-existing at origin dev 4686e425b5: unused export(s) extractRetryableSignal
       "packages/omo-opencode/src/hooks/runtime-fallback/error-classifier.ts": ["extractRetryableSignal"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) getLastUserRetryParts
-      "packages/omo-opencode/src/hooks/runtime-fallback/last-user-retry-parts.ts": ["getLastUserRetryParts"],
       // pre-existing at origin dev 4686e425b5: unused export(s) hasVisibleAssistantResponse
       "packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts": ["hasVisibleAssistantResponse"],
       // pre-existing at origin dev 4686e425b5: unused export(s) HOOK_NAME
@@ -869,8 +865,6 @@
       "packages/omo-opencode/src/plugin/ultrawork-model-override.ts": ["detectUltrawork"],
       // pre-existing at origin dev 4686e425b5: unused export(s) validateAgentOrder
       "packages/omo-opencode/src/shared/agent-ordering.ts": ["validateAgentOrder"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) hasCompactionPart
-      "packages/omo-opencode/src/shared/compaction-marker.ts": ["hasCompactionPart"],
       // pre-existing at origin dev 4686e425b5: unused export(s) createConnectedProvidersCacheStore, findProviderModelMetadata
       "packages/omo-opencode/src/shared/connected-providers-cache.ts": ["createConnectedProvidersCacheStore", "findProviderModelMetadata"],
       // pre-existing at origin dev 4686e425b5: unused export(s) containsPath
