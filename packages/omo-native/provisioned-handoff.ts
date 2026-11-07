@@ -1,5 +1,5 @@
 import { closeSync } from "node:fs"
-import { dirname } from "node:path"
+import { dirname, isAbsolute } from "node:path"
 import { propagateResult, runChild } from "./bin/lib/child-process.js"
 import { inspectPrivateFdTable, PRIVATE_FDS_ENV, privateFdHandoffFor } from "./bin/lib/private-fd-table.js"
 import { isProvisionedExecutable } from "./compile-runtime"
@@ -8,8 +8,18 @@ import { isProvisionedExecutable } from "./compile-runtime"
 // child trusts it over its own executable identity, which Bun on Windows has misreported before, so
 // every child provisioned and re-exec'd again (#7445, #7447): the provisioned exe never re-execs itself.
 export const PROVISIONED_HANDOFF_ENV = "OMO_PROVISIONED_HANDOFF"
+// Set beside the handoff marker, naming the binary the user installed and launched. The provisioned
+// child is what answers `omo update`, and its own executable is the runtime copy the launcher
+// re-materializes on every run, so replacing that copy never updates anything.
+export const PROVISIONED_LAUNCHER_ENV = "OMO_PROVISIONED_LAUNCHER"
 
-export type ProvisionedLaunch = { readonly provision: boolean; readonly handOff: boolean; readonly execDir: string }
+export type ProvisionedLaunch = {
+  readonly provision: boolean
+  readonly handOff: boolean
+  readonly execDir: string
+  /** The installed binary that started this launch; undefined when the runtime copy was run directly. */
+  readonly launcher?: string
+}
 type ReexecOptions = {
   argv?: string[]
   env?: NodeJS.ProcessEnv
@@ -31,10 +41,20 @@ export function planProvisionedLaunch(
 ): ProvisionedLaunch {
   const env = options.env ?? process.env
   const handedOff = env[PROVISIONED_HANDOFF_ENV] === expected
+  const parentLauncher = env[PROVISIONED_LAUNCHER_ENV]
   delete env[PROVISIONED_HANDOFF_ENV]
-  if (handedOff) return { provision: false, handOff: false, execDir: dirname(expected) }
+  delete env[PROVISIONED_LAUNCHER_ENV]
+  if (handedOff) {
+    return { provision: false, handOff: false, execDir: dirname(expected), launcher: handedOffLauncher(parentLauncher, expected) }
+  }
   const provision = !isProvisionedExecutable(runningExecutable, expected)
-  return { provision, handOff: provision, execDir: dirname(runningExecutable) }
+  return { provision, handOff: provision, execDir: dirname(runningExecutable), launcher: provision ? runningExecutable : undefined }
+}
+
+// Only an absolute path that is not the runtime copy itself can name the installed binary.
+function handedOffLauncher(launcher: string | undefined, expected: string): string | undefined {
+  if (launcher === undefined || !isAbsolute(launcher)) return undefined
+  return isProvisionedExecutable(launcher, expected) ? undefined : launcher
 }
 
 export async function reexecProvisionedRuntime(expected: string, options: ReexecOptions = {}): Promise<void> {
@@ -63,8 +83,13 @@ export async function reexecProvisionedRuntime(expected: string, options: Reexec
   propagate(result)
 }
 
-export async function handOffToProvisionedRuntime(expected: string, options: ReexecOptions = {}): Promise<void> {
-  const env = { ...(options.env ?? process.env), [PROVISIONED_HANDOFF_ENV]: expected }
+export async function handOffToProvisionedRuntime(
+  expected: string,
+  options: ReexecOptions & { launcher?: string } = {},
+): Promise<void> {
+  const env: NodeJS.ProcessEnv = { ...(options.env ?? process.env), [PROVISIONED_HANDOFF_ENV]: expected }
+  if (options.launcher === undefined) delete env[PROVISIONED_LAUNCHER_ENV]
+  else env[PROVISIONED_LAUNCHER_ENV] = options.launcher
   // Ctrl+C reaches every process on a Windows console. The child answers its own copy; this parent
   // keeps waiting for the child's exit code instead of dying first and handing the prompt back early.
   const waitForChild = () => {}
