@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { LocalEvent } from "../../src/local-api/protocol.ts";
 import { validateEvent } from "../../src/local-api/validate.ts";
 
 // relay daemon omo#12719: `session.records` may carry `seqs`, one stream seq per record, increasing within the attach
@@ -7,7 +8,8 @@ const records = (extra: Record<string, unknown>) => ({ type: "event", kind: "ses
 
 describe("session.records seqs", () => {
   test("records with increasing seqs, gaps included, validate to themselves", () => {
-    expect(validateEvent(records({ seqs: [4, 11] }))).toEqual(records({ seqs: [4, 11] }));
+    const event: LocalEvent = { type: "event", kind: "session.records", attach: "a1", attach_id: 2, records: [{ type: "a" }, { type: "b" }], seqs: [4, 11] };
+    expect(validateEvent(event)).toEqual(event);
   });
 
   test.each([

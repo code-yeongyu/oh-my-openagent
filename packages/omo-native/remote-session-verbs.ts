@@ -3,7 +3,7 @@ import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contra
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
 import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { setModelRemote } from "../omo-senpi/src/components/thread/remote/remote-controls"
-import { followRemote, watchRemote } from "../omo-senpi/src/components/thread/remote/remote-follow"
+import { followRemote, type RemoteWatchEvent, watchRemote } from "../omo-senpi/src/components/thread/remote/remote-follow"
 import {
   closeRemote,
   interruptRemote,
@@ -98,12 +98,18 @@ async function watchOn(
   { label, json, show }: { readonly label: string; readonly json: boolean; readonly show: Show },
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
-  const watched = await watchRemote(remote, row, event => {
+  // Events can arrive before the watch resolves with where it starts; they print after that first line.
+  const early: RemoteWatchEvent[] = []
+  let started = false
+  const print = (event: RemoteWatchEvent) => {
     if (json) dependencies.output(JSON.stringify(event))
     else for (const line of watchLines(label, row.device, event)) dependencies.output(line)
-  })
+  }
+  const watched = await watchRemote(remote, row, event => (started ? print(event) : early.push(event)))
   if ("kind" in watched) return show(watched, label)
   dependencies.output(json ? JSON.stringify({ kind: "watching", state: watched.initial }) : `Watching ${label} (${watched.initial.status}).`)
+  started = true
+  for (const event of early.splice(0)) print(event)
   const end = await watched.ended
   dependencies.output(json ? JSON.stringify({ kind: "ended", end }) : watchEndLine(label, end))
   return end === "stopped" || end === "session_closed" || end === "session_replaced" ? REMOTE_EXIT.ok : REMOTE_EXIT.failed

@@ -67,7 +67,7 @@ function fakeDevice(engine: { state: JsonObject }) {
     return attach
   }
   const snapshot = (attachId: number) => current().emit({ kind: "snapshot", snapshot: { attach_id: attachId, cursor: { marker_id: "m", last_entry_id: null }, state: {}, entries: [], history_truncated: false, oldest_entry_id: null } })
-  const records = (attachId: number, records: JsonObject[], seqs?: number[]) => current().emit({ kind: "records", attach_id: attachId, records, ...(seqs === undefined ? {} : { seqs }) })
+  const records = (attachId: number, records: readonly Readonly<Record<string, string>>[], seqs?: number[]) => current().emit({ kind: "records", attach_id: attachId, records, ...(seqs === undefined ? {} : { seqs }) })
   return { connect, attaches, live, locate, current, snapshot, records, connections, connects: () => connects }
 }
 
@@ -182,7 +182,7 @@ describe("watch v2 (#12719): a remote session followed across drops, restarts an
     const device = fakeDevice({ state: IDLE })
     const watch = await watching(portOver(device), recorder().handlers)
     device.current().end(reason)
-    expect([await watch.ended, device.attaches]).toEqual([end, ["s1"]])
+    expect([String(await watch.ended), device.attaches]).toEqual([end, ["s1"]])
   })
 
   test("#given two watches on one attach #when the first one's handler throws #then only that watch ends listener_failed, and the second keeps receiving on the same attach", async () => {
