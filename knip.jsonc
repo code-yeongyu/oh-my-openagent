@@ -1685,8 +1685,8 @@
       "packages/shared-skills/skill-source-filter.mjs": ["ignoredSkillSourceFileNames"],
       // pre-existing at origin dev 4686e425b5: unused export(s) BROWSER_ENGINE_ENV
       "packages/shared-skills/skills/browser/scripts/browser-engine-guard.mjs": ["BROWSER_ENGINE_ENV"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) BROWSER_ENGINE_ENV, resolveOmowrightEntry, loadOmowright
-      "packages/shared-skills/skills/browser/scripts/omowright.mjs": ["BROWSER_ENGINE_ENV", "resolveOmowrightEntry", "loadOmowright"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) BROWSER_ENGINE_ENV, resolveOmowrightEntry
+      "packages/shared-skills/skills/browser/scripts/omowright.mjs": ["BROWSER_ENGINE_ENV", "resolveOmowrightEntry"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MAX_ROWS, MAX_OUTPUT_BYTES
       "packages/shared-skills/skills/debugging/references/scripts/dap.mjs": ["MAX_ROWS", "MAX_OUTPUT_BYTES"],
       // pre-existing at origin dev 4686e425b5: unused export(s) classifyName
