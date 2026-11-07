@@ -8,6 +8,7 @@ import {
   compiledBannerLines,
   answerCompiledFastPath,
   buildSenpiArgs,
+  launchPrunesRuntimes,
   remapSenpiEnvironment,
   reexecProvisionedRuntime,
   runCompiledLauncher,
@@ -247,6 +248,30 @@ describe("compiled omo entry launcher parity", () => {
     expect(env.OMO_AGENT_TOOLKIT_BIN).toBeUndefined()
     expect(env.OMO_BIN).toBe(join("/provisioned", process.platform === "win32" ? "omo.exe" : "omo"))
     expect(env.OMO_CODING_AGENT_DIR).toBeDefined()
+  })
+})
+
+describe("which launch prunes old binary runtimes", () => {
+  const handedOff = { handOff: false, launcher: "/home/user/.local/bin/omo" }
+
+  for (const args of [["--version"], ["-v"], ["--help"], ["update"], ["update", "--dry-run"], ["update", "--help"]]) {
+    test(`#given the handed-off runtime #when it answers ${args.join(" ")} #then it never prunes (the installers run omo --version)`, () => {
+      expect(launchPrunesRuntimes(args, handedOff)).toBe(false)
+    })
+  }
+
+  for (const args of [[], ["doctor"], ["-p", "hi"]]) {
+    test(`#given the handed-off runtime #when it runs ${args.join(" ") || "an interactive launch"} #then it prunes`, () => {
+      expect(launchPrunesRuntimes(args, handedOff)).toBe(true)
+    })
+  }
+
+  test("#given the launcher that is about to hand off #when it runs a real launch #then it leaves pruning to the runtime", () => {
+    expect(launchPrunesRuntimes(["doctor"], { handOff: true, launcher: "/home/user/.local/bin/omo" })).toBe(false)
+  })
+
+  test("#given the runtime copy started without a launcher (the engine's own re-run) #when it runs a real launch #then it never prunes", () => {
+    expect(launchPrunesRuntimes(["doctor"], { handOff: false, launcher: undefined })).toBe(false)
   })
 })
 
