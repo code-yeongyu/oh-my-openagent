@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import { createChatMessageHandler } from "./chat-message-handler"
 import { createFallbackState } from "./fallback-state"
 import type { HookDeps } from "./types"
+import { OMO_RUNTIME_FALLBACK_RETRY_MARKER } from "../../shared"
 
 function createDeps(): HookDeps {
   return {
@@ -35,6 +36,110 @@ function createDeps(): HookDeps {
 }
 
 describe("createChatMessageHandler runtime fallback model override", () => {
+  test("#given session.created did not provide a model #when the first real chat message has one #then fallback state is seeded", async () => {
+    // given
+    const deps = createDeps()
+    const sessionID = "session-first-chat-state"
+    const handler = createChatMessageHandler(deps)
+
+    // when
+    await handler(
+      { sessionID, model: { providerID: "openai", modelID: "gpt-5.4" } },
+      { message: {}, parts: [{ type: "text", text: "start" }] },
+    )
+
+    // then
+    expect(deps.sessionStates.get(sessionID)).toMatchObject({
+      originalModel: "openai/gpt-5.4",
+      currentModel: "openai/gpt-5.4",
+      fallbackIndex: -1,
+      attemptCount: 0,
+    })
+    expect(deps.sessionLastAccess.has(sessionID)).toBe(true)
+  })
+
+  test("#given a real user prompt keeps the active model #when chat message runs #then fallback state identity changes without losing fields", async () => {
+    // given
+    const deps = createDeps()
+    const sessionID = "session-real-user-state-generation"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "google/gemini-2.5-pro"
+    state.fallbackIndex = 0
+    state.attemptCount = 1
+    state.failedModels.set("openai/gpt-5.4", 123)
+    deps.sessionStates.set(sessionID, state)
+    const handler = createChatMessageHandler(deps)
+
+    // when
+    await handler(
+      { sessionID, model: { providerID: "google", modelID: "gemini-2.5-pro" } },
+      { message: {} },
+    )
+
+    // then
+    const replacement = deps.sessionStates.get(sessionID)
+    expect(replacement).not.toBe(state)
+    expect(replacement).toEqual(state)
+    expect(replacement?.failedModels).not.toBe(state.failedModels)
+  })
+
+  test("#given a marked OMO retry uses the pending fallback model #when chat message runs #then fallback state identity is retained", async () => {
+    // given
+    const deps = createDeps()
+    const sessionID = "session-internal-retry-state-generation"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "google/gemini-2.5-pro"
+    state.pendingFallbackModel = "google/gemini-2.5-pro"
+    deps.sessionStates.set(sessionID, state)
+    const handler = createChatMessageHandler(deps)
+
+    // when
+    await handler(
+      { sessionID, model: { providerID: "google", modelID: "gemini-2.5-pro" } },
+      {
+        message: {},
+        parts: [{ type: "text", text: `retry this\n${OMO_RUNTIME_FALLBACK_RETRY_MARKER}` }],
+      },
+    )
+
+    // then
+    expect(deps.sessionStates.get(sessionID)).toBe(state)
+  })
+
+  test("#given a real user selects the pending fallback model #when the prompt is unmarked #then fallback state identity changes", async () => {
+    // given
+    const deps = createDeps()
+    const sessionID = "session-user-selects-pending-model"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "google/gemini-2.5-pro"
+    state.pendingFallbackModel = "google/gemini-2.5-pro"
+    state.pendingFallbackPromptMayHaveBeenAccepted = true
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    deps.sessionRetryInFlight.add(sessionID)
+    deps.sessionStatusRetryKeys.set(sessionID, new Set(["retry:stale-generation"]))
+    const fallbackTimeout = setTimeout(() => {}, 60_000)
+    fallbackTimeout.unref()
+    deps.sessionFallbackTimeouts.set(sessionID, fallbackTimeout)
+    const handler = createChatMessageHandler(deps)
+
+    // when
+    await handler(
+      { sessionID, model: { providerID: "google", modelID: "gemini-2.5-pro" } },
+      { message: {}, parts: [{ type: "text", text: "new user turn" }] },
+    )
+
+    // then
+    expect(deps.sessionStates.get(sessionID)).not.toBe(state)
+    expect(deps.sessionStates.get(sessionID)).toEqual(state)
+    expect(deps.sessionStates.get(sessionID)?.pendingFallbackModel).toBeUndefined()
+    expect(deps.sessionStates.get(sessionID)?.pendingFallbackPromptMayHaveBeenAccepted).toBe(false)
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(false)
+    expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(false)
+    expect(deps.sessionStatusRetryKeys.has(sessionID)).toBe(false)
+  })
+
   test("#given retained retry status keys #when the user selects another model #then the reset starts a fresh retry generation", async () => {
     // given
     const deps = createDeps()
