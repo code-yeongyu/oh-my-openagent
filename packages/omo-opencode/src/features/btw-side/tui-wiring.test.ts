@@ -3,7 +3,10 @@ import { describe, expect, it, mock } from "bun:test"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { BTW_SIDE_METADATA_KEY } from "./metadata"
 import { openBtwPicker } from "./tui-picker"
-import { registerBtwSideTui } from "./tui-wiring"
+import {
+  BTW_SESSION_PROMPT_DISABLED_MESSAGE,
+  registerBtwSideTui,
+} from "./tui-wiring"
 
 type TestCommand = {
   name: string
@@ -968,5 +971,36 @@ describe("registerBtwSideTui", () => {
 
     // then
     expect(deleteSession).not.toHaveBeenCalled()
+  })
+
+  it("#given default options #when BTW registers #then it claims the session prompt slot", async () => {
+    // given
+    const harness = createPickerHarness()
+
+    // when
+    await registerBtwSideTui(harness.api, harness.solid)
+
+    // then
+    expect(harness.slots.some((slot) => slot.slots.session_prompt !== undefined)).toBe(true)
+    expect(harness.slots.some((slot) => slot.slots.session_prompt_right !== undefined)).toBe(true)
+  })
+
+  it("#given the session prompt claim is turned off #when BTW registers and /btw runs #then no second composer is claimed and /btw explains why it is off", async () => {
+    // given
+    const harness = createPickerHarness()
+
+    // when
+    await registerBtwSideTui(harness.api, harness.solid, { claimSessionPrompt: false })
+    const openCommand = harness.layers
+      .flatMap((layer) => layer.commands ?? [])
+      .find((command) => command.name === "omo.btw.open")
+    await openCommand?.run?.()
+
+    // then
+    expect(harness.slots.some((slot) => slot.slots.session_prompt !== undefined)).toBe(false)
+    expect(harness.slots.some((slot) => slot.slots.session_prompt_right !== undefined)).toBe(true)
+    expect(openCommand).toBeDefined()
+    expect(harness.createSession).not.toHaveBeenCalled()
+    expect(harness.toasts).toEqual([BTW_SESSION_PROMPT_DISABLED_MESSAGE])
   })
 })
