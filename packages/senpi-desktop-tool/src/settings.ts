@@ -34,6 +34,27 @@ export const ComputerSettingsSchema = Type.Object(
 		cuaAdapter: Type.Optional(
 			Type.Boolean({ default: false, description: "Also register computer_actions (OpenAI computer-use actions)" }),
 		),
+		runSandbox: Type.Optional(
+			Type.Union([Type.Literal("vm"), Type.Literal("quickjs")], {
+				default: "vm",
+				description: "Where `run` code executes; reserved: every run uses `vm` until the QuickJS cell lands",
+			}),
+		),
+		intervention: Type.Optional(
+			Type.Union([Type.Literal("continue"), Type.Literal("pause")], {
+				default: "pause",
+				description: "What a background action does while the user uses the target app; sent only to engines that support it",
+			}),
+		),
+		macosKeyPriming: Type.Optional(
+			Type.Union([Type.Literal("on"), Type.Literal("off")], {
+				default: "off",
+				description: "macOS background keys first make the target window key; sent only to engines that support it",
+			}),
+		),
+		trace: Type.Optional(
+			Type.Boolean({ default: false, description: "Per-request timing traces; sent only to engines that support it" }),
+		),
 	},
 	{ additionalProperties: false },
 );
@@ -55,6 +76,10 @@ export interface ComputerSettings {
 	readonly screenshotGc: { readonly enabled: boolean; readonly staleMs: number; readonly scanIntervalMs: number };
 	readonly enginePath: string | undefined;
 	readonly cuaAdapter: boolean;
+	readonly runSandbox: "vm" | "quickjs";
+	readonly intervention: "continue" | "pause";
+	readonly macosKeyPriming: "on" | "off";
+	readonly trace: boolean;
 }
 
 /** A `computer` settings block that does not match `ComputerSettingsSchema`. */
@@ -95,5 +120,9 @@ export function resolveComputerSettings(raw: unknown, platform: string = process
 		},
 		enginePath: value.enginePath,
 		cuaAdapter: value.cuaAdapter ?? false,
+		runSandbox: value.runSandbox ?? "vm",
+		intervention: value.intervention ?? "pause",
+		macosKeyPriming: value.macosKeyPriming ?? "off",
+		trace: value.trace ?? false,
 	};
 }
