@@ -33,6 +33,8 @@ import {
   initialComputerState,
   skillStatusLine,
   toolActivatedNames,
+  hostLifecycleSource,
+  type ComputerLifecycleSource,
   wireComputerControlEvents,
 } from "./registration-support"
 import { createComputerUseTelemetry } from "./telemetry"
@@ -66,6 +68,8 @@ export interface ComputerUseComponentOptions {
   readonly telemetryObservers?: ComputerUseTelemetryObservers
   /** Imports the implementation entry; the default is `#omo-computer-use-runtime`, on first use only. */
   readonly loadRuntime?: () => Promise<ComputerUseRuntimeModule>
+  /** Run end and close of the session holding the grant; a hand of a split session passes its scope's source. */
+  readonly lifecycle?: (pi: SenpiExtensionAPI) => ComputerLifecycleSource
 }
 
 function hostApi(pi: SenpiExtensionAPI): ComputerHostApi | undefined {
@@ -150,7 +154,7 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
                 if (state.telemetryContext !== undefined) telemetry.engineError(state.telemetryContext, code, state.backend)
               },
             })
-      wireComputerControlEvents(pi, runtime)
+      wireComputerControlEvents((options.lifecycle ?? hostLifecycleSource)(pi), runtime)
 
       pi.registerCommand("computer", {
         description: "Computer use (experimental): on, off, status, stop, or resume (stop and resume are user-only)",
@@ -272,11 +276,6 @@ export function createComputerUseComponent(options: ComputerUseComponentOptions 
       })
       pi.on("message_end", (payload, eventCtx) => {
         telemetry.permissionTierDenied(payload, state.telemetryContext ?? eventCtx, state.backend)
-      })
-      pi.on("session_shutdown", async () => {
-        // A runtime that never loaded has no engine session to end.
-        const started = runtime.started()
-        if (started !== undefined) await (await started).handle.close()
       })
     },
   }
