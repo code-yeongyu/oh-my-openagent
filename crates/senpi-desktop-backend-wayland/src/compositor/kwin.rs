@@ -7,6 +7,12 @@
 //! changes nothing: input never goes through KWin, pointer input stays on
 //! libei, and this module only says where a target window is and which shown
 //! windows are stacked above it.
+//!
+//! KWin 6 serves a loaded script at `/Scripting/Script{id}` and KWin 5 at
+//! `/{id}`; `run` tries the KWin 6 path, falls back to the KWin 5 one only
+//! when the bus says the first names no object, and keeps the path that
+//! answered. A KWin that serves the script at neither is recorded, so the
+//! `windowInput` capability stops offering it.
 
 use std::ffi::OsString;
 use std::fs::OpenOptions;
@@ -15,6 +21,7 @@ use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::Mutex;
@@ -159,10 +166,57 @@ pub enum Detection {
     Scripting(Kwin),
 }
 
+/// Where this KWin serves a loaded script's `org.kde.kwin.Script` object.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+enum ScriptObject {
+    /// No script has run yet.
+    #[default]
+    Unknown,
+    /// `/Scripting/Script{id}` (KWin 6, `scripting.cpp` in Plasma 6.x).
+    Kwin6,
+    /// `/{id}` (KWin 5, `scripting.cpp` in Plasma 5.27).
+    Kwin5,
+    /// Neither path named an object for a loaded script.
+    Unrunnable,
+}
+
+impl ScriptObject {
+    fn path(self, id: i32) -> String {
+        match self {
+            Self::Kwin5 => format!("/{id}"),
+            Self::Kwin6 | Self::Unknown | Self::Unrunnable => {
+                format!("{SCRIPTING_PATH}/Script{id}")
+            }
+        }
+    }
+}
+
+/// The bus answered that `path` holds no such object, method or interface,
+/// as opposed to a script that ran and failed.
+fn names_no_object(err: &zbus::Error) -> bool {
+    const NO_OBJECT: [&str; 3] = [
+        "org.freedesktop.DBus.Error.UnknownObject",
+        "org.freedesktop.DBus.Error.UnknownMethod",
+        "org.freedesktop.DBus.Error.UnknownInterface",
+    ];
+    match err {
+        zbus::Error::MethodError(name, _, _) => NO_OBJECT.contains(&name.as_str()),
+        zbus::Error::FDO(fdo) => matches!(
+            **fdo,
+            zbus::fdo::Error::UnknownObject(_)
+                | zbus::fdo::Error::UnknownMethod(_)
+                | zbus::fdo::Error::UnknownInterface(_)
+        ),
+        _ => false,
+    }
+}
+
 /// A session-bus connection on which `org.kde.KWin` serves `/Scripting`.
 #[derive(Debug, Clone)]
 pub struct Kwin {
     connection: Connection,
+    /// Shared by clones, so the backend's copy sees what a placement learned.
+    script_object: Arc<Mutex<ScriptObject>>,
 }
 
 fn is_kde(desktop: Option<&OsString>) -> bool {
@@ -207,7 +261,10 @@ where
     runtime.block_on(async {
         match tokio::time::timeout(CALL_TIMEOUT, connect()).await {
             Ok(Ok(connection)) if offers_scripting(&connection).await => {
-                Detection::Scripting(Kwin { connection })
+                Detection::Scripting(Kwin {
+                    connection,
+                    script_object: Arc::default(),
+                })
             }
             Ok(_) | Err(_) => Detection::DbusMissing,
         }
@@ -253,10 +310,14 @@ pub fn script(service: &str, path: &str) -> String {
   var desktop = workspace.currentDesktop;
   var onDesktop = function (w) {{
     if (w.onAllDesktops) return true;
+    if (typeof desktop === "number") return w.desktop === desktop;
     if (w.desktops) return w.desktops.some(function (d) {{ return d === desktop || d.id === desktop.id; }});
     return w.desktop === desktop;
   }};
-  var out = workspace.stackingOrder.map(function (w) {{
+  var stack = workspace.stackingOrder || workspace.clientList().slice().sort(function (a, b) {{
+    return a.stackingOrder - b.stackingOrder;
+  }});
+  var out = stack.map(function (w) {{
     var g = w.frameGeometry;
     return {{ id: String(w.internalId), pid: w.pid || 0, caption: String(w.caption), x: Math.round(g.x),
       y: Math.round(g.y), width: Math.round(g.width), height: Math.round(g.height),
@@ -302,6 +363,26 @@ fn internal(what: &str, err: impl std::fmt::Display) -> DesktopError {
 }
 
 impl Kwin {
+    /// `Err` only for a call that got no reply in time; the bus's own answer,
+    /// error or not, is the inner result.
+    async fn try_call<B>(
+        &self,
+        path: &str,
+        iface: &str,
+        method: &str,
+        body: &B,
+    ) -> CoreResult<zbus::Result<zbus::Message>>
+    where
+        B: serde::Serialize + zbus::zvariant::DynamicType,
+    {
+        let call = self
+            .connection
+            .call_method(Some(KWIN_SERVICE), path, Some(iface), method, body);
+        tokio::time::timeout(CALL_TIMEOUT, call)
+            .await
+            .map_err(|_| internal(&format!("{iface}.{method}"), "no reply in time"))
+    }
+
     async fn call<B>(
         &self,
         path: &str,
@@ -312,13 +393,43 @@ impl Kwin {
     where
         B: serde::Serialize + zbus::zvariant::DynamicType,
     {
-        let call = self
-            .connection
-            .call_method(Some(KWIN_SERVICE), path, Some(iface), method, body);
-        match tokio::time::timeout(CALL_TIMEOUT, call).await {
-            Ok(reply) => reply.map_err(|err| internal(&format!("{iface}.{method}"), err)),
-            Err(_) => Err(internal(&format!("{iface}.{method}"), "no reply in time")),
+        self.try_call(path, iface, method, body)
+            .await?
+            .map_err(|err| internal(&format!("{iface}.{method}"), err))
+    }
+
+    /// True once a loaded script could be run at neither object path.
+    pub fn unrunnable(&self) -> bool {
+        *self.script_object.lock() == ScriptObject::Unrunnable
+    }
+
+    /// Runs loaded script `id` at the path this KWin answered on before, else
+    /// at the KWin 6 path and then the KWin 5 one.
+    async fn run_loaded(&self, id: i32) -> CoreResult<()> {
+        let known = *self.script_object.lock();
+        let order: &[ScriptObject] = if known == ScriptObject::Kwin5 {
+            &[ScriptObject::Kwin5, ScriptObject::Kwin6]
+        } else {
+            &[ScriptObject::Kwin6, ScriptObject::Kwin5]
+        };
+        let mut misses = Vec::with_capacity(order.len());
+        for &object in order {
+            let path = object.path(id);
+            match self.try_call(&path, SCRIPT_IFACE, "run", &()).await? {
+                Ok(_) => {
+                    *self.script_object.lock() = object;
+                    return Ok(());
+                }
+                Err(err) if names_no_object(&err) => misses.push(format!("{path}: {err}")),
+                Err(err) => return Err(internal(&format!("{SCRIPT_IFACE}.run"), err)),
+            }
         }
+        *self.script_object.lock() = ScriptObject::Unrunnable;
+        Err(DesktopError::background_unavailable(format!(
+            "kwin-script-unrunnable: KWin serves the loaded script at neither the KWin 6 nor \
+             the KWin 5 object path ({}); no input was sent",
+            misses.join("; ")
+        )))
     }
 
     async fn run_script(
@@ -339,13 +450,7 @@ impl Kwin {
                 "kwin refused the geometry script ({id})"
             )));
         }
-        self.call(
-            &format!("{SCRIPTING_PATH}/Script{id}"),
-            SCRIPT_IFACE,
-            "run",
-            &(),
-        )
-        .await?;
+        self.run_loaded(id).await?;
         match tokio::time::timeout(CALL_TIMEOUT, answered).await {
             Ok(Ok(json)) => Ok(json),
             Ok(Err(_)) | Err(_) => Err(DesktopError::internal(format!(
@@ -408,7 +513,8 @@ impl Kwin {
     /// Every KWin window in stacking order, read fresh by one script run.
     ///
     /// # Errors
-    /// `Internal` when KWin refuses the script or does not answer in time.
+    /// `Internal` when KWin refuses the script or does not answer in time;
+    /// `BackgroundUnavailable` when no object path runs the loaded script.
     pub fn windows(&self) -> CoreResult<Vec<KwinWindow>> {
         parse_windows(&portal_runtime()?.block_on(self.read_windows())?)
     }
@@ -612,6 +718,82 @@ pub(crate) mod tests {
             .expect("script text read at load");
         assert!(script.contains("workspace.stackingOrder"), "{script}");
         assert!(!calls[0].path.exists(), "the script file is removed");
+    }
+
+    fn run_paths(kwin: &FakeKwin) -> Vec<String> {
+        kwin.calls()
+            .iter()
+            .filter(|call| call.method == "run")
+            .map(|call| call.path.display().to_string())
+            .collect()
+    }
+
+    #[test]
+    fn a_kwin_6_script_runs_at_its_scripting_object_path_on_the_first_try() {
+        let kwin = FakeKwin::serve(WINDOWS);
+        let Detection::Scripting(scripting) = detect_with(Some("KDE".into()), || kwin.connect())
+        else {
+            panic!("kwin scripting not detected");
+        };
+
+        scripting.windows().expect("first read");
+        scripting.windows().expect("second read");
+
+        assert_eq!(
+            run_paths(&kwin),
+            ["/Scripting/Script0", "/Scripting/Script1"]
+        );
+    }
+
+    #[test]
+    fn a_kwin_5_script_runs_at_its_root_object_path_once_the_kwin_6_path_is_unknown() {
+        // Given: KWin 5 serves a loaded script at /{id}, not /Scripting/Script{id}
+        let kwin = FakeKwin::serve_kwin5(WINDOWS);
+        let Detection::Scripting(scripting) = detect_with(Some("KDE".into()), || kwin.connect())
+        else {
+            panic!("kwin scripting not detected");
+        };
+
+        // When
+        let placement = scripting
+            .placement(&window(Some(1201), "~ : bash"))
+            .expect("placed over the KWin 5 object path");
+        scripting.windows().expect("second read");
+
+        // Then: the first read falls back to /0; the second goes straight to /1
+        assert_eq!(placement.address, "{1c3e7a51-term}");
+        assert_eq!(run_paths(&kwin), ["/0", "/1"]);
+        assert_eq!(
+            kwin.calls()
+                .iter()
+                .filter(|call| call.method == "unloadScript")
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn a_script_run_at_neither_object_path_is_refused_and_still_unloaded() {
+        let kwin = FakeKwin::unrunnable(WINDOWS);
+        let Detection::Scripting(scripting) = detect_with(Some("KDE".into()), || kwin.connect())
+        else {
+            panic!("kwin scripting not detected");
+        };
+
+        let error = scripting
+            .windows()
+            .expect_err("no object path runs the script");
+
+        assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
+        assert!(
+            error.message.contains("kwin-script-unrunnable"),
+            "{}",
+            error.message
+        );
+        assert_eq!(
+            kwin.calls().last().map(|call| call.method.as_str()),
+            Some("unloadScript")
+        );
     }
 
     #[test]
