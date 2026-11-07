@@ -24,6 +24,7 @@ interface InstallCandidate {
   cacheDir: string
   cachePackagePath: string
   packageCandidates: PackageCandidate[]
+  specifier?: string
 }
 
 export interface LoadedVersionInfo {
@@ -94,6 +95,7 @@ function createTaggedInstallCandidates(rootDir: string): InstallCandidate[] {
     candidates.push({
       cacheDir: installDir,
       cachePackagePath: join(installDir, "package.json"),
+      specifier: entryName,
       packageCandidates: [
         {
           packageName,
@@ -141,11 +143,11 @@ function resolveInstalledPackageJsonPath(): { packageName: string; packageJsonPa
   return null
 }
 
-export function getLoadedPluginVersion(): LoadedVersionInfo {
+function getInstallCandidates(): InstallCandidate[] {
   const configPaths = getOpenCodeConfigPaths({ binary: "opencode" })
   const configDir = resolveExistingDir(configPaths.configDir)
   const cacheDir = resolveExistingDir(resolveOpenCodeCacheDir())
-  const candidates: InstallCandidate[] = [
+  return [
     {
       cacheDir: configDir,
       cachePackagePath: join(configDir, "package.json"),
@@ -159,9 +161,34 @@ export function getLoadedPluginVersion(): LoadedVersionInfo {
     },
     ...createTaggedInstallCandidates(cacheDir),
   ]
+}
 
-  const selectedCandidate = candidates.find((candidate) => candidate.packageCandidates.some((packageCandidate) => existsSync(packageCandidate.installedPackagePath)))
-    ?? candidates[0]
+function findInstalledCandidate(candidates: InstallCandidate[]): InstallCandidate | undefined {
+  return candidates.find((candidate) => candidate.packageCandidates.some((pkg) => existsSync(pkg.installedPackagePath)))
+}
+
+export function findOpenCodeInstalledPluginPackage(pin?: { specifier: string; version: string }): string | null {
+  const candidates = getInstallCandidates()
+  if (!pin) {
+    const candidate = findInstalledCandidate(candidates)
+    return candidate ? selectInstalledPackage(candidate).installedPackagePath : null
+  }
+
+  const tagged = findInstalledCandidate(candidates.filter((candidate) => candidate.specifier === pin.specifier))
+  if (tagged) return selectInstalledPackage(tagged).installedPackagePath
+
+  const packageName = pin.specifier.slice(0, -(pin.version.length + 1))
+  for (const candidate of candidates) {
+    if (candidate.specifier) continue
+    const pkg = candidate.packageCandidates.find((pkg) => pkg.packageName === packageName)
+    if (pkg && readPackageJson(pkg.installedPackagePath)?.version === pin.version) return pkg.installedPackagePath
+  }
+  return null
+}
+
+export function getLoadedPluginVersion(): LoadedVersionInfo {
+  const candidates = getInstallCandidates()
+  const selectedCandidate = findInstalledCandidate(candidates) ?? candidates[0]
 
   const { cacheDir: selectedDir, cachePackagePath } = selectedCandidate
   const selectedPackage = selectInstalledPackage(selectedCandidate)
