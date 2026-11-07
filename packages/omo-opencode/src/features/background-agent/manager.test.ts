@@ -3207,6 +3207,89 @@ describe("BackgroundManager.resume promptAsync gate state", () => {
   })
 })
 
+describe("BackgroundManager canonical reasoning (#6791)", () => {
+  const cases = [
+    { providerID: "openai", modelID: "gpt-5.4", variant: "high", options: undefined },
+    { providerID: "qa-local", modelID: "native-model", variant: undefined, options: { reasoningEffort: "high" } },
+  ]
+
+  for (const capability of cases) {
+    test(`launch lowers canonical reasoning for ${capability.modelID}`, async () => {
+      // given - observe the SDK boundary before the asynchronous launch starts
+      const dispatched = Promise.withResolvers<Record<string, unknown>>()
+      let createdBody: Record<string, unknown> | undefined
+      const sessionID = `reasoning-launch-${capability.modelID}`
+      const manager = new BackgroundManager({ pluginContext: createPluginInput({ session: {
+        get: async () => ({ data: { directory: tmpdir() } }),
+        create: async ({ body }: { body: Record<string, unknown> }) => {
+          createdBody = body
+          return { data: { id: sessionID } }
+        },
+        promptAsync: async ({ body }: { body: Record<string, unknown> }) => {
+          dispatched.resolve(body)
+          return {}
+        },
+        abort: async () => ({}),
+      } }) })
+      try {
+        // when
+        await manager.launch({
+          agent: "explore", description: "reasoning launch", prompt: "inspect",
+          parentSessionId: "parent-reasoning", parentMessageId: "message-reasoning",
+          model: { providerID: capability.providerID, modelID: capability.modelID,
+            reasoning: "high", variant: "low", reasoningEffort: "low" },
+        })
+        const body = await dispatched.promise
+
+        // then - session defaults and the actual prompt agree, never using stale low
+        expect(createdBody?.model).toEqual({
+          id: capability.modelID, providerID: capability.providerID,
+          ...(capability.variant ? { variant: capability.variant } : {}),
+        })
+        expect(body.variant).toBe(capability.variant)
+        expect(getSessionPromptParams(sessionID)?.options).toEqual(capability.options)
+      } finally {
+        manager.shutdown()
+        clearSessionPromptParams(sessionID)
+      }
+    }, 5000)
+
+    test(`resume lowers canonical reasoning for ${capability.modelID}`, async () => {
+      // given
+      const dispatched = Promise.withResolvers<Record<string, unknown>>()
+      const sessionID = `reasoning-resume-${capability.modelID}`
+      const manager = new BackgroundManager({ pluginContext: createPluginInput({ session: {
+        promptAsync: async ({ body }: { body: Record<string, unknown> }) => {
+          dispatched.resolve(body)
+          return {}
+        },
+        abort: async () => ({}),
+      } }) })
+      const task: BackgroundTask = {
+        id: `task-${sessionID}`, sessionId: sessionID, agent: "explore", status: "completed",
+        description: "reasoning resume", prompt: "inspect", parentSessionId: "parent-reasoning",
+        parentMessageId: "message-reasoning", completedAt: new Date(), concurrencyGroup: "explore",
+        model: { providerID: capability.providerID, modelID: capability.modelID,
+          reasoning: "high", variant: "low", reasoningEffort: "low" },
+      }
+      getTaskMap(manager).set(task.id, task)
+      try {
+        // when
+        await manager.resume({ sessionId: sessionID, prompt: "continue",
+          parentSessionId: "parent-reasoning", parentMessageId: "message-reasoning" })
+        const body = await dispatched.promise
+
+        // then
+        expect(body.variant).toBe(capability.variant)
+        expect(getSessionPromptParams(sessionID)?.options).toEqual(capability.options)
+      } finally {
+        manager.shutdown()
+        clearSessionPromptParams(sessionID)
+      }
+    }, 5000)
+  }
+})
+
 describe("BackgroundManager.resume model persistence", () => {
    let manager: BackgroundManager
    let promptCalls: Array<{ path: { id: string }; body: Record<string, unknown> }>
