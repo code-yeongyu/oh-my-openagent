@@ -4,7 +4,8 @@
   "rules": { "types": "off", "nsTypes": "off" },
   // pre-existing at origin dev 4686e425b5: executables root scripts and tests run that no package declares (OS and platform tools)
   // busctl, hyprctl: Linux session tools run by script/qa/desktop/hyprland.ts
-  "ignoreBinaries": ["busctl", "file", "hyprctl", "icacls", "notepad.exe", "tasklist"],
+  // kdotool: KWin window tool run by script/qa/desktop/kwin.ts
+  "ignoreBinaries": ["busctl", "file", "hyprctl", "icacls", "kdotool", "notepad.exe", "tasklist"],
   // Findings marked "pre-existing at origin dev 4686e425b5" were already present when this check was added. Each ignore is
   // scoped to one file (and its issue types) or one dependency, so new dead code anywhere else still fails the check.
   // Remove an entry when its finding is fixed. Root-workspace file ignores live at the top level (knip reads the root
@@ -2140,6 +2141,7 @@
         "script/patch-node-require-shim.ts",
         "script/print-release-notes.ts",
         "script/qa/desktop/hyprland.ts",
+        "script/qa/desktop/kwin.ts",
         "script/qa/desktop/linux.ts",
         "script/qa/desktop/linux/expect-sabotage.ts",
         "script/qa/desktop/windows.ts",

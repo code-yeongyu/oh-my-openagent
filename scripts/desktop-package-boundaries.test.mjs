@@ -31,6 +31,9 @@ const FORBIDDEN_HOST_PACKAGES = ["pi-agent-core", "pi-ai", "pi-tui"]
 // The SDK has no side effects on import and launches nothing itself: a spawn transport takes an injected launcher.
 const SDK_FORBIDDEN_BUILTINS = ["child_process", "net", "tls", "http", "https", "dgram", "cluster", "worker_threads"]
 
+// The one exception: the attach transport connects to the local `--serve` socket its caller names (plan row 25).
+const SDK_ALLOWED_BUILTINS = { "packages/senpi-desktop-sdk/src/transport/attach-uds.ts": ["net"] }
+
 const SOURCE = /\.(?:[cm]?ts|[cm]?js)$/
 const SPECIFIER =
   /(?:\bimport\s+(?:type\s+)?(?:[\w*{}\s,$]+\s+from\s+)?|\bexport\s+(?:type\s+)?(?:\*(?:\s+as\s+\w+)?|\{[^}]*\})\s+from\s+|\bimport\s*\(\s*|\brequire\s*\(\s*)["']([^"']+)["']/g
@@ -49,9 +52,9 @@ function isHostPackage(specifier) {
   return specifier.split("/").some((segment) => FORBIDDEN_HOST_PACKAGES.includes(segment))
 }
 
-function isForbiddenBuiltin(specifier) {
-  const name = specifier.startsWith("node:") ? specifier.slice("node:".length) : specifier
-  return SDK_FORBIDDEN_BUILTINS.includes(name.split("/")[0])
+function isForbiddenBuiltin(file, specifier) {
+  const name = (specifier.startsWith("node:") ? specifier.slice("node:".length) : specifier).split("/")[0]
+  return SDK_FORBIDDEN_BUILTINS.includes(name) && !(SDK_ALLOWED_BUILTINS[file] ?? []).includes(name)
 }
 
 function sourceFiles(dir) {
@@ -80,7 +83,7 @@ function violationsOf(pkg, root = ROOT) {
       violations.push({ file, specifier, why: `${pkg} may import only ${[...allowed].join(", ")}` })
     }
     if (isHostPackage(specifier)) violations.push({ file, specifier, why: "desktop packages never import pi-* host packages" })
-    if (pkg === "senpi-desktop-sdk" && isForbiddenBuiltin(specifier)) {
+    if (pkg === "senpi-desktop-sdk" && isForbiddenBuiltin(file, specifier)) {
       violations.push({ file, specifier, why: "the SDK launches and connects nothing itself" })
     }
   }

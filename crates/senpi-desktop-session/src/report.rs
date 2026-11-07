@@ -7,6 +7,7 @@ use senpi_desktop_core::methods::Method;
 use senpi_desktop_core::protocol_results::{AuditEvent, AxInputResult};
 use senpi_desktop_core::report::{
     ActionEffect, ActionHit, ActionReport, ActionRoute, End, FocusRestoration, Progress, ReportMode, Settled,
+    StageTimings,
 };
 
 use crate::request::Response;
@@ -17,6 +18,8 @@ use crate::request::Response;
 pub(crate) struct ReportExtras {
     pub(crate) route: Option<ActionRoute>,
     pub(crate) hit: Option<ActionHit>,
+    /// `trace: true` sessions only.
+    pub(crate) timings: Option<StageTimings>,
 }
 
 /// How far a mutating request got before it settled.
@@ -179,6 +182,7 @@ pub(crate) fn success_report(event: &AuditEvent, extras: ReportExtras) -> Action
         next_call: None,
         note: None,
         warning: None,
+        timings: extras.timings,
         audit_ids: event.id.iter().cloned().collect(),
     }
 }

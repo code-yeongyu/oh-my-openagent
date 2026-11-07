@@ -25,7 +25,12 @@
               "features": [
                 "action-report",
                 "frame-identity",
-                "frame-consume"
+                "frame-consume",
+                "ax-partial",
+                "trace",
+                "key-priming",
+                "epoch",
+                "interaction-lock"
               ]
             }
           },
