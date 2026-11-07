@@ -2,8 +2,9 @@ import { log } from "@oh-my-opencode/utils/logger"
 import { authRequiredError, type RpcObject, type RpcRequest } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 
 // The commands the host lets an unattached connection send (senpi session-attachment-gate.ts: ATTACH_GATE_EXEMPT,
-// plus close_session, set_session_context and release_attachment, which its gate skips). Every other session
-// command is fenced: deny by default, so a command the client learns later is never sent unattached.
+// plus set_session_context and release_attachment, which its gate skips). Every other session command is fenced: deny
+// by default, so a command the client learns later is never sent unattached. close_session is fenced too: the gate
+// skips it, but close() refuses a connection that holds no attachment with unknown_session (senpi#1782).
 const UNFENCED: ReadonlySet<string> = new Set([
   "get_protocol_info", "list_sessions", "subscribe_sessions", "unsubscribe_sessions", "get_subscription_limits", "warm",
   "detach_connection", "open_session", "attach_session", "reclaim_session", "get_effect_status", "get_state", "get_messages",
@@ -11,7 +12,7 @@ const UNFENCED: ReadonlySet<string> = new Set([
   "get_available_models", "get_available_thinking_levels", "get_fast_mode", "get_session_stats", "get_pending_inputs",
   "get_steering_messages", "get_follow_up_messages", "get_auth_providers", "get_provider_accounts", "resolve_path",
   "memory_report", "eval_cells.list", "eval_cells.peek", "check_reload_veto",
-  "close_session", "set_session_context", "release_attachment",
+  "set_session_context", "release_attachment",
 ])
 
 function errorCodeOf(frame: RpcObject): unknown {
