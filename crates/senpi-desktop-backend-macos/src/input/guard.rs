@@ -106,8 +106,11 @@ pub(super) fn deliver_keys<T>(
             *activated = Some((pid, wid));
             send()
         });
-        if moved.is_some() {
+        if let Some(restoration) = moved {
             *activated = Some((pid, wid));
+            // Layer 1's outcome is not on the wire yet (#12537): the session's
+            // restore seam carries only layer 2's bool, so it is logged here.
+            eprintln!("senpi-desktop: key priming hand-back (layer 1) for window {wid}: {restoration:?}");
         }
         return result;
     }
