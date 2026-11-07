@@ -14,6 +14,8 @@ export default defineConfig({
   reporter: process.env.CI ? [["github"], ["list"]] : "list",
   use: {
     baseURL: "http://127.0.0.1:3000",
+    // The specs were written against the Night palette; a spec that checks Day sets the scheme itself.
+    colorScheme: "dark",
     trace: "on-first-retry",
     headless: true,
     // Never touch the real keychain/profile on a dev machine (raises "Chromium Safe Storage");
