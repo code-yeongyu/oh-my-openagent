@@ -1,11 +1,22 @@
 import { log } from "../../shared/logger"
+import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import type { ChatMessageHandlerOutput, ChatMessageInput } from "../../plugin/chat-message"
 
 export async function applyFallbackToChatMessage(params: {
   input: ChatMessageInput
   output: ChatMessageHandlerOutput
-  fallback: { providerID: string; modelID: string; variant?: string }
+  fallback: {
+    providerID: string
+    modelID: string
+    variant?: string
+    reasoning?: string
+    reasoningEffort?: string
+    temperature?: number
+    top_p?: number
+    maxTokens?: number
+    thinking?: { type: "enabled" | "disabled"; budgetTokens?: number }
+  }
   toast?: (input: {
     title: string
     message: string
@@ -20,9 +31,14 @@ export async function applyFallbackToChatMessage(params: {
   }) => void | Promise<void>
   lastToastKey: Map<string, string>
 }): Promise<void> {
-  const { input, output, fallback, toast, onApplied, lastToastKey } = params
+  const { input, output, toast, onApplied, lastToastKey } = params
   const { sessionID } = input
   if (!sessionID) return
+  // A rung's reasoning wins over its variant: lowered for the rung's own model into a variant, or into
+  // the session's reasoningEffort prompt param when the model has no such variant (#9918).
+  const fallback = params.fallback.reasoning === undefined
+    ? params.fallback
+    : { ...params.fallback, variant: applySessionPromptParams(sessionID, params.fallback).variant }
 
   output.message["model"] = {
     providerID: fallback.providerID,

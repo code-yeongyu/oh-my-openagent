@@ -3,6 +3,7 @@ import { tryFallbackRetry, TeamModeFallbackError, type FallbackRetryHandlerDeps 
 import type { FallbackEntry } from "../../shared/model-requirements"
 import type { ProviderModelsCache } from "../../shared/connected-providers-cache"
 import { QUESTION_DENIED_SESSION_PERMISSION } from "../../shared/question-denied-session-permission"
+import { lowerReasoningForModel } from "../../shared/agent-variant"
 
 const sharedLogMock = mock(() => {})
 const readConnectedProvidersCacheMock = mock(() => null)
@@ -550,5 +551,39 @@ describe("tryFallbackRetry", () => {
       expect(retryInput?.teamRunId).toBe("team-run-abc")
       expect(retryInput?.onSessionCreated).toBe(onSessionCreated)
     })
+  })
+})
+
+describe("tryFallbackRetry rung reasoning (#9918)", () => {
+  test("#given the next rung sets reasoning #when the background task falls back #then the retry model keeps that reasoning and its lowered variant", async () => {
+    // given
+    const args = createDefaultArgs({
+      fallbackChain: [{ model: "glm-5.3-flash", providers: ["zai-coding-plan"], reasoning: "max" }],
+    })
+
+    // when
+    await tryFallbackRetry(args)
+
+    // then
+    const lowered = lowerReasoningForModel("max", { providerID: "zai-coding-plan", modelID: "glm-5.3-flash" })
+    expect(args.task.model).toEqual({
+      providerID: "zai-coding-plan",
+      modelID: "glm-5.3-flash",
+      variant: lowered.variant,
+      reasoning: "max",
+    })
+  })
+
+  test("#given the next rung sets only a variant #when the background task falls back #then the variant is kept as before", async () => {
+    // given
+    const args = createDefaultArgs({
+      fallbackChain: [{ model: "fallback-model-1", providers: ["provider-a"], variant: "high" }],
+    })
+
+    // when
+    await tryFallbackRetry(args)
+
+    // then
+    expect(args.task.model).toEqual({ providerID: "provider-a", modelID: "fallback-model-1", variant: "high" })
   })
 })

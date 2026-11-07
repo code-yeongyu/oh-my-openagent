@@ -11,6 +11,7 @@ import {
   selectFallbackProvider,
 } from "../../shared/model-error-classifier"
 import { transformModelForProvider } from "../../shared/provider-model-id-transform"
+import { lowerReasoningForModel } from "../../shared/agent-variant"
 import { abortWithTimeout } from "./abort-with-timeout"
 import { ensureCurrentAttempt, scheduleRetryAttempt } from "./attempt-lifecycle"
 import { filterProvidersServingModel } from "./fallback-provider-model-filter"
@@ -176,11 +177,16 @@ export async function tryFallbackRetry(args: {
   const previousModel = task.model
 
   const transformedModelId = deps.transformModelForProvider(providerID, nextFallback.model)
-  const nextModel = {
-    providerID,
-    modelID: transformedModelId,
-    variant: nextFallback.variant,
-  }
+  // A rung's reasoning wins over its variant, lowered for the rung's own model like the sync path does;
+  // keeping it on the task model lets the relaunch set reasoningEffort where no variant exists (#9918).
+  const nextModel = nextFallback.reasoning === undefined
+    ? { providerID, modelID: transformedModelId, variant: nextFallback.variant }
+    : {
+        providerID,
+        modelID: transformedModelId,
+        variant: lowerReasoningForModel(nextFallback.reasoning, { providerID, modelID: transformedModelId }).variant,
+        reasoning: nextFallback.reasoning,
+      }
   task.attemptCount = selectedAttemptCount
   const failedAttemptID = ensureCurrentAttempt(task, previousModel).attemptId
   const nextAttempt = failedAttemptID
