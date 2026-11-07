@@ -1,7 +1,8 @@
 import type { Hooks } from "@opencode-ai/plugin"
 
-import { isCompactionAgent } from "../shared/compaction-marker"
+import { isCompactionAgent, isCompactionMessage } from "../shared/compaction-marker"
 import { log } from "../shared/logger"
+import { normalizeSDKResponse } from "../shared/normalize-sdk-response"
 
 type SessionCompactingHook = NonNullable<Hooks["experimental.session.compacting"]>
 type SessionCompactingInput = Parameters<SessionCompactingHook>[0]
@@ -25,8 +26,31 @@ export type CompactionAutocontinueHook = (
   output: CompactionAutocontinueOutput,
 ) => Promise<void>
 
+type CompactionAutocontinueSessionClient = {
+  readonly session: {
+    messages(options: { path: { id: string } }): Promise<unknown>
+    todo(options: { path: { id: string } }): Promise<unknown>
+  }
+}
+
 type CompactionAutocontinueHandlerOptions = {
   readonly duplicateGuardMs?: number
+  readonly client?: CompactionAutocontinueSessionClient
+}
+
+type SessionMessageLike = {
+  readonly info?: {
+    readonly id?: unknown
+    readonly role?: unknown
+    readonly agent?: unknown
+    readonly finish?: unknown
+    readonly error?: unknown
+  }
+  readonly parts?: unknown
+}
+
+type TodoLike = {
+  readonly status?: unknown
 }
 
 type TimerHandleWithOptionalUnref = ReturnType<typeof setTimeout> & {
@@ -91,6 +115,83 @@ function unrefTimer(timer: TimerHandleWithOptionalUnref, sessionID: string): voi
       sessionID,
       error: errorText,
     })
+  }
+}
+
+function getMessageID(message: unknown): string | undefined {
+  if (typeof message !== "object" || message === null) {
+    return undefined
+  }
+  const id = (message as { id?: unknown }).id
+  return typeof id === "string" ? id : undefined
+}
+
+// Mirrors OpenCode 1.x's own loop-exit rule (session/prompt.ts): a turn is finished when it has a
+// finish reason other than tool-calls/unknown and no tool parts. Anything else is mid-work.
+function isCompletedAssistantTurn(message: SessionMessageLike): boolean {
+  const info = message.info
+  if (info?.role !== "assistant") {
+    return false
+  }
+  if (typeof info.finish !== "string" || info.finish === "tool-calls" || info.finish === "unknown") {
+    return false
+  }
+  if (info.error !== undefined && info.error !== null) {
+    return false
+  }
+  const parts = Array.isArray(message.parts) ? message.parts : []
+  return !parts.some((part) => typeof part === "object" && part !== null && (part as { type?: unknown }).type === "tool")
+}
+
+async function compactedTurnWasCompleted(
+  client: CompactionAutocontinueSessionClient,
+  sessionID: string,
+  triggerMessageID: string | undefined,
+): Promise<boolean> {
+  const messages = normalizeSDKResponse(
+    await client.session.messages({ path: { id: sessionID } }),
+    [] as SessionMessageLike[],
+  )
+  const triggerIndex = triggerMessageID === undefined
+    ? -1
+    : messages.findIndex((message) => message.info?.id === triggerMessageID)
+  const searchEnd = triggerIndex === -1 ? messages.length : triggerIndex
+
+  for (let index = searchEnd - 1; index >= 0; index--) {
+    const message = messages[index]
+    if (isCompactionMessage(message)) {
+      continue
+    }
+    return isCompletedAssistantTurn(message)
+  }
+  return false
+}
+
+async function hasIncompleteTodos(client: CompactionAutocontinueSessionClient, sessionID: string): Promise<boolean> {
+  const todos = normalizeSDKResponse(await client.session.todo({ path: { id: sessionID } }), [] as TodoLike[])
+  return todos.some((todo) => todo.status === "pending" || todo.status === "in_progress")
+}
+
+async function shouldVetoAfterCompletedTurn(
+  client: CompactionAutocontinueSessionClient | undefined,
+  input: CompactionAutocontinueInput,
+): Promise<boolean> {
+  if (!client) {
+    return false
+  }
+  try {
+    if (!(await compactedTurnWasCompleted(client, input.sessionID, getMessageID(input.message)))) {
+      return false
+    }
+    // The todo continuation enforcer skips an idle whose latest message is the compaction summary,
+    // so open todos still need OpenCode's continue to resume.
+    return !(await hasIncompleteTodos(client, input.sessionID))
+  } catch (error) {
+    log("[session-compacting] autocontinue completed-turn check failed; keeping autocontinue", {
+      sessionID: input.sessionID,
+      error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+    })
+    return false
   }
 }
 
@@ -177,5 +278,12 @@ export function createCompactionAutocontinueHandler(
         await restore(input.sessionID)
       }
     })
+
+    if (await shouldVetoAfterCompletedTurn(options.client, input)) {
+      output.enabled = false
+      log("[session-compacting] suppressed compaction autocontinue after a completed turn", {
+        sessionID: input.sessionID,
+      })
+    }
   }
 }
