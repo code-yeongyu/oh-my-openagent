@@ -7,7 +7,7 @@ const target = `${root}packages/omo-native/bin/lib/reflection-lock.generated.js`
 
 export async function buildReflectionLock(check = false): Promise<void> {
   const result = await Bun.build({
-    entrypoints: [`${root}packages/memory-core/src/reflection/stale-holder.ts`],
+    entrypoints: [`${root}packages/memory-core/src/reflection/reflection-lock-bundle.ts`],
     target: "node", format: "esm", minify: { whitespace: true, syntax: true }, external: ["bun:ffi"],
   })
   if (!result.success) throw new Error("Reflection lock bundle failed", { cause: result.logs })

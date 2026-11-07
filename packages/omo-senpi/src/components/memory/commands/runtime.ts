@@ -20,6 +20,9 @@ import type { MemoryCommandContext, MemoryCommandDeps, MemoryCommandHandler } fr
 export { planFactsMutation, FactsPlanParentDirtyError } from "@oh-my-opencode/memory-core"
 // Dream conversation loading and selection run only when a dream fires, so the entry bundle loads them from here.
 export { computeUnreflectedVolumeFast, loadConversations, selectLoadedConversations } from "../dream-selector"
+// The stale reflection-lock reaper runs once per session on the first settled turn, on a stuck holder, and from
+// /doctor fix, so the entry bundle loads it from here.
+export { formatStaleLockFixLines, reclaimDeadOwnerLocks, runStaleLockReaper } from "@oh-my-opencode/memory-core"
 
 type CommandRegistrar = (pi: MemoryCommandPort, deps: MemoryCommandDeps) => void
 
