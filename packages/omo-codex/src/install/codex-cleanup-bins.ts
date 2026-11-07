@@ -4,7 +4,7 @@ import { COMMAND_SHIM_MARKER } from "./codex-cache-command-shim"
 import { isManagedComponentBinTarget } from "./codex-cache-dangling-bins"
 import { isNodeErrorWithCode } from "./codex-cache-fs"
 import { isLegacyCodexBinTarget, LEGACY_CODEX_COMPONENT_BIN_NAMES } from "./codex-cache-legacy-bins"
-import { RUNTIME_WRAPPER_MARKER } from "./codex-cache-runtime-wrapper"
+import { hasRuntimeWrapperHeader } from "./codex-cache-runtime-wrapper"
 
 type LinkPlatform = NodeJS.Platform
 
@@ -90,5 +90,5 @@ async function isManagedCodexBin(linkPath: string, platform: LinkPlatform, binNa
 
   if (!entryStat.isFile()) return false
   const content = await readFile(linkPath, "utf8")
-  return content.includes(RUNTIME_WRAPPER_MARKER) || content.includes(COMMAND_SHIM_MARKER)
+  return hasRuntimeWrapperHeader(content) || content.includes(COMMAND_SHIM_MARKER)
 }
