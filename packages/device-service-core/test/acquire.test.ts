@@ -173,6 +173,46 @@ describe("verified acquisition of the device service", () => {
       expect(() => parseReleaseKeySet(bad)).toThrow()
   })
 
+  // #12656: an origin that has never published the pinned release answers 404 for every file of it. That is not a
+  // connection problem, so it is its own refusal; a transport failure, a 5xx or a half-published release still is one.
+  test("a release that was never published (404 for every file) is refused as not_published and nothing is written", async () => {
+    const state = stateDir()
+    const served = serveRelease(new Map())
+    const result = await acquireDeviceService(options(state, served, releaseKey().publicHex))
+    expect(result).toMatchObject({ ok: false, refusal: "not_published" })
+    expect(result.ok ? "" : result.action).not.toContain("connection")
+    expect(served.requested.some(url => url.endsWith(deviceServiceAssetName(HOST)))).toBe(false)
+    expect(existsSync(state)).toBe(false)
+  })
+
+  test.each([
+    ["a fetch that throws", async (): Promise<Response> => { throw new TypeError("fetch failed") }],
+    ["a 503", async (): Promise<Response> => new Response("unavailable", { status: 503 })],
+  ])("%s is still download_failed with the connection action", async (_name, fetch) => {
+    const state = stateDir()
+    const result = await acquireDeviceService(options(state, serveRelease(new Map()), releaseKey().publicHex, { fetch }))
+    expect(result).toEqual({
+      ok: false,
+      refusal: "download_failed",
+      action: "Could not download the OmO device service. Check the connection and try again.",
+    })
+    expect(existsSync(state)).toBe(false)
+  })
+
+  // not_published needs BOTH signed entry files to answer 404; a 404 on only one of them is a broken release.
+  test.each([
+    ["the binary", deviceServiceAssetName(HOST)],
+    ["only checksums.txt", "checksums.txt"],
+    ["only checksums.txt.sig", "checksums.txt.sig"],
+  ])("a half-published release (%s 404) is download_failed, not not_published", async (_name, missing) => {
+    const key = releaseKey()
+    const files = buildRelease({ key, host: HOST })
+    files.delete(missing)
+    const state = stateDir()
+    expect(await acquireDeviceService(options(state, serveRelease(files), key.publicHex))).toMatchObject({ ok: false, refusal: "download_failed" })
+    expect(existsSync(state)).toBe(false)
+  })
+
   test("checksum mismatch aborts before any write", async () => {
     const key = releaseKey()
     const state = stateDir()
