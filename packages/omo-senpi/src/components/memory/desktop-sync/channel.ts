@@ -23,8 +23,17 @@ export type DesktopSyncAttachment =
  * On every platform the stream is the one senpi's takeInheritedPrivateChannel hands over; on win32 senpi
  * builds it over two one-way pipes and clears their inherit flag first, so nothing here is platform-specific.
  */
+// SCRATCH DIAGNOSTICS (memsync-coord/diag-12704-win)
+const diag = (stage: string, fields: Record<string, unknown> = {}): void => {
+  try { process.stderr.write(`omo-boot-diag pid=${process.pid} channel-${stage} ${JSON.stringify(fields)}\n`) } catch { /* never change the attach */ }
+}
+
 export async function attachDesktopSyncChannel(stream: Duplex | undefined): Promise<DesktopSyncAttachment> {
+  diag("attach", { stream: stream === undefined ? "undefined" : "present" })
   if (stream === undefined) return { kind: "unavailable", reason: "private_channel_unavailable" }
+  stream.on("error", error => diag("stream-error", { error: String(error) }))
+  stream.on("end", () => diag("stream-end"))
+  stream.on("close", () => diag("stream-close"))
   const lifetime = new AbortController()
   const waiting = new Map<number, ReturnType<typeof Promise.withResolvers<unknown>>>()
   const listeners = new Set<(event: DesktopSyncEvent) => void>()
@@ -32,6 +41,7 @@ export async function attachDesktopSyncChannel(stream: Duplex | undefined): Prom
   let child: string | undefined
   const close = () => {
     if (lifetime.signal.aborted) return
+    diag("close", { waiting: waiting.size, child: child ?? null })
     lifetime.abort()
     stream.destroy()
     for (const pending of waiting.values()) pending.reject(new DesktopSyncUnavailable())
@@ -61,7 +71,9 @@ export async function attachDesktopSyncChannel(stream: Duplex | undefined): Prom
     waiting.set(id, pending)
     try {
       writeFrame(stream, { id, ...packet })
-    } catch {
+      diag("frame-written", { id, op: packet.op })
+    } catch (error) {
+      diag("frame-write-threw", { id, op: packet.op, error: String(error) })
       close()
     }
     return pending.promise
@@ -70,6 +82,7 @@ export async function attachDesktopSyncChannel(stream: Duplex | undefined): Prom
   timeout.unref()
   try {
     child = desktopSyncChild.parse(await request({ op: "bootstrap" })).child
+    diag("bootstrap-answered", { child })
     if (lifetime.signal.aborted) throw new DesktopSyncUnavailable()
     return {
       kind: "connected",
@@ -87,7 +100,8 @@ export async function attachDesktopSyncChannel(stream: Duplex | undefined): Prom
         },
       },
     }
-  } catch {
+  } catch (error) {
+    diag("bootstrap-failed", { error: String(error) })
     close()
     return { kind: "unavailable", reason: "private_channel_unavailable" }
   } finally {

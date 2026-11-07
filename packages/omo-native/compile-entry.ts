@@ -47,6 +47,7 @@ import { runTrustStage } from "./trust-stage"
 import { resolveEngineTrustHelperPath } from "./engine-trust-helper-path"
 import { claimsMemorySyncAtBoot } from "./bin/lib/memory-sync-boot.js"
 import { claimMemorySyncAtBoot } from "./memory-sync-boot"
+import { bootDiag, launchSnapshot } from "./boot-diag"
 
 // The engine is imported via a RELATIVE string LITERAL, inlined at both import
 // sites, and both properties are load-bearing:
@@ -318,6 +319,7 @@ async function answerUnderRefusedTrust(args: string[]): Promise<boolean> {
 }
 
 async function main(): Promise<void> {
+  bootDiag("main-entry", launchSnapshot())
   // The #10697 plaintext file goes before ANY command, including the answers below that return early.
   removeLegacyServiceCredentials()
   // Before anything opens TLS, and on every start: `host ensure`, the host daemon and the
@@ -351,6 +353,7 @@ async function main(): Promise<void> {
       return
     }
     const trust = await runTrustStage({ args, argv: process.argv.slice(1) })
+    bootDiag("trust-stage", { site: "source", action: trust.action })
     if (trust.action !== "adopt") {
       setTrustExitCode(trust.action)
       return
@@ -358,7 +361,9 @@ async function main(): Promise<void> {
     if (await runCompiledLauncher(process.argv.slice(2), execDir)) return
     process.argv.splice(2, process.argv.length - 2, ...buildSenpiArgs(process.argv.slice(2), execDir))
     Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))
-    if (claimsMemorySyncAtBoot(process.argv.slice(2))) await claimMemorySyncAtBoot()
+    const gate = claimsMemorySyncAtBoot(process.argv.slice(2))
+    bootDiag("gate", { site: "source", result: gate, argv: process.argv.slice(2).slice(0, 12), SENPI_PRIVATE_FDS: process.env.SENPI_PRIVATE_FDS ?? "<unset>" })
+    if (gate) await claimMemorySyncAtBoot()
     await registerEngineRuntimeModules()
     await import("../../node_modules/@code-yeongyu/senpi/dist/cli.js") // literal: see import note above
     return
@@ -396,6 +401,7 @@ async function main(): Promise<void> {
     helper: helperPath !== null && helperEntry !== undefined ? { path: helperPath, sha256: helperEntry.sha256 } : undefined,
     ...(launch.handOff ? { exec: (file: string, argv: string[], env: NodeJS.ProcessEnv) => handOffToProvisionedRuntime(file, { argv, env }) } : {}),
   })
+  bootDiag("trust-stage", { site: "embedded", action: trust.action, handOff: launch.handOff, provision: launch.provision })
   if (trust.action !== "adopt") {
     setTrustExitCode(trust.action)
     return
@@ -417,6 +423,7 @@ async function main(): Promise<void> {
   }
   if (answerCompiledFastPath(process.argv.slice(2), manifest)) return
   if (launch.handOff) {
+    bootDiag("provisioned-handoff", { expected, SENPI_PRIVATE_FDS: process.env.SENPI_PRIVATE_FDS ?? "<unset>" })
     const marker = adoptedEngineTrust()
     if (marker === undefined) throw new Error("trust stage did not record its adopted generation")
     await handOffToProvisionedRuntime(expected, {
@@ -435,8 +442,11 @@ async function main(): Promise<void> {
   process.argv.splice(2, process.argv.length - 2, ...buildSenpiArgs(process.argv.slice(2), execDir))
   Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))
   applyCachedClaudeCode(process.env, execDir)
+  if (isInternalSupervisorLaunch(process.argv.slice(2))) bootDiag("internal-supervisor", launchSnapshot())
   if (isInternalSupervisorLaunch(process.argv.slice(2)) && await runInternalSupervisor(process.argv.slice(2))) return
-  if (claimsMemorySyncAtBoot(process.argv.slice(2))) await claimMemorySyncAtBoot()
+  const gate = claimsMemorySyncAtBoot(process.argv.slice(2))
+  bootDiag("gate", { site: "embedded", result: gate, argv: process.argv.slice(2).slice(0, 12), SENPI_PRIVATE_FDS: process.env.SENPI_PRIVATE_FDS ?? "<unset>", FINAL: process.env.SENPI_PRIVATE_FDS_FINAL ?? "<unset>" })
+  if (gate) await claimMemorySyncAtBoot()
   await registerEngineRuntimeModules()
   await import("../../node_modules/@code-yeongyu/senpi/dist/cli.js") // literal: see import note above
 }

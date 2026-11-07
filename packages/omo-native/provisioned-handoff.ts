@@ -3,6 +3,7 @@ import { dirname } from "node:path"
 import { propagateResult, runChild } from "./bin/lib/child-process.js"
 import { inspectPrivateFdTable, PRIVATE_FDS_ENV, privateFdHandoffFor } from "./bin/lib/private-fd-table.js"
 import { isProvisionedExecutable } from "./compile-runtime"
+import { bootDiag, handleSnapshot } from "./boot-diag"
 
 // Set on the child a launch hands off to, naming the provisioned executable the parent spawned. The
 // child trusts it over its own executable identity, which Bun on Windows has misreported before, so
@@ -49,6 +50,11 @@ export async function reexecProvisionedRuntime(expected: string, options: Reexec
   // The compiled Windows hop captures the pair too; helper spawns must never see its declaration.
   if (platform === "win32") delete env[PRIVATE_FDS_ENV]
   const handoff = privateFdHandoffFor(env, table, platform)
+  bootDiag("reexec-handoff", {
+    expected, argv: argv.slice(0, 12), tableIn: table ?? "<unset>", parentTableAfterDelete: env[PRIVATE_FDS_ENV] ?? "<unset>",
+    childTable: handoff?.env[PRIVATE_FDS_ENV] ?? "<no handoff>", childFinal: handoff?.env.SENPI_PRIVATE_FDS_FINAL ?? env.SENPI_PRIVATE_FDS_FINAL ?? "<unset>",
+    childStdio: handoff?.stdio ?? "<no handoff>", handles: handleSnapshot(),
+  })
   // Named sockets it cannot forward would stay open in this waiting parent, so their peer never saw EOF.
   if (handoff !== undefined) for (const fd of inspectPrivateFdTable(table, platform).discard) closeSync(fd)
   if (handoff === undefined && platform !== "win32" && typeof execve === "function") {
