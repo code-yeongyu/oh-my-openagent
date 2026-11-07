@@ -69,7 +69,7 @@ describe("onboarding migration inventory", () => {
 
     const content = injectedContent(await h.prompt())
 
-    expect(content).toContain("onboarding/SKILL.md")
+    expect(content).toContain("built-in `onboarding` skill")
     expect(content).toContain("Migration inventory")
     for (const id of ["openai", "anthropic", "myco", "ctx", "my-skill"]) expect(content).toContain(id)
     expect(content).not.toContain(SECRET)
@@ -85,7 +85,7 @@ describe("onboarding migration inventory", () => {
 
     expect(h.pi.messages).toHaveLength(1)
     const content = String((h.pi.messages[0] as unknown as { message: { content: unknown } }).message.content)
-    expect(content).toContain("onboarding/SKILL.md")
+    expect(content).toContain("built-in `onboarding` skill")
     expect(content).toContain("Migration inventory")
     expect(content).toContain("my-skill")
   })
@@ -104,7 +104,7 @@ describe("onboarding migration inventory", () => {
     await h.start()
 
     const content = injectedContent(await h.prompt())
-    expect(content).toContain("onboarding/SKILL.md")
+    expect(content).toContain("built-in `onboarding` skill")
     expect(content).not.toContain("Migration inventory")
     expect(state.isOnboardingComplete(dir)).toBe(true)
   })

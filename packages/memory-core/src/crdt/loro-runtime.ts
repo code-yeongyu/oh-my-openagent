@@ -3,7 +3,7 @@
 import { dirname, isAbsolute, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { readFile } from "../fs/resilient"
-import type { Container, ContainerID, ContainerType, LoroDoc, PeerID, Value } from "loro-crdt"
+import type { Container, ContainerID, ContainerType, decodeImportBlobMeta, LoroDoc, PeerID, Value } from "loro-crdt"
 
 import wasmPath from "loro-crdt/bundler/loro_wasm_bg.wasm" with { type: "file" }
 
@@ -34,6 +34,8 @@ export type { ContainerID, ContainerType, LoroDoc, PeerID }
 
 export interface LoroRuntime {
   readonly LoroDoc: typeof LoroDoc
+  /** An update blob's version range without importing it (the sync item store's rewind, #12284). */
+  readonly decodeImportBlobMeta: typeof decodeImportBlobMeta
 }
 
 type WasmExports = Record<string, unknown>
