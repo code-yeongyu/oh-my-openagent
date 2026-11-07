@@ -11,9 +11,9 @@
 
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { join, relative, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
-import { packageRoot, resolveSenpi } from "./package-paths.js"
+import { nativePluginRoot, resolveSenpi } from "./package-paths.js"
 
 export const COVERAGE_RUNTIME = join("plugin", "runtime", "category-coverage", "index.js")
 
@@ -55,7 +55,7 @@ function extensionProviders(register, cwd) {
 }
 
 async function loadRuntime() {
-  return import(pathToFileURL(join(packageRoot, COVERAGE_RUNTIME)).href)
+  return import(pathToFileURL(join(nativePluginRoot(), relative("plugin", COVERAGE_RUNTIME))).href)
 }
 
 /**

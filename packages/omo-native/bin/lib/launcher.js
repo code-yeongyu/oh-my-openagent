@@ -21,7 +21,7 @@ import { removeLegacyServiceCredentials } from "./legacy-service-credentials.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
 import { senpiEnvironment } from "./engine-environment.js"
 import { withHerdrAgentHint } from "./herdr-agent-hint.js"
-import { packageManifest, packageRoot, readJson, releaseBanner, resolveSenpi, updateTarget } from "./package-paths.js"
+import { nativePluginRoot, packageManifest, readJson, releaseBanner, resolveSenpi, updateTarget } from "./package-paths.js"
 import { runSelfUpdate } from "./self-update.js"
 import { isSelfUpdate } from "./update-args.js"
 import { detectHarnesses } from "./setup-detect.js"
@@ -38,7 +38,7 @@ function engineVersion() {
 }
 
 function preparedSenpi() {
-  preparePluginLaunchSpec({ pluginRoot: join(packageRoot, "plugin") })
+  preparePluginLaunchSpec({ pluginRoot: nativePluginRoot() })
   const senpi = resolveSenpi()
   ensureEnginePrepared({
     senpiRoot: senpi.packageRoot,
@@ -68,7 +68,7 @@ async function bootsWithMemorySyncClaim(args, env) {
 async function spawnSenpi(args, withExtension) {
   const senpi = preparedSenpi()
   const finalArgs = withExtension
-    ? ["--extension", join(packageRoot, "plugin"), ...args]
+    ? ["--extension", nativePluginRoot(), ...args]
     : args
   const env = senpiEnvironment(senpi.packageRoot)
   if (withExtension) withHerdrAgentHint(env, args)
@@ -150,7 +150,7 @@ export function engineHostCall(engineArgs, options) {
 }
 
 export function rollbackMigrateCall(request) {
-  const runtime = join(packageRoot, "plugin", "runtime", "rollback-migrate.js")
+  const runtime = join(nativePluginRoot(), "runtime", "rollback-migrate.js")
   const result = spawnSync(process.execPath, [runtime], {
     encoding: "utf8",
     input: JSON.stringify(request),
@@ -179,7 +179,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
     process.exitCode = await runThreadCommand(args.slice(1), {
       engine: { run: engineHostCall },
       reinstall: `Reinstall omo with: ${updateTarget().command}, then retry.`,
-      pluginRoot: join(packageRoot, "plugin"),
+      pluginRoot: nativePluginRoot(),
       agentDir: canonicalAgentDir(),
       env: process.env,
       cwd: process.cwd(),
@@ -195,7 +195,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
     const outcome = await runDaemonCommand(args.slice(1), {
       engine: { run: engineHostCall },
       migration: { run: rollbackMigrateCall },
-      pluginRoot: join(packageRoot, "plugin"),
+      pluginRoot: nativePluginRoot(),
       agentDir: canonicalAgentDir(),
       env: process.env,
       stdout: process.stdout,
@@ -213,7 +213,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
   }
   if (command === "doctor") {
     // Doctor is a launch too: it reports only what the launch-time preparation could not fix.
-    preparePluginLaunchSpec({ pluginRoot: join(packageRoot, "plugin") })
+    preparePluginLaunchSpec({ pluginRoot: nativePluginRoot() })
     if (args[1] === "--models") {
       process.exitCode = await runDoctorModels(args.slice(2), { agentDir: canonicalAgentDir() })
       return
@@ -259,7 +259,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
       env: process.env,
       stdout: process.stdout,
       stderr: process.stderr,
-      readActivity: await sessionActivityReader(join(packageRoot, "plugin")),
+      readActivity: await sessionActivityReader(nativePluginRoot()),
     })
     return
   }

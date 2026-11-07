@@ -10,8 +10,8 @@
  */
 
 import { COVERAGE_RUNTIME, engineAvailableModels } from "./category-coverage.js"
-import { packageRoot } from "./package-paths.js"
-import { join } from "node:path"
+import { nativePluginRoot } from "./package-paths.js"
+import { join, relative } from "node:path"
 import { pathToFileURL } from "node:url"
 
 const STATE_TEXT = {
@@ -64,7 +64,7 @@ export function formatModelChainLines(view) {
 }
 
 async function loadRuntime() {
-  return import(pathToFileURL(join(packageRoot, COVERAGE_RUNTIME)).href)
+  return import(pathToFileURL(join(nativePluginRoot(), relative("plugin", COVERAGE_RUNTIME))).href)
 }
 
 /**
