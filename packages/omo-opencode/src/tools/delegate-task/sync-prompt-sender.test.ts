@@ -230,6 +230,36 @@ bunDescribe("sendSyncPrompt", () => {
     bunExpect(promptArgs.body.tools.call_omo_agent).toBe(true)
   })
 
+  bunTest("disables call_omo_agent for an Anthropic-backed sync task", async () => {
+    //#given
+    const { sendSyncPrompt } = require("./sync-prompt-sender")
+    let promptArgs!: PromptArgs
+    const promptAsync = bunMock(async (input: PromptArgs) => {
+      promptArgs = input
+      return { data: {} }
+    })
+    const input = {
+      sessionID: "test-session",
+      agentToUse: "sisyphus",
+      args: {
+        description: "test task",
+        prompt: "test prompt",
+        run_in_background: false,
+        load_skills: [],
+      },
+      systemContent: undefined,
+      categoryModel: { providerID: "anthropic", modelID: "claude-sonnet-4-6" },
+      toastManager: null,
+      taskId: undefined,
+    }
+
+    //#when
+    await sendSyncPrompt({ session: { prompt: promptAsync, promptAsync } }, input)
+
+    //#then
+    bunExpect(promptArgs.body.tools.call_omo_agent).toBe(false)
+  })
+
   bunTest("includes agent alongside explicit category model", async () => {
     //#given
     const { sendSyncPrompt } = require("./sync-prompt-sender")
