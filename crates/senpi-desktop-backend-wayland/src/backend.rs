@@ -1,8 +1,10 @@
 //! `WaylandBackend`: background-only desktop input over libei, AT-SPI
 //! accessibility and window listing, and honest capabilities. Wayland lets
-//! no client activate or target another surface, so window-targeted input
-//! and raising are refused with the compositor's constraint, and there is no
-//! focus guard. Capture streams each monitor through ScreenCast and PipeWire
+//! no client activate or target another surface, so raising and keyboard
+//! input aimed at a window are refused with the compositor's constraint, and
+//! there is no focus guard. On Hyprland, window-targeted pointer input goes
+//! through libei at the window's geometry read from Hyprland IPC (refused
+//! elsewhere). Capture streams each monitor through ScreenCast and PipeWire
 //! (window capture crops the composite), else uses the Screenshot portal.
 
 use image::RgbaImage;
@@ -15,10 +17,12 @@ use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::menus::MenuItem;
 use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopWindow, DisplaySelector, Target,
+    WindowInput,
 };
 
 use crate::capture::layout::EisRegion;
 use crate::capture::PortalCapture;
+use crate::compositor::hyprland::{self, Detection};
 use crate::input::Libei;
 use crate::portal::{portal_runtime, remote_desktop, token_cleanup};
 
@@ -36,6 +40,9 @@ pub struct WaylandBackend {
     /// Whether the session bus offers the RemoteDesktop portal; probed once,
     /// only while no libei connection was tried.
     portal_offered: Option<bool>,
+    /// Whether this session runs on Hyprland with a reachable IPC socket;
+    /// probed once, on the first capabilities or window pointer request.
+    pub(crate) compositor: Option<Detection>,
     pub(crate) capture: PortalCapture,
     /// The libei layout the last capture's geometry was derived from; pointer
     /// input through a capture frame is refused once it no longer holds.
@@ -58,6 +65,7 @@ impl WaylandBackend {
             ax,
             input: Input::Untried,
             portal_offered: None,
+            compositor: None,
             capture: PortalCapture::new(DisplaySelector::All),
             frame_layout: None,
         }
@@ -76,6 +84,10 @@ impl WaylandBackend {
 
     fn prepare_input(&mut self, target: &Target, kind: &str) -> CoreResult<&mut Libei> {
         Self::window_input_error(target, kind)?;
+        self.connect_input()
+    }
+
+    fn connect_input(&mut self) -> CoreResult<&mut Libei> {
         if matches!(self.input, Input::Untried) {
             self.input = match Libei::connect() {
                 Ok(libei) => Input::Connected(Box::new(libei)),
@@ -109,6 +121,77 @@ impl WaylandBackend {
             }
         }
     }
+
+    fn compositor(&mut self) -> &Detection {
+        self.compositor.get_or_insert_with(hyprland::detect)
+    }
+
+    /// `None` off Hyprland (no compositor path exists yet); on Hyprland,
+    /// available only when its IPC socket and a libei input path both exist.
+    fn window_input(&mut self, input_permission: &str) -> Option<WindowInput> {
+        let unavailable = |reason: &str| WindowInput {
+            available: false,
+            reason: Some(reason.to_owned()),
+        };
+        match self.compositor() {
+            Detection::NotHyprland => None,
+            Detection::IpcMissing => Some(unavailable("hyprland_ipc_missing")),
+            Detection::Ipc(_) if input_permission == "unavailable" => Some(unavailable("no_eis")),
+            Detection::Ipc(_) => Some(WindowInput {
+                available: true,
+                reason: None,
+            }),
+        }
+    }
+
+    /// Pointer input at a window, through libei at the window's Hyprland
+    /// geometry; off Hyprland the compositor constraint refuses it.
+    fn window_pointer(&mut self, id: &str, event: PointerEvent) -> CoreResult<()> {
+        let Detection::Ipc(hyprland) = self.compositor().clone() else {
+            return Self::window_input_error(&Target::Window(id.to_owned()), "pointer input");
+        };
+        let window = self
+            .windows()?
+            .into_iter()
+            .find(|window| window.id == id)
+            .ok_or_else(|| DesktopError::window_not_found(format!("window {id} is no longer available")))?;
+        self.hyprland_pointer(&hyprland, &window, event)
+    }
+
+    /// The event's points are global logical points anchored on the window's
+    /// current AT-SPI origin: `FrameGeometry::map_point` re-anchors a window
+    /// frame on the window `windows()` lists now, and AX clicks use AT-SPI
+    /// coordinates. So that origin is the one subtracted, and the remaining
+    /// offset is placed on the Hyprland rect. A window capture crops at that
+    /// same Hyprland rect (see [`WaylandBackend::capture`]), so pixel
+    /// `(px, py)` of the frame lands at the rect's origin plus `(px, py)`.
+    pub(crate) fn hyprland_pointer(
+        &mut self,
+        hyprland: &hyprland::Hyprland,
+        window: &DesktopWindow,
+        event: PointerEvent,
+    ) -> CoreResult<()> {
+        let placement = hyprland.placement(window)?;
+        let origin = (f64::from(window.x), f64::from(window.y));
+        self.connect_input()?
+            .window_pointer(event, origin, &placement.rect, &placement.covering)
+    }
+}
+
+/// The frame of a window capture Hyprland could not place: its pixels are
+/// shown, but no coordinate input is mapped through them, because a click
+/// would be placed at a rect the crop was not taken from.
+pub(crate) fn unplaced_frame(image: RgbaImage, error: &DesktopError) -> (RgbaImage, FrameGeometry) {
+    let frame = FrameGeometry::pixels_only(
+        image.width(),
+        image.height(),
+        format!(
+            "Hyprland could not place this window ({}), so the crop is not known to show where window \
+             pointer input would land",
+            error.message
+        ),
+    );
+    (image, frame)
 }
 
 const LAYOUT_CHANGED: &str = "the Wayland display layout changed since the last capture, whose pixels were \
@@ -131,6 +214,7 @@ impl Backend for WaylandBackend {
             input_permission: input_permission.to_owned(),
             ax_permission: ax_permission.as_str().to_owned(),
             display_count: u32::try_from(self.capture.displays().len()).unwrap_or(u32::MAX),
+            window_input: self.window_input(input_permission),
             ..DesktopCapabilities::unavailable()
         }
     }
@@ -148,19 +232,43 @@ impl Backend for WaylandBackend {
 
     /// Reads the layout of an already connected libei session only; capture
     /// never opens an input session. A layout that cannot be read leaves the
-    /// geometry unproven, so the frame refuses coordinate input.
+    /// geometry unproven, so the frame refuses coordinate input. On Hyprland a
+    /// window is cropped at its Hyprland rect (one `clients` + `monitors` read
+    /// per capture), the rect window pointer input is placed at; a window
+    /// Hyprland cannot place gets a frame that refuses coordinate input.
     fn capture(&mut self, target: &Target, _caps: &CaptureCaps, _exclude_window_titles: &[String]) -> CoreResult<(RgbaImage, FrameGeometry)> {
         let layout = match &mut self.input {
             Input::Connected(libei) => libei.regions().ok(),
             Input::Untried | Input::Failed(_) => None,
         };
+        let hyprland = match target {
+            Target::Window(_) => match self.compositor() {
+                Detection::Ipc(hyprland) => Some(hyprland.clone()),
+                Detection::NotHyprland | Detection::IpcMissing => None,
+            },
+            Target::Desktop | Target::Display(_) => None,
+        };
+        let mut unplaced = None;
         let ax = &mut self.ax;
-        let captured = self.capture.capture(target, layout.as_deref(), || match ax {
-            Ok(ax) => ax.windows(),
-            Err(error) => Err(error.clone()),
+        let captured = self.capture.capture(target, layout.as_deref(), || {
+            let windows = match ax {
+                Ok(ax) => ax.windows(),
+                Err(error) => Err(error.clone()),
+            }?;
+            Ok(match (&hyprland, target) {
+                (Some(hyprland), Target::Window(id)) => {
+                    let (windows, refused) = hyprland.place_in(windows, id);
+                    unplaced = refused;
+                    windows
+                }
+                _ => windows,
+            })
         })?;
         self.frame_layout = layout.filter(|_| self.capture.eis_derived);
-        Ok(captured)
+        Ok(match unplaced {
+            Some(error) => unplaced_frame(captured.0, &error),
+            None => captured,
+        })
     }
 
     fn pointer(
@@ -171,6 +279,17 @@ impl Backend for WaylandBackend {
         _mode: DeliveryMode,
     ) -> CoreResult<()> {
         let derived_from = self.frame_layout.clone();
+        if let Target::Window(id) = target {
+            if !matches!(self.compositor(), Detection::Ipc(_)) {
+                return Self::window_input_error(target, "pointer input");
+            }
+            if let Some(layout) = derived_from.filter(|_| *frame != FrameGeometry::identity_global()) {
+                if self.connect_input()?.regions()? != layout {
+                    return Err(DesktopError::invalid_coordinate_frame(LAYOUT_CHANGED));
+                }
+            }
+            return self.window_pointer(id, ev);
+        }
         let libei = self.prepare_input(target, "pointer input")?;
         if let Some(layout) = derived_from.filter(|_| *frame != FrameGeometry::identity_global()) {
             if libei.regions()? != layout {
@@ -274,6 +393,8 @@ mod capture_tests;
 mod eis_safety_tests;
 #[cfg(test)]
 mod eis_tests;
+#[cfg(test)]
+mod hyprland_tests;
 #[cfg(test)]
 mod layout_tests;
 #[cfg(test)]
