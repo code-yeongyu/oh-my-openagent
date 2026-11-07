@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { execFileSync } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdir, mkdtemp, utimes, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, stat, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import {
   GitMemoryRepo,
+  TranscriptJournal,
   buildIdentityPaths,
   createLockRecord,
   memoryMaintenanceLockPath,
@@ -317,4 +318,154 @@ describe("createMemoryMaintenance", () => {
     // then
     expect(existsSync(dir)).toBe(true)
   }, 30_000)
+})
+
+describe("runtime retention inside the maintenance pass (A23)", () => {
+  const NOW = Date.parse("2026-11-05T00:00:00.000Z")
+  const DAY = 24 * 60 * 60 * 1000
+
+  async function identityWithOldRun() {
+    const { context, repo } = await identityWithHistory(0)
+    const runDir = join(context.identityPaths.reflection, "runs", "reflection-run-1")
+    await mkdir(runDir, { recursive: true })
+    await writeFile(join(runDir, "final.json"), JSON.stringify({ runId: "reflection-run-1", outcome: "merged", finishedAt: new Date(NOW - 8 * DAY).toISOString() }))
+    await utimes(join(runDir, "final.json"), new Date(NOW - 8 * DAY), new Date(NOW - 8 * DAY))
+    await utimes(runDir, new Date(NOW - 8 * DAY), new Date(NOW - 8 * DAY))
+    const newest = join(context.identityPaths.reflection, "runs", "reflection-run-2")
+    await mkdir(newest, { recursive: true })
+    await writeFile(join(newest, "final.json"), JSON.stringify({ runId: "reflection-run-2", outcome: "merged", finishedAt: new Date(NOW - DAY).toISOString() }))
+    return { context, repo, runDir }
+  }
+
+  test("#given a fresh retention stamp #when a pass is scheduled #then retention does not run", async () => {
+    const { context, repo, runDir } = await identityWithOldRun()
+    await repo.configSet("omo.retentionAt", String(NOW - 60_000))
+    const log = recorder()
+    const maintenance = createMemoryMaintenance({ logger: log.logger, delayMs: 0, now: () => NOW })
+
+    maintenance.schedule(context)
+    await maintenance.settled()
+
+    expect(existsSync(runDir)).toBe(true)
+    expect(log.info.filter((message) => message === "omo-senpi memory runtime retention")).toEqual([])
+  })
+
+  test("#given a stale stamp and two sessions scheduling at once #when their passes come due #then retention runs exactly once", async () => {
+    const { context, runDir } = await identityWithOldRun()
+    const first = recorder()
+    const second = recorder()
+    const a = createMemoryMaintenance({ logger: first.logger, delayMs: 0, now: () => NOW })
+    const b = createMemoryMaintenance({ logger: second.logger, delayMs: 0, now: () => NOW })
+
+    a.schedule(context)
+    b.schedule(context)
+    await Promise.all([a.settled(), b.settled()])
+
+    expect(existsSync(runDir)).toBe(false)
+    const runs = [...first.info, ...second.info].filter((message) => message === "omo-senpi memory runtime retention")
+    expect(runs).toEqual(["omo-senpi memory runtime retention"])
+    expect([...first.warn, ...second.warn]).toEqual([])
+  }, 60_000)
+})
+
+describe("retention stamp and resume (A33 maintenance half)", () => {
+  const NOW = Date.parse("2026-11-05T00:00:00.000Z")
+  const DAY = 24 * 60 * 60 * 1000
+
+  test("#given a cursor file and a fresh omo.maintenanceAt #when maintenance is scheduled #then retention still runs, finishes, stamps omo.retentionAt and deletes the cursor; a later pass within 12 h writes nothing", async () => {
+    const { context, repo } = await identityWithHistory(0)
+    const runs = join(context.identityPaths.reflection, "runs")
+    for (const runId of ["reflection-run-1", "reflection-run-2"]) {
+      await mkdir(join(runs, runId), { recursive: true })
+      await writeFile(join(runs, runId, "final.json"), JSON.stringify({ runId, outcome: "merged", finishedAt: new Date(NOW - 8 * DAY).toISOString() }))
+      await utimes(join(runs, runId, "final.json"), new Date(NOW - 8 * DAY), new Date(NOW - 8 * DAY))
+      await utimes(join(runs, runId), new Date(NOW - 8 * DAY), new Date(NOW - 8 * DAY))
+    }
+    await mkdir(join(runs, "reflection-run-3"), { recursive: true })
+    await writeFile(join(runs, "reflection-run-3", "final.json"), JSON.stringify({ runId: "reflection-run-3", outcome: "merged", finishedAt: new Date(NOW - DAY).toISOString() }))
+    await repo.configSet("omo.maintenanceAt", String(NOW - 60_000))
+    await writeFile(join(context.identityPaths.runtime, "retention.json"), JSON.stringify({ version: 1, cursor: { store: "runs", lastName: "reflection-run-1" } }))
+
+    const first = createMemoryMaintenance({ delayMs: 0, now: () => NOW })
+    first.schedule(context)
+    await first.settled()
+
+    expect(existsSync(join(runs, "reflection-run-1"))).toBe(true)
+    expect(existsSync(join(runs, "reflection-run-2"))).toBe(false)
+    expect(existsSync(join(context.identityPaths.runtime, "retention.json"))).toBe(false)
+    expect(await repo.configGet("omo.retentionAt")).toBe(String(NOW))
+    expect(await repo.configGet("omo.maintenanceAt")).toBe(String(NOW - 60_000))
+
+    const runtimeMtime = (await stat(context.identityPaths.runtime)).mtimeMs
+    const reflectionMtime = (await stat(context.identityPaths.reflection)).mtimeMs
+    const later = createMemoryMaintenance({ delayMs: 0, now: () => NOW + 60 * 60 * 1000 })
+    later.schedule(context)
+    await later.settled()
+    expect(existsSync(join(runs, "reflection-run-1"))).toBe(true)
+    expect((await stat(context.identityPaths.runtime)).mtimeMs).toBe(runtimeMtime)
+    expect((await stat(context.identityPaths.reflection)).mtimeMs).toBe(reflectionMtime)
+  }, 60_000)
+})
+
+describe("host sweep driver 2 (6b, A34 in-session half)", () => {
+  const NOW = Date.parse("2026-11-05T00:00:00.000Z")
+  const DAY = 24 * 60 * 60 * 1000
+
+  async function foreignWithOldRun(memoryRoot: string): Promise<string> {
+    const runs = join(memoryRoot, "agents", "foreign-agent", "runtime", "reflection", "runs")
+    for (const [runId, age] of [["reflection-run-1", 8], ["reflection-run-9", 1]] as const) {
+      await mkdir(join(runs, runId), { recursive: true })
+      await writeFile(join(runs, runId, "final.json"), JSON.stringify({ runId, outcome: "merged", finishedAt: new Date(NOW - age * DAY).toISOString() }))
+      await utimes(join(runs, runId, "final.json"), new Date(NOW - age * DAY), new Date(NOW - age * DAY))
+      await utimes(join(runs, runId), new Date(NOW - age * DAY), new Date(NOW - age * DAY))
+    }
+    return join(runs, "reflection-run-1")
+  }
+
+  test("#given a foreign repo-less identity with a folded run past retention #when a bound session's pass runs with driver 2 on #then the foreign run is pruned and the host round completes", async () => {
+    const { context } = await identityWithHistory(0)
+    const memoryRoot = join(context.identityPaths.root, "..", "..")
+    const foreignRun = await foreignWithOldRun(memoryRoot)
+    const maintenance = createMemoryMaintenance({ delayMs: 0, now: () => NOW, hostSweep: () => ({}) })
+
+    maintenance.schedule(context)
+    await maintenance.settled()
+
+    expect(existsSync(foreignRun)).toBe(false)
+    expect(existsSync(join(memoryRoot, "runtime-sweep.json"))).toBe(true)
+  }, 60_000)
+
+  test("#given a bound identity whose live session has a fully reflected journal past retention #when the pass runs with driver 2 on #then the host sweep does not revisit the bound identity and the journal stays (REVIEW-5 M2)", async () => {
+    const { context } = await identityWithHistory(0)
+    const journalDir = join(context.identityPaths.transcripts, "live-session")
+    const journal = new TranscriptJournal({ journalDir, now: () => new Date(NOW - 20 * DAY) })
+    await journal.reconcile([
+      { kind: "user", messageId: "u1", text: "first" },
+      { kind: "assistant", messageId: "a1", textBlocks: ["first answer"] },
+    ])
+    const snapshot = await journal.captureReflectionSnapshot()
+    if (snapshot === null) throw new Error("expected a snapshot")
+    await journal.finalizeReflection(snapshot, true)
+    for (const name of ["state.json", "transcript.jsonl"]) await utimes(join(journalDir, name), new Date(NOW - 20 * DAY), new Date(NOW - 20 * DAY))
+    await utimes(journalDir, new Date(NOW - 20 * DAY), new Date(NOW - 20 * DAY))
+    const maintenance = createMemoryMaintenance({ delayMs: 0, now: () => NOW, isLiveSession: (id) => id === "live-session", hostSweep: () => ({}) })
+
+    maintenance.schedule(context)
+    await maintenance.settled()
+
+    expect(existsSync(join(journalDir, "transcript.jsonl"))).toBe(true)
+  }, 60_000)
+
+  test("#given driver 2 disabled (CI, task child) #when the pass runs #then foreign identities are untouched", async () => {
+    const { context } = await identityWithHistory(0)
+    const memoryRoot = join(context.identityPaths.root, "..", "..")
+    const foreignRun = await foreignWithOldRun(memoryRoot)
+    const maintenance = createMemoryMaintenance({ delayMs: 0, now: () => NOW })
+
+    maintenance.schedule(context)
+    await maintenance.settled()
+
+    expect(existsSync(foreignRun)).toBe(true)
+    expect(existsSync(join(memoryRoot, "runtime-sweep.json"))).toBe(false)
+  }, 60_000)
 })
