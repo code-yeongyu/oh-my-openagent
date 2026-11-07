@@ -1,0 +1,160 @@
+{
+  "input": "probe-after-leak130.jsonl",
+  "totalRecords": 199,
+  "processes": [
+    {
+      "pid": 1260237,
+      "role": "opencode serve",
+      "argv1": "/$bunfs/root/src/index.js",
+      "records": 199,
+      "eventHookCalls": 159,
+      "disposeHookCalls": 1,
+      "leakControl": {
+        "injected": 130,
+        "sighupAfterInjection": 130,
+        "sighupAfterDispose": 0,
+        "removedAtDispose": 130
+      },
+      "capValuesSeen": [
+        10,
+        128
+      ],
+      "capAtModuleImport": 10,
+      "capAtServerInit": 128,
+      "capAtExit": 128,
+      "warningsTotal": 0,
+      "maxListenersExceededWarnings": 0,
+      "maxListenersExceededMessages": [],
+      "otherWarnings": [],
+      "eventNamesCount": {
+        "moduleImport": 2,
+        "serverInit": 7,
+        "peak": 8,
+        "processExit": 8
+      },
+      "perEvent": {
+        "exit": {
+          "moduleImport": 1,
+          "serverInit": 2,
+          "peakOverall": 2,
+          "peak:startup": 2,
+          "last:startup": 2,
+          "peak:sessions-active": 2,
+          "last:sessions-active": 2,
+          "peak:sessions-deleted": 2,
+          "last:sessions-deleted": 2,
+          "peak:disposed": 2,
+          "last:disposed": 2,
+          "processExit": 2
+        },
+        "beforeExit": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:startup": 1,
+          "last:startup": 1,
+          "peak:sessions-active": 1,
+          "last:sessions-active": 1,
+          "peak:sessions-deleted": 1,
+          "last:sessions-deleted": 1,
+          "peak:disposed": 1,
+          "last:disposed": 1,
+          "processExit": 1
+        },
+        "SIGINT": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:startup": 1,
+          "last:startup": 1,
+          "peak:sessions-active": 1,
+          "last:sessions-active": 1,
+          "peak:sessions-deleted": 1,
+          "last:sessions-deleted": 1,
+          "peak:disposed": 1,
+          "last:disposed": 1,
+          "processExit": 1
+        },
+        "SIGTERM": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:startup": 1,
+          "last:startup": 1,
+          "peak:sessions-active": 1,
+          "last:sessions-active": 1,
+          "peak:sessions-deleted": 1,
+          "last:sessions-deleted": 1,
+          "peak:disposed": 1,
+          "last:disposed": 1,
+          "processExit": 1
+        },
+        "SIGHUP": {
+          "moduleImport": 0,
+          "serverInit": 0,
+          "peakOverall": 130,
+          "peak:startup": 130,
+          "last:startup": 130,
+          "peak:sessions-active": 130,
+          "last:sessions-active": 130,
+          "peak:sessions-deleted": 130,
+          "last:sessions-deleted": 130,
+          "peak:disposed": 130,
+          "last:disposed": 130,
+          "processExit": 130
+        },
+        "uncaughtException": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:startup": 1,
+          "last:startup": 1,
+          "peak:sessions-active": 1,
+          "last:sessions-active": 1,
+          "peak:sessions-deleted": 1,
+          "last:sessions-deleted": 1,
+          "peak:disposed": 1,
+          "last:disposed": 1,
+          "processExit": 1
+        },
+        "unhandledRejection": {
+          "moduleImport": 0,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:startup": 1,
+          "last:startup": 1,
+          "peak:sessions-active": 1,
+          "last:sessions-active": 1,
+          "peak:sessions-deleted": 1,
+          "last:sessions-deleted": 1,
+          "peak:disposed": 1,
+          "last:disposed": 1,
+          "processExit": 1
+        },
+        "warning": {
+          "moduleImport": 1,
+          "serverInit": 1,
+          "peakOverall": 1,
+          "peak:startup": 1,
+          "last:startup": 1,
+          "peak:sessions-active": 1,
+          "last:sessions-active": 1,
+          "peak:sessions-deleted": 1,
+          "last:sessions-deleted": 1,
+          "peak:disposed": 1,
+          "last:disposed": 1,
+          "processExit": 1
+        }
+      },
+      "firstSample": "2026-09-09T08:10:48.320Z",
+      "lastSample": "2026-09-09T08:11:07.210Z"
+    }
+  ],
+  "totals": {
+    "maxListenersExceededWarnings": 0,
+    "capValuesSeen": [
+      10,
+      128
+    ]
+  }
+}
