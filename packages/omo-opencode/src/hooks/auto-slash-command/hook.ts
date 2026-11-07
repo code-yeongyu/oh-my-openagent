@@ -1,16 +1,21 @@
 import { isRecord } from "@oh-my-opencode/utils"
 import {
+  detectAllSlashCommands,
   detectSlashCommand,
   extractPromptText,
+  findMatchingSlashCommandPartIndex,
   findSlashCommandPartIndex,
+  parseSlashCommand,
 } from "./detector"
-import { executeSlashCommand, type ExecutorOptions } from "./executor"
+import { isRealUserTextPart } from "../../shared/internal-initiator-marker"
+import { discoverAllCommands, executeSlashCommand, type ExecutorOptions } from "./executor"
 import { log } from "../../shared"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import {
   AUTO_SLASH_COMMAND_TAG_CLOSE,
   AUTO_SLASH_COMMAND_TAG_OPEN,
 } from "./constants"
+import { replaceSlashCommandSpan } from "./replace-command-span"
 import { createProcessedCommandStore } from "./processed-command-store"
 import type {
   AutoSlashCommandHookInput,
@@ -81,6 +86,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
   }
   const sessionProcessedCommands = createProcessedCommandStore()
   const sessionProcessedCommandExecutions = createProcessedCommandStore()
+  let discoveredCommandNames: Set<string> | null = null
 
   const dispose = (): void => {
     sessionProcessedCommands.clear()
@@ -109,24 +115,11 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         return
       }
 
-      const parsed = detectSlashCommand(promptText)
+      const candidates = detectAllSlashCommands(promptText)
 
-      if (!parsed) {
+      if (candidates.length === 0) {
         return
       }
-
-      const commandKey = input.messageID
-        ? `${input.sessionID}:${input.messageID}:${parsed.command}`
-        : `${input.sessionID}:${parsed.command}`
-      if (sessionProcessedCommands.has(commandKey)) {
-        return
-      }
-      sessionProcessedCommands.add(commandKey)
-
-      log(`[auto-slash-command] Detected: /${parsed.command}`, {
-        sessionID: input.sessionID,
-        args: parsed.args,
-      })
 
       const executionOptions: ExecutorOptions = {
         ...executorOptions,
@@ -134,29 +127,67 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         sessionID: input.sessionID,
       }
 
-      const result = await executeSlashCommand(parsed, executionOptions)
+      // Resolve candidate names against a single discovery pass so that a
+      // pasted log full of absolute paths does not trigger one filesystem
+      // scan per path.
+      if (!discoveredCommandNames) {
+        const discoveredCommands = await discoverAllCommands(executionOptions)
+        discoveredCommandNames = new Set(
+          discoveredCommands.map((cmd) => cmd.name.toLowerCase())
+        )
+      }
+      const availableCommandNames = discoveredCommandNames
+      const resolvingCandidates = candidates.filter((parsed) =>
+        availableCommandNames.has(parsed.command)
+      )
 
-      const idx = findSlashCommandPartIndex(output.parts)
-      if (idx < 0) {
+      if (resolvingCandidates.length === 0) {
         return
       }
 
-      if (!result.success || !result.replacementText) {
-        log(`[auto-slash-command] Command not found, skipping`, {
+      for (const parsed of resolvingCandidates) {
+        const commandKey = input.messageID
+          ? `${input.sessionID}:${input.messageID}:${parsed.command}`
+          : `${input.sessionID}:${parsed.command}`
+        if (sessionProcessedCommands.has(commandKey)) {
+          continue
+        }
+
+        const result = await executeSlashCommand(parsed, executionOptions)
+
+        if (!result.success || !result.replacementText) {
+          log(`[auto-slash-command] Command not found, skipping candidate`, {
+            sessionID: input.sessionID,
+            command: parsed.command,
+            error: result.error,
+          })
+          continue
+        }
+
+        sessionProcessedCommands.add(commandKey)
+
+        log(`[auto-slash-command] Detected: /${parsed.command}`, {
+          sessionID: input.sessionID,
+          args: parsed.args,
+        })
+
+        const idx = findMatchingSlashCommandPartIndex(output.parts, parsed.command)
+        const targetIdx = idx >= 0 ? idx : findSlashCommandPartIndex(output.parts)
+        if (targetIdx < 0) {
+          return
+        }
+
+        const taggedContent = `${AUTO_SLASH_COMMAND_TAG_OPEN}\n${result.replacementText}\n${AUTO_SLASH_COMMAND_TAG_CLOSE}`
+        if (!replaceSlashCommandSpan(output.parts[targetIdx], taggedContent, parsed.command)) {
+          output.parts[targetIdx].text = taggedContent
+        }
+
+        log(`[auto-slash-command] Replaced message with command template`, {
           sessionID: input.sessionID,
           command: parsed.command,
-          error: result.error,
         })
         return
       }
-
-      const taggedContent = `${AUTO_SLASH_COMMAND_TAG_OPEN}\n${result.replacementText}\n${AUTO_SLASH_COMMAND_TAG_CLOSE}`
-      output.parts[idx].text = taggedContent
-
-      log(`[auto-slash-command] Replaced message with command template`, {
-        sessionID: input.sessionID,
-        command: parsed.command,
-      })
     },
 
     "command.execute.before": async (
@@ -211,11 +242,25 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
 
       const taggedContent = `${AUTO_SLASH_COMMAND_TAG_OPEN}\n${result.replacementText}\n${AUTO_SLASH_COMMAND_TAG_CLOSE}`
 
-      const idx = findSlashCommandPartIndex(output.parts)
-      if (idx >= 0) {
-        output.parts[idx].text = taggedContent
+      const matchingIdx = findMatchingSlashCommandPartIndex(output.parts, input.command)
+      if (matchingIdx >= 0) {
+        if (!replaceSlashCommandSpan(output.parts[matchingIdx], taggedContent, input.command)) {
+          output.parts[matchingIdx].text = taggedContent
+        }
       } else {
-        output.parts.unshift({ type: "text", text: taggedContent })
+        const startIdx = output.parts.findIndex(
+          (part) => isRealUserTextPart(part) && (part.text ?? "").trim().startsWith("/")
+        )
+        if (startIdx >= 0) {
+          const partParsed = parseSlashCommand(output.parts[startIdx].text ?? "", input.command)
+          if (partParsed && partParsed.command.toLowerCase() === input.command.toLowerCase()) {
+            output.parts[startIdx].text = taggedContent
+          } else {
+            output.parts.unshift({ type: "text", text: taggedContent })
+          }
+        } else {
+          output.parts.unshift({ type: "text", text: taggedContent })
+        }
       }
 
       log(`[auto-slash-command] command.execute.before - injected template`, {

@@ -1,10 +1,13 @@
 import { describe, expect, it } from "bun:test"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 import {
+  detectAllSlashCommands,
   detectSlashCommand,
   extractPromptText,
+  findMatchingSlashCommandPartIndex,
   findSlashCommandPartIndex,
   isExcludedCommand,
+  parseAllSlashCommands,
   parseSlashCommand,
   removeCodeBlocks,
 } from "./detector"
@@ -128,14 +131,45 @@ After`
       expect(result).toBeNull()
     })
 
-    it("should return null for slash not at start", () => {
+    it("should parse a command that appears mid-sentence", () => {
       // given text with slash in middle
       const text = "some text /command"
 
       // when parsing
       const result = parseSlashCommand(text)
 
-      // then should return null (slash not at start)
+      // then should extract command and span
+      expect(result).not.toBeNull()
+      expect(result?.command).toBe("command")
+      expect(result?.args).toBe("")
+      expect(result?.raw).toBe("/command")
+      expect(result?.start).toBe(10)
+      expect(result?.end).toBe(18)
+    })
+
+    it("should stop args at the end of the command line", () => {
+      // given a command mid-sentence followed by another line
+      const text = "please run /triage on issue 42\nthanks"
+
+      // when parsing
+      const result = parseSlashCommand(text)
+
+      // then args cover only the command line
+      expect(result?.command).toBe("triage")
+      expect(result?.args).toBe("on issue 42")
+      expect(result?.raw).toBe("/triage on issue 42")
+      expect(result?.start).toBe(11)
+      expect(result?.end).toBe(30)
+    })
+
+    it("should not treat a slash inside a word as a command", () => {
+      // given text with slashes inside words
+      const text = "compare and/or with src/app.ts paths"
+
+      // when parsing
+      const result = parseSlashCommand(text)
+
+      // then should return null
       expect(result).toBeNull()
     })
 
@@ -249,6 +283,41 @@ After`
       expect(result?.args).toBe("implement the feature")
     })
 
+    it("should detect slash command mid-sentence", () => {
+      // given prose around a slash command
+      const text = "please run /triage on issue 42"
+
+      // when detecting
+      const result = detectSlashCommand(text)
+
+      // then should detect
+      expect(result).not.toBeNull()
+      expect(result?.command).toBe("triage")
+      expect(result?.args).toBe("on issue 42")
+    })
+
+    it("should not detect an excluded command mid-sentence", () => {
+      // given prose around an excluded command
+      const text = "please run /ulw-loop now"
+
+      // when detecting
+      const result = detectSlashCommand(text)
+
+      // then should not detect (excluded commands stay excluded)
+      expect(result).toBeNull()
+    })
+
+    it("should not detect a mid-sentence command inside a code block", () => {
+      // given prose around a code block containing a command
+      const text = "run this:\n```bash\n/commit fix\n```\nthanks"
+
+      // when detecting
+      const result = detectSlashCommand(text)
+
+      // then should not detect
+      expect(result).toBeNull()
+    })
+
     it("should return null for non-command text", () => {
       // given regular text
       const text = "Just some regular text"
@@ -334,6 +403,20 @@ After`
       expect(result).toBe(2)
     })
 
+    it("selects the part that contains the command mid-sentence", () => {
+      // given
+      const parts = [
+        { type: "text", text: "please use " },
+        { type: "text", text: "the /triage skill" },
+      ]
+
+      // when
+      const result = findSlashCommandPartIndex(parts)
+
+      // then
+      expect(result).toBe(1)
+    })
+
     it("returns minus one when every slash command part is synthetic or internal", () => {
       // given
       const parts = [
@@ -346,6 +429,67 @@ After`
 
       // then
       expect(result).toBe(-1)
+    })
+  })
+
+  describe("parseAllSlashCommands", () => {
+    it("should find multiple slash command candidates on the same line", () => {
+      // given text with multiple slashes
+      const text = "check /var/log then /my-skill now"
+
+      // when parsing all
+      const results = parseAllSlashCommands(text)
+
+      // then should find both candidates with accurate spans and args
+      expect(results).toHaveLength(2)
+      expect(results[0].command).toBe("var/log")
+      expect(results[0].args).toBe("then /my-skill now")
+      expect(results[1].command).toBe("my-skill")
+      expect(results[1].args).toBe("now")
+      expect(results[1].start).toBe(20)
+    })
+
+    it("should ignore candidates inside code blocks", () => {
+      // given text with slash inside code block and another outside
+      const text = "run `/ignore/me` and then /real-cmd arg"
+
+      // when parsing all
+      const results = parseAllSlashCommands(text)
+
+      // then only real candidate is returned
+      expect(results).toHaveLength(1)
+      expect(results[0].command).toBe("real-cmd")
+      expect(results[0].args).toBe("arg")
+    })
+  })
+
+  describe("findMatchingSlashCommandPartIndex", () => {
+    it("finds the part matching the specific command when an earlier part has an unrelated path", () => {
+      // given parts where first part has /var/log and second part has /my-skill
+      const parts = [
+        { type: "text", text: "see /var/log" },
+        { type: "text", text: "/my-skill go" },
+      ]
+
+      // when finding matching part for my-skill
+      const idx = findMatchingSlashCommandPartIndex(parts, "my-skill")
+
+      // then index 1 is returned
+      expect(idx).toBe(1)
+    })
+
+    it("returns minus one when no part contains the requested command", () => {
+      // given parts
+      const parts = [
+        { type: "text", text: "see /var/log" },
+        { type: "text", text: "/my-skill go" },
+      ]
+
+      // when looking for absent command
+      const idx = findMatchingSlashCommandPartIndex(parts, "nonexistent")
+
+      // then -1 is returned
+      expect(idx).toBe(-1)
     })
   })
 })

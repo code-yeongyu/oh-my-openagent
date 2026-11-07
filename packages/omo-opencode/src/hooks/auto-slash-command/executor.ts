@@ -54,7 +54,7 @@ export interface ExecutorOptions {
 }
 
 
-async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandInfo[]> {
+export async function discoverAllCommands(options?: ExecutorOptions): Promise<CommandInfo[]> {
   const discoveredCommands = commandDiscovery.discoverCommandsSync(options?.directory ?? process.cwd(), {
     pluginsEnabled: options?.pluginsEnabled,
     enabledPluginsOverride: options?.enabledPluginsOverride,
