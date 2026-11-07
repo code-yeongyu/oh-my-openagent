@@ -118,6 +118,24 @@ describe.skipIf(process.platform === "win32")("ensureDesktopEngine", () => {
 		expect(cargoCalls()).toHaveLength(4)
 	})
 
+	test("#given a Windows target and both helper crates #when the build runs #then the git job helper is built in its own call with the release static CRT", () => {
+		commitFile(join("crates", "omo-engine-trust-helper", "src", "main.rs"), "fn main() {}\n")
+		commitFile(join("crates", "omo-git-job-helper", "src", "main.rs"), "fn main() {}\n")
+		const bin = installFakeCargo(
+			`#!/bin/sh\necho "$* | RUSTFLAGS=$RUSTFLAGS" >> "${cargoLog}"\nwhile [ "$1" != "--target" ]; do shift; done\nmkdir -p "$CARGO_TARGET_DIR/$2/release"\nfor exe in senpi-desktop-engine omo-engine-trust-helper omo-git-job-helper; do echo built > "$CARGO_TARGET_DIR/$2/release/$exe.exe"; done\n`,
+		)
+		const { RUSTFLAGS: _ignored, ...inherited } = env
+		const windows = { ...inherited, PATH: `${bin}:${process.env.PATH ?? ""}` }
+
+		expect(ensureDesktopEngine(repo, "windows-x64", windows, quiet)).toBe("built")
+		expect(cargoCalls()).toEqual([
+			"build --release -p senpi-desktop-engine --locked --target x86_64-pc-windows-msvc | RUSTFLAGS=",
+			"build --release -p omo-engine-trust-helper --locked --target x86_64-pc-windows-msvc | RUSTFLAGS=",
+			"build --release -p omo-git-job-helper --locked --target x86_64-pc-windows-msvc | RUSTFLAGS=-C target-feature=+crt-static",
+		])
+		expect(ensureDesktopEngine(repo, "windows-x64", windows, quiet)).toBe("reused")
+	})
+
 	test("#given a target that ships no engine #when the build runs #then cargo is skipped", () => {
 		expect(ensureDesktopEngine(repo, "linux-arm64-musl", env, quiet)).toBe("skipped")
 		expect(cargoCalls()).toEqual([])

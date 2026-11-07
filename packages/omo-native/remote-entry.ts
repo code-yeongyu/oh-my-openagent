@@ -11,7 +11,7 @@ import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/syn
 import { runAccountVerb } from "./account-cli"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import packageJson from "./package.json" with { type: "json" }
-import { deviceServiceBootstrapSetup, omoBinaryPath, storedDeviceCredential } from "./remote-bootstrap"
+import { deviceServiceBootstrapSetup, omoBinaryPath } from "./remote-bootstrap"
 import { prepareRemoteAttach, type RemoteVerbDependencies, runRemoteVerb } from "./remote-cli"
 
 // The launchers' `omo remote` entries: the verbs in remote-cli.ts over this device's real service, sign-in and binary.
@@ -51,7 +51,6 @@ function remoteDependencies(): RemoteVerbDependencies {
     error: line => process.stderr.write(`${line}\n`),
     bootstrap: deviceServiceBootstrapSetup({
       stateDir,
-      credential: storedDeviceCredential(serviceApi()),
       binaryPath: omoBinaryPath(),
       agentDir: canonicalAgentDir(),
     }),
