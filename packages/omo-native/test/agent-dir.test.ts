@@ -128,7 +128,7 @@ describe("omo agent directory", () => {
 
   describe("#given an agent directory that is a symlink to a group-writable directory", () => {
     describe("#when the launch prepares the agent directory", () => {
-      test.skipIf(process.platform === "win32")("#then the link is not followed and the remedy names chmod go-w", () => {
+      test.skipIf(process.platform === "win32")("#then the link is not followed and the remedy says to replace the symlink", () => {
         const home = createHome()
         const target = join(home, "elsewhere")
         mkdirSync(target)
@@ -139,7 +139,25 @@ describe("omo agent directory", () => {
         const preparation = prepareAgentDir({}, home)
         expect(preparation).toMatchObject({ action: "left", reason: "not_directory" })
         expect(statSync(target).mode & 0o777).toBe(0o775)
-        expect(agentDirRemedy(preparation)).toContain(`chmod go-w ${agentDir}`)
+        // The host refuses a symlinked key root whatever its mode, so chmod would not fix it.
+        expect(agentDirRemedy(preparation)).toContain("replace the symlink with a real directory")
+        expect(agentDirRemedy(preparation)).not.toContain("chmod")
+      })
+    })
+  })
+
+  describe("#given an agent directory that is a symlink to an owner-only directory", () => {
+    describe("#when the launch prepares the agent directory", () => {
+      test.skipIf(process.platform === "win32")("#then a remedy is still printed, because the host refuses any symlink", () => {
+        const home = createHome()
+        const target = join(home, "elsewhere")
+        mkdirSync(target, { mode: 0o700 })
+        const agentDir = canonicalAgentDir({}, home)
+        mkdirSync(dirname(agentDir), { recursive: true })
+        symlinkSync(target, agentDir)
+        const preparation = prepareAgentDir({}, home)
+        expect(preparation).toMatchObject({ action: "left", reason: "not_directory", symlink: true })
+        expect(agentDirRemedy(preparation)).toContain(`${agentDir} is a symlink`)
       })
     })
   })

@@ -75,7 +75,7 @@ function followedDirMode(path, io) {
   }
 }
 
-/** @typedef {{ action: "created" | "normalized" | "unchanged" | "left" | "skipped", path: string, reason?: string, from?: number, to?: number }} AgentDirPreparation */
+/** @typedef {{ action: "created" | "normalized" | "unchanged" | "left" | "skipped", path: string, reason?: string, from?: number, to?: number, symlink?: boolean }} AgentDirPreparation */
 
 /**
  * Makes the agent directory one the RPC socket host accepts before the engine starts (#12546).
@@ -99,7 +99,9 @@ export function prepareAgentDir(env = process.env, home = runtimeHome(env), io =
     ensureAgentDir(path)
     return { action: "created", path }
   }
-  if (!stat.isDirectory()) return { action: "left", path, reason: "not_directory", from: followedDirMode(path, io) }
+  if (!stat.isDirectory()) {
+    return { action: "left", path, reason: "not_directory", from: followedDirMode(path, io), symlink: stat.isSymbolicLink() }
+  }
   const uid = io.getuid === undefined ? process.getuid?.() : io.getuid()
   const from = stat.mode & 0o7777
   if (uid !== undefined && stat.uid !== uid) return { action: "left", path, reason: "foreign_owner", from }
@@ -111,10 +113,36 @@ export function prepareAgentDir(env = process.env, home = runtimeHome(env), io =
 
 /** The fix to print when `prepareAgentDir` had to leave a directory the host will refuse. */
 export function agentDirRemedy(preparation) {
-  if (preparation.action !== "left" || preparation.from === undefined) return undefined
+  if (preparation.action !== "left") return undefined
+  // The host refuses a symlinked key root whatever the target's mode (senpi-task rpc-host
+  // socket-auth), so chmod would not help: the link itself is the problem.
+  if (preparation.symlink === true) {
+    return `omo: ${preparation.path} is a symlink; the RPC socket host refuses a symlinked agent directory whatever its mode. Fix: replace the symlink with a real directory`
+  }
+  if (preparation.from === undefined) return undefined
   if ((preparation.from & WRITABLE_BY_OTHERS) === 0) return undefined
   const mode = (preparation.from & 0o777).toString(8)
   return `omo: ${preparation.path} is group/world-writable (${mode}) and was left as it is (${preparation.reason}); the RPC socket host refuses it. Fix: chmod go-w ${preparation.path}`
+}
+
+/**
+ * The entry points' one call (#12546): runs before ANY command is dispatched, because several verbs
+ * (`setup`, `login`/`logout`/`whoami`, `sync`, `account`, `remote`) return before the engine starts
+ * and can still create the directory with the umask, e.g. the settings write in `omo setup`.
+ * Fail-open: a failure is reported and never blocks the command.
+ *
+ * @param {(line: string) => void} report
+ */
+export function prepareAgentDirForLaunch(report = (line) => process.stderr.write(`${line}\n`), env = process.env) {
+  let preparation
+  try {
+    preparation = prepareAgentDir(env)
+  } catch (error) {
+    report(`omo: could not prepare the agent directory: ${error instanceof Error ? error.message : String(error)}`)
+    return
+  }
+  const remedy = agentDirRemedy(preparation)
+  if (remedy) report(remedy)
 }
 
 function timestamp() {

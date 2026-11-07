@@ -16,7 +16,7 @@ import { reflectionLockReport } from "./doctor-reflection-lock.js"
 import { ensureEnginePrepared, preparePluginLaunchSpec } from "./engine-prepare.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { removeLegacyServiceCredentials } from "./legacy-service-credentials.js"
-import { adoptLegacyFlatState, agentDirRemedy, canonicalAgentDir, prepareAgentDir } from "./agent-dir.js"
+import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
 import { senpiEnvironment } from "./engine-environment.js"
 import { withHerdrAgentHint } from "./herdr-agent-hint.js"
 import { packageManifest, packageRoot, readJson, releaseBanner, resolveSenpi, updateTarget } from "./package-paths.js"
@@ -83,22 +83,6 @@ function isInteractiveDefault(args) {
 }
 
 /**
- * The engine would create a missing agent directory with the process umask, which the RPC socket
- * host then refuses on a umask 0002 host (#12546). Fail-open: a failure here never blocks the launch.
- */
-function prepareAgentDirForLaunch() {
-  let preparation
-  try {
-    preparation = prepareAgentDir()
-  } catch (error) {
-    console.error(`omo: could not prepare the agent directory: ${error.message}`)
-    return
-  }
-  const remedy = agentDirRemedy(preparation)
-  if (remedy) console.error(remedy)
-}
-
-/**
  * Engine state that predates the unified directory is carried forward once, so unifying the
  * location never presents itself to the user as one more round of erased settings.
  */
@@ -159,7 +143,6 @@ export function rollbackMigrateCall(request) {
 export async function runLauncher(args = process.argv.slice(2)) {
   migrateLegacyBunGlobalManifest()
   removeLegacyServiceCredentials()
-  prepareAgentDirForLaunch()
   reportLegacyFlatAdoption()
   const command = args[0]
   // The toolkit CLI is no longer part of the Native payload; the loop is driven in-process by the

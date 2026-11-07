@@ -3,6 +3,7 @@ import "./lib/private-fds.js"
 import { fileURLToPath } from "node:url"
 import { ensureBunBinShim } from "./lib/bun-bin-shim.js"
 import { maybeReexecUnderBun } from "./lib/bun-runtime.js"
+import { prepareAgentDirForLaunch } from "./lib/agent-dir.js"
 import { runAttachTui, runLauncher } from "./lib/launcher.js"
 import { removeLegacyServiceCredentials } from "./lib/legacy-service-credentials.js"
 import { runRemoteAttachLaunch } from "./lib/remote-attach-launch.js"
@@ -24,6 +25,9 @@ try {
   if (!reexeced) {
     // The #10697 plaintext file goes before ANY command runs: several verbs return before runLauncher.
     removeLegacyServiceCredentials()
+    // Same reason (#12546): `setup` and the service verbs below return before runLauncher, and the
+    // first of them on a fresh host would otherwise create ~/.omo/agent with the umask.
+    prepareAgentDirForLaunch()
     if (["login", "logout", "whoami"].includes(process.argv[2])) {
       const { runServiceAuthCommand } = await import("./lib/service-auth.generated.js")
       await runServiceAuthCommand(process.argv.slice(2))
