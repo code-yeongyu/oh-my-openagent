@@ -152,20 +152,31 @@ fn locks_whole_transaction(mutation: &Mutation<'_>) -> bool {
 }
 
 /// The channel a mutating request's input takes; `None` for a request that
-/// sends no input event (`clipboard.write`).
+/// sends no input event (`clipboard.write`, a window raise). `ax.typeText`
+/// reports `ax` here, for an inserted value; the keys path names its own.
 fn route(mutation: &Mutation<'_>) -> Option<ActionRoute> {
     match mutation.action {
         MutatingAction::AxPerform
         | MutatingAction::AxSetValue
         | MutatingAction::AxFocus
-        | MutatingAction::AxClick
         | MutatingAction::AxTypeText
         | MutatingAction::MenuSelect => Some(ActionRoute::Ax),
-        MutatingAction::ClipboardWrite => None,
-        _ => match (Target::parse(&mutation.target), mutation.delivery) {
-            (Target::Window(_), DeliveryMode::Background) => Some(ActionRoute::BackgroundWindow),
-            _ => Some(ActionRoute::ForegroundHid),
-        },
+        // A pointer click posted to the window that owns the element.
+        MutatingAction::AxClick => Some(event_route(true, mutation.delivery)),
+        MutatingAction::ClipboardWrite | MutatingAction::RaiseWindow => None,
+        _ => Some(event_route(
+            matches!(Target::parse(&mutation.target), Target::Window(_)),
+            mutation.delivery,
+        )),
+    }
+}
+
+/// The channel of input events sent in `delivery` mode, `to_window` when
+/// they are addressed to one window.
+pub(crate) const fn event_route(to_window: bool, delivery: DeliveryMode) -> ActionRoute {
+    match (to_window, delivery) {
+        (true, DeliveryMode::Background) => ActionRoute::BackgroundWindow,
+        _ => ActionRoute::ForegroundHid,
     }
 }
 
@@ -236,11 +247,11 @@ impl Worker {
         }
         match (result, report) {
             (Ok(value), _) => {
-                let hit = self.report_extras.take().and_then(|extras| extras.hit);
+                let extras = self.report_extras.take().unwrap_or_default();
                 let traced = self.options.as_ref().is_some_and(|options| options.trace);
                 self.report_extras.set(Some(ReportExtras {
-                    route: route(mutation),
-                    hit,
+                    route: extras.route.or_else(|| route(mutation)),
+                    hit: extras.hit,
                     timings: traced.then(|| mutation.timings.take()),
                 }));
                 Ok((value, event))

@@ -9,12 +9,13 @@ use senpi_desktop_core::ax::register_node;
 use senpi_desktop_core::backend::{DeliveryMode, ElementDelivery, KeyboardFocus};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::protocol_params::AxTypeTextParams;
-use senpi_desktop_core::protocol_results::AxInputResult;
-use senpi_desktop_core::types::AxNode;
+use senpi_desktop_core::protocol_results::{AxInputMethod, AxInputResult};
+use senpi_desktop_core::types::{AxNode, Target};
 use senpi_desktop_safety::MutatingAction;
 
-use crate::mutate::Mutation;
+use crate::mutate::{event_route, Mutation};
 use crate::pointer::ParsedPointerOptions;
+use crate::report::ReportExtras;
 use crate::request::Response;
 use crate::worker::{Audited, Worker};
 use crate::worker_input::{delivery, interrupted};
@@ -47,7 +48,17 @@ impl Worker {
                 &mut || mutation.text_delivered.set(mutation.text_delivered.get().saturating_add(1)),
             )?;
             match delivered {
-                ElementDelivery::Delivered(method) => Ok(Response::AxInput(AxInputResult { method, report: None })),
+                ElementDelivery::Delivered(method) => {
+                    if method == AxInputMethod::Keys {
+                        let to_window = matches!(Target::parse(&mutation.target), Target::Window(_));
+                        worker.report_extras.set(Some(ReportExtras {
+                            route: Some(event_route(to_window, mode)),
+                            hit: None,
+                            timings: None,
+                        }));
+                    }
+                    Ok(Response::AxInput(AxInputResult { method, report: None }))
+                }
                 ElementDelivery::Unfocused(focus) => Err(worker.element_focus_refusal(&params.ref_, focus, mode)),
             }
         })
