@@ -8,6 +8,18 @@ import { RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS } from "@oh-my-opencode/model
 import type { RuntimeFallbackConfig } from "../../config"
 
 /**
+ * First-prompt watchdog: how long to wait for the first sign of progress
+ * (assistant text/reasoning/finish) from a subagent session before assuming
+ * the provider is silently stuck and dispatching the configured fallback.
+ *
+ * Reasoning-heavy models and relays legitimately take longer than 90 s before
+ * their first progress event (#11887), so this matches the 300 s stream-start
+ * bound the engines themselves use; it stays well below the 30-minute outer
+ * poll timeout. `runtime_fallback.first_prompt_timeout_seconds` overrides it.
+ */
+export const DEFAULT_FIRST_PROMPT_WATCHDOG_MS = 300_000
+
+/**
  * Default configuration values for runtime fallback
  */
 export const DEFAULT_CONFIG: Required<RuntimeFallbackConfig> = {
@@ -16,6 +28,7 @@ export const DEFAULT_CONFIG: Required<RuntimeFallbackConfig> = {
   max_fallback_attempts: 3,
   cooldown_seconds: 60,
   timeout_seconds: 30,
+  first_prompt_timeout_seconds: DEFAULT_FIRST_PROMPT_WATCHDOG_MS / 1000,
   notify_on_fallback: true,
   restore_primary_after_cooldown: false,
 }
@@ -30,14 +43,3 @@ export const RETRYABLE_ERROR_PATTERNS = RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERN
  * Hook name for identification and logging
  */
 export const HOOK_NAME = "runtime-fallback"
-
-/**
- * First-prompt watchdog: how long to wait for the first sign of progress
- * (assistant text/reasoning/finish) from a subagent session before assuming
- * the provider is silently stuck and dispatching the configured fallback.
- *
- * Tuned to be longer than typical first-token latency (well under 30s in
- * practice) yet much shorter than the 30-minute outer poll timeout that
- * would otherwise be the only safety net.
- */
-export const DEFAULT_FIRST_PROMPT_WATCHDOG_MS = 90_000
