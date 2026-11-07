@@ -87,7 +87,21 @@ async function openDevice(remote: RemoteThreadSurface, device: string, handlers:
     lost = false
     known = new Map(rows.map((row) => [row.sessionId, row.status]))
   }
-  const timer = setInterval(() => void round(), LISTING_ROUND_MS)
+  // One round at a time: a listing slower than the cadence skips a tick instead of overlapping. A handler that throws
+  // ends this monitor (senpi settles it) instead of escaping as an unhandled rejection.
+  let inRound = false
+  const tick = (): void => {
+    if (inRound) return
+    inRound = true
+    round().then(
+      () => { inRound = false },
+      (error: unknown) => {
+        clearInterval(timer)
+        handlers.ended(`listener_failed: ${error instanceof Error ? error.message : String(error)}`)
+      },
+    )
+  }
+  const timer = setInterval(tick, LISTING_ROUND_MS)
   timer.unref?.()
   return { initial: { rows: [...known].map(([sessionId, status]) => ({ sessionId, status })) }, stop: () => clearInterval(timer) }
 }

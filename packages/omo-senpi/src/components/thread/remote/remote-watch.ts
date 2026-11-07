@@ -36,6 +36,7 @@ class SessionWatch {
   readonly #settled: string[] = []
   readonly #queue = new WatchQueue((item) => this.#process(item))
   #lostReported = false
+  #leftReason: "session_closed" | "session_replaced" | undefined
   #done = false
   #resolveEnded!: (end: RemoteWatchEnd) => void
   readonly ended = new Promise<RemoteWatchEnd>((resolve) => { this.#resolveEnded = resolve })
@@ -137,12 +138,22 @@ class SessionWatch {
   }
 
   async #resync(restarted: boolean): Promise<void> {
+    const outcome = await this.#resyncOnce(restarted)
+    if (outcome !== "done") await this.#reattach(outcome.reason, restarted, true)
+  }
+
+  // One fresh read and its report. A read the device refused for any reason but the session being gone is handed back:
+  // the caller retries it under the same backoff as a failed attach (the attach itself may be fine and re-hold at once).
+  async #resyncOnce(restarted: boolean): Promise<"done" | { readonly reason: string }> {
     const read = await this.#readState()
-    if (this.#done) return
+    if (this.#done) return "done"
     if (read.kind !== "ok") {
-      if (SESSION_GONE.has(read.reason)) return restarted ? this.#finish("session_closed") : await this.#relocate("session_closed")
-      return await this.#reattach(read.reason)
+      if (!SESSION_GONE.has(read.reason)) return { reason: read.reason }
+      if (restarted) this.#finish(this.#leftReason ?? "session_closed")
+      else await this.#relocate("session_closed")
+      return "done"
     }
+    this.#lostReported = false
     const { state } = read
     const from = this.#status
     const turn = this.#runningTurn
@@ -150,6 +161,7 @@ class SessionWatch {
     for (const settled of settledTurns) this.#markSettled(settled)
     this.#adopt(state)
     this.#deliver(() => this.handlers.resynced?.({ from, state, settledTurns, restarted }))
+    return "done"
   }
 
   async #onAttachEnded(reason: string): Promise<void> {
@@ -163,6 +175,7 @@ class SessionWatch {
   // durable id, else the watch ends with the reason the attach gave.
   async #relocate(reason: "session_closed" | "session_replaced"): Promise<void> {
     this.#release()
+    this.#leftReason = reason
     const durable = this.#durable
     if (durable === undefined) return this.#finish(reason)
     try {
@@ -173,22 +186,33 @@ class SessionWatch {
     await this.#reattach(undefined, true)
   }
 
-  async #reattach(lost: string | undefined, restarted = false): Promise<void> {
+  // Attach, then resync, until both succeed: every failed pass (an attach refused, or a fresh read refused on an attach
+  // that is fine) waits 1 s doubling to 30 s, and the gap is reported lost once. `waitFirst`: the attach was just held.
+  async #reattach(lost: string | undefined, restarted = false, waitFirst = false): Promise<void> {
     this.#release()
     if (lost !== undefined) this.#reportLost(lost)
-    for (let wait = RETRY_FIRST_MS; !this.#done; wait = Math.min(wait * 2, RETRY_MAX_MS)) {
+    let wait = RETRY_FIRST_MS
+    const backOff = async (): Promise<void> => {
+      await this.link.delay(wait)
+      wait = Math.min(wait * 2, RETRY_MAX_MS)
+    }
+    if (waitFirst) await backOff()
+    while (!this.#done) {
       try {
         await this.#attach()
       } catch (error) {
         const code = codeOf(error)
         if (code !== undefined && ACCESS_REFUSED.has(code)) return this.#finish(`access:${code}`)
-        if (code !== undefined && SESSION_GONE.has(code)) return this.#finish("session_closed")
+        if (code !== undefined && SESSION_GONE.has(code)) return this.#finish(this.#leftReason ?? "session_closed")
         this.#reportLost(code ?? "attach_failed")
-        await this.link.delay(wait)
+        await backOff()
         continue
       }
-      this.#lostReported = false
-      return await this.#resync(restarted)
+      const outcome = await this.#resyncOnce(restarted)
+      if (outcome === "done") return
+      this.#release()
+      this.#reportLost(outcome.reason)
+      await backOff()
     }
   }
 
