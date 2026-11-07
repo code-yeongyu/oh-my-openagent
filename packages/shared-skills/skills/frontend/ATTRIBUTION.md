@@ -348,3 +348,37 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Korean design vocabulary (`references/korean-design-vocabulary.md`)
+
+The adjective-to-token table and the per-word clarifying questions are adapted from the
+`dev-uiux-design` skill of CodexClaw by lidge-jun. The Hangul typography notes and the KRDS / KWCAG 2.2
+section are project-original.
+
+- Source: https://github.com/lidge-jun/codexclaw (plugins/codexclaw/skills/dev-uiux-design/references/korean-design-vocabulary.md)
+- Adapted from upstream commit: e413b144ffa0617093d158a0dde101601bcadee9
+- Licensed under the MIT License:
+
+```
+MIT License
+
+Copyright (c) 2026 lidge-jun
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
