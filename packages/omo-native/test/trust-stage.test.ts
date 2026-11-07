@@ -71,8 +71,13 @@ async function child(env: NodeJS.ProcessEnv, dir: string, mode?: string) {
   ])
   return { code, stdout, stderr }
 }
+// A missing log is no records, so a stage that skips its write fails the caller's assertion, not a thrown ENOENT.
 async function records(dir: string) {
-  return (await readFile(join(dir, "diagnostics.jsonl"), "utf8")).trim().split("\n").map((line) => JSON.parse(line))
+  const text = await readFile(join(dir, "diagnostics.jsonl"), "utf8").catch((error: unknown) => {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return ""
+    throw error
+  })
+  return text.trim().split("\n").filter((line) => line !== "").map((line) => JSON.parse(line))
 }
 async function launch(dir: string, env: NodeJS.ProcessEnv = cleanEnv(), fault?: (env: NodeJS.ProcessEnv) => Promise<void>) {
   let output: Awaited<ReturnType<typeof child>> | undefined
@@ -85,6 +90,8 @@ async function launch(dir: string, env: NodeJS.ProcessEnv = cleanEnv(), fault?: 
       output = await child(next, dir)
     },
   })
+  // Every launch reaches the child: a stage that refuses or never execs fails here as an assertion, not a throw.
+  expect(result.action).toBe("import-exec")
   return { result, output: required(output, "compiled child output") }
 }
 
@@ -313,8 +320,22 @@ function windowsStore(store: {
     }
   }
 }
-const everyPath = (accepted: boolean) =>
+// A channel that hangs reports "timeout", so it never equals `false` and never passes for a TLS rejection.
+const everyPath = (accepted: boolean | "timeout") =>
   ({ native: accepted, bunFetch: accepted, saved: accepted, worker: accepted, https: accepted, websocket: accepted })
+
+/** One compiled engine, exec'd through the trust stage, probes `url` over every TLS path. */
+async function compiledTls(acquire: NonNullable<TrustStageOptions["acquire"]>, url: string) {
+  const dir = await directory()
+  let output: Awaited<ReturnType<typeof child>> | undefined
+  await runTrustStage({
+    args: ["-p"], env: cleanEnv(), directory: dir, loadedExtra: () => [], acquire,
+    exec: async (_file, _argv, env) => { output = await child(env, dir, url) },
+  })
+  const compiled = required(output, "compiled child output")
+  expect(compiled.code).toBe(0)
+  return JSON.parse(compiled.stdout)
+}
 
 /** One compiled engine, exec'd through the trust stage, connects to a local server over every TLS path. */
 async function tlsThrough(acquire: NonNullable<TrustStageOptions["acquire"]>, served: { readonly leaf: string; readonly chain?: string }) {
@@ -331,18 +352,19 @@ async function tlsThrough(acquire: NonNullable<TrustStageOptions["acquire"]>, se
     websocket: { message() {} },
   })
   try {
-    const dir = await directory()
-    let output: Awaited<ReturnType<typeof child>> | undefined
-    await runTrustStage({
-      args: ["-p"], env: cleanEnv(), directory: dir, loadedExtra: () => [], acquire,
-      exec: async (_file, _argv, env) => { output = await child(env, dir, `https://127.0.0.1:${server.port}`) },
-    })
-    const compiled = required(output, "compiled child output")
-    expect(compiled.code).toBe(0)
-    const value = JSON.parse(compiled.stdout)
+    const value = await compiledTls(acquire, `https://127.0.0.1:${server.port}`)
     return { tls: value.tls, generation: await readFile(value.marker.file, "utf8") }
   } finally { await server.stop(true) }
 }
+
+// A server that accepts TCP and never answers the handshake: every channel hangs, none is rejected.
+test("a hanging server reports a timeout, never a rejection, on every compiled TLS path", async () => {
+  const server = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } })
+  try {
+    const { tls } = await compiledTls(windowsStore({ roots: ["root"] }), `https://127.0.0.1:${server.port}`)
+    expect(tls).toEqual(everyPath("timeout"))
+  } finally { server.stop(true) }
+}, 30_000)
 
 // Design 9.5 P1: global, Bun.fetch, a saved module-scope fetch, a Worker fetch, node:https and WebSocket.
 test.each([
