@@ -1,3 +1,4 @@
+import { formatNotificationError } from "./notification-error-text"
 import type { BackgroundTaskAttempt, BackgroundTaskStatus } from "./types"
 
 export type BackgroundTaskNotificationStatus = "COMPLETED" | "CANCELLED" | "INTERRUPTED" | "ERROR"
@@ -38,7 +39,7 @@ function formatAttemptTimeline(task: BackgroundTaskNotificationTask): string {
       ]
 
       if (attempt.status !== "completed" && attempt.error) {
-        attemptLines.push(`    Error: ${attempt.error}`)
+        attemptLines.push(`    Error: ${formatNotificationError(attempt.error)}`)
       }
 
       return attemptLines.join("\n")
@@ -52,7 +53,7 @@ function formatTaskSummaryLine(task: BackgroundTaskNotificationTask): string {
   const baseLine = `- \`${task.id}\`: ${task.description || task.id}`
   const statusSuffix = task.status === "completed"
     ? ""
-    : ` [${task.status.toUpperCase()}]${task.error ? ` - ${task.error}` : ""}`
+    : ` [${task.status.toUpperCase()}]${task.error ? ` - ${formatNotificationError(task.error)}` : ""}`
   const timeline = formatAttemptTimeline(task)
 
   return `${baseLine}${statusSuffix}${timeline ? `\n${timeline}` : ""}`
@@ -69,7 +70,7 @@ export function buildBackgroundTaskNotificationText(input: {
   const { task, duration, statusText, allComplete, remainingCount, completedTasks } = input
 
   const safeDescription = (t: BackgroundTaskNotificationTask): string => t.description || t.id
-  const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
+  const errorInfo = task.error ? `\n**Error:** ${formatNotificationError(task.error)}` : ""
 
   if (allComplete) {
     const succeededTasks = completedTasks.filter((t) => t.status === "completed")
