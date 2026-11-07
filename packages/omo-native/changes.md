@@ -1,3 +1,7 @@
+## 2026-11-04 - Remote attach forwards every engine record (#12261)
+
+`remote-attach.ts` answers locally only the attach TUI's plumbing (`set_client_info`, `attach_session`, `release_attachment`, `list_sessions` for the one presented row, `subscribe_sessions`, `get_state`, `get_entries`); every other record goes to the host as a delegated `session.command {rpc}` through `RemoteAttach.command`, with `sessionId: "remote"` replaced by the attached session's id. The engine's reply is sent back verbatim on the request id; a host without delegated commands answers with the command state only (`engine_applied` -> success, otherwise `"<state>: <reason>"`). Frames the engine writes on the delegated connection are relayed after `subscribe_sessions`, and a lost reply or a closed channel becomes a warning notice. `device-service-core` gains `delegated-channel.ts` (reply and frame demultiplexing, blob reassembly with length and sha256 checks) and its vendored local API client is synced with the service's current contract.
+
 ## 2026-11-05 - Doctor reports a broken omo wrapper and duplicate omo-ai installs (#12534)
 
 `omo doctor` now reports a generated `omo` wrapper whose cached runtime is gone, and warns when two different omo-ai installs are both on PATH. Windows `.cmd` wrappers are not covered by the broken check: they write `rem OMO_GENERATED_RUNTIME_WRAPPER` while the check looks for the `#` marker.
