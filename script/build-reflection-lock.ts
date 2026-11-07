@@ -1,13 +1,14 @@
 import { fileURLToPath } from "node:url"
 
-// `omo doctor` must decide a stale reflection lock exactly as the session does (#10377), and the CLI
-// cannot import the TypeScript, so it runs this generated bundle of the one shared decision.
+// `omo doctor` must decide a stale reflection lock exactly as the session does (#10377) and measure an
+// identity's runtime the way the size cap does (#10144), and the CLI cannot import the TypeScript, so it
+// runs this generated bundle of those shared decisions.
 const root = fileURLToPath(new URL("..", import.meta.url))
 const target = `${root}packages/omo-native/bin/lib/reflection-lock.generated.js`
 
 export async function buildReflectionLock(check = false): Promise<void> {
   const result = await Bun.build({
-    entrypoints: [`${root}packages/memory-core/src/reflection/stale-holder.ts`],
+    entrypoints: [`${root}packages/memory-core/src/reflection/reflection-lock-bundle.ts`],
     target: "node", format: "esm", minify: { whitespace: true, syntax: true }, external: ["bun:ffi"],
   })
   if (!result.success) throw new Error("Reflection lock bundle failed", { cause: result.logs })
