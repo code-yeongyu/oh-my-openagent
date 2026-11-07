@@ -309,8 +309,6 @@
       "packages/memory-core/src/sync/crypto/vendor/sync-format/stream.ts": ["PLAINTEXT_LIMIT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) SyncCommitError
       "packages/memory-core/src/sync/engine/adapters/git-sync-repo.ts": ["SyncCommitError"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) OversizedItemError
-      "packages/memory-core/src/sync/engine/batches.ts": ["OversizedItemError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ManualClock, inProcessLock
       "packages/memory-core/src/sync/engine/engine-harness.test-support.ts": ["ManualClock", "inProcessLock"],
       // pre-existing at origin dev 4686e425b5: unused export(s) POLL_MS
@@ -835,8 +833,6 @@
       "packages/omo-opencode/src/hooks/runtime-fallback/agent-resolver.ts": ["AGENT_NAMES"],
       // pre-existing at origin dev 4686e425b5: unused export(s) extractRetryableSignal
       "packages/omo-opencode/src/hooks/runtime-fallback/error-classifier.ts": ["extractRetryableSignal"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) getLastUserRetryParts
-      "packages/omo-opencode/src/hooks/runtime-fallback/last-user-retry-parts.ts": ["getLastUserRetryParts"],
       // pre-existing at origin dev 4686e425b5: unused export(s) hasVisibleAssistantResponse
       "packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts": ["hasVisibleAssistantResponse"],
       // pre-existing at origin dev 4686e425b5: unused export(s) HOOK_NAME
@@ -869,8 +865,6 @@
       "packages/omo-opencode/src/plugin/ultrawork-model-override.ts": ["detectUltrawork"],
       // pre-existing at origin dev 4686e425b5: unused export(s) validateAgentOrder
       "packages/omo-opencode/src/shared/agent-ordering.ts": ["validateAgentOrder"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) hasCompactionPart
-      "packages/omo-opencode/src/shared/compaction-marker.ts": ["hasCompactionPart"],
       // pre-existing at origin dev 4686e425b5: unused export(s) createConnectedProvidersCacheStore, findProviderModelMetadata
       "packages/omo-opencode/src/shared/connected-providers-cache.ts": ["createConnectedProvidersCacheStore", "findProviderModelMetadata"],
       // pre-existing at origin dev 4686e425b5: unused export(s) containsPath
@@ -1884,35 +1878,37 @@
       // pre-existing at origin dev 4686e425b5: unused export(s) parseTarListingOutput
       "packages/utils/src/zip-entry-listing/tar-zip-entry-listing.ts": ["parseTarListingOutput"],
       // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
-      "packages/web/app/[locale]/[...rest]/page.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/[...rest]/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/docs/[slug]/page.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/docs/[slug]/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/docs/install/page.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/docs/install/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/docs/layout.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/docs/layout.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/docs/page.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/docs/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/download/page.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/download/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/layout.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/layout.tsx": ["default"],
+      // the home page has its own root layout (omo.dev renewal draft)
+      "packages/web/app/[locale]/(home)/layout.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/manifesto/2026-01/layout.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/manifesto/2026-01/layout.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/manifesto/2026-01/page.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/manifesto/2026-01/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/manifesto/layout.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/manifesto/layout.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/manifesto/page.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/manifesto/page.tsx": ["default"],
       // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
-      "packages/web/app/[locale]/not-found.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/not-found.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/page.tsx": ["default"],
+      "packages/web/app/[locale]/(home)/page.tsx": ["default"],
+      // re-exported as the home page's generateMetadata (app/[locale]/(home)/page.tsx), which knip does not follow
+      "packages/web/components/home/home-page.tsx": ["generateHomeMetadata"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/support/page.tsx": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) generateLandingMetadata
-      "packages/web/app/_components/landing-page.tsx": ["generateLandingMetadata"],
+      "packages/web/app/[locale]/(site)/support/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GET
       "packages/web/app/api/downloads/route.ts": ["GET"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GET
@@ -1940,16 +1936,12 @@
       "packages/web/app/twitter-image.tsx": ["default", "alt", "size", "contentType"],
       // pre-existing at origin dev 4686e425b5: unused export(s) findHashSectionId
       "packages/web/components/docs/use-docs-navigation.ts": ["findHashSectionId"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) STAGE_STATES
-      "packages/web/components/landing/crafted/stage-states.ts": ["STAGE_STATES"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ROW_GAP, WAVE_HEADER_HEIGHT
       "packages/web/components/landing/dag/layout.ts": ["ROW_GAP", "WAVE_HEADER_HEIGHT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) eventIndexAt
       "packages/web/components/landing/dag/scenario.ts": ["eventIndexAt"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/web/components/landing/graph/graph-hero.tsx": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) TerminalTypewriter
-      "packages/web/components/landing/motion-wrappers.tsx": ["TerminalTypewriter"],
       // pre-existing at origin dev 4686e425b5: unused export(s) KIBITZER_STEP_COUNT
       "packages/web/components/landing/story-data.ts": ["KIBITZER_STEP_COUNT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) LEGACY_MANIFESTO_PATH
@@ -3908,6 +3900,8 @@
         "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "bin/senpi-patch.mjs",
+        // the engine entry the npm launcher spawns by path for a launch that claims memory sync at boot (launcher.js)
+        "bin/lib/engine-boot.js",
         // the manual GUI-session QA runner for the keychain helper: a person runs it by path in a dedicated QA login session
         "keychain-helper/gui-session-runner.ts",
         "keychain-helper/build.ts",

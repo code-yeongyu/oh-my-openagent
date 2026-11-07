@@ -119,7 +119,7 @@ describe("onboarding session history in the background", () => {
 
     const { ms, content } = await timedPrompt(h)
 
-    expect(content).toContain("onboarding/SKILL.md")
+    expect(content).toContain("built-in `onboarding` skill")
     expect(ms).toBeLessThan(FIRST_PROMPT_BUDGET_MS)
   }, WAIT_MS)
 
@@ -157,7 +157,7 @@ describe("onboarding session history in the background", () => {
 
     const { ms, content } = await timedPrompt(h)
 
-    expect(content).toContain("onboarding/SKILL.md")
+    expect(content).toContain("built-in `onboarding` skill")
     expect(ms).toBeLessThan(FIRST_PROMPT_BUDGET_MS)
     expect(scans).toBe(1)
     expect(h.pi.messages).toEqual([])
@@ -172,7 +172,7 @@ describe("onboarding session history in the background", () => {
     await h.start()
 
     const { content } = await timedPrompt(h)
-    expect(content).toContain("onboarding/SKILL.md")
+    expect(content).toContain("built-in `onboarding` skill")
     await failure?.catch(() => undefined)
     await new Promise((resolve) => setImmediate(resolve))
 

@@ -1,14 +1,21 @@
 import { describe, expect, test } from "bun:test"
-import { LocalApiError, type CommandResult, type DeviceService, type RemoteAttach } from "@oh-my-opencode/device-service-core"
+import { connectDeviceService, LocalApiError, type CommandResult, type DeviceService, type RemoteAttach } from "@oh-my-opencode/device-service-core"
+import type { ThreadReadInput } from "../contracts"
 import { createDeviceServiceSessions } from "./device-service"
 import { createLazyRemoteSurface } from "./lazy-remote"
-import { openRemote } from "./remote-ops"
+import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
+import { setModelRemote } from "./remote-controls"
+import { closeRemote, interruptRemote, openRemote, promptRemote, readRemote } from "./remote-ops"
+
+// An attach whose session stream stays silent: no record, frame or channel loss ever arrives.
+const quietStream = { onEvent: () => () => {}, onFrame: () => () => {}, onChannelLoss: () => () => {} }
 
 function fakeService(results: CommandResult[], sent: unknown[]): DeviceService {
   const attach = {
     command: async (rpc: unknown) => { sent.push(rpc); const next = results.shift(); if (next === undefined) throw new Error("no scripted result"); return next },
     read: async () => ({ entries: [{ entry_id: "e1", entry: { role: "user", content: "hi" } }, { entry_id: "e2", too_large: true, bytes: 9 }], next_before: null }),
     detached: new Promise(() => {}),
+    ...quietStream,
   } as unknown as RemoteAttach
   return {
     status: async () => ({ state: "connected" }),
@@ -95,7 +102,7 @@ describe("device-service adapter: a session created on another device is address
         attached.push(sessionId)
         // The listing has the new key only after its next change: the first attach of the key is refused.
         if (sessionId !== KEY || !listed) { listed = sessionId === KEY; throw new LocalApiError("session_not_found", "no such session in that device's listing") }
-        return { command: async (rpc: Record<string, unknown>) => state({ state: "engine_applied" }, { type: "response", command: rpc["type"], success: true, data: { isStreaming: false, sessionId: ENGINE_ID } }), read: async () => ({ entries: [], next_before: null }), detached: new Promise(() => {}) } as unknown as RemoteAttach
+        return { command: async (rpc: Record<string, unknown>) => state({ state: "engine_applied" }, { type: "response", command: rpc["type"], success: true, data: { isStreaming: false, sessionId: ENGINE_ID } }), read: async () => ({ entries: [], next_before: null }), detached: new Promise(() => {}), ...quietStream } as unknown as RemoteAttach
       },
     } as unknown as DeviceService
     const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => service, retryDelay: async () => {} })
@@ -105,6 +112,184 @@ describe("device-service adapter: a session created on another device is address
     const status = await port.sessionCommand("b", created.thread.thread_id, { type: "get_state", sessionId: created.thread.thread_id })
     expect(status.kind).toBe("ok")
     expect(attached.every((id) => id === KEY)).toBe(true)
+  })
+
+  test("#given the create reply names the session's listing key #when the session is created #then no session.locate is sent and the thread is that key", async () => {
+    const located: string[] = []
+    const service = {
+      ...fakeService([], []),
+      devices: async () => [{ device: "b", label: "studio", kind: "cli", platform: "linux", last_seen_ms: 1, online: true }],
+      endpointCommand: async () => state({ state: "engine_applied" }, { ...opened, session_key: KEY }),
+      locate: async (_device: string, engineId: string) => { located.push(engineId); throw new LocalApiError("session_not_found", "not expected") },
+    } as unknown as DeviceService
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => service, retryDelay: async () => {} })
+    const created = await openRemote({ sessions: port, chain: { stamp: (record) => record } }, { kind: "create", device: "b" })
+    if (created.kind !== "ok" || !("thread" in created)) throw new Error(`create failed: ${JSON.stringify(created)}`)
+    expect(created.thread.thread_id).toBe(KEY)
+    expect(located).toEqual([])
+  })
+})
+
+describe("device-service adapter: relay round trips per thread op", () => {
+  // The real device service SDK (connectDeviceService, openAttach, the delegated channel) over a scripted local API
+  // connection: every frame that leaves this device toward the relay is counted, so each op's round trips are measured.
+  const RELAY_FRAMES: ReadonlySet<string> = new Set(["session.attach", "session.command", "session.read", "session.locate", "session.endpoints", "sessions.list"])
+  const row: RemoteSessionRow = { device: "b", session_id: "s1", title: "t", project: "/p", path: "/p/s1.jsonl", state: "idle", updated_ms: 2 }
+
+  function relayWorld() {
+    const frames: string[] = []
+    const listeners = new Set<(event: JsonObject) => void>()
+    const emit = (event: JsonObject) => { for (const listener of [...listeners]) listener(event) }
+    const models: Array<{ provider: string; id: string }> = [{ provider: "a", id: "m1" }, { provider: "a", id: "m2" }]
+    const engine = { model: models[0], streaming: false }
+    // Runs before the command's reply when set: an event of the session that lands while the command is in flight.
+    let beforeReply: (() => void) | undefined
+    // How the next set_model ends instead of applying, and how catalog reads end after it (a channel that lost one reply).
+    let nextSet: { readonly state: "uncertain" | "engine_refused"; readonly reason: string; readonly catalogAfter?: string } | undefined
+    let catalogRefused: string | undefined
+    const data = (rpc: JsonObject): JsonObject => {
+      switch (rpc["type"]) {
+        case "get_state": return { isStreaming: engine.streaming, model: engine.model, pendingMessageCount: 0 }
+        case "get_messages": return { messages: [{ role: "user", content: [{ type: "text", text: "hi" }], timestamp: 1 }] }
+        case "get_available_models": return { models: models.map((model) => ({ ...model })) }
+        case "set_model": engine.model = models.find((model) => model.id === rpc["modelId"]) ?? engine.model; return { ...engine.model }
+        case "prompt": return { disposition: "started", turnId: "7" }
+        case "interrupt": return { interrupted: false }
+        case "unload_session": return { outcome: "unloaded" }
+        default: return {}
+      }
+    }
+    let close!: () => void
+    const closed = new Promise<void>((resolve) => { close = resolve })
+    const client = {
+      welcome: { type: "welcome", v: 1, service_version: "1.4.0", owner: "service", server_proof: "p", server_nonce: "n", capabilities: [], state: { state: "connected" } },
+      request: async (type: string) => {
+        frames.push(type)
+        if (type === "session.attach") return { attach: "a1" }
+        if (type === "status.get") return { state: "connected" }
+        if (type === "devices.list") return { devices: [{ device: "b", label: "studio", kind: "cli", platform: "linux", last_seen_ms: 1, online: true }] }
+        if (type === "session.detach") return {}
+        throw new Error(`unexpected request ${type}`)
+      },
+      onEvent: (listener: (event: JsonObject) => void) => { listeners.add(listener); return () => listeners.delete(listener) },
+      command: async (_attach: string, rpc: JsonObject, commandId: string) => {
+        frames.push("session.command")
+        const scripted = rpc["type"] === "set_model" ? nextSet : rpc["type"] === "get_available_models" && catalogRefused !== undefined ? { state: "engine_refused" as const, reason: catalogRefused } : undefined
+        if (rpc["type"] === "set_model") { nextSet = undefined; if (scripted !== undefined && "catalogAfter" in scripted) catalogRefused = scripted.catalogAfter }
+        const known = rpc["type"] !== "set_model" || models.some((model) => model.provider === rpc["provider"] && model.id === rpc["modelId"])
+        const response = known ? { type: "response", command: rpc["type"], success: true, data: data(rpc) } : { type: "response", command: "set_model", success: false, error: "Model not found" }
+        const before = beforeReply
+        beforeReply = undefined
+        queueMicrotask(() => {
+          before?.()
+          if (scripted !== undefined) return emit({ type: "event", kind: "session.command_state", command_id: commandId, state: scripted.state, reason: scripted.reason, retryable: false })
+          emit({ type: "event", kind: "session.command_event", device: "b", command_id: commandId, response })
+          emit({ type: "event", kind: "session.command_state", command_id: commandId, state: "engine_applied", retryable: false })
+        })
+        return commandId
+      },
+      read: async () => { frames.push("session.read"); return { entries: [], next_before: null } },
+      list: async () => { frames.push("sessions.list"); return { query_id: "q", revision: 1, rows: [], incomplete: [], devices: {} } },
+      endpointCommand: async () => { frames.push("session.command"); return "c" },
+      oversizedLines: () => 0,
+      close: () => close(),
+      closed,
+    }
+    // The host re-established the attach: a new snapshot replaces the session's state.
+    const snapshot = () => emit({ type: "event", kind: "session.snapshot", attach: "a1", attach_id: 2, cursor: { marker_id: "m", last_entry_id: null }, state: {}, entries: [], history_truncated: false, oldest_entry_id: null })
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: () => connectDeviceService({ version: "0.0.0-test", stateDir: "/unused", connect: async () => client as never }) })
+    const surface: RemoteThreadSurface = { sessions: port, chain: { stamp: (rpc) => rpc } }
+    let seen = 0
+    // The relay frames since the last call.
+    const take = (): string[] => { const sent = frames.slice(seen).filter((frame) => RELAY_FRAMES.has(frame)); seen = frames.length; return sent }
+    // The device's catalog changes after this device read it.
+    const removeModel = (id: string) => { models.splice(models.findIndex((model) => model.id === id), 1) }
+    const addModel = (model: { provider: string; id: string }) => { models.push(model) }
+    return { port, surface, take, snapshot, removeModel, addModel, setEnds: (end: NonNullable<typeof nextSet>) => { nextSet = end }, inFlight: (event: () => void) => { beforeReply = event } }
+  }
+
+  test("#given one remote session #when the thread ops run in turn #then the attach is opened once, status and the transcript are read from the device every time, an exact model in the held catalog is one set_model, and each command is one round trip", async () => {
+    const w = relayWorld()
+    const view = { thread: "s1" } as ThreadReadInput
+    const steps: Array<[string, () => Promise<unknown>]> = [
+      ["status (cold)", () => w.port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })],
+      ["status", () => w.port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })],
+      ["view (cold)", () => readRemote(w.surface, row, view)],
+      ["view", () => readRemote(w.surface, row, view)],
+      ["send", () => promptRemote(w.surface, row, { message: "x" }, 0)],
+      ["status after send", () => w.port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })],
+      ["model (cold catalog)", () => setModelRemote(w.surface, row, { model: "m2" })],
+      ["model (exact provider/id)", () => setModelRemote(w.surface, row, { model: "a/m1" })],
+      ["model (by id)", () => setModelRemote(w.surface, row, { model: "m2" })],
+      ["interrupt", () => interruptRemote(w.surface, row, undefined)],
+      ["close", () => closeRemote(w.surface, row)],
+    ]
+    const measured: Array<[string, string[]]> = []
+    for (const [op, run] of steps) {
+      await run()
+      measured.push([op, w.take()])
+    }
+    expect(measured).toEqual([
+      ["status (cold)", ["session.attach", "session.command"]],
+      ["status", ["session.command"]],
+      ["view (cold)", ["session.command"]],
+      ["view", ["session.command"]],
+      ["send", ["session.command"]],
+      ["status after send", ["session.command"]],
+      ["model (cold catalog)", ["session.command", "session.command"]],
+      ["model (exact provider/id)", ["session.command"]],
+      ["model (by id)", ["session.command", "session.command"]],
+      ["interrupt", ["session.command"]],
+      ["close", ["session.command"]],
+    ])
+  })
+
+  test("#given a held catalog #when the host re-establishes the attach, or does so while the catalog is being read #then the next exact model switch reads the catalog again", async () => {
+    const w = relayWorld()
+    await setModelRemote(w.surface, row, { model: "m2" })
+    w.snapshot()
+    w.take()
+    w.inFlight(w.snapshot)
+    await setModelRemote(w.surface, row, { model: "a/m1" })
+    expect(w.take()).toEqual(["session.command", "session.command"])
+    await setModelRemote(w.surface, row, { model: "a/m2" })
+    expect(w.take()).toEqual(["session.command", "session.command"])
+    await setModelRemote(w.surface, row, { model: "a/m1" })
+    expect(w.take()).toEqual(["session.command"])
+  })
+
+  test("#given a held catalog #when the exact set may have run (its reply lost) and the channel then refuses the catalog read #then the answer is idempotency_uncertain, as on dev, and nothing is re-read", async () => {
+    const w = relayWorld()
+    await setModelRemote(w.surface, row, { model: "m2" })
+    w.take()
+    w.setEnds({ state: "uncertain", reason: "request_gone", catalogAfter: "host_not_answering" })
+    const result = await setModelRemote(w.surface, row, { model: "a/m1" })
+    expect(result.kind === "error" ? result.error.code : result.kind).toBe("idempotency_uncertain")
+    expect(w.take()).toEqual(["session.command"])
+  })
+
+  test("#given a held catalog whose exact model the device replaced #when the set is refused and a fresh catalog matches another model by a later rung #then that model is set, as a fresh catalog would", async () => {
+    const w = relayWorld()
+    await setModelRemote(w.surface, row, { model: "m2" })
+    w.take()
+    w.removeModel("m1")
+    w.addModel({ provider: "x", id: "a/m1-v2" })
+    const result = await setModelRemote(w.surface, row, { model: "a/m1" })
+    expect(result.kind === "ok" && "model" in result ? result.model : result).toEqual({ provider: "x", id: "a/m1-v2" })
+    expect(w.take()).toEqual(["session.command", "session.command", "session.command"])
+  })
+
+  test.each([
+    ["a pattern the held catalog lacks", (_w: ReturnType<typeof relayWorld>) => {}, "zz", ["session.command"], "model_not_found"],
+    ["an exact provider/id the device dropped since the catalog was held", (w: ReturnType<typeof relayWorld>) => w.removeModel("m1"), "a/m1", ["session.command", "session.command"], "model_not_found"],
+  ] as const)("#given a held catalog and %s #when the model is set #then the answer is the one a fresh catalog gives", async (_label, change, model, frames, code) => {
+    const w = relayWorld()
+    await setModelRemote(w.surface, row, { model: "m2" })
+    w.take()
+    change(w)
+    const result = await setModelRemote(w.surface, row, { model })
+    expect(result.kind === "error" ? result.error.code : result.kind).toBe(code)
+    expect(w.take()).toEqual([...frames])
   })
 })
 
@@ -122,7 +307,7 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
         attach: async () => {
           calls.attach += 1
           if (attachFailure !== undefined) throw attachFailure
-          return { command: async () => { calls.sent += 1; return await commandAnswer() }, read: async () => ({ entries: [], next_before: null }), detached: new Promise<string>((resolve) => { detachAttach = () => resolve("detached") }) } as unknown as RemoteAttach
+          return { command: async () => { calls.sent += 1; return await commandAnswer() }, read: async () => ({ entries: [], next_before: null }), detached: new Promise<string>((resolve) => { detachAttach = () => resolve("detached") }), ...quietStream } as unknown as RemoteAttach
         },
         closed: new Promise<void>((resolve) => { closeService = resolve }),
       } as unknown as DeviceService

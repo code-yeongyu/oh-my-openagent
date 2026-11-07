@@ -11,6 +11,7 @@ import { LocalApiError } from "./local-api/errors.ts"
 import type { CommandRpc } from "./local-api/protocol.ts"
 import type { SessionCandidate } from "./local-api/protocol-delegated.ts"
 import { randomBytes } from "node:crypto"
+import { compareVersions } from "./release/version.ts"
 
 // A host sends no command state at all for a route it does not list toward a sender it does not grant (docs/local-api.md
 // "Delegated commands"), so the client bounds its own wait.
@@ -147,7 +148,20 @@ export type DeviceCredential = {
   readonly device: DeviceRef
   readonly signingPrivateKey: string
   readonly sealingPrivateKey: string
+  /** The account the sign-in belongs to; sent only to a service that accepts it (ADOPT_ACCOUNT_MIN_SERVICE_VERSION). */
+  readonly account?: string
 }
+
+/**
+ * relay-spec ADOPT_ACCOUNT_MIN_SERVICE_VERSION: the first relayd whose device.adopt accepts the optional `account`
+ * (omo-relay-daemon#730). 0.1.2 shipped without it, and every older relayd refuses any unknown field, so below 0.1.3
+ * device.adopt is sent exactly as before. Gated on welcome.service_version, never on a capability word (design D r9
+ * section 3).
+ */
+export const ADOPT_ACCOUNT_MIN_SERVICE_VERSION = "0.1.3"
+
+const acceptsAdoptAccount = (serviceVersion: string): boolean =>
+  compareVersions(serviceVersion, ADOPT_ACCOUNT_MIN_SERVICE_VERSION) >= 0
 
 export type ConnectDeviceServiceOptions = {
   /** The version of this omo build, reported to the service in its hello. */
@@ -190,9 +204,15 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     registerRefresher: async (binaryPath, version) => {
       await client.request("refresher.register", { binary_path: binaryPath, version })
     },
-    adopt: async ({ device, signingPrivateKey, sealingPrivateKey }) =>
-      (await client.request("device.adopt", { device, signing_private_key: signingPrivateKey, sealing_private_key: sealingPrivateKey }))
-        .device,
+    adopt: async ({ device, signingPrivateKey, sealingPrivateKey, account }) =>
+      (
+        await client.request("device.adopt", {
+          device,
+          signing_private_key: signingPrivateKey,
+          sealing_private_key: sealingPrivateKey,
+          ...(account !== undefined && acceptsAdoptAccount(client.welcome.service_version) ? { account } : {}),
+        })
+      ).device,
     registerEndpoints: async agentDir => {
       await client.request("endpoints.register", { agent_dir: agentDir })
     },
