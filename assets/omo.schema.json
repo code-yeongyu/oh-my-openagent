@@ -2095,7 +2095,8 @@
             "abandoned_journal_days": 14,
             "completions_days": 30,
             "pass_budget_ms": 60000,
-            "discard_unreflected_journals": false
+            "discard_unreflected_journals": false,
+            "max_bytes": 2147483648
           },
           "type": "object",
           "properties": {
@@ -2126,6 +2127,12 @@
             "discard_unreflected_journals": {
               "default": false,
               "type": "boolean"
+            },
+            "max_bytes": {
+              "default": 2147483648,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
             }
           },
           "additionalProperties": false
@@ -2444,6 +2451,11 @@
                   },
                   "discard_unreflected_journals": {
                     "type": "boolean"
+                  },
+                  "max_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
                   }
                 },
                 "additionalProperties": false
@@ -4588,6 +4600,11 @@
                 },
                 "discard_unreflected_journals": {
                   "type": "boolean"
+                },
+                "max_bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
                 }
               },
               "additionalProperties": false
@@ -4904,6 +4921,11 @@
                       },
                       "discard_unreflected_journals": {
                         "type": "boolean"
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
                       }
                     },
                     "additionalProperties": false
@@ -7023,6 +7045,11 @@
                 },
                 "discard_unreflected_journals": {
                   "type": "boolean"
+                },
+                "max_bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
                 }
               },
               "additionalProperties": false
@@ -7339,6 +7366,11 @@
                       },
                       "discard_unreflected_journals": {
                         "type": "boolean"
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
                       }
                     },
                     "additionalProperties": false
@@ -9458,6 +9490,11 @@
                 },
                 "discard_unreflected_journals": {
                   "type": "boolean"
+                },
+                "max_bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
                 }
               },
               "additionalProperties": false
@@ -9774,6 +9811,11 @@
                       },
                       "discard_unreflected_journals": {
                         "type": "boolean"
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
                       }
                     },
                     "additionalProperties": false
@@ -11899,6 +11941,11 @@
                   },
                   "discard_unreflected_journals": {
                     "type": "boolean"
+                  },
+                  "max_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
                   }
                 },
                 "additionalProperties": false
@@ -12215,6 +12262,11 @@
                         },
                         "discard_unreflected_journals": {
                           "type": "boolean"
+                        },
+                        "max_bytes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
                         }
                       },
                       "additionalProperties": false
@@ -14334,6 +14386,11 @@
                       },
                       "discard_unreflected_journals": {
                         "type": "boolean"
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
                       }
                     },
                     "additionalProperties": false
@@ -14650,6 +14707,11 @@
                             },
                             "discard_unreflected_journals": {
                               "type": "boolean"
+                            },
+                            "max_bytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
                             }
                           },
                           "additionalProperties": false
@@ -16769,6 +16831,11 @@
                       },
                       "discard_unreflected_journals": {
                         "type": "boolean"
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
                       }
                     },
                     "additionalProperties": false
@@ -17085,6 +17152,11 @@
                             },
                             "discard_unreflected_journals": {
                               "type": "boolean"
+                            },
+                            "max_bytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
                             }
                           },
                           "additionalProperties": false
@@ -19204,6 +19276,11 @@
                       },
                       "discard_unreflected_journals": {
                         "type": "boolean"
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
                       }
                     },
                     "additionalProperties": false
@@ -19520,6 +19597,11 @@
                             },
                             "discard_unreflected_journals": {
                               "type": "boolean"
+                            },
+                            "max_bytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
                             }
                           },
                           "additionalProperties": false

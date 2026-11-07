@@ -21,7 +21,7 @@ export { planFactsMutation, FactsPlanParentDirtyError } from "@oh-my-opencode/me
 // Dream conversation loading and selection run only when a dream fires, so the entry bundle loads them from here.
 export { computeUnreflectedVolumeFast, loadConversations, selectLoadedConversations } from "../dream-selector"
 // The background maintenance pass runs runtime retention and the host sweep only when one is due, so the entry bundle loads them from here.
-export { runMaintenanceHostSweep, runMaintenanceRetention } from "../memory-retention-pass"
+export { retentionResumePending, runMaintenanceHostSweep, runMaintenanceRetention } from "../memory-retention-pass"
 // The stale reflection-lock reaper runs once per session on the first settled turn, on a stuck holder, and from
 // /doctor fix, so the entry bundle loads it from here.
 export { formatStaleLockFixLines, reclaimDeadOwnerLocks, runStaleLockReaper } from "@oh-my-opencode/memory-core"
