@@ -136,7 +136,8 @@ export async function openRemote(remote: RemoteThreadSurface, request: RemoteOpe
     : request.kind === "open"
       ? { type: "open_session", retain_on_disconnect: true, sessionPath: request.row.path }
       : { type: "open_session", retain_on_disconnect: true, forkFrom: request.row.session_id, ...(request.cwd === undefined ? {} : { cwd: request.cwd }) }
-  const outcome = await remote.sessions.endpointCommand(device, { ...opened, ...skills })
+  // A create or fork asks for its new session's listing key on the reply (decision 0018 amendment 2026-11-06).
+  const outcome = await remote.sessions.endpointCommand(device, { ...opened, ...skills }, request.kind === "open" ? undefined : { locate: true })
   if (outcome.kind !== "ok") return outcomeFailure(outcome, device)
   // An opened row is already addressed by its listing id; a created or forked session is located by its engine id.
   let threadId: string
@@ -144,8 +145,8 @@ export async function openRemote(remote: RemoteThreadSurface, request: RemoteOpe
   else {
     const engineId = openedEngineId(outcome.response)
     if (engineId === undefined) return fail("internal_error", `Device ${device} opened a session but did not name it.`, "Call thread_list with all_scope to find the new thread.", { device })
-    // A host that names the session's listing key beside the engine's reply (`session_key`) spares the locate.
-    const located = await remote.sessions.locate(device, engineId, nonEmpty(outcome.response["session_key"]))
+    // A host that names the session's listing key on the reply (`located`) spares the locate; an older one does not.
+    const located = await remote.sessions.locate(device, engineId, outcome.located)
     if (located.kind !== "ok") return fail("unsupported", `Device ${device} created a session but its id there could not be found (${located.reason}).`, "Call thread_list with all_scope to find the new thread, or update omo on that device.", { device, reason: located.reason })
     threadId = located.sessionId
   }
