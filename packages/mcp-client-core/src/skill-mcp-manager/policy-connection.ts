@@ -11,8 +11,9 @@ export class McpEnvironmentPolicyChangedError extends Error {
 
 export async function connectWithPolicySignal(
   client: McpClient, transport: McpTransport, signal?: AbortSignal,
+  waitForConnection: (connection: Promise<void>) => Promise<void> = (connection) => connection,
 ): Promise<void> {
-  if (!signal) return client.connect(transport)
+  if (!signal) return waitForConnection(client.connect(transport))
   if (signal.aborted) throw new McpEnvironmentPolicyChangedError()
   const aborted = Promise.withResolvers<never>()
   const onAbort = () => {
@@ -25,7 +26,7 @@ export async function connectWithPolicySignal(
   }
   signal.addEventListener("abort", onAbort, { once: true })
   try {
-    await Promise.race([client.connect(transport), aborted.promise])
+    await waitForConnection(Promise.race([client.connect(transport), aborted.promise]))
     if (signal.aborted) throw new McpEnvironmentPolicyChangedError()
   } finally {
     signal.removeEventListener("abort", onAbort)

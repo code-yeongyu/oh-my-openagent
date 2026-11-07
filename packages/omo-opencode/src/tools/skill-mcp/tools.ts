@@ -157,14 +157,21 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
 
       const parsedArgs = parseSkillMcpArguments(args.arguments)
 
+      const requestController = new AbortController()
+      const runWithRequestAbort = <T>(request: () => Promise<T>) => {
+        const forwardAbort = () => requestController.abort(toolContext.abort.reason)
+        if (toolContext.abort.aborted) forwardAbort()
+        else toolContext.abort.addEventListener("abort", forwardAbort, { once: true })
+        return request().finally(() => toolContext.abort.removeEventListener("abort", forwardAbort))
+      }
       let output: string
       const cdpOptions = args.cdp_url
-        ? { cdpUrl: args.cdp_url, signal: toolContext.abort }
-        : { signal: toolContext.abort }
+        ? { cdpUrl: args.cdp_url, signal: requestController.signal }
+        : { signal: requestController.signal }
 
       switch (operation.type) {
         case "tool": {
-          const result = await manager.callTool(info, context, operation.name, parsedArgs, cdpOptions)
+          const result = await runWithRequestAbort(() => manager.callTool(info, context, operation.name, parsedArgs, cdpOptions))
           if (result.isError === true) {
             throw new Error(`MCP tool "${operation.name}" failed: ${JSON.stringify(result, null, 2)}`)
           }
@@ -172,7 +179,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
           break
         }
         case "resource": {
-          const result = await manager.readResource(info, context, operation.name, cdpOptions)
+          const result = await runWithRequestAbort(() => manager.readResource(info, context, operation.name, cdpOptions))
           output = JSON.stringify(result, null, 2)
           break
         }
@@ -181,7 +188,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
           for (const [key, value] of Object.entries(parsedArgs)) {
             stringArgs[key] = String(value)
           }
-          const result = await manager.getPrompt(info, context, operation.name, stringArgs, cdpOptions)
+          const result = await runWithRequestAbort(() => manager.getPrompt(info, context, operation.name, stringArgs, cdpOptions))
           output = JSON.stringify(result, null, 2)
           break
         }
