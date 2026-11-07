@@ -12,7 +12,7 @@ const RUN_ID_MARK_FILE = "run-id.json"
 
 export type RunIdHighWaterPaths = Pick<MemoryIdentityPaths, "reflection" | "reflectionSessions" | "worktrees">
 
-function reflectionRunNumber(name: string): number {
+export function reflectionRunNumber(name: string): number {
   const digits = RUN_ID_NAME.exec(name)?.[1]
   if (digits === undefined) return 0
   const parsed = Number.parseInt(digits, 10)

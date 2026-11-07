@@ -6,7 +6,18 @@
  * instead of a copy of the file lookup, the parse or the precedence.
  */
 
-import { loadOmoConfig, mergeOmoConfigRecords, resolveOmoConfigView, type OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
+import { existsSync, readFileSync } from "node:fs"
+import { join } from "node:path"
+
+import {
+  loadOmoConfig,
+  mergeOmoConfigRecords,
+  OmoMemorySettingsSchema,
+  resolveOmoConfigView,
+  resolveUserOmoConfigDirectory,
+  type OmoConfigEnv,
+  type OmoMemorySettings,
+} from "@oh-my-opencode/omo-config-core"
 
 /** The `task.*` keys `omo daemon` reads. Each is present only when a loaded layer sets it, so the caller can
  * tell "configured" from the schema default. */
@@ -17,6 +28,29 @@ export type DaemonTaskSettings = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+/** The memory settings `omo doctor --fix` applies to every identity on the host. */
+type GlobalMemorySettings = Pick<OmoMemorySettings, "runtime" | "agents">
+
+/**
+ * `memory.runtime` and `memory.agents` of the user's GLOBAL omo config only, resolved by the loader the
+ * session uses (harness "senpi": the legacy `[senpi]` block, then `[native]`, then the active profile, each
+ * merged key by key down to every agent's runtime field). `--fix` sweeps identities of every project, so the
+ * loader sees no project layer. Undefined when no global file loaded (absent or unreadable).
+ */
+export function resolveGlobalMemorySettings(input: { readonly env: OmoConfigEnv }): GlobalMemorySettings | undefined {
+  const directory = resolveUserOmoConfigDirectory(input.env)
+  const userFiles = new Set([join(directory, "omo.jsonc"), join(directory, "omo.json")])
+  const loaded = loadOmoConfig({
+    cwd: directory,
+    env: input.env,
+    harness: "senpi",
+    fileSystem: { existsSync: (path) => userFiles.has(path) && existsSync(path), readFileSync: (path, encoding) => readFileSync(path, encoding) },
+  })
+  if (!loaded.sources.some((source) => source.loaded)) return undefined
+  const memory = loaded.config.memory ?? OmoMemorySettingsSchema.parse({})
+  return { runtime: memory.runtime, agents: memory.agents }
 }
 
 export function resolveDaemonTaskSettings(input: { readonly cwd: string; readonly env: OmoConfigEnv }): DaemonTaskSettings {

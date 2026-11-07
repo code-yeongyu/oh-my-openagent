@@ -14,4 +14,6 @@ export {
 /** @public */
 export { sweepHostIdentities } from "./host-sweep"
 /** @public */
+export { createRetentionHostSweepStep } from "../retention/host-step"
+/** @public */
 export { sweepIdentityOrphanWorktrees } from "./identity-orphan-sweep"
