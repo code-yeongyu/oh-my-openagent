@@ -25,6 +25,8 @@ export interface Todo {
 export interface SessionState {
   countdownTimer?: ReturnType<typeof setTimeout>
   countdownInterval?: ReturnType<typeof setInterval>
+  gateRetryTimer?: ReturnType<typeof setTimeout>
+  gateRetryCount?: number
   isRecovering?: boolean
   wasCancelled?: boolean
   tokenLimitDetected?: boolean
