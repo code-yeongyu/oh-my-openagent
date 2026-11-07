@@ -39,6 +39,7 @@ impl Worker {
             if keys.is_empty() {
                 return Err(DesktopError::invalid_key("held keys must not be empty"));
             }
+            worker.refuse_dangerous_chord(&keys, false, HOLD_REMEDY)?;
             let mode = ParsedPointerOptions::parse(params.opts.as_ref())?.mode;
             if matches!(target, Target::Window(_)) {
                 worker.window(&target)?;
@@ -85,6 +86,7 @@ impl Worker {
                 Some([]) => Vec::new(),
                 Some(keys) => parse_keys(keys)?,
             };
+            worker.refuse_dangerous_chord(&keys, false, HOLD_REMEDY)?;
             let button = MouseButton::parse(params.button.as_deref())?;
             let mode = ParsedPointerOptions::parse(params.opts.as_ref())?.mode;
             let (frame, current) = worker.frame_for(&target, params.frame_id.as_deref())?;
@@ -111,6 +113,10 @@ impl Worker {
         })
     }
 }
+
+/// Holds take no `force`: an object-mode session never holds a dangerous
+/// chord (DESIGN 2 A13), and the refusal points to the request that can send it.
+const HOLD_REMEDY: &str = "a hold never sends it; send it with keyChord and force: true";
 
 fn hold_duration(seconds: f64) -> CoreResult<Duration> {
     if !seconds.is_finite() || !(0.0..=100.0).contains(&seconds) {

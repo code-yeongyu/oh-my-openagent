@@ -6,22 +6,22 @@
 use std::cell::Cell;
 
 use senpi_desktop_core::ax::{AxHandle, AxOwner};
-use senpi_desktop_core::methods::Method;
-use senpi_desktop_core::report::NextCall;
-use serde_json::{Map, Value};
 use senpi_desktop_core::backend::PointerEvent;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::frame::FrameGeometry;
+use senpi_desktop_core::methods::Method;
 use senpi_desktop_core::protocol_params::AxClickParams;
+use senpi_desktop_core::report::NextCall;
 use senpi_desktop_core::types::{DesktopWindow, Target};
 use senpi_desktop_safety::MutatingAction;
+use serde_json::{Map, Value};
 
 use crate::mutate::Mutation;
 use crate::pointer::ParsedPointerOptions;
-use crate::timings::TimedStage;
-use crate::worker_input::with_next_call;
 use crate::request::Response;
+use crate::timings::TimedStage;
 use crate::worker::{Audited, Worker};
+use crate::worker_input::with_next_call;
 
 impl Worker {
     /// Clicks the centre of the element's bounds in the window that owns it.
