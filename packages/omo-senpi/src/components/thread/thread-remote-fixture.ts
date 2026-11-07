@@ -11,7 +11,7 @@ import type { ThreadCloseOutcome } from "./tools/ports"
 
 export const B_ROW: RemoteSessionRow = { device: "b", session_id: "dur-on-b", title: "on b", project: "/work/b", path: "/home/b/.omo/agent/sessions/dur-on-b.jsonl", state: "idle", updated_ms: 1_700_000_000_000 }
 
-type Sent = { readonly via: "endpoint" | "session" | "read"; readonly device: string; readonly session?: string; readonly rpc?: JsonObject }
+type Sent = { readonly via: "endpoint" | "session" | "read" | "watch"; readonly device: string; readonly session?: string; readonly rpc?: JsonObject }
 
 type Engine = { readonly messages: readonly ThreadTranscriptEntry[]; readonly interrupt: JsonObject; readonly streaming: boolean; readonly pending: number; readonly currentTurnId?: string }
 
@@ -30,9 +30,12 @@ export function createRemoteThreadFixture() {
     for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
   }
 
-  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[] } = {}) {
+  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[] } = {}) {
     const engine = options.engine ?? ENGINE
     const sent: Sent[] = []
+    // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
+    const watchers = new Set<(record: JsonObject) => void>()
+    const writeRecords = () => queueMicrotask(() => { for (const record of options.records ?? []) for (const listener of [...watchers]) listener(record) })
     const hops: number[] = []
     const aliases = options.aliases ?? new Map<string, AliasHolder>()
     // The sessions b's engine holds. Its close rules are senpi's (2026.11.5-1): close_session from a connection that never
@@ -103,7 +106,18 @@ export function createRemoteThreadFixture() {
         endpointCommand: async (device, rpc) => { sent.push({ via: "endpoint", device, rpc }); return answer(rpc) },
         // This fake device lists a created session by the id its create reply names.
         locate: async (_device, engineId) => ({ kind: "ok", sessionId: engineId }),
-        sessionCommand: async (device, session, rpc) => { sent.push({ via: "session", device, session, rpc }); return answer(rpc, session) },
+        sessionCommand: async (device, session, rpc) => {
+          sent.push({ via: "session", device, session, rpc })
+          const outcome = answer(rpc, session)
+          if (rpc["type"] === "prompt" && outcome.kind === "ok") writeRecords()
+          return outcome
+        },
+        watch: async (device, session, listener) => {
+          sent.push({ via: "watch", device, session })
+          if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
+          watchers.add(listener)
+          return { kind: "ok", watch: { ended: new Promise<string>(() => {}), stop: () => { watchers.delete(listener) } } }
+        },
         read: async (device, session) => { sent.push({ via: "read", device, session }); return { kind: "ok", response: { entries: [{ role: "user", content: "hi b" }, { role: "assistant", content: "hello from b" }] } } },
       },
       ...(options.noRegistry === true ? {} : { aliases: registry }),

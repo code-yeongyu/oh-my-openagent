@@ -48,6 +48,7 @@ function remoteDependencies(): RemoteVerbDependencies {
     connect: () => connectDeviceService({ version: packageJson.version, stateDir }),
     now: () => Date.now(),
     output: line => process.stdout.write(`${line}\n`),
+    write: text => process.stdout.write(text),
     error: line => process.stderr.write(`${line}\n`),
     bootstrap: deviceServiceBootstrapSetup({
       stateDir,
