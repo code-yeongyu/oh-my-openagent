@@ -1,3 +1,4 @@
+import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import { DEFAULT_CATEGORIES, resolveCategory, type SenpiModelPort, type SenpiModelRegistryPort } from "../category"
@@ -17,6 +18,18 @@ export type AgentCategorySelection = {
   readonly requested_model?: ResolvedModelRecord
   readonly fallback_models?: readonly ResolvedModelRecord[]
 }
+
+// A category the agent resolves through whose whole chain this machine cannot serve: the chain and the
+// providers it has not connected, so a category-only agent's refusal can name them (#12647).
+export type AgentCategoryRefusal = {
+  readonly category: string
+  readonly attempted_chain: readonly DelegateFallbackEntry[]
+  readonly missing_providers: readonly string[]
+}
+
+export type AgentCategoryOutcome =
+  | { readonly kind: "selected"; readonly selection: AgentCategorySelection }
+  | { readonly kind: "refused"; readonly refusals: readonly AgentCategoryRefusal[] }
 
 export type ResolveAgentCategoryInput<TModel extends SenpiModelPort> = {
   readonly categories: readonly string[]
@@ -77,27 +90,42 @@ export function firstCategoryDefaultModel(
 // runtime retry chain, so "deep -> unspecified-high" is both a resolve-time and a runtime fallback.
 export function resolveAgentCategoryModel<TModel extends SenpiModelPort>(
   input: ResolveAgentCategoryInput<TModel>,
-): AgentCategorySelection | undefined {
-  const resolutions = input.categories
+): AgentCategoryOutcome {
+  const all = input.categories
     .map((name) => resolveCategory(name, input.omoConfig, input.registry, { distributeModels: input.distributeModels }))
-    .filter((resolution) => resolution.kind === "resolved")
+  const resolutions = all.filter((resolution) => resolution.kind === "resolved")
   const winner = resolutions[0]
-  if (winner === undefined) return findOnlyCategoryModel(input)
+  if (winner === undefined) {
+    const selection = findOnlyCategoryModel(input)
+    if (selection !== undefined) return { kind: "selected", selection }
+    const refusals = all.flatMap((resolution) =>
+      resolution.kind === "model_unavailable" && resolution.attempted_chain !== undefined
+        ? [{
+            category: resolution.category,
+            attempted_chain: resolution.attempted_chain,
+            missing_providers: resolution.missing_providers ?? [],
+          }]
+        : [])
+    return { kind: "refused", refusals }
+  }
 
   const { spec } = winner
   const categoryReasoning = spec.reasoning ?? spec.reasoningEffort ?? spec.variant
   const chain = agentModelChain(resolutions.map((resolution) => resolution.spec))
 
   return {
-    provider: spec.provider,
-    modelId: spec.modelId,
-    ...(input.configuredTuning.variant !== undefined
-      ? { variant: input.configuredTuning.variant }
-      : categoryReasoning !== undefined ? { variant: categoryReasoning } : {}),
-    ...(input.configuredTuning.reasoningEffort !== undefined
-      ? { reasoningEffort: input.configuredTuning.reasoningEffort }
-      : {}),
-    ...chain,
+    kind: "selected",
+    selection: {
+      provider: spec.provider,
+      modelId: spec.modelId,
+      ...(input.configuredTuning.variant !== undefined
+        ? { variant: input.configuredTuning.variant }
+        : categoryReasoning !== undefined ? { variant: categoryReasoning } : {}),
+      ...(input.configuredTuning.reasoningEffort !== undefined
+        ? { reasoningEffort: input.configuredTuning.reasoningEffort }
+        : {}),
+      ...chain,
+    },
   }
 }
 
