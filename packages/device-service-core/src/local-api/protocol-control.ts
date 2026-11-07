@@ -8,3 +8,8 @@ export type ControlAttachSet = {
 };
 /** changedAt is the RFC 3339 UTC time of the last set, or "" when the device never stored one (attached). */
 export type ControlAttachState = { readonly attached: boolean; readonly changedAt: string };
+// relay daemon #774: the optional session.attach fields. `seqs: true` keeps `seqs` on this attach's session.records
+// whatever the client's version; `resume` (implies seqs) names the last record the client applied, so a replay of that
+// attach_id sends only the records after it.
+export type AttachResume = { readonly attach_id: number; readonly seq: number };
+export type AttachFeatures = { readonly seqs?: true; readonly resume?: AttachResume };
