@@ -277,7 +277,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
       ["status", ["session.command"]],
       ["view (cold)", ["session.command"]],
       ["view", ["session.command"]],
-      ["send", ["session.command", "session.command"]],
+      ["send", ["session.command"]],
       ["status after send", ["session.command"]],
       ["model (cold catalog)", ["session.command", "session.command"]],
       ["model (exact provider/id)", ["session.command"]],
