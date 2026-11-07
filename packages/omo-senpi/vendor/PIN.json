@@ -57,14 +57,14 @@
 		"bunshin-ts-relay": {
 			"name": "@sisyphuslabs/bunshin-ts-relay",
 			"version": "0.1.0",
-			"commit": "29c62ae6d3daa018dfae777a41d57861f4b09d6c",
+			"commit": "a7f5943c2e9ad0020db74432efc9945f5ac3bf00",
 			"packageDir": "packages/bunshin-ts-relay",
 			"dependencies": {},
 			"files": {
 				"LICENSE": "80ecedb83344fb3d85c0ae989eb902181f033ac491e1eb5dacb2bebb7fc2816e",
-				"README.md": "80c0e85a0d3e548b0e1dc866d254510b0a4052b608ee8274da37a586b79a6c0d",
+				"README.md": "2c5d5c6c03d22a966f3d6b57148a1cd4bde574deeed680882709d22cbd66a89a",
 				"index.d.ts": "b96ae1ccdd1a975c26cc7c540d278e33268a2775f6905c3694d8d8e241005b6d",
-				"index.js": "8296685a1eda84090e1ec36edf3039ec7b0e6b6cd462382fb28731f99eadd861",
+				"index.js": "94cb6cc43317fd6e78448c5b12b87106116067ab162aaa71be9c6f76941278c8",
 				"types/src/errors.d.ts": "4823d1ce3a8c2cf5dbf35e64a71a7ce624de43cf2c3a34a76901d15b9b4a6987",
 				"types/src/index.d.ts": "4b48df4632d6288cb060697482a3896d7e1816dd92e81e7ce62e7d9684fc0367",
 				"types/src/transport.d.ts": "1c4ac9a2f79ce92e52830176b8f2bd24abd933e404097d7dfc1898957a98a77b",
