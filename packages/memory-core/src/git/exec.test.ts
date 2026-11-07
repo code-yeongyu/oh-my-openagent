@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { join } from "node:path"
 
 import { GitNotFoundError, GitTimeoutError } from "./errors"
 import {
@@ -15,6 +16,10 @@ const SUCCESS: GitExecResult = {
   stderr: "",
 }
 
+const PATH_GIT = "C:\\Git\\cmd\\git.exe"
+const PROGRAM_FILES_GIT = "C:\\Program Files\\Git\\cmd\\git.exe"
+const SECOND_ROOT_GIT = "D:\\Program Files\\Git\\cmd\\git.exe"
+
 function spawnError(code: string): NodeJS.ErrnoException {
   return Object.assign(new Error(`spawn failed: ${code}`), { code })
 }
@@ -23,273 +28,219 @@ function missingGitError(): GitNotFoundError {
   return new GitNotFoundError({ cause: spawnError("ENOENT") })
 }
 
-function execOptions(environment: NodeJS.ProcessEnv) {
+function execOptions(environment: NodeJS.ProcessEnv, cwd = process.cwd()) {
+  return { cwd, timeoutMs: 5000, env: { PATH: "C:\\Windows\\System32", ...environment } }
+}
+
+function files(...present: string[]) {
+  const set = new Set(present)
+  const probed: string[] = []
   return {
-    cwd: process.cwd(),
-    timeoutMs: 5000,
-    env: {
-      PATH: "/nonexistent",
-      ...environment,
+    set,
+    probed,
+    isFile: (path: string) => {
+      probed.push(path)
+      return set.has(path)
     },
   }
 }
 
-function createHermeticExec(runCommand: CommandRunner, platform: NodeJS.Platform = "win32") {
-  return createNodeGitExec({ platform, runCommand })
+function createHermeticExec(runCommand: CommandRunner, isFile: (path: string) => boolean, platform: NodeJS.Platform = "win32") {
+  return createNodeGitExec({ platform, runCommand, isFile })
 }
 
-describe("createNodeGitExec", () => {
-  test("#given Git resolves on PATH #when Windows roots exist #then bare Git keeps precedence", async () => {
+describe("createNodeGitExec on win32", () => {
+  test("#given git on PATH and under Program Files #when git runs #then the runner receives the absolute PATH git", async () => {
+    const attempts: string[] = []
+    const fs = files(PATH_GIT, PROGRAM_FILES_GIT)
+    const exec = createHermeticExec(async (executable) => {
+      attempts.push(executable)
+      return SUCCESS
+    }, fs.isFile)
+
+    const result = await exec.run(["--version"], execOptions({ PATH: "C:\\Git\\cmd", ProgramFiles: "C:\\Program Files" }))
+
+    expect(result).toBe(SUCCESS)
+    expect(attempts).toEqual([PATH_GIT])
+  })
+
+  test("#given git resolved from an install root #when git runs #then the absolute spawn carries the fsmonitor override ahead of the caller argv", async () => {
+    const argvs: Array<readonly string[]> = []
+    const exec = createHermeticExec(async (_executable, argv) => {
+      argvs.push(argv)
+      return SUCCESS
+    }, files(PROGRAM_FILES_GIT).isFile)
+
+    await exec.run(["-c", "user.name=fixture-writer", "status", "--porcelain"], execOptions({ ProgramFiles: "C:\\Program Files" }))
+
+    expect(argvs).toEqual([["-c", "core.fsmonitor=false", "-c", "user.name=fixture-writer", "status", "--porcelain"]])
+  })
+
+  test("#given no git on PATH #when git runs #then the first existing install root is spawned by absolute path", async () => {
+    const attempts: string[] = []
+    const fs = files(SECOND_ROOT_GIT)
+    const exec = createHermeticExec(async (executable) => {
+      attempts.push(executable)
+      return SUCCESS
+    }, fs.isFile)
+
+    await exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files", ProgramW6432: "D:\\Program Files" }))
+
+    expect(attempts).toEqual([SECOND_ROOT_GIT])
+  })
+
+  test("#given no git anywhere and an existing cwd #when git runs #then GitNotFoundError carries an ENOENT cause and nothing is spawned", async () => {
     const attempts: string[] = []
     const exec = createHermeticExec(async (executable) => {
       attempts.push(executable)
       return SUCCESS
-    })
+    }, files().isFile)
 
-    const result = await exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files" }))
+    const failure = await exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files" })).catch((error: unknown) => error)
 
-    expect(result).toBe(SUCCESS)
-    expect(attempts).toEqual(["git"])
+    expect(failure).toBeInstanceOf(GitNotFoundError)
+    expect(failure).toMatchObject({ cause: { code: "ENOENT" } })
+    expect(attempts).toEqual([])
   })
 
-  test("#given a non-Windows platform and missing Git #when git runs #then Windows roots are not attempted", async () => {
+  test("#given no git anywhere and a missing cwd #when git runs #then it answers exit 128 like git itself", async () => {
+    const exec = createHermeticExec(async () => SUCCESS, files().isFile)
+
+    const result = await exec.run(["rev-parse", "HEAD"], execOptions({}, join(process.cwd(), `missing-${crypto.randomUUID()}`)))
+
+    expect(result.code).toBe(128)
+  })
+
+  test("#given the resolved git disappears #when its spawn reports ENOENT #then it is re-resolved once and the new location runs", async () => {
+    const attempts: string[] = []
+    const fs = files(PROGRAM_FILES_GIT, SECOND_ROOT_GIT)
+    const exec = createHermeticExec(async (executable) => {
+      attempts.push(executable)
+      if (executable === PROGRAM_FILES_GIT) {
+        fs.set.delete(PROGRAM_FILES_GIT)
+        throw missingGitError()
+      }
+      return SUCCESS
+    }, fs.isFile)
+
+    const result = await exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files", ProgramW6432: "D:\\Program Files" }))
+
+    expect(result).toBe(SUCCESS)
+    expect(attempts).toEqual([PROGRAM_FILES_GIT, SECOND_ROOT_GIT])
+  })
+
+  test("#given the resolved git reports ENOENT but still resolves to the same file #when git runs #then the error propagates after one attempt", async () => {
     const original = missingGitError()
     const attempts: string[] = []
     const exec = createHermeticExec(async (executable) => {
       attempts.push(executable)
       throw original
-    }, "linux")
+    }, files(PATH_GIT).isFile)
 
-    await expect(
-      exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files" })),
-    ).rejects.toBe(original)
-    expect(attempts).toEqual(["git"])
+    await expect(exec.run(["--version"], execOptions({ PATH: "C:\\Git\\cmd" }))).rejects.toBe(original)
+    expect(attempts).toEqual([PATH_GIT])
   })
 
-  for (const code of ["EACCES", "EPERM", "EIO"] as const) {
-    test(`#given bare Git reports GitNotFoundError caused by ${code} #when Windows roots exist #then the error propagates without fallback`, async () => {
-      const failure = new GitNotFoundError({ cause: spawnError(code) })
+  const propagated: ReadonlyArray<readonly [string, () => unknown]> = [
+    ["GitNotFoundError caused by EACCES", () => new GitNotFoundError({ cause: spawnError("EACCES") })],
+    ["GitNotFoundError caused by EPERM", () => new GitNotFoundError({ cause: spawnError("EPERM") })],
+    ["a raw EIO spawn error", () => spawnError("EIO")],
+    ["a timeout", () => new GitTimeoutError(["--version"], 5000)],
+  ]
+  for (const [label, makeFailure] of propagated) {
+    test(`#given the resolved git fails with ${label} #when git runs #then it propagates without re-resolving`, async () => {
+      const failure = makeFailure()
       const attempts: string[] = []
       const exec = createHermeticExec(async (executable) => {
         attempts.push(executable)
         throw failure
-      })
+      }, files(PROGRAM_FILES_GIT, SECOND_ROOT_GIT).isFile)
 
-      await expect(
-        exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files" })),
-      ).rejects.toBe(failure)
+      await expect(exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files", ProgramW6432: "D:\\Program Files" }))).rejects.toBe(failure)
+      expect(attempts).toEqual([PROGRAM_FILES_GIT])
+    })
+  }
+
+  test("#given a nonzero git result #when git runs #then it is returned as is", async () => {
+    const nonzero: GitExecResult = { code: 128, stdout: "", stderr: "fatal: command failed" }
+    const exec = createHermeticExec(async () => nonzero, files(PATH_GIT).isFile)
+
+    expect(await exec.run(["status"], execOptions({ PATH: "C:\\Git\\cmd" }))).toBe(nonzero)
+  })
+
+  test("#given stdin #when git runs by absolute path #then stdin reaches the runner", async () => {
+    const inputs: Array<string | Buffer | undefined> = []
+    const exec = createHermeticExec(async (_executable, _argv, options) => {
+      inputs.push(options.stdin)
+      return SUCCESS
+    }, files(PROGRAM_FILES_GIT).isFile)
+
+    await exec.run(["hash-object", "--stdin"], { ...execOptions({ ProgramFiles: "C:\\Program Files" }), stdin: "fallback-input" })
+
+    expect(inputs).toEqual(["fallback-input"])
+  })
+
+  test("#given a resolved git #when the same environment runs git again #then the PATH-value cache answers without probing", async () => {
+    const fs = files(PATH_GIT)
+    const exec = createHermeticExec(async () => SUCCESS, fs.isFile)
+
+    await exec.run(["--version"], execOptions({ PATH: "C:\\Git\\cmd" }))
+    const probesAfterFirst = fs.probed.length
+    await exec.run(["--version"], execOptions({ PATH: "C:\\Git\\cmd" }))
+
+    expect(probesAfterFirst).toBeGreaterThan(0)
+    expect(fs.probed.length).toBe(probesAfterFirst)
+  })
+
+  test("#given git is missing and then installed while omo runs #when git runs again #then the new install is found without a restart", async () => {
+    const attempts: string[] = []
+    const fs = files()
+    const exec = createHermeticExec(async (executable) => {
+      attempts.push(executable)
+      return SUCCESS
+    }, fs.isFile)
+    const options = execOptions({ PATH: "C:\\Git\\cmd" })
+
+    await expect(exec.run(["--version"], options)).rejects.toBeInstanceOf(GitNotFoundError)
+    fs.set.add(PATH_GIT)
+    await exec.run(["--version"], options)
+
+    expect(attempts).toEqual([PATH_GIT])
+  })
+
+  test("#given git only in a relative PATH entry #when git runs #then the entry is never searched", async () => {
+    const fs = files("bin\\git.exe", ".\\git.exe")
+    const exec = createHermeticExec(async () => SUCCESS, fs.isFile)
+
+    await expect(exec.run(["--version"], execOptions({ PATH: `bin;.;relative-exec-${crypto.randomUUID()}` }))).rejects.toBeInstanceOf(GitNotFoundError)
+    expect(fs.probed.filter((path) => !/^[A-Za-z]:\\/.test(path))).toEqual([])
+  })
+})
+
+describe("createNodeGitExec on POSIX", () => {
+  for (const platform of ["linux", "darwin"] as const) {
+    test(`#given ${platform} with git available on a fully qualified PATH #when git runs #then the runner receives bare "git"`, async () => {
+      const attempts: string[] = []
+      const exec = createHermeticExec(async (executable) => {
+        attempts.push(executable)
+        return SUCCESS
+      }, files(PATH_GIT, PROGRAM_FILES_GIT).isFile, platform)
+
+      await exec.run(["--version"], execOptions({ PATH: "C:\\Git\\cmd", ProgramFiles: "C:\\Program Files" }))
+
       expect(attempts).toEqual(["git"])
     })
   }
 
-  test("#given UNC, device-prefix, and root-relative roots #when fallback runs #then only a drive-qualified local root is attempted", async () => {
+  test("#given linux and missing git #when git runs #then the error propagates with no Windows install root attempted", async () => {
     const original = missingGitError()
     const attempts: string[] = []
     const exec = createHermeticExec(async (executable) => {
       attempts.push(executable)
-      if (executable === "git") throw original
-      return SUCCESS
-    })
+      throw original
+    }, files(PROGRAM_FILES_GIT).isFile, "linux")
 
-    const result = await exec.run(["--version"], execOptions({
-      ProgramFiles: "\\\\server\\share",
-      ProgramW6432: "\\\\?\\C:\\Program Files",
-      "ProgramFiles(x86)": "\\Program Files (x86)",
-      LOCALAPPDATA: "C:\\Users\\Example User\\AppData\\Local",
-    }))
-
-    expect(result).toBe(SUCCESS)
-    expect(attempts).toEqual([
-      "git",
-      "C:\\Users\\Example User\\AppData\\Local\\Programs\\Git\\cmd\\git.exe",
-    ])
-  })
-
-  test("#given distinct standard roots #when every executable is absent #then candidates are attempted in deterministic order", async () => {
-    const original = missingGitError()
-    const attempts: string[] = []
-    const exec = createHermeticExec(async (executable) => {
-      attempts.push(executable)
-      throw executable === "git" ? original : missingGitError()
-    })
-
-    await expect(exec.run(["--version"], execOptions({
-      ProgramFiles: "C:\\Program Files",
-      ProgramW6432: "D:\\Program Files",
-      "ProgramFiles(x86)": "E:\\Program Files (x86)",
-      LOCALAPPDATA: "F:\\User Data",
-    }))).rejects.toBe(original)
-
-    expect(attempts).toEqual([
-      "git",
-      "C:\\Program Files\\Git\\cmd\\git.exe",
-      "D:\\Program Files\\Git\\cmd\\git.exe",
-      "E:\\Program Files (x86)\\Git\\cmd\\git.exe",
-      "F:\\User Data\\Programs\\Git\\cmd\\git.exe",
-    ])
-  })
-
-  test("#given duplicate standard roots #when fallback runs #then equivalent candidates are attempted once", async () => {
-    const original = missingGitError()
-    const attempts: string[] = []
-    const exec = createHermeticExec(async (executable) => {
-      attempts.push(executable)
-      throw executable === "git" ? original : missingGitError()
-    })
-
-    await expect(exec.run(["--version"], execOptions({
-      ProgramFiles: "C:\\Program Files",
-      ProgramW6432: "c:\\PROGRAM FILES",
-      "ProgramFiles(x86)": "D:\\Program Files (x86)",
-    }))).rejects.toBe(original)
-
-    expect(attempts).toEqual([
-      "git",
-      "C:\\Program Files\\Git\\cmd\\git.exe",
-      "D:\\Program Files (x86)\\Git\\cmd\\git.exe",
-    ])
-  })
-
-  test("#given the first fallback executable disappears #when its spawn yields ENOENT #then the next candidate is attempted", async () => {
-    const original = missingGitError()
-    const attempts: string[] = []
-    const exec = createHermeticExec(async (executable) => {
-      attempts.push(executable)
-      if (executable === "git") throw original
-      if (executable.startsWith("C:")) throw missingGitError()
-      return SUCCESS
-    })
-
-    const result = await exec.run(["--version"], execOptions({
-      ProgramFiles: "C:\\Program Files",
-      ProgramW6432: "D:\\Program Files",
-    }))
-
-    expect(result).toBe(SUCCESS)
-    expect(attempts).toEqual([
-      "git",
-      "C:\\Program Files\\Git\\cmd\\git.exe",
-      "D:\\Program Files\\Git\\cmd\\git.exe",
-    ])
-  })
-
-  for (const code of ["EACCES", "EPERM", "EIO"] as const) {
-    test(`#given a fallback reports GitNotFoundError caused by ${code} #when fallback runs #then the error propagates without trying later candidates`, async () => {
-      const original = missingGitError()
-      const failure = new GitNotFoundError({ cause: spawnError(code) })
-      const attempts: string[] = []
-      const exec = createHermeticExec(async (executable) => {
-        attempts.push(executable)
-        if (executable === "git") throw original
-        throw failure
-      })
-
-      await expect(exec.run(["--version"], execOptions({
-        ProgramFiles: "C:\\Program Files",
-        ProgramW6432: "D:\\Program Files",
-      }))).rejects.toBe(failure)
-      expect(attempts).toEqual(["git", "C:\\Program Files\\Git\\cmd\\git.exe"])
-    })
-  }
-
-  for (const code of ["EACCES", "EPERM", "EIO"] as const) {
-    test(`#given a fallback spawn ${code} #when fallback runs #then the error propagates without trying later candidates`, async () => {
-      const original = missingGitError()
-      const failure = spawnError(code)
-      const attempts: string[] = []
-      const exec = createHermeticExec(async (executable) => {
-        attempts.push(executable)
-        if (executable === "git") throw original
-        throw failure
-      })
-
-      await expect(exec.run(["--version"], execOptions({
-        ProgramFiles: "C:\\Program Files",
-        ProgramW6432: "D:\\Program Files",
-      }))).rejects.toBe(failure)
-      expect(attempts).toEqual(["git", "C:\\Program Files\\Git\\cmd\\git.exe"])
-    })
-  }
-
-  test("#given a fallback timeout #when fallback runs #then the timeout propagates without trying later candidates", async () => {
-    const original = missingGitError()
-    const timeout = new GitTimeoutError(["--version"], 5000)
-    const attempts: string[] = []
-    const exec = createHermeticExec(async (executable) => {
-      attempts.push(executable)
-      if (executable === "git") throw original
-      throw timeout
-    })
-
-    await expect(exec.run(["--version"], execOptions({
-      ProgramFiles: "C:\\Program Files",
-      ProgramW6432: "D:\\Program Files",
-    }))).rejects.toBe(timeout)
-    expect(attempts).toEqual(["git", "C:\\Program Files\\Git\\cmd\\git.exe"])
-  })
-
-  test("#given a fallback nonzero result #when fallback runs #then the result returns without trying later candidates", async () => {
-    const original = missingGitError()
-    const nonzero: GitExecResult = { code: 128, stdout: "", stderr: "fatal: command failed" }
-    const attempts: string[] = []
-    const exec = createHermeticExec(async (executable) => {
-      attempts.push(executable)
-      if (executable === "git") throw original
-      return nonzero
-    })
-
-    const result = await exec.run(["status"], execOptions({
-      ProgramFiles: "C:\\Program Files",
-      ProgramW6432: "D:\\Program Files",
-    }))
-
-    expect(result).toBe(nonzero)
-    expect(attempts).toEqual(["git", "C:\\Program Files\\Git\\cmd\\git.exe"])
-  })
-
-  test("#given stdin and a Windows fallback #when bare Git is absent #then stdin reaches the fallback runner", async () => {
-    const original = missingGitError()
-    const inputs: Array<string | Buffer | undefined> = []
-    const exec = createHermeticExec(async (executable, _argv, options) => {
-      inputs.push(options.stdin)
-      if (executable === "git") throw original
-      return SUCCESS
-    })
-
-    await exec.run(["hash-object", "--stdin"], {
-      ...execOptions({ ProgramFiles: "C:\\Program Files" }),
-      stdin: "fallback-input",
-    })
-
-    expect(inputs).toEqual(["fallback-input", "fallback-input"])
-  })
-
-  test("#given a Windows fallback #when bare Git is absent #then every attempt carries the fsmonitor override ahead of the caller argv", async () => {
-    const original = missingGitError()
-    const argvs: Array<readonly string[]> = []
-    const exec = createHermeticExec(async (executable, argv) => {
-      argvs.push(argv)
-      if (executable === "git") throw original
-      return SUCCESS
-    })
-
-    await exec.run(["-c", "user.name=fixture-writer", "status", "--porcelain"], execOptions({ ProgramFiles: "C:\\Program Files" }))
-
-    const expected = ["-c", "core.fsmonitor=false", "-c", "user.name=fixture-writer", "status", "--porcelain"]
-    expect(argvs).toEqual([expected, expected])
-  })
-
-  test("#given bare Git fails with a non-ENOENT error #when Windows roots exist #then the error propagates without fallback", async () => {
-    const failure = spawnError("EACCES")
-    const attempts: string[] = []
-    const exec = createHermeticExec(async (executable) => {
-      attempts.push(executable)
-      throw failure
-    })
-
-    await expect(
-      exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files" })),
-    ).rejects.toBe(failure)
+    await expect(exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files" }))).rejects.toBe(original)
     expect(attempts).toEqual(["git"])
   })
 })

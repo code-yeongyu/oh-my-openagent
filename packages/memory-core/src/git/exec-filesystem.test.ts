@@ -18,9 +18,12 @@ describe("createNodeGitExec filesystem fixtures", () => {
       expect(result.code).toBe(128)
       expect(result.stderr).toContain("No such file or directory")
     })
+  })
 
-    test("#when the bare runner reports the missing-cwd result #then Windows fallbacks are not attempted", async () => {
+  describe("#given a git resolved from PATH on win32", () => {
+    test("#when the runner reports the missing-cwd result #then it is returned as is and no install root is probed", async () => {
       const attempts: string[] = []
+      const probed: string[] = []
       const missingCwdResult: GitExecResult = {
         code: 128,
         stdout: "",
@@ -32,16 +35,23 @@ describe("createNodeGitExec filesystem fixtures", () => {
           attempts.push(executable)
           return missingCwdResult
         },
+        // The PATH git is the only spawn: a 128 answer is not a missing binary, so the Git for
+        // Windows install roots stay unprobed and nothing is retried (#12146).
+        isFile: (path) => {
+          probed.push(path)
+          return path === "C:\\Git\\cmd\\git.exe"
+        },
       })
 
       const result = await exec.run(["status"], {
         cwd: process.cwd(),
         timeoutMs: 5000,
-        env: { PATH: "/nonexistent", ProgramFiles: "C:\\Program Files" },
+        env: { PATH: "C:\\Git\\cmd", ProgramFiles: "C:\\Program Files" },
       })
 
       expect(result).toBe(missingCwdResult)
-      expect(attempts).toEqual(["git"])
+      expect(attempts).toEqual(["C:\\Git\\cmd\\git.exe"])
+      expect(probed).not.toContain("C:\\Program Files\\Git\\cmd\\git.exe")
     })
   })
 

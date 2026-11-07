@@ -1,6 +1,7 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process"
 import { readdirSync, watch, writeFileSync } from "@oh-my-opencode/memory-core/fs"
 import { getProcessStartIdentity } from "@oh-my-opencode/memory-core/process-identity"
+import { win32SystemExecutable } from "@oh-my-opencode/memory-core/win32-system-tools"
 
 export type SupervisorRuntimePlatform = "posix" | "win32"
 export type CancelSupervisorDeadline = () => void
@@ -148,7 +149,7 @@ export function signalSupervisorProcessGroup(pid: number, signal: NodeJS.Signals
 }
 
 function taskkillTree(pid: number, synchronous: boolean): void {
-  const command = testCommand("OMO_MEMORY_SUPERVISOR_TASKKILL_COMMAND") ?? ["taskkill"]
+  const command = testCommand("OMO_MEMORY_SUPERVISOR_TASKKILL_COMMAND") ?? [win32SystemExecutable("taskkill.exe")]
   spawnTerminationCommand(command, ["/pid", String(pid), "/T", "/F"], synchronous)
 }
 
@@ -159,7 +160,7 @@ function taskkillTree(pid: number, synchronous: boolean): void {
  */
 export async function terminateSupervisorWin32Tree(pid: number | undefined): Promise<boolean> {
   if (pid === undefined) return true
-  const [executable, ...prefix] = testCommand("OMO_MEMORY_SUPERVISOR_TASKKILL_COMMAND") ?? ["taskkill"]
+  const [executable, ...prefix] = testCommand("OMO_MEMORY_SUPERVISOR_TASKKILL_COMMAND") ?? [win32SystemExecutable("taskkill.exe")]
   if (executable === undefined) throw new TypeError("termination command is required")
   return await new Promise<boolean>((resolve) => {
     let settled = false
