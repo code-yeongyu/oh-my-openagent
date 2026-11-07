@@ -9,12 +9,13 @@ type AttachEvent = Parameters<Parameters<RemoteAttach["onEvent"]>[0]>[0]
 // The device service's account side for one remote session: each attach replays its history from its latest snapshot
 // to a new listener (as remote-attach.ts does), `get_state` answers the engine's current state, and closing the
 // connection ends every attach on it with "closed".
-function fakeDevice(engine: { state: JsonObject }, options: { readonly snapshotAfterAttach?: boolean } = {}) {
+function fakeDevice(engine: { state: JsonObject; failures?: number }, options: { readonly snapshotAfterAttach?: boolean } = {}) {
   const attaches: string[] = []
   const live: Array<{ readonly id: string; readonly emit: (event: AttachEvent) => void; readonly end: (reason: string) => void; readonly detachCalled: Promise<void>; detaches: number }> = []
   const connections: Array<() => void> = []
   let connects = 0
   const locate: { key?: string } = {}
+  const missing = new Set<string>()
   const connect = async (): Promise<DeviceService> => {
     connects += 1
     let close!: () => void
@@ -28,6 +29,7 @@ function fakeDevice(engine: { state: JsonObject }, options: { readonly snapshotA
       locate: async () => { if (locate.key === undefined) throw new LocalApiError("session_not_found", "gone"); return { key: locate.key } },
       attach: async (_device: string, sessionId: string) => {
         attaches.push(sessionId)
+        if (missing.has(sessionId)) throw new LocalApiError("session_not_found", "not listed")
         const history: AttachEvent[] = options.snapshotAfterAttach === true ? [] : [{ kind: "snapshot", snapshot: { attach_id: 1, cursor: { marker_id: "m", last_entry_id: null }, state: { durableSessionId: "dur-1" }, entries: [], history_truncated: false, oldest_entry_id: null } }]
         const listeners = new Set<(event: AttachEvent) => void>()
         let finish!: (reason: string) => void
@@ -55,7 +57,13 @@ function fakeDevice(engine: { state: JsonObject }, options: { readonly snapshotA
           },
           detached,
           detach: async () => { entry.detaches += 1; detachCalled(); entry.end("detached") },
-          command: async (): Promise<CommandResult> => ({ outcome: { type: "event", kind: "session.command_state", command_id: "c", state: "engine_applied", retryable: false }, response: { type: "response", success: true, data: engine.state } }) as unknown as CommandResult,
+          command: async (): Promise<CommandResult> => {
+            if ((engine.failures ?? 0) > 0) {
+              engine.failures = (engine.failures ?? 0) - 1
+              return { outcome: { type: "event", kind: "session.command_state", command_id: "c", state: "engine_refused", reason: "engine_failed", retryable: false } } as unknown as CommandResult
+            }
+            return { outcome: { type: "event", kind: "session.command_state", command_id: "c", state: "engine_applied", retryable: false }, response: { type: "response", success: true, data: engine.state } } as unknown as CommandResult
+          },
         } as unknown as RemoteAttach
       },
     } as unknown as DeviceService
@@ -68,7 +76,7 @@ function fakeDevice(engine: { state: JsonObject }, options: { readonly snapshotA
   }
   const snapshot = (attachId: number) => current().emit({ kind: "snapshot", snapshot: { attach_id: attachId, cursor: { marker_id: "m", last_entry_id: null }, state: {}, entries: [], history_truncated: false, oldest_entry_id: null } })
   const records = (attachId: number, records: readonly Readonly<Record<string, string>>[], seqs?: number[]) => current().emit({ kind: "records", attach_id: attachId, records, ...(seqs === undefined ? {} : { seqs }) })
-  return { connect, attaches, live, locate, current, snapshot, records, connections, connects: () => connects }
+  return { connect, attaches, live, locate, missing, current, snapshot, records, connections, connects: () => connects }
 }
 
 // Each handler call lands in `log`; `until(n)` waits (bounded) for the n-th, subscribed before the trigger fires.
@@ -97,7 +105,7 @@ function recorder() {
 
 const RUNNING = { isStreaming: true, currentTurnId: "7", durableSessionId: "dur-1" }
 const IDLE = { isStreaming: false, durableSessionId: "dur-1" }
-const portOver = (device: ReturnType<typeof fakeDevice>, attachIdleMs?: number) => createDeviceServiceSessions({ version: "0.0.0-test", connect: device.connect, retryDelay: async () => {}, ...(attachIdleMs === undefined ? {} : { attachIdleMs }) })
+const portOver = (device: ReturnType<typeof fakeDevice>, attachIdleMs?: number, delays: number[] = []) => createDeviceServiceSessions({ version: "0.0.0-test", connect: device.connect, retryDelay: async (ms) => { delays.push(ms) }, ...(attachIdleMs === undefined ? {} : { attachIdleMs }) })
 
 async function watching(port: ReturnType<typeof portOver>, handlers: ReturnType<typeof recorder>["handlers"], baseline = true) {
   const watched = await port.watch("b", "s1", handlers, { baseline })
@@ -185,6 +193,31 @@ describe("watch v2 (#12719): a remote session followed across drops, restarts an
     await seen.until(1)
     watch.stop()
     expect([seen.log, device.attaches]).toEqual([["resync running -> idle settled=[7] restarted"], ["s1", "s1-after"]])
+  })
+
+  // Review of #12725 at 46c89e3ce1 (MEDIUM): a get_state refusal on a live attach re-held the pooled attach at once and
+  // resynced again, with no backoff and a lost line per pass.
+  test("#given get_state keeps failing for a reason other than the session being gone #when a resync needs it #then the watch backs off 1 s doubling, says lost once, and resyncs once the device answers", async () => {
+    const engine: { state: JsonObject; failures?: number } = { state: RUNNING }
+    const device = fakeDevice(engine)
+    const seen = recorder()
+    const delays: number[] = []
+    const watch = await watching(portOver(device, undefined, delays), seen.handlers)
+    engine.state = IDLE
+    engine.failures = 3
+    device.snapshot(2)
+    await seen.until(2)
+    watch.stop()
+    expect([seen.log, delays]).toEqual([["lost engine_failed", "resync running -> idle settled=[7]"], [1_000, 2_000, 4_000]])
+  })
+
+  test("#given a watch relocated after session_replaced #when the new key is not listed either #then it ends session_replaced, the reason its attach gave", async () => {
+    const device = fakeDevice({ state: IDLE })
+    const watch = await watching(portOver(device), recorder().handlers)
+    device.locate.key = "s1-after"
+    device.missing.add("s1-after")
+    device.current().end("session_replaced")
+    expect([String(await watch.ended), device.attaches]).toEqual(["session_replaced", ["s1", "s1-after"]])
   })
 
   test.each([
