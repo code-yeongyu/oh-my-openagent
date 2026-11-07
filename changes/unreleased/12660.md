@@ -1,1 +1,0 @@
-A message sent to a thread on another device whose engine answers `started` without a turn id (senpi 2026.11.2) is now confirmed with the running turn that `get_state` reports, instead of `idempotency_uncertain`.
