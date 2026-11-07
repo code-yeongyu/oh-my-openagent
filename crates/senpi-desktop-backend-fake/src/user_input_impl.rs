@@ -43,6 +43,8 @@ struct State {
     dropped: u64,
     started: BTreeMap<u32, u64>,
     scripted: Vec<ScriptedUserPress>,
+    /// `user_input_timeline` presses not yet due, oldest first.
+    timed: VecDeque<UserPress>,
 }
 
 /// The fake's shared feed; clones observe the same record.
@@ -69,24 +71,62 @@ impl FakeUserInput {
         self.0.lock().scripted = presses;
     }
 
+    /// Places each timeline press at `t_ms` from now; the past ones are in
+    /// the record at once, the rest once their time has come.
+    pub(crate) fn script_timeline(&self, timeline: &[crate::scripting::TimedUserPress]) {
+        let now = Instant::now();
+        let mut presses: Vec<UserPress> = timeline
+            .iter()
+            .map(|press| {
+                let offset = std::time::Duration::from_millis(press.t_ms.unsigned_abs());
+                let at = if press.t_ms < 0 { now.checked_sub(offset) } else { now.checked_add(offset) };
+                let at = at.unwrap_or_else(|| {
+                    panic!("user_input_timeline t_ms {} is not representable on this host's monotonic clock", press.t_ms)
+                });
+                UserPress { pid: press.pid, kind: press_kind(press.kind), at }
+            })
+            .collect();
+        presses.sort_by_key(|press| press.at);
+        let mut state = self.0.lock();
+        state.timed = presses.into();
+        land_due(&mut state, now);
+    }
+
     /// Lands every scripted press waiting for `method`.
     pub(crate) fn before(&self, method: FakeMethod) {
         let mut state = self.0.lock();
         let (now, later): (Vec<_>, Vec<_>) = std::mem::take(&mut state.scripted).into_iter().partition(|p| p.before == method);
         state.scripted = later;
         for press in now {
-            let kind = match press.kind {
-                ScriptedPressKind::Key => UserPressKind::Key,
-                ScriptedPressKind::Click => UserPressKind::Click,
-            };
-            state.presses.push_back(UserPress { pid: press.pid, kind, at: Instant::now() });
+            state.presses.push_back(UserPress { pid: press.pid, kind: press_kind(press.kind), at: Instant::now() });
         }
+    }
+}
+
+const fn press_kind(kind: ScriptedPressKind) -> UserPressKind {
+    match kind {
+        ScriptedPressKind::Key => UserPressKind::Key,
+        ScriptedPressKind::Click => UserPressKind::Click,
+    }
+}
+
+/// Moves every timeline press due by `now` into the record at its own press
+/// time, so the record stays in press order however late `take` runs: a
+/// press recorded after a timeline press fell due still sorts behind it.
+fn land_due(state: &mut State, now: Instant) {
+    let due = state.timed.partition_point(|press| press.at <= now);
+    for press in state.timed.drain(..due) {
+        let slot = state
+            .presses
+            .partition_point(|recorded| recorded.at <= press.at);
+        state.presses.insert(slot, press);
     }
 }
 
 impl UserInputFeed for FakeUserInput {
     fn take(&self) -> UserPresses {
         let mut state = self.0.lock();
+        land_due(&mut state, Instant::now());
         UserPresses { presses: state.presses.drain(..).collect(), dropped: std::mem::take(&mut state.dropped) }
     }
 

@@ -90,8 +90,10 @@ not fall back to the owned engine for an authenticated criterion.
 
 ## Capture at a fixed viewport
 
-Match CSS viewport AND PNG dimensions: pin `deviceScaleFactor` through `emulate` (owned) or
-`resize` (attached) instead of resizing the PNG to force a pass; a 390-wide capture at desktop
+Match CSS viewport AND PNG dimensions: pin `deviceScaleFactor` through `emulate` (owned engine).
+Attached `resize(width, height)` sets the window size only and leaves the device pixel ratio at the
+user's display, so on the attached engine record the capture's DPR (PNG width / CSS viewport width)
+and compare against a reference taken at that DPR. Never resize the PNG to force a pass; a 390-wide capture at desktop
 DPR with classic scrollbars is not a phone capture. Wait for the specific page state (a locator,
 a `waitForURL`, a `createNetworkSnoop(page).waitFor(...)`), not a sleep, then compare:
 

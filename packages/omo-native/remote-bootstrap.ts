@@ -34,6 +34,8 @@ export function deviceServiceBootstrapSetup(options: {
   readonly agentDir: string
   readonly platform?: NodeJS.Platform
   readonly arch?: string
+  /** Where the release comes from and how it is verified and installed; this build's defaults when absent. */
+  readonly release?: Pick<Parameters<typeof installDeviceService>[0], "origin" | "fetch" | "releaseKeys" | "run">
 }): BootstrapSetup {
   const host = deviceServiceHost(options.platform ?? process.platform, options.arch ?? process.arch)
   return {
@@ -42,6 +44,7 @@ export function deviceServiceBootstrapSetup(options: {
       host === undefined
         ? { ok: false, state: "service_degraded", action: UNSUPPORTED_HOST }
         : installDeviceService({
+            ...options.release,
             version: DEVICE_SERVICE_VERSION,
             host,
             stateDir: options.stateDir,
