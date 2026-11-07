@@ -3055,6 +3055,7 @@
           "init-deep",
           "lsp-setup",
           "mass-ulw",
+          "mobius-loop",
           "onboarding",
           "programming",
           "refactor",
@@ -3857,5 +3858,5 @@
       }
     }
   },
-  "sha256": "77a2567eb70626bfbfc79838a559bce33102ef7112c3efd39846595ab943df20"
+  "sha256": "650437354f2c15827f8b79e8f156966748f103361538ecc38f66d51946e7c95e"
 }

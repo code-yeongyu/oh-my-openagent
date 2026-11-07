@@ -4,7 +4,7 @@ import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promi
 import { dirname, extname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { createSkillSourceCopyFilter } from "@oh-my-opencode/shared-skills/skill-source-filter"
-import { createNativeSkillSources } from "./native-skill-sources.mjs"
+import { createComponentSkillSources, createNativeSkillSources } from "./native-skill-sources.mjs"
 import { insertSenpiCompatibilityGuidance } from "./senpi-compatibility-guidance.mjs"
 import { applySenpiSkillRosterOverlay, assertSenpiSkillRosterOverlay } from "./senpi-skill-roster-overlay.mjs"
 
@@ -15,12 +15,7 @@ const skillsRoot = process.env.OMO_SENPI_PLUGIN_OUTPUT === undefined
   : join(process.env.OMO_SENPI_PLUGIN_OUTPUT, "skills")
 const sharedSkillsRoot = join(repoRoot, "shared-skills", "skills")
 
-const skillSources = [
-  {
-    name: "ulw-loop",
-    source: join(repoRoot, "omo-senpi", "skills", "ulw-loop"),
-  },
-]
+const skillSources = createComponentSkillSources(repoRoot)
 const componentSkillNames = new Set(skillSources.map(({ name }) => name))
 
 const { sources: nativeSkillSources, names: nativeSkillNames } = createNativeSkillSources(repoRoot)

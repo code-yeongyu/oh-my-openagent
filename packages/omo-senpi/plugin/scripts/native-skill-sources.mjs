@@ -48,6 +48,10 @@ export function createNativeSkillSources(repoRoot) {
       source: join(nativeSkillsRoot, "mass-ulw"),
     },
     {
+      name: "mobius-loop",
+      source: join(nativeSkillsRoot, "mobius-loop"),
+    },
+    {
       name: "onboarding",
       source: join(nativeSkillsRoot, "onboarding"),
     },
@@ -78,6 +82,14 @@ export function createNativeSkillSources(repoRoot) {
   const names = new Set(sources.map(({ name }) => name))
 
   return { sources, names }
+}
+
+/** @param {string} repoRoot @returns {SkillSource[]} */
+export function createComponentSkillSources(repoRoot) {
+  return [{
+    name: "ulw-loop",
+    source: join(repoRoot, "omo-senpi", "skills", "ulw-loop"),
+  }]
 }
 
 /**

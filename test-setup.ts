@@ -56,7 +56,7 @@ for (const name of Object.keys(process.env)) {
 }
 
 let isGlobalMockCleanup = false
-const { restoreModuleMocks } = installModuleMockLifecycle(mock, {
+const { beginTest, restoreModuleMocks } = installModuleMockLifecycle(mock, {
   shouldPreserveActiveMocksOnRestore: () => isGlobalMockCleanup,
   registerGlobalRestore: true,
 })
@@ -78,6 +78,7 @@ function cleanupRulesInjectorStorage(): void {
 }
 
 beforeEach(() => {
+  beginTest()
   resetTestDeadline()
   environmentSnapshot = { ...process.env }
   workingDirectorySnapshot = process.cwd()

@@ -1,12 +1,13 @@
 # skills
 
-Native Senpi skills authored directly against the Senpi tool surface (not ported from Codex or the shared pool). `plugin/scripts/sync-skills.mjs` ships the native registry verbatim; shared-pool skills (ulw-execute, git-master, ...) get senpi overlays at sync time. Earned by score: 11 skill dirs with their own authoring contract.
+Native Senpi skills authored directly against the Senpi tool surface (not ported from Codex or the shared pool). `plugin/scripts/sync-skills.mjs` ships the native registry verbatim; shared-pool skills (ulw-execute, git-master, ...) get senpi overlays at sync time. Earned by score: 12 skill dirs with their own authoring contract.
 
 ## WHERE TO LOOK
 
 | Skill | Role |
 |-------|------|
 | `mass-ulw/` | Dag orchestration at repo scale (one run per phase with every stage chained up front, file handoff between nodes, size formula, node categories). `references/planning.md` is REQUIRED reading before building any dag: stage doctrine, node prompt contract, failure playbook. |
+| `mobius-loop/` | Open Practice Library outcome navigator. Dependency-free scripts own `.omo/mobius/` records; delivery links to existing goals and learning passes through the memory tool. |
 | `ultrawork/` | Senpi-native ultrawork directive source; its body is embedded into `src/components/ultrawork/generated-directive.ts` by `plugin/scripts/embed-directive.mjs` (build fails on non-senpi harness tokens). Blocks wrapped in `<!-- omo-ultrawork-astra:<name>:start/end -->` are swapped for the matching `## <name>` section of `references/astra-variant.md` in the GPT-6 Astra variant the ultrawork component selects by receiving model; the baseline strips only the marker lines, so every other model reads the skill body verbatim. |
 | `ulw-plan/` | Read-only planning lifecycle: draft -> plan with explicit approval; `scripts/scaffold-plan.mjs` scaffolds guarded `.omo` artifacts. |
 | `ulw-loop/` | Goal/QA lifecycle loop; component-owned native source, shipped verbatim. |

@@ -2,10 +2,11 @@
 
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
+import { randomUUID } from "node:crypto"
 import { existsSync, readFileSync } from "node:fs"
-import { cp, mkdtemp } from "node:fs/promises"
+import { chmod, cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { delimiter, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { BUILD_NODES, selectBuildNodes } from "./build-nodes"
 
@@ -52,22 +53,65 @@ describe("node-target CLI build (lazycodex#47)", () => {
     expect(help.stdout).toContain("Usage:")
   }, 60_000)
 
-  test("doctor json runs under plain node without Bun globals", () => {
+  test("doctor json runs under plain node without Bun globals", async () => {
     // #given
     const build = spawnSync("bun", ["run", "build:cli-node"], { cwd: repoRoot, encoding: "utf8" })
     expect(build.status, `build:cli-node failed:\n${build.stderr}`).toBe(0)
 
-    // #when
-    const doctor = spawnSync("node", ["dist/cli-node/index.js", "doctor", "--json"], { cwd: repoRoot, encoding: "utf8" })
+    const root = await mkdtemp(join(tmpdir(), "cli-node-doctor-"))
+    const artifact = `cli-node-doctor-runtime-${randomUUID()}`
+    const leakedPath = join(tmpdir(), artifact)
+    try {
+      const bin = join(root, "bin")
+      await mkdir(bin)
+      const probeMarker = join(root, "probe-called")
+      const probeScript = join(bin, "probe.mjs")
+      await writeFile(probeScript, `
+        import { writeFileSync } from "node:fs"
+        import { tmpdir } from "node:os"
+        import { join } from "node:path"
+        writeFileSync(${JSON.stringify(probeMarker)}, "called")
+        writeFileSync(join(tmpdir(), ${JSON.stringify(artifact)}), "runtime artifact")
+        console.log("1.4.0")
+      `)
+      const command = `${JSON.stringify(process.execPath)} ${JSON.stringify(probeScript)}`
+      await writeFile(join(bin, "opencode"), `#!/bin/sh\nexec ${command}\n`)
+      await chmod(join(bin, "opencode"), 0o755)
+      await writeFile(join(bin, "opencode.cmd"), `@${command}\r\n`)
 
-    // #then
-    expect(doctor.stderr).not.toContain("Bun is not defined")
-    expect(doctor.stderr).not.toContain("Doctor failed unexpectedly")
-    const doctorStatus = doctor.status
-    if (doctorStatus === null) throw new Error(`node doctor exited without a status:\n${doctor.stderr}`)
-    const report = JSON.parse(doctor.stdout) as { exitCode?: number; summary?: { total?: number } }
-    expect(report.exitCode).toBe(doctorStatus)
-    expect(report.summary?.total).toBeGreaterThan(0)
+      // #when
+      const doctor = spawnSync("node", ["dist/cli-node/index.js", "doctor", "--json"], {
+        cwd: repoRoot,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          PATH: `${bin}${delimiter}${process.env.PATH ?? ""}`,
+          HOME: root,
+          USERPROFILE: root,
+          XDG_DATA_HOME: join(root, "data"),
+          XDG_CONFIG_HOME: join(root, "config"),
+          XDG_STATE_HOME: join(root, "state"),
+          XDG_CACHE_HOME: join(root, "cache"),
+          TMPDIR: root,
+          TMP: root,
+          TEMP: root,
+        },
+      })
+
+      // #then
+      expect(doctor.stderr).not.toContain("Bun is not defined")
+      expect(doctor.stderr).not.toContain("Doctor failed unexpectedly")
+      const doctorStatus = doctor.status
+      if (doctorStatus === null) throw new Error(`node doctor exited without a status:\n${doctor.stderr}`)
+      const report = JSON.parse(doctor.stdout) as { exitCode?: number; summary?: { total?: number } }
+      expect(report.exitCode).toBe(doctorStatus)
+      expect(report.summary?.total).toBeGreaterThan(0)
+      expect(existsSync(probeMarker)).toBe(true)
+      expect(existsSync(leakedPath)).toBe(false)
+    } finally {
+      await rm(leakedPath, { force: true })
+      await rm(root, { recursive: true, force: true })
+    }
   }, 120_000)
 
   test("the main build chain and the lazycodex-ai payload carry the node CLI", () => {

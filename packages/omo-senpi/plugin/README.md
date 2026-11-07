@@ -4,7 +4,7 @@
 
 ## Shipped skills
 
-The plugin ships 19 skills by default:
+The bundled skills include:
 
 - `ast-grep` — structural code search and rewrites
 - `coding-agent-sessions` — find, read, and reconstruct coding-agent session transcripts
@@ -14,6 +14,7 @@ The plugin ships 19 skills by default:
 - `hyperplan` — adversarial 5-member cross-critique planning
 - `init-deep` — deep project initialization and scaffold setup
 - `lsp-setup` — Language Server configuration and troubleshooting
+- `mobius-loop` - outcome discovery, options, experiments, and evidence-led learning
 - `programming` — type-strict, modern-stack programming guidance
 - `refactor` — safe refactoring and code quality improvement
 - `remove-ai-slops` — clean AI-generated code smells

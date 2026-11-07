@@ -1,9 +1,96 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, mock, test } from "bun:test"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { getCallerUrlFromStack, installModuleMockLifecycle, normalizeStackPath } from "./module-mock-lifecycle"
 
 describe("installModuleMockLifecycle", () => {
+  test("#given root cleanup #when tests share a file fixture #then test overlays restore without losing the fixture", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omo-module-mock-file-lifetime-"))
+    const repoRoot = fileURLToPath(new URL("../../../../", import.meta.url))
+    try {
+      await writeFile(join(root, "dependency.ts"), 'export function readValue() { return "original" }\n')
+      await writeFile(join(root, "file-fixture.test.ts"), `
+        import { afterAll, expect, mock, test } from "bun:test"
+        mock.module("./dependency", () => ({ readValue: () => "file fixture" }))
+        const dependency = await import("./dependency")
+        afterAll(() => mock.restore())
+        test("uses the file fixture", () => {
+          expect(dependency.readValue()).toBe("file fixture")
+        })
+        test("restores a test overlay to the file fixture", () => {
+          expect(dependency.readValue()).toBe("file fixture")
+          mock.module("./dependency", () => ({ readValue: () => "test overlay" }))
+          expect(dependency.readValue()).toBe("test overlay")
+          mock.restore()
+          expect(dependency.readValue()).toBe("file fixture")
+        })
+        test("keeps the file fixture for the next test", () => {
+          expect(dependency.readValue()).toBe("file fixture")
+        })
+      `)
+      await writeFile(join(root, "next-file.test.ts"), `
+        import { expect, test } from "bun:test"
+        const dependency = await import("./dependency")
+        test("file cleanup restores the original consumer", () => {
+          expect(dependency.readValue()).toBe("original")
+        })
+      `)
+      const child = Bun.spawn([
+        process.execPath, "test", "--timeout", "20000",
+        "--preload", join(repoRoot, "test-env.ts"),
+        "--preload", join(repoRoot, "test-setup.ts"),
+        "./file-fixture.test.ts", "./next-file.test.ts",
+      ], { cwd: root, env: process.env, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
+      const [exitCode, , stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ])
+      expect({ exitCode, failure: exitCode === 0 ? "" : stderr }).toEqual({ exitCode: 0, failure: "" })
+    } finally {
+      await rm(root, { recursive: true })
+    }
+  })
+
+  test("#given an extensionless module mock #when restored #then its consumer reads the original export", async () => {
+    const root = await mkdtemp(join(tmpdir(), "omo-module-mock-resolution-"))
+    try {
+      await writeFile(join(root, "dependency.ts"), 'export function readValue() { return "original" }\n')
+      await writeFile(join(root, "restore.test.ts"), `
+        import { expect, mock, test } from "bun:test"
+        import { installModuleMockLifecycle } from ${JSON.stringify(new URL("./module-mock-lifecycle.ts", import.meta.url).href)}
+        test("restores the live consumer", async () => {
+          installModuleMockLifecycle(mock)
+          const dependency = await import("./dependency")
+          expect(dependency.readValue()).toBe("original")
+          mock.module("./dependency", () => ({ readValue: () => "mocked" }))
+          expect(dependency.readValue()).toBe("mocked")
+          mock.restore()
+          expect(dependency.readValue()).toBe("original")
+        })
+      `)
+      const child = Bun.spawn([process.execPath, "test", "--timeout", "20000", "./restore.test.ts"], {
+        cwd: root,
+        env: process.env,
+        stdin: "ignore",
+        stdout: "pipe",
+        stderr: "pipe",
+      })
+      const [exitCode, , stderr] = await Promise.all([
+        child.exited,
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+      ])
+      expect({ exitCode, failure: exitCode === 0 ? "" : stderr }).toEqual({ exitCode: 0, failure: "" })
+    } finally {
+      await rm(root, { recursive: true })
+    }
+  })
+
   test("#given a Windows stack path #when normalizing caller path #then it becomes a file URL rooted at the drive", () => {
     // given
     const stackPath = String.raw`D:\a\oh-my-openagent\oh-my-openagent\src\hooks\example.test.ts`
@@ -213,8 +300,8 @@ describe("installModuleMockLifecycle", () => {
       "module:./dependency-a:mock-a",
       "module:./dependency-b:mock-b",
       "delegate:restore",
-      "module:./dependency-a:mock-a",
-      "module:./dependency-b:mock-b",
+      "module:file:///repo/tests/first.test.ts:./dependency-a:mock-a",
+      "module:file:///repo/tests/second.test.ts:./dependency-b:mock-b",
     ])
   })
 
@@ -247,7 +334,7 @@ describe("installModuleMockLifecycle", () => {
     expect(events).toEqual([
       "module:./dependency:mocked",
       "delegate:restore",
-      "module:./dependency:mocked",
+      "module:resolved:./dependency:mocked",
     ])
   })
 
@@ -316,7 +403,7 @@ describe("installModuleMockLifecycle", () => {
       "module:./dependency-b:mock-b",
       "delegate:restore",
       "module:file:///repo/tests/first.test.ts:./dependency-a:original",
-      "module:./dependency-b:mock-b",
+      "module:file:///repo/tests/second.test.ts:./dependency-b:mock-b",
     ])
   })
 
@@ -351,8 +438,8 @@ describe("installModuleMockLifecycle", () => {
       "module:./dependency:first-mock",
       "module:./dependency:second-mock",
       "delegate:restore",
-      "module:./dependency:first-mock",
-      "module:./dependency:first-mock",
+      "module:resolved:./shared-dependency:first-mock",
+      "module:resolved:./shared-dependency:first-mock",
     ])
   })
 
@@ -419,7 +506,7 @@ describe("installModuleMockLifecycle", () => {
     expect(events).toEqual([
       "module:./dependency-a:mock-a",
       "delegate:restore",
-      "module:./dependency-a:mock-a",
+      "module:file:///repo/tests/owner.test.ts:./dependency-a:mock-a",
     ])
   })
 
@@ -489,7 +576,7 @@ describe("installModuleMockLifecycle", () => {
       "module:./dependency-b:mock-b",
       "delegate:restore",
       "module:file:///repo/tests/first.test.ts:./dependency-a:original",
-      "module:./dependency-b:mock-b",
+      "module:file:///repo/tests/second.test.ts:./dependency-b:mock-b",
     ])
   })
 

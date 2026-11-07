@@ -5,6 +5,7 @@ import { readFileSync, readdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import {
   getPlatformPackageCandidates,
   getBinaryPath,
@@ -208,4 +209,6 @@ function main() {
   }
 }
 
-main();
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  main();
+}

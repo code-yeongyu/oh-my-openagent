@@ -12,7 +12,7 @@ import {
   OverridableAgentNameSchema,
 } from "../packages/omo-opencode/src/config/schema/agent-names"
 import { DEFAULT_CATEGORIES as OPENCODE_CATEGORIES } from "../packages/omo-opencode/src/tools/delegate-task/builtin-categories"
-import { createNativeSkillSources } from "../packages/omo-senpi/plugin/scripts/native-skill-sources.mjs"
+import { createComponentSkillSources, createNativeSkillSources } from "../packages/omo-senpi/plugin/scripts/native-skill-sources.mjs"
 import {
   designpowersThirdPartyRelativePaths,
   frontendSkillRoot,
@@ -180,7 +180,7 @@ function union(...sets: ReadonlySet<string>[]): ReadonlySet<string> {
 function buildReferenceCatalog(repoRoot: string): ReferenceCatalog {
   const packagesRoot = join(repoRoot, "packages")
   const sharedRoots = skillRootsUnder(join(packagesRoot, "shared-skills", "skills"))
-  const nativeSources = createNativeSkillSources(packagesRoot).sources
+  const nativeSources = [...createNativeSkillSources(packagesRoot).sources, ...createComponentSkillSources(packagesRoot)]
   const xSearchRoot = join(packagesRoot, "omo-senpi", "src", "components", "x-search", "skill")
   const loaderBuiltinRoots = skillRootsUnder(join(packagesRoot, "skills-loader-core", "src", "features", "builtin-skills"))
   const codexComponentRoots = codexComponentSkillRoots(repoRoot)
@@ -260,7 +260,7 @@ function collectAuditedFiles(repoRoot: string): AuditedFile[] {
   const packagesRoot = join(repoRoot, "packages")
   const files: AuditedFile[] = []
 
-  const nativeSources = createNativeSkillSources(packagesRoot).sources
+  const nativeSources = [...createNativeSkillSources(packagesRoot).sources, ...createComponentSkillSources(packagesRoot)]
   const nativeByName = new Map(nativeSources.map((source) => [source.name, source]))
 
   const sharedRoot = join(packagesRoot, "shared-skills", "skills")

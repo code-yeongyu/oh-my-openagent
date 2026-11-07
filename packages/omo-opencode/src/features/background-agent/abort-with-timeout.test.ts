@@ -9,7 +9,6 @@ mock.module("../../shared/logger", () => ({
 import type { OpencodeClient } from "./opencode-client"
 
 const { abortWithTimeout } = await import("./abort-with-timeout")
-mock.restore()
 
 function createClient(abort: (...args: Array<unknown>) => Promise<unknown>): OpencodeClient {
   return {
