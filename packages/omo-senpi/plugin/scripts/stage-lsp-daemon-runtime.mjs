@@ -77,7 +77,7 @@ export async function stageLspDaemonRuntime(options = {}) {
 
 export async function verifyRuntimeDist(distDir) {
   const dist = resolve(distDir)
-  await validateRequiredOutputs(dist)
+  await validateRequiredOutputs(dist, true)
   const manifest = await readRuntimeManifest(dist)
   const outputs = await hashOutputs(dist)
   const actual = JSON.stringify(outputs)
@@ -116,7 +116,13 @@ async function writeManifest(distDir, inputDigest) {
 
 async function readRuntimeManifest(distDir) {
   const manifestPath = join(distDir, manifestName)
-  const manifest = await readJsonObject(manifestPath)
+  let manifest
+  try {
+    manifest = await readJsonObject(manifestPath)
+  } catch (error) {
+    if (isErrno(error, "ENOENT")) throw runtimeStale(`staged manifest is missing: ${manifestPath}`)
+    throw error
+  }
   const schemaVersion = manifest.schemaVersion
   const version = manifest.version
   const inputDigest = manifest.inputDigest
@@ -170,18 +176,25 @@ async function hashOutputs(distDir) {
   return outputs
 }
 
-async function validateRequiredOutputs(distDir) {
+async function validateRequiredOutputs(distDir, staged = false) {
   for (const output of REQUIRED_OUTPUTS) {
     const path = join(distDir, output)
     let stats
     try {
       stats = await stat(path)
     } catch (error) {
-      if (isErrno(error, "ENOENT")) throw new Error(`Senpi LSP runtime is missing ${output} at ${distDir}`)
+      if (isErrno(error, "ENOENT")) {
+        if (staged) throw runtimeStale(`staged output is missing: ${path}`)
+        throw new Error(`Senpi LSP runtime is missing ${output} at ${distDir}`)
+      }
       throw error
     }
     if (!stats.isFile()) throw new Error(`Senpi LSP runtime output is not a file: ${path}`)
   }
+}
+
+function runtimeStale(reason) {
+  return new Error(`Senpi LSP runtime stale: ${reason}; run node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs`)
 }
 
 async function listFiles(path) {

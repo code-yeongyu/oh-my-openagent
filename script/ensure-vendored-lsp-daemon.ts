@@ -66,9 +66,10 @@ const defaultRunCommand: RunVendoredLspCommand = async (command, args, options) 
 const defaultWatchDirectory: WatchBuildLockDirectory = (path, listener) =>
   watch(path, { persistent: false }, listener)
 
+/** Returns true only when this caller created the build, so setup can stage that new output. */
 export async function ensureVendoredLspDaemonBuilt(
   options: EnsureVendoredLspDaemonOptions,
-): Promise<void> {
+): Promise<boolean> {
   const outputPath = options.outputPath ?? join(options.packageDir, "dist", "cli.js")
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const pathExists = options.exists ?? existsSync
@@ -78,7 +79,7 @@ export async function ensureVendoredLspDaemonBuilt(
   const deadline = Date.now() + timeoutMs
 
   if (pathExists(outputPath)) {
-    return
+    return false
   }
 
   const lockPath = resolveBuildLockPath(options.packageDir, options.lockRoot ?? tmpdir())
@@ -98,7 +99,7 @@ export async function ensureVendoredLspDaemonBuilt(
 
     try {
       if (pathExists(outputPath)) {
-        return
+        return false
       }
 
       log(
@@ -121,11 +122,12 @@ export async function ensureVendoredLspDaemonBuilt(
           `[test-setup] lsp-daemon build completed without ${outputPath}`,
         )
       }
-      return
+      return true
     } finally {
       lock.release()
     }
   }
+  return false
 }
 
 function resolveBuildLockPath(packageDir: string, lockRoot: string): string {
