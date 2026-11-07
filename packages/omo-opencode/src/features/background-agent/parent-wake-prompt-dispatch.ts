@@ -7,7 +7,7 @@ import {
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
 import type { PromptDispatchClient } from "@oh-my-opencode/utils/prompt-async-gate/types"
 import { getErrorText } from "./error-classifier"
-import { createEmptyAssistantTurnRetryDedupeKey } from "./parent-wake-history-state"
+import { createEmptyAssistantTurnRetryDedupeKey, createLostDispatchRetryDedupeKey } from "./parent-wake-history-state"
 import { cloneParentWake, isRedundantParentWake, type PendingParentWake } from "./parent-wake-dedupe"
 import type { ToolWaitDeferralDecision } from "./parent-wake-session-history"
 
@@ -40,7 +40,9 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       source: "background-agent-parent-wake",
       ...(input.emptyAssistantTurnRetry
         ? { dedupeKey: createEmptyAssistantTurnRetryDedupeKey(input.latestWake) }
-        : {}),
+        : input.latestWake.lostDispatchRetry === true
+          ? { dedupeKey: createLostDispatchRetryDedupeKey(input.latestWake) }
+          : {}),
       settleMs: 0,
       queueBehavior: "defer",
       checkStatus: input.forceNoReply !== true && input.skipPromptGateStatusCheck !== true,
@@ -102,6 +104,7 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
     }
     log("[background-agent] Sent deferred parent wake:", { sessionID: input.sessionID })
     delete input.latestWake.allowEmptyAssistantTurnRetry
+    delete input.latestWake.lostDispatchRetry
     delete input.latestWake.gateHoldExpiresAt
     markRetainedNoReplyAdmission(input, dispatchStartedAt)
     input.trackDispatchedWake(createTrackedDispatchedWake(input.latestWake, input.forceNoReply), dispatchStartedAt)

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, spyOn, test } from "bun:test"
 import {
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
@@ -21,12 +21,13 @@ const FINAL_WAKE = "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGRO
 
 function createNotifier(options: {
   readonly onPendingWakeRequeued?: (sessionID: string) => void
+  readonly recordDispatchedPrompts?: boolean
 } = {}): {
   readonly notifier: ParentWakeNotifier
   readonly promptAsyncCalls: readonly PromptAsyncCall[]
 } {
   const promptAsyncCalls: PromptAsyncCall[] = []
-  const sessionMessages: readonly SessionMessageStub[] = [
+  const sessionMessages: SessionMessageStub[] = [
     {
       info: {
         role: "assistant",
@@ -41,6 +42,12 @@ function createNotifier(options: {
       status: async () => ({ data: {} }),
       promptAsync: async (call: PromptAsyncCall) => {
         promptAsyncCalls.push(call)
+        if (options.recordDispatchedPrompts === true) {
+          sessionMessages.push({
+            info: { role: "user", time: { created: Date.now() } },
+            parts: [{ type: "text", text: FINAL_WAKE }],
+          })
+        }
         return { data: {} }
       },
     },
@@ -157,6 +164,61 @@ describe("ParentWakeNotifier dispatched wake recovery", () => {
       expect(notifier.getPendingParentWakeTimers().has(sessionID)).toBe(false)
       expect(promptAsyncCalls).toHaveLength(2)
     } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given an accepted parent wake never reached the session history #when its retry runs after the gate hold expires #then the retry is dispatched rather than coalesced with the lost dispatch", async () => {
+    // given
+    const { notifier, promptAsyncCalls } = createNotifier()
+    const sessionID = "parent-window-lost-dispatch"
+    notifier.queuePendingParentWake(sessionID, FINAL_WAKE, { agent: "sisyphus" }, true)
+    const realNow = Date.now.bind(Date)
+    const nowSpy = spyOn(Date, "now")
+
+    try {
+      await notifier.flushPendingParentWake(sessionID)
+      expect(promptAsyncCalls).toHaveLength(1)
+      await waitForTimer()
+      expect(notifier.getPendingParentWakes().get(sessionID)?.lostDispatchRetry).toBe(true)
+
+      // when
+      nowSpy.mockImplementation(() => realNow() + 3_000)
+      await notifier.flushPendingParentWake(sessionID)
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(2)
+      expect(notifier.getDispatchedParentWakes().get(sessionID)?.lostDispatchRetry).toBeUndefined()
+    } finally {
+      nowSpy.mockRestore()
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given an accepted parent wake is recorded but produces no output #when its retry runs inside the semantic hold #then the retry stays coalesced so the prompt is not duplicated", async () => {
+    // given
+    const { notifier, promptAsyncCalls } = createNotifier({ recordDispatchedPrompts: true })
+    const sessionID = "parent-window-recorded-dispatch"
+    notifier.queuePendingParentWake(sessionID, FINAL_WAKE, { agent: "sisyphus" }, true)
+    const realNow = Date.now.bind(Date)
+    const nowSpy = spyOn(Date, "now")
+
+    try {
+      await notifier.flushPendingParentWake(sessionID)
+      expect(promptAsyncCalls).toHaveLength(1)
+      await waitForTimer()
+      expect(notifier.getPendingParentWakes().get(sessionID)?.lostDispatchRetry).toBeUndefined()
+
+      // when
+      nowSpy.mockImplementation(() => realNow() + 3_000)
+      await notifier.flushPendingParentWake(sessionID)
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+    } finally {
+      nowSpy.mockRestore()
       notifier.shutdown()
       releaseAllPromptAsyncReservationsForTesting()
     }

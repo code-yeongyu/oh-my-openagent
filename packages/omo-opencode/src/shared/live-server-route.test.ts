@@ -3,6 +3,7 @@ import { subagentSessions } from "../features/claude-code-session-state/state"
 import {
   _setLiveClientForTesting,
   _setFetchImplementationForTesting,
+  demoteLiveRouteForSession,
   initLiveServerRoute,
   isPreSendConnectionFailure,
   markLiveRouteUnavailable,
@@ -522,6 +523,27 @@ describe("live-server-route", () => {
       expect(syncResult?.route).toBe("in-process")
       expect(syncResult?.reason).toBe("affinity")
       expect(urls().length).toBe(fetchCountAfterAsync)
+    })
+
+    test("#given a stray listener that 500s the session probe #when the session's live route is demoted #then dispatch resolves in-process", async () => {
+      //#given — a portless TUI's fallback serverUrl is answered by an unrelated server
+      const { fetch: fakeFetch } = makeUrlAwareFakeFetch((url) => {
+        if (url.includes("/global/health")) return { ok: true, status: 200 }
+        return { ok: false, status: 500 }
+      })
+      _setFetchImplementationForTesting(fakeFetch)
+      initLiveServerRoute({ serverUrl: FAKE_SERVER_URL, directory: "/tmp/test", inProcessClient: fakeInProcessClient })
+      expect((await resolveDispatchClient(fakeInProcessClient, "ses_stray")).route).toBe("live")
+
+      //#when
+      demoteLiveRouteForSession("ses_stray")
+
+      //#then
+      const asyncResult = await resolveDispatchClient(fakeInProcessClient, "ses_stray")
+      expect(asyncResult.route).toBe("in-process")
+      expect(asyncResult.reason).toBe("affinity")
+      expect(tryResolveDispatchClientSync(fakeInProcessClient, "ses_stray")?.route).toBe("in-process")
+      expect((await resolveDispatchClient(fakeInProcessClient, "ses_other")).route).toBe("live")
     })
   })
 })
