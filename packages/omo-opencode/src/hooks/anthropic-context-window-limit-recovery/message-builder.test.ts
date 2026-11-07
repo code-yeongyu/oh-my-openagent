@@ -1,38 +1,16 @@
-import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
+import { beforeEach, describe, expect, mock, test } from "bun:test"
+import { sanitizeEmptyMessagesBeforeSummarize, PLACEHOLDER_TEXT } from "./message-builder"
 
 const replaceEmptyTextPartsAsync = mock(() => Promise.resolve(false))
 const injectTextPartAsync = mock(() => Promise.resolve(false))
 const findMessagesWithEmptyTextPartsFromSDK = mock(() => Promise.resolve([] as string[]))
 
-mock.module("../../shared/logger", () => ({
-  log: () => {},
-}))
-
-mock.module("../../shared/opencode-storage-detection", () => ({
+const deps = {
   isSqliteBackend: () => true,
-}))
-
-const emptyTextMockFactory = () => ({
-  findMessagesWithEmptyTextParts: () => [],
-  replaceEmptyTextParts: () => false,
-  replaceEmptyTextPartsAsync,
   findMessagesWithEmptyTextPartsFromSDK,
-})
-mock.module("./storage/empty-text", emptyTextMockFactory)
-mock.module("./storage/empty-text.ts", emptyTextMockFactory)
-
-const textPartInjectorMockFactory = () => ({
-  injectTextPart: () => false,
+  replaceEmptyTextPartsAsync,
   injectTextPartAsync,
-})
-mock.module("./storage/text-part-injector", textPartInjectorMockFactory)
-mock.module("./storage/text-part-injector.ts", textPartInjectorMockFactory)
-
-const messageBuilderModulePromise = import("./message-builder")
-
-afterAll(() => {
-  mock.restore()
-})
+}
 
 describe("sanitizeEmptyMessagesBeforeSummarize", () => {
   beforeEach(() => {
@@ -45,7 +23,7 @@ describe("sanitizeEmptyMessagesBeforeSummarize", () => {
   })
 
   test("#given sqlite message with tool content and empty text part #when sanitizing #then it fixes the mixed-content message", async () => {
-    const { sanitizeEmptyMessagesBeforeSummarize, PLACEHOLDER_TEXT } = await messageBuilderModulePromise
+    // given
     const client = {
       session: {
         messages: mock(() => Promise.resolve({
@@ -64,15 +42,17 @@ describe("sanitizeEmptyMessagesBeforeSummarize", () => {
     findMessagesWithEmptyTextPartsFromSDK.mockResolvedValue(["msg-1"])
     replaceEmptyTextPartsAsync.mockResolvedValue(true)
 
-    const fixedCount = await sanitizeEmptyMessagesBeforeSummarize("ses-1", client)
+    // when
+    const fixedCount = await sanitizeEmptyMessagesBeforeSummarize("ses-1", client, deps)
 
+    // then
     expect(fixedCount).toBe(1)
     expect(replaceEmptyTextPartsAsync).toHaveBeenCalledWith(client, "ses-1", "msg-1", PLACEHOLDER_TEXT)
     expect(injectTextPartAsync).not.toHaveBeenCalled()
   })
 
   test("#given sqlite message with mixed content and failed replacement #when sanitizing #then it injects the placeholder text part", async () => {
-    const { sanitizeEmptyMessagesBeforeSummarize, PLACEHOLDER_TEXT } = await messageBuilderModulePromise
+    // given
     const client = {
       session: {
         messages: mock(() => Promise.resolve({
@@ -91,8 +71,10 @@ describe("sanitizeEmptyMessagesBeforeSummarize", () => {
     findMessagesWithEmptyTextPartsFromSDK.mockResolvedValue(["msg-2"])
     injectTextPartAsync.mockResolvedValue(true)
 
-    const fixedCount = await sanitizeEmptyMessagesBeforeSummarize("ses-2", client)
+    // when
+    const fixedCount = await sanitizeEmptyMessagesBeforeSummarize("ses-2", client, deps)
 
+    // then
     expect(fixedCount).toBe(1)
     expect(injectTextPartAsync).toHaveBeenCalledWith(client, "ses-2", "msg-2", PLACEHOLDER_TEXT)
   })
