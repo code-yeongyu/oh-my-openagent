@@ -69,6 +69,7 @@ impl Worker {
         let target = Target::parse(&params.target);
         let mutation = Mutation {
             frame_id: params.frame_id.as_deref(),
+            consume: crate::worker_input::consumes(params.opts.as_ref()),
             keys: params.keys.as_deref(),
             ..Mutation::new(
                 MutatingAction::HoldMouse,
@@ -88,6 +89,7 @@ impl Worker {
             let mode = ParsedPointerOptions::parse(params.opts.as_ref())?.mode;
             let (frame, current) = worker.frame_for(&target, params.frame_id.as_deref())?;
             let (x, y) = frame.map_point(params.x, params.y, current.as_ref())?;
+            worker.read_hit(x, y);
             let check = || {
                 if cancelled() {
                     signal.cancel();
@@ -104,6 +106,7 @@ impl Worker {
                 mode,
                 &HoldControl { check: &check, wait: &wait },
             ))?;
+            worker.judge(&target, &frame, true)?;
             Ok(Response::Unit)
         })
     }
