@@ -131,4 +131,54 @@ describe("model refusals", () => {
     expect(text).toContain("agents.omo-native-code-reviewer.models")
     expect(text).not.toContain("omo-senpi-code-reviewer")
   })
+
+  test("#given exclude_models removes one chain provider #when a category refusal is rendered #then that provider is named as excluded, not as not connected", () => {
+    // given: openai has a credential, but the user excluded every openai model (#12637)
+    const error = {
+      code: "model_unavailable" as const,
+      message: "resolver text",
+      category: "quick",
+      attempted_chain: CHAIN,
+      missing_providers: ["kimi-coding", "kimi-for-coding", "openai"],
+    }
+    const omoConfig = { exclude_models: ["openai/*"] }
+
+    // when
+    const text = categoryModelFailureText(error, omoConfig as never, undefined)
+
+    // then
+    expect(text).toContain("has not connected (kimi-coding, kimi-for-coding)")
+    expect(text).toContain("exclude_models in omo.json keeps out every chain model from openai")
+    expect(text).toContain("connect one of those providers, remove the matching exclude_models entry, or set categories.quick.model")
+  })
+
+  test("#given exclude_models removes every chain provider #when rendered #then no connect-provider wording appears", () => {
+    // given: the pattern has no provider part, so it matches the model id from any provider
+    const missing = ["openai"]
+    const chain: readonly DelegateFallbackEntry[] = [{ providers: ["openai"], model: "gpt-6-luna-fast" }]
+
+    // when
+    const text = chainUnavailableText({ agent: "explore" }, chain, missing, undefined, ["gpt-6-luna-*"])
+
+    // then
+    expect(text).not.toContain("has not connected")
+    expect(text).not.toContain("connect one of those providers")
+    expect(text).toContain("exclude_models in omo.json keeps out every chain model from openai")
+    expect(text).toContain("Fix: remove the matching exclude_models entry, or set agents.explore.model")
+  })
+
+  test("#given exclude_models covers only some of a provider's chain models #when rendered #then the provider stays not connected", () => {
+    // given: openai serves two rungs and only one is excluded, so the credential is still the gap
+    const chain: readonly DelegateFallbackEntry[] = [
+      { providers: ["openai"], model: "gpt-6-luna-fast" },
+      { providers: ["openai"], model: "gpt-6" },
+    ]
+
+    // when
+    const text = chainUnavailableText({ category: "quick" }, chain, ["openai"], undefined, ["openai/gpt-6-luna-*"])
+
+    // then
+    expect(text).toContain("has not connected (openai)")
+    expect(text).not.toContain("exclude_models")
+  })
 })
