@@ -26,11 +26,12 @@ export { serveWorkerPort } from "../desktop-sync/workerPort"
 export function engineDeviceService(
   stateDir: string = deviceServiceStateDir(),
   connect: () => Promise<DeviceService> = () => connectDeviceService({ version: createOmoNativeProductConfig().packageVersion, stateDir, background: true }),
+  log?: (line: string) => void,
 ): HeldCredentialRelay {
   return {
-    readopt: async credential => (await handDeviceKeys({ stateDir, connect, credential, when: "not_adopted" })) !== "not_running",
+    readopt: async credential => (await handDeviceKeys({ stateDir, connect, credential, when: "not_adopted", log })) !== "not_running",
     forget: async () => {
-      await forgetDeviceService({ stateDir, connect })
+      await forgetDeviceService({ stateDir, connect, log })
     },
   }
 }
@@ -40,7 +41,7 @@ export function selectedAccountSource(
   selection: () => Promise<MemorySyncSelection>,
   options: Parameters<typeof createCliAccountSource>[0],
 ): DeviceAccountSource {
-  return accountSourceFromSelection({ selection, cli: () => createCliAccountSource({ relay: engineDeviceService(), ...options }) })
+  return accountSourceFromSelection({ selection, cli: () => createCliAccountSource({ relay: engineDeviceService(undefined, undefined, options.logger === undefined ? undefined : line => options.logger?.warn(line)), ...options }) })
 }
 
 /** A session Worker's selection: the port its host issued through senpi's session worker data, read on first use. */

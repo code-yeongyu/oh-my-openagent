@@ -1,15 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { generateKeyPairSync } from "node:crypto"
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, renameSync, rmSync } from "node:fs"
+import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { connectDeviceService, type DeviceService } from "../../device-service-core/src/index.ts"
+import { connectDeviceService, type DeviceService, deviceServiceEndpointPath } from "../../device-service-core/src/index.ts"
 import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "../../device-service-core/test/local-api/conformance/world.ts"
 import { credentialId, type CredentialStore } from "../../omo-opencode/src/cli/service-auth/keystore"
 import type { Credentials } from "../../omo-opencode/src/cli/service-auth/protocol"
-import type { DeviceServiceHandoff } from "../../omo-opencode/src/cli/service-auth/session"
+import { createSession, type DeviceServiceHandoff } from "../../omo-opencode/src/cli/service-auth/session"
 import { signedOutMarkerPath, writeSignedOutMarker } from "../../omo-opencode/src/cli/service-auth/signed-out-marker"
 import { ACCOUNT_EXIT, runAccountVerb } from "../account-cli"
 import { cliDeviceServiceHandoff } from "../device-service-handoff"
@@ -103,6 +104,44 @@ describe("the omo CLI device service hand-off", () => {
     await handoff.adopt(signedIn("acct_42"))
     await handoff.forget()
     expect(lines).toHaveLength(2)
+  })
+})
+
+describe.skipIf(process.platform === "win32")("a relayd that died and left its endpoint file behind", () => {
+  test("sign-in, omo account adopt and every sign-out still succeed, each with one log line", async () => {
+    const stateDir = join(temp(), "ds")
+    mkdirSync(stateDir, { recursive: true, mode: 0o700 })
+    const endpoint = deviceServiceEndpointPath(stateDir)
+    const server = createServer()
+    await new Promise<void>(resolve => server.listen(endpoint, resolve))
+    linkSync(endpoint, `${endpoint}.kept`)
+    await new Promise<void>(resolve => server.close(() => resolve()))
+    renameSync(`${endpoint}.kept`, endpoint)
+    chmodSync(endpoint, 0o600)
+    const lines: string[] = []
+    const deviceService = cliDeviceServiceHandoff({
+      api: "http://127.0.0.1:9", stateDir, fetch: me, log: line => lines.push(line),
+      connect: () => connectDeviceService({ version: "5.1.60", stateDir }),
+    })
+    let value = null as Credentials | null
+    const store: CredentialStore = {
+      read: async () => value, readAuthoritative: async () => value,
+      write: async next => { value = next }, clear: async () => { value = null },
+    }
+    const home = temp()
+    const session = createSession({ api: "http://127.0.0.1:9", store, home, beforeKeysDiscarded: async () => undefined, deviceService })
+    const signedInCredential = signedIn("acct_42")
+    await session.save(signedInCredential)
+    expect(value).toEqual(signedInCredential)
+    await session.forget()
+    expect(value).toBeNull()
+    const adopt = await runAccountVerb(
+      { api: "http://127.0.0.1:9", store, home, deviceService, pinDir: () => join(home, "pins"),
+        readStdin: async () => JSON.stringify(signedIn("acct_42")), output: () => {}, error: () => {} },
+      ["adopt"],
+    )
+    expect(adopt).toBe(ACCOUNT_EXIT.ok)
+    expect(lines).toHaveLength(3)
   })
 })
 

@@ -1,6 +1,23 @@
 import { existsSync } from "node:fs"
 import { type DeviceCredential, type DeviceService, deviceServiceEndpointPath, type Status } from "./device-service.ts"
 
+/**
+ * A relayd that died can leave its endpoint file behind, so a connect failure is "no service running": logged once and
+ * never thrown, so it can never fail or block a sign-in or a sign-out. The memory device session re-adopts later, once a
+ * service answers.
+ */
+export const connectOrNotRunning = async (
+  connect: () => Promise<DeviceService>,
+  log: ((line: string) => void) | undefined,
+): Promise<DeviceService | "not_running"> => {
+  try {
+    return await connect()
+  } catch (error) {
+    log?.(`OmO device service: its endpoint is there but it did not answer (${error instanceof Error ? error.message : String(error)}); treated as not running.`)
+    return "not_running"
+  }
+}
+
 /** A device credential a client already holds in memory for its own work, with the account it belongs to. */
 export type HeldDeviceCredential = DeviceCredential & { readonly account: string }
 
@@ -18,9 +35,12 @@ export const handDeviceKeys = async (options: {
   readonly connect: () => Promise<DeviceService>
   readonly credential: HeldDeviceCredential
   readonly when: "always" | "not_adopted"
+  /** One line when an endpoint file is there but no service answers it. */
+  readonly log?: (line: string) => void
 }): Promise<"adopted" | "already_adopted" | "not_running"> => {
   if (!existsSync(deviceServiceEndpointPath(options.stateDir))) return "not_running"
-  const service = await options.connect()
+  const service = await connectOrNotRunning(options.connect, options.log)
+  if (service === "not_running") return "not_running"
   try {
     if (options.when === "not_adopted" && adopted(await service.status())) return "already_adopted"
     await service.adopt(options.credential)

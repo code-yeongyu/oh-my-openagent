@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs"
 import { type AccountShowResult, type AccountState, accountStateNotice, classifyAccountShow } from "./account-state.ts"
 import { type DeviceService, deviceServiceEndpointPath, LocalApiError, type Status } from "./device-service.ts"
+import { connectOrNotRunning } from "./hand-device-keys.ts"
 import type { InstallOutcome } from "./install.ts"
 import { compareVersions } from "./release/version.ts"
 
@@ -112,19 +113,18 @@ export const bootstrapDeviceService = async (deps: BootstrapDependencies): Promi
   }
 }
 
-/** `omo logout`: a running service forgets this device. Without a running service there is nothing to tell. */
+/**
+ * Every local end of a sign-in: a running service forgets this device. With no service answering (none running, or a
+ * dead one that left its endpoint file) there is nothing to tell; that is logged, never thrown.
+ */
 export const forgetDeviceService = async (options: {
   readonly stateDir: string
   readonly connect: () => Promise<DeviceService>
+  readonly log?: (line: string) => void
 }): Promise<"forgotten" | "not_running"> => {
   if (!existsSync(deviceServiceEndpointPath(options.stateDir))) return "not_running"
-  let service: DeviceService
-  try {
-    service = await options.connect()
-  } catch (error) {
-    if (isServiceStopped(error)) return "not_running"
-    throw error
-  }
+  const service = await connectOrNotRunning(options.connect, options.log)
+  if (service === "not_running") return "not_running"
   try {
     await service.forget()
   } finally {

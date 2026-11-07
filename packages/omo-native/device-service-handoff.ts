@@ -50,7 +50,7 @@ export function cliDeviceServiceHandoff(options: {
       try {
         const account = await accountOf(options.api, credentials, doFetch)
         await handDeviceKeys({
-          stateDir, connect, when: "always",
+          stateDir, connect, when: "always", log: options.log,
           credential: {
             device: { id: credentials.device.id, name: credentials.device.name },
             signingPrivateKey: credentials.signingPrivateKey,
@@ -64,7 +64,7 @@ export function cliDeviceServiceHandoff(options: {
     },
     forget: async () => {
       try {
-        await forgetDeviceService({ stateDir, connect })
+        await forgetDeviceService({ stateDir, connect, log: options.log })
       } catch (error) {
         report("forgetting this device")(error)
       }

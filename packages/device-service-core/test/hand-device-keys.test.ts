@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { generateKeyPairSync } from "node:crypto"
-import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { chmodSync, linkSync, mkdirSync, mkdtempSync, renameSync, rmSync } from "node:fs"
+import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { connectDeviceService, type DeviceService, handDeviceKeys, type HeldDeviceCredential } from "../src/index.ts"
+import { connectDeviceService, type DeviceService, deviceServiceEndpointPath, forgetDeviceService, handDeviceKeys, type HeldDeviceCredential } from "../src/index.ts"
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "./local-api/conformance/world.ts"
 
@@ -54,6 +55,44 @@ const connector = (stateDir: string) => {
   }
   return { connect, calls }
 }
+
+/** A relayd that died and left its socket behind: the endpoint file exists, nothing listens on it. */
+const deadEndpoint = async (stateDir: string): Promise<void> => {
+  mkdirSync(stateDir, { recursive: true, mode: 0o700 })
+  const endpoint = deviceServiceEndpointPath(stateDir)
+  const server = createServer()
+  await new Promise<void>(resolve => server.listen(endpoint, resolve))
+  linkSync(endpoint, `${endpoint}.kept`)
+  await new Promise<void>(resolve => server.close(() => resolve()))
+  renameSync(`${endpoint}.kept`, endpoint)
+  chmodSync(endpoint, 0o600)
+}
+
+describe.skipIf(process.platform === "win32")("a relayd that died and left its endpoint file behind", () => {
+  test("the hand-off reads it as no relayd running, logs it, and never throws", async () => {
+    const stateDir = stateDirOf()
+    await deadEndpoint(stateDir)
+    const lines: string[] = []
+    const outcome = await handDeviceKeys({
+      stateDir, credential: held(), when: "always", log: line => lines.push(line),
+      connect: () => connectDeviceService({ version: "5.1.60", stateDir }),
+    })
+    expect(outcome).toBe("not_running")
+    expect(lines).toHaveLength(1)
+  })
+
+  test("forget reads it as no relayd running, logs it, and never throws", async () => {
+    const stateDir = stateDirOf()
+    await deadEndpoint(stateDir)
+    const lines: string[] = []
+    const outcome = await forgetDeviceService({
+      stateDir, log: line => lines.push(line),
+      connect: () => connectDeviceService({ version: "5.1.60", stateDir }),
+    })
+    expect(outcome).toBe("not_running")
+    expect(lines).toHaveLength(1)
+  })
+})
 
 describe("handing held device keys to the device service", () => {
   test("no running service: nothing is installed or connected", async () => {
