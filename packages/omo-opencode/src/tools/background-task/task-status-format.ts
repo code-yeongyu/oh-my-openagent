@@ -42,9 +42,10 @@ ${truncated}
 
 > **Note**: No need to wait explicitly - the system will notify you when this task completes.`
    } else if (task.status === "error") {
+     const errorDetail = task.error ? `\n\n**Error:** ${task.error}` : ""
      statusNote = `
 
-> **Failed**: The task encountered an error. Check the last message for details.`
+> **Failed**: The task encountered an error. Check the last message for details.${errorDetail}`
    } else if (task.status === "interrupt") {
      statusNote = `
 

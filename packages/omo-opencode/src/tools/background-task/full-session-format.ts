@@ -125,6 +125,9 @@ export async function formatFullSession(
   lines.push(`Task ID: ${task.id}`)
   lines.push(`Description: ${task.description}`)
   lines.push(`Status: ${task.status}`)
+  if (task.error) {
+    lines.push(`Error: ${task.error}`)
+  }
   lines.push(`Session ID: ${task.sessionId}`)
   lines.push(`Total messages: ${normalizedMessages.length}`)
   lines.push(`Returned: ${visibleMessages.length}`)
