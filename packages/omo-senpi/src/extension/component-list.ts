@@ -10,6 +10,7 @@ import { createComputerUseComponent } from "../components/computer-use"
 import { createConfigStartupComponent } from "../components/config-startup"
 import { createConfigWatchComponent } from "../components/config-watch"
 import { createDeviceServiceComponent } from "../components/device-service"
+import { createExtendedContextComponent } from "../components/extended-context"
 import { createFallbackArchitectComponent } from "../components/fallback-architect"
 import { createFeedbackComponent } from "../components/feedback"
 import { createGitMasterAttributionComponent } from "../components/git-master"
@@ -37,6 +38,7 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createConfigStartupComponent(),
     // After config-startup so configuration diagnostics print before the profile notice.
     createModelProfileComponent(),
+    createExtendedContextComponent(),
     // Skill availability is resolved before the startup UI components run, and it stays
     // outside the native-badge -> onboarding -> advisor adjacency that session-start
     // ordering pins (session-start-ordering.test.ts).

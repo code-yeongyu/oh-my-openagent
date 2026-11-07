@@ -21,6 +21,7 @@ const TOLERATED_FSYNC_CODES: ReadonlySet<string> = new Set([
 export interface AtomicWriteOptions {
   readonly platform?: NodeJS.Platform
   readonly fsyncSync?: typeof FsyncSync
+  readonly mode?: number
 }
 
 function isToleratedFsyncError(error: unknown): boolean {
@@ -45,7 +46,7 @@ export function writeFileAtomically(filePath: string, content: string, options: 
   const fsyncImpl = options.fsyncSync ?? fsyncSync
   const tempPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`
   try {
-    writeFileSync(tempPath, content, "utf-8")
+    writeFileSync(tempPath, content, { encoding: "utf-8", mode: options.mode })
     const tempFileDescriptor = openSync(tempPath, "r+")
     try {
       tolerantFsyncSync(tempFileDescriptor, fsyncImpl)
