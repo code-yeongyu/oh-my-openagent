@@ -3,7 +3,8 @@
   // Exported types are part of our contracts even before they have consumers.
   "rules": { "types": "off", "nsTypes": "off" },
   // pre-existing at origin dev 4686e425b5: executables root scripts and tests run that no package declares (OS and platform tools)
-  "ignoreBinaries": ["file", "icacls", "notepad.exe", "tasklist"],
+  // busctl, hyprctl: Linux session tools run by script/qa/desktop/hyprland.ts
+  "ignoreBinaries": ["busctl", "file", "hyprctl", "icacls", "notepad.exe", "tasklist"],
   // Findings marked "pre-existing at origin dev 4686e425b5" were already present when this check was added. Each ignore is
   // scoped to one file (and its issue types) or one dependency, so new dead code anywhere else still fails the check.
   // Remove an entry when its finding is fixed. Root-workspace file ignores live at the top level (knip reads the root
@@ -2141,6 +2142,7 @@
         "script/oxlint/biome-ports.ts",
         "script/patch-node-require-shim.ts",
         "script/print-release-notes.ts",
+        "script/qa/desktop/hyprland.ts",
         "script/qa/desktop/linux.ts",
         "script/qa/desktop/linux/expect-sabotage.ts",
         "script/qa/desktop/windows.ts",
@@ -2921,6 +2923,8 @@
         "scripts/qa/fused-equivalence-e2e.mjs",
         // run by path as the bunshin-ts eval SDK's live QA driver (scripts/qa/AGENTS.md)
         "scripts/qa/bunshin-ts-eval-sdk-qa.mjs",
+        // run by path as computer-use v2 row 9's live macOS capture-consent and SkyLight measurement
+        "scripts/qa/capture-consent-probe-macos.mjs",
         "src/components/claim-receipt/runtime.ts",
         "src/components/computer-use/runtime.ts",
         "src/components/device-service/runtime.ts",
@@ -3392,7 +3396,8 @@
         "@oh-my-opencode/prompts-core",
       ],
       // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
-      "ignoreBinaries": ["icacls", "pgrep", "taskkill.exe", "vmmap"],
+      // plutil, screencapture: macOS tools run by scripts/qa/capture-consent-probe-macos.mjs
+      "ignoreBinaries": ["icacls", "pgrep", "plutil", "screencapture", "taskkill.exe", "vmmap"],
       "ignoreIssues": {
         // pre-existing at origin dev 4686e425b5: imports of undeclared packages @code-yeongyu/comment-checker
         "scripts/qa/drive.mjs": ["unlisted"],
