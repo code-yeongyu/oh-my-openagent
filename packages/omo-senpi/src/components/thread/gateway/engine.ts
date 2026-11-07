@@ -210,15 +210,19 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
     }
     try {
       if (endpoint === null) return await settle(resultFromRow(outcome.row, outcome.queue_position, null, false, true))
-      let reached = true
+      let reply: Awaited<ReturnType<GatewayEndpointPort["wake"]>> | undefined
       try {
-        reached = (await options.endpoints.wake(endpoint, [deliveryId])).unroutable === undefined
+        reply = await options.endpoints.wake(endpoint, [deliveryId])
       } catch {
-        reached = false
+        reply = undefined
       }
       const view = await store.deliveryView(deliveryId)
       if (view === null) throw new Error(`delivery ${deliveryId} vanished after commit`)
-      return await settle(resultFromRow(view.row, view.queue_position, endpoint.kind, false, !reached))
+      // A live drain pass that finds a queued row always reports one (admitted, refused or held), so a
+      // reply naming nothing while this row is still queued means no drain ran: the session has no
+      // registered control endpoint, and nothing starts it before the session's next run (#12486).
+      const drained = reply !== undefined && reply.unroutable === undefined && (view.row.state !== "queued" || (reply.admitted ?? []).length > 0)
+      return await settle(resultFromRow(view.row, view.queue_position, endpoint.kind, false, !drained))
     } catch (error) {
       await store.abandonReceipt({ now: now(), principal: facts.principal, idempotency_key: idempotencyKey, error_note: error instanceof Error ? error.message : String(error) }).catch(() => false)
       throw error
