@@ -114,9 +114,22 @@ impl AxBackend for FakeBackend {
         Ok(self.ax_tree.element_at(x, y).map(AxHandle::Id))
     }
 
+    /// The system-wide focus is the frontmost app's own; a scenario with no
+    /// focused node there falls back to the first focused node.
     fn focused_element(&mut self) -> CoreResult<Option<AxHandle>> {
         self.begin(FakeMethod::AxFocusedElement)?;
-        Ok(self.ax_tree.focused().map(AxHandle::Id))
+        let front = self.front_pid().and_then(|pid| self.focused_in_app(pid));
+        Ok(front.or_else(|| self.ax_tree.focused()).map(AxHandle::Id))
+    }
+
+    fn app_focused_element(&mut self, pid: u32) -> CoreResult<Option<AxHandle>> {
+        self.begin(FakeMethod::AxAppFocusedElement)?;
+        Ok(self.focused_in_app(pid).map(AxHandle::Id))
+    }
+
+    fn is_secure_text_field(&mut self, h: &AxHandle) -> CoreResult<bool> {
+        self.begin(FakeMethod::AxProps)?;
+        self.ax_tree.secure(node_id(h)?)
     }
 
     fn attributes(&mut self, h: &AxHandle) -> CoreResult<Vec<(String, String)>> {
@@ -139,6 +152,19 @@ const fn presence(present: bool) -> EvidenceState {
         EvidenceState::Known
     } else {
         EvidenceState::Absent
+    }
+}
+
+impl FakeBackend {
+    /// The focused node inside the windows of app `pid`.
+    fn focused_in_app(&self, pid: u32) -> Option<u64> {
+        let windows: Vec<&str> = self
+            .windows
+            .iter()
+            .filter(|window| window.pid == Some(pid))
+            .map(|window| window.id.as_str())
+            .collect();
+        self.ax_tree.focused_in(&windows)
     }
 }
 
