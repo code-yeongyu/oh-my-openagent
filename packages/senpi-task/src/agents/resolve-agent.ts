@@ -3,7 +3,7 @@ import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import type { SenpiModelPort, SenpiModelRegistryPort } from "../category"
 import { missingChainProviders } from "../category/chain-diagnostics"
-import { firstCategoryDefaultModel, resolveAgentCategoryModel } from "./resolve-agent-categories"
+import { type AgentCategoryRefusal, firstCategoryDefaultModel, resolveAgentCategoryModel } from "./resolve-agent-categories"
 import { buildRuntimeModelChain, chainRungCandidates } from "../model-chain"
 import { withoutExcludedModels } from "../model-exclusion"
 import type { ResolvedModelRecord } from "../state"
@@ -61,6 +61,9 @@ export type AgentModelUnavailableResult = {
   // carried so the spawn refusal can name every model instead of one "attempted" id.
   readonly attempted_chain?: readonly DelegateFallbackEntry[]
   readonly missing_providers?: readonly string[]
+  // An agent with no builtin chain resolves through its categories; when none of them can run, the
+  // categories' own dead chains are what the refusal names (#12647).
+  readonly attempted_categories?: readonly AgentCategoryRefusal[]
 }
 
 export type AgentResolutionResult = ResolvedAgentResult | AgentNotFoundResult | AgentModelUnavailableResult
@@ -156,15 +159,17 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     )
   }
 
+  let categoryRefusals: readonly AgentCategoryRefusal[] = []
   if (definition.categories !== undefined) {
-    const selection = resolveAgentCategoryModel({
+    const outcome = resolveAgentCategoryModel({
       categories: definition.categories,
       omoConfig: options.omoConfig ?? {},
       registry,
       configuredTuning,
       distributeModels: options.distributeModels,
     })
-    if (selection !== undefined) {
+    if (outcome.kind === "selected") {
+      const { selection } = outcome
       return resolvedAgent(
         context,
         { provider: selection.provider, modelId: selection.modelId },
@@ -176,6 +181,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
         },
       )
     }
+    categoryRefusals = outcome.refusals
     attemptedModel = attemptedModel ?? firstCategoryDefaultModel(definition.categories, options.omoConfig)
   }
 
@@ -226,6 +232,7 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     ...(fallbackChain !== undefined && availableModels !== undefined
       ? { attempted_chain: fallbackChain, missing_providers: missingChainProviders(fallbackChain, availableModels) }
       : {}),
+    ...(fallbackChain === undefined && categoryRefusals.length > 0 ? { attempted_categories: categoryRefusals } : {}),
   }
 }
 

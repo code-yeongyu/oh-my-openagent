@@ -877,6 +877,28 @@ describe("createTaskChildPlanner model refusals", () => {
     expect(result.error.message).toContain("No child was spawned")
   })
 
+  test.each(["omo-native-code-reviewer", "omo-native-qa-executor", "omo-native-gate-reviewer"])("#given %s, which has no builtin chain, and no connected provider for its categories #when planned #then the refusal names each category's chain, its providers and the Settings key (#12647)", (agent) => {
+    // given
+    const categories = BUILTIN_AGENTS[agent]?.categories ?? []
+    expect(categories.length).toBeGreaterThan(0)
+    const planner = createTaskChildPlanner({}, BUILTIN_AGENTS, proxyOnly)
+
+    // when
+    const result = planner({ prompt: "Review the diff.", parent_session_id: "parent-1", depth: 0, subagent_type: agent })
+
+    // then
+    expect(result.kind).toBe("error")
+    if (result.kind !== "error") return
+    expect(result.error.code).toBe("model_unavailable")
+    expect(result.error.message).not.toContain("No available model for agent")
+    for (const category of categories) {
+      expect(result.error.message).toContain(`category "${category}"`)
+      expect(result.error.message).toContain(`categories.${category}.model`)
+    }
+    expect(result.error.message).toContain("has not connected")
+    expect(result.error.message).toContain("No child was spawned")
+  })
+
   test("#given explore pinned to a model the registry does not serve #when planned #then the refusal names the pin, not its chain", () => {
     // given
     const explore = BUILTIN_AGENTS.explore
