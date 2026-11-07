@@ -24,7 +24,10 @@
     "#omo-device-service-runtime": "./src/components/device-service/runtime.ts",
     "#omo-memory-sync-runtime": "./src/components/memory/sync-runtime.ts",
     "#omo-agent-toolkit-sdk": "./src/extension/agent-toolkit-sdk.ts",
-    "#bunshin-ts": "./src/extension/bunshin-ts-sdk.ts"
+    "#senpi-private-fds": "@code-yeongyu/senpi/private-fds",
+    "#bunshin-ts": "./src/extension/bunshin-ts-sdk.ts",
+    "#bunshin-ts-dep/@sinclair/typebox": "@sinclair/typebox",
+    "#bunshin-ts-dep/@sinclair/typebox/*": "@sinclair/typebox/*"
   },
   "exports": {
     ".": {
