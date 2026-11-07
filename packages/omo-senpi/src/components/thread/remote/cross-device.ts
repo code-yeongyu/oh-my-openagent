@@ -70,8 +70,10 @@ export async function planCreate(
   if (value.alias !== undefined) {
     if (remote.aliases === undefined) return { kind: "done", result: ALIASES_UNAVAILABLE }
     const held = await remote.aliases.resolve(value.alias)
-    if (held.kind === "ok") return { kind: "done", result: { kind: "error", error: threadToolFailure("alias_taken", `The alias ${value.alias} is held by another thread.`, "Choose another alias; the holder is named in details.", { holder: held.value }) } }
-    if (held.error.code !== "alias_not_found") return { kind: "done", result: aliasFailure(held.error) }
+    // Opening the thread that already holds the alias, named by that alias or by its id, keeps the alias it has (#12641).
+    const opensHolder = held.kind === "ok" && value.thread !== undefined && (value.thread === value.alias || value.thread === held.value.session_id)
+    if (held.kind === "ok" && !opensHolder) return { kind: "done", result: { kind: "error", error: threadToolFailure("alias_taken", `The alias ${value.alias} is held by another thread.`, "Choose another alias; the holder is named in details.", { holder: held.value }) } }
+    if (held.kind === "error" && held.error.code !== "alias_not_found") return { kind: "done", result: aliasFailure(held.error) }
   }
   if (value.thread !== undefined) {
     const target = await crossTarget(remote, value.thread, local(value.thread))
