@@ -1,6 +1,6 @@
 ---
 name: git-master
-description: "MUST USE for ANY git operations: atomic commits, rebase/squash/fixup, and history search (blame, bisect, log -S, reflog). Load it before running git yourself, or pass load_skills=['git-master'] to the task that commits. Triggers: 'commit', 'rebase', 'squash', 'who wrote', 'when was X added', 'find the commit that'."
+description: "MUST USE for ANY git operations: atomic commits, rebase/squash/fixup, history search (blame, bisect, log -S, reflog), local branch and worktree cleanup judged by PR state, and the proof a release claim owes. Load it before running git yourself, or pass load_skills=['git-master'] to the task that commits. Triggers: 'commit', 'rebase', 'squash', 'who wrote', 'when was X added', 'find the commit that', 'delete merged branches', 'clean up branches', 'worktree cleanup', '벨랜치 정리', '워크트리 정리', 'release proof', 'is this release safe to publish'."
 ---
 
 # Git Master
@@ -15,6 +15,8 @@ Classify the request first:
 - `REBASE`: rebase, squash, fixup, autosquash, reorder, split, or otherwise rewrite branch history.
 - `HISTORY`: answer when, where, who, why, or which commit changed something.
 - `STATUS`: inspect branch, diff, or working-tree state without changing it.
+- `GC`: delete local branches and worktrees whose work has landed, judged by PR state (`references/local-gc.md`).
+- `RELEASE`: state what a release claim must prove before anyone publishes or announces it (`references/release-proof.md`).
 
 Do not commit, rebase, push, force-push, reset, stash-pop, or delete anything unless the user explicitly asked for that operation. When a workflow the user started mandates one of them (ulw-loop commits each verified unit, ulw-execute lands its branches), that workflow's instruction is the ask. If the request is only investigative, report findings and stop.
 
@@ -96,6 +98,21 @@ Choose the Git tool by the question:
 - `git reflog`: recover or explain recent local history movement.
 
 Always cite the exact command evidence in the answer: commit hash, subject, file path, and line or diff context when relevant. If the evidence is ambiguous, say what remains unproven.
+
+## GC Mode
+
+`git branch --merged` misses every squash and rebase merge, so the proof that a branch landed is the forge's pull request state, joined by branch name and confirmed by the tip SHA. `scripts/branch-gc.ts` does that join and classifies every local branch; read `references/local-gc.md` for the classes and the do-not-delete rules before running it.
+
+```bash
+bun "$SKILL_DIR/scripts/branch-gc.ts" --repo . --json                  # dry run: classes, reasons, exit 2 when candidates exist
+bun "$SKILL_DIR/scripts/branch-gc.ts" --repo . --apply --worktrees      # snapshot first, then remove clean worktrees and delete
+```
+
+`$SKILL_DIR` is this skill's own directory (the folder holding this SKILL.md). The dry run is the default and the report the user sees first. `--apply` writes a `for-each-ref` snapshot (SHA plus refname for every ref, printed as `snapshot: <path>`) before the first deletion, removes worktrees before their branches, and never forces: a locked worktree, a dirty worktree, the worktree you are standing in, a protected or `wip/`/`backup/`/`archive/` branch, an open PR's head, and the base of any open PR are reported and left alone. A scheduled job may run the dry run; the `--apply` run is a human-approved invocation, every time.
+
+## Release Mode
+
+A release claim ("shipped", "published", "deployed", "safe to tag") is a set of facts, and `references/release-proof.md` lists the five the claim owes: the artifact digest, the builder that produced it, the target it went to, the smoke evidence against that target, and the rollback evidence. Collect them before saying the release is done; a claim missing one of them is reported as missing that item, not as done.
 
 ## Safety Checks
 
