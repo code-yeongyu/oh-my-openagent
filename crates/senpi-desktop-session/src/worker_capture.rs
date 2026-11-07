@@ -60,6 +60,7 @@ pub(crate) fn capture_response(
         Delivery::ArtifactOnly { path, note } => (None, "image/png", Some(path), Some(note)),
     };
     Response::Capture(CaptureResult {
+        identity: None,
         mode,
         data,
         mime_type: Some(mime_type.to_owned()),
