@@ -1,6 +1,6 @@
 import type { ControlAttachState, DeviceRow, ListingResult, Status, StatusState } from "../device-service-core/src/index.ts"
 import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
-import type { RemoteWatchEnd } from "../omo-senpi/src/components/thread/remote/ports"
+import type { JsonObject, RemoteWatchEnd } from "../omo-senpi/src/components/thread/remote/ports"
 import type { RemoteWatchEvent } from "../omo-senpi/src/components/thread/remote/remote-follow"
 
 // The human forms of `omo remote`; every command also has a --json form that prints the SDK's typed value as is.
@@ -80,6 +80,29 @@ export function sessionLines(result: ListingResult, labels: ReadonlyMap<string, 
   return lines
 }
 
+// Wire text from another device reaches the terminal: control characters are dropped first.
+const printable = (char: string): boolean => {
+  const code = char.codePointAt(0) ?? 0
+  return code > 0x1f && (code < 0x7f || code > 0x9f)
+}
+const clean = (value: unknown): string => (typeof value === "string" ? [...value].filter(printable).join("").trim() : "")
+
+const isRecord = (value: unknown): value is JsonObject => typeof value === "object" && value !== null && !Array.isArray(value)
+
+function dialogLines(label: string, uiRequestId: string, request: JsonObject): string[] {
+  const questions = Array.isArray(request["questions"]) ? request["questions"].filter(isRecord) : []
+  const asked = clean(request["title"]) || questions.map(question => clean(question["question"])).filter(Boolean).join(" / ")
+  const message = clean(request["message"])
+  const options = Array.isArray(request["options"])
+    ? request["options"].map(clean)
+    : questions.flatMap(question => (Array.isArray(question["options"]) ? question["options"].map(option => clean(isRecord(option) ? option["label"] : option)) : []))
+  const choices = options.filter(Boolean)
+  return [
+    `${label} asks (${clean(request["method"]) || "dialog"}): ${[asked, message].filter(Boolean).join(" - ")}${choices.length > 0 ? ` [${choices.join(" | ")}]` : ""}`,
+    `  answer: omo remote answer ${label} ${clean(uiRequestId)} <answer>`,
+  ]
+}
+
 /** `omo remote watch`'s lines, in the words of senpi's monitor lines for the same events. */
 export function watchLines(label: string, device: string, event: RemoteWatchEvent): string[] {
   switch (event.kind) {
@@ -102,6 +125,10 @@ export function watchLines(label: string, device: string, event: RemoteWatchEven
       return [`device ${device} unreachable (${event.reason}); re-watching`]
     case "record":
       return [`${label} ${String(event.record["type"])}`]
+    case "dialog":
+      return dialogLines(label, event.uiRequestId, event.request)
+    case "dialog_settled":
+      return [`${label} request ${clean(event.uiRequestId)} ${event.disposition}`]
   }
 }
 
@@ -111,7 +138,7 @@ export function watchEndLine(label: string, end: RemoteWatchEnd): string {
 }
 
 /** The human answer of a session verb that succeeded; `label` is the `<device>/<session>` it named. */
-export function sessionVerbLines(verb: "open" | "send" | "model" | "interrupt" | "close" | "watch", label: string, result: ThreadToolResult): string[] {
+export function sessionVerbLines(verb: "open" | "send" | "model" | "interrupt" | "close" | "watch" | "answer", label: string, result: ThreadToolResult): string[] {
   if (result.kind !== "ok") return []
   if (verb === "open" && "thread" in result) return [`${result.thread.device ?? ""}/${result.thread.thread_id}`]
   if (verb === "send" && "delivery" in result) {
@@ -123,6 +150,7 @@ export function sessionVerbLines(verb: "open" | "send" | "model" | "interrupt" |
   if (verb === "model" && "model" in result) return [`${label} now uses ${result.model.provider}/${result.model.id}.`]
   if (verb === "interrupt" && "interrupted" in result) return [result.interrupted ? `Interrupted ${label}.` : `Nothing was running on ${label}.`]
   if (verb === "close" && "closed" in result) return [result.closed ? `Closed ${label}.` : `${label} was not open.`]
+  if (verb === "answer" && "answered" in result) return [`Answered ${result.answered.ui_request_id} on ${label}.`]
   return []
 }
 

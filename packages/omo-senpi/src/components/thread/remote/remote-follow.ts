@@ -56,13 +56,27 @@ export type RemoteWatchEvent =
   | { readonly kind: "resynced"; readonly resync: RemoteResync }
   | { readonly kind: "lost"; readonly reason: string }
   | { readonly kind: "record"; readonly record: JsonObject }
+  /** A dialog the session waits on, raised by any client; answered by its uiRequestId. */
+  | { readonly kind: "dialog"; readonly uiRequestId: string; readonly request: JsonObject }
+  | { readonly kind: "dialog_settled"; readonly uiRequestId: string; readonly disposition: "answered" | "cancelled" }
+
+// A watch is no dialog's raiser, so it sees each dialog only as the session's mirror of it (senpi snapshot-types.ts).
+function dialogEvent(record: JsonObject): RemoteWatchEvent | undefined {
+  const uiRequestId = record["uiRequestId"]
+  if (typeof uiRequestId !== "string" || uiRequestId === "") return undefined
+  const request = record["request"]
+  if (record["type"] === "ui_request_pending" && isJsonObject(request)) return { kind: "dialog", uiRequestId, request }
+  if (record["type"] === "ui_request_settled") return { kind: "dialog_settled", uiRequestId, disposition: record["disposition"] === "answered" ? "answered" : "cancelled" }
+  return undefined
+}
 
 export type RemoteSessionFollow = { readonly initial: RemoteSessionState; readonly ended: Promise<RemoteWatchEnd>; readonly stop: () => void }
 
 /**
  * Watches another device's session until it closes or the access ends: its status changes and turn ends as they
  * happen, and after any gap (relay drop, device-service restart, engine restart) what changed meanwhile, once.
- * `records: true` also passes every other record the session writes.
+ * Every dialog the session waits on, and its settling, is passed too; `records: true` also passes every other record
+ * the session writes.
  */
 export async function watchRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, onEvent: (event: RemoteWatchEvent) => void, options: { readonly records?: boolean } = {}): Promise<RemoteSessionFollow | Failure> {
   const offline = await deviceOnline(remote, row.device)
@@ -74,6 +88,8 @@ export async function watchRemote(remote: RemoteThreadSurface, row: RemoteSessio
         const reason = record["reason"]
         return onEvent({ kind: "settled", ...(typeof turnId === "string" ? { turnId } : {}), ...(typeof reason === "string" ? { reason } : {}) })
       }
+      const dialog = dialogEvent(record)
+      if (dialog !== undefined) return onEvent(dialog)
       if (options.records === true && record["type"] !== "session_status") onEvent({ kind: "record", record })
     },
     status: (change) => onEvent({ kind: "status", change }),

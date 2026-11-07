@@ -41,7 +41,10 @@ const REMOTE_USAGE = `usage: omo remote <command> [--json]
   interrupt <device>/<session>             stop the session's running turn
   close <device>/<session>                 end the session on its device
   watch <device>/<session>                 print the session's status changes and turn ends until it closes,
-                                           re-watching through relay drops (what changed meanwhile is reported)`
+                                           re-watching through relay drops (what changed meanwhile is reported),
+                                           and each request it waits on, whichever device's turn raised it
+  answer <device>/<session> <request> <answer> | --cancel
+                                           answer a request the session waits on, by the id watch prints`
 
 export interface RemoteCommandDependencies {
   /** `omo account show`: the first bootstrap step; nothing else runs unless it reports signed in. */
@@ -145,6 +148,7 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
     case "interrupt":
     case "close":
     case "watch":
+    case "answer":
       if (parsed.session !== undefined) return runSession(service, parsed.session, parsed.json, dependencies)
       throw new UsageError(`omo remote ${parsed.command}: arguments were not parsed`)
     default:

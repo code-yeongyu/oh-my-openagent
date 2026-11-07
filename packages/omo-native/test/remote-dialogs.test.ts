@@ -119,13 +119,13 @@ describe("omo remote: a dialog raised on another device's session", () => {
     expect(b.answers).toEqual([])
   })
 
-  test("#given a request the session no longer waits on #when answer names it #then the engine's refusal is reported as already settled", async () => {
+  test("#given a request the session no longer waits on #when answer names it #then the engine's refusal is reported and nothing counts as answered", async () => {
     const b = waitingOn([], [], "unknown_extension_ui_request")
     const { code, err } = await run(["answer", "b/dur-on-b", "gone-1", "B"], b.remote)
     expect(code).toBe(REMOTE_EXIT.failed)
     expect(err).toEqual([
       "omo remote: b/dur-on-b no longer waits on request gone-1 (unknown_extension_ui_request).",
-      "Run omo remote watch b/dur-on-b to see what it asks now.",
+      "Watch b/dur-on-b for what it asks now; nothing was answered.",
     ])
     expect(b.answers.map(answer => answer["uiRequestId"])).toEqual(["gone-1"])
   })
@@ -134,7 +134,7 @@ describe("omo remote: a dialog raised on another device's session", () => {
     const b = waitingOn([select])
     const { code, err } = await run(["answer", "b/dur-on-b", "dlg-1"], b.remote)
     expect(code).toBe(REMOTE_EXIT.usage)
-    expect(err.join("\n")).toContain("omo remote answer")
+    expect(err[0]).toBe("omo remote answer: the answer is required (or --cancel to cancel the request)")
     expect(b.answers).toEqual([])
   })
 })

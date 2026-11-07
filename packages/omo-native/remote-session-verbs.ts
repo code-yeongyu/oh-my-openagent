@@ -2,6 +2,7 @@ import type { DeviceService } from "../device-service-core/src/index.ts"
 import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
 import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
+import { answerRemote } from "../omo-senpi/src/components/thread/remote/remote-answer"
 import { setModelRemote } from "../omo-senpi/src/components/thread/remote/remote-controls"
 import { followRemote, type RemoteWatchEvent, watchRemote } from "../omo-senpi/src/components/thread/remote/remote-follow"
 import {
@@ -87,6 +88,8 @@ async function runOnSurface(remote: RemoteThreadSurface, args: SessionArgs, json
       return sendTo(remote, row, args, { label, json, show }, dependencies)
     case "watch":
       return watchOn(remote, row, { label, json, show }, dependencies)
+    case "answer":
+      return show(await answerRemote(remote, row, args.uiRequestId, args.answer), label)
   }
 }
 
