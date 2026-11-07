@@ -183,7 +183,7 @@ describe("EXCLUDED_ENV_PATTERNS", () => {
     const testCases = [
       ["NPM_CONFIG_REGISTRY", true], ["npm_config_registry", true], ["YARN_CACHE_FOLDER", true],
       ["PNPM_HOME", true], ["NO_UPDATE_NOTIFIER", true], ["GOOGLE_APPLICATION_CREDENTIALS", true],
-      ["GOOGLE_CLOUD_PROJECT", true], ["AZURE_CLIENT_ID", true], ["GCP_SERVICE_ACCOUNT", true],
+      ["GOOGLE_CLOUD_PROJECT", false], ["GCLOUD_PROJECT", false], ["AZURE_CLIENT_ID", true], ["GCP_SERVICE_ACCOUNT", true],
       ["FIREBASE_CONFIG", true], ["HEROKU_API_KEY", true], ["DOCKER_AUTH_CONFIG", true],
       ["KUBECONFIG", true], ["VAULT_TOKEN", true], ["APP_CREDENTIALS", true],
       ["PATH", false], ["HOME", false], ["NODE_ENV", false],
@@ -221,9 +221,9 @@ describe("secret env var filtering", () => {
     const cleanEnv = createCleanMcpEnvironment({}, { DATABASE_URL: "postgresql://user:password@localhost:5432/db", DB_PASSWORD: "secret", TERM: "xterm-256color" })
     expect(cleanEnv.DATABASE_URL).toBeUndefined(); expect(cleanEnv.DB_PASSWORD).toBeUndefined(); expect(cleanEnv.TERM).toBe("xterm-256color")
   })
-  it("filters out exact cloud credential env vars", () => {
-    const cleanEnv = createCleanMcpEnvironment({}, { GOOGLE_APPLICATION_CREDENTIALS: "/tmp/file", GOOGLE_CLOUD_PROJECT: "demo", PATH: "/usr/bin" })
-    expect(cleanEnv.GOOGLE_APPLICATION_CREDENTIALS).toBeUndefined(); expect(cleanEnv.GOOGLE_CLOUD_PROJECT).toBeUndefined(); expect(cleanEnv.PATH).toBe("/usr/bin")
+  it("filters credential paths but preserves non-secret project IDs", () => {
+    const cleanEnv = createCleanMcpEnvironment({}, { GOOGLE_APPLICATION_CREDENTIALS: "/tmp/file", GOOGLE_CLOUD_PROJECT: "demo", GCLOUD_PROJECT: "demo", PATH: "/usr/bin" })
+    expect(cleanEnv.GOOGLE_APPLICATION_CREDENTIALS).toBeUndefined(); expect(cleanEnv.GOOGLE_CLOUD_PROJECT).toBe("demo"); expect(cleanEnv.GCLOUD_PROJECT).toBe("demo"); expect(cleanEnv.PATH).toBe("/usr/bin")
   })
 })
 
