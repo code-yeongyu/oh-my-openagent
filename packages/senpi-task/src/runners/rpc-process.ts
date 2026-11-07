@@ -3,6 +3,8 @@ import { log } from "@oh-my-opencode/utils"
 
 import type { RpcChildHandle, RpcRunnerSpec } from "./types"
 import { RunnerError } from "./in-process/runner-error"
+import { DesignatedChainNotHeldError, type DesignatedChainNotHeldReason } from "./designated-chain-error"
+import { designatedChainText } from "./designated-fallback-profile"
 import { childRetryFallbackProfile } from "./retry-fallback-profile"
 import { createRpcChildHandle, type CreateRpcChildHandleOptions } from "./rpc/handle"
 import { createRpcModelAdmission, type RpcModelAdmission } from "./rpc/model-admission"
@@ -157,7 +159,7 @@ export class RpcProcessRunner {
   // engine does not hold fails the start before the first prompt: no model runs for that child (#12006).
   private async applyFallbackChain(client: RpcProtocolClient, spec: RpcRunnerSpec): Promise<void> {
     const retryFallback = childRetryFallbackProfile(spec)
-    if (retryFallback === undefined) return
+    if (retryFallback === undefined || spec.model === undefined) return
     // Past the deadline the start fails, so a probe answered late must not send the chain after it.
     const expired = new AbortController()
     const outcome = await withDeadline(
@@ -166,15 +168,23 @@ export class RpcProcessRunner {
       expired,
     )
     if (outcome === "applied") return
-    const reason = client.exited
-      ? "the child exited while it was being sent"
-      : outcome === "unsupported"
-        ? "this senpi engine cannot take a task child's model chain (no retry_fallback_command); upgrade it"
-        : outcome === "timeout" ? `no answer within ${this.fallbackChainDeadlineMs} ms` : outcome.refused
-    throw new Error(
-      `task ${spec.task_id}: its designated model chain was not applied (${reason}), and a child never runs ` +
-        "outside its designated models, so it was not started",
-    )
+    const chain = designatedChainText(spec.model, spec.fallbackModels ?? [])
+    // A child that died or whose pipe failed is a transport failure: the start keeps its exit/transport
+    // classification instead of reading as an engine that refused the chain.
+    if (client.exited) {
+      throw new Error(`task ${spec.task_id}: its designated model chain (${chain}) was not applied because the child exited while it was being sent`)
+    }
+    const [kind, reason]: readonly [DesignatedChainNotHeldReason, string] = outcome === "unsupported"
+        ? ["unsupported", "this senpi engine cannot take a task child's model chain (no retry_fallback_command); upgrade it"]
+        : outcome === "timeout"
+          ? ["timeout", `no answer within ${this.fallbackChainDeadlineMs} ms`]
+          : ["refused", outcome.refused]
+    throw new DesignatedChainNotHeldError({
+      reason: kind,
+      models: [spec.model, ...(spec.fallbackModels ?? [])],
+      message: `task ${spec.task_id}: its designated model chain (${chain}) ` +
+        `was not applied (${reason}), and a child never runs outside its designated models, so it was not started`,
+    })
   }
 
   private async sendFallbackChain(

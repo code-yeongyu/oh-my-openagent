@@ -68,6 +68,7 @@ describe("a daemon-hosted child's own fallback chain (#9512)", () => {
 
     // then
     await expect(started).rejects.toThrow("task daemon unavailable (capability): missing retry_fallback_profile")
+    await expect(started).rejects.toThrow("designated models (anthropic/claude-sonnet-4-5 -> openai/gpt-5.6-sol)")
     const types = host.commands.map((command) => command.type)
     expect(types).not.toContain("open_session")
     expect(types).not.toContain("prompt")

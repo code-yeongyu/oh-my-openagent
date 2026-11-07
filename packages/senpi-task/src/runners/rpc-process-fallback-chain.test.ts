@@ -136,8 +136,10 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
     await expect(first).rejects.toMatchObject({ failure: { kind: "child-prompt-failed" } })
     const second = engine.runner.start(spec("st_p5", { model: "anthropic/claude-opus-5-5" }))
 
-    // then
+    // then: each failure names every designated model, in try order
     await expect(second).rejects.toThrow("retry_fallback_command")
+    await expect(first).rejects.toThrow("(anthropic/claude-opus-5-5 -> openai/gpt-5.6-sol -> kimi-coding/kimi-k3)")
+    await expect(second).rejects.toThrow("(anthropic/claude-opus-5-5)")
     expect(engine.commands().map((command) => command.type)).not.toContain("prompt")
     expect(engine.commands().map((command) => command.type)).not.toContain("set_retry_fallback")
   })
