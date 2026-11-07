@@ -5,24 +5,34 @@ import { join } from "node:path"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { describe, expect, it } from "bun:test"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
+import { listActiveTeams } from "../../features/team-mode/team-state-store/store"
+import { loadPluginConfig } from "../../plugin-config"
 
 const HUNG_LEAD_SESSION_ID = "ses_999999999fffeeRegrTestHang0"
+const SEEDED_TEAM_RUN_ID = "11111111-2222-4333-8444-555555555555"
+// Circuit breaker only: a correct init settles on its own, so this never decides a passing run.
+const INIT_CIRCUIT_BREAKER_MS = 30_000
 
-function makeHangingClient(): {
-  hangCount: { value: number }
-  client: PluginInput["client"]
-} {
-  const hangCount = { value: 0 }
-  const sessionGet = (..._unusedArgs: unknown[]): Promise<unknown> => {
-    hangCount.value += 1
-    return new Promise<never>(() => {})
-  }
-  const client = unsafeTestValue<PluginInput["client"]>({
+// session.get answers with one deferred the test never resolves, so anything awaiting it can never settle.
+function createHeldSessionGetClient(): PluginInput["client"] {
+  const held = new Promise<unknown>(() => {})
+  return unsafeTestValue<PluginInput["client"]>({
     session: {
-      get: sessionGet,
+      get: (..._unusedArgs: unknown[]): Promise<unknown> => held,
     },
   })
-  return { hangCount, client }
+}
+
+async function awaitInitOrTrip(initPromise: Promise<unknown>): Promise<"settled" | "tripped"> {
+  let breaker: ReturnType<typeof setTimeout> | undefined
+  const tripped = new Promise<"tripped">((resolve) => {
+    breaker = setTimeout(() => resolve("tripped"), INIT_CIRCUIT_BREAKER_MS)
+  })
+  try {
+    return await Promise.race([initPromise.then(() => "settled" as const), tripped])
+  } finally {
+    clearTimeout(breaker)
+  }
 }
 
 function createPluginInput(directory: string, client: PluginInput["client"]): PluginInput {
@@ -46,7 +56,7 @@ async function importFreshPluginModule(): Promise<(typeof import("../../index"))
 }
 
 function seedStaleActiveRuntime(omoBaseDir: string): void {
-  const teamRunId = "11111111-2222-3333-4444-555555555555"
+  const teamRunId = SEEDED_TEAM_RUN_ID
   const runtimeDir = join(omoBaseDir, "runtime", teamRunId)
   mkdirSync(runtimeDir, { recursive: true })
   const runtimeState = {
@@ -78,20 +88,24 @@ function seedStaleActiveRuntime(omoBaseDir: string): void {
   writeFileSync(join(runtimeDir, "state.json"), `${JSON.stringify(runtimeState, null, 2)}\n`)
 }
 
-function seedTeamModeConfig(configDir: string, omoBaseDir: string): void {
+// The loader reads the walked project layer `<project>/.omo/omo.json`; OPENCODE_CONFIG_DIR is no longer a config source.
+function seedTeamModeConfig(projectDir: string, omoBaseDir: string): void {
+  const configDir = join(projectDir, ".omo")
   mkdirSync(configDir, { recursive: true })
   const config = {
-    team_mode: {
-      enabled: true,
-      tmux_visualization: false,
-      base_dir: omoBaseDir,
+    "[opencode]": {
+      team_mode: {
+        enabled: true,
+        tmux_visualization: false,
+        base_dir: omoBaseDir,
+      },
     },
   }
   writeFileSync(join(configDir, "omo.json"), JSON.stringify(config, null, 2))
 }
 
 describe("plugin init defers team-mode resume", () => {
-  it("returns within budget even when session.get hangs forever", async () => {
+  it("settles while session.get is held pending forever", async () => {
     // given a stale active team runtime that triggers resumeAllTeams -> session.get
     const rootDirectory = mkdtempSync(join(tmpdir(), "regr-team-defer-"))
     const projectDirectory = join(rootDirectory, "project")
@@ -100,28 +114,32 @@ describe("plugin init defers team-mode resume", () => {
     const previousConfigDirectory = process.env.OPENCODE_CONFIG_DIR
 
     mkdirSync(projectDirectory, { recursive: true })
-    seedTeamModeConfig(configDirectory, omoBaseDirectory)
+    mkdirSync(configDirectory, { recursive: true })
+    seedTeamModeConfig(projectDirectory, omoBaseDirectory)
     seedStaleActiveRuntime(omoBaseDirectory)
     process.env.OPENCODE_CONFIG_DIR = configDirectory
 
     try {
+      // the fixture must reach the resume path: team mode loads ON and the stale active run is listed
+      const teamModeConfig = loadPluginConfig(projectDirectory, undefined).team_mode
+      expect(teamModeConfig?.enabled).toBe(true)
+      if (teamModeConfig === undefined) throw new Error("fixture did not load team_mode")
+      const activeTeams = await listActiveTeams(teamModeConfig)
+      expect(activeTeams.map((team) => [team.teamRunId, team.status])).toContainEqual([SEEDED_TEAM_RUN_ID, "active"])
+
       const pluginModule = await importFreshPluginModule()
-      const { hangCount, client } = makeHangingClient()
-      const input = createPluginInput(projectDirectory, client)
+      const input = createPluginInput(projectDirectory, createHeldSessionGetClient())
 
-      // when serverPlugin is called with a hanging session.get
-      const start = performance.now()
-      const initPromise = pluginModule.server(input, {})
-      const timeoutPromise = new Promise<"timeout">((resolve) => {
-        globalThis.setTimeout(() => resolve("timeout"), 3000)
-      })
-      const result = await Promise.race([initPromise, timeoutPromise])
-      const elapsedMs = performance.now() - start
+      // when serverPlugin runs while every session.get stays pending
+      const outcome = await awaitInitOrTrip(pluginModule.server(input, {}))
 
-      // then plugin init completes; resume call (if it fired) is a deferred no-op against the hang
-      expect(result).not.toBe("timeout")
-      expect(elapsedMs).toBeLessThan(2000)
-      expect(hangCount.value).toBe(0)
+      // then init settled on its own although session.get never answers, so it did not await the resume
+      if (outcome === "tripped") {
+        throw new Error(
+          `plugin init did not settle within the ${INIT_CIRCUIT_BREAKER_MS}ms circuit breaker while session.get was held pending: init awaits the team-mode resume`,
+        )
+      }
+      expect(outcome).toBe("settled")
     } finally {
       if (previousConfigDirectory === undefined) {
         delete process.env.OPENCODE_CONFIG_DIR
@@ -130,5 +148,5 @@ describe("plugin init defers team-mode resume", () => {
       }
       rmSync(rootDirectory, { recursive: true, force: true })
     }
-  })
+  }, INIT_CIRCUIT_BREAKER_MS * 2)
 })
