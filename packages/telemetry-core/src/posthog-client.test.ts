@@ -54,6 +54,42 @@ function createCapturingFactory(capturedMessages: TelemetryCaptureMessage[]): Te
   })
 }
 
+async function captureCodexDailyActive(
+  transportFactory: TelemetryTransportFactory,
+  osProvider: TelemetryOsProvider = OS_PROVIDER,
+): Promise<void> {
+  const savedTermProgram = process.env.TERM_PROGRAM
+  const previousShell = process.env.SHELL
+  process.env.SHELL = "/home/contract-user/.nix-profile/bin/zsh"
+  try {
+    const client = (() => {
+      process.env.TERM_PROGRAM = "WezTerm"
+      try {
+        return createTelemetryClient({
+          env: { POSTHOG_API_KEY: "test-key", POSTHOG_HOST: "https://posthog.test" },
+          osProvider,
+          product: PRODUCT,
+          source: "cli",
+          transportFactory,
+        })
+      } finally {
+        if (savedTermProgram === undefined) delete process.env.TERM_PROGRAM
+        else process.env.TERM_PROGRAM = savedTermProgram
+      }
+    })()
+    client.trackActive({
+      dayUTC: "2026-05-25",
+      distinctId: "a".repeat(64),
+      reason: "cli_run",
+    })
+    await client.flush()
+    await client.shutdown()
+  } finally {
+    if (previousShell === undefined) delete process.env.SHELL
+    else process.env.SHELL = previousShell
+  }
+}
+
 describe("posthog telemetry client", () => {
   test("#given the unconfigured OmO Native placeholder and clean env #when clients are created #then telemetry fails closed without constructing transports", () => {
     let transportsCreated = 0
@@ -112,36 +148,10 @@ describe("posthog telemetry client", () => {
 
   test("#given codex product parameters #when daily active is captured #then payload shape matches current contract", async () => {
     // given
-    const savedTermProgram = process.env.TERM_PROGRAM
-    process.env.TERM_PROGRAM = "WezTerm"
-    const previousShell = process.env.SHELL
-    process.env.SHELL = "/home/contract-user/.nix-profile/bin/zsh"
     const capturedMessages: TelemetryCaptureMessage[] = []
-    const client = (() => {
-      try {
-        return createTelemetryClient({
-          env: { POSTHOG_API_KEY: "test-key", POSTHOG_HOST: "https://posthog.test" },
-          osProvider: OS_PROVIDER,
-          product: PRODUCT,
-          source: "cli",
-          transportFactory: createCapturingFactory(capturedMessages),
-        })
-      } finally {
-        if (savedTermProgram === undefined) delete process.env.TERM_PROGRAM
-        else process.env.TERM_PROGRAM = savedTermProgram
-      }
-    })()
 
     // when
-    client.trackActive({
-      dayUTC: "2026-05-25",
-      distinctId: "a".repeat(64),
-      reason: "cli_run",
-    })
-    await client.flush()
-    await client.shutdown()
-    if (previousShell === undefined) delete process.env.SHELL
-    else process.env.SHELL = previousShell
+    await captureCodexDailyActive(createCapturingFactory(capturedMessages))
 
     // then
     expect(capturedMessages).toHaveLength(1)
@@ -172,6 +182,42 @@ describe("posthog telemetry client", () => {
         day_utc: "2026-05-25",
         reason: "cli_run",
       },
+    })
+  })
+
+  describe.each([undefined, "", "/bin/original-fixture-shell"])("#given SHELL is %p", (shell) => {
+    test.each(["create", "flush", "shutdown"] as const)("#when %s fails #then the contract fixture restores SHELL", async (phase) => {
+      const previousShell = process.env.SHELL
+      if (shell === undefined) delete process.env.SHELL
+      else process.env.SHELL = shell
+      const failure = new Error("contract fixture failure")
+      let failureReached = false
+      const fail = (): never => {
+        failureReached = true
+        throw failure
+      }
+
+      try {
+        const attempt = captureCodexDailyActive(() => ({
+          capture: () => undefined,
+          flush: async () => { if (phase === "flush") fail() },
+          shutdown: async () => { if (phase === "shutdown") fail() },
+        }), {
+          ...OS_PROVIDER,
+          platform: () => phase === "create" ? fail() : OS_PROVIDER.platform(),
+        })
+
+        // The client reports transport shutdown errors without rejecting.
+        if (phase === "shutdown") await attempt
+        else await expect(attempt).rejects.toBe(failure)
+
+        expect(failureReached).toBe(true)
+        expect(process.env.SHELL).toBe(shell)
+        expect(Object.hasOwn(process.env, "SHELL")).toBe(shell !== undefined)
+      } finally {
+        if (previousShell === undefined) delete process.env.SHELL
+        else process.env.SHELL = previousShell
+      }
     })
   })
 
