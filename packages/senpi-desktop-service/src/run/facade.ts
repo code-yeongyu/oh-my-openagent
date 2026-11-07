@@ -16,16 +16,30 @@ import {
 import { ElementHandle, InputTarget, resolveElement, WindowHandle } from "./handles";
 
 export interface WindowFilter {
+	/** Exact match for opaque window id. */
+	readonly id?: string;
 	/** Case-insensitive substring of the owning app name. */
 	readonly app?: string;
 	/** Case-insensitive substring of the window title. */
 	readonly title?: string;
 }
 
+const KNOWN_FILTER_KEYS = new Set(["id", "app", "title"]);
+
+function assertValidFilter(filter: object): void {
+	for (const key of Object.keys(filter)) {
+		if (!KNOWN_FILTER_KEYS.has(key)) {
+			throw new ComputerRunError("assertion", `unknown filter key '${key}' - expected 'id', 'app', or 'title'`);
+		}
+	}
+}
+
 function matchesFilter(window: DesktopWindow, filter: WindowFilter = {}): boolean {
+	const id = filter.id;
 	const app = filter.app?.toLocaleLowerCase();
 	const title = filter.title?.toLocaleLowerCase();
 	return (
+		(!id || window.id === id) &&
 		(!app || window.app.toLocaleLowerCase().includes(app)) &&
 		(!title || window.title.toLocaleLowerCase().includes(title))
 	);
@@ -62,10 +76,18 @@ export function createDesktopFacade(scope: RunScope) {
 				return Object.assign(new InputTarget(scope, `display:${selector}`, DISPLAY_METHODS), { id: selector });
 			}),
 		windows: (filter?: WindowFilter): Promise<readonly DesktopWindow[]> =>
-			method("windows", async (run) => (await listWindows(run)).filter((window) => matchesFilter(window, filter))),
+			method("windows", async (run) => {
+				if (filter !== undefined && typeof filter === "object" && filter !== null) {
+					assertValidFilter(filter);
+				}
+				return (await listWindows(run)).filter((window) => matchesFilter(window, filter));
+			}),
 		/** Exactly one window by opaque id or filter; an ambiguous filter throws listing the candidates. */
 		window: (selector: string | WindowFilter): Promise<WindowHandle> =>
 			method("window", async (run) => {
+				if (typeof selector !== "string" && selector !== null && typeof selector === "object") {
+					assertValidFilter(selector);
+				}
 				const found = (await listWindows(run)).filter((window) =>
 					typeof selector === "string" ? window.id === selector : matchesFilter(window, selector),
 				);
