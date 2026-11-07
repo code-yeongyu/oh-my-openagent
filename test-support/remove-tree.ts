@@ -1,4 +1,4 @@
-import { rm, rmSync } from "node:fs"
+import { lstatSync, rm, rmSync } from "node:fs"
 import { promisify } from "node:util"
 
 // Bun parses fs.rm's maxRetries/retryDelay but never retries (oven-sh/bun#41480), so a Windows
@@ -29,12 +29,20 @@ function blockFor(milliseconds: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds)
 }
 
+// Bun can return success when a child vanishes before openat, leaving its parent (#11806); a path that is still
+// there is reported as ENOTEMPTY so it takes the bounded transient-retry path instead of passing as removed.
+function assertRemoved(path: string): void {
+  if (lstatSync(path, { throwIfNoEntry: false }) === undefined) return
+  throw Object.assign(new Error(`Directory not empty after recursive removal: ${path}`), { code: "ENOTEMPTY", path })
+}
+
 export async function removeTree(path: string, options: RemoveTreeOptions = {}, remove: RemoveAsync = removeRecursive): Promise<void> {
   const maxRetries = options.maxRetries ?? 10
   const retryDelay = options.retryDelay ?? 100
   for (let attempt = 0; ; attempt++) {
     try {
       await remove(path)
+      assertRemoved(path)
       return
     } catch (error) {
       if (!isTransient(error) || attempt >= maxRetries) throw error
@@ -49,6 +57,7 @@ export function removeTreeSync(path: string, options: RemoveTreeOptions = {}, re
   for (let attempt = 0; ; attempt++) {
     try {
       remove(path)
+      assertRemoved(path)
       return
     } catch (error) {
       if (!isTransient(error) || attempt >= maxRetries) throw error

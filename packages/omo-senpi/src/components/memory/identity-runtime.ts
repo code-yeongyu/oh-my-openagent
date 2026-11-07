@@ -55,9 +55,10 @@ export interface MemoryIdentityRuntime {
   launch(run: ReservedRun): Promise<void>
   /**
    * One identity-wide recovery pass. `skipUnchanged` returns at once when the last pass left every run
-   * directory reconciled and no run directory was added or removed since.
+   * directory reconciled and no run directory was added or removed since. `waitPolicy: "none"` (the
+   * per-turn pass) never waits on a run's deadline.
    */
-  reconcile(signal?: AbortSignal, options?: { readonly skipUnchanged?: boolean }): Promise<void>
+  reconcile(signal?: AbortSignal, options?: { readonly skipUnchanged?: boolean; readonly waitPolicy?: "deadline" | "none" }): Promise<void>
   /** Resolves once every launch started in this process has returned (a detached child may still be running). */
   settled(): Promise<void>
 }
@@ -215,7 +216,16 @@ export function createIdentityRuntime(
     async settled(): Promise<void> {
       while (inFlight.size > 0) await Promise.all([...inFlight])
     },
-    async reconcile(signal?: AbortSignal, options: { readonly skipUnchanged?: boolean } = {}): Promise<void> {
+    async reconcile(signal?: AbortSignal, options: { readonly skipUnchanged?: boolean; readonly waitPolicy?: "deadline" | "none" } = {}): Promise<void> {
+      // The per-turn pass never waits on a run's deadline, so it does not join or start the shared flight.
+      if (options.waitPolicy === "none") {
+        await reconcileReflectionRuns({
+          identity: asMemoryIdentity(identity), reservation: store, launch,
+          deferOnSchedulerContention: true, waitPolicy: "none",
+          ...(signal === undefined ? {} : { signal }),
+        })
+        return
+      }
       if (options.skipUnchanged === true && settledRunsStamp !== undefined && await runsStamp() === settledRunsStamp) return
       // One identity-wide pass, including any already-admitted durable transition. Its first
       // observer owns cancellation; an independent caller retries a foreign abort once.

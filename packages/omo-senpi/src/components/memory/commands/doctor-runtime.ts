@@ -32,6 +32,7 @@ import {
 import {
   requireIdentity,
   respond,
+  sessionIdOf,
   type MemoryCommandContext,
   type MemoryCommandDeps,
   type MemoryCommandIdentity,
@@ -80,20 +81,25 @@ function redactReportStrings(value: unknown): unknown {
 }
 
 export async function runDoctor(deps: MemoryCommandDeps, ctx: MemoryCommandContext, args = ""): Promise<string> {
-  const parsed = parseCommandArgs(args, { booleans: ["json"] })
+  const parsed = parseCommandArgs(args, { booleans: ["json", "fix", "dry-run"] })
   for (const flag of parsed.flags.keys()) {
-    if (flag !== "json") return respond(ctx, `unknown flag --${flag}`, "error")
+    if (flag !== "json" && flag !== "fix" && flag !== "dry-run") return respond(ctx, `unknown flag --${flag}`, "error")
   }
-  if (parsed.positionals.length > 0 || (parsed.flags.has("json") && parsed.flags.get("json") !== true)) {
-    return respond(ctx, "usage: /doctor [--json]", "error")
+  if (parsed.positionals.length > 0 || [...parsed.flags.values()].some((value) => value !== true)
+    || (parsed.flags.has("dry-run") && !parsed.flags.has("fix"))) {
+    return respond(ctx, "usage: /doctor [--json] [--fix [--dry-run]]", "error")
   }
   const identity = requireIdentity(deps, ctx)
   if (typeof identity === "string") return respond(ctx, identity, "error")
+  const sessionId = sessionIdOf(ctx)
+  const fixLines = parsed.flags.has("fix") && sessionId !== undefined && deps.reflectionLockFix !== undefined
+    ? await deps.reflectionLockFix(sessionId, { dryRun: parsed.flags.has("dry-run") })
+    : []
 
   const repoDir = identity.identityPaths.repo
   const repository = checkRepository(identity)
   const checks: DoctorCheck[] = [repository]
-  const extra: string[] = []
+  const extra: string[] = fixLines.map((line) => `[fix] ${line}`)
   let audit: MemoryAuditReport | null = null
   let skills = { scanned: 0, repaired: 0 }
   let receipts: ReceiptSummaries | null = null

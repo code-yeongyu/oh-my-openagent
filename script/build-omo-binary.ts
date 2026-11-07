@@ -39,8 +39,10 @@ import { keychainHelperPayload, stageKeychainHelper } from "./release-keychain-h
 import {
   desktopEngineTarget,
   engineTrustHelperTarget,
+  gitJobHelperTarget,
   stageCompiledDesktopEngine,
   stageCompiledEngineTrustHelper,
+  stageCompiledGitJobHelper,
 } from "./release-desktop-engine-target"
 import { EMBEDDED_PAYLOAD_ROOT, RUNTIME_MANIFEST_REL_PATH } from "./embedded-payload-naming"
 import {
@@ -431,6 +433,8 @@ export function resolveExpectedSidecarRelPaths(target: ReleaseBinaryTarget): str
   if (keychainHelper !== null) relPaths.add(keychainHelper)
   const trustHelper = engineTrustHelperTarget(target.target).payload
   if (trustHelper !== null) relPaths.add(trustHelper)
+  const gitJobHelper = gitJobHelperTarget(target.target).payload
+  if (gitJobHelper !== null) relPaths.add(gitJobHelper)
   return [...relPaths].sort()
 }
 
@@ -565,6 +569,8 @@ export function stageSidecarPayload(
   if (keychainHelper !== null) staged.add(keychainHelper)
   const trustHelper = stageCompiledEngineTrustHelper(target.target, stageDir, desktopEngineSourceRoot)
   if (trustHelper !== null) staged.add(trustHelper)
+  const gitJobHelper = stageCompiledGitJobHelper(target.target, stageDir, desktopEngineSourceRoot)
+  if (gitJobHelper !== null) staged.add(gitJobHelper)
   const releaseEngineBuild = releaseEngineBuildStamp(omoBinaryEngineStamp(buildInfo, senpiPackageDir))
   writeFileSync(join(stageDir, "package.json"), createStampedPackageJson(omoAiVersion, buildInfo, releaseEngineBuild), "utf8")
   staged.add("package.json")

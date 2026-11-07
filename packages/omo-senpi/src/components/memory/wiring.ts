@@ -28,12 +28,19 @@ import {
 } from "./wiring-reflection-live"
 import { createMemoryRuntimeWiring } from "./wiring-runtime"
 import { registerMemoryStatic } from "./wiring-static"
-import { recoverStaleReflectionHolder } from "./reflection-stale-active"
+import { reconcileThroughStaleLockReaper, recoverStaleReflectionHolder } from "./reflection-stale-active"
 import { runMemorySessionShutdown } from "./wiring-shutdown"
 import type { MemoryCommandSettings } from "./commands/types"
 import type { MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
 export type { MemorySessionStateLike, MemoryWiring, MemoryWiringOptions } from "./wiring-types"
+
+const PER_TURN_SETTLE_BUDGET_MS = 10_000
+
+function boundedTurnSignal(signal: AbortSignal | undefined): AbortSignal {
+  const budget = AbortSignal.timeout(PER_TURN_SETTLE_BUDGET_MS)
+  return signal === undefined ? budget : AbortSignal.any([signal, budget])
+}
 
 export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   // Persisted compiled blocks: a relaunch reads the block of a commit an earlier process compiled (the store ships
@@ -69,7 +76,8 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     try {
       const recovery = await recoverStaleReflectionHolder({
         reflectionDir: identity.identityPaths.reflection,
-        reconcile: () => runtimeFor(identity).reconcile(signal),
+        // Per turn: no deadline waits (DESIGN.r3 c.15); the 10 s bound is only an outer guard.
+        reconcile: () => runtimeFor(identity).reconcile(boundedTurnSignal(signal), { waitPolicy: "none" }),
         // A holder that one reconciliation could not release is reported, not reconciled every turn.
         shouldReconcile: (runId) => {
           signal?.throwIfAborted()
@@ -116,7 +124,15 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     const { signal } = controller
     const done = userActivity.reconcileOnce(sessionId, async () => {
       try {
-        await runtimeFor(identity).reconcile(signal, { skipUnchanged: true })
+        // The reaper moves a torn active.lock aside first (reconciliation cannot read past it), then reconciles.
+        await reconcileThroughStaleLockReaper({
+          runtimeDir: identity.identityPaths.runtime,
+          reconcile: () => runtimeFor(identity).reconcile(signal, { skipUnchanged: true }),
+          onLoadFailure: (error) => {
+            if (options.logger !== undefined) logBindReconcileFailure(options.logger, error)
+          },
+          ...(options.reflectionHolderSeams === undefined ? {} : { probe: options.reflectionHolderSeams }),
+        })
         signal.throwIfAborted()
       } catch (error) {
         signal.throwIfAborted()
