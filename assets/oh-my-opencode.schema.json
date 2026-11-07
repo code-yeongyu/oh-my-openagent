@@ -9814,6 +9814,14 @@
             "window",
             "session"
           ]
+        },
+        "multiplexer": {
+          "default": "tmux",
+          "type": "string",
+          "enum": [
+            "tmux",
+            "herdr"
+          ]
         }
       },
       "additionalProperties": false

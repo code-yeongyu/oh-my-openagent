@@ -8,6 +8,10 @@ export const TMUX_LAYOUT_VALUES = [
 
 export const TMUX_ISOLATION_VALUES = ["inline", "window", "session"] as const
 
+export const MULTIPLEXER_VALUES = ["tmux", "herdr"] as const
+
+export type MultiplexerBackend = (typeof MULTIPLEXER_VALUES)[number]
+
 export type TmuxLayout = (typeof TMUX_LAYOUT_VALUES)[number]
 export type TmuxIsolation = (typeof TMUX_ISOLATION_VALUES)[number]
 
@@ -18,6 +22,8 @@ export type TmuxConfig = {
   readonly main_pane_min_width: number
   readonly agent_pane_min_width: number
   readonly isolation: TmuxIsolation
+  /** Multiplexer backend for visualization panes. Default (and unset) is tmux. */
+  readonly multiplexer: MultiplexerBackend
 }
 
 export interface SpawnPaneResult {

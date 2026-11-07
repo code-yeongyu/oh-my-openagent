@@ -16,7 +16,7 @@ import { cleanupTeamRunResources } from "./cleanup-team-run-resources"
 import { buildTeammateCommunicationAddendum } from "../member-guidance"
 import { resolveMember } from "./resolve-member"
 import { shouldReuseCallerLeadSession } from "../resolve-caller-team-lead"
-import { sweepStaleTeamSessions } from "../team-layout-tmux/sweep-stale-team-sessions"
+import { sweepStaleHerdrTeamWorkspaces, sweepStaleTeamSessions } from "../team-layout-tmux/sweep-stale-team-sessions"
 import { registerTeamRunForSessionCleanup } from "./session-team-run-registry"
 import { assertNoUnresolvedTeamMembers, hasUnresolvedTeamMembers } from "./unresolved-team-members"
 
@@ -136,6 +136,13 @@ export async function createTeamRun(
   const activeTeams = await listActiveTeams(config)
   const activeRunIds = new Set(activeTeams.map((t) => t.teamRunId))
   sweepStaleTeamSessions(activeRunIds).catch(() => {})
+  // The herdr sweep spawns `herdr workspace list` and can close omo-team-*
+  // workspaces, so it must only run for users who actually selected the
+  // herdr backend - never on a default tmux install (or a machine that just
+  // happens to have herdr installed).
+  if (tmuxMgr?.multiplexer === "herdr") {
+    sweepStaleHerdrTeamWorkspaces(activeRunIds).catch(() => {})
+  }
 
   const baseDir = resolveBaseDir(config)
   await ensureBaseDirs(baseDir)

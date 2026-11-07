@@ -11,6 +11,7 @@ const enabledTmuxConfig = {
 	main_pane_min_width: 120,
 	agent_pane_min_width: 40,
 	isolation: "inline",
+	multiplexer: "tmux",
 } satisfies TmuxConfig
 
 type SpawnTmuxSessionDeps = NonNullable<Parameters<typeof spawnTmuxSession>[6]>

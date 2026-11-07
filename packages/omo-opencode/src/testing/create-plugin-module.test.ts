@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -46,6 +46,7 @@ const mockCreateRuntimeTmuxConfig = mock(() => ({
   main_pane_min_width: 80,
   agent_pane_min_width: 40,
   isolation: "inline" as const,
+  multiplexer: "tmux" as const,
 }))
 const mockTuiStateMirrorStop = mock(() => {})
 const mockCreateManagers = mock(() => ({
@@ -166,6 +167,44 @@ describe("createPluginModule()", () => {
       // then
       expect(getLocale()).toBe("zh")
       expect(t("toast.task_completed")).toBe("任务完成")
+    })
+  })
+
+  describe("#given team mode is enabled and the resolved tmux config selects herdr", () => {
+    it("#then startup probes team dependencies with the config-resolved multiplexer", async () => {
+      // given
+      const baseDir = mkdtempSync(join(tmpdir(), "omo-team-deps-startup-"))
+      const depsModule = await import("../features/team-mode/deps")
+      const checkDependenciesSpy = spyOn(depsModule, "checkTeamModeDependencies").mockResolvedValue({
+        tmuxAvailable: true,
+        gitAvailable: true,
+      })
+      const pluginModule = createTestPluginModule()
+      mockCreateRuntimeTmuxConfig.mockReturnValueOnce({
+        ...mockCreateRuntimeTmuxConfig(),
+        multiplexer: "herdr" as const,
+      })
+      mockLoadPluginConfig.mockReturnValue({
+        team_mode: { enabled: true, base_dir: baseDir },
+      })
+
+      try {
+        // when
+        await pluginModule.server({
+          directory: "/tmp/project",
+          client: {},
+        } as Parameters<typeof pluginModule.server>[0])
+
+        // then: the dependency probe receives the multiplexer resolved from
+        // the runtime tmux config (config chain + env override), so a
+        // config-only herdr user is checked against herdr at startup
+        expect(checkDependenciesSpy).toHaveBeenCalledTimes(1)
+        expect(checkDependenciesSpy.mock.calls[0]?.[1]?.multiplexer).toBe("herdr")
+      } finally {
+        checkDependenciesSpy.mockRestore()
+        mockLoadPluginConfig.mockReturnValue({})
+        rmSync(baseDir, { recursive: true, force: true })
+      }
     })
   })
 

@@ -17,6 +17,7 @@ const originalPassword = process.env.OPENCODE_SERVER_PASSWORD
 const config = {
 	enabled: true,
 	isolation: "inline",
+	multiplexer: "tmux",
 	layout: "main-vertical",
 	main_pane_size: 60,
 	main_pane_min_width: 80,

@@ -67,3 +67,61 @@ export async function sweepStaleTeamSessions(activeTeamRunIds: ReadonlySet<strin
 		log,
 	})
 }
+
+export type HerdrSweepDeps = {
+	listWorkspaces: () => Promise<Array<{ workspaceId: string; label: string }>>
+	listAgents: () => Promise<Array<{ paneId: string; name?: string; status?: string }>>
+	closeWorkspace: (workspaceId: string) => Promise<void>
+	log: (message: string, payload?: unknown) => void
+}
+
+/**
+ * Herdr-side stale sweep: close omo-team workspaces whose teamRunId is no
+ * longer active, but only when no live agent remains in them (the workspace
+ * may still host a running attach). Best-effort and silent on herdr errors:
+ * no herdr dependency is required when herdr is absent.
+ */
+export async function sweepStaleHerdrTeamWorkspacesWith(
+	activeTeamRunIds: ReadonlySet<string>,
+	deps: HerdrSweepDeps,
+): Promise<string[]> {
+	const candidates = await deps.listWorkspaces()
+	const removed: string[] = []
+	for (const workspace of candidates) {
+		const teamRunId = workspace.label.match(TEAM_SESSION_PATTERN)?.[1]
+		if (teamRunId === undefined || teamRunId.length === 0) continue
+		if (activeTeamRunIds.has(teamRunId)) continue
+		try {
+			const agents = await deps.listAgents()
+			const workspacePrefix = `${workspace.workspaceId}:`
+			if (agents.some((agent) => agent.paneId.startsWith(workspacePrefix))) continue
+			await deps.closeWorkspace(workspace.workspaceId)
+			removed.push(workspace.label)
+		} catch (error) {
+			deps.log("herdr stale team workspace sweep failed", {
+				workspaceId: workspace.workspaceId,
+				label: workspace.label,
+				error: error instanceof Error ? String(error) : String(error),
+			})
+		}
+	}
+	return removed
+}
+
+export async function sweepStaleHerdrTeamWorkspaces(activeTeamRunIds: ReadonlySet<string>): Promise<string[]> {
+	const { log } = await import("../logger")
+	const tmuxCore = await import("@oh-my-opencode/tmux-core")
+	try {
+		return await sweepStaleHerdrTeamWorkspacesWith(activeTeamRunIds, {
+			listWorkspaces: () => tmuxCore.herdrListTeamWorkspaces(tmuxCore.defaultHerdrOpsDeps),
+			listAgents: () => tmuxCore.herdrListAgents(tmuxCore.defaultHerdrOpsDeps),
+			closeWorkspace: (workspaceId) => tmuxCore.herdrCloseWorkspace(workspaceId, tmuxCore.defaultHerdrOpsDeps).then(() => undefined),
+			log,
+		})
+	} catch (error) {
+		log("herdr unavailable, skipping herdr team sweep", {
+			error: error instanceof Error ? String(error) : String(error),
+		})
+		return []
+	}
+}

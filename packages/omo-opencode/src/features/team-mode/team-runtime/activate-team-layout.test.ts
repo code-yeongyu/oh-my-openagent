@@ -164,4 +164,29 @@ describe("activateTeamLayout", () => {
     expect(createTeamLayoutSpy).not.toHaveBeenCalled()
     expect(transitionRuntimeStateSpy).not.toHaveBeenCalled()
   })
+
+  test("#given the manager's resolved backend #when activateTeamLayout runs #then it forwards that multiplexer instead of re-parsing the config chain", async () => {
+    // given
+    const runtimeState = createRuntimeState()
+    createTeamLayoutSpy.mockResolvedValue(null)
+
+    // when: a herdr-configured manager, then a manager stub without a backend
+    await activateTeamLayout(
+      runtimeState,
+      createConfig(true),
+      "/project",
+      { getServerUrl: () => "http://127.0.0.1:12345", multiplexer: "herdr" } as never,
+    )
+    await activateTeamLayout(
+      runtimeState,
+      createConfig(true),
+      "/project",
+      { getServerUrl: () => "http://127.0.0.1:12345" } as never,
+    )
+
+    // then
+    expect(createTeamLayoutSpy).toHaveBeenCalledTimes(2)
+    expect(createTeamLayoutSpy.mock.calls[0]?.[4]).toEqual({ multiplexer: "herdr" })
+    expect(createTeamLayoutSpy.mock.calls[1]?.[4]).toEqual({ multiplexer: "tmux" })
+  })
 })

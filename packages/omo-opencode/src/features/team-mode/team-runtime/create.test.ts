@@ -2,7 +2,7 @@
 
 // allow: SIZE_OK - team runtime creation tests share filesystem and tmux mock state; this release adds small lock/spawn coverage and future edits should split by runtime phase.
 
-import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { access, mkdtemp, readdir, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -13,6 +13,8 @@ import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { BackgroundTask, LaunchInput } from "../../background-agent/types"
 import { BackgroundManager } from "../../background-agent/manager"
+import type { TmuxSessionManager } from "../../tmux-subagent/manager"
+import * as sweepStaleSessionsModule from "../team-layout-tmux/sweep-stale-team-sessions"
 import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import { clearTeamSessionRegistry, lookupTeamSession } from "../team-session-registry"
 import type { TeamSpec } from "../types"
@@ -534,5 +536,52 @@ describe("createTeamRun", () => {
       { name: "captain", sessionId: "lead-session" },
       { name: "member-1", sessionId: "member-1-agent-session-1" },
     ])
+  })
+
+  test("never runs the herdr team-workspace sweep unless the resolved multiplexer is herdr", async () => {
+    // given: a default run (no manager) and an explicit tmux-backend run
+    const defaultDir = await mkdtemp(path.join(tmpdir(), "team-runtime-sweep-default-"))
+    const tmuxDir = await mkdtemp(path.join(tmpdir(), "team-runtime-sweep-tmux-"))
+    temporaryDirectories.push(defaultDir, tmuxDir)
+    const { manager: defaultManager } = createManager(defaultDir, async () => ({ id: "task-1", sessionId: "session-1", status: "running" } as BackgroundTask))
+    const { manager: tmuxManager } = createManager(tmuxDir, async () => ({ id: "task-1", sessionId: "session-1", status: "running" } as BackgroundTask))
+    const tmuxMgr = { getServerUrl: () => "http://127.0.0.1:1", multiplexer: "tmux" } as unknown as TmuxSessionManager
+    const herdrSweepSpy = spyOn(sweepStaleSessionsModule, "sweepStaleHerdrTeamWorkspaces").mockResolvedValue([])
+    const tmuxSweepSpy = spyOn(sweepStaleSessionsModule, "sweepStaleTeamSessions").mockResolvedValue([])
+
+    try {
+      // when
+      await createTeamRun(createSpec(1), "lead-session", createContext(defaultDir, defaultManager), createConfig(defaultDir), defaultManager)
+      await createTeamRun(createSpec(1), "lead-session", createContext(tmuxDir, tmuxManager), createConfig(tmuxDir), tmuxManager, tmuxMgr)
+
+      // then: the tmux sweep still runs, herdr is never spawned
+      expect(tmuxSweepSpy).toHaveBeenCalledTimes(2)
+      expect(herdrSweepSpy).not.toHaveBeenCalled()
+    } finally {
+      herdrSweepSpy.mockRestore()
+      tmuxSweepSpy.mockRestore()
+    }
+  })
+
+  test("runs the herdr team-workspace sweep when the resolved multiplexer is herdr", async () => {
+    // given
+    const baseDir = await mkdtemp(path.join(tmpdir(), "team-runtime-sweep-herdr-"))
+    temporaryDirectories.push(baseDir)
+    const { manager } = createManager(baseDir, async () => ({ id: "task-1", sessionId: "session-1", status: "running" } as BackgroundTask))
+    const tmuxMgr = { getServerUrl: () => "http://127.0.0.1:1", multiplexer: "herdr" } as unknown as TmuxSessionManager
+    const herdrSweepSpy = spyOn(sweepStaleSessionsModule, "sweepStaleHerdrTeamWorkspaces").mockResolvedValue([])
+    const tmuxSweepSpy = spyOn(sweepStaleSessionsModule, "sweepStaleTeamSessions").mockResolvedValue([])
+
+    try {
+      // when
+      await createTeamRun(createSpec(1), "lead-session", createContext(baseDir, manager), createConfig(baseDir), manager, tmuxMgr)
+
+      // then
+      expect(herdrSweepSpy).toHaveBeenCalledTimes(1)
+      expect(tmuxSweepSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      herdrSweepSpy.mockRestore()
+      tmuxSweepSpy.mockRestore()
+    }
   })
 })
