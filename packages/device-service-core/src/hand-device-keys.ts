@@ -1,5 +1,22 @@
 import { existsSync } from "node:fs"
-import { type DeviceCredential, type DeviceService, deviceServiceEndpointPath, type Status } from "./device-service.ts"
+import { type DeviceCredential, type DeviceService, deviceServiceEndpointPath, LocalApiError, type Status } from "./device-service.ts"
+
+/** Why a connection to the device service's endpoint failed; the first word of the log line. */
+type ConnectFailure = "dead_endpoint" | "refused" | "unreadable" | "timed_out" | "failed"
+
+const DEAD_ENDPOINT_CODES = new Set(["ENOENT", "ECONNREFUSED", "ECONNRESET", "EPIPE"])
+
+const connectFailure = (error: unknown): { readonly cause: ConnectFailure; readonly detail: string } => {
+  const detail = error instanceof Error ? error.message : String(error)
+  if (error instanceof LocalApiError) {
+    if (error.code === "refused" || error.code === "server_proof_invalid") return { cause: "refused", detail }
+    if (error.code === "insecure_state_dir" || error.code === "read_failed") return { cause: "unreadable", detail }
+    if (error.code === "handshake_timeout" || error.code === "request_timeout") return { cause: "timed_out", detail }
+    return { cause: "failed", detail }
+  }
+  const code = error instanceof Error && "code" in error ? String(error.code) : ""
+  return { cause: DEAD_ENDPOINT_CODES.has(code) ? "dead_endpoint" : "failed", detail }
+}
 
 /**
  * A relayd that died can leave its endpoint file behind, so a connect failure is "no service running": logged once and
@@ -13,7 +30,10 @@ export const connectOrNotRunning = async (
   try {
     return await connect()
   } catch (error) {
-    log?.(`OmO device service: its endpoint is there but it did not answer (${error instanceof Error ? error.message : String(error)}); treated as not running.`)
+    // dead_endpoint: nothing listens (a dead service left its file); refused: it refused us or failed the mutual proof;
+    // unreadable: its state dir or token could not be read safely; timed_out: it did not answer in time.
+    const { cause, detail } = connectFailure(error)
+    log?.(`OmO device service: ${cause}, treated as not running (${detail}).`)
     return "not_running"
   }
 }

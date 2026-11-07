@@ -5,7 +5,9 @@ import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { connectDeviceService, type DeviceService, deviceServiceEndpointPath, forgetDeviceService, handDeviceKeys, type HeldDeviceCredential } from "../src/index.ts"
+import { writeToken } from "../src/local-api/access.ts"
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
+import { testSecure } from "./local-api/support.ts"
 import { defaultWorld } from "./local-api/conformance/world.ts"
 
 // Design D r9 sections 3-4: keys reach the device service only from a credential a client already holds in memory.
@@ -66,7 +68,12 @@ const deadEndpoint = async (stateDir: string): Promise<void> => {
   await new Promise<void>(resolve => server.close(() => resolve()))
   renameSync(`${endpoint}.kept`, endpoint)
   chmodSync(endpoint, 0o600)
+  // A dead service leaves its per-boot token too, so the connect reaches the socket and nothing answers.
+  await writeToken(stateDir, testSecure)
 }
+
+/** The cause word the not-running log line starts with (after the fixed prefix). */
+const causeOf = (line: string | undefined): string | undefined => /^OmO device service: ([a-z_]+),/.exec(line ?? "")?.[1]
 
 describe.skipIf(process.platform === "win32")("a relayd that died and left its endpoint file behind", () => {
   test("the hand-off reads it as no relayd running, logs it, and never throws", async () => {
@@ -78,7 +85,20 @@ describe.skipIf(process.platform === "win32")("a relayd that died and left its e
       connect: () => connectDeviceService({ version: "5.1.60", stateDir }),
     })
     expect(outcome).toBe("not_running")
-    expect(lines).toHaveLength(1)
+    expect(lines.map(causeOf)).toEqual(["dead_endpoint"])
+  })
+
+  test("an endpoint that is not a socket is named unreadable, not dead", async () => {
+    const stateDir = stateDirOf()
+    mkdirSync(stateDir, { recursive: true, mode: 0o700 })
+    await Bun.write(deviceServiceEndpointPath(stateDir), "")
+    const lines: string[] = []
+    const outcome = await handDeviceKeys({
+      stateDir, credential: held(), when: "always", log: line => lines.push(line),
+      connect: () => connectDeviceService({ version: "5.1.60", stateDir }),
+    })
+    expect(outcome).toBe("not_running")
+    expect(lines.map(causeOf)).toEqual(["unreadable"])
   })
 
   test("forget reads it as no relayd running, logs it, and never throws", async () => {
@@ -90,7 +110,7 @@ describe.skipIf(process.platform === "win32")("a relayd that died and left its e
       connect: () => connectDeviceService({ version: "5.1.60", stateDir }),
     })
     expect(outcome).toBe("not_running")
-    expect(lines).toHaveLength(1)
+    expect(lines.map(causeOf)).toEqual(["dead_endpoint"])
   })
 })
 
