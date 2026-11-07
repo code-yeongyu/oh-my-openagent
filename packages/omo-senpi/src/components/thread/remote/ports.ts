@@ -39,7 +39,14 @@ export type RemoteLocateOutcome =
 export type RemoteWatchEnd = "stopped" | "session_closed" | "session_replaced" | "listener_failed" | `access:${string}`
 
 /** The engine's session status (senpi `session_status`), or what a fresh `get_state` implies when no record said it. */
-export type RemoteSessionState = { readonly status: string; readonly sessionId: string; readonly durableSessionId?: string; readonly currentTurnId?: string }
+export type RemoteSessionState = {
+  readonly status: string
+  readonly sessionId: string
+  readonly durableSessionId?: string
+  readonly currentTurnId?: string
+  /** The dialogs and questions the session waits on (get_state `pendingDialogs` + `pendingQuestions`); absent when the engine lists none. */
+  readonly pendingRequests?: readonly JsonObject[]
+}
 
 export type RemoteStatusChange = {
   readonly from: string | undefined

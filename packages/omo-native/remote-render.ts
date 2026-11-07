@@ -128,7 +128,7 @@ export function watchLines(label: string, device: string, event: RemoteWatchEven
     case "dialog":
       return dialogLines(label, event.uiRequestId, event.request)
     case "dialog_settled":
-      return [`${label} request ${clean(event.uiRequestId)} ${event.disposition}`]
+      return [`${label} request ${clean(event.uiRequestId)} ${event.disposition === "settled_while_detached" ? "settled while detached" : event.disposition}`]
   }
 }
 

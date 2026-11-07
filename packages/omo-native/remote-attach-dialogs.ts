@@ -1,4 +1,5 @@
 import type { JsonObject } from "../device-service-core/src/index.ts"
+import { raiserOnly } from "../omo-senpi/src/components/thread/remote/dialog-mirror"
 
 // relayd sends a dialog in its local shape (`extension_ui_request`) only on the delegated connection that raised it; every
 // other attach of the session sees the session's mirror of it instead, `ui_request_pending {uiRequestId, request}` and
@@ -8,12 +9,6 @@ import type { JsonObject } from "../device-service-core/src/index.ts"
 // shows a request id once.
 
 const isObject = (value: unknown): value is JsonObject => typeof value === "object" && value !== null && !Array.isArray(value)
-
-/**
- * A secret input or a grant selection is answerable only on the connection that raised it (relayd answers it nowhere
- * else, fail closed), so a viewer is never shown one it could not answer.
- */
-const raiserOnly = (request: JsonObject): boolean => request["secret"] === true || request["grantSelect"] === true
 
 // Dialogs left pending when their settle never arrives (the session ended) stop being remembered past this many.
 const SHOWN_KEPT = 1024
