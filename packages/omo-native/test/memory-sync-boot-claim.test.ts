@@ -134,7 +134,10 @@ function launchHost(entry: Entry, table: string | undefined) {
 }
 
 for (const entry of ["compiled", "npm"] as const) {
-  describe(`the ${entry} entry claims memory sync when a multi-session engine boots`, () => {
+  // POSIX only: this launches the engine with one inherited socket at fd 5 and kills its process group, neither of
+  // which has a win32 form. The win32 boot claim over the two-pipe pair is proven through the packaged desktop runtime
+  // (omo-desktop-app's real-engine memory-sync chain job); a win32 version here is tracked in #12698.
+  describe.skipIf(process.platform === "win32")(`the ${entry} entry claims memory sync when a multi-session engine boots`, () => {
     test("the bootstrap frame arrives before any session, and the first session reuses that one claim", async () => {
       const launch = launchHost(entry, '{"memory-sync":5}')
       try {
