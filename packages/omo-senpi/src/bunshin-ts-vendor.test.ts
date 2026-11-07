@@ -5,13 +5,13 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { copyVendored, digestTree } from "../scripts/sync-bunshin-ts.ts"
+import { copyVendored, DEPENDENCY_IMPORT_PREFIX, digestTree, pinDependencyImports } from "../scripts/sync-bunshin-ts.ts"
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url))
 const vendorRoot = join(packageRoot, "vendor")
 const VENDORED_NAMES = ["@sisyphuslabs/bunshin-ts", "@sisyphuslabs/bunshin-ts-relay"]
 
-type Pin = { packages: Record<string, { name: string; files: Record<string, string> }> }
+type Pin = { packages: Record<string, { name: string; dependencies: Record<string, string>; files: Record<string, string> }> }
 
 const pin = (): Pin => JSON.parse(readFileSync(join(vendorRoot, "PIN.json"), "utf8")) as Pin
 
@@ -45,6 +45,52 @@ describe("vendored bunshin-ts packages", () => {
       expect(digestTree(dest)).toEqual(digestTree(out))
     } finally {
       rmSync(work, { recursive: true, force: true })
+    }
+  })
+
+  it("#given import and re-export statements #when dependency imports are pinned #then only the declared package and its subpaths move behind the prefix", () => {
+    const source = [
+      `import { Type } from "@sinclair/typebox";`,
+      `import { Value } from '@sinclair/typebox/value';`,
+      `export { Errors } from "@sinclair/typebox/errors";`,
+      `import "@sinclair/typebox";`,
+      `import { other } from "@sinclair/typeboxx";`,
+      `import { join } from "node:path";`,
+      `const name = "@sinclair/typebox";`,
+    ].join("\n")
+    expect(pinDependencyImports(source, ["@sinclair/typebox"])).toBe([
+      `import { Type } from "${DEPENDENCY_IMPORT_PREFIX}@sinclair/typebox";`,
+      `import { Value } from '${DEPENDENCY_IMPORT_PREFIX}@sinclair/typebox/value';`,
+      `export { Errors } from "${DEPENDENCY_IMPORT_PREFIX}@sinclair/typebox/errors";`,
+      `import "${DEPENDENCY_IMPORT_PREFIX}@sinclair/typebox";`,
+      `import { other } from "@sinclair/typeboxx";`,
+      `import { join } from "node:path";`,
+      `const name = "@sinclair/typebox";`,
+    ].join("\n"))
+    expect(() => pinDependencyImports(`await import("@sinclair/typebox")`, ["@sinclair/typebox"])).toThrow("bare dependency imports left")
+  })
+
+  // Package contract: senpi's extension registry claims bare package names (`@sinclair/typebox` is its typebox 1.x) for
+  // every importer in the process, so the vendored runtime reaches its npm dependencies only through omo-senpi's own
+  // `imports` entries, which resolve to the exactly pinned install.
+  it("#given the vendored runtime JS #when its imports are scanned #then every npm dependency comes through an omo-senpi imports entry at a version the package accepts", () => {
+    const manifest = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")) as { imports: Record<string, string>; dependencies: Record<string, string> }
+    const scanner = new Bun.Transpiler({ loader: "js" })
+    for (const [key, entry] of Object.entries(pin().packages)) {
+      const names = Object.keys(entry.dependencies)
+      const specifiers = Object.keys(entry.files)
+        .filter(path => /\.[cm]?js$/.test(path))
+        .flatMap(path => scanner.scanImports(readFileSync(join(vendorRoot, key, path), "utf8")).map(found => found.path))
+      expect(specifiers.filter(specifier => !specifier.startsWith("node:") && !specifier.startsWith(DEPENDENCY_IMPORT_PREFIX))).toEqual([])
+      const reached = specifiers
+        .filter(specifier => specifier.startsWith(DEPENDENCY_IMPORT_PREFIX))
+        .map(specifier => specifier.slice(DEPENDENCY_IMPORT_PREFIX.length))
+      expect(reached.filter(target => !names.some(name => target === name || target.startsWith(`${name}/`)))).toEqual([])
+      for (const name of names) {
+        expect(manifest.imports[`${DEPENDENCY_IMPORT_PREFIX}${name}`]).toBe(name)
+        expect(manifest.imports[`${DEPENDENCY_IMPORT_PREFIX}${name}/*`]).toBe(`${name}/*`)
+        expect(Bun.semver.satisfies(manifest.dependencies[name] ?? "", entry.dependencies[name] ?? "")).toBe(true)
+      }
     }
   })
 
