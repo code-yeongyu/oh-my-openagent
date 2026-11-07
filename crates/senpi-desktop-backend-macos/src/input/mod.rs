@@ -146,13 +146,21 @@ impl MacInput {
                             return background::pointer(&this.source, &mut this.held, pid, wid, &window, event, &this.overlay);
                         }
                         // Pointer actions take no key-focus guard in the session, so the
-                        // window made key for this event hands key focus back here (#12701).
-                        let front = crate::focus::front_window()?;
+                        // window made key for this event hands key focus back here (#12701),
+                        // best effort: neither step can fail the click itself.
+                        let front = crate::focus::front_window().unwrap_or_else(|error| {
+                            eprintln!("senpi-desktop-backend-macos: focus: no front window to hand key focus back to: {error}");
+                            None
+                        });
                         skylight::activate_without_raise(pid, wid)?;
                         this.last_activated = Some((pid, wid));
                         let delivered = background::pointer(&this.source, &mut this.held, pid, wid, &window, event, &this.overlay);
-                        let restored = front.map_or(Ok(()), |front| crate::focus::restore_key_focus(this, &front));
-                        delivered.and(restored)
+                        if let Some(front) = front {
+                            if let Err(error) = crate::focus::restore_key_focus(this, &front) {
+                                eprintln!("senpi-desktop-backend-macos: focus: key focus hand-back after a background click failed: {error}");
+                            }
+                        }
+                        delivered
                     }),
                     DeliveryMode::Foreground => skylight::with_foreground(pid, || {
                         crate::ax::prepare_foreground_input(&window)?;

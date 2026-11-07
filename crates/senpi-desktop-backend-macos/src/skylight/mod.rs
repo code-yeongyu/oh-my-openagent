@@ -152,22 +152,34 @@ pub(crate) fn activate_without_raise(pid: libc::pid_t, wid: u32) -> CoreResult<(
 /// AppKit again, and the key-window pair makes `wid` its key window. AppKit
 /// activation does neither for a process WindowServer still lists as front,
 /// so an Electron window would otherwise stay without a focused element.
+/// `still_front` is asked right before each post; once it says no (the user
+/// switched to another application), nothing more is posted.
 ///
 /// # Errors
 /// `InputFailed` when the process cannot be resolved or a record is refused.
-pub(crate) fn rekey_without_raise(pid: libc::pid_t, wid: u32) -> CoreResult<()> {
+pub(crate) fn rekey_without_raise(
+    pid: libc::pid_t,
+    wid: u32,
+    still_front: &dyn Fn() -> bool,
+) -> CoreResult<()> {
     let spi = required()?;
     let psn = process_psn(spi.psn, pid, wid).ok_or_else(|| {
         DesktopError::input_failed(format!(
             "window {wid} could not resolve its process serial number to give key focus back"
         ))
     })?;
+    if !still_front() {
+        return Ok(());
+    }
     if !post_focus_record(&psn, wid, FocusMarker::Focus) {
         return Err(DesktopError::input_failed(format!(
             "window {wid} rejected the focus record that gives key focus back"
         )));
     }
     thread::sleep(Duration::from_millis(50));
+    if !still_front() {
+        return Ok(());
+    }
     if !post_key_window_records(&psn, wid) {
         return Err(DesktopError::input_failed(format!(
             "window {wid} rejected the key-window records that give key focus back"

@@ -252,21 +252,39 @@ pub(crate) fn restore_key_focus(input: &mut MacInput, front: &FrontWindow) -> Co
         HandBack::UserMovedOn => return Ok(()),
     }
     if activated.is_some_and(|pid| pid != prev_pid) {
-        rekey(prev_pid, front)?;
+        rekey(prev_pid, activated, front);
     }
     mark_key_window(front)
 }
 
+/// Whether the hand-back re-keys `previous`: the engine made another
+/// application key, `previous` reports no focused element, and it is still
+/// the front application (the user did not move on during the AX read).
+pub(crate) fn should_rekey(
+    previous: libc::pid_t,
+    activated: Option<libc::pid_t>,
+    has_focused_element: bool,
+    front: Option<libc::pid_t>,
+) -> bool {
+    activated.is_some_and(|pid| pid != previous) && !has_focused_element && front == Some(previous)
+}
+
 /// Gives `front`'s window key focus back once the application reports no
-/// focused element; an application that kept one is left untouched.
-fn rekey(pid: libc::pid_t, front: &FrontWindow) -> CoreResult<()> {
+/// focused element; an application that kept one is left untouched. Best
+/// effort like the rest of the hand-back: a refused record is logged, and the
+/// input that already went out is not reported as failed.
+fn rekey(pid: libc::pid_t, activated: Option<libc::pid_t>, front: &FrontWindow) {
     let Some(wid) = front.window_id.as_deref().and_then(|id| id.parse::<u32>().ok()) else {
-        return Ok(());
+        return;
     };
-    if ax::has_focused_element(pid) {
-        return Ok(());
+    let focused = ax::has_focused_element(pid);
+    if !should_rekey(pid, activated, focused, current_front_pid()) {
+        return;
     }
-    skylight::rekey_without_raise(pid, wid)
+    let still_front = || current_front_pid() == Some(pid);
+    if let Err(error) = skylight::rekey_without_raise(pid, wid, &still_front) {
+        eprintln!("senpi-desktop-backend-macos: focus: key focus hand-back to window {wid} failed: {error}");
+    }
 }
 
 /// What key-focus hand-back does, from the snapshot, the application the
