@@ -78,6 +78,23 @@ describe("compiled omo doctor", () => {
     expect(exitCode).toBe(0)
   })
 
+  test("#given a memory home #when doctor runs #then it prints the memory-runtime section the npm doctor prints (binary/npm parity)", async () => {
+    const root = runtimeRoot()
+    const memoryHome = temp()
+    mkdirSync(join(memoryHome, "agents", "fixture-agent", "repo"), { recursive: true })
+    mkdirSync(join(memoryHome, "agents", "fixture-agent", "runtime"), { recursive: true })
+    writeFileSync(join(memoryHome, "agents", "fixture-agent", "runtime", "note.txt"), "x".repeat(2048))
+    const output = await captureLog(() => runCompiledLauncher(["doctor"], root, "2026.8.28", root, {
+      env: { ...process.env, OMO_MEMORY_HOME: memoryHome },
+      computerUseLines: async () => [],
+      coverageLines: async () => [],
+      trustLines: async () => [],
+    }))
+    const lines = output.split("\n")
+    expect(lines.filter((line) => line.startsWith("INFO memory runtime: fixture-agent "))).toHaveLength(1)
+    expect(lines.filter((line) => line.startsWith("INFO memory runtime total: "))).toHaveLength(1)
+  })
+
   test("#given a computer-use FAIL line #when doctor runs #then the exit code is 1", async () => {
     const root = runtimeRoot()
     let exitCode: number | undefined
