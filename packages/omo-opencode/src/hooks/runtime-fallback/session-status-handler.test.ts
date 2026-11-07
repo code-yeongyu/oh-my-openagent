@@ -540,4 +540,68 @@ describe("createSessionStatusHandler", () => {
     expect(state.pendingFallbackModel).toBe("google/gemini-2.5-pro")
     SessionCategoryRegistry.clear()
   })
+
+  it("#given no state and no fallback candidates #when a retry signal arrives during a native retry #then it does not abort", async () => {
+    SessionCategoryRegistry.clear()
+    const sessionID = "session-status-no-state-no-fallback"
+    const deps = createDeps()
+    deps.pluginConfig = { categories: { test: { fallback_models: [] } } }
+    SessionCategoryRegistry.register(sessionID, "test")
+    deps.sessionRetryInFlight.add(sessionID)
+    const abortCalls: string[] = []
+    const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+    const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)
+
+    await handler({
+      sessionID,
+      model: "openai/gpt-5.4",
+      status: { type: "retry", attempt: 1, message: "AI_APICallError: overloaded" },
+    })
+
+    expect(abortCalls).toEqual([])
+    expect(retryCalls).toEqual([])
+  })
+
+  it("#given a compaction registry entry and no fallback state #when a retry signal arrives #then it leaves the native retry untouched", async () => {
+    SessionCategoryRegistry.clear()
+    const sessionID = "session-status-compaction-before-state"
+    const deps = createDeps()
+    SessionCategoryRegistry.register(sessionID, "test")
+    deps.sessionRetryInFlight.add(sessionID)
+    const abortCalls: string[] = []
+    const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+    const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)
+    const { recordCompactionStart } = await import("../../shared/compaction-in-flight")
+    recordCompactionStart(sessionID)
+
+    await handler({
+      sessionID,
+      model: "openai/gpt-5.4",
+      status: { type: "retry", attempt: 1, message: "AI_APICallError: overloaded" },
+    })
+
+    expect(abortCalls).toEqual([])
+    expect(retryCalls).toEqual([])
+    expect(deps.sessionStates.has(sessionID)).toBe(false)
+  })
+
+  it("#given an in-flight retry without bootstrap model data #when a retry signal arrives #then it does not abort before returning", async () => {
+    SessionCategoryRegistry.clear()
+    const sessionID = "session-status-no-bootstrap-model"
+    const deps = createDeps()
+    SessionCategoryRegistry.register(sessionID, "test")
+    deps.sessionRetryInFlight.add(sessionID)
+    const abortCalls: string[] = []
+    const retryCalls: Array<{ sessionID: string; model: string; source: string }> = []
+    const handler = createSessionStatusHandler(deps, createHelpers(abortCalls, retryCalls), deps.sessionStatusRetryKeys)
+
+    await handler({
+      sessionID,
+      status: { type: "retry", attempt: 1, message: "AI_APICallError: overloaded" },
+    })
+
+    expect(abortCalls).toEqual([])
+    expect(retryCalls).toEqual([])
+    expect(deps.sessionStates.has(sessionID)).toBe(false)
+  })
 })

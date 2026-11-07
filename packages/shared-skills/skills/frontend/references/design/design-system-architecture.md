@@ -60,7 +60,7 @@ rather than borders, creating layers you feel more than see."
 | Status/info | --status-info | #2563EB | #3B82F6 | Informational |
 
 ### Rules
-- Accent marks the one or two most likely actions on a screen, on the control's background rather than its glyph or label. Peer choices differ by style, never by size. Nothing decorative carries accent.
+- Accent marks the screen's one primary action, on the control's background rather than its glyph or label; a second likely action takes a quieter style. Peer choices differ by style, never by size. Nothing decorative carries accent.
 - Never introduce a color not in this table. Extend the table first.
 
 ## 3. Typography
@@ -229,7 +229,7 @@ Both paths start with `grounding.md`: the guideline source read in full, the ide
 
 ### For New Projects
 
-1. **Select references before taste** — no visual reference means `_INDEX.md` shortlist of 2-3 Layer B candidates, then exactly one Layer A style skill and one Layer B brand/design-system reference. Use `open-design` only when the curated set has no fit.
+1. **Select references before taste** — no visual reference means `_INDEX.md` shortlist of 2-3 Layer B candidates, then exactly one Layer A style skill and one Layer B brand/design-system reference. Use the open-design library only when the curated set has no fit.
 2. **Assemble from references** — extract tokens, layout grammar, component anatomy, states, motion, and taste decisions, then recombine them into project-specific primitives. Customize for the user's product; never copy logos, trademarked assets, or brand-specific copy.
 3. **Define the system** — colour roles first (both themes), then atmosphere, typography, spacing, and one depth strategy, grounded in the selected references and product semantics. Sanity-check the palette and type pairing with one `ui-ux-db` domain search (CLI in `references/ui-ux-db/README.md`).
 4. **Document initial primitives** — only components you are about to build, including variants and states, starting from shadcn/ui anatomy (or the project's own kit) restyled with the tokens.
