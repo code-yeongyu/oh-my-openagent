@@ -9,6 +9,76 @@ const BUILTIN_UNAVAILABLE = {
   invalid_grant: "the app answered the request for its built-in browser with something unusable",
 }
 
+export class AttachedBrowserSetupError extends Error {
+  constructor(cause) {
+    super(
+      `Attached browser setup failed: ${cause instanceof Error ? cause.message : String(cause)}. Stop this attempt; do not retry, copy or clone a browser profile, or fall back to an owned engine. Start the daemon outside omo with \`bsk daemon start\`, then run bskDoctor() and continue only when ready. Use a session-owned foreground service instead when that mode is available.`,
+      { cause },
+    )
+    this.name = "AttachedBrowserSetupError"
+    this.code = "browser_attached_setup_failed"
+    this.retryable = false
+    this.fallbackAllowed = false
+    this.recovery = { kind: "start_daemon_outside_omo", command: "bsk daemon start" }
+  }
+}
+
+// The imported runtime is stable across loadOmowright() calls. Re-loading the wrapper
+// or changing the task name must not restart a failed daemon or open another engine.
+const attachedAttempts = new WeakMap()
+
+function guardAttachedBrowser(raw, extra = {}) {
+  let state = attachedAttempts.get(raw)
+  if (state === undefined) {
+    state = { failure: undefined, pending: undefined }
+    attachedAttempts.set(raw, state)
+  }
+  const library = { ...raw, ...extra }
+  for (const method of ["connectBrowserSkill", "bskOnboard"]) {
+    if (typeof raw[method] !== "function") continue
+    library[method] = async (...args) => {
+      if (state.pending) await state.pending
+      if (state.failure) throw state.failure
+      const pending = (async () => {
+        try {
+          const result = await raw[method](...args)
+          if (method === "bskOnboard" && result.daemon?.error && !result.daemon.running) {
+            throw new Error(result.daemon.error)
+          }
+          return result
+        } catch (cause) {
+          state.failure = new AttachedBrowserSetupError(cause)
+          throw state.failure
+        }
+      })()
+      state.pending = pending
+      try {
+        return await pending
+      } finally {
+        if (state.pending === pending) state.pending = undefined
+      }
+    }
+  }
+  for (const method of ["connect", "connectPipe", "connectCloakProfile", "connectBuiltinBrowser"]) {
+    const connect = library[method]
+    if (typeof connect !== "function") continue
+    library[method] = async (...args) => {
+      await state.pending
+      if (state.failure) throw state.failure
+      return await connect(...args)
+    }
+  }
+  if (typeof raw.bskDoctor === "function") {
+    library.bskDoctor = async (...args) => {
+      const report = await raw.bskDoctor(...args)
+      // A non-starting diagnostic must positively observe the repaired setup.
+      if (report.ready === true) state.failure = undefined
+      return report
+    }
+  }
+  return library
+}
+
 export class BuiltinBrowserUnavailableError extends Error {
   constructor(reason) {
     const unavailable = Object.hasOwn(BUILTIN_UNAVAILABLE, reason)
@@ -29,7 +99,7 @@ export class BuiltinBrowserUnavailableError extends Error {
  */
 export function guardOmowright(raw, { env = process.env, host } = {}) {
   const engine = env[BROWSER_ENGINE_ENV]
-  if (engine === undefined || engine === "") return raw
+  if (engine === undefined || engine === "") return guardAttachedBrowser(raw)
 
   const acquireBuiltinBrowser = async () => {
     let details
@@ -78,5 +148,5 @@ export function guardOmowright(raw, { env = process.env, host } = {}) {
     return await new raw.BrowserConnection(client, options).initialize()
   }
 
-  return { ...raw, connectBuiltinBrowser }
+  return guardAttachedBrowser(raw, { connectBuiltinBrowser })
 }

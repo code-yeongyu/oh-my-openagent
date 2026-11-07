@@ -13,10 +13,12 @@ One library, two engines. omowright ships inside this skill; choose the engine b
 | A throwaway profile, bot-scoring evasion, a CAPTCHA, network interception, a QA flight trace, coordinate control, headless runs | **owned** — a browser your code launches | `connectPipe()` / `connectCloakProfile()` — [references/owned-engine/README.md](references/owned-engine/README.md) |
 | A 403/WAF host the attached engine cannot open, a platform with a native reader, an archive snapshot | neither | the `ultimate-browsing` skill |
 
-**Attached is the default,** because it is the only engine carrying the user's logins and the only
-one where a human is a single call away. Never substitute one engine for the other silently: if
-the attached engine is not set up, run the onboarding script and tell the user its one remaining
-step.
+**Attached is the default:** it carries the user's logins and supports human handoff. Choose owned
+only for an owned-engine task, never to recover a failed attachment. If a daemon start or attach
+fails on any platform, stop that attempt and report the native cause. Never copy/clone the user's
+profile, substitute another engine, or repeat setup until it changes. Start the daemon outside omo
+with `bsk daemon start` now; use the session-owned foreground service once available. In the same
+kernel, run `omowright.bskDoctor()` after repair; only `ready: true` releases the retained failure.
 
 ## Step 0 — inside OmO Desktop: everything above, plus the app's built-in browser
 
@@ -55,6 +57,7 @@ node "<skill-root>/scripts/browser-doctor.mjs" --json
 | State | Meaning | Next |
 |---|---|---|
 | `ready` | CLI, daemon and a connected browser | start a session |
+| `daemon-failed` | daemon start/attach failed | stop and report the cause and recovery printed by the doctor; no profile copies, alternate engine or setup loop |
 | `no-cli` / `no-daemon` / `no-extension` | something is missing | `node "<skill-root>/scripts/browser-install.mjs" [--browser=<id>]` prepares everything it can for **the browser the user uses**, then prints the **single** step only the user can do (relaunch that browser and click **Enable**); relay it verbatim, wait, re-run the doctor |
 | `choose-browser` | the signals do not single out one browser (Safari/Firefox default, an idle default while another browser runs, several in use) | nothing was installed; take the browser from memory or ask the user, then `browser-install.mjs --browser=<id>` |
 | `no-browser-support` | no Chromium-family profile on this machine | say so and stop |
@@ -91,7 +94,7 @@ try {
 1. **Read before every action.** `bskSnapshot` refs and `observe` `@eN` refs are reissued on each
    call; use a ref in the same cycle you read it.
 2. **Navigation and large DOM changes stale every ref.** Read again rather than reusing.
-3. **Two identical failures mean change approach, not retry.** A third identical attempt is a defect.
+3. **Daemon start/attach failures stop immediately;** repair setup and prove readiness before retrying. For page actions, two identical failures mean change approach.
 4. **Borrow a user tab explicitly** (`tabList({ scope: "user" })`, `tabBorrow(id)`, `tabReturn(id)`).
    Borrowing prompts the user; never invent tab ids and never repeat a denied borrow.
 5. **Always `stop()` the session,** on success and on failure.
