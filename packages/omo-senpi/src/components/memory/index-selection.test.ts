@@ -71,7 +71,9 @@ describe("memory component registration selects the engine account source", () =
     expect(await registration("observer-override")).toMatchObject({ observersBefore: 0, observersAfterFirst: 1 })
   }, 30_000)
 
-  test("(a) an in-process desktop daemon selects desktop through the real inherited channel", async () => {
+  // POSIX only: this case asserts a POSIX inherited-fd socket (fd 5), which has no win32 form. On Windows the channel is
+  // two one-way pipes, covered by desktop-sync/channel-compiled.test.ts's win32 pair case (#11997); win32 versions: #12698.
+  test.skipIf(process.platform === "win32")("(a) an in-process desktop daemon selects desktop through the real inherited channel", async () => {
     expect(await registration("desktop")).toEqual({ source: "desktop", cliBuilt: 0, declared: true, sharedSource: true, claims: 1, takes: 1 })
   }, 30_000)
 
@@ -97,7 +99,9 @@ describe("memory component registration selects the engine account source", () =
     expect(result.cliBuilt).toBe(0)
   }, 30_000)
 
-  test("the real senpi handoff gives a session Worker the host's desktop selection", async () => {
+  // POSIX only: this case asserts a POSIX inherited-fd socket (fd 5), which has no win32 form. On Windows the channel is
+  // two one-way pipes, covered by desktop-sync/channel-compiled.test.ts's win32 pair case (#11997); win32 versions: #12698.
+  test.skipIf(process.platform === "win32")("the real senpi handoff gives a session Worker the host's desktop selection", async () => {
     expect(await registration("worker-desktop")).toEqual({ source: "desktop", cliBuilt: 0, declared: false, sharedSource: true, claims: 1, takes: 0 })
   }, 30_000)
 

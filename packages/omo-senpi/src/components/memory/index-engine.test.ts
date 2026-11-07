@@ -83,7 +83,9 @@ async function selection(launch: Awaited<ReturnType<typeof engineLaunch>>): Prom
 }
 
 describe("the real senpi engine claims the desktop's private memory-sync channel at startup (#11997)", () => {
-  test("a declared memory-sync socket gets the bootstrap frame and the engine adopts the reply's child", async () => {
+  // POSIX only: this case asserts a POSIX inherited-fd socket (fd 5), which has no win32 form. On Windows the channel is
+  // two one-way pipes, covered by desktop-sync/channel-compiled.test.ts's win32 pair case (#11997); win32 versions: #12698.
+  test.skipIf(process.platform === "win32")("a declared memory-sync socket gets the bootstrap frame and the engine adopts the reply's child", async () => {
     const launch = await engineLaunch(true)
     try {
       await launch.bootstrapped()
