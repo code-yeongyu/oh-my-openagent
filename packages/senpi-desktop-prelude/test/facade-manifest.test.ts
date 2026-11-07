@@ -178,15 +178,32 @@ describe("computer.verify", () => {
 		expect(verdict).toMatchObject({ status: "unknown", reads: 1, cause: "Suspended: the user pressed the stop chord" });
 	});
 
-	it("treats a StaleRef read as the element being gone", async () => {
+	// The `computer` tool's result for the engine's real StaleRef reply (`e5 expired; re-run ax()/find()`, the code
+	// only in data.code): the code reaches the kernel in details.value, never in the message text.
+	const staleFailure = { code: "COMPUTER_STALE_REF", message: "COMPUTER_STALE_REF: e5 expired; re-run ax()/find()" };
+	const staleRefResult: ToolResult = {
+		text: JSON.stringify(staleFailure, null, 2),
+		details: { value: staleFailure, isError: true },
+		images: [],
+		hasError: true,
+	};
+
+	it("treats an expired ref as the element being gone in both facades, from the failure code", async () => {
 		// Given
-		const kernel = loadJsFacade(() => ({ text: "StaleRef: e1 no longer resolves", hasError: true }));
+		const kernel = loadJsFacade(() => staleRefResult);
 
 		// When
-		const verdict = await kernel.run(`return computer.verify({ kind: "elementExists", ref: "e1", exists: false });`);
+		const js = await kernel.run(`return computer.verify({ kind: "elementExists", ref: "e5", exists: false });`);
+		const py = runPythonFacade("out = computer.verify({'kind': 'elementExists', 'ref': 'e5', 'exists': False})", {
+			ref: JSON.stringify(staleRefResult),
+		});
 
 		// Then
-		expect(verdict).toMatchObject({ status: "satisfied", reads: 1 });
+		expect({ js, py: py.out, error: py.error }).toMatchObject({
+			js: { status: "satisfied", reads: 1 },
+			py: { status: "satisfied", reads: 1 },
+			error: null,
+		});
 	});
 
 	it("matches windows by filter in Python and returns the same verdict shape", () => {
