@@ -66,6 +66,13 @@ describe("session-open permission preflight", HANG_GUARD, () => {
 		expect(log.children).toHaveLength(1);
 		expect(log.kills()).toBe(0);
 		expect(spawned()).toHaveLength(2);
+
+		// And: the child still caches its denial, so every later open probes again and keeps the grant.
+		const third = await service.open({});
+		const fourth = await service.open({});
+		expect([third.capturePermission, fourth.capturePermission]).toEqual(["granted", "granted"]);
+		expect(spawned()).toHaveLength(4);
+		expect(log.children).toHaveLength(1);
 	});
 
 	it("keeps the denial when the fresh process is denied too", async () => {
