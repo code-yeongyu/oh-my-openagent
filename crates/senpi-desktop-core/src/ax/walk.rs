@@ -48,6 +48,9 @@ impl WalkState {
     }
 
     /// Whether the object-mode walk must stop before reading another node.
+    /// Checked between nodes only: one slow `observe`/`children` call (or the
+    /// root's mandatory read) can overrun the deadline, bounded by the
+    /// operation timeout.
     fn spent(&mut self) -> bool {
         if self
             .deadline
@@ -220,6 +223,10 @@ fn structural(role: &str) -> bool {
     )
 }
 
+fn holds_cut(node: &WalkNode) -> bool {
+    node.left_out > 0 || node.children.iter().any(holds_cut)
+}
+
 /// Keeps interactable/named nodes and non-empty structure; collapses
 /// anonymous single-child groups. `all` keeps everything.
 pub(super) fn filter_node(mut node: WalkNode, all: bool) -> Option<WalkNode> {
@@ -236,7 +243,12 @@ pub(super) fn filter_node(mut node: WalkNode, all: bool) -> Option<WalkNode> {
     if !keep_self && node.props.role == "group" && node.children.len() == 1 {
         return node.children.pop();
     }
-    if keep_self || (structural(&node.props.role) && !node.children.is_empty()) {
+    // Any parent of a kept cut stays too, whatever its role, so the cut is
+    // always rendered and listed. `left_out` is set in object mode only.
+    if keep_self
+        || (structural(&node.props.role) && !node.children.is_empty())
+        || node.children.iter().any(holds_cut)
+    {
         Some(node)
     } else {
         None
