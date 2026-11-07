@@ -6,7 +6,7 @@ import { RELEASE_VERSION } from "./compiled-update"
 // Every release provisions ~/.omo/binary-runtime/<version>/ (~250MB) and nothing removed the old ones,
 // so a standalone install grew by one runtime per update. A launch prunes the versions older than its
 // own, keeping the newest older one for a rollback and any runtime a live process runs.
-export const RETAINED_PREVIOUS_RUNTIMES = 1
+const RETAINED_PREVIOUS_RUNTIMES = 1
 const PRUNE_PREFIX = ".prune-"
 
 export type RuntimePruneResult = {
