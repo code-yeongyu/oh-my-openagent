@@ -97,6 +97,27 @@ Named teams come from the project `teams` block in `omo.json` or `<project>/.omo
 
 There is no `team_wait` tool. When the next step depends on a reply, send with `task_send`, end the turn, and let the steered team-message notification resume the conversation when the reply arrives. Durable reservation and processed-message state prevent an inbox message from being lost during delivery or restart reconciliation.
 
+## Nesting depth and independent verification
+
+A child cannot spawn children of its own by default: `task.max_depth` is `1`, so a spawn from a child fails with an error containing `depth 2, beyond max_depth 1`. This keeps the delegation tree flat. Every child, its cost and its result stay visible to the session that started the work, and a worker cannot quietly turn itself into an orchestrator.
+
+When a worker's result should be checked independently (a source comparison, a second read of a diff, a review), the parent starts the verifier as a sibling:
+
+1. The parent spawns the worker and waits for its completion notification.
+2. The parent spawns a read-only verifier (for example `explore`, or a review category) with the worker's result as input: pass the worker's task id, the files it changed, or its output. Do not paste a summary of what the worker claims.
+3. The parent compares the two results and decides. If the verifier finds a problem, the parent steers the worker with `task_send` or starts a fix.
+
+The verifier never sees the worker's reasoning, only its output and the repository. That separation is what makes the check independent. A worker that asked its own child to verify it would choose what that child sees.
+
+If a deeper tree is genuinely needed, use the narrowest control that fits. Both are read from the agent being **started**, not from the agent that starts it (see the [`agents` reference](../reference/omo-json.md#agents)):
+
+- `agents.<name>.max_depth` lets that one agent run deeper than the session limit, whichever agent starts it. The session value stays as it is for every other agent.
+- An agent whose own `allowed_subagents` lists its own name may be started past the depth limit by any parent.
+
+For in-process children (always the case for the curated read-only agents such as `explore` and `librarian`, and for the ulw plan reviewers), the runner adds a fixed cap of one level past `task.max_depth`. So neither setting can take an in-process child deeper than `task.max_depth + 1`; with the default of 1, a child at depth 3 is refused even when the setting admits it.
+
+Raising `task.max_depth` (see the [`task` reference](../reference/omo-json.md#task)) is the last resort. It applies to every agent in the session, so any worker can then start its own children: the tree gets deeper, cost and running work spread across levels the session that started the work no longer sees directly, and a worker can again verify itself.
+
 ## Configuration
 
 ### Checkout isolation
