@@ -195,14 +195,20 @@ export function createCliAccountSource(options: {
     // work. There is no second store read and no unseal for relay. No-holder clause (design D r9 section 3): this
     // session is omo's only holder. If no omo process holds the credential in memory (no engine with memory sync
     // running), an omo-only machine stays not_adopted until one does. Nothing prompts and nothing reads the store for relay.
+    // Marked offered only once the hand-over succeeds: a failure (service down, a refusal) is logged, never thrown into
+    // the session, and retried on the next resolve.
     if (relay !== undefined && offered !== generation) {
-      offered = generation
-      await relay.readopt({
-        device: { id: captured.device.id, name: captured.device.name },
-        account: accountId,
-        signingPrivateKey: captured.signingPrivateKey,
-        sealingPrivateKey: captured.sealingPrivateKey,
-      }).catch(relayFailed("re-adopt"))
+      try {
+        await relay.readopt({
+          device: { id: captured.device.id, name: captured.device.name },
+          account: accountId,
+          signingPrivateKey: captured.signingPrivateKey,
+          sealingPrivateKey: captured.sealingPrivateKey,
+        })
+        offered = generation
+      } catch (error) {
+        relayFailed("re-adopt")(error)
+      }
     }
     const sameCaptured = (current: Credentials | null): boolean => current !== null && current.accountId === accountId
       && current.credentialGeneration === generation && sameKeys(current, captured)

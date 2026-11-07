@@ -78,6 +78,25 @@ describe("the memory device session re-adopts from its held credential", () => {
     expect(held).toHaveLength(1)
   })
 
+  test("a failed hand-over is retried on the next resolve, then not again once it succeeds", async () => {
+    const { store } = countingStore(credentials("gen-a"))
+    const attempts: string[] = []
+    let down = true
+    const relay: HeldCredentialRelay = {
+      readopt: async () => {
+        attempts.push(down ? "failed" : "adopted")
+        if (down) throw new Error("relayd down")
+      },
+      forget: async () => undefined,
+    }
+    const source = createCliAccountSource({ api: "http://127.0.0.1:9", store, fetch: service, relay, logger: { warn: () => undefined } })
+    expect((await source())?.accountId).toBe("acct_42")
+    down = false
+    await source()
+    await source()
+    expect(attempts).toEqual(["failed", "adopted"])
+  })
+
   test("a signed-out device hands nothing over", async () => {
     const { store } = countingStore(null)
     const { relay, held } = recordingRelay()
