@@ -78,6 +78,30 @@ test.describe("Docs Page", () => {
     await expect(page.locator("#installation")).toBeInViewport()
   })
 
+  test("an in-page link to a heading inside a section scrolls to that heading", async ({
+    page,
+  }) => {
+    // given
+    await page.goto("/docs")
+    const profileLink = page.locator('a[href="#pick-a-profile"]').first()
+
+    // when
+    await profileLink.click()
+
+    // then
+    await expect(page).toHaveURL(/\/docs#pick-a-profile$/)
+    await expect(page.getByRole("heading", { name: "Pick a profile" })).toBeInViewport()
+  })
+
+  test("Mermaid diagrams render as inline SVG, not as code", async ({ page }) => {
+    // given / when
+    await page.goto("/docs#orchestration")
+
+    // then
+    await expect(page.locator("code.language-mermaid")).toHaveCount(0)
+    await expect(page.locator("#orchestration figure.docs-diagram svg").first()).toBeVisible()
+  })
+
   test("legacy Korean installation URL redirects to the docs section", async ({ page }) => {
     // given / when
     await page.goto("/ko/installation.md")

@@ -610,6 +610,13 @@
   .docs-content .docs-table {
     @apply my-6 max-w-full overflow-x-auto;
   }
+  .docs-content .docs-diagram {
+    @apply border-line bg-ink-1 my-6 max-w-full overflow-x-auto border p-4;
+    overflow-wrap: normal;
+  }
+  .docs-content .docs-diagram svg {
+    @apply mx-auto block h-auto;
+  }
   .docs-content table {
     @apply border-line my-0 w-full border-collapse border text-sm;
     overflow-wrap: normal;

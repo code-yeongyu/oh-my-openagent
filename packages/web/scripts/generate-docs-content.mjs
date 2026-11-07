@@ -1,16 +1,23 @@
-import { readFile, writeFile } from "node:fs/promises"
+import { readFile, readdir, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { Marked } from "marked"
+import { DIAGRAMS_DIR, diagramKey } from "../lib/docs-diagrams.mjs"
+import { assignHeadingIds, createSlugger } from "../lib/docs-heading-ids.mjs"
 import { DOC_PAGES_DATA, DOC_SECTIONS_DATA } from "../lib/docs-sections-data.mjs"
 
 const SECTIONS = DOC_SECTIONS_DATA
 const DOCS_ROOT = path.resolve(process.cwd(), "..", "..", "docs")
+const DIAGRAMS_ROOT = path.resolve(process.cwd(), DIAGRAMS_DIR)
 const OUTPUT = path.resolve(process.cwd(), "lib", "docs-content.generated.ts")
+// `bun install` runs this as `prepare`, before `bun run docs:diagrams` can draw a new diagram, so only that
+// run may leave an undrawn block as code. Every build, type check and CI run fails on one instead.
+const ALLOW_MISSING_DIAGRAMS = process.argv.includes("--allow-missing-diagrams")
 const sectionIdByFile = new Map(SECTIONS.map((section) => [section.file, section.id]))
 const pageRouteByFile = new Map(DOC_PAGES_DATA.map((page) => [page.file, page.route]))
 
-function rewriteDocsLink(sourceFile, href) {
-  if (!href || href.startsWith("#") || href.startsWith("//")) return href
+function rewriteDocsLink(sourceFile, href, anchors) {
+  if (!href || href.startsWith("//")) return href
+  if (href.startsWith("#")) return `#${anchors.get(href.slice(1)) ?? href.slice(1)}`
   if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return href
 
   const [hrefPath] = href.split("#", 1)
@@ -27,21 +34,69 @@ function rewriteDocsLink(sourceFile, href) {
   return pageRouteByFile.has(sourceFile) ? `/docs#${sectionId}` : `#${sectionId}`
 }
 
-function createMarked(sourceFile) {
+async function loadDiagrams() {
+  const names = await readdir(DIAGRAMS_ROOT).catch(() => [])
+  const svgs = new Map()
+  for (const name of names.filter((entry) => entry.endsWith(".svg"))) {
+    svgs.set(
+      name.slice(0, -".svg".length),
+      (await readFile(path.join(DIAGRAMS_ROOT, name), "utf8")).trim(),
+    )
+  }
+  return svgs
+}
+
+const diagrams = await loadDiagrams()
+const missingDiagrams = []
+
+function createMarked() {
   const marked = new Marked({ gfm: true, breaks: false })
   marked.use({
-    walkTokens(token) {
-      if (token.type !== "link") return
-      token.href = rewriteDocsLink(sourceFile, token.href)
+    renderer: {
+      heading({ tokens, depth, id }) {
+        return `<h${depth} id="${id}">${this.parser.parseInline(tokens)}</h${depth}>\n`
+      },
+      code({ lang, text }) {
+        if (lang !== "mermaid") return false
+        const svg = diagrams.get(diagramKey(text))
+        if (svg) return `<figure class="docs-diagram">${svg}</figure>\n`
+        missingDiagrams.push(diagramKey(text))
+        return false
+      },
     },
   })
   return marked
 }
 
+function compile(file, markdown, pageSlugger) {
+  const marked = createMarked()
+  const tokens = marked.lexer(markdown)
+  const anchors = assignHeadingIds(marked, tokens, pageSlugger)
+  marked.walkTokens(tokens, (token) => {
+    if (token.type === "link") token.href = rewriteDocsLink(file, token.href, anchors)
+  })
+  return marked.parser(tokens)
+}
+
 const sources = {}
-for (const { file } of [...SECTIONS, ...DOC_PAGES_DATA]) {
-  const md = await readFile(path.join(DOCS_ROOT, file), "utf8")
-  sources[file] = await createMarked(file).parse(md)
+// /docs shows every section on one page, next to the section ids, so they share one set of ids.
+const docsPageSlugger = createSlugger(SECTIONS.map((section) => section.id))
+for (const { file } of SECTIONS) {
+  sources[file] = compile(file, await readFile(path.join(DOCS_ROOT, file), "utf8"), docsPageSlugger)
+}
+for (const { file } of DOC_PAGES_DATA) {
+  sources[file] = compile(file, await readFile(path.join(DOCS_ROOT, file), "utf8"), createSlugger())
+}
+
+if (missingDiagrams.length > 0) {
+  const message =
+    `${missingDiagrams.length} Mermaid block(s) have no drawn SVG in ${DIAGRAMS_DIR}/ ` +
+    `(${missingDiagrams.join(", ")}): run \`bun run docs:diagrams\` and commit the result.\n`
+  if (!ALLOW_MISSING_DIAGRAMS) {
+    process.stderr.write(message)
+    process.exit(1)
+  }
+  process.stderr.write(`warning: ${message}`)
 }
 
 const out =
