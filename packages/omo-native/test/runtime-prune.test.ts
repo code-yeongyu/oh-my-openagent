@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs"
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pruneProvisionedRuntimes, removeReplacedLauncher } from "../runtime-prune"
@@ -54,6 +54,33 @@ describe("pruneProvisionedRuntimes", () => {
     } finally {
       removeTree(outside)
     }
+  })
+
+  test("#given an old runtime that starts between the listing and its rename #when a fresh runtime prunes #then the second listing puts it back", () => {
+    // given: idle at the first listing, running from its original path by the second
+    provision("5.1.40", "5.1.56", "5.1.61", "5.1.62")
+    const listings = [[] as string[], [`${join(root, "5.1.40", "omo")} --mode rpc`]]
+    let calls = 0
+    // when
+    const result = pruneProvisionedRuntimes({ root, current: "5.1.62", platform: "linux", listRunning: () => listings[calls++] })
+    // then
+    expect(calls).toBe(2)
+    expect(result.removed).toEqual(["5.1.56"])
+    expect(result.kept.toSorted()).toEqual(["5.1.40", "5.1.61"])
+    expect(readFileSync(join(root, "5.1.40", "omo"), "utf8")).toBe("5.1.40")
+    expect(readdirSync(root).filter((name) => name.startsWith(".prune-"))).toEqual([])
+  })
+
+  test("#given the second listing cannot be read #when a fresh runtime prunes #then every renamed runtime goes back", () => {
+    // given
+    provision("5.1.40", "5.1.56", "5.1.61", "5.1.62")
+    const listings = [[] as string[], undefined]
+    let calls = 0
+    // when
+    const result = pruneProvisionedRuntimes({ root, current: "5.1.62", platform: "linux", listRunning: () => listings[calls++] })
+    // then
+    expect(result.removed).toEqual([])
+    for (const version of ["5.1.40", "5.1.56"]) expect(readFileSync(join(root, version, "omo"), "utf8")).toBe(version)
   })
 
   test("#given the running processes cannot be listed #when a fresh runtime prunes #then nothing is removed", () => {

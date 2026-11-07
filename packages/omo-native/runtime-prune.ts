@@ -52,15 +52,16 @@ export function pruneProvisionedRuntimes(options: {
   if (candidates.length === 0) return result
   // Windows refuses to rename a directory while a file inside it is open, which covers a running
   // runtime without a CIM query that costs seconds on every launch.
-  const running = platform === "win32" ? [] : (options.listRunning ?? listRunningCommands)()
+  const list = platform === "win32" ? () => [] : (options.listRunning ?? listRunningCommands)
+  const running = list()
   if (running === undefined) {
     result.kept.push(...candidates)
     return result
   }
+  const renamed: { version: string; directory: string; pruning: string }[] = []
   for (const version of candidates) {
     const directory = join(options.root, version)
-    // The launcher execs the runtime by its absolute path, so argv[0] starts with the runtime directory.
-    if (running.some((command) => command.startsWith(`${directory}${sep}`))) {
+    if (runsFrom(running, directory)) {
       result.kept.push(version)
       continue
     }
@@ -69,9 +70,25 @@ export function pruneProvisionedRuntimes(options: {
     const pruning = join(options.root, `${PRUNE_PREFIX}${version}-${process.pid}`)
     try {
       renameSync(directory, pruning)
+      renamed.push({ version, directory, pruning })
     } catch (error) {
       result.kept.push(version)
       if (!(platform === "win32" && isBusy(error))) result.failed.push({ version, reason: errorMessage(error) })
+    }
+  }
+  if (renamed.length === 0) return result
+  // A runtime started between the listing above and its rename still runs from the old path. Once
+  // renamed, nothing new can start there, so one more listing catches every such process; its runtime
+  // goes back before it loads a file lazily. An unreadable second listing keeps every runtime.
+  const after = list()
+  for (const { version, directory, pruning } of renamed) {
+    if (after === undefined || runsFrom(after, directory)) {
+      try {
+        renameSync(pruning, directory)
+        result.kept.push(version)
+      } catch (error) {
+        result.failed.push({ version, reason: errorMessage(error) })
+      }
       continue
     }
     try {
@@ -82,6 +99,11 @@ export function pruneProvisionedRuntimes(options: {
     }
   }
   return result
+}
+
+// The launcher execs the runtime by its absolute path, so argv[0] starts with the runtime directory.
+function runsFrom(commands: readonly string[], directory: string): boolean {
+  return commands.some((command) => command.startsWith(`${directory}${sep}`))
 }
 
 /**
