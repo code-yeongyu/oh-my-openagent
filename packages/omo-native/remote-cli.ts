@@ -150,7 +150,7 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
   const signedOut = await accountNotice(dependencies)
   if (signedOut !== undefined) return signedOut
   if (!existsSync(dependencies.stateDir)) {
-    dependencies.error("The OmO device service is not set up on this device. Install the OmO desktop app to set it up.")
+    dependencies.error("The OmO device service is not set up on this device. Run `omo remote bootstrap` (every interactive `omo` start runs it), or install the OmO desktop app, to set it up.")
     return REMOTE_EXIT.unavailable
   }
   if (!existsSync(deviceServiceEndpointPath(dependencies.stateDir))) {

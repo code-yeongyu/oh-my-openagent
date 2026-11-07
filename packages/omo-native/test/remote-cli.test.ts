@@ -164,7 +164,7 @@ describe("omo remote", () => {
   test("reports a missing or stopped service without a stack", async () => {
     const missing = await run(["status"], join(privateDir(), "absent"))
     expect(missing.code).toBe(REMOTE_EXIT.unavailable)
-    expect(missing.err).toEqual(["The OmO device service is not set up on this device. Install the OmO desktop app to set it up."])
+    expect(missing.err).toEqual(["The OmO device service is not set up on this device. Run `omo remote bootstrap` (every interactive `omo` start runs it), or install the OmO desktop app, to set it up."])
     const stopped = await run(["status"], privateDir())
     expect(stopped.code).toBe(REMOTE_EXIT.unavailable)
     expect(stopped.err).toEqual(["The OmO device service is not running on this device."])
