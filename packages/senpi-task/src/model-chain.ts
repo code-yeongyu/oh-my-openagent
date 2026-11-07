@@ -85,6 +85,29 @@ export function availableChainCandidates(
   })
 }
 
+/**
+ * A builtin category default spelled `provider/model` (`anthropic/claude-fable-5-1`) carries one provider
+ * only, while the chain rung for that model ranks every lane that serves it (`anthropic-subscription`
+ * first). The default resolves through that rung's provider order, so it never outranks the chain the
+ * category declares (#12753). Only a default its own provider serves is re-ranked: a default whose provider
+ * is absent already falls through to the chain, and a default no rung names is unchanged.
+ */
+export function chainOrderedDefaultModel(
+  defaultModel: string | undefined,
+  chain: readonly DelegateFallbackEntry[] | undefined,
+  availableModels: ReadonlySet<string>,
+): string | undefined {
+  const separator = defaultModel?.indexOf("/") ?? -1
+  if (defaultModel === undefined || chain === undefined || separator <= 0) return defaultModel
+  const provider = defaultModel.slice(0, separator)
+  const modelId = defaultModel.slice(separator + 1)
+  const rung = chain.find((entry) => entry.model === modelId && entry.providers.includes(provider))
+  if (rung === undefined) return defaultModel
+  const own = availableChainCandidates([{ ...rung, providers: [provider] }], availableModels)[0]?.model
+  const first = availableChainCandidates([rung], availableModels)[0]?.model
+  return own !== undefined && first !== undefined && first !== own ? first : defaultModel
+}
+
 function locateSelectedRung(options: ChainRungCandidateOptions): number {
   const { chain, selectedModel, selectedRungEntry } = options
   if (selectedRungEntry !== undefined) {

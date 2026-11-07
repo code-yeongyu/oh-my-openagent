@@ -12,7 +12,7 @@ import {
 } from "./builtins"
 import { availableCategoryNames, gatedAvailableCategories } from "./available-names"
 import { missingChainProviders, unlistedProviderModel } from "./chain-diagnostics"
-import { buildRuntimeModelChain, chainRungCandidates } from "../model-chain"
+import { buildRuntimeModelChain, chainOrderedDefaultModel, chainRungCandidates } from "../model-chain"
 import { withoutExcludedModels } from "../model-exclusion"
 import { CATEGORY_FALLBACK_CHAINS } from "./fallback-chains"
 import { parseAvailableModels, parseModel, parseRegistryModel } from "./registry-models"
@@ -178,7 +178,7 @@ export function resolveCategory<TModel extends SenpiModelPort>(
     {
       userModel,
       userFallbackModels,
-      categoryDefaultModel: builtinConfig?.model,
+      categoryDefaultModel: chainOrderedDefaultModel(builtinConfig?.model, fallbackChain, availableModelSet),
       isUserConfiguredCategoryModel: false,
       fallbackChain,
       availableModels: new Set(availableModels),

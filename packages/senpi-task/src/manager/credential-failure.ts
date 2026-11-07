@@ -40,10 +40,18 @@ const USAGE_LIMIT =
 // A `/model` command hint (senpi's own limit text says "Switch to another provider with /model") names no model.
 const MODEL_SCOPED_LIMIT = /(?<!\/)\bmodels?\b|\bpremium\b|\b(?:opus|sonnet|haiku|fable|mythos)\b/i
 
+// An empty prepaid balance (Anthropic's "Your credit balance is too low", "Insufficient credits") is a billing
+// fault on the account, not a usage limit: nothing resets it, only adding credit or another provider helps (#12753).
+const OUT_OF_CREDIT = /credit[_ ]balance|insufficient[_ ](?:credits?|balance)|out of credits?/i
+
+export function isOutOfCredit(message: string): boolean {
+  return OUT_OF_CREDIT.test(message)
+}
+
 export type UsageLimitScope = "model" | "account"
 
 export function usageLimitScope(message: string): UsageLimitScope | undefined {
-  if (!USAGE_LIMIT.test(message)) return undefined
+  if (isOutOfCredit(message) || !USAGE_LIMIT.test(message)) return undefined
   return MODEL_SCOPED_LIMIT.test(message) ? "model" : "account"
 }
 
@@ -91,11 +99,15 @@ export function terminalFailureMessage(record: TaskRecord | null | undefined, fa
       : `Credentials for ${provider} were rejected; re-authenticate ${provider} (Provider authentication settings on the desktop, /login ${provider} in an interactive session) or re-add its API key`
     return `${failureMessage}\n${cause}, or pin this category to another provider in omo.json.`
   }
-  if (usageLimitScope(failureMessage) === undefined) return failureMessage
+  const outOfCredit = isOutOfCredit(failureMessage)
+  if (!outOfCredit && usageLimitScope(failureMessage) === undefined) return failureMessage
   const model = record.resolved_model === undefined ? record.model : `${provider}/${record.resolved_model.model_id}`
   const exhausted = runtimeFallbackCandidates(record, failureMessage).remaining.length === 0
     ? " No other model in its fallback chain could take over."
     : ""
+  if (outOfCredit) {
+    return `${failureMessage}\nThe ${provider} account has no credit left for ${model}, so this task stopped.${exhausted} Add credit to the ${provider} account or remove its API key, or point this category at another provider or model in omo.json.`
+  }
   return `${failureMessage}\n${model} reached its usage limit, so this task stopped.${exhausted} Retry once the limit resets, or point this category at another provider or model in omo.json.`
 }
 
@@ -118,15 +130,17 @@ export function runtimeFallbackCandidates(record: TaskRecord, failureMessage: st
       skipped: fallbacks.filter((model) => model.provider === provider),
     }
   }
+  if (provider !== undefined && isOutOfCredit(failureMessage)) return { remaining: providerLast(fallbacks, provider), skipped: [] }
   const limit = usageLimitScope(failureMessage)
   if (limit === undefined) return { remaining: fallbacks, skipped: [] }
   if (limit === "model" || provider === undefined) return { remaining: fallbacks, skipped: [], limit }
-  return {
-    remaining: [
-      ...fallbacks.filter((model) => model.provider !== provider),
-      ...fallbacks.filter((model) => model.provider === provider),
-    ],
-    skipped: [],
-    limit,
-  }
+  return { remaining: providerLast(fallbacks, provider), skipped: [], limit }
+}
+
+// The spent provider's other rungs fail the same way, so they stay only as the last resort.
+function providerLast(fallbacks: readonly ResolvedModelRecord[], provider: string): readonly ResolvedModelRecord[] {
+  return [
+    ...fallbacks.filter((model) => model.provider !== provider),
+    ...fallbacks.filter((model) => model.provider === provider),
+  ]
 }
