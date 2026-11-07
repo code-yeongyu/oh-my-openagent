@@ -28,7 +28,9 @@ const expectedSkillNames = [
   "programming",
   "refactor",
   "remove-ai-slops",
+  "repo-map",
   "review-work",
+  "security",
   "ultimate-browsing",
   "ultrawork",
   "ulw-execute",
@@ -137,7 +139,7 @@ describe("OMO Senpi scoped skill sync", () => {
     expect([...telemetrySkillNames].sort()).toEqual(listDirectoryNames(skillsRoot))
   })
 
-  test("#given synced skill output #when inspected #then exactly 27 roots exist with valid names", () => {
+  test("#given synced skill output #when inspected #then exactly 29 roots exist with valid names", () => {
     const actualNames = listDirectoryNames(skillsRoot)
     expect(actualNames).toEqual([...expectedSkillNames].sort())
 

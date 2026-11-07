@@ -28,6 +28,7 @@ Before the first edit, name the references the request routes to and one reason 
 | Creating or updating `DESIGN.md`; personas, critique, debt, handoff, synthetic user testing | `references/designpowers/README.md` + `lane-c-review.md` (lane-c is the Phase Final critique reviewer and fills the accessibility-constraint and accepted-debt sections). |
 | Any code change in a React project | `references/design/README.md` Phase 0.5: the react-grab / react-scan / react-doctor check (a grep), the install when one is missing, and the dev-only gate; `react-dev-tooling-skill.md` for per-framework snippets. |
 | "What do shipped apps in this space look like?"; design-direction research for an existing product | `references/design/lazyweb.md` (run its recipe verbatim) + the `references/design/_INDEX.md` shortlist. |
+| A brief in Korean design words ("깔끔하게", "모던하게", "고급스럽게", "심플하게"), Hangul typography, a Korean public-sector (KRDS, KWCAG 2.2) or fintech screen | `references/korean-design-vocabulary.md`: the adjective-to-token table, the one question that splits each word's two readings, `word-break: keep-all` and the Hangul type scale, and the KWCAG 2.2 checkpoints a WCAG pass does not settle. |
 | Image only, no code: a mockup, app-screen concepts, a brand board | `references/design/imagegen-frontend-web.md` / `imagegen-frontend-mobile.md` / `imagegen-brandkit.md` (+ a Layer B brand if named). These never write code. |
 
 ## 0. Ground: know the product and the bar before designing

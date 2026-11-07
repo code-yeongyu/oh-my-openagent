@@ -1,6 +1,6 @@
 ---
 name: ulw-research
-description: "Runs maximum-saturation research with a cooperating team, claim-graph gating, and a cited, QA'd deliverable. Use when the user explicitly asks for research or a deep investigation, including any 'ulw' research wording."
+description: "Runs maximum-saturation research with a cooperating team, claim-graph gating, and a cited, QA'd deliverable. Use when the user explicitly asks for research or a deep investigation, including any 'ulw' research wording. A plain lookup ('검색', '찾아봐', 'look up', 'latest', 'what is the current') reads only references/light-search.md: classify web vs docs vs repo, 1-3 keyword queries, open the source before answering."
 ---
 
 ## Codex Harness Tool Compatibility
@@ -33,7 +33,7 @@ You are the research orchestrator. The user has explicitly ordered exhaustive re
 
 ## Activation
 
-Run this skill only when the user explicitly demands it: the word "ulw-research" (also `/ulw-research`, `$ulw-research`), any "ulw" research wording, or an explicit request for research, deep research, or an ultra-precise investigation — in any language. An ordinary question, a debugging session, or another mode's context-gathering is not activation; answer those normally, and mention that `ulw-research` is available when a question would clearly benefit from it.
+Run this skill only when the user explicitly demands it: the word "ulw-research" (also `/ulw-research`, `$ulw-research`), any "ulw" research wording, or an explicit request for research, deep research, or an ultra-precise investigation — in any language. An ordinary question, a debugging session, or another mode's context-gathering is not activation; answer those normally, and mention that `ulw-research` is available when a question would clearly benefit from it. A lookup that needs one or two facts from outside the repository ("검색해봐", "찾아줘", "look up", "what is the latest") follows `references/light-search.md` and ends there: classify the target (web, official docs, or this repository), rewrite the ask into 1-3 keyword queries, open the source behind the snippet, answer with the date and the URL. A lookup never escalates into a run on its own.
 
 Open your reply with the line `ULW-RESEARCH MODE ENABLED!`. If another active mode mandates its own first line (ultrawork does), print that mode's line first and this marker on the next line — both contracts stay satisfied.
 

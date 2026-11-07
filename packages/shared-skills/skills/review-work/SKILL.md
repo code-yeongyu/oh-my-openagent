@@ -137,7 +137,9 @@ You are the QA lane. Do not delegate hands-on QA to a sub-agent: the orchestrato
 | # | Scenario | Exact command / action | Expected | Observed | Verdict | Artifact |
 |---|----------|------------------------|----------|----------|---------|----------|
 
-A row without an artifact path is not PASS. If the application cannot even start, that is an immediate FAIL.
+A row without an artifact path is not PASS. If the application cannot even start, that is an immediate FAIL. `NA` is legal only when the scenario structurally cannot apply to the surface (a viewport row on a headless API), and it carries the reason; `inferred` and `partial` verdicts do not exist, and a scenario that could not run is a FAIL naming the blocker.
+
+5. **Bind the matrix to the tree and validate it.** Write the same rows as `qa-matrix.json` in the evidence directory, following `references/evidence-contract.md` (`$SKILL_DIR` below is this skill's own directory, the folder holding this SKILL.md): a `source` block from `bun "$SKILL_DIR/scripts/validate-evidence.ts" stamp --repo <repo>` (commit SHA, dirty flag, dirty-tree hash), `capturedAt`, and one row per scenario with its artifact paths relative to that directory. Then run `bun "$SKILL_DIR/scripts/validate-evidence.ts" <evidence-dir> --repo <repo>`. It rejects a PASS without a non-empty artifact, a `.png` that is not a whole PNG (signature, IHDR, CRC, IEND), an NA without a reason, and a matrix whose commit SHA or dirty-tree hash no longer matches the checkout. Exit 0 is the only state in which the matrix counts as QA evidence; a capture that stales because a fix landed after it is re-run, never re-stamped.
 
 Any FAIL ends the review here: report **REVIEW FAILED** with the failing rows and skip the gate reviewer - reviewing code that does not work wastes the reviewer. Fix first, then re-enter at Phase 0 with the delta.
 
@@ -204,11 +206,13 @@ REVIEW CHECKLIST:
 6. **Missed context**: does the change respect the reasons recorded in history, issues, PR reviews, and docs? Does anything that imports or documents the changed behavior need to move with it?
 7. **QA evidence audit**: for every matrix row, does the artifact exist and prove what the row claims? Name any success criterion that has no covering row.
 8. **Scope**: anything added that was not asked for - unnecessary abstraction, speculative generality, unrequested hardening - is a NOTE unless it breaks a constraint.
+9. **Changed-file coverage ledger**: account for every file in <changed_files> as `reviewed`, `skipped (reason)`, or `out-of-scope (reason)`. Generated, lock, vendored, binary and outside-domain files may be skipped only with the reason written down. A file you did not account for makes the verdict INCOMPLETE, never APPROVE.
+10. **Falsify before you file**: state each finding as a testable claim, look for the evidence that would disprove it (a guard, a test, the caller, the docs), and keep it only when it survives; tag every finding `verified` (you reproduced it from the artifact or the code path) or `unverified` (the attempt could not be completed). An `unverified` finding never blocks on its own.
 
 APPROVE unless you can cite a specific goal item, constraint, or QA row that the artifact fails, with the evidence that proves it (including an artifact a criterion requires but that is missing). A gap you cannot tie to the stated goal - style preference, alternative design, a scenario the goal never named - is a NOTE, not a blocker. You do not judge approach optimality or hypothetical future requirements.
 
 OUTPUT FORMAT:
-<verdict>APPROVE or REJECT</verdict>
+<verdict>APPROVE, REJECT, or INCOMPLETE (a changed file is unaccounted for in the coverage ledger)</verdict>
 <confidence>HIGH / MEDIUM / LOW</confidence>
 <summary>1-3 sentence overall assessment from the user's perspective</summary>
 <goal_breakdown>
@@ -220,8 +224,11 @@ OUTPUT FORMAT:
 <qa_audit>
   - [VERIFIED/UNPROVEN] Row # - what the artifact shows, or what is missing
 </qa_audit>
+<coverage_ledger>
+  - path - reviewed | skipped (reason) | out-of-scope (reason)   (one line per changed file; an unaccounted file makes the verdict INCOMPLETE)
+</coverage_ledger>
 <blocking_issues>
-  - Violated goal item / constraint / QA row -> observation -> file:line or artifact pointer -> exact fix. Empty if APPROVE.
+  - [verified/unverified] Violated goal item / constraint / QA row -> observation -> file:line or artifact pointer -> exact fix. Empty if APPROVE.
 </blocking_issues>
 <notes>Non-blocking findings, grouped by theme (quality, security, context). Keep them short.</notes>
 """)
@@ -240,11 +247,11 @@ Store the lane verdicts independently:
 | Manual QA (Phase 1) | PASS/FAIL | rows, artifact paths |
 | Gate review | pending/APPROVE/REJECT/INCONCLUSIVE | - |
 
-If the reviewer ends without a verdict (it completed without one, answered ack-only to one follow-up, or reported `BLOCKED:`), record the lane INCONCLUSIVE and respawn one smaller reviewer scoped to the same inputs. A reviewer that is still running is alive, not silent. If that retry also ends without a verdict, close the still-running agent if safe, keep the lane INCONCLUSIVE, and emit the final result naming the incomplete lane. Do not spin in repeated wait/followup cycles, and do not use a queued followup as a cancellation.
+A reviewer verdict of INCOMPLETE (a changed file left unaccounted for in the coverage ledger) is not APPROVE: hand the missing files back in a fresh spawn scoped to them, or record the lane INCONCLUSIVE. If the reviewer ends without a verdict (it completed without one, answered ack-only to one follow-up, or reported `BLOCKED:`), record the lane INCONCLUSIVE and respawn one smaller reviewer scoped to the same inputs. A reviewer that is still running is alive, not silent. If that retry also ends without a verdict, close the still-running agent if safe, keep the lane INCONCLUSIVE, and emit the final result naming the incomplete lane. Do not spin in repeated wait/followup cycles, and do not use a queued followup as a cancellation.
 
 After the lane reaches a terminal state and before delivering the verdict, tear down the review worktree: run `git worktree unlock <path>` followed by `git worktree remove <path>`. The reviewer runs inside that worktree, so removing it earlier destroys its working directory; a crashed review leaves the locked tree as a recoverable marker for manual cleanup.
 
-A re-review after fixes is a fresh Phase 0 -> 3 pass scoped to the delta plus the current evidence: re-run the affected QA rows and spawn a NEW reviewer with the delta diff and the blockers it must re-check. Never send fixes as a followup to the previous reviewer.
+A re-review after fixes is a fresh Phase 0 -> 3 pass scoped to the delta plus the current evidence: re-run the affected QA rows and spawn a NEW reviewer with the delta diff and the blockers it must re-check. Never send fixes as a followup to the previous reviewer. The delta is an interdiff anchored to two commits you record in the report: the head the previous reviewer saw and the new head (`git diff <previous-head> <new-head>`, or `git range-diff <base>..<previous-head> <base>..<new-head>` when history was rewritten). The reviewer gets both anchors, the unresolved findings from the previous round, and the instruction to verify each claimed fix, process new findings normally, and revisit unchanged code only where a cross-file dependency moved. When either anchor is missing or the rewrite makes the interdiff untrustworthy, fall back to a full review of the current base-to-head diff and say so.
 
 ---
 

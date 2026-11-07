@@ -10,4 +10,7 @@ interface:
     - "git blame"
     - "git bisect"
     - "history search"
+    - "branch cleanup"
+    - "worktree cleanup"
+    - "release proof"
   default_prompt: "Use $git-master to inspect the repository state, preserve unrelated work, and handle the requested Git operation with atomic grouping, history safety checks, and evidence-backed verification."
