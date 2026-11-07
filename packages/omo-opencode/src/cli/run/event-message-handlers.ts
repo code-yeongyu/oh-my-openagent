@@ -170,6 +170,8 @@ export function handleMessageUpdated(ctx: RunContext, payload: EventPayload, sta
   const isNewMessage = !messageID || messageID !== state.currentMessageId
   if (isNewMessage) {
     state.currentMessageId = messageID
+    state.hasStructuredOutput = false
+    state.structuredOutput = undefined
     state.mainSessionStarted = true
     state.hasReceivedMeaningfulWork = true
     state.messageCount++
@@ -184,6 +186,11 @@ export function handleMessageUpdated(ctx: RunContext, payload: EventPayload, sta
       state.messageStartedAtById[messageID] = Date.now()
       state.completionMetaPrintedByMessageId[messageID] = false
     }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(props?.info, "structured")) {
+    state.hasStructuredOutput = true
+    state.structuredOutput = props?.info?.structured
   }
 
   const agent = props?.info?.agent ?? null
