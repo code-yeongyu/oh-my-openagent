@@ -69,7 +69,7 @@ async function git(repo: GitMemoryRepo, args: string[]): Promise<string> {
   return String(result.stdout).trim()
 }
 
-setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
+if (process.platform === "win32") setDefaultTimeout(30000)
 
 describe("runMemoryTool", () => {
   it("#given a codex patch #when apply_patch runs #then it applies and commits through the memory tool", async () => {
