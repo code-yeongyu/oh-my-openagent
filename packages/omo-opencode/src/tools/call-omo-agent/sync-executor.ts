@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { clearSessionAgent, handedBackSyncSessions, setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
-import { getAgentToolRestrictions, isAmbiguousPostDispatchPromptFailure, log } from "../../shared"
+import { getAgentToolRestrictions, isAmbiguousPostDispatchPromptFailure, log, normalizeSDKResponse } from "../../shared"
 import { normalizeAgentForPrompt, stripAgentListSortPrefix } from "../../shared/agent-display-names"
 import {
   clearDelegatedChildSessionBootstrap,
@@ -11,6 +11,8 @@ import type { FallbackEntry } from "../../shared/model-requirements"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import { applySessionPromptParams } from "../../shared/session-prompt-params-helpers"
 import { deleteSessionTools, setSessionTools } from "../../shared/session-tools-store"
+import { extractErrorMessage } from "../../features/background-agent/error-classifier"
+import { withCompletionDeadline } from "./completion-deadline"
 import { waitForCompletion } from "./completion-poller"
 import { processMessages } from "./message-processor"
 import { createOrGetSession } from "./session-creator"
@@ -130,6 +132,21 @@ export async function executeSync(
       tools: promptTools,
     })
 
+    let anchorMessageID: string | undefined
+    if (!session.isNew) {
+      const snapshot = await withCompletionDeadline(toolContext.abort, (signal) =>
+        ctx.client.session.messages({ path: { id: session.sessionID }, signal }))
+      if (snapshot.error) {
+        throw new Error(`Failed to read session before prompt: ${extractErrorMessage(snapshot.error) ?? "Unknown SDK error"}`)
+      }
+      if (!Array.isArray(snapshot) && !Array.isArray(snapshot.data)) {
+        throw new Error("Cannot read messages to anchor reused session.")
+      }
+      const messages = normalizeSDKResponse(snapshot, [] as Array<{ info?: { id?: string } }>)
+      anchorMessageID = messages.at(-1)?.info?.id
+      if (messages.length > 0 && !anchorMessageID) throw new Error("Cannot anchor reused session without a message ID.")
+    }
+
     try {
       if (!hasPrompt(ctx.client.session)) {
         return `Error: Failed to send prompt: prompt is not available on this OpenCode client.\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
@@ -178,9 +195,14 @@ export async function executeSync(
       return `Error: Failed to send prompt: ${errorMessage}\n\n<task_metadata>\nsession_id: ${sessionID}\n</task_metadata>`
     }
 
-    await deps.waitForCompletion(sessionID, toolContext, ctx)
+    if (session.isNew) {
+      await deps.waitForCompletion(sessionID, toolContext, ctx)
+    } else {
+      await deps.waitForCompletion(sessionID, toolContext, ctx, anchorMessageID)
+    }
 
-    const responseText = await deps.processMessages(sessionID, ctx)
+    const responseText = await withCompletionDeadline(toolContext.abort, (signal) =>
+      deps.processMessages(session.sessionID, ctx, signal))
 
     return responseText + "\n\n" + ["<task_metadata>", `session_id: ${sessionID}`, "</task_metadata>"].join("\n")
   } catch (error) {

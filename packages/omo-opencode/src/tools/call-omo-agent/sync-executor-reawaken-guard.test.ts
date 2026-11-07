@@ -32,6 +32,7 @@ function createExecuteContext(abortMock: ReturnType<typeof mock>) {
   return {
     client: {
       session: {
+        messages: mock(async () => ({ data: [] })),
         prompt: promptAsync,
         promptAsync,
         abort: abortMock,
