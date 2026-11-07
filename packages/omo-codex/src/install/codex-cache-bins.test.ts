@@ -244,7 +244,8 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
     // then
     if (link === null) throw new Error("expected runtime wrapper link")
     const wrapper = await readFile(link.path, "utf8")
-    expect(wrapper).toMatch(/"[^"\r\n]*omo-ulw-loop\.cmd" ulw-loop %\*/)
+    expect(wrapper).toMatch(/^if "%~1"=="ulw-loop" if exist "[^"\r\n]*omo-ulw-loop\.cmd" "[^"\r\n]*omo-ulw-loop\.cmd" %\*\r$/m)
+    expect(wrapper).not.toContain("shift")
   })
 })
 

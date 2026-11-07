@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:b837866f052aeaebdb29434aa060c717e1588680ac2d27dd6470c3aa46bf6ce0:339b2606b7d2b32746534d242fc03fa67d973e14ef9d15e8669dbf08c420dba7
+// omo-codex-install:36adf01ed0b069aa5c3944a2c141f7408c7a8dcb24d7d920b55e00ae36fd7fd5:aaa7dd271f9bca7338a58fb5950a8049a9dde116252ac5f06cbab237734e4706
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10957,22 +10957,18 @@ function windowsRuntimeWrapper(binName, cliPath, codexHome, binDir, nodeCliPath)
     `set "OMO_INVOCATION_NAME=${binName}"`,
     'set "OMO_EDITION=codex"',
     ...windowsNodeDiscoveryLines(),
-    `if "%~1"=="ulw-loop" if exist "${ulwLoopBin}" (`,
-    "  shift /1",
-    `  "${ulwLoopBin}" ulw-loop %*`,
-    "  exit /b %ERRORLEVEL%",
-    ")",
+    `if "%~1"=="ulw-loop" if exist "${ulwLoopBin}" "${ulwLoopBin}" %*`,
     `if "%OMO_RUNTIME%"=="node" if defined OMO_NODE_BINARY if exist "${nodeCliPath}" (`,
     `  "%OMO_NODE_BINARY%" "${nodeCliPath}" %*`,
-    "  exit /b %ERRORLEVEL%",
+    "  exit /b !ERRORLEVEL!",
     ")",
     'if not defined BUN_BINARY where bun >nul 2>nul && set "BUN_BINARY=bun"',
     'if not defined BUN_BINARY if exist "%USERPROFILE%\\.bun\\bin\\bun.exe" set "BUN_BINARY=%USERPROFILE%\\.bun\\bin\\bun.exe"',
+    `if not defined BUN_BINARY if defined OMO_NODE_BINARY if exist "${nodeCliPath}" (`,
+    `  "%OMO_NODE_BINARY%" "${nodeCliPath}" %*`,
+    "  exit /b !ERRORLEVEL!",
+    ")",
     "if not defined BUN_BINARY (",
-    `  if defined OMO_NODE_BINARY if exist "${nodeCliPath}" (`,
-    `    "%OMO_NODE_BINARY%" "${nodeCliPath}" %*`,
-    "    exit /b %ERRORLEVEL%",
-    "  )",
     `  echo ${binName}: bun runtime not found, no Node runtime was discovered from NODE_REPL_NODE_PATH or PATH, or the node fallback CLI is missing at ${nodeCliPath}; install bun from https://bun.sh or rerun LazyCodex install from Codex Desktop 1>&2`,
     "  exit /b 127",
     ")",
