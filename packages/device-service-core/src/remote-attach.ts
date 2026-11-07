@@ -43,7 +43,9 @@ export type RemoteAttach = {
    * Sends one engine RPC record, unchanged, to the attached session's host on this connection's delegated channel
    * (`session.command {attach, rpc, delegated: true}`) and settles with the first command state that is not a progress
    * state, plus the engine's reply when the host sent one (a host without delegated commands sends none). Rejects with
-   * the local API's refusal, or when the attach ends first.
+   * the local API's refusal, when the connection closes first, or when the attach ended and no final state followed
+   * within ENDED_COMMAND_WAIT_MS: a command that ends its own session (close_session, unload_session) settles with its
+   * state after the attach ends.
    */
   readonly command: (rpc: CommandRpc) => Promise<CommandResult>
   /** The frames the host's engine writes unasked on the delegated channel (dialog requests, session events). */
@@ -72,6 +74,13 @@ const attachEvent = (event: LocalEvent): AttachEvent | undefined => {
       return undefined
   }
 }
+
+// How long a command still in flight when its attach ends waits for its final state. Its reply and state arrive on the
+// connection's delegated channel toward the device, which outlives the attachment: an engine that ends its own session
+// (close_session, unload_session) answers after the host ended the attachment (relay daemon #359 sends attach_ended on
+// the session stream, the reply rides the channel), and a channel that closes ends the command uncertain itself
+// (docs/local-api.md "Delegated commands"). The bound is the local API's own request timeout.
+const ENDED_COMMAND_WAIT_MS = 30_000
 
 // The sender ledger's progress states (local API command_state): every other state ends the command.
 export const PROGRESS_STATES: ReadonlySet<CommandStateEvent["state"]> = new Set(["queued", "transport_confirmed", "engine_dispatched"])
@@ -112,15 +121,29 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
   let failure: unknown
   const commands = new Set<(reason: AttachEnd) => void>()
   let channel: DelegatedChannel | undefined
+  let drain: ReturnType<typeof setTimeout> | undefined
+  let released = false
+  // The connection subscription and the delegated channel stay until the attach has ended and no command waits on them.
+  const release = (): void => {
+    if (released) return
+    released = true
+    clearTimeout(drain)
+    stop()
+    channel?.stop()
+  }
+  const endCommands = (reason: AttachEnd): void => {
+    for (const end of [...commands]) end(reason)
+    release()
+  }
   const finish = (reason: AttachEnd) => {
     if (ended) return
     ended = true
-    stop()
-    channel?.stop()
     listeners.clear()
-    for (const end of [...commands]) end(reason)
     rejectSnapshot(new Error(`the attach ended before its snapshot: ${reason}`))
     resolveDetached(reason)
+    if (reason === "closed" || commands.size === 0) return endCommands(reason)
+    drain = setTimeout(() => endCommands(reason), ENDED_COMMAND_WAIT_MS)
+    drain.unref?.()
   }
   // Listeners run inside the connection's data handler: a throw there must end this attach, never the connection.
   const deliver = (event: AttachEvent) => {
@@ -148,7 +171,10 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
     if (handle === undefined) early.push(mine)
     else if (mine.attach === handle) deliver(mine)
   })
-  void client.closed.then(() => finish("closed"))
+  void client.closed.then(() => {
+    finish("closed")
+    endCommands("closed")
+  })
   return client.request("session.attach", { device, session_id: sessionId }).then(
     ({ attach }) => {
       handle = attach
@@ -178,6 +204,7 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
             const settle = (): void => {
               stopState()
               commands.delete(end)
+              if (ended && commands.size === 0) release()
             }
             const end = (reason: AttachEnd): void => {
               settle()
@@ -186,8 +213,9 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
             const stopState = client.onEvent(event => {
               if (event.kind !== "session.command_state" || event.command_id !== commandId) return
               if (PROGRESS_STATES.has(event.state)) return
-              settle()
+              // Taken before settling: the last command of an ended attach releases the channel that holds the reply.
               const response = delegated.takeReply(commandId)
+              settle()
               resolve(response === undefined ? { outcome: event } : { outcome: event, response })
             })
             commands.add(end)

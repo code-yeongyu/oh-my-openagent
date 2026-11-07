@@ -7,6 +7,7 @@ import { bootstrapDeviceService, type BootstrapDependencies, forgetDeviceService
 import { connectDeviceService, type DeviceCredential, type DeviceService } from "../src/index.ts"
 import type { AccountShowResult } from "../src/account-state.ts"
 import { writeToken } from "../src/local-api/access.ts"
+import { LocalApiError } from "../src/local-api/errors.ts"
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "./local-api/conformance/world.ts"
 import { testSecure } from "./local-api/support.ts"
@@ -152,6 +153,41 @@ describe("device service bootstrap", () => {
       exitCode: 3,
     })
     expect(calls.connect).toBe(0)
+  })
+
+  test.skipIf(process.platform === "win32")("a running service that only times out its handshake is never reinstalled", async () => {
+    const stateDir = home()
+    const owner = await ownerAt(stateDir, PIN)
+    const { deps, calls } = harness(stateDir, {
+      connect: async () => {
+        calls.connect += 1
+        throw new LocalApiError("handshake_timeout", "the owner did not complete the handshake")
+      },
+    })
+    expect(await bootstrapDeviceService(deps)).toMatchObject({ kind: "stopped", state: "service_degraded" })
+    expect(calls).toEqual({ install: 0, connect: 2 })
+    expect(owner.state.adoptions).toBe(0)
+  })
+
+  test.skipIf(process.platform === "win32")("one slow handshake is retried and the running service is used, not replaced", async () => {
+    const stateDir = home()
+    const owner = await ownerAt(stateDir, PIN)
+    let slow = true
+    const { deps, calls } = harness(stateDir, {
+      connect: async () => {
+        calls.connect += 1
+        if (slow) {
+          slow = false
+          throw new LocalApiError("handshake_timeout", "the owner did not complete the handshake")
+        }
+        const service = await connectDeviceService({ version: REFRESHER.version, stateDir })
+        services.push(service)
+        return service
+      },
+    })
+    expect((await bootstrapDeviceService(deps)).kind).toBe("connected")
+    expect(calls).toEqual({ install: 0, connect: 2 })
+    expect(owner.state.adoptions).toBe(1)
   })
 
   test("a bad server_proof drops the connection with zero adopts and installs nothing", async () => {

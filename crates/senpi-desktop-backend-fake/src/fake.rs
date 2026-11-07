@@ -37,10 +37,11 @@ pub struct FakeBackend {
     pub(crate) user_input: std::sync::Arc<crate::user_input_impl::FakeUserInput>,
     pub(crate) user_input_feed: bool,
     faults: Faults,
+    pub(crate) scripted: crate::scripting_impl::Scripted,
 }
 
 impl FakeBackend {
-    pub fn new(scenario: FakeScenario) -> Self {
+    pub fn new(mut scenario: FakeScenario) -> Self {
         let faults = Faults::default();
         for failure in &scenario.fail_next {
             let error = match &failure.reason {
@@ -54,11 +55,23 @@ impl FakeBackend {
             faults.cannot_complete_next(*write);
         }
         let user_input = std::sync::Arc::new(crate::user_input_impl::FakeUserInput::default());
-        user_input.script(scenario.user_presses);
+        user_input.script(std::mem::take(&mut scenario.user_presses));
+        user_input.script_timeline(&scenario.user_input_timeline);
+        for (window, identity) in &scenario.identity {
+            if let Some(pid) = scenario.windows.iter().find(|w| &w.id == window).and_then(|w| w.pid) {
+                user_input.set_started(pid, identity.process_start);
+            }
+        }
+        let mut ax_tree = AxTree::build(&scenario.ax);
+        for (window, count) in &scenario.ax_node_count {
+            ax_tree.pad(window, *count);
+        }
+        let scripted = crate::scripting_impl::Scripted::new(&mut scenario);
         Self {
+            scripted,
             user_input,
             user_input_feed: scenario.user_input_feed,
-            ax_tree: AxTree::build(&scenario.ax),
+            ax_tree,
             ax_owner_unknown: scenario.ax_owner_unknown,
             menus: scenario.menus,
             displays: scenario.displays,
@@ -92,14 +105,16 @@ impl FakeBackend {
     }
 
     /// Entry of every fallible call: scripted delay, then a queued failure.
-    pub(crate) fn begin(&self, method: FakeMethod) -> CoreResult<()> {
+    pub(crate) fn begin(&mut self, method: FakeMethod) -> CoreResult<()> {
+        self.advance_timeline(method);
         self.delay(method);
         self.faults.take(method).map_or(Ok(()), Err)
     }
 
     /// [`Self::begin`] for an AX write: the reply to report once the write
     /// has landed ([`Reply::confirm`]).
-    pub(crate) fn begin_write(&self, write: AxWrite) -> CoreResult<Reply> {
+    pub(crate) fn begin_write(&mut self, write: AxWrite) -> CoreResult<Reply> {
+        self.advance_timeline(write.method());
         self.delay(write.method());
         self.faults.take_write(write)
     }
