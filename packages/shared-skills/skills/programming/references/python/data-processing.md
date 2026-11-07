@@ -10,16 +10,16 @@ NEVER pandas. Polars (with numpy) plus DuckDB. Pandas is 10-50x slower, has weak
 |---|---|---|
 | `.csv` / `.parquet` / `.json` direct query | DuckDB | Zero memory load, SQL ergonomics |
 | `.duckdb` file | DuckDB | Native format |
-| Filter (any size) | Polars | 128x faster than DuckDB for filtering |
-| Sort | Polars | 12x faster |
-| Multi-table join | DuckDB | 3x faster, more join types |
-| Heavy GROUP BY aggregation | DuckDB | 4x faster on large datasets |
-| Window function | Polars | 3-5x faster |
-| Pivot / melt / string ops | Polars | 2x faster |
+| Filter (any size) | Polars | row-wise filtering, low setup cost |
+| Sort | Polars | in-memory sorting |
+| Multi-table join | DuckDB | more join types, out-of-core joins |
+| Heavy GROUP BY aggregation | DuckDB | large grouped aggregation |
+| Window function | Polars | window expressions |
+| Pivot / melt / string ops | Polars | reshape and string expressions |
 | Larger than RAM | Polars streaming or DuckDB out-of-core | Both handle OOM |
 | Mixed pipeline | Hybrid (zero-copy via Arrow) | Use each tool's strengths |
 
-For the deep version (per-operation benchmarks, OOM strategies, full execution templates), load the **`data-scientist`** skill - it lives in this same skill set and is the source of truth for performance numbers.
+For the deep version (engine choice, placement, OOM strategies, execution templates), load the **`data-scientist`** skill - it lives in this same skill set; when the engine choice matters, measure on the actual data, as that skill says.
 
 ## Standard imports
 
@@ -69,7 +69,7 @@ result = (
         pl.len().alias("count"),
         pl.sum("amount").alias("total"),
     ])
-    .collect(streaming=True)
+    .collect(engine="streaming")
 )
 ```
 
@@ -84,7 +84,7 @@ joined = duckdb.sql("""
     JOIN 'products.parquet'  p ON o.product_id  = p.id
 """).pl()
 
-# Phase 2: Polars for filtering and transformation (128x + 2x faster)
+# Phase 2: Polars for filtering and transformation
 processed = (
     joined
     .filter(pl.col("amount") > 100)

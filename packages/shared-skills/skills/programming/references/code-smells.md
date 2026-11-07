@@ -48,10 +48,10 @@ cloc --by-file <file>   # the "code" column is the number
 
 A file may legitimately exceed 250 pure LOC if **and only if** it is:
 
-- A truly indivisible single-responsibility unit (e.g., a generated parser table, a state machine whose states share a single closure). Mark with `// allow: SIZE_OK — <reason>`.
+- A truly indivisible single-responsibility unit (e.g., a generated parser table, a state machine whose states share a single closure). Mark it in the first 10 lines with `# noqa: SIZE_OK — <reason>` in Python (the form `scripts/python/check-no-excuse-rules.py` reads) or `// allow: SIZE_OK — <reason>` in `//`-comment languages.
 - A pure data table (translation strings, error code lookup, brand color palette).
 
-`// allow: SIZE_OK` without a justifying comment is itself slop.
+A SIZE_OK marker without a justifying comment is itself slop.
 
 ### Concrete split examples
 

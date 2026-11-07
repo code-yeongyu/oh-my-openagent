@@ -77,7 +77,7 @@ const pkg = {
   },
   dependencies: {
     hono: "^4.12.5",
-    zod: "^3.24.0",
+    zod: "^4.0.0",
   },
   devDependencies: {
     "@types/bun": "latest",
