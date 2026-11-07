@@ -7,7 +7,9 @@ import { mkdir, mkdtemp, readFile, rm, unlink, utimes, writeFile, readdir, lstat
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { SessionManager } from "@code-yeongyu/senpi"
+import type { SessionManager as SenpiSessionManager } from "@code-yeongyu/senpi"
+
+import { SessionManager } from "../../senpi-test-runtime"
 import {
   DEFAULT_RUNTIME_RETENTION,
   TranscriptJournal,
@@ -132,7 +134,7 @@ describe("run-id high water across a retention pass (H1)", () => {
 type Text = { readonly role: "user" | "assistant"; readonly text: string }
 const usage = { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }
 
-function append(manager: SessionManager, message: Text): string {
+function append(manager: SenpiSessionManager, message: Text): string {
   return message.role === "user"
     ? manager.appendMessage({ role: "user", content: [{ type: "text", text: message.text }], timestamp: NOW })
     : manager.appendMessage({
@@ -143,7 +145,7 @@ function append(manager: SessionManager, message: Text): string {
 
 interface PrunedSession {
   readonly paths: MemoryIdentityPaths
-  readonly manager: SessionManager
+  readonly manager: SenpiSessionManager
   readonly ids: readonly string[]
   readonly journalDir: string
   readonly warnings: string[]
