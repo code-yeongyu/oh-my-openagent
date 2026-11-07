@@ -409,10 +409,10 @@ fn a_drill_reads_one_subtree_in_a_sub_generation_and_keeps_parent_refs() {
 
 #[test]
 fn a_drill_on_a_stale_ref_fails_stale_ref_and_starts_no_generation() {
-    // Given: e1 aged out by two newer snapshots.
+    // Given: e1 aged out by eight newer snapshots.
     let mut m = titled_levels();
     let mut registry = object_registry();
-    for _ in 0..3 {
+    for _ in 0..9 {
         snapshot(&mut m, &mut registry, &window(), &skeleton()).unwrap();
     }
     let options = AxSnapshotOptions {
@@ -423,7 +423,7 @@ fn a_drill_on_a_stale_ref_fails_stale_ref_and_starts_no_generation() {
     let error = snapshot(&mut m, &mut registry, &window(), &options).err().map(|error| error.code);
     // Then
     assert_eq!(error, Some(crate::error::ErrorCode::StaleRef));
-    assert_eq!(registry.current_generation("7"), 3);
+    assert_eq!(registry.current_generation("7"), 9);
 }
 
 #[test]
