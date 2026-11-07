@@ -53,7 +53,8 @@ function startWriter(fixture: IdentityRepo, helper: string, argv: readonly strin
   const child = spawn(process.execPath, [WRITER_SCRIPT, JSON.stringify(config)], { stdio: ["pipe", "pipe", "inherit"], windowsHide: true })
   const seen: string[] = []
   const waiters = new Set<() => void>()
-  createInterface({ input: child.stdout! }).on("line", (text) => {
+  if (child.stdout === null) throw new Error("writer stdout pipe missing")
+  createInterface({ input: child.stdout }).on("line", (text) => {
     seen.push(text)
     for (const waiter of waiters) waiter()
   })
@@ -87,10 +88,12 @@ async function admit(writer: Writer): Promise<OuterJob> {
   const outer = OuterJob.create()
   cleanups.push(() => outer.close())
   outer.assign(writer.child.pid ?? 0)
-  writer.child.stdin!.write("assigned\n")
+  const stdin = writer.child.stdin
+  if (stdin === null) throw new Error("writer stdin pipe missing")
+  stdin.write("assigned\n")
   // P claimed the protocol: its cached `selftest` passed at lock-record creation (design section 6.3).
   expect(await writer.line(["ready"], 30_000)).toBe(`ready ${GIT_ACTIVITY_JOB_PROTOCOL}`)
-  writer.child.stdin!.write("start\n")
+  stdin.write("start\n")
   return outer
 }
 
