@@ -35,6 +35,7 @@ import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/i
 import { buildSenpiArgs, shouldPrintCompiledBanner, trustLaunchKind } from "./compile-args"
 import { runLoroSmoke } from "./loro-smoke"
 import { runAccountCommand } from "./account-cli"
+import { registerHelperCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
 import { runRemoteAttachCommand, runRemoteCommand } from "./remote-entry"
 import { runSyncCommand } from "./sync-cli"
 import { spawnSync } from "node:child_process"
@@ -44,6 +45,7 @@ import { ExtraCaCertificatesError, parseExtraCaCertificates } from "./compiled-c
 import { adoptedEngineTrust, buildTrustLaunchEnvironment } from "@code-yeongyu/senpi/engine-trust"
 import { runTrustStage } from "./trust-stage"
 import { resolveEngineTrustHelperPath } from "./engine-trust-helper-path"
+import { claimMemorySyncAtBoot } from "./memory-sync-boot"
 
 // The engine is imported via a RELATIVE string LITERAL, inlined at both import
 // sites, and both properties are load-bearing:
@@ -136,7 +138,13 @@ export function compiledBannerLines(manifest: Pick<EmbeddedManifest, "omoAiVersi
 /** Test seam: the thread SDK `omo daemon adopt` locates and releases through (the plugin's by default). */
 type CompiledLauncherSeams = { readonly threadSdk?: (options: Record<string, unknown>) => Promise<{ sdk?: unknown; error?: string }> }
 
+/** RULING-74: the runtime's keychain helper sits directly beside the binary (the desktop layout); every command uses it first. */
+export function compiledKeychainHelper(execDir: string): string {
+  return join(execDir, "omo-keychain")
+}
+
 export async function runCompiledLauncher(args: string[], execDir: string, enginePin = "unknown", compiledPackageRoot?: string, migration: CompiledLauncherOptions = {}, seams: CompiledLauncherSeams = {}): Promise<boolean> {
+  registerHelperCandidates([compiledKeychainHelper(execDir)])
   if (args[0] === "loro-smoke") {
     process.exitCode = await runLoroSmoke()
     return true
@@ -349,6 +357,7 @@ async function main(): Promise<void> {
     if (await runCompiledLauncher(process.argv.slice(2), execDir)) return
     process.argv.splice(2, process.argv.length - 2, ...buildSenpiArgs(process.argv.slice(2), execDir))
     Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))
+    await claimMemorySyncAtBoot(process.argv.slice(2))
     await registerEngineRuntimeModules()
     await import("../../node_modules/@code-yeongyu/senpi/dist/cli.js") // literal: see import note above
     return
@@ -426,6 +435,7 @@ async function main(): Promise<void> {
   Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))
   applyCachedClaudeCode(process.env, execDir)
   if (isInternalSupervisorLaunch(process.argv.slice(2)) && await runInternalSupervisor(process.argv.slice(2))) return
+  await claimMemorySyncAtBoot(process.argv.slice(2))
   await registerEngineRuntimeModules()
   await import("../../node_modules/@code-yeongyu/senpi/dist/cli.js") // literal: see import note above
 }

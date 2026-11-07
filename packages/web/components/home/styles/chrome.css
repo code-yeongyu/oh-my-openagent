@@ -1,0 +1,397 @@
+/* The nav, buttons and footer every omo.dev page shares (the home page and the docs site). */
+@import "./tokens.css";
+
+/* 3.1 Nav */
+/* A floating bar: one rounded shell over the page, solid so text under it never shows through. */
+.nav {
+  position: sticky;
+  top: var(--space-3);
+  z-index: 50;
+  padding-inline: var(--gutter);
+}
+
+.nav__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  max-width: 1080px;
+  height: 56px;
+  margin-inline: auto;
+  padding-inline: var(--space-4) var(--space-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--bg-raised) 96%, transparent);
+  box-shadow: 0 8px 32px -16px rgb(0 0 0 / 0.35);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-size: 1.0625rem;
+}
+
+.brand img {
+  width: 28px;
+  height: 28px;
+}
+
+.nav__inner > nav {
+  margin-inline: auto;
+}
+
+.nav__links {
+  display: flex;
+  gap: var(--space-1);
+  margin: 0;
+  list-style: none;
+  padding: 0;
+}
+
+.nav__links a {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: var(--radius-xs);
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: color var(--dur-ui) var(--ease-standard);
+}
+
+.nav__links a:hover {
+  color: var(--ink);
+}
+
+.nav__end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* 3.2 Theme switch: System, Light, Dark */
+.theme-switch {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: var(--bg-raised);
+}
+
+.theme-switch button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 26px;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-ui) var(--ease-standard),
+    color var(--dur-ui) var(--ease-standard);
+}
+
+.theme-switch button:hover {
+  color: var(--ink);
+}
+
+.theme-switch button[aria-pressed="true"] {
+  background: var(--surface-2);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+
+.theme-switch svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* 3.3 Buttons */
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 22px;
+  border-radius: var(--radius-xs);
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform var(--dur-press) var(--ease-standard),
+    background-color var(--dur-ui) var(--ease-standard),
+    border-color var(--dur-ui) var(--ease-standard),
+    color var(--dur-ui) var(--ease-standard);
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn--primary {
+  background: var(--primary);
+  color: var(--primary-ink);
+}
+
+.btn--primary:hover {
+  background: color-mix(in srgb, var(--primary) 88%, var(--accent));
+}
+
+.btn--ghost {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.btn--ghost:hover {
+  background: var(--surface-2);
+}
+
+.btn--sm {
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: var(--text-sm);
+}
+
+.btn .arrow {
+  transition: transform var(--dur-ui) var(--ease-standard);
+}
+
+.btn:hover .arrow {
+  transform: translateX(3px);
+}
+
+.btn__icon {
+  width: 15px;
+  height: 15px;
+}
+.btn .arrow {
+  width: 16px;
+  height: 16px;
+}
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: center;
+  margin-top: var(--space-6);
+}
+.nav__stars {
+  gap: 6px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.wrap {
+  width: 100%;
+  max-width: calc(var(--page-max) + 2 * var(--gutter));
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* 3.10 Footer */
+.footer {
+  border-top: 1px solid var(--line);
+  padding-block: var(--space-7);
+  color: var(--ink-soft);
+  font-size: var(--text-sm);
+}
+
+.footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+.footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+}
+
+.footer a {
+  text-decoration: none;
+  color: var(--ink-soft);
+}
+
+.footer a:hover {
+  color: var(--ink);
+}
+
+.footer__meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  font-size: var(--text-xs);
+}
+.footer__meta p {
+  margin: 0;
+}
+.footer__langs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+.footer__langs [aria-current] {
+  color: var(--ink);
+}
+
+/* The section links need about 860 px beside the brand, the theme switch and Open the app. */
+@media (max-width: 859px) {
+  .nav__links {
+    display: none;
+  }
+
+  .nav__end {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .nav .btn--sm {
+    display: none;
+  }
+}
+
+/* Hit targets: 32 px for pointer layouts, 44 px on touch-width screens (e2e/responsive.spec.ts). */
+.theme-switch button {
+  width: 32px;
+  height: 32px;
+}
+.install__tabs button,
+.copy {
+  min-height: 32px;
+  min-width: 32px;
+}
+@media (max-width: 767px) {
+  .theme-switch button {
+    width: 44px;
+    height: 44px;
+  }
+  .install__tabs button,
+  .copy {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Phone menu: the toggle shows where the section links hide; the sheet drops below the pill. */
+.nav__menu-btn {
+  display: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+.nav__menu-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+}
+.nav__sheet {
+  display: none;
+  /* Anchored to the sticky .nav (its containing block), below the 56 px pill, inset by the page gutter. */
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  left: var(--gutter);
+  right: var(--gutter);
+  max-width: 1080px;
+  max-height: calc(100dvh - 96px);
+  overflow-y: auto;
+  margin-inline: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xl);
+  background: var(--bg-raised);
+  box-shadow: 0 8px 32px -16px rgb(0 0 0 / 0.35);
+}
+.nav__sheet[data-open="true"] {
+  display: block;
+}
+.nav__sheet ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nav__sheet-link {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-xs);
+  color: var(--ink-soft);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.nav__sheet-link:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+.nav__sheet-install {
+  width: 100%;
+  margin-top: var(--space-2);
+}
+@media (max-width: 859px) {
+  .nav__menu-btn {
+    display: grid;
+  }
+}
+@media (min-width: 860px) {
+  .nav__sheet {
+    display: none !important;
+  }
+}
+/* A phone header holds the mark, the theme switch and the menu; the star count moves into the footer's GitHub link. */
+@media (max-width: 639px) {
+  .nav__stars {
+    display: none;
+  }
+}
+
+/* Narrow phones: the theme switch moves into the menu sheet so the header (mark, menu) fits at 320 px. */
+.nav__sheet-theme {
+  display: none;
+  margin-bottom: var(--space-2);
+}
+@media (max-width: 479px) {
+  .nav__end > .theme-switch {
+    display: none;
+  }
+  .nav__sheet-theme {
+    display: flex;
+  }
+}
