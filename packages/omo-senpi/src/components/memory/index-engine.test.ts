@@ -4,11 +4,12 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { Duplex } from "node:stream"
 import { readFrames, writeFrame } from "./desktop-sync/framing"
 
 const senpiCli = join(dirname(createRequire(import.meta.url).resolve("@code-yeongyu/senpi/package.json")), "dist", "bundle", "cli.js")
-const fixture = new URL("./index-engine.fixture.ts", import.meta.url).pathname
+const fixture = fileURLToPath(new URL("./index-engine.fixture.ts", import.meta.url))
 
 type Frame = { readonly id: number; readonly op: string; readonly capability?: string; readonly request?: { readonly op: string } }
 type RpcLine = { readonly id?: string; readonly type?: string; readonly success?: boolean; readonly data?: unknown }
@@ -82,7 +83,9 @@ async function selection(launch: Awaited<ReturnType<typeof engineLaunch>>): Prom
 }
 
 describe("the real senpi engine claims the desktop's private memory-sync channel at startup (#11997)", () => {
-  test("a declared memory-sync socket gets the bootstrap frame and the engine adopts the reply's child", async () => {
+  // POSIX only: this case asserts a POSIX inherited-fd socket (fd 5), which has no win32 form. On Windows the channel is
+  // two one-way pipes, covered by desktop-sync/channel-compiled.test.ts's win32 pair case (#11997); win32 versions: #12698.
+  test.skipIf(process.platform === "win32")("a declared memory-sync socket gets the bootstrap frame and the engine adopts the reply's child", async () => {
     const launch = await engineLaunch(true)
     try {
       await launch.bootstrapped()
