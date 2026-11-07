@@ -93,6 +93,70 @@ describe("reflection completion validation", () => {
     expect(existsSync(worktree.dir)).toBe(false)
     expect(await branchExists(parentDir, worktree.branch)).toBe(false)
   })
+
+  it("#given the maintenance stamp lands in the common config mid-run #when finalized #then the run still completes", async () => {
+    // #given
+    const { parentDir, worktree } = await fixture("stamp")
+    await worktree.parent.configSet("omo.maintenanceAt", String(Date.now()))
+
+    // #when
+    const result = await finalizeReflectionWorktree(worktree, {
+      mode: "auto",
+      summary: "stamp",
+      withWriterLock: async (operation) => operation(),
+    })
+
+    // #then
+    expect(result.status).toBe("no_changes")
+    expect(result.cleanup).toEqual({ worktreeRemoved: true, branchRemoved: true })
+    expect(existsSync(worktree.dir)).toBe(false)
+    expect(await branchExists(parentDir, worktree.branch)).toBe(false)
+  })
+
+  it("#given a non-omo common config change mid-run #when finalized #then validation still fails and cleans up", async () => {
+    // #given
+    const { parentDir, worktree } = await fixture("user-rename")
+    await worktree.parent.configSet("user.name", "Someone Else")
+
+    // #when
+    const result = await finalizeReflectionWorktree(worktree, {
+      mode: "auto",
+      summary: "renamed",
+      withWriterLock: async (operation) => operation(),
+    })
+
+    // #then
+    expect(result.status).toBe("failed")
+    expect(result.detail).toContain("administration")
+    expect(result.cleanup).toEqual({ worktreeRemoved: true, branchRemoved: true })
+    expect(existsSync(worktree.dir)).toBe(false)
+    expect(await branchExists(parentDir, worktree.branch)).toBe(false)
+  })
+
+  it("#given a one-line header key lands right after the omo section mid-run #when finalized #then validation still fails and cleans up", async () => {
+    // #given
+    const { parentDir, worktree } = await fixture("one-line-header")
+    const configPath = join(parentDir, ".git", "config")
+    const config = await readFile(configPath, "utf8")
+    const omoHeader = /^\[omo\]\n/m.exec(config)
+    if (!omoHeader) throw new Error("fixture config has no [omo] section")
+    const afterOmo = omoHeader.index + omoHeader[0].length
+    await writeFile(configPath, `${config.slice(0, afterOmo)}[core] bare = false\n${config.slice(afterOmo)}`)
+
+    // #when
+    const result = await finalizeReflectionWorktree(worktree, {
+      mode: "auto",
+      summary: "one-line header",
+      withWriterLock: async (operation) => operation(),
+    })
+
+    // #then
+    expect(result.status).toBe("failed")
+    expect(result.detail).toContain("administration")
+    expect(result.cleanup).toEqual({ worktreeRemoved: true, branchRemoved: true })
+    expect(existsSync(worktree.dir)).toBe(false)
+    expect(await branchExists(parentDir, worktree.branch)).toBe(false)
+  })
 })
 
 async function branchExists(parentDir: string, branch: string): Promise<boolean> {

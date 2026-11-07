@@ -2,6 +2,7 @@ import { existsSync } from "../fs/resilient"
 import { mkdir, readFile, rm } from "../fs/resilient"
 import { basename, isAbsolute, join, resolve } from "node:path"
 import { GitMemoryRepo, createNodeGitExec, type GitExec } from "../git"
+import { stripOmoMaintenanceStamp } from "./comparable-config"
 import { describeDroppedEntries, validateCompletion } from "./completion-validation"
 import { preflightReflectionDescriptions, type DescriptionPreflightWarn } from "./description-preflight"
 import { cleanupReflectionWorktree, integrateValidatedReflection } from "./worktree-integration"
@@ -19,6 +20,7 @@ export interface ReflectionWorktree {
   readonly gitFilePath: string
   readonly gitFileSnapshot: string
   readonly commonConfigPath: string
+  /** Comparable form of the common config: the `omo.maintenanceAt` stamp is filtered out (#9962). */
   readonly commonConfigSnapshot: string | null
   readonly exec: GitExec
 }
@@ -78,7 +80,7 @@ export async function createReflectionWorktree(
     const rawCommonDir = commonDirResult.stdout.trim()
     const commonDir = isAbsolute(rawCommonDir) ? rawCommonDir : resolve(repo.dir, rawCommonDir)
     const commonConfigPath = join(commonDir, "config")
-    const commonConfigSnapshot = await readOptional(commonConfigPath)
+    const commonConfigSnapshot = stripOmoMaintenanceStamp(await readOptional(commonConfigPath))
     return {
       parent: repo,
       dir,
