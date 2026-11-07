@@ -16,6 +16,14 @@ const tempRoot = () => {
   return root
 }
 const alwaysValid = async () => "valid" as const
+// POSIX directory modes and TMPDIR are what these cases exercise; Windows has neither (a read-only directory stays
+// writable and os.tmpdir() reads TEMP), and the pinned keychain helper only ever runs on macOS.
+const posixPermissions = process.platform !== "win32"
+const exitedPid = async () => {
+  const child = Bun.spawn([process.execPath, "-e", ""])
+  await child.exited
+  return child.pid
+}
 
 describe("pinned helper copies (#11586 review LOWs)", () => {
   test("#given the same unchanged source #when it is pinned twice #then one copy is reused; a changed source gets a new one", async () => {
@@ -35,7 +43,7 @@ describe("pinned helper copies (#11586 review LOWs)", () => {
     expect(third.kind === "pinned" && first.kind === "pinned" && third.path !== first.path).toBe(true)
   })
 
-  test("#given a pin directory that cannot be written #when pinning #then the copy failure is a typed unavailable", async () => {
+  test.skipIf(!posixPermissions)("#given a pin directory that cannot be written #when pinning #then the copy failure is a typed unavailable", async () => {
     const root = tempRoot()
     const source = join(root, "omo-keychain")
     const pins = join(root, "pins")
@@ -58,7 +66,7 @@ describe("pinned helper copies (#11586 review LOWs)", () => {
     expect(second.kind === "pinned" && second.path !== first.path).toBe(true)
   })
 
-  test("#given TMPDIR does not exist #when pinning into the process directory #then unavailable, and a later attempt succeeds", async () => {
+  test.skipIf(!posixPermissions)("#given TMPDIR does not exist #when pinning into the process directory #then unavailable, and a later attempt succeeds", async () => {
     const root = tempRoot()
     const source = join(root, "omo-keychain")
     writeFileSync(source, "signed helper, tmpdir case")
@@ -104,19 +112,19 @@ describe("pinned helper copies (#11586 review LOWs)", () => {
 
   test("#given pin directories of a dead process, of a live one and an unrelated directory #when swept #then only the dead owner's goes", async () => {
     const root = tempRoot()
-    const dead = Bun.spawn(["true"])
-    await dead.exited
-    for (const name of [`omo-keychain-${dead.pid}-aaaaaa`, `omo-keychain-${process.pid}-bbbbbb`, `omo-keychain-1-cccccc`, "omo-keychain-notapid"]) {
+    const dead = await exitedPid()
+    // pid 1 is a live process this user does not own (EPERM) on POSIX; Windows has no such pid.
+    const foreignLive = posixPermissions ? ["omo-keychain-1-cccccc"] : []
+    for (const name of [`omo-keychain-${dead}-aaaaaa`, `omo-keychain-${process.pid}-bbbbbb`, ...foreignLive, "omo-keychain-notapid"]) {
       mkdirSync(join(root, name))
     }
-    expect(sweepDeadPinDirs(root)).toEqual([`omo-keychain-${dead.pid}-aaaaaa`])
-    expect(readdirSync(root).sort()).toEqual([`omo-keychain-${process.pid}-bbbbbb`, "omo-keychain-1-cccccc", "omo-keychain-notapid"].sort())
+    expect(sweepDeadPinDirs(root)).toEqual([`omo-keychain-${dead}-aaaaaa`])
+    expect(readdirSync(root).sort()).toEqual([`omo-keychain-${process.pid}-bbbbbb`, ...foreignLive, "omo-keychain-notapid"].sort())
   })
 
-  test.skipIf(process.getuid?.() === 0)("#given a dead owner's pin directory this user cannot delete #when swept #then it is skipped, the sweep goes on, and nothing throws", async () => {
+  test.skipIf(!posixPermissions || process.getuid?.() === 0)("#given a dead owner's pin directory this user cannot delete #when swept #then it is skipped, the sweep goes on, and nothing throws", async () => {
     const root = tempRoot()
-    const dead = Bun.spawn(["true"])
-    await dead.exited
+    const dead = { pid: await exitedPid() }
     const stuck = join(root, `omo-keychain-${dead.pid}-stuck00`)
     mkdirSync(stuck)
     writeFileSync(join(stuck, "omo-keychain"), "helper copy")
