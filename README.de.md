@@ -110,4 +110,4 @@ Keine Verbindung zu den genannten Projekten oder Modellen. Die Ideen zu Ultragoa
 
 ## Geschätzt von Profis bei
 
-[Indent](https://indentcorp.com), den Machern von Spray (Influencer-Marketing-Lösung), vovushop (Plattform für grenzüberschreitenden Handel) und vreview (KI-Review-Marketing-Lösung für den Handel). [Google](https://google.com). [Microsoft](https://microsoft.com). [Vercel](https://vercel.com). [ELESTYLE](https://elestyle.jp), den Machern von elepay (Multi-Mobile-Payment-Gateway) und OneQR (Mobile-App-SaaS für bargeldlose Lösungen). [Deepgram](https://deepgram.com).
+[Indent](https://indentcorp.com), den Machern von Spray (Influencer-Marketing-Lösung), vovushop (Plattform für grenzüberschreitenden Handel) und vreview (KI-Review-Marketing-Lösung für den Handel). [Google](https://google.com). [Microsoft](https://microsoft.com). [Vercel](https://vercel.com). [ELESTYLE](https://elestyle.jp), den Machern von elepay (Multi-Mobile-Payment-Gateway) und OneQR (Mobile-App-SaaS für bargeldlose Lösungen). [Deepgram](https://deepgram.com). [Chazm](https://chazm.co.kr), ein Marktplatz zum Vergleich von Angeboten für Autoleasing und Langzeitmiete.
