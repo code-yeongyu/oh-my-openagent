@@ -2301,6 +2301,9 @@
         "test-support/held-test-root.d.mts",
       ],
       "ignoreDependencies": [
+        // computer-use v2 row 15: the package-registration audit requires the workspace as a root devDependency; its first
+        // consumers by name land in rows 24 (spawn transport) and 26 (kernel globals), which remove this entry
+        "@oh-my-opencode/senpi-desktop-sdk",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
         "@clack/prompts",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
