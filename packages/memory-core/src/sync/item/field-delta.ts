@@ -18,7 +18,12 @@ import { applyKey, assertNever, clearKey, editSet, writeNatural } from "./key-wr
 import { BODY_NAME, cidRoot } from "./state"
 import { mergeText } from "./three-way"
 
-export async function applyUserDelta(target: LoroDoc, before: string, after: string, unseen: ReadonlySet<string>): Promise<void> {
+export async function applyUserDelta(
+  target: LoroDoc,
+  before: string,
+  after: string,
+  unseen: ReadonlySet<string>,
+): Promise<void> {
   const b = splitItem(before)
   const a = splitItem(after)
   const beforeFields = fieldsOf(b.fm)

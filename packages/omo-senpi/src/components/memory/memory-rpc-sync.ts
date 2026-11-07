@@ -19,7 +19,10 @@ export interface MemoryRpcSync {
   }
 }
 
-export async function readMemoryRpcSync(read: SyncStatusReader | undefined, repo: string): Promise<MemoryRpcSync | undefined> {
+export async function readMemoryRpcSync(
+  read: SyncStatusReader | undefined,
+  repo: string,
+): Promise<MemoryRpcSync | undefined> {
   if (read === undefined) return undefined
   const status = await read(repo).catch(() => null)
   if (status === null) return undefined

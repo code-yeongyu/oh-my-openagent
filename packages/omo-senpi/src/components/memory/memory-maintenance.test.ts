@@ -21,7 +21,11 @@ import { rmEfaultTolerant } from "./teardown.test-support"
 const roots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 })
 
 async function identityWithHistory(commits: number) {
@@ -51,7 +55,11 @@ function looseObjects(dir: string): number {
 function recorder() {
   const info: string[] = []
   const warn: string[] = []
-  return { info, warn, logger: { info: (message: string) => info.push(message), warn: (message: string) => warn.push(message) } }
+  return {
+    info,
+    warn,
+    logger: { info: (message: string) => info.push(message), warn: (message: string) => warn.push(message) },
+  }
 }
 
 describe("createMemoryMaintenance", () => {
@@ -82,13 +90,18 @@ describe("createMemoryMaintenance", () => {
     // when
     maintenance.schedule(context)
     await writeFile(join(repo.dir, "concurrent.md"), "written during maintenance\n")
-    const concurrent = repo.commitWrite(["concurrent.md"], "concurrent note", { agentId: context.identity, authorName: context.identity })
+    const concurrent = repo.commitWrite(["concurrent.md"], "concurrent note", {
+      agentId: context.identity,
+      authorName: context.identity,
+    })
     await Promise.all([concurrent, maintenance.settled()])
 
     // then
     const subjects = (await repo.log()).map((commit) => commit.subject)
     expect(subjects).toContain("concurrent note")
-    expect(execFileSync("git", ["fsck", "--connectivity-only"], { cwd: repo.dir, encoding: "utf8" })).not.toContain("missing")
+    expect(execFileSync("git", ["fsck", "--connectivity-only"], { cwd: repo.dir, encoding: "utf8" })).not.toContain(
+      "missing",
+    )
   }, 60_000)
 
   test("#given a pass ran recently for this identity #when a second process schedules one #then it does not run again within the interval", async () => {
@@ -99,7 +112,10 @@ describe("createMemoryMaintenance", () => {
     await first.settled()
     for (let index = 20; index < 40; index += 1) {
       await writeFile(join(repo.dir, `note-${index}.md`), `note ${index}\n`)
-      await repo.commitWrite([`note-${index}.md`], `note ${index}`, { agentId: context.identity, authorName: context.identity })
+      await repo.commitWrite([`note-${index}.md`], `note ${index}`, {
+        agentId: context.identity,
+        authorName: context.identity,
+      })
     }
     const looseAfterNewCommits = looseObjects(repo.dir)
     const log = recorder()
@@ -140,7 +156,9 @@ describe("createMemoryMaintenance", () => {
     // given
     const { context, repo } = await identityWithHistory(20)
     const log = recorder()
-    const runners = Array.from({ length: 10 }, () => createMemoryMaintenance({ logger: log.logger, delayMs: 0, minLooseObjects: 10 }))
+    const runners = Array.from({ length: 10 }, () =>
+      createMemoryMaintenance({ logger: log.logger, delayMs: 0, minLooseObjects: 10 }),
+    )
 
     // when
     for (const runner of runners) runner.schedule(context)
@@ -193,7 +211,11 @@ describe("createMemoryMaintenance", () => {
   test("#given a loose object no commit references yet (a writer mid-commit) #when a pass packs the repo #then that object is kept", async () => {
     // given
     const { context, repo } = await identityWithHistory(20)
-    const pending = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: repo.dir, input: "staged by a writer\n", encoding: "utf8" }).trim()
+    const pending = execFileSync("git", ["hash-object", "-w", "--stdin"], {
+      cwd: repo.dir,
+      input: "staged by a writer\n",
+      encoding: "utf8",
+    }).trim()
     const maintenance = createMemoryMaintenance({ delayMs: 0, minLooseObjects: 10 })
 
     // when
@@ -201,7 +223,9 @@ describe("createMemoryMaintenance", () => {
     await maintenance.settled()
 
     // then
-    expect(execFileSync("git", ["cat-file", "-p", pending], { cwd: repo.dir, encoding: "utf8" })).toBe("staged by a writer\n")
+    expect(execFileSync("git", ["cat-file", "-p", pending], { cwd: repo.dir, encoding: "utf8" })).toBe(
+      "staged by a writer\n",
+    )
   }, 60_000)
 
   test("#given a shared host where one session exits before its pass #when another session binds later #then that session's pass runs", async () => {
@@ -238,7 +262,10 @@ describe("createMemoryMaintenance", () => {
       const dir = join(identityPaths.transcripts, sessionId)
       await mkdir(dir, { recursive: true })
       await writeFile(join(dir, "transcript.jsonl"), "")
-      await writeFile(join(dir, "state.json"), JSON.stringify({ schema_version: "v3_assistant_steps", total_completed_steps: 0 }))
+      await writeFile(
+        join(dir, "state.json"),
+        JSON.stringify({ schema_version: "v3_assistant_steps", total_completed_steps: 0 }),
+      )
       for (const file of ["transcript.jsonl", "state.json"]) await utimes(join(dir, file), old, old)
       await utimes(dir, old, old)
     }

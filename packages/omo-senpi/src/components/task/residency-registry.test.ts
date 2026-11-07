@@ -68,7 +68,8 @@ function registryFor(handle: ManagedChildHandle, pendingSteering: readonly unkno
   const manager = {
     getResidentHandle: (taskId: string) => (taskId === handle.task_id ? handle : undefined),
     residentTaskIds: () => [handle.task_id],
-    forget: (_taskId: string, _options: Parameters<import("@oh-my-opencode/senpi-task").TaskManager["forget"]>[1]) => undefined,
+    forget: (_taskId: string, _options: Parameters<import("@oh-my-opencode/senpi-task").TaskManager["forget"]>[1]) =>
+      undefined,
     hasPendingSends: (taskId: string) => taskId === handle.task_id && pendingSteering.length > 0,
     get: () => undefined,
   }
@@ -84,14 +85,24 @@ describe("createManagerResidencyRegistry rpc teardown bridge", () => {
       expect(h.registry.get(h.record.task_id)).toBeUndefined()
       expect(h.registry.hasPendingSends(h.record.task_id)).toBe(true)
       expect(h.store.load(h.record.task_id)?.pending_steering).toEqual(pending)
-    } finally { await h.dispose() }
+    } finally {
+      await h.dispose()
+    }
   })
 
   it("#given a finished resident with a durable queue #when idle reclaim runs #then it parks, frees its slot and keeps the queue", async () => {
     let now = 1000
     let disposals = 0
-    const h = coldReviveHarness({ now: () => now, idleTimeoutMs: 37,
-      resume: async (_spec, _path, handle) => ({ ...handle, dispose: async () => { disposals += 1; await handle.dispose() } }),
+    const h = coldReviveHarness({
+      now: () => now,
+      idleTimeoutMs: 37,
+      resume: async (_spec, _path, handle) => ({
+        ...handle,
+        dispose: async () => {
+          disposals += 1
+          await handle.dispose()
+        },
+      }),
     })
     const pending = [{ id: "p1", message: "PENDING", deliver_as: "steer" as const }]
     try {
@@ -109,7 +120,9 @@ describe("createManagerResidencyRegistry rpc teardown bridge", () => {
       expect(h.registry.get(h.record.task_id)).toBeUndefined()
       expect(h.store.load(h.record.task_id)?.residency_state).toBe("persisted_only")
       expect(h.store.load(h.record.task_id)?.pending_steering).toEqual(pending)
-    } finally { await h.dispose() }
+    } finally {
+      await h.dispose()
+    }
   })
 
   it("#given a resident with a queued steering message #when pending sends are checked #then the registry reports true", () => {
@@ -166,12 +179,22 @@ describe("createManagerResidencyRegistry rpc teardown bridge", () => {
 })
 
 describe("createManagerResidencyRegistry ownership (#9785)", () => {
-  const manager = { forget: (_taskId: string, _options: Parameters<import("@oh-my-opencode/senpi-task").TaskManager["forget"]>[1]) => undefined, get: () => undefined, getResidentHandle: () => undefined, hasPendingSends: () => false, residentTaskIds: () => [] }
+  const manager = {
+    forget: (_taskId: string, _options: Parameters<import("@oh-my-opencode/senpi-task").TaskManager["forget"]>[1]) =>
+      undefined,
+    get: () => undefined,
+    getResidentHandle: () => undefined,
+    hasPendingSends: () => false,
+    residentTaskIds: () => [],
+  }
 
   it("#given an engine serving one session #when asked about records #then only that session's own records are owned", () => {
     // given
     let current = "session-a"
-    const registry = createManagerResidencyRegistry(() => manager, () => current)
+    const registry = createManagerResidencyRegistry(
+      () => manager,
+      () => current,
+    )
 
     // when / then
     expect(registry.ownsRecord?.({ parent_session_id: "session-a" })).toBe(true)

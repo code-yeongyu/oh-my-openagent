@@ -15,7 +15,6 @@ import {
 import { spoolRequest } from "./otlp-spool-file"
 import type { TelemetryDiagnosticEvent } from "./types"
 
-
 export type BatchSenderInput = {
   readonly ctx: SpoolContext
   readonly endpoint: string
@@ -78,7 +77,14 @@ export class BatchSender {
     const inFlight = this.#inFlight
     if (inFlight !== undefined) this.#release(inFlight)
     const claiming = this.#claiming
-    if (claiming !== undefined) await Promise.race([claiming.then(() => undefined, () => undefined), grace])
+    if (claiming !== undefined)
+      await Promise.race([
+        claiming.then(
+          () => undefined,
+          () => undefined,
+        ),
+        grace,
+      ])
   }
 
   #release(claimed: string): void {
@@ -164,16 +170,20 @@ export class BatchSender {
         quarantineFile(ctx, claimed)
         return
       }
-      const outcome = await postWithRetry({
-        fetch: this.#input.fetch,
-        sleep: this.#input.sleep,
-        random: this.#input.random,
-        endpoint: this.#input.endpoint,
-        ingestKey: this.#input.ingestKey,
-        abort: this.#abort.signal,
-        requestTimeoutMs: this.#input.requestTimeoutMs,
-        beforeAttempt: () => this.#gate(),
-      }, request.signal, request.body)
+      const outcome = await postWithRetry(
+        {
+          fetch: this.#input.fetch,
+          sleep: this.#input.sleep,
+          random: this.#input.random,
+          endpoint: this.#input.endpoint,
+          ingestKey: this.#input.ingestKey,
+          abort: this.#abort.signal,
+          requestTimeoutMs: this.#input.requestTimeoutMs,
+          beforeAttempt: () => this.#gate(),
+        },
+        request.signal,
+        request.body,
+      )
       const current = this.#inFlight ?? claimed
       if (outcome.kind === "accepted") {
         deleteFile(ctx.dir, current)

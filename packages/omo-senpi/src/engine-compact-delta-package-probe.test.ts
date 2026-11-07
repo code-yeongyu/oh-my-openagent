@@ -36,12 +36,19 @@ function probeSocketPath(): string {
 
 // Readiness is the host's own signal: it prints `senpi rpc listening on unix://<path>` once the socket is bound.
 // A directory watch is not one: macOS does not report a bound socket as a change event, so the wait never ended.
-function waitForListening(stderr: NodeJS.ReadableStream, socketPath: string, exited: Promise<number | null>): Promise<void> {
+function waitForListening(
+  stderr: NodeJS.ReadableStream,
+  socketPath: string,
+  exited: Promise<number | null>,
+): Promise<void> {
   const ready = `senpi rpc listening on unix://${socketPath}`
   return new Promise((resolve, reject) => {
     let seen = ""
     // The tail carries the host's error line; the head is only the source excerpt Bun prints above it.
-    const timer = setTimeout(() => finish(new Error(`host never reported listening on ${socketPath}; stderr: ${seen.slice(-2000)}`)), 60_000)
+    const timer = setTimeout(
+      () => finish(new Error(`host never reported listening on ${socketPath}; stderr: ${seen.slice(-2000)}`)),
+      60_000,
+    )
     function finish(error?: Error) {
       clearTimeout(timer)
       stderr.off("data", onData)
@@ -53,7 +60,9 @@ function waitForListening(stderr: NodeJS.ReadableStream, socketPath: string, exi
       if (seen.includes(ready)) finish()
     }
     stderr.on("data", onData)
-    void exited.then((code) => finish(new Error(`host exited (${code}) before listening; stderr: ${seen.slice(-2000)}`)))
+    void exited.then((code) =>
+      finish(new Error(`host exited (${code}) before listening; stderr: ${seen.slice(-2000)}`)),
+    )
   })
 }
 
@@ -75,7 +84,8 @@ function requestProtocolInfo(socketPath: string): Promise<ProtocolInfo> {
       const newline = buffer.indexOf("\n")
       if (newline < 0) return
       const frame = JSON.parse(buffer.slice(0, newline)) as { success?: boolean; data?: ProtocolInfo }
-      if (frame.success !== true || frame.data === undefined) return done(new Error(`refused: ${buffer.slice(0, newline)}`))
+      if (frame.success !== true || frame.data === undefined)
+        return done(new Error(`refused: ${buffer.slice(0, newline)}`))
       done(undefined, frame.data)
     })
   })
@@ -149,6 +159,8 @@ describe.skipIf(process.platform === "win32")("packaged senpi engine compact del
   it("#given the compact flag unset #when the packaged host answers get_protocol_info #then no compact name is advertised", async () => {
     const info = await probePackagedHost(undefined)
 
-    expect(info.capabilities.filter((capability) => (COMPACT_NAMES as readonly string[]).includes(capability))).toEqual([])
+    expect(info.capabilities.filter((capability) => (COMPACT_NAMES as readonly string[]).includes(capability))).toEqual(
+      [],
+    )
   }, 90_000)
 })

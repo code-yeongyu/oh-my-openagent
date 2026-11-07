@@ -64,7 +64,10 @@ export function createChatMessageHandler(deps: HookDeps) {
 
   return async (
     input: { sessionID: string; agent?: string; model?: { providerID: string; modelID: string }; variant?: string },
-    output: { message: { model?: { providerID: string; modelID: string }; variant?: string }; parts?: Array<{ type: string; text?: string }> }
+    output: {
+      message: { model?: { providerID: string; modelID: string }; variant?: string }
+      parts?: Array<{ type: string; text?: string }>
+    },
   ) => {
     if (!config.enabled) return
 
@@ -75,10 +78,7 @@ export function createChatMessageHandler(deps: HookDeps) {
 
     sessionLastAccess.set(sessionID, Date.now())
 
-    const requestedModel = stringifyRuntimeModelWithVariant(
-      input.model,
-      output.message.variant ?? input.variant,
-    )
+    const requestedModel = stringifyRuntimeModelWithVariant(input.model, output.message.variant ?? input.variant)
 
     if (requestedModel && state.pendingFallbackModel === requestedModel) {
       state.pendingFallbackModel = undefined
@@ -112,7 +112,7 @@ export function createChatMessageHandler(deps: HookDeps) {
         resolveRuntimeModelSettings(sessionID, input.agent ?? getSessionAgent(sessionID), deps.pluginConfig),
       )
       const activeModel = primaryPayload
-        ? stringifyRuntimeModelWithVariant(primaryPayload.model, primaryPayload.variant) ?? state.originalModel
+        ? (stringifyRuntimeModelWithVariant(primaryPayload.model, primaryPayload.variant) ?? state.originalModel)
         : state.originalModel
       log(`[${HOOK_NAME}] Restoring preferred primary model`, {
         sessionID,

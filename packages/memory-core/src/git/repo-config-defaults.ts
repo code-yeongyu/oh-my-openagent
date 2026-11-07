@@ -18,7 +18,9 @@ export interface RepoGitRunner {
 }
 
 export async function ensureRepoConfigDefaults(
-  port: RepoConfigTarget, run: RepoGitRunner, authorName: string,
+  port: RepoConfigTarget,
+  run: RepoGitRunner,
+  authorName: string,
 ): Promise<void> {
   if ((await port.configGet("omo.agentId")) !== port.agentId) await port.configSet("omo.agentId", port.agentId)
   if (!(await port.configGet("user.email"))) await port.configSet("user.email", `${port.agentId}@omo.local`)
@@ -28,7 +30,10 @@ export async function ensureRepoConfigDefaults(
   // Forced, not defaulted: a memory repository is machine-owned and must keep note bytes exactly.
   // The repair never fails init(); an incomplete repair leaves the key unset so the next open retries.
   // The single guard for the whole repair: a rejected git call (spawn error, timeout, abort) counts as incomplete.
-  if ((await port.configGet("core.autocrlf")) !== "false" && (await restoreConvertedCheckouts(port.dir, run).catch(() => false))) {
+  if (
+    (await port.configGet("core.autocrlf")) !== "false" &&
+    (await restoreConvertedCheckouts(port.dir, run).catch(() => false))
+  ) {
     await port.configSet("core.autocrlf", "false")
   }
 }

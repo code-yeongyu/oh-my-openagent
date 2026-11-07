@@ -40,7 +40,8 @@ export function classifyStartCause(cause: unknown): StartCause | undefined {
 
 function hostRefusal(errorCode: unknown, errorData: unknown): StartCause {
   if (typeof errorCode === "string" && CREDENTIAL_CODES.has(errorCode)) {
-    const provider = typeof errorData === "object" && errorData !== null && "provider" in errorData ? errorData.provider : undefined
+    const provider =
+      typeof errorData === "object" && errorData !== null && "provider" in errorData ? errorData.provider : undefined
     return {
       cause_class: "credentials_missing",
       cause_code: errorCode,

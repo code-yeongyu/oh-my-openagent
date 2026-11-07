@@ -30,32 +30,39 @@ async function createRepo(): Promise<GitMemoryRepo> {
 }
 
 function textBytes(documents: readonly RecallDocument[]): number {
-  return documents.reduce((sum, document) => sum + 2 * (document.path.length + document.description.length + document.body.length), 0)
+  return documents.reduce(
+    (sum, document) => sum + 2 * (document.path.length + document.description.length + document.body.length),
+    0,
+  )
 }
 
 // The memory report (senpi#2564) reads these figures on demand to attribute a session's heap to the
 // recall corpus (oh-my-openagent#9442). A shared corpus counts once however many sessions hold it.
 describe("recallMemoryFigures", () => {
-  it("#given two shared caches over one repository #when a report reads the figures #then the corpus counts once", async () => {
-    // given
-    const repo = await createRepo()
-    Bun.gc(true)
-    const before = recallMemoryFigures()
-    const first = new RecallCorpusCache({ shared: true })
-    const second = new RecallCorpusCache({ shared: true })
-    const corpus = await first.load(repo)
-    await second.load(repo)
+  it(
+    "#given two shared caches over one repository #when a report reads the figures #then the corpus counts once",
+    async () => {
+      // given
+      const repo = await createRepo()
+      Bun.gc(true)
+      const before = recallMemoryFigures()
+      const first = new RecallCorpusCache({ shared: true })
+      const second = new RecallCorpusCache({ shared: true })
+      const corpus = await first.load(repo)
+      await second.load(repo)
 
-    // when
-    Bun.gc(true)
-    const after = recallMemoryFigures()
+      // when
+      Bun.gc(true)
+      const after = recallMemoryFigures()
 
-    // then
-    expect(corpus.documents.length).toBe(2)
-    expect(after.corpusCaches - before.corpusCaches).toBe(1)
-    expect(after.documents - before.documents).toBe(2)
-    expect(after.documentTextBytes - before.documentTextBytes).toBe(textBytes(corpus.documents))
-  }, GIT_INTEGRATION_TEST_TIMEOUT)
+      // then
+      expect(corpus.documents.length).toBe(2)
+      expect(after.corpusCaches - before.corpusCaches).toBe(1)
+      expect(after.documents - before.documents).toBe(2)
+      expect(after.documentTextBytes - before.documentTextBytes).toBe(textBytes(corpus.documents))
+    },
+    GIT_INTEGRATION_TEST_TIMEOUT,
+  )
 })
 
 describe("recallTermFigures", () => {

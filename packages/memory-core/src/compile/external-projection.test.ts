@@ -21,8 +21,14 @@ describe("renderExternalProjection limits", () => {
   it("#given both limits disabled #when rendered #then it equals the render with no input, every name in name order", () => {
     // given
     const paths = [
-      "ARCHIVE.md", "reference/zeta.md", "reference/Alpha.md", "reference/project/b.md", "reference/project/a.md",
-      "people/한글/card.md", "notes/n.md", "reference/AKIAABCDEFGHIJKLMNOP.md",
+      "ARCHIVE.md",
+      "reference/zeta.md",
+      "reference/Alpha.md",
+      "reference/project/b.md",
+      "reference/project/a.md",
+      "people/한글/card.md",
+      "notes/n.md",
+      "reference/AKIAABCDEFGHIJKLMNOP.md",
     ]
     const unbounded = `<external_projection>\n${NAME_NOTE}\n$MEMORY_DIR/: ARCHIVE\nnotes/: n\npeople/한글/: card\nreference/: ***, Alpha, zeta\nreference/project/: a, b\n</external_projection>`
 
@@ -53,7 +59,9 @@ describe("renderExternalProjection limits", () => {
     expect(bytes(first)).toBeLessThanOrEqual(limits.maxBytes)
     expect(first).toBe(second)
     expect(first.split("\n")).toContain("small/: s2, s1")
-    expect(first).toMatch(/^big\/: (?:entry-with-a-long-enough-name-\d, )*entry-with-a-long-enough-name-\d \(\+\d+ more; read \$MEMORY_DIR\/big\/ to list\)$/m)
+    expect(first).toMatch(
+      /^big\/: (?:entry-with-a-long-enough-name-\d, )*entry-with-a-long-enough-name-\d \(\+\d+ more; read \$MEMORY_DIR\/big\/ to list\)$/m,
+    )
   })
 
   it("#given a budget too small for the full render #when fitted #then only the wider directory gives up names", () => {
@@ -64,7 +72,10 @@ describe("renderExternalProjection limits", () => {
     const full = renderExternalProjection(paths, { times, limits: { maxEntriesPerDirectory: 0, maxBytes: 0 } })
 
     // when
-    const text = renderExternalProjection(paths, { times, limits: { maxEntriesPerDirectory: 0, maxBytes: bytes(full) - 60 } })
+    const text = renderExternalProjection(paths, {
+      times,
+      limits: { maxEntriesPerDirectory: 0, maxBytes: bytes(full) - 60 },
+    })
 
     // then
     expect(bytes(text)).toBeLessThanOrEqual(bytes(full) - 60)
@@ -100,16 +111,16 @@ describe("renderExternalProjection limits", () => {
 
     // then
     expect(bytes(text)).toBeLessThanOrEqual(bytes(full))
-    expect(renderExternalProjectionStats(paths, { times: at({}), limits })).toMatchObject({ overflow: true, bytes: bytes(text) })
+    expect(renderExternalProjectionStats(paths, { times: at({}), limits })).toMatchObject({
+      overflow: true,
+      bytes: bytes(text),
+    })
   })
 
   it("#given a listing that fits only with one directory full and another emptied #when widest-first shrinking misses it #then that listing is found and no overflow is reported", () => {
     // given
     const long = "a-name-long-enough-to-outweigh-its-omitted-names-marker"
-    const paths = [
-      ...["a", "b", "c", "d", "e", "f"].map((name) => `A/${name}.md`),
-      `B/${long}-1.md`, `B/${long}-2.md`,
-    ]
+    const paths = [...["a", "b", "c", "d", "e", "f"].map((name) => `A/${name}.md`), `B/${long}-1.md`, `B/${long}-2.md`]
     const smallest = [
       "<external_projection>",
       NAME_NOTE,
@@ -135,7 +146,10 @@ describe("renderExternalProjection limits", () => {
     const full = renderExternalProjection(paths, { times, limits: { maxEntriesPerDirectory: 100, maxBytes: 0 } })
 
     // when
-    const fitted = renderExternalProjection(paths, { times, limits: { maxEntriesPerDirectory: 100, maxBytes: bytes(full) } })
+    const fitted = renderExternalProjection(paths, {
+      times,
+      limits: { maxEntriesPerDirectory: 100, maxBytes: bytes(full) },
+    })
 
     // then
     expect(fitted).toBe(full)
@@ -163,15 +177,24 @@ describe("renderExternalProjection limits", () => {
     const stats = renderExternalProjectionStats(paths, input)
 
     // then
-    expect(text).toBe([
-      "<external_projection>",
-      NAME_NOTE,
-      "$MEMORY_DIR/: (+1 more; read $MEMORY_DIR/ to list)",
-      "a/: (+8 more; read $MEMORY_DIR/a/ to list)",
-      "b/: (+1 more; read $MEMORY_DIR/b/ to list)",
-      "</external_projection>",
-    ].join("\n"))
-    expect(stats).toEqual({ shown: 0, omitted: 10, bytes: bytes(text), maxBytes: 1, overflow: true, recencyUnavailable: false })
+    expect(text).toBe(
+      [
+        "<external_projection>",
+        NAME_NOTE,
+        "$MEMORY_DIR/: (+1 more; read $MEMORY_DIR/ to list)",
+        "a/: (+8 more; read $MEMORY_DIR/a/ to list)",
+        "b/: (+1 more; read $MEMORY_DIR/b/ to list)",
+        "</external_projection>",
+      ].join("\n"),
+    )
+    expect(stats).toEqual({
+      shown: 0,
+      omitted: 10,
+      bytes: bytes(text),
+      maxBytes: 1,
+      overflow: true,
+      recencyUnavailable: false,
+    })
   })
 
   it("#given short names whose full listing is smaller than the floor #when the budget is below both #then the full listing is returned and the overflow is reported", () => {
@@ -185,7 +208,14 @@ describe("renderExternalProjection limits", () => {
 
     // then
     expect(text).toBe(renderExternalProjection(paths))
-    expect(stats).toEqual({ shown: 4, omitted: 0, bytes: bytes(text), maxBytes: 1, overflow: true, recencyUnavailable: false })
+    expect(stats).toEqual({
+      shown: 4,
+      omitted: 0,
+      bytes: bytes(text),
+      maxBytes: 1,
+      overflow: true,
+      recencyUnavailable: false,
+    })
   })
 
   it("#given equal commit times #when ordered #then names break the tie, and names without a time come last", () => {
@@ -210,7 +240,12 @@ describe("renderExternalProjection limits", () => {
 
     // then
     expect(stats).toEqual({
-      shown: 2, omitted: 0, bytes: bytes(renderExternalProjection(paths, input)), maxBytes: 24_576, overflow: false, recencyUnavailable: false,
+      shown: 2,
+      omitted: 0,
+      bytes: bytes(renderExternalProjection(paths, input)),
+      maxBytes: 24_576,
+      overflow: false,
+      recencyUnavailable: false,
     })
   })
 })

@@ -2,7 +2,14 @@ import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent } from "./error-classifier"
+import {
+  extractStatusCode,
+  extractErrorName,
+  classifyErrorType,
+  isRetryableError,
+  extractAutoRetrySignal,
+  containsErrorContent,
+} from "./error-classifier"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
@@ -15,7 +22,16 @@ import { normalizeModelToCanonicalString } from "./normalize-model"
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
 export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHelpers) {
-  const { ctx, config, pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight, sessionAwaitingFallbackResult, sessionStatusRetryKeys } = deps
+  const {
+    ctx,
+    config,
+    pluginConfig,
+    sessionStates,
+    sessionLastAccess,
+    sessionRetryInFlight,
+    sessionAwaitingFallbackResult,
+    sessionStatusRetryKeys,
+  } = deps
   const checkVisibleResponse = hasVisibleAssistantResponse(extractAutoRetrySignal)
 
   return async (props: Record<string, unknown> | undefined) => {
@@ -36,9 +52,12 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       : undefined
     const retrySignal = retrySignalResult?.signal ?? retrySignalFromParts
     const errorContentResult = containsErrorContent(parts)
-    const error = info?.error ?? 
+    const error =
+      info?.error ??
       (retrySignal && timeoutEnabled ? { name: "ProviderRateLimitError", message: retrySignal } : undefined) ??
-      (errorContentResult.hasError ? { name: "MessageContentError", message: errorContentResult.errorMessage || "Message contains error content" } : undefined)
+      (errorContentResult.hasError
+        ? { name: "MessageContentError", message: errorContentResult.errorMessage || "Message contains error content" }
+        : undefined)
     const role = info?.role as string | undefined
     const model = normalizeModelToCanonicalString(info?.model)
 
@@ -83,12 +102,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       let state = sessionStates.get(sessionID)
       const pendingFallbackModel = state?.pendingFallbackModel
       const wasAwaitingFallbackResult = sessionAwaitingFallbackResult.has(sessionID)
-      if (
-        wasAwaitingFallbackResult &&
-        pendingFallbackModel &&
-        !retrySignal &&
-        model !== pendingFallbackModel
-      ) {
+      if (wasAwaitingFallbackResult && pendingFallbackModel && !retrySignal && model !== pendingFallbackModel) {
         log(`[${HOOK_NAME}] message.updated fallback skipped - awaiting fallback result`, {
           sessionID,
           pendingFallbackModel,
@@ -142,12 +156,15 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
           })
           return
         }
-        log(`[${HOOK_NAME}] message.updated terminal-quota 402 abort with fallback chain; dispatching session-stable fallback`, {
-          sessionID,
-          statusCode: extractStatusCode(error, config.retry_on_errors),
-          errorName: extractErrorName(error),
-          errorType: classifyErrorType(error),
-        })
+        log(
+          `[${HOOK_NAME}] message.updated terminal-quota 402 abort with fallback chain; dispatching session-stable fallback`,
+          {
+            sessionID,
+            statusCode: extractStatusCode(error, config.retry_on_errors),
+            errorName: extractErrorName(error),
+            errorType: classifyErrorType(error),
+          },
+        )
       }
 
       const agent = info?.agent as string | undefined
@@ -155,10 +172,7 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
 
       if (fallbackModels.length === 0) {
-        if (
-          subagentSessions.has(sessionID) &&
-          classifyErrorType(error) === "quota_exceeded"
-        ) {
+        if (subagentSessions.has(sessionID) && classifyErrorType(error) === "quota_exceeded") {
           log(`[${HOOK_NAME}] Aborting subagent on unrecoverable quota error (no fallback configured)`, {
             sessionID,
             model,

@@ -28,8 +28,7 @@ export type RemoteCommandOutcome =
 export type RemoteServiceState = { readonly state: string }
 
 export type RemoteLocateOutcome =
-  | { readonly kind: "ok"; readonly sessionId: string }
-  | { readonly kind: "refused"; readonly reason: string }
+  { readonly kind: "ok"; readonly sessionId: string } | { readonly kind: "refused"; readonly reason: string }
 
 export type RemoteSessionsPort = {
   /** The device service state; `plan_required` means the account's plan has no relay (A5: paid only). */
@@ -51,7 +50,12 @@ export type RemoteSessionsPort = {
    * An engine record for one session on `device` (`prompt`, `abort`, `get_state`), through an attach. A read the
    * session's mirror holds is answered locally unless `fresh` is set.
    */
-  readonly sessionCommand: (device: string, sessionId: string, rpc: JsonObject, options?: { readonly fresh?: boolean }) => Promise<RemoteCommandOutcome>
+  readonly sessionCommand: (
+    device: string,
+    sessionId: string,
+    rpc: JsonObject,
+    options?: { readonly fresh?: boolean },
+  ) => Promise<RemoteCommandOutcome>
   readonly read: (device: string, sessionId: string, tail: number) => Promise<RemoteCommandOutcome>
 }
 
@@ -73,13 +77,26 @@ export type AliasError = {
   readonly details?: { readonly holder?: AliasHolder; readonly reason?: string }
 }
 
-export type AliasResult<T> = { readonly kind: "ok"; readonly value: T } | { readonly kind: "error"; readonly error: AliasError }
+export type AliasResult<T> =
+  { readonly kind: "ok"; readonly value: T } | { readonly kind: "error"; readonly error: AliasError }
 
 /** Frozen port v1 (`o8/alias-port.v1.ts`): the account service's alias registry implements exactly this. */
 export type AliasRegistry = {
-  readonly claim: (input: { readonly alias: string; readonly holder: AliasHolder; readonly idempotency_key: string }) => Promise<AliasResult<{ readonly alias: string; readonly holder: AliasHolder }>>
-  readonly rename: (input: { readonly session_id: string; readonly from: string; readonly to: string; readonly idempotency_key: string }) => Promise<AliasResult<{ readonly alias: string; readonly holder: AliasHolder }>>
-  readonly release: (input: { readonly session_id: string; readonly alias: string }) => Promise<AliasResult<{ readonly released: boolean }>>
+  readonly claim: (input: {
+    readonly alias: string
+    readonly holder: AliasHolder
+    readonly idempotency_key: string
+  }) => Promise<AliasResult<{ readonly alias: string; readonly holder: AliasHolder }>>
+  readonly rename: (input: {
+    readonly session_id: string
+    readonly from: string
+    readonly to: string
+    readonly idempotency_key: string
+  }) => Promise<AliasResult<{ readonly alias: string; readonly holder: AliasHolder }>>
+  readonly release: (input: {
+    readonly session_id: string
+    readonly alias: string
+  }) => Promise<AliasResult<{ readonly released: boolean }>>
   readonly resolve: (alias: string) => Promise<AliasResult<AliasHolder>>
   readonly aliasesOf: (sessionIds: readonly string[]) => Promise<AliasResult<ReadonlyMap<string, string>>>
 }

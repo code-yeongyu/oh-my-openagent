@@ -5,7 +5,12 @@ import { createConnection, createServer, type Server, type Socket } from "node:n
 import { join } from "node:path"
 import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
-import { createLiveThreadSurface, HOST_ENDPOINTS_CACHE_TTL_MS, parseHostStatusAll, type HostEndpointReport } from "./live-surface"
+import {
+  createLiveThreadSurface,
+  HOST_ENDPOINTS_CACHE_TTL_MS,
+  parseHostStatusAll,
+  type HostEndpointReport,
+} from "./live-surface"
 import { createGatewayStore } from "./gateway/store"
 import { createThreadTools } from "./tools"
 
@@ -15,7 +20,9 @@ type Answer = (frame: Frame) => Record<string, unknown>
 const cleanups: Array<() => Promise<void>> = []
 // An rpc_host listens on the transport its logical path names (a hashed pipe on win32), so dials are recorded by logical path.
 const logicalAddress = new Map<string, string>()
-afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup() })
+afterEach(async () => {
+  for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
+})
 
 function tempDir(prefix: string): string {
   // Short /tmp paths: a unix socket path is capped near 104 bytes on darwin.
@@ -29,21 +36,30 @@ async function endpoint(socketPath: string, answer: Answer): Promise<{ readonly 
   const sockets = new Set<Socket>()
   const transport = fakeHostTransport(socketPath)
   logicalAddress.set(transport.listenAddress, socketPath)
-  const server: Server = createServer((socket) => transport.authenticate(socket, () => {
-    sockets.add(socket)
-    socket.once("close", () => sockets.delete(socket))
-    let buffer = ""
-    socket.on("data", (chunk) => {
-      buffer += chunk.toString("utf8")
-      const newline = buffer.indexOf("\n")
-      if (newline < 0) return
-      const frame = JSON.parse(buffer.slice(0, newline)) as Frame
-      buffer = buffer.slice(newline + 1)
-      if (frame.type === "get_protocol_info") { socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, data: {} })}\n`); return }
-      frames.push(frame)
-      socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, ...answer(frame) })}\n`)
-    })
-  }))
+  const server: Server = createServer((socket) =>
+    transport.authenticate(socket, () => {
+      sockets.add(socket)
+      socket.once("close", () => sockets.delete(socket))
+      let buffer = ""
+      socket.on("data", (chunk) => {
+        buffer += chunk.toString("utf8")
+        const newline = buffer.indexOf("\n")
+        if (newline < 0) return
+        const frame = JSON.parse(buffer.slice(0, newline)) as Frame
+        buffer = buffer.slice(newline + 1)
+        if (frame.type === "get_protocol_info") {
+          socket.write(
+            `${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, data: {} })}\n`,
+          )
+          return
+        }
+        frames.push(frame)
+        socket.write(
+          `${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, ...answer(frame) })}\n`,
+        )
+      })
+    }),
+  )
   const listening = once(server, "listening", { signal: AbortSignal.timeout(2000) })
   server.listen(transport.listenAddress)
   await listening
@@ -60,26 +76,58 @@ async function endpoint(socketPath: string, answer: Answer): Promise<{ readonly 
 function hostWith(durableId: string, name: string, sessionPath: string): Answer {
   return (frame) => {
     switch (frame.type) {
-      case "list_sessions": return { data: { sessions: [{ sessionId: "rpc-1", durableSessionId: durableId, sessionPath, cwd: process.cwd(), name, status: "open" }] } }
-      case "get_state": return { data: { isStreaming: false } }
-      case "prompt": return { data: { turnId: `turn-${durableId}` } }
-      case "get_messages": return { data: { messages: [{ role: "assistant", content: `from ${durableId}` }] } }
-      case "open_session": return { data: { sessionId: "rpc-2", state: { cwd: process.cwd() } } }
-      default: return { data: {} }
+      case "list_sessions":
+        return {
+          data: {
+            sessions: [
+              {
+                sessionId: "rpc-1",
+                durableSessionId: durableId,
+                sessionPath,
+                cwd: process.cwd(),
+                name,
+                status: "open",
+              },
+            ],
+          },
+        }
+      case "get_state":
+        return { data: { isStreaming: false } }
+      case "prompt":
+        return { data: { turnId: `turn-${durableId}` } }
+      case "get_messages":
+        return { data: { messages: [{ role: "assistant", content: `from ${durableId}` }] } }
+      case "open_session":
+        return { data: { sessionId: "rpc-2", state: { cwd: process.cwd() } } }
+      default:
+        return { data: {} }
     }
   }
 }
 
 function writeSessionJsonl(path: string, durableId: string, text: string): void {
-  writeFileSync(path, [
-    { type: "session", id: durableId, cwd: process.cwd(), timestamp: "2026-09-27T00:00:00.000Z" },
-    { type: "session_info", name: "desktop-thread", timestamp: "2026-09-27T00:00:01.000Z" },
-    { type: "model_change", provider: "openai", modelId: "gpt-x", timestamp: "2026-09-27T00:00:01.500Z" },
-    { type: "thinking_level_change", thinkingLevel: "high", timestamp: "2026-09-27T00:00:01.600Z" },
-    { type: "message", timestamp: "2026-09-27T00:00:02.000Z", message: { role: "user", content: text } },
-    { type: "message", timestamp: "2026-09-27T00:00:03.000Z", message: { role: "assistant", content: [{ type: "toolCall", id: "c1", name: "read", arguments: {} }] } },
-    { type: "message", timestamp: "2026-09-27T00:00:04.000Z", message: { role: "toolResult", toolCallId: "c1", content: [{ type: "text", text: "file body" }] } },
-  ].map((entry) => `${JSON.stringify(entry)}\n`).join(""))
+  writeFileSync(
+    path,
+    [
+      { type: "session", id: durableId, cwd: process.cwd(), timestamp: "2026-09-27T00:00:00.000Z" },
+      { type: "session_info", name: "desktop-thread", timestamp: "2026-09-27T00:00:01.000Z" },
+      { type: "model_change", provider: "openai", modelId: "gpt-x", timestamp: "2026-09-27T00:00:01.500Z" },
+      { type: "thinking_level_change", thinkingLevel: "high", timestamp: "2026-09-27T00:00:01.600Z" },
+      { type: "message", timestamp: "2026-09-27T00:00:02.000Z", message: { role: "user", content: text } },
+      {
+        type: "message",
+        timestamp: "2026-09-27T00:00:03.000Z",
+        message: { role: "assistant", content: [{ type: "toolCall", id: "c1", name: "read", arguments: {} }] },
+      },
+      {
+        type: "message",
+        timestamp: "2026-09-27T00:00:04.000Z",
+        message: { role: "toolResult", toolCallId: "c1", content: [{ type: "text", text: "file body" }] },
+      },
+    ]
+      .map((entry) => `${JSON.stringify(entry)}\n`)
+      .join(""),
+  )
 }
 
 type World = {
@@ -90,21 +138,38 @@ type World = {
   readonly run: (name: ThreadToolName, args: unknown) => Promise<ThreadToolResult>
 }
 
-function world(options: { readonly reports: () => readonly HostEndpointReport[] | undefined; readonly legacy: string; readonly shard: string; readonly now?: () => number }): World {
+function world(options: {
+  readonly reports: () => readonly HostEndpointReport[] | undefined
+  readonly legacy: string
+  readonly shard: string
+  readonly now?: () => number
+}): World {
   const dialed: string[] = []
   const statusCalls = { count: 0 }
   const surface = createLiveThreadSurface({} as never, {
     env: { SENPI_RPC_SOCKET: options.legacy },
-    statusAll: async () => { statusCalls.count += 1; return options.reports() },
+    statusAll: async () => {
+      statusCalls.count += 1
+      return options.reports()
+    },
     registry: async () => [],
-    connect: (path) => { dialed.push(logicalAddress.get(path) ?? path); return createConnection(path) },
+    connect: (path) => {
+      dialed.push(logicalAddress.get(path) ?? path)
+      return createConnection(path)
+    },
     ...(options.now === undefined ? {} : { now: options.now }),
   })
   const stateDirectory = tempDir("thr-state-")
   // closed before its directory is removed: win32 cannot delete the open database
   const store = createGatewayStore({ agentDir: stateDirectory })
   cleanups.push(() => store.dispose())
-  const tools = createThreadTools({ host: surface, store, stateDirectory, callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() })
+  const tools = createThreadTools({
+    host: surface,
+    store,
+    stateDirectory,
+    callerSessionId: () => "caller",
+    callerWorkspaceRoot: () => process.cwd(),
+  })
   let calls = 0
   return {
     legacy: options.legacy,
@@ -115,12 +180,17 @@ function world(options: { readonly reports: () => readonly HostEndpointReport[] 
       const tool = tools.find((candidate) => candidate.name === name)
       if (tool === undefined) throw new Error(`${name} is not registered`)
       calls += 1
-      return (await tool.execute(`call-${calls}`, args, undefined, undefined, undefined as never)).details.result as ThreadToolResult
+      return (await tool.execute(`call-${calls}`, args, undefined, undefined, undefined as never)).details
+        .result as ThreadToolResult
     },
   }
 }
 
-const report = (socket: string, reachable: boolean, sessionPaths: readonly string[] = []): HostEndpointReport => ({ socket, reachable, session_paths: sessionPaths })
+const report = (socket: string, reachable: boolean, sessionPaths: readonly string[] = []): HostEndpointReport => ({
+  socket,
+  reachable,
+  session_paths: sessionPaths,
+})
 
 describe("thread tools across host endpoints", () => {
   test("#given host status --all answering the legacy endpoint and an i-* shard with one session each #when thread_list runs #then both threads are listed with their own sockets", async () => {
@@ -137,8 +207,15 @@ describe("thread tools across host endpoints", () => {
 
     // then
     expect(listed.kind).toBe("ok")
-    const threads = (listed as Extract<ThreadToolResult, { kind: "ok"; threads: unknown }>).threads as ReadonlyArray<{ thread_id: string; socket?: string; status: string }>
-    expect(threads.map((thread) => [thread.thread_id, thread.socket, thread.status]).sort()).toEqual([["dur-desktop", shard, "live"], ["dur-terminal", legacy, "live"]])
+    const threads = (listed as Extract<ThreadToolResult, { kind: "ok"; threads: unknown }>).threads as ReadonlyArray<{
+      thread_id: string
+      socket?: string
+      status: string
+    }>
+    expect(threads.map((thread) => [thread.thread_id, thread.socket, thread.status]).sort()).toEqual([
+      ["dur-desktop", shard, "live"],
+      ["dur-terminal", legacy, "live"],
+    ])
   })
 
   test("#given both endpoints hold a session routed as rpc-1 #when thread_send and thread_read target the i-* thread #then every per-session request dials the i-* socket and none reaches the legacy one", async () => {
@@ -155,8 +232,17 @@ describe("thread tools across host endpoints", () => {
     const read = await w.run("thread_read", { thread: "dur-desktop" })
 
     // then
-    expect(sent).toMatchObject({ kind: "ok", thread_id: "dur-desktop", delivery: { kind: "queued" }, endpoint: { kind: "rpc_host" } })
-    expect(read).toMatchObject({ kind: "ok", source: "live_host", items: [{ role: "assistant", content: JSON.stringify("from dur-desktop") }] })
+    expect(sent).toMatchObject({
+      kind: "ok",
+      thread_id: "dur-desktop",
+      delivery: { kind: "queued" },
+      endpoint: { kind: "rpc_host" },
+    })
+    expect(read).toMatchObject({
+      kind: "ok",
+      source: "live_host",
+      items: [{ role: "assistant", content: JSON.stringify("from dur-desktop") }],
+    })
     const perSession = new Set(["wake", "get_messages"])
     const shardPerSession = shardHost.frames.filter((frame) => perSession.has(String(frame.type)))
     expect(new Set(shardPerSession.map((frame) => frame.type))).toEqual(perSession)
@@ -199,14 +285,31 @@ describe("thread tools across host endpoints", () => {
     const sent = await w.run("thread_send", { thread: "dur-terminal", message: "still here" })
 
     // then
-    const threads = (listed as Extract<ThreadToolResult, { kind: "ok"; threads: unknown }>).threads as ReadonlyArray<{ thread_id: string; status: string; socket?: string; error_note?: string }>
+    const threads = (listed as Extract<ThreadToolResult, { kind: "ok"; threads: unknown }>).threads as ReadonlyArray<{
+      thread_id: string
+      status: string
+      socket?: string
+      error_note?: string
+    }>
     const desktop = threads.find((thread) => thread.thread_id === "dur-desktop")
     expect(desktop).toMatchObject({ status: "resumable", socket: shard, error_note: `host_unavailable:${shard}` })
-    expect(threads.find((thread) => thread.thread_id === "dur-terminal")).toMatchObject({ status: "live", socket: legacy })
-    expect(read).toMatchObject({ kind: "ok", source: "session_jsonl", source_incomplete: true, error_note: `host_unavailable:${shard}` })
+    expect(threads.find((thread) => thread.thread_id === "dur-terminal")).toMatchObject({
+      status: "live",
+      socket: legacy,
+    })
+    expect(read).toMatchObject({
+      kind: "ok",
+      source: "session_jsonl",
+      source_incomplete: true,
+      error_note: `host_unavailable:${shard}`,
+    })
     expect((read as { items: ReadonlyArray<{ seq: number; role: string; content: string }> }).items).toEqual([
       { seq: 1, role: "user", content: JSON.stringify("hello from disk") },
-      { seq: 2, role: "assistant", content: JSON.stringify([{ type: "toolCall", id: "c1", name: "read", arguments: {} }]) },
+      {
+        seq: 2,
+        role: "assistant",
+        content: JSON.stringify([{ type: "toolCall", id: "c1", name: "read", arguments: {} }]),
+      },
       { seq: 3, role: "tool", content: JSON.stringify([{ type: "text", text: "file body" }]) },
     ])
     expect(sent).toMatchObject({ kind: "ok", thread_id: "dur-terminal" })
@@ -221,10 +324,19 @@ describe("thread tools across host endpoints", () => {
     const shard = join(dir, "i-0123456789abcdef.sock")
     const desktopJsonl = join(dir, "desktop.jsonl")
     const texts = Array.from({ length: 12 }, (_, index) => `m${index}:${"x".repeat(200)}`)
-    writeFileSync(desktopJsonl, [
-      { type: "session", id: "dur-desktop", cwd: process.cwd(), timestamp: "2026-09-27T00:00:00.000Z" },
-      ...texts.map((text, index) => ({ type: "message", timestamp: `2026-09-27T00:01:${String(index).padStart(2, "0")}.000Z`, message: { role: "user", content: text } })),
-    ].map((entry) => `${JSON.stringify(entry)}\n`).join(""))
+    writeFileSync(
+      desktopJsonl,
+      [
+        { type: "session", id: "dur-desktop", cwd: process.cwd(), timestamp: "2026-09-27T00:00:00.000Z" },
+        ...texts.map((text, index) => ({
+          type: "message",
+          timestamp: `2026-09-27T00:01:${String(index).padStart(2, "0")}.000Z`,
+          message: { role: "user", content: text },
+        })),
+      ]
+        .map((entry) => `${JSON.stringify(entry)}\n`)
+        .join(""),
+    )
     await endpoint(legacy, hostWith("dur-terminal", "terminal", join(dir, "terminal.jsonl")))
     const w = world({ legacy, shard, reports: () => [report(legacy, true), report(shard, false, [desktopJsonl])] })
 
@@ -233,7 +345,11 @@ describe("thread tools across host endpoints", () => {
     let reads = 0
     let cursor: string | undefined
     do {
-      const page = await w.run("thread_read", { thread: "dur-desktop", max_bytes: 1000, ...(cursor === undefined ? {} : { cursor }) })
+      const page = await w.run("thread_read", {
+        thread: "dur-desktop",
+        max_bytes: 1000,
+        ...(cursor === undefined ? {} : { cursor }),
+      })
       expect(page).toMatchObject({ kind: "ok", source: "session_jsonl" })
       reads += 1
       contents.push(...(page as { items: ReadonlyArray<{ content: string }> }).items.map((item) => item.content))
@@ -260,10 +376,30 @@ describe("thread tools across host endpoints", () => {
     const read = await w.run("thread_read", { thread: "dur-terminal" })
 
     // then
-    const threads = (listed as Extract<ThreadToolResult, { kind: "ok"; threads: unknown }>).threads as ReadonlyArray<{ thread_id: string; status: string; socket?: string; error_note?: string }>
-    expect(threads.find((thread) => thread.thread_id === "dur-terminal")).toMatchObject({ status: "resumable", socket: legacy, error_note: `host_unavailable:${legacy}` })
-    expect(threads.find((thread) => thread.thread_id === "dur-desktop")).toMatchObject({ status: "live", socket: shard })
-    expect(read).toMatchObject({ kind: "ok", source: "session_jsonl", items: [{ seq: 1, role: "user", content: JSON.stringify("hello from the legacy host") }, expect.anything(), expect.anything()] })
+    const threads = (listed as Extract<ThreadToolResult, { kind: "ok"; threads: unknown }>).threads as ReadonlyArray<{
+      thread_id: string
+      status: string
+      socket?: string
+      error_note?: string
+    }>
+    expect(threads.find((thread) => thread.thread_id === "dur-terminal")).toMatchObject({
+      status: "resumable",
+      socket: legacy,
+      error_note: `host_unavailable:${legacy}`,
+    })
+    expect(threads.find((thread) => thread.thread_id === "dur-desktop")).toMatchObject({
+      status: "live",
+      socket: shard,
+    })
+    expect(read).toMatchObject({
+      kind: "ok",
+      source: "session_jsonl",
+      items: [
+        { seq: 1, role: "user", content: JSON.stringify("hello from the legacy host") },
+        expect.anything(),
+        expect.anything(),
+      ],
+    })
   })
 
   test("#given thread tools listing and acting on both endpoints #when the frames are inspected #then every list_sessions is an observing read and no request that acts on a session is", async () => {
@@ -286,7 +422,9 @@ describe("thread tools across host endpoints", () => {
     const acting = frames.filter((frame) => frame.type !== "list_sessions")
     expect(listings.length).toBeGreaterThanOrEqual(4)
     expect(listings.every((frame) => frame.observe === true)).toBe(true)
-    expect(acting.map((frame) => frame.type)).toEqual(expect.arrayContaining(["wake", "open_session", "set_session_name"]))
+    expect(acting.map((frame) => frame.type)).toEqual(
+      expect.arrayContaining(["wake", "open_session", "set_session_name"]),
+    )
     expect(acting.some((frame) => "observe" in frame)).toBe(false)
   })
 
@@ -330,7 +468,12 @@ describe("thread tools across host endpoints", () => {
     const legacy = join(dir, "rpc.sock")
     await endpoint(legacy, hostWith("dur-terminal", "terminal", join(dir, "terminal.jsonl")))
     let clock = 1_000
-    const w = world({ legacy, shard: join(dir, "unused.sock"), reports: () => [report(legacy, true)], now: () => clock })
+    const w = world({
+      legacy,
+      shard: join(dir, "unused.sock"),
+      reports: () => [report(legacy, true)],
+      now: () => clock,
+    })
 
     // when
     await w.run("thread_list", {})
@@ -350,8 +493,31 @@ describe("host status --all parsing", () => {
   test("#given the engine's --all line #when parsed #then every addressable endpoint keeps its socket, reachability, and the session files its rows and claims name", () => {
     const line = JSON.stringify({
       endpoints: [
-        { socket: "/a/rpc/rpc.sock", reachable: true, shard: null, session_rows: [{ id: "rpc-1", kind: "interactive", session_path: "/s/one.jsonl", attachments: 1, context: null }], claims: [] },
-        { socket: "/a/rpc/shards/i-0123456789abcdef.sock", reachable: false, shard: { kind: "i", key: "0123456789abcdef" }, session_rows: [], claims: [{ session_path: "/s/two.jsonl", owner_pid: 1, instance_id: "x", generation: null, attached: null, live: false }] },
+        {
+          socket: "/a/rpc/rpc.sock",
+          reachable: true,
+          shard: null,
+          session_rows: [
+            { id: "rpc-1", kind: "interactive", session_path: "/s/one.jsonl", attachments: 1, context: null },
+          ],
+          claims: [],
+        },
+        {
+          socket: "/a/rpc/shards/i-0123456789abcdef.sock",
+          reachable: false,
+          shard: { kind: "i", key: "0123456789abcdef" },
+          session_rows: [],
+          claims: [
+            {
+              session_path: "/s/two.jsonl",
+              owner_pid: 1,
+              instance_id: "x",
+              generation: null,
+              attached: null,
+              live: false,
+            },
+          ],
+        },
         { socket: null, reachable: false, shard: null, session_rows: [], claims: [] },
       ],
     })

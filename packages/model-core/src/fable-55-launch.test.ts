@@ -91,7 +91,10 @@ describe("Fable 5.5 launch values", () => {
     const rejected: LaunchRungRejection[] = []
     // when
     const selected = selectLaunchRungs(
-      [{ model: "claude-fable-5-5", variant: "max" }, { model: "claude-fable-5-1", variant: "max" }],
+      [
+        { model: "claude-fable-5-5", variant: "max" },
+        { model: "claude-fable-5-1", variant: "max" },
+      ],
       { released: false, accepted: ["max"] },
       (r) => rejected.push(r),
     )
@@ -99,7 +102,6 @@ describe("Fable 5.5 launch values", () => {
     expect(selected.map((r) => r.model)).toEqual(["claude-fable-5-1"])
     expect(rejected).toEqual([])
   })
-
 })
 
 describe("Fable 5.5 launch order (#10800 review)", () => {

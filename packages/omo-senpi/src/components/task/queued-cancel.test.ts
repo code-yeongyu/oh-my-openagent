@@ -18,21 +18,37 @@ for (const resident of [true, false]) {
         h.fake.settle({ status: "completed", finalResponse: "DONE" })
         await terminal
       }
-      h.store.mutate(h.record.task_id, record => ({ ...record, pending_steering: [
-        { id: "cancel-1", message: "Q1", deliver_as: "steer" },
-        { id: "cancel-2", message: "Q2", deliver_as: "steer" },
-      ] }))
+      h.store.mutate(h.record.task_id, (record) => ({
+        ...record,
+        pending_steering: [
+          { id: "cancel-1", message: "Q1", deliver_as: "steer" },
+          { id: "cancel-2", message: "Q2", deliver_as: "steer" },
+        ],
+      }))
 
       const result = await runTaskCancel(h.manager, { task_id: h.record.task_id })
 
       expect(result.details).toMatchObject({ kind: "released", undelivered_messages: 2 })
       expect(h.store.load(h.record.task_id)?.pending_steering).toBeUndefined()
-      expect(events.mock.calls.filter(([, event]) => event.type === "steer_dropped").map(([, event]) => event.payload))
-        .toEqual([{ count: 2, reason: "cancelled" }])
+      expect(
+        events.mock.calls.filter(([, event]) => event.type === "steer_dropped").map(([, event]) => event.payload),
+      ).toEqual([{ count: 2, reason: "cancelled" }])
       const notice = withDroppedSteeringNotice("", 2).trim()
-      expect(result.content.filter(part => part.type === "text").map(part => part.text).join("\n")).toContain(notice)
-      expect(renderTaskCancelResult(result, { expanded: false, isPartial: false },
-        { fg: (_color, text) => text, italic: text => text }).render(200).join("\n")).toContain(notice)
+      expect(
+        result.content
+          .filter((part) => part.type === "text")
+          .map((part) => part.text)
+          .join("\n"),
+      ).toContain(notice)
+      expect(
+        renderTaskCancelResult(
+          result,
+          { expanded: false, isPartial: false },
+          { fg: (_color, text) => text, italic: (text) => text },
+        )
+          .render(200)
+          .join("\n"),
+      ).toContain(notice)
       expect((await h.send("NEW_REQUEST")).kind).toBe("revived")
       expect(h.fake.followUpCalls.at(-1)).toBe("NEW_REQUEST")
     } finally {

@@ -177,46 +177,50 @@ export class RpcHostRunner {
         : specInput
     await this.modelAdmission(spec)
     const endpoint = resolveChildEndpoint(this.endpoint, spec)
-    const keyed = endpoint.shardKey === undefined ? spec : { ...spec, treeKey: endpoint.shardKey, shardKey: endpoint.shardKey }
+    const keyed =
+      endpoint.shardKey === undefined ? spec : { ...spec, treeKey: endpoint.shardKey, shardKey: endpoint.shardKey }
     const sessionPath =
       spec.resumeSessionPath ??
       resolveChildSessionPath(spec.state_dir, spec.task_id, new Date(this.now()), randomUUID())
     await admitChildStore(this.endpoint)
-    return await waitOutBusyHost(async () => {
-      for (let retried = false; ; retried = true) {
-        let socket: string
-        try {
-          socket = await ensureChildEndpoint(this.endpoint, endpoint)
-        } catch (error) {
-          if (RunnerError.is(error)) throw error
-          if (endpoint.recorded) throw recordedEndpointFailure(this.endpoint.notice, error, endpoint.socket)
-          return await this.delegate(error, spec, isHostTransportError(error))
-        }
-        await recordSidecarStore(this.endpoint, socket)
-        try {
-          return await this.sessionOpener.openChild(keyed, socket, sessionPath)
-        } catch (error) {
-          if (RunnerError.is(error)) throw error
-          // A recorded session never falls back to another endpoint, even when this host's
-          // capability refusal would allow a fresh child to start in its own process.
-          if (endpoint.recorded && error instanceof HostUnavailableError) {
-            throw recordedEndpointFailure(this.endpoint.notice, error, endpoint.socket)
+    return await waitOutBusyHost(
+      async () => {
+        for (let retried = false; ; retried = true) {
+          let socket: string
+          try {
+            socket = await ensureChildEndpoint(this.endpoint, endpoint)
+          } catch (error) {
+            if (RunnerError.is(error)) throw error
+            if (endpoint.recorded) throw recordedEndpointFailure(this.endpoint.notice, error, endpoint.socket)
+            return await this.delegate(error, spec, isHostTransportError(error))
           }
-          // An ensure answered from the cache can vouch for a host that died moments ago: drop it
-          // and ensure this same endpoint once more.
-          if (!retried && isHostGone(error) && isEnsuredEndpoint(this.endpoint, endpoint)) {
-            forgetTaskDaemon(socket)
-            continue
+          await recordSidecarStore(this.endpoint, socket)
+          try {
+            return await this.sessionOpener.openChild(keyed, socket, sessionPath)
+          } catch (error) {
+            if (RunnerError.is(error)) throw error
+            // A recorded session never falls back to another endpoint, even when this host's
+            // capability refusal would allow a fresh child to start in its own process.
+            if (endpoint.recorded && error instanceof HostUnavailableError) {
+              throw recordedEndpointFailure(this.endpoint.notice, error, endpoint.socket)
+            }
+            // An ensure answered from the cache can vouch for a host that died moments ago: drop it
+            // and ensure this same endpoint once more.
+            if (!retried && isHostGone(error) && isEnsuredEndpoint(this.endpoint, endpoint)) {
+              forgetTaskDaemon(socket)
+              continue
+            }
+            return await this.delegate(error, spec, false)
           }
-          return await this.delegate(error, spec, false)
         }
-      }
-    }, {
-      now: this.now,
-      sleep: this.sleep,
-      waitMs: this.admissionWaitMs,
-      onWarning: this.onWarning,
-    })
+      },
+      {
+        now: this.now,
+        sleep: this.sleep,
+        waitMs: this.admissionWaitMs,
+        onWarning: this.onWarning,
+      },
+    )
   }
 
   async settleTeardowns(): Promise<void> {
@@ -227,11 +231,7 @@ export class RpcHostRunner {
    * The LOUD, narrow fallback. `fallbackAllowed` is the engine's own verdict (`daemon.ts`), so the
    * set of reasons that may run a child as its own process is stated exactly once.
    */
-  private async delegate(
-    error: unknown,
-    spec: RpcRunnerSpec,
-    hostUnreachable: boolean,
-  ): Promise<RpcChildHandle> {
+  private async delegate(error: unknown, spec: RpcRunnerSpec, hostUnreachable: boolean): Promise<RpcChildHandle> {
     const fallback = this.options.fallback
     if (fallback === undefined || !(error instanceof HostUnavailableError) || !error.fallbackAllowed) {
       throw new RunnerError({
@@ -254,7 +254,6 @@ export class RpcHostRunner {
     }
     return await fallback.start(spec)
   }
-
 }
 
 function isHostGone(error: unknown): boolean {

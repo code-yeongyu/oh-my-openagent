@@ -2,7 +2,11 @@ import { PROVENANCE_MIGRATION } from "./provenance-record"
 
 export class GatewaySchemaVersionError extends Error {
   readonly code = "gateway_schema_too_new"
-  constructor(readonly found: number, readonly supported: number, scope = "Gateway") {
+  constructor(
+    readonly found: number,
+    readonly supported: number,
+    scope = "Gateway",
+  ) {
     super(`${scope} schema ${found} is newer than this binary's supported version ${supported}.`)
   }
 }
@@ -277,4 +281,21 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
   ],
 ]
 
-export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms", "extension_schema", "extension_objects", "thread_creations", "extension_registrations", "toolkit_replay_receipts"] as const
+export const GATEWAY_TABLES = [
+  "deliveries",
+  "receipts",
+  "causal_roots",
+  "causal_edges",
+  "rate_buckets",
+  "session_meta",
+  "bindings",
+  "outbox",
+  "gateway_meta",
+  "outbox_cursors",
+  "completion_arms",
+  "extension_schema",
+  "extension_objects",
+  "thread_creations",
+  "extension_registrations",
+  "toolkit_replay_receipts",
+] as const

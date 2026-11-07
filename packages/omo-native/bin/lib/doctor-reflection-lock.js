@@ -24,9 +24,13 @@ export function formatReflectionLockLines(identity, verdict, reflectionDir) {
   if (verdict.state === "none" || verdict.state === "live") return []
   const lock = join(reflectionDir, "active.lock")
   if (verdict.state === "dead") {
-    return [`WARN memory reflection is stuck on a stale lock (${identity}): run ${verdict.runId} still holds ${lock}, but its launcher is gone and it already recorded its outcome. Next step: open a session and send /reflect (or any message); the session settles that run and starts any queued request.`]
+    return [
+      `WARN memory reflection is stuck on a stale lock (${identity}): run ${verdict.runId} still holds ${lock}, but its launcher is gone and it already recorded its outcome. Next step: open a session and send /reflect (or any message); the session settles that run and starts any queued request.`,
+    ]
   }
-  return [`WARN memory reflection is stuck on a stale lock (${identity}): run ${verdict.runId} still holds ${lock} and ${verdict.reason}. Next step: run /doctor in a session; if no reflection run is active, move ${lock} aside (keep a backup) and start a new session.`]
+  return [
+    `WARN memory reflection is stuck on a stale lock (${identity}): run ${verdict.runId} still holds ${lock} and ${verdict.reason}. Next step: run /doctor in a session; if no reflection run is active, move ${lock} aside (keep a backup) and start a new session.`,
+  ]
 }
 
 function listDurableIdentities(agentsRoot) {

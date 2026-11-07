@@ -26,12 +26,7 @@ export async function dispatchFallbackRetry(
   options: DispatchFallbackRetryOptions,
 ): Promise<void> {
   const snapshot = snapshotFallbackState(options.state)
-  const result = prepareFallback(
-    options.sessionID,
-    options.state,
-    options.fallbackModels,
-    deps.config,
-  )
+  const result = prepareFallback(options.sessionID, options.state, options.fallbackModels, deps.config)
 
   if (result.success && result.newModel) {
     const rawDispatchOutcome = await helpers.autoRetryWithFallback(

@@ -10,7 +10,7 @@ test("two processes share the refresh lock and never persist credentials in HOME
   const home = await temporaryHome()
   let saved: Credentials = { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" }
   let rotations = 0
-  const api = fakeApi(async request => {
+  const api = fakeApi(async (request) => {
     if (request.url.endsWith("/fake-store")) {
       if (request.method === "PUT") saved = credentialSchema.parse(await request.json())
       return Response.json(saved)
@@ -33,14 +33,20 @@ test("two processes share the refresh lock and never persist credentials in HOME
     }
   })
   // Launch both contenders while the parent owns the same non-secret lock.
-  await withLock(path, async () => {
-    children.push(...[0, 1].map(() => Bun.spawn(args, { env, stdout: "pipe", stderr: "pipe" })))
-  }, { staleAfterMs: Number.POSITIVE_INFINITY })
-  const exits = await Promise.all(children.map(child => child.exited))
-  const errors = await Promise.all(children.map(child => {
-    if (!child.stderr || typeof child.stderr === "number") throw new Error("child stderr must be piped")
-    return new Response(child.stderr).text()
-  }))
+  await withLock(
+    path,
+    async () => {
+      children.push(...[0, 1].map(() => Bun.spawn(args, { env, stdout: "pipe", stderr: "pipe" })))
+    },
+    { staleAfterMs: Number.POSITIVE_INFINITY },
+  )
+  const exits = await Promise.all(children.map((child) => child.exited))
+  const errors = await Promise.all(
+    children.map((child) => {
+      if (!child.stderr || typeof child.stderr === "number") throw new Error("child stderr must be piped")
+      return new Response(child.stderr).text()
+    }),
+  )
   expect(errors).toEqual(["", ""])
   expect(exits).toEqual([0, 0])
   expect(rotations).toBe(1)
@@ -49,6 +55,7 @@ test("two processes share the refresh lock and never persist credentials in HOME
     const file = join(home, name)
     if (!(await stat(file)).isFile()) continue
     const text = await readFile(file, "utf8")
-    for (const secret of [grant.accessToken, grant.refreshToken, ...Object.values(privateKeys)]) expect(text).not.toContain(secret)
+    for (const secret of [grant.accessToken, grant.refreshToken, ...Object.values(privateKeys)])
+      expect(text).not.toContain(secret)
   }
 }, 10_000)

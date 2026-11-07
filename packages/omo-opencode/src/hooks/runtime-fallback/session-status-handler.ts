@@ -16,12 +16,7 @@ export function createSessionStatusHandler(
   helpers: AutoRetryHelpers,
   sessionStatusRetryKeys: Map<string, Set<string>>,
 ) {
-  const {
-    pluginConfig,
-    sessionStates,
-    sessionLastAccess,
-    sessionRetryInFlight,
-  } = deps
+  const { pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight } = deps
 
   return async (props: Record<string, unknown> | undefined) => {
     const sessionID = resolveSessionEventID(props)

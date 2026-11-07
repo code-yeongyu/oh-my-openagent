@@ -20,7 +20,9 @@ type RedispatchOutcome = {
   readonly owning_session_id?: string
 }
 
-function redispatcher(manager: unknown): { redispatchTask: (idOrName: string, callerSessionId?: string) => Promise<RedispatchOutcome> } {
+function redispatcher(manager: unknown): {
+  redispatchTask: (idOrName: string, callerSessionId?: string) => Promise<RedispatchOutcome>
+} {
   return manager as { redispatchTask: (idOrName: string, callerSessionId?: string) => Promise<RedispatchOutcome> }
 }
 
@@ -124,7 +126,12 @@ describe("TaskManager.redispatchTask (senpi#3266)", () => {
     const { manager, store, taskId } = await flaggedTask()
 
     // when
-    const outcome = await manager.sendToTask({ idOrName: taskId, message: "carry on", deliverAs: "steer", callerSessionId: "parent-1" })
+    const outcome = await manager.sendToTask({
+      idOrName: taskId,
+      message: "carry on",
+      deliverAs: "steer",
+      callerSessionId: "parent-1",
+    })
 
     // then
     expect(outcome.kind).toBe("steered")

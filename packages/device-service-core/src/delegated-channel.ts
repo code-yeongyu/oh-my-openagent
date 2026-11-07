@@ -85,16 +85,16 @@ export function followDelegatedChannel(device: string): DelegatedChannel {
     }
   }
   return {
-    takeReply: commandId => {
+    takeReply: (commandId) => {
       const reply = replies.get(commandId)
       replies.delete(commandId)
       return reply
     },
-    onFrame: listener => {
+    onFrame: (listener) => {
       frames.add(listener)
       return () => frames.delete(listener)
     },
-    onLoss: listener => {
+    onLoss: (listener) => {
       losses.add(listener)
       return () => losses.delete(listener)
     },

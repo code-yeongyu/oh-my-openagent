@@ -7,8 +7,18 @@ import { join } from "node:path"
 import { connectDeviceService, DEVICE_SERVICE_VERSION } from "../../device-service-core/src/index.ts"
 import { deviceServiceAssetName } from "../../device-service-core/src/release/acquire.ts"
 import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
-import { buildRelease, RELEASE_ORIGIN, releaseKey, serveRelease } from "../../device-service-core/test/release-fixture.ts"
-import { defaultWorld, OFFLINE_PEER, PEER, SESSION_ID } from "../../device-service-core/test/local-api/conformance/world.ts"
+import {
+  buildRelease,
+  RELEASE_ORIGIN,
+  releaseKey,
+  serveRelease,
+} from "../../device-service-core/test/release-fixture.ts"
+import {
+  defaultWorld,
+  OFFLINE_PEER,
+  PEER,
+  SESSION_ID,
+} from "../../device-service-core/test/local-api/conformance/world.ts"
 import { createCredentialStore } from "../../omo-opencode/src/cli/service-auth/keystore"
 import { runAccountVerb } from "../account-cli"
 import { type BootstrapSetup, deviceServiceBootstrapSetup } from "../remote-bootstrap"
@@ -31,12 +41,19 @@ const privateDir = (): string => {
   return dir
 }
 
-const SIGNED_IN = { exitCode: 0, stdout: JSON.stringify({ signedIn: true, device: { id: "dev-self", name: "This Mac" }, refreshState: "ok" }) }
+const SIGNED_IN = {
+  exitCode: 0,
+  stdout: JSON.stringify({ signedIn: true, device: { id: "dev-self", name: "This Mac" }, refreshState: "ok" }),
+}
 
 const credential = () => ({
   device: { id: "dev-self", name: "This Mac" },
-  signingPrivateKey: generateKeyPairSync("ed25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
-  sealingPrivateKey: generateKeyPairSync("x25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
+  signingPrivateKey: generateKeyPairSync("ed25519")
+    .privateKey.export({ format: "der", type: "pkcs8" })
+    .toString("base64"),
+  sealingPrivateKey: generateKeyPairSync("x25519")
+    .privateKey.export({ format: "der", type: "pkcs8" })
+    .toString("base64"),
 })
 
 const AGENT_DIR = "/home/user/.omo/agent"
@@ -68,8 +85,8 @@ async function run(args: readonly string[], stateDir?: string, account = SIGNED_
       stateDir: target,
       connect: () => connectDeviceService({ version: "5.1.52", stateDir: target }),
       now: () => NOW,
-      output: line => out.push(line),
-      error: line => err.push(line),
+      output: (line) => out.push(line),
+      error: (line) => err.push(line),
       bootstrap,
     },
     args,
@@ -100,16 +117,16 @@ describe("omo remote", () => {
   test("sessions shows attach targets, marks cached rows and names devices that did not answer", async () => {
     const { code, out } = await run(["sessions"])
     expect(code).toBe(REMOTE_EXIT.ok)
-    const live = out.find(line => line.startsWith(`${PEER}/${SESSION_ID}`))
+    const live = out.find((line) => line.startsWith(`${PEER}/${SESSION_ID}`))
     expect(live).toMatch(/Live session\s+running\s+omo\s+Studio/)
-    expect(out.find(line => line.startsWith(`${OFFLINE_PEER}/${SESSION_ID}`))).toMatch(/running \(cached\)/)
+    expect(out.find((line) => line.startsWith(`${OFFLINE_PEER}/${SESSION_ID}`))).toMatch(/running \(cached\)/)
     expect(out.at(-1)).toBe("Not answered, rows may be missing or cached: Laptop")
   })
 
   test("sessions passes its filter to the service and --json prints the listing result", async () => {
     const { out } = await run(["sessions", "--device", PEER, "--json"])
     const result = JSON.parse(out.join("")) as { rows: { device: string }[] }
-    expect(result.rows.map(row => row.device)).toEqual([PEER])
+    expect(result.rows.map((row) => row.device)).toEqual([PEER])
   })
 
   test("disable and enable report the switch the service answers with", async () => {
@@ -153,18 +170,26 @@ describe("omo remote", () => {
   })
 
   test("control names a service too old to have the attach setting instead of sending it", async () => {
-    const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld(), capabilities: ["sessions", "devices", "enforcement", "upgrade"] })
+    const owner = await startFakeOwner({
+      stateDir: privateDir(),
+      world: defaultWorld(),
+      capabilities: ["sessions", "devices", "enforcement", "upgrade"],
+    })
     owners.push(owner)
     const { code, err } = await run(["control", "off"], owner.stateDir)
     expect(code).toBe(REMOTE_EXIT.unavailable)
-    expect(err).toEqual(["The OmO device service on this device does not have remote control yet. Update OmO, then try again."])
+    expect(err).toEqual([
+      "The OmO device service on this device does not have remote control yet. Update OmO, then try again.",
+    ])
     expect(owner.state.log).not.toContain("control.attach.set")
   })
 
   test("reports a missing or stopped service without a stack", async () => {
     const missing = await run(["status"], join(privateDir(), "absent"))
     expect(missing.code).toBe(REMOTE_EXIT.unavailable)
-    expect(missing.err).toEqual(["The OmO device service is not set up on this device. Install the OmO desktop app to set it up."])
+    expect(missing.err).toEqual([
+      "The OmO device service is not set up on this device. Install the OmO desktop app to set it up.",
+    ])
     const stopped = await run(["status"], privateDir())
     expect(stopped.code).toBe(REMOTE_EXIT.unavailable)
     expect(stopped.err).toEqual(["The OmO device service is not running on this device."])
@@ -173,12 +198,36 @@ describe("omo remote", () => {
 
 describe("omo remote bootstrap: omo account show first", () => {
   test.each([
-    ["signed out", { exitCode: 0, stdout: '{"signedIn":false}' }, "Sign in to OmO first: run omo login (or sign in from the OmO desktop app)."],
-    ["signed out after omo logout", { exitCode: 0, stdout: '{"signedIn":false,"signedOut":{"at":"2026-10-30T00:00:00.000Z"}}' }, "Sign in to OmO first: run omo login (or sign in from the OmO desktop app)."],
-    ["a locked keychain (exit 7)", { exitCode: 7, stdout: '{"keychain":"locked"}' }, "Your OmO sign-in is behind a locked keychain. Unlock it, then try again."],
-    ["an unavailable store (exit 9)", { exitCode: 9, stdout: '{"error":"store-unavailable"}' }, "The credential store holding your OmO sign-in is not available right now. Try again in a moment."],
-    ["output that is not JSON", { exitCode: 0, stdout: "garbage" }, "Could not read your OmO sign-in (omo account show printed no JSON). Sign in again with omo login."],
-    ["signedIn true with a failing exit", { exitCode: 1, stdout: '{"signedIn":true,"device":{"id":"d","name":"n"}}' }, "Could not read your OmO sign-in (omo account show answered an unexpected shape (exit 1)). Sign in again with omo login."],
+    [
+      "signed out",
+      { exitCode: 0, stdout: '{"signedIn":false}' },
+      "Sign in to OmO first: run omo login (or sign in from the OmO desktop app).",
+    ],
+    [
+      "signed out after omo logout",
+      { exitCode: 0, stdout: '{"signedIn":false,"signedOut":{"at":"2026-10-30T00:00:00.000Z"}}' },
+      "Sign in to OmO first: run omo login (or sign in from the OmO desktop app).",
+    ],
+    [
+      "a locked keychain (exit 7)",
+      { exitCode: 7, stdout: '{"keychain":"locked"}' },
+      "Your OmO sign-in is behind a locked keychain. Unlock it, then try again.",
+    ],
+    [
+      "an unavailable store (exit 9)",
+      { exitCode: 9, stdout: '{"error":"store-unavailable"}' },
+      "The credential store holding your OmO sign-in is not available right now. Try again in a moment.",
+    ],
+    [
+      "output that is not JSON",
+      { exitCode: 0, stdout: "garbage" },
+      "Could not read your OmO sign-in (omo account show printed no JSON). Sign in again with omo login.",
+    ],
+    [
+      "signedIn true with a failing exit",
+      { exitCode: 1, stdout: '{"signedIn":true,"device":{"id":"d","name":"n"}}' },
+      "Could not read your OmO sign-in (omo account show answered an unexpected shape (exit 1)). Sign in again with omo login.",
+    ],
   ])("%s stops before contacting the service", async (_label, account, notice) => {
     const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
     owners.push(owner)
@@ -203,7 +252,10 @@ describe("omo remote bootstrap", () => {
   test("signed out stops with the signed_out state and touches no service", async () => {
     const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
     owners.push(owner)
-    const { code, out } = await run(["bootstrap", "--json"], owner.stateDir, { exitCode: 4, stdout: '{"signedIn":false}' })
+    const { code, out } = await run(["bootstrap", "--json"], owner.stateDir, {
+      exitCode: 4,
+      stdout: '{"signedIn":false}',
+    })
     expect(code).toBe(REMOTE_EXIT.unavailable)
     expect(JSON.parse(out.join(""))).toMatchObject({ state: "signed_out" })
     expect(owner.state.log).toEqual([])
@@ -223,10 +275,23 @@ describe("omo remote bootstrap", () => {
       delete: async () => false,
     }
     const api = "https://api.omo.dev"
-    const store = createCredentialStore(api, { secrets: noSecretService, platform: "linux", lockProbe: async () => "unknown", home })
+    const store = createCredentialStore(api, {
+      secrets: noSecretService,
+      platform: "linux",
+      lockProbe: async () => "unknown",
+      home,
+    })
     const lines: string[] = []
     const exitCode = await runAccountVerb(
-      { api, store, home, pinDir: () => join(home, "pins"), readStdin: async () => "", output: line => lines.push(line), error: () => {} },
+      {
+        api,
+        store,
+        home,
+        pinDir: () => join(home, "pins"),
+        readStdin: async () => "",
+        output: (line) => lines.push(line),
+        error: () => {},
+      },
       ["show"],
     )
     const { code, out } = await run(["bootstrap", "--json"], owner.stateDir, { exitCode, stdout: lines.join("\n") })
@@ -234,7 +299,6 @@ describe("omo remote bootstrap", () => {
     expect(JSON.parse(out.join(""))).toMatchObject({ state: "store_unavailable" })
     expect(owner.state.log).toEqual([])
   })
-
 })
 
 // This build's own install (deviceServiceBootstrapSetup) against a local release endpoint: no network, a signing key
@@ -257,7 +321,7 @@ describe("omo remote bootstrap: this build's install", () => {
       release: {
         origin: RELEASE_ORIGIN,
         // The service's own installer starts the service; here a fake owner stands in for it.
-        run: async argv => {
+        run: async (argv) => {
           runs.push(argv)
           owners.push(await startFakeOwner({ stateDir, world: defaultWorld() }))
           return { exitCode: 0, output: "" }
@@ -271,7 +335,10 @@ describe("omo remote bootstrap: this build's install", () => {
 
   test("a release signed by a key in the set installs the pinned version, runs its installer and connects", async () => {
     const key = releaseKey()
-    const served = serveRelease(buildRelease({ key, host: HOST, version: DEVICE_SERVICE_VERSION }), DEVICE_SERVICE_VERSION)
+    const served = serveRelease(
+      buildRelease({ key, host: HOST, version: DEVICE_SERVICE_VERSION }),
+      DEVICE_SERVICE_VERSION,
+    )
     const { code, result, runs, stateDir } = await bootstrapWith({ releaseKeys: [key.publicHex], fetch: served.fetch })
     expect([code, result.state]).toEqual([REMOTE_EXIT.ok, "connected"])
     const releaseDir = join(stateDir, "bin", DEVICE_SERVICE_VERSION)
@@ -280,7 +347,10 @@ describe("omo remote bootstrap: this build's install", () => {
   })
 
   test("this build's pinned keys refuse a release signed by any other key, writing and running nothing", async () => {
-    const served = serveRelease(buildRelease({ key: releaseKey(), host: HOST, version: DEVICE_SERVICE_VERSION }), DEVICE_SERVICE_VERSION)
+    const served = serveRelease(
+      buildRelease({ key: releaseKey(), host: HOST, version: DEVICE_SERVICE_VERSION }),
+      DEVICE_SERVICE_VERSION,
+    )
     const { code, result, runs, stateDir } = await bootstrapWith({ fetch: served.fetch })
     expect([code, result]).toEqual([REMOTE_EXIT.unavailable, { state: "service_degraded", notice: VERIFY_FAILED }])
     expect(served.requested.length).toBeGreaterThan(0)
@@ -291,7 +361,10 @@ describe("omo remote bootstrap: this build's install", () => {
   test("a manifest the signed checksums do not cover is refused, writing and running nothing", async () => {
     const key = releaseKey()
     const files = buildRelease({ key, host: HOST, version: DEVICE_SERVICE_VERSION })
-    files.set("latest.json", new TextEncoder().encode(JSON.stringify({ version: DEVICE_SERVICE_VERSION, min_engine_version: "0.1.0" })))
+    files.set(
+      "latest.json",
+      new TextEncoder().encode(JSON.stringify({ version: DEVICE_SERVICE_VERSION, min_engine_version: "0.1.0" })),
+    )
     const served = serveRelease(files, DEVICE_SERVICE_VERSION)
     const { code, result, runs, stateDir } = await bootstrapWith({ releaseKeys: [key.publicHex], fetch: served.fetch })
     expect([code, result]).toEqual([REMOTE_EXIT.unavailable, { state: "service_degraded", notice: VERIFY_FAILED }])
@@ -302,11 +375,17 @@ describe("omo remote bootstrap: this build's install", () => {
     const key = releaseKey()
     // Above any engine this build can bundle.
     const minEngine = "9999.0.0"
-    const served = serveRelease(buildRelease({ key, host: HOST, version: DEVICE_SERVICE_VERSION, minEngine }), DEVICE_SERVICE_VERSION)
+    const served = serveRelease(
+      buildRelease({ key, host: HOST, version: DEVICE_SERVICE_VERSION, minEngine }),
+      DEVICE_SERVICE_VERSION,
+    )
     const { code, result, runs, stateDir } = await bootstrapWith({ releaseKeys: [key.publicHex], fetch: served.fetch })
     expect([code, result]).toEqual([
       REMOTE_EXIT.unavailable,
-      { state: "update_required", notice: `This OmO device service needs engine ${minEngine} or later. Update OmO, then try again.` },
+      {
+        state: "update_required",
+        notice: `This OmO device service needs engine ${minEngine} or later. Update OmO, then try again.`,
+      },
     ])
     expect([runs, existsSync(join(stateDir, "bin"))]).toEqual([[], false])
   })
@@ -320,7 +399,10 @@ describe("omo remote bootstrap: this build's install", () => {
     const { code, result, runs, stateDir } = await bootstrapWith({ fetch: unreachable })
     expect([code, result]).toEqual([
       REMOTE_EXIT.unavailable,
-      { state: "service_degraded", notice: "Could not download the OmO device service. Check the connection and try again." },
+      {
+        state: "service_degraded",
+        notice: "Could not download the OmO device service. Check the connection and try again.",
+      },
     ])
     expect(requested[0]).toStartWith(`${RELEASE_ORIGIN}/stable/device-service/${DEVICE_SERVICE_VERSION}/`)
     expect([runs, existsSync(join(stateDir, "bin"))]).toEqual([[], false])
@@ -345,7 +427,7 @@ describe("omo remote attach", () => {
         connect: connect ?? (() => connectDeviceService({ version: "5.1.52", stateDir: owner.stateDir })),
         now: () => NOW,
         output: () => {},
-        error: line => err.push(line),
+        error: (line) => err.push(line),
       },
       target,
     )
@@ -362,7 +444,7 @@ describe("omo remote attach", () => {
 
   test.each([[[]], [["no-slash"]], [["/session"]], [["device/"]], [[`${PEER}/${SESSION_ID}`, "extra"]]])(
     "refuses the target %p as usage",
-    async target => {
+    async (target) => {
       const { prepared, err } = await attach(target)
       expect(prepared).toBe(REMOTE_EXIT.usage)
       expect(err[0]).toStartWith("usage: omo remote attach <device>/<session>")
@@ -370,24 +452,39 @@ describe("omo remote attach", () => {
   )
 
   test("checks omo account show before it looks for the service", async () => {
-    const { prepared, err } = await attach([`${PEER}/${SESSION_ID}`], true, { exitCode: 4, stdout: '{"signedIn":false}' })
-    expect([prepared, err]).toEqual([REMOTE_EXIT.unavailable, ["Sign in to OmO first: run omo login (or sign in from the OmO desktop app)."]])
+    const { prepared, err } = await attach([`${PEER}/${SESSION_ID}`], true, {
+      exitCode: 4,
+      stdout: '{"signedIn":false}',
+    })
+    expect([prepared, err]).toEqual([
+      REMOTE_EXIT.unavailable,
+      ["Sign in to OmO first: run omo login (or sign in from the OmO desktop app)."],
+    ])
   })
 
   test("names a stopped service and an unknown session without a stack", async () => {
     const stopped = await attach([`${PEER}/${SESSION_ID}`], false)
-    expect([stopped.prepared, stopped.err]).toEqual([REMOTE_EXIT.unavailable, ["The OmO device service is not running on this device."]])
+    expect([stopped.prepared, stopped.err]).toEqual([
+      REMOTE_EXIT.unavailable,
+      ["The OmO device service is not running on this device."],
+    ])
     const unknown = await attach([`${PEER}/bm8tc3VjaC1zZXNzaW9u`])
     expect(unknown.prepared).toBe(REMOTE_EXIT.failed)
     expect(unknown.err[0]).toStartWith("omo remote: ")
   })
 
   // A stopped service on Windows keeps its TCP endpoint file, so the stop shows up as a refused connection.
-  test.each(["ECONNREFUSED", "ECONNRESET", "ENOENT"])("names a stopped service when the endpoint remains but the connection fails with %s", async code => {
-    const refused = () => Promise.reject(Object.assign(new Error(`connect ${code} 127.0.0.1:1`), { code }))
-    const { prepared, err } = await attach([`${PEER}/${SESSION_ID}`], true, SIGNED_IN, refused)
-    expect([prepared, err]).toEqual([REMOTE_EXIT.unavailable, ["The OmO device service is not running on this device."]])
-  })
+  test.each(["ECONNREFUSED", "ECONNRESET", "ENOENT"])(
+    "names a stopped service when the endpoint remains but the connection fails with %s",
+    async (code) => {
+      const refused = () => Promise.reject(Object.assign(new Error(`connect ${code} 127.0.0.1:1`), { code }))
+      const { prepared, err } = await attach([`${PEER}/${SESSION_ID}`], true, SIGNED_IN, refused)
+      expect([prepared, err]).toEqual([
+        REMOTE_EXIT.unavailable,
+        ["The OmO device service is not running on this device."],
+      ])
+    },
+  )
 })
 
 describe("ago", () => {

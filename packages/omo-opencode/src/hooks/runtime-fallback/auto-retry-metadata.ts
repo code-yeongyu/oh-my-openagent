@@ -5,8 +5,6 @@ export type RetryPromptPart = { type: "text"; text: string; id?: string }
 
 type UserRetryPartRecord = Record<string, unknown> & { type: "text"; text: string }
 
-
-
 export function resolveOriginalUserRetryMetadata(messagesResponse: unknown): {
   messageID?: string
   parts: RetryPromptPart[]
@@ -23,10 +21,7 @@ export function resolveOriginalUserRetryMetadata(messagesResponse: unknown): {
   const parts = rawParts
     .filter(
       (part): part is UserRetryPartRecord =>
-        isRecord(part)
-        && part["type"] === "text"
-        && typeof part["text"] === "string"
-        && part["text"].length > 0,
+        isRecord(part) && part["type"] === "text" && typeof part["text"] === "string" && part["text"].length > 0,
     )
     .map((part) => ({
       type: "text" as const,

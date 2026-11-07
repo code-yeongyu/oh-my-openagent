@@ -57,9 +57,7 @@ export function hasVisibleAssistantResponse(extractAutoRetrySignalFn: typeof ext
         const infoMessageParts = Array.isArray(infoParts)
           ? infoParts.filter((part): part is SessionMessagePart => typeof part === "object" && part !== null)
           : undefined
-        const parts = message.parts && message.parts.length > 0
-          ? message.parts
-          : infoMessageParts
+        const parts = message.parts && message.parts.length > 0 ? message.parts : infoMessageParts
         const assistantText = getAssistantText(parts)
         if (!assistantText) {
           continue

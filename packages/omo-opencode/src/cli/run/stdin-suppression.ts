@@ -18,7 +18,7 @@ export function suppressRunInput(
   stdin: StdinLike = process.stdin,
   onInterrupt: () => void = () => {
     process.kill(process.pid, "SIGINT")
-  }
+  },
 ): () => void {
   if (!stdin.isTTY) {
     return () => {}

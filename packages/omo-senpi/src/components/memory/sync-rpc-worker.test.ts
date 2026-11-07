@@ -26,7 +26,12 @@ test("#given two real coordinator workers #when both enable one device #then ser
   const material = generateDeviceKeyMaterial()
   const principalId = await deviceIdOf(material.publicKeys.signing)
   if (principalId === null) throw new Error("invalid generated key")
-  const token = server.tokenFor({ kind: "device", id: principalId, signing_public_key: material.publicKeys.signing, sealing_public_key: material.publicKeys.sealing })
+  const token = server.tokenFor({
+    kind: "device",
+    id: principalId,
+    signing_public_key: material.publicKeys.signing,
+    sealing_public_key: material.publicKeys.sealing,
+  })
   const workers: Worker[] = []
   try {
     const start = async () => {

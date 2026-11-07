@@ -125,10 +125,12 @@ export class SyncEngine {
   runCycle(): Promise<CycleReport> {
     const previous = this.running ?? Promise.resolve(null)
     let keyAtStart: string | null = null
-    const run = previous.catch(() => null).then(() => {
-      keyAtStart = this.tracker.key()
-      return this.cycle()
-    })
+    const run = previous
+      .catch(() => null)
+      .then(() => {
+        keyAtStart = this.tracker.key()
+        return this.cycle()
+      })
     this.running = run
     const waiters = this.waiters.splice(0)
     void run.then(
@@ -163,7 +165,9 @@ export class SyncEngine {
     try {
       this.deps.onStatusChange?.()
     } catch (error) {
-      this.deps.log?.(`sync status listener failed: ${error instanceof Error ? error.message : "a non-Error value was thrown"}`)
+      this.deps.log?.(
+        `sync status listener failed: ${error instanceof Error ? error.message : "a non-Error value was thrown"}`,
+      )
     }
   }
 
@@ -244,7 +248,14 @@ export class SyncEngine {
     await inbound()
     const settleFirst = this.settleNext
     this.settleNext = false
-    const pushedCycle = await pushCycle({ deps, journal, inbound, sleep: (ms) => this.sleep(ms), settleFirst, frozen: this.tracker.frozen })
+    const pushedCycle = await pushCycle({
+      deps,
+      journal,
+      inbound,
+      sleep: (ms) => this.sleep(ms),
+      settleFirst,
+      frozen: this.tracker.frozen,
+    })
     this.tracker.frozen = pushedCycle.frozen
     const pushed = pushedCycle.pushed
     if (refused === 0) await journal.updateState({ lastSyncedAt: deps.clock.now(), updatedWhileOffline: memories })

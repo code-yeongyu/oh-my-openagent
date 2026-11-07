@@ -11,7 +11,7 @@ export function extractSkillTemplate(skill: LoadedSkill): string {
   if (skill.path) {
     const content = readSkillFileChecked(skill.path, skillProvenance(skill.path, skill.scope, skill.provenance))
     const { body } = parseFrontmatter(content)
-		return body.trim()
-	}
-	return skill.definition.template || ""
+    return body.trim()
+  }
+  return skill.definition.template || ""
 }

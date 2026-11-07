@@ -24,9 +24,7 @@ export function createRuntimeFallbackRetryTextPart(text: string) {
 export function isRuntimeFallbackRetryTextParts(
   parts: readonly RuntimeFallbackRetryTextPartLike[] | undefined,
 ): boolean {
-  return (parts ?? []).some((part) => (
-    part.type === "text"
-    && typeof part.text === "string"
-    && hasRuntimeFallbackRetryMarker(part.text)
-  ))
+  return (parts ?? []).some(
+    (part) => part.type === "text" && typeof part.text === "string" && hasRuntimeFallbackRetryMarker(part.text),
+  )
 }

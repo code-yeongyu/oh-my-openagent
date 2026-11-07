@@ -29,7 +29,11 @@ function blockFor(milliseconds: number): void {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds)
 }
 
-export async function removeTree(path: string, options: RemoveTreeOptions = {}, remove: RemoveAsync = removeRecursive): Promise<void> {
+export async function removeTree(
+  path: string,
+  options: RemoveTreeOptions = {},
+  remove: RemoveAsync = removeRecursive,
+): Promise<void> {
   const maxRetries = options.maxRetries ?? 10
   const retryDelay = options.retryDelay ?? 100
   for (let attempt = 0; ; attempt++) {
@@ -43,7 +47,11 @@ export async function removeTree(path: string, options: RemoveTreeOptions = {}, 
   }
 }
 
-export function removeTreeSync(path: string, options: RemoveTreeOptions = {}, remove: RemoveSync = removeRecursiveSync): void {
+export function removeTreeSync(
+  path: string,
+  options: RemoveTreeOptions = {},
+  remove: RemoveSync = removeRecursiveSync,
+): void {
   const maxRetries = options.maxRetries ?? 10
   const retryDelay = options.retryDelay ?? 100
   for (let attempt = 0; ; attempt++) {

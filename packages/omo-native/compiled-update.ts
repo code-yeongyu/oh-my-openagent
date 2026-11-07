@@ -12,7 +12,11 @@ export type PackageOwner = { readonly manager: "pacman" | "dpkg" | "rpm" | "brew
 export type ProbeOwner = (path: string, platform: NodeJS.Platform) => PackageOwner | undefined
 /** Runs one ownership query; undefined when the tool is missing, fails, or prints nothing. */
 export type RunOwnerQuery = (command: string, args: readonly string[]) => string | undefined
-export type CompiledUpdateResult = { readonly output: string; readonly exitCode: number; readonly stream?: "stdout" | "stderr" }
+export type CompiledUpdateResult = {
+  readonly output: string
+  readonly exitCode: number
+  readonly stream?: "stdout" | "stderr"
+}
 
 // omo-ai publishes betas as `5.0.0-0.beta.90` while the GitHub release is tagged `v5.0.0-beta.90`.
 export function releaseVersionOf(omoAiVersion: string): string {
@@ -20,9 +24,10 @@ export function releaseVersionOf(omoAiVersion: string): string {
 }
 
 export function releaseAssetName(releaseTarget: unknown, platform: NodeJS.Platform, arch: string): string {
-  const flavor = typeof releaseTarget === "string" && RELEASE_TARGET.test(releaseTarget)
-    ? releaseTarget
-    : `${platform === "win32" ? "windows" : platform}-${arch}`
+  const flavor =
+    typeof releaseTarget === "string" && RELEASE_TARGET.test(releaseTarget)
+      ? releaseTarget
+      : `${platform === "win32" ? "windows" : platform}-${arch}`
   return flavor.startsWith("windows-") ? `omo-${flavor}.exe` : `omo-${flavor}`
 }
 
@@ -33,7 +38,12 @@ function readRelease(release: unknown): { readonly version: string; readonly ass
   if (typeof tag !== "string" || !Array.isArray(assets)) throw new Error("GitHub release has no tag_name or assets")
   const version = tag.replace(/^v/, "")
   if (!RELEASE_VERSION.test(version)) return undefined
-  return { version, assets: assets.map((asset) => (typeof asset === "object" && asset !== null ? String(Reflect.get(asset, "name")) : "")) }
+  return {
+    version,
+    assets: assets.map((asset) =>
+      typeof asset === "object" && asset !== null ? String(Reflect.get(asset, "name")) : "",
+    ),
+  }
 }
 
 /**
@@ -79,9 +89,17 @@ const runOwnerQuery: RunOwnerQuery = (command, args) => {
  * The system package manager that owns `path`, or undefined. Fails open: a missing tool, a failed or slow
  * query, or an unowned path all fall back to the plain replace command (#9585).
  */
-export function probePackageOwner(path: string, platform: NodeJS.Platform, run: RunOwnerQuery = runOwnerQuery): PackageOwner | undefined {
+export function probePackageOwner(
+  path: string,
+  platform: NodeJS.Platform,
+  run: RunOwnerQuery = runOwnerQuery,
+): PackageOwner | undefined {
   let resolved = path
-  try { resolved = realpathSync(path) } catch { /* keep the given path */ }
+  try {
+    resolved = realpathSync(path)
+  } catch {
+    /* keep the given path */
+  }
   const nix = /^\/nix\/store\/[0-9a-z]{32}-([^/]+)\//.exec(resolved)
   if (nix !== null) return { manager: "nix", pkg: nix[1] }
   const cellar = /\/Cellar\/([^/]+)\//.exec(resolved)
@@ -139,9 +157,16 @@ export async function compiledUpdate(options: {
     target = pickUpdateVersion(current, await options.fetchReleases(), asset)
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error)
-    return { output: `omo update could not resolve a release (${reason}). Download ${asset} from ${RELEASES_URL}`, exitCode: 1 }
+    return {
+      output: `omo update could not resolve a release (${reason}). Download ${asset} from ${RELEASES_URL}`,
+      exitCode: 1,
+    }
   }
-  if (target === undefined) return { output: `omo ${current} is the newest ${current.includes("-") ? "beta" : "stable"} release`, exitCode: 0 }
+  if (target === undefined)
+    return { output: `omo ${current} is the newest ${current.includes("-") ? "beta" : "stable"} release`, exitCode: 0 }
   const command = replaceCommand(`${RELEASES_URL}/download/v${target}/${asset}`, options.destination, options.platform)
-  return { output: `omo ${target} is available (running ${current}). Replace this binary with:\n${command}`, exitCode: 0 }
+  return {
+    output: `omo ${target} is available (running ${current}). Replace this binary with:\n${command}`,
+    exitCode: 0,
+  }
 }

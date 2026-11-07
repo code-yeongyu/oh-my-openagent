@@ -48,9 +48,7 @@ function preparedSenpi() {
 
 async function spawnSenpi(args, withExtension) {
   const senpi = preparedSenpi()
-  const finalArgs = withExtension
-    ? ["--extension", join(packageRoot, "plugin"), ...args]
-    : args
+  const finalArgs = withExtension ? ["--extension", join(packageRoot, "plugin"), ...args] : args
   const env = senpiEnvironment(senpi.packageRoot)
   if (withExtension) withHerdrAgentHint(env, args)
   const handoff = privateFdHandoff(env)
@@ -148,7 +146,9 @@ export async function runLauncher(args = process.argv.slice(2)) {
   // The toolkit CLI is no longer part of the Native payload; the loop is driven in-process by the
   // eval SDK the extension publishes. Report that plainly instead of failing on a missing file.
   if (command === "ulw-loop") {
-    console.error('omo ulw-loop is unavailable in this build: use the agent toolkit SDK from an eval js cell: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); print(await agentToolkit.status()) (Codex keeps the standalone CLI).')
+    console.error(
+      'omo ulw-loop is unavailable in this build: use the agent toolkit SDK from an eval js cell: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); print(await agentToolkit.status()) (Codex keeps the standalone CLI).',
+    )
     process.exitCode = 2
     return
   }
@@ -195,14 +195,15 @@ export async function runLauncher(args = process.argv.slice(2)) {
       process.exitCode = await runDoctorModels(args.slice(2), { agentDir: canonicalAgentDir() })
       return
     }
-    const [categoryCoverage, computerUse, configDiagnostics, reflectionLock] = args[1] === "--reap"
-      ? [[], [], [], []]
-      : await Promise.all([
-          doctorCoverageLines({ agentDir: canonicalAgentDir() }),
-          doctorComputerUseLines(),
-          doctorConfigLines(),
-          reflectionLockReport(),
-        ])
+    const [categoryCoverage, computerUse, configDiagnostics, reflectionLock] =
+      args[1] === "--reap"
+        ? [[], [], [], []]
+        : await Promise.all([
+            doctorCoverageLines({ agentDir: canonicalAgentDir() }),
+            doctorComputerUseLines(),
+            doctorConfigLines(),
+            reflectionLockReport(),
+          ])
     runDoctor(await detectHarnesses(), args.slice(1), {
       daemonEngine: { run: engineHostCall },
       categoryCoverage,

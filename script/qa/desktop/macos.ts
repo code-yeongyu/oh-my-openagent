@@ -13,38 +13,56 @@ import { parseArgs } from "node:util"
 import { selfTestBinary, selfTestSandbox } from "./macos/agent"
 import { quitTextEdit, workDir } from "./macos/fixtures"
 import {
-  backgroundClickKeepsFocus, backgroundScrollOnce, backgroundTypeMultiwindowRefused,
-  backgroundTypeSoleWindow, foregroundRestores,
+  backgroundClickKeepsFocus,
+  backgroundScrollOnce,
+  backgroundTypeMultiwindowRefused,
+  backgroundTypeSoleWindow,
+  foregroundRestores,
 } from "./macos/scenarios-input"
-import {
-  canary, capabilitiesTruth, killswitchRealHid, preflight, screenshotBudget,
-} from "./macos/scenarios-safety"
+import { canary, capabilitiesTruth, killswitchRealHid, preflight, screenshotBudget } from "./macos/scenarios-safety"
 import { isScenarioName, SCENARIOS, type RunOptions, type ScenarioName, type ScenarioResult } from "./macos/scenario"
 import { tccDiagnostic } from "./macos/tcc"
 
 process.on("exit", () => rmSync(workDir, { recursive: true, force: true }))
 
-function assertNever(value: never): never { throw new TypeError(`unhandled scenario ${String(value)}`) }
+function assertNever(value: never): never {
+  throw new TypeError(`unhandled scenario ${String(value)}`)
+}
 function runScenario(name: ScenarioName, options: RunOptions): Promise<ScenarioResult> {
   switch (name) {
-    case "preflight": return preflight(options)
-    case "background-click-keeps-focus": return backgroundClickKeepsFocus(options)
-    case "background-type-sole-window": return backgroundTypeSoleWindow(options)
-    case "background-type-multiwindow-refused": return backgroundTypeMultiwindowRefused(options)
-    case "foreground-restores": return foregroundRestores(options)
-    case "background-scroll-once": return backgroundScrollOnce(options)
-    case "killswitch-real-hid": return killswitchRealHid(options)
-    case "tcc-diagnostic": return tccDiagnostic(options)
-    case "screenshot-budget": return screenshotBudget(options)
-    case "capabilities-truth": return capabilitiesTruth(options)
-    case "canary": return canary(options, "session")
-    case "canary-off": return canary(options, "off")
-    default: return assertNever(name)
+    case "preflight":
+      return preflight(options)
+    case "background-click-keeps-focus":
+      return backgroundClickKeepsFocus(options)
+    case "background-type-sole-window":
+      return backgroundTypeSoleWindow(options)
+    case "background-type-multiwindow-refused":
+      return backgroundTypeMultiwindowRefused(options)
+    case "foreground-restores":
+      return foregroundRestores(options)
+    case "background-scroll-once":
+      return backgroundScrollOnce(options)
+    case "killswitch-real-hid":
+      return killswitchRealHid(options)
+    case "tcc-diagnostic":
+      return tccDiagnostic(options)
+    case "screenshot-budget":
+      return screenshotBudget(options)
+    case "capabilities-truth":
+      return capabilitiesTruth(options)
+    case "canary":
+      return canary(options, "session")
+    case "canary-off":
+      return canary(options, "off")
+    default:
+      return assertNever(name)
   }
 }
 
 async function judged(name: ScenarioName, options: RunOptions): Promise<ScenarioResult> {
-  try { return await runScenario(name, options) } catch (error) {
+  try {
+    return await runScenario(name, options)
+  } catch (error) {
     if (!(error instanceof Error)) throw error
     return { scenario: name, pass: false, facts: { error: error.message } }
   }
@@ -79,9 +97,11 @@ if (values["self-test"]) {
   if (bin === undefined || !existsSync(bin)) throw new Error("set --senpi-bin or SENPI_BIN to the real Senpi binary")
   accessSync(bin, constants.X_OK)
   const options: RunOptions = {
-    senpiBin: resolve(bin), enginePath: values.engine === undefined ? undefined : resolve(values.engine),
+    senpiBin: resolve(bin),
+    enginePath: values.engine === undefined ? undefined : resolve(values.engine),
     forceForeground: values.sabotage === "force-foreground",
-    jetkvm: process.env.JETKVM, kvmShots: values["kvm-shots"],
+    jetkvm: process.env.JETKVM,
+    kvmShots: values["kvm-shots"],
   }
   const report = (result: ScenarioResult) =>
     console.log(values.json ? JSON.stringify(result) : `${result.pass ? "PASS" : "FAIL"} ${result.scenario}`)

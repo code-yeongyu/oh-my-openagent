@@ -11,30 +11,32 @@ describe("facts secret screening", () => {
   test("#given a batch whose planned content carries a vendor token #when the apply is refused #then the endpoint parks after one failure with the secret reason", async () => {
     // given: the child's own extraction succeeded, so the refusal must come from the commit gate
     const { root, identity, queue } = await fixture()
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
-      createRunner: () => ({
-        start: async (spec) => {
-          const tool = createFactsRecordTool({ exchanges: [], extractionPath: join(spec.cwd, "extraction.jsonl") })
-          await tool.execute("fact-1", {
-            scope: "project",
-            text: "the token is ghp_Ab3dEf5hJ7kL9mN1pQ3rS5tU7vW9xY1zB3C5",
-            date: "2026-08-10",
-          })
-          return {
-            task_id: spec.taskId,
-            sessionId: `session-${spec.taskId}`,
-            effectiveModel: () => undefined,
-            steer: async () => undefined,
-            followUp: async () => undefined,
-            abort: async () => undefined,
-            subscribe: () => () => undefined,
-            waitForIdle: async () => ({ status: "completed" as const, finalResponse: "" }),
-            lastAssistantText: () => undefined,
-            dispose: async () => undefined,
-          }
-        },
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        createRunner: () => ({
+          start: async (spec) => {
+            const tool = createFactsRecordTool({ exchanges: [], extractionPath: join(spec.cwd, "extraction.jsonl") })
+            await tool.execute("fact-1", {
+              scope: "project",
+              text: "the token is ghp_Ab3dEf5hJ7kL9mN1pQ3rS5tU7vW9xY1zB3C5",
+              date: "2026-08-10",
+            })
+            return {
+              task_id: spec.taskId,
+              sessionId: `session-${spec.taskId}`,
+              effectiveModel: () => undefined,
+              steer: async () => undefined,
+              followUp: async () => undefined,
+              abort: async () => undefined,
+              subscribe: () => () => undefined,
+              waitForIdle: async () => ({ status: "completed" as const, finalResponse: "" }),
+              lastAssistantText: () => undefined,
+              dispose: async () => undefined,
+            }
+          },
+        }),
       }),
-    }))
+    )
 
     // when
     const result = await runner.launchPending()

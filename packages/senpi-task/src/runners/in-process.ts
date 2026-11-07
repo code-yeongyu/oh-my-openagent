@@ -15,7 +15,11 @@ import {
   type ChildCompletionPolicy,
   type ChildSession,
 } from "./in-process/child-handle"
-import { buildChildSessionOptions, requireChildSessionDir, resolveMemberScopedToolNames } from "./in-process/child-options"
+import {
+  buildChildSessionOptions,
+  requireChildSessionDir,
+  resolveMemberScopedToolNames,
+} from "./in-process/child-options"
 import { assertPinnedModelHonoured } from "./in-process/pin-check"
 import { RunnerError } from "./in-process/runner-error"
 import type { ChildRetryOverride } from "./in-process/runtime-fallback-settings"
@@ -227,17 +231,18 @@ export class InProcessRunner {
     // The bare envelope is the opt-out from the subagent ancestry wrapper: the spec's prompt is the
     // whole user message, byte-identical. Every other value (including undefined) wraps it in the
     // task envelope, which is what all existing callers rely on.
-    const promptText = spec.promptEnvelope === "bare"
-      ? spec.prompt
-      : buildSubagentPrompt({
-        taskId: spec.taskId,
-        parentSessionId: spec.parentSessionId,
-        rootSessionId: spec.rootSessionId,
-        depth: spec.depth,
-        prompt: spec.prompt,
-        ...(spec.agentType !== undefined && { agentType: spec.agentType }),
-        ...(spec.instructions !== undefined && { instructions: spec.instructions }),
-      })
+    const promptText =
+      spec.promptEnvelope === "bare"
+        ? spec.prompt
+        : buildSubagentPrompt({
+            taskId: spec.taskId,
+            parentSessionId: spec.parentSessionId,
+            rootSessionId: spec.rootSessionId,
+            depth: spec.depth,
+            prompt: spec.prompt,
+            ...(spec.agentType !== undefined && { agentType: spec.agentType }),
+            ...(spec.instructions !== undefined && { instructions: spec.instructions }),
+          })
 
     let staged: { readonly handle: ChildHandle; begin(): void }
     try {
@@ -250,7 +255,10 @@ export class InProcessRunner {
     } catch (error) {
       this.#kernelToolBindings?.release(spec.taskId)
       await discardUnstartedChildSession(session).catch((shutdownError: unknown) => {
-        throw new AggregateError([error, shutdownError], "child handle construction failed, and shutting down its session failed")
+        throw new AggregateError(
+          [error, shutdownError],
+          "child handle construction failed, and shutting down its session failed",
+        )
       })
       throw error
     }
@@ -271,7 +279,8 @@ export class InProcessRunner {
   async resume(spec: ChildSpec, sessionPath: string): Promise<ChildHandle> {
     const yields = (spec.memberScopedTools ?? []).filter(isWorkpoolYieldTool)
     const memberScopedTools = resolveMemberScopedToolNames(spec.memberScopedToolNames ?? [], [
-      ...this.#sharedParentTools.filter(tool => tool.name !== "workpool"), ...yields,
+      ...this.#sharedParentTools.filter((tool) => tool.name !== "workpool"),
+      ...yields,
     ])
     assertUsableSessionFile(sessionPath)
 

@@ -101,6 +101,5 @@ export function toolCallEvents(callCount, name, callId, argsObj) {
 export function appendLog(logFile, line) {
   try {
     fs.appendFileSync(logFile, line)
-  } catch {
-  }
+  } catch {}
 }

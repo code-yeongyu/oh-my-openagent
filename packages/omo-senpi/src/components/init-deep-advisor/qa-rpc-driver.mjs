@@ -15,10 +15,12 @@ import {
   writeSnapshot,
 } from "./qa-rpc-support.mjs"
 
-const FROZEN_PLUGIN = "/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-senpi-onboarding-init-deep-advisor/packages/omo-senpi/plugin/extensions/omo.js"
+const FROZEN_PLUGIN =
+  "/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-senpi-onboarding-init-deep-advisor/packages/omo-senpi/plugin/extensions/omo.js"
 const mode = process.argv[2]
 if (mode !== "e" && mode !== "f") throw new Error("usage: qa-rpc-driver.mjs <e|f>")
-if (process.env.SENPI_BIN !== FROZEN_PLUGIN) throw new Error(`SENPI_BIN must be the frozen plugin path: ${FROZEN_PLUGIN}`)
+if (process.env.SENPI_BIN !== FROZEN_PLUGIN)
+  throw new Error(`SENPI_BIN must be the frozen plugin path: ${FROZEN_PLUGIN}`)
 if (!existsSync(FROZEN_PLUGIN)) throw new Error(`frozen plugin does not exist: ${FROZEN_PLUGIN}`)
 
 const result = mode === "e" ? await scenarioE() : await scenarioF()
@@ -69,7 +71,8 @@ async function scenarioF() {
     removeCooldown(fixture)
     const proposal = JSON.parse(readFileSync(proposalPath(fixture), "utf8"))
     const proposedHead = proposal.lastProposedHead
-    if (proposedHead !== gitText(fixture.repo, ["rev-parse", "HEAD"])) throw new Error("launch 1 did not persist proposed HEAD")
+    if (proposedHead !== gitText(fixture.repo, ["rev-parse", "HEAD"]))
+      throw new Error("launch 1 did not persist proposed HEAD")
 
     const second = await launchRpc(fixture, false)
     if (second.transcript.includes("omo-init-deep-advisor:run")) throw new Error("same-HEAD launch injected init-deep")
@@ -99,7 +102,11 @@ async function scenarioF() {
         shaA,
         proposedHead,
         newHead,
-        turns: [first, second, third].map((run) => ({ turnIndex: run.turnIndex, settledTurnIndex: run.settledTurnIndex, session: basename(run.session) })),
+        turns: [first, second, third].map((run) => ({
+          turnIndex: run.turnIndex,
+          settledTurnIndex: run.settledTurnIndex,
+          session: basename(run.session),
+        })),
       },
     }
   } finally {

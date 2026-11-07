@@ -6,7 +6,9 @@ import { composeOmoSenpiExtension } from "./compose"
 import type { ComponentLogger } from "./types"
 import extension from "./index"
 
-function createRecordingLogger(): ComponentLogger & { entries: Array<{ level: string; message: string; details?: unknown }> } {
+function createRecordingLogger(): ComponentLogger & {
+  entries: Array<{ level: string; message: string; details?: unknown }>
+} {
   const entries: Array<{ level: string; message: string; details?: unknown }> = []
   return {
     entries,
@@ -108,10 +110,7 @@ describe("omo-senpi extension entry", () => {
 
     await composeOmoSenpiExtension([createConfigWatchComponent()], { logger })(pi)
 
-    expect(pi.flags.map((flag) => flag.name)).toEqual([
-      "omo-senpi-disabled",
-      "omo-senpi-config-watch-disabled",
-    ])
+    expect(pi.flags.map((flag) => flag.name)).toEqual(["omo-senpi-disabled", "omo-senpi-config-watch-disabled"])
     expect(emitted).toEqual([])
     expect(logger.entries).toEqual([
       {

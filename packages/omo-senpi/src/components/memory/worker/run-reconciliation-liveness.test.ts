@@ -6,10 +6,7 @@ import { join } from "node:path"
 import { reconcileReflectionRuns } from "./run-reconciliation"
 import { writeRunJsonAtomic } from "./run-artifacts"
 import { exitedWithin, killIfAlive, captureIdentity } from "./process-liveness.test-support"
-import {
-  cleanupReconciliationFixtures,
-  reconciliationFixture as fixture,
-} from "./run-reconciliation.test-support"
+import { cleanupReconciliationFixtures, reconciliationFixture as fixture } from "./run-reconciliation.test-support"
 
 const sleepers: ChildProcess[] = []
 

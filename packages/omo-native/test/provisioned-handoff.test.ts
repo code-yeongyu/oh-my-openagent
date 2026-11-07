@@ -21,13 +21,18 @@ async function run(command: string[]): Promise<Run> {
   const env: Record<string, string | undefined> = { ...process.env, HOME: home, USERPROFILE: home }
   delete env.OMO_PROVISIONED_HANDOFF
   const child = Bun.spawn(command, { cwd: root, env, stdout: "pipe", stderr: "pipe" })
-  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ])
   return { code, stdout, stderr }
 }
 
 function report(result: Run): Report {
   const line = result.stdout.trim().split(/\r?\n/).at(-1) ?? ""
-  if (!line.startsWith("{")) throw new Error(`fixture printed no report (exit ${result.code}):\n${result.stdout}\n${result.stderr}`)
+  if (!line.startsWith("{"))
+    throw new Error(`fixture printed no report (exit ${result.code}):\n${result.stdout}\n${result.stderr}`)
   return JSON.parse(line) as Report
 }
 
@@ -76,13 +81,17 @@ describe("provisioned launch plan", () => {
     const propagated: unknown[] = []
     // when
     await handOffToProvisionedRuntime(expected, {
-      argv: ["-p", "hi"], env: { KEEP: "1" }, platform: "win32",
+      argv: ["-p", "hi"],
+      env: { KEEP: "1" },
+      platform: "win32",
       run: async (_file, _argv, options) => {
         seen.env = (options as { env?: NodeJS.ProcessEnv } | undefined)?.env
         seen.sigintListeners = process.listenerCount("SIGINT")
         return { status: 5, signal: null }
       },
-      propagate: (result: unknown) => { propagated.push(result) },
+      propagate: (result: unknown) => {
+        propagated.push(result)
+      },
     })
     // then
     expect(seen.env).toEqual({ KEEP: "1", [PROVISIONED_HANDOFF_ENV]: expected })

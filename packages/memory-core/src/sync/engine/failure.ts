@@ -6,7 +6,12 @@ import { StrandedGitLockError } from "../../git/repo-lock-sweep"
 import { SyncAuthError, SyncHttpError, SyncNetworkError } from "./adapters/http-transport"
 
 export type SyncFailure =
-  | { readonly kind: "stranded_lock"; readonly paths: readonly string[]; readonly reason: string; readonly action: string }
+  | {
+      readonly kind: "stranded_lock"
+      readonly paths: readonly string[]
+      readonly reason: string
+      readonly action: string
+    }
   | { readonly kind: "auth_expired"; readonly reason: string; readonly action: string }
   | { readonly kind: "offline"; readonly reason: string; readonly action: string }
   | { readonly kind: "unknown"; readonly reason: string; readonly action: string }
@@ -47,9 +52,10 @@ export function describeSyncFailure(error: unknown): SyncFailure {
       kind: "stranded_lock",
       paths: error.paths,
       reason: "A git lock file left in the memory repository blocks sync, and OmO did not remove it on its own.",
-      action: error.paths.length === 1
-        ? `If no other session is working on this memory, run /memory unlock ${error.paths[0]}, or restart OmO.`
-        : `If no other session is working on this memory, run /memory unlock for each: ${error.paths.join(", ")}; or restart OmO.`,
+      action:
+        error.paths.length === 1
+          ? `If no other session is working on this memory, run /memory unlock ${error.paths[0]}, or restart OmO.`
+          : `If no other session is working on this memory, run /memory unlock for each: ${error.paths.join(", ")}; or restart OmO.`,
     }
   }
   if (error instanceof SyncAuthError || (error instanceof SyncHttpError && error.status === 401)) return AUTH_EXPIRED

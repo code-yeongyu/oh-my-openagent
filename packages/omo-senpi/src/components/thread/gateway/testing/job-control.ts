@@ -23,13 +23,16 @@ export async function resumeProcess(pid: number): Promise<void> {
 }
 
 function isStopped(pid: number): boolean {
-  return execFileSync("ps", ["-o", "stat=", "-p", String(pid)], { encoding: "utf8", windowsHide: true }).trim().startsWith("T")
+  return execFileSync("ps", ["-o", "stat=", "-p", String(pid)], { encoding: "utf8", windowsHide: true })
+    .trim()
+    .startsWith("T")
 }
 
 async function untilState(pid: number, state: "stopped" | "running"): Promise<void> {
   const deadline = performance.now() + STATE_WAIT_MS
   while (isStopped(pid) !== (state === "stopped")) {
-    if (performance.now() > deadline) throw new Error(`process ${pid} did not report ${state} within ${STATE_WAIT_MS} ms after its signal`)
+    if (performance.now() > deadline)
+      throw new Error(`process ${pid} did not report ${state} within ${STATE_WAIT_MS} ms after its signal`)
     await Bun.sleep(POLL_MS)
   }
 }

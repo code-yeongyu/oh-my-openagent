@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { DEFAULT_PROMPT_QUEUE_RETRY_MS, releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
+import {
+  DEFAULT_PROMPT_QUEUE_RETRY_MS,
+  releaseAllPromptAsyncReservationsForTesting,
+} from "../../shared/prompt-async-gate"
 import { setPromptReservation } from "@oh-my-opencode/utils/prompt-async-gate/reservations"
 import { createAutoRetryHelpers } from "./auto-retry"
 import { createFallbackState } from "./fallback-state"
@@ -391,12 +394,7 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     const clock = installRuntimeFallbackTestClock()
 
     // when
-    const outcome = await helpers.autoRetryWithFallback(
-      sessionID,
-      "openai/gpt-5.4",
-      "sisyphus",
-      "session.status",
-    )
+    const outcome = await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", "sisyphus", "session.status")
     assistantIsActive = false
     await flushPromptGateMicrotasks()
     await clock.advanceBy(DEFAULT_PROMPT_QUEUE_RETRY_MS)
@@ -428,14 +426,15 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
         })
       }
       return new Promise((resolve) => {
-        releaseMessages = () => resolve({
-          data: [
-            {
-              info: { role: "user" },
-              parts: [{ type: "text", text: "retry this" }],
-            },
-          ],
-        })
+        releaseMessages = () =>
+          resolve({
+            data: [
+              {
+                info: { role: "user" },
+                parts: [{ type: "text", text: "retry this" }],
+              },
+            ],
+          })
       })
     }
     const helpers = createAutoRetryHelpers(deps)
@@ -491,12 +490,7 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
     const clock = installRuntimeFallbackTestClock()
 
     // when
-    const outcome = await helpers.autoRetryWithFallback(
-      sessionID,
-      "openai/gpt-5.4",
-      undefined,
-      "session.error",
-    )
+    const outcome = await helpers.autoRetryWithFallback(sessionID, "openai/gpt-5.4", undefined, "session.error")
     expect(outcome).toEqual({ accepted: true, status: "queued" })
     const replacementState = createFallbackState("google/gemini-2.5-pro")
     deps.sessionStates.set(sessionID, replacementState)
@@ -529,14 +523,15 @@ describe("createAutoRetryDispatcher reserved-session retry (#5109)", () => {
       if (messageCallCount === 1) {
         markLookupStarted?.()
         return new Promise((resolve) => {
-          releaseMessages = () => resolve({
-            data: [
-              {
-                info: { role: "user" },
-                parts: [{ type: "text", text: "retry this" }],
-              },
-            ],
-          })
+          releaseMessages = () =>
+            resolve({
+              data: [
+                {
+                  info: { role: "user" },
+                  parts: [{ type: "text", text: "retry this" }],
+                },
+              ],
+            })
         })
       }
       return Promise.resolve({

@@ -1,5 +1,10 @@
 import type { ChildModelRegistry, ParentState } from "@oh-my-opencode/senpi-task"
-import { RELEASE_RUN_FENCE, type EnginePauseState, type EngineRunHoldContext, type RunRef } from "../../../../senpi-task/src/pause/ports"
+import {
+  RELEASE_RUN_FENCE,
+  type EnginePauseState,
+  type EngineRunHoldContext,
+  type RunRef,
+} from "../../../../senpi-task/src/pause/ports"
 
 // Structural slice of senpi's ExtensionContext the task runtime reads. ExtensionContext satisfies it;
 // tests pass a tiny fake. `ui` lives on ExtensionContext (event/command contexts), NOT ExtensionAPI,

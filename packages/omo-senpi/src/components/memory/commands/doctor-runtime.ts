@@ -25,10 +25,7 @@ import { checkQuarantinedRuns, checkReceipts, type QuarantinedRun, type ReceiptS
 import { checkGhostReservation } from "./doctor-reservation"
 import { factsParkedCauseSummary } from "./facts-failure-cause"
 import { factsRemediationHint, formatFactsAdvisory, readFactsOverview } from "./facts-status"
-import {
-  formatSkillNameFrontmatterRepairReport,
-  repairMissingSkillNameFrontmatter,
-} from "./skill-frontmatter"
+import { formatSkillNameFrontmatterRepairReport, repairMissingSkillNameFrontmatter } from "./skill-frontmatter"
 import {
   requireIdentity,
   respond,
@@ -144,14 +141,25 @@ export async function runDoctor(deps: MemoryCommandDeps, ctx: MemoryCommandConte
     const report = formatSkillNameFrontmatterRepairReport(repaired)
     extra.push(
       `[info] skills: scanned ${repaired.scanned} skill file${repaired.scanned === 1 ? "" : "s"}`,
-      ...report.split("\n").filter((line) => line.length > 0).map((line) => `[info] skills: ${line}`),
+      ...report
+        .split("\n")
+        .filter((line) => line.length > 0)
+        .map((line) => `[info] skills: ${line}`),
     )
   }
 
   const level = worstLevel(checks)
   const notifyLevel = level === "fail" ? "error" : level === "warn" ? "warning" : "info"
   if (parsed.flags.has("json")) {
-    return respond(ctx, JSON.stringify(redactReportStrings({ identity: identity.identity, level, checks, audit, skills, receipts, quarantinedRuns }), null, 2), notifyLevel)
+    return respond(
+      ctx,
+      JSON.stringify(
+        redactReportStrings({ identity: identity.identity, level, checks, audit, skills, receipts, quarantinedRuns }),
+        null,
+        2,
+      ),
+      notifyLevel,
+    )
   }
   const lines = [
     `# Memory doctor: ${identity.identity}`,

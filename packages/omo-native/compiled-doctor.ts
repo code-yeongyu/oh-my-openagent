@@ -17,7 +17,12 @@ import { configDoctorLines } from "./config-doctor-runtime"
 import { claudeCodeDoctorLines } from "./claude-code-doctor"
 import { engineTrustDoctorLines, readEngineTrustRecords } from "./engine-trust-doctor"
 
-type DaemonEngine = { run(args: string[], options: { env: Record<string, string | undefined> }): { exitCode: number; stdout: string; stderr: string } }
+type DaemonEngine = {
+  run(
+    args: string[],
+    options: { env: Record<string, string | undefined> },
+  ): { exitCode: number; stdout: string; stderr: string }
+}
 
 export type CompiledDoctorOptions = {
   readonly env?: NodeJS.ProcessEnv
@@ -107,9 +112,20 @@ export async function runCompiledDoctor(input: CompiledDoctorInput): Promise<voi
   const launchSpec = launchSpecDoctorLines(join(input.execDir, "plugin"))
   if (launchSpec.some((line) => line.startsWith("FAIL "))) failed = true
   lines.push(...launchSpec)
-  lines.push(...(input.options?.keychainHelperLines?.() ?? keychainHelperDoctorLines({ packageRoot: input.execDir, helperRelPath: "omo-keychain" })))
+  lines.push(
+    ...(input.options?.keychainHelperLines?.() ??
+      keychainHelperDoctorLines({ packageRoot: input.execDir, helperRelPath: "omo-keychain" })),
+  )
   if (input.engine !== undefined) {
-    lines.push(...daemonReportLines({ engine: input.engine, pluginRoot: join(input.execDir, "plugin"), agentDir: canonicalAgentDir(), env: process.env, platform: process.platform }))
+    lines.push(
+      ...daemonReportLines({
+        engine: input.engine,
+        pluginRoot: join(input.execDir, "plugin"),
+        agentDir: canonicalAgentDir(),
+        env: process.env,
+        platform: process.platform,
+      }),
+    )
   }
   lines.push(...migrationReport({ ...options, standalone: true }, null))
   lines.push(...warningsForSettings())
@@ -117,11 +133,12 @@ export async function runCompiledDoctor(input: CompiledDoctorInput): Promise<voi
   lines.push(...piConfigReport({ env: options.env, homeDir: options.homeDir }))
   lines.push(...staleEngineReport(options))
   lines.push(...transientMemoryReport({ env }))
-  lines.push(...await trustLines(options))
+  lines.push(...(await trustLines(options)))
   const [computerUse, coverage] = await Promise.all([computerUseLines(input, env), coverageLines(input, env)])
   if (computerUse.some((line) => line.startsWith("FAIL "))) failed = true
   lines.push(...computerUse, ...claudeCodeDoctorLines({ runtimeDir: input.execDir, env }), ...coverage)
-  if (needsSetupSuggestion(input.inventory)) lines.push("INFO no credentials found; run omo setup to review sibling stores")
+  if (needsSetupSuggestion(input.inventory))
+    lines.push("INFO no credentials found; run omo setup to review sibling stores")
   console.log(lines.join("\n"))
   process.exitCode = failed ? 1 : 0
 }

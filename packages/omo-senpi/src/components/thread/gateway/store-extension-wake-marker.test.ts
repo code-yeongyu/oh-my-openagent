@@ -9,7 +9,10 @@ import type { GatewayStore } from "./store"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 
 let harness: GatewayHarness | undefined
-afterEach(async () => { await harness?.dispose(); harness = undefined })
+afterEach(async () => {
+  await harness?.dispose()
+  harness = undefined
+})
 const moduleUrl = new URL("./testing/extension-lifecycle.mjs", import.meta.url).href
 const bind = (session: string) => ({
   principal: "fixture",
@@ -17,7 +20,10 @@ const bind = (session: string) => ({
 })
 
 /** Reads `stream` until a whole line equals `line`; `found` is false when the stream ends first. */
-async function readUntilLine(stream: ReadableStream<Uint8Array>, line: string): Promise<{ found: boolean; text: string }> {
+async function readUntilLine(
+  stream: ReadableStream<Uint8Array>,
+  line: string,
+): Promise<{ found: boolean; text: string }> {
   const reader = stream.getReader()
   const decoder = new TextDecoder()
   let text = ""
@@ -47,14 +53,21 @@ test("#given a blocked inbox path #when a joined enqueue commits #then the call 
     const refused = await store.extensionCall("alpha", "enqueuePair", [bind("blocked")])
     expect(refused).toMatchObject({ kind: "refused" })
     expect(await store.list()).toEqual([])
-    expect(events.filter((event) => typeof event === "object" && event !== null && (event as { kind?: unknown }).kind === "extension_error")).toEqual([])
+    expect(
+      events.filter(
+        (event) =>
+          typeof event === "object" && event !== null && (event as { kind?: unknown }).kind === "extension_error",
+      ),
+    ).toEqual([])
     rmSync(blockedPath)
     const outcome = await store.extensionCall("alpha", "enqueuePair", [bind("blocked")])
     expect(outcome).toMatchObject({ kind: "ok", value: [{ kind: "ok" }] })
     const rows = await store.list()
     expect(rows).toHaveLength(1)
     expect(readdirSync(blockedPath)).toEqual([rows[0]?.delivery_id])
-  } finally { remove() }
+  } finally {
+    remove()
+  }
 })
 
 test("#given an extension enqueue #when a later statement fails #then rollback removes the eagerly created wake marker", async () => {
@@ -71,10 +84,22 @@ test("#given an extension enqueue #when a later statement fails #then rollback r
 
 test("#given the afterDbCommit seam #when a joined enqueue reaches COMMIT #then its wake marker already exists", async () => {
   const agentDir = mkdtempSync(join(tmpdir(), "gateway-wake-"))
-  const child = Bun.spawn([process.execPath, fileURLToPath(new URL("./testing/extension-wake-driver.mjs", import.meta.url)), "commitHook", agentDir], { stdout: "pipe", stderr: "pipe" })
+  const child = Bun.spawn(
+    [
+      process.execPath,
+      fileURLToPath(new URL("./testing/extension-wake-driver.mjs", import.meta.url)),
+      "commitHook",
+      agentDir,
+    ],
+    { stdout: "pipe", stderr: "pipe" },
+  )
   const watchdog = setTimeout(() => child.kill(), 10_000)
   try {
-    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    const [code, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ])
     expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
     const lines = stdout.trim().split("\n")
     expect(JSON.parse(lines[0] ?? "")).toEqual({ markerAtCommit: true })
@@ -90,10 +115,22 @@ test("#given the afterDbCommit seam #when a joined enqueue reaches COMMIT #then 
 test("#given a crash after COMMIT #when the store reopens #then the committed delivery keeps its wake marker", async () => {
   const h = (harness = createGatewayHarness())
   const agentDir = mkdtempSync(join(tmpdir(), "gateway-wake-"))
-  const child = Bun.spawn([process.execPath, fileURLToPath(new URL("./testing/extension-wake-driver.mjs", import.meta.url)), "crashAfterCommit", agentDir], { stdout: "pipe", stderr: "pipe" })
+  const child = Bun.spawn(
+    [
+      process.execPath,
+      fileURLToPath(new URL("./testing/extension-wake-driver.mjs", import.meta.url)),
+      "crashAfterCommit",
+      agentDir,
+    ],
+    { stdout: "pipe", stderr: "pipe" },
+  )
   const watchdog = setTimeout(() => child.kill(), 10_000)
   try {
-    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    const [code, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+    ])
     expect({ code, stderr }).toEqual({ code: 0, stderr: "" })
     const reported = JSON.parse(stdout.trim().split("\n").at(-1) ?? "")
     expect(reported).toMatchObject({ outcome: { kind: "ok", value: [{ kind: "ok" }] } })
@@ -120,7 +157,15 @@ test("#given a crash between marker and COMMIT #when the store reopens #then rec
   const h = (harness = createGatewayHarness())
   const agentDir = mkdtempSync(join(tmpdir(), "gateway-wake-"))
   const inbox = gatewayInboxDirectory(agentDir, "target")
-  const child = Bun.spawn([process.execPath, fileURLToPath(new URL("./testing/extension-wake-driver.mjs", import.meta.url)), "crashBeforeCommit", agentDir], { stdout: "pipe", stderr: "pipe" })
+  const child = Bun.spawn(
+    [
+      process.execPath,
+      fileURLToPath(new URL("./testing/extension-wake-driver.mjs", import.meta.url)),
+      "crashBeforeCommit",
+      agentDir,
+    ],
+    { stdout: "pipe", stderr: "pipe" },
+  )
   const watchdog = setTimeout(() => child.kill(), 15_000)
   let store: GatewayStore | undefined
   try {
@@ -128,13 +173,22 @@ test("#given a crash between marker and COMMIT #when the store reopens #then rec
     // A recursive watch on the inbox is not used: on macOS it is FSEvents-backed and can drop a create made by another
     // process right after the watch is armed, so the wait timed out with the marker already written (#12455).
     const enqueued = await readUntilLine(child.stdout, "ENQUEUED")
-    if (!enqueued.found) throw new Error(`the driver ended before its joined enqueue returned: stdout=${JSON.stringify(enqueued.text)} stderr=${JSON.stringify(await new Response(child.stderr).text())}`)
+    if (!enqueued.found)
+      throw new Error(
+        `the driver ended before its joined enqueue returned: stdout=${JSON.stringify(enqueued.text)} stderr=${JSON.stringify(await new Response(child.stderr).text())}`,
+      )
     expect(readdirSync(inbox)).toHaveLength(1)
     child.kill()
     await child.exited
     store = h.store({ agentDir })
     const self = await store.identity()
-    await store.reconcile({ now: Date.now(), target_durable_id: "target", self, ledger: { pending: [], emitted: [] }, session_path: null })
+    await store.reconcile({
+      now: Date.now(),
+      target_durable_id: "target",
+      self,
+      ledger: { pending: [], emitted: [] },
+      session_path: null,
+    })
     expect(await store.list()).toEqual([])
     expect(existsSync(inbox) && readdirSync(inbox).length > 0).toBe(false)
   } finally {

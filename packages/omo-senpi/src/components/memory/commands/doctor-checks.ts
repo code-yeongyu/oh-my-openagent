@@ -7,7 +7,14 @@ import { readdir, readFile } from "@oh-my-opencode/memory-core/fs"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { V1_PERSONA_SEED_SHA256, auditMemoryRepo, isMemoryContentPath, parseLockRecord, readReflectionParkFile, type MemoryAuditReport } from "@oh-my-opencode/memory-core"
+import {
+  V1_PERSONA_SEED_SHA256,
+  auditMemoryRepo,
+  isMemoryContentPath,
+  parseLockRecord,
+  readReflectionParkFile,
+  type MemoryAuditReport,
+} from "@oh-my-opencode/memory-core"
 
 import {
   locateReflectionChildLog,
@@ -64,17 +71,22 @@ export async function checkFrontmatter(repoDir: string, audit?: MemoryAuditRepor
   // Only the frontmatter contract (the set the pre-commit hook validates); root files such as
   // ARCHIVE.md and notes/ are outside it.
   const paths = (await listMarkdown(repoDir, "")).filter(isMemoryContentPath)
-  const failures = (audit ?? await auditMemoryRepo(repoDir)).issues
+  const failures = (audit ?? (await auditMemoryRepo(repoDir))).issues
     .filter((issue) => issue.code === "frontmatter_invalid")
     .map((issue) => `${issue.path} (${issue.detail})`)
 
-  const frontmatter: DoctorCheck = failures.length === 0
-    ? { name: "frontmatter", level: "ok", detail: `${paths.length} memory file${paths.length === 1 ? "" : "s"} valid` }
-    : {
-        name: "frontmatter",
-        level: "fail",
-        detail: `${failures.length} invalid file${failures.length === 1 ? "" : "s"}: ${failures.join("; ")}; fix the frontmatter or remove the file`,
-      }
+  const frontmatter: DoctorCheck =
+    failures.length === 0
+      ? {
+          name: "frontmatter",
+          level: "ok",
+          detail: `${paths.length} memory file${paths.length === 1 ? "" : "s"} valid`,
+        }
+      : {
+          name: "frontmatter",
+          level: "fail",
+          detail: `${failures.length} invalid file${failures.length === 1 ? "" : "s"}: ${failures.join("; ")}; fix the frontmatter or remove the file`,
+        }
 
   const persona: DoctorCheck = paths.includes(PERSONA_PATH)
     ? { name: "persona", level: "ok", detail: `${PERSONA_PATH} present` }
@@ -136,10 +148,7 @@ export async function checkLocks(deps: MemoryCommandDeps, locksDir: string): Pro
   }
 }
 
-export async function checkWorktrees(
-  deps: MemoryCommandDeps,
-  identity: MemoryCommandIdentity,
-): Promise<DoctorCheck> {
+export async function checkWorktrees(deps: MemoryCommandDeps, identity: MemoryCommandIdentity): Promise<DoctorCheck> {
   const { repo, worktrees } = identity.identityPaths
   if (!existsSync(join(repo, ".git"))) {
     return { name: "worktrees", level: "ok", detail: "no repository to inspect" }
@@ -203,7 +212,8 @@ export async function checkAbandonedRuns(reflectionDir: string): Promise<DoctorC
   const abandoned: string[] = []
   for (const entry of entries) {
     const sentinel = join(runsDir, entry.name, "abandoned.json")
-    if (entry.isDirectory() && existsSync(sentinel) && !(await isInterruptedLaunch(sentinel))) abandoned.push(join(runsDir, entry.name))
+    if (entry.isDirectory() && existsSync(sentinel) && !(await isInterruptedLaunch(sentinel)))
+      abandoned.push(join(runsDir, entry.name))
   }
   abandoned.sort()
   if (abandoned.length === 0) return { name: "abandoned-runs", level: "ok", detail: "no abandoned runs" }
@@ -238,7 +248,11 @@ export async function checkReflectionHealth(
     }
   }
   const failure = health.lastFailure
-  const hint = reflectionRemediation(failure?.reason, failure?.detail, await locateReflectionChildLog(reflectionDir, failure?.runId))
+  const hint = reflectionRemediation(
+    failure?.reason,
+    failure?.detail,
+    await locateReflectionChildLog(reflectionDir, failure?.runId),
+  )
   const paused = await describeReflectionPark(reflectionDir)
   return {
     name: "reflection-health",
@@ -257,7 +271,11 @@ async function describeReflectionPark(reflectionDir: string): Promise<string> {
   }
 }
 
-export async function checkTokens(repoDir: string, warnTokens: number, estimate?: SystemTokenEstimate): Promise<DoctorCheck> {
+export async function checkTokens(
+  repoDir: string,
+  warnTokens: number,
+  estimate?: SystemTokenEstimate,
+): Promise<DoctorCheck> {
   estimate ??= await estimateSystemTokens(repoDir)
   if (estimate.totalTokens < warnTokens) {
     return {

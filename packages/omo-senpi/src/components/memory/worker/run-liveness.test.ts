@@ -9,8 +9,10 @@ describe("run process liveness across start-identity schemes", () => {
   test("#given a run deadline minutes away #when its observer cancels #then the timer wait rejects immediately", async () => {
     const controller = new AbortController()
     const reason = new Error("observer deadline")
-    const pending = waitUntil(Date.now() + 60_000, Date.now, controller.signal)
-      .then(() => undefined, (error: unknown) => error)
+    const pending = waitUntil(Date.now() + 60_000, Date.now, controller.signal).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
     controller.abort(reason)
     expect(await pending).toBe(reason)
   })

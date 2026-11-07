@@ -4,7 +4,14 @@ import { SOCKET_FILE } from "./local-api/access.ts"
 import { connectLocalApi, type ConnectOptions, type LocalApiClient } from "./local-api/client.ts"
 import { connectLocal, ENDPOINT_FILE } from "./local-api/transport.ts"
 import type { ListingResult, ListingRevision } from "./local-api/client-assembly.ts"
-import type { Capability, ControlAttachState, DeviceRef, DeviceRow, SessionFilter, Status } from "./local-api/protocol.ts"
+import type {
+  Capability,
+  ControlAttachState,
+  DeviceRef,
+  DeviceRow,
+  SessionFilter,
+  Status,
+} from "./local-api/protocol.ts"
 import { type CommandResult, openAttach, PROGRESS_STATES, type RemoteAttach } from "./remote-attach.ts"
 import { followDelegatedChannel } from "./delegated-channel.ts"
 import { LocalApiError } from "./local-api/errors.ts"
@@ -16,7 +23,12 @@ import { randomBytes } from "node:crypto"
 // "Delegated commands"), so the client bounds its own wait.
 const ENDPOINT_COMMAND_WAIT_MS = 120_000
 
-function sendToEndpoint(client: LocalApiClient, device: string, endpoint: string, rpc: CommandRpc): Promise<CommandResult> {
+function sendToEndpoint(
+  client: LocalApiClient,
+  device: string,
+  endpoint: string,
+  rpc: CommandRpc,
+): Promise<CommandResult> {
   return new Promise<CommandResult>((resolve, reject) => {
     // Minted before sending, so a state that arrives ahead of the answer is not missed.
     const commandId = randomBytes(16).toString("base64url")
@@ -33,7 +45,7 @@ function sendToEndpoint(client: LocalApiClient, device: string, endpoint: string
       settle()
       reject(error)
     }
-    const stop = client.onEvent(event => {
+    const stop = client.onEvent((event) => {
       channel.accept(event)
       if (done || event.kind !== "session.command_state" || event.command_id !== commandId) return
       if (PROGRESS_STATES.has(event.state)) return
@@ -41,7 +53,10 @@ function sendToEndpoint(client: LocalApiClient, device: string, endpoint: string
       settle()
       resolve(response === undefined ? { outcome: event } : { outcome: event, response })
     })
-    const timer = setTimeout(() => fail(new Error(`no final state for endpoint command ${commandId} within ${ENDPOINT_COMMAND_WAIT_MS} ms`)), ENDPOINT_COMMAND_WAIT_MS)
+    const timer = setTimeout(
+      () => fail(new Error(`no final state for endpoint command ${commandId} within ${ENDPOINT_COMMAND_WAIT_MS} ms`)),
+      ENDPOINT_COMMAND_WAIT_MS,
+    )
     timer.unref?.()
     void client.closed.then(() => fail(new Error("the connection closed before the endpoint command settled")))
     client.endpointCommand(device, endpoint, rpc, commandId).catch(fail)
@@ -121,7 +136,10 @@ export type DeviceService = {
   readonly thisDevice: () => Promise<DeviceRef | null>
   readonly devices: () => Promise<readonly DeviceRow[]>
   /** One listing round across the account's devices; `onRevision` sees each complete revision as it lands. */
-  readonly sessions: (filter?: SessionFilter, onRevision?: (revision: ListingRevision) => void) => Promise<ListingResult>
+  readonly sessions: (
+    filter?: SessionFilter,
+    onRevision?: (revision: ListingRevision) => void,
+  ) => Promise<ListingResult>
   readonly attach: (device: string, sessionId: string) => Promise<RemoteAttach>
   /**
    * Sends one session-less engine record (`open_session`, `list_sessions`, ...) to `device`'s engine endpoint with no
@@ -172,8 +190,8 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     capabilities: client.welcome.capabilities,
     initialStatus: client.welcome.state,
     status: () => client.request("status.get", {}),
-    watchStatus: async listener => {
-      const stop = client.onEvent(event => {
+    watchStatus: async (listener) => {
+      const stop = client.onEvent((event) => {
         if (event.kind === "status.changed") listener(event.status)
       })
       try {
@@ -184,16 +202,21 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
       }
       return stop
     },
-    setEnabled: async enabled => (await client.request("service.set_enabled", { enabled })).enabled,
+    setEnabled: async (enabled) => (await client.request("service.set_enabled", { enabled })).enabled,
     attachControl: () => client.request("control.attach.get", {}),
-    setAttachControl: attached => client.request("control.attach.set", { attached }),
+    setAttachControl: (attached) => client.request("control.attach.set", { attached }),
     registerRefresher: async (binaryPath, version) => {
       await client.request("refresher.register", { binary_path: binaryPath, version })
     },
     adopt: async ({ device, signingPrivateKey, sealingPrivateKey }) =>
-      (await client.request("device.adopt", { device, signing_private_key: signingPrivateKey, sealing_private_key: sealingPrivateKey }))
-        .device,
-    registerEndpoints: async agentDir => {
+      (
+        await client.request("device.adopt", {
+          device,
+          signing_private_key: signingPrivateKey,
+          sealing_private_key: sealingPrivateKey,
+        })
+      ).device,
+    registerEndpoints: async (agentDir) => {
       await client.request("endpoints.register", { agent_dir: agentDir })
     },
     forget: async () => {
@@ -212,7 +235,8 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
       } catch (error) {
         throw markNotSent(error)
       }
-      if (endpoint === undefined) throw new LocalApiError("unsupported", "the device lists no engine endpoint", { not_sent: true })
+      if (endpoint === undefined)
+        throw new LocalApiError("unsupported", "the device lists no engine endpoint", { not_sent: true })
       return await sendToEndpoint(client, device, endpoint, rpc)
     },
     close: () => client.close(),

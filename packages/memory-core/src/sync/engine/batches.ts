@@ -20,7 +20,8 @@ export function splitBatches(items: readonly WireItem[], limit = MAX_BATCH_BYTES
   let size = 0
   for (const item of items) {
     const bytes = plaintextBytes(item)
-    if (bytes > limit) throw new OversizedItemError(`item ${item.key} (${bytes} bytes) exceeds the ${limit}-byte batch bound`)
+    if (bytes > limit)
+      throw new OversizedItemError(`item ${item.key} (${bytes} bytes) exceeds the ${limit}-byte batch bound`)
     if (current.length > 0 && size + bytes > limit) {
       batches.push(current)
       current = []

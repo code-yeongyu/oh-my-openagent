@@ -9,7 +9,19 @@ import { resolveProvenance } from "./provenance-resolver"
 import type { GatewayStore } from "./store-api"
 export type { Deduplicated, DeliveryView, GatewayStore, OutboxPage, ReceiptScope } from "./store-api"
 import { createExtensionFacade, type ExtensionRegisterReply, type RetainedRegistration } from "./store-extension-facade"
-export type { DeclaredSessionOp, SessionCallableOp, SessionCaller, StoreExtensionApi, StoreExtensionOperation, StoreExtensionRefusal, StoreExtensionRefusalCode, StoreExtensionRegistration, StoreExtensionResult, StoreExtensionSessionApi, StoreExtensionTransaction } from "./store-extensions"
+export type {
+  DeclaredSessionOp,
+  SessionCallableOp,
+  SessionCaller,
+  StoreExtensionApi,
+  StoreExtensionOperation,
+  StoreExtensionRefusal,
+  StoreExtensionRefusalCode,
+  StoreExtensionRegistration,
+  StoreExtensionResult,
+  StoreExtensionSessionApi,
+  StoreExtensionTransaction,
+} from "./store-extensions"
 import type { GatewayStoreConfig, GatewayStoreEvent, GatewayStoreTestHooks, ProcessIdentity, Provenance } from "./types"
 
 export type GatewayStoreOptions = {
@@ -54,13 +66,27 @@ export function gatewayStoreWorkerUrl(moduleUrl: string | URL = import.meta.url)
   return existsSync(fileURLToPath(bundled)) ? bundled : new URL("./store-worker.ts", moduleUrl)
 }
 
-type Pending = { readonly worker: Worker; readonly resolve: (value: unknown) => void; readonly reject: (error: Error) => void }
+type Pending = {
+  readonly worker: Worker
+  readonly resolve: (value: unknown) => void
+  readonly reject: (error: Error) => void
+}
 
 type WorkerMessage =
-  | { readonly type: "resolve"; readonly id: number; readonly address: string; readonly request: Parameters<GatewayResolve>[1] }
+  | {
+      readonly type: "resolve"
+      readonly id: number
+      readonly address: string
+      readonly request: Parameters<GatewayResolve>[1]
+    }
   | { readonly type: "provenance"; readonly id: number }
   | { readonly type: "response"; readonly id: number; readonly ok: true; readonly value: unknown }
-  | { readonly type: "response"; readonly id: number; readonly ok: false; readonly error: { readonly message: string; readonly stack?: string; readonly code?: string } }
+  | {
+      readonly type: "response"
+      readonly id: number
+      readonly ok: false
+      readonly error: { readonly message: string; readonly stack?: string; readonly code?: string }
+    }
   | { readonly type: "event"; readonly event: GatewayStoreEvent }
 
 /**
@@ -148,15 +174,36 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     spawned.on("message", (message: WorkerMessage) => {
       if (message.type === "provenance") {
         void (options.senderProvenance?.() ?? resolveProvenance({ cwd: process.cwd() })).then(
-          (value) => { if (worker === spawned) spawned.postMessage({ type: "provenance_resolved", id: message.id, ok: true, value }) },
-          (error: unknown) => { if (worker === spawned) spawned.postMessage({ type: "provenance_resolved", id: message.id, ok: false, error: error instanceof Error ? error.message : String(error) }) },
+          (value) => {
+            if (worker === spawned)
+              spawned.postMessage({ type: "provenance_resolved", id: message.id, ok: true, value })
+          },
+          (error: unknown) => {
+            if (worker === spawned)
+              spawned.postMessage({
+                type: "provenance_resolved",
+                id: message.id,
+                ok: false,
+                error: error instanceof Error ? error.message : String(error),
+              })
+          },
         )
         return
       }
       if (message.type === "resolve") {
         void resolveExtensionTarget(message.address, message.request).then(
-          (value) => { if (worker === spawned) spawned.postMessage({ type: "resolution", id: message.id, ok: true, value }) },
-          (error: unknown) => { if (worker === spawned) spawned.postMessage({ type: "resolution", id: message.id, ok: false, error: error instanceof Error ? error.message : String(error) }) },
+          (value) => {
+            if (worker === spawned) spawned.postMessage({ type: "resolution", id: message.id, ok: true, value })
+          },
+          (error: unknown) => {
+            if (worker === spawned)
+              spawned.postMessage({
+                type: "resolution",
+                id: message.id,
+                ok: false,
+                error: error instanceof Error ? error.message : String(error),
+              })
+          },
         )
         return
       }
@@ -169,7 +216,13 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
       pending.delete(message.id)
       if (pending.size === 0) spawned.unref()
       if (message.ok) entry.resolve(message.value)
-      else entry.reject(Object.assign(new Error(message.error.message), { workerStack: message.error.stack, ...(message.error.code === undefined ? {} : { code: message.error.code }) }))
+      else
+        entry.reject(
+          Object.assign(new Error(message.error.message), {
+            workerStack: message.error.stack,
+            ...(message.error.code === undefined ? {} : { code: message.error.code }),
+          }),
+        )
     })
     spawned.on("error", (error: unknown) => failAll(spawned, error instanceof Error ? error : new Error(String(error))))
     // A worker that exits (a crash, or the termination after a failed open) takes its open with it:
@@ -182,12 +235,21 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
       failAll(spawned, new Error(`the gateway store worker exited (${code})`))
     })
     options._test?.onWorkerStarted?.(spawned)
-    const attempt = (post("init", { config, now: now() }) as Promise<{ readonly self: ProcessIdentity; readonly legacy_migrated: number }>).then(async (value) => {
+    const attempt = (
+      post("init", { config, now: now() }) as Promise<{
+        readonly self: ProcessIdentity
+        readonly legacy_migrated: number
+      }>
+    ).then(async (value) => {
       // A fresh worker holds no extension registrations: restore the ones its predecessor held
       // before any call reaches it, keeping only those the new worker holds in turn. Each is replayed
       // as of its registration time, so it never overwrites a newer one another process persisted.
       for (const [name, { extension, registeredAt }] of registrations) {
-        const reply = (await post("extension_register", { extension, now: now(), restored_at: registeredAt })) as ExtensionRegisterReply
+        const reply = (await post("extension_register", {
+          extension,
+          now: now(),
+          restored_at: registeredAt,
+        })) as ExtensionRegisterReply
         if (!reply.retained) registrations.delete(name)
       }
       return value
@@ -237,7 +299,10 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     const closing: Promise<void> = post("close", null, idle)
       .catch(() => undefined)
       .then(() => idle.terminate())
-      .then(() => options._test?.onWorkerRetired?.(idle), () => options._test?.onWorkerRetired?.(idle))
+      .then(
+        () => options._test?.onWorkerRetired?.(idle),
+        () => options._test?.onWorkerRetired?.(idle),
+      )
       .finally(() => {
         if (retiring === closing) retiring = undefined
       })
@@ -264,7 +329,13 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     })
   }
 
-  const extensions = createExtensionFacade({ agentDir: options.agentDir, now, call, registrations, ...(options._test?.onAwaitArmed === undefined ? {} : { onAwaitArmed: options._test.onAwaitArmed }) })
+  const extensions = createExtensionFacade({
+    agentDir: options.agentDir,
+    now,
+    call,
+    registrations,
+    ...(options._test?.onAwaitArmed === undefined ? {} : { onAwaitArmed: options._test.onAwaitArmed }),
+  })
 
   return {
     ...extensions,

@@ -6,7 +6,11 @@ import { join } from "node:path"
 import { parse as parseYaml } from "yaml"
 import { GitMemoryRepo, type GitCommitAuthor } from "../git"
 import { parseMemoryFile } from "./frontmatter"
-import { MAX_DESCRIPTION_LENGTH, describeFrontmatterGrammarViolation, describeFrontmatterViolation } from "./frontmatter-validation"
+import {
+  MAX_DESCRIPTION_LENGTH,
+  describeFrontmatterGrammarViolation,
+  describeFrontmatterViolation,
+} from "./frontmatter-validation"
 import { installHooks } from "./hooks"
 import { normalizeMemoryFrontmatter } from "./normalize"
 import { removeTree } from "../../../../test-support/remove-tree"
@@ -41,7 +45,11 @@ async function strictFrontmatter(repo: GitMemoryRepo, path: string): Promise<Rec
 describe("normalizeMemoryFrontmatter", () => {
   it("#given legacy files beside a clean one #when normalized #then only the legacy files are rewritten in one commit and content is preserved", async () => {
     // #given
-    const repo = await fixture({ "reference/note.md": LEGACY_NOTE, "skills/deploy/SKILL.md": LEGACY_SKILL, "system/clean.md": CLEAN })
+    const repo = await fixture({
+      "reference/note.md": LEGACY_NOTE,
+      "skills/deploy/SKILL.md": LEGACY_SKILL,
+      "system/clean.md": CLEAN,
+    })
     installHooks(repo.dir)
     const before = {
       note: parseMemoryFile(LEGACY_NOTE),
@@ -88,7 +96,11 @@ describe("normalizeMemoryFrontmatter", () => {
 
   it("#given a legacy commit landing after a normalization #when normalized #then only the files changed since the last pass are examined", async () => {
     // #given
-    const repo = await fixture({ "reference/a.md": LEGACY_NOTE, "reference/b.md": LEGACY_NOTE, "reference/c.md": LEGACY_NOTE })
+    const repo = await fixture({
+      "reference/a.md": LEGACY_NOTE,
+      "reference/b.md": LEGACY_NOTE,
+      "reference/c.md": LEGACY_NOTE,
+    })
     expect((await normalizeMemoryFrontmatter(repo, AUTHOR)).rewritten).toHaveLength(3)
     await writeFile(join(repo.dir, "reference/later.md"), LEGACY_NOTE.replace("note body", "later"))
     await repo.commitWrite(["reference/later.md"], "raw write from an older writer", AUTHOR)
@@ -132,7 +144,9 @@ describe("normalizeMemoryFrontmatter", () => {
     expect(result.rewritten).toEqual(["reference/swallowed.md"])
     const after = await readFile(join(repo.dir, "reference/swallowed.md"), "utf8")
     expect(describeFrontmatterGrammarViolation(after)).toBeNull()
-    expect(parseYaml(after.slice(4, after.indexOf("\n---", 4))).description).toBe(parseMemoryFile(long).frontmatter.description)
+    expect(parseYaml(after.slice(4, after.indexOf("\n---", 4))).description).toBe(
+      parseMemoryFile(long).frontmatter.description,
+    )
     expect(describeFrontmatterViolation(after)).toContain(`${MAX_DESCRIPTION_LENGTH}`)
   })
 
