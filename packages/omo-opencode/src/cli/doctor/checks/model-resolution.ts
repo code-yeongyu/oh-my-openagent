@@ -58,6 +58,15 @@ export function getModelResolutionInfo(): ModelResolutionInfo {
   return { agents, categories }
 }
 
+type CategoryOverride = NonNullable<OmoConfig["categories"]>[string]
+
+/** The model a category dispatches to: the head of its `models` chain when set, else `model` (#9287). */
+function categoryPrimaryModel(category: CategoryOverride | undefined): string | undefined {
+  const head = category?.models?.[0]
+  if (head !== undefined) return typeof head === "string" ? head : head.model
+  return category?.model
+}
+
 export function getModelResolutionInfoWithOverrides(config: OmoConfig): ModelResolutionInfo {
   const agents: AgentResolutionInfo[] = Object.entries(AGENT_MODEL_REQUIREMENTS).map(([name, requirement]) => {
     const userOverride = config.agents?.[name]?.model
@@ -74,7 +83,7 @@ export function getModelResolutionInfoWithOverrides(config: OmoConfig): ModelRes
 
   const categories: CategoryResolutionInfo[] = Object.entries(CATEGORY_MODEL_REQUIREMENTS).map(
     ([name, requirement]) => {
-      const userOverride = config.categories?.[name]?.model
+      const userOverride = categoryPrimaryModel(config.categories?.[name])
       const userVariant = config.categories?.[name]?.variant
       return attachCapabilityDiagnostics({
         name,
