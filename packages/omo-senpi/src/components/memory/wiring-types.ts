@@ -10,7 +10,7 @@ import type { MemoryIdentityRuntime, MemoryIdentityRuntimeDeps } from "./identit
 import type { KibitzerChildStarterSeams } from "./kibitzer"
 import type { MemoryMaintenance, MemoryMaintenanceOptions } from "./memory-maintenance"
 import type { ShutdownDrainInput, ShutdownEvaluator } from "./shutdown-drain"
-import type { refreshMemoryStatus } from "./status"
+import type { GitRepoForStatus, refreshMemoryStatus } from "./status"
 import type { MemoryFooterTimers } from "./status-live"
 import type { SyncStatusReader } from "./sync-status-surface"
 
@@ -36,6 +36,8 @@ export interface MemoryWiringOptions {
   readonly kibitzerChildStarter?: KibitzerChildStarterSeams
   readonly now?: () => number
   readonly refreshStatus?: typeof refreshMemoryStatus
+  /** Injectable git seam for the bind-time footer and advisory reads; tests drive both through one repo. */
+  readonly createGitRepo?: (repoPath: string) => GitRepoForStatus
   /** Injectable animation timers; tests drive frames without touching the wall clock. */
   readonly footerTimers?: MemoryFooterTimers
   /** Process-liveness and hostname seams for the stale reflection lock check (#10377). */
