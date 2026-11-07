@@ -39,20 +39,21 @@ export class WatchQueue {
     this.#records = 0
   }
 
+  // Drops every queued record but the newest session_status and keeps the order of what is left: a snapshot or attach end
+  // queued before that record is still processed before it. A queued read (a snapshot or a resync) is processed after
+  // every dropped record arrived, so it covers them; otherwise one is forced (an attach end may resume, with no read).
   #compact(): void {
-    let newestStatus: WatchItem | undefined
-    for (const item of this.#items) {
-      if (item.kind !== "records") continue
+    let newestStatus: { readonly at: number; readonly item: WatchItem } | undefined
+    this.#items.forEach((item, at) => {
+      if (item.kind !== "records") return
       item.records.forEach((record, index) => {
         const seq = item.seqs?.[index]
-        if (record["type"] === "session_status") newestStatus = { kind: "records", attachId: item.attachId, records: [record], ...(seq === undefined ? {} : { seqs: [seq] }) }
+        if (record["type"] === "session_status") newestStatus = { at, item: { kind: "records", attachId: item.attachId, records: [record], ...(seq === undefined ? {} : { seqs: [seq] }) } }
       })
-    }
-    const others = this.#items.filter((item) => item.kind !== "records")
-    // A queued snapshot already leads to a fresh read; otherwise one is forced (an attach end may resume, with no read).
-    const readsAnyway = others.some((item) => item.kind === "snapshot")
-    const resync: readonly WatchItem[] = readsAnyway ? [] : [{ kind: "resync" }]
-    this.#items = [...(newestStatus === undefined ? [] : [newestStatus]), ...others, ...resync]
+    })
+    const kept = this.#items.flatMap((item, at) => (item.kind !== "records" ? [item] : newestStatus?.at === at ? [newestStatus.item] : []))
+    const readsAnyway = kept.some((item) => item.kind === "snapshot" || item.kind === "resync")
+    this.#items = readsAnyway ? kept : [...kept, { kind: "resync" }]
     this.#records = newestStatus === undefined ? 0 : 1
   }
 

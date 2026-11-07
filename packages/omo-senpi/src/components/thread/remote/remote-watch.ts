@@ -38,7 +38,7 @@ class SessionWatch {
   readonly #settled: string[] = []
   readonly #queue = new WatchQueue((item) => this.#process(item))
   #lostReported = false
-  // The drop a resumed attach has not proven served yet: its snapshot reports it lost, its first records clear it.
+  // The unreported drop a resumed attach has not proven served yet: its snapshot reports it lost, its first records clear it.
   #resumeGap: string | undefined
   #leftReason: "session_closed" | "session_replaced" | undefined
   #done = false
@@ -108,10 +108,7 @@ class SessionWatch {
   async #process(item: WatchItem): Promise<void> {
     switch (item.kind) {
       case "records":
-        if (this.#resumeGap !== undefined) {
-          this.#resumeGap = undefined
-          this.#lostReported = false
-        }
+        this.#resumeGap = undefined
         for (const [index, record] of item.records.entries()) {
           if (!this.#position.admit(item.attachId, item.seqs?.[index])) continue
           if (!this.#apply(record)) return
@@ -224,7 +221,9 @@ class SessionWatch {
         continue
       }
       if (attached === "resumed") {
-        this.#resumeGap = lost ?? "attach_ended"
+        // The attach is back, so the gap is over: one a failed pass already reported is never reported again.
+        this.#resumeGap = this.#lostReported ? undefined : (lost ?? "attach_ended")
+        this.#lostReported = false
         return
       }
       if (lost !== undefined) this.#reportLost(lost)
