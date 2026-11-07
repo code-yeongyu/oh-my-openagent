@@ -94,6 +94,18 @@ pub(crate) fn focus_key_window(window: &DesktopWindow) -> CoreResult<()> {
     actions::set_window_main_and_focused(&root)
 }
 
+/// Whether `pid` reports an `AXFocusedUIElement`; an unreadable application
+/// counts as having one, so nothing is sent to it on a guess.
+pub(crate) fn has_focused_element(pid: libc::pid_t) -> bool {
+    let Ok(app) = element::create_application(pid) else {
+        return true;
+    };
+    if element::set_timeout(&app).is_err() {
+        return true;
+    }
+    element::copy_element(&app, "AXFocusedUIElement").is_some()
+}
+
 /// Performs `AXPress` on an element: the canary's deterministic dialog
 /// dismissal (synthetic clicks are ignored by these alerts on macOS 26).
 pub(crate) fn press(element: &objc2_application_services::AXUIElement) -> CoreResult<()> {

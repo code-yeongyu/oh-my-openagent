@@ -142,11 +142,17 @@ impl MacInput {
                             guard::pointer_kind(&event),
                             guard::pointer_button(&event),
                         )?;
-                        if !window.focused {
-                            skylight::activate_without_raise(pid, wid)?;
-                            this.last_activated = Some((pid, wid));
+                        if window.focused {
+                            return background::pointer(&this.source, &mut this.held, pid, wid, &window, event, &this.overlay);
                         }
-                        background::pointer(&this.source, &mut this.held, pid, wid, &window, event, &this.overlay)
+                        // Pointer actions take no key-focus guard in the session, so the
+                        // window made key for this event hands key focus back here (#12701).
+                        let front = crate::focus::front_window()?;
+                        skylight::activate_without_raise(pid, wid)?;
+                        this.last_activated = Some((pid, wid));
+                        let delivered = background::pointer(&this.source, &mut this.held, pid, wid, &window, event, &this.overlay);
+                        let restored = front.map_or(Ok(()), |front| crate::focus::restore_key_focus(this, &front));
+                        delivered.and(restored)
                     }),
                     DeliveryMode::Foreground => skylight::with_foreground(pid, || {
                         crate::ax::prepare_foreground_input(&window)?;
