@@ -76,7 +76,9 @@ describe("steering a recovering child (#9861)", () => {
 
   // Contract: no queued message is ever stranded. A producer that keeps queueing past the pass limit
   // still has every message delivered once it stops, with no further start or send (#9861).
-  test("a queue that refills past the pass limit empties once the producer stops", async () => {
+  // A host that acknowledges each steer after `ackLatencyMs` is the slow Windows runner of #11180: the whole
+  // drain then outlasts any fixed per-step guard, while it still empties.
+  async function refillPastPassLimit(ackLatencyMs: number): Promise<void> {
     const h = makeHarness()
     const record = h.seedRecord()
     await h.engine.sendToTask({ idOrName: record.task_id, message: "seed", deliverAs: "steer" })
@@ -84,6 +86,7 @@ describe("steering a recovering child (#9861)", () => {
     const child = makeFakeHandle(record.task_id, "rpc")
     const delivered: string[] = []
     h.setLive(record.task_id, { ...child.handle, steer: async (message) => {
+      if (ackLatencyMs > 0) await new Promise((acknowledged) => setTimeout(acknowledged, ackLatencyMs))
       delivered.push(message)
       // Sends that land while a drain delivers are persisted, as a parked window or revival does.
       if (delivered.length <= 40) {
@@ -96,6 +99,14 @@ describe("steering a recovering child (#9861)", () => {
     await empty
     expect(delivered).toHaveLength(41)
     expect(delivered.at(-1)).toBe("more 40")
+  }
+
+  test("a queue that refills past the pass limit empties once the producer stops", async () => {
+    await refillPastPassLimit(0)
+  })
+
+  test("a queue that refills past the pass limit empties once the producer stops, behind a slow host", async () => {
+    await refillPastPassLimit(60)
   })
 
   // Contract: while anything is queued, a new send to a running child goes behind it, never ahead.
