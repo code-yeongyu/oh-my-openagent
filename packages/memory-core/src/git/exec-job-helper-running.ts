@@ -9,7 +9,7 @@ import type { HelperControl } from "./helper-control"
 import { recordGitTimeout } from "./timeout-diagnostics"
 
 // RUNNING, from P's side (design v4.2 sections 7.3, 9, 16): the helper reports `spawned`, then `exit <code>
-// empty|lingering` at root exit. Timeout and abort send `terminate-root` (the launcher only, like today's SIGTERM on
+// empty|lingering` once F's count settles after root exit (bounded; the root's conhost exits just after it). Timeout and abort send `terminate-root` (the launcher only, like today's SIGTERM on
 // win32) and reject once the root has exited. On `empty` P deletes the entry under the gate BEFORE run() resolves, so
 // a sweep that follows the command never sees its own entry; on `lingering` the entry stays and busy is correct.
 

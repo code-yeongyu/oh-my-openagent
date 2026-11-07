@@ -25,6 +25,18 @@ const PIPE_KEY: usize = 2;
 /// Job notifications are documented as not guaranteed, so a running operation re-checks its state this often. It is
 /// only the safety net: member exits wake the loop through `MemberWaits`.
 const RECHECK_MS: u32 = 250;
+/// After the root exits, how long H gives F's count to reach 1 before the operation is called `lingering`. The root's
+/// hidden console (CREATE_NO_WINDOW, spawn.rs) is hosted by a conhost.exe that is an F member and exits only after the
+/// root's console connection closes, i.e. after the root's own handle has signaled. `empty` goes out at the member-exit
+/// wake that reads 1, never on a timer; past the grace the operation is `lingering` and the next probe collects it.
+const ROOT_EXIT_GRACE: Duration = Duration::from_millis(250);
+
+/// Milliseconds until `at`, capped at the recheck interval.
+fn until(at: Instant) -> u32 {
+    u32::try_from(at.saturating_duration_since(Instant::now()).as_millis())
+        .unwrap_or(RECHECK_MS)
+        .min(RECHECK_MS)
+}
 
 enum Event {
     Pipe {
@@ -208,10 +220,15 @@ fn running(
     members.watch(root.pid);
     handle_frames(reader, root);
     control.start_read();
-    let mut exited = false;
+    // The root's exit code and the end of its grace, until the exit frame has gone out.
+    let mut exited: Option<(u32, Instant)> = None;
+    let mut reported = false;
     let mut deadline: Option<Instant> = None;
     loop {
-        match next_event(port, control, RECHECK_MS) {
+        let timeout = exited
+            .filter(|_| !reported)
+            .map_or(RECHECK_MS, |(_, grace)| until(grace));
+        match next_event(port, control, timeout) {
             Event::Pipe {
                 ok: true,
                 transferred,
@@ -237,17 +254,22 @@ fn running(
                 return Exit::PortFailed;
             }
         }
-        if let Some(code) = root_exit_code(root).filter(|_| !exited) {
-            exited = true;
-            let lingering = floor.active() != Ok(1);
-            control.report(&format!(
-                "exit {code} {}",
-                if lingering { "lingering" } else { "empty" }
-            ));
-            deadline =
-                lingering.then(|| Instant::now() + Duration::from_millis(u64::from(linger_ms)));
+        if exited.is_none() {
+            exited = root_exit_code(root).map(|code| (code, Instant::now() + ROOT_EXIT_GRACE));
         }
-        if exited && floor.active() == Ok(1) {
+        if let Some((code, grace)) = exited.filter(|_| !reported) {
+            let empty = floor.active() == Ok(1);
+            if empty || Instant::now() >= grace {
+                reported = true;
+                control.report(&format!(
+                    "exit {code} {}",
+                    if empty { "empty" } else { "lingering" }
+                ));
+                deadline =
+                    (!empty).then(|| Instant::now() + Duration::from_millis(u64::from(linger_ms)));
+            }
+        }
+        if reported && floor.active() == Ok(1) {
             control.report("done");
             return Exit::Ok;
         }

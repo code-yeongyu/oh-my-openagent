@@ -29,10 +29,11 @@ fn run_reports_the_root_exit_then_done() {
     let frames = op.frames_until("done", Duration::from_secs(30));
     receipt.line(format!("{spawned}; {frames:?}"));
     let frames = frames.unwrap_or_else(|error| panic!("{error}\n{receipt}"));
-    assert!(
-        frames
-            .first()
-            .is_some_and(|frame| frame.starts_with("exit 0 ")),
+    // The root's hidden-console conhost.exe is still an F member when the root's handle signals; the exit frame must
+    // still read `empty` once F settles, never `lingering` for a plain command (T6 depends on it).
+    assert_eq!(
+        frames.first().map(String::as_str),
+        Some("exit 0 empty"),
         "{receipt}"
     );
     assert!(sentinel.exists(), "{receipt}");
