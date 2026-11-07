@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { generateKeyPairSync } from "node:crypto"
 import { chmodSync, existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -33,12 +32,6 @@ const privateDir = (): string => {
 
 const SIGNED_IN = { exitCode: 0, stdout: JSON.stringify({ signedIn: true, device: { id: "dev-self", name: "This Mac" }, refreshState: "ok" }) }
 
-const credential = () => ({
-  device: { id: "dev-self", name: "This Mac" },
-  signingPrivateKey: generateKeyPairSync("ed25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
-  sealingPrivateKey: generateKeyPairSync("x25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
-})
-
 const AGENT_DIR = "/home/user/.omo/agent"
 const OMO_BINARY = "/opt/omo/bin/omo"
 
@@ -46,7 +39,6 @@ const OMO_BINARY = "/opt/omo/bin/omo"
 const testBootstrap = (overrides: Partial<BootstrapSetup> = {}): BootstrapSetup => ({
   pinVersion: "1.4.0",
   install: async () => ({ ok: false, state: "service_degraded", action: "This test installs nothing." }),
-  credential: async () => credential(),
   refresher: { binaryPath: OMO_BINARY, version: "5.1.58" },
   agentDir: AGENT_DIR,
   ...overrides,
@@ -195,7 +187,8 @@ describe("omo remote bootstrap", () => {
     const { code, out } = await run(["bootstrap", "--json"], owner.stateDir)
     expect(code).toBe(REMOTE_EXIT.ok)
     expect(JSON.parse(out.join(""))).toMatchObject({ state: "connected", status: { state: "connected" } })
-    expect(owner.state.adoptions).toBe(1)
+    // Design D r9 section 3: the bootstrap reads no credential and adopts nothing.
+    expect(owner.state.adoptions).toBe(0)
     expect(owner.state.refresher).toEqual({ binary_path: OMO_BINARY, version: "5.1.58" })
     expect([...owner.state.endpoints]).toEqual([AGENT_DIR])
   })
@@ -249,7 +242,6 @@ describe("omo remote bootstrap: this build's install", () => {
     const runs: (readonly string[])[] = []
     const setup = deviceServiceBootstrapSetup({
       stateDir,
-      credential: async () => credential(),
       binaryPath: OMO_BINARY,
       agentDir: AGENT_DIR,
       platform: "linux",
