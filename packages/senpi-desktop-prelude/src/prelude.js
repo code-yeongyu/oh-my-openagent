@@ -2,8 +2,14 @@
 // Each helper is one tool call, so lazy activation and the permission-system preflight apply to it; `verify` alone
 // repeats read calls until its deadline. The method lists in the generated region come from facade-manifest.json.
 {
-	// Children a cell starts inherit the marker, so an SDK inside them refuses to spawn a second engine.
-	if (globalThis.process?.env) globalThis.process.env.SENPI_DESKTOP_HOST = "1";
+	// Children a cell starts inherit the marker, so an SDK inside them refuses to spawn a second engine. It is written
+	// only to an environment the kernel owns: a worker thread's own process.env view, or a process-mode kernel's own
+	// process. On a host's main thread the write would reach every later child of the host (the bash tool, subagent
+	// processes, the desktop service), so it is skipped there. The Python kernel is always its own process.
+	const kernelProcess = globalThis.process;
+	const ownsEnvironment = kernelProcess?.getBuiltinModule?.("node:worker_threads")?.isMainThread === false ||
+		globalThis[Symbol.for("senpi.kernel.processMode")] === true;
+	if (kernelProcess?.env && ownsEnvironment) kernelProcess.env.SENPI_DESKTOP_HOST = "1";
 	const validateOptions = (label, options) => {
 		if (options === undefined) return {};
 		if (options === null || typeof options !== "object" || Array.isArray(options)) {
