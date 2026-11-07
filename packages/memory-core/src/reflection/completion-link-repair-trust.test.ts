@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
+import { readFile, writeFile } from "node:fs/promises"
+import { join } from "node:path"
 import { validateCompletion } from "./completion-validation"
 import { LINK_TEST_TIMEOUT_MS, cleanupLinkFixtures, INVALID, PEM, commitAll, git, linkFixture as fixture, note, put, read } from "./completion-links.test-support"
 import { finalizeReflectionWorktree } from "./worktree"
@@ -53,6 +55,25 @@ describe("only the gate's own link repair is exempt from a targeted run's scope 
     expect(result.status).toBe("merged")
     expect(result.detail ?? "").not.toContain("reference/legacy.md")
     expect(await read(worktree.parent.dir, "reference/legacy.md")).toBe(legacy)
+  })
+
+  it("#given a non-UTF-8 note and a UTF-8 note linking a removed note #when validated #then only the UTF-8 note is repaired and the other keeps its bytes", async () => {
+    // given
+    const worktree = await fixture({ "reference/x.md": note("X", "x\n"), "reference/user.md": note("User", "[[reference/x.md|x]]\n") })
+    const latin1 = Buffer.concat([Buffer.from(note("Legacy", "Caf")), Buffer.from([0xe9]), Buffer.from(" see [[reference/x.md|x]].\n")])
+    await writeFile(join(worktree.dir, "reference/legacy.md"), latin1)
+    await git(worktree.dir, "rm", "-q", "reference/x.md")
+    await commitAll(worktree.dir, "chore(dream): retire x")
+
+    // when
+    const result = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
+
+    // then
+    expect(result.status).toBe("valid")
+    if (result.status !== "valid") return
+    expect(result.linkRepairs).toEqual(["reference/user.md"])
+    expect(await read(worktree.dir, "reference/user.md")).not.toContain("[[reference/x.md")
+    expect((await readFile(join(worktree.dir, "reference/legacy.md"))).equals(latin1)).toBe(true)
   })
 
   it("#given a run whose link repair commit exists #when the same branch is validated twice #then both results are equal and name the repair", async () => {

@@ -101,7 +101,8 @@ async function planLinkRepair(run: Run, baseSha: string, runTip: string, skip: R
   const notes = new Set(tree.filter((entry) => entry.regular && entry.path.endsWith(".md") && !skip.has(entry.path)).map((entry) => entry.path))
   const candidates = new Set([...movedFrom.keys(), ...(await notesNaming(run, runTip, [...removed.keys()]))])
   for (const path of [...candidates].filter((candidate) => notes.has(candidate)).sort()) {
-    const current = await blob(run, runTip, path)
+    const current = await noteText(run, runTip, path)
+    if (current === undefined) continue
     const next = repointLinks(path, current, { live, removed }, movedFrom.get(path))
     if (next === current) continue
     const stamped = restamped(current, next)
@@ -142,3 +143,17 @@ function sameWrites(a: ReadonlyMap<string, string>, b: ReadonlyMap<string, strin
 }
 
 const blob = (run: Run, revision: string, path: string): Promise<string> => must(run, ["cat-file", "blob", `${revision}:${path}`])
+
+const UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true })
+
+/** A note's text, or undefined when it is not valid UTF-8: decoding it would rewrite bytes outside its links. */
+async function noteText(run: Run, revision: string, path: string): Promise<string | undefined> {
+  const result = await run(["cat-file", "blob", `${revision}:${path}`])
+  if (result.code !== 0) throw new Error(result.stderr.trim() || `git cat-file blob ${revision}:${path} failed`)
+  try {
+    return UTF8.decode(result.stdoutBytes ?? Buffer.from(result.stdout, "utf8"))
+  } catch (error) {
+    if (error instanceof TypeError) return undefined
+    throw error
+  }
+}

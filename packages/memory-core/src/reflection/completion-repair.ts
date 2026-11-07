@@ -56,7 +56,7 @@ export async function readDroppedTrailers(exec: GitExec, dir: string, baseSha: s
   return entries
 }
 
-export type Run = (argv: readonly string[], env?: Readonly<Record<string, string>>) => Promise<{ code: number; stdout: string; stderr: string }>
+export type Run = (argv: readonly string[], env?: Readonly<Record<string, string>>) => Promise<{ code: number; stdout: string; stderr: string; stdoutBytes?: Buffer }>
 
 /**
  * Every git call here that names a note passes the agent-chosen path as a pathspec. GIT_LITERAL_PATHSPECS makes each
