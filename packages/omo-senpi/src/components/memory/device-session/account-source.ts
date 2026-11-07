@@ -17,6 +17,7 @@ import {
   SignInError,
 } from "@oh-my-opencode/omo-opencode/service-auth"
 import { randomUUID } from "node:crypto"
+import type { HeldDeviceCredential } from "@oh-my-opencode/device-service-core"
 import { deviceKeyringFromMaterial } from "@oh-my-opencode/memory-core/sync-account-ports"
 import { cliAccountOperation, scopedCliKeyring } from "./cli-account-operation"
 
@@ -27,6 +28,18 @@ import { SyncConfigError } from "../sync-config-error"
 import { SyncSessionDeferredError } from "../sync-session-deferred"
 
 export type KeyringFactory = (material: DeviceKeyMaterial) => Promise<DeviceKeyring>
+
+/**
+ * This machine's device service as the memory device session reaches it (design D r9 section 3, r7 N8r): `readopt`
+ * re-sends device.adopt from the credential this session already read for its own sync work, only while the service
+ * reports no adopted device, and answers whether a running service handled it (adopted, or already adopted); false
+ * means no service was running, so the next resolve checks again. `forget` runs when the service ends this sign-in.
+ * Neither reads the credential store.
+ */
+export interface HeldCredentialRelay {
+  readonly readopt: (credential: HeldDeviceCredential) => Promise<boolean>
+  readonly forget: () => Promise<void>
+}
 
 export interface CliDeviceAccount {
   readonly kind: "cli"
@@ -91,6 +104,8 @@ export function createCliAccountSource(options: {
   readonly pinDir?: string
   /** The host's logger: one warning per pin a discard could not retire. */
   readonly logger?: { warn(line: string): void }
+  /** This machine's device service; absent, it is never told anything. */
+  readonly relay?: HeldCredentialRelay
 }): () => Promise<CliDeviceAccount | null> {
   const configured = options.api === undefined ? options.env?.OMO_SERVICE_API_URL : undefined
   let api: string
@@ -105,6 +120,12 @@ export function createCliAccountSource(options: {
   const beforeKeysDiscarded = pinDir === undefined ? async () => undefined
     : retireSyncPinOnDiscard({ pinDir: () => pinDir, log: (line) => options.logger?.warn(line) })
   let active: { readonly generation: string; readonly abort: AbortController } | undefined
+  const relay = options.relay
+  const relayFailed = (what: string) => (error: unknown): void => {
+    options.logger?.warn(`memory sync: the device service ${what} failed (${error instanceof Error ? error.message : String(error)})`)
+  }
+  // The generation whose credential was last offered to the device service: one re-adopt per sign-in, not per resolve.
+  let offered: string | undefined
   // A keychain waiting for its approval dialog is not a signed-out device: sync defers this pass and retries.
   return async () => {
     try {
@@ -133,6 +154,8 @@ export function createCliAccountSource(options: {
     const session = createSession({
       api, store, ...(options.home === undefined ? {} : { home: options.home }),
       beforeKeysDiscarded,
+      // A sign-in the service ends on refresh is a local end of the sign-in: the device service forgets the device.
+      ...(relay === undefined ? {} : { deviceService: { adopt: async () => undefined, forget: () => relay.forget().catch(relayFailed("forget")) } }),
     })
     // One credential transaction captures a concrete generation before the first token or identity await: a legacy
     // credential is stamped and re-read under the lock, so an absent generation is never a wildcard afterwards.
@@ -170,6 +193,25 @@ export function createCliAccountSource(options: {
       active = { generation, abort: new AbortController() }
     }
     const abort = active.abort
+    // The re-adopt hands over `captured`: the credential this session already read and verified above for sync's own
+    // work. There is no second store read and no unseal for relay. No-holder clause (design D r9 section 3): this
+    // session is omo's only holder. If no omo process holds the credential in memory (no engine with memory sync
+    // running), an omo-only machine stays not_adopted until one does. Nothing prompts and nothing reads the store for relay.
+    // Marked offered only once a running service handled it: no service yet, or a failure (a refusal, a dropped
+    // connection), is retried on the next resolve, the session's own cadence; a failure is logged, never thrown.
+    if (relay !== undefined && offered !== generation) {
+      try {
+        const handled = await relay.readopt({
+          device: { id: captured.device.id, name: captured.device.name },
+          account: accountId,
+          signingPrivateKey: captured.signingPrivateKey,
+          sealingPrivateKey: captured.sealingPrivateKey,
+        })
+        if (handled) offered = generation
+      } catch (error) {
+        relayFailed("re-adopt")(error)
+      }
+    }
     const sameCaptured = (current: Credentials | null): boolean => current !== null && current.accountId === accountId
       && current.credentialGeneration === generation && sameKeys(current, captured)
     const isCurrent = async (): Promise<boolean> => {

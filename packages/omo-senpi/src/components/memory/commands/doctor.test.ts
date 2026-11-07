@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { FactsFailureStore, GitMemoryRepo, memoryWriterLockPath } from "@oh-my-opencode/memory-core"
+import { FactsFailureStore, GitMemoryRepo, measureRuntimeSize, memoryWriterLockPath } from "@oh-my-opencode/memory-core"
 
 import { MemoryFakeExtensionAPI, memorySettings } from "../memory.test-support"
 import {
@@ -16,6 +16,7 @@ import {
   type FakeDeps,
 } from "./commands.test-support"
 import { registerDoctorCommand } from "./doctor"
+import { checkRuntimeSize } from "./doctor-checks"
 import { removeTree } from "../../../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
@@ -132,8 +133,8 @@ describe("/doctor", () => {
 
   test("#given an unknown repair flag #when doctor runs #then audit refuses it", async () => {
     const { pi, ctx } = await harness()
-    const text = await invoke(pi, "doctor", "--json --fix", ctx)
-    expect(text).toContain("unknown flag --fix")
+    const text = await invoke(pi, "doctor", "--json --repair", ctx)
+    expect(text).toContain("unknown flag --repair")
     expect(ctx.ui.notifications.at(-1)?.level).toBe("error")
   })
 
@@ -705,5 +706,143 @@ describe("doctor receipts and quarantined runs", () => {
 
     // then
     expect(text).toContain("[ok] abandoned-runs: no abandoned runs")
+  })
+})
+
+describe("doctor runtime size: measurement over budget (B16, r4 R5)", () => {
+  test("#given a measurement deadline that has passed #when the runtime-size check runs #then it reports size unknown with the budget and the date", async () => {
+    const { root, identity } = await tempIdentity()
+    tempDirs.push(root)
+    await mkdir(join(identity.identityPaths.transcripts, "s1"), { recursive: true })
+    await writeFile(join(identity.identityPaths.transcripts, "s1", "transcript.jsonl"), "{}\n")
+
+    const { check, report } = await checkRuntimeSize(identity.identityPaths, {
+      maxBytes: 1024,
+      policy: { retentionDays: 7, abandonedJournalDays: 14, completionsDays: 30, discardUnreflectedJournals: true, passBudgetMs: 60_000 },
+      now: Date.parse("2026-11-05T07:00:00.000Z"),
+      reflectionEnabled: true,
+      discardUnreflectedJournals: true,
+      measureBudgetMs: 60_000,
+      measureSignal: AbortSignal.abort(),
+    })
+
+    expect(report.sizeUnknown).toEqual({ budgetMs: 60_000, at: "2026-11-05T07:00:00.000Z" })
+    expect(check.level).toBe("warn")
+  })
+})
+
+describe("doctor runtime size (B10)", () => {
+  async function sizedIdentity(maxBytesFor: (bytes: number) => number, runtime: Partial<ReturnType<typeof memorySettings>["runtime"]> = {}) {
+    const { root, identity } = await tempIdentity()
+    tempDirs.push(root)
+    await seededRepo(identity, SEEDS)
+    const session = join(identity.identityPaths.transcripts, "s-big")
+    await mkdir(session, { recursive: true })
+    await writeFile(join(session, "transcript.jsonl"), Buffer.alloc(4 * 1024 * 1024, 1))
+    const bytes = (await measureRuntimeSize(identity.identityPaths.runtime)).bytes
+    const maxBytes = maxBytesFor(bytes)
+    const deps = fakeDeps(identity, {
+      loadSettings: () => ({ settings: memorySettings({ runtime: { ...memorySettings().runtime, ...runtime, max_bytes: maxBytes } }), configPath: "/tmp/omo.jsonc" }),
+    })
+    const pi = new MemoryFakeExtensionAPI()
+    registerDoctorCommand(pi, deps)
+    return { pi, ctx: fakeCommandContext(), maxBytes, identityPaths: identity.identityPaths }
+  }
+
+  test("#given a runtime at 85 % of its cap #when doctor runs #then the runtime-size check warns with bytes, cap, top stores and past-retention counts", async () => {
+    const { pi, ctx, maxBytes } = await sizedIdentity((bytes) => Math.floor(bytes / 0.85))
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.checks.find((check: { name: string }) => check.name === "runtime-size")?.level).toBe("warn")
+    expect(report.runtimeSize.maxBytes).toBe(maxBytes)
+    expect(report.runtimeSize.percent).toBeGreaterThanOrEqual(80)
+    expect(report.runtimeSize.stores[0].store).toBe("transcripts")
+    expect(report.runtimeSize.stores.length).toBeLessThanOrEqual(3)
+    expect(report.runtimeSize.pastRetention).toEqual({ runs: 0, journals: 0, sidecars: 0, unclassifiedJournals: 0 })
+  })
+
+  test("#given the switch on, failing reflection and a journal no retention row classifies #when doctor runs #then runtime-size reports the suspension and the unclassified count (r2 item 7)", async () => {
+    const { pi, ctx, identityPaths } = await sizedIdentity((bytes) => bytes * 2, { discard_unreflected_journals: true })
+    const finishedAt = new Date(1_782_000_000_000 - 2 * 24 * 60 * 60 * 1000).toISOString()
+    await mkdir(join(identityPaths.reflection, "completions"), { recursive: true })
+    await writeFile(join(identityPaths.reflection, "completions", "reflection-run-2.json"), JSON.stringify({ runId: "reflection-run-2", outcome: "failed", finishedAt }))
+    const odd = join(identityPaths.transcripts, "s-odd")
+    await mkdir(odd, { recursive: true })
+    await writeFile(join(odd, "state.json"), JSON.stringify({ total_completed_steps: 2, reflected_completed_steps: 0, steps_since_last_successful_reflection: 2, reflected_through_message_id: "m1" }))
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.runtimeSize.suspendedSince).toBe(finishedAt)
+    expect(report.runtimeSize.unclassifiedJournals).toBe(1)
+  })
+
+  test("#given a runtime under its cap holding an unreflected journal #when doctor runs #then the unreflected bytes, which only the over-cap line prints, are not measured (#12538 review r3 M2)", async () => {
+    const { pi, ctx, identityPaths } = await sizedIdentity((bytes) => bytes * 4)
+    await writeFile(join(identityPaths.transcripts, "s-big", "state.json"), JSON.stringify({ total_completed_steps: 3, reflected_completed_steps: 0, steps_since_last_successful_reflection: 3 }))
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.runtimeSize.bytes).toBeGreaterThan(4 * 1024 * 1024)
+    expect(report.runtimeSize.unreflectedBytes).toBeUndefined()
+  })
+
+  test("#given transcripts holding a stray file and an unreadable state.json #when doctor runs #then the runtime-size check still reports (#12538 review r3 M1)", async () => {
+    const { pi, ctx, identityPaths } = await sizedIdentity((bytes) => Math.floor(bytes / 2))
+    await writeFile(join(identityPaths.transcripts, ".DS_Store"), "x")
+    await mkdir(join(identityPaths.transcripts, "s-torn", "state.json"), { recursive: true })
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.runtimeSize.bytes).toBeGreaterThan(4 * 1024 * 1024)
+    expect(report.checks.find((check: { name: string }) => check.name === "runtime-size")).toBeDefined()
+  })
+
+  test("#given a runtime over its cap held by unreflected journals and the default switch (off) #when doctor runs #then runtime-size reports the held bytes (r4 R1)", async () => {
+    const { pi, ctx, identityPaths } = await sizedIdentity((bytes) => Math.floor(bytes / 2))
+    await writeFile(join(identityPaths.transcripts, "s-big", "state.json"), JSON.stringify({ total_completed_steps: 3, reflected_completed_steps: 0, steps_since_last_successful_reflection: 3 }))
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.runtimeSize.unreflectedBytes).toBeGreaterThan(4 * 1024 * 1024)
+    expect(report.runtimeSize.discardUnreflectedJournals).toBe(false)
+    expect(report.checks.find((check: { name: string }) => check.name === "runtime-size")?.detail).toContain("discard_unreflected_journals off")
+  })
+
+  test("#given a runtime over its cap with folded runs to evict and an unreflected journal, switch off #when doctor runs #then it reports the evictable bytes and does not blame the unreflected journals (#12538 review M1)", async () => {
+    const RUN_BYTES = 2 * 1024 * 1024
+    const { pi, ctx, identityPaths } = await sizedIdentity((bytes) => bytes + 5 * 1024 * 1024)
+    await writeFile(join(identityPaths.transcripts, "s-big", "state.json"), JSON.stringify({ total_completed_steps: 3, reflected_completed_steps: 0, steps_since_last_successful_reflection: 3 }))
+    for (const index of [1, 2, 3]) {
+      const dir = join(identityPaths.reflection, "runs", `reflection-run-${index}`)
+      await mkdir(dir, { recursive: true })
+      await writeFile(join(dir, "final.json"), JSON.stringify({ runId: `reflection-run-${index}`, outcome: "merged", finishedAt: new Date(Date.parse("2026-11-01T00:00:00.000Z") + index * 1000).toISOString() }))
+      await writeFile(join(dir, "child-1.log"), Buffer.alloc(RUN_BYTES, 1))
+    }
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.runtimeSize.bytes).toBeGreaterThan(report.runtimeSize.maxBytes)
+    expect(report.runtimeSize.evictableBytes).toBeGreaterThanOrEqual(2 * RUN_BYTES)
+    expect(report.checks.find((check: { name: string }) => check.name === "runtime-size")?.detail).not.toContain("discard_unreflected_journals off")
+  })
+
+  test("#given the switch on over its cap #when doctor runs #then no held-by-unreflected remainder is reported", async () => {
+    const { pi, ctx, identityPaths } = await sizedIdentity((bytes) => Math.floor(bytes / 2), { discard_unreflected_journals: true })
+    await writeFile(join(identityPaths.transcripts, "s-big", "state.json"), JSON.stringify({ total_completed_steps: 3, reflected_completed_steps: 0, steps_since_last_successful_reflection: 3 }))
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.runtimeSize.discardUnreflectedJournals).toBe(true)
+    expect(report.checks.find((check: { name: string }) => check.name === "runtime-size")?.detail).not.toContain("discard_unreflected_journals off")
+  })
+
+  test("#given a runtime at 50 % of its cap #when doctor runs #then the runtime-size check is ok", async () => {
+    const { pi, ctx } = await sizedIdentity((bytes) => bytes * 2)
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.checks.find((check: { name: string }) => check.name === "runtime-size")?.level).toBe("ok")
+    expect(report.runtimeSize.percent).toBeLessThan(80)
   })
 })

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs"
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pruneProvisionedRuntimes, removeReplacedLauncher } from "../runtime-prune"
@@ -126,14 +126,34 @@ describe("pruneProvisionedRuntimes", () => {
     expect(result.removed).toEqual(["5.1.40"])
   })
 
-  test("#given a prune interrupted after its rename #when the next fresh runtime prunes #then the leftover tree is removed", () => {
-    // given
-    provision(".prune-5.1.40-4242", "5.1.62")
+  test("#given renamed trees from a dead and a live pruner #when a fresh runtime prunes #then only the dead pruner's leftover is removed", () => {
+    // given: a pid no process holds, and the parent of this test run, which is alive and may still rename its tree back
+    const dead = `.prune-5.1.40-${0x7ffffffe}`
+    const live = `.prune-5.1.39-${process.ppid}`
+    provision(dead, live, "5.1.62")
     // when
-    pruneProvisionedRuntimes({ root, current: "5.1.62", platform: "linux", listRunning: () => [] })
+    const result = pruneProvisionedRuntimes({ root, current: "5.1.62", platform: "linux", listRunning: () => [] })
     // then
-    expect(present(".prune-5.1.40-4242")).toBe(false)
+    expect(present(dead)).toBe(false)
+    expect(present(live)).toBe(true)
     expect(present("5.1.62")).toBe(true)
+    expect(result.failed).toEqual([])
+  })
+
+  test("#given a concurrent pruner that renames a runtime before this one does #when a fresh runtime prunes #then it counts as removed, not failed", () => {
+    // given: the other pruner takes 5.1.40 between this pruner's listing and its rename
+    provision("5.1.40", "5.1.56", "5.1.61", "5.1.62")
+    let calls = 0
+    const listRunning = () => {
+      if (calls++ === 0) renameSync(join(root, "5.1.40"), join(root, `.prune-5.1.40-${process.ppid}`))
+      return []
+    }
+    // when
+    const result = pruneProvisionedRuntimes({ root, current: "5.1.62", platform: "linux", listRunning })
+    // then
+    expect(result.failed).toEqual([])
+    expect(result.removed.toSorted()).toEqual(["5.1.40", "5.1.56"])
+    expect(result.kept).toEqual(["5.1.61"])
   })
 
   test("#given no runtime root #when a fresh runtime prunes #then it reports nothing", () => {

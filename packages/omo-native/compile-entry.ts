@@ -11,7 +11,7 @@ import {
   type EmbeddedFile,
   type EmbeddedManifest,
 } from "./compile-runtime"
-import { handOffToProvisionedRuntime, planProvisionedLaunch } from "./provisioned-handoff"
+import { handOffToProvisionedRuntime, planProvisionedLaunch, type ProvisionedLaunch } from "./provisioned-handoff"
 import { pruneProvisionedRuntimes, removeReplacedLauncher, type RuntimePruneResult } from "./runtime-prune"
 import { parseBuildInfo, parseEngineBuildStamp, versionLines } from "./build-info"
 import { compiledUpdate, fetchGitHubReleases, probePackageOwner, releaseAssetName, RELEASES_URL } from "./compiled-update"
@@ -20,7 +20,8 @@ import { removeLegacyServiceCredentials } from "./bin/lib/legacy-service-credent
 import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { readJson, releaseBanner } from "./bin/lib/package-paths.js"
 import { remapSenpiEnvironment } from "./compiled-environment"
-import { runServiceAuthCommand, SERVICE_ACCOUNTS_OPEN } from "../omo-opencode/src/cli/service-auth/commands"
+import { SERVICE_ACCOUNTS_OPEN } from "../omo-opencode/src/cli/service-auth/commands"
+import { runServiceAuthCommand } from "./service-auth-command"
 import { runDaemonCommand } from "./bin/lib/daemon.js"
 import { runThreadCommand } from "./bin/lib/thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./bin/lib/host-status.js"
@@ -277,6 +278,16 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
 
 export { reexecProvisionedRuntime } from "./provisioned-handoff"
 
+/**
+ * Whether this launch prunes old runtimes: only the runtime a launcher handed a real launch to.
+ * Never a static answer or self-update (the installers run `omo --version`), never the launcher
+ * that is about to hand off, and never the engine's own re-runs of the runtime copy (no launcher).
+ */
+export function launchPrunesRuntimes(args: readonly string[], launch: Pick<ProvisionedLaunch, "handOff" | "launcher">): boolean {
+  if (launch.launcher === undefined || launch.handOff) return false
+  return trustLaunchKind(args) !== "static" && !isSelfUpdate([...args])
+}
+
 // Pruning old runtimes never blocks a launch, but a runtime that could not be removed is reported.
 function reportRuntimePrune(result: RuntimePruneResult): void {
   for (const { version, reason } of result.failed) {
@@ -427,9 +438,7 @@ async function main(): Promise<void> {
     return
   }
   if (answerCompiledFastPath(process.argv.slice(2), manifest)) return
-  // Only the runtime a launcher handed a real launch to prunes: never on the fast paths above (the
-  // installers run `omo --version`), and not again in the engine's own re-runs of the runtime copy.
-  if (launch.launcher !== undefined && !launch.handOff) {
+  if (launchPrunesRuntimes(process.argv.slice(2), launch) && launch.launcher !== undefined) {
     reportRuntimePrune(pruneProvisionedRuntimes({ root: dirname(dirname(expected)), current: manifest.omoAiVersion }))
     removeReplacedLauncher(launch.launcher)
   }
