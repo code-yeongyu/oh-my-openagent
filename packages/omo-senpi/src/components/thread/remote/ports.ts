@@ -31,6 +31,15 @@ export type RemoteLocateOutcome =
   | { readonly kind: "ok"; readonly sessionId: string }
   | { readonly kind: "refused"; readonly reason: string }
 
+/** A session on another device followed from now on: its records go to the listener until `stop` or the attach ends. */
+export type RemoteSessionWatch = {
+  /** Settles with the reason the attach ended; nothing is delivered after it. */
+  readonly ended: Promise<string>
+  readonly stop: () => void
+}
+
+export type RemoteWatchOutcome = { readonly kind: "ok"; readonly watch: RemoteSessionWatch } | { readonly kind: "refused"; readonly reason: string }
+
 export type RemoteSessionsPort = {
   /** The device service state; `plan_required` means the account's plan has no relay (A5: paid only). */
   readonly status: () => Promise<RemoteServiceState>
@@ -53,6 +62,11 @@ export type RemoteSessionsPort = {
    */
   readonly sessionCommand: (device: string, sessionId: string, rpc: JsonObject, options?: { readonly fresh?: boolean }) => Promise<RemoteCommandOutcome>
   readonly read: (device: string, sessionId: string, tail: number) => Promise<RemoteCommandOutcome>
+  /**
+   * The records `device`'s session writes from now on (none of the ones before), on the attach this port holds for it.
+   * Refused, typed, when that attach cannot be made.
+   */
+  readonly watch: (device: string, sessionId: string, listener: (record: JsonObject) => void) => Promise<RemoteWatchOutcome>
 }
 
 /**
