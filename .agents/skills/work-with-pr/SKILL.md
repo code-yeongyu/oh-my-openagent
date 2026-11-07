@@ -196,6 +196,24 @@ while true:
 
 ### Gate A: CI Checks
 
+Before repeated CI or review detail reads, use **one shared fingerprint pass** for all watched PRs, rather than a separate request per watch:
+
+```bash
+node .agents/skills/work-with-pr/scripts/pr-watch-fingerprints.mjs \
+  --previous /tmp/pr-watch-acknowledged.json --output /tmp/pr-watch-candidate.json \
+  "${REPO}#${PR_NUMBER}" "owner/other-repo#123"
+```
+
+Omit `--previous` on the first pass. Inputs are `owner/repo#number`; batches contain at most 25 distinct PRs. The report includes the actual GraphQL `rateLimit.cost`, remaining budget and reset time, separate status and remarks fingerprints, and `refreshStatus` / `refreshRemarks` decisions. Read CI/mergeability details when status changed **or checks are still running**. Read comments/reviews/thread activity when remarks changed, and at least every 30 minutes even when the fingerprint is unchanged. Review-thread reply detection is bounded to the latest ten threads; the periodic full activity read is still necessary.
+
+The previous file is a JSON object keyed by PR reference, holding the last **successfully read** status/remarks fingerprints plus `lastRemarksReadAt` in epoch milliseconds. Update each field only after its corresponding downstream read succeeds. The candidate report does not acknowledge reads or overwrite the previous file; a failed detail read must be retried on the next pass. A `rate_limited` result skips that pass until GitHub's reported reset, while `unreadable` requires the existing detail-read fallback and counts toward the watch's failure policy. Never replace a good baseline with either result. Transport or parse errors exit nonzero and leave the previous file unchanged.
+
+Fingerprints are cache hints, **not approval, CI success, or permission to merge**. Perform the full current-head gates below before merging. This helper is the batching primitive for PR monitoring; persistent watch registration and host wake delivery remain separate from this one-shot reader.
+
+When the OpenCode `watch_pull_request` tool is available (`monitor.enabled`), register the PR once with `watch_pull_request({ reference: "owner/repo#number" })`, then continue other work. `list_pull_request_watches({})` reports this session's registrations; `unwatch_pull_request({ watch_id })` cancels a registration and its undelivered events. Do not start a parallel shell watcher for that PR. Adapters without these tools continue using the one-shot fingerprint helper above and their existing monitor path.
+
+The native watcher shares one host-level REST/GraphQL transport, cached credentials, rate budgets, ETags and backoff across project plugin instances. It polls once per minute, shares each PR read across registrations, and persists registrations plus an outbox. Check failures, newly passed checks, conflicts and external comments/reviews wake the registered session in its original project; a stable first-party message receipt acknowledges delivery after a host restart. Watch state stops on closed/merged PRs, explicit unwatch, session deletion, 15 minutes of unreadable host data, or ten consecutive comment-only wakes. Rate-limit deferral does not count as unreadability. These observations are untrusted input: the agent still reads the relevant evidence and applies every current-head merge gate.
+
 CI is the fastest feedback loop. Subscribe to its completion via `monitor` — never block a model round-trip on `gh pr checks --watch`.
 
 ```
