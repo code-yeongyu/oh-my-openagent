@@ -67,7 +67,7 @@ describe("restoring extended context", () => {
 
   it.each([
     ["api without a base URL", { api: "openai-completions" }],
-    ["empty models", { models: [] }],
+    ["empty models with credentials", { models: [], credentials: { rotation: false } }],
   ])("#given %s #when the last override is removed #then the invalid provider is not written", async (_label, fields) => {
     const models = join(dir, "models.json")
     const record = join(dir, "extended-context.json")
@@ -82,6 +82,37 @@ describe("restoring extended context", () => {
     await handler("off", { agentDir: dir })
 
     expect(JSON.parse(readFileSync(models, "utf8"))).toEqual(config)
+    expect(existsSync(record)).toBe(true)
+  })
+
+  it("#given an otherwise empty models list #when disabled #then the managed provider is removed", async () => {
+    const models = join(dir, "models.json")
+    const record = join(dir, "extended-context.json")
+    writeFileSync(models, JSON.stringify({
+      providers: { "chatgpt-subscription": { models: [], modelOverrides: { "gpt-6.1-sol": { contextWindow: 744_000 } } } },
+    }))
+    writeFileSync(record, JSON.stringify({
+      version: 1, provider: "chatgpt-subscription", windows: { "gpt-6.1-sol": 744_000 },
+    }))
+
+    await handler("off", { agentDir: dir })
+
+    expect(JSON.parse(readFileSync(models, "utf8"))).toEqual({ providers: {} })
+    expect(existsSync(record)).toBe(false)
+  })
+
+  it("#given a comment in an empty models list #when disabled #then it preserves the file and record", async () => {
+    const models = join(dir, "models.json")
+    const record = join(dir, "extended-context.json")
+    const original = '{"providers":{"chatgpt-subscription":{"models":[/* keep */],"modelOverrides":{"gpt-6.1-sol":{"contextWindow":744000}}}}}'
+    writeFileSync(models, original)
+    writeFileSync(record, JSON.stringify({
+      version: 1, provider: "chatgpt-subscription", windows: { "gpt-6.1-sol": 744_000 },
+    }))
+
+    await handler("off", { agentDir: dir })
+
+    expect(readFileSync(models, "utf8")).toBe(original)
     expect(existsSync(record)).toBe(true)
   })
 })

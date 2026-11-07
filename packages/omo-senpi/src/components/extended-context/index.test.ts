@@ -136,13 +136,21 @@ describe("the command", () => {
     })
   })
 
-  it("#given a corrupt record #when invoked #then it leaves the models file unchanged", async () => {
+  it.each([
+    ["malformed JSON", "on", "{ broken "],
+    ["malformed JSON", "off", "{ broken "],
+    ["invalid structure", "on", '{"version":1,"provider":"chatgpt-subscription","windows":"bad"}'],
+    ["invalid structure", "off", '{"version":1,"provider":"chatgpt-subscription","windows":"bad"}'],
+  ])("#given %s in the record #when %s is requested #then it identifies the record and leaves both files unchanged", async (_kind, command, record) => {
     const original = '{"providers":{}}'
+    const recordPath = join(dir, "extended-context.json")
     writeFileSync(modelsPath(), original)
-    writeFileSync(join(dir, "extended-context.json"), '{"version":1,"provider":"chatgpt-subscription","windows":"bad"}')
+    writeFileSync(recordPath, record)
     const handler = captureHandler("2026.11.2-3", { models: [{ slug: "gpt-6.1-sol", max_context_window: 872_000 }] })
-    await handler("on", context())
+    const message = await handler(command, context())
+    expect(message).toContain(recordPath)
     expect(readFileSync(modelsPath(), "utf8")).toBe(original)
+    expect(readFileSync(recordPath, "utf8")).toBe(record)
   })
 
   it("#given an earlier managed window #when a second model is enabled #then off removes both", async () => {

@@ -24,6 +24,13 @@ export type ModelsJsonRead =
   | { readonly kind: "invalid" }
   | { readonly kind: "ok"; readonly config: ModelsJson }
 
+export class ModelsJsonChangedError extends Error {
+  constructor(path: string) {
+    super(`${path} changed while the command was running; try again`)
+    this.name = "ModelsJsonChangedError"
+  }
+}
+
 export function modelsJsonPath(agentDir: string): string {
   return join(agentDir, "models.json")
 }
@@ -72,7 +79,7 @@ export async function writeModelsJsonConfig(path: string, config: ModelsJson, ex
   }
   const old = parseJsonc<ModelsJson>(original)
   if (!isDeepStrictEqual(old, expected)) {
-    throw new Error(`${path} changed while the command was running; try again`)
+    throw new ModelsJsonChangedError(path)
   }
   let next = original
   const oldProvider = old.providers?.["chatgpt-subscription"]
@@ -126,16 +133,26 @@ export async function readWrittenWindows(path: string): Promise<WrittenWindows> 
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return {}
     throw error
   }
-  const value: unknown = JSON.parse(text)
+  const invalidRecord = (cause?: unknown): Error => new Error(
+    `Invalid extended context record: ${path}. Restore it from a backup, or review models.json and move the record aside. Without it, managed windows cannot be identified automatically.`,
+    cause === undefined ? undefined : { cause },
+  )
+  let value: unknown
+  try {
+    value = JSON.parse(text)
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) throw error
+    throw invalidRecord(error)
+  }
   const parsed = isPlainRecord(value) ? value : undefined
   const windows = isPlainRecord(parsed?.windows) ? parsed.windows : undefined
   if (parsed?.version !== RECORD_VERSION || parsed?.provider !== "chatgpt-subscription" || windows === undefined) {
-    throw new Error(`Invalid extended context record: ${path}`)
+    throw invalidRecord()
   }
   const written: WrittenWindows = {}
   for (const [id, value] of Object.entries(windows)) {
     if (typeof value !== "number" || !Number.isSafeInteger(value) || value <= 0) {
-      throw new Error(`Invalid extended context record: ${path}`)
+      throw invalidRecord()
     }
     written[id] = value
   }
@@ -204,7 +221,10 @@ export function clearContextWindowOverrides(
   else nextProvider.modelOverrides = nextOverrides
 
   const nextProviders = { ...providers }
-  if (Object.keys(nextProvider).length === 0) delete nextProviders[providerId]
+  const keys = Object.keys(nextProvider)
+  const hasOnlyEmptyModels = keys.length === 1 && keys[0] === "models" &&
+    Array.isArray(nextProvider.models) && nextProvider.models.length === 0
+  if (keys.length === 0 || hasOnlyEmptyModels) delete nextProviders[providerId]
   else {
     const valid = (Array.isArray(nextProvider.models) && nextProvider.models.length > 0)
       || Boolean(nextProvider.baseUrl || nextProvider.headers || nextProvider.extraBody || nextProvider.compat

@@ -10,13 +10,14 @@ import {
   applyContextWindowOverrides,
   clearContextWindowOverrides,
   clearWrittenWindows,
+  ModelsJsonChangedError,
   modelsJsonPath,
   readModelsJsonConfig,
   readWrittenWindows,
   recordPath,
   writeModelsJsonConfig,
-  writeWrittenWindows,
 } from "./store"
+import { beginTransaction, clearTransaction, recoverTransaction } from "./transaction"
 import { computeWidenedWindows, parseReportedWindows, type CatalogRow } from "./windows"
 
 const PROVIDER_ID = "chatgpt-subscription"
@@ -143,8 +144,21 @@ async function widen(
   }
 
   const { config, written } = applyContextWindowOverrides(read.config, PROVIDER_ID, widened)
-  await writeModelsJsonConfig(path, config, read.config)
-  await writeWrittenWindows(recordPath(agentDir), PROVIDER_ID, { ...previous, ...written })
+  const next = { ...previous, ...written }
+  beginTransaction(agentDir, read.config, config, previous, next)
+  try {
+    await writeModelsJsonConfig(path, config, read.config)
+  } catch (error) {
+    if (error instanceof ModelsJsonChangedError) {
+      try {
+        await clearTransaction(agentDir)
+      } catch (cleanupError) {
+        throw new AggregateError([error, cleanupError], `Cannot discard the interrupted extended context transaction in ${agentDir}`)
+      }
+    }
+    throw error
+  }
+  await recoverTransaction(agentDir)
   const lines = widened.map((window) => `${window.id}: ${window.from} -> ${window.to}`)
   const reload = await refreshNotice(registry)
   return respond(ctx, `Extended ${widened.length} model window(s) in ${path}\n${lines.join("\n")}${reload}`)
@@ -193,6 +207,7 @@ export function registerExtendedContextCommand(pi: SenpiExtensionAPI, deps: Exte
         const owner = await createLockRecord("extended-context")
         await acquireLock(lockPath, owner, { waitTimeoutMs: 0 })
         try {
+          await recoverTransaction(agentDir)
           const wantsRestore = command === "off" || command === "restore" || command === "reset"
           const wantsWiden = command === "on"
           const written = await readWrittenWindows(recordPath(agentDir))
