@@ -177,15 +177,30 @@ describe("GitMemoryRepo.head filesystem fast path", () => {
     expect(f.spawns()).toBe(1)
   }, GIT_INTEGRATION_TEST_TIMEOUT)
 
-  it("#given a reftable repository #when read #then delegates to git", async () => {
+  it("#given reftable ref-storage config #when read #then delegates to git", async () => {
     // given
     const f = await fixture()
-    await f.git("refs", "migrate", "--ref-format=reftable")
+    expect(f.first).not.toBe(f.second)
+    await writeFile(join(f.dir, ".git/HEAD"), "ref: refs/heads/main\n")
+    await writeFile(join(f.dir, ".git/refs/heads/main"), `${f.first}\n`)
+    await writeFile(
+      join(f.dir, ".git/config"),
+      "[core]\n\trepositoryformatversion = 1\n[extensions]\n\trefStorage = reftable\n",
+    )
+    let calls = 0
+    const exec: GitExec = {
+      async run(argv, options) {
+        calls += 1
+        expect(argv).toEqual(["rev-parse", "--verify", "HEAD"])
+        expect(options.cwd).toBe(f.dir)
+        return { code: 0, stdout: `${f.second}\n`, stderr: "" }
+      },
+    }
     // when
-    const head = await f.open().head()
+    const head = await new GitMemoryRepo({ dir: f.dir, agentId: "head-test", exec }).head()
     // then
     expect(head).toBe(f.second)
-    expect(f.spawns()).toBe(1)
+    expect(calls).toBe(1)
   }, GIT_INTEGRATION_TEST_TIMEOUT)
 
   it("#given malformed loose data over a packed ref #when read #then preserves git's failure", async () => {

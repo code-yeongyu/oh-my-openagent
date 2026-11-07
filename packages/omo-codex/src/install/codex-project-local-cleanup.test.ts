@@ -182,6 +182,7 @@ describe("codex project-local cleanup", () => {
     const projectDirectory = join(homeRoot, "workspace", "app")
     const globalConfigPath = join(codexHome, "config.toml")
     await mkdir(projectDirectory, { recursive: true })
+    await mkdir(join(homeRoot, ".git"), { recursive: true })
     await mkdir(codexHome, { recursive: true })
     await writeFile(
       globalConfigPath,

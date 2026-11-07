@@ -97,6 +97,7 @@ describe("install-codex project-local cleanup", () => {
     const globalConfigPath = join(codexHome, "config.toml")
     const repoRoot = await createPackagedCodexRepoRoot()
     await mkdir(projectDirectory, { recursive: true })
+    await mkdir(join(homeRoot, ".git"), { recursive: true })
     await mkdir(codexHome, { recursive: true })
     // V2 is active via enabled = true, so the legacy agents.max_threads key is removed.
     await writeFile(
