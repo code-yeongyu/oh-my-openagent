@@ -12,7 +12,7 @@ import { runAccountVerb } from "./account-cli"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import packageJson from "./package.json" with { type: "json" }
 import { deviceServiceBootstrapSetup, omoBinaryPath, storedDeviceCredential } from "./remote-bootstrap"
-import { prepareRemoteAttach, type RemoteVerbDependencies, runRemoteVerb } from "./remote-cli"
+import { prepareRemoteAttach, type RemoteAttachLaunch, type RemoteVerbDependencies, runRemoteVerb } from "./remote-cli"
 
 // The launchers' `omo remote` entries: the verbs in remote-cli.ts over this device's real service, sign-in and binary.
 
@@ -59,14 +59,17 @@ function remoteDependencies(): RemoteVerbDependencies {
   }
 }
 
-/** The launchers' entry for `omo remote attach`: the engine argv to run in place of this command, or undefined (exit code set). */
-export async function runRemoteAttachCommand(args: readonly string[]): Promise<readonly string[] | undefined> {
+/**
+ * The launchers' entry for `omo remote attach`: the engine argv to run in place of this command and the attach's end,
+ * or undefined (exit code set).
+ */
+export async function runRemoteAttachCommand(args: readonly string[]): Promise<RemoteAttachLaunch | undefined> {
   const prepared = await prepareRemoteAttach(remoteDependencies(), args.slice(2))
   if (typeof prepared === "number") {
     process.exitCode = prepared
     return undefined
   }
-  return prepared.engineArgs
+  return prepared
 }
 
 export async function runRemoteCommand(args: readonly string[]): Promise<void> {
