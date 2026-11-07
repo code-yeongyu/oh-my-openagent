@@ -18,7 +18,7 @@ function lockPath(): string {
 }
 
 function exitedChildPid(): number {
-  const child = Bun.spawnSync(["/usr/bin/true"])
+  const child = Bun.spawnSync([process.execPath, "-e", ""])
   return child.pid
 }
 
