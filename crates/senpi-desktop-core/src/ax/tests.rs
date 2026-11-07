@@ -266,6 +266,38 @@ fn an_object_mode_depth_clamp_keeps_the_node_and_counts_its_children() {
 }
 
 #[test]
+fn a_cut_under_an_anonymous_non_structural_parent_stays_listed() {
+    // Given: window -> splitgroup -> group with three buttons; four nodes
+    // stop the walk inside the group, under a parent role the filter drops.
+    let mut m = Mock {
+        props: [
+            (1, p("window", Some("Title"))),
+            (2, p("splitgroup", None)),
+            (3, p("group", None)),
+            (4, p("button", Some("A"))),
+            (5, p("button", Some("B"))),
+            (6, p("button", Some("C"))),
+        ]
+        .into(),
+        children: [(1, vec![2]), (2, vec![3]), (3, vec![4, 5, 6])].into(),
+    };
+    let mut registry = AxRegistry::with_report_mode(crate::report::ReportMode::Object);
+    let options = AxSnapshotOptions {
+        max_nodes: Some(4),
+        ..AxSnapshotOptions::default()
+    };
+    // When
+    let s = snapshot(&mut m, &mut registry, &window(), &options).unwrap();
+    // Then: the group is still the listed, marked cut with its two buttons.
+    assert_eq!((s.complete, s.truncated, s.nodes_observed), (Some(false), true, Some(4)));
+    assert_eq!(s.cuts.len(), 1, "{}", s.text);
+    assert_eq!(s.cuts[0].child_count, 2);
+    assert!(s.text.contains(&format!("- group [ref={}] [... 2 more]", s.cuts[0].ref_)), "{}", s.text);
+    assert!(s.text.contains("- button \"A\""), "{}", s.text);
+    assert!(registry.subtree_truncated(&s.cuts[0].ref_));
+}
+
+#[test]
 fn a_null_mode_depth_clamp_keeps_todays_reply() {
     // Given / When
     let options = AxSnapshotOptions {
