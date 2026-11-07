@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test"
-import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -225,6 +225,7 @@ describe("the command", () => {
     if (handler === undefined) throw new Error("command was not registered")
     await handler("on", context())
     expect(readFileSync(modelsPath(), "utf8")).toBe(edited)
+    expect(existsSync(join(dir, "extended-context.json"))).toBe(false)
   })
 
   it("#given a comment inside the last managed override #when disabled #then the comment is not deleted", async () => {

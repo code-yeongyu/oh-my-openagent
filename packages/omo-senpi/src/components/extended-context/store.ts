@@ -206,8 +206,13 @@ export function clearContextWindowOverrides(
   const nextProviders = { ...providers }
   if (Object.keys(nextProvider).length === 0) delete nextProviders[providerId]
   else {
-    const validFields = ["baseUrl", "headers", "apiKey", "api", "models", "modelOverrides", "compat", "authHeader"]
-    if (!validFields.some((field) => nextProvider[field] !== undefined)) {
+    const valid = (Array.isArray(nextProvider.models) && nextProvider.models.length > 0)
+      || Boolean(nextProvider.baseUrl || nextProvider.headers || nextProvider.extraBody || nextProvider.compat
+        || nextProvider.whitelist || nextProvider.blacklist || nextProvider.apiKey)
+      || nextProvider.hideFreeModels !== undefined
+      || nextProvider.authHeader !== undefined
+      || Object.keys(nextOverrides).length > 0
+    if (!valid) {
       throw new Error(`Cannot remove the last override without leaving an invalid ${providerId} provider`)
     }
     nextProviders[providerId] = nextProvider

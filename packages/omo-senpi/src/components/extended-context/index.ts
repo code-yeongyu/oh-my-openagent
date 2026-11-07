@@ -143,8 +143,8 @@ async function widen(
   }
 
   const { config, written } = applyContextWindowOverrides(read.config, PROVIDER_ID, widened)
-  await writeWrittenWindows(recordPath(agentDir), PROVIDER_ID, { ...previous, ...written })
   await writeModelsJsonConfig(path, config, read.config)
+  await writeWrittenWindows(recordPath(agentDir), PROVIDER_ID, { ...previous, ...written })
   const lines = widened.map((window) => `${window.id}: ${window.from} -> ${window.to}`)
   const reload = await refreshNotice(registry)
   return respond(ctx, `Extended ${widened.length} model window(s) in ${path}\n${lines.join("\n")}${reload}`)
@@ -163,7 +163,7 @@ async function restore(ctx: ExtendedContextCommandContext, agentDir: string): Pr
   }
 
   const { config, cleared } = clearContextWindowOverrides(read.config, PROVIDER_ID, written)
-  await writeModelsJsonConfig(path, config, read.config)
+  if (cleared.length > 0) await writeModelsJsonConfig(path, config, read.config)
   await clearWrittenWindows(recordPath(agentDir))
   const registry = registryOf(ctx.modelRegistry)
   const reload = cleared.length === 0 ? "" : await refreshNotice(registry)
