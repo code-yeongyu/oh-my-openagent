@@ -28,7 +28,7 @@ await session.tabReturn(vault.tab_id)
 
 The app mutates its URL hash without updating the document title, so a signed-in vault can still
 report a sign-in title. A live session's `location.href` contains the app path and never the
-sign-in path. Read the URL from `tabList`, or `session.evaluate("location.href")`.
+sign-in path. Read the URL from `tabList` (an `evaluate` is gated: it needs a fresh `cooperate("sync")` context).
 
 ## The browser may be shared
 
