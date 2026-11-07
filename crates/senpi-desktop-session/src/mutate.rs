@@ -14,17 +14,18 @@ use std::time::{Duration, Instant};
 
 use parking_lot::{Mutex, MutexGuard};
 use senpi_desktop_core::backend::DeliveryMode;
-use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode, TccPermission};
+use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode, ErrorReport, TccPermission};
 use senpi_desktop_core::protocol_results::AuditEvent;
-use senpi_desktop_core::report::ReportMode;
+use senpi_desktop_core::report::{ActionRoute, Disposition, ReportMode};
+use senpi_desktop_core::types::Target;
 use senpi_desktop_safety::{
-    gate, FrameContext, FrameId, GateError, LockState, MonotonicClock, MutatingAction, PermissionGate, StopPathReason,
-    StopPolicy, Supervisor,
+    gate, FrameContext, FrameId, FrameRefusal, GateError, LockState, MonotonicClock, MutatingAction, PermissionGate,
+    StopPathReason, StopPolicy, Supervisor,
 };
 
 use crate::audit::audit_event;
 use crate::grant::ControlSlot;
-use crate::report::{error_report, Stage};
+use crate::report::{error_report, ReportExtras, Stage};
 use crate::restore::{Guard, TransactionError};
 use crate::session::guarded;
 use crate::worker::Worker;
@@ -70,6 +71,8 @@ pub(crate) struct Mutation<'a> {
     pub(crate) delivery: DeliveryMode,
     /// The capture the request's coordinates are pixels of.
     pub(crate) frame_id: Option<&'a str>,
+    /// `consume: true`: once input was sent, `frame_id` takes no more input.
+    pub(crate) consume: bool,
     /// Typed text or an AX value: audited by length and hash only.
     pub(crate) text: Option<&'a str>,
     /// Fully delivered Unicode scalars, updated inside an interruptible
@@ -87,6 +90,7 @@ impl Mutation<'_> {
             target,
             delivery,
             frame_id: None,
+            consume: false,
             text: None,
             text_delivered: Cell::new(0),
             keys: None,
@@ -100,6 +104,8 @@ struct GateView {
     lock: LockState,
     input_granted: bool,
     latest_frame: Option<String>,
+    refusal: Option<FrameRefusal>,
+    identity_changed: bool,
 }
 
 impl PermissionGate for GateView {
@@ -116,6 +122,48 @@ impl FrameContext for GateView {
     fn is_latest(&self, frame: &FrameId) -> bool {
         self.latest_frame.as_deref() == Some(frame.as_str())
     }
+
+    fn frame_refusal(&self, _frame: Option<&FrameId>) -> Option<FrameRefusal> {
+        self.refusal
+    }
+
+    fn identity_changed(&self) -> bool {
+        self.identity_changed
+    }
+}
+
+/// The channel a mutating request's input takes; `None` for a request that
+/// sends no input event (`clipboard.write`).
+fn route(mutation: &Mutation<'_>) -> Option<ActionRoute> {
+    match mutation.action {
+        MutatingAction::AxPerform
+        | MutatingAction::AxSetValue
+        | MutatingAction::AxFocus
+        | MutatingAction::AxClick
+        | MutatingAction::AxTypeText
+        | MutatingAction::MenuSelect => Some(ActionRoute::Ax),
+        MutatingAction::ClipboardWrite => None,
+        _ => match (Target::parse(&mutation.target), mutation.delivery) {
+            (Target::Window(_), DeliveryMode::Background) => Some(ActionRoute::BackgroundWindow),
+            _ => Some(ActionRoute::ForegroundHid),
+        },
+    }
+}
+
+/// The report of a refusal: how it settled, plus the `reason` (and, for a
+/// change judged after input was sent, the disposition) its error carried.
+fn settled_report(
+    preset: Option<ErrorReport>,
+    primary: Option<ErrorCode>,
+    stage: Stage,
+    event: &AuditEvent,
+) -> ErrorReport {
+    let mut report = error_report(primary, stage, event);
+    if let Some(preset) = preset {
+        report.reason = preset.reason;
+        report.disposition = preset.disposition.or(report.disposition);
+    }
+    report
 }
 
 impl Worker {
@@ -136,6 +184,7 @@ impl Worker {
         act: impl FnOnce(&mut Self) -> CoreResult<T>,
     ) -> CoreResult<(T, AuditEvent)> {
         let started = Instant::now();
+        self.report_extras.set(None);
         let (result, focus_restored) = match self.admit(cancelled) {
             Ok(_transaction) => self.transaction(mutation, cancelled, act),
             Err(stopped) => (Err(TransactionError::Primary(stopped)), None),
@@ -147,7 +196,8 @@ impl Worker {
                 primary.as_ref().map(|error| error.code)
             }
         };
-        let result = result.map_err(DesktopError::from);
+        let mut result = result.map_err(DesktopError::from);
+        let preset = result.as_mut().err().and_then(|error| error.report.take()).map(|report| *report);
         let code = result.as_ref().err().map(|error| error.code);
         let mut event = audit_event(mutation, code, focus_restored, started.elapsed());
         let object = self.registry.report_mode() == ReportMode::Object;
@@ -156,10 +206,26 @@ impl Worker {
         }
         (self.safety.audit)(&event);
         self.persist_audit(&event, result.as_ref().err());
-        match result {
-            Ok(value) => Ok((value, event)),
-            Err(error) if object => Err(error.with_report(error_report(primary, mutation.stage.get(), &event))),
-            Err(error) => Err(error),
+        let report = result
+            .is_err()
+            .then(|| settled_report(preset, primary, mutation.stage.get(), &event));
+        let sent = report.as_ref().is_none_or(|report| {
+            !matches!(report.disposition, Some(Disposition::NotDelivered { .. }))
+        });
+        if let (true, true, Some(frame_id)) = (mutation.consume, sent, mutation.frame_id) {
+            self.frames.consume(&mutation.target, frame_id);
+        }
+        match (result, report) {
+            (Ok(value), _) => {
+                let hit = self.report_extras.take().and_then(|extras| extras.hit);
+                self.report_extras.set(Some(ReportExtras {
+                    route: route(mutation),
+                    hit,
+                }));
+                Ok((value, event))
+            }
+            (Err(error), Some(report)) if object => Err(error.with_report(report)),
+            (Err(error), _) => Err(error),
         }
     }
 
@@ -275,10 +341,26 @@ impl Worker {
             Ok(false) => LockState::Unlocked,
             Err(_) => LockState::Unknown,
         };
+        let object = self.registry.report_mode() == ReportMode::Object;
+        let refusal = if !mutation.action.is_coordinate() {
+            None
+        } else if object {
+            self.frames.refusal(&mutation.target, mutation.frame_id)
+        } else {
+            self.frames
+                .consumed(&mutation.target, mutation.frame_id)
+                .then_some(FrameRefusal::Consumed)
+        };
+        let identity_changed = object
+            && mutation.action.is_coordinate()
+            && refusal.is_none()
+            && self.identity_changed(&mutation.target);
         let view = GateView {
             lock,
             input_granted,
             latest_frame: self.frames.latest_id(&mutation.target).map(str::to_owned),
+            refusal,
+            identity_changed,
         };
         let result = gate(
             &mutation.action,
@@ -292,6 +374,28 @@ impl Worker {
             Err(GateError::PermissionDenied { permission }) => Err(self.backend()?.permission_denied(permission)),
             other => other.map_err(DesktopError::from),
         }
+    }
+}
+
+impl Worker {
+    /// Whether the window the target's latest capture recorded an identity
+    /// for now belongs to another process. A window that is gone is not a
+    /// change here: mapping the point reports it.
+    fn identity_changed(&mut self, target_key: &str) -> bool {
+        let Some(captured) = self
+            .frames
+            .latest_geometry(target_key)
+            .and_then(|geometry| geometry.identity())
+            .cloned()
+        else {
+            return false;
+        };
+        let target = Target::parse(target_key);
+        if !matches!(target, Target::Window(_)) {
+            return false;
+        }
+        self.window(&target)
+            .is_ok_and(|current| current.identity.as_ref() != Some(&captured))
     }
 }
 
