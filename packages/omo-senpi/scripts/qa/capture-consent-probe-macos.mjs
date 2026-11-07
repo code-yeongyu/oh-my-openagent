@@ -118,8 +118,11 @@ function percentile(samples, fraction) {
 	return sorted[Math.min(sorted.length - 1, Math.ceil(fraction * sorted.length) - 1)];
 }
 
-// Minimal PNG reader: true when any pixel has non-zero alpha (or the image has no alpha channel).
+// Minimal PNG reader: true when any pixel has non-zero alpha (or the image has no alpha channel);
+// null when the bytes are not a PNG (the engine fell back to inline-jpeg), so the check cannot pass by accident.
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 function pngHasOpaquePixel(png) {
+	if (png.length < 8 || !png.subarray(0, 8).equals(PNG_SIGNATURE)) return null;
 	let offset = 8;
 	let width = 0;
 	let colorType = 0;
@@ -185,6 +188,16 @@ async function bench(env, label) {
 		error: error ?? null,
 		routes: [...new Set(routes(engine.stderr()))],
 		png: last?.data === undefined ? undefined : Buffer.from(last.data, "base64"),
+		frame:
+			last === undefined
+				? null
+				: {
+						width: last.width,
+						height: last.height,
+						sourceWidth: last.sourceWidth,
+						sourceHeight: last.sourceHeight,
+						scale: last.displays?.[0]?.scale ?? null,
+					},
 	};
 }
 
@@ -218,7 +231,14 @@ if (enginePath !== undefined && windowId !== undefined) {
 		({ label, runs: count, p50Ms, p95Ms, error, routes: logged }) =>
 			`${label}: runs=${count} p50=${p50Ms}ms p95=${p95Ms}ms error=${JSON.stringify(error)} logged=${JSON.stringify(logged)}`,
 	);
-	lines.push(`window=${windowId} macos=${report.macos} live.png opaque=${opaque}`);
+	lines.push(`window=${windowId} macos=${report.macos} live.png opaque=${opaque === null ? "not-a-png" : opaque}`);
+	if (skylight.frame !== null) {
+		const { width, height, sourceWidth, sourceHeight, scale } = skylight.frame;
+		const expected = scale === null ? null : `${Math.round(sourceWidth * scale)}x${Math.round(sourceHeight * scale)}`;
+		lines.push(
+			`skylight frame=${width}x${height} source=${sourceWidth}x${sourceHeight} scale=${scale} expected=${expected} matches=${expected === null ? "unknown" : expected === `${width}x${height}`}`,
+		);
+	}
 	writeFileSync(join(evidenceDir, "bench.txt"), `${lines.join("\n")}\n`);
 	if (skylight.error !== null || sck.error !== null || opaque !== true) verdict = "FAIL";
 }
