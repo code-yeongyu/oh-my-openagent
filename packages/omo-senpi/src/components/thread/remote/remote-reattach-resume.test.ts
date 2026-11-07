@@ -130,10 +130,8 @@ const delta = (n: number): WireObject => ({ type: "message_update", delta: Strin
 const deltas = (from: number, to: number): WireObject[] => Array.from({ length: to - from + 1 }, (_, i) => delta(from + i))
 const lines = (from: number, to: number): string[] => Array.from({ length: to - from + 1 }, (_, i) => `delta ${from + i}`)
 
-// A watch on a session another local client keeps attached: records 1-5 arrive live, the connection to relayd drops, 6-7
-// are written while omo is away and 8 while its re-attach is held, then 9-10 arrive live once the watch shows it listens
-// again (its `listening`-th line): records sent before the watch listens are the attach's history, which only positions it.
-async function dropAndReattach(relayd: ReturnType<typeof fakeRelayd>, listening: number, before?: () => void) {
+// A watch on a session another local client keeps attached, after records 1-5 arrived live.
+async function watchFirstFive(relayd: ReturnType<typeof fakeRelayd>) {
   const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: () => connectDeviceService({ version: "0.0.0-test", stateDir: "/unused", connect: relayd.connect }), retryDelay: async () => {} })
   const seen = recorder()
   const adoptedFirst = relayd.nextAdopt()
@@ -142,15 +140,23 @@ async function dropAndReattach(relayd: ReturnType<typeof fakeRelayd>, listening:
   await adoptedFirst
   relayd.host(...deltas(1, 5))
   await seen.until(5)
+  return { seen, watch: watched.watch }
+}
+
+// Then the connection to relayd drops, `away` (6-7) is written while omo is away and 8 while its re-attach is held, then
+// 9-10 arrive live once the watch shows it listens again (its `listening`-th line): records sent before the watch listens
+// are the attach's history, which only positions it.
+async function dropAndReattach(relayd: ReturnType<typeof fakeRelayd>, listening: number, before?: () => void, away: WireObject[] = deltas(6, 7)) {
+  const { seen, watch } = await watchFirstFive(relayd)
   before?.()
   const adoptedAgain = relayd.nextAdopt()
   relayd.duringAttach(() => relayd.host(delta(8)))
   relayd.drop()
-  relayd.host(...deltas(6, 7))
+  relayd.host(...away)
   await adoptedAgain
   await seen.until(listening)
   relayd.host(...deltas(9, 10))
-  return { seen, watch: watched.watch }
+  return { seen, watch }
 }
 
 describe("watch v2 re-attach after a drop (relay daemon #774, parity row 11)", () => {
@@ -181,6 +187,34 @@ describe("watch v2 re-attach after a drop (relay daemon #774, parity row 11)", (
     await seen.until(12)
     watch.stop()
     expect([seen.log, relayd.attaches.at(-1)]).toEqual([[...lines(1, 5), "lost closed", "resync running", ...lines(6, 10)], { device: "b", session_id: "s1", resume: { attach_id: 3, seq: 5 } }])
+  })
+
+  // Review of #12771 at 14e77a8323 (MEDIUM): a fallback replay past the queue bound was compacted with its newest status
+  // record ahead of the snapshot, which cleared the gap unreported. Compaction drops content and keeps the order.
+  test.each(["history", "live"] as const)("#given a fallback replay past the queue bound, landing as %s #when it is compacted #then the snapshot still comes first: the gap is reported lost and resynced once, then the newest status record, in order", async (replay) => {
+    const relayd = fakeRelayd({ resume: true, replay })
+    const away = [...deltas(6, 301), { type: "session_status", status: "running" }]
+    const { seen, watch } = await dropAndReattach(relayd, 8, () => relayd.moveAttachment(4), away)
+    await seen.until(10)
+    watch.stop()
+    expect(seen.log).toEqual([...lines(1, 5), "lost closed", "resync running", "delta session_status", ...lines(9, 10)])
+  })
+
+  // Review of #12771 at 14e77a8323 (LOW): a resume served with no new record after a failed pass left the gap marked
+  // reported, so the next drop's failed pass said nothing.
+  test("#given two drops whose first re-attach fails and whose resume is then served with no new record #when each happens #then each gap is reported lost once", async () => {
+    const relayd = fakeRelayd({ resume: true, replay: "history" })
+    const { seen, watch } = await watchFirstFive(relayd)
+    for (let drop = 0; drop < 2; drop += 1) {
+      relayd.failNextAttach()
+      const adopted = relayd.nextAdopt()
+      relayd.drop()
+      await adopted
+    }
+    relayd.host(delta(6))
+    await seen.until(8)
+    watch.stop()
+    expect(seen.log).toEqual([...lines(1, 5), "lost closed", "lost closed", "delta 6"])
   })
 
   // Review of #12771 at 37b5af3936 (LOW): a resumed attach after a failed pass still read the session afresh, ahead of
