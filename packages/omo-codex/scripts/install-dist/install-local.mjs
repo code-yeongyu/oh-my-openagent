@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:6a320a13895b342dfe67fcad595142b84abce196d6d25aa5fc830ee2dc4f803a:982209bd76327c62938d7cbd0a9717a9dd0e3194095709eae6c73e3193b35a1e
+// omo-codex-install:3ca18d4c923c7d61508acde5947da5ec8856aa6fa04421fe3672b22c7d69b371:a37267a25246aed471ef926e255a91128a72270ca495d67bcc87f96213333e96
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19907,14 +19907,16 @@ var OmoMemoryRuntimeSchema = object({
   abandoned_journal_days: number2().int().min(1).default(14),
   completions_days: number2().int().min(1).default(30),
   pass_budget_ms: number2().int().min(1).default(60000),
-  discard_unreflected_journals: boolean2().default(false)
+  discard_unreflected_journals: boolean2().default(false),
+  max_bytes: number2().int().min(0).default(2 * 1024 * 1024 * 1024)
 }).strict();
 var OmoMemoryRuntimeLayerSchema = object({
   retention_days: number2().int().min(1).optional(),
   abandoned_journal_days: number2().int().min(1).optional(),
   completions_days: number2().int().min(1).optional(),
   pass_budget_ms: number2().int().min(1).optional(),
-  discard_unreflected_journals: boolean2().optional()
+  discard_unreflected_journals: boolean2().optional(),
+  max_bytes: number2().int().min(0).optional()
 }).strict();
 var OmoMemoryAgentOverridesSchema = object({
   enabled: boolean2().optional(),
@@ -19976,7 +19978,7 @@ var OmoMemorySettingsSchema = object({
   }),
   project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
   projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 0, max_bytes: 40960 }),
-  runtime: OmoMemoryRuntimeSchema.default({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30, pass_budget_ms: 60000, discard_unreflected_journals: false }),
+  runtime: OmoMemoryRuntimeSchema.default({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30, pass_budget_ms: 60000, discard_unreflected_journals: false, max_bytes: 2 * 1024 * 1024 * 1024 }),
   compile_warn_tokens: number2().int().positive().default(30000),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).default({})
 }).strict();
