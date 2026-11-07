@@ -191,6 +191,20 @@ export interface ItemStore {
   applySnapshot(payload: BatchPayload): Promise<void>
   /** Make CRDT state and baselines durable (temp file + rename) before the journal advances. */
   persist(): Promise<void>
+  /**
+   * Winds this device's own unpublished updates `ops` out of the item (#12284 review M1): the doc goes
+   * back to the version before the earliest of them and that version's render becomes the baseline,
+   * so the working file is captured afresh. Only for ops that never left the device. "kept" when the
+   * ops cannot be attributed to this device (undecodable, or no op of its peer): nothing changes.
+   */
+  rewind(key: string, ops: readonly Uint8Array[]): Promise<"rewound" | "kept">
+  /**
+   * Finishes the import a crash between journaling and importing one of this device's captures left
+   * owed (#12284): "held" when the doc already has `ops`; "imported" when it imported them and set the
+   * baseline to what that capture recorded; "refused" when they are not this device's to import (no op
+   * of its peer, missing deps, undecodable or refused by the doc), with the doc left as it was. Never throws.
+   */
+  adoptJournaled(key: string, ops: Uint8Array): Promise<"held" | "imported" | "refused">
 }
 
 /** The memory writer lock: network work never runs while it is held. */

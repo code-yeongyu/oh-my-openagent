@@ -519,5 +519,190 @@
     "title": "Não encontramos esta página.",
     "body": "O link pode estar desatualizado ou a página pode ter mudado de lugar.",
     "home": "Voltar para o início"
+  },
+  "home": {
+    "metaTitle": "OmO: Sua ferramenta para o trabalho real. Mas é um agente.",
+    "nav": {
+      "primary": "Principal",
+      "skip": "Pular para o conteúdo",
+      "ultrawork": "Ultrawork",
+      "massUlw": "Mass ulw",
+      "models": "Modelos",
+      "skills": "Skills",
+      "docs": "Docs",
+      "install": "Instalar",
+      "stars": "{count} estrelas no GitHub",
+      "theme": "Tema",
+      "system": "Usar o tema do sistema",
+      "light": "Usar o tema claro",
+      "dark": "Usar o tema escuro",
+      "manifesto": "Manifesto",
+      "openMenu": "Abrir menu",
+      "closeMenu": "Fechar menu"
+    },
+    "hero": {
+      "title": "Sua ferramenta para o trabalho real.",
+      "accent": "Mas é um agente.",
+      "sub": "Transforme seus tokens em resultados que importam: pesquisa em dez mil fontes, uma apresentação que as pessoas realmente entendem, backends, frontends e código.",
+      "start": "Começar",
+      "beta": "Baixar a beta para desktop",
+      "download": "Baixar o app para desktop",
+      "makers": "Da <team>Sisyphus Labs</team>, quem criou o <dori>Dori</dori> e o <term>doriterm</term>."
+    },
+    "stats": {
+      "label": "Números ao vivo",
+      "stars": "estrelas no GitHub",
+      "total": "downloads no total",
+      "monthly": "downloads no último mês"
+    },
+    "index": {
+      "label": "Nesta página",
+      "ultrawork": "Uma palavra para uma tarefa difícil",
+      "massUlw": "Um grafo de agentes",
+      "models": "Um prompt ajustado para cada modelo",
+      "kibitzer": "Memória ao lado do agente",
+      "skills": "Carregadas quando a tarefa precisa",
+      "crafted": "As partes que você nunca vê"
+    },
+    "ultrawork": {
+      "eyebrow": "Ultrawork",
+      "title": "Adicione uma palavra a uma tarefa difícil.",
+      "soft": "O agente cuida do resto.",
+      "body": "Não precisa estudar. Se uma tarefa parecer difícil, adicione a palavra ultrawork ao seu prompt. O agente decide como atacá-la e chega ao melhor resultado sozinho.",
+      "prompt": "deixe o relatório trimestral realmente legível",
+      "keyword": "ultrawork",
+      "step1": "lê toda a base de código antes de tocar em uma linha",
+      "step2": "planeja e comprova cada passo antes de avançar",
+      "step3": "verifica o resultado na superfície real e para",
+      "frame": "omo · ~/reports"
+    },
+    "massUlw": {
+      "eyebrow": "Mass ulw",
+      "title": "Uma palavra-chave, centenas de agentes.",
+      "soft": "Cada parte no modelo ideal.",
+      "body": "Digite mass ulw e todo o trabalho vira um grafo de agentes: pesquisa profunda em milhares de fontes, um pipeline completo de machine learning, uma migração que ninguém quer fazer. Cada parte roda em paralelo no modelo ideal e é verificada antes de qualquer coisa ser dada como pronta."
+    },
+    "models": {
+      "eyebrow": "Modelos",
+      "title": "Modelos de ponta e baratos, juntos.",
+      "soft": "Cada um vem com um prompt ajustado para ele.",
+      "body": "Use os modelos de ponta que você adora junto com os mais baratos. Basta entrar. Cada modelo já vem com um prompt de sistema ajustado para ele, para você nunca escolher o errado.",
+      "caption": "Perfis ajustados incluídos no OmO"
+    },
+    "kibitzer": {
+      "eyebrow": "Kibitzer",
+      "title": "Seu agente lembra do seu trabalho.",
+      "soft": "Um modelo pequeno guarda a memória.",
+      "body": "Um modelo pequeno e barato fica ao lado do agente principal mais caro, lê o que você já fez e dá um toque nele antes que repita um erro. O modelo caro mantém o foco; você para de se explicar de novo.",
+      "sidecar": "Kibitzer · modelo pequeno",
+      "main": "Agente principal · modelo de ponta",
+      "cheapLoop": "Modelo pequeno e barato · loop independente",
+      "expensiveLoop": "Modelo de ponta caro · loop principal",
+      "watch": "Observar",
+      "read": "Ler memória",
+      "judge": "Julgar",
+      "memory": "memória",
+      "memoryNote": "Migração anterior: a produção quebrou quando o teste foi pulado.",
+      "nudge": "toque",
+      "plan": "Planejar mudança no schema",
+      "act": "Agir · escrever a migração",
+      "testFirst": "Verificar · rodar teste de migração antes",
+      "ship": "Publicar a mudança",
+      "reason": "Da última vez isso quebrou a produção. Rode o teste de migração primeiro.",
+      "figure": "Um Kibitzer pequeno e barato roda em loop observando e lendo a memória ao lado do loop independente do agente principal caro, inserindo um lembrete para rodar o teste de migração antes de publicar."
+    },
+    "skills": {
+      "eyebrow": "Skills",
+      "title": "Conhecimento do mundo real, em forma de skills.",
+      "soft": "Carregadas só quando a tarefa precisa.",
+      "body": "Seu modelo é inteligente, mas ainda sabe pouco sobre como resolver problemas do mundo real. O OmO traz o conhecimento que falta em forma de skills e carrega só o que a tarefa exige.",
+      "more": "Veja todas as skills na documentação"
+    },
+    "crafted": {
+      "eyebrow": "Lapidado",
+      "title": "Todo o resto foi lapidado.",
+      "soft": "Você não vai ver a maior parte.",
+      "body": "Essa é a ideia. Cada um destes roda em todas as sessões.",
+      "docs": "Veja os detalhes na documentação",
+      "item1Name": "Chamadas de ferramentas em modo código",
+      "item1Desc": "Chamadas de ferramentas independentes rodam juntas em um pequeno programa, sem uma ida e volta lenta para cada uma.",
+      "item2Name": "Absorção de chamadas de ferramentas",
+      "item2Desc": "Dezenas de chamadas de leitura, busca e consulta viram um único passo. Menos turnos, menos espera, menos tokens.",
+      "item3Name": "Correção de chamadas de ferramentas",
+      "item3Desc": "Argumentos malformados são corrigidos antes da execução, para que um erro de digitação nunca desperdice um turno.",
+      "item4Name": "Team mode",
+      "item4Desc": "Um agente líder coordena uma equipe de especialistas em paralelo quando o trabalho é grande o bastante para ser dividido.",
+      "item5Name": "Monitores, não polling",
+      "item5Desc": "Esperar por um build, um deploy ou um arquivo vira uma assinatura de evento. O agente continua trabalhando e acorda quando fica pronto.",
+      "item6Name": "Objetivos que sobrevivem",
+      "item6Desc": "Trabalhos longos salvam checkpoints com evidências; se a sessão reiniciar, ela retoma de onde parou.",
+      "item7Name": "Hot-reload de tudo",
+      "item7Desc": "Configurações, skills e prompts recarregam ao vivo. Sem reiniciar para testar uma mudança.",
+      "item8Name": "Uso do computador",
+      "item8Desc": "O agente lê a tela e a árvore de acessibilidade de apps nativos no macOS, Linux e Windows, e então clica e digita em segundo plano, sem roubar seu foco nem seu cursor. Um atalho de parada o suspende; só você retoma."
+    },
+    "everywhere": {
+      "eyebrow": "Onde roda",
+      "title": "No seu terminal hoje.",
+      "soft": "Nos seus apps de chat em seguida.",
+      "terminalTitle": "No seu terminal",
+      "terminalBody": "Um comando instala o OmO. Depois, execute omo em qualquer projeto.",
+      "terminalMeta": "macOS, Linux, WSL e Windows",
+      "desktopTitle": "Em um app para desktop",
+      "desktopBody": "O app para desktop do OmO para seu Mac, PC com Windows ou máquina Linux.",
+      "desktopMeta": "Beta",
+      "chatTitle": "Dos seus apps de chat",
+      "chatBody": "Fale com seu agente onde você já está. Ele envia mensagens como você, não como um bot, em todas as plataformas que você usa.",
+      "chatMeta": "Em breve. As plataformas de mensagens estão sendo integradas uma a uma."
+    },
+    "voices": {
+      "eyebrow": "Dos usuários",
+      "title": "O que as pessoas dizem.",
+      "q1": "Me fez cancelar minha assinatura do Cursor. Coisas inacreditáveis estão acontecendo na comunidade open source.",
+      "a1": "Arthur Guiot",
+      "q2": "Se o Claude Code faz em 7 dias o que um humano faz em 3 meses, o OmO faz em 1 hora.",
+      "a2": "B, Pesquisador Quant",
+      "q3": "Vocês deveriam colocar isso no core e contratar ele. Sério. É muito, muito, muito bom.",
+      "a3": "Henning Kilset"
+    },
+    "makers": {
+      "title": "Feito pela Sisyphus Labs.",
+      "soft": "Quem está por trás do Dori e do doriterm.",
+      "dori": "Um engenheiro que vive no seu chat. Diga a ele o que fazer no Slack, Discord ou Telegram; ele dá a cada tarefa sua própria sessão de agente de código e avisa quando é feito o merge.",
+      "doriterm": "Todas as suas máquinas, conectadas por uma malha com criptografia de ponta a ponta, em um só terminal. Inicie o OmO no mac mini de casa e responda pelo celular."
+    },
+    "closing": {
+      "title": "Um comando.",
+      "soft": "Depois, de volta ao trabalho.",
+      "body": "Instale o OmO, abra seu projeto e descreva a tarefa. É só isso.",
+      "docs": "Ler a documentação",
+      "manifesto": "Ler o manifesto"
+    },
+    "install": {
+      "label": "Comando de instalação para o seu sistema",
+      "unix": "macOS, Linux, WSL",
+      "powershell": "PowerShell",
+      "cmd": "CMD",
+      "next": "Depois, abra um novo terminal e execute omo.",
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "copyAria": "Copiar comando de instalação",
+      "copiedStatus": "Comando de instalação copiado",
+      "windows": "Windows",
+      "onComputer": "Execute isso no seu computador Mac, Linux ou Windows."
+    },
+    "footer": {
+      "copyright": "© {year} Sisyphus Labs · Código-fonte disponível sob SUL-1.0",
+      "docs": "Docs",
+      "manifesto": "Manifesto",
+      "releases": "Versões",
+      "github": "GitHub",
+      "discord": "Discord",
+      "x": "X @justsisyphus",
+      "privacy": "Privacidade",
+      "terms": "Termos",
+      "language": "Idioma",
+      "label": "Rodapé"
+    }
   }
 }
