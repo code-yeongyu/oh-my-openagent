@@ -1,5 +1,12 @@
 import { ELEMENT_METHODS, type EngineMethod, WINDOW_METHODS } from "@oh-my-opencode/senpi-desktop-protocol";
-import { type FacadeMethod, facadeMethod, type RunScope } from "./context";
+import type {
+	Delivery,
+	AxNode as SdkAxNode,
+	MenuItem as SdkMenuItem,
+	Window as SdkWindow,
+} from "@oh-my-opencode/senpi-desktop-sdk";
+import { isDesktopCapabilities } from "../service/parse";
+import { type FacadeMethod, facadeMethod, type ReplyGuard, type RunScope, viaSdk } from "./context";
 import {
 	type AxInputResult,
 	type AxNode,
@@ -9,12 +16,15 @@ import {
 	isAttributePairs,
 	isAxInputResult,
 	isAxNode,
+	isDisplay,
+	isExecResult,
 	isMenuItem,
 	isText,
+	isWindow,
 	listOf,
 	optional,
 } from "./engine-results";
-import { type DeliveryOptions, InputTarget, pointerOptions, send } from "./input-target";
+import { type DeliveryOptions, InputTarget, pointerOptions } from "./input-target";
 import { observeWindow, type ObserveOptions, type ObservationResult } from "./observe";
 export { type ClickOptions, type DeliveryOptions, InputTarget, type ScrollOptions } from "./input-target";
 
@@ -38,7 +48,49 @@ export interface Bounds {
 	readonly height: number;
 }
 
-/** A window resolved by `desktop.window()`; identity fields are a snapshot, every call goes by id. */
+/**
+ * The run facade's checks of the engine replies it reads through the SDK, kept so a malformed reply fails with
+ * the same `DesktopServiceError` as before the facade wrapped the SDK.
+ */
+export const RUN_REPLY_GUARDS: Readonly<Partial<Record<EngineMethod, ReplyGuard>>> = {
+	capabilities: isDesktopCapabilities,
+	displays: listOf(isDisplay),
+	windows: listOf(isWindow),
+	raiseWindow: isExecResult,
+	"menus.items": listOf(isMenuItem),
+	"menus.select": isExecResult,
+	"ax.query": listOf(isAxNode),
+};
+
+function menuItem({ title, path, enabled, checked, hasSubmenu, shortcut }: SdkMenuItem): MenuItem {
+	return { title, path, enabled, checked, hasSubmenu, shortcut };
+}
+
+/** The run's `AxNode` shape (flat bounds) of an SDK node. */
+function runAxNode(node: SdkAxNode): AxNode {
+	const { ref, role, nativeRole, title, value, description, enabled, focused, actions, childCount, bounds } = node;
+	return {
+		ref,
+		role,
+		nativeRole,
+		title,
+		value,
+		description,
+		enabled,
+		focused,
+		x: bounds?.x ?? null,
+		y: bounds?.y ?? null,
+		width: bounds?.width ?? null,
+		height: bounds?.height ?? null,
+		actions,
+		childCount,
+	};
+}
+
+/**
+ * A window resolved by `desktop.window()` over the SDK `Window` of the same lookup; identity fields are the
+ * engine's snapshot, every call goes by id.
+ */
 export class WindowHandle extends InputTarget {
 	readonly id: string;
 	readonly app: string;
@@ -47,10 +99,12 @@ export class WindowHandle extends InputTarget {
 	readonly bounds: Bounds;
 	readonly focused: boolean;
 	readonly #method: FacadeMethod;
+	readonly #window: SdkWindow;
 
-	constructor(scope: RunScope, window: DesktopWindow) {
+	constructor(scope: RunScope, window: DesktopWindow, sdkWindow: SdkWindow) {
 		super(scope, window.id, WINDOW_METHODS);
 		this.#method = facadeMethod(scope, WINDOW_METHODS);
+		this.#window = sdkWindow;
 		this.id = window.id;
 		this.app = window.app;
 		this.title = window.title;
@@ -60,23 +114,28 @@ export class WindowHandle extends InputTarget {
 	}
 
 	raise(): Promise<void> {
-		return send(this.#method, "raise", "raiseWindow", { windowId: this.id });
+		return this.#method("raise", () =>
+			viaSdk("raiseWindow", async () => {
+				await this.#window.raise();
+			}),
+		);
 	}
 
 	/** The window's native menu: `items` lists children (empty path = the menu bar), `select` invokes a leaf. */
 	readonly menu = {
 		items: (path?: readonly string[]): Promise<readonly MenuItem[]> =>
-			this.#method("menu.items", async ({ call }) => {
-				const items = await call("menus.items", { windowId: this.id, path: [...(path ?? [])] });
-				return expectResult("menus.items", items, listOf(isMenuItem));
-			}),
+			this.#method("menu.items", () =>
+				viaSdk("menus.items", async () => (await this.#window.menu.items(path ?? [])).map(menuItem)),
+			),
+		// Foreground keys the target window and needs the control grant (#9888); omitted stays background.
 		select: (path: readonly string[], options?: { readonly delivery?: string }): Promise<void> =>
-			send(this.#method, "menu.select", "menus.select", {
-				windowId: this.id,
-				path: [...path],
-				// Foreground keys the target window and needs the control grant (#9888); omitted stays background.
-				...(options?.delivery === undefined ? {} : { deliveryMode: options.delivery }),
-			}),
+			this.#method("menu.select", () =>
+				viaSdk("menus.select", async () => {
+					// The engine validates the mode, as it did when the run facade sent the string itself.
+					const delivery = options?.delivery as Delivery | undefined;
+					await this.#window.menu.select(path, delivery === undefined ? undefined : { delivery });
+				}),
+			),
 	};
 
 	/** The formatted accessibility tree, one node per line with `[ref=eN]` tags. */
@@ -92,10 +151,13 @@ export class WindowHandle extends InputTarget {
 	}
 
 	find(query: AxQuery): Promise<readonly ElementHandle[]> {
-		return this.#method("find", async (scope) => {
-			const nodes = await scope.call("ax.query", { target: this.id, query });
-			return expectResult("ax.query", nodes, listOf(isAxNode)).map((node) => new ElementHandle(scope, node));
-		});
+		return this.#method("find", (scope) =>
+			viaSdk("ax.query", async () =>
+				(await this.#window.find(query)).flatMap((element) =>
+					element.node === null ? [] : [new ElementHandle(scope, runAxNode(element.node))],
+				),
+			),
+		);
 	}
 
 	ref(ref: string): Promise<ElementHandle> {
@@ -133,7 +195,7 @@ export class ElementHandle {
 
 	#send(method: string, engineMethod: EngineMethod, params: object): Promise<void> {
 		return this.#method(method, async ({ call }) => {
-			await call(engineMethod, { ref: this.ref, ...params });
+			expectResult(engineMethod, await call(engineMethod, { ref: this.ref, ...params }), isExecResult);
 		});
 	}
 

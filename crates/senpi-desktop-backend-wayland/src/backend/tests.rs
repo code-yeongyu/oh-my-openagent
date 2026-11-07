@@ -21,6 +21,8 @@ pub fn backend_without_services() -> WaylandBackend {
     let mut backend = WaylandBackend::with_ax(Err(DesktopError::ax_unsupported()));
     backend.portal_offered = Some(false);
     backend.capture.probe = Probe::Absent;
+    backend.compositor = Some(crate::compositor::hyprland::Detection::NotHyprland);
+    backend.kwin = Some(crate::compositor::kwin::Detection::NotKwin);
     backend
 }
 
