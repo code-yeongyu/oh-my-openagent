@@ -70,7 +70,9 @@ class SessionWatch {
     if (this.#done) return held.release()
     this.#held = held
     // onEvent replays the attach's history (its latest snapshot and the records after it) before it returns: that
-    // history only positions the watch; what arrives after it is live.
+    // history only positions the watch; what arrives after it is live. The attach's FIRST snapshot positions it too,
+    // replayed or not: the relay sends it after session.attach answers (a re-attach resyncs on its own).
+    this.#attachId = undefined
     let replaying = true
     this.#unsubscribe = held.session.attached.onEvent((event) => this.#accept(event, replaying))
     replaying = false
@@ -80,7 +82,7 @@ class SessionWatch {
   #accept(event: AttachEvent, replaying: boolean): void {
     if (event.kind === "snapshot") {
       this.#durable = nonEmpty(event.snapshot.state["durableSessionId"]) ?? this.#durable
-      if (!replaying) return this.#queue.push({ kind: "snapshot", attachId: event.snapshot.attach_id })
+      if (!replaying && this.#attachId !== undefined) return this.#queue.push({ kind: "snapshot", attachId: event.snapshot.attach_id })
       this.#attachId = event.snapshot.attach_id
       this.#lastSeq = 0
     } else if (event.kind === "records") {

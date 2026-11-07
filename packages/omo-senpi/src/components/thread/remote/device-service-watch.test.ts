@@ -9,7 +9,7 @@ type AttachEvent = Parameters<Parameters<RemoteAttach["onEvent"]>[0]>[0]
 // The device service's account side for one remote session: each attach replays its history from its latest snapshot
 // to a new listener (as remote-attach.ts does), `get_state` answers the engine's current state, and closing the
 // connection ends every attach on it with "closed".
-function fakeDevice(engine: { state: JsonObject }) {
+function fakeDevice(engine: { state: JsonObject }, options: { readonly snapshotAfterAttach?: boolean } = {}) {
   const attaches: string[] = []
   const live: Array<{ readonly id: string; readonly emit: (event: AttachEvent) => void; readonly end: (reason: string) => void; readonly detachCalled: Promise<void>; detaches: number }> = []
   const connections: Array<() => void> = []
@@ -28,7 +28,7 @@ function fakeDevice(engine: { state: JsonObject }) {
       locate: async () => { if (locate.key === undefined) throw new LocalApiError("session_not_found", "gone"); return { key: locate.key } },
       attach: async (_device: string, sessionId: string) => {
         attaches.push(sessionId)
-        const history: AttachEvent[] = [{ kind: "snapshot", snapshot: { attach_id: 1, cursor: { marker_id: "m", last_entry_id: null }, state: { durableSessionId: "dur-1" }, entries: [], history_truncated: false, oldest_entry_id: null } }]
+        const history: AttachEvent[] = options.snapshotAfterAttach === true ? [] : [{ kind: "snapshot", snapshot: { attach_id: 1, cursor: { marker_id: "m", last_entry_id: null }, state: { durableSessionId: "dur-1" }, entries: [], history_truncated: false, oldest_entry_id: null } }]
         const listeners = new Set<(event: AttachEvent) => void>()
         let finish!: (reason: string) => void
         const detached = new Promise<string>((resolve) => { finish = resolve })
@@ -134,6 +134,18 @@ describe("watch v2 (#12719): a remote session followed across drops, restarts an
     await seen.until(3)
     watch.stop()
     expect(seen.log).toEqual(["resync running -> idle settled=[7]", "record agent_start 8", "record agent_settled 8"])
+  })
+
+  // Live relay (2026-11-07): an attach's first snapshot arrives after session.attach answers, so no listener's replay holds it.
+  test("#given an attach whose first snapshot arrives after the watch started #when it arrives #then it only positions the watch: no resync, and the records after it arrive", async () => {
+    const device = fakeDevice({ state: IDLE }, { snapshotAfterAttach: true })
+    const seen = recorder()
+    const watch = await watching(portOver(device), seen.handlers)
+    device.snapshot(1)
+    device.records(1, [{ type: "agent_start" }])
+    await seen.until(1)
+    watch.stop()
+    expect(seen.log).toEqual(["record agent_start"])
   })
 
   test("#given records carrying stream seqs, with gaps, and records with none #when a seq repeats within the attach #then the repeat is dropped and every other record arrives once", async () => {
