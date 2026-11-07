@@ -13,6 +13,7 @@ const ARGUMENT_READING_SKILLS = [
   "hyperplan",
   "init-deep",
   "mass-ulw",
+  "mobius-loop",
   "refactor",
   "remove-ai-slops",
   "ulw-execute",

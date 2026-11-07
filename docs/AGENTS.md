@@ -21,6 +21,7 @@
 | Desktop computer use setup and safety | [docs/guide/computer-use.md](guide/computer-use.md) |
 | Temporary BTW side conversations | [docs/guide/btw.md](guide/btw.md) |
 | Workflows (mass ulw) for users, omo.dev/docs/workflows | [docs/guide/workflows.md](guide/workflows.md) |
+| Outcome discovery, options, experiments, and feedback | [docs/guide/mobius-loop.md](guide/mobius-loop.md) |
 | Delegated agents and the Desktop Agents panel, omo.dev/docs/agents | [docs/guide/agents.md](guide/agents.md) |
 | Reserved keywords (ulw, ulw loop, ulw plan, ulw research, mass ulw), omo.dev/docs/keywords | [docs/guide/keywords.md](guide/keywords.md) |
 | Telemetry in plain words and how to opt out, omo.dev/docs/telemetry | [docs/guide/telemetry.md](guide/telemetry.md) |
