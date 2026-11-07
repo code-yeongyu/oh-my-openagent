@@ -30,6 +30,25 @@ describe("codex PostToolUse hook", () => {
 		});
 	});
 
+	it("#given a file outside cwd #when the hook runs #then it skips that file and checks in-project edits", async () => {
+		const cwd = process.cwd();
+		const outside = path.join(path.dirname(cwd), "config.toml");
+		const checked: string[] = [];
+		const output = await runLspPostToolUseHook(
+			{
+				tool_name: "MultiEdit",
+				tool_input: { file_paths: [outside, "src/broken.ts"] },
+				tool_response: { ok: true },
+			},
+			async (filePath) => {
+				checked.push(filePath);
+				return "error[typescript] (2304) at 1:1: broken";
+			},
+		);
+		expect(checked).toEqual(["src/broken.ts"]);
+		expect(JSON.parse(output).decision).toBe("block");
+	});
+
 	it("extracts files from Codex apply_patch command payloads", () => {
 		const paths = extractMutatedFilePaths({
 			tool_name: "apply_patch",
