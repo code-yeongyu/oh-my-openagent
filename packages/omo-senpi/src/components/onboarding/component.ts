@@ -1,7 +1,9 @@
 import type { ExtensionContext, SessionStartEvent } from "@code-yeongyu/senpi"
+import { join } from "node:path"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { getBuiltinSkillsRoot, getOmoNativeStateDir } from "../telemetry/product-identity"
+import { readDisabledSkills, resolveBundledSkillProvenance } from "../bundled-skills/contributed-skill"
 import { readAgentEndOutcome } from "../ulw-execute-continuation/agent-end-eligibility"
 import { loadOnboardingScanRuntime } from "./scan-component"
 import type { OnboardingScanEnvironment } from "./scan-runtime"
@@ -114,7 +116,27 @@ export function createOnboardingComponent(
     name: "onboarding",
     register(pi: SenpiExtensionAPI, componentContext: ComponentContext): void {
       const stateDir = dependencies.stateDir ?? getOmoNativeStateDir(process.env)
-      const tour = `Follow ${getBuiltinSkillsRoot(process.env, componentContext.logger)}/onboarding/SKILL.md.`
+      // #12150: the tour names the skill, never its install path, so the context is identical
+      // for identical builds whatever the install location. The skills listing resolves
+      // the built-in `onboarding` skill by name.
+      // #12544 review: a user or project skill named `onboarding` loads before extension skill
+      // paths, so the listing resolves the name to that file and the built-in drops out. The
+      // pointer is therefore resolved at prompt time from the listing's provenance: the name
+      // form when the listing resolves to the built-in, the built-in file's absolute path when
+      // it is shadowed. The path form is the old behavior's escape hatch, not a new default:
+      // two installs at different paths still produce byte-identical context unless a shadow
+      // is present. `disabled_skills` hiding `onboarding` leaves no listing entry, so the name
+      // form would point at nothing on the `/skill:` surface; that case falls back to the path
+      // too (#12544 review follow-up), because the tour itself is gated separately by
+      // `omo-senpi-onboarding-disabled` and still runs.
+      const builtinOnboardingSkill = join(getBuiltinSkillsRoot(process.env, componentContext.logger), "onboarding", "SKILL.md")
+      const tour = (): string => {
+        const shadowed = resolveBundledSkillProvenance(pi, "onboarding", builtinOnboardingSkill).shadowed
+        const disabled = readDisabledSkills(pi.cwd ?? process.cwd(), process.env).has("onboarding")
+        return shadowed || disabled
+          ? `Follow ${builtinOnboardingSkill}.`
+          : "Follow the built-in `onboarding` skill."
+      }
       const scanEnvironment = dependencies.scanEnvironment ?? (() => ({}))
       // The first onboarding turn awaits only `omo setup`'s sources (sessions: false): its rows, value
       // summary and migration inventory. Session digests are read by a second scan that starts only
@@ -229,7 +251,7 @@ export function createOnboardingComponent(
         try {
           await pi.sendMessage({
             customType: "omo-onboarding:bootstrap",
-            content: await withInventory(`${tour} Greet first.`),
+            content: await withInventory(`${tour()} Greet first.`),
             display: false,
           }, { triggerTurn: true, deliverAs: "followUp" })
         } catch (error) {
@@ -255,8 +277,8 @@ export function createOnboardingComponent(
             customType: "omo-onboarding:context",
             display: false,
             content: await (preview ? inventoryText : withInventory)(forced
-              ? `${tour} Tour using their message.`
-              : `Answer fully; greet in their language; offer a one-line tour. On request/acceptance: ${tour}`),
+              ? `${tour()} Tour using their message.`
+              : `Answer fully; greet in their language; offer a one-line tour. On request/acceptance: ${tour()}`),
           },
         }
       }, { previewSafe: true })

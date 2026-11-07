@@ -519,5 +519,190 @@
     "title": "This page could not be found.",
     "body": "The link may be old, or the page may have moved.",
     "home": "Back to the home page"
+  },
+  "home": {
+    "metaTitle": "OmO: Your tool for real work. But it's an agent.",
+    "nav": {
+      "primary": "Primary",
+      "skip": "Skip to content",
+      "ultrawork": "Ultrawork",
+      "massUlw": "Mass ulw",
+      "models": "Models",
+      "skills": "Skills",
+      "docs": "Docs",
+      "install": "Install",
+      "stars": "{count} stars on GitHub",
+      "theme": "Theme",
+      "system": "Use the system theme",
+      "light": "Use the light theme",
+      "dark": "Use the dark theme",
+      "manifesto": "Manifesto",
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu"
+    },
+    "hero": {
+      "title": "Your tool for real work.",
+      "accent": "But it's an agent.",
+      "sub": "Turn your tokens into results that matter: research across ten thousand sources, a deck people actually get, backends, frontends and code.",
+      "start": "Get started",
+      "beta": "Get the desktop beta",
+      "download": "Download the desktop app",
+      "makers": "From <team>Sisyphus Labs</team>, the people who made <dori>Dori</dori> and <term>doriterm</term>."
+    },
+    "stats": {
+      "label": "Live numbers",
+      "stars": "GitHub stars",
+      "total": "total downloads",
+      "monthly": "downloads in the last month"
+    },
+    "index": {
+      "label": "On this page",
+      "ultrawork": "One word for a hard task",
+      "massUlw": "A graph of agents",
+      "models": "A prompt tuned per model",
+      "kibitzer": "Memory beside the agent",
+      "skills": "Loaded when the task needs them",
+      "crafted": "The parts you never see"
+    },
+    "ultrawork": {
+      "eyebrow": "Ultrawork",
+      "title": "Add one word to a hard task.",
+      "soft": "The agent takes it from there.",
+      "body": "Skip the study. If a task feels hard, add the word ultrawork to your prompt. The agent decides how to attack it and drives to the best result on its own.",
+      "prompt": "make the quarterly report actually readable",
+      "keyword": "ultrawork",
+      "step1": "reads the whole codebase before touching a line",
+      "step2": "plans, then proves each step before moving on",
+      "step3": "verifies the result on the real surface, then stops",
+      "frame": "omo · ~/reports"
+    },
+    "massUlw": {
+      "eyebrow": "Mass ulw",
+      "title": "One keyword, hundreds of agents.",
+      "soft": "Each part on the model that fits it.",
+      "body": "Type mass ulw and the whole job becomes a graph of agents: deep research over thousands of sources, a full machine-learning pipeline, a migration nobody wants to do. Each part runs on the model that fits it, in parallel, and gets checked before anything is called done."
+    },
+    "models": {
+      "eyebrow": "Models",
+      "title": "Frontier models and cheap ones, together.",
+      "soft": "Each ships with a prompt tuned for it.",
+      "body": "Use the frontier models you love together with the cheap ones. Just sign in. Every model ships with a system prompt tuned for it, so you never pick the wrong one.",
+      "caption": "Tuned profiles shipped with OmO"
+    },
+    "kibitzer": {
+      "eyebrow": "Kibitzer",
+      "title": "Your agent remembers your work.",
+      "soft": "A small model keeps the memory.",
+      "body": "A small, cheap model sits beside the expensive main agent, reads what you've done before, and nudges the main agent before it repeats a mistake. The expensive model stays sharp; you stop re-explaining yourself.",
+      "sidecar": "Kibitzer · small model",
+      "main": "Main agent · frontier model",
+      "cheapLoop": "Small, cheap model · independent loop",
+      "expensiveLoop": "Expensive frontier model · main loop",
+      "watch": "Watch",
+      "read": "Read memory",
+      "judge": "Judge",
+      "memory": "memory",
+      "memoryNote": "Previous migration: production broke when the test was skipped.",
+      "nudge": "nudge",
+      "plan": "Plan the schema change",
+      "act": "Act · write the migration",
+      "testFirst": "Verify · run the migration test first",
+      "ship": "Ship the change",
+      "reason": "Last time this broke production. Run the migration test first.",
+      "figure": "A small, cheap Kibitzer loops through watching and reading memory beside the expensive main agent's independent loop, inserting a reminder to run the migration test before shipping."
+    },
+    "skills": {
+      "eyebrow": "Skills",
+      "title": "Real-world know-how, as skills.",
+      "soft": "Loaded only when the task needs them.",
+      "body": "Your model is smart, but it still doesn't know a lot about solving real-world problems. OmO ships the missing knowledge as skills and loads only what the task needs.",
+      "more": "See every skill in the docs"
+    },
+    "crafted": {
+      "eyebrow": "Crafted",
+      "title": "Everything else is crafted.",
+      "soft": "You won't see most of it.",
+      "body": "That's the point. Each of these runs under every session.",
+      "docs": "Read the details in the docs",
+      "item1Name": "Code-mode tool calls",
+      "item1Desc": "Independent tool calls run together in one small program instead of one slow round trip each.",
+      "item2Name": "Tool-call absorption",
+      "item2Desc": "Dozens of read, search and lookup calls collapse into a single step. Fewer turns, less waiting, fewer tokens.",
+      "item3Name": "Tool-call correction",
+      "item3Desc": "Malformed arguments are repaired before they execute, so a typo never becomes a wasted turn.",
+      "item4Name": "Team mode",
+      "item4Desc": "A lead agent runs a team of specialists in parallel when a job is big enough to split.",
+      "item5Name": "Monitors, not polling",
+      "item5Desc": "Waiting on a build, a deploy or a file is a subscription. The agent keeps working and wakes when it lands.",
+      "item6Name": "Goals that survive",
+      "item6Desc": "Long work is checkpointed with evidence, so a session restart resumes where it stopped.",
+      "item7Name": "Hot-reloading everything",
+      "item7Desc": "Config, skills and prompts reload live. No restarts to try a change.",
+      "item8Name": "Computer use",
+      "item8Desc": "The agent reads the screen and accessibility tree of native apps on macOS, Linux and Windows, then clicks and types in the background, so your focus and cursor stay put. A stop chord suspends it; only you resume."
+    },
+    "everywhere": {
+      "eyebrow": "Where it runs",
+      "title": "Your terminal today.",
+      "soft": "Your chat apps next.",
+      "terminalTitle": "In your terminal",
+      "terminalBody": "One command installs OmO. Then run omo in any project.",
+      "terminalMeta": "macOS, Linux, WSL and Windows",
+      "desktopTitle": "In a desktop app",
+      "desktopBody": "The OmO desktop app for your Mac, Windows PC or Linux machine.",
+      "desktopMeta": "Beta",
+      "chatTitle": "From your chat apps",
+      "chatBody": "Talk to your agent where you already are. It messages as you, not as a bot, on every platform you use.",
+      "chatMeta": "Coming soon. Messaging platforms are being wired in one by one."
+    },
+    "voices": {
+      "eyebrow": "From users",
+      "title": "What people say.",
+      "q1": "It made me cancel my Cursor subscription. Unbelievable things are happening in the open source community.",
+      "a1": "Arthur Guiot",
+      "q2": "If Claude Code does in 7 days what a human does in 3 months, OmO does it in 1 hour.",
+      "a2": "B, Quant Researcher",
+      "q3": "You guys should pull this into core and recruit him. Seriously. It's really, really, really good.",
+      "a3": "Henning Kilset"
+    },
+    "makers": {
+      "title": "Made by Sisyphus Labs.",
+      "soft": "The people behind Dori and doriterm.",
+      "dori": "An engineer who lives in your chat. Tell him what to do in Slack, Discord or Telegram; he gives each job its own coding-agent session and reports back when it is merged.",
+      "doriterm": "Every machine you own, linked through an end-to-end encrypted mesh, in one terminal. Start OmO on the mac mini at home and answer it from your phone."
+    },
+    "closing": {
+      "title": "One command.",
+      "soft": "Then get back to work.",
+      "body": "Install OmO, open your project, describe the job. That's the whole setup.",
+      "docs": "Read the docs",
+      "manifesto": "Read the manifesto"
+    },
+    "install": {
+      "label": "Install command for your system",
+      "unix": "macOS, Linux, WSL",
+      "powershell": "PowerShell",
+      "cmd": "CMD",
+      "next": "Then open a new terminal and run omo.",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyAria": "Copy install command",
+      "copiedStatus": "Install command copied",
+      "windows": "Windows",
+      "onComputer": "Run this on your Mac, Linux or Windows computer."
+    },
+    "footer": {
+      "copyright": "© {year} Sisyphus Labs · Source-available under SUL-1.0",
+      "docs": "Docs",
+      "manifesto": "Manifesto",
+      "releases": "Releases",
+      "github": "GitHub",
+      "discord": "Discord",
+      "x": "X @justsisyphus",
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "language": "Language",
+      "label": "Footer"
+    }
   }
 }
