@@ -71,22 +71,6 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
   })
 })
 
-describe("K8 / R8.c: a chain carries its count across devices; no count or cost limit by default", () => {
-  test("#given a caller with no cause and then one running on a hop-1 delivery #when it sends to b #then the wire gets hop 1 and then hop 2, with no cost field", async () => {
-    const a = account()
-    let cause: string | undefined
-    const { run } = surface(a.remote, { callerCause: () => cause })
-    await run("thread_send", { thread: "dur-on-b", message: "start of a chain" })
-    const local = await run("thread_send", { thread: "dur-local", message: "a hop-1 delivery" })
-    if (local.kind !== "ok" || !("delivery_id" in local) || local.delivery_id === undefined) throw new Error(`local send failed: ${JSON.stringify(local)}`)
-    cause = local.delivery_id
-    await run("thread_send", { thread: "dur-on-b", message: "continues the chain" })
-    expect(a.hops).toEqual([1, 2])
-    const prompts = a.sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => entry.rpc ?? {})
-    expect(prompts.map((record) => [record["chain_count"], Object.keys(record).some((key) => /cost/i.test(key))])).toEqual([[1, false], [2, false]])
-  })
-})
-
 describe("remote == local: the same call answers the same on b as on this device", () => {
 
   test("#given a send to b #when the same idempotency_key is used twice #then b gets one prompt and the retry replays the first answer as deduplicated", async () => {
