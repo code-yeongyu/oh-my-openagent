@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { generateKeyPairSync } from "node:crypto"
 import { chmodSync, existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { connectDeviceService } from "../../device-service-core/src/index.ts"
+import { connectDeviceService, DEVICE_SERVICE_VERSION } from "../../device-service-core/src/index.ts"
+import { deviceServiceAssetName } from "../../device-service-core/src/release/acquire.ts"
 import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
+import { buildRelease, RELEASE_ORIGIN, releaseKey, serveRelease } from "../../device-service-core/test/release-fixture.ts"
 import { defaultWorld, OFFLINE_PEER, PEER, SESSION_ID } from "../../device-service-core/test/local-api/conformance/world.ts"
 import { createCredentialStore } from "../../omo-opencode/src/cli/service-auth/keystore"
 import { runAccountVerb } from "../account-cli"
@@ -31,12 +32,6 @@ const privateDir = (): string => {
 
 const SIGNED_IN = { exitCode: 0, stdout: JSON.stringify({ signedIn: true, device: { id: "dev-self", name: "This Mac" }, refreshState: "ok" }) }
 
-const credential = () => ({
-  device: { id: "dev-self", name: "This Mac" },
-  signingPrivateKey: generateKeyPairSync("ed25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
-  sealingPrivateKey: generateKeyPairSync("x25519").privateKey.export({ format: "der", type: "pkcs8" }).toString("base64"),
-})
-
 const AGENT_DIR = "/home/user/.omo/agent"
 const OMO_BINARY = "/opt/omo/bin/omo"
 
@@ -44,7 +39,6 @@ const OMO_BINARY = "/opt/omo/bin/omo"
 const testBootstrap = (overrides: Partial<BootstrapSetup> = {}): BootstrapSetup => ({
   pinVersion: "1.4.0",
   install: async () => ({ ok: false, state: "service_degraded", action: "This test installs nothing." }),
-  credential: async () => credential(),
   refresher: { binaryPath: OMO_BINARY, version: "5.1.58" },
   agentDir: AGENT_DIR,
   ...overrides,
@@ -193,7 +187,8 @@ describe("omo remote bootstrap", () => {
     const { code, out } = await run(["bootstrap", "--json"], owner.stateDir)
     expect(code).toBe(REMOTE_EXIT.ok)
     expect(JSON.parse(out.join(""))).toMatchObject({ state: "connected", status: { state: "connected" } })
-    expect(owner.state.adoptions).toBe(1)
+    // Design D r9 section 3: the bootstrap reads no credential and adopts nothing.
+    expect(owner.state.adoptions).toBe(0)
     expect(owner.state.refresher).toEqual({ binary_path: OMO_BINARY, version: "5.1.58" })
     expect([...owner.state.endpoints]).toEqual([AGENT_DIR])
   })
@@ -233,17 +228,94 @@ describe("omo remote bootstrap", () => {
     expect(owner.state.log).toEqual([])
   })
 
-  // Until the device service release key is published, this build's own install refuses before any download or write.
-  test("this build's real install fails closed into update_required with its notice, writing nothing", async () => {
+})
+
+// This build's own install (deviceServiceBootstrapSetup) against a local release endpoint: no network, a signing key
+// made at run time. Each path either installs the pinned release or stops before anything is written or run.
+describe("omo remote bootstrap: this build's install", () => {
+  const HOST = "linux-x64"
+  const VERIFY_FAILED =
+    "The downloaded OmO device service failed verification and was not installed. Try again later; if it keeps failing, report it with /bug."
+
+  async function bootstrapWith(release: NonNullable<Parameters<typeof deviceServiceBootstrapSetup>[0]["release"]>) {
     const stateDir = join(privateDir(), "device-service")
-    const setup = deviceServiceBootstrapSetup({ stateDir, credential: async () => credential(), binaryPath: OMO_BINARY, agentDir: AGENT_DIR })
-    const { code, out } = await run(["bootstrap", "--json"], stateDir, SIGNED_IN, setup)
-    expect(code).toBe(REMOTE_EXIT.unavailable)
-    expect(JSON.parse(out.join(""))).toEqual({
-      state: "update_required",
-      notice: "This omo build cannot verify device service releases. Update OmO.",
+    const runs: (readonly string[])[] = []
+    const setup = deviceServiceBootstrapSetup({
+      stateDir,
+      binaryPath: OMO_BINARY,
+      agentDir: AGENT_DIR,
+      platform: "linux",
+      arch: "x64",
+      release: {
+        origin: RELEASE_ORIGIN,
+        // The service's own installer starts the service; here a fake owner stands in for it.
+        run: async argv => {
+          runs.push(argv)
+          owners.push(await startFakeOwner({ stateDir, world: defaultWorld() }))
+          return { exitCode: 0, output: "" }
+        },
+        ...release,
+      },
     })
-    expect(existsSync(join(stateDir, "bin"))).toBe(false)
+    const { code, out } = await run(["bootstrap", "--json"], stateDir, SIGNED_IN, setup)
+    return { code, result: JSON.parse(out.join("")) as Record<string, unknown>, runs, stateDir }
+  }
+
+  test("a release signed by a key in the set installs the pinned version, runs its installer and connects", async () => {
+    const key = releaseKey()
+    const served = serveRelease(buildRelease({ key, host: HOST, version: DEVICE_SERVICE_VERSION }), DEVICE_SERVICE_VERSION)
+    const { code, result, runs, stateDir } = await bootstrapWith({ releaseKeys: [key.publicHex], fetch: served.fetch })
+    expect([code, result.state]).toEqual([REMOTE_EXIT.ok, "connected"])
+    const releaseDir = join(stateDir, "bin", DEVICE_SERVICE_VERSION)
+    expect(runs).toEqual([[join(releaseDir, deviceServiceAssetName(HOST)), "install-service", "--from", releaseDir]])
+    expect(existsSync(join(releaseDir, deviceServiceAssetName(HOST)))).toBe(true)
+  })
+
+  test("this build's pinned keys refuse a release signed by any other key, writing and running nothing", async () => {
+    const served = serveRelease(buildRelease({ key: releaseKey(), host: HOST, version: DEVICE_SERVICE_VERSION }), DEVICE_SERVICE_VERSION)
+    const { code, result, runs, stateDir } = await bootstrapWith({ fetch: served.fetch })
+    expect([code, result]).toEqual([REMOTE_EXIT.unavailable, { state: "service_degraded", notice: VERIFY_FAILED }])
+    expect(served.requested.length).toBeGreaterThan(0)
+    // #12580 item 3: the whole bin/ directory, not only bin/<version>: a staging dir left behind is a write too.
+    expect([runs, existsSync(join(stateDir, "bin"))]).toEqual([[], false])
+  })
+
+  test("a manifest the signed checksums do not cover is refused, writing and running nothing", async () => {
+    const key = releaseKey()
+    const files = buildRelease({ key, host: HOST, version: DEVICE_SERVICE_VERSION })
+    files.set("latest.json", new TextEncoder().encode(JSON.stringify({ version: DEVICE_SERVICE_VERSION, min_engine_version: "0.1.0" })))
+    const served = serveRelease(files, DEVICE_SERVICE_VERSION)
+    const { code, result, runs, stateDir } = await bootstrapWith({ releaseKeys: [key.publicHex], fetch: served.fetch })
+    expect([code, result]).toEqual([REMOTE_EXIT.unavailable, { state: "service_degraded", notice: VERIFY_FAILED }])
+    expect([runs, existsSync(join(stateDir, "bin"))]).toEqual([[], false])
+  })
+
+  test("a release that needs a newer engine than this build bundles stops with update_required, writing nothing", async () => {
+    const key = releaseKey()
+    // Above any engine this build can bundle.
+    const minEngine = "9999.0.0"
+    const served = serveRelease(buildRelease({ key, host: HOST, version: DEVICE_SERVICE_VERSION, minEngine }), DEVICE_SERVICE_VERSION)
+    const { code, result, runs, stateDir } = await bootstrapWith({ releaseKeys: [key.publicHex], fetch: served.fetch })
+    expect([code, result]).toEqual([
+      REMOTE_EXIT.unavailable,
+      { state: "update_required", notice: `This OmO device service needs engine ${minEngine} or later. Update OmO, then try again.` },
+    ])
+    expect([runs, existsSync(join(stateDir, "bin"))]).toEqual([[], false])
+  })
+
+  test("an unreachable release endpoint stops with the download notice, writing nothing", async () => {
+    const requested: string[] = []
+    const unreachable = async (url: string): Promise<Response> => {
+      requested.push(url)
+      throw new TypeError("fetch failed")
+    }
+    const { code, result, runs, stateDir } = await bootstrapWith({ fetch: unreachable })
+    expect([code, result]).toEqual([
+      REMOTE_EXIT.unavailable,
+      { state: "service_degraded", notice: "Could not download the OmO device service. Check the connection and try again." },
+    ])
+    expect(requested[0]).toStartWith(`${RELEASE_ORIGIN}/stable/device-service/${DEVICE_SERVICE_VERSION}/`)
+    expect([runs, existsSync(join(stateDir, "bin"))]).toEqual([[], false])
   })
 })
 

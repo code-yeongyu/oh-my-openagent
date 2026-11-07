@@ -77,6 +77,7 @@ export async function openDeviceSync(options: OpenDeviceSyncOptions): Promise<De
       memoryRoot: options.repoDir,
       syncDir,
       ...(options.machineId === undefined ? {} : { machineId: options.machineId }),
+      ...(options.log === undefined ? {} : { log: options.log }),
     })
     const engine = new SyncEngine({
       repo,

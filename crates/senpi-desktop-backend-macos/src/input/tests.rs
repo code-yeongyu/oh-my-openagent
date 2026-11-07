@@ -17,6 +17,7 @@ use super::keys;
 
 fn window(id: &str, app: &str) -> DesktopWindow {
     DesktopWindow {
+        identity: None,
         id: id.to_string(),
         title: String::new(),
         app: app.to_string(),

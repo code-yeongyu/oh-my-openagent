@@ -1,7 +1,7 @@
 import type {
   ClientInfo,
+  CommandRpc,
   ControlAttachState,
-  CommandRequest,
   EnforcementReport,
   ErrorCode,
   JsonObject,
@@ -25,9 +25,11 @@ export type OwnerState = {
   readonly conns: Set<Conn>;
   readonly log: RequestType[];
   adoptions: number;
+  /** Every device.adopt exactly as it arrived, before validation (the account field included when sent). */
+  readonly adoptRequests: Record<string, unknown>[];
   readonly attaches: Map<string, WorldSession>;
   readonly bindings: Map<string, { readonly target: string; readonly sha256: string }>;
-  readonly commands: CommandRequest[];
+  readonly commands: CommandRpc[];
   readonly uploads: UploadAssembler;
   readonly endpoints: Set<string>;
   readonly reports: Omit<EnforcementReport, "id" | "type">[];

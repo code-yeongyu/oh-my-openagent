@@ -69,7 +69,7 @@ for (const change of ["replacement", "aba", "refresh", "signing", "sealing"] as 
     expect(boundaries).toBe(1)
     expect(renames).toBe(change === "refresh" ? 1 : 0)
     expect(writerExit).toBe(0)
-  }, 15_000)
+  })
 }
 
 const lockedBoundary = (credentials: string, onHeld: () => Promise<void>) => {
@@ -144,7 +144,7 @@ test("pin boundary taken first publishes once, and a sibling replacement waiting
   expect(order.indexOf("rename")).toBeLessThan(order.indexOf("writer-locked"))
   expect(JSON.parse(readFileSync(credentials, "utf8"))).toMatchObject({ identity: "B", generation: 3 })
   expect(writerExit).toBe(0)
-}, 15_000)
+})
 
 test("an EINTR retry of the pin rename re-enters the boundary and cannot publish after the generation changed", async () => {
   const f = await fixture()
@@ -173,4 +173,4 @@ test("an EINTR retry of the pin rename re-enters the boundary and cannot publish
   expect(entries).toEqual([1, 2])
   expect(renames).toBe(1)
   expect(controller.signal.aborted).toBe(false)
-}, 15_000)
+})
