@@ -95,7 +95,7 @@ describe("the omo CLI device service hand-off", () => {
     const stateDir = join(temp(), "ds")
     mkdirSync(stateDir, { recursive: true, mode: 0o700 })
     // An endpoint file that exists but answers nothing a client can use.
-    await Bun.write(join(stateDir, process.platform === "win32" ? "port" : "service.sock"), "")
+    await Bun.write(deviceServiceEndpointPath(stateDir), "")
     const lines: string[] = []
     const handoff = cliDeviceServiceHandoff({
       api: "http://127.0.0.1:9", stateDir, fetch: me, log: line => lines.push(line),
