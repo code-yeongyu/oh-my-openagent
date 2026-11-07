@@ -35,7 +35,7 @@ describe("authoritative prompt admission", () => {
     expect(
       await run("thread_send", { thread: "dur-on-b", message: "once", idempotency_key: "older-engine-turn" }),
     ).toMatchObject({ kind: "ok", delivery: { kind: "started", turn_id: "7" }, deduplicated: false })
-    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toHaveLength(1)
+    expect(commands(a.sent)).toEqual(["prompt", "get_state"])
   })
 
   test.each([
@@ -53,6 +53,22 @@ describe("authoritative prompt admission", () => {
       expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toHaveLength(1)
     },
   )
+})
+
+// Each entry is one session.command frame the device service sends toward the relay, so one round trip (#12320).
+const commands = (sent: readonly { readonly rpc?: Readonly<Record<string, unknown>> }[]) =>
+  sent.map((entry) => entry.rpc?.["type"])
+
+describe("#12320: a send to another device is one prompt, with no get_state before it", () => {
+  test("#given the prompt's reply is lost on the way back #when a message is sent #then the send is idempotency_uncertain naming the reason, and nothing else is sent", async () => {
+    const a = account({ promptOutcome: { kind: "uncertain", reason: "reply_lost" } })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({
+      kind: "error",
+      error: { code: "idempotency_uncertain", details: { device: "b", reason: "reply_lost" } },
+    })
+    expect(commands(a.sent)).toEqual(["prompt"])
+  })
 })
 
 describe("SC-R8: from this device on another (create, list, open, status, prompt, abort, fork)", () => {
@@ -90,10 +106,11 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     })
     expect(a.sent.map((entry) => [entry.via, entry.rpc?.["type"]])).toEqual([
       ["session", "get_messages"],
-      ["session", "get_state"],
       ["session", "prompt"],
       ["session", "interrupt"],
     ])
+    // An idle engine starts a followUp prompt as it starts a bare one, and one that turned busy meanwhile queues it.
+    expect(a.sent.find((entry) => entry.rpc?.["type"] === "prompt")?.rpc?.["streamingBehavior"]).toBe("followUp")
   })
 
   test.each([
@@ -151,6 +168,7 @@ describe("remote == local: the same call answers the same on b as on this device
     const sent = await run("thread_send", { thread: "dur-on-b", message: "later" })
     expect(sent).toMatchObject({ kind: "ok", delivery: { kind: "queued", queue_position: 3 } })
     expect("message_seq" in sent).toBe(false)
+    expect(commands(a.sent)).toEqual(["prompt", "get_state"])
   })
 })
 
@@ -177,7 +195,7 @@ describe("remote == local, round 2: send modes, handoff, list and alias order", 
     expect(
       await run("thread_send", { thread: "dur-on-b", message: "x", delivery: "steer", expected_turn_id: "3" }),
     ).toMatchObject({ kind: "error", error: { code: "not_steerable" } })
-    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toEqual([])
+    expect(commands(a.sent)).toEqual(["get_state"])
   })
 
   test("#given b is mid-turn #when a steer with a well-formed expected turn reaches it #then it is refused turn_conflict because b's engine cannot confirm the turn yet, and no prompt is sent", async () => {
@@ -189,7 +207,7 @@ describe("remote == local, round 2: send modes, handoff, list and alias order", 
       kind: "error",
       error: { code: "turn_conflict", details: { device: "b", reason: "remote_turn_not_verifiable" } },
     })
-    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toEqual([])
+    expect(commands(a.sent)).toEqual(["get_state"])
   })
 
   test("#given a follow_up to b while it runs #when it is sent #then it is queued behind b's own pending count", async () => {

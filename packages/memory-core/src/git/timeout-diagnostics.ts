@@ -43,6 +43,7 @@ export function recordGitTimeout(
   argv: readonly string[],
   cwd: string,
   timeoutMs: number,
+  snapshot: (pid: number) => string = processSnapshot,
 ): void {
   const directory = environment[GIT_TIMEOUT_DIAGNOSTICS_ENV]
   if (!directory || pid === undefined) return
@@ -58,7 +59,7 @@ export function recordGitTimeout(
           timeoutMs,
           argv: argv.slice(0, 12),
           argCount: argv.length,
-          processes: processSnapshot(pid),
+          processes: snapshot(pid),
         },
         null,
         2,

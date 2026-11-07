@@ -60,12 +60,7 @@ export type {
 /** A desktop host whose private sync channel is missing or refused: sync stays idle and diagnosable, never the CLI. */
 export interface DesktopSyncUnavailable {
   readonly kind: "unavailable"
-  readonly reason:
-    | "private_channel_unavailable"
-    | "platform_not_supported"
-    | "port_absent"
-    | "selection_failed"
-    | "host_bootstrap_absent"
+  readonly reason: "private_channel_unavailable" | "port_absent" | "selection_failed" | "host_bootstrap_absent"
 }
 
 export type DeviceAccount = CliDeviceAccount | DesktopSyncAccount | DesktopSyncUnavailable

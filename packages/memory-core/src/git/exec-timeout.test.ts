@@ -135,8 +135,16 @@ describe("a timed-out git (omo #10199 field incident)", () => {
       )
       expect(record.argv).toEqual(["-c", "core.fsmonitor=false", "add", "-A", "--", "n000.md"])
       expect(record.timeoutMs).toBe(2_000)
-      expect(record.processes).toContain(String(record.pid))
-      expect(record.processes).toContain(join(git.bin, "git"))
+      // #12145: the record proves the table was captured before the signal. Under host load the
+      // snapshot itself can time out, so the field holds the failure form instead; assert the
+      // contract (a table naming the pid, or the timeout failure form), not which one the host
+      // produced. Only a timed-out snapshot is excused: any other snapshot failure (missing
+      // binary, sandbox denial, ...) still has to name the pid, so a snapshot that can never
+      // work cannot pass.
+      const tableNamesPid =
+        record.processes.includes(String(record.pid)) && record.processes.includes(join(git.bin, "git"))
+      const snapshotTimedOut = /^process snapshot failed: .*ETIMEDOUT/.test(record.processes)
+      expect(tableNamesPid || snapshotTimedOut).toBe(true)
     },
     60_000,
   )

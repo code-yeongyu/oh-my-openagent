@@ -74,6 +74,7 @@ export function createRemoteThreadFixture() {
       noRegistry?: boolean
       engine?: Engine
       promptResponse?: JsonObject
+      promptOutcome?: RemoteCommandOutcome
       openData?: JsonObject
       failSessionsList?: boolean
       failAliasesOf?: boolean
@@ -127,6 +128,7 @@ export function createRemoteThreadFixture() {
         })
       if (rpc["type"] === "get_messages") return ok({ messages: [...engine.messages] })
       if (rpc["type"] === "interrupt") return ok(engine.interrupt)
+      if (rpc["type"] === "prompt" && options.promptOutcome !== undefined) return options.promptOutcome
       if (rpc["type"] === "prompt")
         return ok(
           options.promptResponse ??
