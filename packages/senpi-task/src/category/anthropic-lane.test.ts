@@ -82,6 +82,29 @@ describe("builtin Claude rungs under the senpi harness", () => {
     expect(resolved.resolved_model).toMatchObject({ provider: "anthropic-subscription", model_id: "claude-fable-5-1" })
   })
 
+  // #12753: the builtin defaults of these categories name `anthropic/<model>`. With an Anthropic API key also
+  // connected, that literal used to win over the chain's provider order, so the child ran (and was billed) on
+  // the API key even though every Claude rung lists `anthropic-subscription` first.
+  test.each([
+    ["architect", "claude-fable-5-1"],
+    ["artistry", "claude-fable-5-1"],
+    ["unspecified-low", "claude-sonnet-5-5"],
+    ["unspecified-high", "claude-opus-5-5"],
+  ])("#given the API key and the subscription both serve the model #when %s resolves #then the subscription the chain lists first is selected and the API key is not a fallback", (category, modelId) => {
+    // given: the API-key lane listed FIRST, so registry order cannot be what picks the subscription
+    const bothLanes = registry(["claude-fable-5-1", "claude-opus-5-5", "claude-sonnet-5-5"].flatMap((id) => [
+      model("anthropic", id),
+      model("anthropic-subscription", id),
+    ]))
+
+    // when
+    const resolved = expectResolvedCategory(resolveCategory(category, {}, bothLanes))
+
+    // then
+    expect([resolved.spec.provider, resolved.spec.modelId]).toEqual(["anthropic-subscription", modelId])
+    expect((resolved.spec.fallback_models ?? []).map((fallback) => fallback.display)).not.toContain(`anthropic/${modelId}`)
+  })
+
   test("#given anthropic-subscription is absent #when Claude rungs resolve #then selection is identical to the pre-lane table", () => {
     // given: the registry shape of a machine without a Claude subscription login
     const apiKeyRegistry = registry([

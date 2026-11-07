@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { createTaskRecord, type ResolvedModelRecord, type TaskRecord } from "../state"
 import { isCredentialFailure, runtimeFallbackCandidates, terminalFailureMessage } from "./credential-failure"
+import { refusalOf } from "./model-refusals"
 
 function rung(provider: string, modelId: string): ResolvedModelRecord {
   return { source: "category", provider, model_id: modelId, display: `${provider}/${modelId}` }
@@ -10,6 +11,8 @@ function rung(provider: string, modelId: string): ResolvedModelRecord {
 const GO_M3 = rung("opencode-go", "minimax-m3")
 const GO_M27 = rung("opencode-go", "minimax-m2.7")
 const ZAI_GLM = rung("zai", "glm-5.3")
+const ANTHROPIC_CREDIT_BALANCE =
+  '400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."}}'
 
 function record(primary: ResolvedModelRecord, fallbacks: readonly ResolvedModelRecord[]): TaskRecord {
   return createTaskRecord({
@@ -191,12 +194,35 @@ describe("runtimeFallbackCandidates", () => {
     expect(candidates).toEqual({ remaining: [ZAI_GLM, GO_M27], skipped: [], limit: "account" })
   })
 
+  // #12753: an empty API-key balance is a billing fault, not a usage limit. Other providers still go first,
+  // but the walk carries no usage-limit scope.
+  test("#given an Anthropic credit-balance 400 on the first rung #when the candidates are computed #then other providers come first and no usage limit is recorded", () => {
+    const candidates = runtimeFallbackCandidates(record(GO_M3, [GO_M27, ZAI_GLM]), ANTHROPIC_CREDIT_BALANCE)
+
+    expect(candidates).toEqual({ remaining: [ZAI_GLM, GO_M27], skipped: [] })
+  })
+
   test("#given a limit that names one model #when the candidates are computed #then the sibling model on the same provider is next", () => {
     const candidates = runtimeFallbackCandidates(record(GO_M3, [GO_M27, ZAI_GLM]), "You've hit your Fable weekly limit \u00b7 resets Oct 2, 9am")
 
     expect(candidates).toEqual({ remaining: [GO_M27, ZAI_GLM], skipped: [], limit: "model" })
   })
 
+})
+
+describe("refusalOf", () => {
+  test.each([
+    ["Anthropic's credit-balance 400", ANTHROPIC_CREDIT_BALANCE],
+    ["an insufficient-credits answer", '402: {"error":{"message":"Insufficient credits. Add more using https://example.test/credits"}}'],
+  ])("#given %s #when the refusal is recorded #then its reason is billing, not a usage limit", (_label, message) => {
+    expect(refusalOf(record(GO_M3, []), message, "2026-11-07T00:00:00.000Z").reason).toBe("billing")
+  })
+
+  test("#given a usage limit worded with its billing cycle #when the refusal is recorded #then it stays a usage limit", () => {
+    const limit = `403: {"message":"You've reached your usage limit for this billing cycle.","type":"access_terminated_error"}`
+
+    expect(refusalOf(record(GO_M3, []), limit, "2026-11-07T00:00:00.000Z").reason).toBe("usage_limit")
+  })
 })
 
 describe("terminalFailureMessage", () => {
