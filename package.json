@@ -266,6 +266,10 @@
     "oh-my-opencode-windows-x64-baseline": "5.1.62"
   },
   "overrides": {
+    "brace-expansion": "5.0.12",
+    "brace-expansion@1": "1.1.18",
+    "brace-expansion@2": "2.1.4",
+    "brace-expansion@3": "3.0.6",
     "hono": "^4.13.8",
     "@hono/node-server": "2.1.1",
     "express-rate-limit": "^8.7.0",
