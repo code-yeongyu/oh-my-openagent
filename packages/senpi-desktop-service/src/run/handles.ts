@@ -9,6 +9,7 @@ import {
 	isAttributePairs,
 	isAxInputResult,
 	isAxNode,
+	isExecResult,
 	isMenuItem,
 	isText,
 	listOf,
@@ -133,7 +134,7 @@ export class ElementHandle {
 
 	#send(method: string, engineMethod: EngineMethod, params: object): Promise<void> {
 		return this.#method(method, async ({ call }) => {
-			await call(engineMethod, { ref: this.ref, ...params });
+			expectResult(engineMethod, await call(engineMethod, { ref: this.ref, ...params }), isExecResult);
 		});
 	}
 

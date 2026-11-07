@@ -199,7 +199,13 @@ async function permissionResult(result: Promise<ComputerToolResult>, handle: Com
 		if (!(error instanceof DesktopEngineRpcError) || error.data === null || !("code" in error.data) ||
 			(error.data.code !== "PermissionDenied" && error.data.code !== "ControlRequired" &&
 				error.data.code !== "InputBusy" && error.data.code !== "Suspended")) throw error;
-		const failure = computerFailure(error.data.code, error.message, handle.settings().stopHotkey, error.data.permission);
+		const failure = computerFailure(
+			error.data.code,
+			error.message,
+			handle.settings().stopHotkey,
+			error.data.permission,
+			error.data.reason,
+		);
 		return {
 			content: [{ type: "text", text: JSON.stringify(failure, null, 2) }],
 			details: { value: failure, isError: true },

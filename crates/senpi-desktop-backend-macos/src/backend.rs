@@ -121,6 +121,10 @@ impl Backend for MacosBackend {
         MacosBackend::capabilities(self)
     }
 
+    fn hit_at(&mut self, x: f64, y: f64) -> CoreResult<Option<senpi_desktop_core::frame::PointHit>> {
+        crate::ax::element::hit_at(x, y)
+    }
+
     fn set_show_cursor(&mut self, enabled: bool) {
         MacosBackend::set_show_cursor(self, enabled);
     }

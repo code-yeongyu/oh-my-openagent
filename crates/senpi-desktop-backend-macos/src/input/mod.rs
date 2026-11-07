@@ -20,6 +20,7 @@ mod remote;
 pub(crate) use keymap::run_helper as run_keymap_helper;
 mod release;
 mod user_monitor;
+pub(crate) use user_monitor::process_started;
 
 #[cfg(test)]
 mod tests;

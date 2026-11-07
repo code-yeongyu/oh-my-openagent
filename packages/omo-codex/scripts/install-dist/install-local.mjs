@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:a9613ef38f6cb8eadfc32b34f2bbd2b217fc2f498913b81fd64c05ce3c262f32:8902ae37787a3b65b0e739f68d86961b85d6cdfb63ffa66dd8d93cb78c67e6d9
+// omo-codex-install:9aecb10f21cd4163e36377dbcb4fb7c34aefdfe7b7233b54b30289e8b2aceef8:93aba3c30c3d141f73a35fd0d155a1381ee592cc63e1465a7e1c3a2d7ba40ef7
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10205,7 +10205,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.64",
+    version: "5.1.62",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -19716,7 +19716,11 @@ var OmoComputerSettingsLayerSchema = object({
   audit_log: object({ enabled: boolean2() }).partial().strict(),
   screenshot_gc: object({ enabled: boolean2(), stale_ms: nonNegativeInteger, scan_interval_ms: nonNegativeInteger }).partial().strict(),
   engine_path: string2().min(1),
-  cua_adapter: boolean2()
+  cua_adapter: boolean2(),
+  run_sandbox: _enum(["vm", "quickjs"]).describe("Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"),
+  intervention: _enum(["continue", "pause"]).describe("What a background action does while the user uses the target app (default: pause)"),
+  macos_key_priming: _enum(["on", "off"]).describe("macOS background keys first make the target window key (default: off)"),
+  trace: boolean2().describe("Per-request timing traces (default: false)")
 }).partial().strict().describe("Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host.");
 var OmoComputerSettingsSchema = OmoComputerSettingsLayerSchema;
 
