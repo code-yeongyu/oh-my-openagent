@@ -1,5 +1,5 @@
 {
-	"note": "Built publishable output of the two packages, vendored because neither is on npm. files: sha256 of every vendored file; the publish manifest is recorded here instead of vendored. Re-sync with scripts/sync-bunshin-ts.ts.",
+	"note": "Built publishable output of the two packages, vendored because neither is on npm. files: sha256 of every vendored file; the publish manifest is recorded here instead of vendored. The runtime JS imports each npm dependency through package.json `#bunshin-ts-dep/<name>` instead of its bare name (the one change made to the build output). Re-sync with scripts/sync-bunshin-ts.ts.",
 	"packages": {
 		"bunshin-ts": {
 			"name": "@sisyphuslabs/bunshin-ts",
@@ -13,7 +13,7 @@
 				"LICENSE": "80ecedb83344fb3d85c0ae989eb902181f033ac491e1eb5dacb2bebb7fc2816e",
 				"README.md": "2382f908f7b6ba5b7404d1ca8a454a1382cc5d33341244125bfb1be81eaf27e1",
 				"index.d.ts": "070ce47e794d2ff5ce0dcec3c6a5a47bab6f52a2f9bf9fbdb294e61dd5ce42f3",
-				"index.js": "820af345cd441312c2e2a44c2f6a5ab5b577c3173deaa29f43ef5600ea35d255",
+				"index.js": "0bbbd0671238d689d651b861d872c034793e9f431d275ea39bf538dde3c80fed",
 				"types/bunshin-ts/src/bunshin-nodes.d.ts": "09066e328630d16aab34ca41c8538f79b429fe87ec95adf5ad82d20397a3f2b1",
 				"types/bunshin-ts/src/client-errors.d.ts": "f0b9eebad7c08752e2469206cecfb075e5fe3becb3bbb15985394d20fa8cd55a",
 				"types/bunshin-ts/src/command-handle.d.ts": "4702704d63619e03b292e13200c35d41f9ebc8db69112c33a2714edc24b7e9a2",
