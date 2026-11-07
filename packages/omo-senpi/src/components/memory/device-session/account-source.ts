@@ -32,10 +32,12 @@ export type KeyringFactory = (material: DeviceKeyMaterial) => Promise<DeviceKeyr
 /**
  * This machine's device service as the memory device session reaches it (design D r9 section 3, r7 N8r): `readopt`
  * re-sends device.adopt from the credential this session already read for its own sync work, only while the service
- * reports no adopted device; `forget` runs when the service ends this sign-in. Neither reads the credential store.
+ * reports no adopted device, and answers whether a running service handled it (adopted, or already adopted); false
+ * means no service was running, so the next resolve checks again. `forget` runs when the service ends this sign-in.
+ * Neither reads the credential store.
  */
 export interface HeldCredentialRelay {
-  readonly readopt: (credential: HeldDeviceCredential) => Promise<void>
+  readonly readopt: (credential: HeldDeviceCredential) => Promise<boolean>
   readonly forget: () => Promise<void>
 }
 
@@ -195,17 +197,17 @@ export function createCliAccountSource(options: {
     // work. There is no second store read and no unseal for relay. No-holder clause (design D r9 section 3): this
     // session is omo's only holder. If no omo process holds the credential in memory (no engine with memory sync
     // running), an omo-only machine stays not_adopted until one does. Nothing prompts and nothing reads the store for relay.
-    // Marked offered only once the hand-over succeeds: a failure (service down, a refusal) is logged, never thrown into
-    // the session, and retried on the next resolve.
+    // Marked offered only once a running service handled it: no service yet, or a failure (a refusal, a dropped
+    // connection), is retried on the next resolve, the session's own cadence; a failure is logged, never thrown.
     if (relay !== undefined && offered !== generation) {
       try {
-        await relay.readopt({
+        const handled = await relay.readopt({
           device: { id: captured.device.id, name: captured.device.name },
           account: accountId,
           signingPrivateKey: captured.signingPrivateKey,
           sealingPrivateKey: captured.sealingPrivateKey,
         })
-        offered = generation
+        if (handled) offered = generation
       } catch (error) {
         relayFailed("re-adopt")(error)
       }

@@ -48,6 +48,7 @@ function recordingRelay(failure?: Error) {
     readopt: async credential => {
       held.push(credential)
       if (failure !== undefined) throw failure
+      return true
     },
     forget: async () => undefined,
   }
@@ -86,6 +87,7 @@ describe("the memory device session re-adopts from its held credential", () => {
       readopt: async () => {
         attempts.push(down ? "failed" : "adopted")
         if (down) throw new Error("relayd down")
+        return true
       },
       forget: async () => undefined,
     }

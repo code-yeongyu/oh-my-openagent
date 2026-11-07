@@ -6,7 +6,7 @@
 // order every entry (the desktop's included) follows.
 
 import { sessionWorkerData } from "@code-yeongyu/senpi/session-worker-data"
-import { connectDeviceService, deviceServiceStateDir, forgetDeviceService, handDeviceKeys } from "@oh-my-opencode/device-service-core"
+import { connectDeviceService, type DeviceService, deviceServiceStateDir, forgetDeviceService, handDeviceKeys } from "@oh-my-opencode/device-service-core"
 import { createOmoNativeProductConfig } from "../../telemetry/product-identity"
 import { MEMORY_SYNC_WORKER_DATA, type MemorySyncSelection } from "../desktop-sync/hostSelection"
 import { workerMemorySyncSource } from "../desktop-sync/workerPort"
@@ -23,13 +23,12 @@ export { serveWorkerPort } from "../desktop-sync/workerPort"
  * This machine's running device service (never installed or started from here): the re-adopt from the memory device
  * session's held credential, and forget when the service ends the sign-in (design D r9 section 3).
  */
-function engineDeviceService(): HeldCredentialRelay {
-  const stateDir = deviceServiceStateDir()
-  const connect = () => connectDeviceService({ version: createOmoNativeProductConfig().packageVersion, stateDir, background: true })
+export function engineDeviceService(
+  stateDir: string = deviceServiceStateDir(),
+  connect: () => Promise<DeviceService> = () => connectDeviceService({ version: createOmoNativeProductConfig().packageVersion, stateDir, background: true }),
+): HeldCredentialRelay {
   return {
-    readopt: async credential => {
-      await handDeviceKeys({ stateDir, connect, credential, when: "not_adopted" })
-    },
+    readopt: async credential => (await handDeviceKeys({ stateDir, connect, credential, when: "not_adopted" })) !== "not_running",
     forget: async () => {
       await forgetDeviceService({ stateDir, connect })
     },
