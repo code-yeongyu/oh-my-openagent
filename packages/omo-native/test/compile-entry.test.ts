@@ -212,6 +212,30 @@ describe("compiled omo entry launcher parity", () => {
     expect(isProvisionedExecutable(expected, executable)).toBe(true)
   })
 
+  describe("#given Windows path spellings of one runtime copy (#12769)", () => {
+    const long = "C:\\Users\\runneradmin\\AppData\\Local\\Temp\\home\\.omo\\binary-runtime\\9.0.0\\omo.exe"
+    const short = "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\home\\.omo\\binary-runtime\\9.0.0\\omo.exe"
+    // The native resolver (GetFinalPathNameByHandle) expands 8.3 names and may keep the \\?\ prefix.
+    const nativeRealpath = (path: string) => `\\\\?\\${path.replace("RUNNER~1", "runneradmin")}`
+    const missing = (path: string): string => { throw Object.assign(new Error(`ENOENT: ${path}`), { code: "ENOENT" }) }
+
+    test("#when the running exe is long and the expected path is the 8.3 short home #then they are the same executable", () => {
+      expect(isProvisionedExecutable(long, short, "win32", nativeRealpath)).toBe(true)
+    })
+
+    test("#when the paths differ only in case and cannot be resolved #then they are the same executable", () => {
+      expect(isProvisionedExecutable(long, long.toUpperCase(), "win32", missing)).toBe(true)
+    })
+
+    test("#when another runtime version is expected #then it is not the provisioned executable", () => {
+      expect(isProvisionedExecutable(long, short.replace("9.0.0", "9.0.1"), "win32", nativeRealpath)).toBe(false)
+    })
+
+    test("#when POSIX paths differ only in case #then they stay different executables", () => {
+      expect(isProvisionedExecutable("/home/u/.omo/omo", "/home/u/.OMO/omo", "linux", missing)).toBe(false)
+    })
+  })
+
   test("a release build's update notice points at omo update instead of a fixed download", () => {
     const env = remapSenpiEnvironment({ PATH: "/bin" }, temp())
     const brand = JSON.parse(env.SENPI_BRAND ?? "{}") as { update?: { command?: string } }
