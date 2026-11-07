@@ -310,24 +310,35 @@ impl Hyprland {
     /// the caller's own not-found error.
     pub fn place_in(
         &self,
-        mut windows: Vec<DesktopWindow>,
+        windows: Vec<DesktopWindow>,
         id: &str,
     ) -> (Vec<DesktopWindow>, Option<DesktopError>) {
-        let Some(window) = windows.iter_mut().find(|window| window.id == id) else {
-            return (windows, None);
-        };
-        let unplaced = match self.placement(window) {
-            Ok(placement) => {
-                window.x = placement.rect.x;
-                window.y = placement.rect.y;
-                window.width = placement.rect.width;
-                window.height = placement.rect.height;
-                None
-            }
-            Err(error) => Some(error),
-        };
-        (windows, unplaced)
+        place_window_in(windows, id, |window| self.placement(window))
     }
+}
+
+/// `windows` with window `id` moved onto the rect `placement` reports; when
+/// it cannot be placed, `windows` comes back unchanged with the refusal, and
+/// a window `windows` does not list is left to the caller's not-found error.
+pub(crate) fn place_window_in(
+    mut windows: Vec<DesktopWindow>,
+    id: &str,
+    placement: impl FnOnce(&DesktopWindow) -> CoreResult<Placement>,
+) -> (Vec<DesktopWindow>, Option<DesktopError>) {
+    let Some(window) = windows.iter_mut().find(|window| window.id == id) else {
+        return (windows, None);
+    };
+    let unplaced = match placement(window) {
+        Ok(placement) => {
+            window.x = placement.rect.x;
+            window.y = placement.rect.y;
+            window.width = placement.rect.width;
+            window.height = placement.rect.height;
+            None
+        }
+        Err(error) => Some(error),
+    };
+    (windows, unplaced)
 }
 
 #[cfg(test)]

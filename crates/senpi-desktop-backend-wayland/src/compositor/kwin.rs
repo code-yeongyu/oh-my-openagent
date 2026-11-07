@@ -26,7 +26,7 @@ use tokio::sync::oneshot;
 use zbus::message::Header;
 use zbus::Connection;
 
-use super::hyprland::{Placement, WindowRect};
+use super::hyprland::{place_window_in, Placement, WindowRect};
 use crate::portal::portal_runtime;
 
 pub const DESKTOP_ENV: &str = "XDG_CURRENT_DESKTOP";
@@ -419,6 +419,18 @@ impl Kwin {
     /// See [`place`] and [`Kwin::windows`].
     pub fn placement(&self, window: &DesktopWindow) -> CoreResult<Placement> {
         place(&self.windows()?, window)
+    }
+
+    /// `windows` with window `id` moved onto its KWin frame rect, read with
+    /// one script run, so a window capture crops the pixels KWin shows at the
+    /// same rect a window click is placed at. When the window cannot be
+    /// placed, `windows` comes back unchanged with the refusal saying why.
+    pub fn place_in(
+        &self,
+        windows: Vec<DesktopWindow>,
+        id: &str,
+    ) -> (Vec<DesktopWindow>, Option<DesktopError>) {
+        place_window_in(windows, id, |window| self.placement(window))
     }
 }
 
