@@ -51,20 +51,85 @@ pub fn token_file(endpoint: &str) -> std::path::PathBuf {
 /// # Errors
 /// The daemon is not reachable or its reply is not JSON.
 pub fn exchange(endpoint: &str, request: &Value) -> io::Result<Value> {
-    let stream = connect_until(endpoint, Instant::now() + BUSY_GUARD, &is_busy)?;
-    exchange_over(stream, request)
+    retry_reset_once(|| {
+        let stream = connect_until(endpoint, Instant::now() + BUSY_GUARD, &is_busy)?;
+        exchange_over(stream, request)
+    })
+}
+
+/// A reset or broken pipe before the first byte from the daemon: a daemon
+/// that was exiting closed its listener with this connection still
+/// unaccepted (T25-24), so no daemon read the request.
+#[derive(Debug)]
+struct ResetBeforeReply(io::Error);
+
+impl std::fmt::Display for ResetBeforeReply {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "the daemon reset the connection before replying: {}", self.0)
+    }
+}
+
+impl std::error::Error for ResetBeforeReply {}
+
+/// Runs `attempt` again, once, when it failed with [`ResetBeforeReply`]. Any
+/// other failure, a second reset, or a reset after a reply byte is returned.
+fn retry_reset_once<T>(mut attempt: impl FnMut() -> io::Result<T>) -> io::Result<T> {
+    match attempt() {
+        Err(error) if error.get_ref().is_some_and(|inner| inner.is::<ResetBeforeReply>()) => attempt(),
+        outcome => outcome,
+    }
+}
+
+/// A stream that counts the bytes read from it.
+struct Counted<S> {
+    inner: S,
+    read: usize,
+}
+
+impl<S: io::Read> io::Read for Counted<S> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let read = self.inner.read(buf)?;
+        self.read += read;
+        Ok(read)
+    }
+}
+
+impl<S: Write> Write for Counted<S> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.inner.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+/// Marks a reset or broken pipe as [`ResetBeforeReply`] while nothing was read.
+fn before_reply(error: io::Error, read: usize) -> io::Error {
+    if read == 0 && matches!(error.kind(), io::ErrorKind::ConnectionReset | io::ErrorKind::BrokenPipe) {
+        io::Error::new(error.kind(), ResetBeforeReply(error))
+    } else {
+        error
+    }
 }
 
 /// Writes `request` and returns the first reply line. Notifications of the
 /// shared session (another client's audit or stop change) can arrive first
 /// and are skipped.
-fn exchange_over(mut stream: impl io::Read + Write, request: &Value) -> io::Result<Value> {
-    writeln!(stream, "{request}")?;
-    stream.flush()?;
+fn exchange_over(stream: impl io::Read + Write, request: &Value) -> io::Result<Value> {
+    let mut stream = Counted { inner: stream, read: 0 };
+    // One write for the whole line: the daemon never sees part of a request.
+    stream
+        .write_all(format!("{request}\n").as_bytes())
+        .map_err(|error| before_reply(error, 0))?;
+    stream.flush().map_err(|error| before_reply(error, 0))?;
     let mut reader = BufReader::new(stream);
     loop {
         let mut line = String::new();
-        if reader.read_line(&mut line)? == 0 {
+        let read = reader
+            .read_line(&mut line)
+            .map_err(|error| before_reply(error, reader.get_ref().read))?;
+        if read == 0 {
             return Err(io::Error::new(
                 io::ErrorKind::UnexpectedEof,
                 "the daemon closed the connection before replying",
@@ -146,14 +211,16 @@ fn connect(endpoint: &str) -> io::Result<std::fs::File> {
 /// # Errors
 /// The daemon could not be started or never accepted within the guard.
 pub fn exchange_or_start(endpoint: &str, serve_args: &[String], request: &Value) -> io::Result<Value> {
-    // The connection that finds the daemon carries the request: a separate probe would take a
-    // named pipe's only free instance, and the real connect would then find it busy.
-    let stream = match connect_until(endpoint, Instant::now() + BUSY_GUARD, &is_busy) {
-        Ok(stream) => stream,
-        Err(error) if refusal(&error) => return Err(error),
-        Err(_) => start_and_connect(endpoint, serve_args)?,
-    };
-    exchange_over(stream, request)
+    retry_reset_once(|| {
+        // The connection that finds the daemon carries the request: a separate probe would take a
+        // named pipe's only free instance, and the real connect would then find it busy.
+        let stream = match connect_until(endpoint, Instant::now() + BUSY_GUARD, &is_busy) {
+            Ok(stream) => stream,
+            Err(error) if refusal(&error) => return Err(error),
+            Err(_) => start_and_connect(endpoint, serve_args)?,
+        };
+        exchange_over(stream, request)
+    })
 }
 
 /// Starts the daemon and connects once it accepts. A start that exits before
@@ -324,6 +391,154 @@ mod tests {
         // Then
         assert_eq!(reply, json!({"jsonrpc": "2.0", "id": 1, "result": 7}));
         server.join().expect("server thread");
+    }
+
+    /// A daemon end that fails the write or read with `kind`, after `reply` bytes.
+    struct Failing {
+        reply: std::io::Cursor<Vec<u8>>,
+        write: Option<std::io::ErrorKind>,
+        read: std::io::ErrorKind,
+    }
+
+    impl Read for Failing {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            match self.reply.read(buf)? {
+                0 => Err(self.read.into()),
+                read => Ok(read),
+            }
+        }
+    }
+
+    impl std::io::Write for Failing {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.write.map_or(Ok(buf.len()), |kind| Err(kind.into()))
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    /// Runs the retried exchange over `ends` in order; returns the outcome and the attempts used.
+    fn exchange_over_ends(ends: Vec<Failing>) -> (std::io::Result<serde_json::Value>, usize) {
+        let mut ends = ends.into_iter();
+        let mut attempts = 0;
+        let outcome = super::retry_reset_once(|| {
+            attempts += 1;
+            exchange_over(ends.next().expect("an end per attempt"), &json!({"id": 1}))
+        });
+        (outcome, attempts)
+    }
+
+    fn end(reply: &str, write: Option<std::io::ErrorKind>, read: std::io::ErrorKind) -> Failing {
+        Failing { reply: std::io::Cursor::new(reply.as_bytes().to_vec()), write, read }
+    }
+
+    #[test]
+    fn t25_24_the_reset_retry_happens_once_and_only_before_a_reply_byte() {
+        use std::io::ErrorKind::{BrokenPipe, ConnectionReset, UnexpectedEof};
+        let replied = || end("{\"id\":1,\"result\":1}\n", None, UnexpectedEof);
+        // A broken pipe on the write, then a served retry.
+        let (outcome, attempts) = exchange_over_ends(vec![end("", Some(BrokenPipe), UnexpectedEof), replied()]);
+        assert_eq!((outcome.expect("retried")["result"].clone(), attempts), (json!(1), 2));
+        // Two resets: the second is returned, no third attempt.
+        let reset = || end("", None, ConnectionReset);
+        let (outcome, attempts) = exchange_over_ends(vec![reset(), reset(), replied()]);
+        assert_eq!((outcome.expect_err("second reset").kind(), attempts), (ConnectionReset, 2));
+        // A reset after a notification byte: the request may have run, so it is not retried.
+        let late = end("{\"method\":\"stopPath.changed\"}\n", None, ConnectionReset);
+        let (outcome, attempts) = exchange_over_ends(vec![late, replied()]);
+        assert_eq!((outcome.expect_err("late reset").kind(), attempts), (ConnectionReset, 1));
+    }
+
+    #[test]
+    fn a_close_before_the_reply_is_not_retried() {
+        // Given: a daemon that read the request and closed without a reset.
+        let (client, daemon) = std::os::unix::net::UnixStream::pair().expect("socket pair");
+        let server = std::thread::spawn(move || {
+            let mut request = String::new();
+            std::io::BufRead::read_line(&mut std::io::BufReader::new(&daemon), &mut request).expect("request");
+        });
+        let mut attempts = 0;
+        let mut client = Some(client);
+        // When
+        let outcome = super::retry_reset_once(|| {
+            attempts += 1;
+            exchange_over(client.take().expect("one connection"), &json!({"id": 1}))
+        });
+        // Then
+        assert_eq!(outcome.expect_err("closed").kind(), std::io::ErrorKind::UnexpectedEof);
+        assert_eq!(attempts, 1);
+        server.join().expect("server thread");
+    }
+
+    /// Accepts one client and waits, without reading, until its request has arrived.
+    #[cfg(target_os = "linux")]
+    fn accept_with_request(listener: &UnixListener) -> std::os::unix::net::UnixStream {
+        use std::os::fd::AsRawFd;
+
+        let (stream, _) = listener.accept().expect("accept");
+        let mut byte = [0_u8; 1];
+        // SAFETY: `stream` is an open socket and `byte` is a writable one-byte buffer.
+        let peeked = unsafe { libc::recv(stream.as_raw_fd(), byte.as_mut_ptr().cast(), 1, libc::MSG_PEEK) };
+        assert_eq!(peeked, 1, "the request arrived");
+        stream
+    }
+
+    /// T25-24: the daemon's listener closes with this client's connection still
+    /// unaccepted, which the kernel reports as a reset before any reply byte.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn t25_24_a_reset_before_the_first_reply_byte_is_retried_once() {
+        // Given: a first daemon that closes the connection with the request unread, then a successor.
+        let dir = private_dir("reset-retry");
+        let socket = dir.join("e.sock");
+        let first = UnixListener::bind(&socket).expect("bind");
+        let path = socket.clone();
+        let server = std::thread::spawn(move || {
+            let unanswered = accept_with_request(&first);
+            std::fs::remove_file(&path).expect("unlink");
+            let successor = UnixListener::bind(&path).expect("rebind");
+            drop((first, unanswered));
+            let (answered, _) = successor.accept().expect("the retry connects");
+            let mut request = String::new();
+            std::io::BufRead::read_line(&mut std::io::BufReader::new(&answered), &mut request).expect("request");
+            std::io::Write::write_all(&mut &answered, b"{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":\"retried\"}\n")
+                .expect("reply");
+            request
+        });
+        // When
+        let reply = super::exchange(socket.to_str().expect("utf-8"), &json!({"jsonrpc": "2.0", "id": 1, "method": "displays"}));
+        // Then
+        let reply = reply.expect("the retry is answered");
+        assert_eq!(reply["result"], json!("retried"));
+        assert!(server.join().expect("server thread").contains("displays"));
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn t25_24_a_reset_after_a_reply_byte_is_not_retried() {
+        // Given: a daemon that writes a notification, then closes with the request unread.
+        let dir = private_dir("reset-late");
+        let socket = dir.join("e.sock");
+        let listener = UnixListener::bind(&socket).expect("bind");
+        let server = std::thread::spawn(move || {
+            let stream = accept_with_request(&listener);
+            std::io::Write::write_all(&mut &stream, b"{\"jsonrpc\":\"2.0\",\"method\":\"stopPath.changed\",\"params\":{}}\n")
+                .expect("notification");
+            drop(stream);
+            listener
+        });
+        // When
+        let failed = super::exchange(socket.to_str().expect("utf-8"), &json!({"jsonrpc": "2.0", "id": 1, "method": "click"}));
+        // Then: the error is returned and nothing connected again.
+        let failed = failed.expect_err("a reset after a reply byte is an error");
+        assert_eq!(failed.kind(), std::io::ErrorKind::ConnectionReset, "{failed}");
+        let listener = server.join().expect("server thread");
+        listener.set_nonblocking(true).expect("nonblocking");
+        assert_eq!(listener.accept().map(drop).map_err(|error| error.kind()), Err(std::io::ErrorKind::WouldBlock));
+        std::fs::remove_dir_all(&dir).expect("cleanup");
     }
 
     #[test]

@@ -217,6 +217,12 @@ class AttachedPort implements RpcPort {
 		if (this.#ended) {
 			return Promise.reject(new PortError({ message: `${method}: the connection is closed`, code: "Closed", nothingSent: true }));
 		}
+		// An abort listener only hears a future abort; a signal aborted already sends nothing.
+		if (options.signal?.aborted) {
+			return Promise.reject(
+				new PortError({ message: `${method}: cancelled before it was sent`, code: "Cancelled", nothingSent: true }),
+			);
+		}
 		const id = this.#nextId++;
 		const { promise, resolve, reject } = Promise.withResolvers<unknown>();
 		const cancel = () => this.#write({ jsonrpc: "2.0", method: "$/cancel", params: { id } });
