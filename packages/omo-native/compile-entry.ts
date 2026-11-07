@@ -45,6 +45,8 @@ import { ExtraCaCertificatesError, parseExtraCaCertificates } from "./compiled-c
 import { adoptedEngineTrust, buildTrustLaunchEnvironment } from "@code-yeongyu/senpi/engine-trust"
 import { runTrustStage } from "./trust-stage"
 import { resolveEngineTrustHelperPath } from "./engine-trust-helper-path"
+import { claimsMemorySyncAtBoot } from "./bin/lib/memory-sync-boot.js"
+import { claimMemorySyncAtBoot } from "./memory-sync-boot"
 
 // The engine is imported via a RELATIVE string LITERAL, inlined at both import
 // sites, and both properties are load-bearing:
@@ -356,6 +358,7 @@ async function main(): Promise<void> {
     if (await runCompiledLauncher(process.argv.slice(2), execDir)) return
     process.argv.splice(2, process.argv.length - 2, ...buildSenpiArgs(process.argv.slice(2), execDir))
     Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))
+    if (claimsMemorySyncAtBoot(process.argv.slice(2))) await claimMemorySyncAtBoot()
     await registerEngineRuntimeModules()
     await import("../../node_modules/@code-yeongyu/senpi/dist/cli.js") // literal: see import note above
     return
@@ -433,6 +436,7 @@ async function main(): Promise<void> {
   Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))
   applyCachedClaudeCode(process.env, execDir)
   if (isInternalSupervisorLaunch(process.argv.slice(2)) && await runInternalSupervisor(process.argv.slice(2))) return
+  if (claimsMemorySyncAtBoot(process.argv.slice(2))) await claimMemorySyncAtBoot()
   await registerEngineRuntimeModules()
   await import("../../node_modules/@code-yeongyu/senpi/dist/cli.js") // literal: see import note above
 }

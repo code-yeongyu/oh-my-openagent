@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { isEngineCommand } from "./engine-commands.js"
 import { spawnNode } from "./child-process.js"
 import { privateFdHandoff } from "./private-fds.js"
+import { claimsMemorySyncAtBoot } from "./memory-sync-boot.js"
 import { doctorCoverageLines } from "./category-coverage.js"
 import { runDoctorModels } from "./model-chains.js"
 import { doctorComputerUseLines } from "./computer-use-doctor.js"
@@ -46,6 +47,9 @@ function preparedSenpi() {
   return senpi
 }
 
+// A memory-sync launch reaches the engine through this entry, which claims before senpi's CLI loads (#11997).
+const ENGINE_BOOT_ENTRY = join(packageRoot, "bin", "lib", "engine-boot.js")
+
 async function spawnSenpi(args, withExtension) {
   const senpi = preparedSenpi()
   const finalArgs = withExtension
@@ -61,6 +65,10 @@ async function spawnSenpi(args, withExtension) {
     } catch {
       // A failed replacement still uses the signal-aware child path below.
     }
+  }
+  if (handoff !== undefined && claimsMemorySyncAtBoot(finalArgs, handoff.env)) {
+    await spawnNode(ENGINE_BOOT_ENTRY, [senpi.cliPath, ...finalArgs], handoff)
+    return
   }
   await spawnNode(senpi.cliPath, finalArgs, handoff ?? { env })
 }
