@@ -102,6 +102,21 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
     expect(openSession).not.toHaveBeenCalled()
   })
 
+  test.each([["its alias", "taken"], ["its id", "dur-on-b"]])("#given b's thread holds an alias #when thread_create opens it by %s with that same alias #then it opens and keeps the alias, not alias_taken (#12641)", async (_label, thread) => {
+    const a = account({ aliases: new Map([["taken", { session_id: "dur-on-b", device: "b" }]]) })
+    const { run } = surface(a.remote)
+    expect(await run("thread_create", { thread, alias: "taken" })).toMatchObject({ kind: "ok", thread: { thread_id: "dur-on-b", device: "b", alias: "taken" } })
+    expect(a.aliases.get("taken")).toMatchObject({ session_id: "dur-on-b" })
+  })
+
+  test("#given b's thread holds an alias #when thread_create opens a different thread with that alias #then it is still alias_taken and nothing is opened (#12641)", async () => {
+    const a = account({ aliases: new Map([["taken", { session_id: "dur-on-b", device: "b" }]]) })
+    const { run, openSession } = surface(a.remote)
+    expect(await run("thread_create", { thread: "dur-local", alias: "taken" })).toMatchObject({ kind: "error", error: { code: "alias_taken", details: { holder: { session_id: "dur-on-b" } } } })
+    expect(openSession).not.toHaveBeenCalled()
+    expect(a.sent).toEqual([])
+  })
+
   test("#given a free alias #when thread_create sets it and thread_rename moves it #then the alias resolves to the new thread, the old alias is freed, and a duplicate rename is alias_taken", async () => {
     const a = account({ aliases: new Map([["other", { session_id: "dur-on-b", device: "b" }]]) })
     const { run } = surface(a.remote)
