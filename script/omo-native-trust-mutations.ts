@@ -29,7 +29,8 @@ export type Mutation = Edit & {
   /** An oracle self-check mutates the test's oracle, not production code; it is reported separately. */
   readonly oracle?: true
 }
-type MutationVerdict = "killed" | "survived" | "control-failed"
+/** `crashed`: the mutant failed only by a thrown runtime error or a load crash, which proves nothing about the assertions. */
+type MutationVerdict = "killed" | "survived" | "crashed" | "control-failed"
 type MutationResult = { readonly id: string; readonly verdict: MutationVerdict; readonly failing: number; readonly ms: number }
 
 export class MutationPatchError extends Error {
@@ -285,12 +286,27 @@ async function disposableCopy(repoRoot: string, packageDir: string): Promise<str
   return root
 }
 
-/** `(fail) a > b [1.2ms]` names the test `a b`, the form `bun test -t` matches against. */
-function failingTests(output: string, pattern: RegExp): number {
-  return output.split("\n").filter((line) => {
-    const name = /^\(fail\) (.*?)(?: \[[\d.]+m?s\])?\s*$/.exec(line.trim())?.[1]
-    return name !== undefined && pattern.test(name.replaceAll(" > ", " "))
-  }).length
+/**
+ * `(fail) a > b [1.2ms]` names the test `a b`, the form `bun test -t` matches against. Bun prints a test's error above its
+ * `(fail)` line; an assertion is `error: expect(received)...` or a failed `expect.assertions(n)` / `expect.hasAssertions()`
+ * (`AssertionError: expected 1 assertion, but test ended with 0 assertions` / `AssertionError: received 0 assertions, but
+ * expected at least one assertion to be called`); anything else (a thrown TypeError, ...) is a runtime error.
+ */
+const ASSERTION_BANNER = /^(?:error: expect\(|AssertionError: (?:expected \d+ assertions?, but test ended with \d+ assertions?|received \d+ assertions?, but expected at least one assertion to be called)$)/
+function failingTests(output: string, pattern: RegExp): { readonly assertion: number; readonly runtime: number } {
+  let assertion = 0
+  let runtime = 0
+  let block: string[] = []
+  for (const line of output.split("\n")) {
+    const result = /^\((pass|fail|skip|todo)\) (.*?)(?: \[[\d.]+m?s\])?\s*$/.exec(line.trim())
+    if (!result) { block.push(line); continue }
+    if (result[1] === "fail" && pattern.test((result[2] ?? "").replaceAll(" > ", " "))) {
+      if (block.some((text) => ASSERTION_BANNER.test(text.trim()))) assertion++
+      else runtime++
+    }
+    block = []
+  }
+  return { assertion, runtime }
 }
 
 async function bunTest(cwd: string, mutation: Mutation, timeoutMs: number): Promise<{ code: number; output: string }> {
@@ -321,16 +337,20 @@ export async function runMutation(mutation: Mutation, options: RunOptions): Prom
     const pattern = new RegExp(mutation.testNamePattern)
     const timeoutMs = options.timeoutMs ?? 600_000
     const control = await bunTest(cwd, mutation, timeoutMs)
-    if (control.code !== 0 || failingTests(control.output, pattern) > 0 || !/^\s*[1-9]\d* pass$/m.test(control.output)) {
+    const controlFailing = failingTests(control.output, pattern)
+    if (control.code !== 0 || controlFailing.assertion + controlFailing.runtime > 0 || !/^\s*[1-9]\d* pass$/m.test(control.output)) {
       options.log?.(control.output)
       return { id: mutation.id, verdict: "control-failed", failing: 0, ms: performance.now() - started }
     }
     await writeFile(target, patched)
     const mutant = await bunTest(cwd, mutation, timeoutMs)
-    const failing = failingTests(mutant.output, pattern)
-    const verdict = mutant.code !== 0 && failing > 0 ? "killed" : "survived"
-    if (verdict === "survived") options.log?.(mutant.output)
-    return { id: mutation.id, verdict, failing, ms: performance.now() - started }
+    const { assertion, runtime } = failingTests(mutant.output, pattern)
+    // Only an assertion kills. A runtime error or a crash outside any test (bun's "Unhandled error between tests") is
+    // its own verdict, so a mutant that merely breaks loading never counts as caught by the named test.
+    const crashed = runtime > 0 || /^# Unhandled error between tests$/m.test(mutant.output)
+    const verdict: MutationVerdict = mutant.code !== 0 && assertion > 0 ? "killed" : crashed ? "crashed" : "survived"
+    if (verdict !== "killed") options.log?.(mutant.output)
+    return { id: mutation.id, verdict, failing: assertion, ms: performance.now() - started }
   } finally {
     await rm(root, { recursive: true, force: true })
   }

@@ -4,11 +4,9 @@ import {
   type BootstrapDependencies,
   bootstrapDeviceService,
   DEVICE_SERVICE_VERSION,
-  type DeviceCredential,
   deviceServiceHost,
   installDeviceService,
 } from "../device-service-core/src/index.ts"
-import { createCredentialStore, SESSION_READ_WAIT } from "../omo-opencode/src/cli/service-auth/keystore"
 import packageJson from "./package.json" with { type: "json" }
 import { statusLines } from "./remote-render"
 
@@ -26,10 +24,9 @@ type BootstrapIo = Pick<BootstrapDependencies, "accountShow" | "stateDir" | "con
 
 const UNSUPPORTED_HOST = "The OmO device service does not run on this platform yet."
 
-/** This build's bootstrap inputs: the pinned release and its verified install, the stored sign-in, this omo binary. */
+/** This build's bootstrap inputs: the pinned release and its verified install and this omo binary; never a credential. */
 export function deviceServiceBootstrapSetup(options: {
   readonly stateDir: string
-  readonly credential: () => Promise<DeviceCredential | null>
   readonly binaryPath: string
   readonly agentDir: string
   readonly platform?: NodeJS.Platform
@@ -50,22 +47,8 @@ export function deviceServiceBootstrapSetup(options: {
             stateDir: options.stateDir,
             engineVersion: packageJson.dependencies["@code-yeongyu/senpi"],
           }),
-    credential: options.credential,
     refresher: { binaryPath: options.binaryPath, version: packageJson.version },
     agentDir: options.agentDir,
-  }
-}
-
-/** The stored sign-in's device and keys, read only after `omo account show` reported signed in. */
-export function storedDeviceCredential(api: string): () => Promise<DeviceCredential | null> {
-  return async () => {
-    const stored = await createCredentialStore(api, { wait: SESSION_READ_WAIT }).read()
-    if (stored === null) return null
-    return {
-      device: { id: stored.device.id, name: stored.device.name },
-      signingPrivateKey: stored.signingPrivateKey,
-      sealingPrivateKey: stored.sealingPrivateKey,
-    }
   }
 }
 

@@ -91,9 +91,10 @@ const MANAGED_MODE_FLAG = "--mode"
  * it can never be a reason for diagnostics to fail, so an unavailable or unparsable listing is an
  * empty list.
  */
-function listProcesses() {
+export function listProcesses() {
   if (process.platform === "win32") return []
-  const listed = spawnSync("ps", ["-axo", "pid=,ppid=,etime=,tty=,args="], { encoding: "utf8" })
+  // -ww: an unlimited width, so `args` is never cut at the terminal width (BSD/macOS `ps` truncates).
+  const listed = spawnSync("ps", ["-ww", "-axo", "pid=,ppid=,etime=,tty=,args="], { encoding: "utf8" })
   if (listed.status !== 0 || typeof listed.stdout !== "string") return []
   const entries = []
   for (const line of listed.stdout.split("\n")) {
