@@ -53,6 +53,8 @@ export function fixtureEnv(fixture: Fixture, env: Record<string, string> = {}): 
   delete inherited.OMO_CODING_AGENT_DIR
   delete inherited.SENPI_CODING_AGENT_DIR
   delete inherited.PI_CODING_AGENT_DIR
+  delete inherited.NODE
+  delete inherited.npm_node_execpath
   return { ...inherited, ...env }
 }
 
