@@ -38,6 +38,8 @@ class SessionWatch {
   readonly #settled: string[] = []
   readonly #queue = new WatchQueue((item) => this.#process(item))
   #lostReported = false
+  // The drop a resumed attach has not proven served yet: its snapshot reports it lost, its first records clear it.
+  #resumeGap: string | undefined
   #leftReason: "session_closed" | "session_replaced" | undefined
   #done = false
   #resolveEnded!: (end: RemoteWatchEnd) => void
@@ -68,9 +70,9 @@ class SessionWatch {
     return { kind: "ok", watch }
   }
 
-  // "resumed": the service took `resume` and replayed no snapshot, so what it replays is exactly the records after the
-  // last one applied (relay daemon #774), applied like live ones. A snapshot instead (it no longer held that attach_id
-  // with every record since) resets the watch as on any fresh attach, and the caller resyncs: "fresh".
+  // "resumed": the service took `resume` (relay daemon #774), so everything it sends on the attach is applied like live
+  // records: the records after the last one applied when it still held that attach_id with every record since, or else a
+  // snapshot (replayed or live, whichever read carries it), which the queue turns into the gap's report and one resync.
   async #attach(resume?: AttachResume): Promise<"resumed" | "fresh"> {
     const held = await this.link.hold(this.device, this.#key, resume)
     if (this.#done) {
@@ -86,24 +88,16 @@ class SessionWatch {
     // replayed or not: the relay sends it after session.attach answers (a re-attach resyncs on its own).
     if (!resumed) this.#position.reset(undefined)
     let replay: Replay = resumed ? "apply" : "position"
-    let replaced = false
-    this.#unsubscribe = attached.onEvent((event) => {
-      if (replay === "apply" && event.kind === "snapshot") {
-        replay = "position"
-        replaced = true
-        this.#position.reset(undefined)
-      }
-      this.#accept(event, replay)
-    })
+    this.#unsubscribe = attached.onEvent((event) => this.#accept(event, replay))
     replay = undefined
     void attached.detached.then((reason) => { if (this.#held === held) this.#queue.push({ kind: "ended", reason }) })
-    return resumed && !replaced ? "resumed" : "fresh"
+    return resumed ? "resumed" : "fresh"
   }
 
   #accept(event: AttachEvent, replay: Replay): void {
     if (event.kind === "snapshot") {
       this.#durable = nonEmpty(event.snapshot.state["durableSessionId"]) ?? this.#durable
-      if (replay === undefined && this.#position.attachId !== undefined) return this.#queue.push({ kind: "snapshot", attachId: event.snapshot.attach_id })
+      if (replay !== "position" && this.#position.attachId !== undefined) return this.#queue.push({ kind: "snapshot", attachId: event.snapshot.attach_id })
       this.#position.reset(event.snapshot.attach_id)
     } else if (event.kind === "records") {
       if (replay === "position") this.#position.pass(event.seqs)
@@ -114,6 +108,10 @@ class SessionWatch {
   async #process(item: WatchItem): Promise<void> {
     switch (item.kind) {
       case "records":
+        if (this.#resumeGap !== undefined) {
+          this.#resumeGap = undefined
+          this.#lostReported = false
+        }
         for (const [index, record] of item.records.entries()) {
           if (!this.#position.admit(item.attachId, item.seqs?.[index])) continue
           if (!this.#apply(record)) return
@@ -121,6 +119,8 @@ class SessionWatch {
         return
       case "snapshot":
         this.#position.reset(item.attachId)
+        if (this.#resumeGap !== undefined) this.#reportLost(this.#resumeGap)
+        this.#resumeGap = undefined
         return await this.#resync(false)
       case "resync":
         return await this.#resync(false)
@@ -200,9 +200,10 @@ class SessionWatch {
 
   // Attach, then resync, until both succeed: every failed pass (an attach refused, or a fresh read refused on an attach
   // that is fine) waits 1 s doubling to 30 s, and the gap is reported lost once. `waitFirst`: the attach was just held.
-  // `resume`: a resumed attach has no gap, so it needs no resync and lost is reported only once a pass falls short.
+  // `resume`: a resumed attach needs no read; whether the drop is a gap is decided by what the service sends on it.
   async #reattach(lost: string | undefined, restarted = false, waitFirst = false, resume?: AttachResume): Promise<void> {
     this.#release()
+    this.#resumeGap = undefined
     if (lost !== undefined && resume === undefined) this.#reportLost(lost)
     let wait = RETRY_FIRST_MS
     const backOff = async (): Promise<void> => {
@@ -222,7 +223,10 @@ class SessionWatch {
         await backOff()
         continue
       }
-      if (attached === "resumed" && !this.#lostReported) return
+      if (attached === "resumed") {
+        this.#resumeGap = lost ?? "attach_ended"
+        return
+      }
       if (lost !== undefined) this.#reportLost(lost)
       const outcome = await this.#resyncOnce(restarted)
       if (outcome === "done") return

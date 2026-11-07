@@ -110,14 +110,15 @@ const toRemote = (event: AttachEvent): RemoteAttachEvent => {
   }
 }
 
-// A service before relay daemon #774 answers either session.attach field invalid_request: the attach is asked again
-// without them, as that service has always served it.
+// A service before relay daemon #774 refuses either session.attach field as an unknown field (its validator's reason):
+// the attach is asked again without them, as that service has always served it. Any other refusal stands.
+const UNKNOWN_FIELD_REASON = "request has an unknown field"
 const requestAttach = async (client: LocalApiClient, device: string, sessionId: string, features: AttachFeatures): Promise<{ readonly attach: string; readonly features: AttachFeatures }> => {
   if (features.seqs === undefined && features.resume === undefined) return { ...(await client.request("session.attach", { device, session_id: sessionId })), features }
   try {
     return { ...(await client.request("session.attach", { device, session_id: sessionId, ...features })), features }
   } catch (error) {
-    if (!(error instanceof LocalApiError && error.code === "invalid_request")) throw error
+    if (!(error instanceof LocalApiError && error.code === "invalid_request" && error.reason === UNKNOWN_FIELD_REASON)) throw error
     return { ...(await client.request("session.attach", { device, session_id: sessionId })), features: {} }
   }
 }
