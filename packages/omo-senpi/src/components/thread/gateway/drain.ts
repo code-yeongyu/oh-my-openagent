@@ -84,7 +84,10 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
     for (const row of reconciled.queued) {
       const gate = runtime.admissionGate()
       const heldRevision = held.get(row.delivery_id)
-      if (heldRevision !== undefined && !RELEASING_REASONS.has(event.reason) && heldRevision === gate.editor_revision) break
+      if (heldRevision !== undefined && !RELEASING_REASONS.has(event.reason) && heldRevision === gate.editor_revision) {
+        admitted.push({ delivery_id: row.delivery_id, kind: "held_draft" })
+        break
+      }
       if (!gate.can_admit) {
         held.set(row.delivery_id, gate.editor_revision)
         noticeQueued(row)
