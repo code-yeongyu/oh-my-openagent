@@ -95,7 +95,7 @@ export type AgentUnavailable = {
  * names each category, the models its chain offers with their providers, the providers this machine
  * has not connected, and the Settings keys that own the choice, like the chain refusal does.
  */
-export function categoryChainsUnavailableText(agent: string, refusals: readonly CategoryChainRefusal[]): string {
+function categoryChainsUnavailableText(agent: string, refusals: readonly CategoryChainRefusal[]): string {
   const missing = [...new Set(refusals.flatMap((refusal) => refusal.missing_providers))]
   const reason = missing.length === 0
     ? "the providers of its categories' chains are connected but none of them lists these model ids"
