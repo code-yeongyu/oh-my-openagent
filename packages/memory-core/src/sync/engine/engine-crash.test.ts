@@ -21,6 +21,14 @@ async function tracked(d: Device): Promise<string[]> {
   return stdout.split("\0").filter((n) => n !== "" && n !== ".gitkeep")
 }
 
+// On darwin `git init` sets core.precomposeunicode=true, so git stores the
+// name in NFC even when the file on disk is NFD; compare NFC forms so the
+// preconditions hold on every platform (same approach as
+// engine-normalized-name.test.ts:44).
+async function trackedNfc(d: Device): Promise<string[]> {
+  return (await tracked(d)).map((n) => n.normalize("NFC"))
+}
+
 const devices: Device[] = []
 afterEach(async () => {
   for (const d of devices.splice(0)) await d.dispose()
@@ -117,7 +125,7 @@ test("a crash after a delete of an NFD-named file has landed resumes staging the
   await b.write(NFC_DELETE, "v2\n")
   await b.engine.runCycle()
   await a.engine.runCycle()
-  expect(await tracked(a)).toContain(NFD_DELETE)
+  expect(await trackedNfc(a)).toContain(NFC_DELETE)
   // when: B deletes the file and A receives the delete, crashing right after the delete lands.
   await b.write(NFC_DELETE, null)
   await b.engine.runCycle()
@@ -125,13 +133,13 @@ test("a crash after a delete of an NFD-named file has landed resumes staging the
   await expect(a.engine.runCycle()).rejects.toBeInstanceOf(CrashInjected)
   // The delete has landed (the working file is moved aside) but nothing is staged yet.
   expect(await a.read(NFD_DELETE)).toBeNull()
-  expect(await tracked(a)).toContain(NFD_DELETE)
+  expect(await trackedNfc(a)).toContain(NFC_DELETE)
   await a.restart()
   await a.engine.runCycle()
   // then: the resumed cycle stages the delete at the spelling HEAD tracked, not the NFC key.
   expect(await a.read(NFD_DELETE)).toBeNull()
   expect(await a.read(NFC_DELETE)).toBeNull()
-  expect(await tracked(a)).not.toContain(NFD_DELETE)
+  expect(await trackedNfc(a)).not.toContain(NFC_DELETE)
   const status = await createNodeGitExec().run(["status", "--porcelain"], { cwd: a.repo.root, timeoutMs: 20_000 })
   expect(status.stdout).toBe("")
   expect(await a.syncCommits()).toEqual(["3-3", "2-2"])
