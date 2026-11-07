@@ -133,7 +133,7 @@ export async function slotHarness(testBudgetMs: number) {
     void exit.catch(() => undefined)
     exits.push(exit)
     events.emit("supervisor")
-    return { child, exit }
+    return { child, exit, diagnostic: supervisor.diagnostic }
   }
 
   const wait = <T>(

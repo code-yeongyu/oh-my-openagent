@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { randomUUID } from "node:crypto"
-import { mkdtemp, readdir, rm, unlink, utimes, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, readdir, rm, unlink, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
 import * as resilientFs from "../fs/resilient"
 import { sweepStaleLockCandidates } from "./candidate-sweep"
-import { LOCK_DIRECTORY_SWEEP_INTERVAL_MS } from "./acquire"
+import { LOCK_DIRECTORY_SWEEP_INTERVAL_MS, acquireWithoutDirectorySweep } from "./acquire"
 import { sweepDeadOwnerLocks } from "./dead-owner-sweep"
 import {
   LockContentionError,
@@ -212,4 +212,77 @@ describe("dead-owner lock reclaim", () => {
     expect(publishes.names()[0]).toStartWith(`${path.basename(lockPath)}.candidate-${process.pid}-`)
     await releaseLock(lockPath, holder)
   })
+
+  test("#given a dead-pid owner whose live holder releases between the stale read and the reclaim unlink #when a contender reclaims #then it takes the lock instead of failing with ENOENT", async () => {
+    // #given: the record names a dead pid (a retained child that exited) but its nonce is still
+    // held by a live supervisor, which releases it inside the contender's reclaim window (#11644)
+    const lockPath = path.join(await createLocksDirectory(), "reflection-run.slot-1.lock")
+    const retained = await deadOwnerRecord("reflection-run")
+    await writeRecord(lockPath, retained)
+    const contender = await createLockRecord("reflection-run")
+    const race = releaseHolderInsideReclaim(lockPath, retained)
+
+    // #when
+    try {
+      await acquireWithoutDirectorySweep(lockPath, contender, { waitTimeoutMs: 0 })
+    } finally {
+      race.restore()
+    }
+
+    // #then
+    expect(race.holderReleased()).toBe(true)
+    expect(JSON.parse(await readFile(lockPath, "utf8")).nonce).toBe(contender.nonce)
+    await releaseLock(lockPath, contender)
+  })
+
+  test("#given the holder releases and a rival publishes inside the reclaim window #when the contender finishes its reclaim #then the rival keeps the lock and the contender is refused", async () => {
+    // #given
+    const lockPath = path.join(await createLocksDirectory(), "reflection-run.slot-1.lock")
+    const retained = await deadOwnerRecord("reflection-run")
+    await writeRecord(lockPath, retained)
+    const contender = await createLockRecord("reflection-run")
+    const rival = await createLockRecord("reflection-run")
+    const race = releaseHolderInsideReclaim(lockPath, retained, () => acquireWithoutDirectorySweep(lockPath, rival, { waitTimeoutMs: 0 }))
+
+    // #when
+    let outcome: unknown
+    try {
+      outcome = await acquireWithoutDirectorySweep(lockPath, contender, { waitTimeoutMs: 0 }).catch((error: unknown) => error)
+    } finally {
+      race.restore()
+    }
+
+    // #then: the cap of one holds - the reclaim must not delete the rival's fresh lock
+    expect(race.holderReleased()).toBe(true)
+    expect(outcome).toBeInstanceOf(LockContentionError)
+    expect(JSON.parse(await readFile(lockPath, "utf8")).nonce).toBe(rival.nonce)
+    await releaseLock(lockPath, rival)
+  })
 })
+
+/**
+ * Opens the reclaim window: at the reclaiming contender's fence read (the first read of
+ * `<lockPath>.recovery` that finds a record, i.e. after it re-read the dead-pid primary and took the
+ * recovery lock, right before it removes the primary), the live holder named by `holder` releases
+ * `lockPath` by nonce and `afterRelease` (a rival contender) runs.
+ */
+function releaseHolderInsideReclaim(
+  lockPath: string,
+  holder: LockRecord,
+  afterRelease?: () => Promise<unknown>,
+): { readonly holderReleased: () => boolean | undefined; readonly restore: () => void } {
+  const realReadFile = resilientFs.readFile as (...args: unknown[]) => Promise<unknown>
+  const recoveryPath = `${lockPath}.recovery`
+  let injected = false
+  let holderReleased: boolean | undefined
+  const spy = spyOn(resilientFs, "readFile").mockImplementation((async (filePath: string, ...rest: unknown[]) => {
+    const content = await realReadFile(filePath, ...rest)
+    if (!injected && String(filePath) === recoveryPath) {
+      injected = true
+      holderReleased = await releaseLock(lockPath, holder)
+      await afterRelease?.()
+    }
+    return content
+  }) as typeof resilientFs.readFile)
+  return { holderReleased: () => holderReleased, restore: () => spy.mockRestore() }
+}
