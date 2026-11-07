@@ -10,7 +10,7 @@
 
 import { dirname, isAbsolute, join, relative, sep } from "node:path"
 
-import { existsSync, lstat, mkdir, readFile, realpath } from "../../fs/resilient"
+import { constants, existsSync, lstat, mkdir, open, readFile, realpath } from "../../fs/resilient"
 import { caseFold } from "../item/casefold"
 
 const FS_REFUSALS = new Set(["EISDIR", "ENOTDIR", "ENAMETOOLONG", "EACCES", "EPERM", "ELOOP", "EEXIST", "EINVAL"])
@@ -49,6 +49,25 @@ export const readWorking = (root: string, path: string): Promise<string | null> 
     throw error
   })
 
+/**
+ * The working text at `path` (null: absent), read only when the opened leaf is a regular file. The
+ * open is non-blocking, so a FIFO swapped in after an lstat check opens at once instead of waiting
+ * for a writer, and the handle's own fstat decides, so no swap after the open changes what is read.
+ */
+export async function readRegularWorking(root: string, path: string): Promise<{ readonly text: string | null } | { readonly refused: "non-regular-file" }> {
+  const handle = await open(join(root, path), constants.O_RDONLY | constants.O_NONBLOCK).catch((error: unknown) => {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return null
+    throw error
+  })
+  if (handle === null) return { text: null }
+  try {
+    if (!(await handle.stat()).isFile()) return { refused: "non-regular-file" }
+    return { text: await handle.readFile({ encoding: "utf8" }) }
+  } finally {
+    await handle.close()
+  }
+}
+
 type Landing = { readonly path: string; readonly working: string | null } | { readonly refused: string }
 
 const missing = (error: unknown): boolean => error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR")
@@ -66,6 +85,15 @@ export async function throughSymlink(root: string, path: string): Promise<boolea
     if (entry.isSymbolicLink()) return true
   }
   return false
+}
+
+/** Whether `path` exists under `root` as anything but a regular file, decided by lstat without opening it. */
+export async function nonRegularLeaf(root: string, path: string): Promise<boolean> {
+  const leaf = await lstat(join(root, path)).catch((error: unknown) => {
+    if (missing(error)) return null
+    throw error
+  })
+  return leaf !== null && !leaf.isFile()
 }
 
 const nearestExisting = (root: string, dir: string): string => {
@@ -92,11 +120,7 @@ export async function prepareLanding(root: string, path: string | null): Promise
     const realRoot = await realpath(root)
     const parent = await realpath(nearestExisting(root, dirname(target)))
     if (!staysInside(realRoot, parent)) return { refused: "outside-root" }
-    const leaf = await lstat(target).catch((error: unknown) => {
-      if (missing(error)) return null
-      throw error
-    })
-    if (leaf !== null && !leaf.isFile()) return { refused: "non-regular-file" }
+    if (await nonRegularLeaf(root, path)) return { refused: "non-regular-file" }
     const working = await readWorking(root, path)
     await mkdir(dirname(target), { recursive: true })
     return { path, working }
