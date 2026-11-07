@@ -12,6 +12,7 @@ members = [
     "crates/senpi-desktop-engine",
     "crates/senpi-desktop-xpc",
     "crates/omo-engine-trust-helper",
+    "crates/omo-git-job-helper",
 ]
 resolver = "2"
 

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
 import { realpathSync } from "node:fs"
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -12,7 +12,6 @@ const roots: string[] = []
 const AUTHOR = { agentId: "agent-one", authorName: "Reflection Agent" }
 const LEGACY = "---\ndescription: Run the chain by default: verify, merge\n---\n\nlegacy body\n"
 
-setDefaultTimeout(process.platform === "win32" ? 20_000 : 5_000)
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
