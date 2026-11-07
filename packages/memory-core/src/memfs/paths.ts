@@ -1,4 +1,5 @@
-import { lstatSync, realpathSync } from "../fs/resilient";
+import { isOnDevice } from "../fs/device-scope";
+import { lstatSync, realpathSync, stat } from "../fs/resilient";
 import {
   dirname,
   extname,
@@ -29,6 +30,11 @@ export interface ValidateMemoryPathOptions {
   /** Tool paths are markdown labels; repository paths may target directories. */
   toolPath?: boolean;
   fieldName?: string;
+  /**
+   * On a split session's device files the symlink check cannot run synchronously: "deferred" means the caller awaits
+   * {@link confineMemoryPathOnDevice} for the returned path. Without it, validation on the device is refused.
+   */
+  deviceConfinement?: "deferred";
 }
 
 export function validateMemoryPath(
@@ -71,8 +77,35 @@ export function validateMemoryPath(
     throw invalid("resolved path escapes memory directory");
   }
 
+  if (isOnDevice()) {
+    if (options.deviceConfinement !== "deferred") throw invalid("path confinement on a split session needs the device check");
+    return target;
+  }
   assertRealParentConfined(root, target);
   return target;
+}
+
+/**
+ * The symlink half of {@link validateMemoryPath} on a split session's device files, which report a symlink as kind
+ * "other" (their stat does not follow links): every existing component from the root to `target` must be a plain
+ * directory or file. Off the device it is a no-op, because validation already resolved the real path.
+ */
+export async function confineMemoryPathOnDevice(memoryRoot: string, target: string): Promise<void> {
+  if (!isOnDevice()) return;
+  const root = resolve(memoryRoot);
+  const segments = relative(root, target).split(/[\\/]/).filter(Boolean);
+  let candidate = root;
+  for (const segment of ["", ...segments]) {
+    if (segment !== "") candidate = resolve(candidate, segment);
+    let info: Awaited<ReturnType<typeof stat>>;
+    try {
+      info = await stat(candidate);
+    } catch (error) {
+      if (isMissingPathError(error)) return;
+      throw invalid(`path ancestor cannot be inspected: ${errorMessage(error)}`);
+    }
+    if (!info.isDirectory() && !info.isFile()) throw invalid("path escapes memory root through a symlink");
+  }
 }
 
 export function validateRepositoryPath(

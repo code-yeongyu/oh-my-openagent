@@ -1,10 +1,10 @@
-import { readFile, readFileSync, writeFile, writeFileSync } from "../fs/resilient"
+import { readFile, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 import { createNodeGitExec, type GitCommitAuthor, type GitExec, type GitMemoryRepo } from "../git"
 import { decodeScalarSource } from "./frontmatter-scalar"
 import { describeFrontmatterGrammarViolation } from "./frontmatter-validation"
 import { parseMemoryFile, renderMemoryFile, type MemoryFrontmatter, type ParsedMemoryFile } from "./frontmatter"
-import { resolveCommonGitDir } from "./hooks"
+import { resolveCommonGitDirAsync } from "./hooks"
 import { isMemoryContentPath } from "./paths"
 import { PROVENANCE_STRIPPED_TRAILER, stampReceipt, strippedLegacyUserHeader } from "../tools/claim-frontmatter"
 
@@ -39,8 +39,8 @@ export async function normalizeMemoryFrontmatter(
   const head = await repo.head()
   if (head === null) return { status: "clean", examined: 0, rewritten: [], skipped: [] }
 
-  const markerPath = markerPathFor(repo)
-  const checkedSha = readMarker(markerPath)
+  const markerPath = await markerPathFor(repo)
+  const checkedSha = await readMarker(markerPath)
   if (checkedSha === head) return { status: "clean", examined: 0, rewritten: [], skipped: [] }
 
   if ((await repo.status()).trim().length > 0) {
@@ -77,18 +77,18 @@ export async function normalizeMemoryFrontmatter(
     ].join("\n"),
     author,
   )
-  writeMarker(markerPath, commit.sha)
+  await writeMarker(markerPath, commit.sha)
   return { status: "normalized", sha: commit.sha, examined: candidates.length, rewritten, skipped }
 }
 
 /** Lock-free pre-check: true when HEAD moved past the last recorded normalization pass (or none was recorded). */
 export async function frontmatterNormalizationPending(repo: GitMemoryRepo): Promise<boolean> {
   const head = await repo.head()
-  return head !== null && readMarker(markerPathFor(repo)) !== head
+  return head !== null && (await readMarker(await markerPathFor(repo))) !== head
 }
 
-function markerPathFor(repo: GitMemoryRepo): string {
-  return join(resolveCommonGitDir(repo.dir), FRONTMATTER_NORMALIZATION_MARKER)
+async function markerPathFor(repo: GitMemoryRepo): Promise<string> {
+  return join(await resolveCommonGitDirAsync(repo.dir), FRONTMATTER_NORMALIZATION_MARKER)
 }
 
 async function normalizeOne(root: string, path: string, stripped: string[]): Promise<"unchanged" | "rewritten" | NormalizeFrontmatterSkip["reason"]> {
@@ -160,15 +160,15 @@ async function changedSince(exec: GitExec, cwd: string, from: string, to: string
   return result.stdout.split("\0").filter(Boolean)
 }
 
-function readMarker(markerPath: string): string | null {
+async function readMarker(markerPath: string): Promise<string | null> {
   try {
-    const sha = readFileSync(markerPath, "utf8").trim()
+    const sha = (await readFile(markerPath, "utf8")).trim()
     return /^[0-9a-f]{40}$/.test(sha) ? sha : null
   } catch {
     return null
   }
 }
 
-function writeMarker(markerPath: string, sha: string): void {
-  writeFileSync(markerPath, `${sha}\n`, "utf8")
+async function writeMarker(markerPath: string, sha: string): Promise<void> {
+  await writeFile(markerPath, `${sha}\n`, "utf8")
 }

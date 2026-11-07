@@ -11,6 +11,7 @@ import {
 import { Type, type Static, type TSchema } from "typebox"
 
 import { prepareMemoryEngineSession } from "./engine-session"
+import { onSessionDevice } from "./hand-split"
 import { createMemoryWriteRenderResult, renderMemoryWriteCall } from "./memory-write-render"
 import type { MemoryRpcSnapshot } from "./memory-rpc-bridge"
 import { buildMemorySnapshot, createMemoryRpcGitRepo } from "./memory-rpc-snapshot-state"
@@ -94,7 +95,13 @@ export interface MemoryToolResultDetails {
 export type MemoryToolExecutionResult = AgentToolResult<MemoryToolResultDetails> & { readonly isError?: boolean }
 
 export type MemoryToolDefinition<TParams extends TSchema> = Omit<ToolDefinition<TParams, MemoryToolResultDetails>, "execute"> & {
-  readonly execute: (toolCallId: string, params: Static<TParams>) => Promise<MemoryToolExecutionResult>
+  readonly execute: (
+    toolCallId: string,
+    params: Static<TParams>,
+    signal?: AbortSignal,
+    onUpdate?: unknown,
+    eventContext?: unknown,
+  ) => Promise<MemoryToolExecutionResult>
 }
 
 export interface MemoryToolWriteNoticeOptions {
@@ -161,9 +168,23 @@ function createMemoryTool(
     parameters: MemoryToolParams,
     executionMode: "sequential",
     renderShell: "self",
-    execute: async (_toolCallId, params) => {
+    // The session's memory binding lives where the loop runs; the store stays on the device (hand-split.ts).
+    runs: "brain",
+    execute: async (_toolCallId, params, _signal, _onUpdate, eventContext) => {
       const context = resolveContext()
       if (context === undefined) return errorResult(`${MEMORY_TOOL_NAME}: ${UNBOUND_IDENTITY_MESSAGE}`)
+      return onSessionDevice(eventContext, () => executeMemoryTool(context, params, options))
+    },
+    renderCall: renderMemoryWriteCall,
+    renderResult: renderResultFor(options),
+  }
+}
+
+async function executeMemoryTool(
+  context: MemoryIdentityContext,
+  params: Static<typeof MemoryToolParams>,
+  options: MemoryToolsOptions,
+): Promise<MemoryToolExecutionResult> {
       try {
         const { repo, lock, author } = await prepareEngine(context, options)
         const provenance = readToolProvenance(params)
@@ -178,10 +199,6 @@ function createMemoryTool(
         if (error instanceof MemoryToolError) return errorResult(error.message)
         throw error
       }
-    },
-    renderCall: renderMemoryWriteCall,
-    renderResult: renderResultFor(options),
-  }
 }
 
 function renderResultFor(options: MemoryToolsOptions) {
