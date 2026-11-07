@@ -1,8 +1,10 @@
 //! A fake KWin on its own private `dbus-daemon`: `org.kde.KWin` serves
 //! `org.kde.kwin.Scripting` at `/Scripting` and one `org.kde.kwin.Script` per
-//! loaded script. `run` answers the way the real script does, with one
-//! `callDBus` to the service and path the script text names, carrying the
-//! scripted reply (or nothing, for a script that never answers).
+//! loaded script, at the object path KWin 6 (`/Scripting/Script{id}`) or
+//! KWin 5 (`/{id}`) uses, or at neither. `run` answers the way the real
+//! script does, with one `callDBus` to the service and path the script text
+//! names, carrying the scripted reply (or nothing, for a script that never
+//! answers).
 
 use std::future::Future;
 use std::io::{BufRead, BufReader};
@@ -30,6 +32,17 @@ struct State {
 
 type Shared = Arc<Mutex<State>>;
 
+/// Where the fake KWin serves a loaded script's `org.kde.kwin.Script`.
+#[derive(Debug, Clone, Copy)]
+enum ScriptAt {
+    /// `/Scripting/Script{id}`, as KWin 6 registers it.
+    Kwin6,
+    /// `/{id}`, as KWin 5 registers it.
+    Kwin5,
+    /// Nowhere: `loadScript` succeeds but no object answers `run`.
+    Nowhere,
+}
+
 fn state(shared: &Shared) -> std::sync::MutexGuard<'_, State> {
     shared.lock().unwrap_or_else(PoisonError::into_inner)
 }
@@ -39,6 +52,7 @@ struct Scripting {
     reply: Option<&'static str>,
     /// Answers from this connection instead of KWin's own, when set.
     impostor: Option<zbus::Connection>,
+    at: ScriptAt,
 }
 
 #[interface(name = "org.kde.kwin.Scripting")]
@@ -70,7 +84,11 @@ impl Scripting {
             reply: self.reply,
             impostor: self.impostor.clone(),
         };
-        server.at(format!("/Scripting/Script{id}"), loaded).await?;
+        match self.at {
+            ScriptAt::Kwin6 => server.at(format!("/Scripting/Script{id}"), loaded).await?,
+            ScriptAt::Kwin5 => server.at(format!("/{id}"), loaded).await?,
+            ScriptAt::Nowhere => false,
+        };
         Ok(id)
     }
 
@@ -103,7 +121,14 @@ fn callback_target(script: &str) -> Option<(String, String)> {
 #[interface(name = "org.kde.kwin.Script")]
 impl Script {
     #[zbus(name = "run")]
-    async fn run(&self, #[zbus(connection)] connection: &zbus::Connection) -> fdo::Result<()> {
+    async fn run(
+        &self,
+        #[zbus(connection)] connection: &zbus::Connection,
+        #[zbus(header)] header: zbus::message::Header<'_>,
+    ) -> fdo::Result<()> {
+        let object = header
+            .path()
+            .map_or_else(PathBuf::new, |path| PathBuf::from(path.as_str()));
         let (plugin, text) = {
             let mut state = state(&self.shared);
             let loaded = usize::try_from(self.id)
@@ -113,7 +138,7 @@ impl Script {
             state.calls.push(Call {
                 method: "run".to_owned(),
                 plugin: loaded.0.clone(),
-                path: PathBuf::new(),
+                path: object,
                 script: None,
             });
             loaded
@@ -149,25 +174,35 @@ pub struct FakeKwin {
 impl FakeKwin {
     /// A bus where no `org.kde.KWin` runs.
     pub fn bus_only() -> Self {
-        Self::start(None, false)
+        Self::start(None, false, ScriptAt::Kwin6)
     }
 
-    /// KWin whose script answers `reply`.
+    /// KWin 6 whose script answers `reply`.
     pub fn serve(reply: &'static str) -> Self {
-        Self::start(Some(Some(reply)), false)
+        Self::start(Some(Some(reply)), false, ScriptAt::Kwin6)
+    }
+
+    /// KWin 5, which serves a loaded script at `/{id}`, answering `reply`.
+    pub fn serve_kwin5(reply: &'static str) -> Self {
+        Self::start(Some(Some(reply)), false, ScriptAt::Kwin5)
+    }
+
+    /// KWin that loads a script but serves it at no object path `run` can reach.
+    pub fn unrunnable(reply: &'static str) -> Self {
+        Self::start(Some(Some(reply)), false, ScriptAt::Nowhere)
     }
 
     /// KWin whose script's answer arrives from another bus connection.
     pub fn impostor(reply: &'static str) -> Self {
-        Self::start(Some(Some(reply)), true)
+        Self::start(Some(Some(reply)), true, ScriptAt::Kwin6)
     }
 
     /// KWin whose script never calls back.
     pub fn silent() -> Self {
-        Self::start(Some(None), false)
+        Self::start(Some(None), false, ScriptAt::Kwin6)
     }
 
-    fn start(kwin: Option<Option<&'static str>>, impostor: bool) -> Self {
+    fn start(kwin: Option<Option<&'static str>>, impostor: bool, at: ScriptAt) -> Self {
         let dir = tempfile::Builder::new()
             .prefix("senpi-kwin-bus-")
             .tempdir()
@@ -218,6 +253,7 @@ impl FakeKwin {
                 shared: Arc::clone(&shared),
                 reply,
                 impostor: impostor.clone(),
+                at,
             };
             runtime
                 .block_on(async {
