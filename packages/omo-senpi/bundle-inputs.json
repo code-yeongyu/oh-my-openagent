@@ -1556,6 +1556,7 @@
     "packages/omo-senpi/src/components/thread/remote/remote-ops.ts",
     "packages/omo-senpi/src/components/thread/remote/remote-watch.ts",
     "packages/omo-senpi/src/components/thread/remote/session-state.ts",
+    "packages/omo-senpi/src/components/thread/remote/watch-position.ts",
     "packages/omo-senpi/src/components/thread/remote/watch-queue.ts",
     "packages/omo-senpi/src/components/thread/sdk.ts",
     "packages/omo-senpi/src/components/thread/session-facts.ts",
