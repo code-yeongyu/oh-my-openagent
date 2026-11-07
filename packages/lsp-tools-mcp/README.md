@@ -65,7 +65,7 @@ When an MCP host omits the variables, the standalone default remains the Codex-c
 - User config: `<opencode config dir>/lsp.json`
 - Install decisions: `<opencode config dir>/lsp-install-decisions.json`
 
-The shared daemon runtime itself is configured only through `OMO_LSP_DAEMON_DIR`, or the paired `OMO_LSP_DAEMON_CLI` plus `OMO_LSP_DAEMON_VERSION` override. OpenCode source mode uses the paired override to run `packages/lsp-daemon/src/cli.ts` with Bun; dist mode resolves the daemon package `./cli` export.
+The shared daemon runtime location is selected through `OMO_LSP_DAEMON_DIR`, or the paired `OMO_LSP_DAEMON_CLI` plus `OMO_LSP_DAEMON_VERSION` override. OpenCode source mode uses the paired override to run `packages/lsp-daemon/src/cli.ts` with Bun; dist mode resolves the daemon package `./cli` export.
 
 Examples:
 
@@ -86,6 +86,19 @@ Example config file:
 	}
 }
 ```
+
+### Diagnostics freshness timeout
+
+Set `OMO_LSP_DIAGNOSTICS_FRESHNESS_TIMEOUT_MS` before starting the MCP host or shared daemon to change the process-wide diagnostics freshness window. The default is 3,000 ms. Valid values are positive integer milliseconds up to 2,147,483,647; missing or invalid values retain the default. An explicit `LspClient` option `diagnosticsFreshnessTimeoutMs` takes precedence.
+
+```bash
+export OMO_LSP_DIAGNOSTICS_FRESHNESS_TIMEOUT_MS=6000
+node dist/cli.js mcp
+```
+
+Restart an already-running shared daemon after changing this setting. It is not a per-project setting. The daemon's separate 30,000 ms total request limit, including server startup, still applies.
+
+MCP hosts that filter child environments must explicitly forward this variable to the MCP server, for example through the server's configured environment. The shipped OMO Codex plugin does so through its LSP server `env_vars` declaration.
 
 ## Architecture
 

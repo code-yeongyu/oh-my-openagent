@@ -232,9 +232,9 @@ export class WorkspaceDocumentState {
 			: { status: "wait", waitMs };
 	}
 
-	waitForDiagnosticsActivity(snapshot: DiagnosticSnapshot, timeoutMs: number): Promise<void> {
+	waitForDiagnosticsActivity(snapshot: DiagnosticSnapshot, timeoutMs: number, signal?: AbortSignal): Promise<void> {
 		const state = this.openByUri.get(normalizeDocumentUri(snapshot.uri));
-		if (!state || timeoutMs <= 0) return Promise.resolve();
+		if (!state || timeoutMs <= 0 || signal?.aborted) return Promise.resolve();
 		// A publish that landed between the caller's snapshot and this registration already IS the
 		// activity being waited for, and its notifyWaiters ran before this waiter existed. Without
 		// this check that wake-up is lost and the wait can only end at the freshness deadline, which
@@ -246,12 +246,14 @@ export class WorkspaceDocumentState {
 				if (settled) return;
 				settled = true;
 				this.timerProvider.clearTimeout(timer);
+				signal?.removeEventListener("abort", finish);
 				state.waiters.delete(finish);
 				resolveActivity();
 			};
 			const timer = this.timerProvider.setTimeout(finish, timeoutMs);
 			if (typeof timer.unref === "function") timer.unref();
 			state.waiters.add(finish);
+			signal?.addEventListener("abort", finish, { once: true });
 		});
 	}
 
