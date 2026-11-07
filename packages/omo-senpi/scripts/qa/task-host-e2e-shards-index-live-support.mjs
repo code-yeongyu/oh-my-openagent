@@ -73,8 +73,27 @@ export function observeRegistrationBeforeEndpoint(sandbox, indexPath, endpointSt
   }, { trigger })
 }
 
-export const crossEndpointHazardPassed = (value) =>
-  value.shard_open_accepted && value.rpc_open_accepted && value.distinct_endpoints && value.disposable_copy_removed
+// senpi 2026.10.10-11 introduced cross-process transcript ownership (CHANGELOG.md, #9825).
+// Keep old binaries' hazard proof distinct from the newer engine's typed safety refusal.
+export function crossEndpointOwnershipPolicy(version) {
+  const match = /engine: senpi (\d+)\.(\d+)\.(\d+)(?:-(\d+))?/.exec(version ?? "")
+  if (match === null) throw new Error(`unknown Senpi engine version: ${version}`)
+  const actual = match.slice(1).map((part) => Number(part ?? 0))
+  const boundary = [2026, 10, 10, 11]
+  for (let index = 0; index < boundary.length; index += 1) {
+    if (actual[index] < boundary[index]) return "per-endpoint"
+    if (actual[index] > boundary[index]) return "transcript-lock"
+  }
+  return "transcript-lock"
+}
+
+export function crossEndpointHazardPassed(value) {
+  if (!value.shard_open_accepted || !value.distinct_endpoints || !value.disposable_copy_removed) return false
+  if (value.ownership_policy === "per-endpoint") return value.rpc_open_accepted === true && value.rpc_open_rejected !== true
+  if (value.ownership_policy !== "transcript-lock") return false
+  return value.rpc_open_rejected === true && value.rpc_open_accepted !== true &&
+    value.live_holders?.some((holder) => Number.isInteger(holder.pid) && holder.pid > 0)
+}
 
 export const idleGcIndexResumePassed = (value) =>
   value.parent_quit_while_request_held && value.supervisor_exited &&
