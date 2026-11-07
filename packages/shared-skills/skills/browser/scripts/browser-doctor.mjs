@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { loadOmowright } from "./omowright.mjs"
+import { resolveConnectedBrowser } from "./browser-identity.mjs"
 
 const { entry, omowright } = await loadOmowright()
 const browserArg = process.argv.find((arg) => arg.startsWith("--browser="))
@@ -36,7 +37,7 @@ const summary = {
   defaultBrowser: report.identification.defaultBrowser,
   registeredElsewhere: report.identification.registeredElsewhere,
   browsersDetected: report.browsers.map((browser) => ({ id: browser.id, userDataDir: browser.userDataDir, extensionRegistered: browser.extensionRegistered })),
-  browsersConnected: report.browsersConnected.map((browser) => ({ instanceId: browser.instance_id, name: browser.browser_name, version: browser.browser_version })),
+  browsersConnected: report.browsersConnected.map((browser) => resolveConnectedBrowser(browser, report)),
   nextStep: report.nextStep,
   remedy: REMEDIES[state],
 }
@@ -52,6 +53,9 @@ if (process.argv.includes("--json")) {
   console.log(`candidates: ${summary.candidates.map((c) => `${c.id}${c.signals.length ? ` (${c.signals.join(", ")})` : ""}`).join(", ") || "none"}`)
   if (summary.registeredElsewhere.length > 0) console.log(`extension entries left in other browsers: ${summary.registeredElsewhere.join(", ")} (not removed automatically)`)
   console.log(`browsers detected: ${summary.browsersDetected.map((b) => `${b.id}${b.extensionRegistered ? " (extension registered)" : ""}`).join(", ") || "none"}`)
-  console.log(`browsers connected: ${summary.browsersConnected.map((b) => `${b.name} ${b.version} [${b.instanceId}]`).join(", ") || "none"}`)
+  console.log(`browsers connected: ${summary.browsersConnected.map((b) => {
+    const provenance = b.daemonProduct && b.daemonProduct !== `${b.name} ${b.version}`.trim() ? ` (daemon: ${b.daemonProduct})` : ""
+    return `${b.name} ${b.version} [${b.instanceId}]${provenance}`
+  }).join(", ") || "none"}`)
   console.log(`\n${REMEDIES[state]}`)
 }
