@@ -12,6 +12,8 @@ struct Registered {
     handle: AxHandle,
     target_key: String,
     generation: u64,
+    /// The snapshot that registered it left out some of its children.
+    subtree_truncated: bool,
 }
 
 /// Maps `eN` refs to handles. Each target keeps its current and previous
@@ -81,6 +83,7 @@ impl AxRegistry {
                 handle,
                 target_key: target.to_string(),
                 generation,
+                subtree_truncated: false,
             },
         );
         self.enforce_cap();
@@ -89,6 +92,19 @@ impl AxRegistry {
 
     pub fn resolve(&self, reference: &str) -> CoreResult<AxHandle> {
         self.entry(reference).map(|entry| entry.handle.clone())
+    }
+
+    /// Records that the snapshot which registered `reference` cut its children.
+    pub fn mark_subtree_truncated(&mut self, reference: &str) {
+        let id = reference.strip_prefix('e').and_then(|id| id.parse::<u64>().ok());
+        if let Some(entry) = id.and_then(|id| self.entries.get_mut(&id)) {
+            entry.subtree_truncated = true;
+        }
+    }
+
+    /// Whether the snapshot that registered `reference` cut its children.
+    pub fn subtree_truncated(&self, reference: &str) -> bool {
+        self.entry(reference).is_ok_and(|entry| entry.subtree_truncated)
     }
 
     pub fn target(&self, reference: &str) -> CoreResult<String> {

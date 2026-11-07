@@ -1,19 +1,18 @@
 import { randomUUID } from "node:crypto";
 import { DESKTOP_METHODS, DISPLAY_METHODS, type DesktopCapabilities } from "@oh-my-opencode/senpi-desktop-protocol";
-import { isDesktopCapabilities, isRecord } from "../service/parse";
-import { ComputerRunError, facadeMethod, type RunScope } from "./context";
+import type { Window as SdkWindow } from "@oh-my-opencode/senpi-desktop-sdk";
+import { isRecord } from "../service/parse";
+import { ComputerRunError, facadeMethod, openSdk, type RunScope, viaSdk } from "./context";
 import {
 	type DesktopDisplay,
 	type DesktopWindow,
 	expectResult,
 	isAxNode,
-	isDisplay,
+	isExecResult,
 	isText,
-	isWindow,
-	listOf,
 	optional,
 } from "./engine-results";
-import { ElementHandle, InputTarget, resolveElement, WindowHandle } from "./handles";
+import { ElementHandle, InputTarget, RUN_REPLY_GUARDS, resolveElement, WindowHandle } from "./handles";
 
 export interface WindowFilter {
 	/** Case-insensitive substring of the owning app name. */
@@ -22,20 +21,34 @@ export interface WindowFilter {
 	readonly title?: string;
 }
 
-function matchesFilter(window: DesktopWindow, filter: WindowFilter = {}): boolean {
-	const app = filter.app?.toLocaleLowerCase();
-	const title = filter.title?.toLocaleLowerCase();
-	return (
-		(!app || window.app.toLocaleLowerCase().includes(app)) &&
-		(!title || window.title.toLocaleLowerCase().includes(title))
-	);
+/** The SDK selector of a run filter: an empty field matches every window, as it always has here. */
+function sdkFilter(filter: WindowFilter = {}): { readonly app?: string; readonly title?: string } {
+	return { ...(filter.app ? { app: filter.app } : {}), ...(filter.title ? { title: filter.title } : {}) };
 }
 
-/** The `desktop` global of a computer run (and the root of direct `call` chains): one engine target plus lookups. */
+/** A window the SDK matched, paired with the engine's own record of it (user code sees the record unchanged). */
+interface MatchedWindow {
+	readonly record: DesktopWindow;
+	readonly window: SdkWindow;
+}
+
+/**
+ * The `desktop` global of a computer run (and the root of direct `call` chains): one engine target plus lookups.
+ * Lookups run through the `@oh-my-opencode/senpi-desktop-sdk` `Computer` over this run's engine channel.
+ */
 export function createDesktopFacade(scope: RunScope) {
 	const method = facadeMethod(scope, DESKTOP_METHODS);
-	const listWindows = async ({ call }: RunScope): Promise<readonly DesktopWindow[]> =>
-		expectResult("windows", await call("windows", {}), listOf(isWindow));
+	const matching = (selector: string | WindowFilter | undefined): Promise<readonly MatchedWindow[]> =>
+		viaSdk("windows", async () => {
+			const sdk = await openSdk(scope, RUN_REPLY_GUARDS);
+			const windows = await sdk.computer.windows(typeof selector === "string" ? { id: selector } : sdkFilter(selector));
+			const byId = new Map(windows.map((window) => [window.id, window]));
+			return (sdk.reply("windows") as readonly DesktopWindow[]).flatMap((record) => {
+				const window = byId.get(record.id);
+				return window === undefined ? [] : [{ record, window }];
+			});
+		});
+	const handle = ({ record, window }: MatchedWindow) => new WindowHandle(scope, record, window);
 	const element = async (
 		engineMethod: "ax.elementAt" | "ax.focused",
 		params: object,
@@ -46,13 +59,19 @@ export function createDesktopFacade(scope: RunScope) {
 	const root = new InputTarget(scope, "desktop", DESKTOP_METHODS);
 	return {
 		capabilities: (): Promise<DesktopCapabilities> =>
-			method("capabilities", async ({ call }) => {
-				const capabilities = expectResult("capabilities", await call("capabilities", {}), isDesktopCapabilities);
-				return { ...capabilities, cursorOverlay: capabilities.cursorOverlay ?? false };
-			}),
+			method("capabilities", () =>
+				viaSdk("capabilities", async () => {
+					const capabilities = await (await openSdk(scope, RUN_REPLY_GUARDS)).computer.capabilities();
+					return { ...capabilities, cursorOverlay: capabilities.cursorOverlay ?? false };
+				}),
+			),
 		displays: (): Promise<readonly DesktopDisplay[]> =>
-			method("displays", async ({ call }) =>
-				expectResult("displays", await call("displays", {}), listOf(isDisplay)),
+			method("displays", () =>
+				viaSdk("displays", async () => {
+					const sdk = await openSdk(scope, RUN_REPLY_GUARDS);
+					await sdk.computer.displays();
+					return sdk.reply("displays") as readonly DesktopDisplay[];
+				}),
 			),
 		/** A per-call display target, without changing the session's default capture; the engine refuses an unknown id at first use. */
 		display: (selector: string): Promise<InputTarget & { readonly id: string }> =>
@@ -62,29 +81,27 @@ export function createDesktopFacade(scope: RunScope) {
 				return Object.assign(new InputTarget(scope, `display:${selector}`, DISPLAY_METHODS), { id: selector });
 			}),
 		windows: (filter?: WindowFilter): Promise<readonly DesktopWindow[]> =>
-			method("windows", async (run) => (await listWindows(run)).filter((window) => matchesFilter(window, filter))),
+			method("windows", async () => (await matching(filter ?? {})).map(({ record }) => record)),
 		/** Exactly one window by opaque id or filter; an ambiguous filter throws listing the candidates. */
 		window: (selector: string | WindowFilter): Promise<WindowHandle> =>
-			method("window", async (run) => {
-				const found = (await listWindows(run)).filter((window) =>
-					typeof selector === "string" ? window.id === selector : matchesFilter(window, selector),
-				);
+			method("window", async () => {
+				const found = await matching(selector);
 				const [only, ...others] = found;
 				if (only === undefined)
 					throw new ComputerRunError("window", `no window matches ${JSON.stringify(selector)}`);
 				if (others.length > 0) {
-					const candidates = found.map((window) => `${window.id} ${window.app} ${JSON.stringify(window.title)}`);
+					const candidates = found.map(({ record }) => `${record.id} ${record.app} ${JSON.stringify(record.title)}`);
 					throw new ComputerRunError(
 						"window",
 						`multiple windows match ${JSON.stringify(selector)}:\n${candidates.join("\n")}`,
 					);
 				}
-				return new WindowHandle(scope, only);
+				return handle(only);
 			}),
 		focusedWindow: (): Promise<WindowHandle | null> =>
-			method("focusedWindow", async (run) => {
-				const focused = (await listWindows(run)).find((window) => window.focused);
-				return focused === undefined ? null : new WindowHandle(scope, focused);
+			method("focusedWindow", async () => {
+				const focused = (await matching({})).find(({ window }) => window.focused);
+				return focused === undefined ? null : handle(focused);
 			}),
 		screenshot: root.screenshot.bind(root),
 		zoom: root.zoom.bind(root),
@@ -110,7 +127,7 @@ export function createDesktopFacade(scope: RunScope) {
 				),
 			write: (text: string): Promise<void> =>
 				method("clipboard.write", async ({ call }) => {
-					await call("clipboard.write", { text });
+					expectResult("clipboard.write", await call("clipboard.write", { text }), isExecResult);
 				}),
 		},
 		control: createControlFacade(scope, method),
