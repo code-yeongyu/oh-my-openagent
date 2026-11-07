@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pruneProvisionedRuntimes, removeReplacedLauncher } from "../runtime-prune"
@@ -35,6 +35,25 @@ describe("pruneProvisionedRuntimes", () => {
     expect(result.failed).toEqual([])
     for (const kept of ["5.1.40", "5.1.61", "5.1.62", "5.2.0", "handoff-fixture"]) expect(present(kept)).toBe(true)
     for (const removed of ["5.1.56", "5.1.60"]) expect(present(removed)).toBe(false)
+  })
+
+  test("#given a version-named link to a directory outside the runtime root #when a fresh runtime prunes #then the link goes and its target is untouched", () => {
+    // given: a junction on Windows (no privilege needed), a plain directory symlink elsewhere
+    provision("5.1.61", "5.1.62")
+    const outside = join(root, "..", `${root.split(/[\\/]/).at(-1)}-outside`)
+    mkdirSync(outside, { recursive: true })
+    writeFileSync(join(outside, "keep.txt"), "user data")
+    symlinkSync(outside, join(root, "5.1.40"), "junction")
+    try {
+      // when
+      const result = pruneProvisionedRuntimes({ root, current: "5.1.62", platform: "linux", listRunning: () => [] })
+      // then
+      expect(result.removed).toEqual(["5.1.40"])
+      expect(() => lstatSync(join(root, "5.1.40"))).toThrow()
+      expect(readFileSync(join(outside, "keep.txt"), "utf8")).toBe("user data")
+    } finally {
+      removeTree(outside)
+    }
   })
 
   test("#given the running processes cannot be listed #when a fresh runtime prunes #then nothing is removed", () => {
