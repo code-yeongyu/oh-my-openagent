@@ -223,6 +223,26 @@ describe("computer.verify", () => {
 		expect(run.calls).toEqual([{ action: "call", chain: [{ method: "windows", args: [] }] }]);
 	});
 
+	it("refuses a non-number intervalMs the same way in both facades, before any tool call", async () => {
+		// Given
+		const kernel = loadJsFacade(windowResponder);
+		const message = "computer.verify() intervalMs must be a finite, non-negative number";
+
+		// When
+		const js = kernel
+			.run(`return computer.verify({ kind: "elementEnabled", ref: "e1" }, { timeoutMs: 50, intervalMs: "fast" });`)
+			.then(() => "resolved", (error: Error) => `${error.name}: ${error.message}`);
+		const py = runPythonFacade("computer.verify({'kind': 'elementEnabled', 'ref': 'e1'}, timeoutMs=50, intervalMs='fast')");
+
+		// Then
+		expect({ js: await js, jsCalls: kernel.calls, py: py.error, pyCalls: py.calls }).toEqual({
+			js: `TypeError: ${message}`,
+			jsCalls: [],
+			py: `TypeError: ${message}`,
+			pyCalls: [],
+		});
+	});
+
 	it("refuses an unknown expectation kind before any tool call", async () => {
 		const kernel = loadJsFacade(windowResponder);
 		await expect(kernel.run(`return computer.verify({ kind: "pixelMatches" });`)).rejects.toThrow(TypeError);

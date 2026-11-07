@@ -273,6 +273,8 @@ def _make_computer():
                 raise TypeError("computer.verify() expects an expectation whose kind is one of " + ", ".join(_EXPECTATION_KINDS))
             if not isinstance(timeoutMs, (int, float)) or timeoutMs != timeoutMs or timeoutMs < 0 or timeoutMs == float("inf"):
                 raise TypeError("computer.verify() timeoutMs must be a finite, non-negative number")
+            if not isinstance(intervalMs, (int, float)) or intervalMs != intervalMs or intervalMs < 0 or intervalMs == float("inf"):
+                raise TypeError("computer.verify() intervalMs must be a finite, non-negative number")
             interval = max(intervalMs, 10) / 1000
             started = time.monotonic()
             deadline = started + timeoutMs / 1000

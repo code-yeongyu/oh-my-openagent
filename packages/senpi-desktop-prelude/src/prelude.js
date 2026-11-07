@@ -211,7 +211,11 @@
 		if (typeof timeoutMs !== "number" || !Number.isFinite(timeoutMs) || timeoutMs < 0) {
 			throw new TypeError("computer.verify() timeoutMs must be a finite, non-negative number");
 		}
-		const interval = Math.max(opts.intervalMs ?? 100, 10);
+		const intervalMs = opts.intervalMs ?? 100;
+		if (typeof intervalMs !== "number" || !Number.isFinite(intervalMs) || intervalMs < 0) {
+			throw new TypeError("computer.verify() intervalMs must be a finite, non-negative number");
+		}
+		const interval = Math.max(intervalMs, 10);
 		const started = Date.now();
 		const deadline = started + timeoutMs;
 		let reads = 0;
