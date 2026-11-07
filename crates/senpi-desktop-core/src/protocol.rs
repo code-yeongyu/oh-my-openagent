@@ -16,8 +16,30 @@ pub const PROTOCOL_VERSION: &str = "1";
 pub const ABI: &str = "senpi-desktop/1";
 /// Opt-in behaviours this engine supports, reported in `engine.hello`
 /// `features`. A host sends `reportMode: "object"` only to an engine that
-/// lists `action-report`.
-pub const FEATURES: &[&str] = &["action-report"];
+/// lists `action-report`. `frame-identity`: window frames are re-checked
+/// against the captured window's owning process; `frame-consume`: pointer
+/// options take `consume`; `ax-partial`: an object-mode `ax.snapshot` past its
+/// deadline (`timeoutMs`, default 3000) returns the nodes it read with
+/// `complete: false` and its `cuts`; `trace`: `trace: true` adds per-stage `timings`
+/// to action reports and a redacted JSONL trace beside the audit log; `epoch`: an
+/// object-mode session supersedes its frames and refs and announces
+/// `epoch.changed` when the desktop changes; `interaction-lock`: input from this
+/// user's engines in every process is serialized by a machine-wide lock, and a lock
+/// held past its wait budget answers `InputBusy`;
+/// `intervention-policy`: `session.open` takes `intervention`, and under
+/// `continue` the user's own presses in the target app are recorded but neither
+/// hold input back nor stop it (`pause`, the default, keeps `UserIntervened`).
+pub const FEATURES: &[&str] = &[
+    "action-report",
+    "frame-identity",
+    "frame-consume",
+    "ax-partial",
+    "trace",
+    "key-priming",
+    "epoch",
+    "interaction-lock",
+    "intervention-policy",
+];
 
 /// Standard JSON-RPC 2.0 error codes the engine emits.
 pub const PARSE_ERROR: i64 = -32_700;
