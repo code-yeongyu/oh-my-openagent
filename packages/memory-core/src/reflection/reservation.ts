@@ -221,6 +221,7 @@ export class ReflectionReservationStore {
       reservedAt: this.now().toISOString(),
       launcherPid: launcher.pid,
       launcherHostname: launcher.hostname,
+      ...(launcher.hostId ? { launcherHostId: launcher.hostId } : {}),
       launcherProcessStart: launcher.processStart,
     }
   }
