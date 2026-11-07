@@ -4,6 +4,7 @@ import { preludeAssets } from "./assets";
  * Every method a `computer` call chain may name: the union of the protocol's desktop, window, and element tier
  * tables. The facades emit nothing else; `test/method-allowlist.test.ts` pins both directions.
  */
+// <generated:facade> from facade-manifest.json by scripts/generate-assets.ts; edit CHAIN_BINDINGS there, then `bun run generate`
 const METHOD_ALLOWLIST: readonly string[] = [
 	"actions",
 	"attributes",
@@ -28,10 +29,10 @@ const METHOD_ALLOWLIST: readonly string[] = [
 	"focusedWindow",
 	"holdKeys",
 	"holdMouse",
-	"move",
-	"observe",
 	"menu.items",
 	"menu.select",
+	"move",
+	"observe",
 	"parent",
 	"perform",
 	"press",
@@ -46,6 +47,7 @@ const METHOD_ALLOWLIST: readonly string[] = [
 	"windows",
 	"zoom",
 ];
+// </generated:facade>
 
 /**
  * The `computer` eval-kernel contribution plus its model docs. `javascript`, `python`, `documentation`, and

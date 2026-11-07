@@ -5,7 +5,8 @@
 // target (InvalidCoordinateFrame otherwise), as the real engine's per-target frames do.
 // Captures of "desktop" and "101" are inline PNGs; "202" is artifact-only.
 // FAKE_ENGINE_INPUT_ERROR=<engine error code> makes every input method fail with that code, the way the
-// engine's input gate refuses (Suspended, StopPathUnavailable, PermissionDenied, ScreenLocked).
+// engine's input gate refuses (Suspended, StopPathUnavailable, PermissionDenied, ScreenLocked);
+// FAKE_ENGINE_INPUT_REASON adds that failure's `data.reason`.
 
 const PNG_1X1 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
@@ -101,6 +102,7 @@ export function createDesktop() {
 		}
 		if (inputError !== undefined && (POINTER_METHODS.has(method) || method === "typeText" || method === "keyChord" || method === "holdKeys")) {
 			const failure = error(INPUT_ERROR_RPC[inputError] ?? -32013, inputError, `input refused: ${inputError}`);
+			if (process.env.FAKE_ENGINE_INPUT_REASON !== undefined) failure.error.data.reason = process.env.FAKE_ENGINE_INPUT_REASON;
 			if (inputError === "PermissionDenied") {
 				failure.error.data.permission = {
 					permission: "accessibility",

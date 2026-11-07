@@ -9,6 +9,7 @@ use crate::scenario::FakeAxNode;
 
 struct AxEntry {
     props: AxProps,
+    identifier: Option<String>,
     parent: Option<u64>,
     children: Vec<u64>,
 }
@@ -62,6 +63,7 @@ impl AxTree {
             id,
             AxEntry {
                 props,
+                identifier: node.identifier.clone(),
                 parent,
                 children,
             },
@@ -86,6 +88,7 @@ impl AxTree {
                 title: Some(format!("filler {index}")),
                 value: None,
                 description: None,
+                identifier: None,
                 enabled: true,
                 focused: false,
                 bounds: None,
@@ -114,6 +117,10 @@ impl AxTree {
 
     pub(crate) fn props(&self, id: u64) -> CoreResult<AxProps> {
         self.entry(id).map(|entry| entry.props.clone())
+    }
+
+    pub(crate) fn identifier(&self, id: u64) -> CoreResult<Option<String>> {
+        self.entry(id).map(|entry| entry.identifier.clone())
     }
 
     pub(crate) fn children(&self, id: u64) -> CoreResult<Vec<u64>> {
