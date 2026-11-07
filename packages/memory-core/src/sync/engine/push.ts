@@ -2,12 +2,15 @@
 // batch on the applied cursor, reserve, upload, append. Each step is journaled before the next, and
 // the batch id is the append's idempotency key, so a crash after the server accepted the batch
 // re-sends the same id and gets the original seq back instead of a second entry.
+// The journal keeps an index of pending items with their ops in segment files (outbox.ts), so
+// each step reads and writes one batch's worth, never the whole backlog (#12286).
 
 import { createHash, randomBytes } from "node:crypto"
 
-import { MAX_BATCH_BYTES, splitBatches } from "./batches"
+import { MAX_BATCH_BYTES, planBatches } from "./batches"
 import type { EngineDeps } from "./engine-deps"
-import { fromBase64, type OutgoingBatch, type SyncJournal, toBase64, type WireItem } from "./journal"
+import type { SyncJournal } from "./journal"
+import type { OutgoingBatch, PendingItem, PendingOps } from "./outbox"
 
 export type PushOutcome = "idle" | "pushed" | "stale"
 
@@ -21,18 +24,19 @@ export function staleBackoffMs(attempt: number, random: () => number = Math.rand
 }
 
 const sha256Hex = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex")
-const carried = (out: OutgoingBatch, item: WireItem): boolean => out.items.some((o) => o.key === item.key && o.ops === item.ops)
 
-async function seal(deps: EngineDeps, journal: SyncJournal, items: readonly WireItem[], batchId: string): Promise<OutgoingBatch> {
-  const all = (await journal.pending()).items
+async function seal(deps: EngineDeps, journal: SyncJournal, items: readonly PendingItem[], batchId: string): Promise<OutgoingBatch> {
   const baseSeq = (await journal.state()).applied
-  const payload = { items: items.map((i) => ({ key: i.key, ops: fromBase64(i.ops) })) }
-  const sealed = await deps.sealer.seal(batchId, baseSeq, payload)
+  // Only this batch's ops are read: the rest of the backlog stays on disk.
+  const payload: { key: string; ops: Uint8Array }[] = []
+  for (const item of items) payload.push({ key: item.key, ops: await journal.outbox.readOps(item) })
+  const sealed = await deps.sealer.seal(batchId, baseSeq, { items: payload })
+  // The bytes are durable before the index names the batch, so a resumed push always finds them.
+  await journal.outbox.putBatch(batchId, sealed.bytes)
   const out: OutgoingBatch = {
     batchId,
     baseSeq,
     digest: sha256Hex(sealed.bytes),
-    bytes: toBase64(sealed.bytes),
     uploadId: null,
     epoch: sealed.epoch,
     link: sealed.link,
@@ -40,22 +44,23 @@ async function seal(deps: EngineDeps, journal: SyncJournal, items: readonly Wire
     stage: "sealed",
     items,
   }
-  await journal.setPending({ items: all, outgoing: out })
+  await journal.setPending({ items: (await journal.pending()).items, outgoing: out })
   deps.fault?.("sealed")
   return out
 }
 
-export async function push(deps: EngineDeps, journal: SyncJournal, batchBytes = MAX_BATCH_BYTES): Promise<PushOutcome> {
+/** `withheld`: keys whose queued ops this device must not send (#12284); they stay pending. */
+export async function push(deps: EngineDeps, journal: SyncJournal, batchBytes = MAX_BATCH_BYTES, withheld: ReadonlySet<string> = new Set()): Promise<PushOutcome> {
   let outcome: PushOutcome = "idle"
   for (;;) {
-    const step = await pushOne(deps, journal, batchBytes)
+    const step = await pushOne(deps, journal, batchBytes, withheld)
     if (step === "idle") return outcome
     if (step === "stale") return "stale"
     outcome = "pushed"
   }
 }
 
-async function pushOne(deps: EngineDeps, journal: SyncJournal, batchBytes: number): Promise<PushOutcome> {
+async function pushOne(deps: EngineDeps, journal: SyncJournal, batchBytes: number, withheld: ReadonlySet<string>): Promise<PushOutcome> {
   const pending = await journal.pending()
   let out = pending.outgoing
   if (out !== null && deps.sealer.sealedBySelf !== undefined && !(await deps.sealer.sealedBySelf(out))) {
@@ -64,11 +69,17 @@ async function pushOne(deps: EngineDeps, journal: SyncJournal, batchBytes: numbe
     out = null
   }
   if (out === null) {
-    const first = splitBatches(pending.items, batchBytes)[0]
-    if (first === undefined) return "idle"
+    const plan = planBatches(pending.items, batchBytes, withheld)
+    // Only ops this device could not wind back are left here (#12284 review L4): never sent, always said.
+    for (const key of new Set(plan.held.map((item) => item.key))) deps.log?.(`sync.item.held side=push len=${Buffer.byteLength(key, "utf8")}`)
+    const first = plan.batches[0]
+    if (first === undefined) {
+      await journal.outbox.sweep(pending)
+      return "idle"
+    }
     out = await seal(deps, journal, first, randomBytes(16).toString("base64url"))
   }
-  const bytes = fromBase64(out.bytes)
+  const bytes = await journal.outbox.readBatch(out)
   if (out.stage === "sealed") {
     out = { ...out, uploadId: await deps.transport.reserve(bytes.length, out.digest), stage: "reserved" }
     await journal.setPending({ ...pending, outgoing: out })
@@ -90,7 +101,11 @@ async function pushOne(deps: EngineDeps, journal: SyncJournal, batchBytes: numbe
     recordSig: out.recordSig,
   })
   if (!result.ok) {
-    await journal.setPending({ items: (await journal.pending()).items, outgoing: null })
+    // The refused batch leaves the index, so its sealed file goes too: a freeze refuses every
+    // cycle, and each would otherwise leave one more batch behind.
+    const dropped: PendingOps = { items: (await journal.pending()).items, outgoing: null }
+    await journal.setPending(dropped)
+    await journal.outbox.sweep(dropped)
     return "stale"
   }
   deps.fault?.("append-landed")
@@ -98,8 +113,10 @@ async function pushOne(deps: EngineDeps, journal: SyncJournal, batchBytes: numbe
   await journal.recordApplied([{ seq: result.seq, kind: "batch", batchId: sent.batchId, digest: sent.digest, objectId: "", author: "self" }])
   const state = await journal.state()
   if (result.seq === state.applied + 1) await journal.updateState({ applied: result.seq })
-  const remaining = (await journal.pending()).items.filter((i) => !carried(sent, i))
-  await journal.setPending({ items: remaining, outgoing: null })
+  const carried = new Set(sent.items.map((i) => i.digest))
+  const next: PendingOps = { items: (await journal.pending()).items.filter((i) => !carried.has(i.digest)), outgoing: null }
+  await journal.setPending(next)
   deps.fault?.("appended")
+  await journal.outbox.sweep(next)
   return "pushed"
 }

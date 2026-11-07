@@ -130,6 +130,26 @@ jobs:
           arch -x86_64 /usr/bin/true 2>/dev/null || sudo softwareupdate --install-rosetta --agree-to-license
           arch -x86_64 "target/${{ matrix.rust_target }}/release/${{ matrix.binary }}" --selftest
 
+      # The memory-core git floor-job helper (omo#10391) ships on Windows only, unsigned like the engine, with a static
+      # CRT (design v4.2 section 3). Its own cargo call, so RUSTFLAGS reaches no other package. The selftest proves the
+      # release bytes can create, limit and join a Global floor job on this runner's own architecture.
+      - name: Build git job helper
+        if: startsWith(matrix.host, 'win32-')
+        env:
+          HOST: ${{ matrix.host }}
+          RUST_TARGET: ${{ matrix.rust_target }}
+          RUSTFLAGS: -C target-feature=+crt-static
+        run: |
+          set -euo pipefail
+          cargo build --release -p omo-git-job-helper --locked --target "$RUST_TARGET"
+          HELPER_DIR=".omo/desktop-engine-assets/git-job-helper-${HOST}"
+          mkdir -p "$HELPER_DIR"
+          cp "target/${RUST_TARGET}/release/omo-git-job-helper.exe" "$HELPER_DIR/"
+          chmod 755 "$HELPER_DIR/omo-git-job-helper.exe"
+          SELFTEST="$("$HELPER_DIR/omo-git-job-helper.exe" selftest)"
+          echo "$SELFTEST"
+          [[ "$SELFTEST" == "selftest ok "* ]]
+
       # The engine CA importer's fact helper (omo#10762) ships on macOS and Windows; Linux reads its trust store
       # from files and gets none. The Windows build stays unsigned, like the Windows engine.
       - name: Build engine trust helper
@@ -220,6 +240,7 @@ jobs:
           path: |
             .omo/desktop-engine-assets/senpi-desktop-engine-*
             .omo/desktop-engine-assets/engine-trust-helper-*/omo-engine-trust-helper*
+            .omo/desktop-engine-assets/git-job-helper-*/omo-git-job-helper*
           retention-days: 1
           if-no-files-found: error
 
@@ -520,6 +541,33 @@ jobs:
         with:
           name: desktop-engine-${{ steps.desktop-engine-target.outputs.host }}
           path: .omo/desktop-engine-assets
+
+      - name: Resolve git job helper availability
+        id: git-job-helper-target
+        if: steps.release-assets.outputs.binary_exists != 'true'
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          set -euo pipefail
+          TARGET_INFO="$(bun script/release-desktop-engine-target.ts --git-job-helper-target "$PLATFORM")"
+          {
+            echo "host=$(jq -r '.host // empty' <<<"$TARGET_INFO")"
+            echo "asset=$(jq -r '.asset // empty' <<<"$TARGET_INFO")"
+            echo "source=$(jq -r '.source // empty' <<<"$TARGET_INFO")"
+          } >> "$GITHUB_OUTPUT"
+
+      # Like the trust helper, the git job helper travels in the desktop-engine artifact downloaded above.
+      - name: Stage git job helper for compiled payload
+        if: steps.git-job-helper-target.outputs.host != ''
+        env:
+          HELPER_ASSET: ${{ steps.git-job-helper-target.outputs.asset }}
+          HELPER_SOURCE: ${{ steps.git-job-helper-target.outputs.source }}
+        run: |
+          set -euo pipefail
+          test -f ".omo/desktop-engine-assets/$HELPER_ASSET"
+          mkdir -p "$(dirname "$HELPER_SOURCE")"
+          cp ".omo/desktop-engine-assets/$HELPER_ASSET" "$HELPER_SOURCE"
+          chmod +x "$HELPER_SOURCE"
 
       # The helper travels in the desktop-engine artifact downloaded above.
       - name: Stage engine trust helper for compiled payload
