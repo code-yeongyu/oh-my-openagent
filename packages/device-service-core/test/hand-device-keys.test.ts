@@ -4,7 +4,7 @@ import { chmodSync, linkSync, mkdirSync, mkdtempSync, renameSync, rmSync } from 
 import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { connectDeviceService, type DeviceService, deviceServiceEndpointPath, forgetDeviceService, handDeviceKeys, type HeldDeviceCredential } from "../src/index.ts"
+import { connectDeviceService, type DeviceService, deviceServiceEndpointPath, forgetDeviceService, handDeviceKeys, type HeldDeviceCredential, LocalApiError } from "../src/index.ts"
 import { writeToken } from "../src/local-api/access.ts"
 import { startFakeOwner, type FakeOwner } from "./local-api/conformance/fake-owner.ts"
 import { testSecure } from "./local-api/support.ts"
@@ -99,6 +99,23 @@ describe.skipIf(process.platform === "win32")("a relayd that died and left its e
     })
     expect(outcome).toBe("not_running")
     expect(lines.map(causeOf)).toEqual(["unreadable"])
+  })
+
+  // read_failed is raised only when a session-history read on a live attach fails (client-assembly.ts #failRead): the
+  // service answered, so it is a plain failure, never an unreadable state dir; insecure_state_dir is the unreadable one.
+  test.each([
+    ["read_failed", "failed"],
+    ["insecure_state_dir", "unreadable"],
+  ] as const)("a %s connect failure is named %s", async (code, cause) => {
+    const stateDir = stateDirOf()
+    await deadEndpoint(stateDir)
+    const lines: string[] = []
+    const outcome = await handDeviceKeys({
+      stateDir, credential: held(), when: "always", log: line => lines.push(line),
+      connect: async () => { throw new LocalApiError(code, "synthetic") },
+    })
+    expect(outcome).toBe("not_running")
+    expect(lines.map(causeOf)).toEqual([cause])
   })
 
   test("forget reads it as no relayd running, logs it, and never throws", async () => {

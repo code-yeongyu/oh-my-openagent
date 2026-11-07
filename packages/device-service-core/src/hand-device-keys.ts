@@ -10,7 +10,8 @@ const connectFailure = (error: unknown): { readonly cause: ConnectFailure; reado
   const detail = error instanceof Error ? error.message : String(error)
   if (error instanceof LocalApiError) {
     if (error.code === "refused" || error.code === "server_proof_invalid") return { cause: "refused", detail }
-    if (error.code === "insecure_state_dir" || error.code === "read_failed") return { cause: "unreadable", detail }
+    // read_failed is a session-history read failing on a live attach, not an unreadable endpoint: it falls to "failed".
+    if (error.code === "insecure_state_dir") return { cause: "unreadable", detail }
     if (error.code === "handshake_timeout" || error.code === "request_timeout") return { cause: "timed_out", detail }
     return { cause: "failed", detail }
   }
