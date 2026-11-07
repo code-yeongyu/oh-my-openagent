@@ -8,6 +8,9 @@
 
 mod backend;
 mod capture;
+mod compositor {
+    pub mod hyprland;
+}
 mod input;
 #[cfg(test)]
 mod live_tests;

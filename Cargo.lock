@@ -2507,6 +2507,8 @@ dependencies = [
  "senpi-desktop-backend-atspi",
  "senpi-desktop-core",
  "senpi-desktop-safety",
+ "serde",
+ "serde_json",
  "tempfile",
  "tokio",
  "xkeysym",
