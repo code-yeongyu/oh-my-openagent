@@ -301,10 +301,7 @@ describe("generateModelConfig", () => {
       // #then
       expect(result.agents?.momus?.model).toBe("openai/gpt-6-astra")
       expect(result.agents?.momus?.variant).toBe("xhigh")
-      expect(result.agents?.momus?.fallback_models?.[0]).toEqual({
-        model: "openai/gpt-6-astra",
-        variant: "high",
-      })
+      expect(result.agents?.momus?.fallback_models).toBeUndefined()
     })
   })
 

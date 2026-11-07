@@ -8,6 +8,7 @@ export type DeclaredRung = {
   readonly model: string
   readonly source: ChainRungSource
   readonly providers?: readonly string[]
+  readonly variant?: string
 }
 
 /**
@@ -33,16 +34,22 @@ export function classifyRungs(
   runtime: readonly string[],
   available: ReadonlySet<string>,
   excludeModels: readonly string[] | undefined,
+  variantByModel: ReadonlyMap<string, string> = new Map(),
 ): readonly ChainRung[] {
   const seen = new Set<string>()
   const rungs: ChainRung[] = []
   for (const rung of declared) {
-    if (seen.has(rung.model)) continue
-    seen.add(rung.model)
+    const variant = rung.variant ?? variantByModel.get(rung.model)
+    const key = variant === undefined ? rung.model : `${rung.model}:${variant}`
+    if (seen.has(key)) continue
+    seen.add(key)
     rungs.push(classify(rung, runtime, available, excludeModels))
   }
   for (const model of runtime) {
-    if (!seen.has(model)) rungs.push(classify({ model, source: "built-in" }, runtime, available, excludeModels))
+    const variant = variantByModel.get(model)
+    const key = variant === undefined ? model : `${model}:${variant}`
+    if (seen.has(key)) continue
+    rungs.push(classify({ model, source: "built-in" }, runtime, available, excludeModels))
   }
   return rungs
 }
