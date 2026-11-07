@@ -8,7 +8,7 @@ import type { Capability, ControlAttachState, DeviceRef, DeviceRow, SessionFilte
 import { type CommandResult, openAttach, PROGRESS_STATES, type RemoteAttach } from "./remote-attach.ts"
 import { followDelegatedChannel } from "./delegated-channel.ts"
 import { LocalApiError } from "./local-api/errors.ts"
-import type { CommandRpc } from "./local-api/protocol.ts"
+import type { AttachFeatures, CommandRpc } from "./local-api/protocol.ts"
 import type { SessionCandidate } from "./local-api/protocol-delegated.ts"
 import { randomBytes } from "node:crypto"
 
@@ -61,6 +61,8 @@ const markNotSent = (error: unknown): unknown =>
 export type { ListingResult, ListingRevision, ReadPage, ReadPageEntry } from "./local-api/client-assembly.ts"
 export { LocalApiError } from "./local-api/errors.ts"
 export type {
+  AttachFeatures,
+  AttachResume,
   Capability,
   CommandRpc,
   CommandStateEvent,
@@ -122,7 +124,11 @@ export type DeviceService = {
   readonly devices: () => Promise<readonly DeviceRow[]>
   /** One listing round across the account's devices; `onRevision` sees each complete revision as it lands. */
   readonly sessions: (filter?: SessionFilter, onRevision?: (revision: ListingRevision) => void) => Promise<ListingResult>
-  readonly attach: (device: string, sessionId: string) => Promise<RemoteAttach>
+  /**
+   * `features`: relay daemon #774's `seqs` / `resume`. A service before it refuses them; the attach is then made without
+   * them, and this connection asks without them from then on.
+   */
+  readonly attach: (device: string, sessionId: string, features?: AttachFeatures) => Promise<RemoteAttach>
   /**
    * Sends one session-less engine record (`open_session`, `list_sessions`, ...) to `device`'s engine endpoint with no
    * attach: relay daemon #393's `session.command {device, endpoint, rpc}`, on the key `session.endpoints` lists first.
@@ -162,6 +168,7 @@ export type ConnectDeviceServiceOptions = {
 /** Opens a proven connection to this device's service (mutual proof before any request) and returns the typed SDK. */
 export async function connectDeviceService(options: ConnectDeviceServiceOptions): Promise<DeviceService> {
   const stateDir = options.stateDir ?? deviceServiceStateDir()
+  let featuresRefused = false
   const client = await (options.connect ?? connectLocalApi)({
     stateDir,
     client: { name: "omo", version: options.version },
@@ -202,7 +209,11 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     thisDevice: async () => (await client.request("device.info", {})).device,
     devices: async () => (await client.request("devices.list", {})).devices,
     sessions: (filter, onRevision) => client.list(filter, onRevision),
-    attach: (device, sessionId) => openAttach(client, device, sessionId),
+    attach: async (device, sessionId, features) => {
+      const attached = await openAttach(client, device, sessionId, featuresRefused ? {} : features)
+      if (features !== undefined && !attached.seqs) featuresRefused = true
+      return attached
+    },
     endpointCommand: async (device, rpc) => {
       // The endpoint lookup runs before any session.command is written, so whatever fails it (a timeout, a closed
       // connection, a refusal) dispatched nothing: it is marked not_sent, unlike a timeout after sending.

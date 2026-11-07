@@ -1,4 +1,4 @@
-import type { DeviceService, RemoteAttach } from "@oh-my-opencode/device-service-core"
+import type { AttachResume, DeviceService, RemoteAttach } from "@oh-my-opencode/device-service-core"
 import type { JsonObject } from "./ports"
 
 // The one read a session's attach holds: its model catalog (`get_available_models`). The catalog does not change with
@@ -40,15 +40,16 @@ type Entry = { readonly opened: Promise<PooledSession>; holders: number; idle?: 
 /**
  * One attach per remote session on the port's connection, counted by its holders (ops in flight and watches). When the
  * count reaches 0 the attach is detached after `idleMs`, unless a new holder comes first; one that ends on its own is
- * dropped, so the next holder attaches again.
+ * dropped, so the next holder attaches again. Every attach asks for record seqs (relay daemon #774); `resume` is sent
+ * only when this hold opens the attach, and the attach reports whether the service took it.
  */
 export function createAttachPool(svc: () => Promise<DeviceService>, idleMs: number = ATTACH_IDLE_MS) {
   const entries = new Map<string, Entry>()
-  const hold = async (device: string, sessionId: string): Promise<HeldAttach> => {
+  const hold = async (device: string, sessionId: string, resume?: AttachResume): Promise<HeldAttach> => {
     const key = `${device}\u0000${sessionId}`
     let entry = entries.get(key)
     if (entry === undefined) {
-      const opened = svc().then((connected) => connected.attach(device, sessionId)).then(
+      const opened = svc().then((connected) => connected.attach(device, sessionId, resume === undefined ? { seqs: true } : { resume })).then(
         (attached) => {
           void attached.detached.then(() => { if (entries.get(key)?.opened === opened) entries.delete(key) })
           return { attached, catalog: createCatalogHold(attached) }

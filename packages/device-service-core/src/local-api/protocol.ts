@@ -18,7 +18,7 @@ import type { SessionCommand, SessionCommandPart } from "./protocol-command.ts";
 export type * from "./protocol-command.ts";
 export type * from "./protocol-control.ts";
 
-import type { ControlAttachGet, ControlAttachSet, ControlAttachState } from "./protocol-control.ts";
+import type { AttachFeatures, ControlAttachGet, ControlAttachSet, ControlAttachState } from "./protocol-control.ts";
 
 // The local API v1 messages (docs/local-api.md). One JSON object per LF-terminated line: the handshake, then
 // requests {id, type, ...} each answered by exactly one response, and pushed events {type: "event", kind, ...}.
@@ -133,7 +133,7 @@ export type SessionsList = {
   /** 2: this query's rows may carry `kind`, `parent` and `parent_listed` (#316); absent, they never do. */
   readonly rows?: 2;
 };
-export type SessionAttach = {
+export type SessionAttach = AttachFeatures & {
   readonly id: string;
   readonly type: "session.attach";
   readonly device: string;

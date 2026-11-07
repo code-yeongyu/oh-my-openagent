@@ -5,7 +5,9 @@ import type { LocalApiClient } from "./local-api/client.ts"
 import type { ReadPage } from "./local-api/client-assembly.ts"
 import { LocalApiError } from "./local-api/errors.ts"
 import type {
+  AttachFeatures,
   AttachPendingReason,
+  AttachResume,
   CommandRpc,
   CommandStateEvent,
   DetachReason,
@@ -32,6 +34,13 @@ export type RemoteAttach = {
   readonly sessionId: string
   /** The local handle the service gave this attach (owned by this connection). */
   readonly handle: string
+  /** The service took `seqs` (or `resume`) for this attach, so its records carry their stream seqs (relay daemon #774). */
+  readonly seqs: boolean
+  /**
+   * The resume point the service took: it replays only the records after it, with no snapshot, when it still holds that
+   * attach_id with every record since; otherwise it sends the full snapshot and records, as without one.
+   */
+  readonly resume: AttachResume | undefined
   /** The first snapshot, inline or reassembled from its blob; a later re-attach replaces it through `onEvent`. */
   readonly snapshot: Promise<SnapshotBody>
   /** Settles with the reason once the attach ends, whoever ended it. */
@@ -101,7 +110,19 @@ const toRemote = (event: AttachEvent): RemoteAttachEvent => {
   }
 }
 
-export function openAttach(client: LocalApiClient, device: string, sessionId: string): Promise<RemoteAttach> {
+// A service before relay daemon #774 answers either session.attach field invalid_request: the attach is asked again
+// without them, as that service has always served it.
+const requestAttach = async (client: LocalApiClient, device: string, sessionId: string, features: AttachFeatures): Promise<{ readonly attach: string; readonly features: AttachFeatures }> => {
+  if (features.seqs === undefined && features.resume === undefined) return { ...(await client.request("session.attach", { device, session_id: sessionId })), features }
+  try {
+    return { ...(await client.request("session.attach", { device, session_id: sessionId, ...features })), features }
+  } catch (error) {
+    if (!(error instanceof LocalApiError && error.code === "invalid_request")) throw error
+    return { ...(await client.request("session.attach", { device, session_id: sessionId })), features: {} }
+  }
+}
+
+export function openAttach(client: LocalApiClient, device: string, sessionId: string, features: AttachFeatures = {}): Promise<RemoteAttach> {
   // Events of the new attach can arrive before its handle is known, so they wait here until the response names it.
   const early: AttachEvent[] = []
   const history: RemoteAttachEvent[] = []
@@ -176,8 +197,8 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
     finish("closed")
     endCommands("closed")
   })
-  return client.request("session.attach", { device, session_id: sessionId }).then(
-    ({ attach }) => {
+  return requestAttach(client, device, sessionId, features).then(
+    ({ attach, features: taken }) => {
       handle = attach
       const delegated = followDelegatedChannel(device)
       channel = delegated
@@ -187,6 +208,8 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
         device,
         sessionId,
         handle: attach,
+        seqs: taken.seqs === true || taken.resume !== undefined,
+        resume: taken.resume,
         snapshot,
         detached,
         onEvent: listener => {

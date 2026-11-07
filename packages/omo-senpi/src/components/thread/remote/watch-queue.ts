@@ -49,8 +49,8 @@ export class WatchQueue {
       })
     }
     const others = this.#items.filter((item) => item.kind !== "records")
-    // A queued snapshot or attach end already leads to a fresh read; otherwise one is forced.
-    const readsAnyway = others.some((item) => item.kind !== "resync")
+    // A queued snapshot already leads to a fresh read; otherwise one is forced (an attach end may resume, with no read).
+    const readsAnyway = others.some((item) => item.kind === "snapshot")
     const resync: readonly WatchItem[] = readsAnyway ? [] : [{ kind: "resync" }]
     this.#items = [...(newestStatus === undefined ? [] : [newestStatus]), ...others, ...resync]
     this.#records = newestStatus === undefined ? 0 : 1

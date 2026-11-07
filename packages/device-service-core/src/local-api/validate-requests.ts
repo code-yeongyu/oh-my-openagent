@@ -1,5 +1,5 @@
 import { SESSION_PROJECT_MAX_CHARS, SESSION_READ_TAIL_MAX } from "./spec-proto.ts";
-import type { EnvironmentReport, LocalRequest, RequestType, SessionFilter } from "./protocol.ts";
+import type { AttachResume, EnvironmentReport, LocalRequest, RequestType, SessionFilter } from "./protocol.ts";
 import {
   COMMAND_REQUEST_VALIDATORS,
   requestFields,
@@ -20,7 +20,7 @@ import {
   text,
   uint,
 } from "./validate-fields.ts";
-import { deviceId, deviceRef, sessionId } from "./validate-shapes.ts";
+import { attachId, deviceId, deviceRef, sessionId } from "./validate-shapes.ts";
 import { FILTER_KEYS, SESSION_ROW_STATES } from "./vocabulary.ts";
 
 const ENVIRONMENTS_MAX = 1024;
@@ -67,6 +67,12 @@ const environmentsOf = (v: unknown): readonly EnvironmentReport[] => {
     : fail("duplicate environment_id");
 };
 
+// relay daemon #774: the last record a reattaching client applied, by its attach_id and that record's seq.
+const resumeOf = (v: unknown): AttachResume => {
+  const m = exactly(v, ["attach_id", "seq"], [], "resume");
+  const seq = uint(m["seq"], 0, Number.MAX_SAFE_INTEGER, "resume.seq");
+  return { attach_id: attachId(m["attach_id"]), seq };
+};
 const bare = (v: Fields): void => {
   requestFields(v, []);
 };
@@ -145,12 +151,16 @@ const VALIDATORS: RequestValidators<RequestType> = {
     };
   },
   "session.attach": (v, id) => {
-    const m = requestFields(v, ["device", "session_id"]);
+    const m = requestFields(v, ["device", "session_id"], ["seqs", "resume"]);
+    const { seqs, resume } = m;
+    if (seqs !== undefined && seqs !== true) return fail("seqs");
     return {
       id,
       type: "session.attach",
       device: deviceId(m["device"]),
       session_id: sessionId(m["session_id"]),
+      ...(seqs === undefined ? {} : { seqs }),
+      ...(resume === undefined ? {} : { resume: resumeOf(resume) }),
     };
   },
   "session.detach": (v, id) => ({
