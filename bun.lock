@@ -390,6 +390,7 @@
       "dependencies": {
         "@oh-my-opencode/senpi-desktop-engine": "workspace:*",
         "@oh-my-opencode/senpi-desktop-protocol": "workspace:*",
+        "@oh-my-opencode/senpi-desktop-sdk": "workspace:*",
       },
       "devDependencies": {
         "@types/node": "26.6.2",

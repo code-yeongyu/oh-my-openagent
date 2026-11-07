@@ -4,6 +4,10 @@
 //! `release_all` on failure or suspension, the focus/cursor restore), then
 //! exactly one [`AuditEvent`]. Read-only requests never pass here.
 //!
+//! The machine-wide [`crate::lock::InteractionLock`] is taken after every
+//! admission wait: a foreground transaction holds it from the capture through
+//! the restore, background exec only around the dispatch.
+//!
 //! A stop or a cancellation observed at admission or just before the action
 //! sends no input; suspension always wins over cancellation (gajae
 //! `execute_one`).
@@ -25,9 +29,11 @@ use senpi_desktop_safety::{
 
 use crate::audit::audit_event;
 use crate::grant::ControlSlot;
+use crate::lock::Held;
 use crate::report::{error_report, ReportExtras, Stage};
 use crate::restore::{Guard, TransactionError};
 use crate::session::guarded;
+use crate::timings::{StageClock, TimedStage};
 use crate::worker::Worker;
 
 /// Serializes input transactions across every session of the process
@@ -81,6 +87,11 @@ pub(crate) struct Mutation<'a> {
     pub(crate) keys: Option<&'a [String]>,
     /// How far the transaction got; decides the object-mode disposition.
     pub(crate) stage: Cell<Stage>,
+    /// Stage durations, reported only in `trace: true` sessions.
+    pub(crate) timings: StageClock,
+    /// Set by the gate: the fake backend joins the machine-wide lock only
+    /// when a test names its directory.
+    pub(crate) fake_backend: Cell<bool>,
 }
 
 impl Mutation<'_> {
@@ -95,6 +106,8 @@ impl Mutation<'_> {
             text_delivered: Cell::new(0),
             keys: None,
             stage: Cell::new(Stage::Admission),
+            timings: StageClock::new(),
+            fake_backend: Cell::new(false),
         }
     }
 }
@@ -130,6 +143,12 @@ impl FrameContext for GateView {
     fn identity_changed(&self) -> bool {
         self.identity_changed
     }
+}
+
+/// A foreground transaction holds the machine-wide lock from its capture
+/// through its restore; background exec only around its dispatch.
+fn locks_whole_transaction(mutation: &Mutation<'_>) -> bool {
+    mutation.delivery == DeliveryMode::Foreground || matches!(route(mutation), Some(ActionRoute::ForegroundHid))
 }
 
 /// The channel a mutating request's input takes; `None` for a request that
@@ -218,9 +237,11 @@ impl Worker {
         match (result, report) {
             (Ok(value), _) => {
                 let hit = self.report_extras.take().and_then(|extras| extras.hit);
+                let traced = self.options.as_ref().is_some_and(|options| options.trace);
                 self.report_extras.set(Some(ReportExtras {
                     route: route(mutation),
                     hit,
+                    timings: traced.then(|| mutation.timings.take()),
                 }));
                 Ok((value, event))
             }
@@ -249,20 +270,36 @@ impl Worker {
             Ok(watch) => watch,
             Err(refused) => return (Err(TransactionError::Primary(refused)), None),
         };
-        let guard = match Guard::begin(self, mutation.action, mutation.delivery) {
+        let whole = locks_whole_transaction(mutation);
+        // Dropped after the restore below: the tail expression runs first.
+        let _interaction = match whole.then(|| self.take_interaction(mutation, cancelled)).transpose() {
+            Ok(held) => held.flatten(),
+            Err(refused) => return (Err(TransactionError::Primary(refused)), None),
+        };
+        let begun = mutation
+            .timings
+            .time(TimedStage::Capture, || Guard::begin(self, mutation.action, mutation.delivery));
+        let guard = match begun {
             Ok(guard) => guard,
             Err(error) => return (Err(TransactionError::Primary(error)), None),
         };
         let mut result = match self.stop_observed(cancelled) {
             Some(stopped) => Err(stopped),
-            None => {
-                mutation.stage.set(Stage::Acting);
-                guarded(|| act(self))
-            }
+            None => match (!whole).then(|| self.take_interaction(mutation, cancelled)).transpose() {
+                Err(refused) => Err(refused),
+                Ok(dispatch) => {
+                    mutation.stage.set(Stage::Acting);
+                    let acted = mutation.timings.time(TimedStage::Dispatch, || guarded(|| act(self)));
+                    drop(dispatch);
+                    acted
+                }
+            },
         };
         if result.is_ok() {
             mutation.stage.set(Stage::Acted);
-            result = self.after_action(mutation, result);
+            result = mutation
+                .timings
+                .time(TimedStage::Verify, || self.after_action(mutation, result));
         }
         if let Err(primary) = &mut result {
             // Recorded on the primary error, never in place of it.
@@ -270,7 +307,16 @@ impl Worker {
                 primary.message = format!("{}; releasing held input also failed: {release}", primary.message);
             }
         }
-        guard.restore(self, result)
+        mutation.timings.time(TimedStage::Restore, || guard.restore(self, result))
+    }
+
+    /// Takes the slot's machine-wide lock, giving up on a stop, a
+    /// cancellation, or another process holding it past the wait budget.
+    fn take_interaction(&self, mutation: &Mutation<'_>, cancelled: &dyn Fn() -> bool) -> CoreResult<Option<Held>> {
+        self.safety
+            .control_slot
+            .interaction()
+            .acquire(mutation.fake_backend.get(), &|| self.stop_observed(cancelled))
     }
 
     /// Waits for the transaction lock, giving up when a stop or a
@@ -335,7 +381,9 @@ impl Worker {
 
     fn gate(&mut self, mutation: &Mutation<'_>) -> CoreResult<()> {
         let policy = self.stop_policy();
-        let input_granted = input_may_proceed(&self.refresh_capabilities().input_permission);
+        let capabilities = self.refresh_capabilities();
+        mutation.fake_backend.set(capabilities.backend == "fake");
+        let input_granted = input_may_proceed(&capabilities.input_permission);
         let lock = match self.backend().and_then(|backend| backend.screen_locked()) {
             Ok(true) => LockState::Locked,
             Ok(false) => LockState::Unlocked,
@@ -429,6 +477,8 @@ fn input_may_proceed(input_permission: &str) -> bool {
 mod desktop_grant_tests;
 #[cfg(test)]
 mod grant_tests;
+#[cfg(test)]
+mod lock_tests;
 #[cfg(test)]
 mod permission_tests;
 #[cfg(test)]
