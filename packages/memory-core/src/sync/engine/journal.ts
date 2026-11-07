@@ -45,6 +45,9 @@ export interface CycleRecord {
  * whether it landed is decidable on any resume: a write landed iff its staged file is gone; a
  * delete landed iff its staged file exists (the working file was moved there, or a marker was
  * written when there was no file). `frontier` is the item doc's version the text was rendered at.
+ * `path` is the on-disk spelling the render landed at: after a delete landed, the file is gone,
+ * so a resume can no longer resolve that spelling from the tree, and staging must use the
+ * recorded one instead (#12158 item 2). Records an older build wrote carry no `path`.
  */
 export interface RenderRecord {
   readonly seq: number
@@ -52,6 +55,7 @@ export interface RenderRecord {
   readonly frontier: string
   readonly hash: string
   readonly text: string | null
+  readonly path?: string
 }
 
 export interface EngineState {
