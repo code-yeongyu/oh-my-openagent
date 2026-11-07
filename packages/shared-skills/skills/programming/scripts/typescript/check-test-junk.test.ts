@@ -122,4 +122,51 @@ describe("#given test files with mechanically detectable junk", () => {
     expect(findings).toEqual([])
     expect(code).toBe(0)
   })
+
+  test("#when delays are expressions #then they are reported while literal zero still yields a tick", async () => {
+    for (const [delay, reported] of [
+      ["POLL_MS", true],
+      ["0 + 1", true],
+      ["0.5", true],
+      ["0x10", true],
+      ["0", false],
+      ["0 ", false],
+      ["0, value", false],
+      ["0\n", false],
+      ["/* ms */ 0", false],
+      ["0 /* yield one tick */", false],
+      ["0 // yield one tick\n", false],
+      ["// ms\n0", false],
+      ["/* ms */ POLL_MS", true],
+      ["0 /* ms */ + 1", true],
+      ["/* ms */\n0", false],
+      ["/* ms\n */ 0", false],
+      ["/* one */ /* two */\n0", false],
+      ["0 /* ms\n */", false],
+      ["/* ms */ 0 /* one\n */", false],
+    ] as const) {
+      writeFileSync(join(root, "src", "delay.test.ts"), [
+        `await new Promise(resolve => setTimeout(resolve, ${delay}))`,
+        `await new Promise(finish => setTimeout(finish, ${delay}))`,
+        `await Bun.sleep(${delay})`,
+        `await sleep(${delay})`,
+      ].join("\n"))
+      const { code, findings } = await run(["src/delay.test.ts"])
+      expect({ delay, code, findings: findings.map(({ line, rule }) => [line, rule]) }).toEqual({
+        delay,
+        code: reported ? 1 : 0,
+        findings: reported ? [1, 2, 3, 4].map(line => [line, "fixed-sleep"]) : [],
+      })
+    }
+  })
+
+  test("#when many comments precede a delay #then a named delay is still reported and zero remains exempt", async () => {
+    const comments = "/* c */ ".repeat(28)
+    writeFileSync(join(root, "src", "comments.test.ts"), `await Bun.sleep(${comments}POLL_MS)\nawait Bun.sleep(${comments}0)\n`)
+    const { code, findings } = await run(["src/comments.test.ts"])
+    expect({ code, findings: findings.map(({ line, rule }) => [line, rule]) }).toEqual({
+      code: 1,
+      findings: [[1, "fixed-sleep"]],
+    })
+  })
 })
