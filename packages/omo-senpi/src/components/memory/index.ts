@@ -1,3 +1,5 @@
+import { isMainThread } from "node:worker_threads"
+import { installLockWorkerObserver } from "@oh-my-opencode/team-core/team-state-store/lock-worker-lifetime"
 import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
 import { InFlightReads, resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core"
 
@@ -13,7 +15,7 @@ import { registerMemoryReadClassifier } from "./read-classifier-wiring"
 import { createSessionBinder, readSessionSurface, releaseSession, type SessionState } from "./session-binding"
 import { finalizeIdentityRun } from "./transient-identity"
 import type { DeviceAccountSource } from "./device-session/account-source"
-import { lazyCliAccountSource } from "./device-session/account-runtime-loader"
+import { selectedDeviceAccountSource } from "./device-session/account-runtime-loader"
 import { createDeviceSessionResolver } from "./device-session/resolver"
 import { trackMemoryHooks } from "./hook-work"
 import { createSyncRunner, type SyncRunner } from "./sync-runner"
@@ -60,6 +62,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
   return {
     name: "memory",
     register(hostPi: SenpiExtensionAPI, ctx: ComponentContext): void {
+      if (isMainThread) installLockWorkerObserver()
       const resolveCwd = options.resolveCwd ?? (() => extensionCwd(hostPi))
       const cwd = resolveCwd()
       const bootConfig = resolveMemoryConfig(loadConfig({ cwd }))
@@ -78,7 +81,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
       const syncStatusChanged: { current?: (repo: string) => void } = {}
       const memoryRoot = resolveMemoryRoot(env, cwd)
       const pinDir = syncPinDir(memoryRoot)
-      const deviceAccount = options.deviceAccount ?? lazyCliAccountSource({ env, pinDir, logger: ctx.logger })
+      const deviceAccount = options.deviceAccount ?? selectedDeviceAccountSource({ env, pinDir, logger: ctx.logger })
       const syncRunner = options.syncRunner ?? createSyncRunner({
         logger: ctx.logger,
         onStatusChange: (repo) => syncStatusChanged.current?.(repo),

@@ -35,6 +35,7 @@ const EXPECTED_SENPI_LOADER_ALIASES = [
   "@earendil-works/pi-ai/compat",
   "@earendil-works/pi-ai/oauth",
   "@code-yeongyu/senpi",
+  "@code-yeongyu/senpi/session-worker-data",
   "@mariozechner/pi-coding-agent",
   "@mariozechner/pi-agent-core",
   "@mariozechner/pi-tui",
@@ -50,18 +51,25 @@ const EXPECTED_SENPI_LOADER_ALIASES = [
 ] as const
 
 describe("omo-senpi bundle purity", () => {
-  it("#given the eval SDK and the telemetry sidecar #when imports and build inputs are inspected #then the SDK bundles no node_modules and the sidecar carries no posthog-node code", async () => {
-    const path = join(packageRoot, "plugin", "runtime", "agent-toolkit-sdk", "sdk.js")
-    expect(existsSync(path)).toBe(true)
-    const imports = collectStaticImportSpecifiers(readFileSync(path, "utf8"))
-    expect(imports.length).toBeGreaterThan(0)
-    expect(imports.filter(specifier => !specifier.startsWith("node:"))).toEqual([])
+  it("#given the eval SDKs and the telemetry sidecar #when imports and build inputs are inspected #then the toolkit SDK bundles no node_modules, the bunshin-ts SDK bundles only its own packages, and the sidecar carries no posthog-node code", async () => {
+    for (const sdk of ["agent-toolkit-sdk", "bunshin-ts"]) {
+      const path = join(packageRoot, "plugin", "runtime", sdk, "sdk.js")
+      expect(existsSync(path), `missing built SDK at ${path}`).toBe(true)
+      const imports = collectStaticImportSpecifiers(readFileSync(path, "utf8"))
+      expect(imports.length).toBeGreaterThan(0)
+      expect(imports.filter(specifier => !specifier.startsWith("node:"))).toEqual([])
+    }
     const root = await mkdtemp(join(tmpdir(), "sdk-inputs-"))
     try {
       const built = await buildExtension({ outputPath: join(root, "omo.js") })
       const { toolkitSdkInputs } = built
       expect(toolkitSdkInputs.length).toBeGreaterThan(0)
       expect(toolkitSdkInputs.filter(input => input.replaceAll("\\\\", "/").includes("node_modules/"))).toEqual([])
+      // The bunshin-ts SDK is its entry files, the two vendored packages and their one npm dependency; no senpi runtime.
+      const bunshinTsInputs = built.bunshinTsInputs.map(input => input.replaceAll("\\", "/"))
+      expect(bunshinTsInputs.filter(input => !/(src\/extension\/bunshin-ts-[a-z-]+\.ts|\/vendor\/bunshin-ts(-relay)?\/index\.js|\/node_modules\/@sinclair\/typebox\/.+)$/.test(input))).toEqual([])
+      expect(bunshinTsInputs.some(input => input.endsWith("/vendor/bunshin-ts/index.js"))).toBe(true)
+      expect(bunshinTsInputs.some(input => input.endsWith("/vendor/bunshin-ts-relay/index.js"))).toBe(true)
       // The sidecar gets the PostHog class from the main bundle; its gzip/Sentry top-level code must not come along.
       const { telemetryRecoveryInputs } = built
       expect(telemetryRecoveryInputs.length).toBeGreaterThan(0)
