@@ -3,7 +3,7 @@ import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { isEngineCommand } from "./engine-commands.js"
-import { spawnNode } from "./child-process.js"
+import { propagateResult, runChild, spawnNode } from "./child-process.js"
 import { privateFdHandoff } from "./private-fds.js"
 import { launchClaimsMemorySyncAtBoot } from "./memory-sync-boot.js"
 import { doctorCoverageLines } from "./category-coverage.js"
@@ -89,10 +89,19 @@ async function spawnSenpi(args, withExtension) {
 }
 
 // `omo remote attach`: the engine's attach TUI runs as a signal-forwarding child, never an execve replacement,
-// because this process serves the endpoint the TUI is attached to until the TUI exits.
-export async function runAttachTui(args) {
+// because this process serves the endpoint the TUI is attached to until the TUI exits. When the remote side ends
+// the attach (`ended` settles), the TUI is asked to leave with SIGTERM, which it handles as a terminal's request
+// (restore the terminal, release, exit); the launcher then reports the end, so the TUI's status does not decide.
+export async function runAttachTui(args, ended) {
   const senpi = preparedSenpi()
-  await spawnNode(senpi.cliPath, args, { env: senpiEnvironment(senpi.packageRoot) })
+  let stopped = false
+  const result = await runChild(process.execPath, [senpi.cliPath, ...args], {
+    env: senpiEnvironment(senpi.packageRoot),
+    terminateWhen: ended?.then(() => {
+      stopped = true
+    }),
+  })
+  if (!stopped) propagateResult(result)
 }
 
 // Routine launch notices go straight to stderr: Bun renders every console.error line red on a

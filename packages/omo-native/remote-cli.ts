@@ -13,6 +13,7 @@ import {
 } from "../device-service-core/src/index.ts"
 import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { serveRemoteAttach } from "./remote-attach"
+import type { RemoteAttachEnded } from "./remote-attach-end"
 import { type BootstrapSetup, runBootstrapVerb } from "./remote-bootstrap"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import { controlLines, deviceLines, sessionLines, statusLines } from "./remote-render"
@@ -222,7 +223,7 @@ function reportFailure(dependencies: RemoteCommandDependencies, error: unknown):
   return REMOTE_EXIT.failed
 }
 
-export type RemoteAttachLaunch = { readonly engineArgs: readonly string[] }
+export type RemoteAttachLaunch = { readonly engineArgs: readonly string[]; readonly ended: Promise<RemoteAttachEnded> }
 
 /**
  * `omo remote attach <device>/<session>`: attaches through the device service and serves the session on a private
@@ -258,7 +259,7 @@ export async function prepareRemoteAttach(dependencies: RemoteCommandDependencie
     await attach.snapshot
     const endpoint = await serveRemoteAttach(attach, { label: target })
     void service.closed.then(() => endpoint.close())
-    return { engineArgs: ["--attach", endpoint.socketPath, "--session", endpoint.sessionRef, "--no-extensions"] }
+    return { engineArgs: ["--attach", endpoint.socketPath, "--session", endpoint.sessionRef, "--no-extensions"], ended: endpoint.ended }
   } catch (error) {
     service.close()
     return reportFailure(dependencies, error)
