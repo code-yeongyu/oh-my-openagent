@@ -68,7 +68,7 @@ export async function stageOmowrightRuntime(options = {}) {
     for (const name of STAGED_FILES) files[name] = await sha256(join(tempDir, name))
     await writeFile(
       join(tempDir, "manifest.json"),
-      `${JSON.stringify({ version, sourceDigest: digest, files, stagedAtUtc: new Date().toISOString() }, null, 2)}\n`,
+      `${JSON.stringify({ version, sourceDigest: digest, files }, null, 2)}\n`,
       "utf8",
     )
     try { await access(targetDir); await rename(targetDir, backupDir); backupCreated = true } catch (error) { if (error.code !== "ENOENT") throw error }
