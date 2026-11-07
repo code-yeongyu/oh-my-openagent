@@ -8,7 +8,6 @@ import { recallBm25IndexFor, recallTermFigures } from "./bm25-index"
 import { RecallCorpusCache, type RecallDocument, recallMemoryFigures } from "./provider"
 import { removeTree } from "../../../../test-support/remove-tree"
 
-const GIT_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
 
 const tempDirs: string[] = []
 
@@ -55,7 +54,7 @@ describe("recallMemoryFigures", () => {
     expect(after.corpusCaches - before.corpusCaches).toBe(1)
     expect(after.documents - before.documents).toBe(2)
     expect(after.documentTextBytes - before.documentTextBytes).toBe(textBytes(corpus.documents))
-  }, GIT_INTEGRATION_TEST_TIMEOUT)
+  })
 })
 
 describe("recallTermFigures", () => {

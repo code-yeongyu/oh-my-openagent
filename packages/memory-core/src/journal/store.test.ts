@@ -114,7 +114,7 @@ describe("cancellable journal flush", () => {
 
     // then
     expect(await readFile(lockPath, "utf8")).toBe(`${process.pid}\n`)
-  }, 15_000)
+  })
 
   it("#given a signal aborted before acquisition #when flush runs #then it throws AbortError and creates no lock file", async () => {
     // given
@@ -205,7 +205,7 @@ describe("stale journal lock recovery", () => {
     // then
     expect(taskRuns).toBe(1)
     expect(existsSync(lockPath)).toBe(false)
-  }, 15_000)
+  })
 
   it("#given a payload-free lock file abandoned mid-acquisition #when the lock is acquired #then the artifact is reclaimed by age", async () => {
     // given
@@ -225,8 +225,10 @@ describe("stale journal lock recovery", () => {
     // then
     expect(taskRuns).toBe(1)
     expect(existsSync(lockPath)).toBe(false)
-  }, 15_000)
+  })
 
+  // Waits the full 5 s acquisition deadline before it can throw, and bun gives every file after the
+  // first in a plain `bun test` run only its 5 s default, so this test carries its own budget.
   it("#given a lock file owned by a live process #when the wait deadline passes #then it throws and the live lock is never stolen", async () => {
     // given
     const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-journal-lock-")))
