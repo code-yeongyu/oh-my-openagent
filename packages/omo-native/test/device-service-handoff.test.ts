@@ -43,7 +43,7 @@ const signedIn = (accountId?: string): Credentials => ({
   ...(accountId === undefined ? {} : { accountId }),
 })
 
-async function runningService(version = "0.1.2") {
+async function runningService(version = "0.1.3") {
   const stateDir = join(temp(), "ds")
   mkdirSync(stateDir, { recursive: true, mode: 0o700 })
   const owner = await startFakeOwner({ stateDir, world: { ...defaultWorld(), service_version: version } })

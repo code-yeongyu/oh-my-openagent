@@ -39,7 +39,7 @@ const ownerAt = async (stateDir: string, adopted: boolean): Promise<FakeOwner> =
   const status = adopted
     ? { ...world.status, device: { id: "dev-self", name: "This Mac" } }
     : { ...world.status, device: null, state: "sign_in_required" as const }
-  const owner = await startFakeOwner({ stateDir, world: { ...world, service_version: "0.1.2", status } })
+  const owner = await startFakeOwner({ stateDir, world: { ...world, service_version: "0.1.3", status } })
   owners.push(owner)
   return owner
 }

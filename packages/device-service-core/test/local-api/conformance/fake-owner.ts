@@ -209,13 +209,13 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
   };
 };
 
-// A relayd at or above 0.1.2 (relay-spec ADOPT_ACCOUNT_MIN_SERVICE_VERSION) accepts device.adopt's optional `account`
+// A relayd at or above 0.1.3 (relay-spec ADOPT_ACCOUNT_MIN_SERVICE_VERSION) accepts device.adopt's optional `account`
 // (omo-relay-daemon#730); an older one runs the shipped strict validator, which refuses any unknown field. Every
 // raw device.adopt is recorded as sent, so a test can see exactly which fields went over the wire.
 const acceptAdoptAccount = (state: OwnerState, message: unknown): unknown => {
   if (typeof message !== "object" || message === null || Reflect.get(message, "type") !== "device.adopt") return message;
   state.adoptRequests.push({ ...message });
-  if (compareVersions(state.world.service_version, "0.1.2") < 0 || !("account" in message)) return message;
+  if (compareVersions(state.world.service_version, "0.1.3") < 0 || !("account" in message)) return message;
   const { account, ...rest } = message as Record<string, unknown>;
   return typeof account === "string" && account !== "" ? rest : message;
 };

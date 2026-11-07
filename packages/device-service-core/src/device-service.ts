@@ -154,10 +154,11 @@ export type DeviceCredential = {
 
 /**
  * relay-spec ADOPT_ACCOUNT_MIN_SERVICE_VERSION: the first relayd whose device.adopt accepts the optional `account`
- * (omo-relay-daemon#730). An older relayd refuses any unknown field, so below it device.adopt is sent exactly as
- * before. Gated on welcome.service_version, never on a capability word (design D r9 section 3).
+ * (omo-relay-daemon#730). 0.1.2 shipped without it, and every older relayd refuses any unknown field, so below 0.1.3
+ * device.adopt is sent exactly as before. Gated on welcome.service_version, never on a capability word (design D r9
+ * section 3).
  */
-export const ADOPT_ACCOUNT_MIN_SERVICE_VERSION = "0.1.2"
+export const ADOPT_ACCOUNT_MIN_SERVICE_VERSION = "0.1.3"
 
 const acceptsAdoptAccount = (serviceVersion: string): boolean =>
   compareVersions(serviceVersion, ADOPT_ACCOUNT_MIN_SERVICE_VERSION) >= 0

@@ -191,7 +191,10 @@ export function createCliAccountSource(options: {
       active = { generation, abort: new AbortController() }
     }
     const abort = active.abort
-    // The credential is already in memory for sync's own work; the device service gets it from here, never from a read.
+    // The re-adopt hands over `captured`: the credential this session already read and verified above for sync's own
+    // work. There is no second store read and no unseal for relay. No-holder clause (design D r9 section 3): this
+    // session is omo's only holder. If no omo process holds the credential in memory (no engine with memory sync
+    // running), an omo-only machine stays not_adopted until one does. Nothing prompts and nothing reads the store for relay.
     if (relay !== undefined && offered !== generation) {
       offered = generation
       await relay.readopt({
