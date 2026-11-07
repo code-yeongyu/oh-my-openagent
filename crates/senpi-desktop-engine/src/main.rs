@@ -18,6 +18,7 @@ mod selftest;
 mod serve;
 mod settle;
 mod stop_path;
+mod trace;
 #[cfg(any(test, target_os = "macos"))]
 mod sessions;
 #[cfg(target_os = "macos")]

@@ -34,6 +34,9 @@ struct Queued {
     method: Method,
     call: SessionCall,
     cancel: oneshot::Receiver<()>,
+    /// The stop generation when the request arrived; a stop read after it
+    /// makes its reply a late one (see [`dispatch`]).
+    generation: u64,
 }
 
 /// Cancel handles of the requests of this connection that await a reply,
@@ -214,6 +217,7 @@ fn handle_line(
                 method,
                 call,
                 cancel,
+                generation: engine.stop_paths().generation(),
             };
             queue.send(queued).err().map(|unsent| {
                 let stopped = DesktopError::internal("the request dispatcher stopped");
@@ -245,6 +249,7 @@ async fn deliver(
     out: &mpsc::Sender<String>,
     reply: String,
 ) -> Result<(), SendError<String>> {
+    engine.announce_epochs();
     out.send(reply).await?;
     for line in engine.outbox().drain() {
         out.send(line).await?;

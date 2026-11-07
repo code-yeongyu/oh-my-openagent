@@ -1,12 +1,20 @@
-//! Raw tree walk with depth/node budgets, and the default noise filter.
+//! Raw tree walk with depth/node budgets, the object-mode partial walk, and
+//! the default noise filter.
 
-use super::{AxBackend, AxHandle, AxProps};
+use std::time::Instant;
+
+use super::{AxBackend, AxHandle, AxObserved, AxProps};
 use crate::error::CoreResult;
+use crate::types::AxEvidence;
 
 #[derive(Clone)]
 pub(super) struct WalkNode {
     pub(super) handle: AxHandle,
     pub(super) props: AxProps,
+    pub(super) evidence: Option<AxEvidence>,
+    pub(super) secure: bool,
+    /// Children the walk left out of `children` (object mode).
+    pub(super) left_out: u32,
     pub(super) children: Vec<Self>,
 }
 
@@ -16,6 +24,9 @@ pub(super) struct WalkState {
     max_nodes: u32,
     max_depth: u32,
     pub(super) truncated: bool,
+    /// When the object-mode walk stops reading; `None` never stops.
+    deadline: Option<Instant>,
+    pub(super) deadline_hit: bool,
 }
 
 impl WalkState {
@@ -26,7 +37,25 @@ impl WalkState {
             max_nodes,
             max_depth,
             truncated: false,
+            deadline: None,
+            deadline_hit: false,
         }
+    }
+
+    pub(super) const fn with_deadline(mut self, deadline: Option<Instant>) -> Self {
+        self.deadline = deadline;
+        self
+    }
+
+    /// Whether the object-mode walk must stop before reading another node.
+    fn spent(&mut self) -> bool {
+        if self
+            .deadline
+            .is_some_and(|deadline| Instant::now() >= deadline)
+        {
+            self.deadline_hit = true;
+        }
+        self.deadline_hit || self.visited >= self.max_nodes
     }
 }
 
@@ -70,8 +99,68 @@ pub(super) fn walk_raw(
     Ok(Some(WalkNode {
         handle,
         props,
+        evidence: None,
+        secure: false,
+        left_out: 0,
         children,
     }))
+}
+
+/// The object-mode walk: reads through `observe`, and where a budget (depth,
+/// nodes, deadline) stops it, keeps the node and counts the children it left
+/// out instead of failing or dropping them. The root is always read.
+pub(super) fn walk_observed(
+    backend: &mut dyn AxBackend,
+    handle: AxHandle,
+    depth: u32,
+    state: &mut WalkState,
+) -> CoreResult<Option<WalkNode>> {
+    state.visited += 1;
+    let AxObserved {
+        props,
+        evidence,
+        secure,
+    } = match backend.observe(&handle) {
+        Ok(observed) => observed,
+        Err(_) if depth > 0 => {
+            state.skipped = state.skipped.saturating_add(1);
+            return Ok(None);
+        }
+        Err(error) => return Err(error),
+    };
+    let mut node = WalkNode {
+        handle,
+        props,
+        evidence,
+        secure,
+        left_out: 0,
+        children: Vec::new(),
+    };
+    if depth >= state.max_depth {
+        node.left_out = node.props.child_count;
+        state.truncated |= node.left_out > 0;
+        return Ok(Some(node));
+    }
+    let child_handles = match backend.children(&node.handle) {
+        Ok(children) => children,
+        Err(_) if depth > 0 => {
+            state.skipped = state.skipped.saturating_add(1);
+            return Ok(None);
+        }
+        Err(error) => return Err(error),
+    };
+    let total = child_handles.len();
+    for (index, child) in child_handles.into_iter().enumerate() {
+        if state.spent() {
+            state.truncated = true;
+            node.left_out = u32::try_from(total - index).unwrap_or(u32::MAX);
+            break;
+        }
+        if let Some(child) = walk_observed(backend, child, depth + 1, state)? {
+            node.children.push(child);
+        }
+    }
+    Ok(Some(node))
 }
 
 fn named(props: &AxProps) -> bool {
@@ -142,7 +231,8 @@ pub(super) fn filter_node(mut node: WalkNode, all: bool) -> Option<WalkNode> {
     if all {
         return Some(node);
     }
-    let keep_self = interactable(&node.props) || named(&node.props);
+    // A cut node stays: its ref is where a drill-down resumes.
+    let keep_self = interactable(&node.props) || named(&node.props) || node.left_out > 0;
     if !keep_self && node.props.role == "group" && node.children.len() == 1 {
         return node.children.pop();
     }

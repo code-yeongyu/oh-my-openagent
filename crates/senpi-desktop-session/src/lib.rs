@@ -9,6 +9,7 @@ mod audit;
 mod budget;
 mod cancel_on_drop;
 mod display_awake;
+mod epoch;
 mod grant;
 mod intervention;
 mod mutate;
@@ -23,6 +24,7 @@ mod session;
 #[cfg(test)]
 mod test_support;
 mod timeouts;
+mod timings;
 mod user_input_watch;
 mod worker;
 mod worker_ax;
