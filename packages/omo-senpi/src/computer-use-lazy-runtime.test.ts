@@ -32,7 +32,7 @@ const PRELUDE_ASSET_FIELDS: readonly (readonly [field: string, marker: string, s
   [
     "COMPUTER_PRELUDE_JAVASCRIPT",
     "computer.run() expects a function or code string",
-    "ad93620f67b4689010b4fc52a8fc3bb4d35949d99d1f16ebbd8fe7db8e9dc636",
+    "c749fc68f5eb7849cecc446b3c45a7d4efc18da6b3557e98028a8298bc8a3204",
   ],
   [
     "COMPUTER_PRELUDE_PYTHON",

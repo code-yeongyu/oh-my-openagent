@@ -1,5 +1,7 @@
 import { spawnSync } from "node:child_process";
+import { once } from "node:events";
 import { readFileSync } from "node:fs";
+import { isMainThread, Worker } from "node:worker_threads";
 import { describe, expect, it } from "vitest";
 import {
 	CHAIN_BINDINGS,
@@ -229,20 +231,53 @@ describe("computer.verify", () => {
 });
 
 describe("SENPI_DESKTOP_HOST marker", () => {
-	it("is set in the JavaScript kernel's environment at install", () => {
-		// Given
-		const env: Record<string, string> = {};
+	const readChildMarker = `require("node:child_process").spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.env.SENPI_DESKTOP_HOST))"], { encoding: "utf8" }).stdout`;
 
-		// When
-		new Function("globalThis", computerPreludeAssets.javascript)({ tool: {}, display: () => {}, process: { env } });
+	it("leaves the host process's environment unmarked when installed on its main thread", () => {
+		// Given: this test process's real `process` on its main thread, standing in for a host that runs the prelude
+		expect(isMainThread).toBe(true);
+		const before = process.env.SENPI_DESKTOP_HOST;
+		delete process.env.SENPI_DESKTOP_HOST;
 
-		// Then
-		expect(env.SENPI_DESKTOP_HOST).toBe("1");
+		try {
+			// When
+			new Function("globalThis", computerPreludeAssets.javascript)({ tool: {}, display: () => {}, process });
+
+			// Then: later children of the host (bash tool, subagents, the desktop service) must not inherit it
+			expect(process.env.SENPI_DESKTOP_HOST).toBeUndefined();
+		} finally {
+			if (before === undefined) delete process.env.SENPI_DESKTOP_HOST;
+			else process.env.SENPI_DESKTOP_HOST = before;
+		}
 	});
 
-	it("reaches a child process a JavaScript cell starts", () => {
-		// Given: a real runtime installs the prelude on its own global, then spawns a child
+	it("reaches a child a worker-thread kernel's cell starts, not the host process that runs the worker", async () => {
+		// Given: senpi's JavaScript kernel is a worker thread of the host process with its own process.env view
+		const before = process.env.SENPI_DESKTOP_HOST;
+		delete process.env.SENPI_DESKTOP_HOST;
+		const worker = new Worker(
+			`new Function("globalThis", ${JSON.stringify(computerPreludeAssets.javascript)})(globalThis);
+			require("node:worker_threads").parentPort.postMessage(${readChildMarker});`,
+			{ eval: true },
+		);
+		const reply = once(worker, "message", { signal: AbortSignal.timeout(30_000) });
+
+		try {
+			// When
+			const [child] = await reply;
+
+			// Then
+			expect({ child, host: process.env.SENPI_DESKTOP_HOST }).toEqual({ child: "1", host: undefined });
+		} finally {
+			await worker.terminate();
+			if (before !== undefined) process.env.SENPI_DESKTOP_HOST = before;
+		}
+	});
+
+	it("reaches a child a process-mode kernel's cell starts", () => {
+		// Given: a process-mode kernel (codemode marks its global) installs the prelude, then spawns a child
 		const script = `
+			globalThis[Symbol.for("senpi.kernel.processMode")] = true;
 			new Function("globalThis", ${JSON.stringify(computerPreludeAssets.javascript)})(globalThis);
 			const { spawnSync } = require("node:child_process");
 			const child = spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.env.SENPI_DESKTOP_HOST))"], { encoding: "utf8" });
