@@ -4,6 +4,8 @@
 // FAKE_ENGINE_ABI overrides the advertised ABI.
 // FAKE_ENGINE_DESKTOP=1 answers desktop methods without `params.fake` from test/fake-desktop.mjs;
 // FAKE_ENGINE_STALL=<method> then treats that method as "cancellable".
+// FAKE_ENGINE_CAPTURE_MARKERS=1 (with FAKE_ENGINE_DESKTOP=1) makes the screen change between desktop captures: capture n
+// is a 1x1 grayscale PNG whose pixel is n * 40 (marker 1, 2, 3, ...) of a 5120x3200 screen, sized by the request's caps.
 // Every received line is echoed first as an `engine.log` notification ("recv <line>") so tests observe the wire.
 // Any other method is steered by `params.fake`:
 //   "hold"        - reply only after a "release" request arrives (after the release reply)
@@ -17,12 +19,40 @@
 //   otherwise     - reply { method, params, pid }
 import { createInterface } from "node:readline";
 import { createDesktop } from "./fake-desktop.mjs";
+import { crc32, deflateSync } from "node:zlib";
 
 const mode = process.env.FAKE_ENGINE_MODE ?? "normal";
 const abi = process.env.FAKE_ENGINE_ABI ?? "senpi-desktop/1";
 const resumeToken = `token-${process.pid}`;
 const desktop = process.env.FAKE_ENGINE_DESKTOP === "1" ? createDesktop() : undefined;
 const stalled = process.env.FAKE_ENGINE_STALL;
+const captureMarkers = process.env.FAKE_ENGINE_CAPTURE_MARKERS === "1";
+let captureCount = 0;
+
+function pngChunk(type, data) {
+	const body = Buffer.concat([Buffer.from(type, "ascii"), data]);
+	const length = Buffer.alloc(4);
+	length.writeUInt32BE(data.length);
+	const crc = Buffer.alloc(4);
+	crc.writeUInt32BE(crc32(body));
+	return Buffer.concat([length, body, crc]);
+}
+
+/** A 1x1 8-bit grayscale PNG whose single pixel is `value`. */
+function grayPng(value) {
+	const header = Buffer.from([0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 0, 0, 0]);
+	const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+	const idat = deflateSync(Buffer.from([0, value]));
+	return Buffer.concat([signature, pngChunk("IHDR", header), pngChunk("IDAT", idat), pngChunk("IEND", Buffer.alloc(0))]).toString("base64");
+}
+
+function withCaptureMarker(method, params, outcome) {
+	if (!captureMarkers || method !== "capture" || params?.target !== "desktop" || outcome?.result === undefined) return outcome;
+	captureCount += 1;
+	const scale = Math.min(1, (params.caps?.maxWidth ?? 5120) / 5120, (params.caps?.maxHeight ?? 3200) / 3200);
+	const size = { width: Math.floor(5120 * scale), height: Math.floor(3200 * scale), sourceWidth: 5120, sourceHeight: 3200 };
+	return { ...outcome, result: { ...outcome.result, ...size, data: grayPng(captureCount * 40), mimeType: "image/png" } };
+}
 
 if (!process.argv.includes("--stdio")) {
 	process.stderr.write("fake-engine: expected --stdio\n");
@@ -141,7 +171,7 @@ function handle(request) {
 		if (refusesGlobalInput(method, params)) {
 			return refused("ControlRequired", "desktop input needs the control grant", -32022);
 		}
-		const outcome = desktop(method, params);
+		const outcome = withCaptureMarker(method, params, desktop(method, params));
 		if (outcome !== undefined) {
 			const { notifications = [], ...reply } = outcome;
 			for (const notification of notifications) send(notification);
