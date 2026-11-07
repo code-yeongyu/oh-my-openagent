@@ -29032,7 +29032,8 @@
               "type": "string",
               "enum": [
                 "exa",
-                "tavily"
+                "tavily",
+                "parallel"
               ]
             }
           },
