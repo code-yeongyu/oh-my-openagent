@@ -145,6 +145,7 @@ impl WaylandBackend {
             Detection::NotHyprland => {}
         }
         match self.kwin() {
+            kwin::Detection::Scripting(kwin) if kwin.unrunnable() => Err("kwin_script_unrunnable"),
             kwin::Detection::Scripting(kwin) => Ok(Some(WindowGeometry::Kwin(kwin.clone()))),
             kwin::Detection::DbusMissing => Err("kwin_dbus_missing"),
             kwin::Detection::NotKwin => Ok(None),

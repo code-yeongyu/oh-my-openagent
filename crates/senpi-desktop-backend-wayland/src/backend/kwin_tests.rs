@@ -246,6 +246,36 @@ fn a_window_click_on_a_point_a_higher_window_covers_sends_nothing() {
 }
 
 #[test]
+fn a_kwin_that_runs_the_script_at_neither_object_path_stops_offering_window_input() {
+    // Given: KWin loads the script but serves it at no path `run` reaches
+    let _env = env_lock();
+    let kwin = FakeKwin::unrunnable(WINDOWS);
+    let dir = tempfile::tempdir().expect("socket dir");
+    let (_eis, _libei) = fake_eis(&dir);
+    let Detection::Scripting(scripting) = scripting(&kwin) else {
+        panic!("kwin scripting not detected");
+    };
+    let mut backend = backend_without_services();
+    backend.kwin = Some(Detection::Scripting(scripting.clone()));
+
+    // When: one placement has tried both object paths
+    let error = backend
+        .kwin_pointer(
+            &scripting,
+            &window(Some(1201), "~ : bash"),
+            click(20.0, 60.0),
+        )
+        .expect_err("no object path runs the script");
+
+    // Then: the refusal is typed and the capability says why
+    assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
+    assert_eq!(
+        backend.capabilities().window_input,
+        unavailable("kwin_script_unrunnable")
+    );
+}
+
+#[test]
 fn keyboard_input_at_a_window_stays_refused_on_kwin() {
     let _env = env_lock();
     let kwin = FakeKwin::serve(WINDOWS);
