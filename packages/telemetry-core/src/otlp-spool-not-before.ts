@@ -20,11 +20,13 @@ export function createSpoolNotBefore(dir: string): NotBefore {
       renameSync(temp, path)
     } catch {
       // Best effort: without the shared file this process still backs off on its own. A temp file the
-      // failed rename left behind would otherwise stay beside the spool for good. The cleanup is best effort
-      // too: `read()` writes, so an error here would turn a skipped write into a failed send.
+      // failed rename left behind would otherwise stay beside the spool for good.
       try {
         rmSync(temp, { force: true })
-      } catch {}
+      } catch {
+        // The cleanup is best effort too: `read()` writes, so an error here (EISDIR when the temp path is a
+        // directory) would turn a skipped write into a failed send. A leftover temp file is the lesser harm.
+      }
     }
   }
   const read = (): number => {
