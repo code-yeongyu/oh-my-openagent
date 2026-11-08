@@ -48,9 +48,12 @@ function textOf(content: unknown): string | undefined {
   return text.length > 0 ? text : undefined
 }
 
+/** A thread_send the run made that succeeded, by the session it resolved to (its result's `thread_id` and `device`). */
+export type SentTarget = { readonly device: string; readonly thread: string }
+
 export type ReplyRouter = {
   readonly noteMessage: (message: EngineMessage) => void
-  readonly noteSend: (thread: string) => void
+  readonly noteSend: (target: SentTarget) => void
   readonly settled: (sessionId: string | undefined) => void
   readonly close: () => void
 }
@@ -60,10 +63,10 @@ export type ReplyRouter = {
  * route, the run's answer is delivered back to the sender's session at the run's settle. A reply never carries a route,
  * so a reply is never answered by a reply; each delivery is answered at most once per session lifetime.
  */
-export function createReplyRouter(deliver: (route: ReplyRoute, answer: string | undefined, sessionId: string) => void): ReplyRouter {
+export function createReplyRouter(deliver: (route: ReplyRoute, answer: string | undefined, sessionId: string | undefined, answered: readonly SentTarget[]) => void): ReplyRouter {
   const pending = new Map<string, ReplyRoute>()
   const routed: string[] = []
-  const sentTo = new Set<string>()
+  const sentTo: SentTarget[] = []
   let answer: string | undefined
   let closed = false
   const markRouted = (delivery: string): void => {
@@ -72,7 +75,7 @@ export function createReplyRouter(deliver: (route: ReplyRoute, answer: string | 
   }
   const reset = (): void => {
     pending.clear()
-    sentTo.clear()
+    sentTo.length = 0
     answer = undefined
   }
   return {
@@ -88,20 +91,18 @@ export function createReplyRouter(deliver: (route: ReplyRoute, answer: string | 
       pending.set(route.delivery, route)
       answer = undefined
     },
-    noteSend: (thread) => {
-      if (!closed) sentTo.add(thread)
+    noteSend: (target) => {
+      if (!closed) sentTo.push(target)
     },
     settled: (sessionId) => {
       if (closed) return
       const routes = [...pending.values()]
       const text = answer
-      const answeredExplicitly = new Set(sentTo)
+      const answered = [...sentTo]
       reset()
       for (const route of routes) {
         markRouted(route.delivery)
-        // The run answered the sender itself with thread_send: that message was the reply.
-        if (answeredExplicitly.has(route.session) || sessionId === undefined) continue
-        deliver(route, text, sessionId)
+        deliver(route, text, sessionId, answered)
       }
     },
     close: () => {

@@ -11,7 +11,7 @@ import { liveReadResult } from "../tools/read-ops"
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
 import type { AliasError, AliasHolder, JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { peerText, type RemotePeer, type RemoteSender } from "./peer-text"
-import { replyRouteToken, type ReplyRoute } from "./reply-route"
+import { replyRouteToken, type ReplyRoute, type SentTarget } from "./reply-route"
 
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
 const fail = (code: ThreadToolFailure["code"], message: string, next: string, details?: Readonly<Record<string, unknown>>): Failure => ({ kind: "error", error: threadToolFailure(code, message, next, details) })
@@ -341,6 +341,8 @@ const ADMIT_UNSUPPORTED: ReadonlySet<string> = new Set(["unknown_command", "engi
 
 export type ReplyAdmission =
   | { readonly kind: "admitted"; readonly disposition: string }
+  /** The run already reached the sender's session with a thread_send of its own; that message was the reply. */
+  | { readonly kind: "answered" }
   | { readonly kind: "unavailable"; readonly code: "remote_reply_unavailable"; readonly reason: string }
   | { readonly kind: "failed"; readonly reason: string }
 
@@ -352,11 +354,13 @@ export type ReplyFrom = { readonly session_id: string; readonly name?: string; r
  * `agent` claim is sent; the chain continues (`chainCount`); the delivery id is derived from the delivery it answers, so a
  * repeated reply is the same delivery and the receiver admits it once.
  */
-export async function admitReplyRemote(remote: RemoteThreadSurface, route: ReplyRoute, from: ReplyFrom, answer: string | undefined): Promise<ReplyAdmission> {
+export async function admitReplyRemote(remote: RemoteThreadSurface, route: ReplyRoute, from: ReplyFrom, answer: string | undefined, answered: readonly SentTarget[] = []): Promise<ReplyAdmission> {
   const unavailable = await remoteAvailable(remote)
   if (unavailable !== undefined) return { kind: "failed", reason: unavailable.error.code }
   const located = await remote.sessions.locate(route.device, route.session)
   if (located.kind !== "ok") return { kind: "failed", reason: located.reason }
+  // A send resolves any address form (id, name, alias) to the listing key it reached; the route names the durable id.
+  if (answered.some((sent) => sent.device === route.device && (sent.thread === route.session || sent.thread === located.sessionId))) return { kind: "answered" }
   const here = await remote.sessions.thisDevice()
   const named = from.name === undefined || from.name.trim() === "" ? undefined : from.name.trim()
   const peer: RemotePeer = {

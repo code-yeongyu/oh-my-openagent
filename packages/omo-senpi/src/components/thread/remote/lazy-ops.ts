@@ -2,7 +2,7 @@ import type { SenpiExtensionAPI } from "../../../extension/types"
 import type { Provenance } from "../gateway/types"
 import type * as CrossDevice from "./cross-device"
 import type { RemoteThreadSurface } from "./ports"
-import { createReplyRouter } from "./reply-route"
+import { createReplyRouter, type ReplyRoute } from "./reply-route"
 import type * as RemoteOps from "./remote-ops"
 import type * as RemoteControls from "./remote-controls"
 
@@ -46,13 +46,17 @@ const sessionIdOf = (ctx: unknown): string | undefined => {
  * events only. The delivery itself loads the sidecar; a session that never consumes a routed input never loads it.
  */
 export function wireReplyRoutes(pi: Pick<SenpiExtensionAPI, "on">, remote: RemoteThreadSurface, options: ReplyRouteOptions): void {
-  const router = createReplyRouter((route, answer, sessionId) => {
-    void (async () => {
+  const failed = (route: ReplyRoute, reason: string): void => options.warn(`remote_reply_failed: the answer to delivery ${route.delivery} was not delivered to session ${route.session} on device ${route.device} (${reason}).`)
+  // One delivery at a time, in settle order, so answers reach the sender in the order the runs made them.
+  let queue: Promise<void> = Promise.resolve()
+  const router = createReplyRouter((route, answer, sessionId, answered) => {
+    queue = queue.then(async () => {
+      if (sessionId === undefined) return failed(route, "the settled run named no session id")
       const name = options.sessionName?.()
-      const outcome = await (await runtime()).admitReplyRemote(remote, route, { session_id: sessionId, provenance: await options.senderProvenance(), ...(name === undefined ? {} : { name }) }, answer)
+      const outcome = await (await runtime()).admitReplyRemote(remote, route, { session_id: sessionId, provenance: await options.senderProvenance(), ...(name === undefined ? {} : { name }) }, answer, answered)
       if (outcome.kind === "unavailable") options.warn(`${outcome.code}: the answer to delivery ${route.delivery} was not delivered to session ${route.session} on device ${route.device}: its engine cannot admit a peer delivery (${outcome.reason}); update omo and senpi on that device.`)
-      else if (outcome.kind === "failed") options.warn(`remote_reply_failed: the answer to delivery ${route.delivery} was not delivered to session ${route.session} on device ${route.device} (${outcome.reason}).`)
-    })().catch((error: unknown) => options.warn(`remote_reply_failed: the answer to delivery ${route.delivery} was not delivered to session ${route.session} on device ${route.device} (${error instanceof Error ? error.message : String(error)}).`))
+      else if (outcome.kind === "failed") failed(route, outcome.reason)
+    }).catch((error: unknown) => failed(route, error instanceof Error ? error.message : String(error)))
   })
   pi.on("message_start", (event) => {
     const message = messageOf(event)
@@ -62,9 +66,11 @@ export function wireReplyRoutes(pi: Pick<SenpiExtensionAPI, "on">, remote: Remot
     const message = messageOf(event)
     if (message?.["role"] === "assistant") router.noteMessage(message)
   })
-  pi.on("tool_execution_start", (event) => {
-    const { toolName, args } = (event ?? {}) as { readonly toolName?: unknown; readonly args?: { readonly thread?: unknown } }
-    if (toolName === "thread_send" && typeof args?.thread === "string") router.noteSend(args.thread)
+  // A thread_send that succeeded, by the session it resolved to: a name or alias for the sender counts as well as its id.
+  pi.on("tool_execution_end", (event) => {
+    const { toolName, isError, result } = (event ?? {}) as { readonly toolName?: unknown; readonly isError?: unknown; readonly result?: { readonly details?: { readonly result?: { readonly kind?: unknown; readonly thread_id?: unknown; readonly device?: unknown } } } }
+    const sent = result?.details?.result
+    if (toolName === "thread_send" && isError !== true && sent?.kind === "ok" && typeof sent.thread_id === "string" && typeof sent.device === "string") router.noteSend({ device: sent.device, thread: sent.thread_id })
   })
   pi.on("agent_settled", (_event, ctx) => router.settled(sessionIdOf(ctx)))
   pi.on("session_shutdown", () => router.close())
