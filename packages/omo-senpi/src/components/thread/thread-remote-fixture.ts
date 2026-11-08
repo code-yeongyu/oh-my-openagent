@@ -154,7 +154,7 @@ export function createRemoteThreadFixture() {
     return { remote, sent, hops, aliases, live, registryCalls, watchers, watching, endWatches }
   }
 
-  function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?: () => string | undefined; sessions?: ThreadHostSession[]; engine?: Engine; caller?: string; diskSessions?: readonly string[]; closeOutcome?: ThreadCloseOutcome } = {}) {
+  function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?: () => string | undefined; callerName?: () => string | undefined; env?: Readonly<Record<string, string | undefined>>; sessions?: ThreadHostSession[]; engine?: Engine; caller?: string; diskSessions?: readonly string[]; closeOutcome?: ThreadCloseOutcome } = {}) {
     const engine = extra.engine ?? ENGINE
     const local: ThreadHostSession = { sessionId: "route-local", durableSessionId: "dur-local", cwd: process.cwd(), name: "local peer", status: "open" }
     const sessions = extra.sessions ?? [local]
@@ -186,7 +186,7 @@ export function createRemoteThreadFixture() {
     // Session files with no live owner: the address book lists them from disk, and no host holds them.
     const disk = (extra.diskSessions ?? []).map((id) => ({ durable_id: id, name: null, cwd: process.cwd(), created_at: "2026-11-01T00:00:00Z", updated_at: null, session_path: join(agentDir, `${id}.jsonl`), source_host: null }))
     const caller = extra.caller ?? "dur-caller"
-    const tools = createThreadTools({ host, store, stateDirectory: join(agentDir, "state"), diskSessions: () => disk, callerSessionId: () => caller, callerWorkspaceRoot: () => process.cwd(), remote, ...(extra.callerCause === undefined ? {} : { callerCause: extra.callerCause }) })
+    const tools = createThreadTools({ host, store, stateDirectory: join(agentDir, "state"), diskSessions: () => disk, callerSessionId: () => caller, callerWorkspaceRoot: () => process.cwd(), remote, ...(extra.callerCause === undefined ? {} : { callerCause: extra.callerCause }), ...(extra.callerName === undefined ? {} : { callerName: extra.callerName }), ...(extra.env === undefined ? {} : { env: extra.env }) })
     const run = async (name: ThreadToolName, args: unknown): Promise<ThreadToolResult> => {
       const tool = tools.find((candidate) => candidate.name === name)
       if (tool === undefined) throw new Error(`${name} is not registered`)

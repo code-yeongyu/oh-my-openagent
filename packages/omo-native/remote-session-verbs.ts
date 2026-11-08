@@ -1,6 +1,7 @@
 import type { DeviceService } from "../device-service-core/src/index.ts"
 import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
+import type { RemoteSender } from "../omo-senpi/src/components/thread/remote/peer-text"
 import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { setModelRemote } from "../omo-senpi/src/components/thread/remote/remote-controls"
 import { followRemote, type RemoteWatchEvent, watchRemote } from "../omo-senpi/src/components/thread/remote/remote-follow"
@@ -35,7 +36,8 @@ function deviceServiceSurface(service: DeviceService, reconnect: () => Promise<D
   return { sessions: createDeviceServiceSessions({ version: service.serviceVersion, connect }), chain: { stamp: record => record } }
 }
 
-const CHAIN_START = 1
+// The person at this terminal sends their own input, not a peer session's message (#12852).
+const PERSON: RemoteSender = { kind: "person", hop: 1 }
 
 type Show = (result: ThreadToolResult, label: string) => number
 
@@ -164,7 +166,7 @@ async function sendTo(
     }
     request = { ...request, expected_turn_id: running.turn_id }
   }
-  if (!args.wait) return show(await promptRemote(remote, row, request, CHAIN_START), label)
+  if (!args.wait) return show(await promptRemote(remote, row, request, PERSON), label)
   // Followed before the send, so no delta of the turn it starts can arrive unseen.
   let reply = ""
   const follow = await followRemote(remote, row, text => {
@@ -173,7 +175,7 @@ async function sendTo(
   })
   if ("kind" in follow) return show(follow, label)
   try {
-    const sent = await promptRemote(remote, row, request, CHAIN_START)
+    const sent = await promptRemote(remote, row, request, PERSON)
     if (sent.kind === "error") return show(sent, label)
     const end = await follow.settled
     if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")
