@@ -219,6 +219,23 @@ describe("codex doctor checks", () => {
     expect(result.issues.map((issue) => issue.title)).not.toContain("omo-agent-toolkit runtime wrapper target is missing")
   })
 
+  test.skipIf(process.platform === "win32")("#given a generated wrapper whose runtime target path holds a double quote #when the target is gone #then the missing target is reported at the unescaped path (#12560)", async () => {
+    // given: the generator escapes the quote, which the old `([^"]+)` capture stopped at, so nothing was reported
+    const { codexHome, binDir } = await createInstalledCodexHome()
+    const wrapperPath = join(binDir, "omo-agent-toolkit")
+    await rm(wrapperPath)
+    const oddRoot = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", 'quo"ted')
+    const cliPath = join(oddRoot, "dist", "cli", "index.js")
+    await writeFile(wrapperPath, posixRuntimeWrapper("omo-agent-toolkit", cliPath, codexHome, binDir, join(oddRoot, "dist", "cli-node", "index.js")))
+
+    // when
+    const result = await checkCodexRuntimeWrapper({ codexHome, binDir })
+
+    // then
+    const issue = result.issues.find((entry) => entry.title === "omo-agent-toolkit runtime wrapper target is missing")
+    expect(issue?.description).toContain(`points to missing target ${cliPath}.`)
+  })
+
   test("#given a marker-bearing legacy omo wrapper #when checking runtime wrapper #then warns with the self-cleaning reinstall command", async () => {
     // given
     const { codexHome, binDir } = await createInstalledCodexHome()
