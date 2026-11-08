@@ -1,6 +1,7 @@
 import { Command } from "commander"
 import { isCancel, select, confirm } from "@clack/prompts"
 import { serviceAccountsOpen } from "./accounts-gate"
+import { isClosedDeviceLogin, withClosedDeviceLoginOptions } from "./closed-device-login"
 import { openSignInBrowser } from "./browser"
 import { deviceName, devicePlatform } from "./device-name"
 import { loginDevice } from "./device-flow"
@@ -151,10 +152,9 @@ function configureClosedServiceAuthCommands(program: Command, hooks: ServiceAuth
 // (#12639). The approval page keeps the service's own access policy, so this admits nobody the service does not admit.
 // Every other closed argv (plain login, --accounts, a stray option or argument) refuses exactly as before.
 function configureClosedDeviceLogin(program: Command, hooks: ServiceAuthHooks): void {
-  const command = program.command("login", { hidden: true }).helpOption(false).allowUnknownOption().allowExcessArguments()
-    .option("--device").option("--no-browser").option("--api <url>")
+  const command = withClosedDeviceLoginOptions(program.command("login", { hidden: true }))
     .action((options: Options) => {
-      if ((options.device !== true && options.browser !== false) || command.args.length > 0) {
+      if (!isClosedDeviceLogin(options, command.args)) {
         console.error(SERVICE_ACCOUNTS_CLOSED_MESSAGE)
         process.exitCode = 1
         return
@@ -183,8 +183,13 @@ export function configureServiceAuthCommands(program: Command, open = serviceAcc
   }
 }
 
-export async function runServiceAuthCommand(args: readonly string[], hooks: ServiceAuthHooks = {}): Promise<void> {
+/** The root program the service-auth bundle parses `omo login|logout|whoami` with. */
+export function serviceAuthProgram(open = serviceAccountsOpen(), hooks: ServiceAuthHooks = {}): Command {
   const program = new Command("omo")
-  configureServiceAuthCommands(program, serviceAccountsOpen(), hooks)
-  await program.parseAsync([...args], { from: "user" })
+  configureServiceAuthCommands(program, open, hooks)
+  return program
+}
+
+export async function runServiceAuthCommand(args: readonly string[], hooks: ServiceAuthHooks = {}): Promise<void> {
+  await serviceAuthProgram(serviceAccountsOpen(), hooks).parseAsync([...args], { from: "user" })
 }
