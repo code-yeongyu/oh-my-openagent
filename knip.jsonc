@@ -2930,6 +2930,8 @@
         "scripts/qa/bunshin-ts-eval-sdk-qa.mjs",
         // run by path as computer-use v2 row 9's live macOS capture-consent and SkyLight measurement
         "scripts/qa/capture-consent-probe-macos.mjs",
+        // run by path from .github/workflows/desktop-bench.yml as computer-use v2 row 38's base-vs-head latency bench
+        "scripts/qa/cu-eval/bench.mjs",
         "src/components/claim-receipt/runtime.ts",
         "src/components/computer-use/runtime.ts",
         "src/components/device-service/runtime.ts",
