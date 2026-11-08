@@ -21,6 +21,18 @@ export function tempStore(): TaskRecordStore {
   return createTaskRecordStore({ project_dir: directory })
 }
 
+/**
+ * A pid no process can hold, for a record "owned by a dead host" that the real signal-0 probe judges.
+ * A fixed literal such as 999_999 is not one: Linux pid_max is configurable up to 2^22 (4194304), and
+ * on a host whose pid counter has passed 999999 under churn that pid can be a live process. kill(2)
+ * answers ESRCH for every pid above /proc/sys/kernel/pid_max, so Linux uses pid_max + 1. Elsewhere
+ * 2^22 + 1 is above macOS's pid ceiling (99998) and, being odd, is never a Windows pid (multiples of 4).
+ */
+export function unreachablePid(): number {
+  if (process.platform !== "linux") return 4_194_305
+  return Number(readFileSync("/proc/sys/kernel/pid_max", "utf8").trim()) + 1
+}
+
 export function settings(overrides: Record<string, unknown> = {}): OmoTaskSettings {
   return OmoTaskSettingsSchema.parse(overrides)
 }

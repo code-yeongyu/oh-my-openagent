@@ -15,6 +15,7 @@ import {
   type TaskStatus,
 } from "@oh-my-opencode/senpi-task"
 
+import { unreachablePid } from "../../../../senpi-task/src/lifecycle/__fixtures__/lifecycle-fakes"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { composeTaskEngine, type TaskEngine, type TaskRunnerFactories } from "./engine"
 import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
@@ -174,7 +175,7 @@ describe("task engine terminal edge observation", () => {
       }),
       status: "running",
       residency_state: "resident",
-      host_pid: 999_999,
+      host_pid: unreachablePid(),
     }
     sibling.save(orphan)
 
