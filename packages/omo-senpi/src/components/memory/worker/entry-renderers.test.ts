@@ -173,7 +173,15 @@ describe("memory reflection entry rendering", () => {
       expect(lines[3]).toBe("from conversation-a")
     })
 
-    test("#when the report opens with the persona's summary item #then its first sentence is the why line", () => {
+    test.each([
+      "1. **Summary**: Reviewed the captured step-count transcript for the browser-guidance migration.",
+      "**1. Summary**\nReviewed the captured step-count transcript for the browser-guidance migration.",
+      "## **1) Summary**\nReviewed the captured step-count transcript for the browser-guidance migration.",
+      "__1. Summary__: Reviewed the captured step-count transcript for the browser-guidance migration.",
+      "* **Summary**: Reviewed the captured step-count transcript for the browser-guidance migration.",
+      "**1.** Summary: Reviewed the captured step-count transcript for the browser-guidance migration.",
+      "- **1. Summary**\nReviewed the captured step-count transcript for the browser-guidance migration.",
+    ])("#when the report opens with a summary item %s #then its first sentence is the why line", (summary) => {
       // given
       const data = { ...completion(), recap: {
         schemaVersion: 1, key: "synthetic", identity: "project-a1b2c3d4", runId: "reflection-run-2",
@@ -182,7 +190,7 @@ describe("memory reflection entry rendering", () => {
         filesChanged: 1, changedPaths: ["reference/tooling/staged-deletion-gates.md"],
         report: {
           status: "available",
-          text: "1. **Summary**: Reviewed the captured step-count transcript for the browser-guidance migration. The durable learning was a verification pattern.\n2. **Memory changes**:\n   - Created `reference/tooling/staged-deletion-gates.md`\n",
+          text: `${summary} The durable learning was a verification pattern.\n2. **Memory changes**:\n   - Created \`reference/tooling/staged-deletion-gates.md\`\n`,
           preview: "1. **Summary**: Reviewed the captured step-count transcript",
           sourceTruncated: false,
         },

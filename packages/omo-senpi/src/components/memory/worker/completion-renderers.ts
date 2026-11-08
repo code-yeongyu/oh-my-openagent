@@ -68,9 +68,9 @@ export function reflectionHeadline(text: string): string | undefined {
 
 function stripMarkdown(line: string): string {
   return line.trim()
-    .replace(/^#+\s*/u, "")
-    .replace(/^(?:\d+[.)]|[-*+])\s+/u, "")
     .replace(/\*\*|__|`/gu, "")
+    .replace(/^#+\s*/u, "")
+    .replace(/^(?:(?:\d+[.)]|[-*+])\s+)+/u, "")
     .trim()
 }
 
