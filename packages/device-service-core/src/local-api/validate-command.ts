@@ -47,13 +47,16 @@ export const COMMAND_REQUEST_VALIDATORS: RequestValidators<
   "session.command": (v, id) => {
     if (Object.hasOwn(v, "device")) {
       // #393: {device, endpoint, rpc} with no attach; `device` without `endpoint` is invalid_request.
-      const m = requestFields(v, ["device", "endpoint", "rpc"], ["command_id"]);
+      const m = requestFields(v, ["device", "endpoint", "rpc"], ["command_id", "locate"]);
+      const locate = m["locate"];
+      if (locate !== undefined && locate !== true) return fail("locate");
       return {
         id,
         type: "session.command",
         device: deviceId(m["device"]),
         endpoint: endpointKey(m["endpoint"]),
         ...commandIdField(m["command_id"]),
+        ...(locate === true ? { locate: true } : {}),
         rpc: commandRpcOf(m["rpc"]),
       };
     }
