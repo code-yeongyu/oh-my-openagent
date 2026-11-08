@@ -43,7 +43,7 @@ test("a journal and item store poisoned by an older build recover on the first c
   const sync = join(b.repo.gitDir, "omo-sync")
   const beside = await besideRoot(b)
   const cycle: CycleRecord = { id: CYCLE_ID, stage: "merged", first: 1, last: 1, batches: [entry1], keys: ["../x.md", ".git/hooks/post-commit"], treeId: null }
-  const state: EngineState = { applied: 0, eventHead: 0, refused: 0, rejectedItems: 0, cycle, paused: null, lastSyncedAt: null, updatedWhileOffline: 0, peer: null }
+  const state: EngineState = { applied: 0, eventHead: 0, refused: 0, rejectedItems: 0, held: null, owed: [], cycle, paused: null, lastSyncedAt: null, updatedWhileOffline: 0, peer: null }
   await writeJsonFile(join(sync, "state.json"), state)
   const incoming1: IncomingRecord = { entry: entry1, stage: "verified", items: [{ key: "../x.md", ops: ok2.ops }], snapshot: false }
   const incoming2: IncomingRecord = { entry: entry2, stage: "verified", items: [{ key: "sub/../../y.md", ops: ok2.ops }, ok2], snapshot: false }

@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { maxSendMs, postWithRetry, type AttemptGate, type OtlpFetch } from "./otlp-http"
+import { createSpoolNotBefore } from "./otlp-spool-not-before"
 import {
   claimBatch,
   deleteFile,
@@ -173,6 +174,7 @@ export class BatchSender {
         abort: this.#abort.signal,
         requestTimeoutMs: this.#input.requestTimeoutMs,
         beforeAttempt: () => this.#gate(),
+        notBefore: createSpoolNotBefore(ctx.dir),
       }, request.signal, request.body)
       const current = this.#inFlight ?? claimed
       if (outcome.kind === "accepted") {

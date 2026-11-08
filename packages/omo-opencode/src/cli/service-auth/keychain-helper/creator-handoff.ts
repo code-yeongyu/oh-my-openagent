@@ -1,4 +1,4 @@
-import { dirname, join } from "node:path"
+import { dirname, join, posix } from "node:path"
 import { bunFile } from "../../../shared/bun-file-shim"
 import { spawn } from "../../../shared/bun-spawn-shim"
 import type { RequirementCheck } from "./signature"
@@ -18,11 +18,12 @@ const HANDOFF_DEADLINE_MS = 45_000
 
 export type DesktopRuntime = { readonly app: string; readonly runtime: string }
 
+/** The desktop app's macOS install locations, joined with POSIX separators on every host. */
 export function desktopRuntimeCandidates(home: string, arch: string = process.arch): readonly DesktopRuntime[] {
   const runtimeArch = arch === "arm64" ? "arm64" : "x64"
-  return ["/Applications/OmO.app", join(home, "Applications", "OmO.app")].map(app => ({
+  return ["/Applications/OmO.app", posix.join(home, "Applications", "OmO.app")].map(app => ({
     app,
-    runtime: join(app, "Contents", "Resources", "omo-runtime", `darwin-${runtimeArch}`, "omo"),
+    runtime: posix.join(app, "Contents", "Resources", "omo-runtime", `darwin-${runtimeArch}`, "omo"),
   }))
 }
 

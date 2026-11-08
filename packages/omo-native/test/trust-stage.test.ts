@@ -71,8 +71,13 @@ async function child(env: NodeJS.ProcessEnv, dir: string, mode?: string) {
   ])
   return { code, stdout, stderr }
 }
+// A missing log is no records, so a stage that skips its write fails the caller's assertion, not a thrown ENOENT.
 async function records(dir: string) {
-  return (await readFile(join(dir, "diagnostics.jsonl"), "utf8")).trim().split("\n").map((line) => JSON.parse(line))
+  const text = await readFile(join(dir, "diagnostics.jsonl"), "utf8").catch((error: unknown) => {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return ""
+    throw error
+  })
+  return text.trim().split("\n").filter((line) => line !== "").map((line) => JSON.parse(line))
 }
 async function launch(dir: string, env: NodeJS.ProcessEnv = cleanEnv(), fault?: (env: NodeJS.ProcessEnv) => Promise<void>) {
   let output: Awaited<ReturnType<typeof child>> | undefined
@@ -85,6 +90,8 @@ async function launch(dir: string, env: NodeJS.ProcessEnv = cleanEnv(), fault?: 
       output = await child(next, dir)
     },
   })
+  // Every launch reaches the child: a stage that refuses or never execs fails here as an assertion, not a throw.
+  expect(result.action).toBe("import-exec")
   return { result, output: required(output, "compiled child output") }
 }
 
@@ -122,7 +129,7 @@ test("static commands never acquire, execute, or create trust storage", async ()
   expect(await stat(dir).catch(() => null)).toBeNull()
 })
 
-test("a compiled child adopts native extras, scrubs plumbing, and restores old desktop values", async () => {
+test("a compiled child adopts native extras, scrubs plumbing, restores old desktop values, and adds no NODE_USE_SYSTEM_CA", async () => {
   const dir = await directory()
   const originals = {
     NODE_USE_SYSTEM_CA: "1", SSL_CERT_FILE: "/synthetic/file", SSL_CERT_DIR: "/synthetic/dir",
@@ -146,6 +153,11 @@ test("a compiled child adopts native extras, scrubs plumbing, and restores old d
   expect(raw).not.toContain(dir)
   expect(raw).not.toContain("/synthetic")
   expect(raw).not.toContain("CERTIFICATE")
+
+  // No stage writes NODE_USE_SYSTEM_CA: a parent that never set it hands the engine none (#10762).
+  const bare = await launch(await directory())
+  expect(bare.output.code).toBe(0)
+  expect(JSON.parse(bare.output.stdout).env.NODE_USE_SYSTEM_CA).toBeNull()
 })
 
 type Fault = { name: string; code: string; check: string | null; apply: (env: NodeJS.ProcessEnv) => Promise<void> }

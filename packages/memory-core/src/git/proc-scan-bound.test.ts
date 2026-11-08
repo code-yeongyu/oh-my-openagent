@@ -24,5 +24,5 @@ describe("Linux /proc scans are bounded", () => {
     // #then
     expect(answer).toBeNull()
     expect(lsofAsked).toBe(false)
-  }, 10_000)
+  })
 })

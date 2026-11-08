@@ -44,6 +44,7 @@ export type AcquireOptions = {
 
 export type AcquireRefusal =
   | "release_key_invalid"
+  | "not_published"
   | "download_failed"
   | "malformed"
   | "signature"
@@ -64,7 +65,8 @@ const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes)
 const platformSecure: SecureFile =
   process.platform === "win32" ? async (path, kind) => windowsSecureFile(await currentUserSid())(path, kind) : posixSecureFile
 
-type Download = Uint8Array | "missing" | "too_large"
+// "not_found" is an HTTP 404; "missing" is every other failed fetch (a throw, a timeout, a 5xx, another status).
+type Download = Uint8Array | "not_found" | "missing" | "too_large"
 
 const downloader = (fetchRelease: FetchRelease, base: string) => async (name: string, maxBytes: number): Promise<Download> => {
   let response: Response
@@ -73,6 +75,7 @@ const downloader = (fetchRelease: FetchRelease, base: string) => async (name: st
   } catch {
     return "missing"
   }
+  if (response.status === 404) return "not_found"
   if (!response.ok) return "missing"
   const declared = Number(response.headers.get("content-length") ?? "0")
   if (declared > maxBytes) return "too_large"
@@ -80,8 +83,8 @@ const downloader = (fetchRelease: FetchRelease, base: string) => async (name: st
   return bytes.length > maxBytes ? "too_large" : bytes
 }
 
-const downloadRefusal = (download: "missing" | "too_large"): AcquireResult =>
-  download === "missing"
+const downloadRefusal = (download: "not_found" | "missing" | "too_large"): AcquireResult =>
+  download !== "too_large"
     ? refuse("download_failed", "Could not download the OmO device service. Check the connection and try again.")
     : refuse("malformed")
 
@@ -132,6 +135,13 @@ export const acquireDeviceService = async (options: AcquireOptions): Promise<Acq
     `${options.origin ?? DEVICE_SERVICE_ORIGIN}/${options.channel ?? "stable"}/device-service/${options.version}/`,
   )
   const [checksums, signature] = await Promise.all([get(CHECKSUMS, CHECKSUMS_MAX_BYTES), get(SIGNATURE, SIGNATURE_BYTES)])
+  // The origin answering 404 for both signed entry files means this pin was never published (#12656), which is not a
+  // connection problem. A 404 on only one of them, or on a later file, is a broken release and stays download_failed.
+  if (checksums === "not_found" && signature === "not_found")
+    return refuse(
+      "not_published",
+      `Remote devices are not available in this omo build yet: OmO device service ${options.version} has not been published.`,
+    )
   if (typeof checksums === "string") return downloadRefusal(checksums)
   if (typeof signature === "string") return downloadRefusal(signature)
   const verdict = await verifyReleaseSignature(keys, signature, checksums)
