@@ -14,6 +14,7 @@ import {
   withLock,
   type RuntimeRetentionPolicy,
 } from "@oh-my-opencode/memory-core"
+import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
 
 import { loadMemoryCommandsRuntime } from "./commands/runtime-loader"
 import type { MemoryIdentityContext } from "./context"
@@ -39,6 +40,10 @@ export interface MemoryMaintenanceOptions {
   readonly resolveRetention?: (context: MemoryIdentityContext) => RuntimeRetentionPolicy
   /** `memory.reflection.enabled` for the identity: the health gate only guards identities that reflect. */
   readonly reflectionEnabled?: (context: MemoryIdentityContext) => boolean
+  /** `memory.runtime.max_bytes` for this identity (`0` = unbounded); defaults to the documented 2 GiB. */
+  readonly resolveMaxBytes?: (context: MemoryIdentityContext) => number
+  /** The memory settings an identity's `memory.runtime` windows and cap resolve from, in the sidecar; the two resolvers above win. */
+  readonly memorySettings?: (context: MemoryIdentityContext) => OmoMemorySettings
   /** Encoded sidecar directory names this process's live sessions own. */
   readonly ownedSidecars?: () => ReadonlySet<string>
   /**
@@ -85,9 +90,10 @@ const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000
  *   exit) cancels it and stops a running git, and every failure is logged, never raised.
  * - Runtime retention (#10144) runs inside the same gate, after the pack: one pass per identity per
  *   interval removes folded reflection runs, idle journals, sidecars and legacy stores past their
- *   `memory.runtime` windows. It is abort-aware between items and logs one summary line. The pass and
- *   the host sweep load from the memory commands sidecar only when one is due, which keeps them out of
- *   the entry bundle; a failed load is logged like any other failure of that step.
+ *   `memory.runtime` windows; the size cap then evicts oldest-first down to `max_bytes` (#10144, design 3).
+ *   It is abort-aware between items and logs one summary line. The pass and the host sweep load from the
+ *   memory commands sidecar only when one is due, which keeps them out of the entry bundle; a failed load
+ *   is logged like any other failure of that step.
  * - Empty transcript journals left by older builds (#9737) are swept once per identity per process, at
  *   once rather than behind the delay: control sessions exit within seconds and dispose() would cancel it.
  */
@@ -121,9 +127,19 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
     }
   }
 
-  /** Due when no completed pass is stamped within the interval, or an interrupted pass left a cursor. */
+  /**
+   * Due when no completed pass is stamped within the interval, or an interrupted pass left work to resume;
+   * a cap resume point whose pass could not even measure waits for the interval (#12538 review r5 L1).
+   */
   async function retentionDue(context: MemoryIdentityContext, repo: GitMemoryRepo): Promise<boolean> {
-    if (existsSync(retentionCursorPath(context.identityPaths.runtime))) return true
+    if (existsSync(retentionCursorPath(context.identityPaths.runtime))) {
+      // A failed sidecar load counts as due, so retain() runs and logs that failure as before.
+      const resumePending = await loadMemoryCommandsRuntime().then(
+        (runtime) => runtime.retentionResumePending(context.identityPaths.runtime),
+        () => true,
+      )
+      if (resumePending) return true
+    }
     const last = Number(await repo.configGet(RETENTION_STAMP_CONFIG_KEY) ?? Number.NaN)
     return !(Number.isFinite(last) && now() - last < intervalMs)
   }
@@ -139,6 +155,8 @@ export function createMemoryMaintenance(options: MemoryMaintenanceOptions = {}):
         signal,
         now,
         ...(options.resolveRetention === undefined ? {} : { policy: options.resolveRetention(context) }),
+        ...(options.resolveMaxBytes === undefined ? {} : { maxBytes: options.resolveMaxBytes(context) }),
+        ...(options.memorySettings === undefined ? {} : { settings: options.memorySettings(context) }),
         reflectionEnabled: options.reflectionEnabled?.(context) ?? true,
         ...(options.isLiveSession === undefined ? {} : { isLiveSession: options.isLiveSession }),
         ...(options.ownedSidecars === undefined ? {} : { ownedSidecars: options.ownedSidecars() }),

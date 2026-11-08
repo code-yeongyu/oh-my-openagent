@@ -134,6 +134,43 @@ describe("retention as a host-sweep step (6b driver 2 / --fix; A34, A38 driver h
     expect(existsSync(join(foreign.reflection, "runs", "reflection-run-1"))).toBe(false)
   })
 
+  test("#given a global max_bytes and an agent override of 0 #when the host sweep step visits #then the over-cap identity loses its oldest folded runs and the unbounded one keeps all (#12538 review L2)", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "memory-host-cap-"))
+    roots.push(memoryRoot)
+    const capped = buildIdentityPaths(memoryRoot, "id-capped")
+    const unbounded = buildIdentityPaths(memoryRoot, "id-unbounded")
+    for (const paths of [capped, unbounded]) {
+      await mkdir(paths.repo, { recursive: true })
+      for (const index of [1, 2, 3]) await reflectionRun(paths, `reflection-run-${index}`, { finishedAt: daysAgo(4 - index) })
+    }
+    const step = createRetentionHostSweepStep({ settings: { runtime: { max_bytes: 1 }, agents: { "id-unbounded": { runtime: { max_bytes: 0 } } } }, now })
+
+    const result = await sweepHostIdentities({ memoryRoot, steps: [step], now })
+
+    if (result.status !== "swept") throw new Error("expected a sweep")
+    expect([1, 2, 3].map((index) => existsSync(join(capped.reflection, "runs", `reflection-run-${index}`)))).toEqual([false, false, true])
+    expect([1, 2, 3].map((index) => existsSync(join(unbounded.reflection, "runs", `reflection-run-${index}`)))).toEqual([true, true, true])
+    expect(result.lines.some((line) => line.startsWith("FIXED id-capped retention removed 2"))).toBe(true)
+  })
+
+  test("#given max_bytes forcing the journal tiers, the switch on and retention_days 7 #when the host sweep step visits #then the cap's journal floor is retention_days, so only the journal idle past it goes (#12538 review L2)", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "memory-host-cap-floor-"))
+    roots.push(memoryRoot)
+    const paths = buildIdentityPaths(memoryRoot, "id-floor")
+    await mkdir(paths.repo, { recursive: true })
+    const old = await journal(paths, "j-old", "never", daysAgo(10))
+    const young = await journal(paths, "j-young", "never", daysAgo(3))
+    const step = createRetentionHostSweepStep({
+      settings: { runtime: { max_bytes: 1, retention_days: 7, abandoned_journal_days: 14, discard_unreflected_journals: true } },
+      now,
+    })
+
+    await sweepHostIdentities({ memoryRoot, steps: [step], now })
+
+    expect(existsSync(old)).toBe(false)
+    expect(existsSync(young)).toBe(true)
+  })
+
   test("#given global settings #when the foreign-identity switch resolves #then only global on plus no override-off counts as on", () => {
     expect(resolveForeignIdentityDiscardUnreflected(SETTINGS, "id-14")).toBe(false)
     expect(resolveForeignIdentityDiscardUnreflected(SETTINGS, "id-15")).toBe(true)
