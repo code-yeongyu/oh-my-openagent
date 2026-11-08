@@ -159,6 +159,34 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     expect(a.sent).toEqual([])
   })
 
+  test.each([["refused" as const], ["throws" as const]])("#given the alias registry is down (%s) #when a tool names a local thread, a remote title or nothing #then each resolves exactly as without a registry; only an explicit alias claim is refused typed", async (registryDown) => {
+    const a = account({ registryDown, rows: [titled("b", "dur-on-b", "release train"), titled("here", "dur-local", "local peer")] })
+    const { run, openSession } = surface(a.remote)
+    expect(await run("thread_send", { thread: "local peer", message: "here" })).toMatchObject({ kind: "ok", thread_id: "dur-local" })
+    expect(await run("thread_send", { thread: "release train", message: "there" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+    expect(await run("thread_send", { thread: "nobody", message: "x" })).toMatchObject({ kind: "error", error: { code: "not_found" } })
+    expect(await run("thread_create", { alias: "mine" })).toMatchObject({ kind: "error", error: { code: "host_unavailable" } })
+    expect(openSession).not.toHaveBeenCalled()
+  })
+
+  test("#given remote sessions are off on this device #when thread_list runs in the workspace scope #then the alias registry is never asked", async () => {
+    const a = account({ plan: "disabled" })
+    const { run } = surface(a.remote)
+    expect(await run("thread_list", {})).toMatchObject({ kind: "ok" })
+    expect(a.registryCalls).toEqual([])
+  })
+
+  test("#given a name held here and on many other devices #when a tool names it #then the candidate list is bounded and still names this device and others", async () => {
+    const a = account({ rows: Array.from({ length: 12 }, (_, index) => titled(`d${index}`, `dur-on-d${index}`, "local peer")) })
+    const { run } = surface(a.remote)
+    const result = await run("thread_send", { thread: "local peer", message: "x" })
+    const candidates = result.kind === "error" ? (result.error.details?.["candidates"] as readonly { id: string; device?: string }[]) : []
+    expect(result).toMatchObject({ kind: "error", error: { code: "ambiguous_target" } })
+    expect(candidates.length).toBe(10)
+    expect(candidates.some((candidate) => candidate.device === "here")).toBe(true)
+    expect(candidates.some((candidate) => candidate.device !== "here")).toBe(true)
+  })
+
   test("#given a thread on this device and one on b share the name #when a tool names it #then it is ambiguous_target naming both devices, never a silent pick of either", async () => {
     const a = account({ rows: [titled("b", "dur-on-b", "local peer")] })
     const { run } = surface(a.remote)

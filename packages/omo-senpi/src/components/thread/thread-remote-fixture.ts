@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
-import type { AliasHolder, AliasRegistry, JsonObject, RemoteCommandOutcome, RemoteDevice, RemoteSessionRow, RemoteThreadSurface } from "./remote/ports"
+import type { AliasHolder, AliasRegistry, AliasResult, JsonObject, RemoteCommandOutcome, RemoteDevice, RemoteSessionRow, RemoteThreadSurface } from "./remote/ports"
 import type { ThreadTranscriptEntry } from "./reader"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import type { ThreadCloseOutcome } from "./tools/ports"
@@ -30,7 +30,7 @@ export function createRemoteThreadFixture() {
     for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
   }
 
-  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[]; rows?: readonly RemoteSessionRow[] } = {}) {
+  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[]; rows?: readonly RemoteSessionRow[]; registryDown?: "refused" | "throws" } = {}) {
     const engine = options.engine ?? ENGINE
     const sent: Sent[] = []
     // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
@@ -75,8 +75,14 @@ export function createRemoteThreadFixture() {
     }
     const devices: RemoteDevice[] = [{ device: "here", label: "this mac", online: true }, { device: "b", label: "studio", online: options.online ?? true }]
     for (const row of options.rows ?? []) if (!devices.some((known) => known.device === row.device)) devices.push({ device: row.device, label: row.device, online: true })
+    const registryCalls: string[] = []
+    const down = <T>(): Promise<AliasResult<T>> => options.registryDown === "throws"
+      ? Promise.reject(new Error("alias registry connection reset"))
+      : Promise.resolve({ kind: "error", error: { code: "alias_registry_unavailable", message: "the alias registry could not be reached", details: { reason: "sign_in" } } })
     const registry: AliasRegistry = {
       claim: async ({ alias, holder }) => {
+        registryCalls.push("claim")
+        if (options.registryDown !== undefined) return await down()
         if (options.failClaim === true) throw new Error("alias registry failed")
         const held = aliases.get(alias)
         if (held !== undefined && held.session_id !== holder.session_id) return { kind: "error", error: { code: "alias_taken", message: `alias ${alias} is taken`, details: { holder: held } } }
@@ -94,10 +100,12 @@ export function createRemoteThreadFixture() {
       },
       release: async ({ alias }) => ({ kind: "ok", value: { released: aliases.delete(alias) } }),
       resolve: async (alias) => {
+        registryCalls.push("resolve")
+        if (options.registryDown !== undefined) return await down()
         const held = aliases.get(alias)
         return held === undefined ? { kind: "error", error: { code: "alias_not_found", message: "no such alias" } } : { kind: "ok", value: held }
       },
-      aliasesOf: async (ids) => options.failAliasesOf === true ? Promise.reject(new Error("alias registry failed")) : ({ kind: "ok", value: new Map([...aliases].filter(([, holder]) => ids.includes(holder.session_id)).map(([alias, holder]) => [holder.session_id, alias])) }),
+      aliasesOf: async (ids) => registryCalls.push("aliasesOf") > 0 && options.failAliasesOf === true ? Promise.reject(new Error("alias registry failed")) : ({ kind: "ok", value: new Map([...aliases].filter(([, holder]) => ids.includes(holder.session_id)).map(([alias, holder]) => [holder.session_id, alias])) }),
     }
     const remote: RemoteThreadSurface = {
       sessions: {
@@ -125,7 +133,7 @@ export function createRemoteThreadFixture() {
       ...(options.noRegistry === true ? {} : { aliases: registry }),
       chain: { stamp: (record, hop) => { hops.push(hop); return { ...record, chain_count: hop } } },
     }
-    return { remote, sent, hops, aliases, live }
+    return { remote, sent, hops, aliases, live, registryCalls }
   }
 
   function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?: () => string | undefined; sessions?: ThreadHostSession[]; engine?: Engine; caller?: string; diskSessions?: readonly string[]; closeOutcome?: ThreadCloseOutcome } = {}) {
