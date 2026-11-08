@@ -49,6 +49,9 @@ export function outcomeFailure(outcome: Exclude<RemoteCommandOutcome, { readonly
   if (outcome.reason === "capability_missing") return fail("scope_denied", `Device ${device} does not grant this command.`, "Allow commands from this device on the other device, then retry.", { device, reason: outcome.reason })
   if (outcome.reason === "host_detached") return fail("host_unavailable", `Device ${device} is not attached to the relay.`, "Retry when that device is signed in and online.", { device, reason: outcome.reason })
   if (UNANSWERED.has(outcome.reason)) return fail("host_unavailable", `Device ${device} did not answer (${outcome.reason}); this call changed nothing there.`, "Retry; nothing needs to be checked first.", { device, reason: outcome.reason })
+  // senpi S32: the other device's engine refuses a thread call past its own user's `threads.chainCountLimit`. Nothing
+  // there needs updating and a retry is refused again; only that device's user can allow more hops.
+  if (outcome.reason === "chain_count_limit") return fail("chain_count_limit", `Device ${device} refused this thread call: the chain has made more hops than its user's thread chain limit (threads.chainCountLimit on device ${device}).`, `Do not retry or extend this chain; finish with what you have. Only the user of device ${device} can allow more hops, by raising or unsetting threads.chainCountLimit there.`, { device, reason: outcome.reason, setting: "threads.chainCountLimit" })
   if (outcome.reason === "record_too_large") return fail("unsupported", `The thread on device ${device} is too large to send back in one relay record (record_too_large).`, "Read it on that device, or ask that thread for a summary with thread_send.", { device, reason: outcome.reason })
   return fail("unsupported", `Device ${device} refused the command (${outcome.reason}).`, "Update omo on that device, or address a thread on this device.", { device, reason: outcome.reason })
 }
