@@ -10,7 +10,7 @@
 
 import { dirname, isAbsolute, join, relative, sep } from "node:path"
 
-import { existsSync, lstat, mkdir, readFile, realpath } from "../../fs/resilient"
+import { constants, existsSync, lstat, mkdir, open, realpath } from "../../fs/resilient"
 import { caseFold } from "../item/casefold"
 
 const FS_REFUSALS = new Set(["EISDIR", "ENOTDIR", "ENAMETOOLONG", "EACCES", "EPERM", "ELOOP", "EEXIST", "EINVAL"])
@@ -37,17 +37,43 @@ export function commitPathProblem(root: string, path: string, platform: NodeJS.P
   return base.length + 1 + path.length >= MINGW_MAX_PATH ? "git-path-too-long" : null
 }
 
+/** The opened leaf is not a regular file: a FIFO, socket or device, or a directory. */
+class NonRegularLeafError extends Error {
+  readonly code = "NON-REGULAR-FILE"
+}
+
 /** The error code when `error` says a path cannot be used on this device, else null. */
 export function fsRefusal(error: unknown): string | null {
+  if (error instanceof NonRegularLeafError) return error.code
   if (!(error instanceof Error) || !("code" in error) || typeof error.code !== "string") return null
   return FS_REFUSALS.has(error.code) ? error.code : null
 }
 
-export const readWorking = (root: string, path: string): Promise<string | null> =>
-  readFile(join(root, path), "utf8").catch((error: unknown) => {
+// O_NONBLOCK: opening a FIFO with no writer returns at once instead of blocking, and the fstat below
+// then refuses it. O_NOFOLLOW: a leaf swapped for a symlink fails with ELOOP instead of being read
+// through. Windows has neither flag (and no FIFOs in a working tree), so they are 0 there.
+const READ_WORKING_FLAGS = constants.O_RDONLY | (constants.O_NONBLOCK ?? 0) | (constants.O_NOFOLLOW ?? 0)
+
+/**
+ * The working text at `path`, or null when nothing is there. The kind of file is judged on the opened
+ * descriptor, never by an earlier lstat, so a leaf swapped between the check and the read cannot block
+ * a cycle (#12575): landing and capture both read through here.
+ */
+export async function readWorking(root: string, path: string): Promise<string | null> {
+  let handle: Awaited<ReturnType<typeof open>>
+  try {
+    handle = await open(join(root, path), READ_WORKING_FLAGS)
+  } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return null
     throw error
-  })
+  }
+  try {
+    if (!(await handle.stat()).isFile()) throw new NonRegularLeafError(`not a regular file: ${path}`)
+    return await handle.readFile("utf8")
+  } finally {
+    await handle.close()
+  }
+}
 
 type Landing = { readonly path: string; readonly working: string | null } | { readonly refused: string }
 
