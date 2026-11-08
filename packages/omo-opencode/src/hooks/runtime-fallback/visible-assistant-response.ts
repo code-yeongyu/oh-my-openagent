@@ -2,6 +2,7 @@ import type { HookDeps } from "./types"
 import type { SessionMessage, SessionMessagePart } from "./session-messages"
 import { extractSessionMessages } from "./session-messages"
 import { extractAutoRetrySignal } from "./error-classifier"
+import { hasCompactionPart, isCompactionAgent } from "../../shared/compaction-marker"
 
 function getLastUserMessageIndex(messages: SessionMessage[]): number {
   for (let index = messages.length - 1; index >= 0; index--) {
@@ -52,6 +53,9 @@ export function hasVisibleAssistantResponse(extractAutoRetrySignalFn: typeof ext
         if (message.info?.error) {
           continue
         }
+        if (message.info?.summary === true || isCompactionAgent(message.info?.agent)) {
+          continue
+        }
 
         const infoParts = message.info?.parts
         const infoMessageParts = Array.isArray(infoParts)
@@ -60,6 +64,9 @@ export function hasVisibleAssistantResponse(extractAutoRetrySignalFn: typeof ext
         const parts = message.parts && message.parts.length > 0
           ? message.parts
           : infoMessageParts
+        if (hasCompactionPart(parts)) {
+          continue
+        }
         const assistantText = getAssistantText(parts)
         if (!assistantText) {
           continue
@@ -74,9 +81,6 @@ export function hasVisibleAssistantResponse(extractAutoRetrySignalFn: typeof ext
 
       return false
     } catch (error) {
-      if (!(error instanceof Error)) {
-        throw error
-      }
       return false
     }
   }

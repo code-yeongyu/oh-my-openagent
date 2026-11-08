@@ -137,6 +137,20 @@ describe("remote == local, round 2: send modes, handoff, list and alias order", 
     expect(commands(a.sent)).toEqual(["get_state"])
   })
 
+  test("#given b is mid-turn on the expected turn #when a steer reaches it #then the prompt steers that turn and names it for b's engine to check again", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, pending: 0, currentTurnId: "3" } })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "x", delivery: "steer", expected_turn_id: "3" })).toMatchObject({ kind: "ok", device: "b", delivery: { kind: "steered", turn_id: "3" } })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => [entry.rpc?.["streamingBehavior"], entry.rpc?.["expectedTurnId"]])).toEqual([["steer", "3"]])
+  })
+
+  test("#given b is mid-turn on another turn #when a steer names an older turn #then it is turn_conflict and no prompt is sent", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, pending: 0, currentTurnId: "4" } })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "x", delivery: "steer", expected_turn_id: "3" })).toMatchObject({ kind: "error", error: { code: "turn_conflict", details: { device: "b", current_turn_id: "4" } } })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toEqual([])
+  })
+
   test("#given a follow_up to b while it runs #when it is sent #then it is queued behind b's own pending count", async () => {
     const a = account({ engine: { ...ENGINE, streaming: true, pending: 2 } })
     const { run } = surface(a.remote)
