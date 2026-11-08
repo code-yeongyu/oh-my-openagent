@@ -175,20 +175,26 @@ describe("a saved cap resume point never stops retention (#12538 review r4 M)", 
   test("#given a stored store cursor and a stored cap resume point #when the pass runs with budget #then the store walk resumes at its cursor and the cap resumes its tier after its own resume point", async () => {
     const paths = await identity()
     const { runs, at } = await unfoldedRuns(paths)
-    const resume: RuntimeCapCursor = { store: "cap", tier: "unfolded-run", clock: (at[0]! + at[1]!) / 2, lastName: runs[0]! }
+    const [at0, at1] = at
+    const [run0] = runs
+    if (at0 === undefined || at1 === undefined || run0 === undefined) throw new Error("expected at least two unfolded runs")
+    const resume: RuntimeCapCursor = { store: "cap", tier: "unfolded-run", clock: (at0 + at1) / 2, lastName: run0 }
     await writeJson(cursorFile(paths), { version: 1, cursor: { store: "journals", lastName: "s-05" }, cap: resume })
 
     const report = await runRuntimeRetention({ paths, policy: UNREFLECTED_ON, now, maxBytes: 1 })
 
     expect(report.cap?.evicted.map((entry) => entry.name)).toEqual([runs[1], runs[2]])
-    expect(await liveRuns(paths)).toEqual([runs[0]!, ...runs.slice(3)].sort())
+    expect(await liveRuns(paths)).toEqual([run0, ...runs.slice(3)].sort())
     expect(await persistedCursors(paths)).toBeUndefined()
   })
 
   test("#given a stored cap resume point #when a pass's cap makes no progress and the next pass has budget #then the first keeps the resume point and the second resumes there and completes", async () => {
     const paths = await identity()
     const { runs, at } = await unfoldedRuns(paths)
-    const resume: RuntimeCapCursor = { store: "cap", tier: "unfolded-run", clock: (at[0]! + at[1]!) / 2, lastName: runs[0]! }
+    const [at0, at1] = at
+    const [run0] = runs
+    if (at0 === undefined || at1 === undefined || run0 === undefined) throw new Error("expected at least two unfolded runs")
+    const resume: RuntimeCapCursor = { store: "cap", tier: "unfolded-run", clock: (at0 + at1) / 2, lastName: run0 }
     await writeJson(cursorFile(paths), { version: 1, cap: resume })
 
     const stalled = await runRuntimeRetention({ paths, policy: ZERO_BUDGET, now, maxBytes: 1 })

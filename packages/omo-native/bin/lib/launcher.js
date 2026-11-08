@@ -241,7 +241,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
           memoryRuntimeReport({
             maxBytesFor: memoryRuntimeMaxBytesResolver({ pluginRoot: join(packageRoot, "plugin") }),
             discardFor: memoryRuntimeDiscardResolver({ pluginRoot: join(packageRoot, "plugin") }),
-          }).then((report) => report.lines),
+          }).then((report) => report.lines, (error) => [`WARN memory runtime: unavailable: ${error instanceof Error ? error.message : String(error)}`]),
         ])
     runDoctor(await detectHarnesses(), args.slice(1), {
       daemonEngine: { run: engineHostCall },
