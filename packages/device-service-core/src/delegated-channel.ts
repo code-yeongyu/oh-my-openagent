@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto"
 
 import type { CommandBlobRef, JsonObject, LocalEvent } from "./local-api/protocol.ts"
+import type { CommandLocated } from "./local-api/protocol-delegated.ts"
 
 // One device's delegated command channel on this local API connection (decision 0018, docs/local-api.md "Delegated
 // commands"): the engine's reply to each delegated command, and the frames the engine writes unasked on that
@@ -10,6 +11,8 @@ import type { CommandBlobRef, JsonObject, LocalEvent } from "./local-api/protoco
 export type DelegatedChannel = {
   /** The engine's reply to a delegated command; it arrives before the command's final state. */
   readonly takeReply: (commandId: string) => JsonObject | undefined
+  /** The session an endpoint open made, when its reply named it (decision 0018 amendment 2026-11-06, `located`). */
+  readonly takeLocated: (commandId: string) => CommandLocated | undefined
   /**
    * Frames that arrived while nothing listened (before the TUI subscribed, or in a reconnect gap) are held, at most
    * HELD_FRAMES_MAX of them, and replayed in order to the next listener before it sees any later frame (#12356).
@@ -34,6 +37,7 @@ const isObject = (value: unknown): value is JsonObject =>
 
 export function followDelegatedChannel(device: string): DelegatedChannel {
   const replies = new Map<string, JsonObject>()
+  const locateds = new Map<string, CommandLocated>()
   const frames = new Set<(frame: JsonObject) => void>()
   const losses = new Set<(reason: string) => void>()
   const blobs = new Map<string, Blob>()
@@ -61,8 +65,13 @@ export function followDelegatedChannel(device: string): DelegatedChannel {
     if (isObject(frame)) return frameArrived(frame)
     const commandId = value["command_id"]
     const response = value["response"]
-    if (typeof commandId === "string" && isObject(response)) replies.set(commandId, response)
-    else lost("a command event with neither a frame nor a reply")
+    if (typeof commandId !== "string" || !isObject(response)) return lost("a command event with neither a frame nor a reply")
+    replies.set(commandId, response)
+    // A reply too large for one line carries `located` inside its blob, which the event validator never saw: only a
+    // pair that names this device's session is kept, and anything else leaves the caller to locate as before.
+    const located = value["located"]
+    if (isObject(located) && typeof located["key"] === "string" && located["key"].length > 0 && located["session"] === `${device}.${located["key"]}`)
+      locateds.set(commandId, { key: located["key"], session: located["session"] })
   }
   const accept = (event: LocalEvent): void => {
     switch (event.kind) {
@@ -112,6 +121,11 @@ export function followDelegatedChannel(device: string): DelegatedChannel {
       replies.delete(commandId)
       return reply
     },
+    takeLocated: commandId => {
+      const located = locateds.get(commandId)
+      locateds.delete(commandId)
+      return located
+    },
     onFrame: listener => {
       for (const frame of held.splice(0)) listener(frame)
       frames.add(listener)
@@ -133,6 +147,7 @@ export function followDelegatedChannel(device: string): DelegatedChannel {
       replies.clear()
       held.length = 0
       unheardDrops = 0
+      locateds.clear()
     },
   }
 }
