@@ -603,7 +603,7 @@ trusted_hash = "sha256:user"
       const standaloneBin = join(binDir, "omo")
       await writeFile(
         standaloneBin,
-        Buffer.concat([Buffer.from([0xcf, 0xfa, 0xed, 0xfe]), Buffer.alloc(1024), Buffer.from(`var marker = "${RUNTIME_WRAPPER_MARKER}";\n`)]),
+        Buffer.concat([Buffer.from([0xcf, 0xfa, 0xed, 0xfe]), Buffer.alloc(1024), Buffer.from(`var marker = "${RUNTIME_WRAPPER_MARKER}";\nvar shim = "${COMMAND_SHIM_MARKER}";\n`)]),
       )
 
       // when
