@@ -668,6 +668,16 @@ describe("memory guard ancestor enumeration (#12301)", () => {
     expect(await enumerate(setup, "grep", setup.memoryRoot, "call-next")).toBeUndefined()
   })
 
+  test("#given an allowed ancestor enumeration #when nothing changes before its result #then the result passes through untouched", async () => {
+    const setup = ancestorFixture()
+
+    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-quiet")).toBeUndefined()
+
+    expect(await finish(setup, "grep", setup.memoryRoot, "call-quiet")).toEqual([])
+  })
+})
+
+describe("memory guard combined tool_result handler (#12594)", () => {
   test("#given the registered guard #when a read tool returns text claiming a user decision #then the one tool_result handler appends the unverified notice", async () => {
     // given: the handler registerMemoryGuard installs, not unverifiedReceiptNotice called on its own
     const setup = ancestorFixture()
@@ -711,13 +721,5 @@ describe("memory guard ancestor enumeration (#12301)", () => {
     expect(results).toEqual([{ content: [expect.objectContaining({ type: "text" })], isError: true, details: {} }])
     expect(JSON.stringify(results)).not.toContain(UNVERIFIED_RECEIPT_NOTICE)
     expectAncestorDenied({ block: true, reason: (results[0] as { content: { text: string }[] }).content[0]?.text }, ["late-id"])
-  })
-
-  test("#given an allowed ancestor enumeration #when nothing changes before its result #then the result passes through untouched", async () => {
-    const setup = ancestorFixture()
-
-    expect(await enumerate(setup, "grep", setup.memoryRoot, "call-quiet")).toBeUndefined()
-
-    expect(await finish(setup, "grep", setup.memoryRoot, "call-quiet")).toEqual([])
   })
 })
