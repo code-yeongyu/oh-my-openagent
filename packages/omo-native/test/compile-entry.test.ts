@@ -257,6 +257,13 @@ describe("compiled omo entry launcher parity", () => {
       expect(isProvisionedExecutable("C:\\stra\u00dfe\\omo.exe", "C:\\STRA\u00dfE\\omo.exe", "win32", missing)).toBe(true)
     })
 
+    test("#when a name holds a surrogate pair or a lone surrogate #then each UTF-16 unit folds to itself", () => {
+      // U+1D400 (a surrogate pair) and a lone high surrogate have no single-unit uppercase, so neither changes.
+      expect(isProvisionedExecutable("C:\\\uD835\uDC00omo.exe", "C:\\\uD835\uDC00OMO.exe", "win32", missing)).toBe(true)
+      expect(isProvisionedExecutable("C:\\\uD835omo.exe", "C:\\\uD835OMO.exe", "win32", missing)).toBe(true)
+      expect(isProvisionedExecutable("C:\\\uD835omo.exe", "C:\\\uD836omo.exe", "win32", missing)).toBe(false)
+    })
+
     test("#when POSIX paths differ only in case #then they stay different executables", () => {
       expect(isProvisionedExecutable("/home/u/.omo/omo", "/home/u/.OMO/omo", "linux", missing)).toBe(false)
     })
