@@ -33,7 +33,7 @@ export type HeldAttach = { readonly session: PooledSession; readonly release: ()
 
 // How long an attach nobody holds is kept: a send, then a read of the same session, reuse it (one round trip each, and
 // the held catalog), while a watch that stopped long ago no longer pins a remote stream. The catalog's own bound.
-export const ATTACH_IDLE_MS = CATALOG_MAX_AGE_MS
+const ATTACH_IDLE_MS = CATALOG_MAX_AGE_MS
 
 type Entry = { readonly opened: Promise<PooledSession>; holders: number; idle?: ReturnType<typeof setTimeout> }
 

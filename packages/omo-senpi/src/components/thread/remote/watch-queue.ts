@@ -9,7 +9,7 @@ export type WatchItem =
 // The attach listener runs inside the connection's data handler and only enqueues; past this many queued records the
 // content is dropped (the newest session_status kept) and the session is read fresh instead, so a backlog costs detail,
 // never a turn end.
-export const WATCH_QUEUE_MAX = 256
+const WATCH_QUEUE_MAX = 256
 
 export class WatchQueue {
   #items: WatchItem[] = []
