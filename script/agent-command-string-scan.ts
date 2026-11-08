@@ -19,6 +19,8 @@ export function isExcluded(filePath: string): boolean {
     || filePath === SCAN_TEST_RELATIVE_PATH
     || filePath === "CHANGELOG.md"
     || filePath.endsWith("/CHANGELOG.md")
+    || filePath === "changes.md"
+    || filePath.endsWith("/changes.md")
     || filePath.startsWith("changes/unreleased/")
     || filePath === ".omo"
     || filePath.startsWith(".omo/")

@@ -17,7 +17,7 @@ const LEGACY_SKILL = "---\nname: deploy\ndescription: senpi #1439 is the tail\nv
 const CLEAN = "---\ndescription: Already clean\n---\n\nclean body\n"
 const roots: string[] = []
 
-setDefaultTimeout(process.platform === "win32" ? 30_000 : 10_000)
+if (process.platform === "win32") setDefaultTimeout(30_000)
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))

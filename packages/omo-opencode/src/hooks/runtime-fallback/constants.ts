@@ -43,3 +43,5 @@ export const RETRYABLE_ERROR_PATTERNS = RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERN
  * Hook name for identification and logging
  */
 export const HOOK_NAME = "runtime-fallback"
+
+export const COMPACTION_WATCHDOG_BUDGET_MS = 600_000
