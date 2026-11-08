@@ -7,6 +7,7 @@
 
 import { sessionWorkerData } from "@code-yeongyu/senpi/session-worker-data"
 import { connectDeviceService, type DeviceService, deviceServiceStateDir, forgetDeviceService, handDeviceKeys } from "@oh-my-opencode/device-service-core"
+import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core"
 import { createCredentialStore, createSession, quietNotice, retireSyncPinOnDiscard, serviceOrigin } from "@oh-my-opencode/omo-opencode/service-auth"
 import { createOmoNativeProductConfig } from "../../telemetry/product-identity"
 import { MEMORY_SYNC_WORKER_DATA, type MemorySyncSelection } from "../desktop-sync/hostSelection"
@@ -52,7 +53,7 @@ export function selectedAccountSource(
  * (trust-pin retirement, device-service forget) as the CLI account source. A desktop launch never reads the CLI
  * credential store (account-transport-api v9 section 7.3), so there every token request is refused.
  */
-export function cliServiceAccess(options: { readonly env: Readonly<Record<string, string | undefined>>; readonly pinDir: () => string; readonly log?: (line: string) => void }): { readonly origin: string; readonly accessToken: () => Promise<string> } {
+export function cliServiceAccess(options: { readonly env: Readonly<Record<string, string | undefined>>; readonly cwd: string; readonly log?: (line: string) => void }): { readonly origin: string; readonly accessToken: () => Promise<string> } {
   const warn = (line: string): void => options.log?.(line)
   const origin = serviceOrigin(options.env["OMO_SERVICE_API_URL"] ?? DEFAULT_SERVICE_API)
   let session: ReturnType<typeof createSession> | undefined
@@ -63,7 +64,7 @@ export function cliServiceAccess(options: { readonly env: Readonly<Record<string
       session ??= createSession({
         api: origin,
         store: createCredentialStore(origin, { notice: quietNotice }),
-        beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir: options.pinDir, log: warn }),
+        beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir: () => syncPinDir(resolveMemoryRoot({ ...options.env }, options.cwd)), log: warn }),
         deviceService: { adopt: async () => undefined, forget: () => engineDeviceService(undefined, undefined, warn).forget().catch((error: unknown) => warn(`thread aliases: the device service forget failed (${error instanceof Error ? error.message : String(error)})`)) },
       })
       return await session.accessToken()

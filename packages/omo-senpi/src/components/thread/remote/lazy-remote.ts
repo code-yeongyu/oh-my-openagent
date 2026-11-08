@@ -1,32 +1,23 @@
-import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core"
 import type { AliasRegistry, AliasResult, RemoteSessionsPort, RemoteThreadSurface } from "./ports"
 
 type Runtime = Pick<typeof import("./device-service"), "createDeviceServiceSessions">
 
 export type LazyRemoteOptions = {
   readonly version: string
-  readonly loadRuntime?: () => Promise<Runtime>
-  /** The account's alias registry; the default speaks to the account service as this device's CLI sign-in. */
-  readonly loadAliasRegistry?: () => Promise<AliasRegistry>
-  /** Where the default registry's sign-in reports a discard step that failed (trust-pin retirement, device-service forget). */
-  readonly log?: (line: string) => void
-}
-
-const defaultAliasRegistry = async (log?: (line: string) => void): Promise<AliasRegistry> => {
-  const [{ createServiceAliasRegistry }, { cliServiceAccess }] = await Promise.all([import("#omo-thread-client-runtime"), import("#omo-device-account-runtime")])
-  return createServiceAliasRegistry(cliServiceAccess({ env: process.env, pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())), ...(log === undefined ? {} : { log }) }))
+  readonly loadRuntime: () => Promise<Runtime>
+  /** The account's alias registry, loaded on its first use. */
+  readonly loadAliasRegistry: () => Promise<AliasRegistry>
 }
 
 /**
- * The default remote surface (on in every launch): the device-service client loads with the thread client sidecar on
- * the first call that needs another device. A failed load is not cached and surfaces as the tools' typed
- * host_unavailable, so a device without the service keeps today's local behavior. The alias registry loads the same
- * way on its first use; a load that fails answers alias_registry_unavailable and is retried on the next call.
+ * A remote surface whose device-service client loads on the first call that needs another device. A failed load is not
+ * cached and surfaces as the tools' typed host_unavailable, so a device without the service keeps today's local behavior.
+ * The alias registry loads the same way on its first use; a load that fails answers alias_registry_unavailable and is
+ * retried on the next call. `sessions.close` ends the device-service connection a short-lived caller opened.
  */
 export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThreadSurface {
   let port: Promise<RemoteSessionsPort> | undefined
-  const loadRuntime = options.loadRuntime ?? (() => import("#omo-thread-client-runtime"))
-  const load = () => port ??= loadRuntime().then(
+  const load = () => port ??= options.loadRuntime().then(
     ({ createDeviceServiceSessions }) => createDeviceServiceSessions({ version: options.version }),
     (error: unknown) => { port = undefined; throw error },
   )
@@ -40,13 +31,17 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
     sessionCommand: async (device, sessionId, rpc, options) => await (await load()).sessionCommand(device, sessionId, rpc, options),
     read: async (device, sessionId, tail) => await (await load()).read(device, sessionId, tail),
     watch: async (device, sessionId, listener) => await (await load()).watch(device, sessionId, listener),
+    close: async () => {
+      const loaded = port
+      port = undefined
+      if (loaded !== undefined) await (await loaded.catch(() => undefined))?.close?.()
+    },
   }
   let registry: Promise<AliasRegistry> | undefined
-  const loadAliasRegistry = options.loadAliasRegistry ?? (() => defaultAliasRegistry(options.log))
   const withRegistry = async <T>(use: (loaded: AliasRegistry) => Promise<AliasResult<T>>): Promise<AliasResult<T>> => {
     let loaded: AliasRegistry
     try {
-      loaded = await (registry ??= loadAliasRegistry().catch((error: unknown) => { registry = undefined; throw error }))
+      loaded = await (registry ??= options.loadAliasRegistry().catch((error: unknown) => { registry = undefined; throw error }))
     } catch (error) {
       return { kind: "error", error: { code: "alias_registry_unavailable", message: `The account's alias registry could not be loaded: ${error instanceof Error ? error.message : String(error)}.`, details: { reason: "registry_unavailable" } } }
     }
