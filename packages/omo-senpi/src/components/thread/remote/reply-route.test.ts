@@ -249,7 +249,10 @@ describe("the reply reaches A's session whatever else the run did", () => {
     const delivered = await within(watched.seen, "the reply to d-8")
     expect(delivered.rpc).toMatchObject({ type: "admit_external_message", sessionId: "key-of-a", deliveryId: "reply-d-8", deliverAs: "followUp", sender: { kind: "agent", session_id: "dur-on-b", name: "agent b" } })
     expect(admits(relay)).toHaveLength(1)
-    expect(bodyOf(delivered.rpc).split("\n")).toEqual(["Reply to delivery d-8.", ...(labelled ? [OTHER_INPUT_LABEL] : []), final])
+    expect(bodyOf(delivered.rpc).split("\n")).toEqual([...(labelled ? [OTHER_INPUT_LABEL] : []), final])
+    // The model reads a local session-to-session delivery: no device anywhere in the text.
+    expect(String(delivered.rpc["text"])).not.toContain("device=")
+    expect(String(delivered.rpc["text"])).toContain("delivery=reply-d-8")
   })
 
   test("#given A's user is composing a draft #when B's reply is refused held_draft #then B logs remote_reply_held and retries until A admits it", async () => {
