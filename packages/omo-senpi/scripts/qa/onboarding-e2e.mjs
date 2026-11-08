@@ -94,8 +94,10 @@ try {
   const contexts = messages.messages.filter((message) => message.customType === "omo-onboarding:context")
   assert.equal(contexts.length, 1)
   assert.equal(contexts[0].display, false)
-  const skillPath = contexts[0].content.match(/\S+\/onboarding\/SKILL\.md/)?.[0]
-  assert.ok(skillPath && existsSync(resolve(skillPath)), "emitted skill pointer must exist")
+  const skillPointer = "built-in `onboarding` skill"
+  // #12150: the context names the skill by its stable name and embeds no install path.
+  assert.ok(contexts[0].content.includes(skillPointer), "emitted skill pointer must name the built-in onboarding skill")
+  assert.ok(!contexts[0].content.includes("/onboarding/SKILL.md"), "emitted context must not embed the install path")
   assert.ok(JSON.stringify(requests[0]).includes(JSON.stringify(contexts[0].content).slice(1, -1)),
     "same provider request must contain the injected context")
   await send("And the next test")
