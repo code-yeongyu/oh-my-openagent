@@ -24,7 +24,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })
 
-setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
+if (process.platform === "win32") setDefaultTimeout(30000)
 
 describe("dream token budget completion validation", () => {
   it("#given a pressure dream whose merged system estimate remains at target #when validated #then budget_not_met is recorded", () => {

@@ -8,6 +8,7 @@ import { daemonReportLines } from "./bin/lib/daemon.js"
 import { keychainHelperDoctorLines } from "./bin/lib/keychain-helper-doctor.js"
 import { reapStaleEngines, staleEngineReport, transientMemoryReport, warningsForSettings } from "./bin/lib/doctor.js"
 import { migrationReport } from "./bin/lib/doctor-migration.js"
+import { memoryRuntimeDiscardResolver, memoryRuntimeMaxBytesResolver, memoryRuntimeReport } from "./bin/lib/doctor-memory-runtime.js"
 import { runDoctorModels } from "./bin/lib/model-chains.js"
 import { piConfigReport } from "./bin/lib/doctor-pi-config.js"
 import { launchSpecDoctorLines } from "./bin/lib/launch-spec-mode.js"
@@ -27,6 +28,7 @@ export type CompiledDoctorOptions = {
   readonly computerUseLines?: () => Promise<string[]>
   readonly keychainHelperLines?: () => string[]
   readonly trustLines?: () => Promise<string[]>
+  readonly memoryRuntimeLines?: () => Promise<string[]>
   readonly list?: () => { pid: number; ppid: number; elapsed: string; tty: string; command: string }[]
   readonly kill?: (pid: number, signal: NodeJS.Signals) => void
 }
@@ -63,6 +65,27 @@ async function trustLines(options: CompiledDoctorOptions): Promise<string[]> {
   if (options.trustLines) return options.trustLines()
   const marker = adoptedEngineTrust()
   return engineTrustDoctorLines({ platform: process.platform, marker, records: await readEngineTrustRecords(marker) })
+}
+
+/** The memory-runtime section the npm launcher's doctor prints (bin/lib/launcher.js), from the same report. */
+async function memoryRuntimeLines(input: CompiledDoctorInput, env: NodeJS.ProcessEnv): Promise<string[]> {
+  try {
+    if (input.options?.memoryRuntimeLines) return await input.options.memoryRuntimeLines()
+    const pluginRoot = join(input.execDir, "plugin")
+    const report = await memoryRuntimeReport({
+      env,
+      maxBytesFor: memoryRuntimeMaxBytesResolver({ pluginRoot, env }),
+      discardFor: memoryRuntimeDiscardResolver({ pluginRoot, env }),
+    })
+    return report.lines
+  } catch (error) {
+    // A runtime the user cannot read (EACCES) must not take the rest of doctor down with it.
+    return [memoryRuntimeUnavailableLine(error)]
+  }
+}
+
+function memoryRuntimeUnavailableLine(error: unknown): string {
+  return `WARN memory runtime: unavailable: ${error instanceof Error ? error.message : String(error)}`
 }
 
 function coverageLines(input: CompiledDoctorInput, env: NodeJS.ProcessEnv): Promise<string[]> {
@@ -118,9 +141,9 @@ export async function runCompiledDoctor(input: CompiledDoctorInput): Promise<voi
   lines.push(...staleEngineReport(options))
   lines.push(...transientMemoryReport({ env }))
   lines.push(...await trustLines(options))
-  const [computerUse, coverage] = await Promise.all([computerUseLines(input, env), coverageLines(input, env)])
+  const [computerUse, coverage, memoryRuntime] = await Promise.all([computerUseLines(input, env), coverageLines(input, env), memoryRuntimeLines(input, env)])
   if (computerUse.some((line) => line.startsWith("FAIL "))) failed = true
-  lines.push(...computerUse, ...claudeCodeDoctorLines({ runtimeDir: input.execDir, env }), ...coverage)
+  lines.push(...computerUse, ...claudeCodeDoctorLines({ runtimeDir: input.execDir, env }), ...coverage, ...memoryRuntime)
   if (needsSetupSuggestion(input.inventory)) lines.push("INFO no credentials found; run omo setup to review sibling stores")
   console.log(lines.join("\n"))
   process.exitCode = failed ? 1 : 0
