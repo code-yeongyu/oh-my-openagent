@@ -24,9 +24,11 @@ export type ReplyFrom = { readonly session_id: string; readonly name?: string; r
  * A session's answer to a peer send, delivered back into the sending session as a peer delivery (senpi#6233
  * `admit_external_message`): the sender label is the receiving engine's to stamp from the authenticated peer, so only an
  * `agent` claim is sent; the chain continues (`chainCount`); the delivery id is derived from the delivery it answers, so a
- * repeated reply is the same delivery and the receiver admits it once.
+ * repeated reply is the same delivery and the receiver admits it once. A `withheld` reply (the route's answer was shared
+ * with another input of the run) is still delivered, as a fixed notice that carries none of the run's output, so the
+ * sender's session always wakes.
  */
-export async function admitReplyRemote(remote: RemoteThreadSurface, route: ReplyRoute, from: ReplyFrom, answer: string | undefined, answered: readonly SentTarget[] = []): Promise<ReplyAdmission> {
+export async function admitReplyRemote(remote: RemoteThreadSurface, route: ReplyRoute, from: ReplyFrom, answer: string | undefined, answered: readonly SentTarget[] = [], withheld = false): Promise<ReplyAdmission> {
   const unavailable = await remoteAvailable(remote)
   if (unavailable !== undefined) return { kind: "failed", reason: unavailable.error.code }
   const located = await remote.sessions.locate(route.device, route.session)
@@ -43,7 +45,9 @@ export async function admitReplyRemote(remote: RemoteThreadSurface, route: Reply
     root_id: route.root,
     hop: route.hop + 1,
   }
-  const body = answer === undefined ? `(Answer to delivery ${route.delivery}: the run ended without a text answer.)` : capBytes(answer, THREAD_MESSAGE_MAX_BYTES)
+  const body = withheld
+    ? `(Delivery ${route.delivery} reached this session, but the run answered other input in the same turn before replying to it, so no answer is attributed to it. Send the question again for a direct answer.)`
+    : answer === undefined ? `(Answer to delivery ${route.delivery}: the run ended without a text answer.)` : capBytes(answer, THREAD_MESSAGE_MAX_BYTES)
   const record: JsonObject = {
     type: "admit_external_message",
     sessionId: located.sessionId,

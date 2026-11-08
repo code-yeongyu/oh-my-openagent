@@ -53,9 +53,10 @@ export function wireReplyRoutes(pi: Pick<SenpiExtensionAPI, "on">, remote: Remot
   const router = createReplyRouter((route, reply, sessionId) => {
     queue = queue.then(async () => {
       if (sessionId === undefined) return failed(route, "the settled run named no session id")
-      if (reply.mixed) return options.warn(`remote_reply_skipped: delivery ${route.delivery} from session ${route.session} on device ${route.device} shares its answer with another input of the same run; nothing was sent, so no answer to another input reaches that peer.`)
+      // A mixed route carries no answer (reply-route.ts), so the sender gets a notice with none of the run's output and still wakes.
+      if (reply.mixed) options.warn(`remote_reply_withheld: delivery ${route.delivery} from session ${route.session} on device ${route.device} shares its answer with another input of the same run; the peer gets a notice without the answer, so no answer to another input reaches it.`)
       const name = options.sessionName?.()
-      const outcome = await (await runtime()).admitReplyRemote(remote, route, { session_id: sessionId, provenance: await options.senderProvenance(), ...(name === undefined ? {} : { name }) }, reply.answer, reply.sent)
+      const outcome = await (await runtime()).admitReplyRemote(remote, route, { session_id: sessionId, provenance: await options.senderProvenance(), ...(name === undefined ? {} : { name }) }, reply.answer, reply.sent, reply.mixed)
       if (outcome.kind === "unavailable") options.warn(`${outcome.code}: the answer to delivery ${route.delivery} was not delivered to session ${route.session} on device ${route.device}: its engine cannot admit a peer delivery (${outcome.reason}); update omo and senpi on that device.`)
       else if (outcome.kind === "failed") failed(route, outcome.reason)
     }).catch((error: unknown) => failed(route, error instanceof Error ? error.message : String(error)))
