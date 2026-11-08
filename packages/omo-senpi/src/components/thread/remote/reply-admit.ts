@@ -29,8 +29,8 @@ export type ReplyFrom = { readonly session_id: string; readonly name?: string; r
  * A session's answer to a peer send, delivered back into the sending session as a peer delivery (senpi#6233
  * `admit_external_message`): the sender label is the receiving engine's to stamp from the authenticated peer, so only an
  * `agent` claim is sent; the chain continues (`chainCount`); the delivery id is derived from the delivery it answers, so a
- * repeated reply is the same delivery and the receiver admits it once. The body names the delivery it answers and, when
- * another input landed in the same run, says the answer may cover it too.
+ * repeated reply is the same delivery and the receiver admits it once. When another input landed in the same run, the
+ * body's first line says the answer may cover it too.
  */
 export async function admitReplyRemote(remote: RemoteThreadSurface, route: ReplyRoute, from: ReplyFrom, answer: string | undefined, answered: readonly SentTarget[] = [], otherInput = false): Promise<ReplyAdmission> {
   const unavailable = await remoteAvailable(remote)
@@ -39,7 +39,6 @@ export async function admitReplyRemote(remote: RemoteThreadSurface, route: Reply
   if (located.kind !== "ok") return { kind: "failed", reason: located.reason }
   // A send resolves any address form (id, name, alias) to the listing key it reached; the route names the durable id.
   if (answered.some((sent) => sent.device === route.device && (sent.thread === route.session || sent.thread === located.sessionId))) return { kind: "answered" }
-  const here = await remote.sessions.thisDevice()
   const named = from.name === undefined || from.name.trim() === "" ? undefined : from.name.trim()
   const peer: RemotePeer = {
     session_id: from.session_id,
@@ -49,15 +48,15 @@ export async function admitReplyRemote(remote: RemoteThreadSurface, route: Reply
     root_id: route.root,
     hop: route.hop + 1,
   }
-  const lines = [`Reply to delivery ${route.delivery}.`]
-  if (otherInput) lines.push(OTHER_INPUT_LABEL)
-  lines.push(answer === undefined ? "(The run ended without a text answer.)" : answer)
-  const body = capBytes(lines.join("\n"), THREAD_MESSAGE_MAX_BYTES)
+  const reply = answer === undefined ? "(The run ended without a text answer.)" : answer
+  const body = capBytes(otherInput ? `${OTHER_INPUT_LABEL}\n${reply}` : reply, THREAD_MESSAGE_MAX_BYTES)
   const record: JsonObject = {
     type: "admit_external_message",
     sessionId: located.sessionId,
     deliveryId: peer.delivery_id,
-    text: peerText(peer, here, { message: body }, "follow_up"),
+    // The text reads exactly like a delivery from a session on the same machine: no device (Q 2026-11-08); the receiving
+    // engine stamps the origin into the entry's metadata.
+    text: peerText(peer, null, { message: body }, "follow_up"),
     displayText: body,
     sender: { kind: "agent", session_id: peer.session_id, ...(named === undefined ? {} : { name: named }) },
     deliverAs: "followUp",
