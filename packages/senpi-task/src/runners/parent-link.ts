@@ -25,13 +25,15 @@ export class ChildParentLink {
   #applied: string | undefined
   #pushes: Promise<void> = Promise.resolve()
   #pushQueued = false
+  #releaseWarning: (() => void) | undefined
 
   constructor(
     private readonly taskId: string,
     private readonly forwarder?: ChildDialogForwarder,
     private readonly permission?: ParentPermissionMode,
-    // Where a child that did not follow is reported (the runner's warning channel, which reaches the parent session).
-    private readonly onWarning?: (message: string) => void,
+    // Where a child that did not follow is reported (the runner's warning channel, which reaches the parent session),
+    // under a per-task token so one task's notice never hides another's; the returned release clears it once a push lands.
+    private readonly onWarning?: (message: string, token: string) => void | (() => void),
   ) {}
 
   answer(frame: AutoAnswerableUiRequest & Readonly<Record<string, unknown>>, send: (response: RpcExtensionUIResponse) => void | Promise<void>): void {
@@ -75,9 +77,17 @@ export class ChildParentLink {
       try {
         await push(preset)
         this.#applied = preset
+        this.#releaseWarning?.()
+        this.#releaseWarning = undefined
       } catch (error) {
+        // The push may have reached the child before it failed (a lost reply, a side connection that failed to close),
+        // so the child's mode is unknown now: nothing counts as applied, and the next change is always pushed.
+        const confirmed = this.#applied
+        this.#applied = undefined
         log("senpi-task child did not follow its parent's approval mode", { taskId: this.taskId, preset, error: String(error) })
-        this.onWarning?.(`task ${this.taskId} did not follow its parent's approval mode (${preset}) and keeps ${this.#applied ?? "its own"}: ${error instanceof Error ? error.message : String(error)}`)
+        this.#releaseWarning?.()
+        const release = this.onWarning?.(`task ${this.taskId} may not have followed its parent's approval mode (${preset}); its mode is unknown (last confirmed ${confirmed ?? "none"}) until the parent's next change reaches it: ${error instanceof Error ? error.message : String(error)}`, `follow:${this.taskId}`)
+        this.#releaseWarning = typeof release === "function" ? release : undefined
       }
     })
   }

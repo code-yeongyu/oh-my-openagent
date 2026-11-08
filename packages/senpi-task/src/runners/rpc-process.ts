@@ -35,7 +35,7 @@ export type RpcProcessRunnerOptions = {
   readonly inheritedExtensions?: readonly string[]
   // Told once when a child's fallback models cannot reach its process: an engine without
   // `retry_fallback_command` (#9582).
-  readonly onWarning?: (message: string) => void | (() => void)
+  readonly onWarning?: (message: string, token?: string) => void | (() => void)
   // The parent session's UI a child's dialogs are answered on, and the approval mode it opens with and follows
   // (#6189 F2c-F2e). Absent: dialogs get the safe deny/cancel default and the child keeps its own mode.
   readonly dialogs?: ChildDialogForwarder
@@ -56,7 +56,7 @@ export class RpcProcessRunner {
   private readonly now: () => number
   private readonly modelAdmission: RpcModelAdmission
   private readonly inheritedExtensions: readonly string[]
-  private readonly onWarning: (message: string) => void | (() => void)
+  private readonly onWarning: (message: string, token?: string) => void | (() => void)
   private readonly fallbackChainDeadlineMs: number
   private fallbackChainUnsupportedNoticed = false
   private readonly pendingTeardowns = new Set<Promise<void>>()
@@ -85,7 +85,7 @@ export class RpcProcessRunner {
         ? { ...specInput, extensions: this.inheritedExtensions }
         : specInput
     await this.modelAdmission(spec)
-    const parent = new ChildParentLink(spec.task_id, this.options.dialogs, this.options.parentPermission, (message) => this.onWarning(message))
+    const parent = new ChildParentLink(spec.task_id, this.options.dialogs, this.options.parentPermission, (message, token) => this.onWarning(message, token))
     const descriptor = this.buildSpawn(parent.named(spec))
     const child = this.spawnChild(descriptor)
     const client = new RpcProtocolClient({ child, onMalformedLine: this.onMalformedLine, parent })

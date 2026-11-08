@@ -65,7 +65,7 @@ export type RpcHostRunnerOptions = {
   readonly heartbeatIntervalMs?: number
   readonly closeGraceMs?: number
   readonly fallback?: FallbackChildRunner
-  readonly onWarning?: (message: string) => void | (() => void)
+  readonly onWarning?: (message: string, token?: string) => void | (() => void)
   readonly now?: () => number
   readonly reattachDelaysMs?: readonly number[]
   // The bound a lost transport's recovery runs under before the child ends `transport lost` (omo#9403).
@@ -129,7 +129,7 @@ export class RpcHostRunner {
   private readonly modelAdmission: RpcModelAdmission
   private readonly inheritedExtensions: readonly string[]
   private readonly now: () => number
-  private readonly onWarning: (message: string) => void | (() => void)
+  private readonly onWarning: (message: string, token?: string) => void | (() => void)
   private readonly warned = new Set<string>()
   private readonly reattachDelaysMs: readonly number[]
   private readonly admissionWaitMs: number
@@ -142,7 +142,7 @@ export class RpcHostRunner {
     this.options = options
     this.createClient = options.createClient ?? ((socketPath, taskId) => new HostSessionClient({
       socketPath,
-      ...(taskId === undefined ? {} : { parent: new ChildParentLink(taskId, options.dialogs, options.parentPermission, (message) => this.onWarning(message)) }),
+      ...(taskId === undefined ? {} : { parent: new ChildParentLink(taskId, options.dialogs, options.parentPermission, (message, token) => this.onWarning(message, token)) }),
     }))
     this.modelAdmission = options.modelAdmission ?? createRpcModelAdmission()
     this.inheritedExtensions = options.inheritedExtensions ?? []
