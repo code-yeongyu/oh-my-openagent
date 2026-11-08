@@ -229,7 +229,7 @@ describe("createFallbackTimeoutHelpers", () => {
     expect(toasts[0]?.message).toBe("No fallback model could be reached (no fallback models configured)")
   })
 
-  test("#given no session is awaiting a fallback result #when the fallback budget is exhausted #then no terminal abort is issued", async () => {
+  test("#given no session is awaiting a fallback result #when the fallback budget is exhausted #then no terminal abort is issued and the user is warned once", async () => {
     // given
     const sessionID = "session-timeout-exhausted-without-awaiting"
     SessionCategoryRegistry.register(sessionID, "test")
@@ -259,9 +259,34 @@ describe("createFallbackTimeoutHelpers", () => {
 
     // then
     expect(abortSources).toEqual(["session.timeout"])
-    expect(toasts).toEqual([])
+    expect(toasts).toEqual([
+      { title: "Runtime fallback", message: "Runtime fallback could not prepare a replacement", variant: "warning" },
+    ])
     expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(false)
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
+  })
+
+  test("#given every remaining fallback model is cooling down below the attempt cap #when the watchdog expires #then the caller is told no fallback model is available", async () => {
+    // given
+    const sessionID = "session-timeout-all-fallbacks-cooling"
+    SessionCategoryRegistry.register(sessionID, "test")
+    const toasts: ToastCall[] = []
+    const deps = createDeps(toasts)
+    const state = createFallbackState("openai/gpt-5.4")
+    state.failedModels.set("litellm/openai.eu.gpt-5.5", Date.now())
+    state.failedModels.set("google/gemini-2.5-pro", Date.now())
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    const helpers = createFallbackTimeoutHelpers(deps, async () => {}, async () => ({ accepted: true, status: "dispatched" }))
+    const clock = installRuntimeFallbackTestClock()
+
+    // when
+    helpers.scheduleSessionFallbackTimeout(sessionID)
+    await clock.advanceBy(10)
+
+    // then
+    expect(state.attemptCount).toBeLessThan(deps.config.max_fallback_attempts)
+    expect(toasts.map((toast) => toast.message)).toEqual(["No fallback model could be reached (no available fallback models)"])
   })
 
   test("#given timeout callback awaits abort #when manual model change replaces state #then the stale generation never dispatches", async () => {
@@ -350,6 +375,43 @@ describe("createFallbackTimeoutHelpers", () => {
     expect(state.failedModels.size).toBe(0)
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
     expect(deps.sessionRetryInFlight.has(sessionID)).toBe(false)
+    expect(isCompactionInFlight(sessionID)).toBe(false)
+  })
+
+  test("#given the watchdog toast never settles #when the compaction budget is exhausted #then ownership is released first and the abort is a real cancellation", async () => {
+    // given
+    const sessionID = "session-timeout-compaction-budget-stuck-toast"
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createDeps([], () => new Promise(() => {}))
+    deps.options = { session_timeout_ms: 30_000 }
+    deps.sessionStates.set(sessionID, createFallbackState("openai/gpt-5.4"))
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    deps.sessionRetryInFlight.add(sessionID)
+    const seenAtAbort: { readonly source: string; readonly awaiting: boolean; readonly retrying: boolean }[] = []
+    const helpers = createFallbackTimeoutHelpers(
+      deps,
+      async (abortedSessionID, source) => {
+        seenAtAbort.push({
+          source,
+          awaiting: deps.sessionAwaitingFallbackResult.has(abortedSessionID),
+          retrying: deps.sessionRetryInFlight.has(abortedSessionID),
+        })
+      },
+      async () => ({ accepted: true, status: "dispatched" }),
+    )
+    const clock = installRuntimeFallbackTestClock(0)
+    recordCompactionStart(sessionID)
+
+    // when
+    helpers.scheduleSessionFallbackTimeout(sessionID)
+    await clock.advanceBy(600_000)
+
+    // then
+    expect(seenAtAbort).toEqual([{ source: "session.timeout.fallback-exhausted", awaiting: false, retrying: false }])
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(false)
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(false)
+    expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(false)
     expect(isCompactionInFlight(sessionID)).toBe(false)
   })
 
