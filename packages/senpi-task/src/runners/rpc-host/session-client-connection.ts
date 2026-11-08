@@ -3,7 +3,8 @@ import type { RpcSessionState, RpcTransportGoneError } from "@code-yeongyu/senpi
 import { log } from "@oh-my-opencode/utils"
 
 import type { SenpiHostProtocolInfo } from "../../lazy/senpi-barrel"
-import { buildAutoUiResponse, type AutoAnswerableUiRequest } from "../rpc/ui-auto-answer"
+import type { AutoAnswerableUiRequest } from "../rpc/ui-auto-answer"
+import { ChildParentLink } from "../parent-link"
 import type { ChildEventListener, RpcEntriesResult, RpcSwitchSessionResult } from "../types"
 import { createChildExtensionEvents } from "../child-extension-events"
 import { socketAcceptsConnection } from "./busy-host"
@@ -12,10 +13,8 @@ import { dispatchHostCommand } from "./host-command-dispatch"
 import {
   createSenpiRpcClient,
   probeWithEngine,
-  type HostProtocolProbe,
   type HostPendingInputs,
   type HostRpcClient,
-  type HostRpcClientFactory,
   type HostSessionOpenInput,
 } from "./session-transport"
 import {
@@ -25,10 +24,11 @@ import {
   parseControlRecord,
   type HostControlRecord,
 } from "./session-wire"
-import { createHostTaskParentWire } from "./task-parent-wire"
+import { hostTaskParentWireOf } from "./task-parent-wire"
 import type { TaskParentWire } from "../task-parent-control"
 import { confirmHostSessionAbsent } from "./session-close-proof"
 import { openHostSessionConnection } from "./session-client-opening"
+import { reapplyPermissionPreset, type PermissionPushPorts } from "./permission-push"
 
 
 /**
@@ -47,27 +47,29 @@ export class HostSessionClient {
   readonly onExtensionEvent = this.extensionEvents.subscribe
   readonly socketPath: string
   readonly transportGone: Promise<RpcTransportGoneError>
-  private readonly createClient: HostRpcClientFactory
-  private readonly probeProtocolInfo: HostProtocolProbe
-  private readonly socketAccepts: (socketPath: string) => Promise<boolean>
+  private readonly ports: PermissionPushPorts
   private readonly transportLoss = Promise.withResolvers<RpcTransportGoneError>()
   private readonly eventListeners = new Set<ChildEventListener>()
   private readonly parkedListeners = new Set<(event: HostSessionParked) => void>()
   private readonly closedListeners = new Set<(event: HostSessionClosed) => void>()
   private readonly replacedListeners = new Set<(event: HostSessionReplaced) => void>()
   private client: HostRpcClient | undefined
-  // One wire per engine connection: a reattach's new connection declares task_parent again.
-  private readonly taskParentWires = new WeakMap<HostRpcClient, TaskParentWire>()
   private routingId: string | undefined
   private identity: SenpiHostProtocolInfo | undefined
   private reattached = false
   private confirmingClose = false
+  private openInput: HostSessionOpenInput | undefined
+  private readonly parent: ChildParentLink
 
   constructor(options: HostSessionClientOptions) {
     this.socketPath = options.socketPath
-    this.createClient = options.ports?.createClient ?? createSenpiRpcClient
-    this.probeProtocolInfo = options.ports?.probeProtocolInfo ?? probeWithEngine
-    this.socketAccepts = options.ports?.socketAccepts ?? socketAcceptsConnection
+    this.parent = options.parent ?? new ChildParentLink("host-child")
+    this.ports = {
+      socketPath: options.socketPath,
+      createClient: options.ports?.createClient ?? createSenpiRpcClient,
+      probeProtocolInfo: options.ports?.probeProtocolInfo ?? probeWithEngine,
+      socketAccepts: options.ports?.socketAccepts ?? socketAcceptsConnection,
+    }
     this.transportGone = this.transportLoss.promise
   }
 
@@ -90,11 +92,9 @@ export class HostSessionClient {
   }
 
   async open(input: HostSessionOpenInput): Promise<OpenedHostSession> {
-    const { opened, identity } = await openHostSessionConnection(input, {
-      socketPath: this.socketPath,
-      createClient: this.createClient,
-      probeProtocolInfo: this.probeProtocolInfo,
-      socketAccepts: this.socketAccepts,
+    this.openInput = this.parent.named(input)
+    const { opened, identity } = await openHostSessionConnection(this.openInput, {
+      ...this.ports,
       onDisconnect: (error) => this.handleTransportLoss(error),
       onEvent: (record) => this.ingest(record),
       bindClient: (client) => { this.client = client },
@@ -102,6 +102,7 @@ export class HostSessionClient {
     this.identity = identity
     this.routingId = opened.sessionId
     this.reattached = opened.attached ?? false
+    this.parent.follow((preset) => this.pushPermissionPreset(preset))
     return {
       sessionId: opened.sessionId,
       attached: this.reattached,
@@ -111,16 +112,12 @@ export class HostSessionClient {
   }
 
   send(command: HostSessionCommand): Promise<void> {
+    if (command.type === "abort") this.parent.turnAborted()
     return dispatchHostCommand(this.connected(command.type), this.routingId, command)
   }
 
   taskParentWire(): TaskParentWire {
-    const client = this.connected("task_parent")
-    const known = this.taskParentWires.get(client)
-    if (known !== undefined) return known
-    const wire = createHostTaskParentWire(client)
-    this.taskParentWires.set(client, wire)
-    return wire
+    return hostTaskParentWireOf(this.connected("task_parent"))
   }
 
   getState(): Promise<RpcSessionState> {
@@ -167,6 +164,7 @@ export class HostSessionClient {
   /** End the session on the host (`close_session`), then drop this child's connection. */
   async close(): Promise<boolean> {
     this.extensionEvents.clear()
+    this.parent.close()
     const client = this.client
     const routingId = this.routingId
     // Keep the transport reachable by detach() while close_session is in flight. A bounded
@@ -206,6 +204,7 @@ export class HostSessionClient {
   /** Drop the connection and leave the session running on the daemon (retained, attachments 0). */
   async detach(): Promise<void> {
     this.extensionEvents.clear()
+    this.parent.close()
     const client = this.client
     this.client = undefined
     this.routingId = undefined
@@ -280,17 +279,19 @@ export class HostSessionClient {
     })
   }
 
-  // The child must never wait on a human: the deny/cancel answer is written and NOT awaited, so a
-  // UI request cannot hold up the record stream or a command in flight.
-  private answerUi(request: AutoAnswerableUiRequest): void {
-    const answer = buildAutoUiResponse(request)
-    if (answer === null) return
-    void this.client?.sendExtensionUIResponse(answer).catch((error: unknown) => {
-      log("senpi-task host session ui auto-answer failed", { socket: this.socketPath, error: String(error) })
-    })
+  // Never awaited, so a UI request cannot hold up the record stream or a command in flight: a forwardable dialog
+  // waits for the parent's answer (#6189 F2d), anything else gets the deny/cancel default at once.
+  private answerUi(request: AutoAnswerableUiRequest & Readonly<Record<string, unknown>>): void {
+    this.parent.answer(request, async (answer) => { await this.client?.sendExtensionUIResponse(answer) })
+  }
+
+  private async pushPermissionPreset(preset: string): Promise<void> {
+    if (this.openInput === undefined || this.routingId === undefined) throw new HostSessionDetachedError("set_permission_preset")
+    await reapplyPermissionPreset({ ...this.openInput, permissionPreset: preset }, this.ports)
   }
 
   private handleTransportLoss(error: RpcTransportGoneError): void {
+    this.parent.close()
     this.routingId = undefined
     this.client = undefined
     this.transportLoss.resolve(error)
