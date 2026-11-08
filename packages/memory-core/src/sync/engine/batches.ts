@@ -1,26 +1,38 @@
-import type { WireItem } from "./journal"
-
 /** sync-design §6: at most 8 MiB of plaintext per batch, a hard bound. */
 export const MAX_BATCH_BYTES = 8 * 1024 * 1024
 
-const plaintextBytes = (item: WireItem): number => Math.floor((item.ops.length * 3) / 4)
+/** A pending item as the batch split sees it: its key and its ops' plaintext size. */
+export interface SizedItem {
+  readonly key: string
+  readonly bytes: number
+}
 
-export class OversizedItemError extends Error {
-  override readonly name = "OversizedItemError"
+export interface PushPlan<T extends SizedItem> {
+  readonly batches: readonly (readonly T[])[]
+  /** Pending items left out of every batch, in capture order; they stay pending. */
+  readonly held: readonly T[]
 }
 
 /**
  * Splits pending items between items, in capture order, so no batch exceeds `limit` plaintext
- * bytes. An item that alone exceeds the bound is refused here; the item store must slice it by
- * version range before it reaches the push path.
+ * bytes. An item that alone exceeds the bound is never sliced, truncated or sent: it is held back
+ * whole, and so is every later op of its key, which builds on it (#12284). Every other item is
+ * still batched, so one oversized item never stops the rest of the device's changes. `withheld` keys
+ * (ops this device must not send) are held the same way, from their first op on.
  */
-export function splitBatches(items: readonly WireItem[], limit = MAX_BATCH_BYTES): WireItem[][] {
-  const batches: WireItem[][] = []
-  let current: WireItem[] = []
+export function planBatches<T extends SizedItem>(items: readonly T[], limit = MAX_BATCH_BYTES, withheld: ReadonlySet<string> = new Set()): PushPlan<T> {
+  const batches: T[][] = []
+  const held: T[] = []
+  const heldKeys = new Set<string>(withheld)
+  let current: T[] = []
   let size = 0
   for (const item of items) {
-    const bytes = plaintextBytes(item)
-    if (bytes > limit) throw new OversizedItemError(`item ${item.key} (${bytes} bytes) exceeds the ${limit}-byte batch bound`)
+    const bytes = item.bytes
+    if (bytes > limit || heldKeys.has(item.key)) {
+      heldKeys.add(item.key)
+      held.push(item)
+      continue
+    }
     if (current.length > 0 && size + bytes > limit) {
       batches.push(current)
       current = []
@@ -30,5 +42,5 @@ export function splitBatches(items: readonly WireItem[], limit = MAX_BATCH_BYTES
     size += bytes
   }
   if (current.length > 0) batches.push(current)
-  return batches
+  return { batches, held }
 }

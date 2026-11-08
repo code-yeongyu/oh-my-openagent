@@ -1,3 +1,37 @@
+## 2026-11-05 - Ancestor enumeration is denied only when a foreign identity exists (#12301)
+
+`guard.ts` used to deny every recursive tool rooted at an ancestor of a memory area. It now lists every area in the call's denied set (lexical and canonical forms, including a transient run's own `transient-runs/<token>/agents`) through `guard-foreign-roots.ts`. Each physical area is listed once by its canonical form, so the verdict does not depend on whether a symlinked home or a case-variant path reached it. Regular files (`.DS_Store`, `desktop.ini`) are skipped because an identity root is a directory; any other entry counts as the caller's own only if it is, or contains, one of the own roots, compared lexically and never resolved, so a dangling link or a link aliasing the own root counts as foreign. A missing area is empty, and any other listing error denies. Because the host checks only the walk's root, an allowed ancestor walk is recorded by `toolCallId`; its `tool_result` re-lists the areas and replaces the whole result with the deny when a foreign root appeared or an area can no longer be listed. The hard filesystem policy still has no ancestor rule, so this soft guard alone covers ancestor enumeration until the host prunes per directory.
+
+## 2026-11-04 - Config-watch creation targets stop at the project root (#12397)
+
+`resolveOmoConfigWatchTargetResolution` bounds the ancestor list used for creation targets with `creationAncestors()`: it stops after the first ancestor holding `.git`, and before any ancestor that contains the user config directory's parent or is the filesystem root. The walk for existing `.omo` config targets is unchanged. Measured on macOS: a session's CPU during 12 s of HOME writes went from 1.69-1.78 s to 0.03-0.04 s.
+
+## 2026-11-02 - Import guard for the shared launch classification module (#11997)
+
+`desktop-sync/launchClassification.test.ts` bundles `launchClassification.ts` on its own and requires the module to be
+its only input, with no imports. The rule that the module stays free of sidecar and private-fds imports used to be a
+comment only; omo.js's registration half imports the module before any sidecar loads, so a later import would have
+pulled that code into omo.js. Test only.
+
+## 2026-11-01 - Shared launch classification for the compiled desktop-sync test (#11997)
+
+`launchCarriedPrivateTable` moved from `device-session/account-runtime-loader.ts` (module-private) to the sidecar-free
+`desktop-sync/launchClassification.ts`; the loader and `desktop-sync/channel-compiled.fixture.ts` both import it, so the
+compiled test can no longer pass on a stale copy of the classification. The fixture header now describes the loader
+wiring it uses. Must not break: the module stays free of sidecar and private-fds imports, because omo.js's
+registration half imports it.
+
+## 2026-10-31 - Desktop memory sync attaches on Windows over senpi's pipe pair (#11997)
+
+`components/memory/desktop-sync/channel.ts` no longer refuses win32. It attaches to the stream senpi's
+`takeInheritedPrivateChannel("memory-sync")` hands over on every platform; on win32 senpi builds that stream
+from two one-way pipes (engine fd 5 read, fd 6 write) and clears their inherit flag before adoption, so the
+receiver opens no descriptor, clears no flag and spawns nothing itself. A declared channel that senpi did not
+adopt (no stream) is `unavailable: private_channel_unavailable` on every platform, never the CLI source.
+Must not break: the receiver stays platform-neutral; Windows handle work belongs to senpi. `channel-compiled.test.ts`
+runs in the Windows Senpi compatibility job and skips the win32 pair case only while the bundled senpi predates
+the pair gate (senpi#5125).
+
 ## 2026-11-05 - An applied onboarding scan stays retained for understanding (#12509)
 
 `omo.onboarding.apply` used to delete the scan from the process-wide store before applying it, so `omo.onboarding.understand` on the same `scanId`, which the desktop sends right after About you's apply, answered `unavailable`. Apply now marks the held scan `applied` (checked and set before its first `await`, so racing applies still produce one success) and leaves it retained with its in-memory digests until the ten-minute TTL or the eight-scan eviction removes it; a failed or expired scan is still dropped at apply. A second apply answers `unavailable` as before. The understand refusal no longer lists "was applied" among its causes.
