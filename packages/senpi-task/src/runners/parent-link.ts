@@ -84,6 +84,8 @@ export class ChildParentLink {
         // so the child's mode is unknown now: nothing counts as applied, and the next change is always pushed.
         const confirmed = this.#applied
         this.#applied = undefined
+        // A link closed while this push was in flight reports nothing: its child is gone and nothing could release it.
+        if (this.#unfollow === undefined) return
         log("senpi-task child did not follow its parent's approval mode", { taskId: this.taskId, preset, error: String(error) })
         this.#releaseWarning?.()
         const release = this.onWarning?.(`task ${this.taskId} may not have followed its parent's approval mode (${preset}); its mode is unknown (last confirmed ${confirmed ?? "none"}) until the parent's next change reaches it: ${error instanceof Error ? error.message : String(error)}`, `follow:${this.taskId}`)
@@ -92,9 +94,13 @@ export class ChildParentLink {
     })
   }
 
+  // Also releases a standing follow notice: a closed, detached or lost child no longer follows anything, and a revived
+  // task's new link would add its own.
   close(): void {
     this.#abort.abort()
     this.#unfollow?.()
     this.#unfollow = undefined
+    this.#releaseWarning?.()
+    this.#releaseWarning = undefined
   }
 }
