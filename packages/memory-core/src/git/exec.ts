@@ -4,6 +4,7 @@ import { win32 } from "node:path"
 import { GitAbortedError, GitNotFoundError, GitTimeoutError } from "./errors"
 import { memoryGitEnvironment } from "./exec-environment"
 import { holdGitActivityShared } from "./git-activity-lock"
+import { resolveHooksDir } from "./git-dir"
 import { recordGitTimeout } from "./timeout-diagnostics"
 
 export interface GitExecOptions {
@@ -250,7 +251,11 @@ export function createNodeGitExec(runtime: NodeGitExecRuntime = {}): GitExec {
 
   return {
     async run(callerArgv, options) {
-      const argv = [...NO_FSMONITOR, ...callerArgv]
+      // A global core.hooksPath silently redirects hook lookup away from the hooks
+      // memory installs, so every commit through this boundary would skip its own
+      // pre-commit, commit-msg and post-commit hooks (#12367). Pin the memory hooks
+      // directory next to NO_FSMONITOR; the value is inert for commands that run no hooks.
+      const argv = [...NO_FSMONITOR, "-c", `core.hooksPath=${resolveHooksDir(options.cwd)}`, ...callerArgv]
       // Never the caller's raw environment: an inherited GIT_CONFIG_* or GIT_DIR would redirect this git (#12354).
       const environment = memoryGitEnvironment(options.env ?? process.env, platform)
       try {

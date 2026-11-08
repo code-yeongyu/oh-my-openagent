@@ -1,9 +1,11 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "../fs/resilient"
-import { isAbsolute, join, resolve } from "node:path"
+import { chmodSync, mkdirSync, writeFileSync } from "../fs/resilient"
+import { join } from "node:path"
+import { resolveHooksDir } from "../git/git-dir"
 import { COMMIT_MSG_HOOK_SCRIPT, type MemoryHookChecker, withMemoryHookChecker } from "./hooks-commit-msg"
 import { POST_COMMIT_HOOK_SCRIPT, PRE_COMMIT_HOOK_SCRIPT } from "./hooks-scripts"
 
 export type { MemoryHookChecker } from "./hooks-commit-msg"
+export { resolveCommonGitDir, resolveHooksDir } from "../git/git-dir"
 
 const HOOK_MODE = 0o755
 
@@ -37,32 +39,4 @@ export function installHooks(repoPath: string, options: { readonly checker?: Mem
     chmodSync(path, HOOK_MODE)
     return { name, path }
   })
-}
-
-/**
- * Resolve the hooks directory for a repository or linked worktree.
- *
- * `.git` is a directory in a normal clone and a `gitdir:` pointer file inside
- * a linked worktree; worktrees share the hooks of the common git directory.
- */
-export function resolveHooksDir(repoPath: string): string {
-  return join(resolveCommonGitDir(repoPath), "hooks")
-}
-
-export function resolveCommonGitDir(repoPath: string): string {
-  const dotGit = join(repoPath, ".git")
-  if (!existsSync(dotGit) || statSync(dotGit).isDirectory()) return dotGit
-
-  const pointer = readFileSync(dotGit, "utf8").trim()
-  const match = /^gitdir:\s*(.+)$/.exec(pointer)
-  if (!match?.[1]) return dotGit
-
-  const gitDir = absolutize(match[1].trim(), repoPath)
-  const commonDirFile = join(gitDir, "commondir")
-  if (!existsSync(commonDirFile)) return gitDir
-  return absolutize(readFileSync(commonDirFile, "utf8").trim(), gitDir)
-}
-
-function absolutize(path: string, base: string): string {
-  return isAbsolute(path) ? path : resolve(base, path)
 }
