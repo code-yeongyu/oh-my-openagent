@@ -6,7 +6,9 @@
 //
 // The names are git's own repository-local list (`git rev-parse --local-env-vars`), which git itself clears
 // when it moves into another repository, plus GIT_NAMESPACE, which would move every ref the memory repository
-// reads or writes. GIT_INDEX_FILE is the one exception: memory-core callers set it on purpose for a temporary index.
+// reads or writes. GIT_INDEX_FILE is on git's list too: an inherited one (an engine started from a git hook, or a test
+// run from one) would point memory git at a foreign index, so it is dropped here, and a caller that wants a temporary
+// index names it for that one command through GitExecOptions.indexFile (#12368).
 // File selection (GIT_CONFIG_GLOBAL, GIT_CONFIG_NOSYSTEM) is kept, so the user's credentials and identity still apply.
 //
 // Injected config (GIT_CONFIG_COUNT pairs, GIT_CONFIG_PARAMETERS) is filtered, not dropped: url.*.insteadOf,
@@ -26,6 +28,7 @@ const REPOSITORY_LOCAL_GIT_ENV = new Set([
   "GIT_PREFIX",
   "GIT_SHALLOW_FILE",
   "GIT_COMMON_DIR",
+  "GIT_INDEX_FILE",
   "GIT_NAMESPACE",
 ])
 const CONFIG_COUNT = "GIT_CONFIG_COUNT"
