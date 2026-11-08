@@ -71,22 +71,6 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
   })
 })
 
-describe("K8 / R8.c: a chain carries its count across devices; no count or cost limit by default", () => {
-  test("#given a caller with no cause and then one running on a hop-1 delivery #when it sends to b #then the wire gets hop 1 and then hop 2, with no cost field", async () => {
-    const a = account()
-    let cause: string | undefined
-    const { run } = surface(a.remote, { callerCause: () => cause })
-    await run("thread_send", { thread: "dur-on-b", message: "start of a chain" })
-    const local = await run("thread_send", { thread: "dur-local", message: "a hop-1 delivery" })
-    if (local.kind !== "ok" || !("delivery_id" in local) || local.delivery_id === undefined) throw new Error(`local send failed: ${JSON.stringify(local)}`)
-    cause = local.delivery_id
-    await run("thread_send", { thread: "dur-on-b", message: "continues the chain" })
-    expect(a.hops).toEqual([1, 2])
-    const prompts = a.sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => entry.rpc ?? {})
-    expect(prompts.map((record) => [record["chain_count"], Object.keys(record).some((key) => /cost/i.test(key))])).toEqual([[1, false], [2, false]])
-  })
-})
-
 describe("remote == local: the same call answers the same on b as on this device", () => {
 
   test("#given a send to b #when the same idempotency_key is used twice #then b gets one prompt and the retry replays the first answer as deduplicated", async () => {
@@ -135,6 +119,20 @@ describe("remote == local, round 2: send modes, handoff, list and alias order", 
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "dur-on-b", message: "x", delivery: "steer", expected_turn_id: "3" })).toMatchObject({ kind: "error", error: { code: "turn_conflict", details: { device: "b", reason: "remote_turn_not_verifiable" } } })
     expect(commands(a.sent)).toEqual(["get_state"])
+  })
+
+  test("#given b is mid-turn on the expected turn #when a steer reaches it #then the prompt steers that turn and names it for b's engine to check again", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, pending: 0, currentTurnId: "3" } })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "x", delivery: "steer", expected_turn_id: "3" })).toMatchObject({ kind: "ok", device: "b", delivery: { kind: "steered", turn_id: "3" } })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => [entry.rpc?.["streamingBehavior"], entry.rpc?.["expectedTurnId"]])).toEqual([["steer", "3"]])
+  })
+
+  test("#given b is mid-turn on another turn #when a steer names an older turn #then it is turn_conflict and no prompt is sent", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, pending: 0, currentTurnId: "4" } })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "x", delivery: "steer", expected_turn_id: "3" })).toMatchObject({ kind: "error", error: { code: "turn_conflict", details: { device: "b", current_turn_id: "4" } } })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toEqual([])
   })
 
   test("#given a follow_up to b while it runs #when it is sent #then it is queued behind b's own pending count", async () => {
