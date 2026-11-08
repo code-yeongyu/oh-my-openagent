@@ -30,12 +30,17 @@ export function createRemoteThreadFixture() {
     for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
   }
 
-  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[]; chainCountLimit?: number } = {}) {
+  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[]; watchEnds?: string; chainCountLimit?: number } = {}) {
     const engine = options.engine ?? ENGINE
     const sent: Sent[] = []
     // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
     const watchers = new Set<(record: JsonObject) => void>()
-    const writeRecords = () => queueMicrotask(() => { for (const record of options.records ?? []) for (const listener of [...watchers]) listener(record) })
+    // `watchEnds`: every open watch ends with that reason right after the prompt's records, as an attach the host drops.
+    const watchEnders = new Set<(reason: string) => void>()
+    const writeRecords = () => queueMicrotask(() => {
+      for (const record of options.records ?? []) for (const listener of [...watchers]) listener(record)
+      if (options.watchEnds !== undefined) for (const end of [...watchEnders]) end(options.watchEnds)
+    })
     const hops: number[] = []
     const aliases = options.aliases ?? new Map<string, AliasHolder>()
     // The sessions b's engine holds. Its close rules are senpi's (2026.11.5-1): close_session from a connection that never
@@ -120,7 +125,8 @@ export function createRemoteThreadFixture() {
           sent.push({ via: "watch", device, session })
           if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
           watchers.add(listener)
-          return { kind: "ok", watch: { ended: new Promise<string>(() => {}), stop: () => { watchers.delete(listener) } } }
+          const ended = new Promise<string>((resolve) => { watchEnders.add(resolve) })
+          return { kind: "ok", watch: { ended, stop: () => { watchers.delete(listener) } } }
         },
         read: async (device, session) => { sent.push({ via: "read", device, session }); return { kind: "ok", response: { entries: [{ role: "user", content: "hi b" }, { role: "assistant", content: "hello from b" }] } } },
       },

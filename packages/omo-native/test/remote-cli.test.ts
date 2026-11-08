@@ -496,6 +496,42 @@ describe("omo remote session verbs", () => {
     expect(types(a.sent, "prompt").map(entry => [entry.rpc?.["streamingBehavior"], entry.rpc?.["expectedTurnId"]])).toEqual([["steer", "3"]])
   })
 
+  // #12712: under --json every exit prints one typed result on stdout, the CLI's own refusals included.
+  test("send --steer to a session with nothing running is refused before sending, in human output and as a typed --json error", async () => {
+    const human = await run(["send", "b/dur-on-b", "faster", "--steer"], undefined, SIGNED_IN, testBootstrap(), fixture.account().remote)
+    expect([human.code, human.out, human.err]).toEqual([REMOTE_EXIT.failed, [], ["omo remote: nothing is running on b/dur-on-b to steer.", "Send without --steer to start a turn."]])
+    const a = fixture.account()
+    const json = await run(["send", "b/dur-on-b", "faster", "--steer", "--json"], undefined, SIGNED_IN, testBootstrap(), a.remote)
+    expect(json.code).toBe(REMOTE_EXIT.failed)
+    expect(JSON.parse(json.out.join(""))).toMatchObject({ kind: "error", error: { code: "not_steerable", next_action: "Send without --steer to start a turn." } })
+    expect(types(a.sent, "prompt")).toEqual([])
+  })
+
+  test("send --json whose session closes before its turn settles still prints the send's typed result, with the text it streamed and how the follow ended", async () => {
+    const a = fixture.account({ records: [{ type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "O" } }, { type: "agent_settled", reason: "session_closed" }] })
+    const { code, out, err } = await run(["send", "b/dur-on-b", "hi", "--json"], undefined, SIGNED_IN, testBootstrap(), a.remote)
+    expect([code, err]).toEqual([REMOTE_EXIT.failed, ["omo remote: the session on b ended before its turn settled (session_closed)."]])
+    expect(JSON.parse(out.join(""))).toMatchObject({ kind: "ok", reply: "O", ended: "session_closed" })
+  })
+
+  test("send whose attach ends before the turn settles fails with the attach's end reason, in human output and --json", async () => {
+    const records = [{ type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "partial" } }]
+    const human = await run(["send", "b/dur-on-b", "hi"], undefined, SIGNED_IN, testBootstrap(), fixture.account({ records, watchEnds: "detached" }).remote)
+    expect([human.code, human.written.join(""), human.err]).toEqual([REMOTE_EXIT.failed, "partial\n", ["omo remote: the session on b ended before its turn settled (detached)."]])
+    const json = await run(["send", "b/dur-on-b", "hi", "--json"], undefined, SIGNED_IN, testBootstrap(), fixture.account({ records, watchEnds: "detached" }).remote)
+    expect(json.code).toBe(REMOTE_EXIT.failed)
+    expect(JSON.parse(json.out.join(""))).toMatchObject({ kind: "ok", reply: "partial", ended: "detached" })
+  })
+
+  test("send --steer that waits prints the steered turn's reply and returns once it settles", async () => {
+    const delta = (text: string) => ({ type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: text } })
+    const a = fixture.account({ engine: { ...ENGINE, streaming: true, currentTurnId: "3" }, records: [delta("fast"), delta("er"), { type: "agent_settled" }] })
+    const { code, written } = await run(["send", "b/dur-on-b", "faster", "--steer"], undefined, SIGNED_IN, testBootstrap(), a.remote)
+    expect([code, written.join("")]).toEqual([REMOTE_EXIT.ok, "faster\n"])
+    expect(types(a.sent, "prompt").map(entry => [entry.rpc?.["streamingBehavior"], entry.rpc?.["expectedTurnId"]])).toEqual([["steer", "3"]])
+    expect(a.sent.findIndex(entry => entry.via === "watch")).toBeLessThan(a.sent.findIndex(entry => entry.rpc?.["type"] === "prompt"))
+  })
+
   test("send --follow-up queues behind the running turn", async () => {
     const a = fixture.account({ engine: { ...ENGINE, streaming: true, pending: 2 } })
     const { code, out } = await run(["send", "b/dur-on-b", "later", "--follow-up", "--no-wait"], undefined, SIGNED_IN, testBootstrap(), a.remote)

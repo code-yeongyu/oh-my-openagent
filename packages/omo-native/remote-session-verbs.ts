@@ -1,5 +1,6 @@
 import type { DeviceService } from "../device-service-core/src/index.ts"
 import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
+import { threadToolFailure } from "../omo-senpi/src/components/thread/errors"
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
 import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { setModelRemote } from "../omo-senpi/src/components/thread/remote/remote-controls"
@@ -111,10 +112,9 @@ async function sendTo(
   if (args.delivery === "steer") {
     const running = await runningTurnRemote(remote, row)
     if (running.kind === "error") return show(running, label)
+    // The CLI's own refusal, typed as the gateway refuses a steer into an idle session, so --json prints it too.
     if (!("turn_id" in running) || running.turn_id === undefined) {
-      dependencies.error(`omo remote: nothing is running on ${label} to steer.`)
-      dependencies.error("Send without --steer to start a turn.")
-      return REMOTE_EXIT.failed
+      return show({ kind: "error", error: threadToolFailure("not_steerable", `nothing is running on ${label} to steer.`, "Send without --steer to start a turn.") }, label)
     }
     request = { ...request, expected_turn_id: running.turn_id }
   }
@@ -131,8 +131,9 @@ async function sendTo(
     if (sent.kind === "error") return show(sent, label)
     const end = await follow.settled
     if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")
-    // --json: the send's typed result, with the answer it streamed.
-    if (json && end === "settled") dependencies.output(JSON.stringify({ ...sent, reply }))
+    // --json: the send's typed result, with the answer it streamed. The send itself succeeded even when its turn did not
+    // settle, so that result is still printed, naming how the follow ended.
+    if (json) dependencies.output(JSON.stringify(end === "settled" ? { ...sent, reply } : { ...sent, reply, ended: end }))
     if (end !== "settled") {
       dependencies.error(`omo remote: the session on ${row.device} ended before its turn settled (${end}).`)
       return REMOTE_EXIT.failed
