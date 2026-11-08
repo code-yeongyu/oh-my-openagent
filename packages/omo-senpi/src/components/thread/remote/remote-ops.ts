@@ -350,4 +350,3 @@ export async function readRemote(remote: RemoteThreadSurface, row: RemoteSession
   const result = liveReadResult(row.session_id, row.title, messages, window)
   return result.kind === "ok" ? { ...result, device: row.device } as ThreadToolResult : result
 }
-
