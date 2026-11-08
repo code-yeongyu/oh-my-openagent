@@ -30,7 +30,7 @@ export function createRemoteThreadFixture() {
     for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
   }
 
-  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[] } = {}) {
+  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[]; chainCountLimit?: number } = {}) {
     const engine = options.engine ?? ENGINE
     const sent: Sent[] = []
     // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
@@ -47,7 +47,7 @@ export function createRemoteThreadFixture() {
       // every field the tools read lives under `data`.
       const ok = (data: JsonObject): RemoteCommandOutcome => ({ kind: "ok", response: { type: "response", id: null, command: rpc["type"] ?? null, success: true, data } })
       if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
-      if (attachedTo !== undefined && !live.has(attachedTo)) return { kind: "refused", reason: "session_not_found" }
+      if (attachedTo !== undefined && !live.has(attachedTo)) return { kind: "refused", reason: "unknown_session" }
       if (rpc["type"] === "close_session") {
         if (attachedTo === undefined) return { kind: "refused", reason: "unknown_session" }
         if ((options.otherHolders ?? 0) === 0) live.delete(attachedTo)
@@ -67,6 +67,9 @@ export function createRemoteThreadFixture() {
       if (rpc["type"] === "get_state") return ok({ isStreaming: engine.streaming, pendingMessageCount: engine.pending, ...(engine.currentTurnId === undefined ? {} : { currentTurnId: engine.currentTurnId }) })
       if (rpc["type"] === "get_messages") return ok({ messages: [...engine.messages] })
       if (rpc["type"] === "interrupt") return ok(engine.interrupt)
+      // b's user set `threads.chainCountLimit` (senpi S32): its engine answers `{success: false, errorCode: "chain_count_limit"}`,
+      // which the device service hands back as this refusal (device-service.ts).
+      if (rpc["type"] === "prompt" && options.chainCountLimit !== undefined && Number(rpc["chainCount"]) > options.chainCountLimit) return { kind: "refused", reason: "chain_count_limit" }
       if (rpc["type"] === "prompt" && options.promptOutcome !== undefined) return options.promptOutcome
       if (rpc["type"] === "prompt") return ok(options.promptResponse ?? (engine.streaming ? { disposition: "queued" } : { disposition: "started", turnId: "turn-b" }))
       if (rpc["type"] === "get_available_models") return ok({ models: [{ provider: "anthropic", id: "claude-opus", name: "Opus" }, { provider: "openai", id: "gpt-6" }] })
@@ -122,7 +125,8 @@ export function createRemoteThreadFixture() {
         read: async (device, session) => { sent.push({ via: "read", device, session }); return { kind: "ok", response: { entries: [{ role: "user", content: "hi b" }, { role: "assistant", content: "hello from b" }] } } },
       },
       ...(options.noRegistry === true ? {} : { aliases: registry }),
-      chain: { stamp: (record, hop) => { hops.push(hop); return { ...record, chain_count: hop } } },
+      // The field senpi's prompt record carries the count in (S32, rpc.md `chainCount`).
+      chain: { stamp: (record, hop) => { hops.push(hop); return { ...record, chainCount: hop } } },
     }
     return { remote, sent, hops, aliases, live }
   }
@@ -165,7 +169,7 @@ export function createRemoteThreadFixture() {
       if (tool === undefined) throw new Error(`${name} is not registered`)
       return (await tool.execute(`call-${Math.random()}`, args, undefined, undefined, { sessionManager: { getSessionId: () => caller } } as never)).details.result as ThreadToolResult
     }
-    return { run, openSession, store, closed }
+    return { run, openSession, store, closed, agentDir }
   }
 
   return { account, surface, cleanup }
