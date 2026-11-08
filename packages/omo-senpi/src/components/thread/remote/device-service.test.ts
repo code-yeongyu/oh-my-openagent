@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { connectDeviceService, LocalApiError, type CommandResult, type DeviceService, type RemoteAttach } from "@oh-my-opencode/device-service-core"
+import { withContractHost } from "../../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
 import type { ThreadReadInput } from "../contracts"
+import { createLiveThreadSurface } from "../live-surface"
 import { createDeviceServiceSessions } from "./device-service"
 import { createLazyRemoteSurface } from "./lazy-remote"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
@@ -316,7 +318,7 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
   }
 
   test.each([
-    ["the session is not on that device", new LocalApiError("session_not_found", "no such session"), "session_not_found"],
+    ["the session is not on that device", new LocalApiError("session_not_found", "no such session"), "unknown_session"],
     ["the host does not answer the attach", new LocalApiError("host_not_answering", "no answer"), "host_not_answering"],
     ["the connection is lost before the attach", new Error("socket gone"), "attach_failed"],
   ] as const)("#given %s #when a command or a read is made #then each is refused typed with its code and no command is sent", async (_label, error, reason) => {
@@ -326,6 +328,19 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     expect(await port.sessionCommand("b", "s1", { type: "abort" })).toEqual({ kind: "refused", reason })
     expect(await port.read("b", "s1", 10)).toEqual({ kind: "refused", reason })
     expect(l.calls.sent).toBe(0)
+  })
+
+  test("#given a closed session #when the same prompt goes to this device's engine and to b #then both answer the same code (#12755)", async () => {
+    let local: unknown
+    await withContractHost({ auth: true, attachRefusal: "unknown_session" }, async (host) => {
+      const client = createLiveThreadSurface(undefined, { env: { OMO_CODING_AGENT_DIR: host.root, SENPI_RPC_SOCKET: host.socket, SENPI_RPC_KEY_ROOT: host.root }, statusAll: async () => undefined, registry: async () => [] })
+      local = await client.prompt("rpc-1", "hello", undefined, "dur-selected").then(() => "answered", (error: unknown) => (error as { code?: unknown }).code)
+    })
+    const l = lifecycle()
+    l.failAttach(new LocalApiError("session_not_found", "no such session"))
+    const remote = await createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect }).sessionCommand("b", "s1", { type: "prompt", message: "hello" })
+    expect(local).toBe("unknown_session")
+    expect(remote).toEqual({ kind: "refused", reason: String(local) })
   })
 
   test.each([
