@@ -2,6 +2,7 @@ import type {
   Capability,
   ClientName,
   ErrorCode,
+  PathRefusalProblem,
   PolicyState,
   RefusedReason,
   SessionRowState,
@@ -11,6 +12,10 @@ import type {
 
 export * from "./vocabulary.ts";
 export * from "./protocol-events.ts";
+export type * from "./protocol-delegated.ts";
+import type { SessionCandidate, SessionEndpoints, SessionEndpointsData, SessionLocate } from "./protocol-delegated.ts";
+import type { SessionCommand, SessionCommandPart } from "./protocol-command.ts";
+export type * from "./protocol-command.ts";
 export type * from "./protocol-control.ts";
 
 import type { ControlAttachGet, ControlAttachSet, ControlAttachState } from "./protocol-control.ts";
@@ -74,18 +79,8 @@ export type SessionFilter = {
   readonly project?: string;
   readonly state?: SessionRowState;
 };
-export type CommandRequest =
-  | { readonly op: "prompt" | "steer"; readonly text: string }
-  | { readonly op: "abort" }
-  | { readonly op: "permission"; readonly ui_request_id: string; readonly confirmed: boolean }
-  | {
-      readonly op: "question";
-      readonly ui_request_id: string;
-      readonly answers: {
-        readonly [id: string]: { readonly selected: readonly string[]; readonly text?: string };
-      };
-      readonly comment?: string;
-    };
+// One engine RPC inbound record (decision 0011, #105): opaque here, classified by the receiving engine.
+export type CommandRpc = JsonObject;
 export type EnvironmentReport = {
   readonly environment_id: string;
   readonly revoked: number;
@@ -117,6 +112,8 @@ export type DeviceAdopt = {
   readonly device: DeviceRef;
   readonly signing_private_key: string;
   readonly sealing_private_key: string;
+  /** omo addition: sent only to a service at or above ADOPT_ACCOUNT_MIN_SERVICE_VERSION (device-service.ts). */
+  readonly account?: string;
 };
 export type DeviceForget = { readonly id: string; readonly type: "device.forget" };
 export type DeviceInfo = { readonly id: string; readonly type: "device.info" };
@@ -135,6 +132,8 @@ export type SessionsList = {
   readonly id: string;
   readonly type: "sessions.list";
   readonly filter?: SessionFilter;
+  /** 2: this query's rows may carry `kind`, `parent` and `parent_listed` (#316); absent, they never do. */
+  readonly rows?: 2;
 };
 export type SessionAttach = {
   readonly id: string;
@@ -146,31 +145,6 @@ export type SessionDetach = {
   readonly id: string;
   readonly type: "session.detach";
   readonly attach: string;
-};
-export type SessionCommand =
-  | {
-      readonly id: string;
-      readonly type: "session.command";
-      readonly attach: string;
-      readonly command_id?: string;
-      readonly command: CommandRequest;
-    }
-  | {
-      readonly id: string;
-      readonly type: "session.command";
-      readonly attach: string;
-      readonly command_id?: string;
-      readonly upload_id: string;
-      readonly op: "prompt" | "steer";
-    };
-export type SessionCommandPart = {
-  readonly id: string;
-  readonly type: "session.command_part";
-  readonly attach: string;
-  readonly upload_id: string;
-  readonly index: number;
-  readonly count: number;
-  readonly b: string;
 };
 export type SessionRead = {
   readonly id: string;
@@ -212,6 +186,8 @@ export type LocalRequest =
   | SessionRead
   | EnforcementReport
   | ShutdownForUpgrade
+  | SessionEndpoints
+  | SessionLocate
   | ControlAttachGet
   | ControlAttachSet;
 export type RequestType = LocalRequest["type"];
@@ -244,14 +220,18 @@ export type ResponseData = {
   readonly "session.read": { readonly query_id: string };
   readonly "enforcement.report": Empty;
   readonly "owner.shutdown_for_upgrade": Empty;
+  readonly "session.endpoints": SessionEndpointsData;
+  readonly "session.locate": SessionCandidate;
   readonly "control.attach.get": ControlAttachState;
   readonly "control.attach.set": ControlAttachState;
 };
+export type PathRefusal = { readonly component: string; readonly problem: PathRefusalProblem };
 export type ErrorBody = {
   readonly code: ErrorCode;
   readonly reason: string;
   readonly action: string | null;
   readonly limit_chars?: number;
+  readonly path_refusal?: PathRefusal;
 };
 export type LocalResponse =
   | { readonly id: string; readonly type: "response"; readonly ok: true; readonly data: JsonObject }
