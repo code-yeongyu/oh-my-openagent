@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs"
+import { isAbsolute, resolve } from "node:path"
+
 import { EMPTY_SKILL_INVOCATIONS, interactionPolicyForAgent } from "../../agents"
 import type { PlanArtifactReference, SkillInvocationState } from "../../agents"
 
@@ -59,8 +62,42 @@ function planSuffix(path: string): string | undefined {
   return index === -1 ? undefined : normalized.slice(index)
 }
 
-export function buildPlanReviewPrompt(path: string): string {
-  return `Review the work plan at ${path} for contradictions and blocking issues.`
+// #11329: the plan review ledger is a markdown section INSIDE the plan file - there is no ledger
+// schema, no side store and no migration. Detection is a heading scan of the plan at spawn time,
+// so a plan without the section keeps the byte-identical pre-ledger prompt below.
+const REVIEW_LEDGER_HEADING = /^##[ \t]+Review ledger[ \t]*$/m
+
+/**
+ * Whether the plan file carries a `## Review ledger` section. Relative recorded paths resolve
+ * against the caller's cwd first. An unreadable or missing plan fails OPEN to "no ledger", which
+ * keeps the pre-ledger contract byte-identical (the child re-reads the plan from disk anyway).
+ */
+function planFileHasReviewLedger(path: string, cwd?: string): boolean {
+  const candidates = isAbsolute(path) || cwd === undefined ? [path] : [resolve(cwd, path), path]
+  for (const candidate of candidates) {
+    let plan: string
+    try {
+      plan = readFileSync(candidate, "utf8")
+    } catch {
+      continue // missing or unreadable at this candidate: try the next, then no ledger
+    }
+    if (REVIEW_LEDGER_HEADING.test(plan)) return true
+  }
+  return false
+}
+
+/**
+ * Appended ONLY when the plan actually carries a review ledger, so the no-ledger spawn stays
+ * byte-identical to the canonical contract. The second sentence is load-bearing: without an
+ * explicit failure verdict a self-attested ledger would be a prompt-stuffing bypass of this
+ * contract (#11329).
+ */
+const REVIEW_LEDGER_DIRECTIVE =
+  " The plan carries a `## Review ledger` section: read it first, then re-verify only the rows it marks as changed plus the plan parts those rows touch instead of re-reviewing the whole plan. The ledger is evidence, not a verdict: a fabricated or incomplete ledger fails this review."
+
+export function buildPlanReviewPrompt(path: string, cwd?: string): string {
+  const canonical = `Review the work plan at ${path} for contradictions and blocking issues.`
+  return planFileHasReviewLedger(path, cwd) ? `${canonical}${REVIEW_LEDGER_DIRECTIVE}` : canonical
 }
 
 export type PlanReviewContractOutcome =
@@ -76,12 +113,13 @@ export function planReviewContractOutcome(
   subagentType: string,
   callerPrompt: string,
   sessionId: string,
+  cwd?: string,
 ): PlanReviewContractOutcome | undefined {
   if (interactionPolicyForAgent(subagentType)?.promptContract !== "plan-review") return undefined
   const state = deps.resolveSkillInvocations?.(sessionId) ?? EMPTY_SKILL_INVOCATIONS
   const target = resolvePlanReviewTarget(callerPrompt, state)
   if (target.kind === "deny") return { kind: "deny", message: target.message }
-  return { kind: "prompt", prompt: buildPlanReviewPrompt(target.path) }
+  return { kind: "prompt", prompt: buildPlanReviewPrompt(target.path, cwd) }
 }
 
 function topReference(references: readonly PlanArtifactReference[]): PlanArtifactReference | undefined {

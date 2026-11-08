@@ -1652,8 +1652,8 @@
       "packages/senpi-task/src/tools/task/foreground-wait.ts": ["MAX_FOREGROUND_WAIT_SECONDS"],
       // pre-existing at origin dev 4686e425b5: unused export(s) listTaskAgents, listTaskCategories, TASK_PROMPT_GUIDELINES, TASK_PROMPT_SNIPPET, buildTaskExecute, resolvePromptCacheSafeWaitSeconds, waitForForegroundTask, TaskToolParams, excerptRendererPromptText, joinRendererTokens and 3 more
       "packages/senpi-task/src/tools/task/index.ts": ["listTaskAgents", "listTaskCategories", "TASK_PROMPT_GUIDELINES", "TASK_PROMPT_SNIPPET", "buildTaskExecute", "resolvePromptCacheSafeWaitSeconds", "waitForForegroundTask", "TaskToolParams", "excerptRendererPromptText", "joinRendererTokens", "statusThemeColor", "taskCallLines", "taskResultLines"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) extractPlanPaths, resolvePlanReviewTarget, buildPlanReviewPrompt
-      "packages/senpi-task/src/tools/task/plan-review-contract.ts": ["extractPlanPaths", "resolvePlanReviewTarget", "buildPlanReviewPrompt"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) extractPlanPaths, resolvePlanReviewTarget
+      "packages/senpi-task/src/tools/task/plan-review-contract.ts": ["extractPlanPaths", "resolvePlanReviewTarget"],
       // pre-existing at origin dev 4686e425b5: unused export(s) formatTaskStatus, formatTaskMode, formatTaskTarget
       "packages/senpi-task/src/tools/task/renderers.ts": ["formatTaskStatus", "formatTaskMode", "formatTaskTarget"],
       // pre-existing at origin dev 4686e425b5: unused export(s) fakeSummary, fakeSendResult

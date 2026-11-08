@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test"
+import { mkdirSync, writeFileSync } from "node:fs"
+import { dirname, join } from "node:path"
 import { Value } from "typebox/value"
 import * as engine from "../index"
 import { filterSharedParentTools } from "../runners/in-process/shared-tool-filter"
@@ -169,4 +171,42 @@ test("#given a queued plan-gated worker #when the host policy changes before gra
   expect((await failed).error?.code).toBe("policy_denied")
   expect(f.starts).toEqual([])
   expect(f.concurrency.getRetainedKeyCounts().leases).toBe(0)
+})
+
+test("#given a plan-reviewer pool agent whose plan carries a review ledger #when the pool is created and dispatched #then both policy checks resolve the same ledger prompt", async () => {
+  // given
+  const f = host()
+  const planPath = join(f.root, ".omo", "plans", "wp-ledger.md")
+  mkdirSync(dirname(planPath), { recursive: true })
+  writeFileSync(planPath, "## Scope\n\nDo it.\n\n## Review ledger\n\n| IS-1 | changed |\n", "utf8")
+  const execute = buildWorkpoolExecute({
+    manager: f.manager,
+    workpools: f.manager.workpools,
+    omoConfig: {},
+    agents: {},
+    resolveSkillInvocations: () => ({
+      hasInvoked: () => false,
+      hasUserRequested: (name: string) => name === "ulw-plan",
+      hasPlanArtifact: () => true,
+      planArtifactReferences: () => [{ path: ".omo/plans/wp-ledger.md", count: 1, lastTouchedAt: 1 }],
+    }),
+  })
+
+  // when
+  const created = await execute(
+    { op: "create", name: "ledger", mode: "fresh", agent: { subagent_type: "plan-reviewer", prompt: "Review my plan" } },
+    f.ctx,
+  )
+  const createdPoolId = created.details.pool_id
+  if (typeof createdPoolId !== "string") throw new Error(`create refused: ${JSON.stringify(created.details.error)}`)
+  const pool = f.manager.workpools.inspect(f.caller, createdPoolId)
+  const dispatched = f.manager.workpools.waitForEvent(pool.pool_id, "dispatched", AbortSignal.timeout(5000))
+  await execute({ op: "push", pool_id: pool.pool_id, items: [{ key: "a", input: 1 }] }, f.ctx)
+  await dispatched
+
+  // then: the create-time substitution and the later dispatcher re-check resolve the plan under the
+  // pool's own cwd, so the ledger clause is never mistaken for a stale recorded prompt (#11329).
+  expect(pool.agent.prompt).toContain(".omo/plans/wp-ledger.md")
+  expect(pool.agent.prompt).toContain("## Review ledger")
+  expect(f.starts[0]?.prompt).toContain("a fabricated or incomplete ledger fails this review")
 })
