@@ -5,7 +5,7 @@ import { mkdir, readFile, rm, utimes, writeFile } from "node:fs/promises"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { appendMemoryReceiptOnce, readMemoryReceipts, receiptIdentity, type MemoryReceiptInput } from "@oh-my-opencode/memory-core"
+import { appendMemoryReceiptOnce, createLockRecord, createReflectionWorktree, readMemoryReceipts, receiptIdentity, runFinalizationLockPath, withLock, type MemoryReceiptInput } from "@oh-my-opencode/memory-core"
 
 import type { MemoryReceiptsPort } from "../receipts-port"
 import { writeRunJsonAtomic } from "./run-artifacts"
@@ -78,6 +78,105 @@ describe("quarantine of runs reconciliation cannot recover", () => {
     expect(results).toEqual([])
     expect(existsSync(join(item.runDir, "quarantined.json"))).toBe(false)
     expect((await item.store.readState()).active?.runId).toBe("run-orphan")
+  }, 30_000)
+
+  test("#given an unparseable ledger whose recorded supervisor pid is gone and has no recorded start under a dead launcher #when reconciled #then the run is quarantined and the reservation released (#11920)", async () => {
+    // given
+    const item = await fixture()
+    const { processStart: _start, childPid: _childPid, childProcessStart: _childStart, ...withoutStarts } = item.ledger as Record<string, unknown>
+    await writeFile(join(item.runDir, "ledger.json"), JSON.stringify({ ...withoutStarts, mergePolicy: "future-policy", launching: false, pid: 424242 }))
+
+    // when
+    await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher() })
+
+    // then
+    expect(await quarantine(item)).toMatchObject({ runId: "run-orphan", reason: "ledger_unreadable" })
+    expect((await item.store.readState()).active).toBeUndefined()
+  }, 30_000)
+
+  test("#given a NON-active run dir with an unreadable ledger and dead recorded pids #when reconciled #then it is quarantined, no longer live, and the orphan sweep reclaims its worktree (#11920)", async () => {
+    // given
+    const item = await fixture()
+    const stranded = await createReflectionWorktree(item.repo, "run-stranded", item.identity.paths.worktrees)
+    const strandedDir = join(item.identity.paths.reflection, "runs", "run-stranded")
+    await mkdir(strandedDir, { recursive: true })
+    await writeFile(join(strandedDir, "ledger.json"), JSON.stringify({ ...item.ledger, runId: "run-stranded", worktreeDir: stranded.dir, deadlineAt: 1, pid: 424243 }))
+    const later = Date.now() + 60 * 60_000
+
+    // when
+    await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher(), now: () => later })
+
+    // then
+    expect(JSON.parse(await readFile(join(strandedDir, "quarantined.json"), "utf8"))).toMatchObject({ runId: "run-stranded", reason: "ledger_unreadable", generation: item.ledger.startedAt })
+    expect((await receipts(item)).filter((receipt) => receipt.kind !== "facts" && receipt.runId === "run-stranded").map((receipt) => receipt.event)).toEqual(["quarantined"])
+    expect(existsSync(stranded.dir)).toBe(false)
+    const branch = Bun.spawnSync(["git", "-C", item.identity.paths.repo, "show-ref", "--verify", `refs/heads/${stranded.branch}`])
+    expect(branch.exitCode).not.toBe(0)
+  }, 30_000)
+
+  test("#given the active run already has its abandoned.json for this generation under a dead launcher #when reconciled #then only the release happens and no second sentinel is written (C29)", async () => {
+    // given
+    const item = await fixture()
+    const active = JSON.parse(await readFile(join(item.identity.paths.reflection, "active.lock"), "utf8"))
+    await writeRunJsonAtomic(join(item.runDir, "abandoned.json"), { version: 1, runId: "run-orphan", reason: "processes_dead", generation: active.reservedAt })
+    const sentinel = await readFile(join(item.runDir, "abandoned.json"), "utf8")
+
+    // when
+    const results = await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher() })
+
+    // then
+    expect(results).toContainEqual({ runId: "run-orphan", outcome: "failed" })
+    expect((await item.store.readState()).active).toBeUndefined()
+    expect(await readFile(join(item.runDir, "abandoned.json"), "utf8")).toBe(sentinel)
+    expect(existsSync(join(item.runDir, "quarantined.json"))).toBe(false)
+  }, 30_000)
+
+  test("#given an unreadable ledger under a dead launcher and a signal that fires right after the sentinel is written #when reconciled #then the reservation is still released in the same call (C29 3, DESIGN.r4 c.21)", async () => {
+    // given
+    const item = await fixture()
+    await writeFile(join(item.runDir, "ledger.json"), "{ not json")
+    const controller = new AbortController()
+    const port: MemoryReceiptsPort = { append: async (runtimeDir: string, input: MemoryReceiptInput) => { controller.abort(); return (await appendMemoryReceiptOnce(runtimeDir, input)) !== undefined } }
+
+    // when
+    await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher(), signal: controller.signal, receipts: port }).catch(() => undefined)
+
+    // then
+    expect(existsSync(join(item.runDir, "quarantined.json"))).toBe(true)
+    expect((await item.store.readState()).active).toBeUndefined()
+  }, 30_000)
+
+  test("#given the same settled run while another settler holds its finalize lock #when reconciled #then nothing is released (REVIEW-3 R2 control)", async () => {
+    // given
+    const item = await fixture()
+    const active = JSON.parse(await readFile(join(item.identity.paths.reflection, "active.lock"), "utf8"))
+    await writeRunJsonAtomic(join(item.runDir, "abandoned.json"), { version: 1, runId: "run-orphan", reason: "processes_dead", generation: active.reservedAt })
+
+    // when
+    const results = await withLock(runFinalizationLockPath(item.identity.paths.locks, "run-orphan"), await createLockRecord("reflection-finalize", { runId: "run-orphan" }), () =>
+      reconcileReflectionRuns({ identity: item.identity, reservation: item.store, ...deadLauncher() }))
+
+    // then
+    expect(results).not.toContainEqual({ runId: "run-orphan", outcome: "failed" })
+    expect((await item.store.readState()).active?.runId).toBe("run-orphan")
+  }, 30_000)
+
+  test("#given a lone pending.json the CLI left behind #when the session reconciles #then it promotes the pending run under its own pid and launches it (C25)", async () => {
+    // given
+    const item = await fixture()
+    const pending = { runId: "run-queued", request: { trigger: "manual", conversationIds: ["conversation-1"], snapshots: [] } }
+    await rm(join(item.identity.paths.reflection, "active.lock"))
+    await writeFile(join(item.identity.paths.reflection, "pending.json"), JSON.stringify(pending))
+    const launched: string[] = []
+
+    // when
+    await reconcileReflectionRuns({ identity: item.identity, reservation: item.store, launch: (run) => launched.push(run.runId), ...deadLauncher() })
+
+    // then
+    expect(launched).toEqual(["run-queued"])
+    const state = await item.store.readState()
+    expect(state.active?.runId).toBe("run-queued")
+    expect(state.pending).toBeUndefined()
   }, 30_000)
 
   test("#given a run dir with no prelaunch or ledger still inside the launch window under a dead launcher #when reconciled #then it is left alone", async () => {

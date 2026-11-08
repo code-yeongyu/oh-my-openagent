@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { answerCompiledFastPath } from "../compile-entry"
-import { compiledUpdate, releaseAssetName, RELEASES_URL, replaceCommand } from "../compiled-update"
+import { compiledUpdate, installCommand, releaseAssetName, RELEASES_URL, replaceCommand } from "../compiled-update"
 
 afterEach(() => {
   process.exitCode = 0
@@ -53,6 +53,39 @@ describe("compiled omo update argument handling", () => {
       expect(result.output).toBe(AVAILABLE)
       expect(result.stream ?? "stdout").toBe("stdout")
       expect(lookups).toBe(1)
+    })
+  }
+})
+
+describe("compiled omo update destination", () => {
+  const provisioned = "/home/user/.omo/binary-runtime/9.9.9/omo"
+
+  async function updateAt(destination: string, platform: NodeJS.Platform) {
+    return compiledUpdate({
+      omoAiVersion: "9.9.9",
+      releaseTarget: undefined,
+      destination,
+      provisioned,
+      platform,
+      arch: "x64",
+      fetchReleases: async () => [{ tag_name: "v9.9.10", assets: [{ name: releaseAssetName(undefined, platform, "x64") }] }],
+      args: ["update"],
+    })
+  }
+
+  test("#given the installed launcher as destination #then the replace command targets it, unchanged", async () => {
+    const result = await updateAt(DESTINATION, "linux")
+    expect(result.exitCode).toBe(0)
+    expect(result.output).toBe(AVAILABLE)
+  })
+
+  for (const [platform, installer] of [["linux", installCommand("linux")], ["win32", installCommand("win32")]] as const) {
+    test(`#given the provisioned runtime copy as destination on ${platform} #then it names the installer instead of a replace command the next launch would undo`, async () => {
+      const result = await updateAt(provisioned, platform)
+      expect(result.exitCode).toBe(1)
+      expect(result.stream).toBe("stderr")
+      expect(result.output.split("\n").at(-1)).toBe(installer)
+      expect(result.output).not.toContain(`${provisioned}.new`)
     })
   }
 })

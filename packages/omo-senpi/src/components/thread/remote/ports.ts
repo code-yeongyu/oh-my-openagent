@@ -20,7 +20,8 @@ export type RemoteDevice = { readonly device: string; readonly label: string; re
  * `uncertain` means it may have run (the relay lost the evidence), so it is never retried blindly.
  */
 export type RemoteCommandOutcome =
-  | { readonly kind: "ok"; readonly response: JsonObject }
+  /** `local`: answered from the session's mirror on this device, with no round trip. */
+  | { readonly kind: "ok"; readonly response: JsonObject; readonly local?: true }
   | { readonly kind: "refused"; readonly reason: string }
   | { readonly kind: "uncertain"; readonly reason: string }
 
@@ -29,6 +30,15 @@ export type RemoteServiceState = { readonly state: string }
 export type RemoteLocateOutcome =
   | { readonly kind: "ok"; readonly sessionId: string }
   | { readonly kind: "refused"; readonly reason: string }
+
+/** A session on another device followed from now on: its records go to the listener until `stop` or the attach ends. */
+export type RemoteSessionWatch = {
+  /** Settles with the reason the attach ended; nothing is delivered after it. */
+  readonly ended: Promise<string>
+  readonly stop: () => void
+}
+
+export type RemoteWatchOutcome = { readonly kind: "ok"; readonly watch: RemoteSessionWatch } | { readonly kind: "refused"; readonly reason: string }
 
 export type RemoteSessionsPort = {
   /** The device service state; `plan_required` means the account's plan has no relay (A5: paid only). */
@@ -45,10 +55,18 @@ export type RemoteSessionsPort = {
    * The id a session just created on `device` is addressed by (its listing row's `session_id`, the key an attach
    * takes), from the durable engine session id the create reply names; settles once that id attaches.
    */
-  readonly locate: (device: string, engineId: string) => Promise<RemoteLocateOutcome>
-  /** An engine record for one session on `device` (`prompt`, `abort`, `get_state`), through an attach. */
-  readonly sessionCommand: (device: string, sessionId: string, rpc: JsonObject) => Promise<RemoteCommandOutcome>
+  readonly locate: (device: string, engineId: string, knownKey?: string) => Promise<RemoteLocateOutcome>
+  /**
+   * An engine record for one session on `device` (`prompt`, `abort`, `get_state`), through an attach. A read the
+   * session's mirror holds is answered locally unless `fresh` is set.
+   */
+  readonly sessionCommand: (device: string, sessionId: string, rpc: JsonObject, options?: { readonly fresh?: boolean }) => Promise<RemoteCommandOutcome>
   readonly read: (device: string, sessionId: string, tail: number) => Promise<RemoteCommandOutcome>
+  /**
+   * The records `device`'s session writes from now on (none of the ones before), on the attach this port holds for it.
+   * Refused, typed, when that attach cannot be made.
+   */
+  readonly watch: (device: string, sessionId: string, listener: (record: JsonObject) => void) => Promise<RemoteWatchOutcome>
 }
 
 /**

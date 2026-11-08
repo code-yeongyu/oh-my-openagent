@@ -11,7 +11,7 @@ import type { ThreadCloseOutcome } from "./tools/ports"
 
 export const B_ROW: RemoteSessionRow = { device: "b", session_id: "dur-on-b", title: "on b", project: "/work/b", path: "/home/b/.omo/agent/sessions/dur-on-b.jsonl", state: "idle", updated_ms: 1_700_000_000_000 }
 
-type Sent = { readonly via: "endpoint" | "session" | "read"; readonly device: string; readonly session?: string; readonly rpc?: JsonObject }
+type Sent = { readonly via: "endpoint" | "session" | "read" | "watch"; readonly device: string; readonly session?: string; readonly rpc?: JsonObject }
 
 type Engine = { readonly messages: readonly ThreadTranscriptEntry[]; readonly interrupt: JsonObject; readonly streaming: boolean; readonly pending: number; readonly currentTurnId?: string }
 
@@ -30,9 +30,12 @@ export function createRemoteThreadFixture() {
     for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
   }
 
-  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[] } = {}) {
+  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[]; chainCountLimit?: number } = {}) {
     const engine = options.engine ?? ENGINE
     const sent: Sent[] = []
+    // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
+    const watchers = new Set<(record: JsonObject) => void>()
+    const writeRecords = () => queueMicrotask(() => { for (const record of options.records ?? []) for (const listener of [...watchers]) listener(record) })
     const hops: number[] = []
     const aliases = options.aliases ?? new Map<string, AliasHolder>()
     // The sessions b's engine holds. Its close rules are senpi's (2026.11.5-1): close_session from a connection that never
@@ -44,7 +47,7 @@ export function createRemoteThreadFixture() {
       // every field the tools read lives under `data`.
       const ok = (data: JsonObject): RemoteCommandOutcome => ({ kind: "ok", response: { type: "response", id: null, command: rpc["type"] ?? null, success: true, data } })
       if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
-      if (attachedTo !== undefined && !live.has(attachedTo)) return { kind: "refused", reason: "session_not_found" }
+      if (attachedTo !== undefined && !live.has(attachedTo)) return { kind: "refused", reason: "unknown_session" }
       if (rpc["type"] === "close_session") {
         if (attachedTo === undefined) return { kind: "refused", reason: "unknown_session" }
         if ((options.otherHolders ?? 0) === 0) live.delete(attachedTo)
@@ -64,6 +67,10 @@ export function createRemoteThreadFixture() {
       if (rpc["type"] === "get_state") return ok({ isStreaming: engine.streaming, pendingMessageCount: engine.pending, ...(engine.currentTurnId === undefined ? {} : { currentTurnId: engine.currentTurnId }) })
       if (rpc["type"] === "get_messages") return ok({ messages: [...engine.messages] })
       if (rpc["type"] === "interrupt") return ok(engine.interrupt)
+      // b's user set `threads.chainCountLimit` (senpi S32): its engine answers `{success: false, errorCode: "chain_count_limit"}`,
+      // which the device service hands back as this refusal (device-service.ts).
+      if (rpc["type"] === "prompt" && options.chainCountLimit !== undefined && Number(rpc["chainCount"]) > options.chainCountLimit) return { kind: "refused", reason: "chain_count_limit" }
+      if (rpc["type"] === "prompt" && options.promptOutcome !== undefined) return options.promptOutcome
       if (rpc["type"] === "prompt") return ok(options.promptResponse ?? (engine.streaming ? { disposition: "queued" } : { disposition: "started", turnId: "turn-b" }))
       if (rpc["type"] === "get_available_models") return ok({ models: [{ provider: "anthropic", id: "claude-opus", name: "Opus" }, { provider: "openai", id: "gpt-6" }] })
       if (rpc["type"] === "set_model") return ok({ provider: rpc["provider"] ?? null, id: rpc["modelId"] ?? null })
@@ -103,11 +110,23 @@ export function createRemoteThreadFixture() {
         endpointCommand: async (device, rpc) => { sent.push({ via: "endpoint", device, rpc }); return answer(rpc) },
         // This fake device lists a created session by the id its create reply names.
         locate: async (_device, engineId) => ({ kind: "ok", sessionId: engineId }),
-        sessionCommand: async (device, session, rpc) => { sent.push({ via: "session", device, session, rpc }); return answer(rpc, session) },
+        sessionCommand: async (device, session, rpc) => {
+          sent.push({ via: "session", device, session, rpc })
+          const outcome = answer(rpc, session)
+          if (rpc["type"] === "prompt" && outcome.kind === "ok") writeRecords()
+          return outcome
+        },
+        watch: async (device, session, listener) => {
+          sent.push({ via: "watch", device, session })
+          if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
+          watchers.add(listener)
+          return { kind: "ok", watch: { ended: new Promise<string>(() => {}), stop: () => { watchers.delete(listener) } } }
+        },
         read: async (device, session) => { sent.push({ via: "read", device, session }); return { kind: "ok", response: { entries: [{ role: "user", content: "hi b" }, { role: "assistant", content: "hello from b" }] } } },
       },
       ...(options.noRegistry === true ? {} : { aliases: registry }),
-      chain: { stamp: (record, hop) => { hops.push(hop); return { ...record, chain_count: hop } } },
+      // The field senpi's prompt record carries the count in (S32, rpc.md `chainCount`).
+      chain: { stamp: (record, hop) => { hops.push(hop); return { ...record, chainCount: hop } } },
     }
     return { remote, sent, hops, aliases, live }
   }
@@ -150,7 +169,7 @@ export function createRemoteThreadFixture() {
       if (tool === undefined) throw new Error(`${name} is not registered`)
       return (await tool.execute(`call-${Math.random()}`, args, undefined, undefined, { sessionManager: { getSessionId: () => caller } } as never)).details.result as ThreadToolResult
     }
-    return { run, openSession, store, closed }
+    return { run, openSession, store, closed, agentDir }
   }
 
   return { account, surface, cleanup }
