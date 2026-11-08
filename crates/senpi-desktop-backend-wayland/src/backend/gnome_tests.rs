@@ -4,13 +4,17 @@
 
 use std::os::unix::net::UnixListener;
 
+use image::{Rgba, RgbaImage};
 use senpi_desktop_core::backend::{Backend, DeliveryMode, Modifiers, MouseButton, PointerEvent};
 use senpi_desktop_core::error::ErrorCode;
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::types::{Target, WindowInput};
 
+use super::hyprland_tests::monitor;
+use super::place_captured;
 use super::tests::{backend_without_services, FR};
 use crate::capture::layout::EisRegion;
+use crate::capture::pipewire::crop_window;
 use crate::compositor::gnome::tests::WINDOWS;
 use crate::compositor::gnome::{detect_with, Detection};
 use crate::compositor::hyprland::tests::window;
@@ -129,6 +133,62 @@ fn a_window_click_lands_at_the_gnome_geometry_through_libei() {
 
     // Then: libei moved to the compositor position before the press
     assert_eq!(clicked, Ok(()));
+    let log = eis.wait_for(|log| log.bursts >= 1);
+    assert_eq!(
+        log.events.first(),
+        Some(&Recorded::Motion { x: 110.0, y: 68.0 })
+    );
+}
+
+#[test]
+fn a_window_frame_and_its_click_agree_on_the_gnome_rect() {
+    // Given: AT-SPI says the terminal (pid 1201) is at (0, 0); GNOME places it at (10, 48),
+    // and the composite marks the pixel GNOME shows at (10 + 100, 48 + 20)
+    let _env = env_lock();
+    let shell = FakeGnome::serve(WINDOWS);
+    let Detection::Extension(gnome) = extension(&shell) else {
+        panic!("gnome extension not detected");
+    };
+    let dir = tempfile::tempdir().expect("socket dir");
+    let (eis, _libei) = fake_eis(&dir);
+    let atspi = window(Some(1201), "~ : bash");
+    let target = Target::Window(atspi.id.clone());
+    let (px, py) = (100_u32, 20_u32);
+    let mark = Rgba([255, 0, 0, 255]);
+    let mut composite = RgbaImage::new(1280, 1080);
+    composite.put_pixel(10 + px, 48 + py, mark);
+    let mut backend = backend_without_services();
+    backend.gnome = Some(Detection::Extension(gnome.clone()));
+    let calls_before = shell.list_calls();
+
+    // When: the window is captured the way `capture` places it, then clicked at pixel (px, py)
+    let geometry = backend.capture_geometry(&target);
+    let (windows, unplaced) = place_captured(geometry.as_ref(), vec![atspi.clone()], &target);
+    let (image, frame) =
+        crop_window(&composite, &[monitor()], windows, &atspi.id).expect("window cropped");
+    let (x, y) = frame
+        .map_point(f64::from(px), f64::from(py), Some(&atspi))
+        .expect("pixel maps");
+    let clicked = backend.gnome_pointer(&gnome, &atspi, click(x, y));
+
+    // Then: the frame is cropped at the GNOME rect, and the click lands on the pixel it shows
+    assert!(unplaced.is_none(), "{unplaced:?}");
+    assert_eq!(
+        *image.get_pixel(px, py),
+        mark,
+        "frame pixel (px, py) is the GNOME rect + (px, py)"
+    );
+    assert_eq!(
+        frame.map_to_pixel(110.0, 68.0),
+        Ok((f64::from(px), f64::from(py))),
+        "the frame's logical origin is the GNOME rect"
+    );
+    assert_eq!(clicked, Ok(()));
+    assert_eq!(
+        shell.list_calls() - calls_before,
+        2,
+        "one extension read for the capture, one for the click"
+    );
     let log = eis.wait_for(|log| log.bursts >= 1);
     assert_eq!(
         log.events.first(),

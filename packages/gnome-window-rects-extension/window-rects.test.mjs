@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 
 import { describeChrome, describeReply, describeShell, describeWindows, INTERFACE_XML, OBJECT_PATH } from "./window-rects.js";
 
-const BACKEND = new URL("../senpi-desktop-backend-wayland/", import.meta.url);
+const BACKEND = new URL("../../crates/senpi-desktop-backend-wayland/", import.meta.url);
 const FIXTURE = JSON.parse(readFileSync(new URL("testdata/gnome-windows.json", BACKEND), "utf8"));
 const GNOME_RS = readFileSync(new URL("src/compositor/gnome.rs", BACKEND), "utf8");
 
