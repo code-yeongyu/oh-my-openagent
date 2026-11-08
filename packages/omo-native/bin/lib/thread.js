@@ -187,7 +187,7 @@ export function threadExitCode(result) {
  * The answer is `{ sdk }` or `{ error, code }`: `unsupported` for the runtime, `internal_error` for a
  * plugin SDK that cannot be imported (a broken or partial install).
  */
-export async function loadThreadSdk({ pluginRoot, agentDir, env, cwd, engine, loadSqlite, importSdk, importThreadClient = undefined, identity }) {
+export async function loadThreadSdk({ pluginRoot, agentDir, env, cwd, engine, loadSqlite, importSdk, importThreadClient = () => import(pathToFileURL(join(pluginRoot, "extensions", "omo-thread-client.js")).href), identity }) {
   try {
     await (loadSqlite ?? (() => import("node:sqlite")))()
   } catch {
@@ -213,7 +213,7 @@ export async function loadThreadSdk({ pluginRoot, agentDir, env, cwd, engine, lo
 async function cliRemoteSurface({ pluginRoot, env, cwd, importThreadClient }) {
   let client
   try {
-    client = await (importThreadClient ?? (() => import(pathToFileURL(join(pluginRoot, "extensions", "omo-thread-client.js")).href)))()
+    client = await importThreadClient()
   } catch {
     return undefined
   }
