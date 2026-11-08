@@ -2355,6 +2355,10 @@
         "picocolors",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
         "picomatch",
+        // Consumed by path, not by import: omowright's package `exports` points at a dist/ that a git install
+        // does not carry, so the browser skill's stager bundles node_modules/omowright and its loader resolves
+        // the same tree at runtime (#12842).
+        "omowright",
       ],
     },
     "packages/rules-engine": {
