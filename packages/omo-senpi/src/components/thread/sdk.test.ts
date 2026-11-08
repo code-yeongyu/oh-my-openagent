@@ -116,11 +116,13 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     expect(account.sent.filter((entry) => entry.via === "session").map((entry) => [entry.device, entry.rpc?.["type"]])).toEqual([["b", "get_messages"]])
   })
 
-  test("#given an alias held by a thread on this device and omo thread run from another workspace #when read names the alias without all_scope #then it reads that thread; the raw id alone stays scope_denied", async () => {
+  test("#given an alias held by a thread on this device and omo thread run from another workspace #when read and send name the alias without all_scope #then both reach that thread; the raw id alone stays scope_denied", async () => {
     const account = remoteFixture.account({ aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]) })
-    const { sdk } = fixture({ remote: account.remote, cwd: "/thread-sdk-other-workspace" })
+    const { sdk, store } = fixture({ remote: account.remote, cwd: "/thread-sdk-other-workspace" })
     expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread_id: "dur-host" })
     expect(await sdk.read({ thread: "dur-host" })).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
+    expect(await sdk.send({ thread: "lane-here", text: "ping" })).toMatchObject({ kind: "ok", deduplicated: false })
+    expect((await store.list({ target_durable_id: "dur-host" })).map((row) => row.sender)).toEqual(["cli:501"])
   })
 })
 
