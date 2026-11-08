@@ -17,10 +17,10 @@ const within = async <T>(signal: Promise<T>, label: string): Promise<T> => {
   try { return await Promise.race([signal, timeout]) } finally { clearTimeout(timer) }
 }
 
-function session(durableId: string) {
+function session(durableId: string | undefined) {
   const handlers = new Map<string, ((payload: unknown, ctx?: unknown) => unknown)[]>()
   const pi = { on: (event: string, handler: (payload: unknown, ctx?: unknown) => unknown) => { handlers.set(event, [...(handlers.get(event) ?? []), handler]) } } as unknown as Pick<SenpiExtensionAPI, "on">
-  const ctx = { sessionManager: { getSessionId: () => durableId } }
+  const ctx = durableId === undefined ? {} : { sessionManager: { getSessionId: () => durableId } }
   const fire = async (event: string, payload: unknown = {}) => { for (const handler of handlers.get(event) ?? []) await handler(payload, ctx) }
   return { pi, fire }
 }
@@ -92,7 +92,7 @@ describe("bounds: only a routed input's own run answers, once, and a reply is ne
   }
   const router = () => {
     const delivered: { route: ReplyRoute; answer: string | undefined; session: string }[] = []
-    return { delivered, routes: createReplyRouter((r, answer, sessionId) => delivered.push({ route: r, answer, session: sessionId })) }
+    return { delivered, routes: createReplyRouter((r, answer, sessionId) => delivered.push({ route: r, answer, session: sessionId ?? "" })) }
   }
 
   test.each([
@@ -119,20 +119,60 @@ describe("bounds: only a routed input's own run answers, once, and a reply is ne
     expect(delivered.map((entry) => entry.answer)).toEqual(["answer 0"])
   })
 
-  test("#given the run answered the sender itself with thread_send #when it settles #then no automatic reply is added", () => {
-    const { delivered, routes } = router()
-    routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
-    routes.noteSend("dur-caller")
-    routes.noteMessage({ role: "assistant", content: "sent it" })
-    routes.settled("dur-on-b")
-    expect(delivered).toHaveLength(0)
-  })
-
   test("#given a routed input #when the session ends before its run settles #then nothing is routed", () => {
     const { delivered, routes } = router()
     routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
     routes.close()
     routes.settled("dur-on-b")
     expect(delivered).toHaveLength(0)
+  })
+})
+
+describe("an explicit reply counts by the session it reached, not by how it was addressed", () => {
+  const routeOf = (delivery: string): ReplyRoute => ({ device: "here", session: "dur-caller", delivery, root: delivery, hop: 1 })
+  const tokenOf = (delivery: string): string => {
+    const value = replyRouteToken(routeOf(delivery))
+    if (value === undefined) throw new Error("route token did not fit")
+    return value
+  }
+  // A's session is listed under a key that is not its durable id, as on a real relay.
+  const relayWithKey = () => {
+    const relay = account({ live: ["key-of-a"] })
+    const located: RemoteThreadSurface = { ...relay.remote, sessions: { ...relay.remote.sessions, locate: async (_device, engineId) => ({ kind: "ok", sessionId: engineId === "dur-caller" ? "key-of-a" : engineId }) } }
+    return { relay, remote: located }
+  }
+  const sendEnd = (toolCallId: string, result: unknown) => ({ toolCallId, toolName: "thread_send", isError: false, result: { content: [], details: { result } } })
+
+  test("#given B answered A with thread_send by A's name #when the run settles #then the automatic reply is not sent, and a later run whose send failed is still answered", async () => {
+    const { relay, remote } = relayWithKey()
+    const watched = commandSeen(remote, "admit_external_message")
+    const b = session("dur-on-b")
+    wireReplyRoutes(b.pi, watched.remote, { senderProvenance: async () => B_PROVENANCE, warn: () => {} })
+
+    await b.fire("message_start", { message: { role: "user", content: "q1", clientMessageId: tokenOf("d-1") } })
+    await b.fire("tool_execution_start", { toolCallId: "t1", toolName: "thread_send", args: { thread: "agent a", message: "here is my answer" } })
+    await b.fire("tool_execution_end", sendEnd("t1", { kind: "ok", thread_id: "key-of-a", device: "here", delivery: { kind: "started", turn_id: "3" }, deduplicated: false }))
+    await b.fire("message_end", { message: { role: "assistant", content: "answered by thread_send" } })
+    await b.fire("agent_settled")
+
+    await b.fire("message_start", { message: { role: "user", content: "q2", clientMessageId: tokenOf("d-2") } })
+    await b.fire("tool_execution_end", sendEnd("t2", { kind: "error", error: { code: "device_offline", message: "offline", next_action: "retry" } }))
+    await b.fire("message_end", { message: { role: "assistant", content: "second answer" } })
+    await b.fire("agent_settled")
+
+    expect((await within(watched.seen, "the second run's reply")).rpc["deliveryId"]).toBe("reply-d-2")
+    expect(relay.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => entry.rpc?.["deliveryId"])).toEqual(["reply-d-2"])
+  })
+
+  test("#given a run settles with no session id #when its route would be answered #then the failure is logged as remote_reply_failed", async () => {
+    const { remote } = relayWithKey()
+    const warned = Promise.withResolvers<string>()
+    const b = session(undefined)
+    wireReplyRoutes(b.pi, remote, { senderProvenance: async () => B_PROVENANCE, warn: (line) => warned.resolve(line) })
+    await b.fire("message_start", { message: { role: "user", content: "q", clientMessageId: tokenOf("d-3") } })
+    await b.fire("agent_settled")
+    const line = await within(warned.promise, "the no-session warning")
+    expect(line).toContain("remote_reply_failed")
+    expect(line).toContain("d-3")
   })
 })
