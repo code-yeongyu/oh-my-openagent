@@ -26,6 +26,9 @@ const NON_RETRYABLE = new Set([400, 401, 413])
 
 export type OtlpFetch = (url: string, init: RequestInit) => Promise<Response>
 
+/** A per-install "do not send before" time shared by every process of the install (see otlp-spool-not-before). */
+export type NotBefore = { readonly read: () => number; readonly defer: (untilMs: number) => void }
+
 /** `lost`: another process owns the batch now; `withdrawn`: telemetry consent ended. Either way nothing is sent. */
 export type AttemptGate = "send" | "lost" | "withdrawn"
 
@@ -39,6 +42,8 @@ export type PostDeps = {
   readonly requestTimeoutMs: number
   /** Runs right before every attempt, the first included. */
   readonly beforeAttempt?: () => AttemptGate
+  /** Waited out before every attempt and pushed forward after a 429, so one install's processes back off together. */
+  readonly notBefore?: NotBefore
 }
 
 export type PartialSuccess = { readonly rejected: number; readonly message: string }
@@ -53,7 +58,7 @@ export type PostOutcome =
 
 type Attempt =
   | { readonly kind: "done"; readonly outcome: PostOutcome }
-  | { readonly kind: "retry"; readonly retryAfterMs: number | undefined }
+  | { readonly kind: "retry"; readonly retryAfterMs: number | undefined; readonly throttled?: boolean }
 
 export function parseRetryAfter(value: string | null, nowMs: number): number | undefined {
   if (value === null || value.trim() === "") return undefined
@@ -95,7 +100,11 @@ async function exchange(deps: PostDeps, signal: Signal, body: Uint8Array, abort:
   }
   if (NON_RETRYABLE.has(response.status)) return { kind: "done", outcome: { kind: "rejected", status: response.status } }
   if (RETRYABLE.has(response.status)) {
-    return { kind: "retry", retryAfterMs: parseRetryAfter(response.headers.get("retry-after"), Date.now()) }
+    return {
+      kind: "retry",
+      retryAfterMs: parseRetryAfter(response.headers.get("retry-after"), Date.now()),
+      throttled: response.status === 429,
+    }
   }
   return { kind: "done", outcome: { kind: "retry_later" } }
 }
@@ -128,7 +137,12 @@ async function attempt(deps: PostDeps, signal: Signal, body: Uint8Array): Promis
  */
 export async function postWithRetry(deps: PostDeps, signal: Signal, body: Uint8Array): Promise<PostOutcome> {
   if (body.byteLength > MAX_BODY_BYTES) return { kind: "rejected", status: 413 }
+  let sleptUntil = 0
   for (let index = 0; ; index += 1) {
+    if (deps.abort.aborted) return { kind: "aborted" }
+    const shared = deps.notBefore?.read() ?? 0
+    const wait = shared > sleptUntil ? shared - Date.now() : 0
+    if (wait > 0) await deps.sleep(Math.min(wait, MAX_RETRY_AFTER_MS), deps.abort)
     if (deps.abort.aborted) return { kind: "aborted" }
     const gate = deps.beforeAttempt?.() ?? "send"
     if (gate !== "send") return { kind: gate }
@@ -136,6 +150,9 @@ export async function postWithRetry(deps: PostDeps, signal: Signal, body: Uint8A
     if (result.kind === "done") return result.outcome
     const backoff = BACKOFF_MS[index]
     if (backoff === undefined) return { kind: "retry_later" }
-    await deps.sleep(result.retryAfterMs ?? backoff + Math.floor(deps.random() * backoff * 0.2), deps.abort)
+    const delay = result.retryAfterMs ?? backoff + Math.floor(deps.random() * backoff * 0.2)
+    sleptUntil = Math.ceil(Date.now() + delay)
+    if (result.throttled === true) deps.notBefore?.defer(sleptUntil)
+    await deps.sleep(delay, deps.abort)
   }
 }

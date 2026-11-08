@@ -24,6 +24,7 @@ export async function checkExtensionCurrent(options = {}) {
     sidePanelRuntimeOutput,
     onboardingScanRuntimeOutput,
     toolkitSdkOutput,
+    bunshinTsOutput,
     rollbackRuntimeOutput,
     computerUseOutput,
     memoryDoctorOutput,
@@ -47,6 +48,8 @@ export async function checkExtensionCurrent(options = {}) {
   } = resolveOutputs(options)
   const currentToolkitSdk = await readBuiltEntry(toolkitSdkOutput)
   if (currentToolkitSdk === undefined) return { ok: false, reason: "missing-output", output: toolkitSdkOutput }
+  const currentBunshinTs = await readBuiltEntry(bunshinTsOutput)
+  if (currentBunshinTs === undefined) return { ok: false, reason: "missing-output", output: bunshinTsOutput }
   const currentRollbackRuntime = await readBuiltEntry(rollbackRuntimeOutput)
   if (currentRollbackRuntime === undefined) return { ok: false, reason: "missing-output", output: rollbackRuntimeOutput }
   const currentMain = await readBuiltEntry(output)
@@ -121,6 +124,7 @@ export async function checkExtensionCurrent(options = {}) {
     sidePanelRuntimeOutputPath: join(tempRoot, "omo-side-panel.js"),
     onboardingScanRuntimeOutputPath: join(tempRoot, "omo-onboarding-scan.js"),
     toolkitSdkOutputPath: join(tempRoot, "runtime", "agent-toolkit-sdk", "sdk.js"),
+    bunshinTsOutputPath: join(tempRoot, "runtime", "bunshin-ts", "sdk.js"),
     rollbackRuntimeOutputPath: join(tempRoot, "runtime", "rollback-migrate.js"),
     memoryDoctorOutputPath: join(tempRoot, "omo-memory-doctor.js"),
     memoryMemfsOutputPath: join(tempRoot, "omo-memory-memfs.js"),
@@ -147,6 +151,7 @@ export async function checkExtensionCurrent(options = {}) {
     for (const [current, built, outputFile] of [
       [currentRollbackRuntime, expected.rollbackRuntimeOutputPath, rollbackRuntimeOutput],
       [currentToolkitSdk, expected.toolkitSdkOutputPath, toolkitSdkOutput],
+      [currentBunshinTs, expected.bunshinTsOutputPath, bunshinTsOutput],
       [currentMain, expected.outputPath, output],
       [currentTask, expected.taskOutputPath, taskOutput],
       [currentMember, expected.memberOutputPath, memberOutput],

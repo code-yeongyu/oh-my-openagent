@@ -802,6 +802,30 @@ It runs opportunistically when the session goes idle, and optionally at shutdown
 | `dream.auto_select_max`       | `5`      | Conversations `--auto` may select (1-10)                      |
 | `dream.auto_select_max_chars` | `150000` | Byte budget for auto-selected conversations                   |
 
+#### Runtime retention
+
+Each memory identity keeps working files next to its repository under `runtime/`: reflection
+run directories, completion records, per-session transcript journals, recall sidecars and ledgers.
+The background maintenance pass (at most once every 12 hours per identity, the same pass that
+packs the memory repository) removes what is past these windows. Anything a live session owns,
+anything locked, reserved or not yet finished, and the newest and highest-numbered reflection run
+are always kept. Identities no session on this machine binds any more are visited by the host sweep
+(a bounded slice after a bound identity's own pass, at most once every 12 hours per machine) and by
+`omo doctor --fix`; identities a session in the running process binds are left to their own pass.
+
+| Option                           | Default | Description                                                                                      |
+| -------------------------------- | ------- | ------------------------------------------------------------------------------------------------ |
+| `runtime.retention_days`         | `7`     | Days before a merged or no-change reflection run, a fully reflected transcript, an idle recall sidecar and the legacy `recall/runs` and `reflection-sessions` stores are removed |
+| `runtime.discard_unreflected_journals` | `false` | Allow deleting transcript input that reflection never folded into memory (never- and partly-reflected journals). When on, it runs only while the identity's newest reflection outcome is a success, it never reflected, or reflection is disabled. `false` keeps that input forever |
+| `runtime.abandoned_journal_days` | `14`    | With `discard_unreflected_journals` on: days before an idle never-reflected journal is removed, or the transcript of a partly reflected one. Suspended while the identity's newest reflection outcome is a failure |
+| `runtime.completions_days`       | `30`    | Days before a delivered completion record (beyond the newest 50) and a recall ledger are removed  |
+| `runtime.pass_budget_ms`         | `60000` | Time one pass may spend on one identity; an interrupted pass resumes where it stopped at the next session start |
+| `runtime.max_bytes`              | `2147483648` (2 GiB) | Per-identity cap on everything under `runtime/`; `0` is unbounded. After retention the maintenance pass evicts oldest-first, inside the same `pass_budget_ms`, until the identity fits (the host sweep and `omo doctor --fix` run the same cap on identities no running session hosts, with the global `max_bytes` and its agent override, and keep every journal idle less than `retention_days` because they cannot see live sessions): folded reflection runs, fully reflected transcripts, sidecars idle 1 h, journals never reflected and idle 24 h and partly reflected transcripts idle 24 h (both only when `discard_unreflected_journals` is on and reflection is healthy for the identity), then failed runs past `retention_days` beyond the newest 10. Live sessions, in-flight runs and the run-id high water are never evicted. `omo doctor` and `/doctor` show the size and warn at 80 % |
+
+Every key accepts a per-agent override under `agents.<id>.runtime`. For identities a session does not host (`omo doctor --fix` and the background host sweep), only the global config counts: every window comes from the global `runtime` and that identity's own global `agents.<id>.runtime` override, and unreflected input is discarded there only when the global `discard_unreflected_journals` is on and that identity's own override does not turn it off. A transcript removed from a
+journal keeps its reflection cursor in `state.json`; a resumed session rebuilds the transcript from
+its own history and continues after the last reflected message.
+
 #### Memory doctor
 
 In Senpi, `/doctor` checks the working memory corpus and reports `ok`, `warn`, or
