@@ -369,10 +369,17 @@ async function resolveCommentChecker() {
 	const { COMMENT_CHECKER_RELEASE_VERSION } = await import(
 		pathToFileURL(join(repoRoot, "packages", "comment-checker-core", "src", "release.ts")).href
 	);
-	const { version } = requireFrom("@code-yeongyu/comment-checker/package.json");
+	const install = "npm --prefix packages/omo-codex/plugin ci --ignore-scripts";
+	let version;
+	try {
+		({ version } = requireFrom("@code-yeongyu/comment-checker/package.json"));
+	} catch (error) {
+		if (error?.code !== "MODULE_NOT_FOUND") throw error;
+		throw new Error(`E24: @code-yeongyu/comment-checker is not installed in the Codex plugin workspace: run ${install}`);
+	}
 	if (version !== COMMENT_CHECKER_RELEASE_VERSION)
 		throw new Error(
-			`E24: installed @code-yeongyu/comment-checker is ${version}, the plugin pins ${COMMENT_CHECKER_RELEASE_VERSION}: run bun install`,
+			`E24: installed @code-yeongyu/comment-checker is ${version}, the plugin pins ${COMMENT_CHECKER_RELEASE_VERSION}: run ${install}`,
 		);
 	return requireFrom("@code-yeongyu/comment-checker").getBinaryPath();
 }
