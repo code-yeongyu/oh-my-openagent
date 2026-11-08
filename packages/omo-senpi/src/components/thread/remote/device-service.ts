@@ -49,6 +49,11 @@ const REFUSED_BEFORE_SENDING: ReadonlySet<LocalApiError["code"]> = new Set<Local
 
 const notSentReason = (error: unknown): string => (error instanceof LocalApiError ? error.code : "attach_failed")
 
+// The device service refuses a session the other device does not hold with session_not_found; an engine answers a
+// command for such a session unknown_session, on that device and on this one. A refusal of a session-scoped command or
+// read reports the engine's code, so a remote command answers exactly what the same command does locally (#12755).
+const sessionReason = (code: string): string => (code === "session_not_found" ? "unknown_session" : code)
+
 // The engine records the thread tools send that change nothing on the other device (thread_read, the pre-send probe).
 // Like the port's read, every failure of one is a typed refusal: there is nothing that may have run.
 const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages"])
@@ -90,7 +95,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
   )
   const pool = createAttachPool(svc, options.attachIdleMs)
   const sessionCommand: RemoteSessionsPort["sessionCommand"] = async (device, sessionId, rpc, commandOptions) => {
-    // Before the command goes out nothing can have run: an attach that fails (session_not_found, peer_not_found,
+    // Before the command goes out nothing can have run: an attach that fails (session_not_found, as unknown_session; peer_not_found,
     // host_not_answering, a lost connection) or a record that is not JSON is refused with its code, typed.
     let held: HeldAttach
     let record: WireRpc
@@ -102,7 +107,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     try {
       held = await pool.hold(device, sessionId)
     } catch (error) {
-      return { kind: "refused", reason: notSentReason(error) }
+      return { kind: "refused", reason: sessionReason(notSentReason(error)) }
     }
     try {
       return await commandOn(held, rpc, record, commandOptions?.fresh === true)
@@ -149,7 +154,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         held = await pool.hold(device, sessionId)
         page = await held.session.attached.read({ tail })
       } catch (error) {
-        return { kind: "refused", reason: notSentReason(error) }
+        return { kind: "refused", reason: sessionReason(notSentReason(error)) }
       } finally {
         held?.release()
       }
@@ -211,10 +216,10 @@ async function commandOn(held: HeldAttach, rpc: JsonObject, record: WireRpc, fre
     return readOnly && outcome.kind === "uncertain" ? { kind: "refused", reason: outcome.reason } : outcome
   } catch (error) {
     // The attach succeeded, so a failure without a local API code is a lost reply, not a failed attach.
-    if (readOnly) return { kind: "refused", reason: error instanceof LocalApiError ? error.code : "reply_lost" }
+    if (readOnly) return { kind: "refused", reason: error instanceof LocalApiError ? sessionReason(error.code) : "reply_lost" }
     // Only a code that answers before sending ran nothing. Anything else - a timeout after sending, the attach or
     // connection ending, a broken protocol - may have run on the other device, so it is uncertain and never retried.
-    if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code)) return { kind: "refused", reason: error.code }
+    if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code)) return { kind: "refused", reason: sessionReason(error.code) }
     return { kind: "uncertain", reason: "reply_lost" }
   }
 }
