@@ -25,17 +25,23 @@ async function desktopRecordIsCurrent(descriptor: DesktopSyncDescriptor, home = 
     return false
   }
   let parsed: unknown
-  try { parsed = JSON.parse(raw) } catch { return false }
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return false
+  }
   const record = DesktopGenerationRecord.safeParse(parsed)
   if (!record.success) return false
   const value = record.data
-  return value.state === "active"
-    && value.generation === descriptor.generation
-    && value.incarnation === descriptor.incarnation
-    && value.accountId === descriptor.accountId
-    && value.serviceDeviceId === descriptor.serviceDeviceId
-    && value.publicKeys?.signing === descriptor.publicKeys.signing
-    && value.publicKeys?.sealing === descriptor.publicKeys.sealing
+  return (
+    value.state === "active" &&
+    value.generation === descriptor.generation &&
+    value.incarnation === descriptor.incarnation &&
+    value.accountId === descriptor.accountId &&
+    value.serviceDeviceId === descriptor.serviceDeviceId &&
+    value.publicKeys?.signing === descriptor.publicKeys.signing &&
+    value.publicKeys?.sealing === descriptor.publicKeys.sealing
+  )
 }
 
 /**
@@ -43,8 +49,15 @@ async function desktopRecordIsCurrent(descriptor: DesktopSyncDescriptor, home = 
  * per-origin lock, so the record cannot change between this read and the synchronous dispatch.
  */
 export function desktopSyncBoundary(descriptor: DesktopSyncDescriptor, lifetime: AbortSignal, home = homedir()) {
-  return <T>(dispatch: () => T): Promise<T> => withCredentialLock(descriptor.serviceOrigin, async () => {
-    if (lifetime.aborted || !await desktopRecordIsCurrent(descriptor, home) || lifetime.aborted) throw new DesktopSyncRefused()
-    return { value: dispatch() }
-  }, home, "desktop-sync-boundary").then(boxed => boxed.value)
+  return <T>(dispatch: () => T): Promise<T> =>
+    withCredentialLock(
+      descriptor.serviceOrigin,
+      async () => {
+        if (lifetime.aborted || !(await desktopRecordIsCurrent(descriptor, home)) || lifetime.aborted)
+          throw new DesktopSyncRefused()
+        return { value: dispatch() }
+      },
+      home,
+      "desktop-sync-boundary",
+    ).then((boxed) => boxed.value)
 }

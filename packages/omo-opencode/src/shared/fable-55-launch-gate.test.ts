@@ -22,7 +22,11 @@ const caches: { name: string; availableModels: Set<string>; connectedProviders: 
   },
 ]
 
-const requirements: { name: string; requirement: (typeof AGENT_MODEL_REQUIREMENTS)[string]; categoryDefaultModel?: string }[] = [
+const requirements: {
+  name: string
+  requirement: (typeof AGENT_MODEL_REQUIREMENTS)[string]
+  categoryDefaultModel?: string
+}[] = [
   ...Object.entries(AGENT_MODEL_REQUIREMENTS).map(([name, requirement]) => ({ name: `agent ${name}`, requirement })),
   ...Object.entries(CATEGORY_MODEL_REQUIREMENTS).map(([name, requirement]) => ({
     name: `category ${name}`,
@@ -49,7 +53,10 @@ describe("launch-gated Fable 5.5 never resolves before release", () => {
         }
         const pipeline = resolveModelPipeline({
           intent: { categoryDefaultModel },
-          constraints: { availableModels: cache.availableModels, connectedProviders: cache.connectedProviders ?? undefined },
+          constraints: {
+            availableModels: cache.availableModels,
+            connectedProviders: cache.connectedProviders ?? undefined,
+          },
           policy: { fallbackChain: chain },
         })
         if (pipeline?.model && isLaunchGatedModel(pipeline.model)) leaks.push(`${name}: model-core ${pipeline.model}`)

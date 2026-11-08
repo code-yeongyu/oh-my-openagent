@@ -26,7 +26,10 @@ function createWindowsDeadCheckerCwd(): string {
   return cwd
 }
 
-async function runCheckerRounds(binaryPath: string, cwd?: string): Promise<{ exitCode: number; results: unknown[]; stderr: string }> {
+async function runCheckerRounds(
+  binaryPath: string,
+  cwd?: string,
+): Promise<{ exitCode: number; results: unknown[]; stderr: string }> {
   const program = `
     const { defaultRunCommentChecker } = await import(${JSON.stringify(RUNNER_URL)})
     const results = []
@@ -62,7 +65,10 @@ async function runCheckerRounds(binaryPath: string, cwd?: string): Promise<{ exi
   return { exitCode, results: lastLine.startsWith("[") ? JSON.parse(lastLine) : [], stderr }
 }
 
-const EMPTY_ROUNDS = Array.from({ length: PAYLOAD_SIZES.length * ROUNDS_PER_SIZE }, () => ({ hasComments: false, message: "" }))
+const EMPTY_ROUNDS = Array.from({ length: PAYLOAD_SIZES.length * ROUNDS_PER_SIZE }, () => ({
+  hasComments: false,
+  message: "",
+}))
 
 describe("comment-checker child stdin (#6396)", () => {
   it("#given a checker binary that exits without reading stdin #when edits of any size are checked #then the host survives and every check is empty", async () => {
@@ -86,7 +92,10 @@ describe("comment-checker child stdin (#6396)", () => {
     "#given a checker that reads all of stdin and reports comments #when edits of any size are checked #then exit-code-2 feedback still arrives",
     async () => {
       // given
-      const binaryPath = writeShellChecker("reporting-checker", "cat >/dev/null\necho 'COMMENT/DOCSTRING DETECTED' >&2\nexit 2")
+      const binaryPath = writeShellChecker(
+        "reporting-checker",
+        "cat >/dev/null\necho 'COMMENT/DOCSTRING DETECTED' >&2\nexit 2",
+      )
 
       // when
       const { exitCode, results } = await runCheckerRounds(binaryPath)

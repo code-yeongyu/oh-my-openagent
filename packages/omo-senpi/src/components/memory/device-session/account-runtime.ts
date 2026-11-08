@@ -6,7 +6,13 @@
 // order every entry (the desktop's included) follows.
 
 import { sessionWorkerData } from "@code-yeongyu/senpi/session-worker-data"
-import { connectDeviceService, type DeviceService, deviceServiceStateDir, forgetDeviceService, handDeviceKeys } from "@oh-my-opencode/device-service-core"
+import {
+  connectDeviceService,
+  type DeviceService,
+  deviceServiceStateDir,
+  forgetDeviceService,
+  handDeviceKeys,
+} from "@oh-my-opencode/device-service-core"
 import { createOmoNativeProductConfig } from "../../telemetry/product-identity"
 import { MEMORY_SYNC_WORKER_DATA, type MemorySyncSelection } from "../desktop-sync/hostSelection"
 import { workerMemorySyncSource } from "../desktop-sync/workerPort"
@@ -25,11 +31,13 @@ export { serveWorkerPort } from "../desktop-sync/workerPort"
  */
 export function engineDeviceService(
   stateDir: string = deviceServiceStateDir(),
-  connect: () => Promise<DeviceService> = () => connectDeviceService({ version: createOmoNativeProductConfig().packageVersion, stateDir, background: true }),
+  connect: () => Promise<DeviceService> = () =>
+    connectDeviceService({ version: createOmoNativeProductConfig().packageVersion, stateDir, background: true }),
   log?: (line: string) => void,
 ): HeldCredentialRelay {
   return {
-    readopt: async credential => (await handDeviceKeys({ stateDir, connect, credential, when: "not_adopted", log })) !== "not_running",
+    readopt: async (credential) =>
+      (await handDeviceKeys({ stateDir, connect, credential, when: "not_adopted", log })) !== "not_running",
     forget: async () => {
       await forgetDeviceService({ stateDir, connect, log })
     },
@@ -41,7 +49,18 @@ export function selectedAccountSource(
   selection: () => Promise<MemorySyncSelection>,
   options: Parameters<typeof createCliAccountSource>[0],
 ): DeviceAccountSource {
-  return accountSourceFromSelection({ selection, cli: () => createCliAccountSource({ relay: engineDeviceService(undefined, undefined, options.logger === undefined ? undefined : line => options.logger?.warn(line)), ...options }) })
+  return accountSourceFromSelection({
+    selection,
+    cli: () =>
+      createCliAccountSource({
+        relay: engineDeviceService(
+          undefined,
+          undefined,
+          options.logger === undefined ? undefined : (line) => options.logger?.warn(line),
+        ),
+        ...options,
+      }),
+  })
 }
 
 /** A session Worker's selection: the port its host issued through senpi's session worker data, read on first use. */

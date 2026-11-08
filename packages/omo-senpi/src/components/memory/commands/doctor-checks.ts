@@ -84,17 +84,22 @@ export async function checkFrontmatter(repoDir: string, audit?: MemoryAuditRepor
   // Only the frontmatter contract (the set the pre-commit hook validates); root files such as
   // ARCHIVE.md and notes/ are outside it.
   const paths = (await listMarkdown(repoDir, "")).filter(isMemoryContentPath)
-  const failures = (audit ?? await auditMemoryRepo(repoDir)).issues
+  const failures = (audit ?? (await auditMemoryRepo(repoDir))).issues
     .filter((issue) => issue.code === "frontmatter_invalid")
     .map((issue) => `${issue.path} (${issue.detail})`)
 
-  const frontmatter: DoctorCheck = failures.length === 0
-    ? { name: "frontmatter", level: "ok", detail: `${paths.length} memory file${paths.length === 1 ? "" : "s"} valid` }
-    : {
-        name: "frontmatter",
-        level: "fail",
-        detail: `${failures.length} invalid file${failures.length === 1 ? "" : "s"}: ${failures.join("; ")}; fix the frontmatter or remove the file`,
-      }
+  const frontmatter: DoctorCheck =
+    failures.length === 0
+      ? {
+          name: "frontmatter",
+          level: "ok",
+          detail: `${paths.length} memory file${paths.length === 1 ? "" : "s"} valid`,
+        }
+      : {
+          name: "frontmatter",
+          level: "fail",
+          detail: `${failures.length} invalid file${failures.length === 1 ? "" : "s"}: ${failures.join("; ")}; fix the frontmatter or remove the file`,
+        }
 
   const persona: DoctorCheck = paths.includes(PERSONA_PATH)
     ? { name: "persona", level: "ok", detail: `${PERSONA_PATH} present` }
@@ -156,10 +161,7 @@ export async function checkLocks(deps: MemoryCommandDeps, locksDir: string): Pro
   }
 }
 
-export async function checkWorktrees(
-  deps: MemoryCommandDeps,
-  identity: MemoryCommandIdentity,
-): Promise<DoctorCheck> {
+export async function checkWorktrees(deps: MemoryCommandDeps, identity: MemoryCommandIdentity): Promise<DoctorCheck> {
   const { repo, worktrees } = identity.identityPaths
   if (!existsSync(join(repo, ".git"))) {
     return { name: "worktrees", level: "ok", detail: "no repository to inspect" }
@@ -223,7 +225,8 @@ export async function checkAbandonedRuns(reflectionDir: string): Promise<DoctorC
   const abandoned: string[] = []
   for (const entry of entries) {
     const sentinel = join(runsDir, entry.name, "abandoned.json")
-    if (entry.isDirectory() && existsSync(sentinel) && !(await isInterruptedLaunch(sentinel))) abandoned.push(join(runsDir, entry.name))
+    if (entry.isDirectory() && existsSync(sentinel) && !(await isInterruptedLaunch(sentinel)))
+      abandoned.push(join(runsDir, entry.name))
   }
   abandoned.sort()
   if (abandoned.length === 0) return { name: "abandoned-runs", level: "ok", detail: "no abandoned runs" }
@@ -258,7 +261,11 @@ export async function checkReflectionHealth(
     }
   }
   const failure = health.lastFailure
-  const hint = reflectionRemediation(failure?.reason, failure?.detail, await locateReflectionChildLog(reflectionDir, failure?.runId))
+  const hint = reflectionRemediation(
+    failure?.reason,
+    failure?.detail,
+    await locateReflectionChildLog(reflectionDir, failure?.runId),
+  )
   const paused = await describeReflectionPark(reflectionDir)
   return {
     name: "reflection-health",
@@ -277,7 +284,11 @@ async function describeReflectionPark(reflectionDir: string): Promise<string> {
   }
 }
 
-export async function checkTokens(repoDir: string, warnTokens: number, estimate?: SystemTokenEstimate): Promise<DoctorCheck> {
+export async function checkTokens(
+  repoDir: string,
+  warnTokens: number,
+  estimate?: SystemTokenEstimate,
+): Promise<DoctorCheck> {
   estimate ??= await estimateSystemTokens(repoDir)
   if (estimate.totalTokens < warnTokens) {
     return {
@@ -319,10 +330,20 @@ export interface RuntimeSizeReport {
 /** The number the size cap acts on (memory-core measureRuntimeSize), with what retention would still free. */
 export async function checkRuntimeSize(
   identityPaths: MemoryIdentityPaths,
-  input: { readonly maxBytes: number; readonly policy: RuntimeRetentionPolicy; readonly now: number; readonly reflectionEnabled: boolean; readonly discardUnreflectedJournals: boolean; readonly measureBudgetMs?: number; readonly measureSignal?: AbortSignal },
+  input: {
+    readonly maxBytes: number
+    readonly policy: RuntimeRetentionPolicy
+    readonly now: number
+    readonly reflectionEnabled: boolean
+    readonly discardUnreflectedJournals: boolean
+    readonly measureBudgetMs?: number
+    readonly measureSignal?: AbortSignal
+  },
 ): Promise<{ readonly check: DoctorCheck; readonly report: RuntimeSizeReport }> {
   // One deadline bounds the whole measurement: the size walk and the journal scans that read transcripts.
-  const signal = input.measureSignal ?? (input.measureBudgetMs === undefined ? undefined : AbortSignal.timeout(input.measureBudgetMs))
+  const signal =
+    input.measureSignal ??
+    (input.measureBudgetMs === undefined ? undefined : AbortSignal.timeout(input.measureBudgetMs))
   const measured = await measureRuntimeSizeWithinBudget(identityPaths.runtime, {
     now: input.now,
     ...(input.measureBudgetMs === undefined ? {} : { budgetMs: input.measureBudgetMs }),
@@ -343,7 +364,11 @@ function sizeUnknownResult(
 ): { readonly check: DoctorCheck; readonly report: RuntimeSizeReport } {
   const { budgetMs, at } = sizeUnknown
   return {
-    check: { name: "runtime-size", level: "warn", detail: `size unknown: measurement exceeded ${budgetMs} ms on ${at}` },
+    check: {
+      name: "runtime-size",
+      level: "warn",
+      detail: `size unknown: measurement exceeded ${budgetMs} ms on ${at}`,
+    },
     report: {
       bytes: 0,
       sizeUnknown: { budgetMs, at },
@@ -359,28 +384,44 @@ function sizeUnknownResult(
 async function measuredRuntimeSize(
   identityPaths: MemoryIdentityPaths,
   size: RuntimeSize,
-  input: { readonly maxBytes: number; readonly policy: RuntimeRetentionPolicy; readonly now: number; readonly reflectionEnabled: boolean; readonly discardUnreflectedJournals: boolean },
+  input: {
+    readonly maxBytes: number
+    readonly policy: RuntimeRetentionPolicy
+    readonly now: number
+    readonly reflectionEnabled: boolean
+    readonly discardUnreflectedJournals: boolean
+  },
   signal: AbortSignal | undefined,
 ): Promise<{ readonly check: DoctorCheck; readonly report: RuntimeSizeReport }> {
   const deadline = signal === undefined ? {} : { signal }
-  const pastRetention = await countRuntimePastRetention({ paths: identityPaths, policy: input.policy, now: () => input.now, reflectionEnabled: input.reflectionEnabled, ...deadline })
-  const gate = input.discardUnreflectedJournals ? await readUnreflectedRetentionGate(identityPaths.reflection, input.reflectionEnabled) : undefined
+  const pastRetention = await countRuntimePastRetention({
+    paths: identityPaths,
+    policy: input.policy,
+    now: () => input.now,
+    reflectionEnabled: input.reflectionEnabled,
+    ...deadline,
+  })
+  const gate = input.discardUnreflectedJournals
+    ? await readUnreflectedRetentionGate(identityPaths.reflection, input.reflectionEnabled)
+    : undefined
   const suspendedSince = gate?.open === false ? gate.newest?.at : undefined
   const standing = runtimeSizeStanding(size.bytes, input.maxBytes)
   const overCap = input.maxBytes > 0 ? size.bytes - input.maxBytes : 0
   // The over-cap line is the only place the unreflected bytes are printed, and only with the switch off.
-  const unreflectedBytes = overCap > 0 && !input.discardUnreflectedJournals
-    ? await measureUnreflectedJournalBytes({ paths: identityPaths, policy: input.policy, ...deadline })
-    : undefined
-  const evictableBytes = overCap > 0
-    ? await measureRuntimeCapEvictableBytes({
-      paths: identityPaths,
-      policy: { ...input.policy, discardUnreflectedJournals: input.discardUnreflectedJournals },
-      now: () => input.now,
-      reflectionEnabled: input.reflectionEnabled,
-      ...deadline,
-    })
-    : undefined
+  const unreflectedBytes =
+    overCap > 0 && !input.discardUnreflectedJournals
+      ? await measureUnreflectedJournalBytes({ paths: identityPaths, policy: input.policy, ...deadline })
+      : undefined
+  const evictableBytes =
+    overCap > 0
+      ? await measureRuntimeCapEvictableBytes({
+          paths: identityPaths,
+          policy: { ...input.policy, discardUnreflectedJournals: input.discardUnreflectedJournals },
+          now: () => input.now,
+          reflectionEnabled: input.reflectionEnabled,
+          ...deadline,
+        })
+      : undefined
   const excess = describeRuntimeCapExcess({
     overCapBytes: overCap,
     evictableBytes: evictableBytes ?? 0,
@@ -407,11 +448,19 @@ async function measuredRuntimeSize(
     `${formatRuntimeBytes(size.bytes)} (${cap})`,
     ...(largest === "" ? [] : [`largest: ${largest}`]),
     `past retention: ${pastRetention.runs} runs, ${pastRetention.journals} journals, ${pastRetention.sidecars} sidecars`,
-    ...(pastRetention.unclassifiedJournals > 0 ? [`${pastRetention.unclassifiedJournals} unclassified journals kept`] : []),
+    ...(pastRetention.unclassifiedJournals > 0
+      ? [`${pastRetention.unclassifiedJournals} unclassified journals kept`]
+      : []),
     ...(excess === undefined ? [] : [excess]),
-    ...(suspendedSince === undefined ? [] : [`abandoned-journal retention suspended since ${suspendedSince} (reflection is failing)`]),
+    ...(suspendedSince === undefined
+      ? []
+      : [`abandoned-journal retention suspended since ${suspendedSince} (reflection is failing)`]),
     // Over the cap the excess line already says what the next pass evicts; this one is for 80-100 %.
-    ...(standing.level === "warn" && excess === undefined ? [`the next maintenance pass evicts the oldest runtime data down to the cap${past > 0 ? " after retention frees what is past its window" : ""}`] : []),
+    ...(standing.level === "warn" && excess === undefined
+      ? [
+          `the next maintenance pass evicts the oldest runtime data down to the cap${past > 0 ? " after retention frees what is past its window" : ""}`,
+        ]
+      : []),
     ...(standing.level === "warn" ? ["raise memory.runtime.max_bytes, or set it to 0, to keep more"] : []),
   ].join("; ")
   return { check: { name: "runtime-size", level: standing.level, detail }, report }

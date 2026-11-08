@@ -9,9 +9,7 @@ import {
 import type { GetLocalVersionOptions, VersionInfo } from "./types"
 import { formatJsonOutput, formatVersionOutput } from "./formatter"
 
-export async function getLocalVersion(
-  options: GetLocalVersionOptions = {}
-): Promise<number> {
+export async function getLocalVersion(options: GetLocalVersionOptions = {}): Promise<number> {
   const directory = options.directory ?? process.cwd()
 
   try {

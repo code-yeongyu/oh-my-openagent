@@ -17,7 +17,10 @@ afterEach(async () => {
 
 const names = Array.from({ length: 30 }, (_, index) => `id-${String(index + 1).padStart(2, "0")}`)
 const REPO_LESS = new Set(["id-03", "id-07", "id-11"])
-const SETTINGS = { runtime: { discard_unreflected_journals: true }, agents: { "id-14": { runtime: { discard_unreflected_journals: false } } } }
+const SETTINGS = {
+  runtime: { discard_unreflected_journals: true },
+  agents: { "id-14": { runtime: { discard_unreflected_journals: false } } },
+}
 
 async function host(): Promise<string> {
   const memoryRoot = await mkdtemp(join(tmpdir(), "memory-host-sweep-"))
@@ -34,8 +37,13 @@ async function host(): Promise<string> {
   }
   const failing = buildIdentityPaths(memoryRoot, "id-12")
   await completion(failing, "reflection-run-1", { status: "consumed", finishedAt: daysAgo(2) })
-  const failingRecord = JSON.parse(await readFile(join(failing.reflection, "completions", "reflection-run-1.json"), "utf8")) as Record<string, unknown>
-  await Bun.write(join(failing.reflection, "completions", "reflection-run-1.json"), JSON.stringify({ ...failingRecord, outcome: "failed" }))
+  const failingRecord = JSON.parse(
+    await readFile(join(failing.reflection, "completions", "reflection-run-1.json"), "utf8"),
+  ) as Record<string, unknown>
+  await Bun.write(
+    join(failing.reflection, "completions", "reflection-run-1.json"),
+    JSON.stringify({ ...failingRecord, outcome: "failed" }),
+  )
   await journal(failing, "s-never", "never", daysAgo(15))
   await journal(buildIdentityPaths(memoryRoot, "id-14"), "s-never", "never", daysAgo(60))
   await journal(buildIdentityPaths(memoryRoot, "id-15"), "s-never", "never", daysAgo(60))
@@ -56,7 +64,10 @@ describe("retention as a host-sweep step (6b driver 2 / --fix; A34, A38 driver h
     if (first.status !== "swept") throw new Error("expected a sweep")
     expect(first.visited).toEqual(names.slice(0, 25))
     expect(first.completed).toBe(false)
-    expect(JSON.parse(await readFile(join(memoryRoot, HOST_SWEEP_STATE_FILE), "utf8"))).toEqual({ version: 1, cursor: "id-25" })
+    expect(JSON.parse(await readFile(join(memoryRoot, HOST_SWEEP_STATE_FILE), "utf8"))).toEqual({
+      version: 1,
+      cursor: "id-25",
+    })
     expect(run(memoryRoot, identityRoot, "id-05", "reflection-run-1")).toBe(false)
     expect(run(memoryRoot, identityRoot, "id-07", "reflection-run-1")).toBe(false)
     expect(run(memoryRoot, identityRoot, "id-20", "reflection-run-1")).toBe(false)
@@ -81,9 +92,16 @@ describe("retention as a host-sweep step (6b driver 2 / --fix; A34, A38 driver h
     const holder = await createLockRecord("runtime-sweep")
     await acquireLock(lockPath, holder)
     try {
-      const result = await sweepHostIdentities({ memoryRoot, steps: [createRetentionHostSweepStep({ settings: SETTINGS, now })], maxIdentities: 25, now })
+      const result = await sweepHostIdentities({
+        memoryRoot,
+        steps: [createRetentionHostSweepStep({ settings: SETTINGS, now })],
+        maxIdentities: 25,
+        now,
+      })
       expect(result.status).toBe("busy")
-      expect(existsSync(join(memoryRoot, "agents", "id-05", "runtime", "reflection", "runs", "reflection-run-1"))).toBe(true)
+      expect(existsSync(join(memoryRoot, "agents", "id-05", "runtime", "reflection", "runs", "reflection-run-1"))).toBe(
+        true,
+      )
     } finally {
       await releaseLock(lockPath, holder)
     }
@@ -91,10 +109,17 @@ describe("retention as a host-sweep step (6b driver 2 / --fix; A34, A38 driver h
 
   test("#given --dry-run #when the step runs #then retention changes nothing", async () => {
     const memoryRoot = await host()
-    const result = await sweepHostIdentities({ memoryRoot, steps: [createRetentionHostSweepStep({ settings: SETTINGS, now, dryRun: true })], dryRun: true, now })
+    const result = await sweepHostIdentities({
+      memoryRoot,
+      steps: [createRetentionHostSweepStep({ settings: SETTINGS, now, dryRun: true })],
+      dryRun: true,
+      now,
+    })
     if (result.status !== "swept") throw new Error("expected a sweep")
     expect(result.visited).toHaveLength(30)
-    expect(existsSync(join(memoryRoot, "agents", "id-05", "runtime", "reflection", "runs", "reflection-run-1"))).toBe(true)
+    expect(existsSync(join(memoryRoot, "agents", "id-05", "runtime", "reflection", "runs", "reflection-run-1"))).toBe(
+      true,
+    )
   })
 
   test("#given global retention_days 30 and an agent override of 3 #when the host sweep step visits #then each identity keeps the windows its global layer sets (REVIEW-5 M1)", async () => {
@@ -107,7 +132,10 @@ describe("retention as a host-sweep step (6b driver 2 / --fix; A34, A38 driver h
       await reflectionRun(paths, "reflection-run-1", { finishedAt: daysAgo(10) })
       await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
     }
-    const step = createRetentionHostSweepStep({ settings: { runtime: { retention_days: 30 }, agents: { "id-narrow": { runtime: { retention_days: 3 } } } }, now })
+    const step = createRetentionHostSweepStep({
+      settings: { runtime: { retention_days: 30 }, agents: { "id-narrow": { runtime: { retention_days: 3 } } } },
+      now,
+    })
 
     await sweepHostIdentities({ memoryRoot, steps: [step], now })
 
@@ -141,15 +169,25 @@ describe("retention as a host-sweep step (6b driver 2 / --fix; A34, A38 driver h
     const unbounded = buildIdentityPaths(memoryRoot, "id-unbounded")
     for (const paths of [capped, unbounded]) {
       await mkdir(paths.repo, { recursive: true })
-      for (const index of [1, 2, 3]) await reflectionRun(paths, `reflection-run-${index}`, { finishedAt: daysAgo(4 - index) })
+      for (const index of [1, 2, 3])
+        await reflectionRun(paths, `reflection-run-${index}`, { finishedAt: daysAgo(4 - index) })
     }
-    const step = createRetentionHostSweepStep({ settings: { runtime: { max_bytes: 1 }, agents: { "id-unbounded": { runtime: { max_bytes: 0 } } } }, now })
+    const step = createRetentionHostSweepStep({
+      settings: { runtime: { max_bytes: 1 }, agents: { "id-unbounded": { runtime: { max_bytes: 0 } } } },
+      now,
+    })
 
     const result = await sweepHostIdentities({ memoryRoot, steps: [step], now })
 
     if (result.status !== "swept") throw new Error("expected a sweep")
-    expect([1, 2, 3].map((index) => existsSync(join(capped.reflection, "runs", `reflection-run-${index}`)))).toEqual([false, false, true])
-    expect([1, 2, 3].map((index) => existsSync(join(unbounded.reflection, "runs", `reflection-run-${index}`)))).toEqual([true, true, true])
+    expect([1, 2, 3].map((index) => existsSync(join(capped.reflection, "runs", `reflection-run-${index}`)))).toEqual([
+      false,
+      false,
+      true,
+    ])
+    expect([1, 2, 3].map((index) => existsSync(join(unbounded.reflection, "runs", `reflection-run-${index}`)))).toEqual(
+      [true, true, true],
+    )
     expect(result.lines.some((line) => line.startsWith("FIXED id-capped retention removed 2"))).toBe(true)
   })
 
@@ -161,7 +199,9 @@ describe("retention as a host-sweep step (6b driver 2 / --fix; A34, A38 driver h
     const old = await journal(paths, "j-old", "never", daysAgo(10))
     const young = await journal(paths, "j-young", "never", daysAgo(3))
     const step = createRetentionHostSweepStep({
-      settings: { runtime: { max_bytes: 1, retention_days: 7, abandoned_journal_days: 14, discard_unreflected_journals: true } },
+      settings: {
+        runtime: { max_bytes: 1, retention_days: 7, abandoned_journal_days: 14, discard_unreflected_journals: true },
+      },
       now,
     })
 
@@ -174,7 +214,12 @@ describe("retention as a host-sweep step (6b driver 2 / --fix; A34, A38 driver h
   test("#given global settings #when the foreign-identity switch resolves #then only global on plus no override-off counts as on", () => {
     expect(resolveForeignIdentityDiscardUnreflected(SETTINGS, "id-14")).toBe(false)
     expect(resolveForeignIdentityDiscardUnreflected(SETTINGS, "id-15")).toBe(true)
-    expect(resolveForeignIdentityDiscardUnreflected({ agents: { "id-15": { runtime: { discard_unreflected_journals: true } } } }, "id-15")).toBe(false)
+    expect(
+      resolveForeignIdentityDiscardUnreflected(
+        { agents: { "id-15": { runtime: { discard_unreflected_journals: true } } } },
+        "id-15",
+      ),
+    ).toBe(false)
     expect(resolveForeignIdentityDiscardUnreflected(undefined, "id-15")).toBe(false)
   })
 })

@@ -8,7 +8,7 @@ type ApplyEnvironmentContextOptions = {
 export function applyEnvironmentContext(
   config: AgentConfig,
   directory?: string,
-  options: ApplyEnvironmentContextOptions = {}
+  options: ApplyEnvironmentContextOptions = {},
 ): AgentConfig {
   if (options.disableOmoEnv || !directory || !config.prompt) return config
   const envContext = createEnvContext()

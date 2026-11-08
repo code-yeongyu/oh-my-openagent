@@ -25,7 +25,9 @@ function createFakeSession(sessionId = "restored-session-1"): FakeSessionControl
         settle = resolve
       })
     },
-    async steer() { return "handled" },
+    async steer() {
+      return "handled"
+    },
     async followUp(text: string) {
       followUpCalls.push(text)
       return "handled"

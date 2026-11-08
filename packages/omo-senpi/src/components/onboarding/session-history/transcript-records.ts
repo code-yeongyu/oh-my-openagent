@@ -39,11 +39,16 @@ export interface TranscriptRecord {
 
 type Fields = Readonly<Record<string, unknown>>
 
-const isFields = (value: unknown): value is Fields => typeof value === "object" && value !== null && !Array.isArray(value)
+const isFields = (value: unknown): value is Fields =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 
 class Invalid extends Error {}
 
-function pick<T>(source: Fields, keys: ReadonlyArray<string>, check: (value: unknown) => value is T): Record<string, T> {
+function pick<T>(
+  source: Fields,
+  keys: ReadonlyArray<string>,
+  check: (value: unknown) => value is T,
+): Record<string, T> {
   const out: Record<string, T> = {}
   for (const key of keys) {
     const value = source[key]

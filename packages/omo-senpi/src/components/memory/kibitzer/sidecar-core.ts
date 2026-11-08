@@ -6,7 +6,12 @@
 import type { RecallCandidate, RecallNudge } from "@oh-my-opencode/memory-core"
 import type { ChildHandle } from "@oh-my-opencode/senpi-task"
 
-import { createKibitzerEventStream, type KibitzerEvent, type KibitzerEventDigest, type KibitzerEventStream } from "./events"
+import {
+  createKibitzerEventStream,
+  type KibitzerEvent,
+  type KibitzerEventDigest,
+  type KibitzerEventStream,
+} from "./events"
 import {
   KIBITZER_RESEED_FRACTION,
   KIBITZER_SIDECAR_MAX_TOKENS,

@@ -23,11 +23,20 @@ export function checkReviveGeneration(record: TaskRecord, port: RevivePolicyPort
   const policy = port.policy ?? ACTIVE_REVIVE_DRIFT_POLICY
   switch (policy) {
     case "recorded_warn":
-      port.warn({ code: "config_generation_mismatch", task_id: record.task_id, parent_session_id: record.parent_session_id, recorded_generation: recorded, current_generation: current })
+      port.warn({
+        code: "config_generation_mismatch",
+        task_id: record.task_id,
+        parent_session_id: record.parent_session_id,
+        recorded_generation: recorded,
+        current_generation: current,
+      })
       return true
-    case "recorded_silent": return true
-    case "refuse": return false
-    default: return assertNever(policy)
+    case "recorded_silent":
+      return true
+    case "refuse":
+      return false
+    default:
+      return assertNever(policy)
   }
 }
 
@@ -44,7 +53,9 @@ export function isColdRevivalCandidate(record: TaskRecord): boolean {
   if (record.runner_kind === "host-session" && record.residency_state === "rpc_detached") {
     return record.status !== "pending" && record.status !== "cancelled" && record.status !== "lost"
   }
-  return ((record.execution_mode === "in-process" && record.residency_state === "persisted_only") ||
-    (record.execution_mode === "process" && record.residency_state === "rpc_detached")) &&
+  return (
+    ((record.execution_mode === "in-process" && record.residency_state === "persisted_only") ||
+      (record.execution_mode === "process" && record.residency_state === "rpc_detached")) &&
     (record.status === "completed" || record.status === "error" || record.status === "interrupted")
+  )
 }

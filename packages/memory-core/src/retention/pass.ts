@@ -61,7 +61,9 @@ export async function runRuntimeRetention(options: RuntimeRetentionOptions): Pro
   const completions = await pruneCompletions(context, guard)
   const reflectionSessions = await pruneLegacyReflectionSessions(context, guard)
   const unreflectedGate = options.policy.discardUnreflectedJournals
-    ? await readUnreflectedRetentionGate(options.paths.reflection, options.reflectionEnabled ?? true, () => budget.proceed("journals"))
+    ? await readUnreflectedRetentionGate(options.paths.reflection, options.reflectionEnabled ?? true, () =>
+        budget.proceed("journals"),
+      )
     : undefined
   const journals = await pruneTranscriptJournals(context, guard, unreflectedGate)
   const sidecarResult = await pruneKibitzerSidecars({
@@ -89,9 +91,10 @@ export async function runRuntimeRetention(options: RuntimeRetentionOptions): Pro
       ...options,
       maxBytes: options.maxBytes,
       budgetMs: budget.remainingMs(),
-      measureSignal: options.signal === undefined
-        ? AbortSignal.timeout(budget.remainingMs())
-        : AbortSignal.any([options.signal, AbortSignal.timeout(budget.remainingMs())]),
+      measureSignal:
+        options.signal === undefined
+          ? AbortSignal.timeout(budget.remainingMs())
+          : AbortSignal.any([options.signal, AbortSignal.timeout(budget.remainingMs())]),
       ...(capResume === undefined ? {} : { resume: capResume }),
     })
     capResume = cap.cursor
@@ -130,9 +133,19 @@ export function summarizeRuntimeRetention(report: RuntimeRetentionReport): {
   readonly removed: number
   readonly [store: string]: number | string | readonly string[]
 } {
-  const stores = [report.runs, report.completions, report.reflectionSessions, report.journals, report.sidecars, report.ledgers]
+  const stores = [
+    report.runs,
+    report.completions,
+    report.reflectionSessions,
+    report.journals,
+    report.sidecars,
+    report.ledgers,
+  ]
   return {
-    removed: stores.reduce((total, store) => total + store.removed.length, 0) + (report.recallRuns === "removed" ? 1 : 0) + (report.cap?.evicted.length ?? 0),
+    removed:
+      stores.reduce((total, store) => total + store.removed.length, 0) +
+      (report.recallRuns === "removed" ? 1 : 0) +
+      (report.cap?.evicted.length ?? 0),
     runs: report.runs.removed.length,
     completions: report.completions.removed.length,
     reflectionSessions: report.reflectionSessions.removed.length,
@@ -142,14 +155,18 @@ export function summarizeRuntimeRetention(report: RuntimeRetentionReport): {
     recallRuns: report.recallRuns,
     skipped: report.skipped,
     ...(report.cursor === undefined ? {} : { interruptedAt: report.cursor.store }),
-    ...(report.cap === undefined ? {} : {
-      capBytes: report.cap.maxBytes,
-      bytesBefore: report.cap.beforeBytes,
-      bytesAfter: report.cap.afterBytes,
-      evicted: report.cap.evicted.length,
-      evictedBytes: report.cap.evicted.reduce((total, entry) => total + entry.bytes, 0),
-      overCapBytes: report.cap.exceededBytes,
-      capKeptHighWater: Object.entries(report.cap.kept).filter(([, reason]) => reason === "high-water").map(([name]) => name),
-    }),
+    ...(report.cap === undefined
+      ? {}
+      : {
+          capBytes: report.cap.maxBytes,
+          bytesBefore: report.cap.beforeBytes,
+          bytesAfter: report.cap.afterBytes,
+          evicted: report.cap.evicted.length,
+          evictedBytes: report.cap.evicted.reduce((total, entry) => total + entry.bytes, 0),
+          overCapBytes: report.cap.exceededBytes,
+          capKeptHighWater: Object.entries(report.cap.kept)
+            .filter(([, reason]) => reason === "high-water")
+            .map(([name]) => name),
+        }),
   }
 }

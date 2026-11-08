@@ -219,7 +219,9 @@ export function senpiEngineBuildIdentity(): EngineBuildIdentityFn {
   return requireHostSymbol<EngineBuildIdentityFn>("engineBuildIdentity")
 }
 
-export type CreateHostDaemonPathsFn = (target: { readonly socket: string; readonly agentDir?: string }) => { readonly dir: string }
+export type CreateHostDaemonPathsFn = (target: { readonly socket: string; readonly agentDir?: string }) => {
+  readonly dir: string
+}
 
 /**
  * The engine's own answer to "which directory holds this endpoint's daemon state". Undefined while

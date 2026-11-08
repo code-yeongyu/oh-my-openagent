@@ -24,7 +24,10 @@ export interface MemorySessionShutdownParts {
   readonly resetSession: (sessionId: string) => void
 }
 
-export async function runMemorySessionShutdown(parts: MemorySessionShutdownParts, input: ShutdownDrainInput): Promise<void> {
+export async function runMemorySessionShutdown(
+  parts: MemorySessionShutdownParts,
+  input: ShutdownDrainInput,
+): Promise<void> {
   const drain = parts.shutdownDrain
   // Background packing is never worth holding an exit for: stop it before the drain.
   parts.maintenance.dispose()
@@ -52,7 +55,9 @@ export async function runMemorySessionShutdown(parts: MemorySessionShutdownParts
   if (identity !== undefined) {
     const facts = parts.factsWiringFor(identity)
     if (facts.cancelActive !== undefined) {
-      await drain.raceDetached(input, "facts-cancel", async () => { await facts.cancelActive?.() })
+      await drain.raceDetached(input, "facts-cancel", async () => {
+        await facts.cancelActive?.()
+      })
     }
   }
   await drain.run(input, { journalFlushed })

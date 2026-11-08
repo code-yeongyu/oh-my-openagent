@@ -64,7 +64,9 @@ describe("computer settings schema", () => {
     const keys = Object.keys(OmoComputerSettingsSchema.shape)
 
     // when
-    const supported = keys.map((key) => COMPUTER_HARNESS_SUPPORT[`computer.${key}` as keyof typeof COMPUTER_HARNESS_SUPPORT])
+    const supported = keys.map(
+      (key) => COMPUTER_HARNESS_SUPPORT[`computer.${key}` as keyof typeof COMPUTER_HARNESS_SUPPORT],
+    )
 
     // then
     expect(supported).toEqual(keys.map(() => ["native"]))

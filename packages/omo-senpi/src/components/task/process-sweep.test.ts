@@ -295,10 +295,13 @@ describe("wireSessionStartProcessSweep()", () => {
 
 function writeOwner(versionDir: string, pid: number): void {
   mkdirSync(versionDir, { recursive: true })
-  writeFileSync(join(versionDir, "daemon.owner"), `${JSON.stringify({
-    endpoint: { kind: "unix", path: "/tmp/daemon.sock", dev: 1, ino: 1 },
-    nonce: "nonce",
-    pid,
-    startedAt: "2026-07-30T00:00:00.000Z",
-  })}\n`)
+  writeFileSync(
+    join(versionDir, "daemon.owner"),
+    `${JSON.stringify({
+      endpoint: { kind: "unix", path: "/tmp/daemon.sock", dev: 1, ino: 1 },
+      nonce: "nonce",
+      pid,
+      startedAt: "2026-07-30T00:00:00.000Z",
+    })}\n`,
+  )
 }

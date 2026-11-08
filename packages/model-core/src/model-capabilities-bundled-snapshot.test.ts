@@ -34,11 +34,7 @@ describe("bundled model capabilities snapshot", () => {
   test("keeps GPT-4.1 OpenAI variants marked as supporting tool calls", () => {
     // given
     const bundledSnapshot = getBundledModelCapabilitiesSnapshot(bundledModelCapabilitiesSnapshotJson)
-    const modelIDs = [
-      "openai/gpt-4.1",
-      "openai/gpt-4.1-mini",
-      "openai/gpt-4.1-nano",
-    ]
+    const modelIDs = ["openai/gpt-4.1", "openai/gpt-4.1-mini", "openai/gpt-4.1-nano"]
 
     // when
     const results = modelIDs.map((modelID) =>

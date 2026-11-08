@@ -9,7 +9,10 @@ function headerValue(value: string): string {
 
 /** A JSON string whose brackets are escaped too, so a quoted value can never close the `[...]` header. */
 function quotedHeaderValue(value: string): string {
-  return JSON.stringify(value).replace(/\[/g, "\\u005b").replace(/\]/g, "\\u005d").replace(/[\u0080-\u009f\u2028\u2029]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`)
+  return JSON.stringify(value)
+    .replace(/\[/g, "\\u005b")
+    .replace(/\]/g, "\\u005d")
+    .replace(/[\u0080-\u009f\u2028\u2029]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`)
 }
 
 export function deliveryProvenanceLine(provenance: Provenance | undefined): string {
@@ -48,12 +51,16 @@ export function renderDeliveryText(row: DeliveryRow): string {
   const header = [
     "OMO_GATEWAY v=1",
     `source=${source}`,
-    ...(envelope.provenance === undefined ? [] : [
-      `workspace=${quotedHeaderValue(envelope.provenance.workspace)}`,
-      `project=${quotedHeaderValue(envelope.provenance.project)}`,
-      ...(envelope.provenance.lane === undefined ? [] : [`lane=${quotedHeaderValue(envelope.provenance.lane)}`]),
-      ...(envelope.provenance.session === undefined ? [] : [`session=${quotedHeaderValue(envelope.provenance.session)}`]),
-    ]),
+    ...(envelope.provenance === undefined
+      ? []
+      : [
+          `workspace=${quotedHeaderValue(envelope.provenance.workspace)}`,
+          `project=${quotedHeaderValue(envelope.provenance.project)}`,
+          ...(envelope.provenance.lane === undefined ? [] : [`lane=${quotedHeaderValue(envelope.provenance.lane)}`]),
+          ...(envelope.provenance.session === undefined
+            ? []
+            : [`session=${quotedHeaderValue(envelope.provenance.session)}`]),
+        ]),
     `actor=${headerValue(envelope.actor)}`,
     ...authorFields(row),
     `sender_session=${headerValue(senderSession)}`,

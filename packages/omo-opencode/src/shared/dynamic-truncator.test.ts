@@ -30,7 +30,7 @@ function resetContextLimitEnv(): void {
 
 function createContextUsageMockContext(
   inputTokens: number,
-  options?: { providerID?: string; modelID?: string; cacheRead?: number }
+  options?: { providerID?: string; modelID?: string; cacheRead?: number },
 ) {
   return {
     client: {

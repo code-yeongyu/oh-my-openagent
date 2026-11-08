@@ -40,7 +40,9 @@ export async function countRuntimePastRetention(input: {
     const classified = await classifyReflectionRun(join(runsDir, name), name)
     if (typeof classified !== "string") folded.push({ name, finishedAt: classified.finishedAt })
   }
-  const newest = folded.toSorted((left, right) => right.finishedAt - left.finishedAt || right.name.localeCompare(left.name))[0]?.name
+  const newest = folded.toSorted(
+    (left, right) => right.finishedAt - left.finishedAt || right.name.localeCompare(left.name),
+  )[0]?.name
   let runs = 0
   for (const run of folded) {
     if (run.name === newest || reflectionRunNumber(run.name) === highWater || run.finishedAt > cutoff) continue
@@ -49,7 +51,12 @@ export async function countRuntimePastRetention(input: {
 
   let journals = 0
   let unclassifiedJournals = 0
-  const context = { paths: input.paths, policy: input.policy, now: input.now, ...(input.signal === undefined ? {} : { signal: input.signal }) }
+  const context = {
+    paths: input.paths,
+    policy: input.policy,
+    now: input.now,
+    ...(input.signal === undefined ? {} : { signal: input.signal }),
+  }
   const gate = await readUnreflectedRetentionGate(input.paths.reflection, input.reflectionEnabled ?? true)
   for (const sessionId of await listNames(input.paths.transcripts)) {
     if (input.isLiveSession?.(sessionId) === true) continue

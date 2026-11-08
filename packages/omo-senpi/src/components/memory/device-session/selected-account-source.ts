@@ -16,7 +16,10 @@ export function accountSourceFromSelection(options: {
   let selected: Promise<MemorySyncSelection> | undefined
   let cliSource: DeviceAccountSource | undefined
   let current: DesktopSyncAccount | undefined
-  const unavailable = (reason: DesktopSyncUnavailable["reason"]): DesktopSyncUnavailable => ({ kind: "unavailable", reason })
+  const unavailable = (reason: DesktopSyncUnavailable["reason"]): DesktopSyncUnavailable => ({
+    kind: "unavailable",
+    reason,
+  })
   return async (): Promise<DeviceAccount | null> => {
     selected ??= options.selection()
     const selection = await selected
@@ -27,7 +30,7 @@ export function accountSourceFromSelection(options: {
     if (selection.kind === "unavailable") return unavailable(selection.reason)
     const channel = selection.channel
     if (channel.signal.aborted) return unavailable("private_channel_unavailable")
-    if (current !== undefined && await current.isCurrent()) return current
+    if (current !== undefined && (await current.isCurrent())) return current
     current = undefined
     try {
       current = await open(channel)

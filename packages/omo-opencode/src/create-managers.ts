@@ -12,10 +12,7 @@ import { lookupTeamSession } from "./features/team-mode/team-session-registry"
 import { TuiStateMirror } from "./features/tui-sidebar/mirror-manager"
 import { createModelFallbackControllerAccessor } from "./hooks/model-fallback"
 import { initTaskToastManager } from "./features/task-toast-manager"
-import {
-  selectTmuxManagerEnvironmentPredicate,
-  TmuxSessionManager,
-} from "./features/tmux-subagent"
+import { selectTmuxManagerEnvironmentPredicate, TmuxSessionManager } from "./features/tmux-subagent"
 import * as openclawRuntimeDispatch from "./openclaw/runtime-dispatch"
 import { registerManagerForCleanup } from "./features/background-agent/process-cleanup"
 import { createConfigHandler } from "./plugin-handlers"
@@ -70,9 +67,12 @@ export function createManagers(args: {
   runtimeSkillSourceUrl?: string
   deps?: Partial<CreateManagersDeps>
 }): Managers {
-  const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled, runtimeSkillSourceUrl } = args
+  const { ctx, pluginConfig, tmuxConfig, modelCacheState, backgroundNotificationHookEnabled, runtimeSkillSourceUrl } =
+    args
   const deps = { ...defaultCreateManagersDeps, ...args.deps }
-  const unsubscribeSkillDiagnostics = subscribeSkillDiagnostics((diagnostic) => showSkillSecurityNotice(ctx, diagnostic.message, diagnostic.category))
+  const unsubscribeSkillDiagnostics = subscribeSkillDiagnostics((diagnostic) =>
+    showSkillSecurityNotice(ctx, diagnostic.message, diagnostic.category),
+  )
 
   // Only mark the server as in-process when the SDK actually exposes a
   // serverUrl. `tmuxConfig.enabled` alone is not proof of a running server —
@@ -85,25 +85,30 @@ export function createManagers(args: {
   if (tmuxConfig.enabled && ctx.serverUrl) {
     deps.markServerRunningInProcessFn()
   }
-  const tmuxSessionManager = new deps.TmuxSessionManagerClass(ctx, tmuxConfig, {
-    isInsideTmux: selectTmuxManagerEnvironmentPredicate(tmuxConfig.isolation),
-  }, {
-    // Team-mode members get their tmux panes from team-layout-tmux, which
-    // owns the lifecycle via runtimeState.tmuxLayout. Telling the subagent
-    // manager to ignore those sessions prevents the polling loop from racing
-    // pane closes against team-layout and stops them from being surfaced
-    // twice in the subagent panel.
-    shouldSkipSession: (sessionId) => lookupTeamSession(sessionId) !== undefined,
-  })
+  const tmuxSessionManager = new deps.TmuxSessionManagerClass(
+    ctx,
+    tmuxConfig,
+    {
+      isInsideTmux: selectTmuxManagerEnvironmentPredicate(tmuxConfig.isolation),
+    },
+    {
+      // Team-mode members get their tmux panes from team-layout-tmux, which
+      // owns the lifecycle via runtimeState.tmuxLayout. Telling the subagent
+      // manager to ignore those sessions prevents the polling loop from racing
+      // pane closes against team-layout and stops them from being surfaced
+      // twice in the subagent panel.
+      shouldSkipSession: (sessionId) => lookupTeamSession(sessionId) !== undefined,
+    },
+  )
   const modelFallbackControllerAccessor = createModelFallbackControllerAccessor()
   let backgroundManager: BackgroundManager | undefined
   let tuiStateMirror: TuiStateMirror | undefined
 
   const monitorManager = pluginConfig.monitor?.enabled
     ? deps.createMonitorManagerFn({
-      pluginContext: { client: ctx.client, directory: ctx.directory },
-      config: pluginConfig.monitor,
-    })
+        pluginContext: { client: ctx.client, directory: ctx.directory },
+        config: pluginConfig.monitor,
+      })
     : undefined
 
   const cleanupTeamModeRuns = async (): Promise<void> => {
@@ -139,36 +144,36 @@ export function createManagers(args: {
     config: pluginConfig.background_task,
     tmuxConfig,
     onSubagentSessionCreated: async (event: SubagentSessionCreatedEvent) => {
-        log("[create-managers] onSubagentSessionCreated callback received", {
-          sessionID: event.sessionID,
-          parentID: event.parentID,
-          title: event.title,
-        })
+      log("[create-managers] onSubagentSessionCreated callback received", {
+        sessionID: event.sessionID,
+        parentID: event.parentID,
+        title: event.title,
+      })
 
-        await tmuxSessionManager.onSessionCreated({
-          type: "session.created",
-          properties: {
-            info: {
-              id: event.sessionID,
-              parentID: event.parentID,
-              title: event.title,
-            },
+      await tmuxSessionManager.onSessionCreated({
+        type: "session.created",
+        properties: {
+          info: {
+            id: event.sessionID,
+            parentID: event.parentID,
+            title: event.title,
+          },
+        },
+      })
+
+      if (pluginConfig.openclaw) {
+        await openclawRuntimeDispatch.dispatchOpenClawEvent({
+          config: pluginConfig.openclaw,
+          rawEvent: "session.created",
+          context: {
+            sessionId: event.sessionID,
+            projectPath: ctx.directory,
+            tmuxPaneId: tmuxSessionManager.getTrackedPaneId?.(event.sessionID) ?? process.env.TMUX_PANE,
           },
         })
+      }
 
-        if (pluginConfig.openclaw) {
-          await openclawRuntimeDispatch.dispatchOpenClawEvent({
-            config: pluginConfig.openclaw,
-            rawEvent: "session.created",
-            context: {
-              sessionId: event.sessionID,
-              projectPath: ctx.directory,
-              tmuxPaneId: tmuxSessionManager.getTrackedPaneId?.(event.sessionID) ?? process.env.TMUX_PANE,
-            },
-          })
-        }
-
-        log("[create-managers] onSubagentSessionCreated callback completed")
+      log("[create-managers] onSubagentSessionCreated callback completed")
     },
     onSubagentSessionDeleted: async (event: { sessionID: string }) => {
       log("[create-managers] onSubagentSessionDeleted callback received", {

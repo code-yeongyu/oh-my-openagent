@@ -8,7 +8,6 @@ import { corePackagePaths as sharedCorePackagePaths } from "./core-package-paths
 
 const corePackagePaths: readonly string[] = sharedCorePackagePaths
 
-
 const mcpPackagePaths: readonly string[] = [
   "packages/ast-grep-mcp",
   "packages/git-bash-mcp",
@@ -128,7 +127,10 @@ async function collectFiles(root: string, predicate: (path: string) => boolean):
   return files
 }
 
-async function collectTrackedFiles(roots: readonly string[], predicate: (path: string) => boolean): Promise<readonly string[]> {
+async function collectTrackedFiles(
+  roots: readonly string[],
+  predicate: (path: string) => boolean,
+): Promise<readonly string[]> {
   return (await Promise.all(roots.map((root) => collectFiles(root, predicate)))).flat().toSorted()
 }
 
@@ -197,7 +199,9 @@ describe("package registration audit", () => {
     // given
     const root = await readRootManifest()
     const managedPackagePaths = (await discoverPackagePaths()).filter(isManagedWorkspacePackage)
-    const managedWorkspacePaths = managedPackagePaths.filter((path) => !mcpPackagePaths.includes(path) || root.workspaces.includes(path))
+    const managedWorkspacePaths = managedPackagePaths.filter(
+      (path) => !mcpPackagePaths.includes(path) || root.workspaces.includes(path),
+    )
     const expectedTypecheckPaths = managedWorkspacePaths.filter((path) => existsSync(join(path, "tsconfig.json")))
     const expectedDevDependencyNames = (
       await Promise.all(
@@ -288,24 +292,28 @@ describe("package registration audit", () => {
     expect(reverseEdges).toEqual([])
   })
 
-  test("#given exact re-export shim scan #when inventory docs are checked #then total targets and every path are present", async () => {
-    // given
-    const docPath = "docs/reference/re-export-shim-inventory.md"
-    const [doc, shims] = await Promise.all([readFile(docPath, "utf8"), collectReExportShims()])
+  test(
+    "#given exact re-export shim scan #when inventory docs are checked #then total targets and every path are present",
+    async () => {
+      // given
+      const docPath = "docs/reference/re-export-shim-inventory.md"
+      const [doc, shims] = await Promise.all([readFile(docPath, "utf8"), collectReExportShims()])
 
-    // when
-    const totalMatch = /Total shim exports found: (\d+)\./.exec(doc)
-    if (totalMatch?.[1] === undefined) throw new Error(`${docPath} is missing the total shim count`)
+      // when
+      const totalMatch = /Total shim exports found: (\d+)\./.exec(doc)
+      if (totalMatch?.[1] === undefined) throw new Error(`${docPath} is missing the total shim count`)
 
-    const documentedTotal = Number.parseInt(totalMatch[1], 10)
-    const targetPackages = [...new Set(shims.map((shim) => shim.targetPackage))].toSorted()
-    const missingTargetPackages = targetPackages.filter((targetPackage) => !doc.includes(`\`${targetPackage}\``))
-    const missingPaths = shims.map((shim) => shim.path).filter((path) => !doc.includes(`\`${path}\``))
+      const documentedTotal = Number.parseInt(totalMatch[1], 10)
+      const targetPackages = [...new Set(shims.map((shim) => shim.targetPackage))].toSorted()
+      const missingTargetPackages = targetPackages.filter((targetPackage) => !doc.includes(`\`${targetPackage}\``))
+      const missingPaths = shims.map((shim) => shim.path).filter((path) => !doc.includes(`\`${path}\``))
 
-    // then
-    expect(doc).toContain("Re-export Shim Inventory")
-    expect(documentedTotal).toBe(shims.length)
-    expect(missingTargetPackages).toEqual([])
-    expect(missingPaths).toEqual([])
-  }, { timeout: 20_000 })
+      // then
+      expect(doc).toContain("Re-export Shim Inventory")
+      expect(documentedTotal).toBe(shims.length)
+      expect(missingTargetPackages).toEqual([])
+      expect(missingPaths).toEqual([])
+    },
+    { timeout: 20_000 },
+  )
 })

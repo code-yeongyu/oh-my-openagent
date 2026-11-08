@@ -51,7 +51,9 @@ const TASK_CONFIG_RUNTIME = join("runtime", "task-config", "index.js")
  */
 function loadMemoryRuntimeCaps(options) {
   try {
-    const runtime = (options.loadRuntime ?? ((pluginRoot) => requireRuntime(join(pluginRoot, TASK_CONFIG_RUNTIME))))(options.pluginRoot)
+    const runtime = (options.loadRuntime ?? ((pluginRoot) => requireRuntime(join(pluginRoot, TASK_CONFIG_RUNTIME))))(
+      options.pluginRoot,
+    )
     return runtime.resolveMemoryRuntimeCaps({ cwd: options.cwd ?? process.cwd(), env: options.env ?? process.env })
   } catch {
     return undefined
@@ -75,9 +77,12 @@ function capText(maxBytes) {
 
 function formatMemoryRuntimeLines(identities, totalBytes) {
   if (identities.length === 0) return []
-  const bySize = [...identities].sort((left, right) => right.bytes - left.bytes || left.identity.localeCompare(right.identity))
+  const bySize = [...identities].sort(
+    (left, right) => right.bytes - left.bytes || left.identity.localeCompare(right.identity),
+  )
   const lines = bySize.slice(0, LISTED_IDENTITIES).map((entry) => {
-    if (entry.sizeUnknown !== undefined) return `INFO memory runtime: ${entry.identity} size unknown (${capText(entry.maxBytes)})`
+    if (entry.sizeUnknown !== undefined)
+      return `INFO memory runtime: ${entry.identity} size unknown (${capText(entry.maxBytes)})`
     const standing = runtimeSizeStanding(entry.bytes, entry.maxBytes)
     const share = standing.percent === undefined ? "" : `, ${standing.percent}%`
     return `INFO memory runtime: ${entry.identity} ${formatRuntimeBytes(entry.bytes)} (${capText(entry.maxBytes)}${share})`
@@ -88,10 +93,14 @@ function formatMemoryRuntimeLines(identities, totalBytes) {
     lines.push(`INFO memory runtime: ${rest.length} more identities hold ${formatRuntimeBytes(restBytes)}`)
   }
   const unknown = identities.filter((entry) => entry.sizeUnknown !== undefined).length
-  lines.push(`INFO memory runtime total: ${formatRuntimeBytes(totalBytes)} across ${identities.length} identit${identities.length === 1 ? "y" : "ies"}${unknown === 0 ? "" : ` (${unknown} not measured)`}`)
+  lines.push(
+    `INFO memory runtime total: ${formatRuntimeBytes(totalBytes)} across ${identities.length} identit${identities.length === 1 ? "y" : "ies"}${unknown === 0 ? "" : ` (${unknown} not measured)`}`,
+  )
   for (const entry of bySize) {
     if (entry.sizeUnknown !== undefined) {
-      lines.push(`WARN memory runtime (${entry.identity}): size unknown: measurement exceeded ${entry.sizeUnknown.budgetMs} ms on ${entry.sizeUnknown.at}`)
+      lines.push(
+        `WARN memory runtime (${entry.identity}): size unknown: measurement exceeded ${entry.sizeUnknown.budgetMs} ms on ${entry.sizeUnknown.at}`,
+      )
       continue
     }
     const excess = describeRuntimeCapExcess({
@@ -102,12 +111,16 @@ function formatMemoryRuntimeLines(identities, totalBytes) {
     })
     // Over the cap, the excess line says what the next pass does; the near-cap line is for 80-100 %.
     if (excess !== undefined) {
-      lines.push(`WARN memory runtime (${entry.identity}): ${excess}; raise memory.runtime.max_bytes, or set it to 0, to keep more.`)
+      lines.push(
+        `WARN memory runtime (${entry.identity}): ${excess}; raise memory.runtime.max_bytes, or set it to 0, to keep more.`,
+      )
       continue
     }
     const standing = runtimeSizeStanding(entry.bytes, entry.maxBytes)
     if (standing.level !== "warn") continue
-    lines.push(`WARN memory runtime is near its size cap (${entry.identity}): ${formatRuntimeBytes(entry.bytes)} is ${standing.percent}% of the ${formatRuntimeBytes(entry.maxBytes)} cap (memory.runtime.max_bytes). The next maintenance pass evicts the oldest runtime data down to the cap; raise the cap, or set it to 0, to keep more.`)
+    lines.push(
+      `WARN memory runtime is near its size cap (${entry.identity}): ${formatRuntimeBytes(entry.bytes)} is ${standing.percent}% of the ${formatRuntimeBytes(entry.maxBytes)} cap (memory.runtime.max_bytes). The next maintenance pass evicts the oldest runtime data down to the cap; raise the cap, or set it to 0, to keep more.`,
+    )
   }
   return lines
 }
@@ -146,11 +159,22 @@ export async function memoryRuntimeReport(options = {}) {
     let evictableBytes
     try {
       // Printed only on the over-cap line, and only with the switch off.
-      unreflectedBytes = overCap && !discardUnreflectedJournals ? await measureUnreflectedJournalBytes({ paths, policy, signal }) : undefined
-      evictableBytes = overCap ? await measureRuntimeCapEvictableBytes({ paths, policy, now: Date.now, signal }) : undefined
+      unreflectedBytes =
+        overCap && !discardUnreflectedJournals
+          ? await measureUnreflectedJournalBytes({ paths, policy, signal })
+          : undefined
+      evictableBytes = overCap
+        ? await measureRuntimeCapEvictableBytes({ paths, policy, now: Date.now, signal })
+        : undefined
     } catch (error) {
       if (!signal.aborted) throw error
-      identities.push({ identity, bytes: 0, maxBytes, discardUnreflectedJournals, sizeUnknown: { budgetMs, at: new Date(startedAt).toISOString() } })
+      identities.push({
+        identity,
+        bytes: 0,
+        maxBytes,
+        discardUnreflectedJournals,
+        sizeUnknown: { budgetMs, at: new Date(startedAt).toISOString() },
+      })
       continue
     }
     identities.push({

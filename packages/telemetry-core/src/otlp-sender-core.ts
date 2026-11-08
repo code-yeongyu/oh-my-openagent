@@ -44,7 +44,13 @@ class OtlpSender {
   readonly #consent: () => boolean
   readonly #batches: BatchSender
   readonly #cap: SpoolCap
-  readonly #unreported: Record<DropReason, number> = { evicted: 0, expired: 0, rejected: 0, corrupt: 0, write_failed: 0 }
+  readonly #unreported: Record<DropReason, number> = {
+    evicted: 0,
+    expired: 0,
+    rejected: 0,
+    corrupt: 0,
+    write_failed: 0,
+  }
   readonly #timers: { readonly cancel: () => void }[] = []
   readonly #started: Promise<void>
   #droppedSince200 = 0
@@ -85,7 +91,10 @@ class OtlpSender {
       endpoint,
       ingestKey: input.ingestKey,
       // The collector this transport was pointed at is ours by definition (OMO_TELEMETRY_ENDPOINT included).
-      fetch: createTraceparentFetch(input.fetch ?? fetch, [...OMO_TRACE_HOSTS, urlHost(endpoint) ?? ""].filter((host) => host !== "")),
+      fetch: createTraceparentFetch(
+        input.fetch ?? fetch,
+        [...OMO_TRACE_HOSTS, urlHost(endpoint) ?? ""].filter((host) => host !== ""),
+      ),
       requestTimeoutMs: input.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
       leaseRenewIntervalMs: input.leaseRenewIntervalMs ?? LEASE_RENEW_INTERVAL_MS,
       sleep: input.sleep ?? abortableSleep,
@@ -99,9 +108,10 @@ class OtlpSender {
     // The startup sweep + pass runs first; a flush waits for it, so a batch sealed by an early flush is
     // never left behind by a pass that listed the spool before the seal.
     // Settled, never rejected: a failed startup pass is reported once, and later flushes still run.
-    this.#started = input.autoStart === false
-      ? Promise.resolve()
-      : this.#start().catch((error: unknown) => this.#report("telemetry_otlp_send_failed", error))
+    this.#started =
+      input.autoStart === false
+        ? Promise.resolve()
+        : this.#start().catch((error: unknown) => this.#report("telemetry_otlp_send_failed", error))
     this.transport = {
       sampling: { rawTurnRate: 1 },
       tracer: this.#providers.tracer,
@@ -111,10 +121,11 @@ class OtlpSender {
       capture: (message) => this.#capture(message),
       flush: () => this.#flush(),
       shutdown: () => this.#shutdown(),
-      sweep: () => this.#guard("telemetry_spool_sweep_failed", () => {
-        sweepSpool(this.#ctx)
-        this.#cap.enforce()
-      }),
+      sweep: () =>
+        this.#guard("telemetry_spool_sweep_failed", () => {
+          sweepSpool(this.#ctx)
+          this.#cap.enforce()
+        }),
       droppedEvents: () => this.#droppedSince200,
     }
   }
@@ -168,7 +179,8 @@ class OtlpSender {
       eventName: `omo.${name}`,
       attributes: {
         ...attributes,
-        "log.record.uid": typeof uid === "string" ? uid : (this.#input.createEventId ?? (() => createBatchId(this.#ctx.nowMs())))(),
+        "log.record.uid":
+          typeof uid === "string" ? uid : (this.#input.createEventId ?? (() => createBatchId(this.#ctx.nowMs())))(),
       },
       context: context.active(),
     })
@@ -224,7 +236,8 @@ class OtlpSender {
       this.#providers.logWriter.discard()
       this.#providers.spanWriter.discard()
       const report = purgeReport(this.#input.diagnostics, this.#input.source ?? "otlp")
-      if (purgeSpool(this.#ctx.dir, this.#input.spoolRoot, report) === "refused") this.#report("telemetry_spool_purge_refused")
+      if (purgeSpool(this.#ctx.dir, this.#input.spoolRoot, report) === "refused")
+        this.#report("telemetry_spool_purge_refused")
     })
   }
 

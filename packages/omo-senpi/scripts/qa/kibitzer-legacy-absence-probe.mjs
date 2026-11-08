@@ -62,10 +62,20 @@ export const RECALL_PATHS = [
  * The retired one-shot QA drivers and their support module, assembled from parts so a repository-wide
  * search for a retired name finds nothing at all - this probe included.
  */
-export const STALE_DRIVERS = ["gate-e2e", "tool-boundary-e2e", "tool-boundary-e2e-scenarios", "persistent-failure-e2e", "e2e-support"]
-  .map((stem) => ["kibitzer", `${stem}.mjs`].join("-"))
+export const STALE_DRIVERS = [
+  "gate-e2e",
+  "tool-boundary-e2e",
+  "tool-boundary-e2e-scenarios",
+  "persistent-failure-e2e",
+  "e2e-support",
+].map((stem) => ["kibitzer", `${stem}.mjs`].join("-"))
 export const ARTIFACTS = ["omo.js", "omo-task.js", "memory-run-supervisor.mjs"]
-export const ARTIFACT_LITERALS = [...ONE_SHOT_SYMBOLS, ...COMPACTION_EPOCH_SYMBOLS, ...PER_RUN_LITERALS, ...DUAL_MODE_LITERALS]
+export const ARTIFACT_LITERALS = [
+  ...ONE_SHOT_SYMBOLS,
+  ...COMPACTION_EPOCH_SYMBOLS,
+  ...PER_RUN_LITERALS,
+  ...DUAL_MODE_LITERALS,
+]
 
 export function parseArgs(argv) {
   const options = { source: repoRoot, pluginRoot: DEFAULT_PLUGIN_ROOT, evidenceDir: undefined }
@@ -87,7 +97,10 @@ export function parseArgs(argv) {
 
 export function walk(root, files = []) {
   if (!existsSync(root)) return files
-  if (statSync(root).isFile()) { files.push(root); return files }
+  if (statSync(root).isFile()) {
+    files.push(root)
+    return files
+  }
   for (const entry of readdirSync(root, { withFileTypes: true })) {
     if (entry.name === "node_modules" || entry.name === "dist" || entry.name === ".git") continue
     const path = join(root, entry.name)
@@ -113,7 +126,8 @@ export function findMatches(files, needle, { identifier }, root) {
     const text = readFileSync(file, "utf8")
     if (identifier ? !pattern.test(text) : !text.includes(needle)) continue
     text.split("\n").forEach((line, index) => {
-      if (identifier ? pattern.test(line) : line.includes(needle)) hits.push(`${relative(root, file).split(sep).join("/")}:${index + 1}`)
+      if (identifier ? pattern.test(line) : line.includes(needle))
+        hits.push(`${relative(root, file).split(sep).join("/")}:${index + 1}`)
     })
   }
   return hits
@@ -121,7 +135,10 @@ export function findMatches(files, needle, { identifier }, root) {
 
 export function probe({ source, pluginRoot }) {
   const checks = []
-  const record = (layer, name, ok, detail) => { checks.push({ layer, name, ok, detail }); return ok }
+  const record = (layer, name, ok, detail) => {
+    checks.push({ layer, name, ok, detail })
+    return ok
+  }
   const scanned = SCAN_ROOTS.flatMap((root) => walk(join(source, root))).filter((file) => basename(file) !== SELF)
   const code = scanned.filter((file) => isCode(file) && !isTest(file))
   const tests = scanned.filter((file) => isCode(file) && isTest(file))
@@ -129,34 +146,100 @@ export function probe({ source, pluginRoot }) {
   const rel = (file) => relative(source, file).split(sep).join("/")
 
   // ---- source: modules ---------------------------------------------------------------------------------------------
-  const survivingModules = walk(join(source, "packages", "omo-senpi", "src")).filter((file) => {
-    const name = basename(file)
-    return ONE_SHOT_MODULES.some((module) => name === module || name === module.replace(/\.ts$/u, ".test.ts"))
-  }).map(rel)
-  record("source", "one-shot-modules-absent", survivingModules.length === 0, survivingModules.length === 0 ? `none of ${ONE_SHOT_MODULES.length} one-shot modules exist under packages/omo-senpi/src` : `present: ${survivingModules.join(", ")}`)
+  const survivingModules = walk(join(source, "packages", "omo-senpi", "src"))
+    .filter((file) => {
+      const name = basename(file)
+      return ONE_SHOT_MODULES.some((module) => name === module || name === module.replace(/\.ts$/u, ".test.ts"))
+    })
+    .map(rel)
+  record(
+    "source",
+    "one-shot-modules-absent",
+    survivingModules.length === 0,
+    survivingModules.length === 0
+      ? `none of ${ONE_SHOT_MODULES.length} one-shot modules exist under packages/omo-senpi/src`
+      : `present: ${survivingModules.join(", ")}`,
+  )
 
   // ---- source: identifiers and literals --------------------------------------------------------------------------
   const matches = {}
-  const scan = (needles, identifier, files = code) => Object.fromEntries(needles.map((needle) => [needle, findMatches(files, needle, { identifier }, source)]))
+  const scan = (needles, identifier, files = code) =>
+    Object.fromEntries(needles.map((needle) => [needle, findMatches(files, needle, { identifier }, source)]))
   matches.oneShot = scan(ONE_SHOT_SYMBOLS, true)
   matches.compactionEpoch = scan(COMPACTION_EPOCH_SYMBOLS, true)
   matches.perRun = scan(PER_RUN_LITERALS, false)
   matches.dualMode = scan(DUAL_MODE_LITERALS, false)
-  const recallFiles = RECALL_PATHS.flatMap((path) => walk(join(source, path))).filter((file) => isCode(file) && !isTest(file) && basename(file) !== SELF)
+  const recallFiles = RECALL_PATHS.flatMap((path) => walk(join(source, path))).filter(
+    (file) => isCode(file) && !isTest(file) && basename(file) !== SELF,
+  )
   matches.recallPath = scan(RECALL_PATH_ONLY_SYMBOLS, true, recallFiles)
   const flat = (group) => Object.values(group).flat()
-  record("source", "one-shot-symbols-absent", flat(matches.oneShot).length === 0, flat(matches.oneShot).length === 0 ? `${ONE_SHOT_SYMBOLS.join(", ")}: no production-code match in ${code.length} files` : flat(matches.oneShot).join(", "))
-  record("source", "compaction-epoch-absent", flat(matches.compactionEpoch).length === 0, flat(matches.compactionEpoch).length === 0 ? `compactionEpoch: no production-code match` : flat(matches.compactionEpoch).join(", "))
-  record("source", "per-run-artifacts-absent", flat(matches.perRun).length === 0, flat(matches.perRun).length === 0 ? `${PER_RUN_LITERALS.join(", ")}: no production-code match` : flat(matches.perRun).join(", "))
-  record("source", "dual-mode-switch-absent", flat(matches.dualMode).length === 0, flat(matches.dualMode).length === 0 ? `${DUAL_MODE_LITERALS.join(", ")}: no production-code match` : flat(matches.dualMode).join(", "))
-  record("source", "recall-path-launch-slot-absent", flat(matches.recallPath).length === 0, flat(matches.recallPath).length === 0 ? `${RECALL_PATH_ONLY_SYMBOLS.join(", ")}: no match in ${recallFiles.length} recall-path files` : flat(matches.recallPath).join(", "))
+  record(
+    "source",
+    "one-shot-symbols-absent",
+    flat(matches.oneShot).length === 0,
+    flat(matches.oneShot).length === 0
+      ? `${ONE_SHOT_SYMBOLS.join(", ")}: no production-code match in ${code.length} files`
+      : flat(matches.oneShot).join(", "),
+  )
+  record(
+    "source",
+    "compaction-epoch-absent",
+    flat(matches.compactionEpoch).length === 0,
+    flat(matches.compactionEpoch).length === 0
+      ? `compactionEpoch: no production-code match`
+      : flat(matches.compactionEpoch).join(", "),
+  )
+  record(
+    "source",
+    "per-run-artifacts-absent",
+    flat(matches.perRun).length === 0,
+    flat(matches.perRun).length === 0
+      ? `${PER_RUN_LITERALS.join(", ")}: no production-code match`
+      : flat(matches.perRun).join(", "),
+  )
+  record(
+    "source",
+    "dual-mode-switch-absent",
+    flat(matches.dualMode).length === 0,
+    flat(matches.dualMode).length === 0
+      ? `${DUAL_MODE_LITERALS.join(", ")}: no production-code match`
+      : flat(matches.dualMode).join(", "),
+  )
+  record(
+    "source",
+    "recall-path-launch-slot-absent",
+    flat(matches.recallPath).length === 0,
+    flat(matches.recallPath).length === 0
+      ? `${RECALL_PATH_ONLY_SYMBOLS.join(", ")}: no match in ${recallFiles.length} recall-path files`
+      : flat(matches.recallPath).join(", "),
+  )
 
   // ---- source: retired drivers ---------------------------------------------------------------------------------------
   const qaDir = join(source, "packages", "omo-senpi", "scripts", "qa")
   const staleFiles = STALE_DRIVERS.filter((name) => existsSync(join(qaDir, name)))
-  const staleReferences = Object.fromEntries(STALE_DRIVERS.map((name) => [name, findMatches([...code, ...tests, ...markdown], name, { identifier: false }, source)]))
-  record("source", "stale-drivers-absent", staleFiles.length === 0, staleFiles.length === 0 ? `none of ${STALE_DRIVERS.length} retired drivers exist in scripts/qa` : `present: ${staleFiles.join(", ")}`)
-  record("source", "stale-drivers-unreferenced", flat(staleReferences).length === 0, flat(staleReferences).length === 0 ? `no code, test or AGENTS reference to a retired driver in ${code.length + tests.length + markdown.length} files` : flat(staleReferences).join(", "))
+  const staleReferences = Object.fromEntries(
+    STALE_DRIVERS.map((name) => [
+      name,
+      findMatches([...code, ...tests, ...markdown], name, { identifier: false }, source),
+    ]),
+  )
+  record(
+    "source",
+    "stale-drivers-absent",
+    staleFiles.length === 0,
+    staleFiles.length === 0
+      ? `none of ${STALE_DRIVERS.length} retired drivers exist in scripts/qa`
+      : `present: ${staleFiles.join(", ")}`,
+  )
+  record(
+    "source",
+    "stale-drivers-unreferenced",
+    flat(staleReferences).length === 0,
+    flat(staleReferences).length === 0
+      ? `no code, test or AGENTS reference to a retired driver in ${code.length + tests.length + markdown.length} files`
+      : flat(staleReferences).join(", "),
+  )
 
   // ---- markdown and test fixtures: informational only ------------------------------------------------------------
   const legacyNeedles = [...ONE_SHOT_SYMBOLS, ...COMPACTION_EPOCH_SYMBOLS, ...PER_RUN_LITERALS, ...DUAL_MODE_LITERALS]
@@ -175,7 +258,14 @@ export function probe({ source, pluginRoot }) {
     const text = readFileSync(file, "utf8")
     const found = ARTIFACT_LITERALS.filter((literal) => text.includes(literal))
     artifacts[name] = { present: true, bytes: text.length, literals: found }
-    record("artifact", `${name}.legacy-literals-absent`, found.length === 0, found.length === 0 ? `none of ${ARTIFACT_LITERALS.length} legacy literals in ${name}` : `found in ${name}: ${found.join(", ")}`)
+    record(
+      "artifact",
+      `${name}.legacy-literals-absent`,
+      found.length === 0,
+      found.length === 0
+        ? `none of ${ARTIFACT_LITERALS.length} legacy literals in ${name}`
+        : `found in ${name}: ${found.join(", ")}`,
+    )
   }
 
   const failures = checks.filter((check) => !check.ok)
@@ -185,10 +275,26 @@ export function probe({ source, pluginRoot }) {
     source,
     pluginRoot,
     scanned: { code: code.length, tests: tests.length, markdown: markdown.length, roots: SCAN_ROOTS },
-    legacy_runtime: survivingModules.length > 0 || flat(matches.oneShot).length > 0 || flat(matches.recallPath).length > 0 || Object.values(artifacts).some((artifact) => artifact.literals.some((literal) => ONE_SHOT_SYMBOLS.includes(literal))),
-    compaction_epoch: flat(matches.compactionEpoch).length > 0 || Object.values(artifacts).some((artifact) => artifact.literals.includes("compactionEpoch")),
-    per_run_artifacts: flat(matches.perRun).length > 0 || Object.values(artifacts).some((artifact) => artifact.literals.some((literal) => PER_RUN_LITERALS.includes(literal))),
-    dual_mode: flat(matches.dualMode).length > 0 || Object.values(artifacts).some((artifact) => artifact.literals.some((literal) => DUAL_MODE_LITERALS.includes(literal))),
+    legacy_runtime:
+      survivingModules.length > 0 ||
+      flat(matches.oneShot).length > 0 ||
+      flat(matches.recallPath).length > 0 ||
+      Object.values(artifacts).some((artifact) =>
+        artifact.literals.some((literal) => ONE_SHOT_SYMBOLS.includes(literal)),
+      ),
+    compaction_epoch:
+      flat(matches.compactionEpoch).length > 0 ||
+      Object.values(artifacts).some((artifact) => artifact.literals.includes("compactionEpoch")),
+    per_run_artifacts:
+      flat(matches.perRun).length > 0 ||
+      Object.values(artifacts).some((artifact) =>
+        artifact.literals.some((literal) => PER_RUN_LITERALS.includes(literal)),
+      ),
+    dual_mode:
+      flat(matches.dualMode).length > 0 ||
+      Object.values(artifacts).some((artifact) =>
+        artifact.literals.some((literal) => DUAL_MODE_LITERALS.includes(literal)),
+      ),
     stale_drivers: staleFiles.length > 0 || flat(staleReferences).length > 0,
     matches: { ...matches, staleReferences, historicalMentions, testFixtureMentions },
     artifacts,
@@ -200,7 +306,8 @@ export function probe({ source, pluginRoot }) {
 async function main() {
   const options = parseArgs(process.argv.slice(2))
   const payload = probe(options)
-  for (const check of payload.checks) console.log(`${check.ok ? "PASS" : "FAIL"} [${check.layer}] ${check.name} :: ${check.detail}`)
+  for (const check of payload.checks)
+    console.log(`${check.ok ? "PASS" : "FAIL"} [${check.layer}] ${check.name} :: ${check.detail}`)
   let evidence
   if (options.evidenceDir !== undefined) {
     mkdirSync(options.evidenceDir, { recursive: true })
@@ -208,21 +315,23 @@ async function main() {
     writeFileSync(evidence, `${JSON.stringify(payload, null, 2)}\n`)
     console.log(`evidence: ${evidence}`)
   }
-  console.log(JSON.stringify({
-    ok: payload.ok,
-    driver: payload.driver,
-    legacy_runtime: payload.legacy_runtime,
-    compaction_epoch: payload.compaction_epoch,
-    per_run_artifacts: payload.per_run_artifacts,
-    dual_mode: payload.dual_mode,
-    stale_drivers: payload.stale_drivers,
-    scanned: payload.scanned,
-    historicalMentions: Object.values(payload.matches.historicalMentions).flat().length,
-    testFixtureMentions: Object.values(payload.matches.testFixtureMentions).flat().length,
-    checks: payload.checks.length,
-    failures: payload.failures,
-    ...(evidence === undefined ? {} : { evidence }),
-  }))
+  console.log(
+    JSON.stringify({
+      ok: payload.ok,
+      driver: payload.driver,
+      legacy_runtime: payload.legacy_runtime,
+      compaction_epoch: payload.compaction_epoch,
+      per_run_artifacts: payload.per_run_artifacts,
+      dual_mode: payload.dual_mode,
+      stale_drivers: payload.stale_drivers,
+      scanned: payload.scanned,
+      historicalMentions: Object.values(payload.matches.historicalMentions).flat().length,
+      testFixtureMentions: Object.values(payload.matches.testFixtureMentions).flat().length,
+      checks: payload.checks.length,
+      failures: payload.failures,
+      ...(evidence === undefined ? {} : { evidence }),
+    }),
+  )
   process.exit(payload.ok ? 0 : 1)
 }
 

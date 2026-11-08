@@ -8,7 +8,8 @@ import { createLiveThreadSurface, type LiveThreadSurface } from "./live-surface"
 function surface(host: ContractHost): LiveThreadSurface {
   return createLiveThreadSurface(undefined, {
     env: { OMO_CODING_AGENT_DIR: host.root, SENPI_RPC_SOCKET: host.socket, SENPI_RPC_KEY_ROOT: host.root },
-    statusAll: async () => undefined, registry: async () => [],
+    statusAll: async () => undefined,
+    registry: async () => [],
   })
 }
 
@@ -18,14 +19,23 @@ async function close(host: ContractHost): Promise<unknown> {
   return await client.closeSession("rpc-1", "dur-selected")
 }
 
-const sentTypes = (host: ContractHost) => host.frames.map(({ frame }) => frame.type).filter((type) => type !== "get_protocol_info" && type !== "authenticate")
+const sentTypes = (host: ContractHost) =>
+  host.frames.map(({ frame }) => frame.type).filter((type) => type !== "get_protocol_info" && type !== "authenticate")
 
 describe("thread_close on this device's host: the session ends for every client that holds it", () => {
   test("#given a session another client also holds #when it is closed #then the host ends it for every holder and the close answers closed", async () => {
     await withContractHost({ auth: true, otherAttachments: 1 }, async (host) => {
       expect(await close(host)).toBe("closed")
       expect(host.live()).toBe(false)
-      expect(host.mutations).toEqual([expect.objectContaining({ type: "unload_session", sessionId: "rpc-1", force: true, interrupt: true, children: "detach" })])
+      expect(host.mutations).toEqual([
+        expect.objectContaining({
+          type: "unload_session",
+          sessionId: "rpc-1",
+          force: true,
+          interrupt: true,
+          children: "detach",
+        }),
+      ])
       expect(sentTypes(host).slice(0, 2)).toEqual(["attach_session", "unload_session"])
     })
   })

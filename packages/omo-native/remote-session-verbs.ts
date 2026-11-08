@@ -22,7 +22,7 @@ import type { SessionArgs } from "./remote-session-args"
 // (K8) starts at its first hop: a person at a terminal is no thread chain.
 const deviceServiceSurface = (service: DeviceService): RemoteThreadSurface => ({
   sessions: createDeviceServiceSessions({ version: service.serviceVersion, connect: async () => service }),
-  chain: { stamp: record => record },
+  chain: { stamp: (record) => record },
 })
 
 const CHAIN_START = 1
@@ -37,7 +37,12 @@ const NO_SUCH_SESSION: ReadonlySet<string> = new Set(["session_not_found", "unkn
  * The session verbs: each is one of the thread tools' remote ops (omo-senpi thread/remote), so the agent and this CLI
  * reach another device's session the same way. --json prints the op's typed result as is.
  */
-export async function runSession(service: DeviceService, args: SessionArgs, json: boolean, dependencies: RemoteCommandDependencies): Promise<number> {
+export async function runSession(
+  service: DeviceService,
+  args: SessionArgs,
+  json: boolean,
+  dependencies: RemoteCommandDependencies,
+): Promise<number> {
   const remote = (dependencies.remote ?? deviceServiceSurface)(service)
   const show: Show = (result, label) => {
     if (json) dependencies.output(JSON.stringify(result))
@@ -60,7 +65,15 @@ export async function runSession(service: DeviceService, args: SessionArgs, json
   const label = `${args.target.device}/${args.target.session}`
   // Addressed directly, as the SDK does: its device refuses a session it does not hold (unknown_session). The
   // account listing settles only with the slowest device (seconds) and lags a session just opened.
-  const row: RemoteSessionRow = { device: args.target.device, session_id: args.target.session, title: "", project: "", path: "", state: "idle", updated_ms: 0 }
+  const row: RemoteSessionRow = {
+    device: args.target.device,
+    session_id: args.target.session,
+    title: "",
+    project: "",
+    path: "",
+    state: "idle",
+    updated_ms: 0,
+  }
   switch (args.verb) {
     case "model":
       return show(await setModelRemote(remote, row, { model: args.model }), label)
@@ -79,10 +92,22 @@ async function openOn(
   { json, show }: { readonly json: boolean; readonly show: Show },
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
-  const opened = await openRemote(remote, { kind: "create", device: args.device, ...(args.project === undefined ? {} : { cwd: args.project }) })
+  const opened = await openRemote(remote, {
+    kind: "create",
+    device: args.device,
+    ...(args.project === undefined ? {} : { cwd: args.project }),
+  })
   if (opened.kind !== "ok" || !("thread" in opened) || args.model === undefined) return show(opened, "")
   const label = `${args.device}/${opened.thread.thread_id}`
-  const created: RemoteSessionRow = { device: args.device, session_id: opened.thread.thread_id, title: opened.thread.name, project: opened.thread.cwd, path: "", state: "idle", updated_ms: 0 }
+  const created: RemoteSessionRow = {
+    device: args.device,
+    session_id: opened.thread.thread_id,
+    title: opened.thread.name,
+    project: opened.thread.cwd,
+    path: "",
+    state: "idle",
+    updated_ms: 0,
+  }
   const model = await setModelRemote(remote, created, { model: args.model })
   if (model.kind === "error") {
     // The session exists on its device (opened to be kept), so the failure names it: a retry must not leave another one
@@ -121,7 +146,7 @@ async function sendTo(
   if (!args.wait) return show(await promptRemote(remote, row, request, CHAIN_START), label)
   // Followed before the send, so no delta of the turn it starts can arrive unseen.
   let reply = ""
-  const follow = await followRemote(remote, row, text => {
+  const follow = await followRemote(remote, row, (text) => {
     reply += text
     if (!json) dependencies.write(text)
   })

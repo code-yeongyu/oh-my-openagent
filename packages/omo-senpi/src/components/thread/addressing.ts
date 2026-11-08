@@ -70,7 +70,12 @@ export type ThreadResolveResult =
   | ThreadAddressError
 
 export type ThreadFuzzyResult =
-  | { readonly kind: "ok"; readonly entry: ThreadAddressEntry; readonly score: number; readonly basis: ThreadFuzzyBasis }
+  | {
+      readonly kind: "ok"
+      readonly entry: ThreadAddressEntry
+      readonly score: number
+      readonly basis: ThreadFuzzyBasis
+    }
   | ThreadAddressError
 
 export type ThreadNameConflictResult = { readonly kind: "ok" } | ThreadAddressError
@@ -94,25 +99,43 @@ const UNFOLDABLE_CONTROLS = /[\u0000-\u0008\u000e-\u001f\u007f]/
  * composed and a decomposed spelling of the same name are one name.
  */
 export function normalizeThreadName(value: string): string {
-  return value
-    .normalize("NFKC")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ")
+  return value.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ")
 }
 
-type Guarded = { readonly ok: true; readonly normalized: string } | { readonly ok: false; readonly error: ThreadAddressError }
+type Guarded =
+  { readonly ok: true; readonly normalized: string } | { readonly ok: false; readonly error: ThreadAddressError }
 
 function guardInput(value: string, what: string): Guarded {
   if (typeof value !== "string") {
-    return { ok: false, error: addressError("invalid_arguments", `The ${what} must be a string.`, `Pass a thread_id or a unique name from thread_list as the ${what}.`) }
+    return {
+      ok: false,
+      error: addressError(
+        "invalid_arguments",
+        `The ${what} must be a string.`,
+        `Pass a thread_id or a unique name from thread_list as the ${what}.`,
+      ),
+    }
   }
   if (UNFOLDABLE_CONTROLS.test(value)) {
-    return { ok: false, error: addressError("invalid_arguments", `The ${what} contains control characters.`, `Remove the control characters and retry, or pass an address from thread_list.`) }
+    return {
+      ok: false,
+      error: addressError(
+        "invalid_arguments",
+        `The ${what} contains control characters.`,
+        `Remove the control characters and retry, or pass an address from thread_list.`,
+      ),
+    }
   }
   const normalized = normalizeThreadName(value)
   if (normalized.length === 0) {
-    return { ok: false, error: addressError("invalid_arguments", `The ${what} is empty.`, `Pass a thread_id or a unique name from thread_list as the ${what}.`) }
+    return {
+      ok: false,
+      error: addressError(
+        "invalid_arguments",
+        `The ${what} is empty.`,
+        `Pass a thread_id or a unique name from thread_list as the ${what}.`,
+      ),
+    }
   }
   return { ok: true, normalized }
 }
@@ -146,7 +169,17 @@ function toCandidate(entry: ThreadAddressEntry): ThreadCandidate {
 function toCandidates(matches: readonly ThreadAddressEntry[]): readonly ThreadCandidate[] {
   return [...matches]
     .sort((a, b) =>
-      a.updated_at === b.updated_at ? (a.thread_id < b.thread_id ? -1 : 1) : a.updated_at === null ? 1 : b.updated_at === null ? -1 : a.updated_at < b.updated_at ? 1 : -1,
+      a.updated_at === b.updated_at
+        ? a.thread_id < b.thread_id
+          ? -1
+          : 1
+        : a.updated_at === null
+          ? 1
+          : b.updated_at === null
+            ? -1
+            : a.updated_at < b.updated_at
+              ? 1
+              : -1,
     )
     .slice(0, AMBIGUOUS_CANDIDATE_LIMIT)
     .map(toCandidate)

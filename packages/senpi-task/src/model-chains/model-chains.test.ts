@@ -10,7 +10,10 @@ const SELECTORS = [
   "kimi-for-coding/k3.1-pro",
   "kimi-for-coding/kimi-for-coding-highspeed",
 ]
-const MODELS = SELECTORS.map((selector) => ({ provider: selector.slice(0, selector.indexOf("/")), id: selector.slice(selector.indexOf("/") + 1) }))
+const MODELS = SELECTORS.map((selector) => ({
+  provider: selector.slice(0, selector.indexOf("/")),
+  id: selector.slice(selector.indexOf("/") + 1),
+}))
 const REGISTRY = {
   getAvailable: () => MODELS,
   find: (provider: string, id: string) => MODELS.find((model) => model.provider === provider && model.id === id),
@@ -69,7 +72,12 @@ describe("describeModelChains", () => {
     // then
     expect(report.excludeModels).toEqual(["claude-fable-*"])
     expect(artistry.primary).toBe("anthropic/claude-opus-5-5")
-    expect(artistry.rungs[0]).toEqual({ model: "anthropic/claude-fable-5-1", source: "built-in", state: "excluded", excludedBy: "claude-fable-*" })
+    expect(artistry.rungs[0]).toEqual({
+      model: "anthropic/claude-fable-5-1",
+      source: "built-in",
+      state: "excluded",
+      excludedBy: "claude-fable-*",
+    })
   })
 
   test("#given a builtin agent with rungs nobody is logged in for #when described #then those rungs are marked no-login with their providers", () => {
@@ -81,13 +89,21 @@ describe("describeModelChains", () => {
     expect(explore.runtime).toEqual(["kimi-for-coding/kimi-for-coding-highspeed"])
     expect(explore.rungs.slice(0, 2)).toEqual([
       { model: "kimi-for-coding/kimi-for-coding-highspeed", source: "built-in", state: "primary" },
-      { model: "gpt-6-luna-fast", source: "built-in", state: "no-login", providers: ["chatgpt-subscription", "openai"] },
+      {
+        model: "gpt-6-luna-fast",
+        source: "built-in",
+        state: "no-login",
+        providers: ["chatgpt-subscription", "openai"],
+      },
     ])
   })
 
   test("#given an omo.json agent and a disabled category #when described #then the agent's own rung is tagged omo.json and the category says disabled", () => {
     // given
-    const config: OmoConfig = { agents: { scout: { models: ["anthropic/claude-opus-5-5"] } }, categories: { artistry: { disable: true } } }
+    const config: OmoConfig = {
+      agents: { scout: { models: ["anthropic/claude-opus-5-5"] } },
+      categories: { artistry: { disable: true } },
+    }
 
     // when
     const scout = entry(config, "agents", "scout")

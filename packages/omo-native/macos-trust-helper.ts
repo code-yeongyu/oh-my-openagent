@@ -6,7 +6,8 @@ import type { EngineTrustFacts, MacCertificate, MacTrustSetting, TrustChain } fr
 export const MAC_TRUST_HELPER_MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 export const MAC_TRUST_HELPER_EXIT = { outputCap: 74, watchdog: 75 } as const
 
-export type MacTrustSourceName = "trust-settings-user" | "trust-settings-admin" | "trust-settings-system" | "keychain-search-list"
+export type MacTrustSourceName =
+  "trust-settings-user" | "trust-settings-admin" | "trust-settings-system" | "keychain-search-list"
 export type MacTrustSource = {
   readonly name: MacTrustSourceName
   readonly outcome: "read" | "absent" | "access-denied" | "enumeration-failed"
@@ -22,32 +23,54 @@ export type MacTrustHelperDocument = {
 export type MacTrustMalformed = {
   readonly kind: "helper-malformed-output"
   readonly check:
-    | "oversize" | "encoding" | "syntax" | "unknown-field" | "missing-field" | "wrong-type" | "invalid-value"
-    | "duplicate-certificate" | "unparseable-certificate"
+    | "oversize"
+    | "encoding"
+    | "syntax"
+    | "unknown-field"
+    | "missing-field"
+    | "wrong-type"
+    | "invalid-value"
+    | "duplicate-certificate"
+    | "unparseable-certificate"
   /** JSON path of the offending value. */
   readonly path: string
 }
-export type MacTrustDecodeResult = { readonly kind: "decoded"; readonly document: MacTrustHelperDocument } | MacTrustMalformed
+export type MacTrustDecodeResult =
+  { readonly kind: "decoded"; readonly document: MacTrustHelperDocument } | MacTrustMalformed
 
 const SSL = "1.2.840.113635.100.1.3"
-const SOURCE_NAMES: readonly MacTrustSourceName[] = ["trust-settings-user", "trust-settings-admin", "trust-settings-system", "keychain-search-list"]
+const SOURCE_NAMES: readonly MacTrustSourceName[] = [
+  "trust-settings-user",
+  "trust-settings-admin",
+  "trust-settings-system",
+  "keychain-search-list",
+]
 const OUTCOMES = ["read", "absent", "access-denied", "enumeration-failed"] as const
 const RESULTS = ["TrustRoot", "TrustAsRoot", "Deny", "Unspecified"] as const
 const ROLES = ["server", "client", "unknown"] as const
 const DOMAINS = ["user", "admin", "system"] as const
 
 class Malformed extends Error {
-  constructor(readonly check: MacTrustMalformed["check"], readonly path: string) {
+  constructor(
+    readonly check: MacTrustMalformed["check"],
+    readonly path: string,
+  ) {
     super(`${check} at ${path}`)
   }
 }
 type Json = null | boolean | number | string | readonly Json[] | { readonly [key: string]: Json }
 type JsonObject = { readonly [key: string]: Json }
 
-function object(value: Json | undefined, path: string, keys: readonly string[], optional: readonly string[] = []): JsonObject {
+function object(
+  value: Json | undefined,
+  path: string,
+  keys: readonly string[],
+  optional: readonly string[] = [],
+): JsonObject {
   if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Malformed("wrong-type", path)
   const record = value as JsonObject
-  for (const key of Object.keys(record)) if (!keys.includes(key) && !optional.includes(key)) throw new Malformed("unknown-field", `${path}.${key}`)
+  for (const key of Object.keys(record))
+    if (!keys.includes(key) && !optional.includes(key)) throw new Malformed("unknown-field", `${path}.${key}`)
   for (const key of keys) if (!(key in record)) throw new Malformed("missing-field", `${path}.${key}`)
   return record
 }
@@ -106,7 +129,9 @@ function setting(value: Json | undefined, path: string): MacTrustSetting {
     policyString: nullable(record.policyString, (raw) => string(raw, `${path}.policyString`)),
     // CFNumber values: a key-usage mask may arrive signed (0xffffffff as -1) or unsigned.
     keyUsage: nullable(record.keyUsage, (raw) => integer(raw, `${path}.keyUsage`, -(2 ** 31), 2 ** 32 - 1)),
-    allowedErrors: array(record.allowedErrors, `${path}.allowedErrors`).map((raw, index) => integer(raw, `${path}.allowedErrors[${index}]`, -(2 ** 31), 2 ** 32 - 1)),
+    allowedErrors: array(record.allowedErrors, `${path}.allowedErrors`).map((raw, index) =>
+      integer(raw, `${path}.allowedErrors[${index}]`, -(2 ** 31), 2 ** 32 - 1),
+    ),
     result: nullable(record.result, (raw) => member(raw, `${path}.result`, RESULTS)),
   }
 }
@@ -115,12 +140,18 @@ function setting(value: Json | undefined, path: string): MacTrustSetting {
  * The policy applies the EKU rule only to path members, so a chain must describe its own certificate:
  * a non-empty path starts at `own`, and an anchor is the path's last member.
  */
-function chain(value: Json | undefined, path: string, own: { readonly sha256: string; readonly sha1: string }): TrustChain {
+function chain(
+  value: Json | undefined,
+  path: string,
+  own: { readonly sha256: string; readonly sha1: string },
+): TrustChain {
   const record = object(value, path, ["anchor", "path", "explicitDistrust"])
   const anchor = nullable(record.anchor, (raw) => identity(raw, `${path}.anchor`))
   const members = array(record.path, `${path}.path`).map((raw, index) => identity(raw, `${path}.path[${index}]`))
-  const same = (a: { readonly sha256: string; readonly sha1: string } | undefined, b: { readonly sha256: string; readonly sha1: string }) =>
-    a !== undefined && a.sha256 === b.sha256 && a.sha1 === b.sha1
+  const same = (
+    a: { readonly sha256: string; readonly sha1: string } | undefined,
+    b: { readonly sha256: string; readonly sha1: string },
+  ) => a !== undefined && a.sha256 === b.sha256 && a.sha1 === b.sha1
   if (members.length > 0 && !same(members[0], own)) throw new Malformed("invalid-value", `${path}.path[0]`)
   if (anchor !== null && !same(members.at(-1), anchor)) throw new Malformed("invalid-value", `${path}.anchor`)
   return { anchor, path: members, explicitDistrust: boolean(record.explicitDistrust, `${path}.explicitDistrust`) }
@@ -137,7 +168,10 @@ function parsed(der: Buffer, path: string) {
   }
   if (!certificate.raw.equals(der)) throw new Malformed("unparseable-certificate", path)
   // Node's keyUsage property is the extended key usage; absent means unrestricted.
-  const eku = certificate.keyUsage === undefined ? { kind: "unrestricted" as const } : { kind: "oids" as const, oids: [...certificate.keyUsage] }
+  const eku =
+    certificate.keyUsage === undefined
+      ? { kind: "unrestricted" as const }
+      : { kind: "oids" as const, oids: [...certificate.keyUsage] }
   return {
     sha256: createHash("sha256").update(der).digest("hex"),
     sha1: createHash("sha1").update(der).digest("hex"),
@@ -149,7 +183,8 @@ function parsed(der: Buffer, path: string) {
 
 function decodeDocument(root: Json): MacTrustHelperDocument {
   const record = object(root, "$", ["schema", "os", "complete", "sources", "certificates"])
-  if (integer(record.schema, "$.schema", Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER) !== 1) throw new Malformed("invalid-value", "$.schema")
+  if (integer(record.schema, "$.schema", Number.MIN_SAFE_INTEGER, Number.MAX_SAFE_INTEGER) !== 1)
+    throw new Malformed("invalid-value", "$.schema")
   if (string(record.os, "$.os") !== "macos") throw new Malformed("invalid-value", "$.os")
   const complete = boolean(record.complete, "$.complete")
   const rawSources = array(record.sources, "$.sources")
@@ -161,7 +196,11 @@ function decodeDocument(root: Json): MacTrustHelperDocument {
     const name = member(source.name, `${at}.name`, SOURCE_NAMES)
     if (seen.has(name)) throw new Malformed("invalid-value", `${at}.name`)
     seen.add(name)
-    return { name, outcome: member(source.outcome, `${at}.outcome`, OUTCOMES), status: integer(source.status, `${at}.status`, -(2 ** 31), 2 ** 31 - 1) }
+    return {
+      name,
+      outcome: member(source.outcome, `${at}.outcome`, OUTCOMES),
+      status: integer(source.status, `${at}.status`, -(2 ** 31), 2 ** 31 - 1),
+    }
   })
   const der = new Map<string, Uint8Array>()
   const certificates = array(record.certificates, "$.certificates").map((raw, index): MacCertificate => {
@@ -169,15 +208,21 @@ function decodeDocument(root: Json): MacTrustHelperDocument {
     const entry = object(raw, at, ["der", "source", "settings"], ["chain"])
     const source = member(entry.source, `${at}.source`, ["trust-settings", "keychain"] as const)
     // Only a keychain (intermediate) candidate carries the OS chain verdict (design 4.4 item 3).
-    if (("chain" in entry) !== (source === "keychain")) throw new Malformed("invalid-value", `${at}.chain`)
+    if ("chain" in entry !== (source === "keychain")) throw new Malformed("invalid-value", `${at}.chain`)
     const encoded = string(entry.der, `${at}.der`)
     const bytes = Buffer.from(encoded, "base64")
     if (bytes.length === 0 || bytes.toString("base64") !== encoded) throw new Malformed("invalid-value", `${at}.der`)
     const settingsRecord = object(entry.settings, `${at}.settings`, DOMAINS)
     const settings = {
-      user: nullable(settingsRecord.user, (list) => array(list, `${at}.settings.user`).map((item, i) => setting(item, `${at}.settings.user[${i}]`))),
-      admin: nullable(settingsRecord.admin, (list) => array(list, `${at}.settings.admin`).map((item, i) => setting(item, `${at}.settings.admin[${i}]`))),
-      system: nullable(settingsRecord.system, (list) => array(list, `${at}.settings.system`).map((item, i) => setting(item, `${at}.settings.system[${i}]`))),
+      user: nullable(settingsRecord.user, (list) =>
+        array(list, `${at}.settings.user`).map((item, i) => setting(item, `${at}.settings.user[${i}]`)),
+      ),
+      admin: nullable(settingsRecord.admin, (list) =>
+        array(list, `${at}.settings.admin`).map((item, i) => setting(item, `${at}.settings.admin[${i}]`)),
+      ),
+      system: nullable(settingsRecord.system, (list) =>
+        array(list, `${at}.settings.system`).map((item, i) => setting(item, `${at}.settings.system[${i}]`)),
+      ),
     }
     // Trust-settings candidates carry settings in at least one domain; keychain candidates have none of their own.
     const hasSettings = DOMAINS.some((domain) => settings[domain] !== null)
@@ -185,16 +230,21 @@ function decodeDocument(root: Json): MacTrustHelperDocument {
     const facts = parsed(bytes, `${at}.der`)
     if (der.has(facts.sha256)) throw new Malformed("duplicate-certificate", `${at}.der`)
     der.set(facts.sha256, new Uint8Array(bytes))
-    return source === "keychain" ? { ...facts, source, settings, chain: chain(entry.chain, `${at}.chain`, facts) } : { ...facts, source, settings }
+    return source === "keychain"
+      ? { ...facts, source, settings, chain: chain(entry.chain, `${at}.chain`, facts) }
+      : { ...facts, source, settings }
   })
   // The importer owns completeness: every trust-settings domain carries Deny facts (design 4.5).
-  const negativesRead = sources.every((source) => source.name === "keychain-search-list" || source.outcome === "read" || source.outcome === "absent")
+  const negativesRead = sources.every(
+    (source) => source.name === "keychain-search-list" || source.outcome === "read" || source.outcome === "absent",
+  )
   return { facts: { os: "macos", complete: complete && negativesRead, certificates }, der, sources }
 }
 
 /** Strict, bounded decoding of the helper's stdout (design 4.1). Any deviation is `helper-malformed-output`. */
 export function decodeMacTrustHelperOutput(bytes: Uint8Array): MacTrustDecodeResult {
-  if (bytes.byteLength > MAC_TRUST_HELPER_MAX_OUTPUT_BYTES) return { kind: "helper-malformed-output", check: "oversize", path: "$" }
+  if (bytes.byteLength > MAC_TRUST_HELPER_MAX_OUTPUT_BYTES)
+    return { kind: "helper-malformed-output", check: "oversize", path: "$" }
   let text: string
   try {
     text = new TextDecoder("utf-8", { fatal: true }).decode(bytes)
@@ -238,7 +288,11 @@ export function runMacTrustHelper(
     const chunks: Buffer[] = []
     let length = 0
     let settled = false
-    const child = spawn(path, [], { env: home === undefined ? {} : { HOME: home }, stdio: ["ignore", "pipe", "ignore"], detached: true })
+    const child = spawn(path, [], {
+      env: home === undefined ? {} : { HOME: home },
+      stdio: ["ignore", "pipe", "ignore"],
+      detached: true,
+    })
     const killGroup = () => {
       if (child.pid === undefined) return
       try {
@@ -269,15 +323,24 @@ export function runMacTrustHelper(
     })
     child.on("error", (error: NodeJS.ErrnoException) => {
       switch (error.code) {
-        case "ENOENT": case "ENOTDIR": case "EACCES": settle({ kind: "helper-missing" }); break
-        case "ENOEXEC": case "EBADARCH": settle({ kind: "helper-wrong-arch" }); break
-        default: settle({ kind: "helper-crash", exitCode: null, signal: null })
+        case "ENOENT":
+        case "ENOTDIR":
+        case "EACCES":
+          settle({ kind: "helper-missing" })
+          break
+        case "ENOEXEC":
+        case "EBADARCH":
+          settle({ kind: "helper-wrong-arch" })
+          break
+        default:
+          settle({ kind: "helper-crash", exitCode: null, signal: null })
       }
     })
     child.on("close", (exitCode: number | null, signal: NodeJS.Signals | null) => {
       if (exitCode === 0) settle({ kind: "output", bytes: new Uint8Array(Buffer.concat(chunks)) })
       else if (exitCode === MAC_TRUST_HELPER_EXIT.watchdog) settle({ kind: "helper-timeout", by: "watchdog" })
-      else if (exitCode === MAC_TRUST_HELPER_EXIT.outputCap) settle({ kind: "helper-malformed-output", check: "oversize", path: "$" })
+      else if (exitCode === MAC_TRUST_HELPER_EXIT.outputCap)
+        settle({ kind: "helper-malformed-output", check: "oversize", path: "$" })
       else settle({ kind: "helper-crash", exitCode, signal })
     })
   })
