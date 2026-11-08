@@ -19,7 +19,7 @@ use senpi_desktop_core::types::DesktopWindow;
 use serde::Deserialize;
 use zbus::Connection;
 
-use super::hyprland::{Placement, WindowRect};
+use super::hyprland::{place_window_in, Placement, WindowRect};
 use crate::portal::portal_runtime;
 
 pub const DESKTOP_ENV: &str = "XDG_CURRENT_DESKTOP";
@@ -310,6 +310,18 @@ impl Gnome {
     /// See [`place`] and [`Gnome::stack`].
     pub fn placement(&self, window: &DesktopWindow) -> CoreResult<Placement> {
         place(&self.stack()?, window)
+    }
+
+    /// `windows` with window `id` moved onto its GNOME frame rect, read with
+    /// one extension call, so a window capture crops the pixels GNOME shows at
+    /// the same rect a window click is placed at. When the window cannot be
+    /// placed, `windows` comes back unchanged with the refusal saying why.
+    pub fn place_in(
+        &self,
+        windows: Vec<DesktopWindow>,
+        id: &str,
+    ) -> (Vec<DesktopWindow>, Option<DesktopError>) {
+        place_window_in(windows, id, |window| self.placement(window))
     }
 }
 
