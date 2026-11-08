@@ -63,11 +63,13 @@ export type LocalApiClient = {
   ) => Promise<string>;
   // omo addition (relay daemon #393): the attach-less endpoint command `session.command {device, endpoint, rpc}`,
   // always delegated. Inline only: a record over the inline line limit is refused message_too_long before sending.
+  // `locate` asks for an open's new session on its reply (decision 0018 amendment 2026-11-06, `located`).
   readonly endpointCommand: (
     device: string,
     endpoint: string,
     rpc: CommandRpc,
     command_id?: string,
+    options?: { readonly locate?: boolean },
   ) => Promise<string>;
   readonly list: (
     filter?: SessionFilter,
@@ -193,9 +195,10 @@ const sendEndpointCommand = async (
   endpoint: string,
   rpc: CommandRpc,
   command_id: string | undefined,
+  locate: boolean,
 ): Promise<string> => {
   const sent = command_id ?? mintId();
-  const params = { device, endpoint, command_id: sent, rpc };
+  const params = { device, endpoint, command_id: sent, ...(locate ? { locate: true as const } : {}), rpc };
   if (lineBytes({ id: "x".repeat(REQUEST_ID_MAX_CHARS), type: "session.command", ...params }) > LOCAL_INLINE_MAX)
     throw new LocalApiError("message_too_long", "an endpoint command travels inline only", {
       limit_chars: MESSAGE_LIMIT_CHARS,
@@ -239,8 +242,8 @@ export const connectLocalApi = async (options: ConnectOptions): Promise<LocalApi
     },
     command: (attach, rpc, command_id, route = {}) =>
       sendCommand(connection, attach, rpc, command_id, route),
-    endpointCommand: (device, endpoint, rpc, command_id) =>
-      sendEndpointCommand(connection, device, endpoint, rpc, command_id),
+    endpointCommand: (device, endpoint, rpc, command_id, options) =>
+      sendEndpointCommand(connection, device, endpoint, rpc, command_id, options?.locate === true),
     list: (filter, onRevision, rows) =>
       new Promise<ListingResult>((resolve, reject) => {
         const params = {
