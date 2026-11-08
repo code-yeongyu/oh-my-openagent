@@ -63,6 +63,9 @@ impl Backend for PanickyFake {
     fn capabilities(&mut self) -> DesktopCapabilities {
         self.inner.capabilities()
     }
+    fn hit_at(&mut self, x: f64, y: f64) -> CoreResult<Option<senpi_desktop_core::frame::PointHit>> {
+        self.inner.hit_at(x, y)
+    }
     fn displays(&mut self) -> CoreResult<Vec<DesktopDisplay>> {
         self.inner.displays()
     }
