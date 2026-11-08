@@ -2355,6 +2355,10 @@
         "picocolors",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
         "picomatch",
+        // Not a dead entry: nothing `import`s omowright because its package `exports` points at build output a git
+        // dependency does not carry (omowright#269). The browser skill consumes it by path instead -- the stager bundles
+        // `node_modules/omowright` and `skills/browser/scripts/omowright.mjs` resolves the same tree at runtime (#12842).
+        "omowright",
       ],
     },
     "packages/rules-engine": {

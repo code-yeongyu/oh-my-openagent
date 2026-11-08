@@ -9,10 +9,17 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const skillRoot = dirname(scriptDir)
 
 export function resolveOmowrightEntry(env = process.env) {
+  const packageRoot = join(skillRoot, "..", "..", "..", "..", "node_modules", "omowright")
+  // Sources before the build and `.ts` before `.js`: a git dependency installs the sources (TypeScript
+  // since the omowright port in omowright#266), a package built for `exports` ships compiled `dist/` and no
+  // sources (omowright#269). Same preference order as stage-omowright-runtime.mjs, so the loader and the stager
+  // cannot pick different entries (#12851).
   const candidates = [
     env.OMOWRIGHT_ROOT ? join(env.OMOWRIGHT_ROOT, "index.js") : undefined,
     join(skillRoot, "runtime", "omowright", "index.js"),
-    join(skillRoot, "..", "..", "..", "..", "node_modules", "omowright", "src", "index.js"),
+    join(packageRoot, "src", "index.ts"),
+    join(packageRoot, "src", "index.js"),
+    join(packageRoot, "dist", "index.js"),
   ].filter((candidate) => candidate !== undefined)
   return candidates.find((candidate) => existsSync(candidate))
 }
