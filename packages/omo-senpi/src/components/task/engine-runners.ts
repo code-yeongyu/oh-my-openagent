@@ -201,7 +201,6 @@ export function buildProcessChildRunner(build: RunnerBuildContext): RpcHostRunne
   const perChild = new RpcProcessRunner({
     inheritedExtensions,
     ...modelAdmission,
-    ...(build.onHostWarning === undefined ? {} : { onWarning: build.onHostWarning }),
   })
   const platform = build.platform ?? process.platform
   if (build.settings.process_runner !== "host" || platform === "win32") return perChild

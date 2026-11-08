@@ -8,8 +8,6 @@ export interface OpenedHostSession {
   readonly attached: boolean
   readonly instanceId: string
   readonly engineVersion: string
-  /** The open asked for a session fallback chain the host cannot hold (no `retry_fallback_profile`). */
-  readonly retryFallbackDropped?: boolean
   /** The model the host reported for a FRESH open (the post-start check's read; #9722). */
   readonly reportedModel?: EffectiveModel
   /** The session's durable id from that same read, so the record carries child_session_id from spawn (#10873). */
