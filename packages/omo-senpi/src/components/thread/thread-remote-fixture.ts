@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
-import type { AliasHolder, AliasRegistry, JsonObject, RemoteCommandOutcome, RemoteDevice, RemoteSessionRow, RemoteThreadSurface } from "./remote/ports"
+import type { AliasHolder, AliasRegistry, AliasResult, JsonObject, RemoteCommandOutcome, RemoteDevice, RemoteSessionRow, RemoteThreadSurface } from "./remote/ports"
 import type { ThreadTranscriptEntry } from "./reader"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import type { ThreadCloseOutcome } from "./tools/ports"
@@ -30,7 +30,7 @@ export function createRemoteThreadFixture() {
     for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
   }
 
-  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[]; chainCountLimit?: number } = {}) {
+  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[]; rows?: readonly RemoteSessionRow[]; registryDown?: "refused" | "throws"; chainCountLimit?: number; relayKeys?: ReadonlyMap<string, string> } = {}) {
     const engine = options.engine ?? ENGINE
     const sent: Sent[] = []
     // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
@@ -77,8 +77,15 @@ export function createRemoteThreadFixture() {
       return ok({})
     }
     const devices: RemoteDevice[] = [{ device: "here", label: "this mac", online: true }, { device: "b", label: "studio", online: options.online ?? true }]
+    for (const row of options.rows ?? []) if (!devices.some((known) => known.device === row.device)) devices.push({ device: row.device, label: row.device, online: true })
+    const registryCalls: string[] = []
+    const down = <T>(): Promise<AliasResult<T>> => options.registryDown === "throws"
+      ? Promise.reject(new Error("alias registry connection reset"))
+      : Promise.resolve({ kind: "error", error: { code: "alias_registry_unavailable", message: "the alias registry could not be reached", details: { reason: "sign_in" } } })
     const registry: AliasRegistry = {
       claim: async ({ alias, holder }) => {
+        registryCalls.push("claim")
+        if (options.registryDown !== undefined) return await down()
         if (options.failClaim === true) throw new Error("alias registry failed")
         const held = aliases.get(alias)
         if (held !== undefined && held.session_id !== holder.session_id) return { kind: "error", error: { code: "alias_taken", message: `alias ${alias} is taken`, details: { holder: held } } }
@@ -96,20 +103,27 @@ export function createRemoteThreadFixture() {
       },
       release: async ({ alias }) => ({ kind: "ok", value: { released: aliases.delete(alias) } }),
       resolve: async (alias) => {
+        registryCalls.push("resolve")
+        if (options.registryDown !== undefined) return await down()
         const held = aliases.get(alias)
         return held === undefined ? { kind: "error", error: { code: "alias_not_found", message: "no such alias" } } : { kind: "ok", value: held }
       },
-      aliasesOf: async (ids) => options.failAliasesOf === true ? Promise.reject(new Error("alias registry failed")) : ({ kind: "ok", value: new Map([...aliases].filter(([, holder]) => ids.includes(holder.session_id)).map(([alias, holder]) => [holder.session_id, alias])) }),
+      aliasesOf: async (ids) => registryCalls.push("aliasesOf") > 0 && options.failAliasesOf === true ? Promise.reject(new Error("alias registry failed")) : ({ kind: "ok", value: new Map([...aliases].filter(([, holder]) => ids.includes(holder.session_id)).map(([alias, holder]) => [holder.session_id, alias])) }),
     }
     const remote: RemoteThreadSurface = {
       sessions: {
         status: async () => ({ state: options.plan ?? "connected" }),
         thisDevice: async () => "here",
         devices: async () => devices,
-        sessions: async () => { if (options.failSessionsList === true) throw new Error("account list failed"); return [{ ...B_ROW, state: options.rowState ?? B_ROW.state }] },
+        sessions: async () => { if (options.failSessionsList === true) throw new Error("account list failed"); return options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }] },
         endpointCommand: async (device, rpc) => { sent.push({ via: "endpoint", device, rpc }); return answer(rpc) },
         // This fake device lists a created session by the id its create reply names.
-        locate: async (_device, engineId) => ({ kind: "ok", sessionId: engineId }),
+        locate: async (_device, engineId) => {
+          // A device's relay connector keys each session it lists by a relay key, kept beside the durable id (relayKeys).
+          if (options.relayKeys === undefined) return { kind: "ok", sessionId: engineId }
+          const key = options.relayKeys.get(engineId)
+          return key === undefined ? { kind: "refused", reason: "session_not_found" } : { kind: "ok", sessionId: key }
+        },
         sessionCommand: async (device, session, rpc) => {
           sent.push({ via: "session", device, session, rpc })
           const outcome = answer(rpc, session)
@@ -128,10 +142,10 @@ export function createRemoteThreadFixture() {
       // The field senpi's prompt record carries the count in (S32, rpc.md `chainCount`).
       chain: { stamp: (record, hop) => { hops.push(hop); return { ...record, chainCount: hop } } },
     }
-    return { remote, sent, hops, aliases, live }
+    return { remote, sent, hops, aliases, live, registryCalls }
   }
 
-  function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?: () => string | undefined; sessions?: ThreadHostSession[]; engine?: Engine; caller?: string; diskSessions?: readonly string[]; closeOutcome?: ThreadCloseOutcome } = {}) {
+  function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?: () => string | undefined; callerName?: () => string | undefined; env?: Readonly<Record<string, string | undefined>>; sessions?: ThreadHostSession[]; engine?: Engine; caller?: string; diskSessions?: readonly string[]; closeOutcome?: ThreadCloseOutcome } = {}) {
     const engine = extra.engine ?? ENGINE
     const local: ThreadHostSession = { sessionId: "route-local", durableSessionId: "dur-local", cwd: process.cwd(), name: "local peer", status: "open" }
     const sessions = extra.sessions ?? [local]
@@ -163,7 +177,7 @@ export function createRemoteThreadFixture() {
     // Session files with no live owner: the address book lists them from disk, and no host holds them.
     const disk = (extra.diskSessions ?? []).map((id) => ({ durable_id: id, name: null, cwd: process.cwd(), created_at: "2026-11-01T00:00:00Z", updated_at: null, session_path: join(agentDir, `${id}.jsonl`), source_host: null }))
     const caller = extra.caller ?? "dur-caller"
-    const tools = createThreadTools({ host, store, stateDirectory: join(agentDir, "state"), diskSessions: () => disk, callerSessionId: () => caller, callerWorkspaceRoot: () => process.cwd(), remote, ...(extra.callerCause === undefined ? {} : { callerCause: extra.callerCause }) })
+    const tools = createThreadTools({ host, store, stateDirectory: join(agentDir, "state"), diskSessions: () => disk, callerSessionId: () => caller, callerWorkspaceRoot: () => process.cwd(), remote, ...(extra.callerCause === undefined ? {} : { callerCause: extra.callerCause }), ...(extra.callerName === undefined ? {} : { callerName: extra.callerName }), ...(extra.env === undefined ? {} : { env: extra.env }) })
     const run = async (name: ThreadToolName, args: unknown): Promise<ThreadToolResult> => {
       const tool = tools.find((candidate) => candidate.name === name)
       if (tool === undefined) throw new Error(`${name} is not registered`)
