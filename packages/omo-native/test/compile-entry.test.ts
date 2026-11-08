@@ -264,6 +264,21 @@ describe("compiled omo entry launcher parity", () => {
       expect(isProvisionedExecutable("C:\\\uD835\uDC00omo.exe", "C:\\\uD835\uDC01omo.exe", "win32", missing)).toBe(false)
     })
 
+    test("#when two names differ by a case pair Unicode added after older NTFS volumes were formatted #then they stay different executables", () => {
+      // An NTFS volume's $UpCase table is frozen at format time; these pairs are newer than it (#12809).
+      expect(isProvisionedExecutable("C:\\\u10D0omo.exe", "C:\\\u1C90omo.exe", "win32", missing)).toBe(false) // Georgian / Mtavruli, Unicode 11
+      expect(isProvisionedExecutable("C:\\\uAB70omo.exe", "C:\\\u13A0omo.exe", "win32", missing)).toBe(false) // Cherokee small, Unicode 8
+      expect(isProvisionedExecutable("C:\\\u0282omo.exe", "C:\\\uA7C5omo.exe", "win32", missing)).toBe(false) // Latin s with hook, Unicode 12
+    })
+
+    test("#when two names differ by a long-standing BMP case pair #then they are the same executable", () => {
+      // Latin-1, Latin Extended-A, Greek and Cyrillic pairs every NTFS upcase table holds.
+      expect(isProvisionedExecutable("C:\\\u00e9t\u00e9\\omo.exe", "C:\\\u00c9T\u00c9\\OMO.EXE", "win32", missing)).toBe(true)
+      expect(isProvisionedExecutable("C:\\\u0142\u0105ka\\omo.exe", "C:\\\u0141\u0104KA\\omo.exe", "win32", missing)).toBe(true)
+      expect(isProvisionedExecutable("C:\\\u03b1\u03b2\\omo.exe", "C:\\\u0391\u0392\\omo.exe", "win32", missing)).toBe(true)
+      expect(isProvisionedExecutable("C:\\\u0434\u0436\\omo.exe", "C:\\\u0414\u0416\\omo.exe", "win32", missing)).toBe(true)
+    })
+
     test("#when POSIX paths differ only in case #then they stay different executables", () => {
       expect(isProvisionedExecutable("/home/u/.omo/omo", "/home/u/.OMO/omo", "linux", missing)).toBe(false)
     })
