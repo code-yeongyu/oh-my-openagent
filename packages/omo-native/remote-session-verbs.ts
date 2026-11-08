@@ -29,6 +29,10 @@ const CHAIN_START = 1
 
 type Show = (result: ThreadToolResult, label: string) => number
 
+// The device service refuses a session the other device does not hold with session_not_found; the remote port reports
+// it as the engine's unknown_session (#12755). Either names a session that is not on this account.
+const NO_SUCH_SESSION: ReadonlySet<string> = new Set(["session_not_found", "unknown_session"])
+
 /**
  * The session verbs: each is one of the thread tools' remote ops (omo-senpi thread/remote), so the agent and this CLI
  * reach another device's session the same way. --json prints the op's typed result as is.
@@ -38,7 +42,7 @@ export async function runSession(service: DeviceService, args: SessionArgs, json
   const show: Show = (result, label) => {
     if (json) dependencies.output(JSON.stringify(result))
     if (result.kind === "error") {
-      if (!json && label !== "" && result.error.details?.["reason"] === "session_not_found") {
+      if (!json && label !== "" && NO_SUCH_SESSION.has(String(result.error.details?.["reason"]))) {
         dependencies.error(`omo remote: no session ${label} on this account.`)
         dependencies.error("Run omo remote sessions to see them.")
       } else if (!json) {
@@ -54,7 +58,7 @@ export async function runSession(service: DeviceService, args: SessionArgs, json
   if (unavailable !== undefined) return show(unavailable, "")
   if (args.verb === "open") return await openOn(remote, args, { json, show }, dependencies)
   const label = `${args.target.device}/${args.target.session}`
-  // Addressed directly, as the SDK does: its device answers session_not_found for a session it does not hold. The
+  // Addressed directly, as the SDK does: its device refuses a session it does not hold (unknown_session). The
   // account listing settles only with the slowest device (seconds) and lags a session just opened.
   const row: RemoteSessionRow = { device: args.target.device, session_id: args.target.session, title: "", project: "", path: "", state: "idle", updated_ms: 0 }
   switch (args.verb) {
