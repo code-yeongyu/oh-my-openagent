@@ -1,6 +1,8 @@
+import { Database } from "bun:sqlite"
 import { afterEach, describe, expect, test } from "bun:test"
 import { COMMAND_UNCERTAIN_REASONS } from "../../../../device-service-core/src/local-api/vocabulary"
 import type { ThreadToolResult } from "./contracts"
+import { gatewayDatabasePath } from "./gateway/paths"
 import { type ThreadHostSession } from "./tools"
 import { B_ROW, comparable, createRemoteThreadFixture } from "./thread-remote-fixture"
 
@@ -368,5 +370,54 @@ describe("remote == local, round 2: send modes, handoff, list and alias order", 
     const twins: ThreadHostSession[] = [{ sessionId: "r1", durableSessionId: "dur-t1", cwd: process.cwd(), name: "twin", status: "open" }, { sessionId: "r2", durableSessionId: "dur-t2", cwd: process.cwd(), name: "twin", status: "open" }]
     const { run } = surface(a.remote, { sessions: twins })
     expect(await run("thread_read", { thread: "twin" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+  })
+})
+
+describe("K8 / R8.c: a chain carries its count across devices; no count or cost limit by default", () => {
+  /**
+   * For each hop, the caller runs on a delivery it received at that hop (0: a user-started turn, no cause), as the
+   * gateway drain leaves it: an applied row addressed to the caller. Each time, it sends to b. Returns each answer.
+   */
+  async function sendFromHops(remote: Parameters<typeof surface>[0], hops: readonly number[]) {
+    let cause: string | undefined
+    const { run, store, agentDir } = surface(remote, { callerCause: () => cause })
+    await store.deliveryView("none") // the store worker creates the schema on its first call
+    const db = new Database(gatewayDatabasePath(agentDir))
+    const answers: ThreadToolResult[] = []
+    try {
+      for (const [index, hop] of hops.entries()) {
+        cause = hop === 0 ? undefined : `received-at-hop-${hop}`
+        if (cause !== undefined) {
+          db.run(
+            "INSERT INTO deliveries (delivery_id, target_durable_id, seq, sender, envelope, body, bytes, mode_requested, state, root_id, hop, created_at, updated_at, expires_at) VALUES (?, 'dur-caller', ?, 'session:dur-peer', '{\"provenance\":{\"workspace\":\"Example\",\"project\":\"project\"}}', 'body', 4, 'auto', 'applied', 'root-chain', ?, 1, 1, 9999999999999)",
+            [cause, index + 1, hop],
+          )
+        }
+        answers.push(await run("thread_send", { thread: "dur-on-b", message: `to b from hop ${hop}`, idempotency_key: `to-b-${index}` }))
+      }
+    } finally {
+      db.close()
+    }
+    return answers
+  }
+
+  const prompts = (sent: readonly { readonly rpc?: Readonly<Record<string, unknown>> }[]) => sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => entry.rpc ?? {})
+
+  test("#given a caller at every hop of a chain past 12 #when it sends to b #then b's prompt carries the caller's hop + 1, nothing is refused and no cost field is sent", async () => {
+    const a = account()
+    const callerHops = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    const answers = await sendFromHops(a.remote, callerHops)
+    expect(answers.map((answer) => answer.kind)).toEqual(callerHops.map(() => "ok"))
+    const sent = prompts(a.sent)
+    expect(sent.map((record) => record["chainCount"])).toEqual(callerHops.map((hop) => hop + 1))
+    expect(sent.flatMap((record) => Object.keys(record).filter((key) => /cost/i.test(key)))).toEqual([])
+  })
+
+  test("#given b's user set a chain count limit of 3 #when the chain reaches b at hops 1 to 4 #then hops 1-3 start there and hop 4 is refused as data naming chain_count_limit and device b", async () => {
+    const a = account({ chainCountLimit: 3 })
+    const answers = await sendFromHops(a.remote, [0, 1, 2, 3])
+    expect(answers.slice(0, 3).map((answer) => answer.kind)).toEqual(["ok", "ok", "ok"])
+    expect(answers[3]).toMatchObject({ kind: "error", error: { details: { device: "b", reason: "chain_count_limit" } } })
+    expect(prompts(a.sent).map((record) => record["chainCount"])).toEqual([1, 2, 3, 4])
   })
 })
