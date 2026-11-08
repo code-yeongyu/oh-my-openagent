@@ -86,28 +86,23 @@ export async function locateAcross(remote: RemoteThreadSurface, address: string)
   return holderTarget(remote, alias.value, here, rows)
 }
 
-/** The durable id in a senpi session file name (`<timestamp>_<id>.jsonl`, or `<id>.jsonl`). */
-function sessionFileId(path: string): string {
-  const name = path.slice(Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1).replace(/\.jsonl$/, "")
-  const cut = name.indexOf("_")
-  return cut < 0 ? name : name.slice(cut + 1)
-}
-
 /**
  * The listing row an alias holder names. A thread claimed on its own device is held by its durable id, while the account
- * listing keys a session by its relay id, so a row matches by either: its listing id, or the durable id its session file
- * carries. A holder whose device is online but lists no such row is not_found; only an offline device is device_offline.
+ * listing keys every session (terminal-held or rpc-host alike) by the relay key that device's connector assigned and names
+ * only its project, so the row cannot be matched by durable id: the holding device maps it (session.locate, the same
+ * lookup a create on another device uses). An offline holder device is device_offline; one that is online but cannot map
+ * the holder to a session it lists is not_found.
  */
 async function holderTarget(remote: RemoteThreadSurface, holder: AliasHolder, here: string | null, rows: readonly RemoteSessionRow[]): Promise<RemoteTarget | Failure> {
-  const held = rows.filter((row) => row.session_id === holder.session_id || sessionFileId(row.path) === holder.session_id)
-  const onHolder = held.find((row) => row.device === holder.device)
-  const elsewhere = held.filter((row) => row.device !== holder.device)
-  const row = onHolder ?? (elsewhere.length === 1 ? elsewhere[0] : undefined)
-  if (row !== undefined) return row.device === here ? { where: "here", session_id: sessionFileId(row.path) } : { where: "remote", row }
   if (holder.device === here) return { where: "here", session_id: holder.session_id }
+  const listed = rows.find((row) => row.device === holder.device && row.session_id === holder.session_id)
+  if (listed !== undefined) return { where: "remote", row: listed }
   const device = (await remote.sessions.devices()).find((candidate) => candidate.device === holder.device)
   if (device !== undefined && !device.online) return fail("device_offline", `Device ${holder.device} holding this thread is offline.`, "Retry when that device is online; nothing was queued.", { device: holder.device, thread_id: holder.session_id })
-  return fail("not_found", `The alias names thread ${holder.session_id} on device ${holder.device}, which that device does not list.`, "Call thread_list with all_scope to find the live thread, then claim the alias for it again with thread_rename.", { device: holder.device, thread_id: holder.session_id })
+  const located = await remote.sessions.locate(holder.device, holder.session_id)
+  const row = located.kind === "ok" ? rows.find((candidate) => candidate.device === holder.device && candidate.session_id === located.sessionId) : undefined
+  if (row !== undefined) return { where: "remote", row }
+  return fail("not_found", `The alias names thread ${holder.session_id} on device ${holder.device}, which that device does not list.`, "Call thread_list with all_scope to find the live thread, then claim the alias for it again with thread_rename.", { device: holder.device, thread_id: holder.session_id, ...(located.kind === "refused" ? { reason: located.reason } : {}) })
 }
 
 /** A typed `device_offline` when the device is known and not online; nothing is ever queued for it (A3). */

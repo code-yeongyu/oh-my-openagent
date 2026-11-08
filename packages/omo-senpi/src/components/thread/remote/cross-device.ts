@@ -11,7 +11,8 @@ type LocalResolution =
   | { readonly kind: "ok"; readonly entry: LocalEntry }
 
 export type CrossTarget =
-  | { readonly kind: "local"; readonly address: string }
+  /** `accountWide`: found through the account (an alias, or an id in the account list), so the workspace scope does not apply. */
+  | { readonly kind: "local"; readonly address: string; readonly accountWide?: true }
   | { readonly kind: "remote"; readonly row: RemoteSessionRow }
   | { readonly kind: "error"; readonly result: ThreadToolResult }
 
@@ -34,7 +35,7 @@ export async function crossTarget(remote: RemoteThreadSurface | undefined, addre
   }
   if ("error" in across) return local.kind === "ok" ? { kind: "local", address } : { kind: "error", result: across }
   if (across.where === "remote") return { kind: "remote", row: across.row }
-  if (across.where === "here") return { kind: "local", address: across.session_id }
+  if (across.where === "here") return { kind: "local", address: across.session_id, accountWide: true }
   return byTitle(across.rows, across.here, address, local)
 }
 
