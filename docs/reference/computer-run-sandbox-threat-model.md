@@ -138,9 +138,12 @@ Handles. The facade returns three handle kinds, and each becomes a VM stub:
 A stub carries its engine identity (window `id`, element `ref`, or `display:<selector>`, the same keys the
 facade already re-resolves on every call, `run/handles.ts:41,110`) plus its snapshot fields as plain JSON
 properties, so bodies that read `editor.title` or `el.role` synchronously (`run.test.ts:103` does) keep working.
-The host keeps no per-handle objects: a stub's call names its identity and the host re-resolves it exactly as the
-vm facade does, so a body that creates thousands of handles costs the host nothing between calls. An identity
-from an earlier run is refused like any unknown id/ref today.
+The host keeps a per-run handle table (`run/sandbox/bridge.ts`): each distinct engine identity a result carries
+gets one entry holding the facade's handle object, and the stub's calls name that entry by its index, so a call
+runs the same handle object the vm facade would. The table is capped at 10,000 distinct handles per run; a call
+whose result would add one more rejects inside the VM with `ComputerRunError("resultSize")`, catchable like an
+over-cap result. The table and the descriptor key that marks a handle in a result are created per run and dropped
+with it, so an index from an earlier run is an unknown handle in the next.
 
 Values. Everything crosses as JSON: arguments host-ward, results VM-ward. Functions, `RegExp` and other
 non-JSON values are refused at the boundary with a `TypeError` in the VM (a facade method that needs a
@@ -196,14 +199,14 @@ run starts a fresh worker. A crash never leaves a run pending until its wall dea
 
 Result size, VM-ward: an engine result is checked against a per-result cap (8 MiB serialized) on the host
 before it is copied into the VM; over the cap, the bridged call rejects inside the VM with
-`ComputerRunError("payloadSize")` naming the size (the worker applies the same rule host-ward: an argument list
-over 1 MiB is rejected before it is posted), so the script can narrow the query (`observe({ since })`, a
+`ComputerRunError("resultSize")` naming the size (the worker applies the same rule host-ward: an argument list
+over 1 MiB is rejected with `ComputerRunError("payloadSize")` before it is posted), so the script can narrow the query (`observe({ since })`, a
 subtree) instead of the run dying on the 64 MiB heap.
 
 ## 6. Limits and structured errors
 
-All limits are per run. `ComputerRunErrorReason` (`run/context.ts:10`) gains six values: `calls`, `memory`,
-`stack`, `payloadSize`, `stalled`, `sandbox`. Existing values keep their meaning; in particular `unavailable`
+All limits are per run. `ComputerRunErrorReason` (`run/context.ts:10`) gains seven values: `calls`, `memory`,
+`stack`, `payloadSize`, `resultSize`, `stalled`, `sandbox`. Existing values keep their meaning; in particular `unavailable`
 stays "this engine lacks the feature" (`run/observe.ts:33`, `run/hold-call.ts:10`) and is not reused for a crash.
 
 | Limit | Default | Enforced by | Error (`ComputerRunError.reason`) | Fatal to the run? |
@@ -212,7 +215,8 @@ stays "this engine lacks the feature" (`run/observe.ts:33`, `run/hold-call.ts:10
 | Bridged calls | 1,000 per run | host call queue counter | `calls` | yes |
 | Heap | 64 MiB VM memory | `memoryLimit` | `memory` (QuickJS `InternalError: out of memory`) | yes |
 | Stack | QuickJS `maxStackSize` guard | `maxStackSize` | `stack` (QuickJS `RangeError: Maximum call stack size exceeded`, reported by the host) | yes |
-| Bridged payload, either direction | 8 MiB serialized per result (VM-ward), 1 MiB per argument list (host-ward) | host before copying a result in; worker before posting arguments out | `payloadSize`, as a rejection of that one call inside the VM | no: catchable, the body can narrow its query |
+| Bridged payload, either direction | 8 MiB serialized per result (VM-ward), 1 MiB per argument list (host-ward) | host before copying a result in; worker before posting arguments out | `resultSize` (result) or `payloadSize` (arguments), as a rejection of that one call inside the VM | no: catchable, the body can narrow its query |
+| Handles | 10,000 distinct handles per run (by engine identity) | host handle table, before a result adds one | `resultSize`, as a rejection of that one call inside the VM | no: catchable |
 | Stall | nothing in flight, nothing queued, VM job queue empty | host, after each drain | `stalled` | yes, at once |
 | Worker crash | n/a | worker `error`/`exit` handler | `sandbox` | yes, at once |
 | Output + return value | 1 MiB serialized per run | worker, before posting | none: truncated (see note) | no |
@@ -350,8 +354,8 @@ Row 32 (bridge):
     `const el = await desktop.ref("e1"); return el.role` return the snapshot without an extra engine call.
 11. Arguments are data: a call whose argument object carries a `"__proto__"` key leaves `Object.prototype` on
     the host unchanged and the engine receives the key as an own property.
-12. Payload caps: a fake engine result past 8 MiB, and an argument list past 1 MiB, each reject that call inside
-    the VM with `payloadSize`; a `try/catch` in the body recovers and the run returns normally.
+12. Payload caps: a fake engine result past 8 MiB rejects that call inside the VM with `resultSize`, and an
+    argument list past 1 MiB with `payloadSize`; a `try/catch` in the body recovers and the run returns normally.
 13. Serialization: `computer.windows(() => true)` and `computer.click(NaN, 1)` throw a VM `TypeError` before any
     engine request; `(await computer.ref("e1")).value()` on an element with no value returns `undefined`;
     `computer.clipboard.read` is a nested function.
