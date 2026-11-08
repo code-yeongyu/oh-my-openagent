@@ -121,8 +121,13 @@ export function createReplyRouter(deliver: (route: ReplyRoute, reply: RouteReply
   let current: Segment | undefined
   // The run's latest input (any kind) has had a final answer: an assistant message that calls no tool.
   let inputAnswered = true
-  // An assistant message has followed the run's latest input (or the run's start): a custom before it is turn-start context.
+  // An assistant message has followed the run's latest input (or the run's start). Set by every assistant message, cleared by
+  // every input.
   let assistantSinceInput = false
+  // A custom arrived before any assistant message since the latest input (or the run's start). It is provisional: turn-start
+  // context when an input follows it before the first assistant message, the run's own input (omo's idle wake, a task
+  // completion, a loop continuation starting a run on an idle session) when the first assistant message comes first.
+  let leadingCustom = false
   let closed = false
   const markRouted = (delivery: string): void => {
     routed.push(delivery)
@@ -137,6 +142,7 @@ export function createReplyRouter(deliver: (route: ReplyRoute, reply: RouteReply
     current = undefined
     inputAnswered = true
     assistantSinceInput = false
+    leadingCustom = false
   }
   return {
     noteMessage: (message) => {
@@ -144,20 +150,27 @@ export function createReplyRouter(deliver: (route: ReplyRoute, reply: RouteReply
       if (message.role === "assistant") {
         assistantSinceInput = true
         const final = !callsTools(message.content)
-        if (final) inputAnswered = true
+        // A leading custom answered by this message was the run's input: it stays open until a final answer.
+        if (leadingCustom) inputAnswered = final
+        else if (final) inputAnswered = true
+        leadingCustom = false
         if (current === undefined) return
         current.answer = textOf(message.content) ?? current.answer
         if (final) current.final = true
         return
       }
       // A user message and another party's delivery are always inputs. Any other custom (a ulw-loop continuation, a task
-      // completion) is an input once an assistant message followed the latest input; before that it is turn-start context
-      // senpi writes with the turn (the environment context, the memory notice, the task usage hint). The memory recall is
-      // context the session gives itself and never an input.
+      // completion) is an input once an assistant message followed the latest input; before that it is provisional (see
+      // leadingCustom): turn-start context senpi writes with the turn (the environment context, the memory notice, the task
+      // usage hint), or the input of a run it starts. The memory recall is context the session gives itself and never an input.
       const custom = message.role === "custom" && message.customType !== MEMORY_RECALL_CUSTOM_TYPE
-      const input = message.role === "user" || (custom && (message.customType === DELIVERY_CUSTOM_TYPE || assistantSinceInput))
-      if (!input) return
+      if (custom && message.customType !== DELIVERY_CUSTOM_TYPE && !assistantSinceInput) {
+        leadingCustom = true
+        return
+      }
+      if (message.role !== "user" && !custom) return
       assistantSinceInput = false
+      leadingCustom = false
       const earlierOpen = !inputAnswered
       endCurrent()
       inputAnswered = false
