@@ -32,9 +32,10 @@ async function readSourceVersion(sourceRoot) {
 
 // omowright shipped JavaScript sources until code-yeongyu/omowright#263 ported them to TypeScript
 // (the page bundle stayed JavaScript); `bun build` compiles either, so take whichever exists (#12842).
+// Entry names are "/"-joined: they are hashed into the digest, which must not depend on the OS.
 function sourceModule(sourceRoot, name) {
-  const typescript = join("src", `${name}.ts`)
-  return existsSync(join(sourceRoot, typescript)) ? typescript : join("src", `${name}.js`)
+  const typescript = `src/${name}.ts`
+  return existsSync(join(sourceRoot, typescript)) ? typescript : `src/${name}.js`
 }
 
 async function sourceDigest(sourceRoot) {
