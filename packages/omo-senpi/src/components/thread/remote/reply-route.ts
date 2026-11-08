@@ -3,10 +3,7 @@ const CLIENT_MESSAGE_ID_MAX = 256
 const ROUTE_PREFIX = "omo-peer.v1:"
 const ROUTE_VERSION = 1
 const ROUTED_KEPT = 256
-// memory/recall-session-read.ts RECALL_CUSTOM_TYPE, by value: importing memory here would pull its prompt module into
-// the thread bundles. reply-route.test.ts compares against that constant, so a rename there fails the test.
-const MEMORY_RECALL_CUSTOM_TYPE = "omo-kibitzer:recall"
-// senpi's own delivery entry: another party's input wherever it lands in a turn.
+// senpi's own delivery entry: another party's input, counted as another input of the run.
 const DELIVERY_CUSTOM_TYPE = "session_control_delivery"
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const HOP = /^[1-9][0-9]{0,15}$/
@@ -91,11 +88,10 @@ function textOf(content: unknown): string | undefined {
 export type SentTarget = { readonly device: string; readonly thread: string }
 
 /**
- * What a route's own input got: the last answer the model gave before the next input arrived, and the sends made while
- * answering it. `mixed`: the route's input shares an answer with another input (one arrived before the route's final
- * answer, or the route steered into a run whose earlier input had none yet), so nothing can be attributed to it.
+ * What a route gets back: the run's final answer, whether another input (a local user message, another peer's prompt or
+ * another party's delivery) landed in the same run, and the sends the run made.
  */
-export type RouteReply = { readonly answer: string | undefined; readonly mixed: boolean; readonly sent: readonly SentTarget[] }
+export type RouteReply = { readonly answer: string | undefined; readonly otherInput: boolean; readonly sent: readonly SentTarget[] }
 
 export type ReplyRouter = {
   readonly noteMessage: (message: EngineMessage) => void
@@ -104,93 +100,60 @@ export type ReplyRouter = {
   readonly close: () => void
 }
 
-type Segment = { readonly route: ReplyRoute; answer: string | undefined; final: boolean; mixed: boolean; readonly sent: SentTarget[] }
-
 const callsTools = (content: unknown): boolean => Array.isArray(content) && content.some((part) => (part as { readonly type?: unknown } | null)?.type === "toolCall")
 
 /**
- * The receiving half of a cross-device thread_send: when this session's run consumed a peer send that carries a reply
- * route, the answer to THAT input (the model's output before the run's next input, the repo's mixed-input rule) goes
- * back to the sender's session at the run's settle. Output that followed the local user's input or another party's
- * input is never sent to a peer. A reply never carries a route, so a reply is never answered by a reply, and each
- * delivery is answered at most once per session lifetime.
+ * The receiving half of a cross-device thread_send: every peer send this session's run consumed with a reply route gets the
+ * run's final answer back in the sender's session at the run's settle, so the sender always hears back. When another input
+ * landed in the same run the reply says so (reply-admit.ts labels it). Only user messages and another party's delivery count
+ * as inputs; extension and engine customs (context, recall, continuations, task completions) never do. A reply never carries
+ * a route, so a reply is never answered by a reply, and each delivery is answered at most once per session lifetime.
  */
 export function createReplyRouter(deliver: (route: ReplyRoute, reply: RouteReply, sessionId: string | undefined) => void): ReplyRouter {
-  const segments: Segment[] = []
+  const routes: ReplyRoute[] = []
   const routed: string[] = []
-  let current: Segment | undefined
-  // The run's latest input (any kind) has had a final answer: an assistant message that calls no tool.
-  let inputAnswered = true
-  // An assistant message has followed the run's latest input (or the run's start). Set by every assistant message, cleared by
-  // every input.
-  let assistantSinceInput = false
-  // A custom arrived before any assistant message since the latest input (or the run's start). It is provisional: turn-start
-  // context when an input follows it before the first assistant message, the run's own input (omo's idle wake, a task
-  // completion, a loop continuation starting a run on an idle session) when the first assistant message comes first.
-  let leadingCustom = false
+  const sent: SentTarget[] = []
+  let inputs = 0
+  let finalAnswer: string | undefined
+  let lastText: string | undefined
   let closed = false
   const markRouted = (delivery: string): void => {
     routed.push(delivery)
     if (routed.length > ROUTED_KEPT) routed.shift()
   }
-  const endCurrent = (): void => {
-    if (current !== undefined && !current.final) current.mixed = true
-    current = undefined
-  }
   const reset = (): void => {
-    segments.length = 0
-    current = undefined
-    inputAnswered = true
-    assistantSinceInput = false
-    leadingCustom = false
+    routes.length = 0
+    sent.length = 0
+    inputs = 0
+    finalAnswer = undefined
+    lastText = undefined
   }
   return {
     noteMessage: (message) => {
       if (closed) return
       if (message.role === "assistant") {
-        assistantSinceInput = true
-        const final = !callsTools(message.content)
-        // A leading custom answered by this message was the run's input: it stays open until a final answer.
-        if (leadingCustom) inputAnswered = final
-        else if (final) inputAnswered = true
-        leadingCustom = false
-        if (current === undefined) return
-        current.answer = textOf(message.content) ?? current.answer
-        if (final) current.final = true
+        const text = textOf(message.content)
+        if (text === undefined) return
+        lastText = text
+        if (!callsTools(message.content)) finalAnswer = text
         return
       }
-      // A user message and another party's delivery are always inputs. Any other custom (a ulw-loop continuation, a task
-      // completion) is an input once an assistant message followed the latest input; before that it is provisional (see
-      // leadingCustom): turn-start context senpi writes with the turn (the environment context, the memory notice, the task
-      // usage hint), or the input of a run it starts. The memory recall is context the session gives itself and never an input.
-      const custom = message.role === "custom" && message.customType !== MEMORY_RECALL_CUSTOM_TYPE
-      if (custom && message.customType !== DELIVERY_CUSTOM_TYPE && !assistantSinceInput) {
-        leadingCustom = true
-        return
-      }
-      if (message.role !== "user" && !custom) return
-      assistantSinceInput = false
-      leadingCustom = false
-      const earlierOpen = !inputAnswered
-      endCurrent()
-      inputAnswered = false
-      const route = message.role === "user" ? parseReplyRoute(message.clientMessageId) : undefined
-      if (route === undefined || routed.includes(route.delivery) || segments.some((segment) => segment.route.delivery === route.delivery)) return
-      current = { route, answer: undefined, final: false, mixed: earlierOpen, sent: [] }
-      segments.push(current)
+      if (message.role === "custom" && message.customType === DELIVERY_CUSTOM_TYPE) inputs += 1
+      if (message.role !== "user") return
+      inputs += 1
+      const route = parseReplyRoute(message.clientMessageId)
+      if (route === undefined || routed.includes(route.delivery) || routes.some((known) => known.delivery === route.delivery)) return
+      routes.push(route)
     },
     noteSend: (target) => {
-      if (!closed) current?.sent.push(target)
+      if (!closed && routes.length > 0) sent.push(target)
     },
     settled: (sessionId) => {
       if (closed) return
-      // A mixed route carries no answer at all, so nothing given to another input can travel past this point.
-      const done = segments.map((segment) => {
-        const mixed = segment.mixed || !segment.final
-        return { route: segment.route, reply: { answer: mixed ? undefined : segment.answer, mixed, sent: [...segment.sent] } }
-      })
+      const reply: RouteReply = { answer: finalAnswer ?? lastText, otherInput: inputs > 1, sent: [...sent] }
+      const done = [...routes]
       reset()
-      for (const { route, reply } of done) {
+      for (const route of done) {
         markRouted(route.delivery)
         deliver(route, reply, sessionId)
       }

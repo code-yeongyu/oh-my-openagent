@@ -9,6 +9,9 @@ import type { ReplyRoute, SentTarget } from "./reply-route"
 // admitted as a delivery there, and it is never downgraded to a user prompt. The device service refuses a record the engine's method classes do not name before it leaves the device
 // (`method_unclassified`, device-service-core local-api vocabulary), and senpi's delegated connection refuses an
 // unclassified type (`delegation_unclassified`); the others are an older engine's own refusal of an unknown command.
+/** The line a reply carries when another input (a user message, another peer's prompt or delivery) landed in the same run. */
+export const OTHER_INPUT_LABEL = "This answer may include content from other input in the same turn."
+
 const ADMIT_UNSUPPORTED: ReadonlySet<string> = new Set(["method_unclassified", "delegation_unclassified", "unknown_command", "engine_capability_missing", "unsupported_command", "method_unknown"])
 
 export type ReplyAdmission =
@@ -16,6 +19,8 @@ export type ReplyAdmission =
   /** The run already reached the sender's session with a thread_send of its own; that message was the reply. */
   | { readonly kind: "answered" }
   | { readonly kind: "unavailable"; readonly code: "remote_reply_unavailable"; readonly reason: string }
+  /** The sender's user is composing in that terminal, so nothing was delivered; the same delivery id can be retried. */
+  | { readonly kind: "held" }
   | { readonly kind: "failed"; readonly reason: string }
 
 export type ReplyFrom = { readonly session_id: string; readonly name?: string; readonly provenance: Provenance }
@@ -24,11 +29,10 @@ export type ReplyFrom = { readonly session_id: string; readonly name?: string; r
  * A session's answer to a peer send, delivered back into the sending session as a peer delivery (senpi#6233
  * `admit_external_message`): the sender label is the receiving engine's to stamp from the authenticated peer, so only an
  * `agent` claim is sent; the chain continues (`chainCount`); the delivery id is derived from the delivery it answers, so a
- * repeated reply is the same delivery and the receiver admits it once. A `withheld` reply (the route's answer was shared
- * with another input of the run) is still delivered, as a fixed notice that carries none of the run's output, so the
- * sender's session always wakes.
+ * repeated reply is the same delivery and the receiver admits it once. The body names the delivery it answers and, when
+ * another input landed in the same run, says the answer may cover it too.
  */
-export async function admitReplyRemote(remote: RemoteThreadSurface, route: ReplyRoute, from: ReplyFrom, answer: string | undefined, answered: readonly SentTarget[] = [], withheld = false): Promise<ReplyAdmission> {
+export async function admitReplyRemote(remote: RemoteThreadSurface, route: ReplyRoute, from: ReplyFrom, answer: string | undefined, answered: readonly SentTarget[] = [], otherInput = false): Promise<ReplyAdmission> {
   const unavailable = await remoteAvailable(remote)
   if (unavailable !== undefined) return { kind: "failed", reason: unavailable.error.code }
   const located = await remote.sessions.locate(route.device, route.session)
@@ -45,9 +49,10 @@ export async function admitReplyRemote(remote: RemoteThreadSurface, route: Reply
     root_id: route.root,
     hop: route.hop + 1,
   }
-  const body = withheld
-    ? `(Delivery ${route.delivery} reached this session, but the run answered other input in the same turn before replying to it, so no answer is attributed to it. Send the question again for a direct answer.)`
-    : answer === undefined ? `(Answer to delivery ${route.delivery}: the run ended without a text answer.)` : capBytes(answer, THREAD_MESSAGE_MAX_BYTES)
+  const lines = [`Reply to delivery ${route.delivery}.`]
+  if (otherInput) lines.push(OTHER_INPUT_LABEL)
+  lines.push(answer === undefined ? "(The run ended without a text answer.)" : answer)
+  const body = capBytes(lines.join("\n"), THREAD_MESSAGE_MAX_BYTES)
   const record: JsonObject = {
     type: "admit_external_message",
     sessionId: located.sessionId,
@@ -60,9 +65,11 @@ export async function admitReplyRemote(remote: RemoteThreadSurface, route: Reply
   }
   const outcome = await remote.sessions.sessionCommand(route.device, located.sessionId, record)
   if (outcome.kind === "refused" && (ADMIT_UNSUPPORTED.has(outcome.reason) || outcome.reason.startsWith("Unknown command"))) return { kind: "unavailable", code: "remote_reply_unavailable", reason: outcome.reason }
+  if (outcome.kind === "refused" && outcome.reason === "held_draft") return { kind: "held" }
   if (outcome.kind !== "ok") return { kind: "failed", reason: outcome.reason }
   const disposition = replyData(outcome.response)["kind"]
-  return typeof disposition === "string" && disposition !== "held_draft" ? { kind: "admitted", disposition } : { kind: "failed", reason: typeof disposition === "string" ? disposition : "no_disposition" }
+  if (disposition === "held_draft") return { kind: "held" }
+  return typeof disposition === "string" ? { kind: "admitted", disposition } : { kind: "failed", reason: "no_disposition" }
 }
 
 function capBytes(text: string, maxBytes: number): string {

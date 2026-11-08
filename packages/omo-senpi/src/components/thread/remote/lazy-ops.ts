@@ -2,7 +2,7 @@ import type { SenpiExtensionAPI } from "../../../extension/types"
 import type { Provenance } from "../gateway/types"
 import type * as CrossDevice from "./cross-device"
 import type { RemoteThreadSurface } from "./ports"
-import { createReplyRouter, type ReplyRoute } from "./reply-route"
+import { createReplyRouter, type ReplyRoute, type RouteReply } from "./reply-route"
 import type * as RemoteOps from "./remote-ops"
 import type * as ReplyAdmit from "./reply-admit"
 import type * as RemoteControls from "./remote-controls"
@@ -30,7 +30,12 @@ export type ReplyRouteOptions = {
   readonly senderProvenance: () => Promise<Provenance>
   readonly sessionName?: () => string | undefined
   readonly warn: (line: string) => void
+  /** The waits between retries of a reply held behind the sender's open draft; the last one used gives up. */
+  readonly heldRetryDelaysMs?: readonly number[]
 }
+
+// About half an hour of retries for a reply held behind a draft the sender's user keeps open (senpi admits nothing then).
+const HELD_RETRY_DELAYS_MS: readonly number[] = [5_000, 15_000, 30_000, 60_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000, 300_000]
 
 const messageOf = (event: unknown): Record<string, unknown> | undefined => {
   const message = (event as { readonly message?: unknown } | undefined)?.message
@@ -48,18 +53,31 @@ const sessionIdOf = (ctx: unknown): string | undefined => {
  */
 export function wireReplyRoutes(pi: Pick<SenpiExtensionAPI, "on">, remote: RemoteThreadSurface, options: ReplyRouteOptions): void {
   const failed = (route: ReplyRoute, reason: string): void => options.warn(`remote_reply_failed: the answer to delivery ${route.delivery} was not delivered to session ${route.session} on device ${route.device} (${reason}).`)
+  const retryDelays = options.heldRetryDelaysMs ?? HELD_RETRY_DELAYS_MS
+  const retries = new Set<ReturnType<typeof setTimeout>>()
   // One delivery at a time, in settle order, so answers reach the sender in the order the runs made them.
   let queue: Promise<void> = Promise.resolve()
-  const router = createReplyRouter((route, reply, sessionId) => {
+  const deliver = (route: ReplyRoute, reply: RouteReply, sessionId: string, attempt: number): void => {
     queue = queue.then(async () => {
-      if (sessionId === undefined) return failed(route, "the settled run named no session id")
-      // A mixed route carries no answer (reply-route.ts), so the sender gets a notice with none of the run's output and still wakes.
-      if (reply.mixed) options.warn(`remote_reply_withheld: delivery ${route.delivery} from session ${route.session} on device ${route.device} shares its answer with another input of the same run; the peer gets a notice without the answer, so no answer to another input reaches it.`)
       const name = options.sessionName?.()
-      const outcome = await (await runtime()).admitReplyRemote(remote, route, { session_id: sessionId, provenance: await options.senderProvenance(), ...(name === undefined ? {} : { name }) }, reply.answer, reply.sent, reply.mixed)
-      if (outcome.kind === "unavailable") options.warn(`${outcome.code}: the answer to delivery ${route.delivery} was not delivered to session ${route.session} on device ${route.device}: its engine cannot admit a peer delivery (${outcome.reason}); update omo and senpi on that device.`)
+      const outcome = await (await runtime()).admitReplyRemote(remote, route, { session_id: sessionId, provenance: await options.senderProvenance(), ...(name === undefined ? {} : { name }) }, reply.answer, reply.sent, reply.otherInput)
+      if (outcome.kind === "held") {
+        const wait = retryDelays[attempt]
+        if (wait === undefined) return failed(route, `held_draft: the sender's user kept a draft open through ${attempt} retries`)
+        options.warn(`remote_reply_held: the answer to delivery ${route.delivery} is held because the user of session ${route.session} on device ${route.device} is composing a draft; retry ${attempt + 1} of ${retryDelays.length} in ${Math.round(wait / 1000)} s.`)
+        const timer = setTimeout(() => {
+          retries.delete(timer)
+          deliver(route, reply, sessionId, attempt + 1)
+        }, wait)
+        ;(timer as { unref?: () => void }).unref?.()
+        retries.add(timer)
+      } else if (outcome.kind === "unavailable") options.warn(`${outcome.code}: the answer to delivery ${route.delivery} was not delivered to session ${route.session} on device ${route.device}: its engine cannot admit a peer delivery (${outcome.reason}); update omo and senpi on that device.`)
       else if (outcome.kind === "failed") failed(route, outcome.reason)
     }).catch((error: unknown) => failed(route, error instanceof Error ? error.message : String(error)))
+  }
+  const router = createReplyRouter((route, reply, sessionId) => {
+    if (sessionId === undefined) return failed(route, "the settled run named no session id")
+    deliver(route, reply, sessionId, 0)
   })
   pi.on("message_start", (event) => {
     const message = messageOf(event)
@@ -76,5 +94,9 @@ export function wireReplyRoutes(pi: Pick<SenpiExtensionAPI, "on">, remote: Remot
     if (toolName === "thread_send" && isError !== true && sent?.kind === "ok" && typeof sent.thread_id === "string" && typeof sent.device === "string") router.noteSend({ device: sent.device, thread: sent.thread_id })
   })
   pi.on("agent_settled", (_event, ctx) => router.settled(sessionIdOf(ctx)))
-  pi.on("session_shutdown", () => router.close())
+  pi.on("session_shutdown", () => {
+    router.close()
+    for (const timer of retries) clearTimeout(timer)
+    retries.clear()
+  })
 }
