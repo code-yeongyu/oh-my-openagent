@@ -228,6 +228,32 @@ export const OmoMemoryProjectionLayerSchema = z.object({
 }).strict()
 
 // ---------------------------------------------------------------------------
+// Runtime retention (#10144): windows in days for the per-identity runtime/ stores.
+// discard_unreflected_journals gates every deletion of transcript input reflection never folded
+// into memory (never- and partly-reflected journals). It ships off (an irreversible loss outweighs
+// reclaimable disk); switched on, it runs only while reflection is healthy for the identity.
+// ---------------------------------------------------------------------------
+
+const OmoMemoryRuntimeSchema = z.object({
+  retention_days: z.number().int().min(1).default(7),
+  abandoned_journal_days: z.number().int().min(1).default(14),
+  completions_days: z.number().int().min(1).default(30),
+  pass_budget_ms: z.number().int().min(1).default(60000),
+  discard_unreflected_journals: z.boolean().default(false),
+  /** Per-identity runtime size cap in bytes (design 3); `0` = unbounded. */
+  max_bytes: z.number().int().min(0).default(2 * 1024 * 1024 * 1024),
+}).strict()
+
+const OmoMemoryRuntimeLayerSchema = z.object({
+  retention_days: z.number().int().min(1).optional(),
+  abandoned_journal_days: z.number().int().min(1).optional(),
+  completions_days: z.number().int().min(1).optional(),
+  pass_budget_ms: z.number().int().min(1).optional(),
+  discard_unreflected_journals: z.boolean().optional(),
+  max_bytes: z.number().int().min(0).optional(),
+}).strict()
+
+// ---------------------------------------------------------------------------
 // Per-agent overrides (layer-shaped)
 // ---------------------------------------------------------------------------
 
@@ -246,6 +272,7 @@ export const OmoMemoryAgentOverridesSchema = z.object({
   search: OmoMemorySearchLayerSchema.optional(),
   recall: OmoMemoryRecallLayerSchema.optional(),
   projection: OmoMemoryProjectionLayerSchema.optional(),
+  runtime: OmoMemoryRuntimeLayerSchema.optional(),
   compile_warn_tokens: z.number().int().positive().optional(),
 }).strict()
 
@@ -300,6 +327,7 @@ export const OmoMemorySettingsSchema = z.object({
   }),
   project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
   projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 0, max_bytes: 40960 }),
+  runtime: OmoMemoryRuntimeSchema.default({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30, pass_budget_ms: 60000, discard_unreflected_journals: false, max_bytes: 2 * 1024 * 1024 * 1024 }),
   compile_warn_tokens: z.number().int().positive().default(30000),
   agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).default({}),
 }).strict()
@@ -321,6 +349,7 @@ export const OmoMemorySettingsLayerSchema = z.object({
   recall: OmoMemoryRecallLayerSchema.optional(),
   project_scope: OmoMemoryProjectScopeLayerSchema.optional(),
   projection: OmoMemoryProjectionLayerSchema.optional(),
+  runtime: OmoMemoryRuntimeLayerSchema.optional(),
   compile_warn_tokens: z.number().int().positive().optional(),
   agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).optional(),
 }).strict()
@@ -342,6 +371,7 @@ export type OmoMemoryDream = z.infer<typeof OmoMemoryDreamSchema>
 export type OmoMemoryPeople = z.infer<typeof OmoMemoryPeopleSchema>
 export type OmoMemorySoul = z.infer<typeof OmoMemorySoulSchema>
 export type OmoMemoryWriteNotice = z.infer<typeof OmoMemoryWriteNoticeSchema>
+export type OmoMemoryRuntime = z.infer<typeof OmoMemoryRuntimeSchema>
 export type OmoMemoryAgentOverrides = z.infer<typeof OmoMemoryAgentOverridesSchema>
 export type OmoMemorySettings = z.infer<typeof OmoMemorySettingsSchema>
 export type OmoMemorySettingsLayer = z.infer<typeof OmoMemorySettingsLayerSchema>

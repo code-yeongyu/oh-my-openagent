@@ -1,9 +1,13 @@
+import { homedir } from "node:os"
+
 import { InFlightReads, MemoryBlockCache } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { buildDreamTriggerWiring } from "./dream-runtime-wiring"
 import { resolveMemorySettings } from "./identity-runtime"
 import { createMemoryMaintenance } from "./memory-maintenance"
+import { resolveAgentReflectionSettings } from "./reflection-settings"
+import { encodeKibitzerSessionId } from "./kibitzer/observe-paths"
 import { createMemoryNudgeWiring } from "./nudge-wiring"
 import type { PalacePeopleOptions } from "./palace/people"
 import { registerMemoryFilesystemPolicy } from "./policy-guard"
@@ -28,12 +32,19 @@ import {
 } from "./wiring-reflection-live"
 import { createMemoryRuntimeWiring } from "./wiring-runtime"
 import { registerMemoryStatic } from "./wiring-static"
-import { recoverStaleReflectionHolder } from "./reflection-stale-active"
+import { reconcileThroughStaleLockReaper, recoverStaleReflectionHolder } from "./reflection-stale-active"
 import { runMemorySessionShutdown } from "./wiring-shutdown"
 import type { MemoryCommandSettings } from "./commands/types"
 import type { MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
 export type { MemorySessionStateLike, MemoryWiring, MemoryWiringOptions } from "./wiring-types"
+
+const PER_TURN_SETTLE_BUDGET_MS = 10_000
+
+function boundedTurnSignal(signal: AbortSignal | undefined): AbortSignal {
+  const budget = AbortSignal.timeout(PER_TURN_SETTLE_BUDGET_MS)
+  return signal === undefined ? budget : AbortSignal.any([signal, budget])
+}
 
 export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   // Persisted compiled blocks: a relaunch reads the block of a commit an earlier process compiled (the store ships
@@ -69,7 +80,8 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     try {
       const recovery = await recoverStaleReflectionHolder({
         reflectionDir: identity.identityPaths.reflection,
-        reconcile: () => runtimeFor(identity).reconcile(signal),
+        // Per turn: no deadline waits (DESIGN.r3 c.15); the 10 s bound is only an outer guard.
+        reconcile: () => runtimeFor(identity).reconcile(boundedTurnSignal(signal), { waitPolicy: "none" }),
         // A holder that one reconciliation could not release is reported, not reconciled every turn.
         shouldReconcile: (runId) => {
           signal?.throwIfAborted()
@@ -153,6 +165,14 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   const kibitzerRef: { current?: KibitzerComposition } = {}
   const maintenance = (options.createMaintenance ?? createMemoryMaintenance)({
     isLiveSession: (sessionId) => options.sessions.has(sessionId),
+    memorySettings: () => resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory),
+    reflectionEnabled: (context) =>
+      resolveAgentReflectionSettings(options.loadConfig({ cwd: options.cwd() }).config.memory, context.identity).enabled,
+    ownedSidecars: () => new Set([...options.sessions.keys()].map(encodeKibitzerSessionId)),
+    // Driver 2 never runs under CI or in a task child; foreign identities use the global layer only.
+    hostSweep: () => process.env.CI !== undefined || process.env.OMO_SENPI_TASK_RPC_CHILD === "1"
+      ? undefined
+      : { settings: resolveMemorySettings(options.loadConfig({ cwd: homedir() }).config.memory) },
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
 
@@ -268,7 +288,14 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
             observer?.phase("onSettled.reflection.reconcile")
             await userActivity.reconcileOnce(sessionId, async () => {
               try {
-                await runtimeFor(identity).reconcile(observer?.signal)
+                await reconcileThroughStaleLockReaper({
+                  runtimeDir: identity.identityPaths.runtime,
+                  reconcile: () => runtimeFor(identity).reconcile(observer?.signal),
+                  onLoadFailure: (error) => {
+                    if (options.logger !== undefined) logBindReconcileFailure(options.logger, error)
+                  },
+                  ...(options.reflectionHolderSeams === undefined ? {} : { probe: options.reflectionHolderSeams }),
+                })
                 observer?.signal.throwIfAborted()
               } catch (error) {
                 observer?.signal.throwIfAborted()
