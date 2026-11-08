@@ -2473,8 +2473,6 @@
         "src/manager/held-send.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) TaskConcurrency, decideDepthPolicy, NameRegistry, AUTO_HOST_CAPABILITIES, adaptInProcessHandle, adaptRpcHandle, TASK_AWAITING_INPUT_EVENT, TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT, logTranscriptEvent and 1 more
         "src/manager/index.ts": ["exports"],
-        // pre-existing at origin dev 4686e425b5: unused export(s) START_REPORT_WINDOW_MS
-        "src/manager/manager.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) readObservedModel, observeChildEffectiveModel
         "src/manager/observed-model.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) PausedChildLostError, PausedChildOwnedElsewhereError

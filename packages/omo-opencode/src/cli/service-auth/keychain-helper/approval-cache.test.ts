@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { pathToFileURL } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import { type ApprovalAnswer, type ApprovalClock, createApprovalCache, isEntryValid } from "./approval-cache"
 
 function fakeClock(start: number) {
@@ -109,7 +109,7 @@ describe("the default clock outside Bun (#11586 review LOW: service-auth.generat
     ].join("\n")
     const outdir = mkdtempSync(join(tmpdir(), "approval-cache-node-"))
     try {
-      const built = await Bun.build({ entrypoints: [new URL("./approval-cache.ts", import.meta.url).pathname], outdir, target: "node", format: "esm" })
+      const built = await Bun.build({ entrypoints: [fileURLToPath(new URL("./approval-cache.ts", import.meta.url))], outdir, target: "node", format: "esm" })
       expect(built.success).toBe(true)
       const output = built.outputs[0]
       if (!output) throw new Error("no build output")

@@ -24,12 +24,17 @@ export function resolveTaskHostSocket(
   return join(agentDir, "rpc", "rpc.sock")
 }
 
-/** Capabilities a daemon must advertise before omo will run task children as its sessions. */
+/**
+ * Capabilities a daemon must advertise before omo will run task children as its sessions.
+ * `retry_fallback_profile` holds each child to its designated models: a host without it builds the session
+ * from its own fallback settings, which can move a child to a model outside its chain (#12006).
+ */
 export const TASK_DAEMON_REQUIRED_CAPABILITIES = [
   "multi_session",
   "extension_events",
   "session_context",
   "session_kind",
+  "retry_fallback_profile",
 ] as const
 
 /** The protocol generation this omo build speaks (senpi `get_protocol_info.protocolVersion`). */
