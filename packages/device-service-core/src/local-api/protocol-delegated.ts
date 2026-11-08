@@ -9,6 +9,13 @@ import type { ChannelClosedReason } from "./vocabulary.ts";
 // session.command_blob_chunk events, ended by session.command_blob_done. session.channel_closed ends the channel toward
 // that device exactly like a closed socket: the next delegated command opens a fresh one.
 export type DelegatedRoute = { readonly delegated?: true; readonly endpoint?: string };
+/**
+ * Decision 0018 amendment 2026-11-06 (relay daemon #698): an endpoint `open_session`/`new_session` sent with
+ * `locate: true` gets the new session as session.locate would answer it, `{key, session}`, on its reply event, from a
+ * host that puts the key on its applied result (only toward a device with view standing). Without it the client
+ * locates as before; a service before the amendment refuses the `locate` field as unknown (invalid_request).
+ */
+export type CommandLocated = { readonly key: string; readonly session: string };
 export type SessionEndpoints = {
   readonly id: string;
   readonly type: "session.endpoints";
@@ -39,7 +46,7 @@ export type CommandBlobRef = {
 };
 export type CommandEventBody =
   | { readonly frame: JsonObject }
-  | { readonly command_id: string; readonly response: JsonObject };
+  | { readonly command_id: string; readonly response: JsonObject; readonly located?: CommandLocated };
 export type CommandEvent = EventOf<
   "session.command_event",
   { readonly device: string } & (CommandEventBody | { readonly blob: CommandBlobRef })
