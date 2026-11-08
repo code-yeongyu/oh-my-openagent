@@ -6,6 +6,7 @@
 // `--check` freshness gate).
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
+import { existsSync } from "node:fs"
 import { access, copyFile, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -29,8 +30,15 @@ async function readSourceVersion(sourceRoot) {
   return manifest.version
 }
 
+// omowright shipped JavaScript sources until code-yeongyu/omowright#263 ported them to TypeScript
+// (the page bundle stayed JavaScript); `bun build` compiles either, so take whichever exists (#12842).
+function sourceModule(sourceRoot, name) {
+  const typescript = join("src", `${name}.ts`)
+  return existsSync(join(sourceRoot, typescript)) ? typescript : join("src", `${name}.js`)
+}
+
 async function sourceDigest(sourceRoot) {
-  const entries = ["package.json", "src/index.js", "src/page-bundle.js", "src/core.js"]
+  const entries = ["package.json", sourceModule(sourceRoot, "index"), "src/page-bundle.js", sourceModule(sourceRoot, "core")]
   const hash = createHash("sha256")
   for (const entry of entries) hash.update(entry).update("\0").update(await readFile(join(sourceRoot, entry)))
   return hash.digest("hex")
@@ -39,7 +47,7 @@ async function sourceDigest(sourceRoot) {
 function bundle({ sourceRoot, outFile, bunExecutable }) {
   const result = spawnSync(
     bunExecutable,
-    ["build", join(sourceRoot, "src", "index.js"), "--target=node", "--format=esm", "--minify-whitespace", `--outfile=${outFile}`],
+    ["build", join(sourceRoot, sourceModule(sourceRoot, "index")), "--target=node", "--format=esm", "--minify-whitespace", `--outfile=${outFile}`],
     { cwd: sourceRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
   )
   if (result.status !== 0) {

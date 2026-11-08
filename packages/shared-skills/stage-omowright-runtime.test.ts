@@ -8,18 +8,23 @@ import { checkOmowrightRuntimeFresh, stageOmowrightRuntime } from "./stage-omowr
 
 const tempDirs: string[] = []
 
-async function makeSourceFixture(): Promise<string> {
+// omowright shipped JavaScript sources until code-yeongyu/omowright#263 ported them to TypeScript;
+// the page bundle stayed JavaScript. Staging must accept both layouts (#12842).
+async function makeSourceFixture(layout: "js" | "ts" = "js"): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "omowright-stage-source-"))
   tempDirs.push(root)
   await mkdir(join(root, "src"), { recursive: true })
   await writeFile(join(root, "package.json"), JSON.stringify({ name: "omowright", version: "0.0.1-fixture", type: "module" }))
   await writeFile(join(root, "src", "page-bundle.js"), "(function(){ globalThis.__omowright = { fixture: true } })();\n")
-  await writeFile(join(root, "src", "core.js"), "export const core = 'fixture'\n")
   await writeFile(
-    join(root, "src", "index.js"),
+    join(root, "src", `core.${layout}`),
+    layout === "ts" ? "export const core: string = 'fixture'\n" : "export const core = 'fixture'\n",
+  )
+  await writeFile(
+    join(root, "src", `index.${layout}`),
     [
       "import { readFileSync } from 'node:fs'",
-      "export { core } from './core.js'",
+      `export { core } from './core.${layout}'`,
       "export const pageBundle = readFileSync(new URL('./page-bundle.js', import.meta.url), 'utf8')",
       "export function connectBrowserSkill() { return 'fixture-session' }",
     ].join("\n"),
@@ -47,6 +52,25 @@ describe("omowright runtime staging", () => {
     const manifest = JSON.parse(await readFile(join(targetDir, "manifest.json"), "utf8"))
     expect(Object.keys(manifest.files).sort()).toEqual(["index.js", "page-bundle.js"])
     expect(await checkOmowrightRuntimeFresh({ sourceRoot, targetDir })).toMatchObject({ ok: true, version: "0.0.1-fixture" })
+  })
+
+  test("#given an omowright source tree in TypeScript #when staged #then the bundle is JavaScript that imports and the freshness digest tracks the .ts sources", async () => {
+    const sourceRoot = await makeSourceFixture("ts")
+    const targetParent = await mkdtemp(join(tmpdir(), "omowright-stage-target-"))
+    tempDirs.push(targetParent)
+    const targetDir = join(targetParent, "omowright")
+
+    await stageOmowrightRuntime({ sourceRoot, targetDir })
+
+    const loaded = await import(join(targetDir, "index.js"))
+    expect(loaded.connectBrowserSkill()).toBe("fixture-session")
+    expect(loaded.core).toBe("fixture")
+    expect(loaded.pageBundle).toContain("globalThis.__omowright")
+    expect(await checkOmowrightRuntimeFresh({ sourceRoot, targetDir })).toMatchObject({ ok: true })
+
+    await writeFile(join(sourceRoot, "src", "core.ts"), "export const core: string = 'changed'\n")
+
+    await expect(checkOmowrightRuntimeFresh({ sourceRoot, targetDir })).rejects.toThrow(/sourceDigest/)
   })
 
   test("#given a staged runtime #when the source changes #then the freshness check rejects it", async () => {

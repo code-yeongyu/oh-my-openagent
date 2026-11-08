@@ -13,6 +13,8 @@ export function resolveOmowrightEntry(env = process.env) {
     env.OMOWRIGHT_ROOT ? join(env.OMOWRIGHT_ROOT, "index.js") : undefined,
     join(skillRoot, "runtime", "omowright", "index.js"),
     join(skillRoot, "..", "..", "..", "..", "node_modules", "omowright", "src", "index.js"),
+    // omowright ships TypeScript sources since its strict TypeScript port; only Bun can import them.
+    join(skillRoot, "..", "..", "..", "..", "node_modules", "omowright", "src", "index.ts"),
   ].filter((candidate) => candidate !== undefined)
   return candidates.find((candidate) => existsSync(candidate))
 }
