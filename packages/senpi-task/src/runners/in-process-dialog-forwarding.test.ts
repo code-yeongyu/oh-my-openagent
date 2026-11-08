@@ -18,12 +18,12 @@ function answering(choice: string): { readonly forwarder: ChildDialogForwarder; 
   return { seen, forwarder: { forward: async (dialog, child) => { seen.push({ dialog, taskId: child.taskId }); return { kind: "value", value: choice } } } }
 }
 
-async function runChild(choice: string, setup: { readonly settingsPreset?: string; readonly liveParent?: boolean } = { settingsPreset: "ask" }): Promise<{ readonly machine: GatedChildMachine; readonly seen: { dialog: ForwardableDialog; taskId: string }[] }> {
+async function runChild(choice: string, setup: { readonly settingsPreset?: string; readonly liveParent?: boolean; readonly ownApprovalMode?: true } = { settingsPreset: "ask" }): Promise<{ readonly machine: GatedChildMachine; readonly seen: { dialog: ForwardableDialog; taskId: string }[] }> {
   const machine = await createGatedChildMachine(setup.settingsPreset === undefined ? {} : { settingsPreset: setup.settingsPreset })
   machines.push(machine)
   const parent = setup.liveParent === true ? await machine.openParent() : undefined
   const { forwarder, seen } = answering(choice)
-  const handle = await new InProcessRunner({ dialogs: forwarder }).start(machine.spec("st_6189c", parent?.sessionId))
+  const handle = await new InProcessRunner({ dialogs: forwarder }).start({ ...machine.spec("st_6189c", parent?.sessionId), ...(setup.ownApprovalMode === undefined ? {} : { ownApprovalMode: true }) })
   await handle.waitForIdle()
   await handle.abort()
   parent?.dispose()
@@ -68,5 +68,21 @@ describe("InProcessRunner with a parent session", () => {
     // then
     expect(seen).toHaveLength(0)
     expect(machine.probeExists()).toBe(true)
+  }, 30_000)
+
+  // An engine-owned worker (the facts extractor, the onboarding understand step) names its run, not a live session,
+  // as its parent: it keeps the approval mode its own settings give it, exactly as before senpi 2026.11.6-3's rule 3,
+  // and is never treated as a delegated child of a parent that is not there.
+  test.each([
+    { name: "a delegated child whose parent is not live", setup: {}, asks: true },
+    { name: "an engine-owned worker under the host default", setup: { ownApprovalMode: true as const }, asks: false },
+    { name: "an engine-owned worker whose own settings say ask", setup: { settingsPreset: "ask", ownApprovalMode: true as const }, asks: true },
+  ])("#given $name #when it makes a gated call #then it asks only when its own rule says so", async ({ setup, asks }) => {
+    // given / when
+    const { machine, seen } = await runChild("Deny", setup)
+
+    // then
+    expect(seen).toHaveLength(asks ? 1 : 0)
+    expect(machine.probeExists()).toBe(!asks)
   }, 30_000)
 })
