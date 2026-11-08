@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
+import { mkdir } from "node:fs/promises"
 import { join } from "node:path"
 
 import { createNodeGitExec, reflectionSchedulerLockPath } from "@oh-my-opencode/memory-core"
@@ -90,5 +91,32 @@ describe("reflection reconciliation orphan sweep", () => {
     expect(results).toEqual([])
     expect(existsSync(orphan.dir)).toBe(true)
     expect(await branchExists(item.identity.paths.repo, orphan.branch)).toBe(true)
+  }, 30_000)
+})
+
+describe("retention tombstones (A09)", () => {
+  test("#given a .prune- tombstone holding a dead run's ledger #when reconciliation runs #then the tombstone is neither reconciled nor counted live", async () => {
+    // given
+    const item = await fixture()
+    await keepRunAlive(item)
+    const tombstone = join(item.identity.paths.reflection, "runs", ".prune-run-gone-0f0f")
+    await mkdir(tombstone, { recursive: true })
+    await writeRunJsonAtomic(join(tombstone, "ledger.json"), { ...item.ledger, runId: "run-gone", pid: 5151, processStart: "gone-start" })
+
+    // when
+    const results = await withinPhase("tombstone-reconcile", () => reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      now: () => Date.now() + HOUR_MS,
+      getPidLiveness: (pid) => (pid === 5151 ? "dead" : "alive"),
+      getProcessStartIdentity: async () => "supervisor-start",
+      waitForOutcome: async () => "timeout",
+    }))
+
+    // then
+    expect(results).toEqual([])
+    for (const name of ["final.json", "abandoned.json", "quarantined.json", "terminal-claim.json"]) {
+      expect(existsSync(join(tombstone, name))).toBe(false)
+    }
   }, 30_000)
 })
