@@ -312,7 +312,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       provenance: name === undefined || name === "" ? provenance : { ...provenance, session: name },
       delivery_id: deliveryId,
       root_id: prior?.root_id ?? deliveryId,
-      hop: (prior?.hop ?? 0) + 1,
+      hop: Math.max(prior?.hop ?? 0, options.callerChainHop?.() ?? 0) + 1,
     }
   }
   async function openLocal(current: ThreadHostView, address: string, callerId: string): Promise<ThreadToolResult> {

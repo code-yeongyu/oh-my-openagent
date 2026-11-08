@@ -4,9 +4,10 @@ import type * as CrossDevice from "./cross-device"
 import type { RemoteThreadSurface } from "./ports"
 import { createReplyRouter, type ReplyRoute } from "./reply-route"
 import type * as RemoteOps from "./remote-ops"
+import type * as ReplyAdmit from "./reply-admit"
 import type * as RemoteControls from "./remote-controls"
 
-type Runtime = Pick<typeof CrossDevice, "crossTarget" | "listAcross" | "planCreate" | "renameAlias" | "withAlias"> & Pick<typeof RemoteOps, "closeRemote" | "deviceOnline" | "interruptRemote" | "outcomeFailure" | "promptRemote" | "readRemote" | "admitReplyRemote"> & Pick<typeof RemoteControls, "setModelRemote">
+type Runtime = Pick<typeof CrossDevice, "crossTarget" | "listAcross" | "planCreate" | "renameAlias" | "withAlias"> & Pick<typeof RemoteOps, "closeRemote" | "deviceOnline" | "interruptRemote" | "outcomeFailure" | "promptRemote" | "readRemote"> & Pick<typeof ReplyAdmit, "admitReplyRemote"> & Pick<typeof RemoteControls, "setModelRemote">
 
 // The cross-device half ships in the thread client sidecar (`#omo-thread-client-runtime`), which every thread
 // operation already loads for the live host, so `omo.js` carries none of it.
@@ -49,18 +50,19 @@ export function wireReplyRoutes(pi: Pick<SenpiExtensionAPI, "on">, remote: Remot
   const failed = (route: ReplyRoute, reason: string): void => options.warn(`remote_reply_failed: the answer to delivery ${route.delivery} was not delivered to session ${route.session} on device ${route.device} (${reason}).`)
   // One delivery at a time, in settle order, so answers reach the sender in the order the runs made them.
   let queue: Promise<void> = Promise.resolve()
-  const router = createReplyRouter((route, answer, sessionId, answered) => {
+  const router = createReplyRouter((route, reply, sessionId, answered) => {
     queue = queue.then(async () => {
       if (sessionId === undefined) return failed(route, "the settled run named no session id")
+      if (reply.mixed && reply.answer === undefined) return options.warn(`remote_reply_skipped: delivery ${route.delivery} from session ${route.session} on device ${route.device} got no answer of its own before the run took another input; nothing was sent, so no answer to another input reaches that peer.`)
       const name = options.sessionName?.()
-      const outcome = await (await runtime()).admitReplyRemote(remote, route, { session_id: sessionId, provenance: await options.senderProvenance(), ...(name === undefined ? {} : { name }) }, answer, answered)
+      const outcome = await (await runtime()).admitReplyRemote(remote, route, { session_id: sessionId, provenance: await options.senderProvenance(), ...(name === undefined ? {} : { name }) }, reply.answer, answered)
       if (outcome.kind === "unavailable") options.warn(`${outcome.code}: the answer to delivery ${route.delivery} was not delivered to session ${route.session} on device ${route.device}: its engine cannot admit a peer delivery (${outcome.reason}); update omo and senpi on that device.`)
       else if (outcome.kind === "failed") failed(route, outcome.reason)
     }).catch((error: unknown) => failed(route, error instanceof Error ? error.message : String(error)))
   })
   pi.on("message_start", (event) => {
     const message = messageOf(event)
-    if (message?.["role"] === "user") router.noteMessage(message)
+    if (message?.["role"] === "user" || message?.["role"] === "custom") router.noteMessage(message)
   })
   pi.on("message_end", (event) => {
     const message = messageOf(event)
