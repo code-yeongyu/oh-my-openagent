@@ -14,7 +14,7 @@
   // The bunshin-ts build output, vendored with only its dependency imports rewritten (pinned by packages/omo-senpi/vendor/PIN.json) is upstream code too.
   // The GNOME Shell extension entry runs inside gnome-shell's GJS (gi:// and resource:// imports, a default-exported
   // Extension class the shell loads); its pure window-rects.js stays checked through window-rects.test.mjs.
-  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**", "crates/senpi-desktop-gnome-extension/extension.js"],
+  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**", "packages/gnome-window-rects-extension/extension.js"],
   // Unused exports already present at origin dev 4686e425b5, named per symbol. knip has no per-symbol ignore and a file-wide
   // ignoreIssues "exports" entry would also hide a new unused export in that file, so script/knip-preexisting-exports.ts
   // (shared byte for byte with omo-relay-daemon, sha256-pinned by script/knip-coverage.test.ts) drops exactly these names, and

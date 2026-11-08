@@ -242,7 +242,7 @@ impl WaylandBackend {
 
     /// The compositor that places a window capture: the same
     /// [`WaylandBackend::window_geometry`] dispatch window pointer input is
-    /// placed through, so on Hyprland and on KWin a window frame is cropped
+    /// placed through, so on Hyprland, KWin and GNOME a window frame is cropped
     /// at the rect its clicks land on. Where no compositor path is usable,
     /// window pointer input is refused anyway and the crop stays at AT-SPI.
     pub(crate) fn capture_geometry(&mut self, target: &Target) -> Option<WindowGeometry> {
@@ -297,8 +297,7 @@ pub(crate) fn place_captured(
             let (windows, refused) = match geometry {
                 WindowGeometry::Hyprland(hyprland) => hyprland.place_in(windows, id),
                 WindowGeometry::Kwin(kwin) => kwin.place_in(windows, id),
-                // GNOME placement is not implemented: the capture passes through unplaced.
-                WindowGeometry::Gnome(_) => (windows, None),
+                WindowGeometry::Gnome(gnome) => gnome.place_in(windows, id),
             };
             (windows, refused.map(|error| (geometry.compositor(), error)))
         }
