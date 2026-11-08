@@ -297,6 +297,8 @@ pub(crate) fn place_captured(
             let (windows, refused) = match geometry {
                 WindowGeometry::Hyprland(hyprland) => hyprland.place_in(windows, id),
                 WindowGeometry::Kwin(kwin) => kwin.place_in(windows, id),
+                // GNOME placement is not implemented: the capture passes through unplaced.
+                WindowGeometry::Gnome(_) => (windows, None),
             };
             (windows, refused.map(|error| (geometry.compositor(), error)))
         }
@@ -315,6 +317,7 @@ impl WindowGeometry {
         match self {
             Self::Hyprland(_) => "Hyprland",
             Self::Kwin(_) => "KWin",
+            Self::Gnome(_) => "GNOME",
         }
     }
 }
