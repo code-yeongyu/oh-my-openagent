@@ -25,6 +25,7 @@ afterEach(async () => {
 // A wait on a test seam that names what never happened, inside the per-test timeout, instead of hanging until
 // Bun kills the test. The deadline uses the real timer, captured before any test spies on setTimeout (#12619).
 const realSetTimeout = globalThis.setTimeout
+const REPORT_TIMER_DEADLINE_MS = 2_000
 const realClearTimeout = globalThis.clearTimeout
 async function within<T>(promise: Promise<T>, ms: number, missing: string): Promise<T> {
   let handle: ReturnType<typeof setTimeout> | undefined
@@ -145,8 +146,8 @@ describe("task start failure cause", () => {
         const starting = manager.start({ prompt: "work", parent_session_id: "parent-1", depth: 1, category: "quick", execution_mode: "process" })
         const report = await within(
           reportWindow.promise,
-          2_000,
-          `the start-report timer was never scheduled: no setTimeout(..., START_REPORT_WINDOW_MS = ${START_REPORT_WINDOW_MS}) within 2s of manager.start`,
+          REPORT_TIMER_DEADLINE_MS,
+          `the start-report timer was never scheduled: no setTimeout(..., START_REPORT_WINDOW_MS = ${START_REPORT_WINDOW_MS}) within ${REPORT_TIMER_DEADLINE_MS} ms of manager.start`,
         )
         timer.mockRestore()
         if (reportFirst) {
