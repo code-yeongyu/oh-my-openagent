@@ -169,6 +169,23 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     expect(openSession).not.toHaveBeenCalled()
   })
 
+  test("#given an alias holder names b's session by its durable id while b's listing keys it by a relay id #when a tool names the alias #then it reaches that listing row on b, never a false device_offline", async () => {
+    const relayRow = { ...titled("b", "relay-kEy-on-b", "worker b"), path: "/home/b/.omo/agent/sessions/--w--/2026-11-08T11-36-00-000Z_dur-on-b.jsonl" }
+    const a = account({ rows: [relayRow], aliases: new Map([["build-b", { session_id: "dur-on-b", device: "b" }]]), live: ["relay-kEy-on-b"] })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "build-b", message: "go" })).toMatchObject({ kind: "ok", thread_id: "relay-kEy-on-b", device: "b" })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => [entry.device, entry.session])).toEqual([["b", "relay-kEy-on-b"]])
+  })
+
+  test("#given an alias whose holder b no longer lists #when a tool names it #then it is not_found naming the device while b is online, and device_offline only when b is offline", async () => {
+    const gone = new Map([["stale-b", { session_id: "dur-gone", device: "b" }]])
+    const online = account({ rows: [titled("b", "dur-on-b", "other")], aliases: gone })
+    expect(await surface(online.remote).run("thread_send", { thread: "stale-b", message: "x" })).toMatchObject({ kind: "error", error: { code: "not_found", details: { device: "b", thread_id: "dur-gone" } } })
+    const offline = account({ rows: [titled("b", "dur-on-b", "other")], aliases: gone, online: false })
+    expect(await surface(offline.remote).run("thread_send", { thread: "stale-b", message: "x" })).toMatchObject({ kind: "error", error: { code: "device_offline", details: { device: "b" } } })
+    expect([...online.sent, ...offline.sent]).toEqual([])
+  })
+
   test("#given remote sessions are off on this device #when thread_list runs in the workspace scope #then the alias registry is never asked", async () => {
     const a = account({ plan: "disabled" })
     const { run } = surface(a.remote)
