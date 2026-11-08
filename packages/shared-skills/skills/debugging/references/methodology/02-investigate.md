@@ -66,7 +66,7 @@ Branch depending on what's available.
 
 When the `team_*` tools are present, create a **debug-squad** team and split investigation across members working on different evidence sources. This is the right default whenever you have ≥3 hypotheses and any of them would take >10 minutes to investigate single-threaded.
 
-**Team spec** — write to `~/.omo/teams/debug-squad/config.json`:
+**Team spec** — write to `.omo/teams/debug-squad/config.json` under the project root (the project-scoped spec location the team loader reads):
 
 ```json
 {
@@ -86,7 +86,7 @@ When the `team_*` tools are present, create a **debug-squad** team and split inv
     {
       "kind": "category",
       "category": "deep-low",
-      "prompt": "You are the Reproduction Engineer. Your job: build the smallest reliable repro — a curl command, a vitest/pytest/go test, a tmux script, a Playwright script for browser bugs, a pwntools script for binary targets. It must reproduce on first try and be copy-pasteable by the Lead. Document exact input, expected output, observed output. Save repro artifacts under /tmp/ and tell the Lead to journal them. If the bug is browser-based you MUST use Playwright CLI — do not simulate with curl."
+      "prompt": "You are the Reproduction Engineer. Your job: build the smallest reliable repro — a curl command, a vitest/pytest/go test, a tmux script, an omowright script for browser bugs, a pwntools script for binary targets. It must reproduce on first try and be copy-pasteable by the Lead. Document exact input, expected output, observed output. Save repro artifacts under /tmp/ and tell the Lead to journal them. If the bug is browser-based you MUST drive a real browser through omowright (references/tools/browser-qa.md) — do not simulate with curl."
     },
     {
       "kind": "category",

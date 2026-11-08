@@ -4,16 +4,19 @@
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::{Arc, Weak};
 use std::thread;
-use std::time::Duration;
 
 use parking_lot::Mutex;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
-use senpi_desktop_core::holds::reports_release_failure;
+use senpi_desktop_core::report::ReportMode;
 use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions};
-use tokio::time::{timeout_at, Instant};
+use tokio::time::Instant;
 
+use crate::display_awake::DisplayAwake;
 use crate::mutate::SessionSafety;
+pub use crate::pending::Pending;
+use crate::pending::PendingKind;
 use crate::request::{Op, Response};
+use crate::screen_notes::{op_display, ScreenNotes};
 use crate::selection::BackendFactory;
 use crate::timeouts::SessionTimeouts;
 use crate::worker::Worker;
@@ -34,6 +37,7 @@ enum Message {
         op: Op,
         reply: Reply,
         signal: Arc<senpi_desktop_safety::HoldSignal>,
+        mode: crate::pending::RequestMode,
     },
     /// Drops the backend, acknowledges, and ends the thread.
     Close {
@@ -50,6 +54,13 @@ pub struct Session {
     holds: Mutex<Vec<Weak<senpi_desktop_safety::HoldSignal>>>,
     capabilities: Arc<Mutex<DesktopCapabilities>>,
     timeouts: SessionTimeouts,
+    /// `reportMode` of the last `open` the session thread applied; written by
+    /// the worker, so an open that failed, was abandoned, or is still queued
+    /// never changes it.
+    report_mode: Arc<Mutex<ReportMode>>,
+    awake: Arc<DisplayAwake>,
+    notes: ScreenNotes,
+    _stop_observer: Arc<dyn Fn() + Send + Sync>,
 }
 
 impl Session {
@@ -80,11 +91,17 @@ impl Session {
         let (queue, requests) = flume::unbounded();
         let (ready_tx, ready_rx) = flume::bounded(1);
         let shared = Arc::clone(&capabilities);
+        let report_mode = Arc::new(Mutex::new(ReportMode::Null));
+        let applied_mode = Arc::clone(&report_mode);
         let supervisor = Arc::clone(&safety.supervisor);
+        let awake = Arc::new(DisplayAwake::default());
+        let stop_observer = awake.observe_stops(&supervisor);
+        let notes = ScreenNotes::default();
+        let screen = (Arc::clone(&awake), notes.clone());
         thread::Builder::new()
             .name(THREAD_NAME.to_owned())
             .spawn(move || {
-                let worker = Worker::new(Box::new(factory), shared, safety);
+                let worker = Worker::new(Box::new(factory), shared, applied_mode, safety, screen);
                 // `start` is blocked on this receiver until it arrives.
                 ready_tx.send(()).unwrap_or(());
                 serve(worker, &requests);
@@ -99,14 +116,22 @@ impl Session {
             holds: Mutex::new(Vec::new()),
             capabilities,
             timeouts,
+            report_mode,
+            awake,
+            notes,
+            _stop_observer: stop_observer,
         })
     }
 
-    /// The latest capabilities the session thread observed; never waits on a
-    /// busy backend.
+    /// The latest capabilities the session thread observed, with the display
+    /// sleep read live; never waits on a busy backend.
     #[must_use]
     pub fn capabilities(&self) -> DesktopCapabilities {
-        self.capabilities.lock().clone()
+        let mut capabilities = self.capabilities.lock().clone();
+        if let Some(state) = self.notes.live(None) {
+            capabilities.display_asleep = state.display_asleep;
+        }
+        capabilities
     }
 
     /// Opens or reconfigures the session. Cursor-only changes preserve the
@@ -116,28 +141,41 @@ impl Session {
         self.enqueue(|reply| Message::Open { options, reply })
     }
 
+    /// The `reportMode` of the last `open` the session thread applied. One
+    /// request's mode is [`Pending::request_mode`]: an open applied after the
+    /// request started must not re-shape its reply.
+    #[must_use]
+    pub fn report_mode(&self) -> ReportMode {
+        *self.report_mode.lock()
+    }
+
     /// Enqueues `op` behind every earlier request.
     pub fn submit(&self, op: Op) -> Pending {
         let budget = self.timeouts.budget_for(&op);
         let is_hold = matches!(op, Op::HoldKeys(_) | Op::HoldMouse(_));
+        let display = op_display(&op);
         let signal = self.supervisor.hold_signal();
+        let mode = crate::pending::RequestMode::new(self.report_mode());
         let mut pending = self.enqueue(|reply| {
             let mut holds = self.holds.lock();
             holds.retain(|hold| hold.strong_count() > 0);
             holds.push(Arc::downgrade(&signal));
-            Message::Op { op, reply, signal: Arc::clone(&signal) }
+            Message::Op { op, reply, signal: Arc::clone(&signal), mode: mode.clone() }
         });
+        pending.mode = Some(mode);
         pending.cancellation = Some(crate::cancel_on_drop::CancelOnDrop(signal));
         pending.budget = budget;
         pending.deadline = Instant::now() + budget;
         pending.release_budget = is_hold.then_some(self.timeouts.close);
+        pending.notes = Some((self.notes.clone(), display));
         pending
     }
 
-    /// Releases the backend after every earlier request. Idempotent: a second
-    /// close answers `Unit` at once.
+    /// Releases the backend after every earlier request, and the
+    /// display-awake hold at once. Idempotent: a second close answers `Unit`.
     pub fn close(&self) -> Pending {
         let mut queue = self.queue.lock();
+        self.awake.close();
         self.cancel_holds();
         let Some(queue) = queue.take() else {
             return Pending::ready(Ok(Response::Unit));
@@ -173,12 +211,27 @@ impl Session {
 
 impl Drop for Session {
     fn drop(&mut self) {
+        self.awake.close();
         self.cancel_holds();
     }
 }
 
+/// The next request; an idle wait ends early when the display-awake grace runs out.
+fn next(worker: &Worker, requests: &flume::Receiver<Message>) -> Option<Message> {
+    loop {
+        let Some(deadline) = worker.awake.deadline() else {
+            return requests.recv().ok();
+        };
+        match requests.recv_deadline(deadline) {
+            Ok(message) => return Some(message),
+            Err(flume::RecvTimeoutError::Timeout) => worker.awake.expire(std::time::Instant::now()),
+            Err(flume::RecvTimeoutError::Disconnected) => return None,
+        }
+    }
+}
+
 fn serve(mut worker: Worker, requests: &flume::Receiver<Message>) {
-    while let Ok(message) = requests.recv() {
+    while let Some(message) = next(&worker, requests) {
         let (reply, result) = match message {
             Message::Close { ack } => {
                 drop(worker);
@@ -189,8 +242,15 @@ fn serve(mut worker: Worker, requests: &flume::Receiver<Message>) {
             // A waiter that already gave up (deadline or `$/cancel`) dropped
             // its receiver: its request must not reach the desktop.
             Message::Open { reply, .. } | Message::Op { reply, .. } if reply.is_disconnected() => continue,
-            Message::Open { options, reply } => (reply, guarded(|| Ok(Response::Capabilities(worker.open(options))))),
-            Message::Op { op, reply, signal } => {
+            Message::Open { options, reply } => {
+                let opened = guarded(|| Ok(Response::Capabilities(worker.open(options))));
+                worker.begin_activity();
+                worker.awake.finish(std::time::Instant::now());
+                (reply, opened)
+            }
+            Message::Op { op, reply, signal, mode } => {
+                // The mode this request is served under, fixed before it runs.
+                mode.set(worker.registry.report_mode());
                 // `$/cancel` or a deadline drops the waiter: that is the
                 // request's cancellation signal while it runs.
                 worker.hold_signal = Some(signal);
@@ -212,76 +272,4 @@ fn serve(mut worker: Worker, requests: &flume::Receiver<Message>) {
 pub(crate) fn guarded<T>(request: impl FnOnce() -> CoreResult<T>) -> CoreResult<T> {
     catch_unwind(AssertUnwindSafe(request))
         .unwrap_or_else(|_| Err(DesktopError::internal("the desktop backend panicked")))
-}
-
-/// The reply to one enqueued request. Dropping it abandons the request: if
-/// the session thread has not started it yet, it never runs.
-pub struct Pending {
-    cancellation: Option<crate::cancel_on_drop::CancelOnDrop>,
-    kind: PendingKind,
-    deadline: Instant,
-    budget: Duration,
-    release_budget: Option<Duration>,
-}
-
-enum PendingKind {
-    Ready(Box<CoreResult<Response>>),
-    Reply(flume::Receiver<CoreResult<Response>>),
-    Close(flume::Receiver<()>),
-}
-
-impl Pending {
-    fn new(kind: PendingKind, budget: Duration) -> Self {
-        Self {
-            cancellation: None,
-            kind,
-            deadline: Instant::now() + budget,
-            budget,
-            release_budget: None,
-        }
-    }
-
-    fn ready(result: CoreResult<Response>) -> Self {
-        Self::new(PendingKind::Ready(Box::new(result)), Duration::ZERO)
-    }
-
-    /// The engine cancels a hold without dropping its completion receiver.
-    pub fn hold_signal(&self) -> Option<Arc<senpi_desktop_safety::HoldSignal>> {
-        self.release_budget?;
-        self.cancellation.as_ref().map(|cancel| Arc::clone(&cancel.0))
-    }
-
-    /// # Errors
-    /// The request's own error, `Timeout` past the deadline, or `Internal`
-    /// when the session thread ended without replying.
-    pub async fn wait(self) -> CoreResult<Response> {
-        let _cancellation = self.cancellation;
-        let timed_out = |what: &str| DesktopError::timeout(format!("{what} within {} ms", self.budget.as_millis()));
-        let lost = || DesktopError::internal(format!("{THREAD_NAME} ended without replying"));
-        match self.kind {
-            PendingKind::Ready(result) => *result,
-            PendingKind::Reply(replied) => match timeout_at(self.deadline, replied.recv_async()).await {
-                Ok(Ok(result)) => result,
-                Ok(Err(_)) => Err(lost()),
-                Err(_) => {
-                    if let (Some(cancel), Some(budget)) = (&_cancellation, self.release_budget) {
-                        cancel.0.cancel();
-                        match tokio::time::timeout(budget, replied.recv_async()).await {
-                            Err(_) => return Err(timed_out("held input release did not complete")),
-                            Ok(Ok(Err(error))) if reports_release_failure(&error) => return Err(error),
-                            // A hold that finished or released cleanly after its deadline still
-                            // answers Timeout: the caller's budget is what was exceeded.
-                            Ok(_) => {}
-                        }
-                    }
-                    Err(timed_out("desktop operation did not complete"))
-                }
-            },
-            PendingKind::Close(acked) => match timeout_at(self.deadline, acked.recv_async()).await {
-                Ok(Ok(())) => Ok(Response::Unit),
-                Ok(Err(_)) => Err(lost()),
-                Err(_) => Err(timed_out("the desktop backend was not released")),
-            },
-        }
-    }
 }

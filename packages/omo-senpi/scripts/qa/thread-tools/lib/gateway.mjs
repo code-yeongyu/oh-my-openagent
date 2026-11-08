@@ -35,6 +35,7 @@ import { fileURLToPath } from "node:url"
 import { withTelemetryOptOut } from "../../telemetry-opt-out-env.mjs"
 import { requireEngineVersion } from "./engine-version.mjs"
 import { QA_TMP_ROOT } from "./qa-tmp.mjs"
+import { sameVersion } from "../../../../../omo-native/bin/lib/same-version.js"
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -325,14 +326,14 @@ function kitDependenciesPresent() {
 
 /** Install the released engine (and the screen emulators) into the kit once; later calls reuse it. */
 export async function ensureKit() {
-  if (installedEngineVersion() !== ENGINE_VERSION || !kitDependenciesPresent()) {
+  if (!sameVersion(installedEngineVersion(), ENGINE_VERSION) || !kitDependenciesPresent()) {
     mkdirSync(KIT_DIR, { recursive: true })
     writeFileSync(join(KIT_DIR, "package.json"), `${JSON.stringify({ name: "qa-thread-tools-kit", private: true, type: "module", dependencies: KIT_DEPENDENCIES }, null, 2)}\n`)
     const installed = await run(process.execPath, ["install"], { cwd: KIT_DIR })
     if (installed.code !== 0) throw new Error(`kit install failed (${installed.code}):\n${installed.stderr.slice(-2000)}`)
   }
   const version = installedEngineVersion()
-  if (version !== ENGINE_VERSION) throw new Error(`kit engine is ${version}, expected ${ENGINE_VERSION}`)
+  if (!sameVersion(version, ENGINE_VERSION)) throw new Error(`kit engine is ${version}, expected ${ENGINE_VERSION}`)
   return { dir: KIT_DIR, engineVersion: version, engineDist: join(KIT_DIR, "node_modules", "@code-yeongyu", "senpi", "dist") }
 }
 
@@ -364,11 +365,11 @@ export const PATCHES = {
     from: /let ([\w$]+)=([\w$]+)\?\.config\.test_hooks\[([\w$]+)\];/,
     to: 'let $1=$2?.config.test_hooks[$3]??("afterDbCommit"===$3?process.env.THREAD_QA_AFTER_DB_COMMIT:void 0);',
   },
-  /** `loop-guard --mutant`: the cycle guard of the store worker answers "no cycle", so the scenario must FAIL. */
-  cycle_check_off: {
+  /** `loop-guard --mutant`: the store worker refuses every chain past hop 2 (a hidden count limit), so the scenario must FAIL. */
+  hop_cap_2: {
     file: "extensions/gateway-store-worker.mjs",
-    from: /([\w$]+\.sender_node,[\w$]+\.target_durable_id\))\?([\w$]+\("loop_detected","The target already leads back to the sender in this causal chain.")/,
-    to: "$1&&false?$2",
+    from: /([\w$]+)\.target_durable_id===\1\.sender_node\)return ([\w$]+)\("loop_detected","A session cannot deliver to itself through the gateway.",\{guard:"self_send"\}\);if\(!([\w$]+)\.new_root\)/,
+    to: '$1.target_durable_id===$1.sender_node||$3.hop>2)return $2("loop_detected","A session cannot deliver to itself through the gateway.",{guard:"self_send"});if(!$3.new_root)',
   },
 }
 

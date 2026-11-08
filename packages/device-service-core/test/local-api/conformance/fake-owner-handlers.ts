@@ -78,6 +78,13 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
       state.reports.push(report);
       return ok();
     }
+    case "control.attach.get":
+    case "control.attach.set":
+      if (role !== "desktop" && role !== "omo")
+        return refuse("forbidden", "only the desktop and the CLI read or set the attach setting");
+      if (request.type === "control.attach.set")
+        state.attach = { attached: request.attached, changedAt: new Date(state.now()).toISOString() };
+      return ok(state.attach);
     case "owner.shutdown_for_upgrade":
       if (role !== "installer") return refuse("forbidden", "only the installer stops the owner");
       return ok({}, () => void state.stop());
@@ -88,6 +95,20 @@ export const dispatch = (state: OwnerState, conn: Conn, request: LocalRequest): 
     case "session.command_part":
     case "session.read":
       return sessionHandler(state, conn, request);
+    case "session.endpoints": {
+      const endpoints = state.world.endpoints?.[request.device];
+      return endpoints === undefined
+        ? refuse("unsupported", "that device names no engine endpoints")
+        : ok({ endpoints: [...endpoints] });
+    }
+    case "session.locate": {
+      const located = state.world.located?.[request.device];
+      if (located === undefined) return refuse("unsupported", "that device takes no locate probe");
+      const key = located[request.engine_id];
+      return key === undefined
+        ? refuse("session_not_found", "no session of that device has that engine id")
+        : ok({ device: request.device, key, session: `${request.device}.${key}` });
+    }
     default:
       return assertNever(request);
   }

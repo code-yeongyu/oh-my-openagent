@@ -61,6 +61,7 @@ export const DOCTOR_EXPECTED_ONLY = {
     ["INFO computer use stop path", "reported once the embedded engine answers"],
     ["INFO Claude Code", "the binary pins the Claude Code it downloads for the anthropic-subscription lane (#9262); npm has no pin"],
     ["PASS Claude Code", "the same pinned Claude Code, once it is downloaded"],
+    ["INFO engine trust", "the engine-trust section is part of the compiled doctor only; the npm launcher's doctor has none (omo#10762)"],
   ],
 }
 
@@ -80,8 +81,10 @@ export function normalizeText(text, roots = []) {
 
 // A doctor/setup line's identity: its level and label, not the machine-specific detail after it.
 export function sectionKey(line) {
-  const shard = /^INFO Shard\b/.exec(line.trim())
-  if (shard) return "INFO Shard"
+  // A leftover task-host shard is runtime state: whether it is still running (INFO) or already exited (WARN) when
+  // each side runs doctor is timing, not a binary/npm difference (#12148).
+  const shard = /^(INFO|WARN) Shard\b/.exec(line.trim())
+  if (shard) return "Shard"
   const match = /^(PASS|WARN|FAIL|INFO|NOTICE)\s+([^:]+?)(:|$)/.exec(line.trim())
   if (match) return `${match[1]} ${match[2].trim()}`
   return line.trim().replace(/\d+/g, "<n>")

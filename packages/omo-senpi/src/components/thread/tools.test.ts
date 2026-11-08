@@ -82,12 +82,12 @@ describe("thread tool registration", () => {
     expect(f.setModel.mock.calls[0]).toEqual(["route-peer", "openai", "gpt-x", "dur-peer"])
   })
 
-  test("registers exactly the seventeen contract tools with search metadata", () => {
+  test("registers exactly the eighteen contract tools with search metadata", () => {
     const tools: Record<string, unknown>[] = []
     const f = fixture()
     registerThreadTools({ registerTool: (tool) => tools.push(tool) }, { ...f, callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() })
     expect(tools.map((tool) => tool.name)).toEqual([
-      "thread_create", "thread_list", "thread_read", "thread_send", "thread_interrupt", "thread_handoff", "thread_rename", "thread_set_model", "thread_set_reasoning",
+      "thread_create", "thread_list", "thread_read", "thread_send", "thread_interrupt", "thread_close", "thread_handoff", "thread_rename", "thread_set_model", "thread_set_reasoning",
       "thread_bind", "thread_unbind", "thread_rebind", "thread_bindings", "thread_report", "thread_outbox", "thread_outbox_ack", "thread_answer",
     ])
     expect(tools.every((tool) => tool.exposure === "search" && tool.searchGroup === "threads")).toBe(true)
@@ -456,7 +456,8 @@ describe("thread_send through the session gateway", () => {
   test("#given a host session and a terminal endpoint #when the host session sends to the terminal #then the result carries delivery_id and endpoint.kind tui and only a wake reached the terminal", async () => {
     const g = gatewayFixture()
     const result = await g.run("thread_send", { thread: "my-tui", message: "hello terminal" }, "dur-host", "call-1")
-    expect(result).toMatchObject({ kind: "ok", thread_id: "dur-tui", endpoint: { kind: "tui" }, effective_mode: "auto", delivery: { kind: "queued" }, deduplicated: false })
+    // The fixture's wake answers with nothing admitted and no drain behind it, so nothing will start the message (#12486).
+    expect(result).toMatchObject({ kind: "ok", thread_id: "dur-tui", endpoint: { kind: "tui" }, effective_mode: "auto", delivery: { kind: "queued_offline" }, deduplicated: false })
     const deliveryId = (result as { delivery_id?: string }).delivery_id
     expect(typeof deliveryId).toBe("string")
     expect(g.wakes).toEqual([{ endpoint: { kind: "tui", socket: TUI_SOCKET, routing_id: "dur-tui", durable_session_id: "dur-tui" }, ids: [deliveryId as string] }])

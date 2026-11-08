@@ -10,7 +10,7 @@ export interface ToolkitGrant {
   readonly tokenFile: string
 }
 
-export function createDesktopToolkitComponent(options: { readonly timeoutMs?: number } = {}): OmoSenpiComponent {
+export function createDesktopToolkitComponent(options: { readonly timeoutMs?: number; readonly loadSdk?: () => Promise<unknown> } = {}): OmoSenpiComponent {
   return {
     name: "desktop-toolkit",
     async register(pi, ctx) {

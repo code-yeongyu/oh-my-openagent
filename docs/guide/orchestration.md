@@ -220,7 +220,7 @@ The delegation router used by `/ulw-execute`:
 | `writing` | documentation and prose |
 | `deep` | hairy debugging, research-heavy or subtle cross-module work |
 | `ultrabrain` | one genuinely hard, logic-heavy problem; hand it the goal, not steps |
-| `architect` | the architect consult lane: module boundaries, decomposition, trade-offs (advisory, read-only) |
+| `architect` | the architect lane: module boundaries, decomposition, trade-offs, and broad debugging across code, logs, history and docs; implements when the task needs it, advisory-only on request |
 
 Splittable work splits into a swarm of `quick`/`unspecified-low` workers in one burst. Cohesive hard work stays whole and goes to `deep` or `ultrabrain` as one delegation.
 

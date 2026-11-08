@@ -22,6 +22,8 @@ const CAS_ATTEMPTS = 5
 const TRAILER_SCAN = 1_000
 /** git could not create a lock file because one exists; a compare-and-swap miss is a different failure. */
 const LOCK_FILE_EXISTS = /unable to create '[^']*\.lock'/i
+/** Sync paths are item keys, never patterns: `:/`, `*`, `?` and `[` must name files, not match them. */
+const LITERAL = "--literal-pathspecs"
 
 export class SyncCommitError extends Error {
   override readonly name = "SyncCommitError"
@@ -58,8 +60,8 @@ export function createGitSyncRepo(options: GitSyncRepoOptions): SyncRepo {
       const present: string[] = []
       const missing: string[] = []
       for (const path of paths) (existsSync(join(root, path)) ? present : missing).push(path)
-      if (present.length > 0) await run(["add", "-A", "--", ...present], env)
-      if (missing.length > 0) await run(["rm", "--cached", "-q", "--ignore-unmatch", "--", ...missing], env)
+      if (present.length > 0) await run([LITERAL, "add", "-A", "--", ...present], env)
+      if (missing.length > 0) await run([LITERAL, "rm", "--cached", "-q", "--ignore-unmatch", "--", ...missing], env)
       return await run(["write-tree"], env)
     } finally {
       await rm(index, { force: true })
@@ -97,7 +99,7 @@ export function createGitSyncRepo(options: GitSyncRepoOptions): SyncRepo {
       throw new SyncCommitError(`HEAD kept moving; the sync commit was not recorded after ${CAS_ATTEMPTS} attempts`)
     },
     async syncIndex(paths) {
-      if (paths.length > 0) await withStrandedGitLockRecovery(root, () => run(["reset", "-q", "HEAD", "--", ...paths]))
+      if (paths.length > 0) await withStrandedGitLockRecovery(root, () => run([LITERAL, "reset", "-q", "HEAD", "--", ...paths]))
     },
     async hasSyncCommit(range) {
       if ((await head()) === null) return false

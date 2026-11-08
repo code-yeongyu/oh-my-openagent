@@ -11,6 +11,7 @@ import {
 	transportFor,
 	verified,
 } from "./testing/world.test-support.ts";
+import { writeBatch } from "./testing/write-batch.test-support.ts";
 
 const NOT_BACKED_UP = {
 	userVerified: true,
@@ -78,8 +79,13 @@ describe("enrolling and removing recovery passkeys (sync-design section 7)", () 
 		});
 	});
 
-	test("removal is member-signed, rotates the key out, signals the platform and tells the user to delete it", async () => {
+	// The batch row: enroll and remove walk the served chain past a batch row (#12277).
+	test.each([
+		["an account with no batch", false],
+		["an account with a batch written before enrolling", true],
+	] as const)("removal is member-signed, rotates the key out, signals the platform and tells the user to delete it: %s", async (_account, withBatch) => {
 		const world = await createWorld();
+		if (withBatch) await writeBatch(world, "kept");
 		const second = await enrollAnother(world);
 		if (!second.ok) throw new Error(second.reason);
 		const outcome = await removeRecoveryKey({

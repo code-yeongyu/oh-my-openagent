@@ -1,9 +1,22 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readlinkSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	lstatSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	readlinkSync,
+	realpathSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
 	dropTimestampOffsets,
+	goldenHostLeaks,
 	pinEnginePackage,
 	splitStatusChannels,
 	statusCounts,
@@ -151,5 +164,52 @@ describe("pinEnginePackage", () => {
 		} finally {
 			rmSync(base, { recursive: true, force: true });
 		}
+	});
+});
+
+describe("goldenHostLeaks", () => {
+	const notice =
+		"OmO Native sends anonymous usage telemetry (no prompts, code, file paths, or account data) to PostHog in the United States to improve the product.";
+
+	test("#given observations with the telemetry notice and terminal restore events #when scanned #then each leak is named with its path", () => {
+		const observations = {
+			O6: [
+				{
+					turn: [
+						{ type: "extension_event", name: "terminal_monitor_state" },
+						{ type: "extension_ui_request", method: "notify", message: notice },
+						{ type: "extension_event", name: "wake_source_state" },
+					],
+				},
+			],
+		};
+
+		expect(goldenHostLeaks(observations)).toEqual([
+			{ path: "$.O6[0].turn[0].name", reason: "terminal_monitor_state event" },
+			{ path: "$.O6[0].turn[1].message", reason: "telemetry notice" },
+			{ path: "$.O6[0].turn[2].name", reason: "wake_source_state event" },
+		]);
+	});
+
+	test("#given observations that only mention the markers inside other text #when scanned #then nothing is reported", () => {
+		const observations = { O1: [{ body: { messages: [{ content: "the terminal_monitor_state event is internal" }] } }] };
+
+		expect(goldenHostLeaks(observations)).toEqual([]);
+	});
+
+	test("#given every committed EQ.omo golden #when scanned #then none carries a host-leaked row", () => {
+		const root = join(dirname(fileURLToPath(import.meta.url)), "fused-equivalence-golden");
+		const goldens = readdirSync(root).flatMap((platform) =>
+			readdirSync(join(root, platform))
+				.filter((name) => /^E\d+\.json$/.test(name))
+				.map((name) => join(platform, name)),
+		);
+		expect(goldens.length).toBeGreaterThan(0);
+
+		const leaks = goldens.flatMap((file) =>
+			goldenHostLeaks(JSON.parse(readFileSync(join(root, file), "utf8")).observations).map((leak) => `${file} ${leak.path}: ${leak.reason}`),
+		);
+
+		expect(leaks).toEqual([]);
 	});
 });

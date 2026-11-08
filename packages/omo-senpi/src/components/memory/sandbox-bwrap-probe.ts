@@ -34,8 +34,11 @@ export function classifyBwrapSmoke(result: BwrapSmokeResult): SandboxUsability {
   return unusable(`smoke test exited ${result.exitCode ?? "without an exit code"}`, result.stderr)
 }
 
-// One verdict per absolute executable path per process. Memoizes both the result and the promise
-// to ensure a second call during a concurrent first spawn does not trigger a second spawn.
+// One DEFINITIVE verdict per absolute executable path per process: the smoke exited (usable or
+// not) or could not be spawned. A timeout is transient (a loaded host, a slow first start), so it
+// is returned to its caller but never memoized; the next probe, which reflection runs once per
+// spawn, runs the smoke again. The pending promise is shared, so concurrent callers still trigger
+// one spawn.
 const verdicts = new Map<string, SandboxUsability>()
 const pendingProbes = new Map<string, Promise<SandboxUsability>>()
 
@@ -50,7 +53,7 @@ export async function probeBwrapUsability(executable: string): Promise<SandboxUs
     try {
       const result = await runBwrapSmoke(executable)
       const verdict = classifyBwrapSmoke(result)
-      verdicts.set(executable, verdict)
+      if (!result.timedOut) verdicts.set(executable, verdict)
       return verdict
     } finally {
       pendingProbes.delete(executable)

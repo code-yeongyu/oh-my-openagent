@@ -129,6 +129,25 @@ describe("parseHtml", () => {
 		expect(childTags(svg.parent as LiteNode)).toEqual(["script", "svg", "p"])
 	})
 
+	test("#given an svg with drawing markup and a foreignObject #when parsed #then raw is kept and only the foreignObject subtree is parsed", () => {
+		// given
+		const source =
+			"<body><svg viewBox=\"0 0 200 100\"><path d=\"M0 0\"/><text>12%</text><foreignObject>\n<div>chart 110.6 mm</div>\n</foreignObject></svg></body>"
+		// when
+		const doc = parseHtml(source)
+		// then
+		const svg = byTag(doc, "svg")[0] as LiteNode
+		expect(svg.raw).toBe("<path d=\"M0 0\"/><text>12%</text><foreignObject>\n<div>chart 110.6 mm</div>\n</foreignObject>")
+		expect(childTags(svg)).toEqual(["foreignobject"])
+		const fo = byTag(doc, "foreignobject")[0] as LiteNode
+		expect(fo.line).toBe(1)
+		const div = byTag(doc, "div")[0] as LiteNode
+		expect(div.line).toBe(2)
+		expect(proseText(div)).toBe("chart 110.6 mm")
+		expect(byTag(doc, "text")).toHaveLength(0)
+		expect(byTag(doc, "path")).toHaveLength(0)
+	})
+
 	test("#given an unclosed fragment without body #when parsed #then the tree still has body > div > p", () => {
 		// given
 		const source = "<div><p>unclosed"

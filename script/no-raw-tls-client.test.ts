@@ -28,6 +28,12 @@ import {
 // destructuring; variable/const-folded module specifiers; Reflect.get(Bun, "connect").
 // This is a regression guard, not a complete data-flow or evasion detector.
 const ALLOWLIST: AllowlistEntry[] = [
+  {
+    file: "packages/omo-senpi/plugin/runtime/bunshin-ts/sdk.js",
+    call: "t.connect()",
+    count: 1,
+    reason: "no TLS and no remote host: `t` is the SDK's relay transport, whose connect() opens the local device service through node:net createConnection({ path: <stateDir>/<socket> }) or, on Windows, { host: \"127.0.0.1\", port } (vendor/bunshin-ts-relay/index.js:766); the bundle imports no node:tls/https/http2 and has no wss URL (#12258, senpi#3078).",
+  },
   ...["omo-codex", "omo-senpi"].flatMap((edition) => ["https", "tls"].map((module) => ({
     file: `packages/${edition}/plugin/skills/browser/runtime/omowright/index.js`,
     call: `__require("${module}")`,
@@ -35,10 +41,16 @@ const ALLOWLIST: AllowlistEntry[] = [
     reason: "bundled ws@8.21.3 acquisition: request options and tls.connect(options) derive host/servername from new URL(address).hostname; the connector call remains independently pinned (omowright#40, senpi#3078).",
   }))),
   {
-    file: "packages/omo-native/compiled-ca-trust.ts",
-    call: 'import * as nodeTls from "node:tls"',
+    file: "packages/omo-native/trust-acquisition.ts",
+    call: 'import { getCACertificates} from "node:tls"',
     count: 1,
-    reason: "no connection and no host: the module reads getCACertificates and sets setDefaultCACertificates at engine startup (#10215); it never calls connect, createConnection, TLSSocket, createSecureContext or checkServerIdentity.",
+    reason: "no connection and no host: the launcher trust importer reads getCACertificates(\"bundled\") only to pass Bun's compiled-in roots to the Windows trust helper on stdin (#10762, design 4.2); it never calls connect, createConnection, TLSSocket, createSecureContext or checkServerIdentity (senpi#3078).",
+  },
+  {
+    file: "packages/omo-native/trust-stage.ts",
+    call: 'import { getCACertificates} from "node:tls"',
+    count: 1,
+    reason: "no connection and no host: the launcher trust stage reads getCACertificates(\"extra\"), Bun's own parse of the native NODE_EXTRA_CA_CERTS, to compare the loaded set at adoption and capture user extras (#10762, design 5.2, 5.9); it never calls connect, createConnection, TLSSocket, createSecureContext or checkServerIdentity (senpi#3078).",
   },
   {
     file: "packages/omo-codex/plugin/scripts/auto-update-release-notes.mjs",
@@ -285,5 +297,6 @@ describe("no raw TLS client calls in shipped source (CVE-2026-48618, Bun 1.4.2)"
     for (const entry of ALLOWLIST) {
       expect(entry.reason.trim().length > 0, "allowlist entry without a reason: " + entry.file).toBe(true)
     }
-  })
+    // The whole-tree scan takes ~10 s; the preload's 20 s default reaches only the first file of a multi-file run.
+  }, 60_000)
 })

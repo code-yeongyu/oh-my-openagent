@@ -5,6 +5,46 @@ import type { ComponentLogger, SettleObserver } from "./types"
 
 afterEach(() => jest.useRealTimers())
 
+test("#given required status delivery #when its read exceeds the observer budget #then settlement still waits for delivery and the following observer remains bounded", async () => {
+  const pi = new FakeExtensionAPI()
+  const deliveryEntered = Promise.withResolvers<void>()
+  const delivery = Promise.withResolvers<void>()
+  const observerEntered = Promise.withResolvers<void>()
+  const reflection = Promise.withResolvers<void>()
+  const sequence: string[] = []
+  await composeOmoSenpiExtension([{
+    name: "fixture",
+    register(api) {
+      api.on("agent_settled", async () => {
+        deliveryEntered.resolve()
+        await delivery.promise
+        sequence.push("delivered")
+      }, { settleDelivery: true })
+      api.on("agent_settled", () => {
+        observerEntered.resolve()
+        return reflection.promise
+      })
+    },
+  }], { logger: { info() {}, warn() {}, error() {} } })(pi)
+  jest.useFakeTimers()
+  const settled = pi.dispatch("agent_settled", {}).then(() => { sequence.push("settled") })
+  try {
+    await deliveryEntered.promise
+    jest.advanceTimersByTime(2_000)
+    expect(sequence).toEqual([])
+    delivery.resolve()
+    await observerEntered.promise
+    expect(sequence).toEqual(["delivered"])
+    jest.advanceTimersByTime(2_000)
+    await settled
+    expect(sequence).toEqual(["delivered", "settled"])
+  } finally {
+    delivery.resolve()
+    reflection.resolve()
+    await settled
+  }
+})
+
 test.each(["observer", "unrelated"] as const)("#given concurrent settles sharing work (%s) #when it rejects #then only a known observer cancellation is absorbed", async (kind) => {
   const pi = new FakeExtensionAPI()
   const entered = Promise.withResolvers<SettleObserver | undefined>()
