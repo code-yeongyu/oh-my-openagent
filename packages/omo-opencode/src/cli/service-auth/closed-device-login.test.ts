@@ -67,3 +67,21 @@ test("#given accounts are closed #then only the device-code login leaves the sta
     ["login"], ["login", "--accounts", "https://example.invalid"], ["login", "--help"], ["logout"], ["whoami"], ["whoami", "--device"],
   ].map(args => trustLaunchKind(args))).toEqual(Array(6).fill("static"))
 })
+
+// #12646: the compiled entry classifies a closed `login` with the same option parse commands.ts runs, so an argv the
+// command refuses is a static refusal at the entry as well, and an argv the command runs is not.
+test.each([
+  [["login", "--device"], "one-shot-network"],
+  [["login", "--no-browser"], "one-shot-network"],
+  [["login", "--api", "https://example.invalid", "--device"], "one-shot-network"],
+  [["login", "--device", "--api", "https://example.invalid"], "one-shot-network"],
+  [["login", "--", "--device"], "static"],
+  [["login", "--accounts", "https://example.invalid", "--device"], "static"],
+  [["login", "--accounts", "--device"], "static"],
+  [["login", "extra", "--device"], "static"],
+  [["login", "--api"], "static"],
+  [["login"], "static"],
+  [["login", "--help"], "static"],
+] as const)("#given accounts are closed #when the compiled entry classifies omo %j #then it is %s", (args, kind) => {
+  expect(trustLaunchKind(args)).toBe(kind)
+})

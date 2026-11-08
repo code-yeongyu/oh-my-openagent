@@ -1534,8 +1534,6 @@
       "packages/senpi-task/src/manager/held-send.ts": ["holdsInChild"],
       // pre-existing at origin dev 4686e425b5: unused export(s) TaskConcurrency, decideDepthPolicy, NameRegistry, AUTO_HOST_CAPABILITIES, adaptInProcessHandle, adaptRpcHandle, TASK_AWAITING_INPUT_EVENT, TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT, logTranscriptEvent and 1 more
       "packages/senpi-task/src/manager/index.ts": ["TaskConcurrency", "decideDepthPolicy", "NameRegistry", "AUTO_HOST_CAPABILITIES", "adaptInProcessHandle", "adaptRpcHandle", "TASK_AWAITING_INPUT_EVENT", "TRANSCRIPT_ASSISTANT_EVENT", "TRANSCRIPT_TOOL_EVENT", "logTranscriptEvent", "subscribeTranscriptLog"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) START_REPORT_WINDOW_MS
-      "packages/senpi-task/src/manager/manager.ts": ["START_REPORT_WINDOW_MS"],
       // pre-existing at origin dev 4686e425b5: unused export(s) readObservedModel, observeChildEffectiveModel
       "packages/senpi-task/src/manager/observed-model.ts": ["readObservedModel", "observeChildEffectiveModel"],
       // pre-existing at origin dev 4686e425b5: unused export(s) PausedChildLostError, PausedChildOwnedElsewhereError
@@ -1680,8 +1678,8 @@
       "packages/shared-skills/skill-source-filter.mjs": ["ignoredSkillSourceFileNames"],
       // pre-existing at origin dev 4686e425b5: unused export(s) BROWSER_ENGINE_ENV
       "packages/shared-skills/skills/browser/scripts/browser-engine-guard.mjs": ["BROWSER_ENGINE_ENV"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) BROWSER_ENGINE_ENV, resolveOmowrightEntry, loadOmowright
-      "packages/shared-skills/skills/browser/scripts/omowright.mjs": ["BROWSER_ENGINE_ENV", "resolveOmowrightEntry", "loadOmowright"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) BROWSER_ENGINE_ENV, resolveOmowrightEntry
+      "packages/shared-skills/skills/browser/scripts/omowright.mjs": ["BROWSER_ENGINE_ENV", "resolveOmowrightEntry"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MAX_ROWS, MAX_OUTPUT_BYTES
       "packages/shared-skills/skills/debugging/references/scripts/dap.mjs": ["MAX_ROWS", "MAX_OUTPUT_BYTES"],
       // pre-existing at origin dev 4686e425b5: unused export(s) classifyName
