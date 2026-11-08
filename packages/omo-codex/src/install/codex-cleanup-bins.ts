@@ -1,6 +1,6 @@
 import { lstat, readFile, readdir, readlink, rm } from "node:fs/promises"
 import { dirname, isAbsolute, join, resolve } from "node:path"
-import { COMMAND_SHIM_MARKER } from "./codex-cache-command-shim"
+import { hasCommandShimHeader } from "./codex-cache-command-shim"
 import { isManagedComponentBinTarget } from "./codex-cache-dangling-bins"
 import { isNodeErrorWithCode } from "./codex-cache-fs"
 import { isLegacyCodexBinTarget, LEGACY_CODEX_COMPONENT_BIN_NAMES } from "./codex-cache-legacy-bins"
@@ -90,5 +90,5 @@ async function isManagedCodexBin(linkPath: string, platform: LinkPlatform, binNa
 
   if (!entryStat.isFile()) return false
   const content = await readFile(linkPath, "utf8")
-  return hasRuntimeWrapperHeader(content) || content.includes(COMMAND_SHIM_MARKER)
+  return hasRuntimeWrapperHeader(content) || hasCommandShimHeader(content)
 }
