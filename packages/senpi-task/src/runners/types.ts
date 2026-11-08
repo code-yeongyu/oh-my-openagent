@@ -57,6 +57,8 @@ export type RpcRunnerSpec = {
   // The delegating turn's W3C traceparent, read back the same two ways (per-child env or daemon session
   // context) so the child's turn spans continue the parent's trace.
   readonly traceparent?: string
+  // The parent's approval mode a separate-process child launches with (`--permission-preset`, #6189 F2c).
+  readonly permissionPreset?: string
 }
 
 export type ChildEventListener = (event: AgentSessionEvent) => void

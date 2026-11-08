@@ -1,4 +1,5 @@
 import type { EffectiveModel } from "../pinned-model-equivalence"
+import type { ChildParentLink } from "../parent-link"
 import type { HostRpcClientFactory, HostProtocolProbe } from "./session-transport"
 
 export interface OpenedHostSession {
@@ -66,4 +67,6 @@ export interface HostSessionClientPorts {
 export interface HostSessionClientOptions {
   readonly socketPath: string
   readonly ports?: HostSessionClientPorts
+  // The parent session this child answers dialogs on and follows the approval mode of (#6189 F2d/F2e).
+  readonly parent?: ChildParentLink
 }
