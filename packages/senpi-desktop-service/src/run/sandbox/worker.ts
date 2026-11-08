@@ -29,6 +29,9 @@ const PRELUDE = `(bridge, names) => {
 		if (data.reason !== undefined) error.reason = data.reason;
 		if (data.data !== undefined) error.data = data.data;
 		if (data.rpcCode !== undefined) error.rpcCode = data.rpcCode;
+		if (data.code !== undefined) error.code = data.code;
+		if (data.engineRestarted !== undefined) error.engineRestarted = data.engineRestarted;
+		if (data.method !== undefined) error.method = data.method;
 		Object.defineProperty(error, "hostError", { value: data.hostError });
 		return error;
 	};

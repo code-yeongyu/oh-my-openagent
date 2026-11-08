@@ -54,6 +54,11 @@ export interface SandboxErrorPayload {
 	/** The host error's `data` (JSON) and JSON-RPC `rpcCode`, readable by the body that catches it. */
 	readonly data?: unknown;
 	readonly rpcCode?: number;
+	/** `DesktopServiceError.code` and `.engineRestarted`, readable by the body that catches it. */
+	readonly code?: string;
+	readonly engineRestarted?: boolean;
+	/** `DesktopEngineRpcError.method`, the engine method that failed. */
+	readonly method?: string;
 }
 
 export type WorkerToHostMessage =

@@ -132,13 +132,20 @@ function jsonOrUndefined(value: unknown): unknown {
 	}
 }
 
-/** A bridged call's failure as the VM sees it: name, message, and the reason, data and rpcCode it carries. */
+/**
+ * A bridged call's failure as the VM sees it: name, message, and the whitelisted fields a vm body can read on the
+ * host error (`reason`, `data`, `rpcCode`, `DesktopServiceError.code`/`.engineRestarted`,
+ * `DesktopEngineRpcError.method`); no other field crosses.
+ */
 function bridgedFailure(error: unknown, token: string): SandboxErrorPayload {
 	if (!(error instanceof Error)) return { name: "Error", message: String(error), hostError: token };
 	const fields: Record<string, unknown> = { ...error };
 	const reason = typeof fields.reason === "string" ? fields.reason : undefined;
 	const data = fields.data === undefined || fields.data === null ? undefined : jsonOrUndefined(fields.data);
 	const rpcCode = typeof fields.rpcCode === "number" ? fields.rpcCode : undefined;
+	const code = typeof fields.code === "string" ? fields.code : undefined;
+	const engineRestarted = typeof fields.engineRestarted === "boolean" ? fields.engineRestarted : undefined;
+	const method = typeof fields.method === "string" ? fields.method : undefined;
 	return {
 		name: error.name,
 		message: error.message,
@@ -146,6 +153,9 @@ function bridgedFailure(error: unknown, token: string): SandboxErrorPayload {
 		...(reason === undefined ? {} : { reason }),
 		...(data === undefined ? {} : { data }),
 		...(rpcCode === undefined ? {} : { rpcCode }),
+		...(code === undefined ? {} : { code }),
+		...(engineRestarted === undefined ? {} : { engineRestarted }),
+		...(method === undefined ? {} : { method }),
 	};
 }
 

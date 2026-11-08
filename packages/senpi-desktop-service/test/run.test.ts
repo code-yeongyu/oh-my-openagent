@@ -307,6 +307,34 @@ describe.each(SANDBOXES)("runComputerCode under %s", (sandbox) => {
 		expect(error).toHaveProperty("data.code", "InvalidCoordinateFrame");
 	});
 
+	it("lets the body read the method of a caught engine error", async () => {
+		// Given
+		const { service } = await openDesktop();
+
+		// When
+		const result = await run(
+			service,
+			`try { await desktop.click(5, 5); } catch (error) { return [error.name, error.method]; }`,
+		);
+
+		// Then
+		expect(result.returnValue).toEqual(["DesktopEngineRpcError", "click"]);
+	});
+
+	it("lets the body read the code and engineRestarted of a caught service error", async () => {
+		// Given: the engine answers clipboard.write with a reply that is not an exec result
+		const { service } = await openDesktop({ FAKE_ENGINE_EXEC_REPLY: "42" });
+
+		// When
+		const result = await run(
+			service,
+			`try { await desktop.clipboard.write("x"); } catch (error) { return [error.name, error.code, error.engineRestarted]; }`,
+		);
+
+		// Then
+		expect(result.returnValue).toEqual(["DesktopServiceError", "Internal", false]);
+	});
+
 	it("drives a window handle by its id and reports the engine's audit events for the run", async () => {
 		// Given
 		const { service, log } = await openDesktop();
