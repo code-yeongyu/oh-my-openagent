@@ -1,6 +1,7 @@
 import type { DeviceService } from "../device-service-core/src/index.ts"
 import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
+import type { RemoteSender } from "../omo-senpi/src/components/thread/remote/peer-text"
 import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { setModelRemote } from "../omo-senpi/src/components/thread/remote/remote-controls"
 import {
@@ -10,7 +11,6 @@ import {
   openRemote,
   promptRemote,
   remoteAvailable,
-  type RemoteSender,
   type RemoteSendRequest,
   runningTurnRemote,
 } from "../omo-senpi/src/components/thread/remote/remote-ops"
