@@ -233,6 +233,100 @@ describe("memory identity runtime", () => {
     },
     30_000,
   )
+
+  test.skipIf(process.platform !== "linux")(
+    "#given auto policy and a bwrap whose first smoke times out and later smokes pass #when three reflection spawns run #then the first runs unsandboxed, the second restores the sandbox, and each transition is logged once",
+    async () => {
+      // given
+      const root = await mkdtemp(join(tmpdir(), "omo-memory-identity-runtime-recovered-"))
+      roots.push(root)
+      const paths = buildIdentityPaths(root, "agent-test")
+      await Promise.all([
+        paths.repo,
+        paths.transcripts,
+        paths.reflection,
+        paths.reflectionSessions,
+        paths.worktrees,
+      ].map((path) => mkdir(path, { recursive: true })))
+      const binDir = join(root, "bin")
+      await mkdir(binDir)
+      const bwrap = join(binDir, "bwrap")
+      // The first smoke outlives the probe's 3 s timeout, which is the one verdict the probe never caches, so the
+      // second spawn probes again; that and every later smoke (and the sandboxed spawn itself) succeed.
+      const firstSmoke = join(root, "first-smoke-ran")
+      await writeFile(bwrap, `#!/bin/sh\nif [ ! -e '${firstSmoke}' ]; then : > '${firstSmoke}'; exec sleep 10; fi\nexit 0\n`)
+      await chmod(bwrap, 0o755)
+      const innerCommand = join(binDir, "senpi-fake")
+      await writeFile(innerCommand, "#!/bin/sh\nexit 0\n")
+      await chmod(innerCommand, 0o755)
+      const identity = createMemoryIdentityContext({
+        identity: "agent-test",
+        identityPaths: paths,
+        binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 },
+      })
+      const ctx = componentContext()
+      const previousPath = process.env.PATH
+      const previousAgentDir = process.env.SENPI_CODING_AGENT_DIR
+      process.env.PATH = `${binDir}:${previousPath ?? ""}`
+      process.env.SENPI_CODING_AGENT_DIR = paths.runtime
+
+      try {
+        const runtime = createIdentityRuntime(identity, {
+          loadConfig: () => loadedMemoryConfig(memorySettings()),
+          cwd: () => root,
+          resolveModelRegistry: () => undefined,
+          logger: ctx.logger,
+        })
+        const sandbox = (runtime.runner as unknown as { options: { sandbox: ReflectionSandbox } }).options.sandbox
+        const spawnArgs = (runId: string): ReflectionSpawnArgs => ({
+          runId,
+          attempt: 1,
+          hardDeadlineAt: Date.now() + 10_000,
+          category: "quick",
+          conversationIds: ["conversation-a"],
+          model: "fixture/model",
+          command: innerCommand,
+          args: [],
+          cwd: paths.worktrees,
+          env: { PATH: binDir },
+          detached: true,
+          paths: {
+            sessionDir: paths.reflectionSessions,
+            worktree: paths.worktrees,
+            gitCommonDir: paths.repo,
+            transcript: join(paths.transcripts, "transcript.json"),
+            persona: join(paths.reflectionSessions, "persona.md"),
+            prompt: join(paths.reflectionSessions, "prompt.md"),
+          },
+        })
+
+        // when
+        const transformed = [
+          await sandbox(spawnArgs("reflection-run-1")),
+          await sandbox(spawnArgs("reflection-run-2")),
+          await sandbox(spawnArgs("reflection-run-3")),
+        ]
+
+        // then
+        expect(transformed.map((args) => args.command)).toEqual([innerCommand, bwrap, bwrap])
+        const transitions = ctx.logs.filter((entry) =>
+          entry.message === "memory reflection sandbox degraded" || entry.message === "memory reflection sandbox restored")
+        expect(transitions.map((entry) => [entry.message, (entry.details as { readonly runId?: string } | undefined)?.runId])).toEqual([
+          ["memory reflection sandbox degraded", "reflection-run-1"],
+          ["memory reflection sandbox restored", "reflection-run-2"],
+        ])
+        expect(transitions[0]?.level).toBe("warn")
+        expect(transitions[1]?.level).toBe("info")
+        expect(JSON.stringify(transitions[0]?.details)).toContain("smoke test timed out")
+      } finally {
+        if (previousPath === undefined) delete process.env.PATH
+        else process.env.PATH = previousPath
+        if (previousAgentDir === undefined) delete process.env.SENPI_CODING_AGENT_DIR
+        else process.env.SENPI_CODING_AGENT_DIR = previousAgentDir
+      }
+    },
+    30_000,
+  )
 })
 
 async function renderReflectionSandboxAgentDir(envShape: {

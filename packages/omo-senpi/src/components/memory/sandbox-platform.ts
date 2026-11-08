@@ -45,6 +45,11 @@ export interface PathSandboxInput {
 export interface GenericSandboxTransform<T> {
   (spawnArgs: T): T | Promise<T>
   readonly wasSandboxed: boolean
+  /**
+   * Why the latest spawn ran unsandboxed, or undefined when it did not. Test the value, not the key: the
+   * deferred Linux transform defines `warning` as a getter that is always present (so `"warning" in transform`
+   * is always true there), while the identity transform omits it when there is nothing to report.
+   */
   readonly warning?: string
 }
 

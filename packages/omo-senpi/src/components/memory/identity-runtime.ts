@@ -80,7 +80,8 @@ export function createIdentityRuntime(
 
   let sandboxState: { readonly transform: SandboxTransform; readonly agentDir: string } | undefined
   // A deferred bwrap probe can degrade one spawn and not the next, so the state is reported per
-  // spawn, but only when it changes: a run of degraded spawns logs once, not once per spawn.
+  // spawn, but only when it changes: degraded spawns log once per distinct warning (a new probe reason warns
+  // again), never once per spawn, and the first usable spawn after them logs the recovery.
   let reportedSandboxWarning: string | undefined
   const reportSandboxState = (transform: SandboxTransform, runId: string | undefined): void => {
     const warning = transform.warning
