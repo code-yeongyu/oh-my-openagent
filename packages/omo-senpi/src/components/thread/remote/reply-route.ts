@@ -6,6 +6,8 @@ const ROUTED_KEPT = 256
 // memory/recall-session-read.ts RECALL_CUSTOM_TYPE, by value: importing memory here would pull its prompt module into
 // the thread bundles. reply-route.test.ts compares against that constant, so a rename there fails the test.
 const MEMORY_RECALL_CUSTOM_TYPE = "omo-kibitzer:recall"
+// senpi's own delivery entry: another party's input wherever it lands in a turn.
+const DELIVERY_CUSTOM_TYPE = "session_control_delivery"
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const HOP = /^[1-9][0-9]{0,15}$/
 const FIELD_UUID = 0
@@ -119,6 +121,8 @@ export function createReplyRouter(deliver: (route: ReplyRoute, reply: RouteReply
   let current: Segment | undefined
   // The run's latest input (any kind) has had a final answer: an assistant message that calls no tool.
   let inputAnswered = true
+  // An assistant message has followed the run's latest input (or the run's start): a custom before it is turn-start context.
+  let assistantSinceInput = false
   let closed = false
   const markRouted = (delivery: string): void => {
     routed.push(delivery)
@@ -132,11 +136,13 @@ export function createReplyRouter(deliver: (route: ReplyRoute, reply: RouteReply
     segments.length = 0
     current = undefined
     inputAnswered = true
+    assistantSinceInput = false
   }
   return {
     noteMessage: (message) => {
       if (closed) return
       if (message.role === "assistant") {
+        assistantSinceInput = true
         const final = !callsTools(message.content)
         if (final) inputAnswered = true
         if (current === undefined) return
@@ -144,10 +150,14 @@ export function createReplyRouter(deliver: (route: ReplyRoute, reply: RouteReply
         if (final) current.final = true
         return
       }
-      // Every custom message is an input, as in component.ts noteInput: another party's delivery, a ulw-loop continuation, a
-      // task completion. Only the memory recall is not: it is context the session gives itself, steered in after an input.
-      const input = message.role === "user" || (message.role === "custom" && message.customType !== MEMORY_RECALL_CUSTOM_TYPE)
+      // A user message and another party's delivery are always inputs. Any other custom (a ulw-loop continuation, a task
+      // completion) is an input once an assistant message followed the latest input; before that it is turn-start context
+      // senpi writes with the turn (the environment context, the memory notice, the task usage hint). The memory recall is
+      // context the session gives itself and never an input.
+      const custom = message.role === "custom" && message.customType !== MEMORY_RECALL_CUSTOM_TYPE
+      const input = message.role === "user" || (custom && (message.customType === DELIVERY_CUSTOM_TYPE || assistantSinceInput))
       if (!input) return
+      assistantSinceInput = false
       const earlierOpen = !inputAnswered
       endCurrent()
       inputAnswered = false
