@@ -11,12 +11,13 @@ import { LocalApiError } from "./local-api/errors.ts"
 import type { CommandRpc } from "./local-api/protocol.ts"
 import type { SessionCandidate } from "./local-api/protocol-delegated.ts"
 import { randomBytes } from "node:crypto"
+import { compareVersions } from "./release/version.ts"
 
 // A host sends no command state at all for a route it does not list toward a sender it does not grant (docs/local-api.md
 // "Delegated commands"), so the client bounds its own wait.
 const ENDPOINT_COMMAND_WAIT_MS = 120_000
 
-function sendToEndpoint(client: LocalApiClient, device: string, endpoint: string, rpc: CommandRpc): Promise<CommandResult> {
+function sendToEndpoint(client: LocalApiClient, device: string, endpoint: string, rpc: CommandRpc, locate: boolean): Promise<CommandResult> {
   return new Promise<CommandResult>((resolve, reject) => {
     // Minted before sending, so a state that arrives ahead of the answer is not missed.
     const commandId = randomBytes(16).toString("base64url")
@@ -38,13 +39,20 @@ function sendToEndpoint(client: LocalApiClient, device: string, endpoint: string
       if (done || event.kind !== "session.command_state" || event.command_id !== commandId) return
       if (PROGRESS_STATES.has(event.state)) return
       const response = channel.takeReply(commandId)
+      const located = channel.takeLocated(commandId)
       settle()
-      resolve(response === undefined ? { outcome: event } : { outcome: event, response })
+      resolve({ outcome: event, ...(response === undefined ? {} : { response }), ...(located === undefined ? {} : { located }) })
     })
     const timer = setTimeout(() => fail(new Error(`no final state for endpoint command ${commandId} within ${ENDPOINT_COMMAND_WAIT_MS} ms`)), ENDPOINT_COMMAND_WAIT_MS)
     timer.unref?.()
     void client.closed.then(() => fail(new Error("the connection closed before the endpoint command settled")))
-    client.endpointCommand(device, endpoint, rpc, commandId).catch(fail)
+    const send = (asked: boolean): Promise<unknown> => client.endpointCommand(device, endpoint, rpc, commandId, { locate: asked })
+    // A service before decision 0018's 2026-11-06 amendment refuses the unknown `locate` field with invalid_request
+    // before routing anything, so the command id is still unbound and the same command goes again without it; its
+    // reply then names no `located` and the caller locates as before.
+    send(locate).catch((error: unknown) =>
+      locate && error instanceof LocalApiError && error.code === "invalid_request" ? send(false).catch(fail) : fail(error),
+    )
   })
 }
 
@@ -132,7 +140,7 @@ export type DeviceService = {
    * `session.command` is written (the `session.endpoints` lookup, whatever its code) is a `LocalApiError` with
    * `not_sent: true`; a `session.command` that times out after sending carries its `command_id` instead.
    */
-  readonly endpointCommand: (device: string, rpc: CommandRpc) => Promise<CommandResult>
+  readonly endpointCommand: (device: string, rpc: CommandRpc, options?: EndpointCommandOptions) => Promise<CommandResult>
   readonly close: () => void
   readonly closed: Promise<void>
   /**
@@ -143,11 +151,30 @@ export type DeviceService = {
   readonly locate: (device: string, engineId: string) => Promise<SessionCandidate>
 }
 
+/**
+ * `locate`: an `open_session`/`new_session` asks for its new session on the reply (`CommandResult.located`), sparing the
+ * session.locate round trip toward a host that names it (decision 0018 amendment 2026-11-06, relay daemon #698).
+ */
+export type EndpointCommandOptions = { readonly locate?: boolean }
+
 export type DeviceCredential = {
   readonly device: DeviceRef
   readonly signingPrivateKey: string
   readonly sealingPrivateKey: string
+  /** The account the sign-in belongs to; sent only to a service that accepts it (ADOPT_ACCOUNT_MIN_SERVICE_VERSION). */
+  readonly account?: string
 }
+
+/**
+ * relay-spec ADOPT_ACCOUNT_MIN_SERVICE_VERSION: the first relayd whose device.adopt accepts the optional `account`
+ * (omo-relay-daemon#730). 0.1.2 shipped without it, and every older relayd refuses any unknown field, so below 0.1.3
+ * device.adopt is sent exactly as before. Gated on welcome.service_version, never on a capability word (design D r9
+ * section 3).
+ */
+export const ADOPT_ACCOUNT_MIN_SERVICE_VERSION = "0.1.3"
+
+const acceptsAdoptAccount = (serviceVersion: string): boolean =>
+  compareVersions(serviceVersion, ADOPT_ACCOUNT_MIN_SERVICE_VERSION) >= 0
 
 export type ConnectDeviceServiceOptions = {
   /** The version of this omo build, reported to the service in its hello. */
@@ -190,9 +217,15 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     registerRefresher: async (binaryPath, version) => {
       await client.request("refresher.register", { binary_path: binaryPath, version })
     },
-    adopt: async ({ device, signingPrivateKey, sealingPrivateKey }) =>
-      (await client.request("device.adopt", { device, signing_private_key: signingPrivateKey, sealing_private_key: sealingPrivateKey }))
-        .device,
+    adopt: async ({ device, signingPrivateKey, sealingPrivateKey, account }) =>
+      (
+        await client.request("device.adopt", {
+          device,
+          signing_private_key: signingPrivateKey,
+          sealing_private_key: sealingPrivateKey,
+          ...(account !== undefined && acceptsAdoptAccount(client.welcome.service_version) ? { account } : {}),
+        })
+      ).device,
     registerEndpoints: async agentDir => {
       await client.request("endpoints.register", { agent_dir: agentDir })
     },
@@ -203,7 +236,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     devices: async () => (await client.request("devices.list", {})).devices,
     sessions: (filter, onRevision) => client.list(filter, onRevision),
     attach: (device, sessionId) => openAttach(client, device, sessionId),
-    endpointCommand: async (device, rpc) => {
+    endpointCommand: async (device, rpc, options) => {
       // The endpoint lookup runs before any session.command is written, so whatever fails it (a timeout, a closed
       // connection, a refusal) dispatched nothing: it is marked not_sent, unlike a timeout after sending.
       let endpoint: string | undefined
@@ -213,7 +246,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
         throw markNotSent(error)
       }
       if (endpoint === undefined) throw new LocalApiError("unsupported", "the device lists no engine endpoint", { not_sent: true })
-      return await sendToEndpoint(client, device, endpoint, rpc)
+      return await sendToEndpoint(client, device, endpoint, rpc, options?.locate === true)
     },
     close: () => client.close(),
     closed: client.closed,

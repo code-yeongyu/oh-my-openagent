@@ -5,7 +5,7 @@ export type RunCommand = (argv: readonly string[]) => Promise<{ readonly exitCod
 
 export type InstallOutcome =
   | { readonly ok: true }
-  | { readonly ok: false; readonly state: "update_required" | "service_degraded"; readonly action: string }
+  | { readonly ok: false; readonly state: "update_required" | "service_degraded" | "not_published"; readonly action: string }
 
 const INSTALL_TIMEOUT_MS = 120_000
 
@@ -31,7 +31,12 @@ export const installDeviceService = async (options: AcquireOptions & { readonly 
   if (!acquired.ok)
     return {
       ok: false,
-      state: acquired.refusal === "update_required" || acquired.refusal === "release_key_invalid" ? "update_required" : "service_degraded",
+      state:
+        acquired.refusal === "not_published"
+          ? "not_published"
+          : acquired.refusal === "update_required" || acquired.refusal === "release_key_invalid"
+            ? "update_required"
+            : "service_degraded",
       action: acquired.action,
     }
   const result = await (options.run ?? runCommand)([acquired.binary, "install-service", "--from", acquired.releaseDir])

@@ -64,6 +64,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
       },
       project_scope: { nudge: false, recall: false },
       projection: { max_entries_per_directory: 12, max_bytes: 4096 },
+      runtime: { retention_days: 10, abandoned_journal_days: 21, completions_days: 45, pass_budget_ms: 30000, discard_unreflected_journals: true, max_bytes: 1024 * 1024 * 1024 },
       compile_warn_tokens: 50000,
       agents: {
         "backend-lead": {
@@ -376,5 +377,66 @@ describe("memory.recall.query_expansion", () => {
     expect(OmoMemoryRecallLayerSchema.safeParse(recall).success).toBe(false)
     expect(OmoMemorySettingsLayerSchema.safeParse({ recall }).success).toBe(false)
     expect(OmoMemorySettingsLayerSchema.safeParse({ agents: { research: { recall } } }).success).toBe(false)
+  })
+})
+
+describe("memory.runtime retention settings (A24)", () => {
+  test("#given an empty memory block #when parsed #then the documented retention defaults apply", () => {
+    expect(OmoMemorySettingsSchema.parse({}).runtime).toEqual({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30, pass_budget_ms: 60000, discard_unreflected_journals: false, max_bytes: 2 * 1024 * 1024 * 1024 })
+    expect(OmoMemorySettingsSchema.parse({ runtime: { discard_unreflected_journals: true } }).runtime.discard_unreflected_journals).toBe(true)
+  })
+
+  test("#given explicit windows and an agent override #when parsed #then the values are kept on the block, the layer and the agent", () => {
+    const parsed = OmoMemorySettingsSchema.parse({
+      runtime: { retention_days: 3, abandoned_journal_days: 5, pass_budget_ms: 5000 },
+      agents: { "agent-a": { runtime: { retention_days: 30, pass_budget_ms: 1000 } } },
+    })
+    expect(parsed.runtime).toEqual({ retention_days: 3, abandoned_journal_days: 5, completions_days: 30, pass_budget_ms: 5000, discard_unreflected_journals: false, max_bytes: 2 * 1024 * 1024 * 1024 })
+    expect(OmoMemorySettingsSchema.parse({ agents: { b: { runtime: { discard_unreflected_journals: true } } } }).agents.b?.runtime).toEqual({ discard_unreflected_journals: true })
+    expect(parsed.agents["agent-a"]?.runtime).toEqual({ retention_days: 30, pass_budget_ms: 1000 })
+    expect(OmoMemorySettingsLayerSchema.parse({ runtime: { completions_days: 60 } }).runtime).toEqual({ completions_days: 60 })
+  })
+
+  test("#given an unknown runtime key or a non-integer window #when parsed #then the strict schema rejects it", () => {
+    expect(OmoMemorySettingsSchema.safeParse({ runtime: { keep_forever: true } }).success).toBe(false)
+    expect(OmoMemorySettingsSchema.safeParse({ runtime: { retention_days: 1.5 } }).success).toBe(false)
+    expect(OmoMemorySettingsSchema.safeParse({ runtime: { abandoned_journal_days: 0 } }).success).toBe(false)
+    expect(OmoMemorySettingsSchema.safeParse({ runtime: { discard_unreflected_journals: "yes" } }).success).toBe(false)
+    expect(OmoMemorySettingsSchema.safeParse({ runtime: { pass_budget_ms: 0 } }).success).toBe(false)
+    expect(OmoMemorySettingsSchema.safeParse({ runtime: { pass_budget_ms: 2.5 } }).success).toBe(false)
+    expect(OmoMemorySettingsLayerSchema.safeParse({ runtime: { completions_days: "30" } }).success).toBe(false)
+    expect(OmoMemorySettingsSchema.safeParse({ agents: { a: { runtime: { retention_days: -1 } } } }).success).toBe(false)
+  })
+})
+
+describe("memory.runtime.max_bytes (B06)", () => {
+  test("#given no cap configured #when parsed #then each identity is capped at 2 GiB", () => {
+    expect(OmoMemorySettingsSchema.parse({}).runtime.max_bytes).toBe(2 * 1024 * 1024 * 1024)
+  })
+
+  test("#given 0 globally and a per-agent cap #when parsed #then 0 (unbounded) and the override are kept", () => {
+    const parsed = OmoMemorySettingsSchema.parse({ runtime: { max_bytes: 0 }, agents: { "agent-a": { runtime: { max_bytes: 1024 } } } })
+    expect(parsed.runtime.max_bytes).toBe(0)
+    expect(parsed.agents["agent-a"]?.runtime).toEqual({ max_bytes: 1024 })
+    expect(OmoMemorySettingsLayerSchema.parse({ runtime: { max_bytes: 0 } }).runtime).toEqual({ max_bytes: 0 })
+  })
+
+  test("#given a negative or fractional cap #when parsed #then the schema rejects it", () => {
+    expect(OmoMemorySettingsSchema.safeParse({ runtime: { max_bytes: -1 } }).success).toBe(false)
+    expect(OmoMemorySettingsSchema.safeParse({ runtime: { max_bytes: 1.5 } }).success).toBe(false)
+    expect(OmoMemorySettingsLayerSchema.safeParse({ agents: { a: { runtime: { max_bytes: "2GiB" } } } }).success).toBe(false)
+  })
+})
+
+describe("memory.runtime.discard_unreflected_journals (LEAD D1)", () => {
+  test("#given no setting #when parsed #then unreflected-input deletion is off", () => {
+    expect(OmoMemorySettingsSchema.parse({}).runtime.discard_unreflected_journals).toBe(false)
+  })
+
+  test("#given the switch off globally and on for one agent #when parsed #then both are kept", () => {
+    const parsed = OmoMemorySettingsSchema.parse({ runtime: { discard_unreflected_journals: false }, agents: { a: { runtime: { discard_unreflected_journals: true } } } })
+    expect(parsed.runtime.discard_unreflected_journals).toBe(false)
+    expect(parsed.agents.a?.runtime).toEqual({ discard_unreflected_journals: true })
+    expect(OmoMemorySettingsSchema.safeParse({ runtime: { discard_unreflected_journals: "yes" } }).success).toBe(false)
   })
 })
