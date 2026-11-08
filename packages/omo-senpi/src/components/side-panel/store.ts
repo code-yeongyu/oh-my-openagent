@@ -65,8 +65,12 @@ const TERMINAL: ReadonlySet<PanelChildStatus> = new Set<PanelChildStatus>(["fini
 
 export function createPanelStore(now: () => number = Date.now): PanelStore {
   const children = new Map<string, PanelChild>()
+  // A finished row the cap pushed out. Task records keep arriving for it on every refresh,
+  // so it is still the previous state of that child, not a new one.
+  const evicted = new Map<string, PanelChild>()
+  // Spend lives apart from the capped rows: dropping a row must not forget, or recount, its cost.
+  const spend = new Map<string, number>()
   let tools: PanelToolCall[] = []
-  let childSpend = 0
 
   const evict = (): void => {
     if (children.size <= AGENT_ROW_CAP) return
@@ -77,6 +81,7 @@ export function createPanelStore(now: () => number = Date.now): PanelStore {
     for (const child of finished) {
       if (children.size <= AGENT_ROW_CAP) break
       children.delete(child.id)
+      evicted.set(child.id, child)
     }
   }
 
@@ -85,12 +90,12 @@ export function createPanelStore(now: () => number = Date.now): PanelStore {
       return {
         children: [...children.values()].sort((left, right) => left.startedAt - right.startedAt),
         tools: [...tools],
-        childSpend,
+        childSpend: [...spend.values()].reduce((total, cost) => total + cost, 0),
       }
     },
 
     upsertChild(update): boolean {
-      const previous = children.get(update.id)
+      const previous = children.get(update.id) ?? evicted.get(update.id)
       const status = update.status ?? previous?.status ?? "queued"
       // A reason only describes a parked child: once it runs or ends, the old reason is history.
       const parkedReason = (status === "resuming" || status === "ending") ? (update.parkedReason ?? previous?.parkedReason) : undefined
@@ -110,9 +115,9 @@ export function createPanelStore(now: () => number = Date.now): PanelStore {
         cost: update.cost ?? previous?.cost,
       }
       if (previous !== undefined && sameChild(previous, merged)) return false
-      // Count a child's cost once, at the moment it stops running.
-      const becameTerminal = TERMINAL.has(merged.status) && (previous === undefined || !TERMINAL.has(previous.status))
-      if (becameTerminal && merged.cost !== undefined) childSpend += merged.cost
+      // A stopped child's cost is counted once per child: a later record replaces it, never adds to it.
+      if (TERMINAL.has(merged.status) && merged.cost !== undefined) spend.set(merged.id, merged.cost)
+      evicted.delete(merged.id)
       children.set(merged.id, merged)
       evict()
       return true
@@ -129,8 +134,9 @@ export function createPanelStore(now: () => number = Date.now): PanelStore {
 
     reset(): void {
       children.clear()
+      evicted.clear()
+      spend.clear()
       tools = []
-      childSpend = 0
     },
   }
 }
