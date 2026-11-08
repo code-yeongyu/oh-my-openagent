@@ -138,8 +138,11 @@ type EngineReport = Pick<ActionReport, "disposition" | "effect" | "focusRestorat
 	};
 
 /**
- * An exec reply in the SDK's `ActionReport` shape, member for member as the SDK maps it. The run facade has already
- * checked the reply (`null`, or a report with a valid disposition) before user code saw it.
+ * An exec reply in the SDK's `ActionReport` shape, member for member as the SDK maps it. Nothing has checked the
+ * reply yet: `reportingService` sits under the run facade and records each reply as the engine sent it, before the
+ * facade validates it (`expectResult` with `isExecResult`). A malformed reply is recorded here and only then fails
+ * that check, and even a reply that passes it carries `effect`, `route` and `focusRestoration` checked only as strings,
+ * not as members of the SDK's unions.
  */
 function actionReportOf(reply: unknown): ActionReport {
 	if (reply === null || reply === undefined) return LEGACY_REPORT;
