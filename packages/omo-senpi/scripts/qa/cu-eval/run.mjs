@@ -21,6 +21,7 @@
 // Exit 0 only when every selected task ran with no `fail`/`error` and every restore post-check held.
 // The SDK is TypeScript source, so under Node this script re-runs itself on Bun (`bun` on PATH).
 import { spawn, spawnSync } from "node:child_process"
+import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, platform, tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
@@ -531,7 +532,7 @@ async function main() {
     if (!existsSync(options.senpi)) refuse(`no senpi at ${options.senpi}; pass --senpi or set SENPI_BIN`)
   }
   const protectedFiles = [join(homedir(), ".senpi", "agent", "auth.json"), join(homedir(), ".omo", "agent", "auth.json")]
-  const digest = (path) => (existsSync(path) ? readFileSync(path).toString("base64").length : -1)
+  const digest = (path) => (existsSync(path) ? createHash("sha256").update(readFileSync(path)).digest("hex") : "absent")
   const before = protectedFiles.map(digest)
   const result = await runEval(options)
   const realStateUntouched = protectedFiles.map(digest).every((value, index) => value === before[index])
