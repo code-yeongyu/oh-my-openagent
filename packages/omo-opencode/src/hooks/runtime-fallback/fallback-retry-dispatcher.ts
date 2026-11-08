@@ -25,6 +25,13 @@ export async function dispatchFallbackRetry(
   helpers: AutoRetryHelpers,
   options: DispatchFallbackRetryOptions,
 ): Promise<void> {
+  const releaseRecovery = () => {
+    deps.sessionAwaitingFallbackResult.delete(options.sessionID)
+    deps.sessionRetryInFlight.delete(options.sessionID)
+    helpers.clearSessionFallbackTimeout(options.sessionID)
+    options.state.pendingFallbackModel = undefined
+    options.state.pendingFallbackPromptMayHaveBeenAccepted = false
+  }
   const snapshot = snapshotFallbackState(options.state)
   const result = prepareFallback(
     options.sessionID,
@@ -52,6 +59,8 @@ export async function dispatchFallbackRetry(
     }
     if (!dispatchOutcome.accepted) {
       restoreFallbackState(options.state, snapshot)
+      // A superseded refusal acquired nothing: the flags, timeout and pending model belong to the live dispatch.
+      if (dispatchOutcome.status !== "superseded") releaseRecovery()
       log(`[${HOOK_NAME}] Fallback dispatch was not accepted`, {
         sessionID: options.sessionID,
         source: options.source,
@@ -75,6 +84,7 @@ export async function dispatchFallbackRetry(
     return
   }
 
+  releaseRecovery()
   log(`[${HOOK_NAME}] Fallback preparation failed`, {
     sessionID: options.sessionID,
     source: options.source,

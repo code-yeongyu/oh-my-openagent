@@ -1,8 +1,8 @@
 import type { JSX } from "react"
 import { NextIntlClientProvider } from "next-intl"
 import { getTranslations } from "next-intl/server"
-import { Footer } from "@/components/footer"
-import { NavHeader } from "@/components/nav-header"
+import { HomeFooter } from "@/components/home/home-footer"
+import { HomeNav } from "@/components/home/home-nav"
 import type { Locale } from "@/i18n/config"
 import { FALLBACK_FORMATTED_STATS, formatStats, getStats } from "@/lib/stats"
 
@@ -36,11 +36,11 @@ export async function LocalizedPageShell({
         <a href="#main-content" className="skip-link focus-ring">
           {t("skipToContent")}
         </a>
-        <NavHeader stars={stars} />
+        <HomeNav stars={stars} onHome={false} />
         <main id="main-content" tabIndex={-1} className="flex-1">
           {children}
         </main>
-        <Footer locale={locale} />
+        <HomeFooter onHome={false} />
       </div>
     </NextIntlClientProvider>
   )
