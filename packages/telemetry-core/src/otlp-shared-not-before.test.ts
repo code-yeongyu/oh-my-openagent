@@ -114,4 +114,18 @@ describe("per-install 429 backoff shared across processes", () => {
     // then
     expect(readdirSync(dirname(dir)).filter((name) => name.endsWith(".tmp"))).toEqual([])
   })
+
+  test("#given the temp file path is a directory #when a later time is deferred #then the failed write and cleanup stay inside defer", () => {
+    // given: a directory at the temp path, so the write fails and the cleanup's rm throws too
+    const { dir, cleanup } = createSpoolRoot("telemetry-core-not-before-temp-dir-")
+    roots.push(cleanup)
+    mkdirSync(`${dir}.not-before.${process.pid}.tmp`, { recursive: true })
+    const notBefore = createSpoolNotBefore(dir)
+
+    // when
+    const defer = () => notBefore.defer(Date.now() + 5_000)
+
+    // then
+    expect(defer).not.toThrow()
+  })
 })
