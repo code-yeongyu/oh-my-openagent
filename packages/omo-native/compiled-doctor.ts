@@ -69,14 +69,23 @@ async function trustLines(options: CompiledDoctorOptions): Promise<string[]> {
 
 /** The memory-runtime section the npm launcher's doctor prints (bin/lib/launcher.js), from the same report. */
 async function memoryRuntimeLines(input: CompiledDoctorInput, env: NodeJS.ProcessEnv): Promise<string[]> {
-  if (input.options?.memoryRuntimeLines) return input.options.memoryRuntimeLines()
-  const pluginRoot = join(input.execDir, "plugin")
-  const report = await memoryRuntimeReport({
-    env,
-    maxBytesFor: memoryRuntimeMaxBytesResolver({ pluginRoot, env }),
-    discardFor: memoryRuntimeDiscardResolver({ pluginRoot, env }),
-  })
-  return report.lines
+  try {
+    if (input.options?.memoryRuntimeLines) return await input.options.memoryRuntimeLines()
+    const pluginRoot = join(input.execDir, "plugin")
+    const report = await memoryRuntimeReport({
+      env,
+      maxBytesFor: memoryRuntimeMaxBytesResolver({ pluginRoot, env }),
+      discardFor: memoryRuntimeDiscardResolver({ pluginRoot, env }),
+    })
+    return report.lines
+  } catch (error) {
+    // A runtime the user cannot read (EACCES) must not take the rest of doctor down with it.
+    return [memoryRuntimeUnavailableLine(error)]
+  }
+}
+
+function memoryRuntimeUnavailableLine(error: unknown): string {
+  return `WARN memory runtime: unavailable: ${error instanceof Error ? error.message : String(error)}`
 }
 
 function coverageLines(input: CompiledDoctorInput, env: NodeJS.ProcessEnv): Promise<string[]> {
