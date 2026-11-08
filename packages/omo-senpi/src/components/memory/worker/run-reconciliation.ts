@@ -4,9 +4,12 @@ import { hostname as readHostname } from "node:os"
 import { join } from "node:path"
 
 import {
+  decideStrandedRun,
+  quarantineStrandedRun,
   LockContentionError,
   type MemoryIdentity,
   type ProcessLiveness,
+  type ReservationState,
   type ReservedRun,
 } from "@oh-my-opencode/memory-core"
 
@@ -27,7 +30,7 @@ import { classifyRunProcess, signalRecordedProcessGroup, waitUntil as waitForTim
 import { quarantineRun, reconcilePrelaunch } from "./run-reconciliation-prelaunch"
 import { RunTerminalClaimUnrecoverableError } from "./run-terminal-claim"
 import { parseReservationRunLedger, type ReservationRunLedger } from "./reservation-run-ledger"
-import type { MemoryReceiptsPort, ReceiptWarn } from "../receipts-port"
+import { emitMemoryReceipt, type MemoryReceiptsPort, type ReceiptWarn } from "../receipts-port"
 import { sweepReflectionRunOrphans, type ReflectionSweepLogger } from "./run-reconciliation-sweep"
 import { waitForRunSentinel, type SentinelWaitResult } from "./run-sentinel"
 import { sweepStrandedRunTemporaries } from "./run-temporaries"
@@ -51,6 +54,11 @@ export interface ReflectionRunReconciliationOptions {
   readonly logger?: ReflectionSweepLogger
   /** Bind-time maintenance defers when another session is scheduling this identity. */
   readonly deferOnSchedulerContention?: boolean
+  /**
+   * "none" (the per-turn path, DESIGN.r3 c.15): a run that would need a deadline wait is left for a later
+   * pass and the loop moves on; never a terminal outcome. Session start keeps "deadline".
+   */
+  readonly waitPolicy?: "deadline" | "none"
   readonly receipts?: MemoryReceiptsPort
   readonly warn?: ReceiptWarn
 }
@@ -76,6 +84,11 @@ export async function reconcileReflectionRuns(
       join(options.identity.paths.reflection, "completions"), context.now(), context.getPidLiveness,
     )
     const runsDir = join(options.identity.paths.reflection, "runs")
+    let reservation: ReservationState | undefined
+    const reserved = async (): Promise<ReservationState> => {
+      reservation ??= await context.reservation.readState(context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined)
+      return reservation
+    }
     for (const name of await directoryNames(runsDir)) {
       context.signal?.throwIfAborted()
       // A retired-generation dir shares the active reservation's id; settling it through the
@@ -88,10 +101,17 @@ export async function reconcileReflectionRuns(
         await backfillRunReceipt(options.identity.paths.runtime, runDir, options.receipts, options.warn)
         continue
       }
-      if (!existsSync(join(runDir, "ledger.json"))) continue
-      const ledger = await readLedgerOrUndefined(runDir)
+      const ledger = existsSync(join(runDir, "ledger.json")) ? await readLedgerOrUndefined(runDir) : undefined
       context.signal?.throwIfAborted()
-      if (ledger === undefined) continue
+      if (ledger === undefined) {
+        // No ledger, or one that cannot be read: the active run is prelaunch's, any other run that is
+        // provably dead gets its terminal sentinel here so it stops counting as live (#11920, #11976).
+        const state = await reserved()
+        if (name === state.active?.runId || name === state.pending?.runId) continue
+        const settled = await settleStrandedRun(context, runDir, name)
+        if (settled !== undefined) results.push(settled)
+        continue
+      }
       const result = await reconcileRunOrQuarantine(context, runDir, ledger)
       if (result !== undefined) results.push({ runId: result.runId, outcome: result.outcome })
     }
@@ -121,6 +141,22 @@ async function reconcileRunOrQuarantine(
   }
 }
 
+async function settleStrandedRun(context: ReconcileContext, runDir: string, runId: string): Promise<ReflectionRunReconcileResult | undefined> {
+  const decision = await decideStrandedRun(runDir, context)
+  context.signal?.throwIfAborted()
+  // A valid ledger never reaches here: reconcileRun settles it with worktree-tip recovery.
+  if (decision.kind === "keep" || decision.action === "processes-dead") return undefined
+  const settled = await quarantineStrandedRun({
+    runtimeDir: context.identity.paths.runtime,
+    runDir,
+    runId,
+    decision,
+    now: context.now,
+    appendReceipt: (runtimeDir, input) => emitMemoryReceipt(runtimeDir, input, context.receipts, context.warn),
+  })
+  return settled ? { runId, outcome: "failed" } : undefined
+}
+
 async function readLedgerOrUndefined(runDir: string): Promise<ReservationRunLedger | undefined> {
   try {
     return parseReservationRunLedger(await readRunJson<unknown>(join(runDir, "ledger.json")))
@@ -145,6 +181,7 @@ async function reconcileRun(
   context.signal?.throwIfAborted()
   if (ledger.queued === true && (supervisor === "alive" || supervisor === "unknown")) return undefined
   if (supervisor === "alive" || supervisor === "unknown") {
+    if (context.waitPolicy === "none") return undefined
     const wait = context.waitForOutcome ?? ((path, deadlineAt, signal) => waitForRunSentinel(path, deadlineAt, context.now, signal))
     await wait(outcomePath, ledger.deadlineAt, context.signal)
     // The sentinel's abort result is also "timeout". It is NOT evidence the run timed out:
@@ -193,6 +230,7 @@ async function reconcileDeadSupervisor(
   if (child === "dead" || child === "absent") {
     return await failReservationRun(context, runDir, ledger, "failed", deadRunDetail(ledger, child), RECOVER_TIP)
   }
+  if (context.waitPolicy === "none") return undefined
   const wait = context.waitUntil ?? ((deadlineAt, signal) => waitForTime(deadlineAt, context.now, signal))
   await wait(ledger.hardDeadlineAt, context.signal)
   context.signal?.throwIfAborted()
@@ -229,7 +267,7 @@ function deadProcesses(ledger: ReservationRunLedger): string {
 async function directoryNames(path: string): Promise<readonly string[]> {
   try {
     return (await readdir(path, { withFileTypes: true }))
-      .filter((entry) => entry.isDirectory())
+      .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
       .map((entry) => entry.name)
       .sort()
   } catch (error) {

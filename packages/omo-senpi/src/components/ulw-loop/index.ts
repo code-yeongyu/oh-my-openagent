@@ -2,6 +2,7 @@ import { existsSync } from "node:fs"
 
 import { readAgentEndOutcome } from "../ulw-execute-continuation/agent-end-eligibility"
 import { findContinuableBoulderWork } from "../ulw-execute-continuation/boulder-eligibility"
+import { BUNSHIN_TS_CELL_HINT } from "../../extension/sdk-root-provisioning"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { createUlwLoopFooterStatus, type UlwLoopFooterStatusOptions } from "./footer-status"
 import { readUlwLoopStatusInProcess } from "./status-source"
@@ -85,6 +86,7 @@ export function createUlwLoopComponent(options: UlwLoopComponentOptions = {}): O
       }
 
       pi.registerRemovedToolHint?.("omo_agent_toolkit", 'omo_agent_toolkit was removed. Inside an eval js cell: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); print(await agentToolkit.status()). Never spawn the toolkit CLI.')
+      pi.registerRemovedToolHint?.("bunshin", BUNSHIN_TS_CELL_HINT)
 
       pi.on("session_start", async (_payload, eventCtx) => {
         const status = await readSessionStatus(eventCtx)

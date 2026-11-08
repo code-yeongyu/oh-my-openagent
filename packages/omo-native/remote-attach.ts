@@ -4,15 +4,16 @@ import { createServer, type Server, type Socket } from "node:net"
 import { tmpdir } from "node:os"
 import { join, win32 } from "node:path"
 
-import type { RemoteAttach, RemoteAttachEvent, SnapshotBody } from "../device-service-core/src/index.ts"
+import type { CommandStateEvent, JsonObject, RemoteAttach, RemoteAttachEvent, SnapshotBody } from "../device-service-core/src/index.ts"
 
 // `omo remote attach` serves one remote session to the engine's unchanged attach TUI (`--attach <socket> --session
 // <ref>`): a private endpoint that speaks the RPC subset the TUI uses, answered from the device service's attach.
 // The TUI authenticates a `t-<16 hex>.sock` endpoint with the 32-byte secret beside it on every platform, and on
 // Windows reaches the named pipe derived from that path and secret, so this endpoint follows the same two rules.
-// Phase 1 observes only: every input the TUI can send is refused with REMOTE_INPUT_OFF.
+// The endpoint answers only its own plumbing (the attach handshake and the presented row, see `answer`); every other
+// record goes to the host unchanged as a delegated `session.command {rpc}`, and the host's engine decides it (DS2b G1,
+// M6); the engine's reply and the frames it writes on that delegated connection come back to the TUI.
 
-export const REMOTE_INPUT_OFF = "remote input not enabled yet: this view is observe-only"
 const SECRET_BYTES = 32
 const HANDSHAKE_TIMEOUT_MS = 2_000
 const MAX_LINE_CHARS = 64 * 1024 * 1024
@@ -21,7 +22,6 @@ const PIPE_PREFIX = "\\\\.\\pipe\\senpi-rpc-"
 export const LOCAL_SESSION_ID = "remote"
 
 type Json = Record<string, unknown>
-const INPUT_COMMANDS = new Set(["prompt", "steer", "follow_up", "abort", "bash", "compact", "new_session", "switch_session"])
 
 export type RemoteAttachEndpoint = {
   /** Pass as `--attach`. */
@@ -38,6 +38,11 @@ export function pipeAddress(socketPath: string, secret: Uint8Array): string {
 }
 
 const isRecord = (value: unknown): value is Json => typeof value === "object" && value !== null && !Array.isArray(value)
+// A record JSON.parse produced holds only JSON values, so an object from one line is a JsonObject.
+const isParsedRecord = (value: unknown): value is JsonObject => isRecord(value)
+
+/** A non-applied outcome as the host or engine stated it: the state, then its reason when it has one. */
+const outcomeText = (outcome: CommandStateEvent): string => ("reason" in outcome ? `${outcome.state}: ${outcome.reason}` : outcome.state)
 
 function stateOf(snapshot: SnapshotBody): Json {
   const state = isRecord(snapshot.state) ? snapshot.state : {}
@@ -62,8 +67,15 @@ class Presentation {
   private startStream(): void {
     if (this.streaming) return
     this.streaming = true
-    this.notify(`Observing ${this.label}: ${REMOTE_INPUT_OFF}`, "info")
-    this.stopStream = this.attach.onEvent(event => this.event(event))
+    this.notify(`Attached to ${this.label}`, "info")
+    const stopEvents = this.attach.onEvent(event => this.event(event))
+    const stopFrames = this.attach.onFrame(frame => this.send("sessionId" in frame ? { ...frame, sessionId: LOCAL_SESSION_ID } : frame))
+    const stopLosses = this.attach.onChannelLoss(reason => this.notify(`Lost a reply or event from the remote device: ${reason}`, "warning"))
+    this.stopStream = () => {
+      stopEvents()
+      stopFrames()
+      stopLosses()
+    }
   }
 
   stop(): void {
@@ -96,23 +108,30 @@ class Presentation {
     this.send({ type: "extension_ui_request", id: randomUUID(), method: "notify", message, notifyType, sessionId: LOCAL_SESSION_ID })
   }
 
-  async answer(request: Json): Promise<void> {
+  async answer(request: JsonObject): Promise<void> {
     const type = String(request.type)
     const reply = (data: Json = {}) => this.send({ type: "response", id: request.id, command: type, success: true, data })
     const refuse = (error: string) => this.send({ type: "response", id: request.id, command: type, success: false, error })
     try {
+      // Endpoint plumbing, answered here because each one presents this endpoint or the attach's own view rather
+      // than acting on the engine: they are the attach TUI's handshake (senpi modes/interactive/attach.ts).
       switch (type) {
+        // The TUI's client declaration, its claim on the presented row, and its release of that claim: they describe
+        // the TUI's connection to THIS endpoint; the host's engine connection is the device service's, not the TUI's.
         case "set_client_info":
         case "attach_session":
         case "release_attachment":
           return reply()
+        // The one presented row: LOCAL_SESSION_ID, standing for the attached session.
         case "list_sessions":
           return reply({
             sessions: [{ sessionId: LOCAL_SESSION_ID, durableSessionId: this.attach.sessionId, retain_on_disconnect: true, sessionName: this.label }],
           })
+        // The row's stream: the attach's own session.records, already flowing to this device.
         case "subscribe_sessions":
           reply({ subscriptionId: randomUUID(), snapshot: [] })
           return this.startStream()
+        // The row's state and history: the attach's snapshot and its session.read pages.
         case "get_state": {
           const snapshot = this.snapshot ?? (await this.attach.snapshot)
           this.snapshot = snapshot
@@ -120,14 +139,33 @@ class Presentation {
         }
         case "get_entries":
           return reply(await this.entries(request))
-        case "extension_ui_response":
-          return refuse(REMOTE_INPUT_OFF)
         default:
-          return refuse(INPUT_COMMANDS.has(type) ? REMOTE_INPUT_OFF : `${type} is not available on a remote session`)
+          return await this.forward(request, type)
       }
     } catch (error) {
       refuse(error instanceof Error ? error.message : String(error))
     }
+  }
+
+  /**
+   * Every record that is not plumbing: sent to the host unchanged, answered on its own id. The engine's own reply,
+   * when the host sent one, goes back verbatim (its refusals included); a host without delegated commands sends only
+   * the outcome, shown as success or as "<state>: <reason>". LOCAL_SESSION_ID names the attached session, so it
+   * travels as that session's id, the route the host derives the engine sessionId from (H1); a record without a
+   * sessionId, or naming another one, goes as it is for the host to decide.
+   */
+  private async forward(request: JsonObject, type: string): Promise<void> {
+    const rpc = request.sessionId === LOCAL_SESSION_ID ? { ...request, sessionId: this.attach.sessionId } : request
+    const { outcome, response } = await this.attach.command(rpc)
+    if (response !== undefined) {
+      this.send({ ...response, id: request.id })
+      return
+    }
+    if (outcome.state === "engine_applied") {
+      this.send({ type: "response", id: request.id, command: type, success: true })
+      return
+    }
+    this.send({ type: "response", id: request.id, command: type, success: false, error: outcomeText(outcome) })
   }
 
   private async entries(request: Json): Promise<Json> {
@@ -216,7 +254,7 @@ export async function serveRemoteAttach(
           socket.destroy()
           return
         }
-        if (isRecord(request)) void presentation.answer(request)
+        if (isParsedRecord(request)) void presentation.answer(request)
       })
     })
   })

@@ -10,6 +10,7 @@ import { migrationReport } from "./doctor-migration.js"
 import { launchSpecDoctorLines } from "./launch-spec-mode.js"
 import { piConfigReport } from "./doctor-pi-config.js"
 import { needsSetupSuggestion } from "./setup-detect.js"
+import { keychainHelperDoctorLines } from "./keychain-helper-doctor.js"
 import { sameVersion } from "./same-version.js"
 
 export function installedDistTag(version) {
@@ -90,9 +91,10 @@ const MANAGED_MODE_FLAG = "--mode"
  * it can never be a reason for diagnostics to fail, so an unavailable or unparsable listing is an
  * empty list.
  */
-function listProcesses() {
+export function listProcesses() {
   if (process.platform === "win32") return []
-  const listed = spawnSync("ps", ["-axo", "pid=,ppid=,etime=,tty=,args="], { encoding: "utf8" })
+  // -ww: an unlimited width, so `args` is never cut at the terminal width (BSD/macOS `ps` truncates).
+  const listed = spawnSync("ps", ["-ww", "-axo", "pid=,ppid=,etime=,tty=,args="], { encoding: "utf8" })
   if (listed.status !== 0 || typeof listed.stdout !== "string") return []
   const entries = []
   for (const line of listed.stdout.split("\n")) {
@@ -425,9 +427,11 @@ export function runDoctor(inventory, args = [], options = {}) {
   lines.push(...retiredPayloadReport(options))
   lines.push(...transientMemoryReport(options))
   lines.push(...(options.reflectionLock ?? []))
+  lines.push(...(options.memoryRuntime ?? []))
   const launchSpec = launchSpecDoctorLines(options.pluginRoot ?? join(packageRoot, "plugin"), options.launchSpecIo)
   if (launchSpec.some((line) => line.startsWith("FAIL "))) failed = true
   lines.push(...launchSpec)
+  lines.push(...(options.keychainHelper ?? keychainHelperDoctorLines({ packageRoot })))
   lines.push(...daemonReport(options), ...(options.computerUse ?? []), ...(options.categoryCoverage ?? []))
   if ((options.computerUse ?? []).some((line) => line.startsWith("FAIL "))) failed = true
   if (needsSetupSuggestion(inventory)) {

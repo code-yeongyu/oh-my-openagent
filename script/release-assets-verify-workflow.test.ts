@@ -102,12 +102,17 @@ function runStep(step: string, released: Files, built: Files | null, payloadDirs
 const withCapabilities = (bytes: string = CAPABILITIES_BYTES): Files => release({ [CAPABILITIES]: bytes })
 
 describe("Verify uploaded assets compares the release with what the run built (RULING-77)", () => {
-  test("a complete release passes with and without the capability file", () => {
-    for (const files of [release(), withCapabilities()]) {
-      const run = runStep(verifyStep, files, files)
-      expect(run.status, run.stderr).toBe(0)
-      expect(run.stdout).toContain(`Verified ${Object.keys(files).length} release assets`)
-    }
+  test("a complete release, capability file included, passes", () => {
+    const files = withCapabilities()
+    const run = runStep(verifyStep, files, files)
+    expect(run.status, run.stderr).toBe(0)
+    expect(run.stdout).toContain(`Verified ${Object.keys(files).length} release assets`)
+  }, TEST_TIMEOUT_MS)
+
+  test("a build output missing the capability file fails Verify, even when the release matches it (unconditional)", () => {
+    const run = runStep(verifyStep, release(), release())
+    expect(run.status).not.toBe(0)
+    expect(run.stdout + run.stderr).toContain(CAPABILITIES)
   }, TEST_TIMEOUT_MS)
 
   test("payload directories the desktop-engine artifact carries are not release assets (#12018)", () => {
@@ -134,7 +139,8 @@ describe("Verify uploaded assets compares the release with what the run built (R
 
   test("a skip_platform rerun (nothing built) is held to the floor and the checksum coverage", () => {
     expect(runStep(verifyStep, withCapabilities(), null).status).toBe(0)
-    const noEngine = release()
+    expect(runStep(verifyStep, release(), null).status).not.toBe(0)
+    const noEngine = withCapabilities()
     delete noEngine[ENGINES[0] ?? ""]
     expect(runStep(verifyStep, noEngine, null).status).not.toBe(0)
     expect(runStep(verifyStep, { ...release(), [CAPABILITIES]: CAPABILITIES_BYTES }, null).status).not.toBe(0)
@@ -149,6 +155,33 @@ describe("Verify uploaded assets compares the release with what the run built (R
     const built = release({ [name]: bytes })
     expect(runStep(verifyStep, built, built).status).toBe(0)
     expect(runStep(verifyStep, release(), built).status).not.toBe(0)
+  }, TEST_TIMEOUT_MS)
+})
+
+describe("a rerun without a new darwin build keeps the capability file only through the restore (RULING-77)", () => {
+  // The real restore step and the real verify step run back to back. SHA256SUMS stays in the built set because the upload
+  // step between them regenerates it over omo-* and it then equals the published one. Each runs in its own subshell, as each
+  // CI step runs in its own shell: one shell would let the verify step's EXIT trap replace the restore step's.
+  const restoreThenVerify = `(\n${restoreStep}\n)\n(\n${verifyStep}\n)`
+
+  test("#given the earlier run published it #when this run built no darwin runtime #then it is restored from SHA256SUMS and Verify passes", () => {
+    const published = withCapabilities()
+    const built: Files = { ...published }
+    delete built[CAPABILITIES]
+    delete built["omo-darwin-arm64"]
+    const run = runStep(restoreThenVerify, published, built)
+    expect(run.status, run.stderr).toBe(0)
+    expect(run.built).toContain(CAPABILITIES)
+  }, TEST_TIMEOUT_MS)
+
+  test("#given it is neither built nor on the earlier release #when the rerun verifies #then Verify fails on the missing capability file", () => {
+    const published = release()
+    const built: Files = { ...published }
+    delete built["omo-darwin-arm64"]
+    const run = runStep(restoreThenVerify, published, built)
+    expect(run.status).not.toBe(0)
+    expect(run.stdout + run.stderr).toContain(CAPABILITIES)
+    expect(run.built).not.toContain(CAPABILITIES)
   }, TEST_TIMEOUT_MS)
 })
 
