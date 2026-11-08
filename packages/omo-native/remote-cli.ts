@@ -11,13 +11,17 @@ import {
   type SessionFilter,
   type SessionRowState,
 } from "../device-service-core/src/index.ts"
+import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { serveRemoteAttach } from "./remote-attach"
 import { type BootstrapSetup, runBootstrapVerb } from "./remote-bootstrap"
+import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import { controlLines, deviceLines, sessionLines, statusLines } from "./remote-render"
+import { isSessionVerb, parseSession, SESSION_VERBS, type SessionArgs } from "./remote-session-args"
+import { runSession } from "./remote-session-verbs"
 
 // `omo remote`: the sessions on this account's other devices, through this device's service. A thin CLI over the
 // device-service SDK: every command has a human table and a --json form that prints the SDK's typed value as is.
-export const REMOTE_EXIT = { ok: 0, failed: 1, usage: 2, unavailable: 3 } as const
+export { REMOTE_EXIT } from "./remote-exit"
 
 const REMOTE_USAGE = `usage: omo remote <command> [--json]
   status                                   the device service's connection state
@@ -28,7 +32,14 @@ const REMOTE_USAGE = `usage: omo remote <command> [--json]
   control [on|off]                         whether your other signed-in devices can view and command this
                                            device's sessions (on unless you turn it off)
   bootstrap                                set up this device's service for your sign-in (every omo start runs it)
-  attach <device>/<session>                watch a session on another device (input is not enabled yet)`
+  attach <device>/<session>                open a session on another device in the terminal UI, to watch and type
+  open <device> [--project P] [--model M]  start a session on another device; prints <device>/<session>
+  send <device>/<session> <text> [--steer|--follow-up] [--no-wait]
+                                           send a message and print the answer as it arrives (--steer: into the
+                                           running turn; --no-wait: return once the session took it)
+  model <device>/<session> <provider/id>   switch the session's model
+  interrupt <device>/<session>             stop the session's running turn
+  close <device>/<session>                 end the session on its device`
 
 export interface RemoteCommandDependencies {
   /** `omo account show`: the first bootstrap step; nothing else runs unless it reports signed in. */
@@ -37,7 +48,11 @@ export interface RemoteCommandDependencies {
   readonly connect: () => Promise<DeviceService>
   readonly now: () => number
   readonly output: (line: string) => void
+  /** Text as it arrives, with no line ending added: `send` streams the answer through it. */
+  readonly write: (text: string) => void
   readonly error: (line: string) => void
+  /** The thread tools' remote surface over a connected service; the device service's own by default. Test seam. */
+  readonly remote?: (service: DeviceService) => RemoteThreadSurface
 }
 
 /** `omo remote` verbs; `bootstrap` also needs the pinned install, the stored keys and this omo binary. */
@@ -45,24 +60,24 @@ export interface RemoteVerbDependencies extends RemoteCommandDependencies {
   readonly bootstrap: BootstrapSetup
 }
 
-const VERBS = ["status", "devices", "sessions", "enable", "disable", "control", "bootstrap"] as const
+const VERBS = ["status", "devices", "sessions", "enable", "disable", "control", "bootstrap", ...SESSION_VERBS] as const
 const CONTROL_VALUES = ["on", "off"] as const
 type ControlValue = (typeof CONTROL_VALUES)[number]
 const isControlValue = (value: string | undefined): value is ControlValue => CONTROL_VALUES.some(v => v === value)
-
-class UsageError extends Error {}
 
 type Parsed = {
   readonly command: string
   readonly json: boolean
   readonly filter: SessionFilter
   readonly control: ControlValue | undefined
+  readonly session?: SessionArgs
 }
 
 const isRowState = (value: string): value is SessionRowState => (SESSION_ROW_STATES as readonly string[]).includes(value)
 
 function parse(args: readonly string[]): Parsed {
   const [command = "", ...rest] = args
+  if (isSessionVerb(command)) return { command, filter: {}, control: undefined, ...parseSession(command, rest) }
   let json = false
   const filter: { device?: string; project?: string; state?: SessionRowState } = {}
   let control: ControlValue | undefined
@@ -122,6 +137,13 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
       const state = parsed.control === undefined ? await service.attachControl() : await service.setAttachControl(parsed.control === "on")
       return print(state, () => controlLines(state, dependencies.now()))
     }
+    case "open":
+    case "send":
+    case "model":
+    case "interrupt":
+    case "close":
+      if (parsed.session !== undefined) return runSession(service, parsed.session, parsed.json, dependencies)
+      throw new UsageError(`omo remote ${parsed.command}: arguments were not parsed`)
     default:
       throw new UsageError(parsed.command === "" ? "omo remote: a command is required" : `omo remote: unknown command ${parsed.command}`)
   }
