@@ -10,6 +10,7 @@ mod registry;
 mod render;
 mod roles;
 mod walk;
+mod wrapper;
 
 pub use ops::{ax_press, element_at_node, node_to_wire, observe, query, register_node};
 pub use registry::AxRegistry;

@@ -72,6 +72,7 @@
               "text": "- window \"Dense - Notes\" [ref=e1] app=Notes (focused) [... 9998 more]\n… truncated (1 nodes)\n… deadline 50 ms reached",
               "nodeCount": 1,
               "truncated": true,
+              "generation": 1,
               "complete": false,
               "nodesObserved": 1,
               "cuts": [
@@ -225,6 +226,7 @@
               "text": "10,000 rendered lines",
               "nodeCount": 10000,
               "truncated": false,
+              "generation": 2,
               "complete": true,
               "nodesObserved": 10000
             }

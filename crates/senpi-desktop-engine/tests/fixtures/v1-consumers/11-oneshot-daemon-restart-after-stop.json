@@ -1,0 +1,288 @@
+{
+  "description": "A stop on the --serve daemon bunshin's --oneshot (and --mcp) reach is lifted by the user's --resume, and is NOT persisted: after a SIGKILL and a fresh --serve on the same endpoint the daemon's own session serves input again with no file to delete. Persistence across restarts exists only on the macOS XPC agent path.",
+  "transport": "oneshot",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {
+    "SENPI_DESKTOP_FAKE_STOP_PATH": "live"
+  },
+  "steps": [
+    {
+      "control": "start-daemon"
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "desktop.stopPath.status",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "suspended": false,
+              "globalLive": true,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/heartbeatFresh",
+            "/result/reason"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "desktop.stop",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": true,
+              "globalLive": true,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/heartbeatFresh",
+            "/result/reason"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "desktop.click",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 10
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "error": {
+              "code": -32015,
+              "message": "input is suspended until the user resumes it",
+              "data": {
+                "code": "Suspended",
+                "hint": null
+              }
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "control": "resume"
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "desktop.capture",
+        "params": {
+          "target": "101",
+          "caps": {
+            "maxWidth": 64
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": {
+              "mode": "inline-png",
+              "data": "png-bytes",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 64,
+              "height": 48,
+              "sourceWidth": 800,
+              "sourceHeight": 600,
+              "coordinateWidth": 64,
+              "coordinateHeight": 48,
+              "region": null,
+              "scale": 0.08,
+              "target": "101",
+              "frameId": "frame-1",
+              "note": null
+            }
+          },
+          "variable": [
+            "/result/data",
+            "/result/frameId"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "desktop.click",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 10
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": null
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "desktop.stop",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "result": {
+              "suspended": true,
+              "globalLive": true,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/heartbeatFresh",
+            "/result/reason"
+          ]
+        }
+      ]
+    },
+    {
+      "control": "restart-daemon"
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "desktop.stopPath.status",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "result": {
+              "suspended": false,
+              "globalLive": true,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/heartbeatFresh",
+            "/result/reason"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "desktop.capture",
+        "params": {
+          "target": "101",
+          "caps": {
+            "maxWidth": 64
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "result": {
+              "mode": "inline-png",
+              "data": "png-bytes",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 64,
+              "height": 48,
+              "sourceWidth": 800,
+              "sourceHeight": 600,
+              "coordinateWidth": 64,
+              "coordinateHeight": 48,
+              "region": null,
+              "scale": 0.08,
+              "target": "101",
+              "frameId": "frame-1",
+              "note": null
+            }
+          },
+          "variable": [
+            "/result/data",
+            "/result/frameId"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "method": "desktop.click",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 10
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 9,
+            "result": null
+          },
+          "variable": []
+        }
+      ]
+    }
+  ]
+}

@@ -70,6 +70,8 @@ fn every_redacted_channel_is_cut_hashed_or_nulled() {
     // Then
     let cut = format!("{}[truncated]", "x".repeat(256));
     assert_eq!(report["hit"]["label"], json!(cut));
+    assert_eq!(report["note"], json!(cut));
+    assert_eq!(report["warning"], json!(cut));
     assert_eq!(report["openedSurfaces"][0]["title"], json!(cut));
     assert_eq!(report["event"]["text"]["length"], json!(SECRET.chars().count()));
     assert_eq!(report["event"]["text"]["sha256"].as_str().map(str::len), Some(16));
@@ -80,6 +82,16 @@ fn every_redacted_channel_is_cut_hashed_or_nulled() {
     );
     assert_eq!(report["node"]["children"][0]["role"], json!("text"));
     assert!(!report.to_string().contains(SECRET));
+}
+
+#[test]
+fn a_note_under_a_secure_ancestor_is_nulled() {
+    // Given
+    let mut report = json!({ "node": { "secure": true, "note": SECRET, "warning": SECRET } });
+    // When
+    redact(&mut report);
+    // Then
+    assert_eq!(report, json!({ "node": { "secure": true, "note": null, "warning": null } }));
 }
 
 #[test]
@@ -135,6 +147,38 @@ fn trace_off_or_no_audit_path_writes_nothing() {
     // Then
     assert!(sink.path().is_none());
     assert!(!dir.path().join("trace").exists());
+}
+
+#[test]
+fn two_engines_sharing_one_trace_file_write_whole_lines_and_one_meta_line() {
+    // Given two sinks that resolve to the same `<pid>-<start ms>` file
+    let dir = Scratch::new();
+    let started_unix_ms = super::unix_now_ms();
+    let sinks: Vec<TraceSink> = (0..2)
+        .map(|_| TraceSink { started_unix_ms, file: parking_lot::Mutex::new(None) })
+        .collect();
+    let report = json!({ "auditIds": ["01AUDIT"], "note": "n".repeat(200), "timings": { "dispatch": 1 } });
+    let per_sink = 200;
+    // When both open and write at once
+    let barrier = std::sync::Barrier::new(sinks.len());
+    std::thread::scope(|scope| {
+        for sink in &sinks {
+            let (barrier, report, dir) = (&barrier, &report, dir.path());
+            scope.spawn(move || {
+                barrier.wait();
+                sink.configure(&options(dir, true));
+                for _ in 0..per_sink {
+                    sink.reply(Method::Click, Duration::ZERO, &Ok(report.clone()));
+                }
+            });
+        }
+    });
+    // Then every line parses, and only one is `trace.meta`
+    assert_eq!(sinks[0].path(), sinks[1].path());
+    let lines = lines(&sinks[0]);
+    assert_eq!(lines.len(), 1 + 2 * per_sink);
+    assert_eq!(lines.iter().filter(|line| line["type"] == "trace.meta").count(), 1);
+    assert_eq!(lines[0]["type"], json!("trace.meta"));
 }
 
 #[test]

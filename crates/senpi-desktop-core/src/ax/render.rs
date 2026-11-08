@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use super::walk::{filter_node, label, walk_observed, walk_raw, WalkNode, WalkState};
 use super::{AxBackend, AxRegistry, DEFAULT_DEADLINE_MS};
-use crate::error::CoreResult;
+use crate::error::{CoreResult, DesktopError};
 use crate::report::ReportMode;
 use crate::types::{AxCut, AxSnapshot, AxSnapshotOptions, DesktopWindow};
 
@@ -23,8 +23,13 @@ fn push_line(text: &mut String, line: &str) {
     text.push_str(line);
 }
 
+/// The logical depth a `skeleton` snapshot reads to.
+const SKELETON_DEPTH: u32 = 3;
+
 struct TreeWriter<'a> {
     window: &'a DesktopWindow,
+    /// The tree starts at a drilled element, not at the window.
+    drill: bool,
     registry: &'a mut AxRegistry,
     generation: u64,
     text: String,
@@ -42,7 +47,8 @@ impl TreeWriter<'_> {
             line.push_str(&format!(" \"{}\"", escaped_truncated(label, 80)));
         }
         line.push_str(&format!(" [ref={reference}]"));
-        if depth == 0 {
+        let window_root = depth == 0 && !self.drill;
+        if window_root {
             line.push_str(&format!(" app={}", self.window.app));
         }
         if let Some(value) = node.props.value.as_deref().filter(|value| !value.is_empty()) {
@@ -53,7 +59,7 @@ impl TreeWriter<'_> {
         }
         // The root's own AXFocused only reflects app-local focus; report the
         // global roster flag instead.
-        let focused = if depth == 0 {
+        let focused = if window_root {
             self.window.focused
         } else {
             node.props.focused
@@ -88,21 +94,40 @@ pub fn snapshot(
     // Measured from the request, so the root lookup counts against it; a
     // deadline past what `Instant` can hold never stops the walk.
     let deadline = object.then(|| Instant::now().checked_add(timeout)).flatten();
-    let generation = registry.begin_snapshot(&window.id);
-    let root = backend.window_root(window)?;
-    let mut state = WalkState::new(
-        options.max_nodes.unwrap_or(800).max(1),
-        options.max_depth.unwrap_or(24),
-    )
-    .with_deadline(deadline);
+    // Object mode only: a null-mode reply ignores `root` and `skeleton`.
+    let drill = options.root.as_deref().filter(|_| object);
+    let (generation, parent, root) = if let Some(reference) = drill {
+        let handle = registry.resolve(reference)?;
+        if registry.target(reference)? != window.id {
+            return Err(DesktopError::invalid_target(format!(
+                "{reference} was not read from window {}",
+                window.id
+            )));
+        }
+        let parent = registry.generation_of(reference)?;
+        let generation = registry.begin_sub_generation(&window.id, parent);
+        (generation, Some(parent), handle)
+    } else {
+        let generation = registry.begin_snapshot(&window.id);
+        (generation, None, backend.window_root(window)?)
+    };
+    let max_depth = options.max_depth.unwrap_or(24);
+    let max_depth = if object && options.skeleton == Some(true) {
+        max_depth.min(SKELETON_DEPTH)
+    } else {
+        max_depth
+    };
+    let mut state = WalkState::new(options.max_nodes.unwrap_or(800).max(1), max_depth)
+        .with_deadline(deadline);
     let root = if object {
-        walk_observed(backend, root, 0, &mut state)?
+        walk_observed(backend, root, 0, 0, &mut state)?
     } else {
         walk_raw(backend, root, 0, &mut state)?
     }
-    .and_then(|node| filter_node(node, options.all.unwrap_or(false)));
+    .and_then(|node| filter_node(node, options.all.unwrap_or(false), object));
     let mut writer = TreeWriter {
         window,
+        drill: drill.is_some(),
         registry,
         generation,
         text: String::new(),
@@ -136,8 +161,8 @@ pub fn snapshot(
         text,
         node_count,
         truncated: state.truncated,
-        generation: None,
-        parent: None,
+        generation: object.then_some(generation),
+        parent,
         complete: object.then_some(!state.truncated),
         nodes_observed: object.then(|| state.visited.saturating_sub(state.skipped)),
         cuts,

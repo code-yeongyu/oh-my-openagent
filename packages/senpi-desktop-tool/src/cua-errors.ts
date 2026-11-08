@@ -21,6 +21,7 @@ const ENGINE_TO_COMPUTER: Readonly<Record<string, string>> = {
 	AmbiguousTarget: "COMPUTER_AMBIGUOUS_TARGET",
 	CaptureConsentRequired: "COMPUTER_CAPTURE_CONSENT_REQUIRED",
 	ProtectedProcess: "COMPUTER_PROTECTED_PROCESS",
+	StaleRef: "COMPUTER_STALE_REF",
 	Cancelled: "COMPUTER_CANCELLED",
 	Timeout: "COMPUTER_CANCELLED",
 	timeout: "COMPUTER_CANCELLED",

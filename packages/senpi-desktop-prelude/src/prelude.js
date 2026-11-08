@@ -2,8 +2,14 @@
 // Each helper is one tool call, so lazy activation and the permission-system preflight apply to it; `verify` alone
 // repeats read calls until its deadline. The method lists in the generated region come from facade-manifest.json.
 {
-	// Children a cell starts inherit the marker, so an SDK inside them refuses to spawn a second engine.
-	if (globalThis.process?.env) globalThis.process.env.SENPI_DESKTOP_HOST = "1";
+	// Children a cell starts inherit the marker, so an SDK inside them refuses to spawn a second engine. It is written
+	// only to an environment the kernel owns: a worker thread's own process.env view, or a process-mode kernel's own
+	// process. On a host's main thread the write would reach every later child of the host (the bash tool, subagent
+	// processes, the desktop service), so it is skipped there. The Python kernel is always its own process.
+	const kernelProcess = globalThis.process;
+	const ownsEnvironment = kernelProcess?.getBuiltinModule?.("node:worker_threads")?.isMainThread === false ||
+		globalThis[Symbol.for("senpi.kernel.processMode")] === true;
+	if (kernelProcess?.env && ownsEnvironment) kernelProcess.env.SENPI_DESKTOP_HOST = "1";
 	const validateOptions = (label, options) => {
 		if (options === undefined) return {};
 		if (options === null || typeof options !== "object" || Array.isArray(options)) {
@@ -37,9 +43,15 @@
 		return JSON.stringify(value) ?? "undefined";
 	};
 	// The tool result is `{ text, details?, images?, hasError? }`: images display, `details.value` is the return value.
+	// A failed call's `details.value.code` (COMPUTER_*) rides on the thrown error as `error.code`.
 	const invoke = async args => {
 		const result = await globalThis.tool.computer(args);
-		if (result.hasError) throw new Error(result.text);
+		if (result.hasError) {
+			const error = new Error(result.text);
+			const code = result.details?.value?.code;
+			if (typeof code === "string") error.code = code;
+			throw error;
+		}
 		for (const image of result.images ?? []) globalThis.display(image);
 		return result.details?.value;
 	};
@@ -164,7 +176,7 @@
 					return expectation.exists ?? true;
 				} catch (error) {
 					// A ref that no longer resolves answers the question (the element is gone); other failures do not.
-					if (/\bStaleRef\b/.test(String(error?.message))) return !(expectation.exists ?? true);
+					if (error?.code === "COMPUTER_STALE_REF") return !(expectation.exists ?? true);
 					throw error;
 				}
 			case "elementValue":
@@ -199,7 +211,11 @@
 		if (typeof timeoutMs !== "number" || !Number.isFinite(timeoutMs) || timeoutMs < 0) {
 			throw new TypeError("computer.verify() timeoutMs must be a finite, non-negative number");
 		}
-		const interval = Math.max(opts.intervalMs ?? 100, 10);
+		const intervalMs = opts.intervalMs ?? 100;
+		if (typeof intervalMs !== "number" || !Number.isFinite(intervalMs) || intervalMs < 0) {
+			throw new TypeError("computer.verify() intervalMs must be a finite, non-negative number");
+		}
+		const interval = Math.max(intervalMs, 10);
 		const started = Date.now();
 		const deadline = started + timeoutMs;
 		let reads = 0;
