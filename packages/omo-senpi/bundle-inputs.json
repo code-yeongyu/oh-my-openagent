@@ -1592,6 +1592,7 @@
     "packages/omo-senpi/src/components/thread/remote/peer-text.ts",
     "packages/omo-senpi/src/components/thread/remote/remote-controls.ts",
     "packages/omo-senpi/src/components/thread/remote/remote-ops.ts",
+    "packages/omo-senpi/src/components/thread/remote/reply-route.ts",
     "packages/omo-senpi/src/components/thread/sdk.ts",
     "packages/omo-senpi/src/components/thread/session-facts.ts",
     "packages/omo-senpi/src/components/thread/thread-link.ts",
