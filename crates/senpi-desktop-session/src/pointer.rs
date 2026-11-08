@@ -69,8 +69,9 @@ fn next_frame_id() -> (String, u64) {
     (format!("frame-{}-{capture}", engine_instance()), capture)
 }
 
-/// Targets whose latest capture the cache keeps (DESIGN 9, frame store);
-/// capturing one more evicts the least recently captured target.
+/// Targets whose latest capture an object-mode cache keeps (DESIGN 9, frame
+/// store); capturing one more evicts the least recently captured target. A
+/// null-mode (v1) cache is not capped, as it is never idle-flushed.
 pub(crate) const MAX_TARGETS: usize = 16;
 
 /// The latest capture of up to [`MAX_TARGETS`] targets; coordinate input maps
@@ -131,7 +132,7 @@ impl FrameCache {
             consumed: false,
         };
         self.latest.insert(target.key().to_owned(), frame);
-        if self.latest.len() > MAX_TARGETS {
+        if self.report_mode == ReportMode::Object && self.latest.len() > MAX_TARGETS {
             self.evict_oldest();
         }
         id
@@ -228,7 +229,7 @@ mod tests {
     use senpi_desktop_core::types::Target;
     use senpi_desktop_safety::FrameRefusal;
 
-    use super::{FrameCache, MAX_TARGETS};
+    use super::{FrameCache, ReportMode, MAX_TARGETS};
 
     fn window(index: usize) -> Target {
         Target::Window(format!("{index}"))
@@ -237,7 +238,7 @@ mod tests {
     #[test]
     fn capturing_a_seventeenth_target_evicts_the_least_recently_captured_one() {
         // Given: 16 targets captured, target 0 recaptured last
-        let mut frames = FrameCache::default();
+        let mut frames = FrameCache::with_report_mode(ReportMode::Object);
         let first: Vec<String> = (0..MAX_TARGETS)
             .map(|index| frames.record(&window(index), FrameGeometry::identity_global()))
             .collect();
@@ -255,9 +256,23 @@ mod tests {
     }
 
     #[test]
+    fn a_v1_session_keeps_its_oldest_frame_past_seventeen_targets() {
+        // Given
+        let mut frames = FrameCache::with_report_mode(ReportMode::Null);
+        let oldest = frames.record(&window(0), FrameGeometry::identity_global());
+        // When
+        for index in 1..=MAX_TARGETS {
+            frames.record(&window(index), FrameGeometry::identity_global());
+        }
+        // Then
+        assert_eq!(frames.latest_id("0"), Some(oldest.as_str()));
+        assert_eq!(frames.refusal("0", Some(&oldest)), None);
+    }
+
+    #[test]
     fn recapturing_a_known_target_never_evicts() {
         // Given
-        let mut frames = FrameCache::default();
+        let mut frames = FrameCache::with_report_mode(ReportMode::Object);
         for index in 0..MAX_TARGETS {
             frames.record(&window(index), FrameGeometry::identity_global());
         }
