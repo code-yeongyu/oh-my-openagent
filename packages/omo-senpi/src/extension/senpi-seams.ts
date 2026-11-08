@@ -72,13 +72,13 @@ const REMOTE_TARGET = /^([^/]+)\/[^/]+$/
 const DRIVE_LETTER = /^[A-Za-z]:$/
 const PATH_SEGMENT = /^[.~]/
 
-export function isRemoteMonitorTarget(target: string): boolean {
+function isRemoteMonitorTarget(target: string): boolean {
   const trimmed = target.trim()
   const device = REMOTE_TARGET.exec(trimmed)?.[1]
   return device !== undefined && !/\.jsonl$/i.test(trimmed) && !DRIVE_LETTER.test(device) && !PATH_SEGMENT.test(device)
 }
 
-export function remoteWakeUnavailable(surface: unknown, target: string): { readonly code: typeof REMOTE_WAKE_UNAVAILABLE; readonly message: string } | undefined {
+function remoteWakeUnavailable(surface: unknown, target: string): { readonly code: typeof REMOTE_WAKE_UNAVAILABLE; readonly message: string } | undefined {
   if (!isRemoteMonitorTarget(target) || seamPresent(surface, REMOTE_WAKE_SEAM, "function")) return undefined
   return {
     code: REMOTE_WAKE_UNAVAILABLE,
