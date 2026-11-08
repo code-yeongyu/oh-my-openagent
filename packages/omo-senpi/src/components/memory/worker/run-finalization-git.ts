@@ -8,6 +8,7 @@ import {
   integrateValidatedReflection,
   maybeKillAt,
   memoryWriterLockPath,
+  pathsOutsideTarget,
   probeLegacyAutoRunReceipt,
   probeReflectionIntegration,
   preflightReflectionDescriptions,
@@ -73,7 +74,7 @@ export async function resolveFinalizationDecision(
     if (validation.status === "valid") {
       maybeKillAt("after-validate")
       if (ledger.targetDoc !== undefined
-        && validation.changedPaths.some((path) => path !== ledger.targetDoc)) {
+        && pathsOutsideTarget(validation, [ledger.targetDoc]).length > 0) {
         const decision = { outcome: "failed" as const, reason: "invalid_target", detail: "Dream changed paths outside targetDoc" }
         await checkpointDecision(ledgerPath, decision)
         await cleanupAndRecord(context, ledger, runDir)
