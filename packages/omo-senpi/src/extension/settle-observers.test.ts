@@ -1,5 +1,5 @@
 import { afterEach, expect, jest, test } from "bun:test"
-import { FakeExtensionAPI } from "../../test-support/fake-extension-api"
+import { FakeExtensionAPI, withInertSenpiSeams } from "../../test-support/fake-extension-api"
 import { composeOmoSenpiExtension } from "./compose"
 import type { ComponentLogger, SettleObserver } from "./types"
 
@@ -84,7 +84,7 @@ test.each(["observer", "unrelated"] as const)("#given concurrent settles sharing
 })
 
 test("#given a named subscriber that never resolves #when its budget expires #then observation aborts and the next subscriber executes", async () => {
-  const pi = new FakeExtensionAPI()
+  const pi = withInertSenpiSeams(new FakeExtensionAPI())
   const entered = Promise.withResolvers<SettleObserver | undefined>()
   const release = Promise.withResolvers<void>()
   const logs: unknown[] = []

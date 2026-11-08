@@ -1652,6 +1652,7 @@
     "packages/omo-senpi/src/extension/prewarm-diagnostics.ts",
     "packages/omo-senpi/src/extension/rollback-migrate-runtime.ts",
     "packages/omo-senpi/src/extension/sdk-root-provisioning.ts",
+    "packages/omo-senpi/src/extension/senpi-seams.ts",
     "packages/omo-senpi/src/extension/settle-observers.ts",
     "packages/omo-senpi/src/extension/startup-deferral.ts",
     "packages/omo-senpi/src/extension/thread-sdk.ts",
