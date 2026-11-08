@@ -18,12 +18,12 @@ function answering(choice: string): { readonly forwarder: ChildDialogForwarder; 
   return { seen, forwarder: { forward: async (dialog, child) => { seen.push({ dialog, taskId: child.taskId }); return { kind: "value", value: choice } } } }
 }
 
-async function runChild(choice: string, setup: { readonly settingsPreset?: string; readonly liveParent?: boolean; readonly ownApprovalMode?: true } = { settingsPreset: "ask" }): Promise<{ readonly machine: GatedChildMachine; readonly seen: { dialog: ForwardableDialog; taskId: string }[] }> {
+async function runChild(choice: string, setup: { readonly settingsPreset?: string; readonly liveParent?: boolean; readonly ownApprovalMode?: { readonly allowTools: readonly string[] } } = { settingsPreset: "ask" }): Promise<{ readonly machine: GatedChildMachine; readonly seen: { dialog: ForwardableDialog; taskId: string }[] }> {
   const machine = await createGatedChildMachine(setup.settingsPreset === undefined ? {} : { settingsPreset: setup.settingsPreset })
   machines.push(machine)
   const parent = setup.liveParent === true ? await machine.openParent() : undefined
   const { forwarder, seen } = answering(choice)
-  const handle = await new InProcessRunner({ dialogs: forwarder }).start({ ...machine.spec("st_6189c", parent?.sessionId), ...(setup.ownApprovalMode === undefined ? {} : { ownApprovalMode: true }) })
+  const handle = await new InProcessRunner({ dialogs: forwarder }).start({ ...machine.spec("st_6189c", parent?.sessionId), ...(setup.ownApprovalMode === undefined ? {} : { ownApprovalMode: setup.ownApprovalMode }) })
   await handle.waitForIdle()
   await handle.abort()
   parent?.dispose()
@@ -70,14 +70,18 @@ describe("InProcessRunner with a parent session", () => {
     expect(machine.probeExists()).toBe(true)
   }, 30_000)
 
-  // An engine-owned worker (the facts extractor, the onboarding understand step) names its run, not a live session,
-  // as its parent: it keeps the approval mode its own settings give it, exactly as before senpi 2026.11.6-3's rule 3,
-  // and is never treated as a delegated child of a parent that is not there.
+  // An engine-owned worker (facts extraction and the onboarding understand step both launch through the facts launch)
+  // names its run, not a live session, as its parent. Its preset is the one the engine's resolver gives its OWN
+  // settings - never looser, never inherited: only its own tools run without asking. A launch that copied a raw
+  // preset flag or a looser mode into the child would let the "not its tool" rows run instead of asking. The probe
+  // call is `write`, whose permission is `edit`; record_fact is its own permission.
   test.each([
     { name: "a delegated child whose parent is not live", setup: {}, asks: true },
-    { name: "an engine-owned worker under the host default", setup: { ownApprovalMode: true as const }, asks: false },
-    { name: "an engine-owned worker whose own settings say ask", setup: { settingsPreset: "ask", ownApprovalMode: true as const }, asks: true },
-  ])("#given $name #when it makes a gated call #then it asks only when its own rule says so", async ({ setup, asks }) => {
+    { name: "a worker on its own ask settings, the call being its own tool", setup: { settingsPreset: "ask", ownApprovalMode: { allowTools: ["edit"] } }, asks: false },
+    { name: "a worker on its own ask settings, the call not being its tool", setup: { settingsPreset: "ask", ownApprovalMode: { allowTools: ["record_fact"] } }, asks: true },
+    { name: "a worker on its own read-only settings, the call not being its tool", setup: { settingsPreset: "read-only", ownApprovalMode: { allowTools: ["record_fact"] } }, asks: true },
+    { name: "a worker on the host default, the call not being its tool", setup: { ownApprovalMode: { allowTools: ["record_fact"] } }, asks: false },
+  ])("#given $name #when it makes a gated call #then it asks exactly when its own settings do", async ({ setup, asks }) => {
     // given / when
     const { machine, seen } = await runChild("Deny", setup)
 
