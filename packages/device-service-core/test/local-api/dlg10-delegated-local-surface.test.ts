@@ -27,6 +27,9 @@ describe("DLG10 the local API carries delegated commands, endpoint keys and the 
     expect(ok({ ...base, delegated: true })).toEqual({ ...base, delegated: true });
     expect(ok({ ...base, endpoint: KEY })).toEqual({ ...base, endpoint: KEY });
     expect(ok(base)).toEqual(base);
+    const toDevice = { id: "r1", type: "session.command", device: PEER, endpoint: KEY, rpc: { type: "open_session" } } as const;
+    expect(ok({ ...toDevice, locate: true })).toEqual({ ...toDevice, locate: true });
+    expect(validateRequest({ ...toDevice, locate: false }).ok).toBe(false);
     for (const bad of [
       { ...base, delegated: false },
       { ...base, endpoint: "short" },
@@ -63,6 +66,8 @@ describe("DLG10 the local API carries delegated commands, endpoint keys and the 
     const valid = [
       { ...head, frame: { type: "session_status", sessionId: "rpc-1" } },
       { ...head, command_id: "Y29tbWFuZC1pZC0wMDAwMQ", response: { success: true } },
+      // Decision 0018 amendment 2026-11-06: an open that asked names its new session beside the reply.
+      { ...head, command_id: "Y29tbWFuZC1pZC0wMDAwMQ", response: { success: true }, located: { key: KEY, session: `${PEER}.${KEY}` } },
       { ...head, blob: { id: "b1", bytes: 3, sha256: SHA } },
       { type: "event", kind: "session.command_blob_chunk", id: "b1", off: 0, b: "YWJj" },
       { type: "event", kind: "session.command_blob_done", id: "b1" },
@@ -74,6 +79,9 @@ describe("DLG10 the local API carries delegated commands, endpoint keys and the 
       { ...head },
       { ...head, frame: {}, response: {} },
       { ...head, response: { success: true } },
+      { ...head, command_id: "Y29tbWFuZC1pZC0wMDAwMQ", response: {}, located: { key: KEY, session: `other.${KEY}` } },
+      { ...head, command_id: "Y29tbWFuZC1pZC0wMDAwMQ", response: {}, located: { key: "short", session: `${PEER}.short` } },
+      { ...head, command_id: "Y29tbWFuZC1pZC0wMDAwMQ", response: {}, located: { key: KEY } },
       { ...head, frame: { big: "x".repeat(LOCAL_INLINE_MAX) } },
       { type: "event", kind: "session.channel_closed", device: PEER, reason: "bored" },
     ];

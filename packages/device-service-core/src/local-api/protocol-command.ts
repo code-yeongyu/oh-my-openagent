@@ -10,6 +10,8 @@ export type SessionCommand = (
       readonly device: string;
       readonly endpoint: string;
       readonly command_id?: string;
+      /** Decision 0018 amendment 2026-11-06: an open asks for its new session's `located` pair on the reply. */
+      readonly locate?: true;
       readonly rpc: CommandRpc;
     }
   | {
