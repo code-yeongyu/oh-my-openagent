@@ -9,8 +9,9 @@
 //   show (a calculator result, a toggled switch, a menu command) is checked on the engine audit file instead.
 // - `live`: the same task against real macOS apps (English UI). Its oracles read AX and files the way a person
 //   would check the result, and `setup`/`restore` leave the apps as found.
-// A `postcheck` sees the readback taken after the restore steps (before any teardown op closes a window) and
-// only the audit lines the restore wrote.
+// An `oracle` sees the windows and files as the plan left them, before any restore step. A `postcheck` sees the
+// readback taken after the restore steps (before any teardown op closes a window), only the audit lines the
+// restore wrote, and the windows and files observed after the teardown ops.
 //
 // Plan ops: `press` (AX press), `setValue`, `type` (element typing), `menu` (window menu path). An element is
 // `{ role, name }`, matched by exact title or description after the engine's substring `ax.query`.
