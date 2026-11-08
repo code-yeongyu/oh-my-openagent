@@ -5,6 +5,7 @@ import { join } from "node:path"
 import {
   REFLECTION_SNAPSHOT_MAX_BYTES,
   captureCursorSnapshot,
+  countCompletedSteps,
   deriveState,
   finalizeCursor,
   initialReflectionState,
@@ -29,6 +30,7 @@ export type TranscriptJournalOptions = {
   readonly snapshotMaxBytes?: number
   /** Replaces the state rename, so a test can simulate a rename the platform refuses. */
   readonly renameFile?: (from: string, to: string) => Promise<void>
+  readonly warn?: (message: string, fields: Readonly<Record<string, unknown>>) => void
 }
 
 export type AppendResult = { readonly appended: number; readonly skipped: number }
@@ -76,7 +78,9 @@ function parseState(raw: string | null): ReflectionTranscriptState {
     const unreflectedBytes = optionalNonNegativeInteger(state.unreflected_bytes)
     const consecutiveFailures = optionalNonNegativeInteger(state.consecutive_failures)
     const nextEligibleAt = optionalString(state.next_eligible_at)
+    const transcriptPrunedAt = optionalString(state.transcript_pruned_at)
     return {
+      ...(transcriptPrunedAt === undefined ? {} : { transcript_pruned_at: transcriptPrunedAt }),
       ...(unreflectedBytes === undefined ? {} : { unreflected_bytes: unreflectedBytes }),
       ...(consecutiveFailures === undefined ? {} : { consecutive_failures: consecutiveFailures }),
       ...(nextEligibleAt === undefined ? {} : { next_eligible_at: nextEligibleAt }),
@@ -290,8 +294,34 @@ export class TranscriptJournal {
       )
     }
     const allEntries = [...existing, ...fresh]
-    await this.writeStateUnlocked(await this.readStateUnlocked(), allEntries)
+    const state = await this.readStateUnlocked()
+    const rebuilt = existing.length === 0 && fresh.length > 0 && state.transcript_pruned_at !== undefined
+    await this.writeStateUnlocked(rebuilt ? this.reanchorAfterPrune(state, allEntries) : state, allEntries)
     return { appended: fresh.length, skipped }
+  }
+
+  /**
+   * A transcript removed by retention is rebuilt from the harness projection, which may be shorter
+   * than the original: senpi's `getBranch()` after a compaction holds only the messages from the
+   * compaction's first kept entry on. The reflected count is recomputed against the rebuilt rows. When
+   * the anchor is no longer projected it lay before the kept window, so every rebuilt row is after it
+   * and unreflected: the cursor restarts at the first row instead of clamping a stale count.
+   */
+  private reanchorAfterPrune(state: ReflectionTranscriptState, entries: readonly TranscriptEntry[]): ReflectionTranscriptState {
+    const { transcript_pruned_at: _prunedAt, reflected_through_byte_offset: _offset, ...rest } = state
+    const anchor = state.reflected_through_message_id
+    if (anchor === undefined) return rest
+    let anchorIndex = -1
+    for (const [index, entry] of entries.entries()) if (entry.source_message_id === anchor) anchorIndex = index
+    if (anchorIndex >= 0) {
+      return { ...rest, reflected_completed_steps: countCompletedSteps(entries.slice(0, anchorIndex + 1)) }
+    }
+    this.options.warn?.("journal anchor lost after prune", {
+      journalDir: this.options.journalDir,
+      reflectedThroughMessageId: anchor,
+    })
+    const { reflected_through_message_id: _anchor, ...unanchored } = rest
+    return { ...unanchored, reflected_completed_steps: 0 }
   }
 
   private async readEntriesUnlocked(): Promise<TranscriptEntry[]> {

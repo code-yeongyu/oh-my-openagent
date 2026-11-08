@@ -3,18 +3,25 @@ import { mkdir, readdir, stat } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import {
+  classifyRecordedProcessLenient,
+  createLockRecord,
   discardReflectionWorktree,
   GitMemoryRepo,
+  isSettledUnderDeadLauncher,
+  LockContentionError,
+  runFinalizationLockPath,
   RESERVATION_EVIDENCE_FILENAME,
+  writeAbandoned,
+  withLock,
   writeQuarantine,
   type QuarantineReason,
   type ReservedRun,
 } from "@oh-my-opencode/memory-core"
 
 import { emitMemoryReceipt, runReceipt, type RunReceiptLedger } from "../receipts-port"
-import { parseRunPrelaunchArtifact, readRunJson, writeRunJsonAtomic } from "./run-artifacts"
+import { parseRunPrelaunchArtifact, readRunJson } from "./run-artifacts"
 import { classifyGhostActive } from "./run-ghost-active"
-import { classifyRunProcess, isLauncherDead } from "./run-liveness"
+import { isLauncherDead } from "./run-liveness"
 import type { ReconcileContext, ReflectionRunReconcileResult } from "./run-reconciliation"
 import { parseReservationRunLedger, type ReservationRunLedger } from "./reservation-run-ledger"
 
@@ -31,7 +38,19 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
     context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined,
   )).active
   context.signal?.throwIfAborted()
-  if (active === undefined) return {}
+  if (active === undefined) {
+    const promoted = await context.reservation.promotePending?.(context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined)
+    context.signal?.throwIfAborted()
+    if (promoted !== undefined) context.launch?.(promoted)
+    return {}
+  }
+  // An earlier settle wrote this generation's sentinel and stopped before releasing (DESIGN.r3 c.14).
+  if (await isSettledUnderDeadLauncher(context.identity.paths.reflection, context)) {
+    // Under the run's finalize lock without waiting (REVIEW-3 R2): a settler still holding it finishes first.
+    const released = await withRunFinalizeLock(context.identity.paths.locks, active.runId, async () =>
+      await isSettledUnderDeadLauncher(context.identity.paths.reflection, context) ? releaseReservationAsFailed(context, active.runId) : undefined)
+    return released === undefined ? {} : { result: released, retiredRunId: active.runId }
+  }
   const ghost = await classifyGhostActive({ identity: context.identity, active })
   context.signal?.throwIfAborted()
   if (ghost.ghost && ghost.reason === "missing-identity") {
@@ -95,8 +114,22 @@ export async function reconcilePrelaunch(context: ReconcileContext): Promise<Pre
     if (!cleanup.worktreeRemoved || !cleanup.branchRemoved) return {}
   }
   context.signal?.throwIfAborted()
-  await recordInterruptedLaunch(context, runDir, active)
-  return { result: await releaseReservationAsFailed(context, active.runId) }
+  // The sentinel and its release share the finalize lock (REVIEW-4 M-a): a concurrent release-settled
+  // in another session cannot slip in between them.
+  const interrupted = await withRunFinalizeLock(context.identity.paths.locks, active.runId, async () => {
+    await recordInterruptedLaunch(context, runDir, active)
+    return releaseReservationAsFailed(context, active.runId)
+  })
+  return interrupted === undefined ? {} : { result: interrupted }
+}
+
+async function withRunFinalizeLock<T>(locksDir: string, runId: string, task: () => Promise<T>): Promise<T | undefined> {
+  try {
+    return await withLock(runFinalizationLockPath(locksDir, runId), await createLockRecord("reflection-finalize", { runId }), task, { waitTimeoutMs: 0 })
+  } catch (error) {
+    if (error instanceof LockContentionError) return undefined
+    throw error
+  }
 }
 
 /**
@@ -110,7 +143,7 @@ async function recordInterruptedLaunch(context: ReconcileContext, runDir: string
   const kind = active.request.trigger === "dream" ? "dream" : "reflection"
   const origin = active.request.origin
   await mkdir(runDir, { recursive: true, mode: 0o700 })
-  await writeRunJsonAtomic(join(runDir, "abandoned.json"), {
+  await writeAbandoned(runDir, {
     version: 1,
     runId: active.runId,
     abandonedAt: new Date(context.now()).toISOString(),
@@ -152,7 +185,8 @@ async function recordedProcessesDead(context: ReconcileContext, runDir: string):
   const pid = (key: string) => typeof raw[key] === "number" ? raw[key] as number : undefined
   const start = (key: string) => typeof raw[key] === "string" || raw[key] === null ? raw[key] as string | null : undefined
   for (const [pidKey, startKey] of [["pid", "processStart"], ["childPid", "childProcessStart"]] as const) {
-    const verdict = await classifyRunProcess(pid(pidKey), start(startKey), context)
+    // Lenient on purpose (#11920): an unparseable ledger has no queued/launching state to protect.
+    const verdict = await classifyRecordedProcessLenient(pid(pidKey), start(startKey), context)
     if (verdict !== "dead" && verdict !== "absent") return false
   }
   return true
@@ -168,7 +202,8 @@ async function quarantineUnderDeadLauncher(
 ): Promise<PrelaunchReconcile> {
   if (active.launcherPid === undefined || active.launcherHostname !== context.hostname()) return {}
   if (!(await isLauncherDead(active.launcherPid, active.launcherProcessStart, context))) return {}
-  return { result: await quarantineRun(context, runDir, active.runId, reason, ledger, active), retiredRunId: active.runId }
+  const result = await withRunFinalizeLock(context.identity.paths.locks, active.runId, () => quarantineRun(context, runDir, active.runId, reason, ledger, active))
+  return result === undefined ? {} : { result, retiredRunId: active.runId }
 }
 
 /** Generation is `ledger.startedAt`, else `reservedAt`: the sentinel alone must yield the receipt's identity. */
@@ -207,8 +242,9 @@ export async function quarantineRun(
   return active === undefined ? { runId, outcome: "failed" } : releaseReservationAsFailed(context, runId)
 }
 
+// No abort check here (DESIGN.r4 c.21): callers check before any sentinel write, so a written sentinel
+// is always followed by its release in the same call.
 async function releaseReservationAsFailed(context: ReconcileContext, runId: string): Promise<ReflectionRunReconcileResult> {
-  context.signal?.throwIfAborted()
   const transition = await context.reservation.complete(
     runId,
     "failed",

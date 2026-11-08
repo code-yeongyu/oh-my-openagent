@@ -26,6 +26,7 @@ fn display(scale: f64) -> DesktopDisplay {
 }
 fn window(x: i32, y: i32) -> DesktopWindow {
     DesktopWindow {
+        identity: None,
         id: "7".into(),
         title: "T".into(),
         app: "A".into(),

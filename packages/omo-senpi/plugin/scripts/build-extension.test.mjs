@@ -368,6 +368,8 @@ describe("checkExtensionCurrent", () => {
       "packages/omo-senpi/src/components/memory/commands/facts.ts",
       // A dream fire loads its conversation selection from this sidecar (keeps omo.js inside its byte budget).
       "packages/omo-senpi/src/components/memory/dream-selector.ts",
+      // The maintenance pass loads runtime retention and the host sweep from this sidecar when one is due (keeps omo.js inside its byte budget).
+      "packages/omo-senpi/src/components/memory/memory-retention-pass.ts",
     ]) {
       expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
       expect(memoryCommandsInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
@@ -596,6 +598,7 @@ describe("checkExtensionCurrent", () => {
       "#omo-telemetry-recovery-runtime": "./extensions/omo-telemetry-recovery.js",
       "#telemetry-immediate-send": "./extensions/omo-telemetry-recovery.js",
       "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",
+      "#bunshin-ts": "./runtime/bunshin-ts/sdk.js",
     })
   })
 })

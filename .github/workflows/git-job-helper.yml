@@ -1,0 +1,112 @@
+name: Git job helper
+
+# The memory-core git floor-job helper (omo#10391, design v4.2): the native contract rows N1..N10 plus the run-mode
+# rows on real Windows, on both architectures. N2(b) is the release gate for any `win32-job-v1` claim. PRs stacked
+# on the helper PR's branch target it, so it is listed to give them this run.
+on:
+  pull_request:
+    branches: [master, dev, fix/10391-windows-job-helper-native]
+    paths:
+      - "crates/omo-git-job-helper/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/git-job-helper.yml"
+  push:
+    branches: [master, dev]
+    paths:
+      - "crates/omo-git-job-helper/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - ".github/workflows/git-job-helper.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  windows-helper:
+    name: windows git job helper (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, rust_target: x86_64-pc-windows-msvc }
+          - { os: windows-11-arm, rust_target: aarch64-pc-windows-msvc }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # N2(c) runs a Bun member whose libuv job nests under the floor job.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Setup Rust
+        shell: bash
+        run: |
+          toolchain=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)
+          rustup toolchain install "$toolchain" --profile minimal --component clippy
+          rustup default "$toolchain"
+          rustup target add "${{ matrix.rust_target }}"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clippy
+        shell: bash
+        run: cargo clippy -p omo-git-job-helper --all-targets --locked -- -D warnings
+
+      # The testkit images (examples/) are the members, children and token launcher the rows spawn.
+      - name: Build helper and testkit images
+        shell: bash
+        run: cargo build -p omo-git-job-helper --bins --examples --locked
+
+      - name: Native contract rows N1-N10 and run mode
+        shell: bash
+        env:
+          RUST_BACKTRACE: "1"
+        run: |
+          cargo test -p omo-git-job-helper --locked --no-fail-fast \
+            --test n1_control --test n2_kill_on_close --test n3_ordering --test n4_fresh_creation \
+            --test n5_limits --test n6_handle_hygiene --test n7_classification --test n8_n9_tokens \
+            --test n10_await_go --test run_mode --test join_verify_failure --test port_failure \
+            --test control_pipe --test done_latency --test kernel_exit_ordering -- --nocapture
+
+      - name: N2(b) in-flight creation at kill (release gate, >= 200 iterations)
+        shell: bash
+        env:
+          RUST_BACKTRACE: "1"
+        run: cargo test -p omo-git-job-helper --locked --test n2b_in_flight_creation -- --nocapture
+
+      - name: Build release helper (static CRT)
+        shell: bash
+        env:
+          RUSTFLAGS: -C target-feature=+crt-static
+        run: cargo build --release -p omo-git-job-helper --locked --target "${{ matrix.rust_target }}"
+
+      - name: Release helper selftest
+        shell: bash
+        run: |
+          out=$("target/${{ matrix.rust_target }}/release/omo-git-job-helper.exe" selftest)
+          echo "$out"
+          [[ "$out" == "selftest ok "* ]]
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Git job helper (${{ matrix.os }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Clippy (-D warnings), then the native contract rows N1-N10 and the run-mode rows against real job objects.
+            - N2(b): at least 200 kill-during-creation iterations; refutation of I7 is criterion (1) or (3) only.
+            - Release build with a static CRT and its selftest.
+          JOB_SUMMARY_NEXT: Start with the first failing row; every row prints its receipt before it asserts.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh

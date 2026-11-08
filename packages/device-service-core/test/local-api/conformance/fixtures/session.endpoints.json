@@ -1,0 +1,102 @@
+{
+  "request": "session.endpoints",
+  "cases": [
+    {
+      "name": "a host that takes delegated commands names its engine endpoint keys",
+      "outcome": "ok",
+      "world": {
+        "endpoints": {
+          "dev-peer-1": ["RVBFUEVQRVBFUEVQRVBFUA"]
+        }
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "session.endpoints",
+            "device": "dev-peer-1"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "endpoints": ["RVBFUEVQRVBFUEVQRVBFUA"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a host that does not take delegated commands answers unsupported",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "session.endpoints",
+            "device": "dev-peer-1"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "unsupported"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "session.endpoints without a device is refused",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "session.endpoints"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "refused before the client proof",
+      "outcome": "refusal",
+      "handshake": "welcome_only",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "session.endpoints",
+            "device": "dev-peer-1"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "unauthenticated"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
