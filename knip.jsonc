@@ -2622,6 +2622,8 @@
     },
     "packages/memory-core": {
       "includeEntryExports": true,
+      // engine-received-key-fifo.test.ts creates its FIFO with the POSIX mkfifo binary (the test is skipped on Windows).
+      "ignoreBinaries": ["mkfifo"],
       // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
       // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
       // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).

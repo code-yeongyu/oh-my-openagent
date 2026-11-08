@@ -12,7 +12,7 @@ import type { EngineDeps } from "./engine-deps"
 import { batchBound, heldPrint } from "./held"
 import { acceptedKeys, rejectItem } from "./item-keys"
 import type { CycleRecord, SyncJournal } from "./journal"
-import { fsRefusal, readWorking, throughSymlink } from "./landing"
+import { fsRefusal, nonRegularLeaf, readRegularWorking, readWorking, throughSymlink } from "./landing"
 import type { PendingItem } from "./outbox"
 import { diskLister, type ItemPaths, itemPaths, landingPath, scanWorkingTree } from "./working-tree"
 
@@ -47,7 +47,10 @@ async function workingFiles(deps: EngineDeps, journal: SyncJournal): Promise<Ite
 
 /**
  * The working text at `path`, or undefined (reported) when this device cannot read that path at all
- * or, for a known item the walk did not list, when its path goes through a symlink.
+ * or, for a known item the walk did not list, when its path goes through a symlink or names a
+ * non-regular file. The walk lists only regular files, so an unlisted key can name a FIFO left by a
+ * refused landing (#12158); opening one blocks until a writer appears, so it is refused unread, and a
+ * leaf swapped in after that lstat is opened non-blocking and refused by the handle's own fstat.
  */
 async function readCaptured(deps: EngineDeps, journal: SyncJournal, key: string, path: string, listed: boolean): Promise<string | null | undefined> {
   try {
@@ -55,7 +58,17 @@ async function readCaptured(deps: EngineDeps, journal: SyncJournal, key: string,
       await rejectItem(deps, journal, "capture", key, "symlink")
       return undefined
     }
-    return await readWorking(deps.repo.root, path)
+    if (listed) return await readWorking(deps.repo.root, path)
+    if (await nonRegularLeaf(deps.repo.root, path)) {
+      await rejectItem(deps, journal, "capture", key, "non-regular-file")
+      return undefined
+    }
+    const read = await readRegularWorking(deps.repo.root, path)
+    if ("refused" in read) {
+      await rejectItem(deps, journal, "capture", key, read.refused)
+      return undefined
+    }
+    return read.text
   } catch (error) {
     const code = fsRefusal(error)
     if (code === null) throw error
