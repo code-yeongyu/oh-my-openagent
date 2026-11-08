@@ -102,10 +102,11 @@ describe("monitor open on a remote session target", () => {
     const edit = { hide: [REMOTE_WAKE_SEAM] }
 
     // when
-    const results = await Promise.all(["all", "children", "st_0123", "sessions/run.jsonl", "C:/x", "/abs/session"].map((target) => preflightMonitor(edit, target)))
+    const targets = ["all", "children", "st_0123", "sessions/run.jsonl", "sessions/run.JSONL", "C:/x", "/abs/session", "./x", "../x", "~/x", ".omo/x", "s-0123"]
+    const results = await Promise.all(targets.map((target) => preflightMonitor(edit, target)))
 
     // then
-    expect(results.map((result) => result?.block === true)).toEqual([false, false, false, false, false, false])
+    expect(targets.filter((_, index) => results[index]?.block === true)).toEqual([])
   })
 
   test("#given senpi with the remote-wake seam #when a monitor opens on <device>/<session> #then omo leaves the call to senpi", async () => {

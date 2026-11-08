@@ -15,6 +15,9 @@ const GUARD_PATTERNS: readonly { readonly pattern: RegExp; readonly seam: (match
   { pattern: /typeof\s+(?:[\w$]+\.)*(?:pi|api)\.(\w+)/g, seam: (match) => match[1] ?? "" },
   { pattern: /(?<![\w$])(?:pi|api)\.(\w+)\s*[!=]==?\s*undefined/g, seam: (match) => match[1] ?? "" },
   { pattern: /["'](\w+)["']\s+in\s+(?:pi|api)(?![\w$.])/g, seam: (match) => match[1] ?? "" },
+  { pattern: /(?<![\w$])(?:pi|api)\.(\w+)\s*(?:\?\?|&&|\|\||\?(?![.?]))/g, seam: (match) => match[1] ?? "" },
+  { pattern: /!\s*(?:pi|api)\.(\w+)(?![\w$(.?])/g, seam: (match) => match[1] ?? "" },
+  { pattern: /\bif\s*\(\s*(?:pi|api)\.(\w+)\s*\)/g, seam: (match) => match[1] ?? "" },
 ]
 
 function guardedSeams(source: string): Set<string> {
@@ -69,13 +72,20 @@ describe("senpi seam contract", () => {
       "const host = deps.pi.lifecycle?.markRunCompleted",
       "if (\"getWidgets\" in pi) pi.getWidgets()",
       "// typeof pi.commentedOut",
+      "const version = options.version ?? pi.hostVersion ?? \"unknown\"",
+      "if (pi.getTheme) pi.getTheme()",
+      "const status = api.setStatus && api.setStatus(\"x\")",
+      "if (!pi.setTitle) return",
+      "const id = pi.sessionId || fallbackId",
+      "const label = pi.sessionLabel ? pi.sessionLabel : \"none\"",
+      "const n = pi.registerTool(tool) ?? pi.on(\"x\", handler) && pi.cwd",
     ].join("\n")
 
     // when
     const seams = guardedSeams(source)
 
     // then
-    expect([...seams].sort()).toEqual(["getWidgets", "lifecycle", "lifecycle.markRunCompleted", "registerRpcRemoteSource"])
+    expect([...seams].sort()).toEqual(["getTheme", "getWidgets", "hostVersion", "lifecycle", "lifecycle.markRunCompleted", "registerRpcRemoteSource", "sessionId", "sessionLabel", "setStatus", "setTitle"])
   })
 
   test("#given the installed senpi #when compared with the package pin #then it is the pinned version", () => {

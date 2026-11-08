@@ -1,6 +1,6 @@
 /**
  * The senpi `pi.*` seams omo feature-detects (#12861). Every guard in this package that probes the host
- * (`typeof pi.X`, `pi.X === undefined`, `pi.X?.`, `"X" in pi`) degrades a feature silently when the seam is
+ * (`typeof pi.X`, `pi.X === undefined`, `pi.X?.`, `"X" in pi`, `pi.X ?? fallback`, `if (pi.X)`, `!pi.X`, `pi.X && ...`) degrades a feature silently when the seam is
  * missing, so each one is listed here: `senpi-seams.test.ts` scans the guard sites and fails when one is not
  * listed, and checks this list against the pinned `@code-yeongyu/senpi` package's real ExtensionAPI.
  *
@@ -17,6 +17,7 @@ export const SENPI_SEAMS = {
   getAllTools: "function",
   getCommands: "function",
   getSessionName: "function",
+  hostVersion: "string",
   lifecycle: "object",
   "lifecycle.markRunCompleted": "function",
   on: "function",
@@ -63,14 +64,18 @@ export function absentSenpiSeamsNotice(surface: unknown): string | undefined {
 export const REMOTE_WAKE_SEAM = "registerRpcRemoteSource"
 export const REMOTE_WAKE_UNAVAILABLE = "remote_wake_unavailable"
 
-// senpi's own remote-target shape (rpc-monitor-targets.ts): one `/`, no leading `/`, not a `.jsonl` path, not a drive letter.
+// senpi's remote-target shape (rpc-monitor-targets.ts `parseRpcTarget`, from 2026.11.6-2): one `/`, no leading `/`,
+// not a `.jsonl` path, not a drive letter. A senpi without the seam resolves every such target locally, so the
+// refusal must never catch a local path: a first segment only a path can have (`.`, `..`, `.hidden`, `~`, `~user`)
+// and a `.jsonl` file in any case stay local even where senpi's own shape would call them remote.
 const REMOTE_TARGET = /^([^/]+)\/[^/]+$/
 const DRIVE_LETTER = /^[A-Za-z]:$/
+const PATH_SEGMENT = /^[.~]/
 
 export function isRemoteMonitorTarget(target: string): boolean {
   const trimmed = target.trim()
   const device = REMOTE_TARGET.exec(trimmed)?.[1]
-  return device !== undefined && !trimmed.endsWith(".jsonl") && !DRIVE_LETTER.test(device)
+  return device !== undefined && !/\.jsonl$/i.test(trimmed) && !DRIVE_LETTER.test(device) && !PATH_SEGMENT.test(device)
 }
 
 export function remoteWakeUnavailable(surface: unknown, target: string): { readonly code: typeof REMOTE_WAKE_UNAVAILABLE; readonly message: string } | undefined {
