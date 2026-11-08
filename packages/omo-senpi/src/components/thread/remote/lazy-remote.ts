@@ -8,11 +8,13 @@ export type LazyRemoteOptions = {
   readonly loadRuntime?: () => Promise<Runtime>
   /** The account's alias registry; the default speaks to the account service as this device's CLI sign-in. */
   readonly loadAliasRegistry?: () => Promise<AliasRegistry>
+  /** Where the default registry's sign-in reports a discard step that failed (trust-pin retirement, device-service forget). */
+  readonly log?: (line: string) => void
 }
 
-const defaultAliasRegistry = async (): Promise<AliasRegistry> => {
+const defaultAliasRegistry = async (log?: (line: string) => void): Promise<AliasRegistry> => {
   const [{ createServiceAliasRegistry }, { cliServiceAccess }] = await Promise.all([import("#omo-thread-client-runtime"), import("#omo-device-account-runtime")])
-  return createServiceAliasRegistry(cliServiceAccess({ env: process.env, pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())) }))
+  return createServiceAliasRegistry(cliServiceAccess({ env: process.env, pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())), ...(log === undefined ? {} : { log }) }))
 }
 
 /**
@@ -40,7 +42,7 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
     watch: async (device, sessionId, listener) => await (await load()).watch(device, sessionId, listener),
   }
   let registry: Promise<AliasRegistry> | undefined
-  const loadAliasRegistry = options.loadAliasRegistry ?? defaultAliasRegistry
+  const loadAliasRegistry = options.loadAliasRegistry ?? (() => defaultAliasRegistry(options.log))
   const withRegistry = async <T>(use: (loaded: AliasRegistry) => Promise<AliasResult<T>>): Promise<AliasResult<T>> => {
     let loaded: AliasRegistry
     try {

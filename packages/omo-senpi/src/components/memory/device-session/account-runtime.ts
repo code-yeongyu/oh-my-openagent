@@ -52,7 +52,8 @@ export function selectedAccountSource(
  * (trust-pin retirement, device-service forget) as the CLI account source. A desktop launch never reads the CLI
  * credential store (account-transport-api v9 section 7.3), so there every token request is refused.
  */
-export function cliServiceAccess(options: { readonly env: Readonly<Record<string, string | undefined>>; readonly pinDir: () => string }): { readonly origin: string; readonly accessToken: () => Promise<string> } {
+export function cliServiceAccess(options: { readonly env: Readonly<Record<string, string | undefined>>; readonly pinDir: () => string; readonly log?: (line: string) => void }): { readonly origin: string; readonly accessToken: () => Promise<string> } {
+  const warn = (line: string): void => options.log?.(line)
   const origin = serviceOrigin(options.env["OMO_SERVICE_API_URL"] ?? DEFAULT_SERVICE_API)
   let session: ReturnType<typeof createSession> | undefined
   return {
@@ -62,8 +63,8 @@ export function cliServiceAccess(options: { readonly env: Readonly<Record<string
       session ??= createSession({
         api: origin,
         store: createCredentialStore(origin, { notice: quietNotice }),
-        beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir: options.pinDir, log: () => {} }),
-        deviceService: { adopt: async () => undefined, forget: () => engineDeviceService().forget().catch(() => undefined) },
+        beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir: options.pinDir, log: warn }),
+        deviceService: { adopt: async () => undefined, forget: () => engineDeviceService(undefined, undefined, warn).forget().catch((error: unknown) => warn(`thread aliases: the device service forget failed (${error instanceof Error ? error.message : String(error)})`)) },
       })
       return await session.accessToken()
     },

@@ -13,6 +13,8 @@ export type ServiceAccess = {
 const CONTRACT_VERSION = "1.31.0"
 const SCHEME = "plain-v1"
 const LOOKUP_MAX = 500
+// The service-auth protocol's bound on one account-service request: a stalled connection never holds a tool call.
+const REQUEST_TIMEOUT_MS = 30_000
 const ROUTES = { claim: "/v1/session-aliases", rename: "/v1/session-aliases/rename", release: "/v1/session-aliases/release", resolve: "/v1/session-aliases/resolve", of: "/v1/session-aliases/of" } as const
 
 // The service's alias rules, checked before anything is sent: an alias it would refuse never leaves this device.
@@ -71,9 +73,10 @@ export function createServiceAliasRegistry(access: ServiceAccess): AliasRegistry
         method: "POST",
         headers: { authorization: `Bearer ${token}`, "content-type": "application/json", "omo-contract-version": CONTRACT_VERSION },
         body: JSON.stringify({ scheme: SCHEME, ...body }),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       }))
-    } catch {
-      return unavailable("network")
+    } catch (error) {
+      return unavailable(error instanceof Error && error.name === "TimeoutError" ? "timeout" : "network")
     }
     const raw = await response.text().catch(() => "")
     let json: unknown

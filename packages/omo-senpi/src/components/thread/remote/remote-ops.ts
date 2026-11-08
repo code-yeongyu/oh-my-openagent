@@ -79,11 +79,10 @@ export async function locateAcross(remote: RemoteThreadSurface, address: string)
   const byId = rows.find((row) => row.session_id === address)
   if (byId !== undefined) return byId.device === here ? { where: "here", session_id: byId.session_id } : { where: "remote", row: byId }
   if (remote.aliases === undefined) return { where: "none", rows, here }
-  const alias = await remote.aliases.resolve(address)
-  if (alias.kind === "error") {
-    if (alias.error.code === "alias_not_found" || alias.error.code === "alias_invalid") return { where: "none", rows, here }
-    return aliasFailure(alias.error)
-  }
+  // The address was not asked for as an alias, so a registry that cannot answer only means no alias match: a name keeps
+  // resolving through step 3 exactly as without a registry. Explicit alias claims keep their typed refusal (planCreate).
+  const alias = await remote.aliases.resolve(address).catch(() => undefined)
+  if (alias === undefined || alias.kind === "error") return { where: "none", rows, here }
   return holderTarget(alias.value, here, rows)
 }
 

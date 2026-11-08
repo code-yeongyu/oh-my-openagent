@@ -1,4 +1,4 @@
-import { normalizeThreadName, type ThreadCandidate } from "../addressing"
+import { AMBIGUOUS_CANDIDATE_LIMIT, normalizeThreadName, type ThreadCandidate } from "../addressing"
 import type { ThreadStatus, ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
 import { threadLink } from "../thread-link"
@@ -52,13 +52,16 @@ function byTitle(rows: readonly RemoteSessionRow[], here: string | null, address
     ? [{ id: local.entry.thread_id, name: local.entry.name ?? address, cwd: local.entry.cwd ?? "", preview: local.entry.preview ?? "", updatedAt: local.entry.updated_at ?? null, state: local.entry.status ?? "live" }]
     : local.code === "ambiguous_target" ? (local.candidates ?? []) : []
   if (remote.length === 1 && localMatches.length === 0 && !(local.kind === "error" && local.code === "ambiguous_target")) return { kind: "remote", row: remote[0] }
+  // One bounded list that always shows both sides: this device keeps at least half the slots it can fill, the other
+  // devices take the rest (the local list already arrives capped at the same limit).
+  const localShown = localMatches.slice(0, Math.max(AMBIGUOUS_CANDIDATE_LIMIT - remote.length, Math.min(localMatches.length, AMBIGUOUS_CANDIDATE_LIMIT / 2)))
   const candidates: readonly ThreadCandidate[] = [
-    ...localMatches.map((candidate) => (here === null ? candidate : { ...candidate, device: here })),
-    ...remote.map((row) => ({ id: row.session_id, name: row.title, cwd: row.project, preview: "", updatedAt: new Date(row.updated_ms).toISOString(), state: "live" as const, device: row.device })),
+    ...localShown.map((candidate) => (here === null ? candidate : { ...candidate, device: here })),
+    ...remote.slice(0, AMBIGUOUS_CANDIDATE_LIMIT - localShown.length).map((row) => ({ id: row.session_id, name: row.title, cwd: row.project, preview: "", updatedAt: new Date(row.updated_ms).toISOString(), state: "live" as const, device: row.device })),
   ]
   return {
     kind: "error",
-    result: { kind: "error", error: threadToolFailure("ambiguous_target", `${candidates.length} threads on this account's devices share the name "${address}".`, "Call thread_list with all_scope and pass the exact thread_id of the intended thread.", { candidates }) },
+    result: { kind: "error", error: threadToolFailure("ambiguous_target", `Threads on more than one of this account's devices share the name "${address}" (${candidates.length} listed).`, "Call thread_list with all_scope and pass the exact thread_id of the intended thread.", { candidates }) },
   }
 }
 
@@ -99,7 +102,7 @@ export async function planCreate(
   }
   if (value.alias !== undefined) {
     if (remote.aliases === undefined) return { kind: "done", result: ALIASES_UNAVAILABLE }
-    const held = await remote.aliases.resolve(value.alias)
+    const held = await remote.aliases.resolve(value.alias).catch((error: unknown): Awaited<ReturnType<AliasRegistry["resolve"]>> => ({ kind: "error", error: { code: "alias_registry_unavailable", message: `The account's alias registry did not answer: ${error instanceof Error ? error.message : String(error)}.`, details: { reason: "resolve_failed" } } }))
     if (held.kind === "ok") return { kind: "done", result: { kind: "error", error: threadToolFailure("alias_taken", `The alias ${value.alias} is held by another thread.`, "Choose another alias; the holder is named in details.", { holder: held.value }) } }
     if (held.error.code !== "alias_not_found") return { kind: "done", result: aliasFailure(held.error) }
   }
@@ -173,8 +176,8 @@ export async function renameAlias(remote: RemoteThreadSurface | undefined, threa
 export async function listAcross(remote: RemoteThreadSurface | undefined, local: ThreadToolResult, allScope: boolean): Promise<ThreadToolResult> {
   if (remote === undefined || local.kind !== "ok" || !("threads" in local)) return local
   const ids = local.threads.map((thread) => thread.thread_id)
-  if (!allScope) return withAliases(remote, local, ids)
   const unavailable = await remoteAvailable(remote)
+  if (!allScope) return unavailable === undefined ? withAliases(remote, local, ids) : local
   if (unavailable !== undefined) return { ...local, remote_unavailable: unavailable.error.code }
   const here = await remote.sessions.thisDevice()
   const known = new Set(ids)
