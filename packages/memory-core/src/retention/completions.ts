@@ -39,10 +39,13 @@ export async function pruneCompletions(context: RetentionContext, lazyGuard: Laz
     else if (!record.consumed) tally.keep(record.runId, "pending-delivery")
     else if (record.finishedAt > cutoff) tally.keep(record.runId, "recent")
     else if (existsSync(join(context.paths.reflection, "runs", record.runId))) tally.keep(record.runId, "run-present")
-    else if (await keepByGuard(context, lazyGuard, number) !== undefined) tally.keep(record.runId, (await keepByGuard(context, lazyGuard, number))!)
     else {
-      await rm(join(dir, `${record.runId}.json`), { force: true })
-      tally.removed.push(record.runId)
+      const guarded = await keepByGuard(context, lazyGuard, number)
+      if (guarded !== undefined) tally.keep(record.runId, guarded)
+      else {
+        await rm(join(dir, `${record.runId}.json`), { force: true })
+        tally.removed.push(record.runId)
+      }
     }
     context.budget?.done("completions", record.runId)
   }

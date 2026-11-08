@@ -735,8 +735,9 @@ describe("runtime retention: a capture racing a journal claim (N1, A35)", () => 
     })
 
     expect(captured).not.toBeNull()
+    if (captured === null) throw new Error("expected the claim hook to capture a snapshot")
     expect(report.journals.kept["X"]).toBe("recent")
-    const reserved = await store.tryReserve({ trigger: "dream", origin: "shutdown", conversationIds: ["X"], snapshots: [{ conversationId: "X", snapshot: captured! }] })
+    const reserved = await store.tryReserve({ trigger: "dream", origin: "shutdown", conversationIds: ["X"], snapshots: [{ conversationId: "X", snapshot: captured }] })
     if (reserved.status !== "active") throw new Error("expected an active dream")
     await store.complete(reserved.run.runId, "merged")
     const state = JSON.parse(await readFile(join(paths.transcripts, "X", "state.json"), "utf8")) as Record<string, unknown>
