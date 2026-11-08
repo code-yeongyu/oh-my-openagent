@@ -14,7 +14,8 @@ import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
 import { createLazyLiveThreadSurface } from "./lazy-live-surface"
 import { createDefaultRemoteSurface } from "./remote/default-remote"
-import { registerRemoteMonitorTargets } from "./remote/lazy-ops"
+import { registerRemoteMonitorTargets, wireReplyRoutes } from "./remote/lazy-ops"
+import { parseReplyRoute } from "./remote/reply-route"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import { defaultThreadStateDirectory } from "./live-surface-paths"
 
@@ -68,9 +69,9 @@ export type ThreadComponentOptions = Partial<Omit<ThreadToolSurfaceOptions, "cal
  * only one it goes there. Never a misroute: an input the session cannot attribute makes an implicit
  * report refuse when several bindings exist.
  */
-type RunContext = { turn: number; cause: string | undefined; consumed: string[]; local: boolean; answered: boolean }
+type RunContext = { turn: number; cause: string | undefined; consumed: string[]; local: boolean; answered: boolean; chainHop: number }
 
-type EngineMessage = { readonly role?: unknown; readonly customType?: unknown; readonly details?: unknown; readonly content?: unknown }
+type EngineMessage = { readonly role?: unknown; readonly customType?: unknown; readonly details?: unknown; readonly content?: unknown; readonly clientMessageId?: unknown }
 
 function messageOf(event: unknown): EngineMessage | undefined {
   const message = (event as { readonly message?: unknown } | undefined)?.message
@@ -84,6 +85,12 @@ function deliveryIdOf(message: EngineMessage): string | undefined {
   return typeof id === "string" ? id : undefined
 }
 
+// The chain a cross-device input arrived on: an admitted peer delivery's `chain_count` (senpi#6233), or a routed prompt's hop.
+function inboundHop(message: EngineMessage): number {
+  const count = message.role === "custom" && message.customType === SESSION_CONTROL_DELIVERY_TYPE ? (message.details as { readonly chain_count?: unknown } | null | undefined)?.chain_count : message.role === "user" ? parseReplyRoute(message.clientMessageId)?.hop : undefined
+  return typeof count === "number" && Number.isSafeInteger(count) && count >= 1 ? count : 0
+}
+
 function callsTools(message: EngineMessage): boolean {
   return Array.isArray(message.content) && message.content.some((part) => (part as { readonly type?: unknown } | null)?.type === "toolCall")
 }
@@ -94,7 +101,9 @@ function noteInput(run: RunContext, message: EngineMessage): void {
     run.consumed = []
     run.local = false
     run.answered = false
+    run.chainHop = 0
   }
+  run.chainHop = Math.max(run.chainHop, inboundHop(message))
   if (message.role === "user") run.local = true
   const deliveryId = deliveryIdOf(message)
   if (deliveryId === undefined) return
@@ -212,7 +221,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         }
         if (event.kind === "legacy_mailbox_skipped") ctx.logger.warn(`thread gateway: ${event.items.length} legacy thread mailbox item(s) in ${event.directory} name no session id and were not imported: ${event.items.map((item) => `#${item.message_seq} -> ${JSON.stringify(item.target)}`).join(", ")}`)
       })
-      const run: RunContext = { turn: 0, cause: undefined, consumed: [], local: false, answered: true }
+      const run: RunContext = { turn: 0, cause: undefined, consumed: [], local: false, answered: true, chainHop: 0 }
       const completions = createCompletionTracker((durableId, outcome, throughArmSeq) => store.emitCompletions({ now: store.now(), session_durable_id: durableId, outcome, through_arm_seq: throughArmSeq }), {
         retryAfterMs: () => store.busyTimeoutMs,
         onWriteFailed: (error, retrying) =>
@@ -237,11 +246,14 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerTurnId: () => (run.turn === 0 ? undefined : `turn-${run.turn}`),
         callerName: () => pi.getSessionName?.(),
         callerCause: () => run.cause,
+        callerChainHop: () => run.chainHop,
         callerRunDeliveries: () => [...run.consumed],
         callerRunHasLocalInput: () => run.local,
         onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
         remote,
       }, (line) => ctx.logger.warn(line))
+      // The answer to a cross-device peer send this session consumed goes back into the sender's session (reply-route.ts).
+      wireReplyRoutes(pi, remote, { senderProvenance: () => resolveProvenance({ cwd: callerWorkspaceRoot(), env: options.env, loadWorkspaces: loadProvenanceWorkspaces, onWarning: onProvenanceWarning }), sessionName: () => pi.getSessionName?.(), warn: (line) => ctx.logger.warn(`thread gateway: ${line}`) })
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
       // crash before its write), or made by another process (`omo thread report ... completion`) - is
       // picked up at session_start and on a `wake` command, and written at this session's next settle.
@@ -342,6 +354,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         run.consumed = []
         run.local = false
         run.answered = true
+        run.chainHop = 0
         if (durableId === undefined) return
         // A failed write is reported (and retried) by the tracker's onWriteFailed.
         await waitAtMost(completions.settled(durableId).then(() => undefined, () => undefined), COMPLETION_SETTLE_WAIT_MS)

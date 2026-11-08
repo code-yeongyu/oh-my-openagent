@@ -502,5 +502,6 @@ export function createCliRemoteSurface(options: { readonly version: string; read
 }
 export { crossTarget, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
 export { closeRemote, deviceOnline, interruptRemote, outcomeFailure, promptRemote, readRemote } from "./remote/remote-ops"
+export { admitReplyRemote } from "./remote/reply-admit"
 export { setModelRemote } from "./remote/remote-controls"
 export { createRemoteMonitorSource } from "./remote/monitor-source"

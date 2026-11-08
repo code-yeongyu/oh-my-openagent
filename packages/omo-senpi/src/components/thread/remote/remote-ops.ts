@@ -10,6 +10,7 @@ import { liveReadResult } from "../tools/read-ops"
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
 import type { AliasError, AliasHolder, JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { peerText, type RemoteSender } from "./peer-text"
+import { replyRouteToken } from "./reply-route"
 
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
 const fail = (code: ThreadToolFailure["code"], message: string, next: string, details?: Readonly<Record<string, unknown>>): Failure => ({ kind: "error", error: threadToolFailure(code, message, next, details) })
@@ -208,8 +209,11 @@ export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessi
   const offline = await deviceOnline(remote, row.device)
   if (offline !== undefined) return offline
   const here = sender.kind === "peer" ? await remote.sessions.thisDevice() : null
+  // The receiving session answers a peer send back to this session (reply-route.ts); a person's send carries no route.
+  const route = sender.kind === "peer" && here !== null ? replyRouteToken({ device: here, session: sender.session_id, delivery: sender.delivery_id, root: sender.root_id, hop: sender.hop }) : undefined
+  if (sender.kind === "peer" && here !== null && route === undefined) return fail("invalid_arguments", "This session's reply route does not fit the 256 characters a remote prompt can carry; nothing was sent.", "Send from a session whose id is shorter, or report this as a bug.", { device: row.device })
   // A peer's text never reaches the receiver's command dispatch or prompt templates (senpi prompt `expandPromptTemplates`).
-  const text = (effective: EffectiveLane) => sender.kind === "peer" ? { message: peerText(sender, here, request, effective), expandPromptTemplates: false } : { message: request.message }
+  const text = (effective: EffectiveLane) => sender.kind === "peer" ? { message: peerText(sender, here, request, effective), expandPromptTemplates: false, ...(route === undefined ? {} : { clientMessageId: route }) } : { message: request.message }
   if (request.delivery === "steer") {
     const state = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
     if (state.kind !== "ok") return outcomeFailure(state, row.device)
@@ -311,3 +315,4 @@ export async function readRemote(remote: RemoteThreadSurface, row: RemoteSession
   const result = liveReadResult(row.session_id, row.title, messages, window)
   return result.kind === "ok" ? { ...result, device: row.device } as ThreadToolResult : result
 }
+
