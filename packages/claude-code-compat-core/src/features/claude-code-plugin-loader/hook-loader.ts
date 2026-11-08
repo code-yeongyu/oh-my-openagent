@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "fs"
 import { log } from "../../shared/logger"
+import { stripBom } from "../../shared/jsonc-parser"
 import type { HookEntry, HooksConfig, LoadedPlugin } from "./types"
 import { resolvePluginPaths } from "./plugin-path-resolver"
 
@@ -32,7 +33,7 @@ export function loadPluginHooksConfigs(plugins: LoadedPlugin[]): HooksConfig[] {
 
     try {
       const content = readFileSync(plugin.hooksPath, "utf-8")
-      let config = JSON.parse(content) as HooksConfig
+      let config = JSON.parse(stripBom(content)) as HooksConfig
 
       config = resolvePluginPaths(config, plugin.installPath)
       stampPluginRoot(config, plugin.installPath)

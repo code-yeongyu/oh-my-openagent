@@ -5,6 +5,7 @@ import { shouldLoadMcpServer } from "../claude-code-mcp-loader/scope-filter"
 import { transformMcpServer } from "../claude-code-mcp-loader/transformer"
 import type { ClaudeCodeMcpConfig } from "../claude-code-mcp-loader/types"
 import { log } from "../../shared/logger"
+import { stripBom } from "../../shared/jsonc-parser"
 import type { LoadedPlugin } from "./types"
 import { resolvePluginPaths } from "./plugin-path-resolver"
 import { bunFile } from "../../shared/bun-file-shim"
@@ -20,7 +21,7 @@ export async function loadPluginMcpServers(
 
     try {
       const content = await bunFile(plugin.mcpPath).text()
-      let config = JSON.parse(content) as ClaudeCodeMcpConfig
+      let config = JSON.parse(stripBom(content)) as ClaudeCodeMcpConfig
 
       config = resolvePluginPaths(config, plugin.installPath)
       config = expandEnvVarsInObject(config)

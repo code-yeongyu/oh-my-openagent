@@ -44,6 +44,18 @@ describe("getSystemMcpServerNames", () => {
     }
   })
 
+  it("#given a project .mcp.json saved with a UTF-8 BOM #when names are read #then its servers are listed (#12731)", async () => {
+    // given
+    writeFileSync(join(TEST_DIR, ".mcp.json"), `\uFEFF${JSON.stringify({ mcpServers: { playwright: { command: "npx", args: ["@playwright/mcp@latest"] } } })}`)
+
+    // when
+    const { getSystemMcpServerNames } = await import("./loader")
+    const names = getSystemMcpServerNames(loaderOptions())
+
+    // then
+    expect([...names]).toEqual(["playwright"])
+  })
+
   it("returns server names from project .mcp.json", async () => {
     // given
     const mcpConfig = {

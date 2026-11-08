@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from "fs"
 import { join } from "path"
 import { log } from "../../shared/logger"
+import { stripBom } from "../../shared/jsonc-parser"
 import type { PluginManifest } from "./types"
 
 export function findPluginManifestPath(installPath: string): string | null {
@@ -24,7 +25,7 @@ export function loadPluginManifest(installPath: string): PluginManifest | null {
 
   try {
     const content = readFileSync(manifestPath, "utf-8")
-    return JSON.parse(content) as PluginManifest
+    return JSON.parse(stripBom(content)) as PluginManifest
   } catch (error) {
     if (error instanceof Error) {
       log(`Failed to load plugin manifest from ${manifestPath}`, error)
@@ -37,7 +38,7 @@ export function loadPluginManifest(installPath: string): PluginManifest | null {
 export function readManifestFromPath(manifestPath: string): PluginManifest | null {
   try {
     const content = readFileSync(manifestPath, "utf-8")
-    return JSON.parse(content) as PluginManifest
+    return JSON.parse(stripBom(content)) as PluginManifest
   } catch (error) {
     if (error instanceof Error) {
       return null

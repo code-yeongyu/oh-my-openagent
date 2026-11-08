@@ -93,4 +93,20 @@ describe("loadPluginHooksConfigs pluginRoot stamping (#4458)", () => {
     expect(action?.type).toBe("http")
     expect((action as { pluginRoot?: string }).pluginRoot).toBe(plugin.installPath)
   })
+
+  // #12731 (win-hooks CASE-01): editors on Windows often save JSON with a UTF-8 BOM. readFileSync keeps it and
+  // JSON.parse rejects it, so the plugin's hooks were dropped with only a log line.
+  test("#given a hooks.json saved with a UTF-8 BOM #when loaded #then its hooks load like the same file without one", () => {
+    // given
+    const plugin = makePlugin("bom-plugin", {})
+    writeFileSync(plugin.hooksPath ?? "", `\uFEFF${JSON.stringify({ hooks: { Stop: [{ matcher: "*", hooks: [{ type: "command", command: "echo done" }] }] } })}`, "utf-8")
+
+    // when
+    const configs = loadPluginHooksConfigs([plugin])
+
+    // then
+    const action = configs[0]?.hooks?.Stop?.[0]?.hooks?.[0]
+    expect(configs).toHaveLength(1)
+    expect(action).toMatchObject({ type: "command", command: "echo done", pluginRoot: plugin.installPath })
+  })
 })

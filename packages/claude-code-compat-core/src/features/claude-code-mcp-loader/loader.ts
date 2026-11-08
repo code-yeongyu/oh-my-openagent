@@ -10,6 +10,7 @@ import type {
 } from "./types"
 import { transformMcpServer } from "./transformer"
 import { log } from "../../shared/logger"
+import { stripBom } from "../../shared/jsonc-parser"
 import { shouldLoadMcpServer } from "./scope-filter"
 import { bunFile } from "../../shared/bun-file-shim"
 
@@ -70,7 +71,7 @@ async function loadMcpConfigFile(
 
   try {
     const content = await bunFile(filePath).text()
-    return JSON.parse(content) as ClaudeCodeMcpConfig
+    return JSON.parse(stripBom(content)) as ClaudeCodeMcpConfig
   } catch (error) {
     if (error instanceof Error) {
       log(`Failed to load MCP config from ${filePath}`, error)
@@ -92,7 +93,7 @@ export function getSystemMcpServerNames(options: McpLoaderOptions = {}): Set<str
 
     try {
       const content = readFileSync(path, "utf-8")
-      const config = JSON.parse(content) as ClaudeCodeMcpConfig
+      const config = JSON.parse(stripBom(content)) as ClaudeCodeMcpConfig
       if (!config?.mcpServers) continue
 
       for (const [name, serverConfig] of Object.entries(config.mcpServers)) {

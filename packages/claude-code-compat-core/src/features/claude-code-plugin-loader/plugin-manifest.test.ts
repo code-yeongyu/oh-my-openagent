@@ -41,4 +41,19 @@ describe("loadPluginManifest", () => {
     expect(manifest?.name).toBe("claude-layout")
     expect(manifest?.version).toBe("2.0.0")
   })
+
+  it("#given a plugin.json saved with a UTF-8 BOM #when loading the manifest #then it parses (#12731)", async () => {
+    //#given
+    const installPath = createTemporaryDirectory("omo-manifest-bom-")
+    mkdirSync(join(installPath, ".claude-plugin"), { recursive: true })
+    writeFileSync(join(installPath, ".claude-plugin", "plugin.json"), `\uFEFF${JSON.stringify({ name: "bom-plugin", version: "1.2.3" })}`, "utf-8")
+
+    //#when
+    const { loadPluginManifest } = await import(`./discovery?t=${Date.now()}-manifest-bom`)
+    const manifest = loadPluginManifest(installPath)
+
+    //#then
+    expect(manifest?.name).toBe("bom-plugin")
+    expect(manifest?.version).toBe("1.2.3")
+  })
 })
