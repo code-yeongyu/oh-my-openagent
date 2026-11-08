@@ -64,6 +64,8 @@ bool target_keychain_locked(void);
 bool item_keychain_locked(const char *account);
 bool ui_available(void);
 bool buffer_is(const buffer *value, const char *text);
+
+#define OLD_SLOTS 8
 OSStatus lookup_attributes(const char *account, item_state *state);
 OSStatus read_data(const char *account, item_state *state);
 OSStatus unlock_holder(SecKeychainItemRef item);
