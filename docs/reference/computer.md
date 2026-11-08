@@ -69,6 +69,8 @@ A failed call carries one engine error code (`crates/senpi-desktop-core/src/erro
 | `ProtectedProcess` | The target app is protected from automation | Do not retry; ask the user to act in that app |
 | `CaptureFailed`, `InputFailed`, `Timeout`, `Cancelled`, `Closed`, `TransactionFailed`, `Internal` | The platform call failed, took too long, was aborted, or the session ended. On macOS a `CaptureFailed`, `InputFailed` or `Timeout` message that ends `(the screen is locked)` or `(the display is asleep)` names the likely cause | Observe again before retrying; stop after repeated failures; for a lock or sleep note, ask the user to unlock or wake the Mac |
 
+A stop persists across an engine restart only on the macOS XPC agent path, which keeps a private stopped marker that no operation clears. The `--serve` daemon behind `--oneshot` and `--mcp` keeps its stop in memory: `--resume` lifts it, and a daemon that restarts (after a crash, an idle exit or a kill) starts unstopped, so a v1 consumer never stays `Suspended` behind a file the user would have to delete.
+
 Engine start failures are reported by `/computer status` as `engine: native-unavailable`, `quarantined` or `abi-mismatch`, and are described in [Troubleshooting](../guide/computer-use.md#troubleshooting).
 
 ## Engine interoperability

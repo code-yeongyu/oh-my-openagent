@@ -11,6 +11,7 @@ mod point_owner;
 mod popup;
 pub(crate) mod element;
 mod props;
+mod retained;
 mod text_input;
 mod tree;
 
@@ -149,6 +150,10 @@ impl AxBackend for MacAx {
 
     fn children(&mut self, h: &AxHandle) -> CoreResult<Vec<AxHandle>> {
         Ok(tree::children(element(h)?).into_iter().map(handle).collect())
+    }
+
+    fn identifier(&mut self, h: &AxHandle) -> CoreResult<Option<String>> {
+        Ok(element::copy_string(element(h)?, "AXIdentifier"))
     }
 
     fn parent(&mut self, h: &AxHandle) -> CoreResult<Option<AxHandle>> {

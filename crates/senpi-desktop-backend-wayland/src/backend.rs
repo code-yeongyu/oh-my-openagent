@@ -2,9 +2,10 @@
 //! accessibility and window listing, and honest capabilities. Wayland lets
 //! no client activate or target another surface, so raising and keyboard
 //! input aimed at a window are refused with the compositor's constraint, and
-//! there is no focus guard. On Hyprland and KWin, window-targeted pointer
-//! input goes through libei at the window's geometry read from Hyprland IPC
-//! or a read-only KWin script (refused elsewhere). Capture streams each monitor through ScreenCast and PipeWire
+//! there is no focus guard. On Hyprland, KWin and GNOME, window-targeted
+//! pointer input goes through libei at the window's geometry read from
+//! Hyprland IPC, a read-only KWin script or the read-only window-rect GNOME
+//! Shell extension (refused elsewhere). Capture streams each monitor through ScreenCast and PipeWire
 //! (window capture crops the composite), else uses the Screenshot portal.
 
 use image::RgbaImage;
@@ -23,7 +24,7 @@ use senpi_desktop_core::types::{
 use crate::capture::layout::EisRegion;
 use crate::capture::PortalCapture;
 use crate::compositor::hyprland::{self, Detection, Placement};
-use crate::compositor::kwin;
+use crate::compositor::{gnome, kwin};
 use crate::input::Libei;
 use crate::portal::{portal_runtime, remote_desktop, token_cleanup};
 
@@ -47,6 +48,9 @@ pub struct WaylandBackend {
     /// Whether this KDE session's KWin serves its scripting API; probed once,
     /// only off Hyprland.
     pub(crate) kwin: Option<kwin::Detection>,
+    /// Whether this GNOME session's shell serves the window-rect extension;
+    /// probed once, only off Hyprland and KWin.
+    pub(crate) gnome: Option<gnome::Detection>,
     pub(crate) capture: PortalCapture,
     /// The libei layout the last capture's geometry was derived from; pointer
     /// input through a capture frame is refused once it no longer holds.
@@ -71,6 +75,7 @@ impl WaylandBackend {
             portal_offered: None,
             compositor: None,
             kwin: None,
+            gnome: None,
             capture: PortalCapture::new(DisplaySelector::All),
             frame_layout: None,
         }
@@ -135,8 +140,12 @@ impl WaylandBackend {
         self.kwin.get_or_insert_with(kwin::detect)
     }
 
+    fn gnome(&mut self) -> &gnome::Detection {
+        self.gnome.get_or_insert_with(gnome::detect)
+    }
+
     /// The compositor path that can say where a window is: Hyprland first,
-    /// else KWin; `Err` carries the reason neither is usable, `Ok(None)`
+    /// else KWin, else GNOME; `Err` carries the reason neither is usable, `Ok(None)`
     /// means no compositor path exists on this desktop.
     fn window_geometry(&mut self) -> Result<Option<WindowGeometry>, &'static str> {
         match self.compositor() {
@@ -145,13 +154,19 @@ impl WaylandBackend {
             Detection::NotHyprland => {}
         }
         match self.kwin() {
-            kwin::Detection::Scripting(kwin) => Ok(Some(WindowGeometry::Kwin(kwin.clone()))),
-            kwin::Detection::DbusMissing => Err("kwin_dbus_missing"),
-            kwin::Detection::NotKwin => Ok(None),
+            kwin::Detection::Scripting(kwin) if kwin.unrunnable() => return Err("kwin_script_unrunnable"),
+            kwin::Detection::Scripting(kwin) => return Ok(Some(WindowGeometry::Kwin(kwin.clone()))),
+            kwin::Detection::DbusMissing => return Err("kwin_dbus_missing"),
+            kwin::Detection::NotKwin => {}
+        }
+        match self.gnome() {
+            gnome::Detection::Extension(gnome) => Ok(Some(WindowGeometry::Gnome(gnome.clone()))),
+            gnome::Detection::ExtensionMissing => Err("gnome_extension_missing"),
+            gnome::Detection::NotGnome => Ok(None),
         }
     }
 
-    /// `None` where no compositor path exists; on Hyprland or KWin,
+    /// `None` where no compositor path exists; on Hyprland, KWin or GNOME,
     /// available only when the compositor answers and a libei input path
     /// exists.
     fn window_input(&mut self, input_permission: &str) -> Option<WindowInput> {
@@ -184,7 +199,18 @@ impl WaylandBackend {
         match geometry {
             WindowGeometry::Hyprland(hyprland) => self.hyprland_pointer(&hyprland, &window, event),
             WindowGeometry::Kwin(kwin) => self.kwin_pointer(&kwin, &window, event),
+            WindowGeometry::Gnome(gnome) => self.gnome_pointer(&gnome, &window, event),
         }
+    }
+
+    pub(crate) fn gnome_pointer(
+        &mut self,
+        gnome: &gnome::Gnome,
+        window: &DesktopWindow,
+        event: PointerEvent,
+    ) -> CoreResult<()> {
+        let placement = gnome.placement(window)?;
+        self.placed_pointer(&placement, window, event)
     }
 
     pub(crate) fn kwin_pointer(
@@ -197,6 +223,13 @@ impl WaylandBackend {
         self.placed_pointer(&placement, window, event)
     }
 
+    /// The event's points are global logical points anchored on the window's
+    /// current AT-SPI origin: `FrameGeometry::map_point` re-anchors a window
+    /// frame on the window `windows()` lists now, and AX clicks use AT-SPI
+    /// coordinates. So that origin is the one subtracted, and the remaining
+    /// offset is placed on the Hyprland (or KWin) rect. A window capture crops
+    /// at that same rect (see [`WaylandBackend::capture`]), so pixel
+    /// `(px, py)` of the frame lands at the rect's origin plus `(px, py)`.
     pub(crate) fn hyprland_pointer(
         &mut self,
         hyprland: &hyprland::Hyprland,
@@ -205,6 +238,18 @@ impl WaylandBackend {
     ) -> CoreResult<()> {
         let placement = hyprland.placement(window)?;
         self.placed_pointer(&placement, window, event)
+    }
+
+    /// The compositor that places a window capture: the same
+    /// [`WaylandBackend::window_geometry`] dispatch window pointer input is
+    /// placed through, so on Hyprland and on KWin a window frame is cropped
+    /// at the rect its clicks land on. Where no compositor path is usable,
+    /// window pointer input is refused anyway and the crop stays at AT-SPI.
+    pub(crate) fn capture_geometry(&mut self, target: &Target) -> Option<WindowGeometry> {
+        match target {
+            Target::Window(_) => self.window_geometry().ok().flatten(),
+            Target::Desktop | Target::Display(_) => None,
+        }
     }
 
     fn placed_pointer(
@@ -219,9 +264,62 @@ impl WaylandBackend {
     }
 }
 
-enum WindowGeometry {
+/// The frame of a window capture its compositor could not place: its pixels
+/// are shown, but no coordinate input is mapped through them, because a
+/// click would be placed at a rect the crop was not taken from.
+pub(crate) fn unplaced_frame(
+    image: RgbaImage,
+    compositor: &str,
+    error: &DesktopError,
+) -> (RgbaImage, FrameGeometry) {
+    let frame = FrameGeometry::pixels_only(
+        image.width(),
+        image.height(),
+        format!(
+            "{compositor} could not place this window ({}), so the crop is not known to show where \
+             window pointer input would land",
+            error.message
+        ),
+    );
+    (image, frame)
+}
+
+/// `windows` with the captured window moved onto the rect its compositor
+/// places window pointer input at; the refusal names the compositor that
+/// could not place it. Display and desktop captures are left alone.
+pub(crate) fn place_captured(
+    geometry: Option<&WindowGeometry>,
+    windows: Vec<DesktopWindow>,
+    target: &Target,
+) -> (Vec<DesktopWindow>, Option<(&'static str, DesktopError)>) {
+    match (geometry, target) {
+        (Some(geometry), Target::Window(id)) => {
+            let (windows, refused) = match geometry {
+                WindowGeometry::Hyprland(hyprland) => hyprland.place_in(windows, id),
+                WindowGeometry::Kwin(kwin) => kwin.place_in(windows, id),
+                // GNOME placement is not implemented: the capture passes through unplaced.
+                WindowGeometry::Gnome(_) => (windows, None),
+            };
+            (windows, refused.map(|error| (geometry.compositor(), error)))
+        }
+        _ => (windows, None),
+    }
+}
+
+pub(crate) enum WindowGeometry {
     Hyprland(hyprland::Hyprland),
     Kwin(kwin::Kwin),
+    Gnome(gnome::Gnome),
+}
+
+impl WindowGeometry {
+    const fn compositor(&self) -> &'static str {
+        match self {
+            Self::Hyprland(_) => "Hyprland",
+            Self::Kwin(_) => "KWin",
+            Self::Gnome(_) => "GNOME",
+        }
+    }
 }
 
 const LAYOUT_CHANGED: &str = "the Wayland display layout changed since the last capture, whose pixels were \
@@ -262,19 +360,33 @@ impl Backend for WaylandBackend {
 
     /// Reads the layout of an already connected libei session only; capture
     /// never opens an input session. A layout that cannot be read leaves the
-    /// geometry unproven, so the frame refuses coordinate input.
+    /// geometry unproven, so the frame refuses coordinate input. On Hyprland
+    /// and KWin a window is cropped at its compositor rect (one `clients` +
+    /// `monitors` read, or one KWin script run, per capture), the rect window
+    /// pointer input is placed at; a window the compositor cannot place gets
+    /// a frame that refuses coordinate input.
     fn capture(&mut self, target: &Target, _caps: &CaptureCaps, _exclude_window_titles: &[String]) -> CoreResult<(RgbaImage, FrameGeometry)> {
         let layout = match &mut self.input {
             Input::Connected(libei) => libei.regions().ok(),
             Input::Untried | Input::Failed(_) => None,
         };
+        let geometry = self.capture_geometry(target);
+        let mut unplaced = None;
         let ax = &mut self.ax;
-        let captured = self.capture.capture(target, layout.as_deref(), || match ax {
-            Ok(ax) => ax.windows(),
-            Err(error) => Err(error.clone()),
+        let captured = self.capture.capture(target, layout.as_deref(), || {
+            let windows = match ax {
+                Ok(ax) => ax.windows(),
+                Err(error) => Err(error.clone()),
+            }?;
+            let (windows, refused) = place_captured(geometry.as_ref(), windows, target);
+            unplaced = refused;
+            Ok(windows)
         })?;
         self.frame_layout = layout.filter(|_| self.capture.eis_derived);
-        Ok(captured)
+        Ok(match unplaced {
+            Some((compositor, error)) => unplaced_frame(captured.0, compositor, &error),
+            None => captured,
+        })
     }
 
     fn pointer(
@@ -289,7 +401,7 @@ impl Backend for WaylandBackend {
             if !matches!(self.window_geometry(), Ok(Some(_))) {
                 return Self::window_input_error(target, "pointer input");
             }
-            if let Some(layout) = derived_from {
+            if let Some(layout) = derived_from.filter(|_| *frame != FrameGeometry::identity_global()) {
                 if self.connect_input()?.regions()? != layout {
                     return Err(DesktopError::invalid_coordinate_frame(LAYOUT_CHANGED));
                 }
@@ -399,6 +511,8 @@ mod capture_tests;
 mod eis_safety_tests;
 #[cfg(test)]
 mod eis_tests;
+#[cfg(test)]
+mod gnome_tests;
 #[cfg(test)]
 mod hyprland_tests;
 #[cfg(test)]

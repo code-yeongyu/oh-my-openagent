@@ -55,7 +55,7 @@ pub fn query(
     let root = backend.window_root(window)?;
     let mut state = WalkState::new(QUERY_MAX_NODES, QUERY_MAX_DEPTH);
     let root = if registry.report_mode() == ReportMode::Object {
-        walk_observed(backend, root, 0, &mut state)?
+        walk_observed(backend, root, 0, 0, &mut state)?
     } else {
         walk_raw(backend, root, 0, &mut state)?
     };

@@ -127,7 +127,7 @@ pub struct PermissionDeniedData {
 }
 
 /// Why a `CaptureUnavailable` capture was refused. `reason` is an open token
-/// set: B9 introduces `"minimized"` and later waves add more.
+/// set: B9 introduces `"minimized"`; P8 adds `"off-space"` and `"off-screen"`; later waves add more.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptureUnavailableData {

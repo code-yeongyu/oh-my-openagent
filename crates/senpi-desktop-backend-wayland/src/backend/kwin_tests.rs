@@ -4,13 +4,17 @@
 
 use std::os::unix::net::UnixListener;
 
+use image::{Rgba, RgbaImage};
 use senpi_desktop_core::backend::{Backend, DeliveryMode, Modifiers, MouseButton, PointerEvent};
 use senpi_desktop_core::error::ErrorCode;
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::types::{Target, WindowInput};
 
+use super::hyprland_tests::monitor;
 use super::tests::{backend_without_services, FR};
+use super::{place_captured, unplaced_frame};
 use crate::capture::layout::EisRegion;
+use crate::capture::pipewire::crop_window;
 use crate::compositor::hyprland::tests::window;
 use crate::compositor::kwin::tests::WINDOWS;
 use crate::compositor::kwin::{detect_with, Detection};
@@ -139,6 +143,83 @@ fn a_window_click_lands_at_the_kwin_geometry_through_libei() {
     );
 }
 
+fn script_runs(kwin: &FakeKwin) -> usize {
+    kwin.calls().iter().filter(|call| call.method == "run").count()
+}
+
+#[test]
+fn a_window_frame_and_its_click_agree_on_the_kwin_rect() {
+    // Given: AT-SPI says the terminal (pid 1201) is at (0, 0); KWin places it at (10, 48),
+    // and the composite marks the pixel KWin shows at (10 + 100, 48 + 20)
+    let _env = env_lock();
+    let kwin = FakeKwin::serve(WINDOWS);
+    let Detection::Scripting(scripting) = scripting(&kwin) else {
+        panic!("kwin scripting not detected");
+    };
+    let dir = tempfile::tempdir().expect("socket dir");
+    let (eis, _libei) = fake_eis(&dir);
+    let atspi = window(Some(1201), "~ : bash");
+    let target = Target::Window(atspi.id.clone());
+    let (px, py) = (100_u32, 20_u32);
+    let mark = Rgba([255, 0, 0, 255]);
+    let mut composite = RgbaImage::new(1280, 1080);
+    composite.put_pixel(10 + px, 48 + py, mark);
+    let mut backend = backend_without_services();
+    backend.kwin = Some(Detection::Scripting(scripting.clone()));
+
+    // When: the window is captured the way `capture` places it, then clicked at pixel (px, py)
+    let geometry = backend.capture_geometry(&target);
+    let (windows, unplaced) = place_captured(geometry.as_ref(), vec![atspi.clone()], &target);
+    let (image, frame) =
+        crop_window(&composite, &[monitor()], windows, &atspi.id).expect("window cropped");
+    let (x, y) = frame
+        .map_point(f64::from(px), f64::from(py), Some(&atspi))
+        .expect("pixel maps");
+    let clicked = backend.kwin_pointer(&scripting, &atspi, click(x, y));
+
+    // Then: the frame is cropped at the KWin rect, and the click lands on the pixel it shows
+    assert!(unplaced.is_none(), "{unplaced:?}");
+    assert_eq!(*image.get_pixel(px, py), mark, "frame pixel (px, py) is the KWin rect + (px, py)");
+    assert_eq!(
+        frame.map_to_pixel(110.0, 68.0),
+        Ok((f64::from(px), f64::from(py))),
+        "the frame's logical origin is the KWin rect"
+    );
+    assert_eq!(clicked, Ok(()));
+    assert_eq!(script_runs(&kwin), 2, "one script run for the capture, one for the click");
+    let log = eis.wait_for(|log| log.bursts >= 1);
+    assert_eq!(
+        log.events.first(),
+        Some(&Recorded::Motion { x: 110.0, y: 68.0 })
+    );
+}
+
+#[test]
+fn a_window_kwin_cannot_place_gets_a_frame_that_refuses_pointer_input() {
+    // Given: the accessibility tree reports no pid for the window
+    let _env = env_lock();
+    let kwin = FakeKwin::serve(WINDOWS);
+    let atspi = window(None, "~ : bash");
+    let target = Target::Window(atspi.id.clone());
+    let mut backend = backend_without_services();
+    backend.kwin = Some(scripting(&kwin));
+
+    // When
+    let geometry = backend.capture_geometry(&target);
+    let (windows, unplaced) = place_captured(geometry.as_ref(), vec![atspi.clone()], &target);
+    let (compositor, error) = unplaced.expect("an unplaced window is reported");
+    let (image, _) = crop_window(&RgbaImage::new(1280, 1080), &[monitor()], windows.clone(), &atspi.id)
+        .expect("cropped at the AT-SPI bounds");
+    let (_, frame) = unplaced_frame(image, compositor, &error);
+
+    // Then: the window keeps its AT-SPI bounds and no pixel of its frame maps to input
+    assert_eq!(windows.as_slice(), std::slice::from_ref(&atspi));
+    assert!(error.message.contains("kwin-window-unresolved"), "{}", error.message);
+    let refused = frame.map_point(100.0, 20.0, Some(&atspi)).expect_err("pixels only");
+    assert_eq!(refused.code, ErrorCode::InvalidCoordinateFrame);
+    assert!(refused.message.contains("KWin could not place"), "{}", refused.message);
+}
+
 #[test]
 fn a_window_click_on_a_point_a_higher_window_covers_sends_nothing() {
     // Given: the editor (pid 1302) under its Save As dialog
@@ -162,6 +243,36 @@ fn a_window_click_on_a_point_a_higher_window_covers_sends_nothing() {
     let error = clicked.expect_err("a covered point must be refused");
     assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
     assert!(eis.wait_for(|log| log.connected).events.is_empty());
+}
+
+#[test]
+fn a_kwin_that_runs_the_script_at_neither_object_path_stops_offering_window_input() {
+    // Given: KWin loads the script but serves it at no path `run` reaches
+    let _env = env_lock();
+    let kwin = FakeKwin::unrunnable(WINDOWS);
+    let dir = tempfile::tempdir().expect("socket dir");
+    let (_eis, _libei) = fake_eis(&dir);
+    let Detection::Scripting(scripting) = scripting(&kwin) else {
+        panic!("kwin scripting not detected");
+    };
+    let mut backend = backend_without_services();
+    backend.kwin = Some(Detection::Scripting(scripting.clone()));
+
+    // When: one placement has tried both object paths
+    let error = backend
+        .kwin_pointer(
+            &scripting,
+            &window(Some(1201), "~ : bash"),
+            click(20.0, 60.0),
+        )
+        .expect_err("no object path runs the script");
+
+    // Then: the refusal is typed and the capability says why
+    assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
+    assert_eq!(
+        backend.capabilities().window_input,
+        unavailable("kwin_script_unrunnable")
+    );
 }
 
 #[test]

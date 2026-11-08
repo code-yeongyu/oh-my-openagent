@@ -79,6 +79,19 @@ pub(crate) fn plan_window_route(skylight: bool, placement: SpacePlacement) -> Wi
     }
 }
 
+fn minimized(id: &str) -> DesktopError {
+    DesktopError::capture_unavailable(
+        "minimized",
+        format!("window '{id}' is minimized; restore it, or read it through accessibility"),
+    )
+}
+
+/// B9: a minimized window is refused on every route, and only on a definite
+/// `AXMinimized == true`; an unknown answer keeps the capture.
+fn window_is_minimized(pid: Option<i32>, window_id: u32) -> bool {
+    pid.and_then(|pid| super::minimized::window_minimized(pid, window_id)) == Some(true)
+}
+
 fn off_space(id: &str, cause: &str) -> DesktopError {
     DesktopError::capture_unavailable(
         "off-space",
@@ -255,12 +268,22 @@ impl MacCapture {
         if excluded.contains(&window_id) {
             return Err(DesktopError::capture_failed("cursor-helper windows are not capture targets"));
         }
-        let cause = match skylight_capture::capture(window_id) {
-            Ok((image, window)) if !fully_transparent(&image) => {
-                let geometry = FrameGeometry::for_window(&window, image.width(), image.height());
-                return Ok(Some((image, geometry)));
+        // B9 before any read of the backing store: SkyLight returns the last
+        // drawn contents of a minimized window, which the contract refuses.
+        let cause = match skylight_capture::listing(window_id) {
+            Ok(window) => {
+                if window_is_minimized(window.pid.and_then(|pid| i32::try_from(pid).ok()), window_id) {
+                    return Err(minimized(id));
+                }
+                match skylight_capture::capture(window_id) {
+                    Ok(image) if !fully_transparent(&image) => {
+                        let geometry = FrameGeometry::for_window(&window, image.width(), image.height());
+                        return Ok(Some((image, geometry)));
+                    },
+                    Ok(_) => "SkyLight returned a fully transparent image".to_owned(),
+                    Err(error) => error.message,
+                }
             },
-            Ok(_) => "SkyLight returned a fully transparent image".to_owned(),
             Err(error) => error.message,
         };
         if route == WindowRoute::SkyLightOnly {
@@ -346,23 +369,22 @@ impl MacCapture {
                     )
                 })?;
                 if frame.is_on_screen == Some(false)
-                    && frame
-                        .pid
-                        .and_then(|pid| super::minimized::window_minimized(pid, window_id))
-                        == Some(true)
+                    && window_is_minimized(frame.pid, window_id)
                 {
-                    return Err(DesktopError::capture_unavailable(
-                        "minimized",
-                        format!(
-                            "window '{id}' is minimized; restore it, \
-                             or read it through accessibility"
-                        ),
-                    ));
+                    return Err(minimized(id));
                 }
-                // Off screen, not minimized, and nothing drawn: another Space
-                // that only SkyLight could have read.
+                // Off screen, not minimized, and nothing drawn. Only a window the
+                // Space listing places elsewhere is reported as off-Space; a hidden
+                // app or an unanswered AXMinimized gets the plain refusal.
                 if frame.is_on_screen == Some(false) && fully_transparent(&frame.image) {
-                    return Err(off_space(id, "ScreenCaptureKit returned a fully transparent image"));
+                    return Err(if spaces::placement(window_id) == SpacePlacement::Other {
+                        off_space(id, "ScreenCaptureKit returned a fully transparent image")
+                    } else {
+                        DesktopError::capture_unavailable(
+                            "off-screen",
+                            format!("window '{id}' is off screen and drew nothing; bring it on screen, or read it through accessibility"),
+                        )
+                    });
                 }
                 let (width, height) = (frame.image.width(), frame.image.height());
                 let (x, y, logical_width, logical_height) = frame.bounds;

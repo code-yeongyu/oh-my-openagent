@@ -49,12 +49,17 @@ pub(super) fn ensure_trusted() -> CoreResult<()> {
     }
 }
 
+/// A retained, generation-bound handle for `element` (see `retained`).
 pub(super) fn handle(element: CFRetained<AXUIElement>) -> AxHandle {
-    AxHandle::native(element)
+    super::retained::wrap(element)
 }
 
-/// The AXUIElement behind a handle this backend produced.
+/// The AXUIElement behind a handle this backend produced: `StaleRef` once the
+/// ref generations that held it expired or its app was replaced.
 pub(crate) fn element(handle: &AxHandle) -> CoreResult<&AXUIElement> {
+    if let Some(found) = super::retained::resolve(handle) {
+        return found;
+    }
     handle
         .downcast_native::<CFRetained<AXUIElement>>()
         .map(|element| &**element)
