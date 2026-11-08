@@ -72,7 +72,7 @@ Saturation is not just more searching; it is a knowledge-production protocol. Th
 - `verification-economics.md` — one row per proof decision. Required fields: claim, risk, error cost, verification cost/time, chosen verification path, defer/verify decision, outcome, and residual risk.
 - `cause-disappearance.md` — one row per causal finding. Required fields: cause id, expected truth, previous observation, `last_seen`, disconfirming observation, replacement cause if any, current status, and whether the violation is no longer observed.
 
-Observation candidates and claim candidates travel back from workers as message text. The orchestrator writes the instrumentation artifacts, links candidates into the intent diff and claim graph, and records where each observation entered the synthesis. A conclusion is not ready for final materials until its expected truth/reality diff is closed or marked unknown, its claim node exists, and its independent-observation convergence status is supported or explicitly excepted.
+Observation candidates and claim candidates travel back from workers as message text. **Every conclusion stands on an observation a tool produced** — a page read, a file read, a command run — recorded in `observation-manifest.md`: a claim candidate, a DEAD END, a convergence call, and your own judgment that a topic is settled alike. What you or a worker knows from memory is a LEAD to probe, never evidence. The orchestrator writes the instrumentation artifacts, links candidates into the intent diff and claim graph, and records where each observation entered the synthesis. A claim is not ready for final materials until its expected truth/reality diff is closed or marked unknown, its claim node exists, and its independent-observation convergence status is supported or explicitly excepted.
 
 ## Run the swarm as a cooperating team
 
@@ -105,15 +105,15 @@ Every research spawn message contains, in order:
 2. The budget lift: "This is an explicit exhaustive-research assignment. Your default retrieval budget and stop-when-answered rules do not apply — run the full protocol below and report every lead."
 3. Scope — the axis, the sources to hit, and what a complete answer contains.
 4. The role protocol (Phase 1).
-5. The reply tail. EXPAND markers, observation candidates, and claim candidates travel back as message text, never as files. Every worker ends the reply with:
+5. The reply tail. EXPAND markers, observation candidates, and claim candidates travel back as message text, never as files. Each claim candidate carries `OBSERVED: <URL read | file:line | command and its output>`; a claim the worker only remembers goes into the tail as a LEAD. Every worker ends the reply with:
 
 ```
 ## EXPAND
 - LEAD: <discovery not yet investigated> — WHY: <why it matters> — ANGLE: <suggested search>
-- DEAD END: <lead explored to exhaustion>
+- DEAD END: <lead explored to exhaustion> — PROBED: <the searches, reads, or commands that exhausted it>
 ```
 
-A worker with nothing to expand writes `## EXPAND` followed by `none — <one-line reason>`. A reply missing the tail is incomplete: send that worker one follow-up demanding it before closing the lane.
+A worker with nothing to expand writes `## EXPAND` followed by `none — <one-line reason>`. A reply missing the tail, or a claim or DEAD END missing its `OBSERVED:`/`PROBED:` line, is incomplete: send that worker one follow-up demanding it before closing the lane.
 
 ## Execution references
 
