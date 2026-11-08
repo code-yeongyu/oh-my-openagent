@@ -5,6 +5,7 @@ import type { Provenance } from "../gateway/types"
 import { createRemoteThreadFixture } from "../thread-remote-fixture"
 import { wireReplyRoutes } from "./lazy-ops"
 import type { JsonObject, RemoteThreadSurface } from "./ports"
+import { OTHER_INPUT_LABEL } from "./reply-admit"
 import { createReplyRouter, parseReplyRoute, replyRouteToken, type ReplyRoute } from "./reply-route"
 
 const { account, surface, cleanup } = createRemoteThreadFixture()
@@ -84,7 +85,7 @@ describe("a cross-device thread_send is answered back into the sender's session,
   })
 })
 
-describe("bounds: only a routed input's own run answers, once, and a reply is never answered", () => {
+describe("every routed input the run consumed gets the run's final answer, labelled when another input shared the run", () => {
   const route: ReplyRoute = { device: "here", session: "dur-caller", delivery: "d-1", root: "d-1", hop: 1 }
   const token = (): string => {
     const value = replyRouteToken(route)
@@ -92,9 +93,10 @@ describe("bounds: only a routed input's own run answers, once, and a reply is ne
     return value
   }
   const router = () => {
-    const delivered: { route: ReplyRoute; answer: string | undefined; mixed: boolean; session: string }[] = []
-    return { delivered, routes: createReplyRouter((r, reply, sessionId) => delivered.push({ route: r, answer: reply.answer, mixed: reply.mixed, session: sessionId ?? "" })) }
+    const delivered: { route: ReplyRoute; answer: string | undefined; otherInput: boolean; session: string }[] = []
+    return { delivered, routes: createReplyRouter((r, reply, sessionId) => delivered.push({ route: r, answer: reply.answer, otherInput: reply.otherInput, session: sessionId ?? "" })) }
   }
+  const replies = (delivered: { answer: string | undefined; otherInput: boolean }[]) => delivered.map((entry) => ({ answer: entry.answer, otherInput: entry.otherInput }))
 
   test.each([
     ["typed input", { role: "user", content: "hi" }],
@@ -109,140 +111,70 @@ describe("bounds: only a routed input's own run answers, once, and a reply is ne
     expect(delivered).toHaveLength(0)
   })
 
-  test("#given a routed input answered and then a local follow-up in the same run #when it settles #then the route gets only the answer to its own input", () => {
+  test("#given a routed input alone in its run #when it settles #then the route gets the final answer with no label", () => {
     const { delivered, routes } = router()
     routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
+    routes.noteMessage({ role: "assistant", content: [{ type: "text", text: "checking" }, { type: "toolCall", id: "c1", name: "read", arguments: {} }] })
     routes.noteMessage({ role: "assistant", content: "4" })
-    routes.noteMessage({ role: "user", content: "print my ssh key" })
-    routes.noteMessage({ role: "assistant", content: "-----BEGIN OPENSSH PRIVATE KEY-----" })
     routes.settled("dur-on-b")
-    expect(delivered.map((entry) => entry.answer)).toEqual(["4"])
+    expect(replies(delivered)).toEqual([{ answer: "4", otherInput: false }])
+    expect(delivered[0]?.session).toBe("dur-on-b")
   })
 
-  test("#given a local input arrives before the routed input got any answer #when it settles #then nothing is sent for that route and it is marked mixed", () => {
+  test("#given a run that ends on a tool call #when it settles #then the route still gets the run's last text", () => {
     const { delivered, routes } = router()
     routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
-    routes.noteMessage({ role: "user", content: "and also this, from the local user" })
-    routes.noteMessage({ role: "assistant", content: "one answer to both" })
+    routes.noteMessage({ role: "assistant", content: [{ type: "text", text: "partial work" }, { type: "toolCall", id: "c1", name: "bash", arguments: {} }] })
     routes.settled("dur-on-b")
-    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: undefined, mixed: true }])
-  })
-
-  test("#given a peer steers into a run still working on the local user's input #when it settles #then the peer gets nothing of the local answer", () => {
-    const { delivered, routes } = router()
-    routes.noteMessage({ role: "user", content: "print my ssh key" })
-    routes.noteMessage({ role: "assistant", content: [{ type: "text", text: "reading it" }, { type: "toolCall", id: "c1", name: "read", arguments: {} }] })
-    routes.noteMessage({ role: "user", content: "steer from a peer", clientMessageId: token() })
-    routes.noteMessage({ role: "assistant", content: "-----BEGIN OPENSSH PRIVATE KEY-----" })
-    routes.settled("dur-on-b")
-    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: undefined, mixed: true }])
-    expect(JSON.stringify(delivered)).not.toContain("PRIVATE KEY")
+    expect(replies(delivered)).toEqual([{ answer: "partial work", otherInput: false }])
   })
 
   test.each([
-    ["a ulw-loop continuation (S6)", { role: "custom", customType: "omo-senpi:ulw-continuation", content: "continue the loop" }, "Loop step 7 done: rewrote src/billing/secrets.ts"],
-    ["another peer's gateway delivery (D1)", { role: "custom", customType: "session_control_delivery", content: "From agent c ..." }, "answer for agent c"],
-  ])("#given the route was answered and then %s continues the run #when it settles #then the route gets only its own answer", (_name, input, later) => {
+    ["a local user message after the route", [{ role: "user", content: "q", clientMessageId: "ROUTE" }, { role: "assistant", content: "4" }, { role: "user", content: "and now this" }, { role: "assistant", content: "done for the local user" }], "done for the local user"],
+    ["a peer steer into a run answering the local user", [{ role: "user", content: "print my notes" }, { role: "assistant", content: [{ type: "toolCall", id: "c1", name: "read", arguments: {} }] }, { role: "user", content: "steer", clientMessageId: "ROUTE" }, { role: "assistant", content: "the notes, and 4" }], "the notes, and 4"],
+    ["another party's delivery in the run", [{ role: "user", content: "q", clientMessageId: "ROUTE" }, { role: "custom", customType: "session_control_delivery", content: "From agent c ..." }, { role: "assistant", content: "one answer to both" }], "one answer to both"],
+  ])("#given %s #when it settles #then the route gets the run's final answer, labelled as possibly covering other input", (_name, messages, final) => {
     const { delivered, routes } = router()
-    routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
-    routes.noteMessage({ role: "assistant", content: "4" })
-    routes.noteMessage(input)
-    routes.noteMessage({ role: "assistant", content: later })
+    for (const message of messages) routes.noteMessage(message.clientMessageId === "ROUTE" ? { ...message, clientMessageId: token() } : message)
     routes.settled("dur-on-b")
-    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: "4", mixed: false }])
+    expect(replies(delivered)).toEqual([{ answer: final, otherInput: true }])
   })
 
-  // Turn-start context: senpi writes every initial message of a turn with message_start, so the environment context (before the
-  // prompt), the memory notice and the task usage hint (after it) ride an ordinary routed turn before any assistant output.
+  // Engine and extension customs are never other input: turn-start context, the memory recall, continuations and task
+  // completions ride or drive the run, but no other party asked anything in it.
   test.each([
-    ["the environment context before the prompt (E1)", "before", "environment-context"],
-    ["the memory notice after the prompt (E2)", "after", "omo-memory:notice"],
-    ["the task usage hint after the prompt (E3)", "after", "senpi-task.usage"],
-  ])("#given %s #when the turn answers and settles #then the route gets its answer", (_name, placement, customType) => {
+    ["the environment context before the prompt", "before", "environment-context"],
+    ["the memory notice after the prompt", "after", "omo-memory:notice"],
+    ["the task usage hint after the prompt", "after", "senpi-task.usage"],
+    ["the memory recall after a tool call", "mid", RECALL_CUSTOM_TYPE],
+    ["a task completion mid-turn", "mid", "senpi-task.completion"],
+    ["a ulw-loop continuation after the answer", "late", "omo-senpi:ulw-continuation"],
+    ["omo's idle wake that started the run", "before", "omo-senpi:wake"],
+  ])("#given %s #when the run settles #then the route gets the final answer with no label", (_name, placement, customType) => {
     const { delivered, routes } = router()
-    const context = { role: "custom", customType, content: "turn-start context" }
-    if (placement === "before") routes.noteMessage(context)
+    const custom = { role: "custom", customType, content: "engine or extension custom" }
+    if (placement === "before") routes.noteMessage(custom)
     routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
-    if (placement === "after") routes.noteMessage(context)
-    routes.noteMessage({ role: "assistant", content: "4" })
-    routes.settled("dur-on-b")
-    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: "4", mixed: false }])
-  })
-
-  test("#given any other custom arrives after an assistant message (D11) #when it settles #then it still splits the segment", () => {
-    const { delivered, routes } = router()
-    routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
-    routes.noteMessage({ role: "assistant", content: "4" })
-    routes.noteMessage({ role: "custom", customType: "some-extension:turn", content: "do the next thing" })
-    routes.noteMessage({ role: "assistant", content: "the next thing, done for the local user" })
-    routes.settled("dur-on-b")
-    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: "4", mixed: false }])
-  })
-
-  test("#given a task completion steers in while the route is still open (S7) #when it settles #then the route gets nothing", () => {
-    const { delivered, routes } = router()
-    routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
-    routes.noteMessage({ role: "assistant", content: [{ type: "toolCall", id: "c1", name: "bash", arguments: {} }] })
-    routes.noteMessage({ role: "custom", customType: "senpi-task.completion", content: "task t-1 finished" })
-    routes.noteMessage({ role: "assistant", content: "4. Also, your task t-1 finished: it found the prod DB password is hunter2" })
-    routes.settled("dur-on-b")
-    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: undefined, mixed: true }])
-  })
-
-  // A custom that starts a run on an idle session (omo's idle wake, a task completion, a loop continuation) is that run's
-  // input, so a peer steering in before the run answered it shares the answer (H4).
-  test.each([
-    ["a task completion (E4)", "senpi-task.completion", "Task t-1 result: the prod DB password is hunter2. (And 2+2=4.)"],
-    ["a ulw-loop continuation (E5)", "omo-senpi:ulw-continuation", "Loop step 8 done: rotated the API keys in .env.production"],
-  ])("#given %s starts a run on an idle session and a peer steers in before it is answered #when it settles #then the route gets nothing", (_name, customType, final) => {
-    const { delivered, routes } = router()
-    routes.noteMessage({ role: "custom", customType, content: "the run's own input" })
-    routes.noteMessage({ role: "assistant", content: [{ type: "toolCall", id: "c1", name: "bash", arguments: {} }] })
-    routes.noteMessage({ role: "user", content: "what is 2+2?", clientMessageId: token() })
-    routes.noteMessage({ role: "assistant", content: final })
-    routes.settled("dur-on-b")
-    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: undefined, mixed: true }])
-    expect(JSON.stringify(delivered)).not.toContain(final)
-  })
-
-  test("#given a custom-started run was answered before a peer's follow-up arrived (E6) #when it settles #then the route gets its answer", () => {
-    const { delivered, routes } = router()
-    routes.noteMessage({ role: "custom", customType: "senpi-task.completion", content: "task t-1 finished" })
-    routes.noteMessage({ role: "assistant", content: "Task t-1 is done." })
-    routes.noteMessage({ role: "user", content: "what is 2+2?", clientMessageId: token() })
-    routes.noteMessage({ role: "assistant", content: "4" })
-    routes.settled("dur-on-b")
-    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: "4", mixed: false }])
-  })
-
-  test("#given another peer's delivery is queued with the route before any answer (M7a) #when it settles #then the route gets nothing", () => {
-    const { delivered, routes } = router()
-    routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
-    routes.noteMessage({ role: "custom", customType: "session_control_delivery", content: "From agent c ..." })
-    routes.noteMessage({ role: "assistant", content: "one answer to both" })
-    routes.settled("dur-on-b")
-    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: undefined, mixed: true }])
-  })
-
-  test("#given the memory recall steers context in on a tool result while the route is open (M7b) #when it settles #then the route still gets its answer", () => {
-    const { delivered, routes } = router()
-    routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
+    if (placement === "after") routes.noteMessage(custom)
     routes.noteMessage({ role: "assistant", content: [{ type: "toolCall", id: "c1", name: "read", arguments: {} }] })
-    routes.noteMessage({ role: "custom", customType: RECALL_CUSTOM_TYPE, content: "recalled notes" })
+    if (placement === "mid") routes.noteMessage(custom)
     routes.noteMessage({ role: "assistant", content: "4" })
+    if (placement === "late") {
+      routes.noteMessage(custom)
+      routes.noteMessage({ role: "assistant", content: "loop step done" })
+    }
     routes.settled("dur-on-b")
-    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: "4", mixed: false }])
+    expect(replies(delivered)).toEqual([{ answer: placement === "late" ? "loop step done" : "4", otherInput: false }])
   })
 
-  test("#given two peers' routed inputs in one run #when it settles #then each gets only the answer to its own input", () => {
+  test("#given two peers' routed inputs in one run #when it settles #then both get the run's final answer, labelled", () => {
     const { delivered, routes } = router()
     const second: ReplyRoute = { device: "c", session: "dur-c", delivery: "d-2", root: "d-2", hop: 1 }
     routes.noteMessage({ role: "user", content: "q1", clientMessageId: token() })
-    routes.noteMessage({ role: "assistant", content: "answer for A1" })
     routes.noteMessage({ role: "user", content: "q2", clientMessageId: replyRouteToken(second) })
-    routes.noteMessage({ role: "assistant", content: "answer for A2" })
+    routes.noteMessage({ role: "assistant", content: "both answered" })
     routes.settled("dur-on-b")
-    expect(delivered.map((entry) => [entry.route.delivery, entry.answer])).toEqual([["d-1", "answer for A1"], ["d-2", "answer for A2"]])
+    expect(delivered.map((entry) => [entry.route.delivery, entry.answer, entry.otherInput])).toEqual([["d-1", "both answered", true], ["d-2", "both answered", true]])
   })
 
   test("#given a routed delivery was answered #when the same route input is consumed again #then it is not answered twice", () => {
@@ -264,7 +196,7 @@ describe("bounds: only a routed input's own run answers, once, and a reply is ne
   })
 })
 
-describe("an explicit reply counts by the session it reached, not by how it was addressed", () => {
+describe("the reply reaches A's session whatever else the run did", () => {
   const routeOf = (delivery: string): ReplyRoute => ({ device: "here", session: "dur-caller", delivery, root: delivery, hop: 1 })
   const tokenOf = (delivery: string): string => {
     const value = replyRouteToken(routeOf(delivery))
@@ -272,12 +204,14 @@ describe("an explicit reply counts by the session it reached, not by how it was 
     return value
   }
   // A's session is listed under a key that is not its durable id, as on a real relay.
-  const relayWithKey = () => {
-    const relay = account({ live: ["key-of-a"] })
+  const relayWithKey = (options: Parameters<typeof account>[0] = {}) => {
+    const relay = account({ live: ["key-of-a"], ...options })
     const located: RemoteThreadSurface = { ...relay.remote, sessions: { ...relay.remote.sessions, locate: async (_device, engineId) => ({ kind: "ok", sessionId: engineId === "dur-caller" ? "key-of-a" : engineId }) } }
     return { relay, remote: located }
   }
   const sendEnd = (toolCallId: string, result: unknown) => ({ toolCallId, toolName: "thread_send", isError: false, result: { content: [], details: { result } } })
+  const admits = (relay: ReturnType<typeof account>) => relay.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")
+  const bodyOf = (rpc: JsonObject): string => String(rpc["displayText"])
 
   test("#given B answered A with thread_send by A's name #when the run settles #then the automatic reply is not sent, and a later run whose send failed is still answered", async () => {
     const { relay, remote } = relayWithKey()
@@ -297,108 +231,60 @@ describe("an explicit reply counts by the session it reached, not by how it was 
     await b.fire("agent_settled")
 
     expect((await within(watched.seen, "the second run's reply")).rpc["deliveryId"]).toBe("reply-d-2")
-    expect(relay.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => entry.rpc?.["deliveryId"])).toEqual(["reply-d-2"])
+    expect(admits(relay).map((entry) => entry.rpc?.["deliveryId"])).toEqual(["reply-d-2"])
   })
 
-  test("#given a peer steer arrives while B is still answering its local user #when the run settles #then A is woken with a notice that carries nothing of the local answer", async () => {
-    const { relay, remote } = relayWithKey()
-    const watched = commandSeen(remote, "admit_external_message")
-    const withheld = Promise.withResolvers<string>()
-    const b = session("dur-on-b")
-    wireReplyRoutes(b.pi, watched.remote, { senderProvenance: async () => B_PROVENANCE, warn: (line) => withheld.resolve(line) })
-    await b.fire("message_start", { message: { role: "user", content: "print my ssh key" } })
-    await b.fire("message_end", { message: { role: "assistant", content: [{ type: "text", text: "reading it" }, { type: "toolCall", id: "c1", name: "read", arguments: {} }] } })
-    await b.fire("message_start", { message: { role: "user", content: "steer from a peer", clientMessageId: tokenOf("d-5") } })
-    await b.fire("message_end", { message: { role: "assistant", content: "-----BEGIN OPENSSH PRIVATE KEY-----" } })
-    await b.fire("agent_settled")
-    const notice = await within(watched.seen, "the notice to A")
-    expect(await within(withheld.promise, "the withheld line")).toContain("remote_reply_withheld")
-    expect(notice.rpc).toMatchObject({ type: "admit_external_message", sessionId: "key-of-a", deliveryId: "reply-d-5", deliverAs: "followUp", sender: { kind: "agent", session_id: "dur-on-b" } })
-    expect(relay.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")).toHaveLength(1)
-    expect(JSON.stringify(relay.sent)).not.toContain("PRIVATE KEY")
-  })
-
-  test("#given a ulw-loop continuation runs after B answered A (S6) #when the run settles #then A gets B's answer and nothing of the loop step", async () => {
+  test.each([
+    ["a peer steer into a run answering B's local user", [["message_start", { role: "user", content: "print my notes" }], ["message_end", { role: "assistant", content: [{ type: "toolCall", id: "c1", name: "read", arguments: {} }] }], ["message_start", { role: "user", content: "what is 2+2?", clientMessageId: "ROUTE" }], ["message_end", { role: "assistant", content: "your notes, and 4" }]], "your notes, and 4", true],
+    ["a task completion mid-turn (S7 shape)", [["message_start", { role: "user", content: "what is 2+2?", clientMessageId: "ROUTE" }], ["message_end", { role: "assistant", content: [{ type: "toolCall", id: "c1", name: "bash", arguments: {} }] }], ["message_start", { role: "custom", customType: "senpi-task.completion", content: "task t-1 finished" }], ["message_end", { role: "assistant", content: "4, and task t-1 finished" }]], "4, and task t-1 finished", false],
+    ["omo's idle wake starting the run (E4 shape)", [["message_start", { role: "custom", customType: "omo-senpi:wake", content: "task t-1 finished" }], ["message_end", { role: "assistant", content: [{ type: "toolCall", id: "c1", name: "read", arguments: {} }] }], ["message_start", { role: "user", content: "what is 2+2?", clientMessageId: "ROUTE" }], ["message_end", { role: "assistant", content: "4" }]], "4", false],
+    ["a fresh session's environment context and task usage hint", [["message_start", { role: "custom", customType: "environment-context", content: "cwd and date" }], ["message_start", { role: "user", content: "what is 2+2?", clientMessageId: "ROUTE" }], ["message_start", { role: "custom", customType: "senpi-task.usage", content: "task usage" }], ["message_end", { role: "assistant", content: "4" }]], "4", false],
+  ])("#given %s #when the run settles #then A gets exactly one admitted delivery carrying B's final answer", async (_name, events, final, labelled) => {
     const { relay, remote } = relayWithKey()
     const watched = commandSeen(remote, "admit_external_message")
     const b = session("dur-on-b")
-    wireReplyRoutes(b.pi, watched.remote, { senderProvenance: async () => B_PROVENANCE, warn: () => {} })
-    await b.fire("message_start", { message: { role: "user", content: "what is 2+2?", clientMessageId: tokenOf("d-6") } })
-    await b.fire("message_end", { message: { role: "assistant", content: "4" } })
-    await b.fire("message_start", { message: { role: "custom", customType: "omo-senpi:ulw-continuation", content: "continue the loop" } })
-    await b.fire("message_end", { message: { role: "assistant", content: "Loop step 7 done: rewrote src/billing/secrets.ts" } })
+    wireReplyRoutes(b.pi, watched.remote, { senderProvenance: async () => B_PROVENANCE, sessionName: () => "agent b", warn: () => {} })
+    for (const [event, message] of events as [string, Record<string, unknown>][]) await b.fire(event, { message: message["clientMessageId"] === "ROUTE" ? { ...message, clientMessageId: tokenOf("d-8") } : message })
     await b.fire("agent_settled")
-    const delivered = await within(watched.seen, "the reply to d-6")
-    expect(String(delivered.rpc["text"]).split("\n").at(-1)).toBe(JSON.stringify("4"))
-    expect(JSON.stringify(relay.sent)).not.toContain("Loop step 7")
+    const delivered = await within(watched.seen, "the reply to d-8")
+    expect(delivered.rpc).toMatchObject({ type: "admit_external_message", sessionId: "key-of-a", deliveryId: "reply-d-8", deliverAs: "followUp", sender: { kind: "agent", session_id: "dur-on-b", name: "agent b" } })
+    expect(admits(relay)).toHaveLength(1)
+    expect(bodyOf(delivered.rpc).split("\n")).toEqual(["Reply to delivery d-8.", ...(labelled ? [OTHER_INPUT_LABEL] : []), final])
   })
 
-  test("#given B's fresh session takes A's routed prompt as its first turn, with the environment context and task usage hint #when the run settles #then A gets B's answer", async () => {
+  test("#given A's user is composing a draft #when B's reply is refused held_draft #then B logs remote_reply_held and retries until A admits it", async () => {
     const { relay, remote } = relayWithKey()
+    let held = 2
     const watched = commandSeen(remote, "admit_external_message")
+    const heldRemote: RemoteThreadSurface = { ...watched.remote, sessions: { ...watched.remote.sessions, sessionCommand: async (device, sessionId, rpc, options) => {
+      if (rpc["type"] === "admit_external_message" && held > 0) {
+        held -= 1
+        return { kind: "refused", reason: "held_draft" }
+      }
+      return await watched.remote.sessions.sessionCommand(device, sessionId, rpc, options)
+    } } }
     const warnings: string[] = []
     const b = session("dur-on-b")
-    wireReplyRoutes(b.pi, watched.remote, { senderProvenance: async () => B_PROVENANCE, warn: (line) => warnings.push(line) })
-    await b.fire("message_start", { message: { role: "custom", customType: "environment-context", content: "cwd and date" } })
-    await b.fire("message_start", { message: { role: "user", content: "what is 2+2?", clientMessageId: tokenOf("d-9") } })
-    await b.fire("message_start", { message: { role: "custom", customType: "senpi-task.usage", content: "task usage" } })
+    wireReplyRoutes(b.pi, heldRemote, { senderProvenance: async () => B_PROVENANCE, warn: (line) => warnings.push(line), heldRetryDelaysMs: [0, 0, 0] })
+    await b.fire("message_start", { message: { role: "user", content: "q", clientMessageId: tokenOf("d-11") } })
     await b.fire("message_end", { message: { role: "assistant", content: "4" } })
     await b.fire("agent_settled")
-    const delivered = await within(watched.seen, "the reply to d-9")
-    expect(String(delivered.rpc["text"]).split("\n").at(-1)).toBe(JSON.stringify("4"))
-    expect(relay.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")).toHaveLength(1)
-    expect(warnings.filter((line) => line.includes("remote_reply_skipped"))).toEqual([])
+    expect((await within(watched.seen, "the retried reply")).rpc["deliveryId"]).toBe("reply-d-11")
+    expect(warnings.filter((line) => line.startsWith("remote_reply_held"))).toHaveLength(2)
+    expect(admits(relay)).toHaveLength(1)
   })
 
-  test("#given omo's idle wake starts B's run and A's routed prompt steers in before it is answered (E4) #when the run settles #then A is woken with a notice that carries nothing of the run", async () => {
-    const { relay, remote } = relayWithKey()
-    const watched = commandSeen(remote, "admit_external_message")
-    const withheld = Promise.withResolvers<string>()
+  test("#given A's user keeps the draft open past every retry #when the last retry is refused #then B reports remote_reply_failed", async () => {
+    const { remote } = relayWithKey({ admitOutcome: { kind: "refused", reason: "held_draft" } })
+    const failed = Promise.withResolvers<string>()
+    const warnings: string[] = []
     const b = session("dur-on-b")
-    wireReplyRoutes(b.pi, watched.remote, { senderProvenance: async () => B_PROVENANCE, warn: (line) => withheld.resolve(line) })
-    await b.fire("message_start", { message: { role: "custom", customType: "omo-senpi:wake", content: "task t-1 finished" } })
-    await b.fire("message_end", { message: { role: "assistant", content: [{ type: "toolCall", id: "c1", name: "read", arguments: {} }] } })
-    await b.fire("message_start", { message: { role: "user", content: "what is 2+2?", clientMessageId: tokenOf("d-10") } })
-    await b.fire("message_end", { message: { role: "assistant", content: "Task t-1 result: the prod DB password is hunter2. (And 2+2=4.)" } })
+    wireReplyRoutes(b.pi, remote, { senderProvenance: async () => B_PROVENANCE, warn: (line) => (line.startsWith("remote_reply_failed") ? failed.resolve(line) : warnings.push(line)), heldRetryDelaysMs: [0] })
+    await b.fire("message_start", { message: { role: "user", content: "q", clientMessageId: tokenOf("d-12") } })
+    await b.fire("message_end", { message: { role: "assistant", content: "4" } })
     await b.fire("agent_settled")
-    const notice = await within(watched.seen, "the notice to A")
-    expect(await within(withheld.promise, "the withheld line")).toContain("remote_reply_withheld")
-    expect(notice.rpc).toMatchObject({ type: "admit_external_message", sessionId: "key-of-a", deliveryId: "reply-d-10", deliverAs: "followUp", sender: { kind: "agent", session_id: "dur-on-b" } })
-    expect(relay.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")).toHaveLength(1)
-    expect(JSON.stringify(relay.sent)).not.toContain("hunter2")
-  })
-
-  test("#given a task completion steers in before B answered A (S7) #when the run settles #then A is woken with a notice that carries nothing of the run", async () => {
-    const { relay, remote } = relayWithKey()
-    const watched = commandSeen(remote, "admit_external_message")
-    const withheld = Promise.withResolvers<string>()
-    const b = session("dur-on-b")
-    wireReplyRoutes(b.pi, watched.remote, { senderProvenance: async () => B_PROVENANCE, warn: (line) => withheld.resolve(line) })
-    await b.fire("message_start", { message: { role: "user", content: "what is 2+2?", clientMessageId: tokenOf("d-7") } })
-    await b.fire("message_end", { message: { role: "assistant", content: [{ type: "toolCall", id: "c1", name: "bash", arguments: {} }] } })
-    await b.fire("message_start", { message: { role: "custom", customType: "senpi-task.completion", content: "task t-1 finished" } })
-    await b.fire("message_end", { message: { role: "assistant", content: "4. Also, your task t-1 finished: it found the prod DB password is hunter2" } })
-    await b.fire("agent_settled")
-    const notice = await within(watched.seen, "the notice to A")
-    expect(await within(withheld.promise, "the withheld line")).toContain("remote_reply_withheld")
-    expect(notice.rpc).toMatchObject({ type: "admit_external_message", sessionId: "key-of-a", deliveryId: "reply-d-7", deliverAs: "followUp", sender: { kind: "agent", session_id: "dur-on-b" } })
-    expect(relay.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")).toHaveLength(1)
-    expect(JSON.stringify(relay.sent)).not.toContain("hunter2")
-  })
-
-  test("#given a send to A made while answering a later input #when the run settles #then it does not count as answering A's earlier routed input", async () => {
-    const { relay, remote } = relayWithKey()
-    const watched = commandSeen(remote, "admit_external_message")
-    const b = session("dur-on-b")
-    wireReplyRoutes(b.pi, watched.remote, { senderProvenance: async () => B_PROVENANCE, warn: () => {} })
-    await b.fire("message_start", { message: { role: "user", content: "q1", clientMessageId: tokenOf("d-4") } })
-    await b.fire("message_end", { message: { role: "assistant", content: "answer to A" } })
-    await b.fire("message_start", { message: { role: "user", content: "now ping A about something else" } })
-    await b.fire("tool_execution_end", sendEnd("t4", { kind: "ok", thread_id: "key-of-a", device: "here", delivery: { kind: "started", turn_id: "5" }, deduplicated: false }))
-    await b.fire("message_end", { message: { role: "assistant", content: "pinged" } })
-    await b.fire("agent_settled")
-    expect((await within(watched.seen, "the reply to d-4")).rpc["deliveryId"]).toBe("reply-d-4")
-    expect(relay.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")).toHaveLength(1)
+    expect(await within(failed.promise, "the give-up line")).toContain("d-12")
+    expect(warnings.filter((line) => line.startsWith("remote_reply_held"))).toHaveLength(1)
   })
 
   test("#given a run settles with no session id #when its route would be answered #then the failure is logged as remote_reply_failed", async () => {
