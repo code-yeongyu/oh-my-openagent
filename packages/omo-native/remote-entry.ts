@@ -18,11 +18,19 @@ import { prepareRemoteAttach, type RemoteVerbDependencies, runRemoteVerb } from 
 
 const serviceApi = (): string => serviceOrigin(process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
 
-async function inProcessAccountShow(): Promise<AccountShowResult> {
+/**
+ * The `account show` that `omo remote` runs in process, with its stdout captured for parsing. A sync-pin retire
+ * warning goes to stderr as it does on the `omo account` and sync paths (#12485), never into the captured lines.
+ */
+export async function inProcessAccountShow(seams: {
+  readonly runVerb?: typeof runAccountVerb
+  readonly warn?: (line: string) => void
+} = {}): Promise<AccountShowResult> {
   const api = serviceApi()
   const lines: string[] = []
   let store: CredentialStore | undefined
-  const exitCode = await runAccountVerb(
+  const warn = seams.warn ?? ((line: string) => process.stderr.write(`${line}\n`))
+  const exitCode = await (seams.runVerb ?? runAccountVerb)(
     {
       api,
       get store() {
@@ -30,7 +38,7 @@ async function inProcessAccountShow(): Promise<AccountShowResult> {
         return store
       },
       pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
-      beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())), log: () => {} }),
+      beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())), log: warn }),
       readStdin: async () => "",
       output: line => lines.push(line),
       error: () => {},
@@ -43,7 +51,7 @@ async function inProcessAccountShow(): Promise<AccountShowResult> {
 function remoteDependencies(): RemoteVerbDependencies {
   const stateDir = deviceServiceStateDir()
   return {
-    accountShow: inProcessAccountShow,
+    accountShow: () => inProcessAccountShow(),
     stateDir,
     connect: () => connectDeviceService({ version: packageJson.version, stateDir }),
     now: () => Date.now(),
