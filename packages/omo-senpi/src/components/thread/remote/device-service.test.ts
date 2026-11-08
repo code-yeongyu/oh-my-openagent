@@ -116,12 +116,12 @@ describe("device-service adapter: a session created on another device is address
     expect(attached.every((id) => id === KEY)).toBe(true)
   })
 
-  test("#given the create reply names the session's listing key #when the session is created #then no session.locate is sent and the thread is that key", async () => {
+  test("#given the create reply carries the located session #when the session is created #then no session.locate is sent and the thread is that key", async () => {
     const located: string[] = []
     const service = {
       ...fakeService([], []),
       devices: async () => [{ device: "b", label: "studio", kind: "cli", platform: "linux", last_seen_ms: 1, online: true }],
-      endpointCommand: async () => state({ state: "engine_applied" }, { ...opened, session_key: KEY }),
+      endpointCommand: async () => ({ ...state({ state: "engine_applied" }, opened), located: { key: KEY, session: `b.${KEY}` } }),
       locate: async (_device: string, engineId: string) => { located.push(engineId); throw new LocalApiError("session_not_found", "not expected") },
     } as unknown as DeviceService
     const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => service, retryDelay: async () => {} })
@@ -137,9 +137,17 @@ describe("device-service adapter: relay round trips per thread op", () => {
   // connection: every frame that leaves this device toward the relay is counted, so each op's round trips are measured.
   const RELAY_FRAMES: ReadonlySet<string> = new Set(["session.attach", "session.command", "session.read", "session.locate", "session.endpoints", "sessions.list"])
   const row: RemoteSessionRow = { device: "b", session_id: "s1", title: "t", project: "/p", path: "/p/s1.jsonl", state: "idle", updated_ms: 2 }
+  // What a create on b answers: the engine's own session id, and the key b's listing names the new session by.
+  const CREATED_ENGINE_ID = "01a1b2c4-0000-7000-8000-000000000001"
+  const CREATED_KEY = "Ab3dEfGh1jKlMnOpQrStUv"
 
-  function relayWorld() {
+  // `relayd`: how this device's service and b's host treat an open that asks for its located session (decision 0018
+  // amendment 2026-11-06): `located` answers {key, session} on the reply, an `older-host` never adds it, and an
+  // `older-local` service refuses the `locate` field as unknown before anything leaves this device.
+  function relayWorld(relayd: "located" | "older-host" | "older-local" = "located") {
     const frames: string[] = []
+    // Whether each endpoint command this device wrote asked for the located session.
+    const locateAsked: boolean[] = []
     const listeners = new Set<(event: JsonObject) => void>()
     const emit = (event: JsonObject) => { for (const listener of [...listeners]) listener(event) }
     const models: Array<{ provider: string; id: string }> = [{ provider: "a", id: "m1" }, { provider: "a", id: "m2" }]
@@ -168,6 +176,8 @@ describe("device-service adapter: relay round trips per thread op", () => {
       request: async (type: string) => {
         frames.push(type)
         if (type === "session.attach") return { attach: "a1" }
+        if (type === "session.endpoints") return { endpoints: ["e1"] }
+        if (type === "session.locate") return { device: "b", key: CREATED_KEY, session: `b.${CREATED_KEY}` }
         if (type === "status.get") return { state: "connected" }
         if (type === "devices.list") return { devices: [{ device: "b", label: "studio", kind: "cli", platform: "linux", last_seen_ms: 1, online: true }] }
         if (type === "session.detach") return {}
@@ -192,7 +202,19 @@ describe("device-service adapter: relay round trips per thread op", () => {
       },
       read: async () => { frames.push("session.read"); return { entries: [], next_before: null } },
       list: async () => { frames.push("sessions.list"); return { query_id: "q", revision: 1, rows: [], incomplete: [], devices: {} } },
-      endpointCommand: async () => { frames.push("session.command"); return "c" },
+      endpointCommand: async (_device: string, _endpoint: string, rpc: JsonObject, commandId: string, options?: { readonly locate?: boolean }) => {
+        frames.push("session.command")
+        const asked = options?.locate === true
+        locateAsked.push(asked)
+        if (asked && relayd === "older-local") throw new LocalApiError("invalid_request", "request has an unknown field")
+        const response = { type: "response", command: rpc["type"], success: true, data: { state: { sessionId: CREATED_ENGINE_ID }, sessionId: CREATED_ENGINE_ID } }
+        const located = asked && relayd === "located" ? { located: { key: CREATED_KEY, session: `b.${CREATED_KEY}` } } : {}
+        queueMicrotask(() => {
+          emit({ type: "event", kind: "session.command_event", device: "b", command_id: commandId, response, ...located })
+          emit({ type: "event", kind: "session.command_state", command_id: commandId, state: "engine_applied", retryable: false })
+        })
+        return commandId
+      },
       oversizedLines: () => 0,
       close: () => close(),
       closed,
@@ -207,8 +229,29 @@ describe("device-service adapter: relay round trips per thread op", () => {
     // The device's catalog changes after this device read it.
     const removeModel = (id: string) => { models.splice(models.findIndex((model) => model.id === id), 1) }
     const addModel = (model: { provider: string; id: string }) => { models.push(model) }
-    return { port, surface, take, snapshot, removeModel, addModel, setEnds: (end: NonNullable<typeof nextSet>) => { nextSet = end }, inFlight: (event: () => void) => { beforeReply = event } }
+    return { port, surface, take, snapshot, removeModel, addModel, locateAsked, setEnds: (end: NonNullable<typeof nextSet>) => { nextSet = end }, inFlight: (event: () => void) => { beforeReply = event } }
   }
+
+  test.each([
+    ["a relayd that answers the open with its located session", "located", ["session.endpoints", "session.command", "session.attach"], [true]],
+    ["an older host relayd that never adds the located session", "older-host", ["session.endpoints", "session.command", "session.locate", "session.attach"], [true]],
+    ["an older local relayd that refuses the locate field", "older-local", ["session.endpoints", "session.command", "session.command", "session.locate", "session.attach"], [true, false]],
+  ] as const)("#given %s #when a thread is created on b #then the open asks for its located session and session.locate runs only when the reply lacks it", async (_label, relayd, frames, asked) => {
+    const w = relayWorld(relayd)
+    const created = await openRemote(w.surface, { kind: "create", device: "b" })
+    if (created.kind !== "ok" || !("thread" in created)) throw new Error(`create failed: ${JSON.stringify(created)}`)
+    expect(created.thread.thread_id).toBe(CREATED_KEY)
+    expect(w.take()).toEqual([...frames])
+    expect(w.locateAsked).toEqual([...asked])
+  })
+
+  test("#given an existing row of b #when it is opened #then the open does not ask for a located session and nothing is located", async () => {
+    const w = relayWorld()
+    const opened = await openRemote(w.surface, { kind: "open", row })
+    expect(opened.kind).toBe("ok")
+    expect(w.take()).toEqual(["session.endpoints", "session.command"])
+    expect(w.locateAsked).toEqual([false])
+  })
 
   test("#given one remote session #when the thread ops run in turn #then the attach is opened once, status and the transcript are read from the device every time, an exact model in the held catalog is one set_model, and each command is one round trip", async () => {
     const w = relayWorld()
