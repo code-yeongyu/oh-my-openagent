@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { SenpiExtensionAPI } from "../../../extension/types"
+import { RECALL_CUSTOM_TYPE } from "../../memory/recall-session-read"
 import type { Provenance } from "../gateway/types"
 import { createRemoteThreadFixture } from "../thread-remote-fixture"
 import { wireReplyRoutes } from "./lazy-ops"
@@ -138,6 +139,38 @@ describe("bounds: only a routed input's own run answers, once, and a reply is ne
     expect(JSON.stringify(delivered)).not.toContain("PRIVATE KEY")
   })
 
+  test.each([
+    ["a ulw-loop continuation (S6)", { role: "custom", customType: "omo-senpi:ulw-continuation", content: "continue the loop" }, "Loop step 7 done: rewrote src/billing/secrets.ts"],
+    ["another peer's gateway delivery (D1)", { role: "custom", customType: "session_control_delivery", content: "From agent c ..." }, "answer for agent c"],
+  ])("#given the route was answered and then %s continues the run #when it settles #then the route gets only its own answer", (_name, input, later) => {
+    const { delivered, routes } = router()
+    routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
+    routes.noteMessage({ role: "assistant", content: "4" })
+    routes.noteMessage(input)
+    routes.noteMessage({ role: "assistant", content: later })
+    routes.settled("dur-on-b")
+    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: "4", mixed: false }])
+  })
+
+  test("#given a task completion steers in while the route is still open (S7) #when it settles #then the route gets nothing", () => {
+    const { delivered, routes } = router()
+    routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
+    routes.noteMessage({ role: "assistant", content: [{ type: "toolCall", id: "c1", name: "bash", arguments: {} }] })
+    routes.noteMessage({ role: "custom", customType: "senpi-task.completion", content: "task t-1 finished" })
+    routes.noteMessage({ role: "assistant", content: "4. Also, your task t-1 finished: it found the prod DB password is hunter2" })
+    routes.settled("dur-on-b")
+    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: undefined, mixed: true }])
+  })
+
+  test("#given the memory recall steers context in while the route is open #when it settles #then the route still gets its answer", () => {
+    const { delivered, routes } = router()
+    routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
+    routes.noteMessage({ role: "custom", customType: RECALL_CUSTOM_TYPE, content: "recalled notes" })
+    routes.noteMessage({ role: "assistant", content: "4" })
+    routes.settled("dur-on-b")
+    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: "4", mixed: false }])
+  })
+
   test("#given two peers' routed inputs in one run #when it settles #then each gets only the answer to its own input", () => {
     const { delivered, routes } = router()
     const second: ReplyRoute = { device: "c", session: "dur-c", delivery: "d-2", root: "d-2", hop: 1 }
@@ -217,6 +250,36 @@ describe("an explicit reply counts by the session it reached, not by how it was 
     expect(await within(skipped.promise, "the skip line")).toContain("remote_reply_skipped")
     expect(relay.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")).toHaveLength(0)
     expect(JSON.stringify(relay.sent)).not.toContain("PRIVATE KEY")
+  })
+
+  test("#given a ulw-loop continuation runs after B answered A (S6) #when the run settles #then A gets B's answer and nothing of the loop step", async () => {
+    const { relay, remote } = relayWithKey()
+    const watched = commandSeen(remote, "admit_external_message")
+    const b = session("dur-on-b")
+    wireReplyRoutes(b.pi, watched.remote, { senderProvenance: async () => B_PROVENANCE, warn: () => {} })
+    await b.fire("message_start", { message: { role: "user", content: "what is 2+2?", clientMessageId: tokenOf("d-6") } })
+    await b.fire("message_end", { message: { role: "assistant", content: "4" } })
+    await b.fire("message_start", { message: { role: "custom", customType: "omo-senpi:ulw-continuation", content: "continue the loop" } })
+    await b.fire("message_end", { message: { role: "assistant", content: "Loop step 7 done: rewrote src/billing/secrets.ts" } })
+    await b.fire("agent_settled")
+    const delivered = await within(watched.seen, "the reply to d-6")
+    expect(String(delivered.rpc["text"]).split("\n").at(-1)).toBe(JSON.stringify("4"))
+    expect(JSON.stringify(relay.sent)).not.toContain("Loop step 7")
+  })
+
+  test("#given a task completion steers in before B answered A (S7) #when the run settles #then nothing reaches A", async () => {
+    const { relay, remote } = relayWithKey()
+    const skipped = Promise.withResolvers<string>()
+    const b = session("dur-on-b")
+    wireReplyRoutes(b.pi, remote, { senderProvenance: async () => B_PROVENANCE, warn: (line) => skipped.resolve(line) })
+    await b.fire("message_start", { message: { role: "user", content: "what is 2+2?", clientMessageId: tokenOf("d-7") } })
+    await b.fire("message_end", { message: { role: "assistant", content: [{ type: "toolCall", id: "c1", name: "bash", arguments: {} }] } })
+    await b.fire("message_start", { message: { role: "custom", customType: "senpi-task.completion", content: "task t-1 finished" } })
+    await b.fire("message_end", { message: { role: "assistant", content: "4. Also, your task t-1 finished: it found the prod DB password is hunter2" } })
+    await b.fire("agent_settled")
+    expect(await within(skipped.promise, "the skip line")).toContain("remote_reply_skipped")
+    expect(relay.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")).toHaveLength(0)
+    expect(JSON.stringify(relay.sent)).not.toContain("hunter2")
   })
 
   test("#given a send to A made while answering a later input #when the run settles #then it does not count as answering A's earlier routed input", async () => {
