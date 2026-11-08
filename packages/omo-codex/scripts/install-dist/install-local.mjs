@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:f8a4ab5294d9c37fc457906405ce05a01bf034db4a1cd50bdaa753bb8c10f181:7d51e43febe2cae839d8552f2590057bb3fb908173dec2f162e1d2791f28a170
+// omo-codex-install:92352976bc4c64aa24e660fad21f81e1d632ecfb91655d40a5f74627272a5d1b:279fdc6ef0fc0f5b159f042831dc86ce7a6e071463b1f2a655f82d421f45ad24
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10205,7 +10205,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.62",
+    version: "5.1.64",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -19902,6 +19902,22 @@ var OmoMemoryProjectionLayerSchema = object({
   max_entries_per_directory: number2().int().min(0).optional(),
   max_bytes: number2().int().min(0).optional()
 }).strict();
+var OmoMemoryRuntimeSchema = object({
+  retention_days: number2().int().min(1).default(7),
+  abandoned_journal_days: number2().int().min(1).default(14),
+  completions_days: number2().int().min(1).default(30),
+  pass_budget_ms: number2().int().min(1).default(60000),
+  discard_unreflected_journals: boolean2().default(false),
+  max_bytes: number2().int().min(0).default(2 * 1024 * 1024 * 1024)
+}).strict();
+var OmoMemoryRuntimeLayerSchema = object({
+  retention_days: number2().int().min(1).optional(),
+  abandoned_journal_days: number2().int().min(1).optional(),
+  completions_days: number2().int().min(1).optional(),
+  pass_budget_ms: number2().int().min(1).optional(),
+  discard_unreflected_journals: boolean2().optional(),
+  max_bytes: number2().int().min(0).optional()
+}).strict();
 var OmoMemoryAgentOverridesSchema = object({
   enabled: boolean2().optional(),
   agent: string2().min(1).optional(),
@@ -19917,6 +19933,7 @@ var OmoMemoryAgentOverridesSchema = object({
   search: OmoMemorySearchLayerSchema.optional(),
   recall: OmoMemoryRecallLayerSchema.optional(),
   projection: OmoMemoryProjectionLayerSchema.optional(),
+  runtime: OmoMemoryRuntimeLayerSchema.optional(),
   compile_warn_tokens: number2().int().positive().optional()
 }).strict();
 var OmoMemoryAutoIdentitySchema = _enum(["path", "git"]);
@@ -19961,6 +19978,7 @@ var OmoMemorySettingsSchema = object({
   }),
   project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
   projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 0, max_bytes: 40960 }),
+  runtime: OmoMemoryRuntimeSchema.default({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30, pass_budget_ms: 60000, discard_unreflected_journals: false, max_bytes: 2 * 1024 * 1024 * 1024 }),
   compile_warn_tokens: number2().int().positive().default(30000),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).default({})
 }).strict();
@@ -19981,6 +19999,7 @@ var OmoMemorySettingsLayerSchema = object({
   recall: OmoMemoryRecallLayerSchema.optional(),
   project_scope: OmoMemoryProjectScopeLayerSchema.optional(),
   projection: OmoMemoryProjectionLayerSchema.optional(),
+  runtime: OmoMemoryRuntimeLayerSchema.optional(),
   compile_warn_tokens: number2().int().positive().optional(),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).optional()
 }).strict();
@@ -21858,13 +21877,6 @@ function resolveOmoConfigView(options) {
 }
 
 // packages/omo-config-core/src/loader/loader.ts
-function positionAt(content, offset) {
-  const before = content.slice(0, offset);
-  const lineStart = before.lastIndexOf(`
-`) + 1;
-  return { line: before.split(`
-`).length, column: offset - lineStart + 1 };
-}
 function parseJsoncSafe(content) {
   const errors = [];
   const data = parse4(content.charCodeAt(0) === 65279 ? content.slice(1) : content, errors, {
@@ -21911,14 +21923,12 @@ function readConfigSource(path, scope, fileSystem) {
     };
   }
   const parsed = parseJsoncSafe(content);
-  const firstError = parsed.errors[0];
-  if (firstError !== undefined) {
+  if (parsed.errors.length > 0) {
     return {
       diagnostics: [{
         kind: "parse",
         message: `JSONC parse error in ${path}: ${parsed.errors.map((error) => error.message).join(", ")}`,
-        path,
-        position: positionAt(content.charCodeAt(0) === 65279 ? content.slice(1) : content, firstError.offset)
+        path
       }],
       source: { exists: true, loaded: false, path, scope }
     };

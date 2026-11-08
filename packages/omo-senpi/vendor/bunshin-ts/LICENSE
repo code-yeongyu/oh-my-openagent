@@ -1,0 +1,46 @@
+# License
+
+OmO Device Service End-User License Agreement
+SPDX-License-Identifier: LicenseRef-OmO-Device-Service-EULA
+
+This repository and every artifact built from it (the OmO device service, also called the
+relay daemon, in source or binary form) are proprietary work:
+
+1. **Proprietary work**: all code, documentation, and other material in this repository,
+   Copyright (c) 2026 Yeongyu Kim, proprietary — all rights reserved (see the End-User
+   License below).
+2. All third party components incorporated into this software are licensed under the original
+   license provided by the owner of the applicable component.
+3. The public `omo-ai` package is not covered by this agreement. It remains under its own
+   Sustainable Use License and only downloads the closed artifact described here; nothing in
+   this agreement changes that package's license. Notwithstanding anything else in this
+   agreement, the compiled bunshin-ts and bunshin-ts-relay client libraries built from this
+   software may be distributed with this agreement attached, as built or bundled into the build
+   output of the omo-ai and omo-senpi packages, inside those packages and their source
+   repositories; this permission covers only those copies and grants no other right.
+
+## End-User License (proprietary)
+
+Copyright (c) 2026 Yeongyu Kim. All rights reserved.
+
+You may install and run the binary artifact of this software only as delivered to you by an
+official OmO installer or downloaded from get.omo.dev, and only together with OmO.
+
+Redistribution is permitted only inside official OmO installers and through get.omo.dev.
+No other license is granted. Without the prior written permission of the copyright holder you
+may not:
+
+1. copy, publish, distribute, sublicense, sell, or otherwise redistribute the software or any
+   artifact built from it separately from an official OmO installer or get.omo.dev;
+2. modify, merge, adapt, translate, or create derivative works of the software; or
+3. reverse engineer, decompile, disassemble, or otherwise attempt to derive the source code,
+   protocols, or keys of the software, except to the extent applicable law expressly permits
+   it notwithstanding this limitation.
+
+Access to the source code, where granted, is provided solely for preparing contributions to
+the Project (the omo-device-service software and its binaries distributed by Yeongyu Kim).
+Contributions are governed by the Contributor License Agreement (CLA.md).
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. IN NO EVENT
+SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM
+THE SOFTWARE OR ITS USE.

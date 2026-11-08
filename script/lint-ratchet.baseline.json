@@ -392,9 +392,6 @@
   "packages/omo-senpi/src/components/onboarding/claim-takeover-race.test.ts": {
     "typescript/no-non-null-assertion": 1
   },
-  "packages/omo-senpi/src/components/onboarding/component.test.ts": {
-    "typescript/no-non-null-assertion": 1
-  },
   "packages/omo-senpi/src/components/onboarding/state.test.ts": {
     "typescript/no-non-null-assertion": 1
   },
@@ -482,9 +479,6 @@
   "packages/utils/src/process-sweep/sweeper.ts": {
     "typescript/no-non-null-assertion": 1
   },
-  "packages/web/e2e/landing.spec.ts": {
-    "typescript/no-non-null-assertion": 1
-  },
   "packages/web/e2e/manifesto-glyph-oracle.spec.ts": {
     "typescript/no-non-null-assertion": 1
   },
@@ -493,9 +487,6 @@
   },
   "packages/web/e2e/manifesto-reading.spec.ts": {
     "typescript/no-non-null-assertion": 8
-  },
-  "packages/web/e2e/secret-reading-state.ts": {
-    "typescript/no-non-null-assertion": 5
   },
   "packages/web/lib/install-targets.test.ts": {
     "typescript/no-non-null-assertion": 2
