@@ -10,6 +10,7 @@ import {
   openRemote,
   promptRemote,
   remoteAvailable,
+  type RemoteSender,
   type RemoteSendRequest,
   runningTurnRemote,
 } from "../omo-senpi/src/components/thread/remote/remote-ops"
@@ -25,7 +26,8 @@ const deviceServiceSurface = (service: DeviceService): RemoteThreadSurface => ({
   chain: { stamp: record => record },
 })
 
-const CHAIN_START = 1
+// The person at this terminal sends their own input, not a peer session's message (#12852).
+const PERSON: RemoteSender = { kind: "person", hop: 1 }
 
 type Show = (result: ThreadToolResult, label: string) => number
 
@@ -118,7 +120,7 @@ async function sendTo(
     }
     request = { ...request, expected_turn_id: running.turn_id }
   }
-  if (!args.wait) return show(await promptRemote(remote, row, request, CHAIN_START), label)
+  if (!args.wait) return show(await promptRemote(remote, row, request, PERSON), label)
   // Followed before the send, so no delta of the turn it starts can arrive unseen.
   let reply = ""
   const follow = await followRemote(remote, row, text => {
@@ -127,7 +129,7 @@ async function sendTo(
   })
   if ("kind" in follow) return show(follow, label)
   try {
-    const sent = await promptRemote(remote, row, request, CHAIN_START)
+    const sent = await promptRemote(remote, row, request, PERSON)
     if (sent.kind === "error") return show(sent, label)
     const end = await follow.settled
     if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")
