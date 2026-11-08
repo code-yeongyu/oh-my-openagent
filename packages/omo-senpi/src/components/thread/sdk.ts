@@ -205,13 +205,23 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
       if (request.binding_id !== undefined) return await inbound({ ...request, binding_id: request.binding_id })
       if (request.thread === undefined) return fail("invalid_arguments", "A send without a binding needs a target session.", "Pass the target session, or --binding to deliver through a binding.")
       if (request.author !== undefined) return fail("invalid_arguments", "An author names a human in a bound external thread; a send without a binding has none.", "Pass binding_id with the author, or drop the author.")
+      // Resolved like read: an alias or account id held on this device is account-wide, so the workspace scope does not apply.
+      let target = request.thread
+      let allScope = request.all_scope
+      if (options.remote !== undefined) {
+        const across = await crossTarget(options.remote, target, resolution(surface, resolveEntries(surface, await view()), target, UNKNOWN_CALLER, true))
+        if (across.kind === "local") {
+          target = across.address
+          allScope = localScope(across, request.all_scope)
+        }
+      }
       return await engine.deliver({
         sender: { kind: "cli", uid: options.uid, user: options.user },
-        target: request.thread,
+        target,
         text: request.text,
         ...(request.mode === undefined ? {} : { mode: request.mode }),
         ...(request.expected_turn_id === undefined ? {} : { expected_turn_id: request.expected_turn_id }),
-        ...(request.all_scope === undefined ? {} : { all_scope: request.all_scope }),
+        ...(allScope === undefined ? {} : { all_scope: allScope }),
         ...(request.idempotency_key === undefined ? {} : { idempotency_key: request.idempotency_key }),
       })
     }),
