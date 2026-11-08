@@ -9,6 +9,7 @@ import type { RemoteThreadSurface } from "./remote/ports"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
 import { createRemoteThreadFixture } from "./thread-remote-fixture"
 import type { ThreadHost, ThreadHostSession } from "./tools"
+import type { ThreadHostViewRequest } from "./tools/ports"
 
 const TUI_SOCKET = "/tmp/t-0123456789abcdef.sock"
 const HOST_SOCKET = "/tmp/i-0123456789abcdef.sock"
@@ -32,6 +33,7 @@ function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, re
   for (const session of [hostSession, tuiSession, ...diskOnly]) writeFileSync(join(sessionsDir, `epoch_${session.durableSessionId}.jsonl`), JSON.stringify({ type: "session", id: session.durableSessionId, cwd: session.cwd, timestamp: "2026-10-02T00:00:00Z" }) + "\n")
   const wakes: { readonly endpoint: GatewayEndpointRef; readonly ids: readonly string[] }[] = []
   const releases: { readonly endpoint: GatewayEndpointRef; readonly request: ReleaseSessionRequest }[] = []
+  const views: (ThreadHostViewRequest | undefined)[] = []
   const unused = async (): Promise<never> => {
     throw new Error("not used by the SDK")
   }
@@ -39,6 +41,7 @@ function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, re
     socket: "/tmp/thread-sdk-legacy.sock",
     listSessions: async () => [hostSession, tuiSession],
     listView: async (request) => {
+      views.push(request)
       // The live surface's contract: when no endpoint answers it throws, unless the caller takes nothing live as the offline case.
       if (options.noHostAnswering === true) {
         if (request?.offline !== true) throw new Error("connect ECONNREFUSED")
@@ -76,7 +79,23 @@ function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, re
   }
   const sdk = createThreadSdk({ agentDir, cwd: options.cwd ?? process.cwd(), uid: 501, user: "qa-user", host, ...(options.sdkOwnsStore === true ? {} : { store }), ...(options.remote === undefined ? {} : { remote: options.remote }) })
   sdks.push(sdk)
-  return { sdk, store, wakes, releases }
+  return { sdk, store, wakes, releases, views }
+}
+
+/** The remote surface with every device-service and alias-registry call it takes recorded by method name. */
+function countingRemote(remote: RemoteThreadSurface): { readonly remote: RemoteThreadSurface; readonly calls: string[] } {
+  const calls: string[] = []
+  const counted = <T extends object>(port: T): T => new Proxy(port, {
+    get: (target, key, receiver) => {
+      const value: unknown = Reflect.get(target, key, receiver)
+      if (typeof value !== "function") return value
+      return (...args: unknown[]) => {
+        calls.push(String(key))
+        return Reflect.apply(value, target, args)
+      }
+    },
+  })
+  return { remote: { ...remote, sessions: counted(remote.sessions), ...(remote.aliases === undefined ? {} : { aliases: counted(remote.aliases) }) }, calls }
 }
 
 describe("thread SDK: sessions", () => {
@@ -139,6 +158,17 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     expect(await sdk.send({ thread: "dur-off", text: "by id" })).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
     expect(await sdk.send({ thread: "lane-off", text: "by alias" })).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
     expect((await store.list({ target_durable_id: "dur-off" })).map((row) => row.sender)).toEqual(["cli:501", "cli:501"])
+  })
+
+  test("#given a published thread id and the account surface set #when omo thread send names that id #then it is delivered with no host listing and no device-service or alias call (#12860)", async () => {
+    const account = remoteFixture.account({ aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]) })
+    const counting = countingRemote(account.remote)
+    const { sdk, store, views } = fixture({ remote: counting.remote })
+    await store.registerIncarnation({ durable_id: "dur-host", incarnation: "rpc-1", endpoint: { kind: "rpc_host", socket: HOST_SOCKET } })
+    expect(await sdk.send({ thread: "dur-host", text: "ping" })).toMatchObject({ kind: "ok", deduplicated: false })
+    expect((await store.list({ target_durable_id: "dur-host" })).map((row) => row.sender)).toEqual(["cli:501"])
+    expect(views).toEqual([])
+    expect(counting.calls).toEqual([])
   })
 })
 
