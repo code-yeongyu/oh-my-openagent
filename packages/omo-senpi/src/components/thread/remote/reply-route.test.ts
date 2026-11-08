@@ -152,6 +152,33 @@ describe("bounds: only a routed input's own run answers, once, and a reply is ne
     expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: "4", mixed: false }])
   })
 
+  // Turn-start context: senpi writes every initial message of a turn with message_start, so the environment context (before the
+  // prompt), the memory notice and the task usage hint (after it) ride an ordinary routed turn before any assistant output.
+  test.each([
+    ["the environment context before the prompt (E1)", "before", "environment-context"],
+    ["the memory notice after the prompt (E2)", "after", "omo-memory:notice"],
+    ["the task usage hint after the prompt (E3)", "after", "senpi-task.usage"],
+  ])("#given %s #when the turn answers and settles #then the route gets its answer", (_name, placement, customType) => {
+    const { delivered, routes } = router()
+    const context = { role: "custom", customType, content: "turn-start context" }
+    if (placement === "before") routes.noteMessage(context)
+    routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
+    if (placement === "after") routes.noteMessage(context)
+    routes.noteMessage({ role: "assistant", content: "4" })
+    routes.settled("dur-on-b")
+    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: "4", mixed: false }])
+  })
+
+  test("#given any other custom arrives after an assistant message (D11) #when it settles #then it still splits the segment", () => {
+    const { delivered, routes } = router()
+    routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
+    routes.noteMessage({ role: "assistant", content: "4" })
+    routes.noteMessage({ role: "custom", customType: "some-extension:turn", content: "do the next thing" })
+    routes.noteMessage({ role: "assistant", content: "the next thing, done for the local user" })
+    routes.settled("dur-on-b")
+    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: "4", mixed: false }])
+  })
+
   test("#given a task completion steers in while the route is still open (S7) #when it settles #then the route gets nothing", () => {
     const { delivered, routes } = router()
     routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
@@ -265,6 +292,23 @@ describe("an explicit reply counts by the session it reached, not by how it was 
     const delivered = await within(watched.seen, "the reply to d-6")
     expect(String(delivered.rpc["text"]).split("\n").at(-1)).toBe(JSON.stringify("4"))
     expect(JSON.stringify(relay.sent)).not.toContain("Loop step 7")
+  })
+
+  test("#given B's fresh session takes A's routed prompt as its first turn, with the environment context and task usage hint #when the run settles #then A gets B's answer", async () => {
+    const { relay, remote } = relayWithKey()
+    const watched = commandSeen(remote, "admit_external_message")
+    const warnings: string[] = []
+    const b = session("dur-on-b")
+    wireReplyRoutes(b.pi, watched.remote, { senderProvenance: async () => B_PROVENANCE, warn: (line) => warnings.push(line) })
+    await b.fire("message_start", { message: { role: "custom", customType: "environment-context", content: "cwd and date" } })
+    await b.fire("message_start", { message: { role: "user", content: "what is 2+2?", clientMessageId: tokenOf("d-9") } })
+    await b.fire("message_start", { message: { role: "custom", customType: "senpi-task.usage", content: "task usage" } })
+    await b.fire("message_end", { message: { role: "assistant", content: "4" } })
+    await b.fire("agent_settled")
+    const delivered = await within(watched.seen, "the reply to d-9")
+    expect(String(delivered.rpc["text"]).split("\n").at(-1)).toBe(JSON.stringify("4"))
+    expect(relay.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")).toHaveLength(1)
+    expect(warnings.filter((line) => line.includes("remote_reply_skipped"))).toEqual([])
   })
 
   test("#given a task completion steers in before B answered A (S7) #when the run settles #then nothing reaches A", async () => {
