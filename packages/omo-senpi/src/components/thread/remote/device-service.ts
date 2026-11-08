@@ -201,6 +201,21 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       const entries: JsonObject[] = page.entries.flatMap((item) => ("entry" in item && typeof item.entry === "object" && item.entry !== null && !Array.isArray(item.entry) ? [item.entry as JsonObject] : []))
       return { kind: "ok", response: { entries } }
     },
+    watch: async (device, sessionId, listener) => {
+      let attached: RemoteAttach
+      try {
+        attached = (await attach(device, sessionId)).attached
+      } catch (error) {
+        return { kind: "refused", reason: notSentReason(error) }
+      }
+      // onEvent replays the attach's history to a new listener before it returns: only what arrives after is delivered.
+      let live = false
+      const stop = attached.onEvent((event) => {
+        if (live && event.kind === "records") for (const record of event.records) listener(record)
+      })
+      live = true
+      return { kind: "ok", watch: { ended: attached.detached, stop } }
+    },
     locate: async (device, engineId, knownKey) => {
       let connected: DeviceService
       try {

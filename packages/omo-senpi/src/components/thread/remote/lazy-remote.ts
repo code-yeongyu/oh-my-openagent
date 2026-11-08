@@ -28,6 +28,7 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
     locate: async (device, engineId, knownKey) => await (await load()).locate(device, engineId, knownKey),
     sessionCommand: async (device, sessionId, rpc, options) => await (await load()).sessionCommand(device, sessionId, rpc, options),
     read: async (device, sessionId, tail) => await (await load()).read(device, sessionId, tail),
+    watch: async (device, sessionId, listener) => await (await load()).watch(device, sessionId, listener),
   }
   return { sessions, chain: { stamp: (record) => record } }
 }
