@@ -6,9 +6,11 @@ import {
 	WINDOW_METHODS,
 } from "@oh-my-opencode/senpi-desktop-protocol";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ComputerRunError } from "../src/run/context";
+import { ComputerRunError, RunOutput } from "../src/run/context";
 import { type ComputerRunSandbox, type ExecuteTool, runComputerCode } from "../src/run/runtime";
-import { SANDBOX_RESULT_BYTES } from "../src/run/sandbox/limits";
+import { createComputerBridge } from "../src/run/sandbox/bridge";
+import { SANDBOX_MAX_CALLS, SANDBOX_RESULT_BYTES } from "../src/run/sandbox/limits";
+import { BridgedJson } from "../src/run/sandbox/quickjs";
 import { DesktopEngineRpcError } from "../src/service/rpc-client";
 import { DesktopService } from "../src/service/service";
 import { fakeEngineFactory, rejectionOf, type SpawnLog } from "./harness";
@@ -447,6 +449,33 @@ describe("runComputerCode vm-only bodies", HANG_GUARD, () => {
 		expect(error).toHaveProperty("message", "tool is not defined");
 		expect(executeTool).not.toHaveBeenCalled();
 	});
+
+	// Compatibility matrix M5: the call `computer.run(fn)` generates (senpi-desktop-prelude/src/prelude.js) names `wait`,
+	// so under quickjs every function-form run throws until the prelude stops naming it; this pins that gap.
+	const M5_BODY = "return await ((({ desktop }, n) => n + 1))({ desktop, wait, assert }, 41);";
+
+	it("runs the generated computer.run(fn) shape under vm", async () => {
+		// Given
+		const { service } = await openDesktop();
+
+		// When
+		const result = await runCode(service, M5_BODY);
+
+		// Then
+		expect(result.returnValue).toBe(42);
+	});
+
+	it("throws ReferenceError for the generated computer.run(fn) shape under quickjs while it names wait", async () => {
+		// Given
+		const { service } = await openDesktop();
+
+		// When
+		const error = await rejectionOf(runCode(service, M5_BODY, { sandbox: "quickjs" }));
+
+		// Then
+		expect(error).toBeInstanceOf(ReferenceError);
+		expect(error).toHaveProperty("message", "wait is not defined");
+	});
 });
 
 describe("the computer bridge in the QuickJS run cell", HANG_GUARD, () => {
@@ -636,5 +665,60 @@ describe("the computer bridge in the QuickJS run cell", HANG_GUARD, () => {
 		expect(absent.returnValue).toEqual(["undefined", "undefined", "function"]);
 		expect(flood).toBeInstanceOf(ComputerRunError);
 		expect(flood).toHaveProperty("reason", "calls");
+	});
+
+	it("fails with calls past the cap and sends $/cancel for the call still in flight", async () => {
+		// Given: the first call stalls in the engine, every later one queues behind it
+		const { service, log } = await openDesktop({ FAKE_ENGINE_STALL: "windows" });
+		const code = `
+			const stuck = computer.windows();
+			for (let i = 0; i < ${SANDBOX_MAX_CALLS}; i++) computer.capabilities().catch(() => {});
+			await stuck;
+		`;
+
+		// When
+		const running = rejectionOf(quickjs(service, code));
+		const sent = await log.nthRequest("windows", 1);
+		const error = await running;
+
+		// Then
+		expect(error).toBeInstanceOf(ComputerRunError);
+		expect(error).toHaveProperty("reason", "calls");
+		expect((await log.nthRequest("$/cancel", 1)).params).toEqual({ id: sent.id });
+	});
+
+	it("keeps handles per run: a handle index from one run is an unknown handle in the next", async () => {
+		// Given: a body can only reach a handle through the stubs its own run revived, so the host's per-run handle
+		// table is where a handle from another run would have to be refused; two runs' bridges over one session
+		const { service } = await openDesktop();
+		const bridgeOf = () =>
+			createComputerBridge({
+				snapshot: snapshot(false),
+				deadline: Date.now() + RUN_TIMEOUT_MS,
+				output: new RunOutput(),
+				screenshots: [],
+				call: (method, params, signal) => service.call(method, params, { signal }),
+			});
+		const first = bridgeOf();
+		const second = bridgeOf();
+		const signal = new AbortController().signal;
+		const callFirst = first.bridge.computer;
+		const callSecond = second.bridge.computer;
+		if (callFirst === undefined || callSecond === undefined) throw new Error("no computer bridge");
+		const found = await callFirst([0, "window", [{ app: "Code" }]], signal);
+		if (!(found instanceof BridgedJson)) throw new Error("window result is not bridged JSON");
+		const { marker } = JSON.parse(first.setup.data) as { marker: string };
+		const { handle } = (JSON.parse(found.json) as Record<string, { handle: number }>)[marker] ?? { handle: -1 };
+
+		// When
+		const inFirst = await callFirst([handle, "raise", []], signal);
+		const inSecond = await rejectionOf(callSecond([handle, "raise", []], signal));
+
+		// Then
+		expect(handle).toBe(1);
+		expect(inFirst).toBeUndefined();
+		expect(inSecond).toBeInstanceOf(TypeError);
+		expect(inSecond).toHaveProperty("message", `computer run: unknown handle ${handle}`);
+		expect((JSON.parse(second.setup.data) as { marker: string }).marker).not.toBe(marker);
 	});
 });
