@@ -93,7 +93,7 @@ export class HostSessionClient {
 
   async open(input: HostSessionOpenInput): Promise<OpenedHostSession> {
     this.openInput = this.parent.named(input)
-    const { opened, identity, retryFallbackDropped } = await openHostSessionConnection(this.openInput, {
+    const { opened, identity } = await openHostSessionConnection(this.openInput, {
       ...this.ports,
       onDisconnect: (error) => this.handleTransportLoss(error),
       onEvent: (record) => this.ingest(record),
@@ -108,7 +108,6 @@ export class HostSessionClient {
       attached: this.reattached,
       instanceId: identity.instanceId,
       engineVersion: identity.engineVersion,
-      ...(retryFallbackDropped ? { retryFallbackDropped } : {}),
     }
   }
 
