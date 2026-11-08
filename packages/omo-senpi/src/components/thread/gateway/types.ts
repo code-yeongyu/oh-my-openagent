@@ -44,6 +44,8 @@ export type Provenance = {
   readonly project: string
   readonly lane?: string
   readonly session?: string
+  /** The account device a send to another device left from (remote/remote-ops.ts); absent on a send within one device. */
+  readonly device?: string
 }
 
 export type DeliveryEnvelope = {

@@ -84,6 +84,8 @@ export type RemoteSessionsPort = {
     sessionId: string,
     listener: (record: JsonObject) => void,
   ) => Promise<RemoteWatchOutcome>
+  /** Closes the device-service connection this port opened, if any; a short-lived caller (the CLI) calls it at the end. */
+  readonly close?: () => Promise<void>
 }
 
 /**

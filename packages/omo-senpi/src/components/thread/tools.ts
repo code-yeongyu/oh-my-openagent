@@ -1,4 +1,5 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
+import { randomUUID } from "node:crypto"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
 import {
@@ -35,6 +36,7 @@ import { isLockWaitExceeded } from "./gateway/lock-wait"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
+import { localScope } from "./remote/local-scope"
 import {
   closeRemote,
   crossTarget,
@@ -49,6 +51,7 @@ import {
   setModelRemote,
   withAlias,
 } from "./remote/lazy-ops"
+import type { RemotePeer } from "./remote/peer-text"
 import { matchModel, modelPatternFailure } from "./tools/model-match"
 import { recordThreadCreator, registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
@@ -90,7 +93,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
   readonly tools: readonly AnyTool[]
   readonly dispose: () => void
 } {
-  const { store, engine, relay } = createGatewayServices(options, () => view({ offline: true }))
+  const { store, engine, relay, senderProvenance } = createGatewayServices(options, () => view({ offline: true }))
   const now = options.now ?? store.now
   async function view(request?: ThreadHostViewRequest): Promise<ThreadHostView> {
     await options.ensureHost?.()
@@ -389,7 +392,11 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         return readThread(
           options,
           current,
-          { ...value, thread: target.kind === "local" ? target.address : value.thread },
+          {
+            ...value,
+            thread: target.kind === "local" ? target.address : value.thread,
+            all_scope: localScope(target, value.all_scope),
+          },
           callerId,
         )
       }),
@@ -423,7 +430,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           resolveEntries(options, current),
           target.kind === "local" ? target.address : value.thread,
           callerId,
-          value.all_scope,
+          localScope(target, value.all_scope),
         )
         if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult
         const session = targetSession(current, resolved.entry.thread_id)
@@ -463,7 +470,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           resolveEntries(options, current),
           target.kind === "local" ? target.address : value.thread,
           callerId,
-          value.all_scope,
+          localScope(target, value.all_scope),
         )
         if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult
         const session = targetSession(current, resolved.entry.thread_id)
@@ -568,7 +575,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
                 entries,
                 target.kind === "local" ? target.address : value.thread,
                 callerId,
-                value.all_scope,
+                localScope(target, value.all_scope),
               )
             : undefined
         if (resolved?.kind === "error") return { kind: "error", error: resolved }
@@ -653,7 +660,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           resolveEntries(options, current),
           target.kind === "local" ? target.address : value.thread,
           callerId,
-          value.all_scope,
+          localScope(target, value.all_scope),
         )
         if (resolved.kind === "error") return { kind: "error", error: resolved }
         const session = targetSession(current, resolved.entry.thread_id)
@@ -710,11 +717,22 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         return { kind: "ok", thread_id: resolved.entry.thread_id, level: value.level, scope: value.scope ?? "session" }
       }),
   }
-  // K8 / R8.c: the hop a send to another device carries, continuing the caller's own chain.
-  async function nextHop(): Promise<number> {
+  // K8 / R8.c: a send to another device continues the caller's own chain (its hop and root), and names its sender the way
+  // a local delivery does (gateway/engine.ts senderFacts): the session, its name, and its workspace and project (#12852).
+  async function remotePeer(callerId: string): Promise<RemotePeer> {
     const cause = options.callerCause?.()
-    if (cause === undefined) return 1
-    return ((await store.deliveryView(cause))?.row.hop ?? 0) + 1
+    const prior = cause === undefined ? undefined : (await store.deliveryView(cause))?.row
+    const name = options.callerName?.()?.trim()
+    const deliveryId = randomUUID()
+    const provenance = await senderProvenance()
+    return {
+      session_id: callerId,
+      ...(name === undefined || name === "" ? {} : { name }),
+      provenance: name === undefined || name === "" ? provenance : { ...provenance, session: name },
+      delivery_id: deliveryId,
+      root_id: prior?.root_id ?? deliveryId,
+      hop: (prior?.hop ?? 0) + 1,
+    }
   }
   async function openLocal(current: ThreadHostView, address: string, callerId: string): Promise<ThreadToolResult> {
     const resolved = resolution(
@@ -821,6 +839,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
     callerId: string,
     resolvedBy?: "exact_name" | "fuzzy",
   ): Promise<ThreadToolResult> {
+    let scope = value.all_scope
     if (options.remote !== undefined && current !== PUBLISHED_SEND_VIEW) {
       const target = await crossTarget(
         options.remote,
@@ -855,7 +874,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
           callerId,
           idempotencyKey,
           value,
-          async () => await promptRemote(remote, row, request, await nextHop()),
+          async () => await promptRemote(remote, row, request, { kind: "peer", ...(await remotePeer(callerId)) }),
         )
         if (resolvedBy === undefined || sent.kind !== "ok" || !("delivery" in sent)) return sent
         const seen = new Date(row.updated_ms).toISOString()
@@ -878,15 +897,16 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
         } as ThreadToolResult
       }
       address = target.address
+      scope = localScope(target, value.all_scope)
     }
     if (current === PUBLISHED_SEND_VIEW)
       return await deliverThroughGateway(options, engine, current, address, value, idempotencyKey, callerId, resolvedBy)
     const resolved = resolution(
       options,
-      toThreadAddressEntries(sendAddressBook(options, current, address, value.all_scope)),
+      toThreadAddressEntries(sendAddressBook(options, current, address, scope)),
       address,
       callerId,
-      value.all_scope,
+      scope,
     )
     if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult
     return await deliverThroughGateway(
@@ -894,7 +914,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): {
       engine,
       current,
       resolved.entry.thread_id,
-      value,
+      { ...value, all_scope: scope },
       idempotencyKey,
       callerId,
       resolvedBy,
