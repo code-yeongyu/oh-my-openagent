@@ -9,7 +9,7 @@
 //   dense-window-observe      a Safari page of `--dense-rows` list rows (default 2,000, >= 5,000 AX nodes). An
 //                             `ax.snapshot` at the 3,000 ms default deadline (no node cap) returns complete:false
 //                             with cuts and the deadline line; a drill on its smallest cut completes; the default
-//                             depth-3 skeleton stays within the 2,000-token budget (conservative estimate, bytes / 3);
+//                             depth-3 skeleton stays within the 2,000-token budget (an estimate, bytes / 3);
 //                             the SDK's `window.ax` hands out a partial snapshot. The measurements go to the engine
 //                             without the SDK's reply validation, so they stay engine facts. The control: the same
 //                             window with a 10,000 ms deadline returns complete:true and observes >= 5,000 nodes,
@@ -244,6 +244,7 @@ async function denseWindowObserve({ enginePath, denseRows }) {
 		// The skeleton a caller gets by default: depth 3, the engine's own node budget and deadline.
 		const skeleton = await timed(() => snapshot({ skeleton: true }));
 		const skeletonBytes = Buffer.byteLength(skeleton.value.text);
+		// An estimate (utf8 bytes / 3), not a tokenizer count.
 		const skeletonTokens = Math.ceil(skeletonBytes / 3);
 		// The SDK consumer path: a node-budget-cut snapshot is partial too, and window.ax must hand it out.
 		let sdkPartial;
@@ -266,7 +267,7 @@ async function denseWindowObserve({ enginePath, denseRows }) {
 				ms: skeleton.ms,
 				...snapshotSummary(skeleton.value),
 				tokenEstimate: skeletonTokens,
-				tokenMethod: "ceil(utf8 bytes / 3), conservative; the DESIGN section 9 max_tokens=1 count is taken off-host from this text",
+				tokenMethod: "ceil(utf8 bytes / 3), estimate; the DESIGN section 9 max_tokens=1 count is taken off-host from this text",
 				text: skeleton.value.text,
 			},
 			sdkPartial,
