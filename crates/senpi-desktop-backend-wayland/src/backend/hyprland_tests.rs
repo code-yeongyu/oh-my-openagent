@@ -137,7 +137,7 @@ fn a_window_click_lands_at_the_hyprland_geometry_through_libei() {
 }
 
 /// One 1280x1080 monitor at scale 1, ScreenCast-shaped.
-fn monitor() -> DesktopDisplay {
+pub(super) fn monitor() -> DesktopDisplay {
     DesktopDisplay {
         id: "pipewire-0".to_owned(),
         name: "DP-1".to_owned(),
@@ -241,7 +241,7 @@ fn a_window_hyprland_cannot_place_gets_a_frame_that_refuses_pointer_input() {
     let error = unplaced.expect("an unplaced window is reported");
     let (image, _) = crop_window(&RgbaImage::new(1280, 1080), &[monitor()], windows.clone(), &atspi.id)
         .expect("cropped at the AT-SPI bounds");
-    let (_, frame) = unplaced_frame(image, &error);
+    let (_, frame) = unplaced_frame(image, "Hyprland", &error);
 
     // Then: the window keeps its AT-SPI bounds and no pixel of its frame maps to input
     assert_eq!(windows.as_slice(), std::slice::from_ref(&atspi));
