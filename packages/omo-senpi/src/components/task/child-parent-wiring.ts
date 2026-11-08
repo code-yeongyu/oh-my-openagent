@@ -12,7 +12,7 @@ import type { DialogUi, SenpiExtensionAPI } from "../../extension/types"
 import type { TaskRuntimeContext } from "./runtime-context"
 
 export interface ChildParentWiringInput {
-  readonly pi: Pick<SenpiExtensionAPI, "on" | "events" | "getPermissionPreset" | "sessionDialog">
+  readonly pi: Pick<SenpiExtensionAPI, "events" | "getPermissionPreset" | "sessionDialog">
   readonly runtime: Pick<TaskRuntimeContext, "ui">
   readonly labelOf: (taskId: string) => string
   readonly origins?: ForegroundDialogOrigins
@@ -28,19 +28,15 @@ const PERMISSION_PRESET_CHANGED = "permission_preset_changed"
 /**
  * The parent session's side of #6189 F2d/F2e. A child's dialog is raised on the parent's UI: a foreground child's
  * inside the parent turn's own context, so the engine targets the connection that started that turn; a background
- * child's through `pi.sessionDialog`, which every attached client that may answer receives (first answer wins).
+ * child's through `pi.sessionDialog`, which every attached client that may answer receives (first answer wins). The
+ * parent session's teardown settles both (the engine cancels its pending dialogs) and ends the children with it.
  * An engine without `sessionDialog` cancels a background child's dialog, as before.
  */
 export function createChildParentWiring(input: ChildParentWiringInput): ChildParentWiring {
   const origins = input.origins ?? sharedForegroundDialogOrigins
-  let teardown = new AbortController()
-  input.pi.on("session_shutdown", () => {
-    teardown.abort()
-    teardown = new AbortController()
-  })
   const dialogForwarder: ChildDialogForwarder = {
     async forward(dialog, child) {
-      const signal = AbortSignal.any([child.signal, teardown.signal])
+      const signal = child.signal
       if (signal.aborted) return CANCELLED_CHILD_DIALOG
       const title = `${input.labelOf(child.taskId)}: ${dialog.title}`
       const origin = origins.originOf(child.taskId)

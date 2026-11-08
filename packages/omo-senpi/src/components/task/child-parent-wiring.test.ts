@@ -24,13 +24,11 @@ function recordingUi(via: string, raised: Raised[], answer = "Allow once"): Dial
 
 function harness() {
   const raised: Raised[] = []
-  const shutdown: Array<() => void> = []
   const changes: Array<() => void> = []
   let preset = "full-access"
   const origins = createForegroundDialogOrigins()
   const wiring = createChildParentWiring({
     pi: {
-      on: (event, handler) => { if (event === "session_shutdown") shutdown.push(() => void handler(undefined)) },
       events: { emit: () => {}, on: (name, handler) => { if (name === "permission_preset_changed") changes.push(() => handler({ permissionPreset: "x" })); return () => {} } },
       getPermissionPreset: () => preset,
       sessionDialog: recordingUi("session", raised),
@@ -39,7 +37,7 @@ function harness() {
     labelOf: (taskId) => `task ${taskId}`,
     origins,
   })
-  return { raised, origins, wiring, shutdown: () => shutdown.forEach((run) => run()), change: (next: string) => { preset = next; changes.forEach((run) => run()) } }
+  return { raised, origins, wiring, change: (next: string) => { preset = next; changes.forEach((run) => run()) } }
 }
 
 describe("createChildParentWiring", () => {
@@ -69,14 +67,15 @@ describe("createChildParentWiring", () => {
     expect(raised.map(({ via, connection: at }) => ({ via, at }))).toEqual([{ via: "origin", at: "conn-origin" }, { via: "session", at: undefined }])
   })
 
-  test("#given a forwarded prompt #when the parent session shuts down #then the prompt's signal is aborted", async () => {
+  test("#given a forwarded prompt #when the child task is cancelled #then the prompt's signal is aborted", async () => {
     // given
-    const { raised, wiring, shutdown } = harness()
-    await wiring.dialogForwarder.forward(PROMPT, { taskId: "st_bg", signal: new AbortController().signal })
+    const { raised, wiring } = harness()
+    const child = new AbortController()
+    await wiring.dialogForwarder.forward(PROMPT, { taskId: "st_bg", signal: child.signal })
     const signal = (raised[0]?.opts as { readonly signal: AbortSignal }).signal
 
     // when
-    shutdown()
+    child.abort()
 
     // then
     expect(signal.aborted).toBe(true)

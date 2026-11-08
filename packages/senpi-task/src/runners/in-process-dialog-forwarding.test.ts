@@ -24,9 +24,9 @@ async function runChild(choice: string, setup: { readonly settingsPreset?: strin
   const parent = setup.liveParent === true ? await machine.openParent() : undefined
   const { forwarder, seen } = answering(choice)
   const handle = await new InProcessRunner({ dialogs: forwarder }).start(machine.spec("st_6189c", parent?.sessionId))
-  parent?.dispose()
   await handle.waitForIdle()
   await handle.abort()
+  parent?.dispose()
   return { machine, seen }
 }
 

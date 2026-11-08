@@ -13,10 +13,8 @@ import { dispatchHostCommand } from "./host-command-dispatch"
 import {
   createSenpiRpcClient,
   probeWithEngine,
-  type HostProtocolProbe,
   type HostPendingInputs,
   type HostRpcClient,
-  type HostRpcClientFactory,
   type HostSessionOpenInput,
 } from "./session-transport"
 import {
