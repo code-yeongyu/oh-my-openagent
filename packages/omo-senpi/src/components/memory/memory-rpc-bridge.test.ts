@@ -729,12 +729,16 @@ describe("memory rpc bridge sync field (omo #10637)", () => {
     bridge.dispose()
   })
 
+  // A held file (#12284) reaches the desktop the same way as a freeze above: a failure of the "unknown" kind,
+  // carrying its reason, action and held keys (the desktop's schema ignores fields it does not know).
   const cases: ReadonlyArray<readonly [string, SyncStatusReader, MemoryRpcSync | undefined]> = [
     ["synced", async () => ({ kind: "synced", at: Date.parse("2026-10-22T10:00:00.000Z"), updatedWhileOffline: 0 }), { state: "synced", lastSyncedAtISO: "2026-10-22T10:00:00.000Z" }],
     ["never synced", async () => ({ kind: "never_synced" }), { state: "never_synced" }],
     ["paused at a refused entry", async () => ({ kind: "paused", seq: 1, code: "signature" }), { state: "paused" }],
     ["unavailable on this device", async () => ({ kind: "sync-unavailable", reason: "Another process holds the engine." }), { state: "unavailable" }],
     ["off because its configuration is invalid", async () => ({ kind: "sync-config-invalid", variable: "OMO_SERVICE_API_URL", reason: "OMO_SERVICE_API_URL is not a valid service URL" }), { state: "unavailable" }],
+    ["holding files too large to sync (#12284)", async () => ({ kind: "failing", since: Date.parse("2026-10-22T10:00:00.000Z"), attempts: 2, failure: { kind: "oversized_item", keys: ["big.md", "old.md"], stuck: ["old.md"], limitBytes: 8388608, reason: "r", action: "a" } }), { state: "failing", failure: { kind: "unknown", reason: "r", action: "a", sinceISO: "2026-10-22T10:00:00.000Z", attempts: 2, keys: ["big.md", "old.md"], stuckKeys: ["old.md"], limitBytes: 8388608 } }],
+    ["paused at a refused entry while holding files (#12284)", async () => ({ kind: "paused", seq: 1, code: "signature", held: { since: Date.parse("2026-10-22T10:00:00.000Z"), attempts: 2, failure: { kind: "oversized_item", keys: ["big.md", "old.md"], stuck: ["old.md"], limitBytes: 8388608, reason: "r", action: "a" } } }), { state: "paused", failure: { kind: "unknown", reason: "r", action: "a", sinceISO: "2026-10-22T10:00:00.000Z", attempts: 2, keys: ["big.md", "old.md"], stuckKeys: ["old.md"], limitBytes: 8388608 } }],
     ["not syncing on this device", async () => null, undefined],
     ["a reader that throws", async () => Promise.reject(new Error("runner gone")), undefined],
   ]
@@ -746,6 +750,8 @@ describe("memory rpc bridge sync field (omo #10637)", () => {
 
     const snapshot = (await host.handlers.get(MEMORY_STATUS_RPC_METHOD)?.({})) as MemoryRpcSnapshot
 
+    if (snapshot.sync !== undefined) expect(["never_synced", "synced", "paused", "failing", "unavailable"]).toContain(String(snapshot.sync.state))
+    if (snapshot.sync?.failure !== undefined) expect(["stranded_lock", "auth_expired", "offline", "unknown"]).toContain(String(snapshot.sync.failure.kind))
     expect(snapshot.sync).toEqual(expected)
     expect("sync" in snapshot).toBe(expected !== undefined)
     bridge.dispose()
