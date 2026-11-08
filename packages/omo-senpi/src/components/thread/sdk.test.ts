@@ -20,7 +20,7 @@ afterEach(async () => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
-function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, request: ReleaseSessionRequest) => Promise<never>; readonly store?: (agentDir: string) => GatewayStore; readonly sdkOwnsStore?: boolean; readonly remote?: RemoteThreadSurface } = {}) {
+function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, request: ReleaseSessionRequest) => Promise<never>; readonly store?: (agentDir: string) => GatewayStore; readonly sdkOwnsStore?: boolean; readonly remote?: RemoteThreadSurface; readonly cwd?: string } = {}) {
   const agentDir = mkdtempSync(join(tmpdir(), "thread-sdk-"))
   directories.push(agentDir)
   const store: GatewayStore = options.store?.(agentDir) ?? createGatewayStore({ agentDir })
@@ -66,7 +66,7 @@ function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, re
       }),
     },
   }
-  const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa-user", host, ...(options.sdkOwnsStore === true ? {} : { store }), ...(options.remote === undefined ? {} : { remote: options.remote }) })
+  const sdk = createThreadSdk({ agentDir, cwd: options.cwd ?? process.cwd(), uid: 501, user: "qa-user", host, ...(options.sdkOwnsStore === true ? {} : { store }), ...(options.remote === undefined ? {} : { remote: options.remote }) })
   sdks.push(sdk)
   return { sdk, store, wakes, releases }
 }
@@ -114,6 +114,13 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread_id: "dur-host" })
     expect(await sdk.read({ thread: "lane-b" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
     expect(account.sent.filter((entry) => entry.via === "session").map((entry) => [entry.device, entry.rpc?.["type"]])).toEqual([["b", "get_messages"]])
+  })
+
+  test("#given an alias held by a thread on this device and omo thread run from another workspace #when read names the alias without all_scope #then it reads that thread; the raw id alone stays scope_denied", async () => {
+    const account = remoteFixture.account({ aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]) })
+    const { sdk } = fixture({ remote: account.remote, cwd: "/thread-sdk-other-workspace" })
+    expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread_id: "dur-host" })
+    expect(await sdk.read({ thread: "dur-host" })).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
   })
 })
 

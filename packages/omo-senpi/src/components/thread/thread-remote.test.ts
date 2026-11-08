@@ -171,12 +171,30 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     expect(openSession).not.toHaveBeenCalled()
   })
 
-  test("#given an alias holder names b's session by its durable id while b's listing keys it by a relay id #when a tool names the alias #then it reaches that listing row on b, never a false device_offline", async () => {
-    const relayRow = { ...titled("b", "relay-kEy-on-b", "worker b"), path: "/home/b/.omo/agent/sessions/--w--/2026-11-08T11-36-00-000Z_dur-on-b.jsonl" }
-    const a = account({ rows: [relayRow], aliases: new Map([["build-b", { session_id: "dur-on-b", device: "b" }]]), live: ["relay-kEy-on-b"] })
+  test("#given aliases claimed on b for a terminal-held and an rpc-host session (held by durable id; b's listing keys each by a relay key and names only its project) #when a tool names each alias from this device #then each reaches its listing row on b through b's connector key, never a false not_found or device_offline", async () => {
+    // A listing row's path is the session's project directory, never its session file: the durable id is not in the row.
+    const terminalRow = { ...titled("b", "sJMySZH_wlx9qQ25AU60qQ", "worker b tui"), path: "/home/b" }
+    const hostRow = { ...titled("b", "JkMGhxKatogMmrmtCW-oFA", "worker b rpc"), path: "/home/b" }
+    const a = account({
+      rows: [terminalRow, hostRow],
+      relayKeys: new Map([["dur-tui-on-b", "sJMySZH_wlx9qQ25AU60qQ"], ["dur-rpc-on-b", "JkMGhxKatogMmrmtCW-oFA"]]),
+      aliases: new Map([["tui-b", { session_id: "dur-tui-on-b", device: "b" }], ["rpc-b", { session_id: "dur-rpc-on-b", device: "b" }]]),
+      live: ["sJMySZH_wlx9qQ25AU60qQ", "JkMGhxKatogMmrmtCW-oFA"],
+    })
     const { run } = surface(a.remote)
-    expect(await run("thread_send", { thread: "build-b", message: "go" })).toMatchObject({ kind: "ok", thread_id: "relay-kEy-on-b", device: "b" })
-    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => [entry.device, entry.session])).toEqual([["b", "relay-kEy-on-b"]])
+    expect(await run("thread_send", { thread: "tui-b", message: "go" })).toMatchObject({ kind: "ok", thread_id: "sJMySZH_wlx9qQ25AU60qQ", device: "b" })
+    expect(await run("thread_send", { thread: "rpc-b", message: "go" })).toMatchObject({ kind: "ok", thread_id: "JkMGhxKatogMmrmtCW-oFA", device: "b" })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => [entry.device, entry.session])).toEqual([["b", "sJMySZH_wlx9qQ25AU60qQ"], ["b", "JkMGhxKatogMmrmtCW-oFA"]])
+  })
+
+  test("#given an alias held by a thread on this device outside the caller's workspace #when thread_read and thread_send name the alias #then both reach it without all_scope, while its raw id alone stays scope_denied as before", async () => {
+    const far: ThreadHostSession = { sessionId: "route-far", durableSessionId: "dur-far", cwd: "/thread-remote-far-workspace", name: "far lane", status: "open" }
+    const near: ThreadHostSession = { sessionId: "route-local", durableSessionId: "dur-local", cwd: process.cwd(), name: "local peer", status: "open" }
+    const a = account({ aliases: new Map([["my-far", { session_id: "dur-far", device: "here" }]]) })
+    const { run } = surface(a.remote, { sessions: [near, far] })
+    expect(await run("thread_read", { thread: "my-far" })).toMatchObject({ kind: "ok", thread_id: "dur-far" })
+    expect(await run("thread_send", { thread: "my-far", message: "hi" })).toMatchObject({ kind: "ok", thread_id: "dur-far" })
+    expect(await run("thread_read", { thread: "dur-far" })).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
   })
 
   test("#given an alias whose holder b no longer lists #when a tool names it #then it is not_found naming the device while b is online, and device_offline only when b is offline", async () => {
