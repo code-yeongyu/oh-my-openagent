@@ -12,7 +12,7 @@ import { statusLines } from "./remote-render"
 
 // `omo remote bootstrap`: the device service bootstrap every interactive omo start runs in the background (the
 // omo-senpi device-service component starts it). One JSON line with --json: {state: "connected", status} or
-// {state, notice}; the component shows the notice for every stop but signed_out.
+// {state, notice}; the component shows the notice for every stop but signed_out, store_unavailable and not_published.
 
 /** Everything the bootstrap needs besides the account read, the state dir and the connection `omo remote` already has. */
 export type BootstrapSetup = Omit<BootstrapDependencies, "accountShow" | "stateDir" | "connect">
