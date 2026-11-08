@@ -94,7 +94,7 @@ function outcomeOf(result: CommandResult): RemoteCommandOutcome {
     const error = response["error"]
     return { kind: "refused", reason: typeof code === "string" && code.length > 0 ? code : typeof error === "string" && error.length > 0 ? error : "engine_failed" }
   }
-  return { kind: "ok", response }
+  return result.located === undefined ? { kind: "ok", response } : { kind: "ok", response, located: result.located.key }
 }
 
 /**
@@ -135,7 +135,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     sessions: async () => (await (await svc()).sessions()).rows.map((row) => ({ device: row.device, session_id: row.session_id, title: row.title, project: row.project, path: row.path, state: row.state, updated_ms: row.updated_ms })),
     // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
     // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
-    endpointCommand: async (device, rpc) => {
+    endpointCommand: async (device, rpc, endpointOptions) => {
       let record: WireRpc
       try {
         record = wireRecord(rpc)
@@ -149,7 +149,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         return { kind: "refused", reason: notSentReason(error) }
       }
       try {
-        return outcomeOf(await connected.endpointCommand(device, record))
+        return outcomeOf(await connected.endpointCommand(device, record, endpointOptions))
       } catch (error) {
         // The SDK marks a failure before session.command was written (the endpoint lookup timing out or the connection
         // closing during it) not_sent: nothing ran, so it is refused. The same codes after sending stay uncertain.
