@@ -39,7 +39,8 @@ function startChild(options: {
   readonly mode?: ParentPermissionMode
   readonly forwarder?: ChildDialogForwarder
   readonly env?: Readonly<Record<string, string>>
-  readonly onWarning?: (message: string) => void
+  readonly onWarning?: (message: string, token?: string) => void
+  readonly taskId?: string
 }): { readonly started: Promise<RpcChildHandle>; readonly descriptor: () => RpcSpawnDescriptor | undefined; readonly commandLog: string } {
   const stateDir = mkdtempSync(join(tmpdir(), "senpi-task-6189-"))
   tmpDirs.push(stateDir)
@@ -56,7 +57,7 @@ function startChild(options: {
       return child
     },
   })
-  const started = runner.start({ task_id: "st_6189b", cwd: process.cwd(), state_dir: stateDir, prompt: "hold" })
+  const started = runner.start({ task_id: options.taskId ?? "st_6189b", cwd: process.cwd(), state_dir: stateDir, prompt: "hold" })
   return { started, descriptor: () => descriptor, commandLog }
 }
 
@@ -153,5 +154,41 @@ describe("RpcProcessRunner with a parent session", () => {
     const message = await warned.promise.finally(() => clearTimeout(timer))
     expect(message).toContain("st_6189b")
     expect(message).toContain("ask")
+  })
+
+  // Review of 12839 r2 (MEDIUM): a push that failed after the child applied it must not make the link skip the next one.
+  test("#given a push that the child applied but whose reply failed #when the parent moves back #then that change still reaches the child", async () => {
+    // given
+    const mode = parentMode("full-access")
+    const warned = Promise.withResolvers<void>()
+    const launched = startChild({ mode, env: { FAKE_PERMISSION_PRESET: "apply-then-refuse" }, onWarning: () => warned.resolve() })
+    const handle = await launched.started
+    mode.change("ask")
+    await warned.promise
+    const back = nextEvent(handle, "preset:full-access")
+
+    // when
+    mode.change("full-access")
+
+    // then
+    await back
+  })
+
+  // Review of 12839 r2 (LOW): each task's follow failure is its own notice, so one task's failure never hides another's.
+  test("#given two children that cannot follow #when the parent moves #then each warning carries its own task token", async () => {
+    // given
+    const mode = parentMode("full-access")
+    const tokens: string[] = []
+    const both = Promise.withResolvers<void>()
+    const onWarning = (_message: string, token?: string) => { tokens.push(token ?? ""); if (tokens.length === 2) both.resolve() }
+    await startChild({ mode, taskId: "st_follow_a", env: { FAKE_PERMISSION_PRESET: "refuse" }, onWarning }).started
+    await startChild({ mode, taskId: "st_follow_b", env: { FAKE_PERMISSION_PRESET: "refuse" }, onWarning }).started
+
+    // when
+    mode.change("ask")
+
+    // then
+    await both.promise
+    expect(tokens.sort()).toEqual(["follow:st_follow_a", "follow:st_follow_b"])
   })
 })
