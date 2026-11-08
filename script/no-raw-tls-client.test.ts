@@ -41,12 +41,6 @@ const ALLOWLIST: AllowlistEntry[] = [
     reason: "bundled ws@8.21.3 acquisition: request options and tls.connect(options) derive host/servername from new URL(address).hostname; the connector call remains independently pinned (omowright#40, senpi#3078).",
   }))),
   {
-    file: "packages/omo-native/compiled-ca-trust.ts",
-    call: 'import * as nodeTls from "node:tls"',
-    count: 1,
-    reason: "no connection and no host: the module reads getCACertificates and sets setDefaultCACertificates at engine startup (#10215); it never calls connect, createConnection, TLSSocket, createSecureContext or checkServerIdentity.",
-  },
-  {
     file: "packages/omo-native/trust-acquisition.ts",
     call: 'import { getCACertificates} from "node:tls"',
     count: 1,
