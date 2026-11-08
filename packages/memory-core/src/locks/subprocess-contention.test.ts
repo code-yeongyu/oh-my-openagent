@@ -125,7 +125,7 @@ describe("real subprocess lock contention", () => {
     expect((await readFile(fixture.logPath, "utf8")).trim().split("\n")).toEqual([
       "first:enter", "first:exit", "second:enter", "second:exit",
     ])
-  }, 10_000)
+  })
 
   test("#given a SIGKILLed Bun lock holder #when another process acquires #then proven-dead ownership is recovered", async () => {
     // #given
@@ -144,7 +144,7 @@ describe("real subprocess lock contention", () => {
     expect(killed.signal).toBe("SIGKILL")
     expect(JSON.parse(await readFile(fixture.lockPath, "utf8"))).toEqual(successor)
     expect(await releaseLock(fixture.lockPath, successor)).toBe(true)
-  }, 10_000)
+  })
 
   test("#given a live Bun lock holder #when a contender tries immediately #then the live owner is never stolen", async () => {
     // #given
@@ -162,7 +162,7 @@ describe("real subprocess lock contention", () => {
     const exitPromise = waitForExit(holder)
     holder.kill("SIGKILL")
     await exitPromise
-  }, 10_000)
+  })
 })
 
 describe("subprocess lock holder lifecycle", () => {
