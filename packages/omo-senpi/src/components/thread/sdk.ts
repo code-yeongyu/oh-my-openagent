@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 
-import type { AddressEntry } from "./address-book"
+import { toThreadAddressEntries, type AddressEntry } from "./address-book"
 import type { ThreadToolResult } from "./contracts"
 import { threadToolFailure, type ThreadToolFailure } from "./errors"
 import type { ReleaseSessionReply, ReleaseSessionRequest } from "./gateway/adapter"
@@ -16,7 +16,7 @@ export type { StoreExtensionApi, StoreExtensionRegistration, StoreExtensionTrans
 import type { ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult } from "./gateway/types"
 import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
 import { createGatewayResolver, createGatewayServices } from "./tools/gateway-services"
-import { addressBook, hostView, resolution, resolveEntries, resolveStoredSession } from "./tools/internals"
+import { addressBook, hostView, resolution, resolveEntries, resolveStoredSession, sendAddressBook } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread } from "./tools/read-ops"
 import { crossTarget } from "./remote/cross-device"
@@ -206,10 +206,13 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
       if (request.thread === undefined) return fail("invalid_arguments", "A send without a binding needs a target session.", "Pass the target session, or --binding to deliver through a binding.")
       if (request.author !== undefined) return fail("invalid_arguments", "An author names a human in a bound external thread; a send without a binding has none.", "Pass binding_id with the author, or drop the author.")
       // Resolved like read: an alias or account id held on this device is account-wide, so the workspace scope does not apply.
+      // Like the agent's thread_send, a published id needs no lookup, and any other address resolves over the offline view
+      // and the send address book, so a thread that is not running with nothing live answering still queues offline.
       let target = request.thread
       let allScope = request.all_scope
-      if (options.remote !== undefined) {
-        const across = await crossTarget(options.remote, target, resolution(surface, resolveEntries(surface, await view()), target, UNKNOWN_CALLER, true))
+      if (options.remote !== undefined && await store.sessionOwner(target) === null) {
+        const offline = await hostView(surface, { offline: true })
+        const across = await crossTarget(options.remote, target, resolution(surface, toThreadAddressEntries(sendAddressBook(surface, offline, target, true)), target, UNKNOWN_CALLER, true))
         if (across.kind === "local") {
           target = across.address
           allScope = localScope(across, request.all_scope)
