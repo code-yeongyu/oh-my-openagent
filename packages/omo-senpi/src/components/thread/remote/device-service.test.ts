@@ -180,6 +180,8 @@ describe("device-service adapter: relay round trips per thread op", () => {
         if (type === "session.locate") return { device: "b", key: CREATED_KEY, session: `b.${CREATED_KEY}` }
         if (type === "status.get") return { state: "connected" }
         if (type === "devices.list") return { devices: [{ device: "b", label: "studio", kind: "cli", platform: "linux", last_seen_ms: 1, online: true }] }
+        // A peer send names the device it left from: a local read, never a relay frame.
+        if (type === "device.info") return { device: { id: "a", label: "here" } }
         if (type === "session.detach") return {}
         throw new Error(`unexpected request ${type}`)
       },
@@ -261,7 +263,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
       ["status", () => w.port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })],
       ["view (cold)", () => readRemote(w.surface, row, view)],
       ["view", () => readRemote(w.surface, row, view)],
-      ["send", () => promptRemote(w.surface, row, { message: "x" }, 0)],
+      ["send", () => promptRemote(w.surface, row, { message: "x" }, { kind: "peer", session_id: "s0", provenance: { workspace: "w", project: "p" }, delivery_id: "d0", root_id: "d0", hop: 0 })],
       ["status after send", () => w.port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })],
       ["model (cold catalog)", () => setModelRemote(w.surface, row, { model: "m2" })],
       ["model (exact provider/id)", () => setModelRemote(w.surface, row, { model: "a/m1" })],
