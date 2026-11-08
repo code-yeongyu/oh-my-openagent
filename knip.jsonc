@@ -5,14 +5,16 @@
   // pre-existing at origin dev 4686e425b5: executables root scripts and tests run that no package declares (OS and platform tools)
   // busctl, hyprctl: Linux session tools run by script/qa/desktop/hyprland.ts
   // kdotool: KWin window tool run by script/qa/desktop/kwin.ts
-  "ignoreBinaries": ["busctl", "file", "hyprctl", "icacls", "kdotool", "notepad.exe", "tasklist"],
+  "ignoreBinaries": ["busctl", "file", "gdbus", "gnome-extensions", "hyprctl", "icacls", "kdotool", "notepad.exe", "tasklist"],
   // Findings marked "pre-existing at origin dev 4686e425b5" were already present when this check was added. Each ignore is
   // scoped to one file (and its issue types) or one dependency, so new dead code anywhere else still fails the check.
   // Remove an entry when its finding is fixed. Root-workspace file ignores live at the top level (knip reads the root
   // workspace's ignoreIssues only there).
   // Third-party projects vendored as git submodules; the build materializes them, they are not this repository's code.
   // The bunshin-ts build output, vendored with only its dependency imports rewritten (pinned by packages/omo-senpi/vendor/PIN.json) is upstream code too.
-  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**"],
+  // The GNOME Shell extension entry runs inside gnome-shell's GJS (gi:// and resource:// imports, a default-exported
+  // Extension class the shell loads); its pure window-rects.js stays checked through window-rects.test.mjs.
+  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**", "crates/senpi-desktop-gnome-extension/extension.js"],
   // Unused exports already present at origin dev 4686e425b5, named per symbol. knip has no per-symbol ignore and a file-wide
   // ignoreIssues "exports" entry would also hide a new unused export in that file, so script/knip-preexisting-exports.ts
   // (shared byte for byte with omo-relay-daemon, sha256-pinned by script/knip-coverage.test.ts) drops exactly these names, and
@@ -2139,6 +2141,8 @@
         "script/print-release-notes.ts",
         "script/qa/desktop/hyprland.ts",
         "script/qa/desktop/kwin.ts",
+        // run by path as the live GNOME Wayland window-input QA (docs/guide/computer-use.md)
+        "script/qa/desktop/gnome.ts",
         "script/qa/desktop/linux.ts",
         "script/qa/desktop/linux/expect-sabotage.ts",
         "script/qa/desktop/windows.ts",
