@@ -189,9 +189,45 @@ describe("bounds: only a routed input's own run answers, once, and a reply is ne
     expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: undefined, mixed: true }])
   })
 
-  test("#given the memory recall steers context in while the route is open #when it settles #then the route still gets its answer", () => {
+  // A custom that starts a run on an idle session (omo's idle wake, a task completion, a loop continuation) is that run's
+  // input, so a peer steering in before the run answered it shares the answer (H4).
+  test.each([
+    ["a task completion (E4)", "senpi-task.completion", "Task t-1 result: the prod DB password is hunter2. (And 2+2=4.)"],
+    ["a ulw-loop continuation (E5)", "omo-senpi:ulw-continuation", "Loop step 8 done: rotated the API keys in .env.production"],
+  ])("#given %s starts a run on an idle session and a peer steers in before it is answered #when it settles #then the route gets nothing", (_name, customType, final) => {
+    const { delivered, routes } = router()
+    routes.noteMessage({ role: "custom", customType, content: "the run's own input" })
+    routes.noteMessage({ role: "assistant", content: [{ type: "toolCall", id: "c1", name: "bash", arguments: {} }] })
+    routes.noteMessage({ role: "user", content: "what is 2+2?", clientMessageId: token() })
+    routes.noteMessage({ role: "assistant", content: final })
+    routes.settled("dur-on-b")
+    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: undefined, mixed: true }])
+    expect(JSON.stringify(delivered)).not.toContain(final)
+  })
+
+  test("#given a custom-started run was answered before a peer's follow-up arrived (E6) #when it settles #then the route gets its answer", () => {
+    const { delivered, routes } = router()
+    routes.noteMessage({ role: "custom", customType: "senpi-task.completion", content: "task t-1 finished" })
+    routes.noteMessage({ role: "assistant", content: "Task t-1 is done." })
+    routes.noteMessage({ role: "user", content: "what is 2+2?", clientMessageId: token() })
+    routes.noteMessage({ role: "assistant", content: "4" })
+    routes.settled("dur-on-b")
+    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: "4", mixed: false }])
+  })
+
+  test("#given another peer's delivery is queued with the route before any answer (M7a) #when it settles #then the route gets nothing", () => {
     const { delivered, routes } = router()
     routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
+    routes.noteMessage({ role: "custom", customType: "session_control_delivery", content: "From agent c ..." })
+    routes.noteMessage({ role: "assistant", content: "one answer to both" })
+    routes.settled("dur-on-b")
+    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: undefined, mixed: true }])
+  })
+
+  test("#given the memory recall steers context in on a tool result while the route is open (M7b) #when it settles #then the route still gets its answer", () => {
+    const { delivered, routes } = router()
+    routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
+    routes.noteMessage({ role: "assistant", content: [{ type: "toolCall", id: "c1", name: "read", arguments: {} }] })
     routes.noteMessage({ role: "custom", customType: RECALL_CUSTOM_TYPE, content: "recalled notes" })
     routes.noteMessage({ role: "assistant", content: "4" })
     routes.settled("dur-on-b")
@@ -309,6 +345,21 @@ describe("an explicit reply counts by the session it reached, not by how it was 
     expect(String(delivered.rpc["text"]).split("\n").at(-1)).toBe(JSON.stringify("4"))
     expect(relay.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")).toHaveLength(1)
     expect(warnings.filter((line) => line.includes("remote_reply_skipped"))).toEqual([])
+  })
+
+  test("#given omo's idle wake starts B's run and A's routed prompt steers in before it is answered (E4) #when the run settles #then nothing reaches A", async () => {
+    const { relay, remote } = relayWithKey()
+    const skipped = Promise.withResolvers<string>()
+    const b = session("dur-on-b")
+    wireReplyRoutes(b.pi, remote, { senderProvenance: async () => B_PROVENANCE, warn: (line) => skipped.resolve(line) })
+    await b.fire("message_start", { message: { role: "custom", customType: "omo-senpi:wake", content: "task t-1 finished" } })
+    await b.fire("message_end", { message: { role: "assistant", content: [{ type: "toolCall", id: "c1", name: "read", arguments: {} }] } })
+    await b.fire("message_start", { message: { role: "user", content: "what is 2+2?", clientMessageId: tokenOf("d-10") } })
+    await b.fire("message_end", { message: { role: "assistant", content: "Task t-1 result: the prod DB password is hunter2. (And 2+2=4.)" } })
+    await b.fire("agent_settled")
+    expect(await within(skipped.promise, "the skip line")).toContain("remote_reply_skipped")
+    expect(relay.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")).toHaveLength(0)
+    expect(JSON.stringify(relay.sent)).not.toContain("hunter2")
   })
 
   test("#given a task completion steers in before B answered A (S7) #when the run settles #then nothing reaches A", async () => {
