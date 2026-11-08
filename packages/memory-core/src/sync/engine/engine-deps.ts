@@ -1,9 +1,11 @@
-import type { Clock, ItemStore, Sealer, SyncRepo, Transport, Verifier, WriterLock } from "./ports"
+import type { Clock, FreezeSettler, ItemStore, Sealer, SyncRepo, Transport, Verifier, WriterLock } from "./ports"
 
 /** Where a crash can be injected: right after each journal marker, or between an effect and its marker. */
 export const INBOUND_POINTS = ["captured", "persisted", "downloaded", "verified", "merged", "staged", "render-intent", "render-key", "rendered", "git-commit", "committed", "checkpointed"] as const
 export const OUTBOUND_POINTS = ["sealed", "reserved", "uploaded", "append-landed", "appended"] as const
-export type EnginePoint = (typeof INBOUND_POINTS)[number] | (typeof OUTBOUND_POINTS)[number]
+/** After an older build's queued oversized ops are wound back in the store, before the journal drops them. */
+const REWIND_POINT = "rewound"
+export type EnginePoint = (typeof INBOUND_POINTS)[number] | (typeof OUTBOUND_POINTS)[number] | typeof REWIND_POINT
 export type EngineFault = (point: EnginePoint) => void
 
 export class CrashInjected extends Error {
@@ -28,4 +30,6 @@ export interface EngineDeps {
   /** The plaintext bound per pushed batch; defaults to MAX_BATCH_BYTES. */
   readonly batchBytes?: number
   readonly random?: () => number
+  /** Ends a service freeze (rotation on revoke); absent, a frozen push is retried as a plain stale base. */
+  readonly freeze?: FreezeSettler
 }

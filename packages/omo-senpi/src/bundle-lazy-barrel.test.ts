@@ -25,6 +25,7 @@ const BUNDLE_FILES = [
   "omo-memory-commands.js",
   "omo-session-history.js",
   "omo-recall-store.js",
+  "omo-device-service.js",
   "omo-telemetry-posthog.js",
   "omo-telemetry-otlp.js",
   "omo-memory-sync.js",

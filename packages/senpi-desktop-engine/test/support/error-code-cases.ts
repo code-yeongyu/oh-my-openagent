@@ -242,6 +242,9 @@ export const ERROR_CODE_CASES: readonly ErrorCodeCase[] = [
 	},
 	{ code: "SpaceUnsupported", overlay: failNextWith("windows", "SpaceUnsupported"), drive: listWindows },
 	{ code: "SpaceMoveDenied", overlay: failNextWith("windows", "SpaceMoveDenied"), drive: listWindows },
+	{ code: "AmbiguousTarget", overlay: failNextWith("windows", "AmbiguousTarget"), drive: listWindows },
+	{ code: "CaptureConsentRequired", overlay: failNextWith("windows", "CaptureConsentRequired"), drive: listWindows },
+	{ code: "ProtectedProcess", overlay: failNextWith("windows", "ProtectedProcess"), drive: listWindows },
 ];
 
 /**

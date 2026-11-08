@@ -7,14 +7,23 @@ import { reinstallStep } from "../../reinstall/reinstall-step"
 
 export type MemoryCommandsRuntimeModule = Pick<typeof CommandsRuntime, "runMemoryCommand">
 export type MemoryCommandsRuntimeLoader = () => Promise<MemoryCommandsRuntimeModule>
+/** The dream selection a fired dream loads from the same sidecar (`dream-trigger-fire.ts`). */
+export type DreamSelectionRuntimeModule = Pick<
+  typeof CommandsRuntime,
+  "computeUnreflectedVolumeFast" | "loadConversations" | "selectLoadedConversations"
+>
+
+/** The runtime retention pass and host sweep the maintenance pass loads from the same sidecar (`memory-maintenance.ts`). */
+export type MemoryRetentionRuntimeModule = Pick<
+  typeof CommandsRuntime,
+  "retentionResumePending" | "runMaintenanceHostSweep" | "runMaintenanceRetention"
+>
 
 export const MEMORY_COMMANDS_RUNTIME_ARTIFACT = "extensions/omo-memory-commands.js"
 
 /** One shared import per process; a failed import is not cached, so the next invocation retries. */
-export function createMemoryCommandsRuntimeLoader(
-  importRuntime: () => Promise<MemoryCommandsRuntimeModule>,
-): MemoryCommandsRuntimeLoader {
-  let pending: Promise<MemoryCommandsRuntimeModule> | undefined
+export function createMemoryCommandsRuntimeLoader<Module>(importRuntime: () => Promise<Module>): () => Promise<Module> {
+  let pending: Promise<Module> | undefined
   return () => {
     pending ??= importRuntime().catch((error: unknown) => {
       pending = undefined
@@ -24,9 +33,13 @@ export function createMemoryCommandsRuntimeLoader(
   }
 }
 
-export const loadMemoryCommandsRuntime: MemoryCommandsRuntimeLoader = createMemoryCommandsRuntimeLoader(
-  () => import("#omo-memory-commands-runtime"),
-)
+/** The stale reflection-lock reaper the session and /doctor fix load from the same sidecar. */
+export type ReflectionLockRuntimeModule = Pick<typeof CommandsRuntime, "formatStaleLockFixLines" | "reclaimDeadOwnerLocks" | "runStaleLockReaper">
+
+export const loadMemoryCommandsRuntime: () => Promise<
+  MemoryCommandsRuntimeModule & DreamSelectionRuntimeModule & MemoryRetentionRuntimeModule & ReflectionLockRuntimeModule
+> =
+  createMemoryCommandsRuntimeLoader(() => import("#omo-memory-commands-runtime"))
 
 export function memoryCommandsRuntimeLoadFailure(command: string, error: unknown): string {
   const cause = error instanceof Error ? error.message : String(error)
