@@ -7,6 +7,7 @@
 //   FAKE_CAPABILITIES=a,b get_protocol_info advertises these capabilities (unset: retry_fallback_command,
 //                        as the pinned engine does; set it empty for an engine without it)
 //   FAKE_COMMAND_LOG=path append every received command as one JSON line
+//   FAKE_ACK_COMMAND=1 acknowledge each logged command with a session_info_changed event
 //   FAKE_RETRY_FALLBACK=refuse|hang|exit answer set_retry_fallback with an error, never answer it, or exit on it
 //   FAKE_PROTOCOL_INFO=after-prompt hold the get_protocol_info answer until a prompt arrives (a probe answered late)
 //   FAKE_PROTOCOL_INFO=no-data answer get_protocol_info with success and no data (an engine that names no capabilities)
@@ -178,6 +179,7 @@ function handleLine(line) {
   }
   const parsed = JSON.parse(trimmed)
   if (process.env.FAKE_COMMAND_LOG) appendFileSync(process.env.FAKE_COMMAND_LOG, `${JSON.stringify(parsed)}\n`)
+  if (process.env.FAKE_ACK_COMMAND === "1") emit({ type: "session_info_changed", name: `command:${parsed.type}` })
   if (parsed.type === "prompt" && !promptSeen) {
     promptSeen = true
     if (heldProtocolInfo) {

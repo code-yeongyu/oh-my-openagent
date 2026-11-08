@@ -2,6 +2,7 @@ import type { ChildProcess } from "node:child_process"
 import { mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { createInterface } from "node:readline"
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { cleanupProjects, launchSettled, makeManager } from "../manager/__fixtures__/manager-fakes"
@@ -10,15 +11,22 @@ import { createRpcManagedRunner } from "../manager/runner"
 import type { ChildPlanner } from "../manager/types"
 import type { ResolvedModelRecord } from "../state"
 import { spawnFakeChild } from "./rpc/__fixtures__/spawn-fake"
+import { fakeClock } from "./rpc/__fixtures__/clock"
 import { terminateRpcChild } from "./rpc/terminate"
 import { RpcProcessRunner } from "./rpc-process"
 import type { RpcRunnerSpec } from "./types"
 
 const children: ChildProcess[] = []
+const runners: RpcProcessRunner[] = []
 const tmpDirs: string[] = []
 
 afterEach(async () => {
-  for (const child of children.splice(0)) await terminateRpcChild(child, { sigkillDelayMs: 200 })
+  await Promise.all(runners.splice(0).map((runner) => runner.settleTeardowns()))
+  for (const child of children.splice(0)) {
+    if (child.exitCode === null && child.signalCode === null) {
+      await terminateRpcChild(child, { sigkillDelayMs: 200 })
+    }
+  }
   for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true })
   cleanupProjects()
 })
@@ -36,6 +44,7 @@ function spec(taskId: string, overrides: Partial<RpcRunnerSpec> = {}): RpcRunner
 interface FakeEngine {
   readonly runner: RpcProcessRunner
   commands(): Array<{ readonly type: string; readonly retryFallback?: unknown }>
+  waitForCommand(type: string): Promise<void>
 }
 
 function processRunner(
@@ -47,6 +56,14 @@ function processRunner(
   } = {},
 ): FakeEngine {
   const log = join(tempDir(), "commands.jsonl")
+  const received = new Map<string, ReturnType<typeof Promise.withResolvers<void>>>()
+  const receipt = (type: string) => {
+    const existing = received.get(type)
+    if (existing !== undefined) return existing
+    const pending = Promise.withResolvers<void>()
+    received.set(type, pending)
+    return pending
+  }
   const runner = new RpcProcessRunner({
     // Model admission probes a real catalog (seconds on a cold Windows runner); it is not what these tests cover.
     modelAdmission: async () => {},
@@ -56,15 +73,25 @@ function processRunner(
         ...descriptor.env,
         FAKE_CAPABILITIES: capabilities.join(","),
         FAKE_COMMAND_LOG: log,
+        FAKE_ACK_COMMAND: "1",
         ...(options.retryFallback === undefined ? {} : { FAKE_RETRY_FALLBACK: options.retryFallback }),
         ...(options.protocolInfo === undefined ? {} : { FAKE_PROTOCOL_INFO: options.protocolInfo }),
       })
       children.push(child)
+      if (child.stdout === null) throw new Error("fake child stdout was not piped")
+      createInterface({ input: child.stdout }).on("line", (line) => {
+        const event: { readonly type?: string; readonly name?: string } = JSON.parse(line)
+        if (event.type === "session_info_changed" && event.name?.startsWith("command:")) {
+          receipt(event.name.slice("command:".length)).resolve()
+        }
+      })
       return child
     },
   })
+  runners.push(runner)
   return {
     runner,
+    waitForCommand: (type) => receipt(type).promise,
     commands: () =>
       readFileSync(log, "utf8")
         .split("\n")
@@ -168,30 +195,41 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
     expect(engine.commands().map((command) => command.type)).toEqual(["get_protocol_info", "set_retry_fallback"])
   })
 
-  test("#given an engine that never answers the chain #when a child with fallback models starts #then after the deadline the start fails and the child is never prompted", async () => {
+  test.each([
+    { retryFallback: "hang", command: "set_retry_fallback" },
+    { protocolInfo: "after-prompt", command: "get_protocol_info" },
+  ] as const)("#given an engine that never answers $command #when its deadline expires #then the start fails and no prompt or later chain is sent", async (options) => {
     // given
-    const engine = processRunner(["retry_fallback_command"], { retryFallback: "hang", fallbackChainDeadlineMs: 300 })
+    const engine = processRunner(["retry_fallback_command"], { ...options, fallbackChainDeadlineMs: 50 })
+    const received = engine.waitForCommand(options.command)
+    let watchdog: ReturnType<typeof setTimeout> | undefined
+    const deadline = new Promise<never>((_, reject) => {
+      watchdog = setTimeout(() => reject(new Error(`fake engine did not receive ${options.command}`)), 5_000)
+    })
+    const clock = fakeClock()
+    try {
+      // when: child boot and pipe delivery use real I/O; only the launch deadline is advanced.
+      const started = engine.runner.start(spec("st_deadline", CHAINED))
+      const rejected = started.then(() => undefined, (error: unknown) => error)
+      await Promise.race([received, deadline])
+      await clock.advance(50)
+      const error = await rejected
+      expect(error).toBeInstanceOf(Error)
+      if (!(error instanceof Error)) throw new Error("expected the start to fail")
+      expect(error.message).toContain("no answer")
+      clock.restore()
+      await engine.runner.settleTeardowns()
 
-    // when
-    const started = engine.runner.start(spec("st_p7", CHAINED))
-
-    // then
-    await expect(started).rejects.toThrow("no answer")
-    expect(engine.commands().map((command) => command.type)).not.toContain("prompt")
-  })
-
-  test("#given an engine that answers the capability probe only after the deadline #when a child with fallback models starts #then the start fails and neither the chain nor a prompt is sent", async () => {
-    // given
-    const engine = processRunner(["retry_fallback_command"], { protocolInfo: "after-prompt", fallbackChainDeadlineMs: 50 })
-
-    // when
-    const started = engine.runner.start(spec("st_p9", CHAINED))
-
-    // then
-    await expect(started).rejects.toThrow("no answer")
-    const types = engine.commands().map((command) => command.type)
-    expect(types).not.toContain("prompt")
-    expect(types).not.toContain("set_retry_fallback")
+      // then: read the final transcript after the child has stopped.
+      expect(engine.commands().map((command) => command.type)).toEqual(
+        options.command === "get_protocol_info"
+          ? ["get_protocol_info"]
+          : ["get_protocol_info", "set_retry_fallback"],
+      )
+    } finally {
+      clock.restore()
+      clearTimeout(watchdog)
+    }
   })
 
   test("#given a child that exits while its chain is being sent #when it starts #then the start fails on the dead child and says it exited, not that the chain was refused", async () => {
