@@ -368,7 +368,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     if (current === PUBLISHED_SEND_VIEW) return await deliverThroughGateway(options, engine, current, address, value, idempotencyKey, callerId, resolvedBy)
     const resolved = resolution(options, toThreadAddressEntries(sendAddressBook(options, current, address, scope)), address, callerId, scope)
     if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult
-    return await deliverThroughGateway(options, engine, current, resolved.entry.thread_id, value, idempotencyKey, callerId, resolvedBy)
+    return await deliverThroughGateway(options, engine, current, resolved.entry.thread_id, { ...value, all_scope: scope }, idempotencyKey, callerId, resolvedBy)
   }
 }
 
