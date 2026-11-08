@@ -25,6 +25,8 @@ export type ReflectionTranscriptState = {
   readonly unreflected_bytes?: number
   readonly consecutive_failures?: number
   readonly next_eligible_at?: string
+  /** Set when retention removed `transcript.jsonl` and kept this state; cleared by the next rebuild. */
+  readonly transcript_pruned_at?: string
 }
 
 export type ReflectionSnapshot = {

@@ -19,7 +19,7 @@
 // blows the byte cap: retention exists to bound growth, not to erase the run a user just made.
 
 import { randomUUID } from "node:crypto"
-import { lstat, readdir, rename, rm } from "@oh-my-opencode/memory-core/fs"
+import { lstat, readdir, rename } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
 import {
@@ -28,6 +28,7 @@ import {
   createLockRecord,
   factsRunsLockPath,
   releaseLock,
+  removeTree,
   runFinalizationLockPath,
   withLock,
 } from "@oh-my-opencode/memory-core"
@@ -79,7 +80,7 @@ export async function pruneTerminalFactsRuns(
   for (const { name, tombstone } of claimed) {
     await options.beforeTombstoneDelete?.(join(runsDir, tombstone))
     try {
-      await rm(join(runsDir, tombstone), { recursive: true, force: true })
+      await removeTree(join(runsDir, tombstone))
     } catch (error) {
       // The tombstone name is already unreachable by reservation; the sweep retries it.
       options.warn?.("facts run tombstone deletion failed", { tombstone, error: describe(error) })

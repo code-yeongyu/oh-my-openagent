@@ -237,7 +237,7 @@ for (const method of ["flush", "captureImmediate"] as const) {
       // Attach a rejection handler before firing the deadlines.
       const result = Promise.resolve(pending).then(() => "acknowledged", error => String(error))
       await started.promise
-      for (const deadline of deadlines) deadline()
+      for (const deadline of [...deadlines]) deadline()
       acknowledged.resolve(undefined)
       expect(await result).toBe("acknowledged")
     } finally {

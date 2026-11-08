@@ -1,7 +1,13 @@
-import { blobEvents, LOCAL_INLINE_MAX, lineBytes, sha256Hex } from "../../../src/local-api/chunking.ts";
+import {
+  blobEvents,
+  chunkPayload,
+  LOCAL_INLINE_MAX,
+  lineBytes,
+  sha256Hex,
+} from "../../../src/local-api/chunking.ts";
 import { pageListing } from "../../../src/local-api/listing.ts";
 import type {
-  CommandRequest,
+  CommandRpc,
   JsonObject,
   ListingRow,
   SessionAttach,
@@ -12,8 +18,8 @@ import type {
   SessionRead,
   SessionsList,
 } from "../../../src/local-api/protocol.ts";
-import { checkCommandText, MESSAGE_LIMIT_CHARS } from "../../../src/local-api/upload.ts";
-import { assertNever } from "../../../src/local-api/validate-fields.ts";
+import { MESSAGE_LIMIT_CHARS } from "../../../src/local-api/upload.ts";
+import { assertNever, jsonObject } from "../../../src/local-api/validate-fields.ts";
 import { readPage } from "./fake-owner-history.ts";
 import {
   type Conn,
@@ -121,42 +127,100 @@ const sortedJson = (value: unknown): string =>
       : v,
   );
 
-const commandOf = (state: OwnerState, request: SessionCommand): CommandRequest | Outcome => {
-  if ("command" in request) return request.command;
+const uploadedRpc = (json: string): CommandRpc | undefined => {
+  try {
+    return jsonObject(JSON.parse(json), "rpc");
+  } catch {
+    return undefined;
+  }
+};
+
+type Resolved = { readonly rpc: CommandRpc } | { readonly refused: Outcome };
+const commandOf = (state: OwnerState, request: SessionCommand): Resolved => {
+  if ("rpc" in request) return { rpc: request.rpc };
   const taken = state.uploads.take(request.upload_id);
-  if (taken.kind === "text") return { op: request.op, text: taken.text };
-  if (taken.kind === "refused" && taken.reason === "message_too_long") return tooLong();
-  return refuse("upload_incomplete", "the upload is not complete");
+  if (taken.kind === "refused" && taken.reason === "message_too_long")
+    return { refused: tooLong() };
+  if (taken.kind !== "text")
+    return { refused: refuse("upload_incomplete", "the upload is not complete") };
+  const rpc = uploadedRpc(taken.text);
+  return rpc === undefined
+    ? { refused: refuse("invalid_request", "the upload is not one JSON object") }
+    : { rpc };
 };
 
 // A command_id binds once to (session, payload sha256): a repeat with the same binding answers the same id and
 // dispatches nothing; any other repeat is command_id_conflict.
+// #393: an endpoint command names the host device and an engine endpoint key it lists, and needs no attach.
+const endpointCommand = (
+  state: OwnerState,
+  conn: Conn,
+  request: Extract<SessionCommand, { readonly device: string }>,
+): Outcome => {
+  const listed = state.world.endpoints?.[request.device];
+  if (listed === undefined) return refuse("unsupported", "that device names no engine endpoints");
+  const answer = state.world.endpointCommand;
+  if (!listed.includes(request.endpoint) || answer === undefined)
+    return refuse("unsupported", "that endpoint takes no commands");
+  const command_id = request.command_id ?? state.mint();
+  const binding = {
+    target: `${request.device}/endpoint/${request.endpoint}`,
+    sha256: sha256Hex(utf8(sortedJson(request.rpc))),
+  };
+  const bound = state.bindings.get(command_id);
+  if (bound !== undefined && (bound.target !== binding.target || bound.sha256 !== binding.sha256))
+    return refuse("command_id_conflict", "the command_id is bound to another target or payload");
+  if (bound !== undefined) return ok({ command_id });
+  state.bindings.set(command_id, binding);
+  state.commands.push(request.rpc);
+  return ok({ command_id }, () => {
+    const response = { type: "response", id: request.rpc["id"] ?? null, command: request.rpc["type"] ?? null, success: true, data: answer.data };
+    sendCommandEvent(conn, state.mint, request.device, { command_id, response });
+    for (const outcome of answer.outcome)
+      conn.send(eventOf("session.command_state", { command_id, ...outcome }));
+  });
+};
+
 const command = (state: OwnerState, conn: Conn, request: SessionCommand): Outcome => {
+  if ("device" in request) return endpointCommand(state, conn, request);
   const session = state.attaches.get(request.attach);
   if (session === undefined || !conn.attaches.has(request.attach))
     return refuse("not_attached", "attach first");
   const resolved = commandOf(state, request);
-  if ("reply" in resolved) return resolved;
-  if (
-    (resolved.op === "prompt" || resolved.op === "steer") &&
-    checkCommandText(resolved.text) !== "ok"
-  )
-    return tooLong();
+  if ("refused" in resolved) return resolved.refused;
   const command_id = request.command_id ?? state.mint();
   const binding = {
     target: `${session.device}/${session.session_id}`,
-    sha256: sha256Hex(utf8(sortedJson(resolved))),
+    sha256: sha256Hex(utf8(sortedJson(resolved.rpc))),
   };
   const bound = state.bindings.get(command_id);
   if (bound !== undefined && (bound.target !== binding.target || bound.sha256 !== binding.sha256))
     return refuse("command_id_conflict", "the command_id is bound to another session or payload");
   if (bound !== undefined) return ok({ command_id });
   state.bindings.set(command_id, binding);
-  state.commands.push(resolved);
+  state.commands.push(resolved.rpc);
   return ok({ command_id }, () => {
+    if (request.delegated === true && session.delegated !== undefined) {
+      const { data, frames } = session.delegated;
+      for (const frame of frames) sendCommandEvent(conn, state.mint, session.device, { frame });
+      const response = { type: "response", id: resolved.rpc["id"] ?? null, command: resolved.rpc["type"] ?? null, success: true, data };
+      sendCommandEvent(conn, state.mint, session.device, { command_id, response });
+    }
     for (const outcome of session.outcome)
       conn.send(eventOf("session.command_state", { command_id, ...outcome }));
   });
+};
+
+// A command event inline, or, when its line would pass LOCAL_INLINE_MAX, as a blob of the body's UTF-8 JSON.
+const sendCommandEvent = (conn: Conn, mint: () => string, device: string, body: JsonObject): void => {
+  const inline = eventOf("session.command_event", { device, ...body });
+  if (lineBytes(inline) <= LOCAL_INLINE_MAX) return conn.send(inline);
+  const bytes = utf8(JSON.stringify(body));
+  const id = mint();
+  conn.send(eventOf("session.command_event", { device, blob: { id, bytes: bytes.length, sha256: sha256Hex(bytes) } }));
+  for (const { off, b } of chunkPayload(bytes))
+    conn.send(eventOf("session.command_blob_chunk", { id, off, b }));
+  conn.send(eventOf("session.command_blob_done", { id }));
 };
 
 const part = (state: OwnerState, conn: Conn, request: SessionCommandPart): Outcome => {

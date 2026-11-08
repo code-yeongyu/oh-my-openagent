@@ -15,7 +15,7 @@ const AUTHOR: GitCommitAuthor = { agentId: "agent-agreements", authorName: "Agre
 const HUMAN_LINE = "- [global] Never filter the message monitor output. <!-- id: 3f9a1c0b2e; by: human; n: 2; since: 2026-10-14; last: 2026-10-20; status: active -->"
 const roots: string[] = []
 
-setDefaultTimeout(process.platform === "win32" ? 30_000 : 10_000)
+if (process.platform === "win32") setDefaultTimeout(30_000)
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
