@@ -10,13 +10,7 @@ import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { createServer, type Server, type Socket } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { loadOmowright } from "./skills/browser/scripts/omowright.mjs"
-
-// omowright's `exports` points at a `dist/` its repository does not commit and a git install does not
-// build, so the bare specifier does not resolve for this repo's git dependency. Load the pin the way the
-// browser skill does: staged runtime first, then the installed sources or build.
-const { omowright: pinnedOmowright } = await loadOmowright({})
-const BskIpcClient = pinnedOmowright.BskIpcClient
+import { BskIpcClient } from "omowright"
 
 type Frame = { readonly id: string; readonly method: string; readonly params?: Record<string, unknown> }
 type Reply = Record<string, unknown> | undefined

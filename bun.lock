@@ -66,7 +66,7 @@
         "jsonc-parser": "^3.3.1",
         "knip": "6.43.0",
         "node-pty": "^1.1.0",
-        "omowright": "github:code-yeongyu/omowright#ab7d268462b6054cdf4e4a2f3ec32d426459f06c",
+        "omowright": "^0.3.0",
         "oxc-parser": "0.148.0",
         "oxlint": "1.89.0",
         "picocolors": "^1.1.1",
@@ -1743,7 +1743,7 @@
 
     "omo-ai": ["omo-ai@workspace:packages/omo-native"],
 
-    "omowright": ["omowright@github:code-yeongyu/omowright#ab7d268", { "dependencies": { "ws": "^8.18.3", "zod": "^4.1.5" }, "bin": { "omowright-cloak": "./dist/bin/omowright-cloak.js" } }, "code-yeongyu-omowright-ab7d268", "sha512-Vl+CI77yL5YTsmrmN16g94/M9IOXzSo9LQty6z/y4aDIfYwjoWQqQLZCbi1FMTE24Io2/U6wHYm/WsxddFFRFw=="],
+    "omowright": ["omowright@0.3.0", "", { "dependencies": { "ws": "^8.18.3", "zod": "^4.1.5" }, "bin": { "omowright-cloak": "dist/bin/omowright-cloak.js" } }, "sha512-hiIJVqxZyN8QG4Jou3IKzdHKbuv1fgF+BBjXDAaj7UKNxKca8RGB1ltBFKmJU8bqGE7k9YtWTo8VvyYCZi71mw=="],
 
     "on-finished": ["on-finished@2.4.1", "", { "dependencies": { "ee-first": "1.1.1" } }, "sha512-oVlzkg3ENAhCk2zdv7IJwd/QUD4z2RxRwpkcGY8psCVcCYZNq4wYnVWALHM+brtuJjePWiYF/ClmuDr8Ch5+kg=="],
 
