@@ -114,4 +114,3 @@ async function strippedHeaderPaths(repo: GitMemoryRepo, recovery: FactsApplyReco
   }
   return stripped
 }
-EOF
