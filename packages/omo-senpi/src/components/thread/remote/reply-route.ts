@@ -88,10 +88,11 @@ function textOf(content: unknown): string | undefined {
 export type SentTarget = { readonly device: string; readonly thread: string }
 
 /**
- * What a route's own input got: the last answer the model gave before the next input arrived. `mixed`: another input
- * (the local user's, or another party's delivery) arrived before any answer, so no answer can be attributed to the route.
+ * What a route's own input got: the last answer the model gave before the next input arrived, and the sends made while
+ * answering it. `mixed`: the route's input shares an answer with another input (one arrived before the route's final
+ * answer, or the route steered into a run whose earlier input had none yet), so nothing can be attributed to it.
  */
-export type RouteReply = { readonly answer: string | undefined; readonly mixed: boolean }
+export type RouteReply = { readonly answer: string | undefined; readonly mixed: boolean; readonly sent: readonly SentTarget[] }
 
 export type ReplyRouter = {
   readonly noteMessage: (message: EngineMessage) => void
@@ -100,7 +101,9 @@ export type ReplyRouter = {
   readonly close: () => void
 }
 
-type Segment = { readonly route: ReplyRoute; answer: string | undefined; mixed: boolean }
+type Segment = { readonly route: ReplyRoute; answer: string | undefined; final: boolean; mixed: boolean; readonly sent: SentTarget[] }
+
+const callsTools = (content: unknown): boolean => Array.isArray(content) && content.some((part) => (part as { readonly type?: unknown } | null)?.type === "toolCall")
 
 /**
  * The receiving half of a cross-device thread_send: when this session's run consumed a peer send that carries a reply
@@ -109,51 +112,61 @@ type Segment = { readonly route: ReplyRoute; answer: string | undefined; mixed: 
  * input is never sent to a peer. A reply never carries a route, so a reply is never answered by a reply, and each
  * delivery is answered at most once per session lifetime.
  */
-export function createReplyRouter(deliver: (route: ReplyRoute, reply: RouteReply, sessionId: string | undefined, answered: readonly SentTarget[]) => void): ReplyRouter {
+export function createReplyRouter(deliver: (route: ReplyRoute, reply: RouteReply, sessionId: string | undefined) => void): ReplyRouter {
   const segments: Segment[] = []
   const routed: string[] = []
-  const sentTo: SentTarget[] = []
   let current: Segment | undefined
+  // The run's latest input (any kind) has had a final answer: an assistant message that calls no tool.
+  let inputAnswered = true
   let closed = false
   const markRouted = (delivery: string): void => {
     routed.push(delivery)
     if (routed.length > ROUTED_KEPT) routed.shift()
   }
   const endCurrent = (): void => {
-    if (current !== undefined && current.answer === undefined) current.mixed = true
+    if (current !== undefined && !current.final) current.mixed = true
     current = undefined
   }
   const reset = (): void => {
     segments.length = 0
-    sentTo.length = 0
     current = undefined
+    inputAnswered = true
   }
   return {
     noteMessage: (message) => {
       if (closed) return
       if (message.role === "assistant") {
-        if (current !== undefined) current.answer = textOf(message.content) ?? current.answer
+        const final = !callsTools(message.content)
+        if (final) inputAnswered = true
+        if (current === undefined) return
+        current.answer = textOf(message.content) ?? current.answer
+        if (final) current.final = true
         return
       }
       const input = message.role === "user" || (message.role === "custom" && message.customType === DELIVERY_CUSTOM_TYPE)
       if (!input) return
+      const earlierOpen = !inputAnswered
       endCurrent()
+      inputAnswered = false
       const route = message.role === "user" ? parseReplyRoute(message.clientMessageId) : undefined
       if (route === undefined || routed.includes(route.delivery) || segments.some((segment) => segment.route.delivery === route.delivery)) return
-      current = { route, answer: undefined, mixed: false }
+      current = { route, answer: undefined, final: false, mixed: earlierOpen, sent: [] }
       segments.push(current)
     },
     noteSend: (target) => {
-      if (!closed) sentTo.push(target)
+      if (!closed) current?.sent.push(target)
     },
     settled: (sessionId) => {
       if (closed) return
-      const done = segments.map((segment) => ({ route: segment.route, reply: { answer: segment.answer, mixed: segment.mixed } }))
-      const answered = [...sentTo]
+      // A mixed route carries no answer at all, so nothing given to another input can travel past this point.
+      const done = segments.map((segment) => {
+        const mixed = segment.mixed || !segment.final
+        return { route: segment.route, reply: { answer: mixed ? undefined : segment.answer, mixed, sent: [...segment.sent] } }
+      })
       reset()
       for (const { route, reply } of done) {
         markRouted(route.delivery)
-        deliver(route, reply, sessionId, answered)
+        deliver(route, reply, sessionId)
       }
     },
     close: () => {

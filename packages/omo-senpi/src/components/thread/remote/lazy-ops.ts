@@ -50,12 +50,12 @@ export function wireReplyRoutes(pi: Pick<SenpiExtensionAPI, "on">, remote: Remot
   const failed = (route: ReplyRoute, reason: string): void => options.warn(`remote_reply_failed: the answer to delivery ${route.delivery} was not delivered to session ${route.session} on device ${route.device} (${reason}).`)
   // One delivery at a time, in settle order, so answers reach the sender in the order the runs made them.
   let queue: Promise<void> = Promise.resolve()
-  const router = createReplyRouter((route, reply, sessionId, answered) => {
+  const router = createReplyRouter((route, reply, sessionId) => {
     queue = queue.then(async () => {
       if (sessionId === undefined) return failed(route, "the settled run named no session id")
-      if (reply.mixed && reply.answer === undefined) return options.warn(`remote_reply_skipped: delivery ${route.delivery} from session ${route.session} on device ${route.device} got no answer of its own before the run took another input; nothing was sent, so no answer to another input reaches that peer.`)
+      if (reply.mixed) return options.warn(`remote_reply_skipped: delivery ${route.delivery} from session ${route.session} on device ${route.device} shares its answer with another input of the same run; nothing was sent, so no answer to another input reaches that peer.`)
       const name = options.sessionName?.()
-      const outcome = await (await runtime()).admitReplyRemote(remote, route, { session_id: sessionId, provenance: await options.senderProvenance(), ...(name === undefined ? {} : { name }) }, reply.answer, answered)
+      const outcome = await (await runtime()).admitReplyRemote(remote, route, { session_id: sessionId, provenance: await options.senderProvenance(), ...(name === undefined ? {} : { name }) }, reply.answer, reply.sent)
       if (outcome.kind === "unavailable") options.warn(`${outcome.code}: the answer to delivery ${route.delivery} was not delivered to session ${route.session} on device ${route.device}: its engine cannot admit a peer delivery (${outcome.reason}); update omo and senpi on that device.`)
       else if (outcome.kind === "failed") failed(route, outcome.reason)
     }).catch((error: unknown) => failed(route, error instanceof Error ? error.message : String(error)))
