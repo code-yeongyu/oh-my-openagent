@@ -1,10 +1,14 @@
-import type { ThreadToolResult } from "../contracts"
+import { normalizeThreadName, type ThreadCandidate } from "../addressing"
+import type { ThreadStatus, ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
 import { threadLink } from "../thread-link"
 import type { AliasRegistry, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { aliasFailure, deviceOnline, locateAcross, openRemote, remoteAvailable } from "./remote-ops"
 
-type LocalResolution = { readonly kind: "error"; readonly code: string } | { readonly kind: "ok"; readonly entry: { readonly thread_id: string } }
+type LocalEntry = { readonly thread_id: string; readonly name?: string; readonly cwd?: string; readonly preview?: string; readonly updated_at?: string | null; readonly status?: ThreadStatus }
+type LocalResolution =
+  | { readonly kind: "error"; readonly code: string; readonly candidates?: readonly ThreadCandidate[] }
+  | { readonly kind: "ok"; readonly entry: LocalEntry }
 
 export type CrossTarget =
   | { readonly kind: "local"; readonly address: string }
@@ -13,7 +17,9 @@ export type CrossTarget =
 
 /**
  * Frozen order (alias port v1): 1 an exact session id (this device, then the account list), 2 an alias,
- * 3 today's local name ladder. Without a remote surface the tools resolve exactly as before.
+ * 3 the name ladder: this device's names and the titles of the account's other devices' live sessions, judged together
+ * (#12833), so one match anywhere resolves and two or more are ambiguous_target naming each device. Without a remote
+ * surface the tools resolve exactly as before.
  */
 export async function crossTarget(remote: RemoteThreadSurface | undefined, address: string, local: LocalResolution): Promise<CrossTarget> {
   if (remote === undefined || address === "self") return { kind: "local", address }
@@ -29,7 +35,31 @@ export async function crossTarget(remote: RemoteThreadSurface | undefined, addre
   if ("error" in across) return local.kind === "ok" ? { kind: "local", address } : { kind: "error", result: across }
   if (across.where === "remote") return { kind: "remote", row: across.row }
   if (across.where === "here") return { kind: "local", address: across.session_id }
-  return { kind: "local", address }
+  return byTitle(across.rows, across.here, address, local)
+}
+
+// The local ladder's answers that leave room for a title on another device: nothing here by that name, several here,
+// or no workspace to scope it by. Any other answer (an id hit out of scope, an invalid address) stays local.
+const NAME_OPEN: ReadonlySet<string> = new Set(["not_found", "ambiguous_target", "caller_context_missing"])
+
+function byTitle(rows: readonly RemoteSessionRow[], here: string | null, address: string, local: LocalResolution): CrossTarget {
+  if (local.kind === "error" && !NAME_OPEN.has(local.code)) return { kind: "local", address }
+  const wanted = normalizeThreadName(address)
+  // A device's ended sessions are reached by id only: a name addresses a live agent, and old runs reuse names.
+  const remote = rows.filter((row) => row.device !== here && row.state !== "ended" && normalizeThreadName(row.title) === wanted)
+  if (remote.length === 0) return { kind: "local", address }
+  const localMatches: readonly ThreadCandidate[] = local.kind === "ok"
+    ? [{ id: local.entry.thread_id, name: local.entry.name ?? address, cwd: local.entry.cwd ?? "", preview: local.entry.preview ?? "", updatedAt: local.entry.updated_at ?? null, state: local.entry.status ?? "live" }]
+    : local.code === "ambiguous_target" ? (local.candidates ?? []) : []
+  if (remote.length === 1 && localMatches.length === 0 && !(local.kind === "error" && local.code === "ambiguous_target")) return { kind: "remote", row: remote[0] }
+  const candidates: readonly ThreadCandidate[] = [
+    ...localMatches.map((candidate) => (here === null ? candidate : { ...candidate, device: here })),
+    ...remote.map((row) => ({ id: row.session_id, name: row.title, cwd: row.project, preview: "", updatedAt: new Date(row.updated_ms).toISOString(), state: "live" as const, device: row.device })),
+  ]
+  return {
+    kind: "error",
+    result: { kind: "error", error: threadToolFailure("ambiguous_target", `${candidates.length} threads on this account's devices share the name "${address}".`, "Call thread_list with all_scope and pass the exact thread_id of the intended thread.", { candidates }) },
+  }
 }
 
 const ALIASES_UNAVAILABLE: ThreadToolResult = { kind: "error", error: threadToolFailure("host_unavailable", "Thread aliases need the account's alias registry, which this device cannot reach.", "Create or address the thread by its id; retry the alias later.") }

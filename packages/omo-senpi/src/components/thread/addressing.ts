@@ -41,6 +41,8 @@ export type ThreadCandidate = {
   readonly preview: string
   readonly updatedAt: string | null
   readonly state: ThreadStatus
+  /** The account device that holds it, when the candidates span devices (a name matched across the account). */
+  readonly device?: string
 }
 
 /** How a resolveTarget hit was found. */

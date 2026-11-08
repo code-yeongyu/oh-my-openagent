@@ -60,11 +60,14 @@ export function aliasFailure(error: AliasError): Failure {
   return fail("host_unavailable", error.message, "Retry when the account service is reachable.", { reason: error.details?.reason })
 }
 
-/** Where a session address points once the account is consulted (A3): another device's session, or this device. */
+/**
+ * Where a session address points once the account is consulted (A3): another device's session, or this device. With
+ * no id or alias match, `none` hands back the account list it read, so step 3 matches titles without a second read.
+ */
 export type RemoteTarget =
   | { readonly where: "remote"; readonly row: RemoteSessionRow }
   | { readonly where: "here"; readonly session_id: string }
-  | { readonly where: "none" }
+  | { readonly where: "none"; readonly rows: readonly RemoteSessionRow[]; readonly here: string | null }
 
 /**
  * Resolution steps 1b and 2 of the frozen order: an exact session id in the account list, then an alias.
@@ -75,10 +78,10 @@ export async function locateAcross(remote: RemoteThreadSurface, address: string)
   const rows = await remote.sessions.sessions()
   const byId = rows.find((row) => row.session_id === address)
   if (byId !== undefined) return byId.device === here ? { where: "here", session_id: byId.session_id } : { where: "remote", row: byId }
-  if (remote.aliases === undefined) return { where: "none" }
+  if (remote.aliases === undefined) return { where: "none", rows, here }
   const alias = await remote.aliases.resolve(address)
   if (alias.kind === "error") {
-    if (alias.error.code === "alias_not_found" || alias.error.code === "alias_invalid") return { where: "none" }
+    if (alias.error.code === "alias_not_found" || alias.error.code === "alias_invalid") return { where: "none", rows, here }
     return aliasFailure(alias.error)
   }
   return holderTarget(alias.value, here, rows)
