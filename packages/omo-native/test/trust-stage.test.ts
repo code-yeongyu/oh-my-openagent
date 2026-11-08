@@ -129,7 +129,7 @@ test("static commands never acquire, execute, or create trust storage", async ()
   expect(await stat(dir).catch(() => null)).toBeNull()
 })
 
-test("a compiled child adopts native extras, scrubs plumbing, and restores old desktop values", async () => {
+test("a compiled child adopts native extras, scrubs plumbing, restores old desktop values, and adds no NODE_USE_SYSTEM_CA", async () => {
   const dir = await directory()
   const originals = {
     NODE_USE_SYSTEM_CA: "1", SSL_CERT_FILE: "/synthetic/file", SSL_CERT_DIR: "/synthetic/dir",
@@ -153,6 +153,11 @@ test("a compiled child adopts native extras, scrubs plumbing, and restores old d
   expect(raw).not.toContain(dir)
   expect(raw).not.toContain("/synthetic")
   expect(raw).not.toContain("CERTIFICATE")
+
+  // No stage writes NODE_USE_SYSTEM_CA: a parent that never set it hands the engine none (#10762).
+  const bare = await launch(await directory())
+  expect(bare.output.code).toBe(0)
+  expect(JSON.parse(bare.output.stdout).env.NODE_USE_SYSTEM_CA).toBeNull()
 })
 
 type Fault = { name: string; code: string; check: string | null; apply: (env: NodeJS.ProcessEnv) => Promise<void> }
