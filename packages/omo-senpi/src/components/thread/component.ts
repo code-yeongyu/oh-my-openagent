@@ -13,7 +13,7 @@ import { controlSessionOf, createControlEndpointRegistrant, hostInstanceOf, sess
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
 import { createLazyLiveThreadSurface } from "./lazy-live-surface"
-import { createLazyRemoteSurface } from "./remote/lazy-remote"
+import { createDefaultRemoteSurface } from "./remote/default-remote"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import { defaultThreadStateDirectory } from "./live-surface-paths"
 
@@ -237,7 +237,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerRunDeliveries: () => [...run.consumed],
         callerRunHasLocalInput: () => run.local,
         onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
-        remote: options.remote ?? createLazyRemoteSurface({ version: createOmoNativeProductConfig().packageVersion }),
+        remote: options.remote ?? createDefaultRemoteSurface({ version: createOmoNativeProductConfig().packageVersion, log: (line) => ctx.logger.warn(line) }),
       }, (line) => ctx.logger.warn(line))
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
       // crash before its write), or made by another process (`omo thread report ... completion`) - is

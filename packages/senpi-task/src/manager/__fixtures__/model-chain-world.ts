@@ -30,7 +30,7 @@ export type ModelChainWorld = {
   /** How many times a child started by `runner()` was aborted before `dispose()`. */
   aborts(): number
   runner(): ManagedRunner
-  engineRunner(kind: EngineRunnerKind): Promise<ManagedRunner>
+  engineRunner(kind: EngineRunnerKind, options?: { readonly hiddenCapabilities?: readonly string[] }): Promise<ManagedRunner>
   /** The settings file an engine runner reads, copied byte for byte from `settingsPath` when it starts. */
   engineSettingsPath(kind: EngineRunnerKind): string
   dispose(): Promise<void>
@@ -119,8 +119,8 @@ export async function createModelChainWorld(
         return handle
       } }
     },
-    engineRunner: async (kind) => {
-      const engine = await startEngineRunner(kind, { root, settingsPath, scripts })
+    engineRunner: async (kind, engineOptions = {}) => {
+      const engine = await startEngineRunner(kind, { root, settingsPath, scripts, ...engineOptions })
       engines.push(engine)
       return engine.runner
     },
