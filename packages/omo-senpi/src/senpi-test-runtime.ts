@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
@@ -57,6 +58,21 @@ const mcpServiceModule = await import(
   getSnapshot(): { readonly connectionCount: number; readonly disposed: boolean }
 } }
 
+// The loader senpi builds every extension's `pi` with; not on the package entry, so loaded from the dist file.
+interface SenpiEventBus { emit(channel: string, data: unknown): void }
+const eventBusModule = await import(
+  pathToFileURL(join(senpiDistDir, "core", "event-bus.js")).href
+) as { createEventBus(): SenpiEventBus }
+const extensionLoaderModule = await import(
+  pathToFileURL(join(senpiDistDir, "core", "extensions", "loader.js")).href
+) as {
+  createExtensionRuntime(): object
+  loadExtensionFromFactory(factory: (pi: unknown) => void | Promise<void>, cwd: string, eventBus: SenpiEventBus, runtime: object): Promise<{ readonly path: string }>
+}
+
+export const senpiPackageVersion: unknown = (JSON.parse(readFileSync(join(senpiDistDir, "..", "package.json"), "utf8")) as { version?: unknown }).version
+export const { createEventBus } = eventBusModule
+export const { createExtensionRuntime, loadExtensionFromFactory } = extensionLoaderModule
 export const { Theme } = themeModule
 export const { ModelRegistry } = modelRegistryModule
 export const { ModelRuntime } = modelRuntimeModule
