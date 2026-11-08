@@ -184,8 +184,22 @@ const newestRetiredRoot = async (stateDir: string, account: string): Promise<str
  * Whether a ceremony that just pinned `genesisDigest` moved the account to a different root than the
  * one this device last held (#12280): a non-blocking notice, never a refusal. Only local retired pins
  * are read; nothing a server says enters the comparison.
+ *
+ * It runs after the pin is written, so it is best-effort (#12382): a retired-pin directory that cannot
+ * be read is reported through `warn` and answers "no notice", never failing a join that already pinned.
  */
-export const rootChangedSinceRetired = async (stateDir: string, account: string, genesisDigest: string): Promise<boolean> => {
-  const retired = await newestRetiredRoot(stateDir, account)
-  return retired !== null && retired !== genesisDigest
+export const rootChangedSinceRetired = async (
+  stateDir: string,
+  account: string,
+  genesisDigest: string,
+  warn: (message: string) => void = (message) => { process.stderr.write(`${message}\n`) },
+): Promise<boolean> => {
+  try {
+    const retired = await newestRetiredRoot(stateDir, account)
+    return retired !== null && retired !== genesisDigest
+  } catch (error) {
+    const reason = error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : String(error)
+    warn(`memory sync: the account is pinned, but its retired pins could not be read to check for a root change (${reason})`)
+    return false
+  }
 }

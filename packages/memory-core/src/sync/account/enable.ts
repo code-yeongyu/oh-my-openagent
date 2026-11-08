@@ -29,6 +29,8 @@ export interface EnableSyncInput extends SyncOperationOptions {
   readonly userName?: string
   readonly roaming?: boolean
   readonly genesis?: GenesisBridge
+  /** A best-effort step after the pin failed (#12382); stderr when absent. */
+  readonly onWarning?: (message: string) => void
 }
 
 export async function enableSync(input: EnableSyncInput): Promise<EnableOutcome> {
@@ -83,6 +85,6 @@ export async function enableSync(input: EnableSyncInput): Promise<EnableOutcome>
     const result = await completeGenesis(captured, intent)
     checkSyncOperation(input)
     if (result !== "created") return { kind: "join_required" }
-    return (await rootChangedSinceRetired(input.pinDir, input.account, intent.genesisDigest)) ? { kind: "joined", created: true, rootChanged: true } : { kind: "joined", created: true }
+    return (await rootChangedSinceRetired(input.pinDir, input.account, intent.genesisDigest, input.onWarning)) ? { kind: "joined", created: true, rootChanged: true } : { kind: "joined", created: true }
   })
 }
