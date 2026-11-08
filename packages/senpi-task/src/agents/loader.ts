@@ -1,5 +1,8 @@
 import { resolve } from "node:path"
 
+import { MERGED_OMO_CONFIG_PATH } from "@oh-my-opencode/omo-config-core"
+
+import { categoryShadowedAgentNames, categoryShadowMessage } from "./category-shadow"
 import { loadMarkdownAgent } from "./markdown"
 import { loadOmoAgentOverlays } from "./omo-overlay"
 import { listMarkdownAgentFiles, resolveAgentDefinitionLocations } from "./paths"
@@ -23,14 +26,21 @@ export function loadAgents(options: LoadAgentsOptions = {}): LoadAgentsResult {
   }
   const agents = new Map<string, AgentDefinition>()
   const diagnostics: AgentLoaderDiagnostic[] = []
+  // A user's markdown agent that declares its own model already has a chain, so a same-named category
+  // shadows nothing it relies on (same rule as an omo.json agent entry with model/models). The startup
+  // notice and the doctor command read config only and do not see markdown agents, so for a markdown
+  // agent named after a builtin they can still warn where this loader does not.
+  const markdownAgentsWithOwnModel = new Set<string>()
 
   for (const location of resolveAgentDefinitionLocations(resolvedOptions)) {
     const listed = listMarkdownAgentFiles(location)
     diagnostics.push(...listed.diagnostics)
     for (const path of listed.files) {
       const loaded = loadMarkdownAgent(path)
-      if (loaded.ok) overlayAgent(agents, loaded.agent)
-      else diagnostics.push(loaded.diagnostic)
+      if (loaded.ok) {
+        overlayAgent(agents, loaded.agent)
+        if (loaded.agent.model !== undefined || loaded.agent.models !== undefined) markdownAgentsWithOwnModel.add(loaded.agent.name)
+      } else diagnostics.push(loaded.diagnostic)
     }
   }
 
@@ -42,6 +52,16 @@ export function loadAgents(options: LoadAgentsOptions = {}): LoadAgentsResult {
   diagnostics.push(...omoOverlay.diagnostics)
   for (const definition of omoOverlay.agents) {
     overlayAgent(agents, definition)
+  }
+
+  for (const name of categoryShadowedAgentNames(omoOverlay.config, agents.keys())) {
+    if (markdownAgentsWithOwnModel.has(name)) continue
+    diagnostics.push({
+      kind: "category_shadows_agent",
+      path: MERGED_OMO_CONFIG_PATH,
+      message: categoryShadowMessage(omoOverlay.config, name),
+      issuePaths: [`categories.${name}`],
+    })
   }
 
   return { agents: Object.fromEntries(agents), diagnostics }

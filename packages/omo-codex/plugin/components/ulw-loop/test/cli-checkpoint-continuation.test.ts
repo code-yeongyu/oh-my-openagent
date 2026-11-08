@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ulwLoopCommand } from "../src/cli-commands.js";
-import { ULW_LOOP_AGGREGATE_CODEX_OBJECTIVE } from "../src/goal-status.js";
+import { aggregateCodexObjectiveForScope } from "../src/goal-status.js";
+import { CLI_TEST_SCOPE, CLI_TEST_SESSION_ID } from "./fixtures/cli-session.js";
 
 let testDir: string;
 let out: string[];
@@ -15,6 +16,7 @@ beforeEach(async () => {
 	out = [];
 	originalOmoSessionId = process.env["OMO_ULW_LOOP_SESSION_ID"];
 	delete process.env["OMO_ULW_LOOP_SESSION_ID"];
+	process.env["OMO_ULW_LOOP_SESSION_ID"] = CLI_TEST_SESSION_ID;
 	vi.spyOn(process, "cwd").mockReturnValue(testDir);
 	vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array): boolean => {
 		out.push(chunk.toString());
@@ -39,7 +41,7 @@ function stdoutJson(): Record<string, unknown> {
 }
 
 function codexSnapshot(): string {
-	return JSON.stringify({ goal: { objective: ULW_LOOP_AGGREGATE_CODEX_OBJECTIVE, status: "active" } });
+	return JSON.stringify({ goal: { objective: aggregateCodexObjectiveForScope(CLI_TEST_SCOPE), status: "active" } });
 }
 
 async function passCriterion(criterionId: string): Promise<void> {

@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { describe, it, expect, beforeEach, afterEach, afterAll, mock, spyOn } from "bun:test"
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js"
+import type { StdioServerParameters } from "@modelcontextprotocol/sdk/client/stdio.js"
 import * as connectionModule from "./connection"
 import type { SkillMcpClientInfo, SkillMcpServerContext } from "./types"
 import type { ClaudeCodeMcpServer } from "../claude-code-mcp-loader/types"
@@ -650,7 +651,7 @@ describe("SkillMcpManager", () => {
 
       // then
       expect(callCount).toBe(2)
-      expect(result).toEqual([{ type: "text", text: "success" }])
+      expect(result).toEqual({ content: [{ type: "text", text: "success" }] })
       expect(getOrCreateSpy).toHaveBeenCalledTimes(2)
     })
 
@@ -944,7 +945,7 @@ describe("SkillMcpManager", () => {
       const result = await manager.callTool(info, context, "test-tool", {})
 
       // then
-      expect(result).toEqual([{ type: "text", text: "success" }])
+      expect(result).toEqual({ content: [{ type: "text", text: "success" }] })
       expect(mockLogin).toHaveBeenCalled()
     })
 
@@ -1138,19 +1139,25 @@ describe("SkillMcpManager", () => {
         command: "npx",
         args: ["@playwright/mcp@latest"],
       }
-      const getOrCreateSpy = spyOn(connectionModule, "getOrCreateClient")
-      getOrCreateSpy.mockResolvedValue(createMockClient("client-1"))
+      // CDP is composed after declaration revalidation, at the connection boundary (#10693).
+      const createTransport = mock((options: StdioServerParameters) => ({
+        options,
+        start: async () => {},
+        send: async () => {},
+        close: async () => {},
+      }))
+      setStdioClientDependenciesForTesting({
+        createClient: (clientInfo, options) => new MockHttpClient(clientInfo, options),
+        createTransport,
+      })
 
       // when
       await manager.getOrCreateClient(info, config, { cdpUrl: "http://localhost:9222" })
 
       // then
-      const passedConfig = getOrCreateSpy.mock.calls[0]?.[0].config
-      expect(passedConfig).toEqual({
-        command: "npx",
-        args: ["@playwright/mcp@latest", "--cdp-endpoint", "http://localhost:9222"],
-      })
-      expect(passedConfig).not.toBe(config)
+      expect(createTransport.mock.calls[0]?.[0].args).toEqual([
+        "@playwright/mcp@latest", "--cdp-endpoint", "http://localhost:9222",
+      ])
       expect(config.args).toEqual(["@playwright/mcp@latest"])
     })
 

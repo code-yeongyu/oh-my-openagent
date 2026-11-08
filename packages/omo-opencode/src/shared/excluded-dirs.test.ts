@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test"
 import { EXCLUDED_DIRS } from "./excluded-dirs"
-import { EXCLUDED_DIRS as EXCLUDED_DIRS_FROM_BARREL } from "."
 
 describe("EXCLUDED_DIRS", () => {
   test("contains the well-known junk directories we never want to recurse into", () => {
@@ -43,8 +42,4 @@ describe("EXCLUDED_DIRS", () => {
     expect(Object.isFrozen(EXCLUDED_DIRS)).toBe(true)
   })
 
-  test("is re-exported from the shared barrel", () => {
-    // given / when / then
-    expect(EXCLUDED_DIRS_FROM_BARREL).toBe(EXCLUDED_DIRS)
-  })
 })

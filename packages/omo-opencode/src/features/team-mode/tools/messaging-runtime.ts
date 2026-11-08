@@ -11,9 +11,20 @@ export type TeamRuntimeDetails = {
   leadRecipient?: string
 }
 
+// Prompt-gate timing for a team message's live delivery and its fallback mailbox
+// wake. Every field falls back to the gate default when omitted, so production
+// callers never set this; tests inject it to observe a retrying wake through its
+// event instead of the durable-retry backoff wall clock.
+export type TeamSendMessageDispatchTiming = {
+  readonly postDispatchHoldMs?: number
+  readonly queueRetryMs?: number
+  readonly fallbackWakeSettleMs?: number
+}
+
 export type TeamSendMessageToolDeps = {
   loadRuntimeState: typeof loadRuntimeState
   liveDeliverySettleMs?: number
+  dispatchTiming?: TeamSendMessageDispatchTiming
 }
 
 export const defaultTeamSendMessageToolDeps: TeamSendMessageToolDeps = {
@@ -22,6 +33,10 @@ export const defaultTeamSendMessageToolDeps: TeamSendMessageToolDeps = {
 
 type RuntimeMember = RuntimeState["members"][number]
 
+// Resolves the "lead" sentinel to a member name. Order: the member bound to the lead
+// session, then the member typed "leader", then the first member, which is the lead a
+// team spec without an explicit leadAgentId defaults to (TeamSpecSchema), i.e. the
+// team's creator when the caller session is not registered as any member.
 export function resolveLeadRecipient(runtimeState: RuntimeState): string | undefined {
   const leadSessionId = runtimeState.leadSessionId
   if (leadSessionId !== undefined) {
@@ -29,7 +44,9 @@ export function resolveLeadRecipient(runtimeState: RuntimeState): string | undef
     if (bySession !== undefined) return bySession.name
   }
 
-  return runtimeState.members.find((member) => member.agentType === "leader")?.name
+  return (
+    runtimeState.members.find((member) => member.agentType === "leader") ?? runtimeState.members[0]
+  )?.name
 }
 
 export function shouldReserveRecipientMailbox(member: RuntimeMember, message: Message, senderName: string): boolean {

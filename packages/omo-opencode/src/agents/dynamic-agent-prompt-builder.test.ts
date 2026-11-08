@@ -74,7 +74,7 @@ describe("buildUltraworkSection", () => {
 })
 
 describe("buildParallelDelegationSection", () => {
-  const deepCategory: AvailableCategory = { name: "deep", description: "SENTINEL_DEEP" }
+  const deepCategory: AvailableCategory = { name: "deep-low", description: "SENTINEL_DEEP" }
   const highCategory: AvailableCategory = { name: "unspecified-high", description: "SENTINEL_HIGH" }
   const otherCategory: AvailableCategory = { name: "quick", description: "SENTINEL_QUICK" }
 

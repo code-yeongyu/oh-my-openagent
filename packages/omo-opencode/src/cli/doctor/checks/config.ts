@@ -13,6 +13,7 @@ interface ConfigValidationResult {
   valid: boolean
   config: OmoConfig | null
   errors: string[]
+  warnings: readonly string[]
 }
 
 function toOmoConfig(config: OhMyOpenCodeConfig): OmoConfig {
@@ -42,7 +43,7 @@ function toOmoConfig(config: OhMyOpenCodeConfig): OmoConfig {
 function validateConfig(): ConfigValidationResult {
   const validation = validatePluginConfig(process.cwd())
   if (!validation.path) {
-    return { exists: false, path: null, valid: true, config: null, errors: [] }
+    return { exists: false, path: null, valid: true, config: null, errors: [], warnings: validation.warnings }
   }
 
   return {
@@ -51,6 +52,7 @@ function validateConfig(): ConfigValidationResult {
     valid: validation.valid,
     config: toOmoConfig(validation.config),
     errors: [...validation.messages],
+    warnings: validation.warnings,
   }
 }
 
@@ -117,6 +119,12 @@ export async function checkConfig(): Promise<CheckResult> {
     homeDir,
   }))
   if (legacyWarning !== undefined) issues.push(legacyWarning)
+  issues.push(...validation.warnings.map((warning) => ({
+    title: warning,
+    description: "The rest of that file still applies; fix or remove this value to use it.",
+    severity: "warning" as const,
+    affects: ["configuration"],
+  })))
 
   if (!validation.exists) {
     return {

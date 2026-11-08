@@ -1,9 +1,10 @@
-import { readFileSync } from "../../fs/resilient"
-import { dirname, join } from "node:path"
+import { dirname } from "node:path"
 import { fileURLToPath } from "node:url"
+
+import { loadPersonaAsset } from "../../personas/load"
 
 const ASSETS_DIR = dirname(fileURLToPath(import.meta.url))
 
 export function loadFactsPersona(): string {
-  return readFileSync(join(ASSETS_DIR, "facts-persona.md"), "utf8")
+  return loadPersonaAsset(ASSETS_DIR, "facts")
 }

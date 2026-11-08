@@ -1,18 +1,17 @@
-import { execFileSync } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
 import {
   existsSync,
   mkdirSync,
   readFileSync,
-  realpathSync,
   renameSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs"
-import { join, resolve } from "node:path"
+import { join } from "node:path"
 
 import { getOmoNativeStateDir } from "../telemetry/product-identity"
 import { COOLDOWN_DAYS, MS_PER_DAY } from "./constants"
+import { gitCommonDirRealpath } from "./git-helpers"
 
 export interface InitDeepSnapshotV1 {
   commitSha: string
@@ -39,11 +38,7 @@ export function getAdvisorStateDir(env?: Parameters<typeof getOmoNativeStateDir>
 }
 
 export function repoHash(root: string): string {
-  const commonDir = execFileSync("git", ["rev-parse", "--git-common-dir"], {
-    cwd: root,
-    encoding: "utf8",
-  }).trim()
-  return createHash("sha256").update(realpathSync(resolve(root, commonDir))).digest("hex")
+  return createHash("sha256").update(gitCommonDirRealpath(root)).digest("hex")
 }
 
 export function writeGlobalDecline(stateDir: string): void {

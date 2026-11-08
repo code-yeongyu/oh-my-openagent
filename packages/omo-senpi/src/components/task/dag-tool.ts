@@ -7,7 +7,9 @@ import { DagManagerError, type DagRunId } from "@oh-my-opencode/senpi-task/dag"
 // scheduler module by path for the same reason, and both resolve to the same source file, so the
 // instanceof check below stays sound.
 import { DagNodeControlError } from "../../../../senpi-task/src/dag/scheduler"
+import { quietNodesNotice } from "./dag-quiet-nodes"
 import { amendAction, retryAction, sendAction } from "./dag-tool-control"
+import { guideAction } from "./dag-tool-guide"
 import {
   failure,
   invalidNodeTargets,
@@ -45,6 +47,7 @@ const DESCRIPTION = [
   "Each node targets EITHER category OR subagent_type, never both; model is an explicit override valid only alongside subagent_type.",
   "start is idempotent per definition key: re-starting the same key with the same graph reuses the run instead of duplicating it.",
   "wait detaches by default against a live run: the session is woken as each node completes and when the run settles, and detach=false restores the blocking wait that returns the final result.",
+  "snapshot carries each settled node's own output plus outputBytes, and each running node's lastActivityAt, so a midpoint peek can audit a child's claim and tell a working child from a silent one.",
   "When a run settles badly, do NOT start a new one: retry re-runs the failed nodes in place, amend edits the graph and re-runs only what changed, and send steers or revives one node's child.",
 ].join(" ")
 
@@ -123,7 +126,7 @@ async function waitAction(deps: DagToolDeps, params: DagToolInput, runId: string
   // the eval SDK and dag library rely on.
   if (params.detach !== false && !TERMINAL_RUN_STATUSES.has(snapshot.status)) {
     return toolResult(
-      `Detached from dag run ${runId} (${snapshot.status}, ${snapshot.counts.completed}/${snapshot.counts.total} nodes complete). The session is woken as each node completes and again when the run settles; use action=snapshot for a midpoint peek or action=wait with detach=false to block until settle.`,
+      `Detached from dag run ${runId} (${snapshot.status}, ${snapshot.counts.completed}/${snapshot.counts.total} nodes complete). The session is woken as each node completes and again when the run settles; use action=snapshot for a midpoint peek or action=wait with detach=false to block until settle.${quietNodesNotice(snapshot.nodes, Date.now())}`,
       {
         kind: "detached",
         run_id: runId,
@@ -171,7 +174,7 @@ export async function runDagTool(deps: DagToolDeps, params: DagToolInput): Promi
       }
       case "snapshot": {
         const snapshot = deps.manager.snapshot(runId as DagRunId, deps.parentSessionId())
-        return toolResult(`Dag run ${runId} is ${snapshot.status} (${snapshot.counts.completed}/${snapshot.counts.total} nodes complete).`, {
+        return toolResult(`Dag run ${runId} is ${snapshot.status} (${snapshot.counts.completed}/${snapshot.counts.total} nodes complete).${quietNodesNotice(snapshot.nodes, Date.now())}`, {
           kind: "snapshot",
           run_id: runId,
           snapshot,
@@ -181,12 +184,30 @@ export async function runDagTool(deps: DagToolDeps, params: DagToolInput): Promi
         return await waitAction(deps, params, runId)
       case "cancel":
         return await cancelAction(deps, runId, params.reason)
+      case "cancel_node": {
+        deps.manager.snapshot(runId as DagRunId, deps.parentSessionId())
+        if (params.node_id === undefined || params.node_id.trim().length === 0) return failure("invalid_arguments", "cancel_node requires node_id.")
+        if (deps.cancelNode === undefined) return failure("node_not_continuable", "Paused child cancellation is not available in this session.")
+        const nodeId = params.node_id.trim()
+        await deps.cancelNode(runId as DagRunId, nodeId)
+        return toolResult(`Cancelled dag node ${nodeId}.`, {
+          kind: "node_cancelled", run_id: runId, node_id: nodeId, snapshot: deps.manager.snapshot(runId as DagRunId, deps.parentSessionId()),
+        })
+      }
       case "retry":
         return await retryAction(deps, params, runId)
+      case "guide":
+        return await guideAction(deps, params, runId as DagRunId)
       case "send":
         return await sendAction(deps, params, runId)
       case "amend":
         return await amendAction(deps, params, runId)
+      case "resume": {
+        const snapshot = deps.manager.snapshot(runId as DagRunId, deps.parentSessionId())
+        return snapshot.pause?.reason === "user_stop"
+          ? failure("run_paused_by_user", "Only the user's Resume on the parent session may restart this run.")
+          : failure("invalid_arguments", "Use the parent session Resume control.")
+      }
     }
   } catch (error) {
     if (error instanceof DagManagerError) return fromManagerError(error)

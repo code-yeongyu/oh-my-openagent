@@ -26,7 +26,9 @@ import type {
   DagRpcSubscribeHandshake,
 } from "./dag-rpc-handlers"
 import { runDagTool } from "./dag-tool"
+import { wireDagLifecycle } from "./index"
 import { composeTaskEngine, type TaskEngine, type TaskRunnerFactories } from "./engine"
+import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
 import type { CapturedUi } from "./runtime-context"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
 
@@ -193,9 +195,10 @@ type RuntimeFixtureOptions = {
   readonly coordinator?: IdleInjectionCoordinator
   readonly attach?: boolean
   readonly awaitAttach?: boolean
-  // Session id the fixture's engine reports; defaults to the module-wide sessionId. An adoption
-  // test attaches under a DIFFERENT id to model fork/compaction/restart re-homing (#7316).
+  // A fork attaches under a different id; its own session file header declares the source.
   readonly sessionId?: string
+  readonly sessionFile?: string
+  readonly startEvent?: { readonly reason: "fork"; readonly previousSessionFile: string }
 }
 
 type RuntimeFixture = {
@@ -239,8 +242,9 @@ async function runtimeFixture(options: RuntimeFixtureOptions = {}): Promise<Runt
   const widgetCalls: Array<string[] | undefined> = []
   engine.runtime.captureFrom({
     mode: "tui",
+    modelRegistry: createTeamServiceTestModelRegistry(),
     ui: fakeUi(widgetCalls),
-    sessionManager: { getSessionId: () => options.sessionId ?? sessionId },
+    sessionManager: { getSessionId: () => options.sessionId ?? sessionId, getSessionFile: () => options.sessionFile },
     isIdle: () => options.idle ?? false,
   })
   const bridgeTimers = new ManualTimers()
@@ -260,7 +264,7 @@ async function runtimeFixture(options: RuntimeFixtureOptions = {}): Promise<Runt
   } finally {
     createStore.mockRestore()
   }
-  const attached = options.attach === false ? Promise.resolve() : runtime.attach()
+  const attached = options.attach === false ? Promise.resolve() : runtime.attach(options.startEvent)
   if (options.attach !== false && options.awaitAttach !== false) await attached
 
   return {
@@ -314,9 +318,8 @@ function events(fixture: RuntimeFixture, runId: DagRunId): readonly DagRunEvent[
   return fixture.runtime.manager.history({ runId, parentSessionId: sessionId, limit: 256 }).events
 }
 
-function pauseForShutdown(runtime: DagRuntime): void {
-  const candidate: Partial<Pick<DagRuntime, "pauseForShutdown">> = runtime
-  candidate.pauseForShutdown?.()
+async function pauseForShutdown(runtime: DagRuntime): Promise<void> {
+  await runtime.pauseForShutdown()
 }
 
 async function seedPendingRun(project: string, runId: DagRunId): Promise<void> {
@@ -466,7 +469,7 @@ describe("assembled DAG lifecycle end to end", () => {
     const first = await runtimeFixture({ project, attach: false })
 
     // when
-    pauseForShutdown(first.runtime)
+    await pauseForShutdown(first.runtime)
     first.runtime.dispose()
 
     // then
@@ -497,34 +500,38 @@ describe("assembled DAG lifecycle end to end", () => {
     restarted.runtime.dispose()
   })
 
-  test("#given a paused run whose owner session is gone #when a fresh session id attaches over a dead lease #then it adopts, re-homes, and completes the run", async () => {
+  test("#given a paused run whose owner session is gone #when its fork attaches over a dead lease #then it adopts, re-homes, and completes the run", async () => {
     // given a run paused by its original session, whose process has since died (#7316)
     const project = fs.mkdtempSync(join(tmpdir(), "omo-dag-lifecycle-adopt-"))
     cleanupRoots.push(project)
     const runId = "dag-lifecycle-adopt" as DagRunId
     await seedPendingRun(project, runId)
     const first = await runtimeFixture({ project, attach: false })
-    pauseForShutdown(first.runtime)
+    await pauseForShutdown(first.runtime)
     first.runtime.dispose()
     const store = createFileStore({ project_dir: project }, { fsync: false })
     const paused = store.readCheckpoint<DagRunRecordV1 & { readonly previousLeaseHolderPid?: number }>(runId)
     if (paused === null) throw new Error("expected paused checkpoint")
     store.writeCheckpoint(runId, { ...paused, previousLeaseHolderPid: 2_147_483_647 })
 
-    // when a session with a NEW id attaches (fork / compaction / restart under a new id)
-    const adopterRunner = new ControlledRunner()
-    const adopter = await runtimeFixture({ project, runner: adopterRunner, sessionId: "session-adopter", awaitAttach: false })
-    const adopted = await Promise.race([
-      adopterRunner.whenStarted(1).then(() => true),
-      // Today attach resolves WITHOUT adopting the foreign run, so the race falls through false.
-      adopter.attached.then(() => false),
-    ])
+    const previousSessionFile = join(project, "fork-source.jsonl")
+    fs.writeFileSync(previousSessionFile, JSON.stringify({ type: "session", id: sessionId }) + "\n")
+    const adopterSessionFile = join(project, "fork-adopter.jsonl")
+    fs.writeFileSync(adopterSessionFile, JSON.stringify({ type: "session", id: "session-adopter", parentSession: previousSessionFile }) + "\n")
 
-    // then the adopter schedules the orphaned node instead of skipping it as foreign
-    expect(adopted).toBe(true)
-    adopterRunner.children[0]?.settle("adopted output")
+    // when a real fork from the paused source attaches under a new id
+    const adopterRunner = new ControlledRunner()
+    const adopter = await runtimeFixture({
+      project, runner: adopterRunner, sessionId: "session-adopter", sessionFile: adopterSessionFile, awaitAttach: false,
+      startEvent: { reason: "fork", previousSessionFile },
+    })
     await adopter.attached
+
+    // then the adopter re-homes and schedules the orphaned node instead of skipping it as foreign
+    // (a skip leaves the run under the source session and never starts its node)
     expect(adopter.runtime.manager.list("session-adopter").some((run) => run.runId === runId)).toBe(true)
+    await within(adopterRunner.whenStarted(1), 5_000)
+    adopterRunner.children[0]?.settle("adopted output")
     const result = await adopter.runtime.wait(runId, "session-adopter")
     expect(result.status).toBe("completed")
     expect(result.nodes.resume).toEqual(expect.objectContaining({ state: "completed", output: "adopted output" }))
@@ -539,7 +546,7 @@ describe("assembled DAG lifecycle end to end", () => {
     const runId = "dag-lifecycle-first-snapshot" as DagRunId
     await seedPendingRun(project, runId)
     const first = await runtimeFixture({ project, attach: false })
-    pauseForShutdown(first.runtime)
+    await pauseForShutdown(first.runtime)
     first.runtime.dispose()
     const store = createFileStore({ project_dir: project }, { fsync: false })
     const paused = store.readCheckpoint<DagRunRecordV1 & { readonly previousLeaseHolderPid?: number }>(runId)
@@ -564,6 +571,7 @@ describe("assembled DAG lifecycle end to end", () => {
     await runner.whenStarted(1)
     runner.children[0]?.settle("first snapshot output")
     await attaching
+    await fixture.runtime.wait(runId, sessionId)
     fixture.bridgeTimers.flush(50)
 
     // then no consumer ever observed the stale pre-recovery pause, and the final snapshot is live
@@ -573,6 +581,44 @@ describe("assembled DAG lifecycle end to end", () => {
       .filter((status): status is string => status !== undefined)
     expect(statuses.length).toBeGreaterThan(0)
     expect(statuses.at(-1)).toBe("completed")
+    fixture.runtime.dispose()
+  })
+
+  // #12113 review: the first turn waits for the attach, so the attach must end once the recovered run
+  // is installed, not when the whole run finishes, and its snapshot must reach the client meanwhile.
+  test("#given a recovered run whose node is still working #when the session's first turn starts #then the turn starts and the recovered snapshot is out before the node settles", async () => {
+    // given a paused run with a dead predecessor lease, recovered through the real lifecycle wiring
+    const project = fs.mkdtempSync(join(tmpdir(), "omo-dag-lifecycle-first-turn-"))
+    cleanupRoots.push(project)
+    const runId = "dag-lifecycle-first-turn" as DagRunId
+    await seedPendingRun(project, runId)
+    const first = await runtimeFixture({ project, attach: false })
+    await pauseForShutdown(first.runtime)
+    first.runtime.dispose()
+    const store = createFileStore({ project_dir: project }, { fsync: false })
+    const paused = store.readCheckpoint<DagRunRecordV1 & { readonly previousLeaseHolderPid?: number }>(runId)
+    if (paused === null) throw new Error("expected paused checkpoint")
+    store.writeCheckpoint(runId, { ...paused, previousLeaseHolderPid: 2_147_483_647 })
+    const runner = new ControlledRunner()
+    const fixture = await runtimeFixture({ project, runner, attach: false })
+    const host = new FakeExtensionAPI()
+    wireDagLifecycle(host, fixture.runtime, () => ({ afterSessionStartReconcile: () => Promise.resolve(true) }))
+
+    // when the session starts and its first turn begins while the recovered node is still running
+    await host.dispatch("session_start", { type: "session_start" }, {})
+    await runner.whenStarted(1)
+    await within(host.dispatch("before_agent_start", { type: "before_agent_start", prompt: "continue" }, {}), 5_000)
+
+    // then the client already holds the recovered run as live, with its node unsettled
+    const statuses = fixture.rpc.events
+      .filter((event) => event.name === "omo.dag.updated")
+      .map((event) => (event.data as { readonly runs?: ReadonlyArray<{ readonly run_id?: string; readonly status?: string }> })
+        .runs?.find((run) => run.run_id === runId)?.status)
+    expect(statuses.at(-1)).toBe("running")
+    runner.children[0]?.settle("first turn output")
+    const result = await fixture.runtime.wait(runId, sessionId)
+    expect(result.status).toBe("completed")
+    expect(result.nodes.resume).toEqual(expect.objectContaining({ state: "completed", output: "first turn output" }))
     fixture.runtime.dispose()
   })
 
@@ -636,7 +682,7 @@ describe("assembled DAG lifecycle end to end", () => {
     const deliveries: Array<{ readonly content: string; readonly deliverAs: string }> = []
     const coordinator = new IdleInjectionCoordinator(
       (message, options) => { deliveries.push({ content: message.content, deliverAs: options.deliverAs }) },
-      { scheduleFlush: (flush) => scheduled.push(flush) },
+      { scheduleFlush: (flush) => { scheduled.push(flush) } },
     )
     const fixture = await runtimeFixture({ coordinator, idle: false })
     const first = await fixture.start("wake-first")
@@ -667,7 +713,7 @@ describe("assembled DAG lifecycle end to end", () => {
     const deliveries: Array<{ readonly content: string; readonly deliverAs: string }> = []
     const coordinator = new IdleInjectionCoordinator(
       (message, options) => { deliveries.push({ content: message.content, deliverAs: options.deliverAs }) },
-      { scheduleFlush: (flush) => scheduled.push(flush) },
+      { scheduleFlush: (flush) => { scheduled.push(flush) } },
     )
     const fixture = await runtimeFixture({ coordinator, idle: false })
     const runId = await fixture.start("wake-detached")
@@ -731,8 +777,10 @@ describe("assembled DAG lifecycle end to end", () => {
   })
 
   test("#given bursty adapter mutations with an identical final state #when the snapshot window flushes #then omo.dag.updated emits that state once", async () => {
-    // given
+    // given (the attach already put its own snapshot on the wire, #12113)
     const fixture = await runtimeFixture()
+    const updates = () => fixture.rpc.events.filter((event) => event.name === "omo.dag.updated")
+    const onAttach = updates().length
     await fixture.start("snapshot-dedup")
     await fixture.runner.whenStarted(1)
 
@@ -741,11 +789,11 @@ describe("assembled DAG lifecycle end to end", () => {
     fixture.runtime.sync()
     fixture.runtime.sync()
     fixture.bridgeTimers.flush(50)
-    const firstWindow = fixture.rpc.events.filter((event) => event.name === "omo.dag.updated")
+    const firstWindow = updates().slice(onAttach)
     fixture.runtime.sync()
     fixture.runtime.sync()
     fixture.bridgeTimers.flush(50)
-    const secondWindow = fixture.rpc.events.filter((event) => event.name === "omo.dag.updated")
+    const secondWindow = updates().slice(onAttach)
 
     // then
     expect(firstWindow).toHaveLength(1)

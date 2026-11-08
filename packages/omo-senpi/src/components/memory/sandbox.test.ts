@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, mkdirSync, realpathSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, dirname, join } from "node:path"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
@@ -16,6 +16,17 @@ const roots: string[] = []
 afterEach(() => {
   for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
+
+/**
+ * Helper to handle potentially async transforms. In tests with custom sync probes,
+ * the result is sync; unwrap it if needed for type safety.
+ */
+function unwrapTransformResult(result: ReflectionSpawnArgs | Promise<ReflectionSpawnArgs>): ReflectionSpawnArgs {
+  if (result instanceof Promise) {
+    throw new Error("Transform returned a Promise in a sync context - did you forget to await?")
+  }
+  return result
+}
 
 function fixture(): {
   readonly root: string
@@ -83,6 +94,35 @@ function build(policy: SandboxPolicy, options: {
 }
 
 describe("reflection worker OS sandbox", () => {
+  test("#given the reflection sandbox transform with the agent dir in runtimeWrites #when the Darwin profile is generated #then the whole agent dir is writable, so every senpi lock file under it (settings, auth, hooks-state) is too", () => {
+    // given: identity-runtime passes resolveAgentDir() through runtimeWrites; the transform itself
+    // never resolves the agent home (that would read process-wide state the caller never passed).
+    const { setup } = build("required", { platform: "darwin", which: () => "/usr/bin/sandbox-exec" })
+    const agentDir = join(setup.root, "agent")
+    mkdirSync(agentDir, { recursive: true })
+    const transform = buildSandboxTransform({
+      policy: "required",
+      worktreeDir: setup.worktree,
+      gitCommonDir: setup.gitCommonDir,
+      payloadPaths: setup.payloadPaths,
+      runtimeWrites: [agentDir],
+      command: "/bin/sh",
+      env: { PATH: process.env.PATH },
+      platform: "darwin",
+      which: () => "/usr/bin/sandbox-exec",
+    })
+
+    // when
+    const profile = unwrapTransformResult(transform(spawnArgs(setup.worktree))).args[1] ?? ""
+
+    // then: one subpath grant on the agent dir covers settings.json.lock, auth.json.lock and hooks-state.json.lock
+    const realAgentDir = realpathSync(agentDir)
+    expect(profile).toContain(`(allow file-write* (subpath ${JSON.stringify(realAgentDir)}))`)
+    for (const lock of ["settings.json.lock", "auth.json.lock", "hooks-state.json.lock"]) {
+      expect(dirname(join(realAgentDir, lock))).toBe(realAgentDir)
+    }
+  }, 30_000)
+
   test.skipIf(process.platform !== "darwin" || !existsSync("/usr/bin/sandbox-exec"))(
     "#given the real Darwin seatbelt #when a child writes inside the worktree and its parent repo #then only the worktree write succeeds",
     () => {
@@ -92,9 +132,9 @@ describe("reflection worker OS sandbox", () => {
       const denied = join(setup.parentRepo, "denied.txt")
 
       // when
-      const allowedRun = transform({ ...spawnArgs(setup.worktree), args: ["-c", `echo allowed > '${allowed}'`] })
+      const allowedRun = unwrapTransformResult(transform({ ...spawnArgs(setup.worktree), args: ["-c", `echo allowed > '${allowed}'`] }))
       const allowedResult = Bun.spawnSync([allowedRun.command, ...allowedRun.args], { cwd: allowedRun.cwd, env: allowedRun.env })
-      const deniedRun = transform({ ...spawnArgs(setup.worktree), args: ["-c", `echo denied > '${denied}'`] })
+      const deniedRun = unwrapTransformResult(transform({ ...spawnArgs(setup.worktree), args: ["-c", `echo denied > '${denied}'`] }))
       const deniedResult = Bun.spawnSync([deniedRun.command, ...deniedRun.args], { cwd: deniedRun.cwd, env: deniedRun.env })
 
       // then
@@ -124,7 +164,7 @@ describe("reflection worker OS sandbox", () => {
     })
 
     // when
-    const transformed = transform(spawnArgs(setup.worktree))
+    const transformed = unwrapTransformResult(transform(spawnArgs(setup.worktree)))
     const profile = transformed.args[1]
 
     // then
@@ -149,7 +189,7 @@ describe("reflection worker OS sandbox", () => {
     })
 
     // when
-    const profile = transform(spawnArgs(setup.worktree)).args[1]
+    const profile = unwrapTransformResult(transform(spawnArgs(setup.worktree))).args[1]
 
     // then
     // git opens /dev/null read-write for stream redirection and the shell touches /dev/tty; the
@@ -158,12 +198,13 @@ describe("reflection worker OS sandbox", () => {
     expect(profile).toContain('(allow file-write* (literal "/dev/tty"))')
   }, 30_000)
 
-  test("#given Linux with bwrap available #when spawn arguments are transformed #then the root is read-only while worktree and git state are rebound writable", () => {
+  test("#given Linux with bwrap available #when spawn arguments are transformed #then the root is read-only while worktree and git state are rebound writable", async () => {
     // given
-    const { setup, transform } = build("required", { platform: "linux", which: () => "/usr/bin/bwrap" })
+    const { setup, transform } = build("required", { platform: "linux", which: () => "/usr/bin/bwrap", probe: () => ({ usable: true }) })
 
     // when
-    const transformed = transform(spawnArgs(setup.worktree))
+    const result = transform(spawnArgs(setup.worktree))
+    const transformed = result instanceof Promise ? await result : result
 
     // then
     expect(transform.wasSandboxed).toBe(true)
@@ -179,7 +220,7 @@ describe("reflection worker OS sandbox", () => {
     ])
   }, 30_000)
 
-  test("#given a bare inner command available on the child PATH #when sandbox arguments are transformed #then the wrapper receives its absolute path", () => {
+  test("#given a bare inner command available on the child PATH #when sandbox arguments are transformed #then the wrapper receives its absolute path", async () => {
     // given
     const setup = fixture()
     const original = {
@@ -196,10 +237,12 @@ describe("reflection worker OS sandbox", () => {
       env: original.env,
       platform: "linux",
       which: () => "/usr/bin/bwrap",
+      probe: () => ({ usable: true }),
     })
 
     // when
-    const transformed = transform(original)
+    const result = transform(original)
+    const transformed = result instanceof Promise ? await result : result
 
     // then
     expect(transformed.command).toBe("/usr/bin/bwrap")
@@ -219,11 +262,12 @@ describe("reflection worker OS sandbox", () => {
       env: original.env,
       platform: "linux",
       which: () => "/usr/bin/bwrap",
+      probe: () => ({ usable: true }),
     })
 
     // when
     const wasSandboxedBeforeSpawn = transform.wasSandboxed
-    const transformed = transform(original)
+    const transformed = unwrapTransformResult(transform(original))
 
     // then
     expect(wasSandboxedBeforeSpawn).toBe(false)
@@ -259,7 +303,7 @@ describe("reflection worker OS sandbox", () => {
     const original = spawnArgs(setup.worktree)
 
     // when
-    const transformed = transform(original)
+    const transformed = unwrapTransformResult(transform(original))
 
     // then
     expect(transformed).toBe(original)
@@ -273,7 +317,7 @@ describe("reflection worker OS sandbox", () => {
     const original = spawnArgs(setup.worktree)
 
     // when
-    const transformed = transform(original)
+    const transformed = unwrapTransformResult(transform(original))
 
     // then
     expect(transformed).toBe(original)
@@ -292,13 +336,13 @@ describe("reflection worker OS sandbox", () => {
     const original = spawnArgs(setup.worktree)
 
     // when
-    const transformed = transform(original)
+    const transformed = unwrapTransformResult(transform(original))
 
     // then
     expect(transformed).toBe(original)
     expect(transform.wasSandboxed).toBe(false)
-    expect(transform.warning).toContain("setting up uid map: Permission denied")
-    expect(transform.warning).toContain("running unsandboxed because policy is auto")
+    expect(transform.warning ?? "").toContain("setting up uid map: Permission denied")
+    expect(transform.warning ?? "").toContain("running unsandboxed because policy is auto")
   }, 30_000)
 
   test("#given Linux where bwrap exists but cannot create a user namespace #when required policy is used #then the build fails closed with a typed error", () => {
@@ -332,12 +376,38 @@ describe("reflection worker OS sandbox", () => {
     })
 
     // when
-    const transformed = transform(spawnArgs(setup.worktree))
+    const transformed = unwrapTransformResult(transform(spawnArgs(setup.worktree)))
 
     // then
     expect(transform.wasSandboxed).toBe(true)
     expect(transform.warning).toBeUndefined()
     expect(transformed.command).toBe("/usr/bin/bwrap")
+  }, 30_000)
+
+  test.skipIf(process.platform === "win32")("#given a bwrap whose first smoke times out and later ones succeed #when two reflection spawns are transformed #then the first runs unsandboxed and the second gets the sandbox", async () => {
+    // given: a stand-in bwrap whose first invocation never exits; the default probe runs it
+    // because the resolved path exists on this machine.
+    const binDir = mkdtempSync(join(tmpdir(), "omo-memory-sandbox-bwrap-"))
+    roots.push(binDir)
+    const executable = join(binDir, "bwrap")
+    writeFileSync(
+      executable,
+      "#!/bin/sh\nprintf 'spawn\\n' >> \"$0.spawns\"\nif [ ! -e \"$0.hung\" ]; then : > \"$0.hung\"; exec sleep 30; fi\nexit 0\n",
+    )
+    chmodSync(executable, 0o755)
+    const { setup, transform } = build("auto", { platform: "linux", which: () => executable })
+
+    // when
+    const firstResult = transform(spawnArgs(setup.worktree))
+    const first = firstResult instanceof Promise ? await firstResult : firstResult
+    const secondResult = transform(spawnArgs(setup.worktree))
+    const second = secondResult instanceof Promise ? await secondResult : secondResult
+
+    // then
+    expect(first.command).toBe("/bin/sh")
+    expect(second.command).toBe(executable)
+    expect(second.args.slice(-4)).toEqual(["--", "/bin/sh", "-c", "exit 0"])
+    expect(readFileSync(`${executable}.spawns`, "utf8")).toBe("spawn\nspawn\n")
   }, 30_000)
 
   test("#given off policy on Linux #when the transform is built #then the usability probe never runs", () => {
@@ -350,7 +420,7 @@ describe("reflection worker OS sandbox", () => {
     const original = spawnArgs(setup.worktree)
 
     // when
-    const transformed = transform(original)
+    const transformed = unwrapTransformResult(transform(original))
 
     // then
     expect(transformed).toBe(original)
@@ -367,7 +437,7 @@ describe("reflection worker OS sandbox", () => {
     const original = spawnArgs(setup.worktree)
 
     // when
-    const transformed = transform(original)
+    const transformed = unwrapTransformResult(transform(original))
 
     // then
     expect(transformed).toBe(original)
@@ -383,7 +453,7 @@ describe("reflection worker OS sandbox", () => {
     })
 
     // when
-    const transformed = transform(spawnArgs(setup.worktree))
+    const transformed = unwrapTransformResult(transform(spawnArgs(setup.worktree)))
 
     // then
     expect(transform.wasSandboxed).toBe(true)

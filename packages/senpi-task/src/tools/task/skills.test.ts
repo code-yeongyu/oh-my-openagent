@@ -203,6 +203,6 @@ describe("createFsSkillLoader", () => {
     // then
     expect(resolution.resolved).toEqual(["aliased"])
     expect(resolution.missing).toEqual(["missing-one", "missing-two"])
-    expect(scans).toEqual([projectSkills, agentSkills, globalSkills, packageSkills])
+    expect(scans).toEqual([agentSkills, globalSkills, packageSkills])
   })
 })

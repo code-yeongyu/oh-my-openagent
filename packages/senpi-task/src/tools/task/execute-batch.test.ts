@@ -84,25 +84,31 @@ describe("buildTaskExecute batch fanout", () => {
     ])
   })
 
-  test(" w2batch #given an oversized batch #when executed #then it rejects before starting any item", async () => {
+  test(" w2batch #given a 40-item batch #when executed #then every item starts and results preserve input order", async () => {
     // given
-    let startCalls = 0
+    let startIndex = 0
     const manager = createFakeManager({
-      start: async (): Promise<StartResult> => {
-        startCalls += 1
-        throw new Error("batch start must not run")
+      start: async (spec): Promise<StartResult> => {
+        const taskId = `st_big_${startIndex}`
+        startIndex += 1
+        return started(taskId, spec.name ?? `item-${startIndex}`)
       },
+      waitFor: async (taskId): Promise<TaskRecord> =>
+        makeRecord({ task_id: taskId, status: "completed", final_response: `done:${taskId}` }),
     })
-    const tasks = Array.from({ length: 17 }, () => ({ prompt: "one" }))
+    const tasks = Array.from({ length: 40 }, (_, index) => ({ prompt: `item ${index}` }))
 
     // when
     const output = await buildTaskExecute(makeDeps(manager))(
-      "oversized-batch", { category: "quick", tasks }, undefined, undefined, CTX,
+      "large-batch", { category: "quick", tasks }, undefined, undefined, CTX,
     )
 
     // then
-    expect(startCalls).toBe(0)
-    expect(output.details).toMatchObject({ task_id: "", status: "invalid_arguments", mode: "spawn" })
+    expect(startIndex).toBe(40)
+    expect(output.details.status).toBe("completed")
+    expect(output.details.items?.map((item) => item.task_id)).toEqual(
+      Array.from({ length: 40 }, (_, index) => `st_big_${index}`),
+    )
   })
 
   test(" w2batch #given a thrown middle start #when later items can start #then every item outcome is preserved", async () => {
@@ -143,6 +149,7 @@ describe("buildTaskExecute batch fanout", () => {
     let startIndex = 0
     let waitCalls = 0
     const cancelled: string[] = []
+    const updates: Array<Awaited<ReturnType<ReturnType<typeof buildTaskExecute>>>> = []
     const manager = createFakeManager({
       start: async (): Promise<StartResult> => {
         const taskId = IDS[startIndex]
@@ -174,7 +181,7 @@ describe("buildTaskExecute batch fanout", () => {
       "batch-abort",
       { category: "quick", tasks: [{ prompt: "one" }, { prompt: "two" }, { prompt: "three" }] },
       controller.signal,
-      undefined,
+      (update) => { updates.push(update) },
       CTX,
     )
     // then
@@ -182,6 +189,7 @@ describe("buildTaskExecute batch fanout", () => {
     expect(cancelled).toEqual(IDS)
     expect(output.details.status).toBe("cancelled")
     expect(output.details.items?.map((item) => item.status)).toEqual(["cancelled", "cancelled", "cancelled"])
+    expect(updates.at(-1)?.details.items?.map((item) => item.status)).toEqual(["cancelled", "cancelled", "cancelled"])
   })
 
   test(" w2batch #given one tasks item #when compared with a legacy prompt #then the single-spawn result is identical", async () => {

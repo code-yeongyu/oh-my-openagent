@@ -1,0 +1,88 @@
+{
+  "cases": [
+    {
+      "file": "batch-a-bad-magic.omob",
+      "base": "batch-a-epoch1.omob",
+      "mutation": "magic",
+      "expect": "bad_magic"
+    },
+    {
+      "file": "batch-a-bad-major.omob",
+      "base": "batch-a-epoch1.omob",
+      "mutation": "major",
+      "expect": "unsupported_major"
+    },
+    {
+      "file": "batch-a-bad-header-length.omob",
+      "base": "batch-a-epoch1.omob",
+      "mutation": "header-length",
+      "expect": "bad_header"
+    },
+    {
+      "file": "batch-a-bad-header-byte.omob",
+      "base": "batch-a-epoch1.omob",
+      "mutation": "header-byte",
+      "expect": "bad_signature"
+    },
+    {
+      "file": "batch-a-bad-signature-byte.omob",
+      "base": "batch-a-epoch1.omob",
+      "mutation": "signature-byte",
+      "expect": "bad_signature"
+    },
+    {
+      "file": "batch-a-bad-ciphertext-byte.omob",
+      "base": "batch-a-epoch1.omob",
+      "mutation": "ciphertext-byte",
+      "expect": "stream_aead"
+    },
+    {
+      "file": "batch-big-reordered.omob",
+      "base": "batch-big-epoch1.omob",
+      "mutation": "reordered",
+      "expect": "stream_aead"
+    },
+    {
+      "file": "batch-big-spliced.omob",
+      "base": "batch-big-epoch1.omob",
+      "mutation": "spliced",
+      "expect": "stream_aead"
+    },
+    {
+      "file": "batch-big-truncated.omob",
+      "base": "batch-big-epoch1.omob",
+      "mutation": "truncated",
+      "expect": "truncated"
+    },
+    {
+      "file": "batch-a-cut-tail.omob",
+      "base": "batch-a-epoch1.omob",
+      "mutation": "cut-tail",
+      "expect": "truncated"
+    },
+    {
+      "file": "batch-a-bad-deflate.omob",
+      "base": "batch-a-epoch1.omob",
+      "mutation": "bad-deflate",
+      "expect": "bad_payload"
+    },
+    {
+      "file": "batch-a-truncated-deflate.omob",
+      "base": "batch-a-epoch1.omob",
+      "mutation": "truncated-deflate",
+      "expect": "bad_payload"
+    },
+    {
+      "file": "batch-a-deflate-bomb.omob",
+      "base": "batch-a-epoch1.omob",
+      "mutation": "deflate-bomb",
+      "expect": "payload_too_large"
+    },
+    {
+      "file": "rotated-out-signer.record.json",
+      "base": "batch-d-epoch3-recovered.omob",
+      "mutation": "rotated-out-signer",
+      "expect": "not_member"
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-# Phase 6 + 7 — Root Cause Confirmation & TDD Fix
+# Phase 6 + 7 — Root Cause Confirmation & Reproduction-Locked Fix
 
 A cause is not "confirmed" until you can toggle the bug by toggling the cause. Every other level of evidence is correlation, and correlation-driven fixes ship bugs.
 
@@ -51,7 +51,15 @@ The "mechanism" field is the acid test. If you can't write the causal chain from
 
 Red, green, refactor. No shortcuts.
 
-### 1. Red — failing-first test
+### 0. Look for the owner test first
+
+Before writing a reproduction test, find the test that already owns this contract at the strongest boundary. Run it on the pre-fix code:
+
+- **It already fails for this bug.** It is the red proof. Record its failure and skip step 1.
+- **It passes but covers the path.** Extend it with the failing case (a table row, a fixture case) instead of adding a parallel test.
+- **No owner exists.** Write the new reproduction test in step 1, and apply the repository's test-authoring gate if it has one.
+
+### 1. Red — the reproduction as a test
 
 Write a test that fails *specifically because of this bug*. Requirements:
 
@@ -92,6 +100,8 @@ Only cleanup directly related to the fix. Do not re-architect.
 
 If the code around the fix is rough, note it in the journal as a follow-up for the user; do not expand scope here. Refactoring during a bugfix is how one-line fixes turn into hundred-line diffs nobody can review.
 
+**The one carve-out, and it runs before step 2, not after green:** if the fix must add lines to a file that already exceeds the `programming` skill's 250 pure-LOC ceiling (its DEFECT row forbids new lines in that file), first extract the unit you are touching into its own file as a separate, behavior-preserving move (the red test still fails for the same reason, every other test still passes), journal it, then make the minimal fix in the extracted file. The `programming` skill's SIZE_OK and pure-data-table exceptions still apply. That split ships with the fix; any other rough code stays a follow-up.
+
 ### 4. Regression — full suite green
 
 Run the full test suite for the affected package (not just the one new test). Existing tests must still pass.
@@ -117,6 +127,6 @@ Full suite: <N tests, <M failures — should be 0>
 
 ## The red-green discipline summary
 
-No red test → no proof the fix addresses the reported bug. Only proof it doesn't break tests that already existed.
+No captured failure → no proof the fix addresses the reported bug. Only proof it doesn't break tests that already existed. Keep the reproduction as a test where the repository keeps tests for this behavior; otherwise the captured before/after run is the proof.
 
 A test written *after* the fix might still pass with the fix reverted. If that's the case, the test doesn't lock the bug — it locks something else. Always verify the test fails without the fix and passes with it. The journal should show both outputs.

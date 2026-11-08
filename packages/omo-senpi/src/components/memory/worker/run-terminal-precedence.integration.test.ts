@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { spawn, type ChildProcess } from "node:child_process"
 import { existsSync, realpathSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { hostname, tmpdir } from "node:os"
 import { join } from "node:path"
 
 import {
@@ -65,6 +65,7 @@ async function fixture() {
     attempt: 1,
     kind: "reflection",
     command: process.execPath,
+    memoryRoot: root,
     args: [childPath, runDir],
     cwd: worktree.dir,
     env: { ...process.env },
@@ -77,6 +78,10 @@ async function fixture() {
   const active: ReservedRun = {
     runId: "run-1",
     request: { trigger: "step-count", conversationIds: ["conversation-a"], snapshots: [] },
+    reservedAt: new Date().toISOString(),
+    launcherPid: process.pid,
+    launcherHostname: hostname(),
+    launcherProcessStart: null,
   }
   return { identity, runDir, ledger, active }
 }

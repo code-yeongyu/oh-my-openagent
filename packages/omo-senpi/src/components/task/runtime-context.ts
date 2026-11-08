@@ -1,14 +1,20 @@
 import type { ChildModelRegistry, ParentState } from "@oh-my-opencode/senpi-task"
+import { RELEASE_RUN_FENCE, type EnginePauseState, type EngineRunHoldContext, type RunRef } from "../../../../senpi-task/src/pause/ports"
 
 // Structural slice of senpi's ExtensionContext the task runtime reads. ExtensionContext satisfies it;
 // tests pass a tiny fake. `ui` lives on ExtensionContext (event/command contexts), NOT ExtensionAPI,
 // so it is captured here on entry and cleared on switch/shutdown (the todo-18 bridge constraint).
 // modelRegistry is the CONCRETE senpi ModelRegistry: the planner reads it through its structural port,
 // and in-process children reuse this exact instance so they inherit the parent's live provider set.
-export interface LiveTaskContext {
+export interface LiveTaskContext extends EngineRunHoldContext {
   readonly cwd?: string
   readonly modelRegistry?: ChildModelRegistry
+  readonly loadedExtensionPaths?: readonly string[]
   readonly model?: unknown
+  readonly serviceTier?: unknown
+  // senpi >= the effectiveServiceTier context field: the tier requests carry right now, fast mode
+  // included. Older engines expose only `serviceTier`, which misses a session-flag fast mode.
+  readonly effectiveServiceTier?: unknown
   readonly ui?: CapturedUi
   readonly mode?: string
   readonly hasUI?: boolean
@@ -17,6 +23,7 @@ export interface LiveTaskContext {
     getSessionFile?(): string | undefined
   }
   isIdle?(): boolean
+  isProjectTrusted?(): boolean
 }
 
 // The slice of senpi's ExtensionUIContext the task component drives (setStatus/setWidget power the
@@ -25,12 +32,24 @@ export interface LiveTaskContext {
 export interface CapturedUi {
   notify(message: string, type?: "info" | "warning" | "error"): void
   setStatus(key: string, text: string | undefined): void
+  // senpi#2471: absent on engines before it, so the footer simply shows no subagent figure there.
+  setSubagentCost?(costUsd: number | undefined): void
   setWidget(key: string, content: string[] | undefined, options?: { placement?: "belowEditor" | "aboveEditor" }): void
   select(title: string, options: string[], opts?: { signal?: unknown; timeout?: number }): Promise<string | undefined>
   confirm(title: string, message: string, opts?: { signal?: unknown; timeout?: number }): Promise<boolean>
 }
 
 export type ParentTransition = "compacting" | "session_switching" | "session_shutdown" | undefined
+
+export type ParentServiceTier = "auto" | "flex" | "priority"
+
+function isParentServiceTier(value: unknown): value is ParentServiceTier {
+  return value === "auto" || value === "flex" || value === "priority"
+}
+
+function asParentServiceTier(value: unknown): ParentServiceTier | undefined {
+  return isParentServiceTier(value) ? value : undefined
+}
 
 /**
  * Mutable holder for the latest live-context facts. The manager's planner and in-process runner are
@@ -40,20 +59,29 @@ export type ParentTransition = "compacting" | "session_switching" | "session_shu
 export class TaskRuntimeContext {
   #cwd: string
   #modelRegistry: ChildModelRegistry | undefined
+  #modelContext: Pick<LiveTaskContext, "model" | "getPauseState" | "fenceRun" | typeof RELEASE_RUN_FENCE> | undefined
+  #loadedExtensionPaths: readonly string[] = []
+  #parentServiceTier: ParentServiceTier | undefined
   #idle = true
   #transition: ParentTransition
   #ui: CapturedUi | undefined
   #sessionId: string | undefined
   #sessionFile: string | undefined
   #mode: string | undefined
+  #projectTrusted: boolean | undefined
 
   constructor(cwd: string) {
     this.#cwd = cwd
   }
 
   captureFrom(ctx: LiveTaskContext): void {
+    this.#modelContext = ctx
     if (typeof ctx.cwd === "string" && ctx.cwd.length > 0) this.#cwd = ctx.cwd
     if (ctx.modelRegistry !== undefined) this.#modelRegistry = ctx.modelRegistry
+    if (ctx.loadedExtensionPaths !== undefined) this.#loadedExtensionPaths = ctx.loadedExtensionPaths
+    if ("effectiveServiceTier" in ctx || "serviceTier" in ctx) {
+      this.#parentServiceTier = asParentServiceTier(ctx.effectiveServiceTier) ?? asParentServiceTier(ctx.serviceTier)
+    }
     if (ctx.ui !== undefined) this.#ui = ctx.ui
     if (typeof ctx.mode === "string") this.#mode = ctx.mode
     if (ctx.sessionManager !== undefined) {
@@ -61,6 +89,7 @@ export class TaskRuntimeContext {
       this.#sessionFile = ctx.sessionManager.getSessionFile?.()
     }
     if (typeof ctx.isIdle === "function") this.#idle = ctx.isIdle()
+    if (typeof ctx.isProjectTrusted === "function") this.#projectTrusted = ctx.isProjectTrusted()
   }
 
   clearUi(): void {
@@ -79,6 +108,43 @@ export class TaskRuntimeContext {
     return this.#modelRegistry
   }
 
+  // Retain the host context's live getter: fallback can replace its model before a queued wake lands.
+  parentModel(): string | undefined {
+    const model = this.#modelContext?.model
+    if (typeof model === "string") return model
+    if (typeof model !== "object" || model === null || !("id" in model)) return undefined
+    return typeof model.id === "string" ? model.id : undefined
+  }
+
+  getPauseState(): EnginePauseState | undefined {
+    return this.#modelContext?.getPauseState?.()
+  }
+
+  fenceRun(runRef: RunRef): void {
+    const context = this.#modelContext
+    if (context?.fenceRun === undefined) throw new Error("engine run fences are unavailable")
+    context.fenceRun(runRef)
+  }
+
+  // Feature-detected: an engine without it keeps the fence until the next human input or
+  // resume_session. Answers whether the engine released it.
+  releaseRunFence(runRef: RunRef): boolean {
+    const release = this.#modelContext?.[RELEASE_RUN_FENCE]
+    if (release === undefined) return false
+    release(runRef)
+    return true
+  }
+
+  loadedExtensionPaths(): readonly string[] {
+    return this.#loadedExtensionPaths
+  }
+
+  // The parent session's effective request tier at the last captured event; a delegated child
+  // inherits it (see fast-mode-inheritance.ts). Undefined until a context carrying a tier is seen.
+  parentServiceTier(): ParentServiceTier | undefined {
+    return this.#parentServiceTier
+  }
+
   ui(): CapturedUi | undefined {
     return this.#ui
   }
@@ -93,6 +159,11 @@ export class TaskRuntimeContext {
 
   mode(): string | undefined {
     return this.#mode
+  }
+
+  // The parent session's project-trust decision at the last captured event; undefined until seen.
+  projectTrusted(): boolean | undefined {
+    return this.#projectTrusted
   }
 
   parentState(): ParentState {

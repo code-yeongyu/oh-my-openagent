@@ -1,6 +1,7 @@
 import { isPlainRecord } from "./codex-cache-fs"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
 
 export type CodexReasoningProfile = {
   readonly model: string
@@ -18,15 +19,15 @@ export type CodexModelCatalog = {
 
 const FALLBACK_CODEX_MODEL_CATALOG: CodexModelCatalog = {
   current: {
-    model: "gpt-5.6-sol",
-    modelContextWindow: 650_000,
+    model: LATEST_MODEL_BY_FAMILY.gptAstra,
+    modelContextWindow: 600_000,
     modelReasoningEffort: "high",
     planModeReasoningEffort: "xhigh",
   },
   managedProfiles: [
     {
       model: "gpt-5.5",
-      modelContextWindow: 650_000,
+      modelContextWindow: 400_000,
       modelReasoningEffort: "high",
       planModeReasoningEffort: "xhigh",
     },
@@ -37,6 +38,12 @@ const FALLBACK_CODEX_MODEL_CATALOG: CodexModelCatalog = {
       planModeReasoningEffort: "xhigh",
     },
     { model: "gpt-5.5", modelContextWindow: 272_000 },
+    {
+      model: "gpt-5.6-sol",
+      modelContextWindow: 650_000,
+      modelReasoningEffort: "high",
+      planModeReasoningEffort: "xhigh",
+    },
   ],
 }
 

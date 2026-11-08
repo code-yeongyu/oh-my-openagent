@@ -1,5 +1,5 @@
 import type { OAuthTokenData } from "./storage"
-import { loadToken, saveToken } from "./storage"
+import { deleteToken, loadToken, saveToken } from "./storage"
 import { PLUGIN_NAME } from "../plugin-identity"
 import { discoverOAuthServerMetadata } from "./discovery"
 import type { OAuthServerMetadata } from "./discovery"
@@ -11,7 +11,6 @@ import {
   generateCodeChallenge,
   generateCodeVerifier,
   runAuthorizationCodeRedirect,
-  startCallbackServer,
 } from "./oauth-authorization-flow"
 
 export type McpOAuthProviderOptions = {
@@ -51,11 +50,13 @@ function buildOAuthTokenData(
   }
 
   return {
+    ...(clientInfo.issuer ? { issuer: clientInfo.issuer } : {}),
     accessToken,
     refreshToken: typeof tokenData["refresh_token"] === "string" ? tokenData["refresh_token"] : fallbackRefreshToken,
     expiresAt:
       typeof tokenData["expires_in"] === "number" ? Math.floor(Date.now() / 1000) + tokenData["expires_in"] : undefined,
     clientInfo: {
+      ...(clientInfo.issuer ? { issuer: clientInfo.issuer } : {}),
       clientId: clientInfo.clientId,
       ...(clientInfo.clientSecret ? { clientSecret: clientInfo.clientSecret } : {}),
     },
@@ -69,6 +70,7 @@ export class McpOAuthProvider {
   private storedCodeVerifier: string | null = null
   private storedClientInfo: ClientCredentials | null = null
   private callbackPort: number | null = null
+  private issuer: string | undefined
 
   constructor(options: McpOAuthProviderOptions) {
     this.serverUrl = options.serverUrl
@@ -81,7 +83,32 @@ export class McpOAuthProvider {
   }
 
   saveTokens(tokenData: OAuthTokenData): boolean {
-    return saveToken(this.serverUrl, this.serverUrl, tokenData)
+    const issuer = tokenData.issuer ?? this.issuer
+    return saveToken(this.serverUrl, this.serverUrl, issuer ? {
+      ...tokenData,
+      issuer,
+      ...(tokenData.clientInfo ? { clientInfo: { ...tokenData.clientInfo, issuer: tokenData.clientInfo.issuer ?? issuer } } : {}),
+    } : tokenData)
+  }
+
+  private bindIssuer(issuer: string): boolean {
+    const token = this.tokens()
+    const stamps = [token?.issuer, token?.clientInfo?.issuer, this.storedClientInfo?.issuer, this.issuer]
+    const changed = stamps.some((stamp) => stamp !== undefined && stamp !== issuer)
+    if (changed) {
+      this.storedClientInfo = null
+      this.storedCodeVerifier = null
+      if (!deleteToken(this.serverUrl, this.serverUrl)) {
+        throw new Error("Unable to discard credentials for the previous OAuth issuer")
+      }
+    }
+    this.issuer = issuer
+    if (!changed && token && !this.saveTokens(token)) {
+      throw new Error("Unable to stamp stored OAuth credentials with their issuer")
+    }
+    const clientInfo = this.clientInformation()
+    if (clientInfo) this.storedClientInfo = { ...clientInfo, issuer }
+    return changed
   }
 
   clientInformation(): ClientCredentials | null {
@@ -117,6 +144,8 @@ export class McpOAuthProvider {
     }
 
     const result = await runAuthorizationCodeRedirect({
+      issuer: metadata.issuer,
+      authorizationResponseIssParameterSupported: metadata.authorizationResponseIssParameterSupported,
       authorizationEndpoint: metadata.authorizationEndpoint,
       callbackPort: this.callbackPort,
       clientId: clientInfo.clientId,
@@ -130,18 +159,20 @@ export class McpOAuthProvider {
   }
 
   async login(): Promise<OAuthTokenData> {
-    const metadata = await discoverOAuthServerMetadata(this.serverUrl)
+    const metadata = await discoverOAuthServerMetadata(this.serverUrl, true)
+    this.bindIssuer(metadata.issuer)
+    if (this.callbackPort === null) this.callbackPort = await findAvailablePort()
 
     const clientRegistrationStorage: ClientRegistrationStorage = {
       getClientRegistration: () => this.storedClientInfo,
       setClientRegistration: (_serverIdentifier: string, credentials: ClientCredentials) => {
-        this.storedClientInfo = credentials
+        this.storedClientInfo = { ...credentials, issuer: metadata.issuer }
       },
     }
 
     const clientInfo = await getOrRegisterClient({
       ...(metadata.registrationEndpoint ? { registrationEndpoint: metadata.registrationEndpoint } : {}),
-      serverIdentifier: this.serverUrl,
+      serverIdentifier: metadata.issuer,
       clientName: PLUGIN_NAME,
       redirectUris: [this.redirectUrl()],
       tokenEndpointAuthMethod: "none",
@@ -153,7 +184,7 @@ export class McpOAuthProvider {
       throw new Error("Failed to obtain client credentials. Provide a clientId or ensure the server supports DCR.")
     }
 
-    this.storedClientInfo = clientInfo
+    this.storedClientInfo = { ...clientInfo, issuer: metadata.issuer }
 
     const { code } = await this.redirectToAuthorization(metadata)
     const verifier = this.codeVerifier()
@@ -175,14 +206,15 @@ export class McpOAuthProvider {
     })
 
     const tokenData = await parseTokenResponse(tokenResponse)
-    const oauthTokenData = buildOAuthTokenData(tokenData, clientInfo)
+    const oauthTokenData = buildOAuthTokenData(tokenData, { ...clientInfo, issuer: metadata.issuer })
 
     this.saveTokens(oauthTokenData)
     return oauthTokenData
   }
 
   async refresh(refreshToken: string): Promise<OAuthTokenData> {
-    const metadata = await discoverOAuthServerMetadata(this.serverUrl)
+    const metadata = await discoverOAuthServerMetadata(this.serverUrl, true)
+    if (this.bindIssuer(metadata.issuer)) return this.login()
     const clientInfo = this.clientInformation()
     const clientId = clientInfo?.clientId ?? this.configClientId
     if (!clientId) {
@@ -204,6 +236,7 @@ export class McpOAuthProvider {
     const tokenData = await parseTokenResponse(tokenResponse)
     const oauthTokenData = buildOAuthTokenData(tokenData, {
       clientId,
+      issuer: metadata.issuer,
       ...(clientInfo?.clientSecret ? { clientSecret: clientInfo.clientSecret } : {}),
     }, refreshToken)
 

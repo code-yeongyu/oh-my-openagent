@@ -10,7 +10,7 @@ export function findWorkspaceRootOutsideContext(directory: string): string {
 	return realpathSync(nearestExistingAncestor(directory));
 }
 
-function nearestMarkedAncestor(directory: string): string | undefined {
+export function nearestMarkedAncestor(directory: string): string | undefined {
 	let current = directory;
 	for (;;) {
 		if (existsSync(current) && WORKSPACE_MARKERS.some((marker) => existsSync(join(current, marker)))) {

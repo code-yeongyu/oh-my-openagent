@@ -78,11 +78,11 @@ export function killRun1Script(sentinel) {
 
 // Cap-1 LRU lane: the agent-side record wait guarantees lruone is a terminal idle resident before
 // lrutwo's spawn forces the eviction (only terminal idle residents are evictable).
-export function lruRun1Script(cwd, sentinel) {
+export function lruRun1Script(sandbox, sentinel) {
   return {
     parentSteps: [
       spawnBackground("lru-child oldest unit", "lruone"),
-      bash(waitForRecordStatusCommand(cwd, "lruone", "completed")),
+      bash(waitForRecordStatusCommand(sandbox, "lruone", "completed")),
       spawnBackground("lru-child newest unit", "lrutwo"),
       bash(waitForFileCommand(sentinel)),
       text("lru run settled, quitting"),
@@ -90,12 +90,12 @@ export function lruRun1Script(cwd, sentinel) {
   }
 }
 
-export function ttlRun1Script(cwd, sentinel) {
+export function ttlRun1Script(sandbox, sentinel) {
   return {
     parentSteps: [
       spawnBackground("ttl-child expiring unit", "ttlchild"),
       spawnBackground("midturn-child ttl witness", "ttlwitness"),
-      bash(waitForRecordStatusCommand(cwd, "ttlchild", "completed")),
+      bash(waitForRecordStatusCommand(sandbox, "ttlchild", "completed")),
       bash(waitForFileCommand(sentinel)),
       text("ttl run settled, quitting"),
     ],

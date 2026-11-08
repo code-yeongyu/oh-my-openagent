@@ -8,6 +8,8 @@ import {
   taskCallLines,
 } from "./call-renderer"
 import { formatTargetWithModel } from "../../status-line"
+import { priorityAliasBaseId } from "../../runners/pinned-model-equivalence"
+import { splitModelDecorators } from "../../senpi/explicit-pin"
 import {
   ELLIPSIS,
   excerptRendererText,
@@ -16,7 +18,7 @@ import {
   optionalRendererText,
   rendererVisibleWidth,
 } from "../../renderer-text"
-import { runStatsResultTokens } from "../run-stats-format"
+import { runStatsCardSummary } from "../run-stats-format"
 
 const TASK_REASON_EXCERPT_WIDTH = 40
 
@@ -109,20 +111,38 @@ function fallbackCountToken(details: Pick<TaskToolDetails, "fallback_attempts">)
   return count > 0 ? `fallback:${count}` : undefined
 }
 
+function taskDowngradeToken(details: TaskToolDetails): string | undefined {
+  const effective = details.effective_model
+  const tier = optionalRendererText(effective?.service_tier)
+  if (effective === undefined || tier === undefined || tier === "priority") return undefined
+  const resolved = details.resolved_model
+  const { base: pin } = splitModelDecorators(details.model ?? "")
+  const separator = pin.indexOf("/")
+  const provider = resolved?.provider ?? pin.slice(0, separator)
+  const id = resolved?.model_id ?? pin.slice(separator + 1)
+  const baseId = priorityAliasBaseId(id)
+  if (baseId === undefined || effective.provider !== provider) return undefined
+  if (effective.model_id !== id && effective.model_id !== baseId) return undefined
+  // Legacy records lack catalog tier metadata; a successful alias-to-base start proves pairing.
+  if (resolved?.service_tier !== "priority" && effective.model_id !== baseId) return undefined
+  return `tier:${tier}`
+}
+
 function taskResultLine(details: TaskToolDetails, mode: string | undefined): string {
   const taskId = optionalRendererText(details.task_id)
   const reason = optionalRendererText(details.reason)
+  const summary = runStatsCardSummary(details.run_stats)
   return joinRendererTokens([
     "task",
     taskTargetToken(details),
+    taskDowngradeToken(details),
     fallbackCountToken(details),
     mode,
     formatTaskStatus(details.status),
     taskId === undefined ? undefined : `id:${taskId}`,
-    ...runStatsResultTokens(details.run_stats),
     details.queue_position === undefined ? undefined : `queue:${details.queue_position}`,
     reason === undefined ? undefined : `reason:${excerptRendererText(reason, TASK_REASON_EXCERPT_WIDTH)}`,
-  ])
+  ]) + summary
 }
 
 function taskItemResultLine(item: TaskToolItemDetail): string {
@@ -143,6 +163,7 @@ function taskItemResultLine(item: TaskToolItemDetail): string {
 function taskResultLineForWidth(details: TaskToolDetails, mode: string | undefined, width: number): string {
   const requiredWithoutTarget = [
     "task",
+    taskDowngradeToken(details),
     fallbackCountToken(details),
     mode,
     formatTaskStatus(details.status),
@@ -155,6 +176,7 @@ function taskResultLineForWidth(details: TaskToolDetails, mode: string | undefin
   const required = [
     "task",
     compactTargetToken(details, targetWidth),
+    taskDowngradeToken(details),
     fallbackCountToken(details),
     mode,
     formatTaskStatus(details.status),
@@ -165,6 +187,10 @@ function taskResultLineForWidth(details: TaskToolDetails, mode: string | undefin
     const candidate = `${line} ${token}`
     if (rendererVisibleWidth(candidate) > width) break
     line = candidate
+  }
+  const summary = runStatsCardSummary(details.run_stats)
+  if (summary.length > 0 && rendererVisibleWidth(`${line}${summary}`) <= width) {
+    line = `${line}${summary}`
   }
   return line
 }
@@ -180,7 +206,6 @@ function taskResultOptionalTokens(details: TaskToolDetails): readonly string[] {
   const reason = optionalRendererText(details.reason)
   return [
     taskId === undefined ? undefined : `id:${taskId}`,
-    ...runStatsResultTokens(details.run_stats),
     details.queue_position === undefined ? undefined : `queue:${details.queue_position}`,
     reason === undefined ? undefined : `reason:${excerptRendererText(reason, TASK_REASON_EXCERPT_WIDTH)}`,
   ].filter((token): token is string => token !== undefined)

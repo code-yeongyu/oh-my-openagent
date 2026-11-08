@@ -72,7 +72,7 @@ describe("buildPrometheusAgentConfig", () => {
     describe("#when currentModel IS in Prometheus fallback chain", () => {
       test("preserves currentModel as uiSelectedModel for claude-fable-5", async () => {
         // given - currentModel matches a Prometheus fallback chain entry
-        const currentModel = "anthropic/claude-fable-5";
+        const currentModel = "anthropic/claude-fable-5-1";
 
         // when - should not throw and should produce a valid config
         const result = await buildPrometheusAgentConfig({

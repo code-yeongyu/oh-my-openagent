@@ -1,5 +1,6 @@
 import { createRequire } from "node:module"
-import { dirname, join } from "node:path"
+
+import { COMMENT_CHECKER_PACKAGE_NAME, findCommentCheckerPackageBinary, isModuleResolutionMiss } from "./package-binary"
 
 import type {
   CheckResult,
@@ -11,9 +12,23 @@ import type {
 } from "./types"
 
 const EMPTY_RESULT: CheckResult = { hasComments: false, message: "" }
+const MAX_FAILURE_STDERR = 500
+
+type ExitOutcome = { readonly kind: "exited"; readonly code: number } | { readonly kind: "not-started"; readonly reason: string }
 
 function normalizeMessage(message: string): string {
   return message.replace(/\r\n/g, "\n")
+}
+
+function failed(exitCode: number | null, stderr: string): CheckResult {
+  return { ...EMPTY_RESULT, failure: { exitCode, stderr: normalizeMessage(stderr).trim().slice(0, MAX_FAILURE_STDERR) } }
+}
+
+function readText(stream: ReadableStream<Uint8Array>): Promise<string | undefined> {
+  return new Response(stream).text().then(
+    (text) => text,
+    () => undefined,
+  )
 }
 
 function killProcessSafely(process: SpawnProcess, signal: SpawnSignal): void {
@@ -27,7 +42,7 @@ function killProcessSafely(process: SpawnProcess, signal: SpawnSignal): void {
 }
 
 export function resolveCommentCheckerBinary(input: ResolveCommentCheckerBinaryInput): string | null {
-  const packageName = input.packageName ?? "@code-yeongyu/comment-checker"
+  const packageName = input.packageName ?? COMMENT_CHECKER_PACKAGE_NAME
 
   if (input.cachedBinaryPath !== null && input.existsSync(input.cachedBinaryPath)) {
     return input.cachedBinaryPath
@@ -40,12 +55,14 @@ export function resolveCommentCheckerBinary(input: ResolveCommentCheckerBinaryIn
   try {
     const require = createRequire(input.importMetaUrl)
     const packageJsonPath = require.resolve(`${packageName}/package.json`)
-    const binaryPath = join(dirname(packageJsonPath), "bin", input.binaryName)
-    return input.existsSync(binaryPath) ? binaryPath : null
+    return findCommentCheckerPackageBinary({
+      packageJsonPath,
+      packageName,
+      binaryName: input.binaryName,
+      existsSync: input.existsSync,
+    })
   } catch (error) {
-    if (error instanceof Error) {
-      return null
-    }
+    if (isModuleResolutionMiss(error)) return null
     throw error
   }
 }
@@ -68,9 +85,23 @@ export async function runCommentChecker(
   const setTimer = options.setTimeoutFn ?? setTimeout
   const clearTimer = options.clearTimeoutFn ?? clearTimeout
 
-  const process = options.spawn(args)
-  process.stdin.write(JSON.stringify(input.hookInput))
-  process.stdin.end()
+  let process: SpawnProcess
+  try {
+    process = options.spawn(args)
+  } catch (error) {
+    if (error instanceof Error) {
+      return failed(null, error.message)
+    }
+    throw error
+  }
+  const spawned = process
+  const inputDelivered = spawned.stdin.send(JSON.stringify(input.hookInput)).then(
+    () => true,
+    () => {
+      killProcessSafely(spawned, "SIGKILL")
+      return false
+    },
+  )
 
   let timeoutId: ReturnType<typeof setTimeout> | null = null
   let graceId: ReturnType<typeof setTimeout> | null = null
@@ -88,25 +119,36 @@ export async function runCommentChecker(
   })
 
   try {
-    const stdoutPromise = new Response(process.stdout).text()
-    const stderrPromise = new Response(process.stderr).text()
-    const exitCodePromise = process.exited
-    const completed = Promise.all([stdoutPromise, stderrPromise, exitCodePromise] as const)
+    const stdoutPromise = readText(process.stdout)
+    const stderrPromise = readText(process.stderr)
+    // A spawn error (EACCES, ENOEXEC, ENOENT) rejects `exited`; under Bun it also aborts the output
+    // streams, so neither may hide that the checker never started (#8850).
+    const exitPromise = process.exited.then(
+      (code): ExitOutcome => ({ kind: "exited", code }),
+      (error: unknown): ExitOutcome => ({ kind: "not-started", reason: error instanceof Error ? error.message : String(error) }),
+    )
+    const completed = Promise.all([stdoutPromise, stderrPromise, exitPromise, inputDelivered] as const)
     const race = await Promise.race([completed, timeoutPromise] as const)
 
     if (race === "timeout") {
       return EMPTY_RESULT
     }
 
-    const [_stdout, stderr, exitCode] = race
-    if (exitCode === 0) {
+    const [_stdout, stderr, exit, delivered] = race
+    if (exit.kind === "not-started") {
+      return failed(null, exit.reason)
+    }
+    if (exit.code === 0) {
       return EMPTY_RESULT
     }
-    if (exitCode === 2) {
-      return { hasComments: true, message: normalizeMessage(stderr) }
+    if (exit.code === 2) {
+      // Feedback about input the checker never fully read is not trustworthy.
+      return delivered && stderr !== undefined ? { hasComments: true, message: normalizeMessage(stderr) } : EMPTY_RESULT
     }
+    // Outside the protocol, whether or not the input was delivered: a checker that cannot start
+    // exits before reading stdin, and that is the case callers need to see (#8850).
 
-    return EMPTY_RESULT
+    return failed(exit.code, stderr ?? "")
   } catch (error) {
     if (error instanceof Error) {
       return EMPTY_RESULT

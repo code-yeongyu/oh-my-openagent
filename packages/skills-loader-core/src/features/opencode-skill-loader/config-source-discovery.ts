@@ -3,12 +3,21 @@ import { homedir } from "os"
 import { dirname, extname, isAbsolute, join, relative } from "path"
 import picomatch from "picomatch"
 import type { SkillsConfig } from "../../types"
-import { resolveSymlinkAsync } from "@oh-my-opencode/utils"
 import { normalizeSkillsConfig } from "./merger/skills-config-normalizer"
 import { deduplicateSkillsByName } from "./skill-deduplication"
 import { loadSkillsFromDir } from "./skill-directory-loader"
 import { inferSkillNameFromFileName, loadSkillFromPath } from "./loaded-skill-from-path"
 import type { LoadedSkill } from "./types"
+import { detectWorktreePath } from "../../shared/project-discovery-dirs"
+import { skillProvenance, checkSkillPath, reportSkillLoadError, type SkillProvenance, type SkillDiagnosticSink } from "./skill-provenance"
+
+const sourceOrigins = new WeakMap<object, SkillProvenance>()
+export function setSkillSourceProvenance(config: SkillsConfig, provenance: SkillProvenance): void {
+  sourceOrigins.set(config, provenance)
+}
+export function getSkillSourceProvenance(config: SkillsConfig | undefined): SkillProvenance | undefined {
+  return config ? sourceOrigins.get(config) : undefined
+}
 
 const MAX_RECURSIVE_DEPTH = 10
 
@@ -49,29 +58,32 @@ function filterByGlob(skills: LoadedSkill[], sourceBaseDir: string, globPattern?
   })
 }
 
-async function resolveRealPath(path: string): Promise<string> {
-  return resolveSymlinkAsync(path).catch((error) => {
-    if (error instanceof Error) {
-      return path
-    }
-    throw error
-  })
-}
-
 async function loadSourcePath(options: {
   sourcePath: string
   recursive: boolean
   globPattern?: string
   configDir: string
+  provenance: SkillProvenance
+  onDiagnostic?: SkillDiagnosticSink
 }): Promise<LoadedSkill[]> {
   if (isHttpUrl(options.sourcePath)) {
     return []
   }
 
   const absolutePath = toAbsolutePath(options.sourcePath, options.configDir)
-  const stat = await fs.stat(absolutePath).catch(() => null)
+  const provenance = skillProvenance(absolutePath, "config", { ...options.provenance, selectedRoot: absolutePath })
+  if (provenance.kind === "project-auto") {
+    try { checkSkillPath(absolutePath, provenance, true) } catch (error) {
+      reportSkillLoadError(error, absolutePath, options.onDiagnostic)
+      return []
+    }
+  }
+  const stat = await fs.stat(absolutePath).catch((error) => {
+    reportSkillLoadError(error, absolutePath, options.onDiagnostic)
+    return null
+  })
   if (!stat) return []
-  const realSourcePath = await resolveRealPath(absolutePath)
+  const realSourcePath = absolutePath
 
   if (stat.isFile()) {
     if (!isMarkdownPath(realSourcePath)) return []
@@ -80,6 +92,8 @@ async function loadSourcePath(options: {
       resolvedPath: dirname(realSourcePath),
       defaultName: inferSkillNameFromFileName(realSourcePath),
       scope: "config",
+      provenance,
+      onDiagnostic: options.onDiagnostic,
     })
     if (!loaded) return []
     return filterByGlob([loaded], dirname(realSourcePath), options.globPattern)
@@ -91,6 +105,8 @@ async function loadSourcePath(options: {
     skillsDir: realSourcePath,
     scope: "config",
     maxDepth: options.recursive ? MAX_RECURSIVE_DEPTH : 0,
+    provenance,
+    onDiagnostic: options.onDiagnostic,
   })
   return filterByGlob(directorySkills, realSourcePath, options.globPattern)
 }
@@ -98,17 +114,34 @@ async function loadSourcePath(options: {
 export async function discoverConfigSourceSkills(options: {
   config: SkillsConfig | undefined
   configDir: string
+  provenance?: SkillProvenance
+  onDiagnostic?: SkillDiagnosticSink
+  userSources?: readonly string[]
+  projectSources?: readonly string[]
 }): Promise<LoadedSkill[]> {
   const normalized = normalizeSkillsConfig(options.config)
   if (normalized.sources.length === 0) return []
+  const provenance = options.provenance ?? (options.config && sourceOrigins.get(options.config)) ?? {
+    kind: "project-auto", selectedRoot: options.configDir, projectRoot: detectWorktreePath(options.configDir) ?? options.configDir,
+  }
 
   const loadedBySource = await Promise.all(
     normalized.sources.map((source) => {
+      const sourcePath = typeof source === "string" ? source : source.path
+      const userSelected = options.userSources?.some((path) =>
+        toAbsolutePath(path, options.configDir) === toAbsolutePath(sourcePath, options.configDir))
+      const projectSelected = options.projectSources?.some((path) =>
+        toAbsolutePath(path, options.configDir) === toAbsolutePath(sourcePath, options.configDir))
+      const sourceProvenance: SkillProvenance = userSelected
+        ? { ...provenance, kind: "user" }
+        : projectSelected ? { ...provenance, kind: "project-auto" } : provenance
       if (typeof source === "string") {
         return loadSourcePath({
           sourcePath: source,
           recursive: false,
           configDir: options.configDir,
+          provenance: sourceProvenance,
+          onDiagnostic: options.onDiagnostic,
         })
       }
 
@@ -117,6 +150,8 @@ export async function discoverConfigSourceSkills(options: {
         recursive: source.recursive ?? false,
         globPattern: source.glob,
         configDir: options.configDir,
+        provenance: sourceProvenance,
+        onDiagnostic: options.onDiagnostic,
       })
     }),
   )

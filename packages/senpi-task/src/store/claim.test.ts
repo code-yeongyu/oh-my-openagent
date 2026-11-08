@@ -146,7 +146,7 @@ describe("claimTaskRecord", () => {
 
   test("#given a claimed record in an isolated process #when a new id is created #then the id floor follows the claim", async () => {
     // given
-    const child = Bun.spawn([process.execPath, claimFloorChildFixturePath], { stdout: "pipe", stderr: "pipe" })
+    const child = Bun.spawn([process.execPath, claimFloorChildFixturePath], { stdout: "pipe", stderr: "pipe", env: { ...process.env } })
 
     // when
     const [exitCode, stdout, stderr] = await Promise.all([

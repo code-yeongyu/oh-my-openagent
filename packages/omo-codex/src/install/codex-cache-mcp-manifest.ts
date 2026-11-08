@@ -1,22 +1,12 @@
 import { readFile, writeFile } from "node:fs/promises"
 import { join, sep } from "node:path"
-import { resolveCodegraphNodeRuntime } from "@oh-my-opencode/utils/codegraph/resolve"
 import { resolveBundledMcpRuntimeArg } from "./codex-cache-bundled-mcps"
 import { fileExistsStrict, isPlainRecord } from "./codex-cache-fs"
 import { resolveCachedRuntimePath } from "./codex-cache-paths"
 
-const CODEGRAPH_RELATIVE_ARGS = new Set(["components/codegraph/dist/serve.js", "./components/codegraph/dist/serve.js"])
 const CONTEXT7_API_KEY_ENV = "CONTEXT7_API_KEY"
 
-export interface RewriteCachedMcpManifestOptions {
-  readonly codegraphNodeRuntime?: () => string | null
-}
-
-export async function rewriteCachedMcpManifest(
-  pluginRoot: string,
-  sourceRoot = pluginRoot,
-  options: RewriteCachedMcpManifestOptions = {},
-): Promise<void> {
+export async function rewriteCachedMcpManifest(pluginRoot: string, sourceRoot = pluginRoot): Promise<void> {
   const manifestPath = join(pluginRoot, ".mcp.json")
   if (!(await fileExistsStrict(manifestPath))) return
   const raw = await readFile(manifestPath, "utf8")
@@ -35,7 +25,6 @@ export async function rewriteCachedMcpManifest(
         if (typeof arg !== "string") return arg
         const bundledMcpRuntimeArg = resolveBundledMcpRuntimeArg(pluginRoot, arg)
         if (bundledMcpRuntimeArg !== null) return bundledMcpRuntimeArg
-        if (CODEGRAPH_RELATIVE_ARGS.has(arg)) return join(pluginRoot, "components", "codegraph", "dist", "serve.js")
         if (arg.startsWith("./") || arg.startsWith("../")) return resolveCachedRuntimePath(pluginRoot, sourceRoot, arg)
         return arg
       })
@@ -46,14 +35,6 @@ export async function rewriteCachedMcpManifest(
     }
     if (serverName === "context7" && sanitizeContext7Auth(server)) {
       changed = true
-    }
-    if (!Array.isArray(currentArgs)) continue
-    if (server === parsed.mcpServers.codegraph) {
-      const runtime = options.codegraphNodeRuntime?.() ?? resolveCodegraphNodeRuntime()
-      if (runtime !== null && server.command === "node") {
-        server.command = runtime
-        changed = true
-      }
     }
   }
   if (changed) await writeFile(manifestPath, `${JSON.stringify(parsed, null, "\t")}\n`)

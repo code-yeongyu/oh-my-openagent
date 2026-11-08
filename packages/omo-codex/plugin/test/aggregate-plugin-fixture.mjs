@@ -232,10 +232,11 @@ export function findSpawnAgentCallsWithoutIsolation(content) {
 
 export function findSpawnAgentCallsWithUnsupportedParameters(content) {
 	return findSpawnAgentCalls(content).flatMap((entry) => {
-		const allowsObjectAgentType = entry.receiver === "multi_agent_v1";
+		// Both multi_agent_v1 and the flat v2 spawn_agent take an object agent_type once roles are
+		// configured (codex exposes it whenever agent_roles is non-empty), and the LazyCodex spawn
+		// guard requires it, so only the direct keyword form is unsupported.
 		const parameters = spawnParameters(entry.call)
-			.filter(({ name, direct }) => name === "model" || name === "reasoning_effort" ||
-				(name === "agent_type" && (direct || !allowsObjectAgentType)))
+			.filter(({ name, direct }) => name === "model" || name === "reasoning_effort" || (name === "agent_type" && direct))
 			.map(({ name }) => name);
 		return parameters.length === 0 ? [] : [{ ...entry, parameters }];
 	});

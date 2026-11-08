@@ -1,0 +1,4 @@
+# Migrations applied to the Sisyphus Labs omo-get database (755b541b). The deploy refuses to run while a
+# migrations/*.sql file is missing here: apply it through the reviewed step in
+# sisyphuslabs/common-infra docs/cutover-workers.md (short-lived D1 token), then add its name in the same PR.
+0001_downloads.sql

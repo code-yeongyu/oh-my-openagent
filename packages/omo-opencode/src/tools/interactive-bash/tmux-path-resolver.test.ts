@@ -35,9 +35,11 @@ beforeEach(() => {
 	resetTmuxPathCacheForTesting()
 	delete process.env.CMUX_SOCKET_PATH
 	delete process.env.TMUX
-	process.env.PATH = originalPath
+	if (originalPath === undefined) delete process.env.PATH
+	else process.env.PATH = originalPath
 	if (process.platform === "win32") {
-		process.env.Path = originalWindowsPath
+		if (originalWindowsPath === undefined) delete process.env.Path
+		else process.env.Path = originalWindowsPath
 	}
 })
 
@@ -56,9 +58,11 @@ afterAll(async () => {
 		process.env.TMUX = originalTmux
 	}
 
-	process.env.PATH = originalPath
+	if (originalPath === undefined) delete process.env.PATH
+	else process.env.PATH = originalPath
 	if (process.platform === "win32") {
-		process.env.Path = originalWindowsPath
+		if (originalWindowsPath === undefined) delete process.env.Path
+		else process.env.Path = originalWindowsPath
 	}
 
 	for (const directoryPath of temporaryDirectories) {

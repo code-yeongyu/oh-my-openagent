@@ -38,7 +38,7 @@ function harness(): {
         root_session_id: "parent-1",
         depth: 0,
         execution_mode: "in-process",
-        model: "anthropic/claude-opus-5",
+        model: "anthropic/claude-opus-5-5",
         notify_on_terminal: false,
         task_seq: 0,
       })
@@ -125,7 +125,7 @@ describe("store status-edge observation", () => {
       root_session_id: "parent-1",
       depth: 0,
       execution_mode: "in-process",
-      model: "anthropic/claude-opus-5",
+      model: "anthropic/claude-opus-5-5",
       notify_on_terminal: false,
     })
 
@@ -155,7 +155,7 @@ describe("store status-edge observation", () => {
       root_session_id: "parent-1",
       depth: 0,
       execution_mode: "in-process",
-      model: "anthropic/claude-opus-5",
+      model: "anthropic/claude-opus-5-5",
       notify_on_terminal: false,
     })
     backing.save({ ...draft, status: "running" })
@@ -187,7 +187,7 @@ describe("store status-edge observation", () => {
       root_session_id: "parent-1",
       depth: 0,
       execution_mode: "in-process",
-      model: "anthropic/claude-opus-5",
+      model: "anthropic/claude-opus-5-5",
       notify_on_terminal: false,
     })
 

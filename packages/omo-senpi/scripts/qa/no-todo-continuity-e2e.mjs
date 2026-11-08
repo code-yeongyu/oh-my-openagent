@@ -12,6 +12,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createSandbox, credentialDigest, seedSandbox } from "./drive.mjs";
+import { isolatedChildEnv } from "./sandbox-child-env.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const mockProvider = join(scriptDir, "mock-provider", "index.ts");
@@ -24,7 +25,7 @@ function scenarioEnv(sandbox, sessionDir) {
 	const home = join(sandbox.root, "home");
 	mkdirSync(home, { recursive: true });
 	return {
-		...process.env,
+		...isolatedChildEnv(process.env, sandbox.agentDir),
 		HOME: home,
 		USERPROFILE: home,
 		XDG_CONFIG_HOME: sandbox.xdgConfigHome,

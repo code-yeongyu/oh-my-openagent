@@ -31,9 +31,8 @@ export const AST_GREP_SERVER_NAME = "ast_grep" as const;
 export const AST_GREP_SERVER_VERSION = "0.1.0" as const;
 const DEFAULT_PROTOCOL_VERSION = "2024-11-05";
 
-// 10 minutes: matches the mcp-stdio-core default already shipped for the
-// senpi-hosted memory MCP (omo-senpi/src/mcp/memory-server.ts), and the senpi
-// host auto-reconnects a degraded stdio server, so an idle exit costs one
+// 10 minutes: matches the mcp-stdio-core default, and the senpi host
+// auto-reconnects a degraded stdio server, so an idle exit costs one
 // backoff-delayed respawn rather than a broken session.
 export const DEFAULT_AST_GREP_IDLE_TIMEOUT_MS = 10 * 60_000;
 const IDLE_TIMEOUT_ENV_KEY = "OMO_AST_GREP_IDLE_TIMEOUT_MS";
@@ -78,16 +77,16 @@ const STRICTNESS = ["cst", "smart", "ast", "relaxed", "signature"] as const;
 // BYTES) while JSON Schema `maxLength` counts Unicode CODE POINTS, so a maxLength keyword
 // cannot express these budgets faithfully — a 10k-code-point CJK pattern is 30k bytes.
 // The budget is therefore published in the description and the parser stays authoritative.
-const PATTERN_BYTES_NOTE = "Max 16 KiB (16384 BYTES, UTF-8) — the limit counts bytes, not characters.";
-const REWRITE_BYTES_NOTE = "Max 64 KiB (65536 BYTES, UTF-8) — the limit counts bytes, not characters.";
-const INLINE_RULES_BYTES_NOTE = "Max 64 KiB (65536 BYTES, UTF-8) — the limit counts bytes, not characters.";
+const PATTERN_BYTES_NOTE = "Max 16 KiB (16384 BYTES, UTF-8): the limit counts bytes, not characters.";
+const REWRITE_BYTES_NOTE = "Max 64 KiB (65536 BYTES, UTF-8): the limit counts bytes, not characters.";
+const INLINE_RULES_BYTES_NOTE = "Max 64 KiB (65536 BYTES, UTF-8): the limit counts bytes, not characters.";
 
 const pathsSchema = {
   type: "array",
   minItems: 1,
   maxItems: 64,
   items: { type: "string", minLength: 1, maxLength: 4096 },
-  description: "Files or directories to search. Required — there is no implicit '.' default.",
+  description: "Files or directories to search. Required: there is no implicit '.' default.",
 } as const;
 
 const globsSchema = {
@@ -128,7 +127,7 @@ export const AST_GREP_MCP_TOOLS: readonly McpToolDescriptor[] = [
     inputSchema: {
       type: "object",
       properties: {
-        pattern: { type: "string", minLength: 1, description: `ast-grep pattern — code, not regex. ${PATTERN_BYTES_NOTE}` },
+        pattern: { type: "string", minLength: 1, description: `ast-grep pattern: code, not regex. ${PATTERN_BYTES_NOTE}` },
         language: { type: "string", enum: [...LANGUAGES], description: "Language the pattern must parse in." },
         paths: pathsSchema,
         workdir: workdirSchema,
@@ -151,7 +150,7 @@ export const AST_GREP_MCP_TOOLS: readonly McpToolDescriptor[] = [
     inputSchema: {
       type: "object",
       properties: {
-        pattern: { type: "string", minLength: 1, description: `ast-grep pattern — code, not regex. ${PATTERN_BYTES_NOTE}` },
+        pattern: { type: "string", minLength: 1, description: `ast-grep pattern: code, not regex. ${PATTERN_BYTES_NOTE}` },
         rewrite: { type: "string", description: `Replacement code; empty deletes the match. ${REWRITE_BYTES_NOTE}` },
         language: { type: "string", enum: [...LANGUAGES], description: "Language the pattern must parse in." },
         paths: pathsSchema,

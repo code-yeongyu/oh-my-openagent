@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { readFile, writeFile, mkdir } from "node:fs/promises"
 import { join, dirname } from "node:path"
-import { stepCountIs, streamText, type CoreMessage } from "ai"
+import { isStepCount, streamText, type ModelMessage } from "ai"
 import { tool } from "ai"
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
 import { z } from "zod"
@@ -129,7 +129,7 @@ async function run() {
 
   emit({ type: "user", content: prompt })
 
-  const messages: CoreMessage[] = [{ role: "user", content: prompt }]
+  const messages: ModelMessage[] = [{ role: "user", content: prompt }]
   const system =
     "You are a code editing assistant. Use read_file to read files and edit_file to edit them. " +
     "Always read a file before editing it to get fresh LINE#ID anchors.\n\n" +
@@ -141,11 +141,11 @@ async function run() {
       tools,
       messages,
       system,
-      stopWhen: stepCountIs(1),
+      stopWhen: isStepCount(1),
     })
 
     let currentText = ""
-    for await (const part of stream.fullStream) {
+    for await (const part of stream.stream) {
       switch (part.type) {
         case "text-delta":
           currentText += part.text
@@ -155,12 +155,12 @@ async function run() {
             type: "tool_call",
             tool_call_id: part.toolCallId,
             tool_name: part.toolName,
-            tool_input: part.args,
+            tool_input: part.input,
             model: modelId,
           })
           break
         case "tool-result": {
-          const output = typeof part.result === "string" ? part.result : JSON.stringify(part.result)
+          const output = typeof part.output === "string" ? part.output : JSON.stringify(part.output)
           const isError = typeof output === "string" && output.startsWith("Error:")
           emit({
             type: "tool_result",

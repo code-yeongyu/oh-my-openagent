@@ -154,7 +154,7 @@ describe("createTaskStatusUi.syncNow", () => {
     expect(ui.widgetCalls).toHaveLength(0)
   })
 
-  it("#given a completed non-resident team record #when syncing #then the stale widget row is cleared", () => {
+  it("#given a completed team record whose handle is still resident #when syncing #then the widget is cleared", () => {
     const ui = fakeUi()
     const manager = {
       ...fakeManager([record({
@@ -162,7 +162,7 @@ describe("createTaskStatusUi.syncNow", () => {
         name: "team:12345678-1234-1234-1234-123456789abc:stale",
         status: "completed",
       })]),
-      residentTaskIds: () => [],
+      residentTaskIds: () => ["st_stale"],
     }
     createTaskStatusUi({ manager, runtime: runtimeOf(ui) }).syncNow()
     expect(ui.widgetCalls.at(-1)?.content).toBeUndefined()

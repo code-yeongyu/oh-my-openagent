@@ -1,7 +1,7 @@
 import { createBuiltinAgents } from "../agents";
 import { collectDisabledSkillAliases } from "../plugin/skill-context";
 import { isTaskSystemEnabled } from "../shared";
-import { AGENT_NAME_MAP } from "../shared/migration";
+import { migrateDisabledAgents } from "../shared/disabled-agents";
 import { assembleAgentConfig } from "./agent-config-assembly";
 import { finalizeAgentConfig } from "./agent-config-finalizer";
 import { discoverAgentSkills } from "./agent-skill-discovery";
@@ -11,8 +11,8 @@ import type { ApplyAgentConfigParams } from "./agent-config-types";
 export async function applyAgentConfig(
   params: ApplyAgentConfigParams,
 ): Promise<Record<string, unknown>> {
-  const migratedDisabledAgents = (params.pluginConfig.disabled_agents ?? []).map(
-    (agent: string) => AGENT_NAME_MAP[agent.toLowerCase()] ?? AGENT_NAME_MAP[agent] ?? agent,
+  const migratedDisabledAgents = migrateDisabledAgents(
+    params.pluginConfig.disabled_agents,
   ) as typeof params.pluginConfig.disabled_agents;
   const allDiscoveredSkills = await discoverAgentSkills(params);
   const sources = loadAgentSources(params);

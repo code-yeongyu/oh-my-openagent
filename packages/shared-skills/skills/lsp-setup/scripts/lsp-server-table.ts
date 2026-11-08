@@ -58,7 +58,7 @@ export const LANGUAGES: readonly LanguageServer[] = [
 	{
 		language: "kotlin",
 		serverId: "kotlin-ls",
-		command: ["kotlin-lsp"],
+		command: ["kotlin-lsp", "--stdio"],
 		extensions: [".kt", ".kts"],
 		installHint: "https://github.com/Kotlin/kotlin-lsp",
 	},
@@ -80,7 +80,7 @@ export const LANGUAGES: readonly LanguageServer[] = [
 		language: "swift",
 		serverId: "sourcekit-lsp",
 		command: ["sourcekit-lsp"],
-		extensions: [".swift", ".objc", ".objcpp"],
+		extensions: [".swift", ".m", ".mm"],
 		installHint: "Included with Xcode (xcode-select --install) or the Swift toolchain",
 	},
 	{
@@ -174,4 +174,5 @@ export const PROJECT_CONFIG_FILES: readonly string[] = [
 	".opencode/lsp.json",
 	".omo/lsp.json",
 	".omo/lsp-client.json",
+	".pi/lsp-client.json",
 ] as const

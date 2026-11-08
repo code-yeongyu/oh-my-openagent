@@ -27,7 +27,7 @@ function record(overrides: Partial<TaskRecord> = {}): TaskRecord {
     notification: { run_epoch: 0, notified_epoch: -1 },
     task_seq: 3,
     background_mode: "foreground",
-    category: "deep",
+    category: "deep-low",
     config_generation: 2,
     spawn_spec: { version: 1, cwd: "/repo", prompt: "do the work" },
     resolved_model: {
@@ -110,7 +110,7 @@ describe("delegation_completed projection", () => {
       run_epoch: 0,
       status: "completed",
       start_reason: "initial_spawn",
-      category: "deep",
+      category: "deep-low",
       agent_type: "none",
       owner_kind: "plain_child",
       background_mode: "foreground",

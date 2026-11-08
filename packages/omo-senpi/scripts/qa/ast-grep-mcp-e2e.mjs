@@ -68,7 +68,7 @@ function credentialDigest(agentDir) {
 function isolatedEnv(workRoot, homeDir, agentDir) {
   const xdgRoot = join(workRoot, "xdg")
   const env = {
-    ...process.env,
+    ...isolatedChildEnv(process.env, agentDir),
     HOME: homeDir,
     USERPROFILE: homeDir,
     HOMEDRIVE: "",
@@ -206,6 +206,7 @@ function packAndExtract(workRoot, transcript) {
 function writeCaptureProvider(path) {
   writeFileSync(path, `
 import { writeFileSync } from "node:fs"
+import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 const capturePath = process.env.OMO_AST_GREP_QA_CAPTURE
 const model = { id:"mock-1", name:"Mock 1", reasoning:false, input:["text"], cost:{input:0,output:0,cacheRead:0,cacheWrite:0}, contextWindow:200000, maxTokens:4096 }
 export default function(pi) {

@@ -11,12 +11,11 @@
 # ─── How to run ───
 # 1. Install uv (if not installed):
 #      curl -LsSf https://astral.sh/uv/install.sh | sh
-# 2. Install Playwright browsers (one-time):
-#      uv run --with playwright python -m playwright install chromium
+# 2. Chrome must already be installed locally:
+#      The script uses channel="chrome"; it downloads no browser.
 # 3. Run:
 #      uv run lighthouse-audit.py https://example.com
 #      uv run lighthouse-audit.py https://example.com --desktop-only
-#      uv run lighthouse-audit.py https://example.com --threshold 95
 # ──────────────────
 
 """Lighthouse audit via real Playwright Chrome.

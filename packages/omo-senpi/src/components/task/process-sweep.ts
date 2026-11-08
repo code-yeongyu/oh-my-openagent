@@ -1,4 +1,4 @@
-import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task"
+import { readSessionRole } from "@oh-my-opencode/senpi-task"
 import {
   sweepOrphanedLspDaemonProxies,
   sweepStaleLspDaemonVersions,
@@ -49,8 +49,11 @@ export function wireSessionStartProcessSweep(
   })
 
   pi.on("session_start", () => {
-    if (env[OMO_SENPI_TASK_RPC_CHILD] === "1") {
-      ctx.logger.info("omo-senpi process sweep skipped: running inside a senpi-task RPC child")
+    // Machine hygiene belongs to the process the USER launched. A task child - its own process, or
+    // a session of the shared daemon - never sweeps: on the daemon it would sweep for every child.
+    const role = readSessionRole(pi, env)
+    if (role !== undefined) {
+      ctx.logger.info("omo-senpi process sweep skipped: running as a senpi-task child session", { role })
       return undefined
     }
     runSweepBestEffort(sweep, ctx)

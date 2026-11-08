@@ -1,6 +1,7 @@
 // biome-ignore-all format: compact batch steering module stays below the pure LOC budget.
 import type { UlwLoopScope } from "./paths.js";
-import { appendLedger, appendLedgerEntries, findAcceptedSteeringLedgerEntry, readUlwLoopPlan, withUlwLoopMutationLock, writePlan } from "./plan-io.js";
+import { commit } from "./plan-commit.js";
+import { findAcceptedSteeringLedgerEntry, readUlwLoopPlan, withUlwLoopMutationLock } from "./plan-io.js";
 import { applySteeringMutation, validateUlwLoopSteeringProposal } from "./steering.js";
 import { buildSteeringPlanSnapshot, changedGoalIdsBetween } from "./steering-snapshot.js";
 import type { UlwLoopLedgerEntry, UlwLoopPlan, UlwLoopSteeringAudit, UlwLoopSteeringProposal } from "./types.js";
@@ -43,17 +44,16 @@ export async function steerUlwLoopBatch(
 		const failed = prepared.results.find((item) => !item.accepted);
 		if (failed !== undefined) {
 			const entry = rejectedLedgerEntry(prepared.results);
-			await appendLedger(repoRoot, entry, scope);
+			await commit(repoRoot, scope, { plan, entries: [entry] });
 			return rejected(plan, prepared.results, failed.rejectedReasons);
 		}
 		let next = plan;
 		for (const item of prepared.items) if (item.kind === "fresh") next = item.prepared.next;
 		const fresh = prepared.items.filter((item): item is Extract<PreparedItem, { readonly kind: "fresh" }> => item.kind === "fresh");
 		if (fresh.length > 0) {
-			await writePlan(repoRoot, next, scope);
 			const entries = fresh.map((item) => ledgerEntry(item.prepared.proposal, item.prepared.audit, item.prepared.proposal.now?.toISOString() ?? iso()));
 			const batchEntry = batchUpdateLedgerEntry(plan, next, iso());
-			await appendLedgerEntries(repoRoot, batchEntry === null ? entries : [...entries, batchEntry], scope);
+			await commit(repoRoot, scope, { plan: next, entries: batchEntry === null ? entries : [...entries, batchEntry] });
 		}
 		return { plan: next, accepted: true, results: prepared.results, rejectedReasons: [] };
 	});

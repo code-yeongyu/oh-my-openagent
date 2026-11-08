@@ -15,5 +15,6 @@ export function requireFinalizedResult(
     ...(result.detail === undefined ? {} : { detail: result.detail }),
     completion: result.completion,
     ...(result.launch === undefined ? {} : { launch: result.launch }),
+    ...(result.park === undefined ? {} : { park: result.park }),
   }
 }

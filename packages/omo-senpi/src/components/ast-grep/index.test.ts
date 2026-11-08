@@ -73,6 +73,7 @@ describe("createAstGrepComponent", () => {
           env: { OMO_AST_GREP_PROJECT_CWD: "/workspace/project", BUN_BE_BUN: "1" },
           enabled: true,
           lifecycle: "lazy",
+          exposure: "search",
         },
       },
     ])

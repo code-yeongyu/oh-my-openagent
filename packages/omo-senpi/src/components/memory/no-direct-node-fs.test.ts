@@ -17,10 +17,6 @@ function collectSourceFiles(root: string): string[] {
     if (!entry.name.endsWith(".ts")) continue
     if (entry.name.endsWith(".test.ts")) continue
     if (entry.name.includes("test-support")) continue
-    // Carries the memorian gate child's materialized `-e` extension as an embedded source string.
-    // That generated child file must stay dependency-free (it loads outside this package's module
-    // graph), so its `node:fs` import lives inside the template literal, not this module's imports.
-    if (entry.name === "memorian-nudge-extension.ts") continue
     files.push(entryPath)
   }
   return files

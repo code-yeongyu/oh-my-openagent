@@ -6,7 +6,6 @@ export const FACTS_FAILURES_VERSION = 1 as const
 
 export const FACTS_FAILURE_REASONS = [
   "quick_category_unavailable",
-  "sandbox_unavailable",
   "child_exit",
   "deadline_exceeded",
   "invalid_extraction",
@@ -15,6 +14,7 @@ export const FACTS_FAILURE_REASONS = [
   "unknown_liveness",
   "payload_envelope_oversize",
   "payload_entry_oversize",
+  "secret_like_content",
   "other",
 ] as const
 

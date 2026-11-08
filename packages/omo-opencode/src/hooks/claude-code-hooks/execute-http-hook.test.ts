@@ -1,4 +1,5 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
+import { restoreEnvironment } from "../../../../../test-support/environment-integrity"
 import type { HookHttp } from "./types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
@@ -52,14 +53,14 @@ describe("executeHttpHook", () => {
   })
 
   describe("#given an HTTP hook with headers and env var interpolation", () => {
-    const originalEnv = process.env
+    const originalEnv = { ...process.env }
 
     beforeEach(() => {
-      process.env = { ...originalEnv, MY_TOKEN: "secret-123", OTHER_VAR: "other-value" }
+      restoreEnvironment({ ...originalEnv, MY_TOKEN: "secret-123", OTHER_VAR: "other-value" })
     })
 
     afterEach(() => {
-      process.env = originalEnv
+      restoreEnvironment(originalEnv)
     })
 
     it("#when allowedEnvVars includes the var #then interpolates env var in headers", async () => {
@@ -295,14 +296,14 @@ describe("executeHttpHook", () => {
 })
 
 describe("interpolateEnvVars", () => {
-  const originalEnv = process.env
+  const originalEnv = { ...process.env }
 
   beforeEach(() => {
-    process.env = { ...originalEnv, TOKEN: "abc", SECRET: "xyz" }
+    restoreEnvironment({ ...originalEnv, TOKEN: "abc", SECRET: "xyz" })
   })
 
   afterEach(() => {
-    process.env = originalEnv
+    restoreEnvironment(originalEnv)
   })
 
   it("#given $VAR syntax #when var is allowed #then interpolates", async () => {
@@ -330,7 +331,7 @@ describe("interpolateEnvVars", () => {
   })
 
   it("#given ${VAR} where value contains $ANOTHER #when both allowed #then does not double-interpolate", async () => {
-    process.env = { ...process.env, TOKEN: "val$SECRET", SECRET: "oops" }
+    Object.assign(process.env, { TOKEN: "val$SECRET", SECRET: "oops" })
     const { interpolateEnvVars } = await import("./execute-http-hook")
 
     const result = interpolateEnvVars("Bearer ${TOKEN}", ["TOKEN", "SECRET"])

@@ -1,4 +1,4 @@
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 import type { MemoryIdentity, ReflectionWorktree, ReservedRun } from "@oh-my-opencode/memory-core"
@@ -17,6 +17,7 @@ type ReflectionSpawnInput = {
   readonly candidate: ReflectionModelCandidate
   readonly attempt: number
   readonly hardDeadlineAt: number
+  readonly memoryRoot?: string
   readonly nextAttempt?: RunAttempt
   readonly config: OmoConfig
   readonly identity: MemoryIdentity
@@ -41,8 +42,11 @@ export function prepareReflectionCandidateSpawn(input: ReflectionSpawnInput) {
     category: input.category,
     model: input.candidate.model,
     thinking: input.candidate.thinking,
+    ...(input.candidate.loadExtensions === true ? { loadExtensions: true } : {}),
     attempt: input.attempt,
     hardDeadlineAt: input.hardDeadlineAt,
+    memoryRoot: input.memoryRoot ?? dirname(dirname(input.identity.paths.root)),
+    maxConcurrentRuns: input.config.memory?.reflection.max_concurrent_runs ?? 1,
     nextAttempt: input.nextAttempt,
     env: input.env,
     mergePolicy: input.mergePolicy,

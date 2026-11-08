@@ -15,8 +15,8 @@ export function analyzeMain(run, sandbox, obsDir, observedEvidence = undefined) 
   const runId = create?.details?.team_run_id
   const memberNames = (create?.details?.members ?? []).map((member) => member.name).sort()
   const leadToQuick = teamMessageEnqueues(sends).find((entry) => entry.recipients.includes("quick"))
-  const quickTask = runId === undefined ? undefined : memberTaskId(sandbox.cwd, runId, "quick")
-  const evidence = observedEvidence ?? injectionEvidence(sandbox.cwd, runId, quickTask, leadToQuick?.messageId, obsDir)
+  const quickTask = runId === undefined ? undefined : memberTaskId(sandbox, runId, "quick")
+  const evidence = observedEvidence ?? injectionEvidence(sandbox, runId, quickTask, leadToQuick?.messageId, obsDir)
   mkdirSync(obsDir, { recursive: true })
   writeFileSync(join(obsDir, "team-injection-evidence.json"), `${JSON.stringify(evidence, null, 2)}\n`)
   return {
@@ -39,7 +39,7 @@ export function teamMessageEnqueues(sendResults) {
   })
 }
 
-export function injectionEvidence(cwd, runId, quickTask, leadMessage, obsDir) {
+export function injectionEvidence(sandbox, runId, quickTask, leadMessage, obsDir) {
   const leadReceipt = join(obsDir, "lead-received.txt")
   return {
     runId,
@@ -48,11 +48,11 @@ export function injectionEvidence(cwd, runId, quickTask, leadMessage, obsDir) {
     memberEnvelopeEchoed:
       quickTask !== undefined
       && leadMessage !== undefined
-      && sessionContainsText(cwd, quickTask, leadMessage),
+      && sessionContainsText(sandbox, quickTask, leadMessage),
     memberToLeadInjected:
       existsSync(leadReceipt)
       && readFileSync(leadReceipt, "utf8").includes("QUICK2LEAD"),
-    leadInbox: runId === undefined ? { unread: 0, reserved: 0, processed: 0 } : inboxCounts(memberInboxDir(cwd, runId, "lead")),
+    leadInbox: runId === undefined ? { unread: 0, reserved: 0, processed: 0 } : inboxCounts(memberInboxDir(sandbox, runId, "lead")),
   }
 }
 

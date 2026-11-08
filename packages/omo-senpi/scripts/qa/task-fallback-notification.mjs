@@ -23,6 +23,7 @@ import {
   snapshotDir,
 } from "./task-e2e-analysis.mjs"
 import { isAlive, killTree } from "./task-e2e-process.mjs"
+import { isolatedChildEnv, sandboxStateDir } from "./sandbox-child-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "task-e2e-mock-provider.ts")
@@ -61,10 +62,10 @@ function parseArgs(argv) {
   return output
 }
 
-function scenarioScript() {
+function scenarioScript(tasksDir) {
   const waitForTaskTerminal = `node -e '${[
     "const fs=require(\"node:fs\")",
-    "const dir=\".omo/senpi-task/tasks\"",
+    `const dir=${JSON.stringify(tasksDir)}`,
     "fs.mkdirSync(dir,{recursive:true})",
     "const terminal=new Set([\"completed\",\"error\",\"cancelled\",\"interrupted\",\"lost\"])",
     "const done=()=>fs.readdirSync(dir).filter(f=>f.endsWith(\".json\")).some(f=>{const r=JSON.parse(fs.readFileSync(dir+\"/\"+f,\"utf8\"));return terminal.has(r.status)&&r.notification?.notified_epoch>=r.notification?.run_epoch})",
@@ -122,12 +123,12 @@ function seedScenario() {
   }, null, 2)}\n`)
   writeFileSync(
     join(sandbox.cwd, "mock-script.json"),
-    `${JSON.stringify(scenarioScript(), null, 2)}\n`,
+    `${JSON.stringify(scenarioScript(join(sandboxStateDir(sandbox), "tasks")), null, 2)}\n`,
   )
   return {
     sandbox,
     sessionDir,
-    stateDir: join(sandbox.cwd, ".omo", "senpi-task"),
+    stateDir: sandboxStateDir(sandbox),
   }
 }
 
@@ -231,9 +232,12 @@ function selfTest() {
   if (count(`x ${FALLBACK_LINE} y`, FALLBACK_LINE) !== 1) {
     throw new Error("fallback line counter failed")
   }
-  const script = scenarioScript()
+  const script = scenarioScript("/sandbox/state/tasks")
   if (script.failChildModels[0] !== "mock-primary") {
     throw new Error("primary failure model mismatch")
+  }
+  if (!script.parentSteps[1].arguments.command.includes(JSON.stringify("/sandbox/state/tasks"))) {
+    throw new Error("the terminal wait must watch the resolved task-record dir")
   }
   console.log("SELF-TEST OK")
 }
@@ -276,7 +280,7 @@ function main() {
       {
         cwd: scenario.sandbox.cwd,
         env: {
-          ...process.env,
+          ...isolatedChildEnv(process.env, scenario.sandbox.agentDir),
           SENPI_CODING_AGENT_DIR: scenario.sandbox.agentDir,
           SENPI_CODING_AGENT_SESSION_DIR: scenario.sessionDir,
           XDG_CONFIG_HOME: scenario.sandbox.xdgConfigHome,

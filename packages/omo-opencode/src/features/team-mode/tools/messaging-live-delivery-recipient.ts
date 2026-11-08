@@ -11,6 +11,7 @@ import { enqueueFallbackMailboxWake } from "./messaging-fallback-wake"
 import type { DeliveryReservation } from "./messaging-live-delivery-reservation"
 import { releaseReservationSafely } from "./messaging-live-delivery-reservation"
 import { markLiveDeliveryPending } from "./messaging-live-delivery-state"
+import type { TeamSendMessageDispatchTiming } from "./messaging-runtime"
 
 type RuntimeMember = RuntimeState["members"][number]
 type LiveDeliveryEnvelope = ReturnType<typeof buildEnvelope>
@@ -26,6 +27,7 @@ export async function deliverLiveToRecipient(input: {
   config: TeamModeConfig
   directory: string
   settleMs?: number
+  dispatchTiming?: TeamSendMessageDispatchTiming
 }): Promise<void> {
   const {
     client,
@@ -38,6 +40,7 @@ export async function deliverLiveToRecipient(input: {
     config,
     directory,
     settleMs,
+    dispatchTiming,
   } = input
 
   const recipientSessionId = recipientMember.sessionId
@@ -57,6 +60,7 @@ export async function deliverLiveToRecipient(input: {
         recipientName,
         messageId: message.messageId,
         config,
+        dispatchTiming,
       })
     }
     return
@@ -103,6 +107,7 @@ export async function deliverLiveToRecipient(input: {
       source: "team-live-delivery",
       queueBehavior: "defer",
       settleMs,
+      postDispatchHoldMs: dispatchTiming?.postDispatchHoldMs,
       input: {
         path: { id: recipientSessionId },
         body: buildMemberPromptBody(recipientMember, envelope),
@@ -150,6 +155,7 @@ export async function deliverLiveToRecipient(input: {
         recipientName,
         messageId: message.messageId,
         config,
+        dispatchTiming,
       })
       return
     }

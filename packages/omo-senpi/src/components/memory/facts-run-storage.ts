@@ -16,8 +16,9 @@ import { readRunJson, writeRunJsonAtomic } from "./worker/run-artifacts"
 import { cleanupTerminalFactsRun, type RemoveRunArtifact } from "./facts-run-cleanup"
 import type { FactsQueuedKey } from "./facts-failure-recording"
 import type { FactsFinalRecord, FactsLaunchResult, FactsRunLedger } from "./facts-runner-types"
+import { emitMemoryReceipt, factsReceipt, type MemoryReceiptsPort, type ReceiptWarn } from "./receipts-port"
 
-const DEFAULT_DEADLINE_MS = 15 * 60_000
+export const FACTS_DEADLINE_MS = 15 * 60_000
 const DEFAULT_GRACE_MS = 5_000
 const RUNS_LOCK_WAIT_MS = 2_000
 
@@ -36,14 +37,21 @@ export async function reserveFactsRunDir(options: {
   readonly deadlineMs?: number
   readonly terminationGraceMs?: number
   readonly lockWaitMs?: number
+  readonly receiptsDir?: string
+  readonly receipts?: MemoryReceiptsPort
+  readonly warn?: ReceiptWarn
 }): Promise<string | undefined> {
   const record = await createLockRecord("facts-runs", { runId: options.batchId })
-  return withLock(
+  const runDir = await withLock(
     factsRunsLockPath(options.locksDir),
     record,
     () => claimFactsRunDir(options),
     { waitTimeoutMs: options.lockWaitMs ?? RUNS_LOCK_WAIT_MS },
   )
+  if (runDir !== undefined && options.receiptsDir !== undefined) {
+    await emitMemoryReceipt(options.receiptsDir, factsReceipt(options.batchId, "launched"), options.receipts, options.warn)
+  }
+  return runDir
 }
 
 async function claimFactsRunDir(options: {
@@ -62,7 +70,7 @@ async function claimFactsRunDir(options: {
     const runDir = join(runsDir, `facts-${digest}-${attempt}`)
     try {
       await mkdir(runDir, { mode: 0o700 })
-      const deadlineMs = options.deadlineMs ?? DEFAULT_DEADLINE_MS
+      const deadlineMs = options.deadlineMs ?? FACTS_DEADLINE_MS
       const terminationGraceMs = options.terminationGraceMs ?? DEFAULT_GRACE_MS
       try {
         await writeRunJsonAtomic(join(runDir, "ledger.json"), {

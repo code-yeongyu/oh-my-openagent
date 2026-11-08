@@ -14,6 +14,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { createSandbox, seedSandbox } from "./drive.mjs"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(scriptDir, "..", "..")
@@ -60,8 +61,11 @@ function freshSandbox() {
 try {
   function capture(label, inputs) {
     const sandbox = freshSandbox()
+    // Every agent-dir lane: an inherited OMO_CODING_AGENT_DIR outranks SENPI_CODING_AGENT_DIR.
     const envPrefix = [
+      `OMO_CODING_AGENT_DIR=${sandbox.agentDir}`,
       `SENPI_CODING_AGENT_DIR=${sandbox.agentDir}`,
+      `PI_CODING_AGENT_DIR=${sandbox.agentDir}`,
       `XDG_CONFIG_HOME=${sandbox.xdgConfigHome}`,
       `OMO_MEMORY_HOME=${join(sandbox.root, "memory")}`,
       `HOME=${sandbox.homeDir}`,
@@ -80,7 +84,7 @@ try {
       "--source-label", "senpi interactive mock-provider memory write",
     ]
     for (const input of inputs) args.push("--input", input)
-    const run = spawnSync(process.execPath, args, { encoding: "utf8", timeout: 180_000 })
+    const run = spawnSync(process.execPath, args, { encoding: "utf8", env: withTelemetryOptOut(process.env), timeout: 180_000 })
     if (run.status !== 0) {
       record(`${label} capture`, false, (run.stderr ?? run.stdout ?? "").split("\n").slice(-3).join(" | "))
       return { transcript: "", ansi: "" }
@@ -92,11 +96,11 @@ try {
 
   // Collapsed row: typed prompt -> mock emits the memory tool call -> real tool executes.
   const collapsed = capture("collapsed", ["remember the deploy runbook location", "{Enter}"])
-  record("collapsed: notice title rendered", /Memory updated/.test(collapsed.transcript), "expects 'Memory updated' in row")
+  record("collapsed: notice title rendered", /Remembered/.test(collapsed.transcript), "expects 'Remembered' in row")
   record("collapsed: old line gone", !/committed locally/.test(collapsed.transcript), "'committed locally' must not appear")
   record("collapsed: command name gone", !/create committed|Memory create/.test(collapsed.transcript), "command name must not appear")
   record("collapsed: why line names path", /knowledge\/deploy\.md/.test(collapsed.transcript), "affected path visible")
-  record("collapsed: bold title styling", /\[1m.*Memory updated/s.test(collapsed.ansi), "SGR bold around title")
+  record("collapsed: bold title styling", /\[1m.*Remembered/s.test(collapsed.ansi), "SGR bold around title")
 
   // Expanded row: same flow, then {Ctrl+o} toggles tool output to reveal the detail line.
   const expanded = capture("expanded", ["remember the deploy runbook location", "{Enter}", "{Ctrl+o}"])

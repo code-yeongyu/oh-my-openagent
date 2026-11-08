@@ -64,6 +64,18 @@ describe("facts failure backoff curve", () => {
     }
   })
 
+  test("#given a first secret_like_content failure #when applyFailure runs #then the entry parks immediately instead of backing off", () => {
+    // given / when
+    const entries = streak(1, "secret_like_content")
+
+    // then: a secret cannot heal by waiting, so one failure parks the endpoint
+    const record = entries[0]
+    expect(record?.streak).toBe(1)
+    expect(record?.state).toBe("parked")
+    expect(record?.nextEligibleAt).toBeNull()
+    expect(record?.parkedAt).toBe(T0.toISOString())
+  })
+
   test("#given a fifth consecutive failure #when applyFailure runs #then the entry parks with no eligibility", () => {
     // given / when
     const entries = streak(5)

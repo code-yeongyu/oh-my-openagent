@@ -76,11 +76,12 @@ async function main() {
   const playwrightExtra = requireOptionalModule('playwright-extra');
   const stealthPlugin = playwrightExtra ? requireOptionalModule('puppeteer-extra-plugin-stealth') : null;
   if (playwrightExtra && stealthPlugin) {
-    ({ chromium, devices } = playwrightExtra);
+    ({ devices } = require('playwright-core'));
+    chromium = playwrightExtra.addExtra(require('playwright-core').chromium);
     const stealth = stealthPlugin();
     chromium.use(stealth);
   } else {
-    ({ chromium, devices } = require('playwright'));
+    ({ chromium, devices } = require('playwright-core'));
   }
 
   const dev = devices[deviceName];
@@ -94,6 +95,8 @@ async function main() {
   try {
     ctx = await chromium.launchPersistentContext(profileDir, {
       channel: 'chrome',
+      args: ['--disable-blink-features=AutomationControlled'],
+      ignoreDefaultArgs: ['--enable-automation'],
       headless,
       ...dev,
     });

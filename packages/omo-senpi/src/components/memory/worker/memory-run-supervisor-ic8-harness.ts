@@ -39,7 +39,7 @@ export function createMemoryRunSupervisorIc8Harness() {
     )
   }
 
-  const makeRun = async (mode: "graceful" | "stubborn") => {
+  const makeRun = async (mode: "graceful" | "stubborn" | "with-grandchild") => {
     const runDir = realpathSync.native(
       await mkdtemp(join(tmpdir(), "memory-run-supervisor-ic8-")),
     )
@@ -58,6 +58,7 @@ export function createMemoryRunSupervisorIc8Harness() {
         version: 1,
         runId: "run-ic8",
         kind: "reflection",
+        memoryRoot: runDir,
         command: process.execPath,
         args: [childFixture, mode, runDir],
         cwd: runDir,
@@ -84,6 +85,7 @@ export function createMemoryRunSupervisorIc8Harness() {
     const child = spawn(process.execPath, [supervisorPath, runDir], {
       detached: true,
       stdio: "ignore",
+      windowsHide: true,
       env: {
         ...process.env,
         OMO_MEMORY_SUPERVISOR_ALLOW_TEST_SEAMS: "1",
@@ -163,7 +165,7 @@ export function createMemoryRunSupervisorIc8Harness() {
     for (const pid of groups) {
       if (!processGroupIsAlive(pid)) continue
       try {
-        terminateProcessGroup(pid)
+        await terminateProcessGroup(pid)
       } catch (error) {
         if (!(error instanceof Error) || !("code" in error) || error.code !== "ESRCH") {
           cleanupError ??= asError(error)

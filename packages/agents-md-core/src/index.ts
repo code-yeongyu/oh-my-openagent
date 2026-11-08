@@ -1,4 +1,3 @@
-export { AGENTS_FILENAME } from "./constants";
 export { resolveFilePath } from "./finder";
 export { formatAgentsMdContextBlock } from "./formatter";
 export { getSessionCache } from "./injection-cache";

@@ -6,6 +6,7 @@
 export type DagLintNode = {
   readonly id: string
   readonly prompt: string
+  readonly subagent_type?: string
 }
 
 const TASK_MARKER = /TASK:/

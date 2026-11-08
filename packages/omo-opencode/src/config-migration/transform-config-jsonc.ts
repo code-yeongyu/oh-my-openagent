@@ -26,16 +26,15 @@ export function transformConfigJsoncSources(
   const senpi = recordAt(legacy, "[senpi]")
   const history = legacyMigrationHistory(input.discovered, input.sources)
   const diagnostics = omo !== undefined && senpi !== undefined
-    ? ["conflict: [senpi] legacy [omo] kept [senpi]"]
+    ? ["conflict: [native] legacy [omo] kept [native]"]
     : []
   return {
     diagnostics,
     document: {
       $schema: OMO_SCHEMA_URL,
-      ...(recordAt(legacy, "codegraph") === undefined ? {} : { codegraph: recordAt(legacy, "codegraph") }),
       ...(recordAt(legacy, "[opencode]") === undefined ? {} : { "[opencode]": recordAt(legacy, "[opencode]") }),
       ...(recordAt(legacy, "[codex]") === undefined ? {} : { "[codex]": recordAt(legacy, "[codex]") }),
-      ...(senpi === undefined && omo === undefined ? {} : { "[senpi]": senpi ?? omo }),
+      ...(senpi === undefined && omo === undefined ? {} : { "[native]": senpi ?? omo }),
       ...(Object.keys(history).length === 0 ? {} : { legacy_migrations: history }),
     },
   }

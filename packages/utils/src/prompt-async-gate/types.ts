@@ -69,7 +69,7 @@ export type InternalPromptDispatchResult =
   | { readonly status: "dispatched"; readonly response: unknown }
   | { readonly status: "queued"; readonly queuedBy: string; readonly position: number }
   | { readonly status: "active" }
-  | { readonly status: "reserved"; readonly reservedBy: string }
+  | { readonly status: "reserved"; readonly reservedBy: string; readonly expiresAt?: number }
   | { readonly status: "cancelled" }
   | { readonly status: "unavailable" }
   | {

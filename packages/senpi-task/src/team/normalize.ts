@@ -1,6 +1,6 @@
 import { normalizeTeamSpecInput } from "@oh-my-opencode/team-core/team-registry"
 import { TeamSpecSchema, type TeamSpec } from "@oh-my-opencode/team-core/types"
-import { isPlainRecord } from "@oh-my-opencode/utils"
+import { isPlainRecord } from "@oh-my-opencode/utils/record-type-guard"
 
 import { clampTaskSummary } from "../task-summary"
 import { SenpiTeamSpecError } from "./errors"

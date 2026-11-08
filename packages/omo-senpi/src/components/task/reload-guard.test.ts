@@ -52,13 +52,13 @@ describe("reload guard", () => {
     const veto = evaluateReloadVeto(
       managerOf([
         record({ task_id: "st_1", status: "running", name: "worker", description: "Fix type error" }),
-        record({ task_id: "st_2", status: "running", name: "momus-review" }),
+        record({ task_id: "st_2", status: "running", name: "plan-review" }),
         record({ task_id: "st_3", status: "running" }),
       ]),
     )
 
     expect(veto?.reason).toBe(
-      "3 subagent(s) still running: Fix type error, momus-review, st_3 - wait for them to finish or cancel them (task_cancel) before reloading.",
+      "3 subagent(s) still running: Fix type error, plan-review, st_3 - wait for them to finish or cancel them (task_cancel) before reloading.",
     )
   })
 

@@ -1073,4 +1073,224 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
       ...TEAM_TOOL_DENIALS,
     })
   })
+
+  test("attaches the session to the background manager for the poll window and detaches after handback", async () => {
+    //#given - a background manager that tracks sync continuation attachment
+    const attachCalls: string[] = []
+    let detachCalls = 0
+    let attachedDuringPoll = false
+    const mockManager = {
+      attachSyncContinuation: (sessionID: string) => {
+        attachCalls.push(sessionID)
+        return () => {
+          detachCalls += 1
+        }
+      },
+    }
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => {
+        attachedDuringPoll = attachCalls.length === 1 && detachCalls === 0
+        return null
+      },
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      manager: mockManager,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+
+    //#then - the manager must not delete the session while the poll is in flight
+    expect(result).toContain("Task continued and completed")
+    expect(attachCalls).toEqual(["ses_test_12345678"])
+    expect(attachedDuringPoll).toBe(true)
+    expect(detachCalls).toBe(1)
+  })
+
+  test("detaches from the background manager when pollSyncSession throws", async () => {
+    //#given
+    const attachCalls: string[] = []
+    let detachCalls = 0
+    const mockManager = {
+      attachSyncContinuation: (sessionID: string) => {
+        attachCalls.push(sessionID)
+        return () => {
+          detachCalls += 1
+        }
+      },
+    }
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    const deps = {
+      pollSyncSession: async () => {
+        throw new Error("Poll error")
+      },
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      manager: mockManager,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when
+    let error: unknown = null
+    try {
+      await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+    } catch (e) {
+      error = e
+    }
+
+    //#then
+    expect((error as Error).message).toBe("Poll error")
+    expect(attachCalls).toEqual(["ses_test_12345678"])
+    expect(detachCalls).toBe(1)
+  })
+
+  test("detaches from the background manager when the continuation prompt fails", async () => {
+    //#given
+    const attachCalls: string[] = []
+    let detachCalls = 0
+    const mockManager = {
+      attachSyncContinuation: (sessionID: string) => {
+        attachCalls.push(sessionID)
+        return () => {
+          detachCalls += 1
+        }
+      },
+    }
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+            {
+              info: { id: "msg_002", role: "assistant", time: { created: 2000 }, finish: "end_turn" },
+              parts: [{ type: "text", text: "Response" }],
+            },
+          ],
+        }),
+        prompt: async () => {
+          throw new Error("Session not found")
+        },
+        promptAsync: async () => {
+          throw new Error("Session not found")
+        },
+        status: async () => ({
+          data: { ses_test: { type: "idle" } },
+        }),
+      },
+    }
+
+    const { executeSyncContinuation } = require("./sync-continuation")
+
+    let pollCalled = false
+    const deps = {
+      pollSyncSession: async () => {
+        pollCalled = true
+        return null
+      },
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-123",
+      metadata: () => {},
+    }
+
+    const mockExecutorCtx = {
+      client: mockClient,
+      manager: mockManager,
+    }
+
+    const args = {
+      task_id: "ses_test_12345678",
+      prompt: "test prompt",
+      description: "test task",
+      load_skills: [],
+      run_in_background: false,
+    }
+
+    //#when
+    const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
+
+    //#then
+    expect(result).toContain("Failed to send continuation prompt")
+    expect(pollCalled).toBe(false)
+    expect(attachCalls).toEqual(["ses_test_12345678"])
+    expect(detachCalls).toBe(1)
+  })
 })

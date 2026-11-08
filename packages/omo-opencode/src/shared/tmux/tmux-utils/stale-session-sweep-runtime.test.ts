@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 
 import type { TmuxCommandResult } from "../runner"
 
@@ -16,10 +16,12 @@ const runTmuxCommandMock = mock(async (): Promise<TmuxCommandResult> => ({
 	stderr: "",
 	exitCode: 0,
 }))
-const killTmuxSessionIfExistsMock = mock(async (): Promise<boolean> => true)
+const killTmuxSessionIfExistsMock = mock(async (_sessionName: string): Promise<boolean> => true)
 const isInsideTmuxMock = mock((): boolean => true)
 const getTmuxPathMock = mock(async (): Promise<string | undefined> => "sh")
 const logMock = mock(() => undefined)
+
+let liveChild: Bun.Subprocess | undefined
 
 async function loadSweepStaleOmoAgentSessions(): Promise<typeof import("./stale-session-sweep").sweepStaleOmoAgentSessions> {
 	const module = await import(`${staleSessionSweepSpecifier}?test=${crypto.randomUUID()}`)
@@ -38,6 +40,22 @@ function registerModuleMocks(): void {
 	mock.module(tmuxPathResolverSpecifier, () => ({ getTmuxPath: getTmuxPathMock }))
 }
 
+function listSessions(names: string[]): void {
+	const output = names.join("\n")
+	runTmuxCommandMock.mockResolvedValue({ success: true, output, stdout: output, stderr: "", exitCode: 0 })
+}
+
+async function spawnExitedPid(): Promise<number> {
+	const child = Bun.spawn([process.execPath, "-e", ""], { stdout: "ignore", stderr: "ignore" })
+	await child.exited
+	return child.pid
+}
+
+function spawnLivePid(): number {
+	liveChild = Bun.spawn([process.execPath, "-e", "setInterval(() => {}, 1000)"], { stdout: "ignore", stderr: "ignore" })
+	return liveChild.pid
+}
+
 describe("sweepStaleOmoAgentSessions runtime runner integration", () => {
 	beforeEach(() => {
 		registerModuleMocks()
@@ -47,30 +65,47 @@ describe("sweepStaleOmoAgentSessions runtime runner integration", () => {
 		getTmuxPathMock.mockClear()
 		logMock.mockClear()
 
-		runTmuxCommandMock.mockResolvedValue({
-			success: true,
-			output: "omo-agents-99991\nomo-agents-99992",
-			stdout: "omo-agents-99991\nomo-agents-99992",
-			stderr: "",
-			exitCode: 0,
-		})
 		killTmuxSessionIfExistsMock.mockResolvedValue(true)
 		isInsideTmuxMock.mockReturnValue(true)
 		getTmuxPathMock.mockResolvedValue("sh")
 	})
 
-	it("#given stale sessions listed by tmux #when sweepStaleOmoAgentSessions called #then delegates list-sessions to shared runner", async () => {
+	afterEach(async () => {
+		if (liveChild) {
+			liveChild.kill()
+			await liveChild.exited
+			liveChild = undefined
+		}
+	})
+
+	it("#given a session whose pid has exited #when sweepStaleOmoAgentSessions called #then delegates list-sessions to shared runner and kills it", async () => {
 		// given
+		const deadSession = `omo-agents-${await spawnExitedPid()}`
+		listSessions([deadSession])
 		const sweepStaleOmoAgentSessions = await loadSweepStaleOmoAgentSessions()
 
 		// when
 		const result = await sweepStaleOmoAgentSessions()
 
 		// then
-		expect(result).toBe(2)
+		expect(result).toBe(1)
 		expect(runTmuxCommandMock.mock.calls).toEqual([
 			["sh", ["list-sessions", "-F", "#{session_name}"]],
 		])
-		expect(killTmuxSessionIfExistsMock).toHaveBeenCalledTimes(2)
+		expect(killTmuxSessionIfExistsMock.mock.calls).toEqual([[deadSession]])
+	})
+
+	it("#given a session whose pid is alive #when sweepStaleOmoAgentSessions called #then leaves it alone", async () => {
+		// given
+		const liveSession = `omo-agents-${spawnLivePid()}`
+		listSessions([liveSession])
+		const sweepStaleOmoAgentSessions = await loadSweepStaleOmoAgentSessions()
+
+		// when
+		const result = await sweepStaleOmoAgentSessions()
+
+		// then
+		expect(result).toBe(0)
+		expect(killTmuxSessionIfExistsMock).not.toHaveBeenCalled()
 	})
 })

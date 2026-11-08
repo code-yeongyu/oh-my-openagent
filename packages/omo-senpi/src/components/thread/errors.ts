@@ -28,7 +28,22 @@ export const THREAD_ERROR_CODES = [
   "unsupported",
   "overloaded",
   "transport_closed",
+  "host_unavailable",
   "internal_error",
+  "model_not_found",
+  "model_ambiguous",
+  "thinking_level_unsupported",
+  "loop_detected",
+  "binding_conflict",
+  "binding_mismatch",
+  "binding_inactive",
+  "stale_revision",
+  "stale_token",
+  "already_answered",
+  "answer_in_progress",
+  "device_offline",
+  "relay_requires_paid_plan",
+  "alias_taken",
 ] as const
 
 export type ThreadErrorCode = (typeof THREAD_ERROR_CODES)[number]

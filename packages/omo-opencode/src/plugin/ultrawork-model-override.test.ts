@@ -56,6 +56,17 @@ describe("detectUltrawork", () => {
     expect(detectUltrawork("the `ultrawork` mode is cool")).toBe(false)
   })
 
+  test.each(["use ulw-plan first", "load the ulw-research skill", "ulw-loop", "ulw-execute this", "ulw-plan으로 계획 세워줘"])(
+    "should not detect a ulw-* skill name: %s",
+    (prompt) => {
+      expect(detectUltrawork(prompt)).toBe(false)
+    },
+  )
+
+  test.each(["ulw로 해줘", "이거 ulw", "ulw ulw-plan"])("should detect bare ulw next to Korean or a skill name: %s", (prompt) => {
+    expect(detectUltrawork(prompt)).toBe(true)
+  })
+
   test("should not detect when keyword absent", () => {
     expect(detectUltrawork("just do something normal")).toBe(false)
   })

@@ -10,6 +10,7 @@ import type { PersistedTaskEvent, TaskRecordStore } from "../store"
 import { collisionStore } from "./__fixtures__/collision-store"
 import { FakeRunner, baseSpec, categoryPlanner, cleanupProjects, flush, makeManager, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
+import { SUBPROCESS_DEADLINE_MS, describeChild, runSignalledChild } from "./__fixtures__/signalled-child"
 
 function firstAllocationFailsStore(inner: TaskRecordStore): TaskRecordStore {
   let armed = true
@@ -73,14 +74,9 @@ function managerWithStore(
 const seedFloorChildFixturePath = resolve(import.meta.dir, "__fixtures__", "seed-floor-child.ts")
 
 async function expectSeedFloorChildModeToSucceed(mode: string): Promise<void> {
-  const child = Bun.spawn([process.execPath, seedFloorChildFixturePath, mode], { stdout: "pipe", stderr: "pipe" })
-  const [exitCode, stdout, stderr] = await Promise.all([
-    child.exited,
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-  ])
+  const result = await runSignalledChild([seedFloorChildFixturePath, mode])
 
-  expect(exitCode, `stdout:\n${stdout}\nstderr:\n${stderr}`).toBe(0)
+  expect({ phase: result.phase, exitCode: result.exitCode }, describeChild(result)).toEqual({ phase: "exited", exitCode: 0 })
 }
 
 afterEach(cleanupProjects)
@@ -130,17 +126,22 @@ describe("TaskManager claim characterization", () => {
     }
     const nowSnapshot = Date.now()
     const clock = () => (Math.floor(nowSnapshot / 65_536) + 10_000_000) * 65_536
-    const firstTaskId = `st_${Math.floor(clock() / 65_536).toString(16).padStart(8, "0")}`
+    // The process-wide id floor (syncTaskIdFloor) may already exceed the clock-derived candidate
+    // when sibling test files seeded higher fixture ids (e.g. st_deadbeef) in this process, so the
+    // first id cannot be pinned to the clock. Probe the allocator, then assert the RELATIONSHIP the
+    // test is about: an id-shaped requested name forces the unnamed sibling past it, names unique.
+    const probe = await managerWithStore(createTaskRecordStore({ project_dir: tempProject() }), new FakeRunner(), new FakeRunner(), clock).manager.start(baseSpec())
+    if (probe.kind !== "started") throw new Error("expected probe to start")
+    const firstTaskId = bumpTaskId(probe.task_id as `st_${string}`)
     const { manager } = managerWithStore(invariantStore, new FakeRunner(), new FakeRunner(), clock)
 
     // when
-    const first = await manager.start(baseSpec({ name: bumpTaskId(firstTaskId as `st_${string}`) }))
+    const first = await manager.start(baseSpec({ name: bumpTaskId(firstTaskId) }))
     const second = await manager.start(baseSpec())
 
     // then
     if (first.kind !== "started" || second.kind !== "started") throw new Error("expected both tasks to start")
-    expect(first.task_id).toBe(firstTaskId)
-    expect(first.name).toBe(bumpTaskId(firstTaskId as `st_${string}`))
+    expect(first.name).toBe(bumpTaskId(firstTaskId))
     expect(second.task_id).toBe(bumpTaskId(first.name as `st_${string}`))
     expect(second.name).toBe(second.task_id)
   })
@@ -208,6 +209,7 @@ describe("TaskManager claim characterization", () => {
     async (mode) => {
       await expectSeedFloorChildModeToSucceed(mode)
     },
+    SUBPROCESS_DEADLINE_MS + 5_000,
   )
 
   test("#given a foreign winner for the first candidate #when started #then it claims the next id", async () => {

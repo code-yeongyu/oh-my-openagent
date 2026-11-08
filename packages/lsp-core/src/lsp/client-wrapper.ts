@@ -166,7 +166,7 @@ function formatInstallOptions(serverId: string, installHint: string): string[] {
 		return ["To install, run:", `  ${installHint}`];
 	}
 	return [
-		"To install in THIS repository (preferred — no global install needed):",
+		"To install in THIS repository (preferred, no global install needed):",
 		`  ${localHint}`,
 		"",
 		"Or install it globally:",
@@ -181,7 +181,7 @@ function formatNotInstalled(result: Extract<ServerLookupResult, { status: "not_i
 	const context = lspRequestContext();
 
 	if (decision === "declined") {
-		return `LSP server '${server.id}' (${extensions}) is NOT INSTALLED; user previously declined installation — proceed without LSP.`;
+		return `LSP server '${server.id}' (${extensions}) is NOT INSTALLED; user previously declined installation: proceed without LSP.`;
 	}
 
 	const header = [
@@ -205,7 +205,7 @@ function formatNotInstalled(result: Extract<ServerLookupResult, { status: "not_i
 			...header,
 			...installOptions,
 			"",
-			"ACTION REQUIRED — ASK THE USER whether to install this LSP server.",
+			"ACTION REQUIRED: ASK THE USER whether to install this LSP server.",
 			"Install-decision recording is unavailable in this harness; proceed without LSP if the user declines.",
 		].join("\n");
 	}
@@ -214,7 +214,7 @@ function formatNotInstalled(result: Extract<ServerLookupResult, { status: "not_i
 		...header,
 		...installOptions,
 		"",
-		"ACTION REQUIRED — ASK THE USER whether to install this LSP server.",
+		"ACTION REQUIRED: ASK THE USER whether to install this LSP server.",
 		"- If the user agrees: run the install command above, then retry this tool.",
 		"- If the user declines, OR has NOT explicitly asked for LSP installation:",
 		`    call lsp_install_decision { server_id: "${server.id}", decision: "declined" },`,

@@ -190,7 +190,7 @@ describe("memory journal wiring", () => {
   })
 
   test("#given role-custom entries in the branch #when settled #then only user and assistant rows journal, whatever the custom type", async () => {
-    // given: a memorian recall hint and a foreign extension's custom message, both in the
+    // given: a kibitzer recall hint and a foreign extension's custom message, both in the
     // role-custom `message` shape older writers can leave behind
     const { paths } = fixture()
     const pi = new FakeExtensionAPI()
@@ -210,7 +210,7 @@ describe("memory journal wiring", () => {
     })
     const entries = [
       userEntry("u1", "deploy question"),
-      customEntry("x1", "omo-memorian:recall"),
+      customEntry("x1", "omo-kibitzer:recall"),
       customEntry("x2", "vendor-banner:notice"),
       assistantEntry("a1", { texts: ["answer one"] }),
     ]
@@ -401,4 +401,17 @@ describe("memory journal wiring", () => {
       await foreign.exited
     }
   }, 30_000)
+
+  test("#given a session that never carried a message #when session_start and agent_settled fire #then no journal is created (#9737)", async () => {
+    const { paths } = fixture()
+    const pi = new FakeExtensionAPI()
+    createMemoryJournalWiring({ identityPaths: paths }).register(pi)
+
+    const started = await pi.dispatch("session_start", {}, sessionCtx([], "control-session"))
+    const settled = await pi.dispatch("agent_settled", {}, sessionCtx([], "control-session"))
+
+    expect(started).toEqual([{ appended: 0, skipped: 0 }])
+    expect(settled).toEqual([{ appended: 0, skipped: 0 }])
+    expect(existsSync(join(paths.transcripts, "control-session"))).toBe(false)
+  })
 })

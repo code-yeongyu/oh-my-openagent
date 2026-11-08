@@ -205,7 +205,7 @@ describe("createEventHandler - model fallback", () => {
       {
         sessionID,
         agent: "sisyphus",
-        model: { providerID: "anthropic", modelID: "claude-opus-5" },
+        model: { providerID: "anthropic", modelID: "claude-opus-5-5" },
       },
       output,
     )
@@ -215,7 +215,7 @@ describe("createEventHandler - model fallback", () => {
     expect(promptCalls).toEqual([sessionID])
     expect(output.message["model"]).toEqual({
       providerID: "opencode-go",
-      modelID: "kimi-k3",
+      modelID: "kimi-k3.1-pro",
     })
     expect(output.message["variant"]).toBeUndefined()
   })
@@ -638,7 +638,7 @@ describe("createEventHandler - model fallback", () => {
     expect(promptCalls).toEqual([sessionID])
     expect(output.message["model"]).toMatchObject({
       providerID: "anthropic",
-      modelID: "claude-opus-5",
+      modelID: "claude-opus-5-5",
     })
     expect(output.message["variant"]).toBe("max")
   })
@@ -652,7 +652,7 @@ describe("createEventHandler - model fallback", () => {
     const { handler, abortCalls, promptCalls } = createHandler({ hooks: { modelFallback } })
     const chatMessageHandler = createChatFallbackMessageHandler(modelFallback)
 
-    setSessionModel(sessionID, { providerID: "anthropic", modelID: "claude-opus-5" })
+    setSessionModel(sessionID, { providerID: "anthropic", modelID: "claude-opus-5-5" })
 
     //#when
     await handler({
@@ -675,7 +675,7 @@ describe("createEventHandler - model fallback", () => {
       {
         sessionID,
         agent: "sisyphus",
-        model: { providerID: "anthropic", modelID: "claude-opus-5" },
+        model: { providerID: "anthropic", modelID: "claude-opus-5-5" },
       },
       output,
     )
@@ -685,7 +685,7 @@ describe("createEventHandler - model fallback", () => {
     expect(promptCalls).toEqual([sessionID])
     expect(output.message["model"]).toEqual({
       providerID: "opencode-go",
-      modelID: "kimi-k3",
+      modelID: "kimi-k3.1-pro",
     })
     expect(output.message["variant"]).toBeUndefined()
   })
@@ -835,7 +835,7 @@ describe("createEventHandler - model fallback", () => {
             id: "msg_user_status_idle_reset_opus5",
             sessionID,
             role: "user",
-            modelID: "claude-opus-5",
+            modelID: "claude-opus-5-5",
             providerID: "anthropic",
             agent: "Sisyphus - Ultraworker",
           },
@@ -850,7 +850,7 @@ describe("createEventHandler - model fallback", () => {
           status: {
             ...retryStatus.properties.status,
             message:
-              "All credentials for model claude-opus-5 are cooling down [retrying in ~5 days attempt #1]",
+              "All credentials for model claude-opus-5-5 are cooling down [retrying in ~5 days attempt #1]",
           },
         },
       },
@@ -1221,24 +1221,30 @@ describe("createEventHandler - model fallback", () => {
     const first = await triggerRetryCycle("anthropic", "claude-opus-4-8-thinking")
 
     //#then - first Opus 5 fallback entry is applied to the legacy Opus 4.8 input
-    expect(first.message["model"]).toMatchObject({ providerID: "anthropic", modelID: "claude-opus-5" })
+    expect(first.message["model"]).toMatchObject({ providerID: "anthropic", modelID: "claude-opus-5-5" })
     expect(first.message["variant"]).toBe("max")
 
     //#when - second retry cycle
-    const second = await triggerRetryCycle("opencode-go", "kimi-k3")
+    const second = await triggerRetryCycle("opencode-go", "kimi-k3.1-pro")
 
-    //#then - restored Sol entry applied after the consolidated Kimi rung
-    expect(second.message["model"]).toMatchObject({ providerID: "openai", modelID: "gpt-5.6-sol" })
-    expect(second.message["variant"]).toBe("medium")
+    //#then - the Kimi K3 rung for providers without K3.1 Pro follows the K3.1 Pro rung
+    expect(second.message["model"]).toMatchObject({ providerID: "opencode", modelID: "kimi-k3" })
 
     //#when - third retry cycle
-    const third = await triggerRetryCycle("openai", "gpt-5.6-sol")
+    const third = await triggerRetryCycle("opencode", "kimi-k3")
+
+    //#then - restored Sol entry applied after the Kimi rungs
+    expect(third.message["model"]).toMatchObject({ providerID: "openai", modelID: "gpt-5.6-sol" })
+    expect(third.message["variant"]).toBe("medium")
+
+    //#when - fourth retry cycle
+    const fourth = await triggerRetryCycle("openai", "gpt-5.6-sol")
 
     //#then - fallback continues to GLM after the restored Sol rung
-    expect(third.message["model"]).toMatchObject({ providerID: "zai-coding-plan", modelID: "glm-5.2" })
-    expect(third.message["variant"]).toBeUndefined()
-    expect(abortCalls).toEqual([sessionID, sessionID, sessionID])
-    expect(promptCalls).toEqual([sessionID, sessionID, sessionID])
+    expect(fourth.message["model"]).toMatchObject({ providerID: "zai-coding-plan", modelID: "glm-5.2" })
+    expect(fourth.message["variant"]).toBeUndefined()
+    expect(abortCalls).toEqual([sessionID, sessionID, sessionID, sessionID])
+    expect(promptCalls).toEqual([sessionID, sessionID, sessionID, sessionID])
     expect(toastCalls.length).toBeGreaterThanOrEqual(0)
   })
 
@@ -1275,7 +1281,7 @@ describe("createEventHandler - model fallback", () => {
       {
         sessionID,
         agent: "sisyphus",
-        model: { providerID: "anthropic", modelID: "claude-opus-5" },
+        model: { providerID: "anthropic", modelID: "claude-opus-5-5" },
       },
       output,
     )
@@ -1285,7 +1291,7 @@ describe("createEventHandler - model fallback", () => {
     expect(promptCalls).toEqual([sessionID])
     expect(output.message["model"]).toEqual({
       providerID: "opencode-go",
-      modelID: "kimi-k3",
+      modelID: "kimi-k3.1-pro",
     })
     expect(output.message["variant"]).toBeUndefined()
   })

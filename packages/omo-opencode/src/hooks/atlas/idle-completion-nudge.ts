@@ -33,7 +33,7 @@ export async function handleCompletedBoulderIdle(input: {
 }): Promise<void> {
   const { ctx, options, sessionID, sessionState, boulderState } = input
   if (sessionState.pendingRetryTimer) {
-    clearTimeout(sessionState.pendingRetryTimer)
+    sessionState.pendingRetryTimer.cancel()
     sessionState.pendingRetryTimer = undefined
   }
 

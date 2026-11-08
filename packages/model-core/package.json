@@ -8,6 +8,10 @@
     ".": {
       "types": "./index.d.ts",
       "import": "./src/index.ts"
+    },
+    "./latest-models": {
+      "types": "./src/latest-models.ts",
+      "import": "./src/latest-models.ts"
     }
   },
   "types": "./index.d.ts",

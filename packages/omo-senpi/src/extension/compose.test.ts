@@ -1,10 +1,53 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, it } from "bun:test"
+import { afterEach, describe, expect, it, jest, spyOn } from "bun:test"
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import { FakeExtensionAPI } from "../../test-support/fake-extension-api"
 import { composeOmoSenpiExtension } from "./compose"
+import { IdleInjectionRetiredError, type IdleInjectionCoordinator } from "./idle-injection-coordinator"
 import type { ComponentLogger, OmoSenpiComponent } from "./types"
+
+// Mirrors senpi's reload: after `session_shutdown {reason: "reload"}` the old generation's API throws
+// from every call instead of delivering.
+class ReloadingFakeExtensionAPI extends FakeExtensionAPI {
+  sendMessageCalls = 0
+  #stale = false
+
+  override sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void {
+    this.sendMessageCalls += 1
+    if (this.#stale) throw new Error("stale extension generation after reload")
+    super.sendMessage(message, options)
+  }
+
+  override async dispatch(event: string, payload: unknown, ctx?: unknown): Promise<unknown[]> {
+    const results = await super.dispatch(event, payload, ctx)
+    if (event === "session_shutdown") this.#stale = true
+    return results
+  }
+}
+
+const pythonCacheEnv = {
+  PYTHONDONTWRITEBYTECODE: process.env.PYTHONDONTWRITEBYTECODE,
+  PYTHONPYCACHEPREFIX: process.env.PYTHONPYCACHEPREFIX,
+  XDG_CACHE_HOME: process.env.XDG_CACHE_HOME,
+  LOCALAPPDATA: process.env.LOCALAPPDATA,
+}
+
+// Read through a call: after `delete process.env.X`, TypeScript narrows a direct `process.env.X` read to undefined.
+function readPythonCacheEnv(): Record<"PYTHONDONTWRITEBYTECODE" | "PYTHONPYCACHEPREFIX", string | undefined> {
+  return { PYTHONDONTWRITEBYTECODE: process.env.PYTHONDONTWRITEBYTECODE, PYTHONPYCACHEPREFIX: process.env.PYTHONPYCACHEPREFIX }
+}
+
+afterEach(() => {
+  jest.useRealTimers()
+  for (const [name, value] of Object.entries(pythonCacheEnv)) {
+    if (value === undefined) delete process.env[name]
+    else process.env[name] = value
+  }
+})
 
 function createRecordingLogger(): ComponentLogger & { entries: Array<{ level: string; message: string; details?: unknown }> } {
   const entries: Array<{ level: string; message: string; details?: unknown }> = []
@@ -95,6 +138,68 @@ describe("composeOmoSenpiExtension", () => {
     expect(pi.tools.map((tool) => tool.name)).toEqual(["alpha_tool"])
   })
 
+  it("#given OMO_SENPI_DISABLED=1 in the environment #when composed #then no component registers", async () => {
+    // given
+    const pi = new FakeExtensionAPI()
+    const components: OmoSenpiComponent[] = [
+      { name: "alpha", register(api) { api.registerTool({ name: "alpha_tool" }) } },
+    ]
+
+    // when
+    await composeOmoSenpiExtension(components, { env: { OMO_SENPI_DISABLED: "1" } })(pi)
+
+    // then
+    expect(pi.tools).toEqual([])
+  })
+
+  it("#given no user Python cache setting #when composed #then Python bytecode is cached under the OmO prefix and never next to a project's code (#11373)", async () => {
+    // given
+    const work = mkdtempSync(join(tmpdir(), "omo-pycache-"))
+    const project = join(work, "project")
+    mkdirSync(project)
+    writeFileSync(join(project, "helper.py"), "VALUE = 7\n")
+    writeFileSync(join(project, "main.py"), "import helper\nprint(helper.VALUE)\n")
+    process.env.XDG_CACHE_HOME = work
+    process.env.LOCALAPPDATA = work
+    delete process.env.PYTHONDONTWRITEBYTECODE
+    delete process.env.PYTHONPYCACHEPREFIX
+
+    try {
+      // when
+      await composeOmoSenpiExtension([])(new FakeExtensionAPI())
+      const child = Bun.spawn([process.platform === "win32" ? "python" : "python3", "main.py"], { cwd: project, env: process.env, stdout: "pipe", stderr: "pipe" })
+      const [stdout, exitCode] = await Promise.all([new Response(child.stdout).text(), child.exited])
+
+      // then
+      const prefix = join(work, "omo-senpi", "pycache")
+      expect(readPythonCacheEnv()).toEqual({ PYTHONDONTWRITEBYTECODE: undefined, PYTHONPYCACHEPREFIX: prefix })
+      expect({ exitCode, stdout: stdout.trim() }).toEqual({ exitCode: 0, stdout: "7" })
+      expect(readdirSync(prefix, { recursive: true, encoding: "utf8" }).some((path) => path.includes("helper.") && path.endsWith(".pyc"))).toBe(true)
+      expect(readdirSync(project).sort()).toEqual(["helper.py", "main.py"])
+    } finally {
+      rmSync(work, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it("#given the user set either Python cache variable, even empty #when composed #then both are left exactly as they were (#11373)", async () => {
+    for (const choice of [{ PYTHONDONTWRITEBYTECODE: "1" }, { PYTHONDONTWRITEBYTECODE: "" }, { PYTHONPYCACHEPREFIX: "/mine" }, { PYTHONPYCACHEPREFIX: "" }]) {
+      // given
+      delete process.env.PYTHONDONTWRITEBYTECODE
+      delete process.env.PYTHONPYCACHEPREFIX
+      Object.assign(process.env, choice)
+
+      // when
+      await composeOmoSenpiExtension([])(new FakeExtensionAPI())
+
+      // then
+      expect(readPythonCacheEnv()).toEqual({
+        PYTHONDONTWRITEBYTECODE: undefined,
+        PYTHONPYCACHEPREFIX: undefined,
+        ...choice,
+      })
+    }
+  })
+
   it("#given a component throws #when composed #then logs the error and registers later components", async () => {
     // given
     const pi = new FakeExtensionAPI()
@@ -131,6 +236,10 @@ describe("composeOmoSenpiExtension", () => {
     const pi: Omit<FakeExtensionAPI, "registerMcpServer"> & { registerMcpServer?: undefined } = {
       handlers: [],
       tools: [],
+      removedToolHints: new Map(),
+      registerRemovedToolHint(name, hint) {
+        this.removedToolHints.set(name, hint)
+      },
       commands: [],
       flags: [],
       messages: [],
@@ -253,5 +362,187 @@ describe("composeOmoSenpiExtension", () => {
         },
       },
     ])
+  })
+
+  it("#given a deferred idle-injection flush armed inside the batch window #when session_shutdown(reload) invalidates the API before the timer fires #then the flush neither throws nor calls sendMessage", async () => {
+    // given a component that schedules a batched steer on agent_end
+    const pi = new ReloadingFakeExtensionAPI()
+    const components: OmoSenpiComponent[] = [
+      {
+        name: "ulw-like",
+        register(api, ctx) {
+          api.on("agent_end", () => {
+            ctx.idleCoordinator?.enqueue({ key: "ulw", source: "ulw-continuation", content: "continue the run" })
+            ctx.idleCoordinator?.scheduleFlush()
+          })
+        },
+      },
+    ]
+    await composeOmoSenpiExtension(components, { logger: createRecordingLogger() })(pi)
+    jest.useFakeTimers()
+
+    // when the 200ms flush is armed, then the session reloads before it fires
+    await pi.dispatch("agent_end", { type: "agent_end" })
+    await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "reload" })
+
+    // then the stale timer is a no-op rather than an uncaught exception
+    expect(() => jest.advanceTimersByTime(200)).not.toThrow()
+    expect(pi.sendMessageCalls).toBe(0)
+    expect(pi.messages).toHaveLength(0)
+  })
+
+  it("#given a completion queued inside the batch window #when session_shutdown(reload) retires the coordinator #then its producer gets a failure receipt and later enqueues are refused", async () => {
+    // given the real composition seam: whatever compose wires into ctx.idleCoordinator
+    const pi = new ReloadingFakeExtensionAPI()
+    let coordinator: IdleInjectionCoordinator | undefined
+    const components: OmoSenpiComponent[] = [
+      {
+        name: "task-like",
+        register(_api, ctx) {
+          coordinator = ctx.idleCoordinator
+        },
+      },
+    ]
+    await composeOmoSenpiExtension(components, { logger: createRecordingLogger() })(pi)
+
+    // when a background child completes inside the 200ms batch window and the session reloads first
+    const failures: unknown[] = []
+    const accepted = coordinator?.enqueue({
+      key: "task-completion:st_1",
+      source: "task-completion",
+      content: "task st_1 completed",
+      onDeliveryFailed: (error) => failures.push(error),
+    })
+    coordinator?.scheduleFlush()
+    expect(accepted).toBe(true)
+    await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "reload" })
+
+    // then the queued completion is handed back as a delivery failure (senpi-task rolls notified_epoch
+    // back on this receipt, so the post-reload reconcile redelivers) and nothing hit the stale API
+    expect(failures).toHaveLength(1)
+    expect(failures[0]).toBeInstanceOf(IdleInjectionRetiredError)
+    expect(pi.sendMessageCalls).toBe(0)
+    expect(pi.messages).toHaveLength(0)
+
+    // and a retry that arrives after the reload is refused instead of reported as queued
+    const retried = coordinator?.enqueue({
+      key: "task-completion:st_1",
+      source: "task-completion",
+      content: "task st_1 completed",
+    })
+    expect(retried).toBe(false)
+  })
+
+  it("#given the default logger and no OMO_DEBUG #when a component logs info #then nothing is printed on stderr or stdout", async () => {
+    // given: print/json mode must not dump component diagnostics (#8819); a child's stdout is its
+    // deliverable, so diagnostics must never share that stream (#8564)
+    const captured = await captureDefaultLoggerOutput(undefined, (ctx) => {
+      ctx.logger.info("alpha ready")
+      ctx.logger.info("alpha detail", { count: 1 })
+    })
+
+    // then
+    expect(captured.stdout).toStrictEqual([])
+    expect(captured.stderr).toStrictEqual([])
+    expect(captured.warn).toStrictEqual([])
+  })
+
+  it("#given the default logger and OMO_DEBUG=1 #when a component logs info #then it goes to stderr, never stdout, without a trailing undefined", async () => {
+    // given
+    const captured = await captureDefaultLoggerOutput("1", (ctx) => {
+      ctx.logger.info("alpha ready")
+      ctx.logger.info("alpha detail", { count: 1 })
+    })
+
+    // then
+    expect(captured.stdout).toStrictEqual([])
+    expect(captured.warn).toStrictEqual([])
+    expect(captured.stderr).toStrictEqual([["alpha ready"], ["alpha detail", { count: 1 }]])
+  })
+
+  it("#given the default logger and no OMO_DEBUG #when a component logs warn #then it still goes to stderr, never stdout", async () => {
+    // given
+    const captured = await captureDefaultLoggerOutput(undefined, (ctx) => {
+      ctx.logger.warn("alpha warn")
+      ctx.logger.warn("alpha warn-detail", { count: 1 })
+    })
+
+    // then
+    expect(captured.stdout).toStrictEqual([])
+    expect(captured.stderr).toStrictEqual([])
+    expect(captured.warn).toStrictEqual([["alpha warn"], ["alpha warn-detail", { count: 1 }]])
+  })
+})
+
+async function captureDefaultLoggerOutput(
+  debug: string | undefined,
+  log: (ctx: { logger: ComponentLogger }) => void,
+): Promise<{ stdout: unknown[][]; stderr: unknown[][]; warn: unknown[][] }> {
+  const previous = process.env.OMO_DEBUG
+  if (debug === undefined) delete process.env.OMO_DEBUG
+  else process.env.OMO_DEBUG = debug
+
+  const pi = new FakeExtensionAPI()
+  const info = spyOn(console, "info").mockImplementation(() => {})
+  const logFn = spyOn(console, "log").mockImplementation(() => {})
+  const error = spyOn(console, "error").mockImplementation(() => {})
+  const warn = spyOn(console, "warn").mockImplementation(() => {})
+  try {
+    await composeOmoSenpiExtension([
+      {
+        name: "alpha",
+        register(_api, ctx) {
+          log(ctx)
+        },
+      },
+    ])(pi)
+    const alpha = (call: unknown[]) => String(call[0]).startsWith("alpha")
+    return {
+      stdout: [...info.mock.calls, ...logFn.mock.calls].filter(alpha),
+      stderr: error.mock.calls.filter(alpha),
+      warn: warn.mock.calls.filter(alpha),
+    }
+  } finally {
+    info.mockRestore()
+    logFn.mockRestore()
+    error.mockRestore()
+    warn.mockRestore()
+    if (previous === undefined) delete process.env.OMO_DEBUG
+    else process.env.OMO_DEBUG = previous
+  }
+}
+
+describe("idle-injection retire on session_shutdown (#10782)", () => {
+  it("#given a queued injection whose failure receipt throws #when session_shutdown fires #then the error is logged and later shutdown handlers still run", async () => {
+    // given a component that queues an injection with a throwing receipt and also listens for shutdown
+    const pi = new FakeExtensionAPI()
+    const logger = createRecordingLogger()
+    let laterHandlerRan = false
+    const components: OmoSenpiComponent[] = [
+      {
+        name: "throwing-receipt",
+        register(api, ctx) {
+          ctx.idleCoordinator?.enqueue({
+            key: "task:st_24",
+            source: "task-completion",
+            content: "st_24 completed",
+            onDeliveryFailed: () => {
+              throw new Error("receipt failed")
+            },
+          })
+          api.on("session_shutdown", () => {
+            laterHandlerRan = true
+          })
+        },
+      },
+    ]
+    await composeOmoSenpiExtension(components, { logger })(pi)
+
+    // when
+    await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "reload" })
+
+    // then
+    expect(laterHandlerRan).toBe(true)
+    expect(logger.entries.some((entry) => entry.level === "warn" && entry.message.includes("receipt failed on shutdown"))).toBe(true)
   })
 })

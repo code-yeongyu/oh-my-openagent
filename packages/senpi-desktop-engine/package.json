@@ -1,0 +1,27 @@
+{
+	"name": "@oh-my-opencode/senpi-desktop-engine",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"description": "Locator, ABI handshake, and dev-build fallback for the senpi-desktop-engine binary",
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"import": "./src/index.ts"
+		},
+		"./package.json": "./package.json"
+	},
+	"types": "./src/index.ts",
+	"scripts": {
+		"typecheck": "tsgo --noEmit -p tsconfig.json",
+		"test": "vitest --run test"
+	},
+	"dependencies": {
+		"@oh-my-opencode/senpi-desktop-protocol": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "26.6.2",
+		"zod": "4.6.5",
+		"vitest": "5.0.1"
+	}
+}

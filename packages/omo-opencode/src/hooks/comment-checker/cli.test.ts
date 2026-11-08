@@ -62,37 +62,9 @@ describe("comment-checker CLI", () => {
       // then
       expect(result).toBeNull()
     })
-
-    test("getCommentCheckerPathSync should be lazy and callable", async () => {
-      // given
-      const cliModule = await import("./cli")
-      // when
-      const result = cliModule.getCommentCheckerPathSync()
-      // then
-      expect(typeof cliModule.getCommentCheckerPathSync).toBe("function")
-      expect(result === null || typeof result === "string").toBe(true)
-    })
-
-    test("COMMENT_CHECKER_CLI_PATH export should not exist", async () => {
-      // given
-      const cliModule = await import("./cli")
-      // when
-      // then
-      expect("COMMENT_CHECKER_CLI_PATH" in cliModule).toBe(false)
-    })
   })
 
   describe("runCommentChecker", () => {
-    test("returns CheckResult shape without explicit CLI path", async () => {
-      // given
-      const { runCommentChecker } = await import("./cli")
-      // when
-      const result = await runCommentChecker(createMockInput())
-      // then
-      expect(typeof result.hasComments).toBe("boolean")
-      expect(typeof result.message).toBe("string")
-    })
-
     test("sends SIGKILL after grace period when process ignores SIGTERM", async () => {
       // given
       const { runCommentChecker } = await import("./cli")

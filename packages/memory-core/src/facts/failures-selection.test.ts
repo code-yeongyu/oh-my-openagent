@@ -84,7 +84,7 @@ describe("facts launch selection", () => {
     expect(selection.skipped).toEqual({})
   })
 
-  test("#given a parked endpoint #when selecting #then its later same-conversation entries are blocked but other conversations flow", () => {
+  test("#given a parked endpoint #when selecting #then it is skipped and its later same-conversation entries still launch (#10918)", () => {
     // given
     const entries = [
       entry("alpha", "m1", 1),
@@ -96,9 +96,22 @@ describe("facts launch selection", () => {
     const selection = selectLaunchable(entries, failures([parked("alpha", "m1", 1)]), T0)
 
     // then
+    expect(endpoints(selection)).toEqual(["alpha/m2", "beta/m9"])
+    expect(selection.skipped).toEqual({ [factsSelectionKey("alpha", "m1")]: "parked" })
+  })
+
+  test("#given an endpoint in backoff #when selecting #then its later same-conversation entries wait behind it", () => {
+    // given
+    const eligibleAt = new Date(T0.getTime() + 60_000)
+    const entries = [entry("alpha", "m1", 1), entry("alpha", "m2", 4), entry("beta", "m9", 2)]
+
+    // when
+    const selection = selectLaunchable(entries, failures([backoff("alpha", "m1", 1, eligibleAt)]), T0)
+
+    // then
     expect(endpoints(selection)).toEqual(["beta/m9"])
     expect(selection.skipped).toEqual({
-      [factsSelectionKey("alpha", "m1")]: "parked",
+      [factsSelectionKey("alpha", "m1")]: "backoff",
       [factsSelectionKey("alpha", "m2")]: "blocked-by-predecessor",
     })
   })
@@ -142,11 +155,8 @@ describe("facts launch selection", () => {
     const selection = selectLaunchable(entries, failures([parked("alpha", "m1", 0)]), T0)
 
     // then
-    expect(selection.selected).toEqual([])
-    expect(selection.skipped).toEqual({
-      [factsSelectionKey("alpha", "m1")]: "parked",
-      [factsSelectionKey("alpha", "m2")]: "blocked-by-predecessor",
-    })
+    expect(endpoints(selection)).toEqual(["alpha/m2"])
+    expect(selection.skipped).toEqual({ [factsSelectionKey("alpha", "m1")]: "parked" })
   })
 
   test("#given an unrelated failure record #when selecting #then entries with no record of their own stay launchable", () => {
@@ -161,17 +171,26 @@ describe("facts launch selection", () => {
     expect(selection.skipped).toEqual({})
   })
 
+  test("#given a parked predecessor whose file moved to the dead-letter store #when selecting its successor #then the successor still flows (#10918)", () => {
+    // The parked record has no pending entry once its file sits in parked/; it must not hold the conversation back.
+    const entries = [entry("alpha", "m2", 4), entry("beta", "m9", 2)]
+    const selection = selectLaunchable(entries, failures([parked("alpha", "m1", 2)]), T0)
+    expect([...endpoints(selection)].sort()).toEqual(["alpha/m2", "beta/m9"])
+    expect(selection.skipped).toEqual({})
+  })
+
   test("#given an out-of-order pending list #when a dropped entry has a lower snapshot boundary #then gating follows the boundary, not the list order", () => {
     // given: the successor is listed first; prefix gating is defined by the snapshot boundary.
+    const eligibleAt = new Date(T0.getTime() + 60_000)
     const entries = [entry("alpha", "m2", 6), entry("alpha", "m1", 2)]
 
     // when
-    const selection = selectLaunchable(entries, failures([parked("alpha", "m1", 2)]), T0)
+    const selection = selectLaunchable(entries, failures([backoff("alpha", "m1", 2, eligibleAt)]), T0)
 
     // then
     expect(selection.selected).toEqual([])
     expect(selection.skipped).toEqual({
-      [factsSelectionKey("alpha", "m1")]: "parked",
+      [factsSelectionKey("alpha", "m1")]: "backoff",
       [factsSelectionKey("alpha", "m2")]: "blocked-by-predecessor",
     })
   })

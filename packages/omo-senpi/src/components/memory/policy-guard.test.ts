@@ -1,15 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
+
+import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 
-import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
+import { createMemoryIdentityContext } from "./context"
 import { registerMemoryGuard } from "./guard"
 import { componentContext } from "./memory.test-support"
+import { TRANSIENT_DIRNAME } from "./transient-identity"
 import {
   type FilesystemOperation,
   type FilesystemPolicy,
@@ -17,82 +18,13 @@ import {
   hasFilesystemPolicySupport,
   registerMemoryFilesystemPolicy,
 } from "./policy-guard"
+import { canonical, policyFixture, registeredPolicy, type PolicyFixture } from "./policy-guard.test-support"
 
 const roots: string[] = []
 
 afterEach(() => {
   for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
-
-class PolicyCapturingFakeExtensionAPI extends FakeExtensionAPI {
-  readonly filesystemPolicies: FilesystemPolicy[] = []
-
-  registerFilesystemPolicy(policy: FilesystemPolicy): void {
-    this.filesystemPolicies.push(policy)
-  }
-}
-
-type PolicyFixture = {
-  readonly pi: PolicyCapturingFakeExtensionAPI
-  readonly own: MemoryIdentityContext
-  readonly memoryRoot: string
-  readonly workspace: string
-  readonly ownRepoFile: string
-  readonly ownWorktreeFile: string
-  readonly foreignRoot: string
-  readonly foreignFile: string
-  readonly agentsRoot: string
-  readonly outsideFile: string
-}
-
-function fixture(): PolicyFixture {
-  const memoryRoot = mkdtempSync(join(tmpdir(), "omo-memory-policy-"))
-  const workspace = mkdtempSync(join(tmpdir(), "omo-memory-policy-workspace-"))
-  roots.push(memoryRoot, workspace)
-
-  const ownPaths = buildIdentityPaths(memoryRoot, "own")
-  const foreignPaths = buildIdentityPaths(memoryRoot, "foreign")
-  const ownRepoFile = join(ownPaths.repo, "system", "persona.md")
-  const ownWorktreeFile = join(ownPaths.worktrees, "reflection", "notes.md")
-  const foreignFile = join(foreignPaths.repo, "system", "persona.md")
-  mkdirSync(dirname(ownRepoFile), { recursive: true })
-  mkdirSync(dirname(ownWorktreeFile), { recursive: true })
-  mkdirSync(dirname(foreignFile), { recursive: true })
-  writeFileSync(ownRepoFile, "own")
-  writeFileSync(ownWorktreeFile, "worktree")
-  writeFileSync(foreignFile, "foreign")
-  const outsideFile = join(workspace, "notes.md")
-  writeFileSync(outsideFile, "outside")
-
-  const own = createMemoryIdentityContext({
-    identity: "own",
-    identityPaths: ownPaths,
-    binding: { identity: "own", repoPathHash: "hash", boundAt: 1 },
-  })
-
-  return {
-    pi: new PolicyCapturingFakeExtensionAPI(),
-    own,
-    memoryRoot,
-    workspace,
-    ownRepoFile,
-    ownWorktreeFile,
-    foreignRoot: foreignPaths.root,
-    foreignFile,
-    agentsRoot: dirname(ownPaths.root),
-    outsideFile,
-  }
-}
-
-function canonical(path: string): string {
-  return realpathSync(path)
-}
-
-function registeredPolicy(setup: PolicyFixture): FilesystemPolicy {
-  const policy = setup.pi.filesystemPolicies[0]
-  if (policy === undefined) throw new Error("expected a registered filesystem policy")
-  return policy
-}
 
 async function check(
   policy: FilesystemPolicy,
@@ -105,7 +37,7 @@ async function check(
 
 describe("memory filesystem policy guard", () => {
   test("#given a bound identity on a policy-capable host #when registration runs #then exactly one policy is registered with foreign-only denied roots", () => {
-    const setup = fixture()
+    const setup = policyFixture(roots)
 
     const result = registerMemoryFilesystemPolicy(setup.pi, setup.own)
 
@@ -118,7 +50,7 @@ describe("memory filesystem policy guard", () => {
   })
 
   test("#given the registered policy #when read and write target a foreign identity file #then both are denied with the stable reason", async () => {
-    const setup = fixture()
+    const setup = policyFixture(roots)
     registerMemoryFilesystemPolicy(setup.pi, setup.own)
     const policy = registeredPolicy(setup)
     const foreign = canonical(setup.foreignFile)
@@ -134,7 +66,7 @@ describe("memory filesystem policy guard", () => {
   })
 
   test("#given the registered policy #when enumeration targets the agents root or a foreign root #then both are denied", async () => {
-    const setup = fixture()
+    const setup = policyFixture(roots)
     registerMemoryFilesystemPolicy(setup.pi, setup.own)
     const policy = registeredPolicy(setup)
     const agents = canonical(setup.agentsRoot)
@@ -151,7 +83,7 @@ describe("memory filesystem policy guard", () => {
   })
 
   test("#given the registered policy #when operations target the bound identity repo and worktrees #then they are allowed", async () => {
-    const setup = fixture()
+    const setup = policyFixture(roots)
     registerMemoryFilesystemPolicy(setup.pi, setup.own)
     const policy = registeredPolicy(setup)
 
@@ -161,7 +93,7 @@ describe("memory filesystem policy guard", () => {
   })
 
   test("#given the registered policy #when an operation targets a path outside the agents root #then it is allowed", async () => {
-    const setup = fixture()
+    const setup = policyFixture(roots)
     registerMemoryFilesystemPolicy(setup.pi, setup.own)
     const policy = registeredPolicy(setup)
 
@@ -169,7 +101,7 @@ describe("memory filesystem policy guard", () => {
   })
 
   test("#given the registered policy #when a sibling identity appears after registration #then its files are still denied", async () => {
-    const setup = fixture()
+    const setup = policyFixture(roots)
     registerMemoryFilesystemPolicy(setup.pi, setup.own)
     const policy = registeredPolicy(setup)
 
@@ -186,7 +118,7 @@ describe("memory filesystem policy guard", () => {
   })
 
   test("#given an unbound identity on a policy-capable host #when registration runs #then no policy is registered", () => {
-    const setup = fixture()
+    const setup = policyFixture(roots)
 
     const result = registerMemoryFilesystemPolicy(setup.pi, undefined)
 
@@ -195,7 +127,7 @@ describe("memory filesystem policy guard", () => {
   })
 
   test("#given a host without the policy API #when registration runs #then nothing is registered and the soft guard stays the enforcement layer", async () => {
-    const setup = fixture()
+    const setup = policyFixture(roots)
     const pi = new FakeExtensionAPI()
 
     expect(hasFilesystemPolicySupport(pi)).toBe(false)
@@ -220,9 +152,55 @@ describe("memory filesystem policy guard", () => {
   })
 
   test("#given the capability check #when the host exposes the policy API #then support is detected without any cast", () => {
-    const setup = fixture()
+    const setup = policyFixture(roots)
 
     expect(hasFilesystemPolicySupport(setup.pi)).toBe(true)
+  })
+
+  test("#given runtime-only sibling directories #when the policy registers #then only durable identities are denied roots and the strays stay denied by the check", async () => {
+    const setup = policyFixture(roots)
+    const strayPaths = buildIdentityPaths(setup.memoryRoot, "stray-run")
+    mkdirSync(join(strayPaths.transcripts, "stream-1"), { recursive: true })
+
+    registerMemoryFilesystemPolicy(setup.pi, setup.own)
+    const policy = registeredPolicy(setup)
+
+    const deniedRoots = policy.deniedRoots ?? []
+    expect(deniedRoots).toContain(canonical(setup.foreignRoot))
+    expect(deniedRoots).not.toContain(canonical(strayPaths.root))
+    const stray = canonical(strayPaths.transcripts)
+    expect(await check(policy, "read", stray)).toEqual({
+      allow: false,
+      reason: `cross-identity memory access denied: read ${stray}`,
+    })
+  })
+
+  test("#given a transient run identity #when the policy registers #then the durable agents root and other transient runs are denied while its own run root is allowed", async () => {
+    const setup = policyFixture(roots)
+    const runPaths = buildIdentityPaths(join(setup.memoryRoot, TRANSIENT_DIRNAME, "token-1"), "own")
+    const otherRunPaths = buildIdentityPaths(join(setup.memoryRoot, TRANSIENT_DIRNAME, "token-2"), "other")
+    mkdirSync(join(runPaths.transcripts, "stream-1"), { recursive: true })
+    mkdirSync(join(otherRunPaths.transcripts, "stream-1"), { recursive: true })
+    const transient = createMemoryIdentityContext({
+      identity: "own",
+      identityPaths: runPaths,
+      durableRoot: setup.own.identityPaths.root,
+      binding: { identity: "own", repoPathHash: "hash", boundAt: 1 },
+    })
+
+    registerMemoryFilesystemPolicy(setup.pi, transient)
+    const policy = registeredPolicy(setup)
+
+    expect(await check(policy, "write", canonical(runPaths.transcripts), "write")).toEqual({ allow: true })
+    expect(await check(policy, "read", canonical(setup.foreignFile))).toEqual({
+      allow: false,
+      reason: `cross-identity memory access denied: read ${canonical(setup.foreignFile)}`,
+    })
+    const otherRun = canonical(otherRunPaths.transcripts)
+    expect(await check(policy, "read", otherRun)).toEqual({
+      allow: false,
+      reason: `cross-identity memory access denied: read ${otherRun}`,
+    })
   })
 
   test("#given the policy guard module source #when imports are audited #then senpi references are type-only with no runtime import or any-cast", () => {

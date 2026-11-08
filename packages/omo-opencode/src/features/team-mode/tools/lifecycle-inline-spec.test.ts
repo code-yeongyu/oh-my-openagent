@@ -56,7 +56,8 @@ function createRuntimeState(spec: TeamSpec, leadSessionId: string, teamRunId: st
   }
 }
 
-const createTeamRunMock = mock(async (spec: TeamSpec, leadSessionId: string) => {
+const createTeamRunMock = mock(async (...args: Parameters<typeof import("../team-runtime/create").createTeamRun>) => {
+  const [spec, leadSessionId] = args
   const teamRunId = `team-run-${nextTeamRunNumber++}`
   const runtimeState = createRuntimeState(spec, leadSessionId, teamRunId)
   runtimes.set(teamRunId, runtimeState)
@@ -104,11 +105,11 @@ describe("createTeamCreateTool inline_spec normalization", () => {
     createTeamRunMock.mockClear()
   })
 
-  test("accepts inline_spec objects and auto-assigns missing member names", async () => {
+  test.each([false, true, undefined])("accepts inline_spec objects and forwards claudeCodeAgentsEnabled=%s", async (claudeCodeAgentsEnabled) => {
     // given
     const createTeamCreateTool = await loadCreateTeamCreateTool()
     const config = createConfig()
-    const teamCreateTool = createTeamCreateToolForTest(createTeamCreateTool, config)
+    const teamCreateTool = createTeamCreateToolForTest(createTeamCreateTool, config, { claudeCodeAgentsEnabled })
     const inlineSpec = {
       name: "alpha-team",
       lead: { kind: "subagent_type", subagent_type: "sisyphus" },
@@ -132,6 +133,7 @@ describe("createTeamCreateTool inline_spec normalization", () => {
       ],
     })
     expect(firstCall?.[1]).toBe("lead-session")
+    expect(firstCall?.[2].claudeCodeAgentsEnabled).toBe(claudeCodeAgentsEnabled)
     expect(result.runtimeState.members.map((member: { name: string }) => member.name)).toEqual(["lead", "quick-1", "atlas-1"])
   })
 

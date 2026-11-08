@@ -27,17 +27,31 @@ describe("replaceToolArgs", () => {
 			expect(output.args.format).toBe("markdown")
 		})
 
-		it("#when patching #then the original args object is not the same reference", () => {
+		it("#when patching #then the host-held args object receives the patch", () => {
 			// given
-			const originalArgs = { command: "echo hi" } as Record<string, unknown>
+			const originalArgs: Record<string, unknown> = { command: "echo hi" }
 			const output = { args: originalArgs }
 
 			// when
 			replaceToolArgs(output, { command: "echo bye" })
 
 			// then
-			expect(output.args).not.toBe(originalArgs)
-			expect(originalArgs.command).toBe("echo hi")
+			expect(originalArgs.command).toBe("echo bye")
+			expect(output.args).toBe(originalArgs)
+		})
+
+		it("#when a later hook edits patched args #then the host executes both rewrites", () => {
+			// given
+			const originalArgs: Record<string, unknown> = { command: "echo hi", timeout: 30 }
+			const output = { args: originalArgs }
+
+			// when
+			replaceToolArgs(output, { command: "echo bye" })
+			output.args.command += "; echo later"
+
+			// then
+			expect(originalArgs.command).toBe("echo bye; echo later")
+			expect(originalArgs.timeout).toBe(30)
 		})
 	})
 

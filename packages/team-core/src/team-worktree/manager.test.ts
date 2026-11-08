@@ -44,6 +44,7 @@ describe("team-worktree manager", () => {
     const repositoryRoot = await initGitRepo()
     const worktreePath = `../worktree-${randomUUID()}`
     const worktreeDirectory = path.resolve(repositoryRoot, worktreePath)
+    temporaryDirectories.push(worktreeDirectory)
 
     // when
     const resultPath = await createWorktree(repositoryRoot, "t1", "m1", worktreePath, {})

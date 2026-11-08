@@ -1,13 +1,14 @@
 import { describe, expect, test } from "bun:test"
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { isAbsolute, join, relative, resolve, sep } from "node:path"
 
 import {
   findTaskByName,
   readTaskRecords,
   revivedAfterSuspend,
   sessionIdFromEvents,
+  taskStateDir,
   waitForFileCommand,
   waitForRecordStatusCommand,
 } from "./resume-e2e-runtime.mjs"
@@ -148,10 +149,15 @@ describe("agent-side wait commands", () => {
   })
 
   test("#given a record wait #when building the command #then name and status are argv", () => {
-    const command = waitForRecordStatusCommand("/tmp/project", "lruone", "completed")
+    const sandbox = { cwd: "/tmp/project", agentDir: "/tmp/agent" }
+    const command = waitForRecordStatusCommand(sandbox, "lruone", "completed")
     expect(command).toContain('"lruone"')
     expect(command).toContain('"completed"')
-    expect(command).toContain(JSON.stringify(join("/tmp/project", ".omo", "senpi-task", "tasks")))
+    const tasksDir = join(taskStateDir(sandbox), "tasks")
+    // The engine resolves the agent dir, so on Windows `/tmp/agent` becomes `<drive>:\tmp\agent`: compare resolved paths.
+    const insideProjects = relative(resolve("/tmp/agent", "projects"), tasksDir)
+    expect(isAbsolute(insideProjects) || insideProjects.split(sep)[0] === "..").toBe(false)
+    expect(command).toContain(JSON.stringify(tasksDir))
   })
 })
 
@@ -159,13 +165,15 @@ describe("store readers", () => {
   test("#given a fixture store #when reading records #then findTaskByName matches", () => {
     const root = mkdtempSync(join(tmpdir(), "resume-e2e-store-"))
     try {
-      const tasksDir = join(root, ".omo", "senpi-task", "tasks")
+      const sandbox = { cwd: join(root, "project"), agentDir: join(root, "agent") }
+      const tasksDir = join(taskStateDir(sandbox), "tasks")
+      expect(tasksDir.startsWith(join(root, "agent", "projects"))).toBe(true)
       mkdirSync(tasksDir, { recursive: true })
       writeFileSync(join(tasksDir, "st_one.json"), `${JSON.stringify({ task_id: "st_one", name: "midchild", status: "running", residency_state: "persisted_only" })}\n`)
       writeFileSync(join(tasksDir, "st_two.json"), `${JSON.stringify({ task_id: "st_two", name: "finchild", status: "completed", residency_state: "resident" })}\n`)
-      expect(readTaskRecords(root)).toHaveLength(2)
-      expect(findTaskByName(root, "midchild")?.task_id).toBe("st_one")
-      expect(findTaskByName(root, "missing")).toBeUndefined()
+      expect(readTaskRecords(sandbox)).toHaveLength(2)
+      expect(findTaskByName(sandbox, "midchild")?.task_id).toBe("st_one")
+      expect(findTaskByName(sandbox, "missing")).toBeUndefined()
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

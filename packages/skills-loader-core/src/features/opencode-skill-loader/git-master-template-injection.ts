@@ -44,20 +44,64 @@ export function buildShellAwareGitPrefix(bashPrefix: string, shellType?: ShellTy
 	return buildEnvPrefix(envRecord, resolvedShellType)
 }
 
-export function injectGitMasterConfig(template: string, config?: GitMasterConfig): string {
-	const commitFooter = config?.commit_footer ?? true
-	const includeCoAuthoredBy = config?.include_co_authored_by ?? true
+/** The co-author git-master adds to every commit while `include_co_authored_by` is on (the default). */
+export const SISYPHUS_CO_AUTHOR_TRAILER =
+	"Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"
+
+/**
+ * `addIfDifferent` makes git itself keep a single copy of the trailer: a message that already
+ * carries it (an amend or a reworded commit) is not given a second one. A squash joins messages
+ * without `--trailer` and keeps both copies, so the instruction asks for one rewrite afterwards.
+ */
+const DEDUP_TRAILER_GIT_OPTION = "-c trailer.ifexists=addIfDifferent"
+
+export const CO_AUTHOR_TRAILER_INSTRUCTION = [
+	`**Co-author trailer, exactly once:** \`${SISYPHUS_CO_AUTHOR_TRAILER}\`.`,
+	`Pass it with \`--trailer\`, never inside \`-m\`, and run the commit as \`git ${DEDUP_TRAILER_GIT_OPTION} commit ...\`,`,
+	"so a message that already carries it keeps a single copy.",
+	"A squash joins messages without `--trailer` and can leave two copies, so after squashing rewrite the message once",
+	"with the same command plus `--amend` and a fresh `-m` that does not repeat the trailer.",
+].join(" ")
+
+export const NO_CO_AUTHOR_INSTRUCTION = "Do NOT add a Co-authored-by trailer."
+
+export function buildAttributedCommitExample(
+	commandPrefix: string,
+	footerText: string | undefined,
+	includeCoAuthor: boolean,
+): string {
+	const parts = [
+		commandPrefix === "" ? "git" : `${commandPrefix} git`,
+		...(includeCoAuthor ? [DEDUP_TRAILER_GIT_OPTION] : []),
+		'commit -m "{Commit Message}"',
+		...(footerText === undefined ? [] : [`-m "${footerText}"`]),
+		...(includeCoAuthor ? [`--trailer "${SISYPHUS_CO_AUTHOR_TRAILER}"`] : []),
+	]
+	return parts.join(" ")
+}
+
+/**
+ * Commit attribution: the `Co-authored-by` trailer is on by default (`include_co_authored_by`)
+ * and the body footer is opt-in (`commit_footer`, default off). Author and committer stay the
+ * operator's own git identity.
+ */
+export function injectGitMasterConfig(
+	template: string,
+	config?: GitMasterConfig,
+	shellType: ShellType = detectShellType(),
+): string {
+	const commitFooter = config?.commit_footer ?? false
+	const includeCoAuthor = config?.include_co_authored_by ?? true
 	const gitEnvPrefix = assertValidGitEnvPrefix(config?.git_env_prefix ?? "GIT_MASTER=1")
 
-	const shellType = detectShellType()
 	const shellPrefix = gitEnvPrefix ? buildShellAwareGitPrefix(gitEnvPrefix, shellType) : ""
 	const codeBlockLang = shellType === "powershell" ? "pwsh" : shellType === "csh" ? "csh" : "bash"
 	const skipBashBlockPrefixing = shellType === "powershell" || shellType === "cmd" || shellType === "csh"
 
 	let result = gitEnvPrefix ? injectGitEnvPrefix(template, shellPrefix, codeBlockLang) : template
 
-	if (commitFooter || includeCoAuthoredBy) {
-		const injection = buildCommitFooterInjection(commitFooter, includeCoAuthoredBy, shellPrefix)
+	if (commitFooter || includeCoAuthor) {
+		const injection = buildCommitAttributionInjection(commitFooter, includeCoAuthor, shellPrefix)
 		const insertionPoint = result.indexOf("```\n</execution>")
 
 		result =
@@ -133,67 +177,33 @@ function prefixGitCommandsInCodeBlock(codeBlock: string, prefix: string): string
 		.join("\n")
 }
 
-function buildCommitFooterInjection(
+function buildCommitAttributionInjection(
 	commitFooter: boolean | string,
-	includeCoAuthoredBy: boolean,
+	includeCoAuthor: boolean,
 	gitEnvPrefix: string,
 ): string {
-	const sections: string[] = []
-	const cmdPrefix = gitEnvPrefix ? `${gitEnvPrefix} ` : ""
-
-	sections.push("### 5.5 Commit Footer & Co-Author")
-	sections.push("")
-	sections.push("Add Sisyphus attribution to EVERY commit:")
-	sections.push("")
-
-	if (commitFooter) {
-		const footerText =
-			typeof commitFooter === "string"
+	const footerText =
+		commitFooter === false
+			? undefined
+			: typeof commitFooter === "string"
 				? commitFooter
 				: "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-openagent)"
-		sections.push("1. **Footer in commit body:**")
-		sections.push("```")
-		sections.push(footerText)
-		sections.push("```")
-		sections.push("")
-	}
 
-	if (includeCoAuthoredBy) {
-		sections.push(`${commitFooter ? "2" : "1"}. **Co-authored-by trailer:**`)
-		sections.push("```")
-		sections.push("Co-authored-by: Sisyphus <clio-agent@sisyphuslabs.ai>")
-		sections.push("```")
-		sections.push("")
-	}
+	const footerStep = footerText === undefined ? [] : ["1. **Footer in commit body:**", "```", footerText, "```", ""]
+	const coAuthorStep = includeCoAuthor
+		? `${footerText === undefined ? 1 : 2}. ${CO_AUTHOR_TRAILER_INSTRUCTION}`
+		: NO_CO_AUTHOR_INSTRUCTION
+	const steps = [...footerStep, coAuthorStep, ""]
 
-	if (commitFooter && includeCoAuthoredBy) {
-		const footerText =
-			typeof commitFooter === "string"
-				? commitFooter
-				: "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-openagent)"
-		sections.push("**Example (both enabled):**")
-		sections.push("```bash")
-		sections.push(
-			`${cmdPrefix}git commit -m "{Commit Message}" -m "${footerText}" -m "Co-authored-by: Sisyphus <clio-agent@sisyphuslabs.ai>"`
-		)
-		sections.push("```")
-	} else if (commitFooter) {
-		const footerText =
-			typeof commitFooter === "string"
-				? commitFooter
-				: "Ultraworked with [Sisyphus](https://github.com/code-yeongyu/oh-my-openagent)"
-		sections.push("**Example:**")
-		sections.push("```bash")
-		sections.push(`${cmdPrefix}git commit -m "{Commit Message}" -m "${footerText}"`)
-		sections.push("```")
-	} else if (includeCoAuthoredBy) {
-		sections.push("**Example:**")
-		sections.push("```bash")
-		sections.push(
-			`${cmdPrefix}git commit -m "{Commit Message}" -m "Co-authored-by: Sisyphus <clio-agent@sisyphuslabs.ai>"`
-		)
-		sections.push("```")
-	}
-
-	return sections.join("\n")
+	return [
+		"### 5.5 Commit Attribution",
+		"",
+		"Add Sisyphus attribution to EVERY commit:",
+		"",
+		...steps,
+		"**Example:**",
+		"```bash",
+		buildAttributedCommitExample(gitEnvPrefix, footerText, includeCoAuthor),
+		"```",
+	].join("\n")
 }

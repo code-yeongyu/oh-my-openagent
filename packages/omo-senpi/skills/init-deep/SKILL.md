@@ -1,6 +1,7 @@
 ---
 name: init-deep
-description: "(builtin) Initialize hierarchical AGENTS.md knowledge base"
+description: "Initializes a hierarchical AGENTS.md knowledge base for a project. Use when a repo needs its structure, commands, and conventions documented for agents."
+argument-hint: "[--create-new] [--max-depth=N]"
 ---
 # /init-deep
 
@@ -36,7 +37,7 @@ Generate hierarchical AGENTS.md files: root + complexity-scored subdirectories, 
 
 Measure and compute in ONE eval cell - code, not mental arithmetic:
 
-```python
+```js
 # Measure (tracked files minus vendored/generated: node_modules, .git, dist,
 # build, out, vendor, target, coverage, lockfiles, minified and binary files)
 S        = total source bytes after exclusions
@@ -57,7 +58,7 @@ N_high  = ceil(N_quick / 12)  # one reducer absorbs ~12 reports (~60k tokens) an
 Route:
 
 - **N_quick < 4** -> inline path below; a dag costs more than it saves.
-- **N_quick > `task.dag.max_nodes_per_run` (default 64)** -> raise the knob in omo config, or run one chained dag per top-level directory (multi-run composition, `mass-ulw` skill).
+- **N_quick + N_high + 2 > `task.dag.max_nodes_per_run` (default 64)** -> the cap counts every node in the run (scanners, writers, root-writer and verify), so raise the knob in omo config, or run one chained dag per top-level directory (multi-run composition, `mass-ulw` skill).
 - **Otherwise** -> dag path: emit `CHUNKS = [{id, dirs, bytes}]`, assign each writer a directory SUBTREE (disjoint - no two writers own the same directory), and `mkdir -p .omo/init-deep/reports .omo/init-deep/digests`.
 
 `--create-new`: read every existing AGENTS.md FIRST (still-true facts survive as scanner input), then delete all, then regenerate.
@@ -126,7 +127,7 @@ STOP WHEN: files and digest are written and verified.
 - **root-writer** - `category: "unspecified-high"`, `load_skills: ["init-deep"]`, dependsOn every writer. Reads ONLY `.omo/init-deep/digests/*` plus the existing root AGENTS.md; writes the root file per the template below. Never reads chunk reports.
 - **verify** - `category: "quick"`, dependsOn root-writer. Checks: every digest-declared path exists; root is 50-150 lines; subdirectory files 30-80; no child repeats a parent section block. DELIVERABLE: one `PASS` / `FAIL <path>: <reason>` line per file.
 
-The main session reads the verify node's output and nothing else. Each FAIL line -> `dag send` the owning writer with the named defect (or `retry` it), then re-run verify. Loop until all PASS. Fixing files yourself by reading reports is a defect - repair flows through the dag.
+The main session reads the verify node's output and nothing else. Each FAIL line -> `amend` the settled run with the owning writer's prompt extended by the named defect: amend re-runs that writer plus its dependents (root-writer, verify), so verify re-checks in the same run. `retry` is not the repair here, because every writer has already completed and a completed node refuses retry (`node_not_retryable`). Loop until all PASS. Fixing files yourself by reading reports is a defect - repair flows through the dag.
 
 ---
 
@@ -158,7 +159,7 @@ The main session reads the verify node's output and nothing else. Each FAIL line
 ```
 AGENTS_LOCATIONS = [
   { path: ".", type: "root" },
-  { path: "src/hooks", score: 18, reason: "high complexity" },
+  { path: "src/hooks", score: 16, reason: "high complexity" },
   { path: "src/api", score: 12, reason: "distinct domain" }
 ]
 ```
@@ -233,7 +234,7 @@ Ask the user: **Local or committed?**
 
 Capture the answer as `USER_MODE_CHOICE`. The explicit answer is authoritative:
 - `local` keeps the generated guidance personal to this checkout.
-- `committed` reruns the change through the `work-with-pr` skill so the generated guidance lands through a reviewed PR.
+- `committed` lands the generated guidance through a reviewed PR, via the committed-mode PR handoff at the end of this phase.
 - If no explicit answer is available, tracked `AGENTS.md` status is the fallback.
 
 Run these commands after the review is complete:
@@ -268,13 +269,25 @@ fi
 find . -name AGENTS.md -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/dist/*' -not -path '*/build/*'
 ```
 
-When switching from local mode to committed mode, remove the managed block before rerunning through `work-with-pr`:
+When switching from local mode to committed mode, remove the managed block before rerunning in committed mode:
 
 ```bash
 EXCLUDE=$(git rev-parse --git-path info/exclude) && sed -i.bak "/# >>> omo-senpi init-deep local (managed)/,/# <<< omo-senpi init-deep local (managed)/d" "$EXCLUDE" && rm -f "$EXCLUDE.bak"
 ```
 
 `USER_MODE_CHOICE=committed` selects committed mode even when `AGENTS.md` is untracked. `USER_MODE_CHOICE=local` selects local mode even when `AGENTS.md` is tracked. `.git/info/exclude` cannot hide changes to an already tracked file, so explicit local mode on a tracked `AGENTS.md` is informational only and the file remains visible to git.
+
+### Committed-mode PR handoff
+
+Committed mode is self-contained: it never requires a skill outside the shipped payload.
+
+- If the current environment provides a `work-with-pr` skill (some repositories define one project-locally), run the handoff through it: it knows that repository's branch, review, and merge conventions.
+- Otherwise run the generic handoff:
+  1. Create a dedicated branch for the guidance change. Follow the repository's branch naming if it defines one; otherwise use `docs/init-deep`. Never commit generated guidance straight to the default branch.
+  2. Commit only the AGENTS.md files this run generated or updated.
+  3. Push the branch and open a pull request against the repository's default branch (or the integration branch its contribution docs name). The PR body lists every file written, with its score and one-line role, matching the final report below.
+  4. Stop there. Merging follows the repository's own review process: never merge the guidance PR yourself, and never treat a hosting tool's defaults as the repository's conventions.
+- If no PR route exists (no remote, no hosting CLI or credentials, offline checkout), leave the change committed on the local branch and say so in the final report: name the branch, state that the PR could not be opened, and give the exact push and PR-open commands for the user to run. Never fall back to committing on the default branch, and never silently downgrade to local mode.
 
 ---
 

@@ -39,6 +39,7 @@ def jsonl_session(platform: str, path: Path, fallback_id: str) -> Session:
     sid = fallback_id
     cwd = provider = model = first_user = parent = agent = None
     last_user = ""
+    prompts: list[str] = []
     created = updated = None
     usage: JsonMap = {}
     for data in iter_jsonl(path):
@@ -65,8 +66,9 @@ def jsonl_session(platform: str, path: Path, fallback_id: str) -> Session:
         if prompt:
             first_user = first_user or prompt
             last_user = prompt
+            prompts.append(prompt)
         merge_usage(usage, as_map(message.get("usage")) or as_map(data.get("usage")))
-    return Session(platform, sid, str(path), cwd, created or file_time(path), updated or created or file_time(path), provider, model, first_user or "", usage, parent, agent, last_user)
+    return Session(platform, sid, str(path), cwd, created or file_time(path), updated or created or file_time(path), provider, model, first_user or "", usage, parent, agent, last_user, tuple(prompts))
 
 
 def spawn_info(source: Json | None) -> tuple[str | None, str | None]:

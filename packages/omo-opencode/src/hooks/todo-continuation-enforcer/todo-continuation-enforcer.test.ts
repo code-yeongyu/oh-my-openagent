@@ -106,6 +106,7 @@ function createFakeTimers(): FakeTimers {
     if (advanceClock) {
       clockNow += clamped
     }
+    let fired = 0
     while (true) {
       let next: { id: number; time: number; interval: number | null; callback: TimerCallback; args: unknown[] } | undefined
       for (const timer of timers.values()) {
@@ -114,6 +115,7 @@ function createFakeTimers(): FakeTimers {
         }
       }
       if (!next) break
+      if (++fired > 10_000) throw new Error("fake clock fired more than 10000 timers in one advance: a timer keeps rescheduling itself")
 
       timerNow = next.time
       timers.delete(next.id)

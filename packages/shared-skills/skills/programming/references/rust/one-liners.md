@@ -124,9 +124,9 @@ rust-script --build-only --base-path . ./script.rs
 
 This drops a `target/` next to the script with the prebuilt binary.
 
-## `cargo-script` (RFC 3424, stable since Rust 1.85)
+## `cargo-script` (RFC 3424, nightly-only)
 
-The official replacement that landed in cargo proper. Same idea, slightly different syntax:
+The official replacement being built into cargo. Same idea, slightly different syntax:
 
 ```rust
 #!/usr/bin/env -S cargo +nightly -Zscript
@@ -140,6 +140,8 @@ dependencies:
   reqwest = { version = "0.12", features = ["blocking"] }
 ---
 
+use anyhow::Context as _;
+
 fn main() -> anyhow::Result<()> {
     let url = std::env::args().nth(1).context("url required")?;
     println!("{}", reqwest::blocking::get(&url)?.text()?.len());
@@ -147,7 +149,7 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-Status as of 2026-05: stabilization in progress. Use `rust-script` for production now, migrate when `cargo script` is stable everywhere your tools live.
+Stable cargo (1.97) still rejects `-Zscript` and refuses to run a `.rs` file directly. Use `rust-script` now; migrate once `cargo script` reaches the stable channel of every toolchain your scripts run on.
 
 ## Strict mode for scripts
 

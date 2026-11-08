@@ -5,6 +5,7 @@ import { rememberRecentPromptDispatch } from "./recent-dispatches"
 import {
   finishPromptReservation,
   getActiveReservation,
+  reservedDispatchResult,
   setPromptReservation,
 } from "./reservations"
 import {
@@ -57,7 +58,7 @@ export async function dispatchAfterSessionIdle<TInput>(args: {
       reservedBy: existing.source,
       reservedAgeMs: Date.now() - existing.reservedAt,
     })
-    return { status: "reserved", reservedBy: existing.source }
+    return reservedDispatchResult(existing)
   }
 
   const reservation: PromptAsyncReservation = {

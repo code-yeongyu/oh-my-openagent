@@ -2,11 +2,14 @@
 // `facts-queue` lock; the enqueue watermark is MONOTONIC so a late-finishing older batch
 // can never republish a range overlapping a retained newer entry.
 
-import { mkdir, readFile, readdir, rename, rm, writeFile } from "../fs/resilient"
+import { mkdir, readFile, rename, rm, writeFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import type { MemoryIdentityPaths } from "../identity"
 import { isCanonicalEntry, type TranscriptEntry } from "../journal"
+import { leadOf } from "./queue-lead"
+import { migrateParkedEntries } from "./parked"
+import { scanQueueEntries, type ScannedQueueEntry } from "./queue-scan"
 import { createLockRecord, factsQueueLockPath, withLock } from "../locks"
 import {
   FACTS_QUEUE_VERSION,
@@ -96,6 +99,7 @@ export class FactsQueue {
         },
         enqueuedAt: at.toISOString(),
         entries: request.entries.slice(startIndex),
+        ...leadOf(request.entries, startIndex),
       }
 
       if (abortedNow()) return { enqueued: false, reason: "no-new-entries" }
@@ -109,6 +113,46 @@ export class FactsQueue {
   /** Every retained queue file, oldest first: crash recovery relaunches exactly these. */
   async listPending(): Promise<FactsQueueEntry[]> {
     return this.locked(() => this.listPendingUnlocked())
+  }
+
+  async claim(entries: readonly FactsQueueEntry[], claimId: string): Promise<FactsQueueEntry[]> {
+    if (entries.length === 0) return []
+    return this.locked(async () => {
+      const claims = await this.readClaimsUnlocked()
+      const reclaimBefore = this.now().getTime() - 15 * 60_000
+      const claimed: FactsQueueEntry[] = []
+      const selected = new Set<string>()
+      for (const entry of entries) {
+        const key = this.entryKey(entry)
+        if (selected.has(key)) continue
+        const claim = claims[key]
+        if (claim !== undefined && Date.parse(claim.claimedAt) >= reclaimBefore) continue
+        const filePath = this.layout.entryPath(entry.conversationId, entry.range.end_message_id, new Date(entry.enqueuedAt))
+        const raw = await readFile(filePath, "utf8").catch(() => undefined)
+        const current = raw === undefined ? undefined : parseQueueEntry(raw)
+        if (current === undefined || this.entryKey(current) !== this.entryKey(entry)) continue
+        claimed.push(current)
+        selected.add(key)
+      }
+      for (const entry of claimed) delete claims[this.entryKey(entry)]
+      const next = { ...claims }
+      for (const entry of claimed) next[this.entryKey(entry)] = { claimId, claimedAt: this.now().toISOString() }
+      await this.writeClaims(next)
+      return claimed
+    })
+  }
+
+  async releaseClaim(entries: readonly FactsQueueEntry[], claimId: string): Promise<void> {
+    if (entries.length === 0) return
+    await this.locked(async () => {
+      const claims = await this.readClaimsUnlocked()
+      const next = { ...claims }
+      for (const entry of entries) {
+        const key = this.entryKey(entry)
+        if (next[key]?.claimId === claimId) delete next[key]
+      }
+      await this.writeClaims(next)
+    })
   }
 
   /**
@@ -127,6 +171,10 @@ export class FactsQueue {
         const key = `${candidate.conversationId}\u0000${candidate.range.end_message_id}`
         if (consumedKeys.has(key)) await rm(candidate.filePath, { force: true })
       }
+      const claims = await this.readClaimsUnlocked()
+      const nextClaims = { ...claims }
+      for (const entry of entries) delete nextClaims[this.entryKey(entry)]
+      await this.writeClaims(nextClaims)
       await this.advanceConsumed(entries)
     })
   }
@@ -139,7 +187,10 @@ export class FactsQueue {
     await mkdir(this.layout.queueDir, { recursive: true })
     await mkdir(join(this.lockPath, ".."), { recursive: true })
     const record = await createLockRecord("facts-queue")
-    return withLock(this.lockPath, record, task, { waitTimeoutMs: LOCK_WAIT_MS })
+    return withLock(this.lockPath, record, async () => {
+      await migrateParkedEntries(this.layout)
+      return task()
+    }, { waitTimeoutMs: LOCK_WAIT_MS })
   }
 
   private async effectiveAnchor(
@@ -153,9 +204,12 @@ export class FactsQueue {
       cursor.consumed_through_message_id,
       consumed.consumed[conversationId]?.end_message_id ?? null,
     ]
-    for (const pending of await this.listPendingUnlocked()) {
-      if (pending.conversationId !== conversationId) continue
-      candidates.push(pending.range.end_message_id)
+    // Parked files count too: a file published before its cursor advanced and then parked is the only record
+    // of that endpoint, and ignoring it would move the anchor backward and extract the range twice.
+    for (const dir of [this.layout.queueDir, this.layout.parkedDir]) {
+      for (const retained of await scanQueueEntries(dir, conversationId)) {
+        if (retained.conversationId === conversationId) candidates.push(retained.range.end_message_id)
+      }
     }
 
     let anchor = -1
@@ -177,29 +231,42 @@ export class FactsQueue {
     await rename(temporary, target)
   }
 
-  private async listPendingUnlocked(): Promise<(FactsQueueEntry & { readonly filePath: string })[]> {
-    let names: string[]
-    try {
-      names = await readdir(this.layout.queueDir)
-    } catch {
-      return []
-    }
-    const entries: (FactsQueueEntry & { readonly filePath: string })[] = []
-    for (const name of names.sort()) {
-      if (!name.endsWith(".json") || name === "consumed.json" || name === "failures.json") continue
-      const filePath = join(this.layout.queueDir, name)
-      const raw = await readFile(filePath, "utf8").catch(() => undefined)
-      if (raw === undefined) continue
-      const parsed = parseQueueEntry(raw)
-      if (parsed === undefined) continue
-      entries.push({ ...parsed, filePath })
-    }
-    return entries
+  private async listPendingUnlocked(conversationId?: string): Promise<ScannedQueueEntry[]> {
+    return scanQueueEntries(this.layout.queueDir, conversationId)
   }
 
   private async readCursorUnlocked(conversationId: string): Promise<FactsCursor> {
     const raw = await readFile(this.layout.cursorPath(conversationId), "utf8").catch(() => undefined)
     return raw === undefined ? initialCursor() : parseCursor(raw)
+  }
+
+  private async readClaimsUnlocked(): Promise<Record<string, { claimId: string; claimedAt: string }>> {
+    const raw = await readFile(join(this.layout.queueDir, "claims.json"), "utf8").catch(() => undefined)
+    if (raw === undefined) return {}
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return {}
+      const claims: Record<string, { claimId: string; claimedAt: string }> = {}
+      for (const [key, value] of Object.entries(parsed)) {
+        if (value === null || typeof value !== "object" || Array.isArray(value)) continue
+        const claimId = Reflect.get(value, "claimId")
+        const claimedAt = Reflect.get(value, "claimedAt")
+        if (typeof claimId !== "string" || claimId.length === 0 || typeof claimedAt !== "string" || Number.isNaN(Date.parse(claimedAt))) continue
+        claims[key] = { claimId, claimedAt }
+      }
+      return claims
+    } catch { return {} }
+  }
+
+  private async writeClaims(claims: Record<string, { claimId: string; claimedAt: string }>): Promise<void> {
+    const target = join(this.layout.queueDir, "claims.json")
+    const temporary = `${target}.tmp`
+    await writeFile(temporary, `${JSON.stringify(claims, null, 2)}\n`, { encoding: "utf8", mode: 0o600 })
+    await rename(temporary, target)
+  }
+
+  private entryKey(entry: FactsQueueEntry): string {
+    return `${entry.conversationId}\u0000${entry.range.end_message_id}`
   }
 
   private async readConsumedUnlocked(): Promise<FactsConsumedWatermark> {

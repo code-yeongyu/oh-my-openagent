@@ -87,4 +87,29 @@ describe("dag definition lint", () => {
     // then
     expect(warnings).toEqual([])
   })
+
+  test("#given a node targeting a retired curated agent id #when linted #then no deprecation warning fires", () => {
+    // given: the read alias is gone, so a retired id is just an agent name the run must define
+    const nodes = [
+      { id: "plan-review", prompt: CONTRACT_PROMPT, subagent_type: "momus" },
+      { id: "gap-analysis", prompt: CONTRACT_PROMPT, subagent_type: "metis" },
+    ]
+
+    // when
+    const warnings = lintDagDefinitionNodes(nodes)
+
+    // then
+    expect(warnings).toEqual([])
+  })
+
+  test("#given a node targeting the canonical agent id #when linted #then no deprecation warning fires", () => {
+    // given
+    const nodes = [{ id: "plan-review", prompt: CONTRACT_PROMPT, subagent_type: "plan-reviewer" }]
+
+    // when
+    const warnings = lintDagDefinitionNodes(nodes)
+
+    // then
+    expect(warnings).toEqual([])
+  })
 })

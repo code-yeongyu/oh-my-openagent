@@ -101,7 +101,6 @@ export function createTeamSendMessageTool(
         isLead: teamRuntime.isLead,
         activeMembers: teamRuntime.activeMembers,
         reservedRecipients,
-        ...(teamRuntime.leadRecipient !== undefined ? { leadRecipient: teamRuntime.leadRecipient } : {}),
       })
 
       try {

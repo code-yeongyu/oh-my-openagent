@@ -20,6 +20,12 @@ export type DelegateModelResolutionInput = {
   readonly categoryDefaultModel?: string
   readonly isUserConfiguredCategoryModel?: boolean
   readonly fallbackChain?: readonly DelegateFallbackEntry[]
+  /**
+   * Let a chain rung match its model on a provider the rung does not list. Off by default: a builtin
+   * chain must never route to a provider it does not name, such as a gateway re-publishing the same
+   * model (#9146). Only a caller whose rungs come from the user's own selection opts in.
+   */
+  readonly allowUnlistedProviders?: boolean
   readonly availableModels: ReadonlySet<string>
   readonly systemDefaultModel?: string
 }
@@ -234,9 +240,14 @@ export function resolveModelForDelegateTask(
     } else {
       for (const [entryIndex, entry] of fallbackChain.entries()) {
         for (const provider of entry.providers) {
-          const transformedModelId = transformModelForProvider(provider, modelIDForProvider(provider, entry.model))
-          const fullModel = `${provider}/${transformedModelId}`
-          const match = fuzzyMatchModel(fullModel, new Set(input.availableModels), [provider])
+          const entryModelId = modelIDForProvider(provider, entry.model)
+          const transformedModelId = transformModelForProvider(provider, entryModelId)
+          // A listed provider may publish the rung id as the chain spells it rather than transformed
+          // (kimi-coding/kimi-k3 for a kimi-k3 rung); both spellings stay on this provider.
+          const candidateIds = transformedModelId === entryModelId ? [entryModelId] : [transformedModelId, entryModelId]
+          const match = candidateIds
+            .map((modelId) => fuzzyMatchModel(`${provider}/${modelId}`, new Set(input.availableModels), [provider]))
+            .find((candidate) => candidate !== null)
           if (match) {
             if (explicitHighModel && entry.variant === "high" && match === explicitHighBaseModel) {
               return { model: explicitHighModel, fallbackEntry: entry, matchedFallback: true }
@@ -245,6 +256,8 @@ export function resolveModelForDelegateTask(
             return { model: match, variant: entry.variant, fallbackEntry: entry, matchedFallback: true }
           }
         }
+
+        if (input.allowUnlistedProviders !== true) continue
 
         const laterRungProviders = new Set(
           fallbackChain

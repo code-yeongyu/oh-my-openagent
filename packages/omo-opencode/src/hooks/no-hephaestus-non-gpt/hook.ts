@@ -2,8 +2,6 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { isGptModel } from "../../agents/types"
 import {
   getSessionAgent,
-  resolveRegisteredAgentName,
-  updateSessionAgent,
 } from "../../features/claude-code-session-state"
 import { log } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
@@ -16,6 +14,16 @@ const TOAST_MESSAGE = [
 ].join("\n")
 type NoHephaestusNonGptHookOptions = {
   allowNonGptModel?: boolean
+}
+
+export class HephaestusRequiresGptError extends Error {
+  override readonly name = "HephaestusRequiresGptError"
+
+  constructor(modelID: string) {
+    super(
+      `Hephaestus requires a GPT-family model (got ${modelID}). Use Sisyphus for non-GPT models.`,
+    )
+  }
 }
 
 function showToast(ctx: PluginInput, sessionID: string, variant: "error" | "warning"): void {
@@ -56,11 +64,13 @@ export function createNoHephaestusNonGptHook(
         if (allowNonGptModel) {
           return
         }
-        input.agent = resolveRegisteredAgentName("sisyphus") ?? "sisyphus"
-        if (output?.message) {
-          output.message.agent = resolveRegisteredAgentName("sisyphus") ?? "sisyphus"
-        }
-        updateSessionAgent(input.sessionID, "sisyphus")
+        const error = new HephaestusRequiresGptError(modelID)
+        log("[no-hephaestus-non-gpt] Refusing non-GPT Hephaestus primary", {
+          sessionID: input.sessionID,
+          modelID,
+          error: error.message,
+        })
+        throw error
       }
     },
   }

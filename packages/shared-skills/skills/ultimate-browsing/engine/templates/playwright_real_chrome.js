@@ -10,9 +10,9 @@
  * NO-SITE-NAME RULE: this file must never branch on specific hostnames.
  * All site specifics come from the JSON input (url, waitSelector).
  *
- * Dependencies (install once on target machine):
- *   npm i -g playwright playwright-extra puppeteer-extra-plugin-stealth
- *   npx playwright install chrome    # system Chrome binary
+ * User setup: ../../references/chrome-stealth.md (engine-local dependencies).
+ * Chrome must already be installed; optional stealth plugins run only in this script.
+ * Execute this script from js eval; profileDir must be task-owned or a CLONED profile.
  */
 
 const fs = require('fs');
@@ -82,18 +82,20 @@ async function main() {
   const playwrightExtra = requireOptionalModule('playwright-extra');
   const stealthPlugin = playwrightExtra ? requireOptionalModule('puppeteer-extra-plugin-stealth') : null;
   if (playwrightExtra && stealthPlugin) {
-    ({ chromium } = playwrightExtra);
+    chromium = playwrightExtra.addExtra(require('playwright-core').chromium);
     const stealth = stealthPlugin();
     chromium.use(stealth);
   } else {
-    // Fallback to plain playwright (no stealth). Still uses channel:chrome.
-    ({ chromium } = require('playwright'));
+    // Core controls installed Chrome without downloading a managed browser.
+    ({ chromium } = require('playwright-core'));
   }
 
   let ctx;
   try {
     ctx = await chromium.launchPersistentContext(profileDir, {
       channel: 'chrome',          // real Chrome, not bundled Chromium
+      args: ['--disable-blink-features=AutomationControlled'],
+      ignoreDefaultArgs: ['--enable-automation'],
       headless,
       viewport,
     });

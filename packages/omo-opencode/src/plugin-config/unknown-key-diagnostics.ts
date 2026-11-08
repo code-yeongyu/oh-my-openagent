@@ -57,7 +57,7 @@ function unknownPaths(schema: Schema, value: unknown, path: UnknownKeyPath): rea
   if (def.type === "object" && isPlainRecord(value) && def.shape !== undefined) {
     const catchall = def.catchall !== undefined && definition(def.catchall).type !== "never" ? def.catchall : undefined
     return Object.entries(value).flatMap(([key, entry]) => {
-      const propertySchema = def.shape?.[key]
+      const propertySchema = def.shape !== undefined && Object.hasOwn(def.shape, key) ? def.shape[key] : undefined
       if (propertySchema !== undefined) return unknownPaths(propertySchema, entry, [...path, key])
       if (catchall !== undefined) return unknownPaths(catchall, entry, [...path, key])
       return [[...path, key]]

@@ -375,6 +375,49 @@ describe("dag rpc bridge", () => {
   })
 
   describe("#given the omo.dag.updated snapshot channel", () => {
+    // #12113: the attach is the point a session's first turn waits on, so the snapshot it owes the
+    // client must already be on the wire when attach() returns, not on a debounce timer after it.
+    it("#when the bridge attaches #then the current snapshot is emitted before any timer fires", () => {
+      // given
+      const { bridge, emitted } = wireSnapshots([runSnapshot("dag_1")])
+
+      // when
+      bridge.attach()
+
+      // then
+      const updates = emittedNames(emitted, "omo.dag.updated")
+      expect(updates).toHaveLength(1)
+      expect((updates[0]?.data as { runs: { run_id: string }[] }).runs.map((run) => run.run_id)).toEqual(["dag_1"])
+    })
+
+    it("#when a client reattaches with nothing changed #then resend restates the snapshot exactly once", () => {
+      // given
+      const { bridge, emitted, timers } = wireSnapshots([runSnapshot("dag_1")])
+      bridge.attach()
+      timers.advance(DAG_SNAPSHOT_DEBOUNCE_MS)
+
+      // when
+      bridge.resend()
+      timers.advance(DAG_SNAPSHOT_DEBOUNCE_MS)
+
+      // then
+      const updates = emittedNames(emitted, "omo.dag.updated")
+      expect(updates).toHaveLength(2)
+      expect(updates[1]?.data).toEqual(updates[0]?.data)
+    })
+
+    it("#when resend runs while detached #then nothing is emitted", () => {
+      // given
+      const { bridge, emitted, timers } = wireSnapshots([runSnapshot("dag_1")])
+
+      // when
+      bridge.resend()
+      timers.advance(DAG_SNAPSHOT_DEBOUNCE_MS)
+
+      // then
+      expect(emittedNames(emitted, "omo.dag.updated")).toHaveLength(0)
+    })
+
     it("#when the store mutates twice with identical state #then only one snapshot is emitted", () => {
       // given
       const { bridge, emitted, timers } = wireSnapshots([runSnapshot("dag_1")])
@@ -723,6 +766,73 @@ describe("dag rpc bridge", () => {
 
       // then
       expect(emittedNames(emitted, "omo.dag.heartbeat")).toHaveLength(2)
+    })
+  })
+
+  // The heartbeat and snapshot flushes run from timers: a throw there has no caller to reach and takes
+  // the whole process down ("OmO exiting due to uncaughtException: ENOENT ... dag/runs").
+  describe("#given the run store stops being readable mid-session", () => {
+    function storeFault(): Error {
+      return Object.assign(new Error("ENOENT: no such file or directory, scandir '/p/.omo/senpi-task/dag/runs'"), { code: "ENOENT" })
+    }
+
+    it("#when the heartbeat tick hits the fault #then the tick survives, logs once, and beats resume when reads recover", () => {
+      // given
+      const source = fakeRun("dag_1", "running")
+      const warnings: unknown[] = []
+      let faulted = false
+      const { bridge, emitted, timers } = wire([source.run], {
+        liveRuns: () => {
+          if (faulted) throw storeFault()
+          return [source.run]
+        },
+        logger: { warn: (message, details) => void warnings.push([message, details]) },
+      })
+      bridge.attach()
+      expect(timers.pending()).toBeGreaterThan(0)
+
+      // when - the state directory vanishes between two ticks, then another sync hits the same fault
+      faulted = true
+      expect(() => timers.advance(DAG_DEFAULT_HEARTBEAT_MS)).not.toThrow()
+      expect(() => bridge.sync()).not.toThrow()
+
+      // then - no beat claims a live run, and one identical fault is reported once
+      expect(emittedNames(emitted, "omo.dag.heartbeat")).toHaveLength(0)
+      expect(warnings).toHaveLength(1)
+
+      // when - the store reads again
+      faulted = false
+      bridge.sync()
+      timers.advance(DAG_DEFAULT_HEARTBEAT_MS)
+
+      // then
+      expect(emittedNames(emitted, "omo.dag.heartbeat")).toHaveLength(1)
+    })
+
+    it("#when the debounced snapshot flush hits the fault #then the flush survives and no snapshot is emitted", () => {
+      // given
+      const timers = fakeTimers()
+      const { pi, emitted } = fakePi()
+      const warnings: unknown[] = []
+      const bridge = createDagRpcBridge(pi, {
+        liveRuns: () => [],
+        runSnapshots: () => {
+          throw storeFault()
+        },
+        parentSessionId: () => "ses_parent",
+        timers: timers.seam,
+        now: timers.now,
+        logger: { warn: (message, details) => void warnings.push([message, details]) },
+      })
+      bridge.attach()
+
+      // when
+      bridge.notifyStoreMutation()
+      expect(() => timers.advance(DAG_SNAPSHOT_DEBOUNCE_MS)).not.toThrow()
+
+      // then
+      expect(emittedNames(emitted, "omo.dag.updated")).toHaveLength(0)
+      expect(warnings).toHaveLength(1)
     })
   })
 })

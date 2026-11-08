@@ -1,4 +1,9 @@
 import { spawnSync } from "node:child_process"
+import { fileURLToPath } from "node:url"
+
+const ATTACHMENT_PROBE_PATH = fileURLToPath(
+  new URL("./windows-console-attachment-probe.ts", import.meta.url),
+)
 
 export type ConsoleAttachment = {
   readonly attached: boolean
@@ -23,27 +28,16 @@ export function mainWindowHandle(pid: number): number {
   return handle
 }
 
+/**
+ * Asks a throwaway Bun child whether `pid` owns a visible console window.
+ *
+ * The answer comes from kernel32/user32 through bun:ffi rather than from a PowerShell shim that
+ * compiled a C# P/Invoke class with csc.exe on every call: that compile plus a Windows PowerShell
+ * 5.1 cold start ran twice inside a probe step bounded at 60s, and is what the probe spent its
+ * budget on when a loaded runner aborted it (#8323).
+ */
 export function consoleAttachment(pid: number): ConsoleAttachment {
-  const source = [
-    "Add-Type -TypeDefinition @'",
-    "using System;",
-    "using System.Runtime.InteropServices;",
-    "public static class OmoConsoleProbe {",
-    '  [DllImport("kernel32.dll", SetLastError = true)] public static extern bool FreeConsole();',
-    '  [DllImport("kernel32.dll", SetLastError = true)] public static extern bool AttachConsole(uint processId);',
-    '  [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();',
-    '  [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] public static extern bool IsWindowVisible(IntPtr hWnd);',
-    "}",
-    "'@",
-    "[OmoConsoleProbe]::FreeConsole() | Out-Null",
-    `$attached = [OmoConsoleProbe]::AttachConsole(${pid})`,
-    "$errorCode = [Runtime.InteropServices.Marshal]::GetLastWin32Error()",
-    "$windowHandle = [OmoConsoleProbe]::GetConsoleWindow()",
-    "$windowVisible = [OmoConsoleProbe]::IsWindowVisible($windowHandle)",
-    "[Console]::Out.Write((@{ attached = $attached; errorCode = $errorCode; windowHandle = [int64]$windowHandle; windowVisible = $windowVisible } | ConvertTo-Json -Compress))",
-    "if ($attached) { [OmoConsoleProbe]::FreeConsole() | Out-Null }",
-  ].join("\n")
-  const result = spawnSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", source], {
+  const result = spawnSync(process.execPath, [ATTACHMENT_PROBE_PATH, String(pid)], {
     encoding: "utf8",
     windowsHide: true,
   })

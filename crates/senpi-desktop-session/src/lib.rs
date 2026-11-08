@@ -1,0 +1,43 @@
+//! The desktop session: one `senpi-desktop-session` thread owns the backend,
+//! the AX ref registry, and the capture frame cache, and serves requests in
+//! submission order. Each request runs under `catch_unwind` and its waiter
+//! gives up at the injected [`SessionTimeouts`] deadline. Every mutating
+//! request passes one choke point (`mutate`): the safety gate, a focus/cursor
+//! transaction, and one audit event to [`SessionSafety::audit`].
+
+mod audit;
+mod budget;
+mod cancel_on_drop;
+mod display_awake;
+mod grant;
+mod intervention;
+mod mutate;
+mod pending;
+mod pointer;
+mod report;
+mod request;
+mod restore;
+mod screen_notes;
+mod selection;
+mod session;
+#[cfg(test)]
+mod test_support;
+mod timeouts;
+mod user_input_watch;
+mod worker;
+mod worker_ax;
+mod worker_capture;
+mod worker_observe;
+mod worker_zoom;
+mod worker_clipboard;
+mod worker_input;
+mod worker_holds;
+mod worker_menus;
+
+pub use grant::ControlSlot;
+pub use mutate::SessionSafety;
+pub use pending::RequestMode;
+pub use request::{Op, Response};
+pub use selection::{BackendFactory, BackendSelection, SelectionError};
+pub use session::{Pending, Session, THREAD_NAME};
+pub use timeouts::{SessionTimeouts, CLOSE_TIMEOUT, OPERATION_TIMEOUT};

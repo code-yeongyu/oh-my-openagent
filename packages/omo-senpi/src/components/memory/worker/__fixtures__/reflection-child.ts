@@ -20,7 +20,7 @@ if (!worktree) throw new Error("MEMORY_DIR is required")
 if (!process.env.TRANSCRIPT_PATH) throw new Error("TRANSCRIPT_PATH is required")
 if (process.env.SENPI_MEMORY_REFLECTION !== "1") throw new Error("reflection sentinel is required")
 
-if (mode === "commit") {
+if (mode === "commit" || mode === "commit-fail" || mode === "commit-hang" || mode === "commit-late-ok") {
   await mkdir(join(worktree, "system"), { recursive: true })
   await writeFile(
     join(worktree, "system", "reflected.md"),
@@ -28,6 +28,21 @@ if (mode === "commit") {
   )
   await git(worktree, ["add", "system/reflected.md"])
   await git(worktree, ["commit", "-m", "chore(reflection): add stub memory"])
+  if (mode === "commit-fail") {
+    console.error("model failed after a partial commit")
+    process.exitCode = 1
+  } else if (mode === "commit-hang") {
+    setInterval(() => undefined, 1_000)
+  } else if (mode === "commit-late-ok") {
+    // Outlives the deadline, then exits 0 on the termination signal: a clean code, but too late.
+    const keepAlive = setInterval(() => undefined, 1_000)
+    process.on("SIGTERM", () => {
+      clearInterval(keepAlive)
+      process.exit(0)
+    })
+  }
+} else if (mode === "noop") {
+  process.exitCode = 0
 } else if (mode === "admin") {
   await appendFile(join(worktree, ".git"), "# reflection stub touched git administration\n")
 } else if (mode === "timeout") {

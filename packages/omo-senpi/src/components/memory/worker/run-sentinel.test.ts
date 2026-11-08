@@ -11,6 +11,15 @@ const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
 
 describe("run completion sentinel", () => {
+  test("#given an armed outcome watcher #when its observer cancels #then it releases without a sentinel", async () => {
+    const runDir = await mkdtemp(join(tmpdir(), "run-sentinel-abort-"))
+    roots.push(runDir)
+    const controller = new AbortController()
+    const pending = waitForRunSentinel(join(runDir, "outcome.json"), Date.now() + 60_000, Date.now, controller.signal)
+    controller.abort()
+    expect(await pending).toBe("timeout")
+  })
+
   test("#given a missing watch directory #when the watcher cannot start #then the bounded fallback reaches timeout", async () => {
     // given
     const path = join(tmpdir(), "missing-run-sentinel", "outcome.json")

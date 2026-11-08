@@ -1,0 +1,271 @@
+import { readSignInMethods, SIGN_IN_METHODS, type SignInMethod } from "./account.ts";
+import { REPORT_SECTION_IDS, type ReportSectionId } from "./reports.ts";
+import {
+  defineSchema,
+  type Issues,
+  readBoolean,
+  readInteger,
+  readObject,
+  readOneOf,
+  readString,
+  readTrue,
+} from "./schema.ts";
+
+/**
+ * The closed list of error codes. Clients switch on these. A new code is a minor version: a client
+ * that does not know it reads the body as a contract error and treats it as a plain failure.
+ */
+export const ERROR_CODES = [
+  "invalid_request",
+  "anonymous_closed",
+  "not_configured",
+  "unauthorized",
+  "forbidden",
+  "not_available",
+  "not_found",
+  "method_not_allowed",
+  "conflict",
+  "stale_base",
+  "quota_exceeded",
+  "rate_limited",
+  "entitlement_required",
+  "device_revoked",
+  "account_deleted",
+  "reauth_required",
+  "client_update_required",
+  "update_required",
+  "client_upgrade_required",
+  "writer_floor_mismatch",
+  "service_upgrade_required",
+  "unsupported_version",
+  /** An export past its 24 hours; start a new one (contract 1.7.0). */
+  "export_expired",
+  /**
+   * Signed in, but this action needs a first factor proved in the last 10 minutes (starting a data
+   * export). The session stays valid: confirm who the person is, then let them ask again
+   * (contract 1.9.0).
+   */
+  "step_up_required",
+  /**
+   * Signed in, but OmO isn't open to this person yet: the service runs invite-only and their
+   * verified email isn't on the early-access list. Nothing is wrong with the session; show a plain
+   * "not open yet" page (contract 1.11.0).
+   */
+  "access_not_open",
+  /**
+   * A report section still holds something shaped like a credential (a private key, a token, an
+   * API key); `detail.sectionId` names it and nothing was stored. Run the redactor again, show the
+   * person what changed, then send again (contract 1.19.0).
+   */
+  "secret_detected",
+  "internal",
+] as const;
+export type ErrorCode = (typeof ERROR_CODES)[number];
+
+/**
+ * How the service answers each code by default. The envelope still carries `retryable` per
+ * response, because the service may know better for one request (e.g. an internal error that
+ * will not go away); clients act on the envelope, not on this table.
+ */
+export type ErrorTraits = {
+  /** HTTP status the service answers with. */
+  readonly status: number;
+  /** True when the same request may succeed later unchanged; keep working on cached state. */
+  readonly retryable: boolean;
+};
+
+export const ERROR_TRAITS: Readonly<Record<ErrorCode, ErrorTraits>> = {
+  invalid_request: { status: 400, retryable: false },
+  anonymous_closed: { status: 403, retryable: false },
+  not_configured: { status: 500, retryable: false },
+  unauthorized: { status: 401, retryable: false },
+  forbidden: { status: 403, retryable: false },
+  not_available: { status: 403, retryable: false },
+  not_found: { status: 404, retryable: false },
+  method_not_allowed: { status: 405, retryable: false },
+  conflict: { status: 409, retryable: false },
+  stale_base: { status: 409, retryable: false },
+  quota_exceeded: { status: 403, retryable: false },
+  rate_limited: { status: 429, retryable: true },
+  entitlement_required: { status: 403, retryable: false },
+  device_revoked: { status: 401, retryable: false },
+  account_deleted: { status: 410, retryable: false },
+  reauth_required: { status: 401, retryable: false },
+  client_update_required: { status: 426, retryable: false },
+  update_required: { status: 400, retryable: false },
+  client_upgrade_required: { status: 426, retryable: false },
+  writer_floor_mismatch: { status: 401, retryable: false },
+  service_upgrade_required: { status: 426, retryable: false },
+  unsupported_version: { status: 400, retryable: false },
+  export_expired: { status: 410, retryable: false },
+  step_up_required: { status: 403, retryable: false },
+  access_not_open: { status: 403, retryable: false },
+  secret_detected: { status: 400, retryable: false },
+  internal: { status: 500, retryable: true },
+};
+
+/**
+ * Why a request was refused, when the client has a next step to offer. Each reason travels with
+ * one code: `device_limit` with entitlement_required (remove a device with the management token,
+ * then retry), `account_exists` with conflict (sign in with the method used before).
+ */
+export type ErrorDetail =
+  | {
+      readonly reason: "device_limit";
+      /** Lists and revokes devices only; valid for 10 minutes. */
+      readonly managementToken: string;
+      readonly used: number;
+      readonly limit: number;
+    }
+  | { readonly reason: "account_exists"; readonly signInMethod: SignInMethod }
+  | {
+      /**
+       * A sign-in method this person never added to OmO appeared on their sign-in: nothing was
+       * created or linked, the new method was removed and the session ended. Sign in with one of
+       * these, then add the new method from the account.
+       */
+      readonly reason: "identity_collision";
+      readonly signInMethods: ReadonlyArray<SignInMethod>;
+      /**
+       * Present when nothing could be removed, so signing in again alone is refused the same way:
+       * the unrecognized method holds the primary email, or it is all this login holds. The person
+       * fixes it in their account settings first (the message says how), then signs in again.
+       */
+      readonly blocked?: {
+        readonly by: "primary_email" | "last_method";
+        readonly unrecognized: ReadonlyArray<SignInMethod>;
+      };
+      /**
+       * A first sign-in whose provider hid the person's email (Apple's private relay): nothing was
+       * created and the session was kept. A person who already uses OmO signs in with one of their
+       * methods instead; a new person repeats the authorize request with `createAccount: true`
+       * (contract 1.6.0).
+       */
+      readonly hiddenEmail?: true;
+    }
+  | { readonly reason: "billing_closed" }
+  | {
+      /**
+       * An export larger than the service can build (contract 1.10.0): `bytes` is an upper bound on
+       * what this account would export. Since #303 it is the status of an export the job refused
+       * before uploading anything (the limit is 75.3 GB of archive, see docs/export-format.md).
+       */
+      readonly reason: "export_too_large";
+      readonly bytes: number;
+      readonly limitBytes: number;
+    }
+  | { readonly reason: "secret_detected"; readonly sectionId: ReportSectionId };
+
+const BLOCKED_BY = ["primary_email", "last_method"] as const;
+
+export const ERROR_REASONS = [
+  "device_limit",
+  "account_exists",
+  "identity_collision",
+  "billing_closed",
+  "export_too_large",
+  "secret_detected",
+] as const;
+
+/** Body of every non-2xx response. */
+export type ErrorEnvelope = {
+  readonly error: {
+    readonly code: ErrorCode;
+    readonly message: string;
+    readonly retryable: boolean;
+    /** Same value as the response's request id header; quote it when reporting a problem. */
+    readonly requestId: string;
+    readonly detail?: ErrorDetail;
+  };
+};
+
+/** The one code each reason travels with; a reason on any other code is refused. */
+const REASON_CODE: Readonly<Record<ErrorDetail["reason"], ErrorCode>> = {
+  device_limit: "entitlement_required",
+  account_exists: "conflict",
+  identity_collision: "conflict",
+  billing_closed: "entitlement_required",
+  export_too_large: "quota_exceeded",
+  secret_detected: "secret_detected",
+};
+
+const readDetail = (value: unknown, code: ErrorCode, issues: Issues): ErrorDetail => {
+  const o = readObject(value, ["error", "detail"], issues);
+  const path = (key: string) => ["error", "detail", key];
+  const reason = readOneOf(o["reason"], ERROR_REASONS, path("reason"), issues);
+  if (REASON_CODE[reason] !== code) {
+    issues.push({
+      message: `reason ${reason} travels only with ${REASON_CODE[reason]}`,
+      path: path("reason"),
+    });
+  }
+  switch (reason) {
+    case "device_limit":
+      return {
+        reason,
+        managementToken: readString(o["managementToken"], path("managementToken"), issues),
+        used: readInteger(o["used"], path("used"), issues),
+        limit: readInteger(o["limit"], path("limit"), issues),
+      };
+    case "account_exists":
+      return {
+        reason,
+        signInMethod: readOneOf(o["signInMethod"], SIGN_IN_METHODS, path("signInMethod"), issues),
+      };
+    case "identity_collision": {
+      const signInMethods = readSignInMethods(o["signInMethods"], path("signInMethods"), issues);
+      const hidden =
+        o["hiddenEmail"] === undefined
+          ? {}
+          : readTrue(o["hiddenEmail"], path("hiddenEmail"), issues)
+            ? { hiddenEmail: true as const }
+            : {};
+      const blocked: unknown = o["blocked"];
+      if (blocked === undefined) return { reason, signInMethods, ...hidden };
+      const b = readObject(blocked, path("blocked"), issues);
+      const unrecognizedPath = [...path("blocked"), "unrecognized"];
+
+      return {
+        reason,
+        signInMethods,
+        ...hidden,
+        blocked: {
+          by: readOneOf(b["by"], BLOCKED_BY, [...path("blocked"), "by"], issues),
+          unrecognized: readSignInMethods(b["unrecognized"], unrecognizedPath, issues),
+        },
+      };
+    }
+    case "billing_closed":
+      return { reason };
+    case "export_too_large":
+      return {
+        reason,
+        bytes: readInteger(o["bytes"], path("bytes"), issues),
+        limitBytes: readInteger(o["limitBytes"], path("limitBytes"), issues),
+      };
+    case "secret_detected":
+      return {
+        reason,
+        sectionId: readOneOf(o["sectionId"], REPORT_SECTION_IDS, path("sectionId"), issues),
+      };
+  }
+};
+
+export const errorEnvelopeSchema = defineSchema<ErrorEnvelope>((value, issues) => {
+  const root = readObject(value, [], issues);
+  const error = readObject(root["error"], ["error"], issues);
+  const code = readOneOf(error["code"], ERROR_CODES, ["error", "code"], issues);
+  const detail = error["detail"];
+  return {
+    error: {
+      code,
+      message: readString(error["message"], ["error", "message"], issues),
+      retryable: readBoolean(error["retryable"], ["error", "retryable"], issues),
+      requestId: readString(error["requestId"], ["error", "requestId"], issues),
+      // An absent detail is omitted; null is read as absent too, never as an empty detail.
+      ...(detail === undefined || detail === null
+        ? {}
+        : { detail: readDetail(detail, code, issues) }),
+    },
+  };
+});

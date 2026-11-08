@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { createMessageUpdateHandler } from "./message-update-handler"
+import { createFallbackState } from "./fallback-state"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { extractAutoRetrySignal } from "./error-classifier"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
+import { clearAllCompactions, recordCompactionStart } from "../../shared/compaction-in-flight"
 
 function createContext(messagesResponse: unknown): RuntimeFallbackPluginInput {
   return {
@@ -23,6 +25,23 @@ function createContext(messagesResponse: unknown): RuntimeFallbackPluginInput {
 }
 
 describe("hasVisibleAssistantResponse", () => {
+  for (const text of [
+    "Done. I added a content filter toggle to the settings page.",
+    "The Azure response includes content_filter_results; I now parse them.",
+  ]) {
+    it(`counts a completed reply mentioning filtering as visible: ${text}`, async () => {
+      const checkVisibleResponse = hasVisibleAssistantResponse(extractAutoRetrySignal)
+      const ctx = createContext({
+        data: [
+          { info: { role: "user" }, parts: [{ type: "text", text: "Update the settings page." }] },
+          { info: { role: "assistant" }, parts: [{ type: "text", text }] },
+        ],
+      })
+
+      expect(await checkVisibleResponse(ctx, "session-content-filter-answer", undefined)).toBe(true)
+    })
+  }
+
   it("#given only an old assistant reply before the latest user turn #when visibility is checked #then the stale reply is ignored", async () => {
     // given
     const checkVisibleResponse = hasVisibleAssistantResponse(() => undefined)
@@ -81,6 +100,26 @@ describe("hasVisibleAssistantResponse", () => {
 
     // then
     expect(result).toBe(false)
+  })
+
+  it("#given a compaction part with text but no summary metadata #when visibility is checked #then it is not visible", async () => {
+    const checkVisibleResponse = hasVisibleAssistantResponse(() => undefined)
+    const ctx = createContext({
+      data: [
+        { info: { role: "user" }, parts: [{ type: "text", text: "latest question" }] },
+        { info: { role: "assistant" }, parts: [{ type: "compaction" }, { type: "text", text: "summary text" }] },
+      ],
+    })
+
+    expect(await checkVisibleResponse(ctx, "session-compaction-part", undefined)).toBe(false)
+  })
+
+  it("#given a non-Error session message failure #when visibility is checked #then it returns false safely", async () => {
+    const checkVisibleResponse = hasVisibleAssistantResponse(() => undefined)
+    const ctx = createContext({ data: [] })
+    ctx.client.session.messages = async () => { throw "non-error rejection" }
+
+    expect(await checkVisibleResponse(ctx, "session-non-error-rejection", undefined)).toBe(false)
   })
 })
 
@@ -154,7 +193,121 @@ function createRuntimeFallbackHelpers(deps: HookDeps, operations: string[]): Aut
 
 describe("createMessageUpdateHandler runtime fallback dispatch", () => {
   afterEach(() => {
+    clearAllCompactions()
     SessionCategoryRegistry.clear()
+  })
+
+  it("clears the fallback timeout after a completed answer mentioning content filters", async () => {
+    const sessionID = "session-content-filter-answer"
+    const operations: string[] = []
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.ctx = createContext({
+      data: [
+        { info: { role: "user" }, parts: [{ type: "text", text: "Update the settings page." }] },
+        {
+          info: { role: "assistant" },
+          parts: [{ type: "text", text: "Done. I added a content filter toggle to the settings page." }],
+        },
+      ],
+    })
+    const state = createFallbackState("openai/primary")
+    state.currentModel = "openai/current"
+    state.pendingFallbackModel = "openai/current"
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    deps.sessionFallbackTimeouts.set(sessionID, 1)
+    const helpers = createRuntimeFallbackHelpers(deps, operations)
+    helpers.clearSessionFallbackTimeout = () => {
+      operations.push("clear-timeout")
+      deps.sessionFallbackTimeouts.delete(sessionID)
+    }
+    const handler = createMessageUpdateHandler(deps, helpers)
+
+    await handler({ sessionID, info: { role: "assistant", model: "openai/current" } })
+
+    expect(operations).toEqual(["clear-timeout"])
+    expect(deps.sessionFallbackTimeouts.has(sessionID)).toBe(false)
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
+    expect(state.pendingFallbackModel).toBeUndefined()
+  })
+
+  it.each([0, 30])("interrupts a real ContentFilterError during an active retry with timeout %i", async (timeoutSeconds) => {
+    const sessionID = "session-content-filter-signal"
+    const operations: string[] = []
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.config.timeout_seconds = timeoutSeconds
+    deps.pluginConfig = {
+      categories: {
+        test: {
+          fallback_models: ["openai/primary", "openai/current", "openai/next"],
+        },
+      },
+    }
+    SessionCategoryRegistry.register(sessionID, "test")
+    const state = createFallbackState("openai/primary")
+    state.currentModel = "openai/current"
+    state.pendingFallbackModel = "openai/current"
+    state.fallbackIndex = 1
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionRetryInFlight.add(sessionID)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "openai/current",
+        error: {
+          name: "ContentFilterError",
+          data: { message: "Blocked by the provider's content management policy." },
+        },
+      },
+    })
+
+    expect(operations).toEqual([
+      "abort:message.updated.retry-signal",
+      "retry:openai/next",
+      "toast",
+    ])
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(false)
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
+    expect(state.currentModel).toBe("openai/next")
+    expect(state.pendingFallbackModel).toBe("openai/next")
+    expect(state.attemptCount).toBe(2)
+  })
+
+  it("ignores a stale ContentFilterError from an older model while a newer retry is active", async () => {
+    const sessionID = "session-stale-content-filter-error"
+    const operations: string[] = []
+    const deps = createRuntimeFallbackDeps(operations)
+    const state = createFallbackState("openai/primary")
+    state.currentModel = "openai/current"
+    state.pendingFallbackModel = "openai/current"
+    state.attemptCount = 1
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionRetryInFlight.add(sessionID)
+    deps.sessionAwaitingFallbackResult.add(sessionID)
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "openai/primary",
+        error: {
+          name: "ContentFilterError",
+          data: { message: "Blocked by the provider's content management policy." },
+        },
+      },
+    })
+
+    expect(operations).toEqual([])
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(true)
+    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
+    expect(state.pendingFallbackModel).toBe("openai/current")
+    expect(state.attemptCount).toBe(1)
   })
 
   it("#given quota-exceeded assistant error with a fallback #when message update is handled #then primary request is aborted before fallback dispatch and toast", async () => {
@@ -185,6 +338,140 @@ describe("createMessageUpdateHandler runtime fallback dispatch", () => {
       "toast",
     ])
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+  })
+
+  it("#given an exhausted quota fallback #when message update is handled #then it does not abort without a replacement", async () => {
+    const sessionID = "session-quota-fallback-exhausted"
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.config.max_fallback_attempts = 0
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        error: { name: "ProviderRateLimitError", statusCode: 402, message: "quota exhausted" },
+      },
+    })
+
+    expect(operations.filter((operation) => operation.startsWith("abort:"))).toEqual([])
+    expect(operations.filter((operation) => operation.startsWith("retry:"))).toEqual([])
+  })
+
+  it("#given info.agent is absent #when a retry signal is handled #then the resolved agent supplies both checks and dispatch", async () => {
+    const sessionID = "session-message-resolved-agent"
+    const operations: string[] = []
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.pluginConfig = { agents: { worker: { fallback_models: ["litellm/openai.eu.gpt-5.5"] } } }
+    const state = createFallbackState("openai/gpt-5.4")
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionRetryInFlight.add(sessionID)
+    const helpers = createRuntimeFallbackHelpers(deps, operations)
+    let resolveCalls = 0
+    let dispatchedAgent: string | undefined
+    helpers.resolveAgentForSessionFromContext = async () => {
+      resolveCalls += 1
+      return "worker"
+    }
+    helpers.autoRetryWithFallback = async (_sessionID, model, resolvedAgent) => {
+      dispatchedAgent = resolvedAgent
+      operations.push(`retry:${model}`)
+      return { accepted: true, status: "dispatched" }
+    }
+    const handler = createMessageUpdateHandler(deps, helpers)
+
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        status: "retrying in 1s",
+        message: "retrying in 1s",
+        error: { name: "ProviderRateLimitError", message: "All credentials for model gpt are cooling down [retrying in 1s attempt #1]" },
+      },
+    })
+
+    expect(resolveCalls).toBe(1)
+    expect(dispatchedAgent).toBe("worker")
+    expect(operations).toContain("retry:litellm/openai.eu.gpt-5.5")
+  })
+
+  // A real provider retry signal, so without the guard this update would override the in-flight retry
+  // (abort + dispatch); the guard must leave the compaction lane's native retry alone.
+  it("#given a provider retry signal while a registry-tracked compaction runs #when handled #then the primary chain is untouched", async () => {
+    // given
+    const sessionID = "session-message-compaction-registry"
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.sessionRetryInFlight.add(sessionID)
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+    recordCompactionStart(sessionID)
+
+    // when
+    await handler({ sessionID, info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        status: "retrying in 1s",
+        message: "retrying in 1s",
+        error: { name: "ProviderRateLimitError", message: "All credentials for model gpt are cooling down [retrying in 1s attempt #1]" },
+      } })
+
+    // then
+    expect(operations).toEqual([])
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(true)
+  })
+
+  it("#given a provider retry signal and no fallback left #when the in-flight retry would be overridden #then it does not abort without a replacement", async () => {
+    // given
+    const sessionID = "session-message-override-exhausted"
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.config.max_fallback_attempts = 0
+    deps.sessionRetryInFlight.add(sessionID)
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    // when
+    await handler({ sessionID, info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        status: "retrying in 1s",
+        message: "retrying in 1s",
+        error: { name: "ProviderRateLimitError", message: "All credentials for model gpt are cooling down [retrying in 1s attempt #1]" },
+      } })
+
+    // then
+    expect(operations.filter((operation) => operation.startsWith("abort:"))).toEqual([])
+    expect(operations.filter((operation) => operation.startsWith("retry:"))).toEqual([])
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(true)
+  })
+
+  it("#given a retryable quota error and no fallback left #when message update is handled #then the quota retry is not aborted without a replacement", async () => {
+    // given
+    const sessionID = "session-message-quota-exhausted-retryable"
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.config.max_fallback_attempts = 0
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    // when
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        error: { name: "ProviderRateLimitError", message: "The usage limit has been reached for this model." },
+      },
+    })
+
+    // then
+    expect(operations.filter((operation) => operation.startsWith("abort:"))).toEqual([])
+    expect(operations.filter((operation) => operation.startsWith("retry:"))).toEqual([])
   })
 })
 

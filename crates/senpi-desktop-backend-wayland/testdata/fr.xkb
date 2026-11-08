@@ -1,0 +1,1914 @@
+xkb_keymap {
+xkb_keycodes "(unnamed)" {
+	minimum = 8;
+	maximum = 708;
+	<ESC>                = 9;
+	<AE01>               = 10;
+	<AE02>               = 11;
+	<AE03>               = 12;
+	<AE04>               = 13;
+	<AE05>               = 14;
+	<AE06>               = 15;
+	<AE07>               = 16;
+	<AE08>               = 17;
+	<AE09>               = 18;
+	<AE10>               = 19;
+	<AE11>               = 20;
+	<AE12>               = 21;
+	<BKSP>               = 22;
+	<TAB>                = 23;
+	<AD01>               = 24;
+	<AD02>               = 25;
+	<AD03>               = 26;
+	<AD04>               = 27;
+	<AD05>               = 28;
+	<AD06>               = 29;
+	<AD07>               = 30;
+	<AD08>               = 31;
+	<AD09>               = 32;
+	<AD10>               = 33;
+	<AD11>               = 34;
+	<AD12>               = 35;
+	<RTRN>               = 36;
+	<LCTL>               = 37;
+	<AC01>               = 38;
+	<AC02>               = 39;
+	<AC03>               = 40;
+	<AC04>               = 41;
+	<AC05>               = 42;
+	<AC06>               = 43;
+	<AC07>               = 44;
+	<AC08>               = 45;
+	<AC09>               = 46;
+	<AC10>               = 47;
+	<AC11>               = 48;
+	<TLDE>               = 49;
+	<LFSH>               = 50;
+	<BKSL>               = 51;
+	<AB01>               = 52;
+	<AB02>               = 53;
+	<AB03>               = 54;
+	<AB04>               = 55;
+	<AB05>               = 56;
+	<AB06>               = 57;
+	<AB07>               = 58;
+	<AB08>               = 59;
+	<AB09>               = 60;
+	<AB10>               = 61;
+	<RTSH>               = 62;
+	<KPMU>               = 63;
+	<LALT>               = 64;
+	<SPCE>               = 65;
+	<CAPS>               = 66;
+	<FK01>               = 67;
+	<FK02>               = 68;
+	<FK03>               = 69;
+	<FK04>               = 70;
+	<FK05>               = 71;
+	<FK06>               = 72;
+	<FK07>               = 73;
+	<FK08>               = 74;
+	<FK09>               = 75;
+	<FK10>               = 76;
+	<NMLK>               = 77;
+	<SCLK>               = 78;
+	<KP7>                = 79;
+	<KP8>                = 80;
+	<KP9>                = 81;
+	<KPSU>               = 82;
+	<KP4>                = 83;
+	<KP5>                = 84;
+	<KP6>                = 85;
+	<KPAD>               = 86;
+	<KP1>                = 87;
+	<KP2>                = 88;
+	<KP3>                = 89;
+	<KP0>                = 90;
+	<KPDL>               = 91;
+	<LVL3>               = 92;
+	<LSGT>               = 94;
+	<FK11>               = 95;
+	<FK12>               = 96;
+	<AB11>               = 97;
+	<KATA>               = 98;
+	<HIRA>               = 99;
+	<HENK>               = 100;
+	<HKTG>               = 101;
+	<MUHE>               = 102;
+	<JPCM>               = 103;
+	<KPEN>               = 104;
+	<RCTL>               = 105;
+	<KPDV>               = 106;
+	<PRSC>               = 107;
+	<RALT>               = 108;
+	<LNFD>               = 109;
+	<HOME>               = 110;
+	<UP>                 = 111;
+	<PGUP>               = 112;
+	<LEFT>               = 113;
+	<RGHT>               = 114;
+	<END>                = 115;
+	<DOWN>               = 116;
+	<PGDN>               = 117;
+	<INS>                = 118;
+	<DELE>               = 119;
+	<I120>               = 120;
+	<MUTE>               = 121;
+	<VOL->               = 122;
+	<VOL+>               = 123;
+	<POWR>               = 124;
+	<KPEQ>               = 125;
+	<I126>               = 126;
+	<PAUS>               = 127;
+	<I128>               = 128;
+	<I129>               = 129;
+	<HNGL>               = 130;
+	<HJCV>               = 131;
+	<AE13>               = 132;
+	<LWIN>               = 133;
+	<RWIN>               = 134;
+	<COMP>               = 135;
+	<STOP>               = 136;
+	<AGAI>               = 137;
+	<PROP>               = 138;
+	<UNDO>               = 139;
+	<FRNT>               = 140;
+	<COPY>               = 141;
+	<OPEN>               = 142;
+	<PAST>               = 143;
+	<FIND>               = 144;
+	<CUT>                = 145;
+	<HELP>               = 146;
+	<I147>               = 147;
+	<I148>               = 148;
+	<I149>               = 149;
+	<I150>               = 150;
+	<I151>               = 151;
+	<I152>               = 152;
+	<I153>               = 153;
+	<I154>               = 154;
+	<I155>               = 155;
+	<I156>               = 156;
+	<I157>               = 157;
+	<I158>               = 158;
+	<I159>               = 159;
+	<I160>               = 160;
+	<I161>               = 161;
+	<I162>               = 162;
+	<I163>               = 163;
+	<I164>               = 164;
+	<I165>               = 165;
+	<I166>               = 166;
+	<I167>               = 167;
+	<I168>               = 168;
+	<I169>               = 169;
+	<I170>               = 170;
+	<I171>               = 171;
+	<I172>               = 172;
+	<I173>               = 173;
+	<I174>               = 174;
+	<I175>               = 175;
+	<I176>               = 176;
+	<I177>               = 177;
+	<I178>               = 178;
+	<I179>               = 179;
+	<I180>               = 180;
+	<I181>               = 181;
+	<I182>               = 182;
+	<I183>               = 183;
+	<I184>               = 184;
+	<I185>               = 185;
+	<I186>               = 186;
+	<I187>               = 187;
+	<I188>               = 188;
+	<I189>               = 189;
+	<I190>               = 190;
+	<FK13>               = 191;
+	<FK14>               = 192;
+	<FK15>               = 193;
+	<FK16>               = 194;
+	<FK17>               = 195;
+	<FK18>               = 196;
+	<FK19>               = 197;
+	<FK20>               = 198;
+	<FK21>               = 199;
+	<FK22>               = 200;
+	<FK23>               = 201;
+	<FK24>               = 202;
+	<LVL5>               = 203;
+	<ALT>                = 204;
+	<META>               = 205;
+	<SUPR>               = 206;
+	<HYPR>               = 207;
+	<I208>               = 208;
+	<I209>               = 209;
+	<I210>               = 210;
+	<I211>               = 211;
+	<I212>               = 212;
+	<I213>               = 213;
+	<I214>               = 214;
+	<I215>               = 215;
+	<I216>               = 216;
+	<I217>               = 217;
+	<I218>               = 218;
+	<I219>               = 219;
+	<I220>               = 220;
+	<I221>               = 221;
+	<I222>               = 222;
+	<I223>               = 223;
+	<I224>               = 224;
+	<I225>               = 225;
+	<I226>               = 226;
+	<I227>               = 227;
+	<I228>               = 228;
+	<I229>               = 229;
+	<I230>               = 230;
+	<I231>               = 231;
+	<I232>               = 232;
+	<I233>               = 233;
+	<I234>               = 234;
+	<I235>               = 235;
+	<I236>               = 236;
+	<I237>               = 237;
+	<I238>               = 238;
+	<I239>               = 239;
+	<I240>               = 240;
+	<I241>               = 241;
+	<I242>               = 242;
+	<I243>               = 243;
+	<I244>               = 244;
+	<I245>               = 245;
+	<I246>               = 246;
+	<I247>               = 247;
+	<I248>               = 248;
+	<I249>               = 249;
+	<I250>               = 250;
+	<I251>               = 251;
+	<I252>               = 252;
+	<I253>               = 253;
+	<I254>               = 254;
+	<I255>               = 255;
+	<I256>               = 256;
+	<I360>               = 360;
+	<I361>               = 361;
+	<I362>               = 362;
+	<I363>               = 363;
+	<I364>               = 364;
+	<I365>               = 365;
+	<I366>               = 366;
+	<I367>               = 367;
+	<I368>               = 368;
+	<I369>               = 369;
+	<I370>               = 370;
+	<I371>               = 371;
+	<I372>               = 372;
+	<I373>               = 373;
+	<I374>               = 374;
+	<I375>               = 375;
+	<I376>               = 376;
+	<I377>               = 377;
+	<I378>               = 378;
+	<I379>               = 379;
+	<I380>               = 380;
+	<I381>               = 381;
+	<I382>               = 382;
+	<I383>               = 383;
+	<I384>               = 384;
+	<I385>               = 385;
+	<I386>               = 386;
+	<I387>               = 387;
+	<I388>               = 388;
+	<I389>               = 389;
+	<I390>               = 390;
+	<I391>               = 391;
+	<I392>               = 392;
+	<I393>               = 393;
+	<I394>               = 394;
+	<I395>               = 395;
+	<I396>               = 396;
+	<I397>               = 397;
+	<I398>               = 398;
+	<I399>               = 399;
+	<I400>               = 400;
+	<I401>               = 401;
+	<I402>               = 402;
+	<I403>               = 403;
+	<I404>               = 404;
+	<I405>               = 405;
+	<I406>               = 406;
+	<I407>               = 407;
+	<I408>               = 408;
+	<I409>               = 409;
+	<I410>               = 410;
+	<I411>               = 411;
+	<I412>               = 412;
+	<I413>               = 413;
+	<I414>               = 414;
+	<I415>               = 415;
+	<I416>               = 416;
+	<I417>               = 417;
+	<I418>               = 418;
+	<I419>               = 419;
+	<I420>               = 420;
+	<I421>               = 421;
+	<I422>               = 422;
+	<I423>               = 423;
+	<I424>               = 424;
+	<I425>               = 425;
+	<I426>               = 426;
+	<I427>               = 427;
+	<I428>               = 428;
+	<I429>               = 429;
+	<I430>               = 430;
+	<I431>               = 431;
+	<I432>               = 432;
+	<I433>               = 433;
+	<I434>               = 434;
+	<I435>               = 435;
+	<I436>               = 436;
+	<I437>               = 437;
+	<I438>               = 438;
+	<I439>               = 439;
+	<I440>               = 440;
+	<I441>               = 441;
+	<I442>               = 442;
+	<I443>               = 443;
+	<I444>               = 444;
+	<I445>               = 445;
+	<I446>               = 446;
+	<I447>               = 447;
+	<I448>               = 448;
+	<I449>               = 449;
+	<I450>               = 450;
+	<I452>               = 452;
+	<I453>               = 453;
+	<I454>               = 454;
+	<I456>               = 456;
+	<I457>               = 457;
+	<I458>               = 458;
+	<I459>               = 459;
+	<I472>               = 472;
+	<I473>               = 473;
+	<I474>               = 474;
+	<I475>               = 475;
+	<I476>               = 476;
+	<I477>               = 477;
+	<I478>               = 478;
+	<I479>               = 479;
+	<I480>               = 480;
+	<I481>               = 481;
+	<I482>               = 482;
+	<I483>               = 483;
+	<I484>               = 484;
+	<I485>               = 485;
+	<I486>               = 486;
+	<I487>               = 487;
+	<I488>               = 488;
+	<I489>               = 489;
+	<I490>               = 490;
+	<I491>               = 491;
+	<I492>               = 492;
+	<I493>               = 493;
+	<I505>               = 505;
+	<I506>               = 506;
+	<I507>               = 507;
+	<I508>               = 508;
+	<I509>               = 509;
+	<I510>               = 510;
+	<I511>               = 511;
+	<I512>               = 512;
+	<I513>               = 513;
+	<I514>               = 514;
+	<I520>               = 520;
+	<I521>               = 521;
+	<I522>               = 522;
+	<I523>               = 523;
+	<I524>               = 524;
+	<I525>               = 525;
+	<I526>               = 526;
+	<I527>               = 527;
+	<I528>               = 528;
+	<I529>               = 529;
+	<I530>               = 530;
+	<I531>               = 531;
+	<I532>               = 532;
+	<I533>               = 533;
+	<I534>               = 534;
+	<I535>               = 535;
+	<I536>               = 536;
+	<I537>               = 537;
+	<I538>               = 538;
+	<I539>               = 539;
+	<I540>               = 540;
+	<I541>               = 541;
+	<I542>               = 542;
+	<I543>               = 543;
+	<I544>               = 544;
+	<I545>               = 545;
+	<I546>               = 546;
+	<I547>               = 547;
+	<I548>               = 548;
+	<I549>               = 549;
+	<I550>               = 550;
+	<I568>               = 568;
+	<I569>               = 569;
+	<I584>               = 584;
+	<I585>               = 585;
+	<I586>               = 586;
+	<I587>               = 587;
+	<I588>               = 588;
+	<I589>               = 589;
+	<I590>               = 590;
+	<I591>               = 591;
+	<I592>               = 592;
+	<I593>               = 593;
+	<I594>               = 594;
+	<I595>               = 595;
+	<I596>               = 596;
+	<I597>               = 597;
+	<I600>               = 600;
+	<I601>               = 601;
+	<I616>               = 616;
+	<I617>               = 617;
+	<I618>               = 618;
+	<I619>               = 619;
+	<I620>               = 620;
+	<I621>               = 621;
+	<I622>               = 622;
+	<I623>               = 623;
+	<I624>               = 624;
+	<I625>               = 625;
+	<I626>               = 626;
+	<I627>               = 627;
+	<I628>               = 628;
+	<I629>               = 629;
+	<I630>               = 630;
+	<I631>               = 631;
+	<I632>               = 632;
+	<I633>               = 633;
+	<I634>               = 634;
+	<I635>               = 635;
+	<I636>               = 636;
+	<I637>               = 637;
+	<I638>               = 638;
+	<I639>               = 639;
+	<I640>               = 640;
+	<I641>               = 641;
+	<I642>               = 642;
+	<I643>               = 643;
+	<I644>               = 644;
+	<I645>               = 645;
+	<I646>               = 646;
+	<I647>               = 647;
+	<I648>               = 648;
+	<I649>               = 649;
+	<I650>               = 650;
+	<I651>               = 651;
+	<I652>               = 652;
+	<I653>               = 653;
+	<I654>               = 654;
+	<I655>               = 655;
+	<I656>               = 656;
+	<I657>               = 657;
+	<I664>               = 664;
+	<I665>               = 665;
+	<I666>               = 666;
+	<I667>               = 667;
+	<I668>               = 668;
+	<I669>               = 669;
+	<I670>               = 670;
+	<I671>               = 671;
+	<I672>               = 672;
+	<I673>               = 673;
+	<I674>               = 674;
+	<I675>               = 675;
+	<I676>               = 676;
+	<I677>               = 677;
+	<I678>               = 678;
+	<I679>               = 679;
+	<I680>               = 680;
+	<I681>               = 681;
+	<I682>               = 682;
+	<I683>               = 683;
+	<I684>               = 684;
+	<I685>               = 685;
+	<I686>               = 686;
+	<I687>               = 687;
+	<I688>               = 688;
+	<I689>               = 689;
+	<I690>               = 690;
+	<I691>               = 691;
+	<I692>               = 692;
+	<I693>               = 693;
+	<I696>               = 696;
+	<I697>               = 697;
+	<I698>               = 698;
+	<I699>               = 699;
+	<I700>               = 700;
+	<I701>               = 701;
+	<I704>               = 704;
+	<I705>               = 705;
+	<I706>               = 706;
+	<I707>               = 707;
+	<I708>               = 708;
+	indicator 1 = "Caps Lock";
+	indicator 2 = "Num Lock";
+	indicator 3 = "Scroll Lock";
+	indicator 4 = "Compose";
+	indicator 5 = "Kana";
+	indicator 6 = "Sleep";
+	indicator 7 = "Suspend";
+	indicator 8 = "Mute";
+	indicator 9 = "Misc";
+	indicator 10 = "Mail";
+	indicator 11 = "Charging";
+	indicator 12 = "Shift Lock";
+	indicator 13 = "Group 2";
+	indicator 14 = "Mouse Keys";
+	alias <AC12>         = <BKSL>;
+	alias <ALGR>         = <RALT>;
+	alias <MENU>         = <COMP>;
+	alias <HZTG>         = <TLDE>;
+	alias <LMTA>         = <LWIN>;
+	alias <RMTA>         = <RWIN>;
+	alias <OUTP>         = <I235>;
+	alias <KITG>         = <I236>;
+	alias <KIDN>         = <I237>;
+	alias <KIUP>         = <I238>;
+	alias <I121>         = <MUTE>;
+	alias <I122>         = <VOL->;
+	alias <I123>         = <VOL+>;
+	alias <I124>         = <POWR>;
+	alias <I125>         = <KPEQ>;
+	alias <I127>         = <PAUS>;
+	alias <I130>         = <HNGL>;
+	alias <I131>         = <HJCV>;
+	alias <I132>         = <AE13>;
+	alias <I133>         = <LWIN>;
+	alias <I134>         = <RWIN>;
+	alias <I135>         = <COMP>;
+	alias <I136>         = <STOP>;
+	alias <I137>         = <AGAI>;
+	alias <I138>         = <PROP>;
+	alias <I139>         = <UNDO>;
+	alias <I140>         = <FRNT>;
+	alias <I141>         = <COPY>;
+	alias <I142>         = <OPEN>;
+	alias <I143>         = <PAST>;
+	alias <I144>         = <FIND>;
+	alias <I145>         = <CUT>;
+	alias <I146>         = <HELP>;
+	alias <I191>         = <FK13>;
+	alias <I192>         = <FK14>;
+	alias <I193>         = <FK15>;
+	alias <I194>         = <FK16>;
+	alias <I195>         = <FK17>;
+	alias <I196>         = <FK18>;
+	alias <I197>         = <FK19>;
+	alias <I198>         = <FK20>;
+	alias <I199>         = <FK21>;
+	alias <I200>         = <FK22>;
+	alias <I201>         = <FK23>;
+	alias <I202>         = <FK24>;
+	alias <MDSW>         = <LVL5>;
+	alias <KPPT>         = <I129>;
+	alias <LatA>         = <AD01>;
+	alias <LatZ>         = <AD02>;
+	alias <LatE>         = <AD03>;
+	alias <LatR>         = <AD04>;
+	alias <LatT>         = <AD05>;
+	alias <LatY>         = <AD06>;
+	alias <LatU>         = <AD07>;
+	alias <LatI>         = <AD08>;
+	alias <LatO>         = <AD09>;
+	alias <LatP>         = <AD10>;
+	alias <LatQ>         = <AC01>;
+	alias <LatS>         = <AC02>;
+	alias <LatD>         = <AC03>;
+	alias <LatF>         = <AC04>;
+	alias <LatG>         = <AC05>;
+	alias <LatH>         = <AC06>;
+	alias <LatJ>         = <AC07>;
+	alias <LatK>         = <AC08>;
+	alias <LatL>         = <AC09>;
+	alias <LatM>         = <AC10>;
+	alias <LatW>         = <AB01>;
+	alias <LatX>         = <AB02>;
+	alias <LatC>         = <AB03>;
+	alias <LatV>         = <AB04>;
+	alias <LatB>         = <AB05>;
+	alias <LatN>         = <AB06>;
+};
+
+xkb_types "(unnamed)" {
+	virtual_modifiers NumLock,Alt,LevelThree,LevelFive,Meta,Super,Hyper,ScrollLock;
+
+	type "ONE_LEVEL" {
+		modifiers= none;
+		level_name[1]= "Any";
+	};
+	type "TWO_LEVEL" {
+		modifiers= Shift;
+		map[Shift]= 2;
+		level_name[1]= "Base";
+		level_name[2]= "Shift";
+	};
+	type "ALPHABETIC" {
+		modifiers= Shift+Lock;
+		map[Shift]= 2;
+		map[Lock]= 2;
+		level_name[1]= "Base";
+		level_name[2]= "Caps";
+	};
+	type "PC_ALT_LEVEL2" {
+		modifiers= Alt;
+		map[Alt]= 2;
+		level_name[1]= "Base";
+		level_name[2]= "Alt";
+	};
+	type "PC_SUPER_LEVEL2" {
+		modifiers= Mod4;
+		map[Mod4]= 2;
+		level_name[1]= "Base";
+		level_name[2]= "Super";
+	};
+	type "PC_CONTROL_LEVEL2" {
+		modifiers= Control;
+		map[Control]= 2;
+		level_name[1]= "Base";
+		level_name[2]= "Control";
+	};
+	type "CTRL+ALT" {
+		modifiers= Shift+Control+Alt+LevelThree;
+		map[Shift]= 2;
+		preserve[Shift]= Shift;
+		map[LevelThree]= 3;
+		map[Shift+LevelThree]= 4;
+		preserve[Shift+LevelThree]= Shift;
+		map[Control+Alt]= 5;
+		level_name[1]= "Base";
+		level_name[2]= "Shift";
+		level_name[3]= "AltGr";
+		level_name[4]= "Shift AltGr";
+		level_name[5]= "Ctrl+Alt";
+	};
+	type "THREE_LEVEL" {
+		modifiers= Shift+LevelThree;
+		map[Shift]= 2;
+		map[LevelThree]= 3;
+		map[Shift+LevelThree]= 3;
+		level_name[1]= "Base";
+		level_name[2]= "Shift";
+		level_name[3]= "Level3";
+	};
+	type "FOUR_LEVEL" {
+		modifiers= Shift+LevelThree;
+		map[Shift]= 2;
+		map[LevelThree]= 3;
+		map[Shift+LevelThree]= 4;
+		level_name[1]= "Base";
+		level_name[2]= "Shift";
+		level_name[3]= "AltGr";
+		level_name[4]= "Shift AltGr";
+	};
+	type "FOUR_LEVEL_ALPHABETIC" {
+		modifiers= Shift+Lock+LevelThree;
+		map[Shift]= 2;
+		map[Lock]= 2;
+		map[LevelThree]= 3;
+		map[Shift+LevelThree]= 4;
+		map[Lock+LevelThree]= 4;
+		map[Shift+Lock+LevelThree]= 3;
+		level_name[1]= "Base";
+		level_name[2]= "Shift";
+		level_name[3]= "AltGr";
+		level_name[4]= "Shift AltGr";
+	};
+	type "FOUR_LEVEL_SEMIALPHABETIC" {
+		modifiers= Shift+Lock+LevelThree;
+		map[Shift]= 2;
+		map[Lock]= 2;
+		map[LevelThree]= 3;
+		map[Shift+LevelThree]= 4;
+		map[Lock+LevelThree]= 3;
+		preserve[Lock+LevelThree]= Lock;
+		map[Shift+Lock+LevelThree]= 4;
+		preserve[Shift+Lock+LevelThree]= Lock;
+		level_name[1]= "Base";
+		level_name[2]= "Shift";
+		level_name[3]= "AltGr";
+		level_name[4]= "Shift AltGr";
+	};
+	type "FOUR_LEVEL_KEYPAD" {
+		modifiers= Shift+NumLock+LevelThree;
+		map[Shift]= 2;
+		map[NumLock]= 2;
+		map[LevelThree]= 3;
+		map[Shift+LevelThree]= 4;
+		map[NumLock+LevelThree]= 4;
+		map[Shift+NumLock+LevelThree]= 3;
+		level_name[1]= "Base";
+		level_name[2]= "Shift/Numlock";
+		level_name[3]= "AltGr";
+		level_name[4]= "Shift/Numlock AltGr";
+	};
+	type "FOUR_LEVEL_MIXED_KEYPAD" {
+		modifiers= Shift+NumLock+LevelThree;
+		map[Shift]= 2;
+		map[NumLock]= 2;
+		map[LevelThree]= 3;
+		map[Shift+LevelThree]= 4;
+		map[NumLock+LevelThree]= 3;
+		map[Shift+NumLock+LevelThree]= 4;
+		level_name[1]= "Base";
+		level_name[2]= "Number";
+		level_name[3]= "AltGr";
+		level_name[4]= "Shift AltGr";
+	};
+	type "FOUR_LEVEL_X" {
+		modifiers= Shift+Control+Alt+LevelThree;
+		map[LevelThree]= 2;
+		map[Shift+LevelThree]= 3;
+		map[Control+Alt]= 4;
+		level_name[1]= "Base";
+		level_name[2]= "AltGr";
+		level_name[3]= "Shift AltGr";
+		level_name[4]= "Ctrl+Alt";
+	};
+	type "SEPARATE_CAPS_AND_SHIFT_ALPHABETIC" {
+		modifiers= Shift+Lock+LevelThree;
+		map[Shift]= 2;
+		map[Lock]= 4;
+		preserve[Lock]= Lock;
+		map[LevelThree]= 3;
+		map[Shift+LevelThree]= 4;
+		map[Lock+LevelThree]= 3;
+		preserve[Lock+LevelThree]= Lock;
+		map[Shift+Lock+LevelThree]= 3;
+		level_name[1]= "Base";
+		level_name[2]= "Shift";
+		level_name[3]= "AltGr";
+		level_name[4]= "Caps / Shift AltGr";
+	};
+	type "FOUR_LEVEL_PLUS_LOCK" {
+		modifiers= Shift+Lock+LevelThree;
+		map[Shift]= 2;
+		map[LevelThree]= 3;
+		map[Shift+LevelThree]= 4;
+		map[Lock]= 5;
+		map[Shift+Lock]= 2;
+		map[Lock+LevelThree]= 3;
+		map[Shift+Lock+LevelThree]= 4;
+		level_name[1]= "Base";
+		level_name[2]= "Shift";
+		level_name[3]= "AltGr";
+		level_name[4]= "Shift AltGr";
+		level_name[5]= "Lock";
+	};
+	type "EIGHT_LEVEL" {
+		modifiers= Shift+LevelThree+LevelFive;
+		map[Shift]= 2;
+		map[LevelThree]= 3;
+		map[Shift+LevelThree]= 4;
+		map[LevelFive]= 5;
+		map[Shift+LevelFive]= 6;
+		map[LevelThree+LevelFive]= 7;
+		map[Shift+LevelThree+LevelFive]= 8;
+		level_name[1]= "Base";
+		level_name[2]= "Shift";
+		level_name[3]= "AltGr";
+		level_name[4]= "Shift AltGr";
+		level_name[5]= "X";
+		level_name[6]= "X Shift";
+		level_name[7]= "X AltGr";
+		level_name[8]= "X Shift AltGr";
+	};
+	type "EIGHT_LEVEL_ALPHABETIC" {
+		modifiers= Shift+Lock+LevelThree+LevelFive;
+		map[Shift]= 2;
+		map[Lock]= 2;
+		map[LevelThree]= 3;
+		map[Shift+LevelThree]= 4;
+		map[Lock+LevelThree]= 4;
+		map[Shift+Lock+LevelThree]= 3;
+		map[LevelFive]= 5;
+		map[Shift+LevelFive]= 6;
+		map[Lock+LevelFive]= 6;
+		map[Shift+Lock+LevelFive]= 5;
+		map[LevelThree+LevelFive]= 7;
+		map[Shift+LevelThree+LevelFive]= 8;
+		map[Lock+LevelThree+LevelFive]= 8;
+		map[Shift+Lock+LevelThree+LevelFive]= 7;
+		level_name[1]= "Base";
+		level_name[2]= "Shift";
+		level_name[3]= "AltGr";
+		level_name[4]= "Shift AltGr";
+		level_name[5]= "X";
+		level_name[6]= "X Shift";
+		level_name[7]= "X AltGr";
+		level_name[8]= "X Shift AltGr";
+	};
+	type "EIGHT_LEVEL_SEMIALPHABETIC" {
+		modifiers= Shift+Lock+LevelThree+LevelFive;
+		map[Shift]= 2;
+		map[Lock]= 2;
+		map[LevelThree]= 3;
+		map[Shift+LevelThree]= 4;
+		map[Lock+LevelThree]= 3;
+		preserve[Lock+LevelThree]= Lock;
+		map[Shift+Lock+LevelThree]= 4;
+		preserve[Shift+Lock+LevelThree]= Lock;
+		map[LevelFive]= 5;
+		map[Shift+LevelFive]= 6;
+		map[Lock+LevelFive]= 6;
+		map[Shift+Lock+LevelFive]= 5;
+		map[LevelThree+LevelFive]= 7;
+		map[Shift+LevelThree+LevelFive]= 8;
+		map[Lock+LevelThree+LevelFive]= 7;
+		preserve[Lock+LevelThree+LevelFive]= Lock;
+		map[Shift+Lock+LevelThree+LevelFive]= 8;
+		preserve[Shift+Lock+LevelThree+LevelFive]= Lock;
+		level_name[1]= "Base";
+		level_name[2]= "Shift";
+		level_name[3]= "AltGr";
+		level_name[4]= "Shift AltGr";
+		level_name[5]= "X";
+		level_name[6]= "X Shift";
+		level_name[7]= "X AltGr";
+		level_name[8]= "X Shift AltGr";
+	};
+	type "EIGHT_LEVEL_WITH_LEVEL5_LOCK" {
+		modifiers= Shift+NumLock+LevelThree+LevelFive;
+		map[Shift]= 2;
+		map[LevelThree]= 3;
+		map[Shift+LevelThree]= 4;
+		map[LevelFive]= 5;
+		map[Shift+LevelFive]= 6;
+		preserve[Shift+LevelFive]= Shift;
+		map[LevelThree+LevelFive]= 7;
+		map[Shift+LevelThree+LevelFive]= 8;
+		map[NumLock]= 5;
+		map[Shift+NumLock]= 6;
+		preserve[Shift+NumLock]= Shift;
+		map[NumLock+LevelThree]= 7;
+		map[Shift+NumLock+LevelThree]= 8;
+		map[Shift+NumLock+LevelFive]= 2;
+		map[NumLock+LevelThree+LevelFive]= 3;
+		map[Shift+NumLock+LevelThree+LevelFive]= 4;
+		level_name[1]= "Base";
+		level_name[2]= "Shift";
+		level_name[3]= "AltGr";
+		level_name[4]= "Shift AltGr";
+		level_name[5]= "X";
+		level_name[6]= "X Shift";
+		level_name[7]= "X AltGr";
+		level_name[8]= "X Shift AltGr";
+	};
+	type "EIGHT_LEVEL_ALPHABETIC_WITH_LEVEL5_LOCK" {
+		modifiers= Shift+Lock+NumLock+LevelThree+LevelFive;
+		map[Shift]= 2;
+		map[LevelThree]= 3;
+		map[Shift+LevelThree]= 4;
+		map[LevelFive]= 5;
+		map[Shift+LevelFive]= 6;
+		preserve[Shift+LevelFive]= Shift;
+		map[LevelThree+LevelFive]= 7;
+		map[Shift+LevelThree+LevelFive]= 8;
+		map[NumLock]= 5;
+		map[Shift+NumLock]= 6;
+		preserve[Shift+NumLock]= Shift;
+		map[NumLock+LevelThree]= 7;
+		map[Shift+NumLock+LevelThree]= 8;
+		map[Shift+NumLock+LevelFive]= 2;
+		map[NumLock+LevelThree+LevelFive]= 3;
+		map[Shift+NumLock+LevelThree+LevelFive]= 4;
+		map[Lock]= 2;
+		map[Lock+LevelThree]= 3;
+		map[Shift+Lock+LevelThree]= 4;
+		map[Lock+LevelFive]= 5;
+		map[Shift+Lock+LevelFive]= 6;
+		map[Lock+LevelThree+LevelFive]= 7;
+		map[Shift+Lock+LevelThree+LevelFive]= 8;
+		map[Lock+NumLock]= 5;
+		map[Shift+Lock+NumLock]= 6;
+		map[Lock+NumLock+LevelThree]= 7;
+		map[Shift+Lock+NumLock+LevelThree]= 8;
+		map[Lock+NumLock+LevelFive]= 2;
+		map[Lock+NumLock+LevelThree+LevelFive]= 3;
+		map[Shift+Lock+NumLock+LevelThree+LevelFive]= 4;
+		level_name[1]= "Base";
+		level_name[2]= "Shift";
+		level_name[3]= "AltGr";
+		level_name[4]= "Shift AltGr";
+		level_name[5]= "X";
+		level_name[6]= "X Shift";
+		level_name[7]= "X AltGr";
+		level_name[8]= "X Shift AltGr";
+	};
+	type "EIGHT_LEVEL_BY_CTRL" {
+		modifiers= Shift+Lock+Control+LevelThree;
+		map[Shift]= 2;
+		map[Lock]= 2;
+		map[LevelThree]= 3;
+		map[Shift+LevelThree]= 4;
+		map[Lock+LevelThree]= 4;
+		map[Shift+Lock+LevelThree]= 3;
+		map[Control]= 5;
+		map[Shift+Control]= 6;
+		map[Lock+Control]= 6;
+		map[Shift+Lock+Control]= 5;
+		map[Control+LevelThree]= 7;
+		map[Shift+Control+LevelThree]= 8;
+		map[Lock+Control+LevelThree]= 8;
+		map[Shift+Lock+Control+LevelThree]= 7;
+		level_name[1]= "Base";
+		level_name[2]= "Shift";
+		level_name[3]= "Level3";
+		level_name[4]= "Shift Level3";
+		level_name[5]= "Ctrl";
+		level_name[6]= "Shift Ctrl";
+		level_name[7]= "Level3 Ctrl";
+		level_name[8]= "Shift Level3 Ctrl";
+	};
+	type "KEYPAD" {
+		modifiers= Shift+NumLock;
+		map[NumLock]= 2;
+		level_name[1]= "Base";
+		level_name[2]= "Number";
+	};
+	type "SHIFT+ALT" {
+		modifiers= Shift+Alt;
+		map[Shift+Alt]= 2;
+		level_name[1]= "Base";
+		level_name[2]= "Shift+Alt";
+	};
+};
+
+xkb_compatibility "(unnamed)" {
+	virtual_modifiers NumLock,Alt,LevelThree,LevelFive,Meta,Super,Hyper,ScrollLock;
+
+	interpret.useModMapMods= AnyLevel;
+	interpret.repeat= False;
+	interpret ISO_Level2_Latch+Exactly(Shift) {
+		useModMapMods=level1;
+		action= LatchMods(modifiers=Shift,clearLocks,latchToLock);
+	};
+	interpret Shift_Lock+AnyOf(Shift+Lock) {
+		action= LockMods(modifiers=Shift);
+	};
+	interpret Num_Lock+AnyOf(all) {
+		virtualModifier= NumLock;
+		action= LockMods(modifiers=NumLock);
+	};
+	interpret ISO_Level3_Shift+AnyOf(all) {
+		virtualModifier= LevelThree;
+		useModMapMods=level1;
+		action= SetMods(modifiers=LevelThree,clearLocks);
+	};
+	interpret ISO_Level3_Latch+AnyOf(all) {
+		virtualModifier= LevelThree;
+		useModMapMods=level1;
+		action= LatchMods(modifiers=LevelThree,clearLocks,latchToLock);
+	};
+	interpret ISO_Level3_Lock+AnyOf(all) {
+		virtualModifier= LevelThree;
+		useModMapMods=level1;
+		action= LockMods(modifiers=LevelThree);
+	};
+	interpret Alt_L+AnyOf(all) {
+		virtualModifier= Alt;
+		action= SetMods(modifiers=modMapMods,clearLocks);
+	};
+	interpret Alt_R+AnyOf(all) {
+		virtualModifier= Alt;
+		action= SetMods(modifiers=modMapMods,clearLocks);
+	};
+	interpret Meta_L+AnyOf(all) {
+		virtualModifier= Meta;
+		action= SetMods(modifiers=modMapMods,clearLocks);
+	};
+	interpret Meta_R+AnyOf(all) {
+		virtualModifier= Meta;
+		action= SetMods(modifiers=modMapMods,clearLocks);
+	};
+	interpret Super_L+AnyOf(all) {
+		virtualModifier= Super;
+		action= SetMods(modifiers=modMapMods,clearLocks);
+	};
+	interpret Super_R+AnyOf(all) {
+		virtualModifier= Super;
+		action= SetMods(modifiers=modMapMods,clearLocks);
+	};
+	interpret Hyper_L+AnyOf(all) {
+		virtualModifier= Hyper;
+		action= SetMods(modifiers=modMapMods,clearLocks);
+	};
+	interpret Hyper_R+AnyOf(all) {
+		virtualModifier= Hyper;
+		action= SetMods(modifiers=modMapMods,clearLocks);
+	};
+	interpret Scroll_Lock+AnyOf(all) {
+		virtualModifier= ScrollLock;
+		action= LockMods(modifiers=modMapMods);
+	};
+	interpret ISO_Level5_Shift+AnyOf(all) {
+		virtualModifier= LevelFive;
+		useModMapMods=level1;
+		action= SetMods(modifiers=LevelFive,clearLocks);
+	};
+	interpret ISO_Level5_Latch+AnyOf(all) {
+		virtualModifier= LevelFive;
+		useModMapMods=level1;
+		action= LatchMods(modifiers=LevelFive,clearLocks,latchToLock);
+	};
+	interpret ISO_Level5_Lock+AnyOf(all) {
+		virtualModifier= LevelFive;
+		useModMapMods=level1;
+		action= LockMods(modifiers=LevelFive);
+	};
+	interpret Mode_switch+AnyOfOrNone(all) {
+		action= SetGroup(group=+1);
+	};
+	interpret ISO_Level3_Shift+AnyOfOrNone(all) {
+		action= SetMods(modifiers=LevelThree,clearLocks);
+	};
+	interpret ISO_Level3_Latch+AnyOfOrNone(all) {
+		action= LatchMods(modifiers=LevelThree,clearLocks,latchToLock);
+	};
+	interpret ISO_Level3_Lock+AnyOfOrNone(all) {
+		action= LockMods(modifiers=LevelThree);
+	};
+	interpret ISO_Group_Latch+AnyOfOrNone(all) {
+		action= LatchGroup(group=2);
+	};
+	interpret ISO_Next_Group+AnyOfOrNone(all) {
+		action= LockGroup(group=+1);
+	};
+	interpret ISO_Prev_Group+AnyOfOrNone(all) {
+		action= LockGroup(group=-1);
+	};
+	interpret ISO_First_Group+AnyOfOrNone(all) {
+		action= LockGroup(group=1);
+	};
+	interpret ISO_Last_Group+AnyOfOrNone(all) {
+		action= LockGroup(group=2);
+	};
+	interpret KP_1+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=-1,y=+1);
+	};
+	interpret KP_End+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=-1,y=+1);
+	};
+	interpret KP_2+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=+0,y=+1);
+	};
+	interpret KP_Down+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=+0,y=+1);
+	};
+	interpret KP_3+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=+1,y=+1);
+	};
+	interpret KP_Next+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=+1,y=+1);
+	};
+	interpret KP_4+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=-1,y=+0);
+	};
+	interpret KP_Left+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=-1,y=+0);
+	};
+	interpret KP_6+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=+1,y=+0);
+	};
+	interpret KP_Right+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=+1,y=+0);
+	};
+	interpret KP_7+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=-1,y=-1);
+	};
+	interpret KP_Home+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=-1,y=-1);
+	};
+	interpret KP_8+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=+0,y=-1);
+	};
+	interpret KP_Up+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=+0,y=-1);
+	};
+	interpret KP_9+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=+1,y=-1);
+	};
+	interpret KP_Prior+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=+1,y=-1);
+	};
+	interpret KP_5+AnyOfOrNone(all) {
+		repeat= True;
+		action= PtrBtn(button=default);
+	};
+	interpret KP_Begin+AnyOfOrNone(all) {
+		repeat= True;
+		action= PtrBtn(button=default);
+	};
+	interpret KP_F2+AnyOfOrNone(all) {
+		repeat= True;
+		action= SetPtrDflt(affect=button,button=1);
+	};
+	interpret KP_Divide+AnyOfOrNone(all) {
+		repeat= True;
+		action= SetPtrDflt(affect=button,button=1);
+	};
+	interpret KP_F3+AnyOfOrNone(all) {
+		repeat= True;
+		action= SetPtrDflt(affect=button,button=2);
+	};
+	interpret KP_Multiply+AnyOfOrNone(all) {
+		repeat= True;
+		action= SetPtrDflt(affect=button,button=2);
+	};
+	interpret KP_F4+AnyOfOrNone(all) {
+		repeat= True;
+		action= SetPtrDflt(affect=button,button=3);
+	};
+	interpret KP_Subtract+AnyOfOrNone(all) {
+		repeat= True;
+		action= SetPtrDflt(affect=button,button=3);
+	};
+	interpret KP_Separator+AnyOfOrNone(all) {
+		repeat= True;
+		action= PtrBtn(button=default,count=2);
+	};
+	interpret KP_Add+AnyOfOrNone(all) {
+		repeat= True;
+		action= PtrBtn(button=default,count=2);
+	};
+	interpret KP_0+AnyOfOrNone(all) {
+		repeat= True;
+		action= LockPtrBtn(button=default,affect=lock);
+	};
+	interpret KP_Insert+AnyOfOrNone(all) {
+		repeat= True;
+		action= LockPtrBtn(button=default,affect=lock);
+	};
+	interpret KP_Decimal+AnyOfOrNone(all) {
+		repeat= True;
+		action= LockPtrBtn(button=default,affect=unlock);
+	};
+	interpret KP_Delete+AnyOfOrNone(all) {
+		repeat= True;
+		action= LockPtrBtn(button=default,affect=unlock);
+	};
+	interpret F25+AnyOfOrNone(all) {
+		repeat= True;
+		action= SetPtrDflt(affect=button,button=1);
+	};
+	interpret F26+AnyOfOrNone(all) {
+		repeat= True;
+		action= SetPtrDflt(affect=button,button=2);
+	};
+	interpret F27+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=-1,y=-1);
+	};
+	interpret F29+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=+1,y=-1);
+	};
+	interpret F31+AnyOfOrNone(all) {
+		repeat= True;
+		action= PtrBtn(button=default);
+	};
+	interpret F33+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=-1,y=+1);
+	};
+	interpret F35+AnyOfOrNone(all) {
+		repeat= True;
+		action= MovePtr(x=+1,y=+1);
+	};
+	interpret Pointer_Button_Dflt+AnyOfOrNone(all) {
+		action= PtrBtn(button=default);
+	};
+	interpret Pointer_Button1+AnyOfOrNone(all) {
+		action= PtrBtn(button=1);
+	};
+	interpret Pointer_Button2+AnyOfOrNone(all) {
+		action= PtrBtn(button=2);
+	};
+	interpret Pointer_Button3+AnyOfOrNone(all) {
+		action= PtrBtn(button=3);
+	};
+	interpret Pointer_DblClick_Dflt+AnyOfOrNone(all) {
+		action= PtrBtn(button=default,count=2);
+	};
+	interpret Pointer_DblClick1+AnyOfOrNone(all) {
+		action= PtrBtn(button=1,count=2);
+	};
+	interpret Pointer_DblClick2+AnyOfOrNone(all) {
+		action= PtrBtn(button=2,count=2);
+	};
+	interpret Pointer_DblClick3+AnyOfOrNone(all) {
+		action= PtrBtn(button=3,count=2);
+	};
+	interpret Pointer_Drag_Dflt+AnyOfOrNone(all) {
+		action= LockPtrBtn(button=default,affect=both);
+	};
+	interpret Pointer_Drag1+AnyOfOrNone(all) {
+		action= LockPtrBtn(button=1,affect=both);
+	};
+	interpret Pointer_Drag2+AnyOfOrNone(all) {
+		action= LockPtrBtn(button=2,affect=both);
+	};
+	interpret Pointer_Drag3+AnyOfOrNone(all) {
+		action= LockPtrBtn(button=3,affect=both);
+	};
+	interpret Pointer_EnableKeys+AnyOfOrNone(all) {
+		action= LockControls(controls=MouseKeys);
+	};
+	interpret Pointer_Accelerate+AnyOfOrNone(all) {
+		action= LockControls(controls=MouseKeysAccel);
+	};
+	interpret Pointer_DfltBtnNext+AnyOfOrNone(all) {
+		action= SetPtrDflt(affect=button,button=+1);
+	};
+	interpret Pointer_DfltBtnPrev+AnyOfOrNone(all) {
+		action= SetPtrDflt(affect=button,button=-1);
+	};
+	interpret AccessX_Enable+AnyOfOrNone(all) {
+		action= LockControls(controls=AccessXKeys);
+	};
+	interpret AccessX_Feedback_Enable+AnyOfOrNone(all) {
+		action= LockControls(controls=AccessXFeedback);
+	};
+	interpret RepeatKeys_Enable+AnyOfOrNone(all) {
+		action= LockControls(controls=RepeatKeys);
+	};
+	interpret SlowKeys_Enable+AnyOfOrNone(all) {
+		action= LockControls(controls=SlowKeys);
+	};
+	interpret BounceKeys_Enable+AnyOfOrNone(all) {
+		action= LockControls(controls=BounceKeys);
+	};
+	interpret StickyKeys_Enable+AnyOfOrNone(all) {
+		action= LockControls(controls=StickyKeys);
+	};
+	interpret MouseKeys_Enable+AnyOfOrNone(all) {
+		action= LockControls(controls=MouseKeys);
+	};
+	interpret MouseKeys_Accel_Enable+AnyOfOrNone(all) {
+		action= LockControls(controls=MouseKeysAccel);
+	};
+	interpret Overlay1_Enable+AnyOfOrNone(all) {
+		action= LockControls(controls=none);
+	};
+	interpret Overlay2_Enable+AnyOfOrNone(all) {
+		action= LockControls(controls=none);
+	};
+	interpret AudibleBell_Enable+AnyOfOrNone(all) {
+		action= LockControls(controls=AudibleBell);
+	};
+	interpret Terminate_Server+AnyOfOrNone(all) {
+		action= Terminate();
+	};
+	interpret Alt_L+AnyOfOrNone(all) {
+		action= SetMods(modifiers=Alt,clearLocks);
+	};
+	interpret Alt_R+AnyOfOrNone(all) {
+		action= SetMods(modifiers=Alt,clearLocks);
+	};
+	interpret Meta_L+AnyOfOrNone(all) {
+		action= SetMods(modifiers=Meta,clearLocks);
+	};
+	interpret Meta_R+AnyOfOrNone(all) {
+		action= SetMods(modifiers=Meta,clearLocks);
+	};
+	interpret Super_L+AnyOfOrNone(all) {
+		action= SetMods(modifiers=Super,clearLocks);
+	};
+	interpret Super_R+AnyOfOrNone(all) {
+		action= SetMods(modifiers=Super,clearLocks);
+	};
+	interpret Hyper_L+AnyOfOrNone(all) {
+		action= SetMods(modifiers=Hyper,clearLocks);
+	};
+	interpret Hyper_R+AnyOfOrNone(all) {
+		action= SetMods(modifiers=Hyper,clearLocks);
+	};
+	interpret Shift_L+AnyOfOrNone(all) {
+		action= SetMods(modifiers=Shift,clearLocks);
+	};
+	interpret Shift_R+AnyOfOrNone(all) {
+		action= SetMods(modifiers=Shift,clearLocks);
+	};
+	interpret XF86Switch_VT_1+AnyOfOrNone(all) {
+		repeat= True;
+		action= SwitchScreen(screen=1,!same);
+	};
+	interpret XF86Switch_VT_2+AnyOfOrNone(all) {
+		repeat= True;
+		action= SwitchScreen(screen=2,!same);
+	};
+	interpret XF86Switch_VT_3+AnyOfOrNone(all) {
+		repeat= True;
+		action= SwitchScreen(screen=3,!same);
+	};
+	interpret XF86Switch_VT_4+AnyOfOrNone(all) {
+		repeat= True;
+		action= SwitchScreen(screen=4,!same);
+	};
+	interpret XF86Switch_VT_5+AnyOfOrNone(all) {
+		repeat= True;
+		action= SwitchScreen(screen=5,!same);
+	};
+	interpret XF86Switch_VT_6+AnyOfOrNone(all) {
+		repeat= True;
+		action= SwitchScreen(screen=6,!same);
+	};
+	interpret XF86Switch_VT_7+AnyOfOrNone(all) {
+		repeat= True;
+		action= SwitchScreen(screen=7,!same);
+	};
+	interpret XF86Switch_VT_8+AnyOfOrNone(all) {
+		repeat= True;
+		action= SwitchScreen(screen=8,!same);
+	};
+	interpret XF86Switch_VT_9+AnyOfOrNone(all) {
+		repeat= True;
+		action= SwitchScreen(screen=9,!same);
+	};
+	interpret XF86Switch_VT_10+AnyOfOrNone(all) {
+		repeat= True;
+		action= SwitchScreen(screen=10,!same);
+	};
+	interpret XF86Switch_VT_11+AnyOfOrNone(all) {
+		repeat= True;
+		action= SwitchScreen(screen=11,!same);
+	};
+	interpret XF86Switch_VT_12+AnyOfOrNone(all) {
+		repeat= True;
+		action= SwitchScreen(screen=12,!same);
+	};
+	interpret XF86LogGrabInfo+AnyOfOrNone(all) {
+		repeat= True;
+		action= Private(type=0x86,data[0]=0x50,data[1]=0x72,data[2]=0x47,data[3]=0x72,data[4]=0x62,data[5]=0x73,data[6]=0x00);
+	};
+	interpret XF86LogWindowTree+AnyOfOrNone(all) {
+		repeat= True;
+		action= Private(type=0x86,data[0]=0x50,data[1]=0x72,data[2]=0x57,data[3]=0x69,data[4]=0x6e,data[5]=0x73,data[6]=0x00);
+	};
+	interpret XF86Next_VMode+AnyOfOrNone(all) {
+		repeat= True;
+		action= Private(type=0x86,data[0]=0x2b,data[1]=0x56,data[2]=0x4d,data[3]=0x6f,data[4]=0x64,data[5]=0x65,data[6]=0x00);
+	};
+	interpret XF86Prev_VMode+AnyOfOrNone(all) {
+		repeat= True;
+		action= Private(type=0x86,data[0]=0x2d,data[1]=0x56,data[2]=0x4d,data[3]=0x6f,data[4]=0x64,data[5]=0x65,data[6]=0x00);
+	};
+	interpret ISO_Level5_Shift+AnyOfOrNone(all) {
+		action= SetMods(modifiers=LevelFive,clearLocks);
+	};
+	interpret ISO_Level5_Latch+AnyOfOrNone(all) {
+		action= LatchMods(modifiers=LevelFive,clearLocks,latchToLock);
+	};
+	interpret ISO_Level5_Lock+AnyOfOrNone(all) {
+		action= LockMods(modifiers=LevelFive);
+	};
+	interpret Caps_Lock+AnyOfOrNone(all) {
+		action= LockMods(modifiers=Lock);
+	};
+	interpret Any+Exactly(Lock) {
+		action= LockMods(modifiers=Lock);
+	};
+	interpret Any+AnyOf(all) {
+		action= SetMods(modifiers=modMapMods,clearLocks);
+	};
+	indicator "Caps Lock" {
+		whichModState= locked;
+		modifiers= Lock;
+	};
+	indicator "Num Lock" {
+		whichModState= locked;
+		modifiers= NumLock;
+	};
+	indicator "Scroll Lock" {
+		whichModState= locked;
+		modifiers= ScrollLock;
+	};
+	indicator "Shift Lock" {
+		whichModState= locked;
+		modifiers= Shift;
+	};
+	indicator "Group 2" {
+		groups= 0xfe;
+	};
+	indicator "Mouse Keys" {
+		controls= MouseKeys;
+	};
+};
+
+xkb_symbols "(unnamed)" {
+	name[Group1]="French";
+
+	key <ESC>                {	[          Escape ] };
+	key <AE01>               {	[       ampersand,               1,     onesuperior,      exclamdown ] };
+	key <AE02>               {	[          eacute,               2,      asciitilde,       oneeighth ] };
+	key <AE03>               {	[        quotedbl,               3,      numbersign,        sterling ] };
+	key <AE04>               {	[      apostrophe,               4,       braceleft,          dollar ] };
+	key <AE05>               {	[       parenleft,               5,     bracketleft,    threeeighths ] };
+	key <AE06>               {	[           minus,               6,             bar,     fiveeighths ] };
+	key <AE07>               {	[          egrave,               7,           grave,    seveneighths ] };
+	key <AE08>               {	[      underscore,               8,       backslash,       trademark ] };
+	key <AE09>               {	[        ccedilla,               9,     asciicircum,       plusminus ] };
+	key <AE10>               {	[          agrave,               0,              at,          degree ] };
+	key <AE11>               {	[      parenright,          degree,    bracketright,    questiondown ] };
+	key <AE12>               {	[           equal,            plus,      braceright,     dead_ogonek ] };
+	key <BKSP>               {	[       BackSpace,       BackSpace ] };
+	key <TAB>                {	[             Tab,    ISO_Left_Tab ] };
+	key <AD01>               {	[               a,               A,              ae,              AE ] };
+	key <AD02>               {	[               z,               Z,   guillemetleft,            less ] };
+	key <AD03>               {	[               e,               E,        EuroSign,            cent ] };
+	key <AD04>               {	[               r,               R,       paragraph,      registered ] };
+	key <AD05>               {	[               t,               T,          tslash,          Tslash ] };
+	key <AD06>               {	[               y,               Y,       leftarrow,             yen ] };
+	key <AD07>               {	[               u,               U,       downarrow,         uparrow ] };
+	key <AD08>               {	[               i,               I,      rightarrow,        idotless ] };
+	key <AD09>               {	[               o,               O,          oslash,          Oslash ] };
+	key <AD10>               {	[               p,               P,           thorn,           THORN ] };
+	key <AD11>               {	[ dead_circumflex,  dead_diaeresis,  dead_diaeresis,  dead_abovering ] };
+	key <AD12>               {	[          dollar,        sterling,        currency,     dead_macron ] };
+	key <RTRN>               {	[          Return ] };
+	key <LCTL>               {	[       Control_L ] };
+	key <AC01>               {	[               q,               Q,              at,     Greek_OMEGA ] };
+	key <AC02>               {	[               s,               S,          ssharp,           U1E9E ] };
+	key <AC03>               {	[               d,               D,             eth,             ETH ] };
+	key <AC04>               {	[               f,               F,         dstroke,     ordfeminine ] };
+	key <AC05>               {	[               g,               G,             eng,             ENG ] };
+	key <AC06>               {	[               h,               H,         hstroke,         Hstroke ] };
+	key <AC07>               {	[               j,               J,       dead_hook,       dead_horn ] };
+	key <AC08>               {	[               k,               K,             kra,       ampersand ] };
+	key <AC09>               {	[               l,               L,         lstroke,         Lstroke ] };
+	key <AC10>               {	[               m,               M,              mu,    ordmasculine ] };
+	key <AC11>               {	[          ugrave,         percent, dead_circumflex,      dead_caron ] };
+	key <TLDE>               {	[     twosuperior,      asciitilde,         notsign,         notsign ] };
+	key <LFSH>               {	[         Shift_L ] };
+	key <BKSL>               {	[        asterisk,              mu,      dead_grave,      dead_breve ] };
+	key <AB01>               {	[               w,               W,         lstroke,         Lstroke ] };
+	key <AB02>               {	[               x,               X,  guillemetright,         greater ] };
+	key <AB03>               {	[               c,               C,            cent,       copyright ] };
+	key <AB04>               {	[               v,               V, doublelowquotemark, singlelowquotemark ] };
+	key <AB05>               {	[               b,               B, leftdoublequotemark, leftsinglequotemark ] };
+	key <AB06>               {	[               n,               N, rightdoublequotemark, rightsinglequotemark ] };
+	key <AB07>               {	[           comma,        question,      dead_acute, dead_doubleacute ] };
+	key <AB08>               {	[       semicolon,          period,           U2022,        multiply ] };
+	key <AB09>               {	[           colon,           slash,  periodcentered,        division ] };
+	key <AB10>               {	[          exclam,         section,   dead_belowdot,   dead_abovedot ] };
+	key <RTSH>               {	[         Shift_R ] };
+	key <KPMU>               {
+		type= "CTRL+ALT",
+		symbols[Group1]= [     KP_Multiply,     KP_Multiply,     KP_Multiply,     KP_Multiply,   XF86ClearGrab ]
+	};
+	key <LALT>               {	[           Alt_L,          Meta_L ] };
+	key <SPCE>               {	[           space ] };
+	key <CAPS>               {	[       Caps_Lock ] };
+	key <FK01>               {
+		type= "CTRL+ALT",
+		symbols[Group1]= [              F1,              F1,              F1,              F1, XF86Switch_VT_1 ]
+	};
+	key <FK02>               {
+		type= "CTRL+ALT",
+		symbols[Group1]= [              F2,              F2,              F2,              F2, XF86Switch_VT_2 ]
+	};
+	key <FK03>               {
+		type= "CTRL+ALT",
+		symbols[Group1]= [              F3,              F3,              F3,              F3, XF86Switch_VT_3 ]
+	};
+	key <FK04>               {
+		type= "CTRL+ALT",
+		symbols[Group1]= [              F4,              F4,              F4,              F4, XF86Switch_VT_4 ]
+	};
+	key <FK05>               {
+		type= "CTRL+ALT",
+		symbols[Group1]= [              F5,              F5,              F5,              F5, XF86Switch_VT_5 ]
+	};
+	key <FK06>               {
+		type= "CTRL+ALT",
+		symbols[Group1]= [              F6,              F6,              F6,              F6, XF86Switch_VT_6 ]
+	};
+	key <FK07>               {
+		type= "CTRL+ALT",
+		symbols[Group1]= [              F7,              F7,              F7,              F7, XF86Switch_VT_7 ]
+	};
+	key <FK08>               {
+		type= "CTRL+ALT",
+		symbols[Group1]= [              F8,              F8,              F8,              F8, XF86Switch_VT_8 ]
+	};
+	key <FK09>               {
+		type= "CTRL+ALT",
+		symbols[Group1]= [              F9,              F9,              F9,              F9, XF86Switch_VT_9 ]
+	};
+	key <FK10>               {
+		type= "CTRL+ALT",
+		symbols[Group1]= [             F10,             F10,             F10,             F10, XF86Switch_VT_10 ]
+	};
+	key <NMLK>               {	[        Num_Lock ] };
+	key <SCLK>               {	[     Scroll_Lock ] };
+	key <KP7>                {	[         KP_Home,            KP_7 ] };
+	key <KP8>                {	[           KP_Up,            KP_8 ] };
+	key <KP9>                {	[        KP_Prior,            KP_9 ] };
+	key <KPSU>               {
+		type= "CTRL+ALT",
+		symbols[Group1]= [     KP_Subtract,     KP_Subtract,     KP_Subtract,     KP_Subtract,  XF86Prev_VMode ]
+	};
+	key <KP4>                {	[         KP_Left,            KP_4 ] };
+	key <KP5>                {	[        KP_Begin,            KP_5 ] };
+	key <KP6>                {	[        KP_Right,            KP_6 ] };
+	key <KPAD>               {
+		type= "CTRL+ALT",
+		symbols[Group1]= [          KP_Add,          KP_Add,          KP_Add,          KP_Add,  XF86Next_VMode ]
+	};
+	key <KP1>                {	[          KP_End,            KP_1 ] };
+	key <KP2>                {	[         KP_Down,            KP_2 ] };
+	key <KP3>                {	[         KP_Next,            KP_3 ] };
+	key <KP0>                {	[       KP_Insert,            KP_0 ] };
+	key <KPDL>               {	[       KP_Delete,      KP_Decimal ] };
+	key <LVL3>               {	[ ISO_Level3_Shift ] };
+	key <LSGT>               {	[            less,         greater,             bar,       brokenbar ] };
+	key <FK11>               {
+		type= "CTRL+ALT",
+		symbols[Group1]= [             F11,             F11,             F11,             F11, XF86Switch_VT_11 ]
+	};
+	key <FK12>               {
+		type= "CTRL+ALT",
+		symbols[Group1]= [             F12,             F12,             F12,             F12, XF86Switch_VT_12 ]
+	};
+	key <KATA>               {	[        Katakana ] };
+	key <HIRA>               {	[        Hiragana ] };
+	key <HENK>               {	[     Henkan_Mode ] };
+	key <HKTG>               {	[ Hiragana_Katakana ] };
+	key <MUHE>               {	[        Muhenkan ] };
+	key <KPEN>               {	[        KP_Enter ] };
+	key <RCTL>               {	[       Control_R ] };
+	key <KPDV>               {
+		type= "CTRL+ALT",
+		symbols[Group1]= [       KP_Divide,       KP_Divide,       KP_Divide,       KP_Divide,      XF86Ungrab ]
+	};
+	key <PRSC>               {
+		type= "PC_ALT_LEVEL2",
+		symbols[Group1]= [           Print,         Sys_Req ]
+	};
+	key <RALT>               {
+		type= "ONE_LEVEL",
+		symbols[Group1]= [ ISO_Level3_Shift ]
+	};
+	key <LNFD>               {	[        Linefeed ] };
+	key <HOME>               {	[            Home ] };
+	key <UP>                 {	[              Up ] };
+	key <PGUP>               {	[           Prior ] };
+	key <LEFT>               {	[            Left ] };
+	key <RGHT>               {	[           Right ] };
+	key <END>                {	[             End ] };
+	key <DOWN>               {	[            Down ] };
+	key <PGDN>               {	[            Next ] };
+	key <INS>                {	[          Insert ] };
+	key <DELE>               {	[          Delete ] };
+	key <MUTE>               {	[   XF86AudioMute ] };
+	key <VOL->               {	[ XF86AudioLowerVolume ] };
+	key <VOL+>               {	[ XF86AudioRaiseVolume ] };
+	key <POWR>               {	[    XF86PowerOff ] };
+	key <KPEQ>               {	[        KP_Equal ] };
+	key <I126>               {	[       plusminus ] };
+	key <PAUS>               {
+		type= "PC_CONTROL_LEVEL2",
+		symbols[Group1]= [           Pause,           Break ]
+	};
+	key <I128>               {	[     XF86LaunchA ] };
+	key <I129>               {	[      KP_Decimal,      KP_Decimal ] };
+	key <HNGL>               {	[          Hangul ] };
+	key <HJCV>               {	[    Hangul_Hanja ] };
+	key <LWIN>               {	[         Super_L ] };
+	key <RWIN>               {	[         Super_R ] };
+	key <COMP>               {	[            Menu ] };
+	key <STOP>               {	[          Cancel ] };
+	key <AGAI>               {	[            Redo ] };
+	key <PROP>               {	[        SunProps ] };
+	key <UNDO>               {	[            Undo ] };
+	key <FRNT>               {	[        SunFront ] };
+	key <COPY>               {	[        XF86Copy ] };
+	key <OPEN>               {	[        XF86Open ] };
+	key <PAST>               {	[       XF86Paste ] };
+	key <FIND>               {	[            Find ] };
+	key <CUT>                {	[         XF86Cut ] };
+	key <HELP>               {	[            Help ] };
+	key <I147>               {	[      XF86MenuKB ] };
+	key <I148>               {	[  XF86Calculator ] };
+	key <I150>               {	[       XF86Sleep ] };
+	key <I151>               {	[      XF86WakeUp ] };
+	key <I152>               {	[    XF86Explorer ] };
+	key <I153>               {	[        XF86Send ] };
+	key <I155>               {	[        XF86Xfer ] };
+	key <I156>               {	[     XF86Launch1 ] };
+	key <I157>               {	[     XF86Launch2 ] };
+	key <I158>               {	[         XF86WWW ] };
+	key <I159>               {	[         XF86DOS ] };
+	key <I160>               {	[ XF86ScreenSaver ] };
+	key <I161>               {	[ XF86RotateWindows ] };
+	key <I162>               {	[    XF86TaskPane ] };
+	key <I163>               {	[        XF86Mail ] };
+	key <I164>               {	[   XF86Favorites ] };
+	key <I165>               {	[  XF86MyComputer ] };
+	key <I166>               {	[        XF86Back ] };
+	key <I167>               {	[     XF86Forward ] };
+	key <I169>               {	[       XF86Eject ] };
+	key <I170>               {	[       XF86Eject ] };
+	key <I171>               {	[   XF86AudioNext ] };
+	key <I172>               {	[   XF86AudioPlay,  XF86AudioPause ] };
+	key <I173>               {	[   XF86AudioPrev ] };
+	key <I174>               {	[   XF86AudioStop,       XF86Eject ] };
+	key <I175>               {	[ XF86AudioRecord ] };
+	key <I176>               {	[ XF86AudioRewind ] };
+	key <I177>               {	[       XF86Phone ] };
+	key <I179>               {	[       XF86Tools ] };
+	key <I180>               {	[    XF86HomePage ] };
+	key <I181>               {	[      XF86Reload ] };
+	key <I182>               {	[       XF86Close ] };
+	key <I185>               {	[    XF86ScrollUp ] };
+	key <I186>               {	[  XF86ScrollDown ] };
+	key <I187>               {	[       parenleft ] };
+	key <I188>               {	[      parenright ] };
+	key <I189>               {	[         XF86New ] };
+	key <I190>               {	[            Redo ] };
+	key <FK13>               {	[       XF86Tools ] };
+	key <FK14>               {	[     XF86Launch5 ] };
+	key <FK15>               {	[     XF86Launch6 ] };
+	key <FK16>               {	[     XF86Launch7 ] };
+	key <FK17>               {	[     XF86Launch8 ] };
+	key <FK18>               {	[     XF86Launch9 ] };
+	key <FK20>               {	[ XF86AudioMicMute ] };
+	key <FK21>               {	[ XF86TouchpadToggle ] };
+	key <FK22>               {	[  XF86TouchpadOn ] };
+	key <FK23>               {	[ XF86TouchpadOff ] };
+	key <LVL5>               {	[ ISO_Level5_Shift ] };
+	key <ALT>                {	[        NoSymbol,           Alt_L ] };
+	key <META>               {	[        NoSymbol,          Meta_L ] };
+	key <SUPR>               {	[        NoSymbol,         Super_L ] };
+	key <HYPR>               {	[        NoSymbol,         Hyper_L ] };
+	key <I208>               {	[   XF86AudioPlay ] };
+	key <I209>               {	[  XF86AudioPause ] };
+	key <I210>               {	[     XF86Launch3 ] };
+	key <I211>               {	[     XF86Launch4 ] };
+	key <I212>               {	[     XF86LaunchB ] };
+	key <I213>               {	[     XF86Suspend ] };
+	key <I214>               {	[       XF86Close ] };
+	key <I215>               {	[   XF86AudioPlay ] };
+	key <I216>               {	[ XF86AudioForward ] };
+	key <I218>               {	[           Print ] };
+	key <I220>               {	[      XF86WebCam ] };
+	key <I221>               {	[ XF86AudioPreset ] };
+	key <I223>               {	[        XF86Mail ] };
+	key <I224>               {	[   XF86Messenger ] };
+	key <I225>               {	[      XF86Search ] };
+	key <I226>               {	[          XF86Go ] };
+	key <I227>               {	[     XF86Finance ] };
+	key <I228>               {	[        XF86Game ] };
+	key <I229>               {	[        XF86Shop ] };
+	key <I231>               {	[          Cancel ] };
+	key <I232>               {	[ XF86MonBrightnessDown ] };
+	key <I233>               {	[ XF86MonBrightnessUp ] };
+	key <I234>               {	[  XF86AudioMedia ] };
+	key <I235>               {	[     XF86Display ] };
+	key <I236>               {	[ XF86KbdLightOnOff ] };
+	key <I237>               {	[ XF86KbdBrightnessDown ] };
+	key <I238>               {	[ XF86KbdBrightnessUp ] };
+	key <I239>               {	[        XF86Send ] };
+	key <I240>               {	[       XF86Reply ] };
+	key <I241>               {	[ XF86MailForward ] };
+	key <I242>               {	[        XF86Save ] };
+	key <I243>               {	[   XF86Documents ] };
+	key <I244>               {	[     XF86Battery ] };
+	key <I245>               {	[   XF86Bluetooth ] };
+	key <I246>               {	[        XF86WLAN ] };
+	key <I247>               {	[         XF86UWB ] };
+	key <I249>               {	[  XF86Next_VMode ] };
+	key <I250>               {	[  XF86Prev_VMode ] };
+	key <I251>               {	[ XF86MonBrightnessCycle ] };
+	key <I252>               {	[ XF86BrightnessAuto ] };
+	key <I253>               {	[  XF86DisplayOff ] };
+	key <I254>               {	[        XF86WWAN ] };
+	key <I255>               {	[      XF86RFKill ] };
+	key <I256>               {	[ XF86AudioMicMute ] };
+	key <I366>               {	[        XF86Info ] };
+	key <I372>               {	[   XF86Favorites ] };
+	key <I379>               {	[  XF86CycleAngle ] };
+	key <I380>               {	[  XF86FullScreen ] };
+	key <I382>               {	[    XF86Keyboard ] };
+	key <I383>               {	[ XF86AspectRatio ] };
+	key <I397>               {	[         XF86DVD ] };
+	key <I400>               {	[       XF86Audio ] };
+	key <I401>               {	[       XF86Video ] };
+	key <I405>               {	[    XF86Calendar ] };
+	key <I410>               {	[   XF86ChannelUp ] };
+	key <I411>               {	[ XF86ChannelDown ] };
+	key <I418>               {	[ XF86AudioRandomPlay ] };
+	key <I419>               {	[       XF86Break ] };
+	key <I424>               {	[  XF86VideoPhone ] };
+	key <I425>               {	[        XF86Game ] };
+	key <I426>               {	[      XF86ZoomIn ] };
+	key <I427>               {	[     XF86ZoomOut ] };
+	key <I428>               {	[   XF86ZoomReset ] };
+	key <I429>               {	[        XF86Word ] };
+	key <I430>               {	[      XF86Editor ] };
+	key <I431>               {	[       XF86Excel ] };
+	key <I432>               {	[ XF86GraphicsEditor ] };
+	key <I433>               {	[ XF86Presentation ] };
+	key <I434>               {	[    XF86Database ] };
+	key <I435>               {	[        XF86News ] };
+	key <I436>               {	[   XF86Voicemail ] };
+	key <I437>               {	[ XF86Addressbook ] };
+	key <I438>               {	[   XF86Messenger ] };
+	key <I439>               {	[ XF86DisplayToggle ] };
+	key <I440>               {	[  XF86SpellCheck ] };
+	key <I441>               {	[      XF86LogOff ] };
+	key <I442>               {	[          dollar ] };
+	key <I443>               {	[        EuroSign ] };
+	key <I444>               {	[   XF86FrameBack ] };
+	key <I445>               {	[ XF86FrameForward ] };
+	key <I446>               {	[ XF86ContextMenu ] };
+	key <I447>               {	[ XF86MediaRepeat ] };
+	key <I448>               {	[ XF8610ChannelsUp ] };
+	key <I449>               {	[ XF8610ChannelsDown ] };
+	key <I450>               {	[      XF86Images ] };
+	key <I452>               {	[ XF86NotificationCenter ] };
+	key <I453>               {	[ XF86PickupPhone ] };
+	key <I454>               {	[ XF86HangupPhone ] };
+	key <I472>               {	[          XF86Fn ] };
+	key <I473>               {	[      XF86Fn_Esc ] };
+	key <I493>               {	[ XF86FnRightShift ] };
+	key <I505>               {	[   braille_dot_1 ] };
+	key <I506>               {	[   braille_dot_2 ] };
+	key <I507>               {	[   braille_dot_3 ] };
+	key <I508>               {	[   braille_dot_4 ] };
+	key <I509>               {	[   braille_dot_5 ] };
+	key <I510>               {	[   braille_dot_6 ] };
+	key <I511>               {	[   braille_dot_7 ] };
+	key <I512>               {	[   braille_dot_8 ] };
+	key <I513>               {	[   braille_dot_9 ] };
+	key <I514>               {	[   braille_dot_1 ] };
+	key <I520>               {	[    XF86Numeric0 ] };
+	key <I521>               {	[    XF86Numeric1 ] };
+	key <I522>               {	[    XF86Numeric2 ] };
+	key <I523>               {	[    XF86Numeric3 ] };
+	key <I524>               {	[    XF86Numeric4 ] };
+	key <I525>               {	[    XF86Numeric5 ] };
+	key <I526>               {	[    XF86Numeric6 ] };
+	key <I527>               {	[    XF86Numeric7 ] };
+	key <I528>               {	[    XF86Numeric8 ] };
+	key <I529>               {	[    XF86Numeric9 ] };
+	key <I530>               {	[ XF86NumericStar ] };
+	key <I531>               {	[ XF86NumericPound ] };
+	key <I532>               {	[    XF86NumericA ] };
+	key <I533>               {	[    XF86NumericB ] };
+	key <I534>               {	[    XF86NumericC ] };
+	key <I535>               {	[    XF86NumericD ] };
+	key <I536>               {	[ XF86CameraFocus ] };
+	key <I537>               {	[   XF86WPSButton ] };
+	key <I538>               {	[ XF86TouchpadToggle ] };
+	key <I539>               {	[  XF86TouchpadOn ] };
+	key <I540>               {	[ XF86TouchpadOff ] };
+	key <I541>               {	[ XF86CameraZoomIn ] };
+	key <I542>               {	[ XF86CameraZoomOut ] };
+	key <I543>               {	[    XF86CameraUp ] };
+	key <I544>               {	[  XF86CameraDown ] };
+	key <I545>               {	[  XF86CameraLeft ] };
+	key <I546>               {	[ XF86CameraRight ] };
+	key <I547>               {	[ XF86AttendantOn ] };
+	key <I548>               {	[ XF86AttendantOff ] };
+	key <I549>               {	[ XF86AttendantToggle ] };
+	key <I550>               {	[ XF86LightsToggle ] };
+	key <I568>               {	[   XF86ALSToggle ] };
+	key <I569>               {	[ XF86RotationLockToggle ] };
+	key <I584>               {	[ XF86Buttonconfig ] };
+	key <I585>               {	[ XF86Taskmanager ] };
+	key <I586>               {	[     XF86Journal ] };
+	key <I587>               {	[ XF86ControlPanel ] };
+	key <I588>               {	[   XF86AppSelect ] };
+	key <I589>               {	[ XF86Screensaver ] };
+	key <I590>               {	[ XF86VoiceCommand ] };
+	key <I591>               {	[   XF86Assistant ] };
+	key <I592>               {	[  ISO_Next_Group ] };
+	key <I593>               {	[ XF86EmojiPicker ] };
+	key <I594>               {	[     XF86Dictate ] };
+	key <I595>               {	[ XF86CameraAccessEnable ] };
+	key <I596>               {	[ XF86CameraAccessDisable ] };
+	key <I597>               {	[ XF86CameraAccessToggle ] };
+	key <I600>               {	[ XF86BrightnessMin ] };
+	key <I601>               {	[ XF86BrightnessMax ] };
+	key <I616>               {	[ XF86KbdInputAssistPrev ] };
+	key <I617>               {	[ XF86KbdInputAssistNext ] };
+	key <I618>               {	[ XF86KbdInputAssistPrevgroup ] };
+	key <I619>               {	[ XF86KbdInputAssistNextgroup ] };
+	key <I620>               {	[ XF86KbdInputAssistAccept ] };
+	key <I621>               {	[ XF86KbdInputAssistCancel ] };
+	key <I622>               {	[     XF86RightUp ] };
+	key <I623>               {	[   XF86RightDown ] };
+	key <I624>               {	[      XF86LeftUp ] };
+	key <I625>               {	[    XF86LeftDown ] };
+	key <I626>               {	[    XF86RootMenu ] };
+	key <I627>               {	[ XF86MediaTopMenu ] };
+	key <I628>               {	[   XF86Numeric11 ] };
+	key <I629>               {	[   XF86Numeric12 ] };
+	key <I630>               {	[   XF86AudioDesc ] };
+	key <I631>               {	[      XF863DMode ] };
+	key <I632>               {	[ XF86NextFavorite ] };
+	key <I633>               {	[  XF86StopRecord ] };
+	key <I634>               {	[ XF86PauseRecord ] };
+	key <I635>               {	[         XF86VOD ] };
+	key <I636>               {	[      XF86Unmute ] };
+	key <I637>               {	[ XF86FastReverse ] };
+	key <I638>               {	[ XF86SlowReverse ] };
+	key <I639>               {	[        XF86Data ] };
+	key <I640>               {	[ XF86OnScreenKeyboard ] };
+	key <I641>               {	[ XF86PrivacyScreenToggle ] };
+	key <I642>               {	[ XF86SelectiveScreenshot ] };
+	key <I643>               {	[ XF86NextElement ] };
+	key <I644>               {	[ XF86PreviousElement ] };
+	key <I645>               {	[ XF86AutopilotEngageToggle ] };
+	key <I646>               {	[ XF86MarkWaypoint ] };
+	key <I647>               {	[         XF86Sos ] };
+	key <I648>               {	[    XF86NavChart ] };
+	key <I649>               {	[ XF86FishingChart ] };
+	key <I650>               {	[ XF86SingleRangeRadar ] };
+	key <I651>               {	[ XF86DualRangeRadar ] };
+	key <I652>               {	[ XF86RadarOverlay ] };
+	key <I653>               {	[ XF86TraditionalSonar ] };
+	key <I654>               {	[ XF86ClearvuSonar ] };
+	key <I655>               {	[ XF86SidevuSonar ] };
+	key <I656>               {	[     XF86NavInfo ] };
+	key <I657>               {	[ XF86BrightnessAdjust ] };
+	key <I664>               {	[      XF86Macro1 ] };
+	key <I665>               {	[      XF86Macro2 ] };
+	key <I666>               {	[      XF86Macro3 ] };
+	key <I667>               {	[      XF86Macro4 ] };
+	key <I668>               {	[      XF86Macro5 ] };
+	key <I669>               {	[      XF86Macro6 ] };
+	key <I670>               {	[      XF86Macro7 ] };
+	key <I671>               {	[      XF86Macro8 ] };
+	key <I672>               {	[      XF86Macro9 ] };
+	key <I673>               {	[     XF86Macro10 ] };
+	key <I674>               {	[     XF86Macro11 ] };
+	key <I675>               {	[     XF86Macro12 ] };
+	key <I676>               {	[     XF86Macro13 ] };
+	key <I677>               {	[     XF86Macro14 ] };
+	key <I678>               {	[     XF86Macro15 ] };
+	key <I679>               {	[     XF86Macro16 ] };
+	key <I680>               {	[     XF86Macro17 ] };
+	key <I681>               {	[     XF86Macro18 ] };
+	key <I682>               {	[     XF86Macro19 ] };
+	key <I683>               {	[     XF86Macro20 ] };
+	key <I684>               {	[     XF86Macro21 ] };
+	key <I685>               {	[     XF86Macro22 ] };
+	key <I686>               {	[     XF86Macro23 ] };
+	key <I687>               {	[     XF86Macro24 ] };
+	key <I688>               {	[     XF86Macro25 ] };
+	key <I689>               {	[     XF86Macro26 ] };
+	key <I690>               {	[     XF86Macro27 ] };
+	key <I691>               {	[     XF86Macro28 ] };
+	key <I692>               {	[     XF86Macro29 ] };
+	key <I693>               {	[     XF86Macro30 ] };
+	key <I696>               {	[ XF86MacroRecordStart ] };
+	key <I697>               {	[ XF86MacroRecordStop ] };
+	key <I698>               {	[ XF86MacroPresetCycle ] };
+	key <I699>               {	[ XF86MacroPreset1 ] };
+	key <I700>               {	[ XF86MacroPreset2 ] };
+	key <I701>               {	[ XF86MacroPreset3 ] };
+	key <I704>               {	[ XF86KbdLcdMenu1 ] };
+	key <I705>               {	[ XF86KbdLcdMenu2 ] };
+	key <I706>               {	[ XF86KbdLcdMenu3 ] };
+	key <I707>               {	[ XF86KbdLcdMenu4 ] };
+	key <I708>               {	[ XF86KbdLcdMenu5 ] };
+	modifier_map Shift { <LFSH>, <RTSH> };
+	modifier_map Lock { <CAPS> };
+	modifier_map Control { <LCTL>, <RCTL> };
+	modifier_map Mod1 { <LALT>, <ALT>, <META> };
+	modifier_map Mod2 { <NMLK> };
+	modifier_map Mod3 { <LVL5> };
+	modifier_map Mod4 { <LWIN>, <RWIN>, <SUPR>, <HYPR> };
+	modifier_map Mod5 { <LVL3> };
+};
+
+};
+

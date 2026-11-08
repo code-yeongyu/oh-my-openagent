@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { hostname } from "node:os"
 
+import { osFileLockAvailable } from "./os-file-lock"
 import { getProcessStartIdentity } from "./process-identity"
 
 export type LockRecord = {
@@ -11,6 +12,9 @@ export type LockRecord = {
   readonly created_at: string
   readonly purpose: string
   readonly run_id?: string
+  // This process runs its memory-core git under the kernel git-activity lock (omo #10322), so an
+  // idle activity lock proves none of its git processes outlived it.
+  readonly git_activity_lock?: true
 }
 
 export type CreateLockRecordOptions = {
@@ -47,6 +51,7 @@ export function parseLockRecord(content: string): LockRecord | null {
     created_at: candidate.created_at,
     purpose: candidate.purpose,
     ...(candidate.run_id === undefined ? {} : { run_id: candidate.run_id }),
+    ...(candidate.git_activity_lock === true ? { git_activity_lock: true as const } : {}),
   }
 }
 
@@ -64,5 +69,6 @@ export async function createLockRecord(
     created_at: new Date().toISOString(),
     purpose,
     ...(options.runId === undefined ? {} : { run_id: options.runId }),
+    ...((await osFileLockAvailable()) ? { git_activity_lock: true as const } : {}),
   }
 }

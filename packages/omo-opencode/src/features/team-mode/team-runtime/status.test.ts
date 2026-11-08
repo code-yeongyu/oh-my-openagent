@@ -7,7 +7,7 @@ import path from "node:path"
 import type { BackgroundManager } from "../../background-agent/manager"
 import { TeamModeConfigSchema } from "../../../config/schema/team-mode"
 import type { TeamModeConfig } from "../../../config/schema/team-mode"
-import { createTask } from "../team-tasklist/store"
+import { createTask } from "@oh-my-opencode/team-core/team-tasklist/store"
 import { createTaskInput } from "../team-tasklist/test-support"
 import { getInboxDir, getTasksDir, resolveBaseDir } from "../team-registry/paths"
 import { createRuntimeState, saveRuntimeState } from "../team-state-store/store"
@@ -70,7 +70,8 @@ describe("aggregateStatus", () => {
     const claimsDir = path.join(getTasksDir(resolveBaseDir(config), teamRunId), "claims")
     await mkdir(claimsDir, { recursive: true })
     const claimedTask = await createTask(teamRunId, createTaskInput(), config)
-    await writeFile(path.join(claimsDir, `${claimedTask.id}.lock`), "owner\n999999\n1\n")
+    // pid above every OS pid_max so the owner can never be a live process on a busy host
+    await writeFile(path.join(claimsDir, `${claimedTask.id}.lock`), "owner\n999999999\n1\n")
 
     // when
     const result = await aggregateStatus(teamRunId, config)

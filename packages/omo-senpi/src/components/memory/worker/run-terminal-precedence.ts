@@ -60,6 +60,7 @@ export async function checkRunAbandonmentPrecedence(
     classifyRunProcess(ledger.childPid, ledger.childProcessStart, seams),
   ])
   if (supervisor === "alive" || child === "alive") return { decision: "veto", ledger }
+  if (ledger.queued === true && supervisor === "unknown") return { decision: "veto", ledger }
 
   // Preserve the legacy marker veto, then make the terminal decision with one
   // filesystem-exclusive claim rather than another check followed by a write.

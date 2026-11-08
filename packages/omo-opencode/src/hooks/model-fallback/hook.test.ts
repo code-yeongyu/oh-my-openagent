@@ -64,7 +64,7 @@ describe("model fallback hook", () => {
 
     expect(output.message["model"]).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-5",
+      modelID: "claude-opus-5-5",
     })
   })
 
@@ -93,7 +93,7 @@ describe("model fallback hook", () => {
 
     expect(firstOutput.message["model"]).toEqual({
       providerID: "anthropic",
-      modelID: "claude-opus-5",
+      modelID: "claude-opus-5-5",
     })
 
     expect(
@@ -110,7 +110,7 @@ describe("model fallback hook", () => {
 
     expect(secondOutput.message["model"]).toEqual({
       providerID: "opencode-go",
-      modelID: "kimi-k3",
+      modelID: "kimi-k3.1-pro",
     })
     expect(secondOutput.message["variant"]).toBeUndefined()
   })

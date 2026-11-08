@@ -7,7 +7,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import type { RpcSpawnDescriptor } from "./rpc/spawn"
 import { mapExitOutcomeToError } from "./rpc/exit-mapping"
-import { terminateRpcChild } from "./rpc/terminate"
+import { stopFakeChild } from "./rpc/__fixtures__/stop-fake-child"
 import { spawnFakeChild } from "./rpc/__fixtures__/spawn-fake"
 import { RpcProcessRunner } from "./rpc-process"
 import type { RpcRunnerSpec } from "./types"
@@ -53,7 +53,7 @@ afterEach(async () => {
   while (children.length > 0) {
     const child = children.pop()
     if (child) {
-      await terminateRpcChild(child, { sigkillDelayMs: 200 })
+      await stopFakeChild(child)
     }
   }
   while (tmpDirs.length > 0) {
@@ -154,6 +154,82 @@ describe("RpcProcessRunner", () => {
     },
   )
 
+  test("#given the initial prompt rejects while the child is alive #when startup cleans up #then the failure records alive and no cleanup exit", async () => {
+    // given: force the stdin write to reject without changing the child's live exit state.
+    const runner = new RpcProcessRunner({
+      modelAdmission: async () => {},
+      buildSpawn: (spec) => ({ command: process.execPath, args: [], cwd: spec.cwd, env: process.env }),
+      spawnChild: () => {
+        const child = spawnFakeChild()
+        children.push(child)
+        const stdin = child.stdin
+        if (stdin === null) throw new Error("fake child stdin was not piped")
+        const write = (...args: unknown[]): boolean => {
+          const callback = args.findLast((value): value is (error: Error) => void => typeof value === "function")
+          callback?.(new Error("synthetic prompt rejection"))
+          return false
+        }
+        Object.defineProperty(stdin, "write", { value: write })
+        return child
+      },
+    })
+
+    // when / then
+    const failure = await runner.start(makeSpec()).catch((error: unknown) => error)
+    expect(failure).toMatchObject({
+      failure: {
+        kind: "child-prompt-failed",
+        rejected_while: "alive",
+      },
+    })
+    expect(failure).not.toMatchObject({ failure: { exit: expect.anything() } })
+    await runner.settleTeardowns()
+  })
+
+  test("#given a failed resume and held teardown #when reopening could retry #then rejection awaits termination", async () => {
+    const release = Promise.withResolvers<void>()
+    const terminating = Promise.withResolvers<void>()
+    let terminated = false
+    let rejected = false
+    const runner = new RpcProcessRunner({
+      modelAdmission: async () => {},
+      spawnChild: () => {
+        const child = spawnFakeChild()
+        children.push(child)
+        if (child.stdin === null) throw new Error("fake child stdin was not piped")
+        Object.defineProperty(child.stdin, "write", {
+          value: (...args: unknown[]): boolean => {
+            const callback = args.findLast((value): value is (error: Error) => void => typeof value === "function")
+            callback?.(new Error("synthetic switch_session refusal"))
+            return false
+          },
+        })
+        return child
+      },
+      terminateChild: async (child) => {
+        terminating.resolve()
+        await release.promise
+        const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))
+        child.kill("SIGTERM")
+        await exited
+        terminated = true
+      },
+    })
+    const start = runner.start(makeSpec({ resumeSessionPath: join(tmpdir(), "held-resume.jsonl") })).catch((error: unknown) => {
+      rejected = true
+      expect(terminated).toBe(true)
+      return error
+    })
+    try {
+      await terminating.promise
+      expect(rejected).toBe(false)
+    } finally {
+      release.resolve()
+    }
+    expect(await start).toMatchObject({ failure: { kind: "session_unavailable", rejected_while: "alive" } })
+    expect(terminated).toBe(true)
+  })
+
   test("#given a child that exits nonzero before terminal #when it crashes #then the outcome carries the stderr tail", async () => {
     // given
     const rejections: unknown[] = []
@@ -169,6 +245,8 @@ describe("RpcProcessRunner", () => {
       failure: {
         kind: "child-prompt-failed",
         message: expect.stringContaining("boom stderr detail"),
+        rejected_while: "exited",
+        exit: { kind: "crashed", code: 4, signal: null },
       },
     })
     await Promise.resolve()

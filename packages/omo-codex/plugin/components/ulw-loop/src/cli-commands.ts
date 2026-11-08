@@ -12,7 +12,8 @@ import {
 	steer,
 } from "./cli-subcommands.js";
 import { resolveUlwLoopSessionIdFromEnv, type UlwLoopScope } from "./paths.js";
-import { sessionIdRequiredMessage } from "./plan-missing-recovery.js";
+import { listUlwLoopSessionIds } from "./plan-io.js";
+import { sessionIdRequiredMessage, sessionScopeRequiredMessage } from "./plan-missing-recovery.js";
 import { UlwLoopError } from "./types.js";
 
 export const ULW_LOOP_SUBCOMMANDS = [
@@ -41,7 +42,6 @@ export async function ulwLoopCommand(argv: readonly string[]): Promise<number> {
 	const repoRoot = process.cwd();
 	const json = hasFlag(rest, "--json");
 	try {
-		const scope = commandScope(rest);
 		if (!isUlwLoopSubcommand(command)) {
 			if (json) {
 				printJsonError(
@@ -58,10 +58,12 @@ export async function ulwLoopCommand(argv: readonly string[]): Promise<number> {
 			process.stdout.write(`${subcommandHelp(command)}\n`);
 			return 0;
 		}
+		if (command === "help") {
+			process.stdout.write(`${ULW_LOOP_HELP}\n`);
+			return 0;
+		}
+		const scope = commandScope(repoRoot, rest);
 		switch (command) {
-			case "help":
-				process.stdout.write(`${ULW_LOOP_HELP}\n`);
-				return 0;
 			case "create-goals":
 				return await createGoals(repoRoot, rest, json, scope);
 			case "status":
@@ -105,7 +107,10 @@ function sessionIdFlagPresent(argv: readonly string[]): boolean {
 	return hasFlag(argv, SESSION_ID_FLAG) || argv.some((arg) => arg.startsWith(`${SESSION_ID_FLAG}=`));
 }
 
-function commandScope(argv: readonly string[]): UlwLoopScope | undefined {
+// Every state subcommand runs against exactly one session directory. Without a flag or
+// a session env there is no owner to resolve, so the command refuses instead of
+// falling back to the repo-global root that every session in the cwd would share.
+function commandScope(repoRoot: string, argv: readonly string[]): UlwLoopScope {
 	if (sessionIdFlagPresent(argv)) {
 		const sessionId = readValue(argv, SESSION_ID_FLAG)?.trim();
 		if (!sessionId) {
@@ -116,5 +121,11 @@ function commandScope(argv: readonly string[]): UlwLoopScope | undefined {
 		return { sessionId };
 	}
 	const sessionId = resolveUlwLoopSessionIdFromEnv();
-	return sessionId === null ? undefined : { sessionId };
+	if (sessionId !== null) return { sessionId };
+	const existingSessionIds = listUlwLoopSessionIds(repoRoot);
+	throw new UlwLoopError(
+		sessionScopeRequiredMessage(SESSION_ID_FLAG, existingSessionIds),
+		"ULW_LOOP_SESSION_SCOPE_REQUIRED",
+		{ details: { flag: SESSION_ID_FLAG, existingSessionIds } },
+	);
 }

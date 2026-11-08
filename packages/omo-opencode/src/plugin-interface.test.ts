@@ -3,7 +3,11 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { randomUUID } from "node:crypto"
+import type { PluginInput } from "@opencode-ai/plugin"
+import { unsafeTestValue } from "../../../test-support/unsafe-test-value"
 import { createPluginInterface } from "./plugin-interface"
+import { createKeywordDetectorHook } from "./hooks/keyword-detector"
+import { getUltraworkMessage } from "./hooks/keyword-detector/ultrawork"
 import { createAutoSlashCommandHook } from "./hooks/auto-slash-command"
 import { createUlwExecuteHook } from "./hooks/ulw-execute"
 import { readBoulderState } from "./features/boulder-state"
@@ -247,6 +251,72 @@ describe("createPluginInterface - goal native command smoke", () => {
         objective: "Ship feature",
       },
     ])
+  })
+})
+
+describe("createPluginInterface - post-compaction ULW restoration", () => {
+  test("keeps runtime guidance in system transforms until a real message restores it", async () => {
+    const sessionID = "ses-system-ulw"
+    const keywordDetector = createKeywordDetectorHook(unsafeTestValue<PluginInput>({
+      client: { tui: { showToast: async () => {} } },
+    }))
+    const pluginInterface = createPluginInterface({
+      ctx: { directory: tmpdir(), client: { tui: { showToast: async () => {} } } } as never,
+      pluginConfig: {} as never,
+      firstMessageVariantGate: {
+        shouldOverride: () => false,
+        markApplied: () => {},
+        markSessionCreated: () => {},
+        clear: () => {},
+      },
+      managers: {} as never,
+      hooks: { keywordDetector } as never,
+      tools: {},
+    })
+    const initial = {
+      message: { id: "msg-system-ulw-initial" },
+      parts: [{ type: "text", text: "ulw initial" }],
+    }
+    await keywordDetector["chat.message"]({ sessionID, agent: "sisyphus", model: { providerID: "openai", modelID: "gpt-fake" } }, initial)
+    const guidance = initial.parts[0].text.slice(initial.parts[0].text.indexOf("<ultrawork-mode>"))
+    keywordDetector.event({ event: { type: "session.compacted", properties: { sessionID } } })
+    const renderSystem = async (modelID = "gpt-fake") => {
+      const output = { system: ["base system prompt"] }
+      await pluginInterface["experimental.chat.system.transform"]?.(
+        { sessionID, model: { id: modelID, providerID: "openai" } },
+        output,
+      )
+      return output
+    }
+
+    const firstResumeSystem = await renderSystem()
+    const secondResumeSystem = await renderSystem()
+    const changedModelSystem = await renderSystem("gemini-3-pro")
+    const durableMessage = {
+      message: { id: "msg-system-ulw-durable" },
+      parts: [{ type: "text", text: "continue after compaction" }],
+    }
+    await keywordDetector["chat.message"]({ sessionID, agent: "sisyphus" }, durableMessage)
+    const restoredSystem = await renderSystem()
+    const followingMessage = {
+      message: { id: "msg-system-ulw-followup" },
+      parts: [{ type: "text", text: "continue" }],
+    }
+    await keywordDetector["chat.message"]({ sessionID, agent: "sisyphus" }, followingMessage)
+
+    expect({
+      guidanceStable: firstResumeSystem.system.at(-1) === guidance && secondResumeSystem.system.at(-1) === guidance,
+      runtimeModelSelected: changedModelSystem.system.at(-1) === getUltraworkMessage("sisyphus", "gemini-3-pro"),
+      durableMessageRestored: durableMessage.parts[0].text.includes("<ultrawork-mode>"),
+      systemRestorationCleared: restoredSystem.system.every((part) => !part.includes("<ultrawork-mode>")),
+      followingMessageCompact: followingMessage.parts.some((part) => part.synthetic === true),
+    }).toEqual({
+      guidanceStable: true,
+      runtimeModelSelected: true,
+      durableMessageRestored: true,
+      systemRestorationCleared: true,
+      followingMessageCompact: true,
+    })
   })
 })
 

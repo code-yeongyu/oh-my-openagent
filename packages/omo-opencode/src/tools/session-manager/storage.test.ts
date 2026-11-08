@@ -433,6 +433,40 @@ describe("session-manager storage - getMainSessions", () => {
     expect(sessionsB[0].id).toBe("ses_projB")
   })
 
+  test("getMainSessions matches directory when filter has trailing slash (file storage)", async () => {
+    // given
+    const projectA = "proj_trail"
+    const now = Date.now()
+
+    createSessionMetadata(projectA, "ses_trail", { directory: "/path/to/projectA", updated: now })
+    createMessageForSession("ses_trail", "msg_001", now)
+
+    // when
+    const sessions = await storage.getMainSessions({ directory: "/path/to/projectA/" })
+
+    // then
+    expect(sessions.length).toBe(1)
+    expect(sessions[0].id).toBe("ses_trail")
+  })
+
+  test("getMainSessions does not match distinct directories that share a prefix (file storage)", async () => {
+    // given
+    const projectA = "proj_prefix_a"
+    const projectB = "proj_prefix_ab"
+    const now = Date.now()
+
+    createSessionMetadata(projectA, "ses_a", { directory: "/path/to/projectA", updated: now })
+    createSessionMetadata(projectB, "ses_ab", { directory: "/path/to/projectAB", updated: now })
+    createMessageForSession("ses_a", "msg_001", now)
+    createMessageForSession("ses_ab", "msg_001", now)
+
+    // when
+    const sessions = await storage.getMainSessions({ directory: "/path/to/projectA" })
+
+    // then
+    expect(sessions.map((s) => s.id)).toEqual(["ses_a"])
+  })
+
   test("getMainSessions returns all main sessions when directory is not specified", async () => {
     // given
     const projectA = "proj_aaa"
@@ -530,6 +564,29 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     expect(mockClient.session.list).toHaveBeenCalled()
     expect(sessions.length).toBe(1)
     expect(sessions[0].id).toBe("ses_1")
+  })
+
+  test("getMainSessions matches SDK directory when filter has trailing slash", async () => {
+    // given
+    const mockSessions = [
+      { id: "ses_trail_sdk", directory: "/path/to/projectA", parentID: null, time: { created: 1000, updated: 2000 } },
+    ]
+    mockClient.session.list.mockImplementation(() => Promise.resolve({ data: mockSessions }))
+
+    mock.module("../../shared/opencode-storage-detection", () => ({
+      isSqliteBackend: () => true,
+      resetSqliteBackendCache: () => {},
+    }))
+
+    const { setStorageClient, getMainSessions } = await import("./storage")
+    setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
+
+    // when
+    const sessions = await getMainSessions({ directory: "/path/to/projectA/" })
+
+    // then
+    expect(sessions.length).toBe(1)
+    expect(sessions[0].id).toBe("ses_trail_sdk")
   })
 
   test("getAllSessions uses SDK when beta mode is enabled", async () => {

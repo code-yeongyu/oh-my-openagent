@@ -1,6 +1,6 @@
 ---
 name: data-scientist
-description: "Expert data processing with a hybrid engine strategy: resident-kernel engines first - DuckDB plus a resident Python stack (Polars/numpy/matplotlib) in persistent js/py eval kernels where the harness has them, bun/uv one-shots elsewhere - and per-action placement judgment (in-memory vs streaming vs remote-in-place). Triggers: 'analyze the data', 'what is in this CSV/parquet/json', 'summarize this', 'group by', 'filter rows', 'sort by', 'join these files', 'merge datasets', 'time series trend', 'compare yesterday and today', 'distribution/histogram', 'correlation', 'clean duplicates', 'handle missing values', 'dataset larger than RAM', 'SQL query on files', 'DataFrame operations', 'chart/plot this data', DuckDB vs Polars selection, quick data exploration CLI. NOT for plain text/code inspection, configs, or tiny inline math."
+description: "Processes and analyzes data with resident-kernel engines (DuckDB, Polars) and one-shot tools. Use for CSV/parquet/JSON analysis, group-by/join/aggregation, time series, distributions, cleaning, or plotting a dataset."
 ---
 
 # Data Scientist: Hybrid-Engine Data Processing
@@ -42,8 +42,9 @@ Per-surface patterns and pitfalls: read `references/execution-surfaces.md` befor
   older spellings.
 - **numpy** when numeric work goes beyond SQL/DataFrame aggregation: statistical tests,
   linear algebra, FFT, random sampling.
-- **matplotlib** for every chart — read `references/visualization.md` first; it carries the
-  quality bar and a mandatory visual check.
+- **matplotlib** for charts in a kernel, a file or a document; a chart shown inline beside a
+  reply is drawn in HTML instead. Read `references/visualization.md` first either way; it
+  carries the quality bar, the inline case and a mandatory visual check.
 
 Performance folklore ("X is Nx faster at filtering") varies with data shape, cardinality,
 and hardware. When the engine choice materially matters, measure on the actual data instead
@@ -65,10 +66,11 @@ a direct scan. Then place the work:
   takes longer.
 - **Query remotely, in place** when the data lives elsewhere: DuckDB reads http(s)/S3
   Parquet and CSV with projection and predicate pushdown, so fetch the columns and rows the
-  question needs, never the whole file. When data sits on another machine you can execute
-  on, ship the query to the data and return the small result. Rule: result much smaller
-  than data — move the query; repeated local iteration planned — move a pruned copy of the
-  data once.
+  question needs, never the whole file. When data sits in a database, run the aggregation
+  there in its own SQL and pull back the result rows, never a table dump. When data sits on
+  another machine you can execute on, ship the query to the data and return the small
+  result. Rule: result much smaller than data — move the query; repeated local iteration
+  planned — move a pruned copy of the data once.
 
 Sizing heuristics and recipes: `references/placement.md`.
 

@@ -13,7 +13,6 @@ import {
 } from "./memory-apply-patch.test-support"
 
 const { fixture, cleanup } = createPatchFixtureHarness()
-const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
 
 afterEach(cleanup)
 
@@ -95,7 +94,7 @@ describe("memoryApplyPatch validation failures", () => {
 
     // #then
     expect(error.message).toBe([
-      "memory_apply_patch: failed to apply hunk to system/fenced.md: context not found",
+      "memory apply_patch: failed to apply hunk to system/fenced.md: context not found",
       "",
       "The patch old/context lines did not match the current memory file exactly.",
       "Read the current memory file and retry with exact context.",
@@ -150,7 +149,7 @@ describe("memoryApplyPatch validation failures", () => {
     // #then
     expect(error.message).toMatch(/memory_apply_patch: failed to read system\/utf16\.md: File is not valid UTF-8 text: .*Detected UTF-16LE BOM; convert the file to UTF-8 and retry\./)
     expect(Buffer.compare(await readFile(join(dir, "system/utf16.md")), bytes)).toBe(0)
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+  })
 
   it("#given duplicate add, existing add, and empty patch #when applied #then each fails with the tool prefix", async () => {
     // #given
