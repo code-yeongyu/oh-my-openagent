@@ -21,6 +21,7 @@
 // Exit 0 only when every selected task ran with no `fail`/`error` and every restore post-check held.
 // The SDK is TypeScript source, so under Node this script re-runs itself on Bun (`bun` on PATH).
 import { spawn, spawnSync } from "node:child_process"
+import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, platform, tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
@@ -94,9 +95,11 @@ function expectOf(surface, mismatch) {
   return mismatch ? core.mismatched(surface.expect) : surface.expect
 }
 
-function oracleRow({ task, arm, surface, mismatch, outcome }) {
+/** The oracle judges what the plan left; the post-check judges the restored readback, audit, windows and files. */
+export function oracleRow({ task, arm, surface, mismatch, outcome }) {
   const checks = surface.oracle({ ...outcome, expect: expectOf(surface, mismatch) }).map(normalizeCheck)
-  const restoreChecks = (surface.postcheck({ ...outcome, readback: outcome.restoredReadback, audit: outcome.restoreAudit }) ?? []).map(normalizeCheck)
+  const restored = { readback: outcome.restoredReadback, audit: outcome.restoreAudit, windows: outcome.restoredWindows, files: outcome.restoredFiles }
+  const restoreChecks = (surface.postcheck({ ...outcome, ...restored }) ?? []).map(normalizeCheck)
   return {
     task: task.id,
     title: task.title,
@@ -136,6 +139,22 @@ function errorRow(task, arm, error, wallMs = 0) {
 
 // ---------------------------------------------------------------- sdk-direct
 
+/**
+ * Observes what the plan left (the oracle's windows and files), restores, reads the restored state back, runs
+ * the teardown ops, then observes again for the post-check: a teardown op closes the window the oracle checks.
+ */
+export async function restoreAndObserve({ computer, win, surface, live, dir, remembered, readback }) {
+  const observe = async () =>
+    live === undefined ? { windows: [], files: {} } : { windows: (await computer.windows()).map(({ app, title }) => ({ app, title })), files: live.files(surface, dir) }
+  const observed = await observe()
+  const teardown = surface.restore.filter((step) => live?.TEARDOWN_OPS.has(step.op))
+  await core.runPlan(computer, win, surface.restore.filter((step) => !teardown.includes(step)), { remembered, readback, live })
+  const restoredReadback = await core.readBack(computer, win, [...surface.readback, ...(surface.remember ?? [])])
+  await core.runPlan(computer, win, teardown, { live })
+  const restored = await observe()
+  return { ...observed, restoredReadback, restoredWindows: restored.windows, restoredFiles: restored.files }
+}
+
 async function runSdkTask({ task, enginePath, live, mismatch, scratch }) {
   const surface = surfaceOf(task, live)
   const dir = mkdtempSync(join(scratch, `${task.id}-`))
@@ -161,14 +180,8 @@ async function runSdkTask({ task, enginePath, live, mismatch, scratch }) {
     const wallMs = performance.now() - started
     const audit = core.readJsonLines(auditPath)
     const restoreFrom = audit.length
-    // Restore, read the restored state back, then close what the readback needed (live teardown ops).
-    const teardown = surface.restore.filter((step) => live$?.TEARDOWN_OPS.has(step.op))
-    await core.runPlan(computer, win, surface.restore.filter((step) => !teardown.includes(step)), { remembered, readback, live: live$ })
-    const restoredReadback = await core.readBack(computer, win, [...surface.readback, ...(surface.remember ?? [])])
-    await core.runPlan(computer, win, teardown, { live: live$ })
+    const observed = await restoreAndObserve({ computer, win, surface, live: live$, dir, remembered, readback })
     const all = core.readJsonLines(auditPath)
-    const windows = live$ === undefined ? [] : (await computer.windows()).map(({ app, title }) => ({ app, title }))
-    const files = live$ === undefined ? {} : live$.files(surface, dir)
     return oracleRow({
       task,
       arm: "sdk-direct",
@@ -178,11 +191,9 @@ async function runSdkTask({ task, enginePath, live, mismatch, scratch }) {
         reports,
         readback,
         remembered,
-        restoredReadback,
+        ...observed,
         audit: all.slice(0, restoreFrom),
         restoreAudit: all.slice(restoreFrom),
-        windows,
-        files,
         steps: reports.length,
         tokens: { input: 0, output: 0, source: "none (no model)" },
         wallMs,
@@ -521,7 +532,7 @@ async function main() {
     if (!existsSync(options.senpi)) refuse(`no senpi at ${options.senpi}; pass --senpi or set SENPI_BIN`)
   }
   const protectedFiles = [join(homedir(), ".senpi", "agent", "auth.json"), join(homedir(), ".omo", "agent", "auth.json")]
-  const digest = (path) => (existsSync(path) ? readFileSync(path).toString("base64").length : -1)
+  const digest = (path) => (existsSync(path) ? createHash("sha256").update(readFileSync(path)).digest("hex") : "absent")
   const before = protectedFiles.map(digest)
   const result = await runEval(options)
   const realStateUntouched = protectedFiles.map(digest).every((value, index) => value === before[index])
