@@ -137,6 +137,39 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
   })
 })
 
+describe("#12833: a name reaches a thread on another device by its title", () => {
+  const titled = (device: string, session_id: string, title: string, state = "idle") => ({ ...B_ROW, device, session_id, title, state })
+
+  test("#given b lists a live session titled with the name #when thread_send names it from this device #then it reaches b's session; this device's own row and an ended session are never matched by title", async () => {
+    const a = account({ rows: [titled("b", "dur-on-b", "Release Train"), titled("here", "dur-local", "local peer"), titled("b", "dur-old-on-b", "stale", "ended")] })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "release  train", message: "go" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => [entry.device, entry.session])).toEqual([["b", "dur-on-b"]])
+    expect(await run("thread_send", { thread: "local peer", message: "here" })).toMatchObject({ kind: "ok", thread_id: "dur-local" })
+    expect(await run("thread_send", { thread: "stale", message: "x" })).toMatchObject({ kind: "error", error: { code: "not_found" } })
+  })
+
+  test("#given two devices each hold a session with the name #when a tool names it #then it is ambiguous_target listing both with their devices, and nothing is sent", async () => {
+    const a = account({ rows: [titled("b", "dur-on-b", "worker"), titled("c", "dur-on-c", "Worker")] })
+    const { run } = surface(a.remote)
+    const result = await run("thread_send", { thread: "worker", message: "x" })
+    expect(result).toMatchObject({ kind: "error", error: { code: "ambiguous_target" } })
+    const candidates = result.kind === "error" ? (result.error.details?.["candidates"] as readonly { id: string; device?: string }[]) : []
+    expect(candidates.map((candidate) => [candidate.id, candidate.device]).sort()).toEqual([["dur-on-b", "b"], ["dur-on-c", "c"]])
+    expect(a.sent).toEqual([])
+  })
+
+  test("#given a thread on this device and one on b share the name #when a tool names it #then it is ambiguous_target naming both devices, never a silent pick of either", async () => {
+    const a = account({ rows: [titled("b", "dur-on-b", "local peer")] })
+    const { run } = surface(a.remote)
+    const result = await run("thread_send", { thread: "local peer", message: "x" })
+    expect(result).toMatchObject({ kind: "error", error: { code: "ambiguous_target" } })
+    const candidates = result.kind === "error" ? (result.error.details?.["candidates"] as readonly { id: string; device?: string }[]) : []
+    expect(candidates.map((candidate) => [candidate.id, candidate.device]).sort()).toEqual([["dur-local", "here"], ["dur-on-b", "b"]])
+    expect(a.sent).toEqual([])
+  })
+})
+
 describe("the device service is not connected, or the alias registry is not there yet", () => {
   test("#given remote sessions turned off on this device #when a tool names this device's thread by name and another device's by id #then both answer exactly as without a remote surface: the local one works and the other is not_found", async () => {
     const a = account({ plan: "disabled" })

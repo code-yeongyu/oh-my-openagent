@@ -30,7 +30,7 @@ export function createRemoteThreadFixture() {
     for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
   }
 
-  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[] } = {}) {
+  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[]; rows?: readonly RemoteSessionRow[] } = {}) {
     const engine = options.engine ?? ENGINE
     const sent: Sent[] = []
     // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
@@ -74,6 +74,7 @@ export function createRemoteThreadFixture() {
       return ok({})
     }
     const devices: RemoteDevice[] = [{ device: "here", label: "this mac", online: true }, { device: "b", label: "studio", online: options.online ?? true }]
+    for (const row of options.rows ?? []) if (!devices.some((known) => known.device === row.device)) devices.push({ device: row.device, label: row.device, online: true })
     const registry: AliasRegistry = {
       claim: async ({ alias, holder }) => {
         if (options.failClaim === true) throw new Error("alias registry failed")
@@ -103,7 +104,7 @@ export function createRemoteThreadFixture() {
         status: async () => ({ state: options.plan ?? "connected" }),
         thisDevice: async () => "here",
         devices: async () => devices,
-        sessions: async () => { if (options.failSessionsList === true) throw new Error("account list failed"); return [{ ...B_ROW, state: options.rowState ?? B_ROW.state }] },
+        sessions: async () => { if (options.failSessionsList === true) throw new Error("account list failed"); return options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }] },
         endpointCommand: async (device, rpc) => { sent.push({ via: "endpoint", device, rpc }); return answer(rpc) },
         // This fake device lists a created session by the id its create reply names.
         locate: async (_device, engineId) => ({ kind: "ok", sessionId: engineId }),
