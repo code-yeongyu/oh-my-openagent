@@ -3,6 +3,7 @@
 // Behavior is driven by the incoming commands plus a few env flags:
 //   FAKE_IGNORE_TERM=1   install a SIGTERM handler that ignores it (proves SIGKILL escalation)
 //   FAKE_EMIT_UI=1       emit an extension_ui_request confirm at startup
+//   FAKE_EMIT_UI_FRAME=<json> emit this extension_ui_request at startup instead
 //   FAKE_EMIT_MALFORMED=1 emit one malformed line then a valid event at startup
 //   FAKE_CAPABILITIES=a,b get_protocol_info advertises these capabilities
 //   FAKE_COMMAND_LOG=path append every received command as one JSON line
@@ -144,6 +145,11 @@ function handleCommand(cmd) {
           capabilities: (process.env.FAKE_CAPABILITIES ?? "").split(",").filter((entry) => entry.length > 0),
         },
       })
+    case "set_permission_preset":
+      respond("set_permission_preset", cmd.id, {
+        data: { permissionPreset: cmd.permissionPreset, permissionPresetSource: "client", permissionPresetStatus: "applied" },
+      })
+      return emit({ type: "session_info_changed", name: `preset:${cmd.permissionPreset}` })
     case "set_retry_fallback":
       if (process.env.FAKE_RETRY_FALLBACK === "hang") return
       if (process.env.FAKE_RETRY_FALLBACK === "exit") return process.exit(3)
@@ -184,7 +190,7 @@ function handleLine(line) {
     }
   }
   if (parsed.type === "extension_ui_response") {
-    const outcome = parsed.confirmed === false ? "denied" : parsed.cancelled ? "cancelled" : "confirmed"
+    const outcome = typeof parsed.value === "string" ? `value:${parsed.value}` : parsed.confirmed === false ? "denied" : parsed.cancelled ? "cancelled" : "confirmed"
     emit({ type: "session_info_changed", name: `ui:${outcome}` })
     return
   }
@@ -200,6 +206,11 @@ if (process.env.FAKE_IGNORE_TERM === "1") {
 if (process.env.FAKE_EMIT_MALFORMED === "1") {
   process.stdout.write("this-is-not-json\n")
   emit({ type: "agent_start" })
+}
+
+if (process.env.FAKE_EMIT_UI_FRAME) {
+  const frame = JSON.parse(process.env.FAKE_EMIT_UI_FRAME)
+  setTimeout(() => emit({ type: "extension_ui_request", ...frame }), 5)
 }
 
 if (process.env.FAKE_EMIT_UI === "1") {
