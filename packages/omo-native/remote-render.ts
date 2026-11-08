@@ -1,4 +1,5 @@
 import type { ControlAttachState, DeviceRow, ListingResult, Status, StatusState } from "../device-service-core/src/index.ts"
+import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
 
 // The human forms of `omo remote`; every command also has a --json form that prints the SDK's typed value as is.
 const STATE_LABELS: Readonly<Record<StatusState, string>> = {
@@ -75,6 +76,22 @@ export function sessionLines(result: ListingResult, labels: ReadonlyMap<string, 
   if (missing.length > 0)
     lines.push("", `Not answered, rows may be missing or cached: ${missing.map(device => labels.get(device) ?? device).join(", ")}`)
   return lines
+}
+
+/** The human answer of a session verb that succeeded; `label` is the `<device>/<session>` it named. */
+export function sessionVerbLines(verb: "open" | "send" | "model" | "interrupt" | "close", label: string, result: ThreadToolResult): string[] {
+  if (result.kind !== "ok") return []
+  if (verb === "open" && "thread" in result) return [`${result.thread.device ?? ""}/${result.thread.thread_id}`]
+  if (verb === "send" && "delivery" in result) {
+    const { delivery } = result
+    if (delivery.kind === "queued" || delivery.kind === "queued_offline") return [`Queued on ${label} at position ${delivery.queue_position}.`]
+    if (delivery.kind === "steered") return [`Steered turn ${delivery.turn_id} on ${label}.`]
+    return [`Sent to ${label}: turn ${delivery.turn_id} started.`]
+  }
+  if (verb === "model" && "model" in result) return [`${label} now uses ${result.model.provider}/${result.model.id}.`]
+  if (verb === "interrupt" && "interrupted" in result) return [result.interrupted ? `Interrupted ${label}.` : `Nothing was running on ${label}.`]
+  if (verb === "close" && "closed" in result) return [result.closed ? `Closed ${label}.` : `${label} was not open.`]
+  return []
 }
 
 export function controlLines(state: ControlAttachState, now: number): string[] {
