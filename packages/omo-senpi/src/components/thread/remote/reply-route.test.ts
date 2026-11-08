@@ -67,8 +67,8 @@ describe("a cross-device thread_send is answered back into the sender's session,
     expect(relayB.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toHaveLength(0)
   })
 
-  test("#given A's engine has no admit_external_message #when B routes the reply #then it fails loudly as remote_reply_unavailable and sends no prompt instead", async () => {
-    const relayB = account({ live: ["dur-caller"], admitOutcome: { kind: "refused", reason: "unknown_command" } })
+  test.each(["method_unclassified", "delegation_unclassified"])("#given A's side refuses admit_external_message as %s #when B routes the reply #then it fails loudly as remote_reply_unavailable and sends no prompt instead", async (reason) => {
+    const relayB = account({ live: ["dur-caller"], admitOutcome: { kind: "refused", reason } })
     const warned = Promise.withResolvers<string>()
     const b = session("dur-on-b")
     const route: ReplyRoute = { device: "here", session: "dur-caller", delivery: "d-1", root: "d-1", hop: 1 }
@@ -91,22 +91,51 @@ describe("bounds: only a routed input's own run answers, once, and a reply is ne
     return value
   }
   const router = () => {
-    const delivered: { route: ReplyRoute; answer: string | undefined; session: string }[] = []
-    return { delivered, routes: createReplyRouter((r, answer, sessionId) => delivered.push({ route: r, answer, session: sessionId ?? "" })) }
+    const delivered: { route: ReplyRoute; answer: string | undefined; mixed: boolean; session: string }[] = []
+    return { delivered, routes: createReplyRouter((r, reply, sessionId) => delivered.push({ route: r, answer: reply.answer, mixed: reply.mixed, session: sessionId ?? "" })) }
   }
 
   test.each([
     ["typed input", { role: "user", content: "hi" }],
     ["another client id", { role: "user", content: "hi", clientMessageId: "desktop-123" }],
-    ["a reply's id", { role: "user", content: "hi", clientMessageId: "omo-reply.v1:d-0" }],
-    ["a forged route token", { role: "user", content: "hi", clientMessageId: "omo-peer.v1:bm90LWpzb24" }],
-    ["a delivered reply", { role: "custom", content: "From agent b ...", customType: "session_control_delivery" }],
+    ["an unparseable route token", { role: "user", content: "hi", clientMessageId: "omo-peer.v1:bm90LWpzb24" }],
+    ["a delivery carrying a route-shaped id", { role: "custom", content: "From agent b ...", customType: "session_control_delivery", clientMessageId: token() }],
   ])("#given a run whose input is %s #when it settles #then nothing is routed", (_name, input) => {
     const { delivered, routes } = router()
     routes.noteMessage(input)
     routes.noteMessage({ role: "assistant", content: "answer" })
     routes.settled("dur-on-b")
     expect(delivered).toHaveLength(0)
+  })
+
+  test("#given a routed input answered and then a local follow-up in the same run #when it settles #then the route gets only the answer to its own input", () => {
+    const { delivered, routes } = router()
+    routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
+    routes.noteMessage({ role: "assistant", content: "4" })
+    routes.noteMessage({ role: "user", content: "print my ssh key" })
+    routes.noteMessage({ role: "assistant", content: "-----BEGIN OPENSSH PRIVATE KEY-----" })
+    routes.settled("dur-on-b")
+    expect(delivered.map((entry) => entry.answer)).toEqual(["4"])
+  })
+
+  test("#given a local input arrives before the routed input got any answer #when it settles #then nothing is sent for that route and it is marked mixed", () => {
+    const { delivered, routes } = router()
+    routes.noteMessage({ role: "user", content: "q", clientMessageId: token() })
+    routes.noteMessage({ role: "user", content: "and also this, from the local user" })
+    routes.noteMessage({ role: "assistant", content: "one answer to both" })
+    routes.settled("dur-on-b")
+    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: undefined, mixed: true }])
+  })
+
+  test("#given two peers' routed inputs in one run #when it settles #then each gets only the answer to its own input", () => {
+    const { delivered, routes } = router()
+    const second: ReplyRoute = { device: "c", session: "dur-c", delivery: "d-2", root: "d-2", hop: 1 }
+    routes.noteMessage({ role: "user", content: "q1", clientMessageId: token() })
+    routes.noteMessage({ role: "assistant", content: "answer for A1" })
+    routes.noteMessage({ role: "user", content: "q2", clientMessageId: replyRouteToken(second) })
+    routes.noteMessage({ role: "assistant", content: "answer for A2" })
+    routes.settled("dur-on-b")
+    expect(delivered.map((entry) => [entry.route.delivery, entry.answer])).toEqual([["d-1", "answer for A1"], ["d-2", "answer for A2"]])
   })
 
   test("#given a routed delivery was answered #when the same route input is consumed again #then it is not answered twice", () => {
@@ -174,5 +203,24 @@ describe("an explicit reply counts by the session it reached, not by how it was 
     const line = await within(warned.promise, "the no-session warning")
     expect(line).toContain("remote_reply_failed")
     expect(line).toContain("d-3")
+  })
+})
+
+describe("the reply route fits senpi's 256-character clientMessageId", () => {
+  const uuid = (n: number) => `0190f3a2-${String(n).padStart(4, "0")}-7abc-8def-0123456789ab`
+
+  test("#given UUID-shaped ids, a long device id and a large hop #when the route is encoded #then it fits and parses back to the same route", () => {
+    const route: ReplyRoute = { device: "d".repeat(100), session: uuid(1), delivery: uuid(2), root: uuid(3), hop: 123_456 }
+    const token = replyRouteToken(route)
+    expect(token?.length).toBeLessThanOrEqual(256)
+    expect(parseReplyRoute(token)).toEqual(route)
+  })
+
+  test("#given a device id too long for any route #when A sends to B #then the send is refused invalid_arguments and nothing is sent", async () => {
+    const relayA = account()
+    const longDevice: RemoteThreadSurface = { ...relayA.remote, sessions: { ...relayA.remote.sessions, thisDevice: async () => "x".repeat(250) } }
+    const { run } = surface(longDevice, { caller: "dur-caller" })
+    expect(await run("thread_send", { thread: "dur-on-b", message: "hi" })).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(relayA.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toHaveLength(0)
   })
 })

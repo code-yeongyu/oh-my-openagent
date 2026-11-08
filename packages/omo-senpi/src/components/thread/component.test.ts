@@ -9,6 +9,8 @@ import { createGatewayEngine, resolveFromEntries, type GatewayAddressEntry } fro
 import { gatewayDatabasePath, gatewayInboxDirectory, gatewayRootDirectory } from "./gateway/paths"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { resumeProcess, suspendProcess } from "./gateway/testing/job-control"
+import { parseReplyRoute, replyRouteToken } from "./remote/reply-route"
+import { createRemoteThreadFixture } from "./thread-remote-fixture"
 import type { ThreadHost } from "./tools"
 
 function host(): ThreadHost {
@@ -614,5 +616,31 @@ describe("thread component production registration", () => {
     const f = api()
     createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(f.pi as never, context([]) as never)
     expect(f.tools).toHaveLength(18)
+  })
+})
+
+describe("a run woken from another device continues that chain in its next cross-device send (K8)", () => {
+  const fixture = createRemoteThreadFixture()
+
+  test.each([
+    ["an admitted peer delivery naming chain_count 2", { role: "custom", customType: "session_control_delivery", content: "reply", details: { delivery_id: "reply-x", chain_count: 2 } }, 3],
+    ["a routed prompt at hop 4", { role: "user", content: "q", clientMessageId: replyRouteToken({ device: "c", session: "dur-c", delivery: "d-9", root: "d-9", hop: 4 }) }, 5],
+  ])("#given %s #when the run sends to b #then the send carries the next hop", async (_name, input, expectedHop) => {
+    const agentDir = mkdtempSync(join(tmpdir(), "thr-component-chain-"))
+    const store = createGatewayStore({ agentDir })
+    try {
+      const relay = fixture.account()
+      const f = eventApi()
+      createThreadComponent({ host: host(), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store, remote: relay.remote }).register(f.pi as never, context([]) as never)
+      await f.dispatch("agent_start", sessionCtx("dur-caller"))
+      await f.dispatch("message_start", sessionCtx("dur-caller"), { message: input })
+      await f.tool("thread_send").execute("call-send", { thread: "dur-on-b", message: "next" }, undefined, undefined, sessionCtx("dur-caller"))
+      const prompt = relay.sent.find((entry) => entry.rpc?.["type"] === "prompt")?.rpc ?? {}
+      expect(parseReplyRoute(prompt["clientMessageId"])?.hop).toBe(expectedHop)
+    } finally {
+      await store.dispose()
+      rmSync(agentDir, { recursive: true, force: true })
+      await fixture.cleanup()
+    }
   })
 })
