@@ -7,6 +7,7 @@
 
 import { memoryGitEnvironment } from "../../git/exec-environment"
 import { AUTO_AGENT_VALUE } from "../../identity/resolve"
+import { gitSpawnTarget, spawnTargetOptions } from "../../process/win32-launch"
 import type { BindingKey, Remote } from "./binding"
 import { localBinding, mintLocalBinding, namedBinding, parseBinding, repoBinding, spaceIdForBinding } from "./binding"
 
@@ -99,8 +100,17 @@ export function resolveSpaceInRepo(
 
 function runGit(dir: string, args: readonly string[]): string | null {
   // Never the inherited environment as is: a GIT_DIR / GIT_WORK_TREE the host exported would read and
-  // write another repository's config and list its remotes instead of `dir`'s (#12354).
-  const r = Bun.spawnSync(["git", "-C", dir, ...args], { env: memoryGitEnvironment(process.env) })
-  if (r.exitCode !== 0) return null
+  // write another repository's config and list its remotes instead of `dir`'s (#12354), on win32 too.
+  const env = memoryGitEnvironment(process.env)
+  const r = process.platform === "win32" ? spawnWin32Git(["-C", dir, ...args], env) : Bun.spawnSync(["git", "-C", dir, ...args], { env })
+  if (r === null || r.exitCode !== 0) return null
   return r.stdout.toString()
+}
+
+// This spawn has no cwd, so a bare name would be searched in the omo process's working directory -
+// the user's project - before PATH; git is resolved to an absolute path instead (#12146).
+function spawnWin32Git(args: readonly string[], env: NodeJS.ProcessEnv) {
+  const target = gitSpawnTarget(args, env)
+  if (target === undefined) return null
+  return Bun.spawnSync({ cmd: [target.file, ...target.args], ...spawnTargetOptions(target), env })
 }

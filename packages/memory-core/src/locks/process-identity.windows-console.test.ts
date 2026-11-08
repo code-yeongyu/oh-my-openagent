@@ -14,6 +14,12 @@ interface CapturedExecFile {
 
 const POWERSHELL_INSTANT = "2026-09-19T15:04:05.0000000Z"
 
+// Where Windows keeps powershell.exe on every install; on win32 hosts this is the OS's own answer,
+// and off win32 the mock's fallback directory is the default. The probe never searches PATH (#12146).
+function systemRoot(): string {
+  return process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows"
+}
+
 function captureExecFile(): CapturedExecFile[] {
   const captured: CapturedExecFile[] = []
   mock.module("node:child_process", () => ({
@@ -59,7 +65,9 @@ describe("process start identity win32 console suppression", () => {
         const identity = await getProcessStartIdentity(livePid)
 
         expect(captured).toHaveLength(1)
-        expect(captured[0]?.command).toBe("powershell.exe")
+        expect(captured[0]?.command.toLowerCase()).toBe(
+          `${systemRoot()}\\System32\\WindowsPowerShell\\v1.0\\powershell.exe`.toLowerCase(),
+        )
         expect(captured[0]?.options.windowsHide).toBe(true)
         expect(identity).toBe(`win32-creation-date:${POWERSHELL_INSTANT}`)
       })

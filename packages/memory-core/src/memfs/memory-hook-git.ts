@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process"
 import { join } from "node:path"
 
 import { readFileSync } from "../fs/resilient"
+import { gitSpawnTarget, spawnTargetOptions } from "../process/win32-launch"
 
 export interface StagedEntry {
   readonly status: string
@@ -15,13 +16,18 @@ export interface StagedEntry {
 const ZERO = /^0+$/
 
 export function git(cwd: string, args: readonly string[]): string | undefined {
-  const result = spawnSync("git", ["--literal-pathspecs", ...args], {
+  // Git rejects literal pathspecs combined with inherited glob or case-folding modes.
+  const env = { ...process.env, GIT_GLOB_PATHSPECS: "0", GIT_ICASE_PATHSPECS: "0" }
+  // On win32 git is resolved to an absolute path, never looked up in the repo being committed (#12146).
+  const target = gitSpawnTarget(["--literal-pathspecs", ...args], env)
+  if (target === undefined) return undefined
+  const result = spawnSync(target.file, [...target.args], {
     cwd,
-    // Git rejects literal pathspecs combined with inherited glob or case-folding modes.
-    env: { ...process.env, GIT_GLOB_PATHSPECS: "0", GIT_ICASE_PATHSPECS: "0" },
+    env,
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
     windowsHide: true,
+    ...spawnTargetOptions(target),
   })
   return result.status === 0 ? result.stdout : undefined
 }

@@ -228,7 +228,7 @@
       // pre-existing at origin dev 4686e425b5: unused export(s) isGitConfigLockError
       "packages/memory-core/src/git/config-lock.ts": ["isGitConfigLockError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GIT_ACTIVITY_LOCK_NAME, GIT_ACTIVITY_SHARED_WAIT_MS, GitActivityLockError
-      "packages/memory-core/src/git/git-activity-lock.ts": ["GIT_ACTIVITY_LOCK_NAME", "GIT_ACTIVITY_SHARED_WAIT_MS", "GitActivityLockError"],
+      "packages/memory-core/src/git/git-activity-lock.ts": ["GIT_ACTIVITY_LOCK_NAME"],
       // pre-existing at origin dev 4686e425b5: unused export(s) listProcPids
       "packages/memory-core/src/git/proc-view.ts": ["listProcPids"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GIT_LOCK_SETTLE_MS
@@ -255,8 +255,8 @@
       "packages/memory-core/src/memfs/frontmatter-scalar.ts": ["isYamlMapping"],
       // pre-existing at origin dev 4686e425b5: unused export(s) describeHeaderViolation
       "packages/memory-core/src/memfs/frontmatter-validation.ts": ["describeHeaderViolation"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) git, parseRawZ
-      "packages/memory-core/src/memfs/memory-hook-git.ts": ["git", "parseRawZ"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) parseRawZ
+      "packages/memory-core/src/memfs/memory-hook-git.ts": ["parseRawZ"],
       // pre-existing at origin dev 4686e425b5: unused export(s) parseRawZ, provenanceOf, preCommitFailures, commitMessageFailures
       "packages/memory-core/src/memfs/memory-hook.ts": ["parseRawZ", "provenanceOf", "preCommitFailures", "commitMessageFailures"],
       // pre-existing at origin dev 4686e425b5: unused export(s) FRONTMATTER_NORMALIZATION_MARKER, FRONTMATTER_NORMALIZATION_SUBJECT

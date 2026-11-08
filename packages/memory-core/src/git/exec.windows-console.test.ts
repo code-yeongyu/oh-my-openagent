@@ -77,26 +77,48 @@ describe("memory git exec win32 console suppression", () => {
 
         expect(result.code).toBe(0)
         expect(captured).toHaveLength(1)
-        expect(captured[0]?.executable).toBe("git")
+        expect(captured[0]?.executable).toEqual(process.platform === "win32" ? expect.stringMatching(/^[A-Za-z]:\\.+\\git\.(?:exe|cmd|bat|com)$/i) : "git")
         expect(captured[0]?.options.windowsHide).toBe(true)
       })
     })
 
-    describe("#when git is absent from PATH and the windows install fallbacks are tried", () => {
-      test("#then every fallback executable is spawned with windowsHide: true", async () => {
-        const captured = captureSpawns((executable) =>
-          executable === "git" ? missingBinaryChild() : closingChild(),
-        )
+    describe("#when the first resolved install root is gone and the next one is spawned", () => {
+      test("#then every spawn is hidden", async () => {
+        const first = "C:\\Program Files\\Git\\cmd\\git.exe"
+        const second = "D:\\Program Files\\Git\\cmd\\git.exe"
+        const present = new Set([first, second])
+        const captured = captureSpawns((executable) => {
+          if (executable !== first) return closingChild()
+          present.delete(first)
+          return missingBinaryChild()
+        })
         const { createNodeGitExec } = await import("./exec")
 
-        await createNodeGitExec({ platform: "win32" }).run(["status", "--porcelain"], {
+        await createNodeGitExec({ platform: "win32", isFile: (path) => present.has(path) }).run(["status", "--porcelain"], {
           cwd: tmpdir(),
           timeoutMs: 5_000,
-          env: { ProgramFiles: "C:\\Program Files" } as NodeJS.ProcessEnv,
+          env: { ProgramFiles: "C:\\Program Files", ProgramW6432: "D:\\Program Files" },
         })
 
-        expect(captured.length).toBeGreaterThan(1)
-        expect(captured.map((call) => call.options.windowsHide)).toEqual(captured.map(() => true))
+        expect(captured.map((call) => call.executable)).toEqual([first, second])
+        expect(captured.map((call) => call.options.windowsHide)).toEqual([true, true])
+      })
+    })
+
+    describe("#when git resolves to a batch wrapper", () => {
+      test("#then cmd.exe runs it explicitly and is hidden", async () => {
+        const captured = captureSpawns(() => closingChild())
+        const { createNodeGitExec } = await import("./exec")
+
+        await createNodeGitExec({ platform: "win32", isFile: (path) => path === "C:\\Wrap\\git.cmd" }).run(["status"], {
+          cwd: tmpdir(),
+          timeoutMs: 5_000,
+          env: { PATH: "C:\\Wrap", SystemRoot: "C:\\Windows" },
+        })
+
+        expect(captured.map((call) => call.executable)).toEqual(["C:\\Windows\\System32\\cmd.exe"])
+        expect(captured[0]?.argv).toEqual(["/d", "/s", "/c", "\"\"C:\\Wrap\\git.cmd\" \"-c\" \"core.fsmonitor=false\" \"status\"\""])
+        expect(captured[0]?.options).toMatchObject({ windowsHide: true, windowsVerbatimArguments: true })
       })
     })
   })
