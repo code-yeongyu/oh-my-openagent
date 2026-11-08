@@ -213,6 +213,10 @@ export function createComputerTool(deps: ComputerToolDeps) {
 	};
 }
 
+// Engine failures returned as structured results, so the eval-kernel facade reads the code from `details.value`.
+// StaleRef lets `computer.verify` tell a gone element from a failed read; its message names no code.
+const STRUCTURED_ENGINE_CODES: ReadonlySet<string> = new Set(["PermissionDenied", "ControlRequired", "InputBusy", "Suspended", "StaleRef"]);
+
 async function permissionResult(result: Promise<ComputerToolResult>, handle: ComputerHandle): Promise<ComputerToolResult> {
 	try {
 		return await result;
@@ -226,8 +230,7 @@ async function permissionResult(result: Promise<ComputerToolResult>, handle: Com
 			};
 		}
 		if (!(error instanceof DesktopEngineRpcError) || error.data === null || !("code" in error.data) ||
-			(error.data.code !== "PermissionDenied" && error.data.code !== "ControlRequired" &&
-				error.data.code !== "InputBusy" && error.data.code !== "Suspended")) throw error;
+			!STRUCTURED_ENGINE_CODES.has(error.data.code)) throw error;
 		const failure = computerFailure(
 			error.data.code,
 			error.message,

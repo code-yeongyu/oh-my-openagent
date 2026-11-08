@@ -1,5 +1,7 @@
 import { spawnSync } from "node:child_process";
+import { once } from "node:events";
 import { readFileSync } from "node:fs";
+import { isMainThread, Worker } from "node:worker_threads";
 import { describe, expect, it } from "vitest";
 import {
 	CHAIN_BINDINGS,
@@ -178,15 +180,32 @@ describe("computer.verify", () => {
 		expect(verdict).toMatchObject({ status: "unknown", reads: 1, cause: "Suspended: the user pressed the stop chord" });
 	});
 
-	it("treats a StaleRef read as the element being gone", async () => {
+	// The `computer` tool's result for the engine's real StaleRef reply (`e5 expired; re-run ax()/find()`, the code
+	// only in data.code): the code reaches the kernel in details.value, never in the message text.
+	const staleFailure = { code: "COMPUTER_STALE_REF", message: "COMPUTER_STALE_REF: e5 expired; re-run ax()/find()" };
+	const staleRefResult: ToolResult = {
+		text: JSON.stringify(staleFailure, null, 2),
+		details: { value: staleFailure, isError: true },
+		images: [],
+		hasError: true,
+	};
+
+	it("treats an expired ref as the element being gone in both facades, from the failure code", async () => {
 		// Given
-		const kernel = loadJsFacade(() => ({ text: "StaleRef: e1 no longer resolves", hasError: true }));
+		const kernel = loadJsFacade(() => staleRefResult);
 
 		// When
-		const verdict = await kernel.run(`return computer.verify({ kind: "elementExists", ref: "e1", exists: false });`);
+		const js = await kernel.run(`return computer.verify({ kind: "elementExists", ref: "e5", exists: false });`);
+		const py = runPythonFacade("out = computer.verify({'kind': 'elementExists', 'ref': 'e5', 'exists': False})", {
+			ref: JSON.stringify(staleRefResult),
+		});
 
 		// Then
-		expect(verdict).toMatchObject({ status: "satisfied", reads: 1 });
+		expect({ js, py: py.out, error: py.error }).toMatchObject({
+			js: { status: "satisfied", reads: 1 },
+			py: { status: "satisfied", reads: 1 },
+			error: null,
+		});
 	});
 
 	it("matches windows by filter in Python and returns the same verdict shape", () => {
@@ -204,6 +223,26 @@ describe("computer.verify", () => {
 		expect(run.calls).toEqual([{ action: "call", chain: [{ method: "windows", args: [] }] }]);
 	});
 
+	it("refuses a non-number intervalMs the same way in both facades, before any tool call", async () => {
+		// Given
+		const kernel = loadJsFacade(windowResponder);
+		const message = "computer.verify() intervalMs must be a finite, non-negative number";
+
+		// When
+		const js = kernel
+			.run(`return computer.verify({ kind: "elementEnabled", ref: "e1" }, { timeoutMs: 50, intervalMs: "fast" });`)
+			.then(() => "resolved", (error: Error) => `${error.name}: ${error.message}`);
+		const py = runPythonFacade("computer.verify({'kind': 'elementEnabled', 'ref': 'e1'}, timeoutMs=50, intervalMs='fast')");
+
+		// Then
+		expect({ js: await js, jsCalls: kernel.calls, py: py.error, pyCalls: py.calls }).toEqual({
+			js: `TypeError: ${message}`,
+			jsCalls: [],
+			py: `TypeError: ${message}`,
+			pyCalls: [],
+		});
+	});
+
 	it("refuses an unknown expectation kind before any tool call", async () => {
 		const kernel = loadJsFacade(windowResponder);
 		await expect(kernel.run(`return computer.verify({ kind: "pixelMatches" });`)).rejects.toThrow(TypeError);
@@ -212,20 +251,53 @@ describe("computer.verify", () => {
 });
 
 describe("SENPI_DESKTOP_HOST marker", () => {
-	it("is set in the JavaScript kernel's environment at install", () => {
-		// Given
-		const env: Record<string, string> = {};
+	const readChildMarker = `require("node:child_process").spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.env.SENPI_DESKTOP_HOST))"], { encoding: "utf8" }).stdout`;
 
-		// When
-		new Function("globalThis", computerPreludeAssets.javascript)({ tool: {}, display: () => {}, process: { env } });
+	it("leaves the host process's environment unmarked when installed on its main thread", () => {
+		// Given: this test process's real `process` on its main thread, standing in for a host that runs the prelude
+		expect(isMainThread).toBe(true);
+		const before = process.env.SENPI_DESKTOP_HOST;
+		delete process.env.SENPI_DESKTOP_HOST;
 
-		// Then
-		expect(env.SENPI_DESKTOP_HOST).toBe("1");
+		try {
+			// When
+			new Function("globalThis", computerPreludeAssets.javascript)({ tool: {}, display: () => {}, process });
+
+			// Then: later children of the host (bash tool, subagents, the desktop service) must not inherit it
+			expect(process.env.SENPI_DESKTOP_HOST).toBeUndefined();
+		} finally {
+			if (before === undefined) delete process.env.SENPI_DESKTOP_HOST;
+			else process.env.SENPI_DESKTOP_HOST = before;
+		}
 	});
 
-	it("reaches a child process a JavaScript cell starts", () => {
-		// Given: a real runtime installs the prelude on its own global, then spawns a child
+	it("reaches a child a worker-thread kernel's cell starts, not the host process that runs the worker", async () => {
+		// Given: senpi's JavaScript kernel is a worker thread of the host process with its own process.env view
+		const before = process.env.SENPI_DESKTOP_HOST;
+		delete process.env.SENPI_DESKTOP_HOST;
+		const worker = new Worker(
+			`new Function("globalThis", ${JSON.stringify(computerPreludeAssets.javascript)})(globalThis);
+			require("node:worker_threads").parentPort.postMessage(${readChildMarker});`,
+			{ eval: true },
+		);
+		const reply = once(worker, "message", { signal: AbortSignal.timeout(30_000) });
+
+		try {
+			// When
+			const [child] = await reply;
+
+			// Then
+			expect({ child, host: process.env.SENPI_DESKTOP_HOST }).toEqual({ child: "1", host: undefined });
+		} finally {
+			await worker.terminate();
+			if (before !== undefined) process.env.SENPI_DESKTOP_HOST = before;
+		}
+	});
+
+	it("reaches a child a process-mode kernel's cell starts", () => {
+		// Given: a process-mode kernel (codemode marks its global) installs the prelude, then spawns a child
 		const script = `
+			globalThis[Symbol.for("senpi.kernel.processMode")] = true;
 			new Function("globalThis", ${JSON.stringify(computerPreludeAssets.javascript)})(globalThis);
 			const { spawnSync } = require("node:child_process");
 			const child = spawnSync(process.execPath, ["-e", "process.stdout.write(String(process.env.SENPI_DESKTOP_HOST))"], { encoding: "utf8" });
