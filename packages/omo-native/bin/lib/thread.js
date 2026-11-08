@@ -187,7 +187,7 @@ export function threadExitCode(result) {
  * The answer is `{ sdk }` or `{ error, code }`: `unsupported` for the runtime, `internal_error` for a
  * plugin SDK that cannot be imported (a broken or partial install).
  */
-export async function loadThreadSdk({ pluginRoot, agentDir, env, cwd, engine, loadSqlite, importSdk, importThreadClient, identity }) {
+export async function loadThreadSdk({ pluginRoot, agentDir, env, cwd, engine, loadSqlite, importSdk, importThreadClient = undefined, identity }) {
   try {
     await (loadSqlite ?? (() => import("node:sqlite")))()
   } catch {

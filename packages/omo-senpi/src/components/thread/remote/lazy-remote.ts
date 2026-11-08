@@ -5,8 +5,8 @@ type Runtime = Pick<typeof import("./device-service"), "createDeviceServiceSessi
 export type LazyRemoteOptions = {
   readonly version: string
   readonly loadRuntime: () => Promise<Runtime>
-  /** The account's alias registry, loaded on its first use. */
-  readonly loadAliasRegistry: () => Promise<AliasRegistry>
+  /** The account's alias registry, loaded on its first use; absent, the surface has no registry and aliases are refused typed. */
+  readonly loadAliasRegistry?: () => Promise<AliasRegistry>
 }
 
 /**
@@ -37,11 +37,13 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
       if (loaded !== undefined) await (await loaded.catch(() => undefined))?.close?.()
     },
   }
+  const loadAliasRegistry = options.loadAliasRegistry
+  if (loadAliasRegistry === undefined) return { sessions, chain: { stamp: (record) => record } }
   let registry: Promise<AliasRegistry> | undefined
   const withRegistry = async <T>(use: (loaded: AliasRegistry) => Promise<AliasResult<T>>): Promise<AliasResult<T>> => {
     let loaded: AliasRegistry
     try {
-      loaded = await (registry ??= options.loadAliasRegistry().catch((error: unknown) => { registry = undefined; throw error }))
+      loaded = await (registry ??= loadAliasRegistry().catch((error: unknown) => { registry = undefined; throw error }))
     } catch (error) {
       return { kind: "error", error: { code: "alias_registry_unavailable", message: `The account's alias registry could not be loaded: ${error instanceof Error ? error.message : String(error)}.`, details: { reason: "registry_unavailable" } } }
     }
