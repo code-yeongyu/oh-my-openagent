@@ -221,6 +221,12 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       live = true
       return { kind: "ok", watch: { ended: attached.detached, stop } }
     },
+    close: async () => {
+      const open = service
+      service = undefined
+      attaches.clear()
+      if (open !== undefined) (await open.catch(() => undefined))?.close()
+    },
     locate: async (device, engineId, knownKey) => {
       let connected: DeviceService
       try {
