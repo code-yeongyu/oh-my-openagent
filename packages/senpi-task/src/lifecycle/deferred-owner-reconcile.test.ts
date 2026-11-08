@@ -4,6 +4,7 @@ import { cleanupProjects, FakeRegistry, readEvents, seedRecord, settings, tempSt
 import { createTaskLifecycle } from "./create"
 import { DEFAULT_HOST_SESSION_RETRY_POLICY, NO_HOST_ENDPOINT } from "./host-session"
 import type { TaskRecordStore } from "../store"
+import { withinTestBudget } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -58,16 +59,8 @@ function fixture(startupBackoffMs: readonly number[] = []) {
   }
 }
 
-async function bounded<T>(promise: Promise<T>): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("reconcile event missing")), 1_000) }),
-    ])
-  } finally {
-    clearTimeout(timer)
-  }
+function bounded<T>(promise: Promise<T>): Promise<T> {
+  return withinTestBudget(promise, "reconcile event missing")
 }
 
 describe("deferred foreign owner reconciliation (omo#9715)", () => {

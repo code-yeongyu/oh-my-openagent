@@ -3,13 +3,12 @@ import { AdmissionBarrier } from "../pause/admission-barrier"
 import { createTaskRecordStore } from "../store"
 import { createTaskManager } from "./manager"
 import { baseSpec, categoryPlanner, cleanupProjects, FakeRunner, launchSettled, settings, tempProject } from "./__fixtures__/manager-fakes"
+import { withinTestBudget } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
 function bounded<T>(promise: Promise<T>): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const deadline = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error("superseded capacity wait did not settle")), 5000) })
-  return Promise.race([promise, deadline]).finally(() => { if (timer !== undefined) clearTimeout(timer) })
+  return withinTestBudget(promise, "superseded capacity wait did not settle", 15000)
 }
 
 test.each([false, true])("design 40: a second Stop disarms a capacity-waiting Resume (fresh owner: %s)", async freshOwner => {

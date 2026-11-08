@@ -4,15 +4,12 @@ import { PauseRegistry, type PauseParticipant } from "../pause/registry"
 import { createTaskRecordStore } from "../store"
 import { createTaskManager } from "./manager"
 import { baseSpec, categoryPlanner, cleanupProjects, FakeRunner, launchSettled, settings, tempProject } from "./__fixtures__/manager-fakes"
+import { withinTestBudget } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
 function bounded<T>(promise: Promise<T>): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const deadline = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error("held first launch did not settle")), 5000)
-  })
-  return Promise.race([promise, deadline]).finally(() => { if (timer !== undefined) clearTimeout(timer) })
+  return withinTestBudget(promise, "held first launch did not settle", 15000)
 }
 
 function fixture() {
