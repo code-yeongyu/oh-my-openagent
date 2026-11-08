@@ -15,6 +15,13 @@ declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
 // consumed as a silent fallback handoff.
 const TERMINAL_ABORT_SOURCE = "session.timeout.fallback-exhausted"
 
+// Below the attempt cap, canPrepareFallback fails only because every remaining model is cooling
+// down or already used, which is what prepareFallback reports as "no available fallback models".
+function wedgeReturnReason(fallbackModels: number, attemptCount: number, maxAttempts: number): string {
+  if (fallbackModels === 0) return "no fallback models configured"
+  return attemptCount >= maxAttempts ? "max fallback attempts reached" : "no available fallback models"
+}
+
 export function createFallbackTimeoutHelpers(
   deps: HookDeps,
   abortSessionRequest: (sessionID: string, source: string) => Promise<void>,
@@ -162,14 +169,19 @@ export function createFallbackTimeoutHelpers(
           elapsed,
           budgetMs: COMPACTION_WATCHDOG_BUDGET_MS,
         })
-        await abortSessionRequest(sessionID, "session.timeout")
-        recordCompactionEnd(sessionID)
-        await showWatchdogToast(sessionID, "Compaction exceeded its watchdog budget")
+        // Control goes back to the user and nothing retries, so ownership is released before any await:
+        // the abort's own session.error must not find a retry in flight, and a toast that never settles
+        // must not leave the session marked as owning recovery. The abort uses the terminal source so
+        // it reaches the caller as a real cancellation, not a fallback handoff.
         deps.sessionAwaitingFallbackResult.delete(sessionID)
         sessionRetryInFlight.delete(sessionID)
         sessionResolvedAgents.delete(sessionID)
-        // Events caused by the abort can re-arm the watchdog while the awaits above are pending.
+        deps.internallyAbortedSessions.delete(sessionID)
+        await abortSessionRequest(sessionID, TERMINAL_ABORT_SOURCE)
+        recordCompactionEnd(sessionID)
+        // Events caused by the abort can re-arm the watchdog while it is pending.
         clearSessionFallbackTimeout(sessionID)
+        void showWatchdogToast(sessionID, "Compaction exceeded its watchdog budget")
         return
       }
 
@@ -196,18 +208,22 @@ export function createFallbackTimeoutHelpers(
         })
         // An awaiting caller gets exactly one observable terminal abort (#6637);
         // without one, the stuck stream is returned with a plain timeout abort.
-        if (!deps.sessionAwaitingFallbackResult.has(sessionID)) {
+        const awaitingCaller = deps.sessionAwaitingFallbackResult.has(sessionID)
+        if (!awaitingCaller) {
           await abortSessionRequest(sessionID, "session.timeout")
         }
         await failSessionFallbackTerminally(
           sessionID,
           state,
-          fallbackModels.length === 0 ? "no fallback models configured" : "max fallback attempts reached",
+          wedgeReturnReason(fallbackModels.length, state.attemptCount, config.max_fallback_attempts),
           { attemptCount: state.attemptCount },
           "Runtime fallback could not prepare a replacement",
         )
         // Same window as the budget branch: nothing may stay armed once control is returned.
         clearSessionFallbackTimeout(sessionID)
+        // With nobody awaiting, the terminal path above stays silent; the user still learns once that
+        // control came back, as on a refused dispatch.
+        if (!awaitingCaller) await showWatchdogToast(sessionID, "Runtime fallback could not prepare a replacement")
         return
       }
 
