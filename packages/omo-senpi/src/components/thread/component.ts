@@ -13,6 +13,7 @@ import { controlSessionOf, createControlEndpointRegistrant, hostInstanceOf, sess
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
 import { createLazyLiveThreadSurface } from "./lazy-live-surface"
+import { wireReplyRoutes } from "./remote/lazy-ops"
 import { createLazyRemoteSurface } from "./remote/lazy-remote"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import { defaultThreadStateDirectory } from "./live-surface-paths"
@@ -219,6 +220,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
             ? `thread gateway: completion report not written yet, retrying in ${store.busyTimeoutMs} ms: ${error instanceof Error ? error.message : String(error)}`
             : `thread gateway: completion reports were not written: ${error instanceof Error ? error.message : String(error)}`),
       })
+      const remote = options.remote ?? createLazyRemoteSurface({ version: createOmoNativeProductConfig().packageVersion })
       const tools = registerThreadTools(pi, {
         host,
         stateDirectory,
@@ -237,8 +239,10 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerRunDeliveries: () => [...run.consumed],
         callerRunHasLocalInput: () => run.local,
         onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
-        remote: options.remote ?? createLazyRemoteSurface({ version: createOmoNativeProductConfig().packageVersion }),
+        remote,
       }, (line) => ctx.logger.warn(line))
+      // The answer to a cross-device peer send this session consumed goes back into the sender's session (reply-route.ts).
+      wireReplyRoutes(pi, remote, { senderProvenance: () => resolveProvenance({ cwd: callerWorkspaceRoot(), env: options.env, loadWorkspaces: loadProvenanceWorkspaces, onWarning: onProvenanceWarning }), sessionName: () => pi.getSessionName?.(), warn: (line) => ctx.logger.warn(`thread gateway: ${line}`) })
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
       // crash before its write), or made by another process (`omo thread report ... completion`) - is
       // picked up at session_start and on a `wake` command, and written at this session's next settle.
