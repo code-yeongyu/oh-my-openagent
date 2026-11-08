@@ -176,6 +176,7 @@ function buildStart(
     depth: 1,
     parentSessionId: `facts-${input.runId}`,
     rootSessionId: `facts-${input.runId}`,
+    ownApprovalMode: true,
     systemPrompt: loadFactsPersona(),
     promptEnvelope: "bare",
     completion: "turn",

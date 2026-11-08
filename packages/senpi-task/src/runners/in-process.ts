@@ -105,6 +105,10 @@ export type ChildSpec = {
   readonly depth: number
   readonly parentSessionId: string
   readonly rootSessionId: string
+  // An engine-owned worker (the facts extractor) whose parent ids name its run, not a live session: it opens
+  // without spawnedBy, so it keeps the approval mode its own settings give it (senpi rule 4), exactly as before
+  // 2026.11.6-3, instead of being an orphaned delegated child that must ask (rule 3).
+  readonly ownApprovalMode?: true
   readonly agentType?: string
   readonly instructions?: string
   readonly prompt: string
@@ -190,7 +194,7 @@ export class InProcessRunner {
       const { SessionManager } = await loadSenpiBarrel()
       const options = buildChildSessionOptions({
         spec,
-        sessionManager: SessionManager.create(spec.cwd, requireChildSessionDir(spec), {
+        sessionManager: SessionManager.create(spec.cwd, requireChildSessionDir(spec), spec.ownApprovalMode === true ? {} : {
           spawnedBy: { parentSessionId: spec.parentSessionId, rootSessionId: spec.rootSessionId, taskId: spec.taskId },
         }),
         sharedParentTools: this.#sharedParentTools,
