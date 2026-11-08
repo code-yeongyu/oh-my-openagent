@@ -40,10 +40,14 @@
     },
     "./external-projection": {
       "import": "./src/compile/external-projection.ts"
+    },
+    "./completion-links": {
+      "import": "./src/reflection/completion-links.ts"
     }
   },
   "imports": {
-    "#memory-external-projection": "./src/compile/external-projection.ts"
+    "#memory-external-projection": "./src/compile/external-projection.ts",
+    "#memory-completion-links": "./src/reflection/completion-links.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit -p tsconfig.json",

@@ -3,6 +3,8 @@ import {
   clearDelegatedChildSessionBootstrap,
   getDelegatedChildSessionBootstrap,
 } from "../../shared/delegated-child-session-bootstrap"
+import { hasCompactionPart } from "../../shared/compaction-marker"
+import { hasSubstantivePromptText } from "../../shared/runtime-fallback-retry-marker"
 
 type RetryPart = { type: "text"; text: string }
 
@@ -25,10 +27,17 @@ export function getLastUserRetryPayload(
 ): LastUserRetryPayload {
   const bootstrap = sessionID ? getDelegatedChildSessionBootstrap(sessionID) : undefined
   const messages = extractSessionMessages(messagesResponse)
-  const lastUserMessage = messages?.filter((message) => message.info?.role === "user").pop()
-  const lastUserParts =
-    lastUserMessage?.parts
-    ?? (lastUserMessage?.info?.parts as Array<{ type?: string; text?: string }> | undefined)
+  const lastUserMessage = messages?.filter((message) => {
+    if (message.info?.role !== "user") return false
+    const propParts = Array.isArray(message.parts) ? message.parts : undefined
+    const infoParts = Array.isArray(message.info?.parts) ? message.info.parts : undefined
+    const parts = propParts && propParts.length > 0 ? propParts : infoParts
+    if (hasCompactionPart(parts)) return false
+    return hasSubstantivePromptText(parts)
+  }).pop()
+  const propParts = Array.isArray(lastUserMessage?.parts) ? lastUserMessage.parts : undefined
+  const infoParts = Array.isArray(lastUserMessage?.info?.parts) ? lastUserMessage.info.parts : undefined
+  const lastUserParts = propParts && propParts.length > 0 ? propParts : infoParts
 
   const retryParts = (lastUserParts ?? [])
     .filter(
