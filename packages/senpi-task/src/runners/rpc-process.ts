@@ -85,7 +85,7 @@ export class RpcProcessRunner {
         ? { ...specInput, extensions: this.inheritedExtensions }
         : specInput
     await this.modelAdmission(spec)
-    const parent = new ChildParentLink(spec.task_id, this.options.dialogs, this.options.parentPermission)
+    const parent = new ChildParentLink(spec.task_id, this.options.dialogs, this.options.parentPermission, (message) => this.onWarning(message))
     const descriptor = this.buildSpawn(parent.named(spec))
     const child = this.spawnChild(descriptor)
     const client = new RpcProtocolClient({ child, onMalformedLine: this.onMalformedLine, parent })

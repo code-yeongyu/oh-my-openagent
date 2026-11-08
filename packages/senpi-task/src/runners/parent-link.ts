@@ -21,11 +21,17 @@ export interface ParentPermissionMode {
 export class ChildParentLink {
   #abort = new AbortController()
   #unfollow: (() => void) | undefined
+  // The mode the child was last given (at launch or open, or by the last push that landed).
+  #applied: string | undefined
+  #pushes: Promise<void> = Promise.resolve()
+  #pushQueued = false
 
   constructor(
     private readonly taskId: string,
     private readonly forwarder?: ChildDialogForwarder,
     private readonly permission?: ParentPermissionMode,
+    // Where a child that did not follow is reported (the runner's warning channel, which reaches the parent session).
+    private readonly onWarning?: (message: string) => void,
   ) {}
 
   answer(frame: AutoAnswerableUiRequest & Readonly<Record<string, unknown>>, send: (response: RpcExtensionUIResponse) => void | Promise<void>): void {
@@ -41,16 +47,38 @@ export class ChildParentLink {
   /** The open or launch input naming the parent's current mode; unchanged when the parent has none to name. */
   named<T extends { readonly permissionPreset?: string }>(input: T): T {
     const preset = this.permission?.current()
+    this.#applied = preset
     return preset === undefined ? input : { ...input, permissionPreset: preset }
   }
 
-  /** Pushes every later parent mode change to the child; a failed push is logged and the child keeps its mode. */
+  /**
+   * Keeps the child on the parent's mode from now on: a change the parent made while the child was still opening is
+   * pushed at once, and later changes are pushed one at a time, each reading the parent's mode when it starts, so a
+   * burst coalesces to the latest mode and pushes never land out of order. A failed push leaves the child in its
+   * earlier mode; it is warned on the runner's channel, and the next change tries again.
+   */
   follow(push: (preset: string) => Promise<unknown>): void {
     this.#unfollow?.()
-    this.#unfollow = this.permission?.onChange((preset) => {
-      void push(preset).catch((error: unknown) => {
+    const permission = this.permission
+    if (permission === undefined) return
+    this.#unfollow = permission.onChange(() => this.#schedule(permission, push))
+    this.#schedule(permission, push)
+  }
+
+  #schedule(permission: ParentPermissionMode, push: (preset: string) => Promise<unknown>): void {
+    if (this.#pushQueued) return
+    this.#pushQueued = true
+    this.#pushes = this.#pushes.then(async () => {
+      this.#pushQueued = false
+      const preset = permission.current()
+      if (preset === undefined || preset === this.#applied || this.#unfollow === undefined) return
+      try {
+        await push(preset)
+        this.#applied = preset
+      } catch (error) {
         log("senpi-task child did not follow its parent's approval mode", { taskId: this.taskId, preset, error: String(error) })
-      })
+        this.onWarning?.(`task ${this.taskId} did not follow its parent's approval mode (${preset}) and keeps ${this.#applied ?? "its own"}: ${error instanceof Error ? error.message : String(error)}`)
+      }
     })
   }
 

@@ -68,6 +68,7 @@ async function raise(ui: DialogUi, dialog: ForwardableDialog, title: string, sig
     signal,
     ...("timeout" in dialog && dialog.timeout !== undefined ? { timeout: dialog.timeout } : {}),
     ...("toolCallId" in dialog && dialog.toolCallId !== undefined ? { toolCallId: dialog.toolCallId } : {}),
+    ...("parentToolCallId" in dialog && dialog.parentToolCallId !== undefined ? { parentToolCallId: dialog.parentToolCallId } : {}),
   }
   const text = (value: string | undefined): ForwardedAnswer => (value === undefined ? CANCELLED_CHILD_DIALOG : { kind: "value", value })
   switch (dialog.method) {

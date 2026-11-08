@@ -142,7 +142,7 @@ export class RpcHostRunner {
     this.options = options
     this.createClient = options.createClient ?? ((socketPath, taskId) => new HostSessionClient({
       socketPath,
-      ...(taskId === undefined ? {} : { parent: new ChildParentLink(taskId, options.dialogs, options.parentPermission) }),
+      ...(taskId === undefined ? {} : { parent: new ChildParentLink(taskId, options.dialogs, options.parentPermission, (message) => this.onWarning(message)) }),
     }))
     this.modelAdmission = options.modelAdmission ?? createRpcModelAdmission()
     this.inheritedExtensions = options.inheritedExtensions ?? []

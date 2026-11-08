@@ -3,7 +3,7 @@ import type { ExtensionUIContext } from "@code-yeongyu/senpi"
 import type { ChildDialogForwarder } from "./forwarder"
 import type { ForwardableDialog, ForwardedAnswer } from "./forwardable-dialog"
 
-type DialogOptions = { readonly signal?: AbortSignal; readonly timeout?: number; readonly toolCallId?: string; readonly secret?: boolean }
+type DialogOptions = { readonly signal?: AbortSignal; readonly timeout?: number; readonly toolCallId?: string; readonly parentToolCallId?: string; readonly secret?: boolean }
 
 const NEVER_ABORTED = new AbortController().signal
 
@@ -15,7 +15,10 @@ export function createForwardingUIContext(headless: ExtensionUIContext, forwarde
   const forward = (dialog: ForwardableDialog, opts: DialogOptions | undefined): Promise<ForwardedAnswer> =>
     forwarder.forward(dialog, { taskId, signal: opts?.signal ?? NEVER_ABORTED })
   const timeout = (opts: DialogOptions | undefined) => (opts?.timeout === undefined ? {} : { timeout: opts.timeout })
-  const toolCall = (opts: DialogOptions | undefined) => (opts?.toolCallId === undefined ? {} : { toolCallId: opts.toolCallId })
+  const toolCall = (opts: DialogOptions | undefined) => ({
+    ...(opts?.toolCallId === undefined ? {} : { toolCallId: opts.toolCallId }),
+    ...(opts?.parentToolCallId === undefined ? {} : { parentToolCallId: opts.parentToolCallId }),
+  })
   const value = (answer: ForwardedAnswer): string | undefined => (answer.kind === "value" ? answer.value : undefined)
   const forwarding: Pick<ExtensionUIContext, "select" | "confirm" | "input" | "editor"> = {
     select: async (title, options, opts) =>

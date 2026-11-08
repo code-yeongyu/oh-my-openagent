@@ -28,7 +28,7 @@ export interface SettleObserver {
   phase(label: string): void
 }
 
-type DialogOptions = { readonly signal?: AbortSignal; readonly timeout?: number; readonly toolCallId?: string }
+type DialogOptions = { readonly signal?: AbortSignal; readonly timeout?: number; readonly toolCallId?: string; readonly parentToolCallId?: string }
 
 /** The prompting dialogs of senpi's ExtensionUIContext; `input`/`editor` are optional so narrow fakes still fit. */
 export interface DialogUi {
