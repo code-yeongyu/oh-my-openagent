@@ -36,8 +36,8 @@ function parentMode(initial: string): ParentPermissionMode & { change(preset: st
   }
 }
 
-function linkedClient(host: FakeHost, parent: ChildParentLink): HostSessionClient {
-  const client = new HostSessionClient({ socketPath: host.socketPath, ports: { probeProtocolInfo: () => host.probeProtocolInfo() }, parent })
+function linkedClient(host: FakeHost, parent: ChildParentLink, probe = () => host.probeProtocolInfo()): HostSessionClient {
+  const client = new HostSessionClient({ socketPath: host.socketPath, ports: { probeProtocolInfo: probe }, parent })
   clients.push(client)
   return client
 }
@@ -52,11 +52,11 @@ describe("HostSessionClient with a parent session", () => {
     const answered = host.waitForCommand("extension_ui_response")
 
     // when
-    host.requestUi(opened.sessionId, { id: "ui-allow", method: "select", title: "Run bash?", options: ["Allow", "Deny"], toolCallId: "call-7" })
+    host.requestUi(opened.sessionId, { id: "ui-allow", method: "select", title: "Run bash?", options: ["Allow", "Deny"], toolCallId: "call-7", parentToolCallId: "cell-2" })
 
     // then
     expect((await answered).payload).toMatchObject({ type: "extension_ui_response", id: "ui-allow", value: "Allow" })
-    expect(seen).toEqual([{ taskId: "st_t16a", dialog: { method: "select", title: "Run bash?", options: ["Allow", "Deny"], toolCallId: "call-7" } }])
+    expect(seen).toEqual([{ taskId: "st_t16a", dialog: { method: "select", title: "Run bash?", options: ["Allow", "Deny"], toolCallId: "call-7", parentToolCallId: "cell-2" } }])
   })
 
   test("#given a child secret input #when it arrives #then it is never forwarded and the child gets the cancel", async () => {
@@ -93,4 +93,77 @@ describe("HostSessionClient with a parent session", () => {
     expect(client.sessionId).toBe(opened.sessionId)
     expect(await client.getState()).toBeDefined()
   })
+
+  // Review of 12839 (MEDIUM): a parent mode change while the child's own open is still in flight must reach the child.
+  test("#given the parent moves to ask while the child is opening #when the open completes #then the child is moved to ask", async () => {
+    // given
+    const host = await fakeHost()
+    const mode = parentMode("full-access")
+    let moved = false
+    const probe = () => {
+      if (!moved) { moved = true; mode.change("ask") }
+      return host.probeProtocolInfo()
+    }
+    const client = linkedClient(host, new ChildParentLink("st_m1", undefined, mode), probe)
+    const reapplied = within(host.waitForCommand("open_session", 2), "a re-open naming the parent's new mode")
+
+    // when
+    await client.open(childOpenInput("/tmp/sessions/m1.jsonl"))
+
+    // then
+    expect((await reapplied).payload).toMatchObject({ sessionPath: "/tmp/sessions/m1.jsonl", permissionPreset: "ask" })
+  })
+
+  // Review of 12839 (MEDIUM): rapid changes are applied one at a time, latest mode wins, never out of order.
+  test("#given rapid parent changes ask, full-access, ask #when they are pushed #then one push runs at a time and the child ends in ask", async () => {
+    // given
+    const host = await fakeHost()
+    const mode = parentMode("full-access")
+    const gate = heldProbes(host)
+    const client = linkedClient(host, new ChildParentLink("st_m2", undefined, mode), gate.probe)
+    await client.open(childOpenInput("/tmp/sessions/m2.jsonl"))
+    gate.hold()
+
+    // when
+    mode.change("ask")
+    mode.change("full-access")
+    mode.change("ask")
+    await within(gate.firstHeld, "the first follow push to start")
+
+    // then
+    expect(gate.held()).toBe(1)
+    const landed = host.waitForCommand("open_session")
+    gate.releaseAll()
+    expect((await within(landed, "the follow push to land")).payload).toMatchObject({ permissionPreset: "ask" })
+  })
 })
+
+function within<T>(promise: Promise<T>, what: string, ms = 5_000): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`waited ${ms}ms for ${what}, never seen`)), ms)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}
+
+// Probes pass straight through until hold(); then each waits for releaseAll(), so concurrent pushes are countable.
+function heldProbes(host: FakeHost) {
+  let holding = false
+  const waiting: Array<() => void> = []
+  const first = Promise.withResolvers<void>()
+  return {
+    firstHeld: first.promise,
+    hold: () => { holding = true },
+    held: () => waiting.length,
+    releaseAll: () => { holding = false; for (const release of waiting.splice(0)) release() },
+    probe: async () => {
+      if (holding) {
+        const released = Promise.withResolvers<void>()
+        waiting.push(released.resolve)
+        first.resolve()
+        await released.promise
+      }
+      return await host.probeProtocolInfo()
+    },
+  }
+}

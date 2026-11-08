@@ -11,7 +11,7 @@ import { createChildParentWiring } from "./child-parent-wiring"
 // cancelled, and which mode a mode change hands the children.
 
 const connection = new AsyncLocalStorage<string>()
-const PROMPT: ForwardableDialog = { method: "select", title: "Run bash?", options: ["Allow once", "Deny"], toolCallId: "call-d" }
+const PROMPT: ForwardableDialog = { method: "select", title: "Run bash?", options: ["Allow once", "Deny"], toolCallId: "call-d", parentToolCallId: "cell-d" }
 
 type Raised = { readonly via: string; readonly title: string; readonly opts: unknown; readonly connection: string | undefined }
 
@@ -50,7 +50,7 @@ describe("createChildParentWiring", () => {
 
     // then
     expect(answer).toEqual({ kind: "value", value: "Allow once" })
-    expect(raised).toEqual([{ via: "session", title: "task st_bg: Run bash?", opts: expect.objectContaining({ toolCallId: "call-d" }), connection: undefined }])
+    expect(raised).toEqual([{ via: "session", title: "task st_bg: Run bash?", opts: expect.objectContaining({ toolCallId: "call-d", parentToolCallId: "cell-d" }), connection: undefined }])
   })
 
   test("#given a child the parent turn waits on #when it asks from outside that turn #then the prompt is raised in the turn's own connection context", async () => {

@@ -39,6 +39,7 @@ function startChild(options: {
   readonly mode?: ParentPermissionMode
   readonly forwarder?: ChildDialogForwarder
   readonly env?: Readonly<Record<string, string>>
+  readonly onWarning?: (message: string) => void
 }): { readonly started: Promise<RpcChildHandle>; readonly descriptor: () => RpcSpawnDescriptor | undefined; readonly commandLog: string } {
   const stateDir = mkdtempSync(join(tmpdir(), "senpi-task-6189-"))
   tmpDirs.push(stateDir)
@@ -47,6 +48,7 @@ function startChild(options: {
   const runner = new RpcProcessRunner({
     ...(options.mode === undefined ? {} : { parentPermission: options.mode }),
     ...(options.forwarder === undefined ? {} : { dialogs: options.forwarder }),
+    ...(options.onWarning === undefined ? {} : { onWarning: options.onWarning }),
     spawnChild: (built) => {
       descriptor = built
       const child = spawnFakeChild({ ...built.env, FAKE_COMMAND_LOG: commandLog, ...options.env })
@@ -133,5 +135,23 @@ describe("RpcProcessRunner with a parent session", () => {
     const sent = readFileSync(launched.commandLog, "utf8").trim().split("\n").map((line) => JSON.parse(line) as { type?: string })
       .filter((command) => command.type === "set_permission_preset")
     expect(sent).toEqual([expect.objectContaining({ type: "set_permission_preset", permissionPreset: "ask" })])
+  })
+
+  // Review of 12839 (LOW): a child that did not follow stays looser than its parent, so the parent session is told.
+  test("#given a child whose engine refuses set_permission_preset #when the parent moves to ask #then the runner warns that the child kept its mode", async () => {
+    // given
+    const mode = parentMode("full-access")
+    const warned = Promise.withResolvers<string>()
+    const launched = startChild({ mode, env: { FAKE_PERMISSION_PRESET: "refuse" }, onWarning: (message) => warned.resolve(message) })
+    await launched.started
+    const timer = setTimeout(() => warned.reject(new Error(`waited ${WAIT_MS}ms for the follow-failure warning, never sent`)), WAIT_MS)
+
+    // when
+    mode.change("ask")
+
+    // then
+    const message = await warned.promise.finally(() => clearTimeout(timer))
+    expect(message).toContain("st_6189b")
+    expect(message).toContain("ask")
   })
 })

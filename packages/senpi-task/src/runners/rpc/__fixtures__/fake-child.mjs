@@ -4,6 +4,7 @@
 //   FAKE_IGNORE_TERM=1   install a SIGTERM handler that ignores it (proves SIGKILL escalation)
 //   FAKE_EMIT_UI=1       emit an extension_ui_request confirm at startup
 //   FAKE_EMIT_UI_FRAME=<json> emit this extension_ui_request at startup instead
+//   FAKE_PERMISSION_PRESET=refuse answer set_permission_preset with an error (an engine without the record)
 //   FAKE_EMIT_MALFORMED=1 emit one malformed line then a valid event at startup
 //   FAKE_CAPABILITIES=a,b get_protocol_info advertises these capabilities
 //   FAKE_COMMAND_LOG=path append every received command as one JSON line
@@ -146,6 +147,7 @@ function handleCommand(cmd) {
         },
       })
     case "set_permission_preset":
+      if (process.env.FAKE_PERMISSION_PRESET === "refuse") return reject("set_permission_preset", cmd.id, "unknown command type: set_permission_preset")
       respond("set_permission_preset", cmd.id, {
         data: { permissionPreset: cmd.permissionPreset, permissionPresetSource: "client", permissionPresetStatus: "applied" },
       })
