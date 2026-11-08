@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { OPS, foldSamples } from "./bench.mjs"
 import { compareBench, dispositionHistogram, exitCodeFor, judge, mismatched, percentile, summarize } from "./eval-core.mjs"
-import { cuaActions, modelScript, parseReadback, planCode, readbackCode, traceDisposition } from "./run.mjs"
+import { cuaActions, modelScript, oracleRow, parseReadback, planCode, readbackCode, restoreAndObserve, traceDisposition } from "./run.mjs"
 import { TASKS, pressesReached, textLanded } from "./tasks.mjs"
 
 const byId = Object.fromEntries(TASKS.map((task) => [task.id, task]))
@@ -74,6 +74,30 @@ describe("cu-eval arms", () => {
     const calculator = cuaActions(byId["calculator-multiply"].fake, byId["calculator-multiply"].fake.plan)
     expect(calculator.actions[0]).toEqual({ action: "click", x: 250, y: 320 })
     expect(modelScript("model-cua", byId["calculator-multiply"].fake).own.map((step) => step.name)).toEqual(["computer", "computer_actions", "computer_actions"])
+  })
+
+  test("#given a live task whose teardown closes the window #when restored #then the oracle sees the window open and the post-check sees it closed", async () => {
+    // A Finder-like window that only the teardown op closes: the oracle needs it open, the post-check closed.
+    let open = true
+    const computer = { windows: async () => (open ? [{ id: 1, app: "Finder", title: "Downloads" }] : []) }
+    const live = {
+      TEARDOWN_OPS: new Set(["closeWindow"]),
+      ops: { closeWindow: async () => ((open = false), []) },
+      files: () => ({}),
+    }
+    const shows = (windows) => windows.some((w) => w.app === "Finder" && w.title === "Downloads")
+    const surface = {
+      readback: [],
+      restore: [{ op: "closeWindow" }],
+      expect: {},
+      oracle: ({ windows }) => [{ check: "a Finder window shows Downloads", kind: "ax", ok: shows(windows) }],
+      postcheck: ({ windows }) => [{ check: "no eval Finder window is left open", kind: "ax", ok: !shows(windows) }],
+    }
+    const observed = await restoreAndObserve({ computer, win: {}, surface, live, dir: "", remembered: {}, readback: {} })
+    const row = oracleRow({ task: { id: "t", title: "t" }, arm: "sdk-direct", surface, mismatch: false, outcome: { ...observed, reports: [], audit: [], restoreAudit: [], steps: 1, wallMs: 1 } })
+    expect(open).toBe(false)
+    expect(row.status).toBe("pass")
+    expect(row.restore.status).toBe("pass")
   })
 
   test("#given trace replies #when folded into the histogram #then reports, legacy null replies and refusals are counted apart", () => {
