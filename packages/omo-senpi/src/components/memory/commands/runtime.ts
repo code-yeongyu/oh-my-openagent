@@ -25,6 +25,9 @@ export { retentionResumePending, runMaintenanceHostSweep, runMaintenanceRetentio
 // The stale reflection-lock reaper runs once per session on the first settled turn, on a stuck holder, and from
 // /doctor fix, so the entry bundle loads it from here.
 export { formatStaleLockFixLines, reclaimDeadOwnerLocks, runStaleLockReaper } from "@oh-my-opencode/memory-core"
+// memory-core's `#memory-completion-links` (the dream archive link repair, #12642) maps here in the plugin manifest:
+// it runs only when a dream or reflection run is finalized, so the entry bundle loads it from here.
+export { applyLinkRepair, recognizeLinkRepair } from "@oh-my-opencode/memory-core/completion-links"
 
 type CommandRegistrar = (pi: MemoryCommandPort, deps: MemoryCommandDeps) => void
 
