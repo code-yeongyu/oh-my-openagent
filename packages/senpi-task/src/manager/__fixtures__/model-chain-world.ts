@@ -27,7 +27,7 @@ export type ModelChainWorld = {
   readonly calls: readonly ProviderCall[]
   toolRuns(): number
   runner(): ManagedRunner
-  engineRunner(kind: EngineRunnerKind): Promise<ManagedRunner>
+  engineRunner(kind: EngineRunnerKind, options?: { readonly hiddenCapabilities?: readonly string[] }): Promise<ManagedRunner>
   /** The settings file an engine runner reads, copied byte for byte from `settingsPath` when it starts. */
   engineSettingsPath(kind: EngineRunnerKind): string
   dispose(): Promise<void>
@@ -98,8 +98,8 @@ export async function createModelChainWorld(
       const model = provider === undefined || id === undefined ? undefined : modelRegistry.find(provider, id)
       return { agentDir, projectTrusted: false, modelRegistry, modelRuntime, ...(model === undefined ? {} : { model }) }
     }),
-    engineRunner: async (kind) => {
-      const engine = await startEngineRunner(kind, { root, settingsPath, scripts })
+    engineRunner: async (kind, engineOptions = {}) => {
+      const engine = await startEngineRunner(kind, { root, settingsPath, scripts, ...engineOptions })
       engines.push(engine)
       return engine.runner
     },

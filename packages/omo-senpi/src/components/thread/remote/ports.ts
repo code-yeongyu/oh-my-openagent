@@ -20,8 +20,11 @@ export type RemoteDevice = { readonly device: string; readonly label: string; re
  * `uncertain` means it may have run (the relay lost the evidence), so it is never retried blindly.
  */
 export type RemoteCommandOutcome =
-  /** `local`: answered from the session's mirror on this device, with no round trip. */
-  | { readonly kind: "ok"; readonly response: JsonObject; readonly local?: true }
+  /**
+   * `local`: answered from the session's mirror on this device, with no round trip. `located`: the listing key of the
+   * session an endpoint open made, when the open asked for it and the host named it on the reply.
+   */
+  | { readonly kind: "ok"; readonly response: JsonObject; readonly local?: true; readonly located?: string }
   | { readonly kind: "refused"; readonly reason: string }
   | { readonly kind: "uncertain"; readonly reason: string }
 
@@ -31,6 +34,15 @@ export type RemoteLocateOutcome =
   | { readonly kind: "ok"; readonly sessionId: string }
   | { readonly kind: "refused"; readonly reason: string }
 
+/** A session on another device followed from now on: its records go to the listener until `stop` or the attach ends. */
+export type RemoteSessionWatch = {
+  /** Settles with the reason the attach ended; nothing is delivered after it. */
+  readonly ended: Promise<string>
+  readonly stop: () => void
+}
+
+export type RemoteWatchOutcome = { readonly kind: "ok"; readonly watch: RemoteSessionWatch } | { readonly kind: "refused"; readonly reason: string }
+
 export type RemoteSessionsPort = {
   /** The device service state; `plan_required` means the account's plan has no relay (A5: paid only). */
   readonly status: () => Promise<RemoteServiceState>
@@ -39,9 +51,10 @@ export type RemoteSessionsPort = {
   readonly sessions: () => Promise<readonly RemoteSessionRow[]>
   /**
    * A session-less engine record (`open_session`, `list_sessions`) on `device`'s engine endpoint, with no
-   * attach: the attach-less `session.command {device, endpoint, rpc}` shape (relay daemon #393).
+   * attach: the attach-less `session.command {device, endpoint, rpc}` shape (relay daemon #393). `locate` asks a
+   * create or fork for its new session's listing key on the reply (`located`), so no session.locate follows it.
    */
-  readonly endpointCommand: (device: string, rpc: JsonObject) => Promise<RemoteCommandOutcome>
+  readonly endpointCommand: (device: string, rpc: JsonObject, options?: { readonly locate?: boolean }) => Promise<RemoteCommandOutcome>
   /**
    * The id a session just created on `device` is addressed by (its listing row's `session_id`, the key an attach
    * takes), from the durable engine session id the create reply names; settles once that id attaches.
@@ -53,6 +66,13 @@ export type RemoteSessionsPort = {
    */
   readonly sessionCommand: (device: string, sessionId: string, rpc: JsonObject, options?: { readonly fresh?: boolean }) => Promise<RemoteCommandOutcome>
   readonly read: (device: string, sessionId: string, tail: number) => Promise<RemoteCommandOutcome>
+  /**
+   * The records `device`'s session writes from now on (none of the ones before), on the attach this port holds for it.
+   * Refused, typed, when that attach cannot be made.
+   */
+  readonly watch: (device: string, sessionId: string, listener: (record: JsonObject) => void) => Promise<RemoteWatchOutcome>
+  /** Closes the device-service connection this port opened, if any; a short-lived caller (the CLI) calls it at the end. */
+  readonly close?: () => Promise<void>
 }
 
 /**

@@ -1136,8 +1136,6 @@
       "packages/omo-senpi/src/components/memory/commands/types.ts": ["identityFor"],
       // pre-existing at origin dev 4686e425b5: unused export(s) getMemoryRepo
       "packages/omo-senpi/src/components/memory/context.ts": ["getMemoryRepo"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_SERVICE_API
-      "packages/omo-senpi/src/components/memory/device-session/account-source.ts": ["DEFAULT_SERVICE_API"],
       // pre-existing at origin dev 4686e425b5: unused export(s) FakeScheduler
       "packages/omo-senpi/src/components/memory/dream-trigger.test-support.ts": ["FakeScheduler"],
       // pre-existing at origin dev 4686e425b5: unused export(s) factsAgreementContract

@@ -1,6 +1,7 @@
 import type { ThreadToolResult } from "../contracts"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { REFUSAL_CODES } from "../gateway/result"
+import type { EffectiveLane } from "../gateway/types"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
 import { threadLink } from "../thread-link"
 import type { ThreadReadInput } from "../contracts"
@@ -8,6 +9,7 @@ import type { ThreadTranscriptEntry } from "../reader"
 import { liveReadResult } from "../tools/read-ops"
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
 import type { AliasError, AliasHolder, JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "./ports"
+import { peerText, type RemoteSender } from "./peer-text"
 
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
 const fail = (code: ThreadToolFailure["code"], message: string, next: string, details?: Readonly<Record<string, unknown>>): Failure => ({ kind: "error", error: threadToolFailure(code, message, next, details) })
@@ -60,11 +62,14 @@ export function aliasFailure(error: AliasError): Failure {
   return fail("host_unavailable", error.message, "Retry when the account service is reachable.", { reason: error.details?.reason })
 }
 
-/** Where a session address points once the account is consulted (A3): another device's session, or this device. */
+/**
+ * Where a session address points once the account is consulted (A3): another device's session, or this device. With
+ * no id or alias match, `none` hands back the account list it read, so step 3 matches titles without a second read.
+ */
 export type RemoteTarget =
   | { readonly where: "remote"; readonly row: RemoteSessionRow }
   | { readonly where: "here"; readonly session_id: string }
-  | { readonly where: "none" }
+  | { readonly where: "none"; readonly rows: readonly RemoteSessionRow[]; readonly here: string | null }
 
 /**
  * Resolution steps 1b and 2 of the frozen order: an exact session id in the account list, then an alias.
@@ -75,20 +80,31 @@ export async function locateAcross(remote: RemoteThreadSurface, address: string)
   const rows = await remote.sessions.sessions()
   const byId = rows.find((row) => row.session_id === address)
   if (byId !== undefined) return byId.device === here ? { where: "here", session_id: byId.session_id } : { where: "remote", row: byId }
-  if (remote.aliases === undefined) return { where: "none" }
-  const alias = await remote.aliases.resolve(address)
-  if (alias.kind === "error") {
-    if (alias.error.code === "alias_not_found" || alias.error.code === "alias_invalid") return { where: "none" }
-    return aliasFailure(alias.error)
-  }
-  return holderTarget(alias.value, here, rows)
+  if (remote.aliases === undefined) return { where: "none", rows, here }
+  // The address was not asked for as an alias, so a registry that cannot answer only means no alias match: a name keeps
+  // resolving through step 3 exactly as without a registry. Explicit alias claims keep their typed refusal (planCreate).
+  const alias = await remote.aliases.resolve(address).catch(() => undefined)
+  if (alias === undefined || alias.kind === "error") return { where: "none", rows, here }
+  return holderTarget(remote, alias.value, here, rows)
 }
 
-function holderTarget(holder: AliasHolder, here: string | null, rows: readonly RemoteSessionRow[]): RemoteTarget | Failure {
+/**
+ * The listing row an alias holder names. A thread claimed on its own device is held by its durable id, while the account
+ * listing keys every session (terminal-held or rpc-host alike) by the relay key that device's connector assigned and names
+ * only its project, so the row cannot be matched by durable id: the holding device maps it (session.locate, the same
+ * lookup a create on another device uses). An offline holder device is device_offline; one that is online but cannot map
+ * the holder to a session it lists is not_found.
+ */
+async function holderTarget(remote: RemoteThreadSurface, holder: AliasHolder, here: string | null, rows: readonly RemoteSessionRow[]): Promise<RemoteTarget | Failure> {
   if (holder.device === here) return { where: "here", session_id: holder.session_id }
-  const row = rows.find((candidate) => candidate.device === holder.device && candidate.session_id === holder.session_id)
-  if (row === undefined) return fail("device_offline", `Device ${holder.device} holding this thread is offline.`, "Retry when that device is online; nothing was queued.", { device: holder.device, thread_id: holder.session_id })
-  return { where: "remote", row }
+  const listed = rows.find((row) => row.device === holder.device && row.session_id === holder.session_id)
+  if (listed !== undefined) return { where: "remote", row: listed }
+  const device = (await remote.sessions.devices()).find((candidate) => candidate.device === holder.device)
+  if (device !== undefined && !device.online) return fail("device_offline", `Device ${holder.device} holding this thread is offline.`, "Retry when that device is online; nothing was queued.", { device: holder.device, thread_id: holder.session_id })
+  const located = await remote.sessions.locate(holder.device, holder.session_id)
+  const row = located.kind === "ok" ? rows.find((candidate) => candidate.device === holder.device && candidate.session_id === located.sessionId) : undefined
+  if (row !== undefined) return { where: "remote", row }
+  return fail("not_found", `The alias names thread ${holder.session_id} on device ${holder.device}, which that device does not list.`, "Call thread_list with all_scope to find the live thread, then claim the alias for it again with thread_rename.", { device: holder.device, thread_id: holder.session_id, ...(located.kind === "refused" ? { reason: located.reason } : {}) })
 }
 
 /** A typed `device_offline` when the device is known and not online; nothing is ever queued for it (A3). */
@@ -136,7 +152,8 @@ export async function openRemote(remote: RemoteThreadSurface, request: RemoteOpe
     : request.kind === "open"
       ? { type: "open_session", retain_on_disconnect: true, sessionPath: request.row.path }
       : { type: "open_session", retain_on_disconnect: true, forkFrom: request.row.session_id, ...(request.cwd === undefined ? {} : { cwd: request.cwd }) }
-  const outcome = await remote.sessions.endpointCommand(device, { ...opened, ...skills })
+  // A create or fork asks for its new session's listing key on the reply (decision 0018 amendment 2026-11-06).
+  const outcome = await remote.sessions.endpointCommand(device, { ...opened, ...skills }, request.kind === "open" ? undefined : { locate: true })
   if (outcome.kind !== "ok") return outcomeFailure(outcome, device)
   // An opened row is already addressed by its listing id; a created or forked session is located by its engine id.
   let threadId: string
@@ -144,8 +161,8 @@ export async function openRemote(remote: RemoteThreadSurface, request: RemoteOpe
   else {
     const engineId = openedEngineId(outcome.response)
     if (engineId === undefined) return fail("internal_error", `Device ${device} opened a session but did not name it.`, "Call thread_list with all_scope to find the new thread.", { device })
-    // A host that names the session's listing key beside the engine's reply (`session_key`) spares the locate.
-    const located = await remote.sessions.locate(device, engineId, nonEmpty(outcome.response["session_key"]))
+    // A host that names the session's listing key on the reply (`located`) spares the locate; an older one does not.
+    const located = await remote.sessions.locate(device, engineId, outcome.located)
     if (located.kind !== "ok") return fail("unsupported", `Device ${device} created a session but its id there could not be found (${located.reason}).`, "Call thread_list with all_scope to find the new thread, or update omo on that device.", { device, reason: located.reason })
     threadId = located.sessionId
   }
@@ -181,11 +198,14 @@ export function sendArgumentFailure(request: RemoteSendRequest): Failure | undef
   return undefined
 }
 
-export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, request: RemoteSendRequest, hop: number): Promise<ThreadToolResult> {
+export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, request: RemoteSendRequest, sender: RemoteSender): Promise<ThreadToolResult> {
   const refused = sendArgumentFailure(request)
   if (refused !== undefined) return refused
   const offline = await deviceOnline(remote, row.device)
   if (offline !== undefined) return offline
+  const here = sender.kind === "peer" ? await remote.sessions.thisDevice() : null
+  // A peer's text never reaches the receiver's command dispatch or prompt templates (senpi prompt `expandPromptTemplates`).
+  const text = (effective: EffectiveLane) => sender.kind === "peer" ? { message: peerText(sender, here, request, effective), expandPromptTemplates: false } : { message: request.message }
   if (request.delivery === "steer") {
     const state = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
     if (state.kind !== "ok") return outcomeFailure(state, row.device)
@@ -194,13 +214,21 @@ export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessi
     const pendingQuestions = engineState["pendingQuestions"]
     const midTurn = engineState["isStreaming"] === true && engineState["isCompacting"] !== true && !(Array.isArray(pendingQuestions) && pendingQuestions.length > 0)
     if (!midTurn) return fail(REFUSAL_CODES.not_steerable.code, `A steer to ${row.session_id} was refused: not_steerable.`, REFUSAL_CODES.not_steerable.next, { device: row.device })
-    // The other device's engine reports no turn id, so the caller's expected_turn_id cannot be checked there yet.
-    return fail(REFUSAL_CODES.turn_conflict.code, `Turn ${request.expected_turn_id} of ${row.session_id} cannot be confirmed on device ${row.device}.`, REFUSAL_CODES.turn_conflict.next, { device: row.device, reason: "remote_turn_not_verifiable" })
+    // An engine that reports no running turn id (before senpi 2026.11.2) cannot have the caller's expected_turn_id checked.
+    const current = engineState["currentTurnId"]
+    if (typeof current !== "string" || current.length === 0) return fail(REFUSAL_CODES.turn_conflict.code, `Turn ${request.expected_turn_id} of ${row.session_id} cannot be confirmed on device ${row.device}.`, REFUSAL_CODES.turn_conflict.next, { device: row.device, reason: "remote_turn_not_verifiable" })
+    if (current !== request.expected_turn_id) return fail(REFUSAL_CODES.turn_conflict.code, `Turn ${request.expected_turn_id} is not the running turn of ${row.session_id} on device ${row.device}.`, REFUSAL_CODES.turn_conflict.next, { device: row.device, current_turn_id: current })
+    // The engine checks expectedTurnId again when the steer arrives, so a turn that ended in between is refused there.
+    const steer = remote.chain.stamp({ type: "prompt", sessionId: row.session_id, ...text("steer"), streamingBehavior: "steer", expectedTurnId: current }, sender.hop)
+    const steered = await remote.sessions.sessionCommand(row.device, row.session_id, steer)
+    if (steered.kind === "refused" && (steered.reason === "turn_conflict" || steered.reason === "not_steerable")) return fail(REFUSAL_CODES[steered.reason].code, `A steer to ${row.session_id} was refused: ${steered.reason}.`, REFUSAL_CODES[steered.reason].next, { device: row.device })
+    if (steered.kind !== "ok") return outcomeFailure(steered, row.device)
+    return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "steered", turn_id: current }, deduplicated: false, device: row.device }
   }
   // One round trip (#12320): no get_state goes first. The engine itself starts a followUp prompt on an idle session and
   // queues it behind a running turn, deciding both in one step (senpi agent-session `_prompt`, 2026.11.2-3 and later),
   // and its reply's disposition says which happened.
-  const record = remote.chain.stamp({ type: "prompt", sessionId: row.session_id, message: request.message, streamingBehavior: "followUp" }, hop)
+  const record = remote.chain.stamp({ type: "prompt", sessionId: row.session_id, ...text("follow_up"), streamingBehavior: "followUp" }, sender.hop)
   const sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
   if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
   const reply = replyData(sent.response)
@@ -214,6 +242,53 @@ export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessi
   const pending = settled["pendingMessageCount"]
   if (typeof pending !== "number" || !Number.isInteger(pending) || pending < 1) return fail("idempotency_uncertain", `Device ${row.device} accepted the message but did not report where it waits.`, "Read the thread before deciding whether to send again.", { device: row.device })
   return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "queued", queue_position: pending }, deduplicated: false, device: row.device }
+}
+
+/** The turn running in another device's session (`get_state.currentTurnId`), for a caller that steers whatever runs. */
+export async function runningTurnRemote(remote: RemoteThreadSurface, row: RemoteSessionRow): Promise<{ readonly kind: "ok"; readonly turn_id?: string } | Failure> {
+  const offline = await deviceOnline(remote, row.device)
+  if (offline !== undefined) return offline
+  const state = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
+  if (state.kind !== "ok") return outcomeFailure(state, row.device)
+  const current = nonEmpty(replyData(state.response)["currentTurnId"])
+  return current === undefined ? { kind: "ok" } : { kind: "ok", turn_id: current }
+}
+
+export type RemoteFollow = {
+  /** "settled" once the session's run settles (`agent_settled`), "session_closed" when its close cut the run short, else the reason its attach ended first. */
+  readonly settled: Promise<string>
+  readonly stop: () => void
+}
+
+const isRecord = (value: unknown): value is JsonObject => typeof value === "object" && value !== null && !Array.isArray(value)
+
+/**
+ * Follows another device's session from now on: each assistant text delta (`message_update` / `text_delta`) goes to
+ * `onText` in the order the session wrote it, until its run settles, with a line break between the text of separate
+ * messages or content blocks. Start it before the send it follows.
+ */
+export async function followRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, onText: (text: string) => void): Promise<RemoteFollow | Failure> {
+  const offline = await deviceOnline(remote, row.device)
+  if (offline !== undefined) return offline
+  let settle!: (end: string) => void
+  const settled = new Promise<string>((resolve) => { settle = resolve })
+  let last: { readonly index: unknown; readonly endsLine: boolean } | undefined
+  let newMessage = false
+  const watched = await remote.sessions.watch(row.device, row.session_id, (record) => {
+    // senpi settles a turn the session's close cut short with reason session_closed: that turn never finished.
+    if (record["type"] === "agent_settled") return settle(record["reason"] === "session_closed" ? "session_closed" : "settled")
+    if (record["type"] === "message_start" || record["type"] === "message_end") newMessage = true
+    const event = record["assistantMessageEvent"]
+    if (record["type"] !== "message_update" || !isRecord(event) || event["type"] !== "text_delta" || typeof event["delta"] !== "string" || event["delta"] === "") return
+    const delta = event["delta"]
+    if (last !== undefined && !last.endsLine && (newMessage || event["contentIndex"] !== last.index)) onText("\n")
+    newMessage = false
+    last = { index: event["contentIndex"], endsLine: delta.endsWith("\n") }
+    onText(delta)
+  })
+  if (watched.kind !== "ok") return outcomeFailure(watched, row.device)
+  void watched.watch.ended.then(settle)
+  return { settled, stop: watched.watch.stop }
 }
 
 /** The local engine's own `interrupt` record, so an idle session answers interrupted:false exactly as on this device. */
