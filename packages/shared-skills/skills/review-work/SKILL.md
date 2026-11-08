@@ -121,7 +121,7 @@ For GOAL, CONSTRAINTS, BACKGROUND - review the full conversation history. The us
 
 ## Phase 1: Manual QA (you run it)
 
-You are the QA lane. Do not delegate hands-on QA to a sub-agent: the orchestrator owns the real-surface proof, exactly as the ulw-loop final gate records `manualQa` under the main session. One exception: inside a `ulw-execute` run, whose root never runs QA itself, dispatch these scenarios to one QA worker and build the matrix from the artifacts it captures.
+You are the QA lane. Do not delegate hands-on QA to a sub-agent: the orchestrator owns the real-surface proof, exactly as the ulw-loop final gate records `manualQa` under the main session. One exception: inside a `ulw-execute` run, whose root delegates the run's QA scenarios to workers, dispatch these scenarios to one QA worker and build the matrix from the artifacts it captures. (In the Codex edition the root also runs its own final verification at the end of the run; that step is separate from this pass.)
 
 1. **Reuse first.** If this session already captured real-surface evidence for the FINAL tree (an ultrawork or ulw-loop evidence directory, a `visual-qa` verdict on this same build), consume it as QA rows instead of re-running. A fix committed after a capture stales that capture: re-run the rows it covered.
 2. **Pick the channel that faithfully exercises the surface** and capture the artifact:

@@ -25,16 +25,20 @@ const profile = mkdtempSync(join(tmpdir(), "debug-repro-"))
 const browser = await omowright.connectPipe({ browserPath, browserArgs: ["--headless", `--user-data-dir=${profile}`], storageRoot: profile })
 const page = await browser.newTab("about:blank")
 const trace = omowright.createTrace(page, { dir: traceDir })          // trace.jsonl + trace.har + before/after screenshots
+// The console buffer is per document: read it on each page before a step navigates away, or that page's errors are lost.
+const consoleErrors = []
+const readConsoleErrors = async () => consoleErrors.push(...(await page.console.logs({ levels: ["error"] })).map((entry) => entry.message))
 try {
   await trace.step("open", () => page.goto(url, { waitUntil: "load" }))
   await trace.step("submit", async () => {
     const { tree } = await page.snapshot({ interactive: true })       // read, then act on a fresh ref
     await page.locator("e5").fill(value)
+    await readConsoleErrors()                                           // the form page's errors, before the submit navigates
     await page.locator("e7").click()
     await page.waitForURL(/\/done/, { timeout: 10_000 })
   })
   await Bun.write(pngPath, await page.screenshot())
-  const consoleErrors = (await page.console.logs({ levels: ["error"] })).map((entry) => entry.message)
+  await readConsoleErrors()                                             // the /done page's own errors
 } finally {
   await trace.stop()
   await browser.close()
