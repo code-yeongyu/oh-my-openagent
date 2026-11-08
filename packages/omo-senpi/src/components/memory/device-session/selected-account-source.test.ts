@@ -73,7 +73,6 @@ describe("the account source built from the engine's one selection", () => {
     // when
     const first = source()
     const second = source()
-    await Bun.sleep(0)
     release()
 
     // then
