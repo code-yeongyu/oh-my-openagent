@@ -76,6 +76,8 @@ export async function bootstrapAtStart(eventCtx: unknown, logger: ComponentLogge
     return
   }
   if (report === undefined) logger.warn("device service bootstrap answered no report")
+  // A release this build pins but nobody has published yet (#12656): `omo remote` says so when used, the start stays quiet.
+  else if ("notice" in report && report.state === "not_published") logger.debug?.("device service release is not published", { notice: report.notice })
   else if ("notice" in report && !QUIET_STOPS.has(report.state)) notify(report.notice, "warning")
 }
 
