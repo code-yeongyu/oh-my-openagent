@@ -70,6 +70,7 @@
     "@oh-my-opencode/omo-opencode": "workspace:*",
     "@oh-my-opencode/prompts-core": "workspace:*",
     "@oh-my-opencode/senpi-desktop-engine": "workspace:*",
+    "@oh-my-opencode/senpi-desktop-sdk": "workspace:*",
     "@oh-my-opencode/senpi-desktop-service": "workspace:*",
     "@oh-my-opencode/senpi-desktop-tool": "workspace:*",
     "@oh-my-opencode/senpi-task": "workspace:*",
@@ -93,7 +94,6 @@
     "@code-yeongyu/senpi": "2026.11.5-1",
     "@code-yeongyu/senpi-agent-core": "2026.11.5-1",
     "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.5-1",
-    "@oh-my-opencode/senpi-desktop-sdk": "workspace:*",
     "@types/node": "26.6.2",
     "bun-types": "1.4.4",
     "terser": "5.51.2"
