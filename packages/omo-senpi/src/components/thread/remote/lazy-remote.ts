@@ -5,6 +5,7 @@ type Runtime = Pick<typeof import("./device-service"), "createDeviceServiceSessi
 export type LazyRemoteOptions = {
   readonly version: string
   readonly loadRuntime?: () => Promise<Runtime>
+  readonly permissionPreset?: () => string | undefined
 }
 
 /**
@@ -30,5 +31,5 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
     read: async (device, sessionId, tail) => await (await load()).read(device, sessionId, tail),
     watch: async (device, sessionId, listener) => await (await load()).watch(device, sessionId, listener),
   }
-  return { sessions, chain: { stamp: (record) => record } }
+  return { sessions, chain: { stamp: (record) => record }, ...(options.permissionPreset === undefined ? {} : { permissionPreset: options.permissionPreset }) }
 }

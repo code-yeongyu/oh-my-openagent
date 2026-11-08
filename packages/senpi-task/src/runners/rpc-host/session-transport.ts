@@ -62,6 +62,7 @@ export interface HostOpenSessionWire {
   readonly retain_on_disconnect: boolean
   readonly auto_title: boolean
   readonly retryFallback?: HostRetryFallbackProfile
+  readonly permissionPreset?: string
 }
 
 /** The immutable launch profile of one child session, in omo's names. */
@@ -78,6 +79,8 @@ export interface HostSessionOpenInput {
   readonly autoTitle: boolean
   /** Sent only to a host advertising `retry_fallback_profile`; an older host opens without it. */
   readonly retryFallback?: HostRetryFallbackProfile
+  /** The parent's approval mode a child in the task host opens with (#6189 F2c); the host cannot see the parent. */
+  readonly permissionPreset?: string
 }
 
 export interface HostRpcClientOptions {
@@ -113,6 +116,7 @@ export function toWireOpen(input: HostSessionOpenInput): HostOpenSessionWire {
     retain_on_disconnect: input.retainOnDisconnect,
     auto_title: input.autoTitle,
     ...(input.retryFallback === undefined ? {} : { retryFallback: input.retryFallback }),
+    ...(input.permissionPreset === undefined ? {} : { permissionPreset: input.permissionPreset }),
   }
 }
 

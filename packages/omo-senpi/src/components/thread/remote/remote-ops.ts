@@ -131,12 +131,14 @@ export async function openRemote(remote: RemoteThreadSurface, request: RemoteOpe
   const offline = await deviceOnline(remote, device)
   if (offline !== undefined) return offline
   const skills = request.kind === "open" || request.skills === undefined || request.skills.length === 0 ? {} : { context: { [INITIAL_SKILLS_CONTEXT_KEY]: JSON.stringify(request.skills) } }
+  // A created or forked session names its creator's mode, so remote work never falls to the engine's delegated default.
+  const mode = request.kind === "open" ? undefined : remote.permissionPreset?.()
   const opened: JsonObject = request.kind === "create"
     ? { type: "open_session", retain_on_disconnect: true, ...(request.cwd === undefined ? {} : { cwd: request.cwd }) }
     : request.kind === "open"
       ? { type: "open_session", retain_on_disconnect: true, sessionPath: request.row.path }
       : { type: "open_session", retain_on_disconnect: true, forkFrom: request.row.session_id, ...(request.cwd === undefined ? {} : { cwd: request.cwd }) }
-  const outcome = await remote.sessions.endpointCommand(device, { ...opened, ...skills })
+  const outcome = await remote.sessions.endpointCommand(device, { ...opened, ...skills, ...(mode === undefined ? {} : { permissionPreset: mode }) })
   if (outcome.kind !== "ok") return outcomeFailure(outcome, device)
   // An opened row is already addressed by its listing id; a created or forked session is located by its engine id.
   let threadId: string

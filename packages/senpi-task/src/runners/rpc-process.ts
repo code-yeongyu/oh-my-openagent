@@ -11,6 +11,8 @@ import { type RpcSpawnDescriptor, buildRpcSpawn } from "./rpc/spawn"
 import { discardUnstartedRpcHandle } from "./rpc/start-cleanup"
 import { createTaskRecordStore } from "../store"
 import { InputUncertainError } from "./input-effects"
+import type { ChildDialogForwarder } from "./child-dialogs/forwarder"
+import { ChildParentLink, type ParentPermissionMode } from "./parent-link"
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000
 /** senpi capability: a single-session `--mode rpc` process accepts `set_retry_fallback` before its first turn. */
@@ -34,6 +36,10 @@ export type RpcProcessRunnerOptions = {
   // Told once when a child's fallback models cannot reach its process: an engine without
   // `retry_fallback_command` (#9582).
   readonly onWarning?: (message: string) => void | (() => void)
+  // The parent session's UI a child's dialogs are answered on, and the approval mode it opens with and follows
+  // (#6189 F2c-F2e). Absent: dialogs get the safe deny/cancel default and the child keeps its own mode.
+  readonly dialogs?: ChildDialogForwarder
+  readonly parentPermission?: ParentPermissionMode
 }
 
 /**
@@ -55,8 +61,10 @@ export class RpcProcessRunner {
   private fallbackChainUnsupportedNoticed = false
   private readonly pendingTeardowns = new Set<Promise<void>>()
   private readonly terminateChild: CreateRpcChildHandleOptions["terminateChild"]
+  private readonly options: RpcProcessRunnerOptions
 
   constructor(options: RpcProcessRunnerOptions = {}) {
+    this.options = options
     this.terminateChild = options.terminateChild
     this.spawnChild =
       options.spawnChild ??
@@ -77,9 +85,10 @@ export class RpcProcessRunner {
         ? { ...specInput, extensions: this.inheritedExtensions }
         : specInput
     await this.modelAdmission(spec)
-    const descriptor = this.buildSpawn(spec)
+    const parent = new ChildParentLink(spec.task_id, this.options.dialogs, this.options.parentPermission)
+    const descriptor = this.buildSpawn(parent.named(spec))
     const child = this.spawnChild(descriptor)
-    const client = new RpcProtocolClient({ child, onMalformedLine: this.onMalformedLine })
+    const client = new RpcProtocolClient({ child, onMalformedLine: this.onMalformedLine, parent })
     const handle = createRpcChildHandle({
       client,
       child,
