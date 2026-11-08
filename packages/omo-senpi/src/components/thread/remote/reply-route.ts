@@ -3,8 +3,9 @@ const CLIENT_MESSAGE_ID_MAX = 256
 const ROUTE_PREFIX = "omo-peer.v1:"
 const ROUTE_VERSION = 1
 const ROUTED_KEPT = 256
-// senpi's own delivery entry: another party's input, so it ends the routed input's answer like a user message does.
-const DELIVERY_CUSTOM_TYPE = "session_control_delivery"
+// memory/recall-session-read.ts RECALL_CUSTOM_TYPE, by value: importing memory here would pull its prompt module into
+// the thread bundles. reply-route.test.ts compares against that constant, so a rename there fails the test.
+const MEMORY_RECALL_CUSTOM_TYPE = "omo-kibitzer:recall"
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const HOP = /^[1-9][0-9]{0,15}$/
 const FIELD_UUID = 0
@@ -143,7 +144,9 @@ export function createReplyRouter(deliver: (route: ReplyRoute, reply: RouteReply
         if (final) current.final = true
         return
       }
-      const input = message.role === "user" || (message.role === "custom" && message.customType === DELIVERY_CUSTOM_TYPE)
+      // Every custom message is an input, as in component.ts noteInput: another party's delivery, a ulw-loop continuation, a
+      // task completion. Only the memory recall is not: it is context the session gives itself, steered in after an input.
+      const input = message.role === "user" || (message.role === "custom" && message.customType !== MEMORY_RECALL_CUSTOM_TYPE)
       if (!input) return
       const earlierOpen = !inputAnswered
       endCurrent()
