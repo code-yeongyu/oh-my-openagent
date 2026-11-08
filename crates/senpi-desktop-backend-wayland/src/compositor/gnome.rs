@@ -1,5 +1,5 @@
 //! GNOME window geometry from the read-only `senpi-desktop-window-rects`
-//! GNOME Shell extension (`crates/senpi-desktop-gnome-extension`), probed
+//! GNOME Shell extension (`packages/gnome-window-rects-extension`), probed
 //! only when `XDG_CURRENT_DESKTOP` names GNOME. Mutter offers clients no way
 //! to list other windows, so the extension serves one method, `List`, on
 //! GNOME Shell's own bus name (`org.gnome.Shell`), as JSON: the shell's own
