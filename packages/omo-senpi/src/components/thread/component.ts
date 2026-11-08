@@ -15,7 +15,7 @@ import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } fr
 import { createLazyLiveThreadSurface } from "./lazy-live-surface"
 import { wireReplyRoutes } from "./remote/lazy-ops"
 import { parseReplyRoute } from "./remote/reply-route"
-import { createLazyRemoteSurface } from "./remote/lazy-remote"
+import { createDefaultRemoteSurface } from "./remote/default-remote"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import { defaultThreadStateDirectory } from "./live-surface-paths"
 
@@ -229,7 +229,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
             ? `thread gateway: completion report not written yet, retrying in ${store.busyTimeoutMs} ms: ${error instanceof Error ? error.message : String(error)}`
             : `thread gateway: completion reports were not written: ${error instanceof Error ? error.message : String(error)}`),
       })
-      const remote = options.remote ?? createLazyRemoteSurface({ version: createOmoNativeProductConfig().packageVersion })
+      const remote = options.remote ?? createDefaultRemoteSurface({ version: createOmoNativeProductConfig().packageVersion, log: (line) => ctx.logger.warn(line), permissionPreset: () => pi.getPermissionPreset?.() })
       const tools = registerThreadTools(pi, {
         host,
         stateDirectory,

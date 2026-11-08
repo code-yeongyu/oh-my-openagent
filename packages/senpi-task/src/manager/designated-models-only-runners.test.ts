@@ -98,6 +98,32 @@ describe.each(["in-process", "process", "host"] as const)("senpi's shipped defau
   }, 60_000)
 })
 
+describe("a process child whose engine cannot hold its designated chain (#12759)", () => {
+  const { primary, second, parent } = chainIds("process")
+
+  test("#given an engine without retry_fallback_command, a working parent model and user chains that walk to it #when the child's model would hit its usage limit #then the child never starts, fails naming its chain, and no model is called, the parent's included", async () => {
+    // given: the user's settings chain the child's only model to the parent's working model, so an engine
+    // left on its own fallback settings would carry the child onto the parent's model after the limit.
+    // when
+    const { record, world } = await runCategoryChild({
+      runner: "process",
+      category: "deep-high",
+      chain: [primary],
+      scripts: { [primary]: ["quota"] },
+      userFallbackChains: { [primary]: [parent, second] },
+      engineHides: ["retry_fallback_command"],
+    })
+
+    // then
+    expect(calledModels(world)).not.toContain(parent)
+    expect(calledModels(world)).toEqual([])
+    expect(record.status).toBe("error")
+    expect(record.error_message).toBe(
+      `Child prompt failed to start: the engine could not hold its designated model chain (${primary}) (chain_not_held: unsupported), and a child never runs outside its designated models.`,
+    )
+  }, 60_000)
+})
+
 describe("each child's designated chain on one socket host stays its own session's", () => {
   const { primary, second, parent, opus55, opus5 } = chainIds("host")
 
