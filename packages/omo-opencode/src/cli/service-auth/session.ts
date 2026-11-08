@@ -35,6 +35,17 @@ export type BeforeKeysDiscarded = ((discarded: DiscardedCredential) => Promise<v
   readonly wantsAccount?: () => Promise<boolean>
 }
 
+/**
+ * This machine's device service, told about the sign-in from memory (design D r9 sections 4-5): `adopt` gets a fresh
+ * sign-in's credential after the signed-out marker is gone, `forget` runs at every local end of a sign-in (logout on
+ * every path, forget, a session the service ended). Neither ever reads the credential store, and neither throws: a
+ * device service that is down or refuses never fails a sign-in or a sign-out.
+ */
+export type DeviceServiceHandoff = {
+  readonly adopt: (credentials: Credentials) => Promise<void>
+  readonly forget: () => Promise<void>
+}
+
 export const discardedOf = (credentials: Credentials, cause: "refused" | "forget" | "logout" | "replaced"): DiscardedCredential => ({
   kind: "credential", deviceId: credentials.device.id, accountId: credentials.accountId, owner: credentials.owner, cause,
 })
@@ -47,8 +58,11 @@ export function createSession(options: {
   readonly now?: () => number
   /** Runs inside the credential lock immediately before a stored principal's keys are discarded. */
   readonly beforeKeysDiscarded: BeforeKeysDiscarded
+  /** This machine's device service; absent, no device service is told anything. */
+  readonly deviceService?: DeviceServiceHandoff
 }) {
   const api = serviceOrigin(options.api)
+  const deviceService = options.deviceService
   const now = options.now ?? Date.now
   const { store, signal, beforeKeysDiscarded } = options
   const markerPath = signedOutMarkerPath(options.home ?? homedir(), credentialId(api))
@@ -92,6 +106,7 @@ export function createSession(options: {
           ["unauthorized", "account_deleted", "reauth_required", "invalid_grant", "device_revoked"].includes(error.code)) {
         await beforeKeysDiscarded(discardedOf(current, "refused"))
         await store.clear()
+        await deviceService?.forget()
         throw new SessionEnded(
           error.code === "reauth_required"
             ? `This session was ended because its refresh token was reused. ${signInHint("again")}`
@@ -136,6 +151,9 @@ export function createSession(options: {
         await store.write(value, "fresh-sign-in", () => beforeKeysDiscarded({ kind: "unreadable" }))
         await clearSignedOutMarker(markerPath)
       })
+      // After the marker is gone, so a stale marker from an earlier sign-out cannot park this sign-in; from the value
+      // in memory, never read back from the store.
+      await deviceService?.adopt(value)
     },
     /** The marker an explicit `omo logout` left, or null; only an empty store makes it meaningful. */
     signedOutMarker: () => readSignedOutMarker(markerPath),
@@ -160,39 +178,45 @@ export function createSession(options: {
      */
     async forget(): Promise<void> {
       await locked(() => store.clear())
+      await deviceService?.forget()
     },
     accessSnapshot: snapshot,
     async logout(): Promise<boolean> {
-      return locked(async () => {
-        let current: Credentials | null = null
-        let account: string | undefined
-        try {
-          current = await store.readAuthoritative()
-          if (current !== null) {
-            if (current.refreshState === "uncertain") return false
-            const access = Date.parse(current.accessTokenExpiresAt) <= now() ? (await refreshed(current)).accessToken : current.accessToken
-            if (current.accountId === undefined && current.owner === undefined && await beforeKeysDiscarded.wantsAccount?.() === true) {
-              account = await accountOf(access)
+      // Every path (revoked, uncertain, offline, nothing stored) ends the sign-in locally, so every path forgets.
+      try {
+        return await locked(async () => {
+          let current: Credentials | null = null
+          let account: string | undefined
+          try {
+            current = await store.readAuthoritative()
+            if (current !== null) {
+              if (current.refreshState === "uncertain") return false
+              const access = Date.parse(current.accessTokenExpiresAt) <= now() ? (await refreshed(current)).accessToken : current.accessToken
+              if (current.accountId === undefined && current.owner === undefined && await beforeKeysDiscarded.wantsAccount?.() === true) {
+                account = await accountOf(access)
+              }
+              await request(`/v1/devices/${encodeURIComponent(current.device.id)}`, {
+                method: "DELETE", headers: { authorization: `Bearer ${access}` },
+              })
             }
-            await request(`/v1/devices/${encodeURIComponent(current.device.id)}`, {
-              method: "DELETE", headers: { authorization: `Bearer ${access}` },
-            })
+            return true
+          } catch (error) {
+            if (error instanceof SessionEnded) return error.deviceRevoked
+            if (error instanceof SignInError) return false
+            throw error
+          } finally {
+            // Marker first: it only counts once the store is empty, so an unlocked reader never sees an empty store
+            // without it, and a failed marker write leaves the credentials in place instead of half-signing-out.
+            await writeSignedOutMarker(markerPath, current?.device.id ?? null)
+            // A refresh refusal inside this logout already cleared the store (and retired the pin).
+            const stored = current === null ? null : await store.read().catch(() => current)
+            if (stored !== null) await beforeKeysDiscarded(discardedOf(stored.accountId === undefined && account !== undefined ? { ...stored, accountId: account } : stored, "logout"))
+            await store.clear()
           }
-          return true
-        } catch (error) {
-          if (error instanceof SessionEnded) return error.deviceRevoked
-          if (error instanceof SignInError) return false
-          throw error
-        } finally {
-          // Marker first: it only counts once the store is empty, so an unlocked reader never sees an empty store
-          // without it, and a failed marker write leaves the credentials in place instead of half-signing-out.
-          await writeSignedOutMarker(markerPath, current?.device.id ?? null)
-          // A refresh refusal inside this logout already cleared the store (and retired the pin).
-          const stored = current === null ? null : await store.read().catch(() => current)
-          if (stored !== null) await beforeKeysDiscarded(discardedOf(stored.accountId === undefined && account !== undefined ? { ...stored, accountId: account } : stored, "logout"))
-          await store.clear()
-        }
-      })
+        })
+      } finally {
+        await deviceService?.forget()
+      }
     },
     /** `expect` rejects a stored credential that is no longer the caller's captured identity before any refresh. */
     async accessToken(expect?: (current: Credentials) => boolean): Promise<string> {
