@@ -18,6 +18,7 @@
     "#omo-memory-palace-runtime": "./extensions/omo-memory-palace.js",
     "#omo-device-account-runtime": "./extensions/omo-device-account.js",
     "#omo-memory-commands-runtime": "./extensions/omo-memory-commands.js",
+    "#memory-completion-links": "./extensions/omo-memory-commands.js",
     "#omo-session-history-runtime": "./extensions/omo-session-history.js",
     "#omo-recall-store-runtime": "./extensions/omo-recall-store.js",
     "#memory-external-projection": "./extensions/omo-recall-store.js",
