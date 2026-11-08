@@ -170,6 +170,8 @@ class AttachedPort implements RpcPort {
 	#nextId = 1;
 	#buffer = "";
 	#ended = false;
+	/** An error the daemon answered with a null id (it could not read which request failed); it closes next. */
+	#unmatched: RpcPortFailure | undefined;
 
 	constructor(socket: net.Socket) {
 		this.#socket = socket;
@@ -182,7 +184,9 @@ class AttachedPort implements RpcPort {
 		this.#closed = new Promise((resolve) => {
 			socket.once("close", () => {
 				this.#ended = true;
-				const closed = new PortError({ message: `the desktop daemon connection closed${failure}`, code: "Closed" });
+				const closed = new PortError(
+					this.#unmatched ?? { message: `the desktop daemon connection closed${failure}`, code: "Closed" },
+				);
 				for (const waiter of this.#pending.values()) {
 					waiter.cleanup();
 					waiter.reject(closed);
@@ -266,6 +270,11 @@ class AttachedPort implements RpcPort {
 		}
 		if (typeof message.method === "string" && message.id === undefined) {
 			for (const listener of [...this.#listeners]) listener(message as JsonRpcNotification);
+			return;
+		}
+		if (message.id === null && message.error !== undefined) {
+			const { error } = message;
+			this.#unmatched = { message: error.message, rpcCode: error.code, data: error.data ?? null };
 			return;
 		}
 		if (typeof message.id !== "number") return;

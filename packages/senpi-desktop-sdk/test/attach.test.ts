@@ -20,6 +20,7 @@ interface FakeDaemon {
 	received(method: string): Promise<void>;
 	push(line: unknown): void;
 	dropAll(): void;
+	endAll(): void;
 }
 
 const cleanup: Array<() => Promise<void> | void> = [];
@@ -89,6 +90,9 @@ async function fakeDaemon(dir = privateDir(), unanswered = ""): Promise<FakeDaem
 			}),
 		dropAll: () => {
 			for (const socket of sockets) socket.destroy();
+		},
+		endAll: () => {
+			for (const socket of sockets) socket.end();
 		},
 		push: (line) => {
 			for (const socket of sockets) socket.write(`${JSON.stringify(line)}\n`);
@@ -259,4 +263,32 @@ describe.skipIf(process.platform === "win32")("sdk attach over a unix socket", (
 		expect(await outcome).toMatchObject({ code: "Closed" });
 		await expect(port.call("windows", {})).rejects.toMatchObject({ code: "Closed", nothingSent: true });
 	});
+
+	it("#given an oversized request #when the daemon answers request_too_large under its id #then the call rejects with that reason", async () => {
+		const daemon = await fakeDaemon(privateDir(), "windows");
+		const port = await attachUds(daemon.endpoint, environment({}));
+		const arrived = daemon.received("windows");
+
+		const outcome = port.call("windows", {}).catch((error: unknown) => error);
+		await arrived;
+		daemon.push({ jsonrpc: "2.0", id: 1, error: { code: -32603, message: "too large", data: TOO_LARGE } });
+
+		expect(await outcome).toMatchObject({ rpcCode: -32603, data: TOO_LARGE });
+		await port.close();
+	});
+
+	it("#given an oversized request whose id the daemon cannot read #when it refuses with a null id and closes #then the pending call rejects with that refusal", async () => {
+		const daemon = await fakeDaemon(privateDir(), "windows");
+		const port = await attachUds(daemon.endpoint, environment({}));
+		const arrived = daemon.received("windows");
+
+		const outcome = port.call("windows", {}).catch((error: unknown) => error);
+		await arrived;
+		daemon.push({ jsonrpc: "2.0", id: null, error: { code: -32603, message: "too large, closing", data: TOO_LARGE } });
+		daemon.endAll();
+
+		expect(await outcome).toMatchObject({ message: "too large, closing", rpcCode: -32603, data: TOO_LARGE });
+	});
 });
+
+const TOO_LARGE = { code: "Internal", reason: "request_too_large" };

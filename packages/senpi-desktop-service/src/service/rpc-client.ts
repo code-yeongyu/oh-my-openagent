@@ -67,6 +67,8 @@ export class RpcClient {
 	readonly #pending = new Map<number, Pending>();
 	#nextId = 1;
 	#exitReason: string | undefined;
+	/** An error the engine answered with a null id (it could not read which request failed); it closes next. */
+	#unmatched: { readonly code: number; readonly message: string; readonly data: unknown } | undefined;
 
 	constructor(process: ChildProcessWithoutNullStreams, hooks: RpcClientHooks) {
 		this.#hooks = hooks;
@@ -168,6 +170,10 @@ export class RpcClient {
 			this.#hooks.onNotification(message.method, message.params);
 			return;
 		}
+		if (message.id === null && isRecord(message.error) && typeof message.error.code === "number" && typeof message.error.message === "string") {
+			this.#unmatched = { code: message.error.code, message: message.error.message, data: message.error.data };
+			return;
+		}
 		// A reply for an id no longer pending was already settled by the grace kill: nothing awaits it.
 		const pending = typeof message.id === "number" ? this.#settle(message.id) : undefined;
 		if (pending === undefined) return;
@@ -197,11 +203,16 @@ export class RpcClient {
 		const failure = this.#exitReason === undefined ? refusal : undefined;
 		this.#exitReason ??= reason;
 		const closed = failure ?? new DesktopServiceError("Closed", this.#exitReason);
+		const unmatched = this.#unmatched;
 		for (const id of [...this.#pending.keys()]) {
 			const pending = this.#settle(id);
+			if (pending === undefined) continue;
 			// Keep cancellation identity while retaining the drained exit code and stderr diagnostic.
-			if (pending?.cancelled !== undefined) pending.cancelled.cause = closed;
-			pending?.reject(pending.cancelled ?? closed);
+			if (pending.cancelled !== undefined) pending.cancelled.cause = closed;
+			// The engine's refusal of a request it could not identify says why every caller lost its reply.
+			const refused = unmatched === undefined ? undefined : new DesktopEngineRpcError(pending.method, unmatched);
+			if (refused !== undefined) refused.cause = closed;
+			pending.reject(pending.cancelled ?? refused ?? closed);
 		}
 		this.#hooks.onExit();
 	}

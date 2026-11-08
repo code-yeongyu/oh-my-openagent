@@ -32,8 +32,12 @@ use dispatch::dispatch;
 const OUTBOUND_CAPACITY: usize = 256;
 
 /// The longest request line, newline excluded (DESIGN 9, request size); a
-/// longer one is discarded unread and answered `request_too_large`.
+/// longer one is discarded unread and answered `request_too_large` under the
+/// id read from its bytes as they stream past (see [`IdSniff`]).
 pub(crate) const MAX_REQUEST_BYTES: usize = 1 << 20;
+
+/// The longest id value an oversized line may carry and still be answered.
+const MAX_ID_BYTES: usize = 1024;
 
 struct Queued {
     id: RequestId,
@@ -237,7 +241,16 @@ async fn read_requests<R: AsyncRead + Unpin>(
     loop {
         let reply = match read_line(&mut reader, &mut line).await? {
             Line::End => return Ok(()),
-            Line::TooLarge => Some(failure_line(None, Failure::Engine(request_too_large()))),
+            Line::TooLarge(Sniffed::Id(id)) => Some(failure_line(Some(id), Failure::Engine(request_too_large(true)))),
+            // A notification is never answered, oversized or not.
+            Line::TooLarge(Sniffed::Notification) => None,
+            Line::TooLarge(Sniffed::Unknown) => {
+                // No caller can be told which request failed, so none may
+                // keep waiting: say why, then close the connection.
+                let refusal = failure_line(None, Failure::Engine(request_too_large(false)));
+                deliver(engine, out, refusal).await.unwrap_or(());
+                return Ok(());
+            }
             Line::Read => {
                 let text = line.trim_ascii();
                 if text.is_empty() {
@@ -259,44 +272,190 @@ async fn read_requests<R: AsyncRead + Unpin>(
 enum Line {
     End,
     Read,
-    /// Longer than [`MAX_REQUEST_BYTES`]: discarded, so its id is unknown.
-    TooLarge,
+    /// Longer than [`MAX_REQUEST_BYTES`]: discarded, with what its bytes said
+    /// about its id.
+    TooLarge(Sniffed),
 }
 
 /// Reads one line into `line`, keeping at most [`MAX_REQUEST_BYTES`] of it in
-/// memory; the rest of an oversized line is consumed and dropped.
+/// memory; the rest of an oversized line is consumed and dropped, its id read
+/// on the way.
 async fn read_line<R: AsyncBufRead + Unpin>(reader: &mut R, line: &mut Vec<u8>) -> io::Result<Line> {
     line.clear();
-    let mut too_large = false;
+    let mut sniff: Option<IdSniff> = None;
     loop {
         let available = reader.fill_buf().await?;
         if available.is_empty() {
-            return Ok(match (too_large, line.is_empty()) {
-                (true, _) => Line::TooLarge,
-                (false, true) => Line::End,
-                (false, false) => Line::Read,
+            return Ok(match sniff {
+                Some(sniff) => Line::TooLarge(sniff.finish()),
+                None if line.is_empty() => Line::End,
+                None => Line::Read,
             });
         }
         let newline = available.iter().position(|&byte| byte == b'\n');
         let content = &available[..newline.unwrap_or(available.len())];
-        if !too_large && line.len() + content.len() > MAX_REQUEST_BYTES {
-            too_large = true;
+        if let Some(sniff) = sniff.as_mut() {
+            sniff.feed(content);
+        } else if line.len() + content.len() > MAX_REQUEST_BYTES {
+            let mut started = IdSniff::default();
+            started.feed(line);
+            started.feed(content);
             *line = Vec::new();
-        }
-        if !too_large {
+            sniff = Some(started);
+        } else {
             line.extend_from_slice(content);
         }
         let consumed = newline.map_or(available.len(), |index| index + 1);
         reader.consume(consumed);
         if newline.is_some() {
-            return Ok(if too_large { Line::TooLarge } else { Line::Read });
+            return Ok(sniff.map_or(Line::Read, |sniff| Line::TooLarge(sniff.finish())));
         }
     }
 }
 
-fn request_too_large() -> DesktopError {
+/// What an oversized line said about its id.
+#[derive(Debug, PartialEq)]
+enum Sniffed {
+    Id(RequestId),
+    /// A whole object without an `id` member.
+    Notification,
+    /// Not an object, cut short, or an id that is not a number or string.
+    Unknown,
+}
+
+/// Reads the top-level `"id"` member of a request line from its bytes as they
+/// stream past, holding at most [`MAX_ID_BYTES`] of them; nested members are
+/// skipped, so an `"id"` inside `params` is never taken for the request's.
+#[derive(Default)]
+struct IdSniff {
+    state: SniffState,
+    /// The member key, or the id value, being read.
+    held: Vec<u8>,
+    /// Nesting inside the member value being read.
+    depth: usize,
+    in_string: bool,
+    escaped: bool,
+}
+
+#[derive(Default)]
+enum SniffState {
+    /// Before the opening `{`.
+    #[default]
+    Open,
+    /// Before a member key.
+    Key,
+    KeyText,
+    Colon,
+    Value {
+        id: bool,
+    },
+    Done(Sniffed),
+}
+
+impl IdSniff {
+    fn feed(&mut self, bytes: &[u8]) {
+        for &byte in bytes {
+            if matches!(self.state, SniffState::Done(_)) {
+                return;
+            }
+            self.step(byte);
+        }
+    }
+
+    fn finish(self) -> Sniffed {
+        match self.state {
+            SniffState::Done(sniffed) => sniffed,
+            _ => Sniffed::Unknown,
+        }
+    }
+
+    fn step(&mut self, byte: u8) {
+        let blank = byte.is_ascii_whitespace();
+        match self.state {
+            SniffState::Open if byte == b'{' => self.state = SniffState::Key,
+            SniffState::Key if byte == b'"' => {
+                self.held.clear();
+                self.state = SniffState::KeyText;
+            }
+            SniffState::Key if byte == b'}' => self.state = SniffState::Done(Sniffed::Notification),
+            SniffState::Open | SniffState::Key | SniffState::Colon if blank => {}
+            SniffState::Open | SniffState::Key => self.state = SniffState::Done(Sniffed::Unknown),
+            SniffState::KeyText => self.key_byte(byte),
+            SniffState::Colon if byte == b':' => {
+                let id = self.held == b"id";
+                self.held.clear();
+                self.depth = 0;
+                self.state = SniffState::Value { id };
+            }
+            SniffState::Colon => self.state = SniffState::Done(Sniffed::Unknown),
+            SniffState::Value { id } => self.value_byte(byte, id),
+            SniffState::Done(_) => {}
+        }
+    }
+
+    /// A byte of a member key; only the first three are kept, enough to tell
+    /// `id` from every other key.
+    fn key_byte(&mut self, byte: u8) {
+        if self.escaped {
+            self.escaped = false;
+        } else if byte == b'\\' {
+            self.escaped = true;
+        } else if byte == b'"' {
+            self.state = SniffState::Colon;
+            return;
+        }
+        if self.held.len() < 3 {
+            self.held.push(byte);
+        }
+    }
+
+    fn value_byte(&mut self, byte: u8, id: bool) {
+        if self.in_string {
+            if self.escaped {
+                self.escaped = false;
+            } else if byte == b'\\' {
+                self.escaped = true;
+            } else if byte == b'"' {
+                self.in_string = false;
+            }
+        } else {
+            match byte {
+                b'"' => self.in_string = true,
+                b'{' | b'[' => self.depth += 1,
+                b'}' | b']' if self.depth > 0 => self.depth -= 1,
+                b',' | b'}' if self.depth == 0 => {
+                    self.state = match (id, byte) {
+                        (true, _) => SniffState::Done(
+                            serde_json::from_slice(self.held.trim_ascii()).map_or(Sniffed::Unknown, Sniffed::Id),
+                        ),
+                        (false, b',') => SniffState::Key,
+                        (false, _) => SniffState::Done(Sniffed::Notification),
+                    };
+                    return;
+                }
+                _ => {}
+            }
+        }
+        if id {
+            if self.held.len() == MAX_ID_BYTES {
+                self.state = SniffState::Done(Sniffed::Unknown);
+                return;
+            }
+            self.held.push(byte);
+        }
+    }
+}
+
+/// `answered`: the reply carries the request's id; otherwise the connection
+/// closes after it, since no caller can match it to a request.
+fn request_too_large(answered: bool) -> DesktopError {
+    let outcome = if answered {
+        "send smaller requests"
+    } else {
+        "its id could not be read, so this connection closes; send smaller requests"
+    };
     DesktopError::internal(format!(
-        "the request line is longer than {MAX_REQUEST_BYTES} bytes and was discarded; send smaller requests"
+        "the request line is longer than {MAX_REQUEST_BYTES} bytes and was discarded; {outcome}"
     ))
     .with_report(ErrorReport {
         reason: Some("request_too_large".to_owned()),
@@ -403,7 +562,9 @@ async fn write_lines<W: AsyncWrite + Unpin>(
 mod line_cap_tests {
     use tokio::io::BufReader;
 
-    use super::{read_line, Line, MAX_REQUEST_BYTES};
+    use senpi_desktop_core::protocol::RequestId;
+
+    use super::{read_line, IdSniff, Line, Sniffed, MAX_REQUEST_BYTES};
 
     async fn lines(input: Vec<u8>) -> Vec<(bool, usize)> {
         let mut reader = BufReader::with_capacity(4096, input.as_slice());
@@ -412,10 +573,41 @@ mod line_cap_tests {
         loop {
             match read_line(&mut reader, &mut line).await.expect("in-memory reads succeed") {
                 Line::End => return read,
-                Line::TooLarge => read.push((true, line.len())),
+                Line::TooLarge(_) => read.push((true, line.len())),
                 Line::Read => read.push((false, line.len())),
             }
         }
+    }
+
+    /// Sniffs `text` fed in 7-byte chunks, so tokens straddle chunk edges.
+    fn sniffed(text: &str) -> Sniffed {
+        let mut sniff = IdSniff::default();
+        for chunk in text.as_bytes().chunks(7) {
+            sniff.feed(chunk);
+        }
+        sniff.finish()
+    }
+
+    #[test]
+    fn the_top_level_id_is_read_wherever_it_sits() {
+        let big = "x".repeat(4096);
+        assert_eq!(sniffed(r#"{"jsonrpc":"2.0","id":42,"method":"m","params":{}}"#), Sniffed::Id(RequestId::Number(42)));
+        assert_eq!(
+            sniffed(&format!(r#"{{ "params" : {{"id":1,"t":"{big}\"}}","a":[{{}}]}} , "id" : "req-7" }}"#)),
+            Sniffed::Id(RequestId::String("req-7".to_owned()))
+        );
+        // The id is known before the rest of the line arrives.
+        assert_eq!(sniffed(&format!(r#"{{"id":-3,"params":{{"t":"{big}"#)), Sniffed::Id(RequestId::Number(-3)));
+    }
+
+    #[test]
+    fn a_line_without_a_readable_id_is_a_notification_or_unknown() {
+        assert_eq!(sniffed(r#"{"method":"m","params":{"id":1}}"#), Sniffed::Notification);
+        assert_eq!(sniffed(r#"{"method":"m","params":{"t":"#), Sniffed::Unknown);
+        assert_eq!(sniffed(r#"[{"id":1}]"#), Sniffed::Unknown);
+        assert_eq!(sniffed(r#"{"id":null,"method":"m"}"#), Sniffed::Unknown);
+        assert_eq!(sniffed(r#"{"id" 1}"#), Sniffed::Unknown);
+        assert_eq!(sniffed(&format!(r#"{{"id":"{}"}}"#, "x".repeat(super::MAX_ID_BYTES))), Sniffed::Unknown);
     }
 
     #[tokio::test]
