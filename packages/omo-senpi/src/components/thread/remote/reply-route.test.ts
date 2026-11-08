@@ -127,6 +127,17 @@ describe("bounds: only a routed input's own run answers, once, and a reply is ne
     expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: undefined, mixed: true }])
   })
 
+  test("#given a peer steers into a run still working on the local user's input #when it settles #then the peer gets nothing of the local answer", () => {
+    const { delivered, routes } = router()
+    routes.noteMessage({ role: "user", content: "print my ssh key" })
+    routes.noteMessage({ role: "assistant", content: [{ type: "text", text: "reading it" }, { type: "toolCall", id: "c1", name: "read", arguments: {} }] })
+    routes.noteMessage({ role: "user", content: "steer from a peer", clientMessageId: token() })
+    routes.noteMessage({ role: "assistant", content: "-----BEGIN OPENSSH PRIVATE KEY-----" })
+    routes.settled("dur-on-b")
+    expect(delivered.map((entry) => ({ answer: entry.answer, mixed: entry.mixed }))).toEqual([{ answer: undefined, mixed: true }])
+    expect(JSON.stringify(delivered)).not.toContain("PRIVATE KEY")
+  })
+
   test("#given two peers' routed inputs in one run #when it settles #then each gets only the answer to its own input", () => {
     const { delivered, routes } = router()
     const second: ReplyRoute = { device: "c", session: "dur-c", delivery: "d-2", root: "d-2", hop: 1 }
@@ -191,6 +202,36 @@ describe("an explicit reply counts by the session it reached, not by how it was 
 
     expect((await within(watched.seen, "the second run's reply")).rpc["deliveryId"]).toBe("reply-d-2")
     expect(relay.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => entry.rpc?.["deliveryId"])).toEqual(["reply-d-2"])
+  })
+
+  test("#given a peer steer arrives while B is still answering its local user #when the run settles #then nothing of the local answer reaches A", async () => {
+    const { relay, remote } = relayWithKey()
+    const skipped = Promise.withResolvers<string>()
+    const b = session("dur-on-b")
+    wireReplyRoutes(b.pi, remote, { senderProvenance: async () => B_PROVENANCE, warn: (line) => skipped.resolve(line) })
+    await b.fire("message_start", { message: { role: "user", content: "print my ssh key" } })
+    await b.fire("message_end", { message: { role: "assistant", content: [{ type: "text", text: "reading it" }, { type: "toolCall", id: "c1", name: "read", arguments: {} }] } })
+    await b.fire("message_start", { message: { role: "user", content: "steer from a peer", clientMessageId: tokenOf("d-5") } })
+    await b.fire("message_end", { message: { role: "assistant", content: "-----BEGIN OPENSSH PRIVATE KEY-----" } })
+    await b.fire("agent_settled")
+    expect(await within(skipped.promise, "the skip line")).toContain("remote_reply_skipped")
+    expect(relay.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")).toHaveLength(0)
+    expect(JSON.stringify(relay.sent)).not.toContain("PRIVATE KEY")
+  })
+
+  test("#given a send to A made while answering a later input #when the run settles #then it does not count as answering A's earlier routed input", async () => {
+    const { relay, remote } = relayWithKey()
+    const watched = commandSeen(remote, "admit_external_message")
+    const b = session("dur-on-b")
+    wireReplyRoutes(b.pi, watched.remote, { senderProvenance: async () => B_PROVENANCE, warn: () => {} })
+    await b.fire("message_start", { message: { role: "user", content: "q1", clientMessageId: tokenOf("d-4") } })
+    await b.fire("message_end", { message: { role: "assistant", content: "answer to A" } })
+    await b.fire("message_start", { message: { role: "user", content: "now ping A about something else" } })
+    await b.fire("tool_execution_end", sendEnd("t4", { kind: "ok", thread_id: "key-of-a", device: "here", delivery: { kind: "started", turn_id: "5" }, deduplicated: false }))
+    await b.fire("message_end", { message: { role: "assistant", content: "pinged" } })
+    await b.fire("agent_settled")
+    expect((await within(watched.seen, "the reply to d-4")).rpc["deliveryId"]).toBe("reply-d-4")
+    expect(relay.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")).toHaveLength(1)
   })
 
   test("#given a run settles with no session id #when its route would be answered #then the failure is logged as remote_reply_failed", async () => {
