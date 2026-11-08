@@ -29,17 +29,33 @@ async function readSourceVersion(sourceRoot) {
   return manifest.version
 }
 
-async function sourceDigest(sourceRoot) {
-  const entries = ["package.json", "src/index.js", "src/page-bundle.js", "src/core.js"]
+// omowright ships TypeScript sources from code-yeongyu/omowright#263 on and JavaScript before it; `bun build`
+// compiles either. The page bundle stays JavaScript in both. The JavaScript layout keeps the digest entries it
+// always had, so a runtime staged before this change is still current.
+async function sourceLayout(sourceRoot) {
+  for (const extension of ["js", "ts"]) {
+    const entry = `src/index.${extension}`
+    try {
+      await access(join(sourceRoot, entry))
+      return { entry, core: `src/core.${extension}` }
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error
+    }
+  }
+  throw new Error(`omowright source has neither src/index.js nor src/index.ts: ${sourceRoot}`)
+}
+
+async function sourceDigest(sourceRoot, layout) {
+  const entries = ["package.json", layout.entry, "src/page-bundle.js", layout.core]
   const hash = createHash("sha256")
   for (const entry of entries) hash.update(entry).update("\0").update(await readFile(join(sourceRoot, entry)))
   return hash.digest("hex")
 }
 
-function bundle({ sourceRoot, outFile, bunExecutable }) {
+function bundle({ sourceRoot, entry, outFile, bunExecutable }) {
   const result = spawnSync(
     bunExecutable,
-    ["build", join(sourceRoot, "src", "index.js"), "--target=node", "--format=esm", "--minify-whitespace", `--outfile=${outFile}`],
+    ["build", join(sourceRoot, entry), "--target=node", "--format=esm", "--minify-whitespace", `--outfile=${outFile}`],
     { cwd: sourceRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
   )
   if (result.status !== 0) {
@@ -52,7 +68,8 @@ export async function stageOmowrightRuntime(options = {}) {
   const targetDir = resolve(options.targetDir ?? defaultTargetDir)
   const bunExecutable = options.bunExecutable ?? process.env.BUN ?? "bun"
   const version = await readSourceVersion(sourceRoot)
-  const digest = await sourceDigest(sourceRoot)
+  const layout = await sourceLayout(sourceRoot)
+  const digest = await sourceDigest(sourceRoot, layout)
 
   await mkdir(dirname(targetDir), { recursive: true })
   const tempParent = await mkdtemp(join(dirname(targetDir), ".tmp-omowright-runtime-"))
@@ -62,7 +79,7 @@ export async function stageOmowrightRuntime(options = {}) {
   let targetMoved = false
   try {
     await mkdir(tempDir, { recursive: true })
-    bundle({ sourceRoot, outFile: join(tempDir, "index.js"), bunExecutable })
+    bundle({ sourceRoot, entry: layout.entry, outFile: join(tempDir, "index.js"), bunExecutable })
     await copyFile(join(sourceRoot, "src", "page-bundle.js"), join(tempDir, "page-bundle.js"))
     const files = {}
     for (const name of STAGED_FILES) files[name] = await sha256(join(tempDir, name))
@@ -90,7 +107,7 @@ export async function stageOmowrightRuntime(options = {}) {
 export async function checkOmowrightRuntimeFresh(options = {}) {
   const sourceRoot = resolve(options.sourceRoot ?? defaultSourceRoot)
   const targetDir = resolve(options.targetDir ?? defaultTargetDir)
-  const digest = await sourceDigest(sourceRoot)
+  const digest = await sourceDigest(sourceRoot, await sourceLayout(sourceRoot))
   let manifest
   try {
     manifest = JSON.parse(await readFile(join(targetDir, "manifest.json"), "utf8"))
