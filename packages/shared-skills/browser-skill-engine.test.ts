@@ -46,12 +46,18 @@ function fakeHost(answer?: (args: Json) => Json) {
 }
 
 const RAW_EXPORTS = ["connectBrowserSkill", "connectPipe", "connectCloakProfile", "connect", "createCua", "emulate", "bskSnapshot", "bskDoctor", "DEVICE_PRESETS"] as const
+const GUARDED_EXPORTS = new Set(["connectBrowserSkill", "connectPipe", "connectCloakProfile", "connect", "bskDoctor"])
 
 describe("inside OmO Desktop the library is the terminal's, plus the app's built-in browser", () => {
-  test("#given no OMO_BROWSER_ENGINE #when the library loads #then it is the raw library", () => {
+  test("#given no OMO_BROWSER_ENGINE #when the library loads #then its exports remain available", () => {
     const raw = fakeRaw()
 
-    expect(guardOmowright(raw, { env: {}, host: fakeHost() })).toBe(raw)
+    const library = guardOmowright(raw, { env: {}, host: fakeHost() })
+    for (const name of RAW_EXPORTS) {
+      if (GUARDED_EXPORTS.has(name)) expect(typeof library[name]).toBe("function")
+      else expect(library[name]).toBe(raw[name])
+    }
+    expect("connectBuiltinBrowser" in library).toBe(false)
   })
 
   for (const engine of ["builtin", "connected", "none", "something-new"]) {
@@ -60,7 +66,10 @@ describe("inside OmO Desktop the library is the terminal's, plus the app's built
 
       const library = guardOmowright(raw, { env: { OMO_BROWSER_ENGINE: engine }, host: fakeHost() }) as unknown as Record<string, unknown>
 
-      for (const name of RAW_EXPORTS) expect(library[name]).toBe(raw[name])
+      for (const name of RAW_EXPORTS) {
+        if (GUARDED_EXPORTS.has(name)) expect(typeof library[name]).toBe("function")
+        else expect(library[name]).toBe(raw[name])
+      }
       expect(typeof library.connectBuiltinBrowser).toBe("function")
     })
 
