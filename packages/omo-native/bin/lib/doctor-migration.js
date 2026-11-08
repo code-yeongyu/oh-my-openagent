@@ -146,12 +146,19 @@ function codexLightCacheTarget(shim, homeDir) {
   // allows escaped characters and is unescaped back to the real path (#12560).
   const posix = shim.match(/exec "\$BUN_BINARY" "((?:[^"\\]|\\.)+)" "\$@"/)
   const windows = posix === null ? shim.match(/"%+BUN_BINARY%+"\s+"([^"]+)"\s+%+\*/) : null
-  const raw = posix === null ? windows?.[1] : unescapePosixDoubleQuoted(posix[1])
+  const raw = posix === null ? (windows === null ? undefined : unescapeCmdQuoted(windows[1])) : unescapePosixDoubleQuoted(posix[1])
   if (raw === undefined) return null
   if (!/[\\/]plugins[\\/]cache[\\/]sisyphuslabs[\\/]omo[\\/]/.test(raw)) return null
   if (raw.startsWith("~/") || raw.startsWith("~\\")) return join(homeDir, raw.slice(2))
   if (raw.startsWith("$HOME/") || raw.startsWith("$HOME\\")) return join(homeDir, raw.slice(6))
   return isAbsolute(raw) || win32.isAbsolute(raw) ? raw : null
+}
+
+// The `.cmd` generator doubles `%` and, for a value holding `!`, escapes `^` and `!` for delayed expansion
+// (escapeCmdQuoted in codex-cache-runtime-wrapper.ts): cmd runs the literal path, so that is the one checked (#12811).
+function unescapeCmdQuoted(value) {
+  const carets = value.includes("!") ? value.replace(/\^([\^!])/g, "$1") : value
+  return carets.replaceAll("%%", "%")
 }
 
 function unescapePosixDoubleQuoted(value) {

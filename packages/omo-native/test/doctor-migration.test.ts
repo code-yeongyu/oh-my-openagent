@@ -343,6 +343,19 @@ describe("omo doctor migration checks", () => {
       expect(entry?.broken).toBeUndefined()
     })
 
+    test("#when the Windows omo.cmd wrapper's cache path holds %VAR% text, !, ^ and parentheses #then doctor checks the literal path cmd runs (#12811)", () => {
+      const sandbox = createSandbox()
+      const localBin = join(sandbox.home, ".local", "bin")
+      const codexHome = join(sandbox.root, "odd %TEMP% !bang^ (x)", ".codex")
+      const target = cliIn(codexHome)
+      writeFile(join(localBin, "omo.cmd"), windowsRuntimeWrapper("omo", target, codexHome, localBin, cliIn(codexHome, "cli-node")))
+      expect(readFileSync(join(localBin, "omo.cmd"), "utf8")).toContain("odd %%TEMP%% ^!bang^^ (x)")
+
+      expect(scan(sandbox, localBin, true)[0]?.broken).toBe(target)
+      writeFile(target, "#!/usr/bin/env node\n")
+      expect(scan(sandbox, localBin, true)[0]?.broken).toBeUndefined()
+    })
+
     test.skipIf(process.platform === "win32")("#when a POSIX wrapper's cache path holds $ and a backtick and its target exists #then the escaped target is read back as that path and not reported broken", () => {
       const sandbox = createSandbox()
       const localBin = join(sandbox.home, ".local", "bin")

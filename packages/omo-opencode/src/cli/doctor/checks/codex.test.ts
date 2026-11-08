@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
 import { checkCodex, gatherCodexSummary } from "./codex"
 import { checkCodexRuntimeWrapper } from "./codex-runtime-wrapper"
-import { posixRuntimeWrapper } from "../../../../../omo-codex/src/install/codex-cache-runtime-wrapper"
+import { posixRuntimeWrapper, windowsRuntimeWrapper } from "../../../../../omo-codex/src/install/codex-cache-runtime-wrapper"
 
 async function createPlatformBin(binDir: string, name: string, target: string): Promise<void> {
   if (process.platform === "win32") {
@@ -234,6 +234,23 @@ describe("codex doctor checks", () => {
     // then
     const issue = result.issues.find((entry) => entry.title === "omo-agent-toolkit runtime wrapper target is missing")
     expect(issue?.description).toContain(`points to missing target ${cliPath}.`)
+  })
+
+  test("#given a generated .cmd wrapper whose runtime target path holds %VAR% text and ! #when checking runtime wrapper #then the literal path cmd runs is the one checked (#12811)", async () => {
+    // given: the generator doubles % and escapes ! for delayed expansion; the target does not exist yet
+    const { codexHome, binDir } = await createInstalledCodexHome()
+    const oddRoot = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "odd %TEMP% !bang")
+    const cliPath = join(oddRoot, "dist", "cli", "index.js")
+    await writeFile(join(binDir, "omo-agent-toolkit.cmd"), windowsRuntimeWrapper("omo-agent-toolkit", cliPath, codexHome, binDir, join(oddRoot, "dist", "cli-node", "index.js")))
+    const missingTitle = "omo-agent-toolkit runtime wrapper target is missing"
+
+    // when / then: reported at the literal path while it is gone, silent once it exists
+    const missing = await checkCodexRuntimeWrapper({ codexHome, binDir, platform: "win32" })
+    expect(missing.issues.find((entry) => entry.title === missingTitle)?.description).toContain(`points to missing target ${cliPath}.`)
+    await mkdir(join(oddRoot, "dist", "cli"), { recursive: true })
+    await writeFile(cliPath, "#!/usr/bin/env node\n")
+    const present = await checkCodexRuntimeWrapper({ codexHome, binDir, platform: "win32" })
+    expect(present.issues.map((issue) => issue.title)).not.toContain(missingTitle)
   })
 
   test("#given a marker-bearing legacy omo wrapper #when checking runtime wrapper #then warns with the self-cleaning reinstall command", async () => {
