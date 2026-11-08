@@ -6,7 +6,6 @@ import { FRONTMATTER_RE } from "../memfs/frontmatter-scalar"
 import { describeFrontmatterViolation } from "../memfs/frontmatter-validation"
 import { isMemoryContentPath } from "../memfs/paths"
 import { redactSecretLikeMaterial } from "../sync/redact"
-import { applyLinkRepair, recognizeLinkRepair } from "./completion-links"
 import { commitCount, readDroppedTrailers as readTrailersAt, squashWithoutPaths, type DroppedEntry } from "./completion-repair"
 import { findSecretLikeFailures } from "./completion-secret-scan"
 import type { ReflectionWorktree } from "./worktree"
@@ -18,7 +17,7 @@ export { describeDroppedEntries } from "./completion-repair"
 
 /** The drop report a validated tip carries, read past the gate's own link-repair commit when one sits on top. */
 export async function readDroppedTrailers(exec: GitExec, dir: string, baseSha: string, tipSha: string): Promise<DroppedEntry[]> {
-  const repair = await recognizeLinkRepair(exec, dir, baseSha, tipSha)
+  const repair = await (await import("#memory-completion-links")).recognizeLinkRepair(exec, dir, baseSha, tipSha)
   return await readTrailersAt(exec, dir, baseSha, repair?.runTip ?? tipSha)
 }
 
@@ -79,6 +78,8 @@ export async function validateCompletion(
 
     // A tip that is provably the gate's own earlier link repair is set aside, so the run is screened alone and the
     // repair is recomputed on the screened tip; the screen never sees, drops or squashes the repair.
+    // The link repair is a lazy sidecar in bundles that map `#memory-completion-links` (omo-senpi's omo.js).
+    const { applyLinkRepair, recognizeLinkRepair } = await import("#memory-completion-links")
     const prior = await recognizeLinkRepair(exec, worktree.dir, recordedBase, tipSha)
     if (prior !== undefined) await git(exec, worktree.dir, ["reset", "-q", "--hard", prior.runTip])
     const screened = await screenEntries(exec, worktree, recordedBase, prior?.runTip ?? tipSha)
