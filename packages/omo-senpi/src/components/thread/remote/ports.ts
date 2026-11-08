@@ -31,10 +31,57 @@ export type RemoteLocateOutcome =
   | { readonly kind: "ok"; readonly sessionId: string }
   | { readonly kind: "refused"; readonly reason: string }
 
-/** A session on another device followed from now on: its records go to the listener until `stop` or the attach ends. */
+/**
+ * Why a watch ended for good. `stopped`: its holder stopped it. `session_closed` / `session_replaced`: the session left
+ * its device's engine and could not be found again by its durable id. The access reasons (the relay's revocations, and
+ * the refusals a re-attach can meet) never retry. `listener_failed`: a handler threw.
+ */
+export type RemoteWatchEnd = "stopped" | "session_closed" | "session_replaced" | "listener_failed" | `access:${string}`
+
+/** The engine's session status (senpi `session_status`), or what a fresh `get_state` implies when no record said it. */
+export type RemoteSessionState = { readonly status: string; readonly sessionId: string; readonly durableSessionId?: string; readonly currentTurnId?: string }
+
+export type RemoteStatusChange = {
+  readonly from: string | undefined
+  readonly to: string
+  /** True when the session's stream carries no `session_status` record and the change was read off its lifecycle records. */
+  readonly derived: boolean
+  readonly cause?: string
+}
+
+/** What a watch reports after a gap (a re-established attach, a re-attach, an overflowed queue): the session now. */
+export type RemoteResync = {
+  readonly from: string | undefined
+  readonly state: RemoteSessionState
+  /** Turns that settled while the watch could not see them, each reported once per turn id across the watch. */
+  readonly settledTurns: readonly string[]
+  /** The session was found again under a new key after its engine let it go (an engine restart). */
+  readonly restarted: boolean
+}
+
+export type RemoteWatchHandlers = {
+  /** Each record the session writes from now on, once: a record seq or turn id already applied is dropped. */
+  readonly record: (record: JsonObject) => void
+  readonly status?: (change: RemoteStatusChange) => void
+  readonly resynced?: (resync: RemoteResync) => void
+  /** Once per gap: the attach or the device service went away; the watch re-attaches with backoff. */
+  readonly lost?: (reason: string) => void
+}
+
+export type RemoteWatchOptions = {
+  /** Read the session's state once before the watch is returned, for a caller that shows where it starts. */
+  readonly baseline?: boolean
+}
+
+/**
+ * A session on another device followed from now on, across relay drops, device-service restarts and engine restarts,
+ * until `stop` or an end that no re-attach can undo.
+ */
 export type RemoteSessionWatch = {
-  /** Settles with the reason the attach ended; nothing is delivered after it. */
-  readonly ended: Promise<string>
+  /** Settles once with why the watch ended; nothing is delivered after it. */
+  readonly ended: Promise<RemoteWatchEnd>
+  /** The session's state when the watch started (`baseline`), else undefined. */
+  readonly initial?: RemoteSessionState
   readonly stop: () => void
 }
 
@@ -63,10 +110,10 @@ export type RemoteSessionsPort = {
   readonly sessionCommand: (device: string, sessionId: string, rpc: JsonObject, options?: { readonly fresh?: boolean }) => Promise<RemoteCommandOutcome>
   readonly read: (device: string, sessionId: string, tail: number) => Promise<RemoteCommandOutcome>
   /**
-   * The records `device`'s session writes from now on (none of the ones before), on the attach this port holds for it.
-   * Refused, typed, when that attach cannot be made.
+   * The records `device`'s session writes from now on (none of the ones before), on the attach this port holds for it,
+   * shared with every other holder. Refused, typed, when that attach cannot be made.
    */
-  readonly watch: (device: string, sessionId: string, listener: (record: JsonObject) => void) => Promise<RemoteWatchOutcome>
+  readonly watch: (device: string, sessionId: string, handlers: RemoteWatchHandlers, options?: RemoteWatchOptions) => Promise<RemoteWatchOutcome>
   /** Closes the device-service connection this port opened, if any; a short-lived caller (the CLI) calls it at the end. */
   readonly close?: () => Promise<void>
 }

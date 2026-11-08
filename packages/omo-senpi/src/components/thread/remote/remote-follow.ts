@@ -1,0 +1,90 @@
+import type { ThreadToolFailure } from "../errors"
+import type { JsonObject, RemoteResync, RemoteSessionRow, RemoteSessionState, RemoteStatusChange, RemoteThreadSurface, RemoteWatchEnd } from "./ports"
+import { deviceOnline, outcomeFailure } from "./remote-ops"
+import { isJsonObject } from "./session-state"
+
+type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
+
+export type RemoteFollow = {
+  /** "settled" once the session's run settles (`agent_settled`), "session_closed" when its close cut the run short, else why the watch ended first. */
+  readonly settled: Promise<string>
+  readonly stop: () => void
+}
+
+const NOT_RUNNING: ReadonlySet<string> = new Set(["idle", "closed", "unloaded"])
+
+/**
+ * Follows another device's session from now on: each assistant text delta (`message_update` / `text_delta`) goes to
+ * `onText` in the order the session wrote it, until its run settles, with a line break between the text of separate
+ * messages or content blocks. Start it before the send it follows. A relay drop or a device-service restart in between
+ * is resynced, so a run that settled while the follow could not see it still settles the follow.
+ */
+export async function followRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, onText: (text: string) => void): Promise<RemoteFollow | Failure> {
+  const offline = await deviceOnline(remote, row.device)
+  if (offline !== undefined) return offline
+  let settle!: (end: string) => void
+  const settled = new Promise<string>((resolve) => { settle = resolve })
+  let last: { readonly index: unknown; readonly endsLine: boolean } | undefined
+  let newMessage = false
+  let running = false
+  const watched = await remote.sessions.watch(row.device, row.session_id, {
+    record: (record) => {
+      // senpi settles a turn the session's close cut short with reason session_closed: that turn never finished.
+      if (record["type"] === "agent_settled") return settle(record["reason"] === "session_closed" ? "session_closed" : "settled")
+      if (record["type"] === "message_start" || record["type"] === "message_end") newMessage = true
+      const event = record["assistantMessageEvent"]
+      if (record["type"] !== "message_update" || !isJsonObject(event) || event["type"] !== "text_delta" || typeof event["delta"] !== "string" || event["delta"] === "") return
+      const delta = event["delta"]
+      if (last !== undefined && !last.endsLine && (newMessage || event["contentIndex"] !== last.index)) onText("\n")
+      newMessage = false
+      last = { index: event["contentIndex"], endsLine: delta.endsWith("\n") }
+      onText(delta)
+    },
+    status: (change) => { if (change.to === "running") running = true },
+    resynced: (resync) => {
+      if (resync.settledTurns.length > 0 || (running && NOT_RUNNING.has(resync.state.status))) settle(resync.state.status === "closed" ? "session_closed" : "settled")
+    },
+  })
+  if (watched.kind !== "ok") return outcomeFailure(watched, row.device)
+  void watched.watch.ended.then(settle)
+  return { settled, stop: watched.watch.stop }
+}
+
+export type RemoteWatchEvent =
+  | { readonly kind: "status"; readonly change: RemoteStatusChange }
+  | { readonly kind: "settled"; readonly turnId?: string; readonly reason?: string }
+  | { readonly kind: "resynced"; readonly resync: RemoteResync }
+  | { readonly kind: "lost"; readonly reason: string }
+  | { readonly kind: "record"; readonly record: JsonObject }
+
+export type RemoteSessionFollow = { readonly initial: RemoteSessionState; readonly ended: Promise<RemoteWatchEnd>; readonly stop: () => void }
+
+/**
+ * Watches another device's session until it closes or the access ends: its status changes and turn ends as they
+ * happen, and after any gap (relay drop, device-service restart, engine restart) what changed meanwhile, once.
+ * `records: true` also passes every other record the session writes.
+ */
+export async function watchRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, onEvent: (event: RemoteWatchEvent) => void, options: { readonly records?: boolean } = {}): Promise<RemoteSessionFollow | Failure> {
+  const offline = await deviceOnline(remote, row.device)
+  if (offline !== undefined) return offline
+  const watched = await remote.sessions.watch(row.device, row.session_id, {
+    record: (record) => {
+      if (record["type"] === "agent_settled") {
+        const turnId = record["turnId"]
+        const reason = record["reason"]
+        return onEvent({ kind: "settled", ...(typeof turnId === "string" ? { turnId } : {}), ...(typeof reason === "string" ? { reason } : {}) })
+      }
+      if (options.records === true && record["type"] !== "session_status") onEvent({ kind: "record", record })
+    },
+    status: (change) => onEvent({ kind: "status", change }),
+    resynced: (resync) => onEvent({ kind: "resynced", resync }),
+    lost: (reason) => onEvent({ kind: "lost", reason }),
+  }, { baseline: true })
+  if (watched.kind !== "ok") return outcomeFailure(watched, row.device)
+  const { initial } = watched.watch
+  if (initial === undefined) {
+    watched.watch.stop()
+    return outcomeFailure({ kind: "refused", reason: "state_unread" }, row.device)
+  }
+  return { initial, ended: watched.watch.ended, stop: watched.watch.stop }
+}

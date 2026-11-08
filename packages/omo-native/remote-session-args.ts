@@ -1,7 +1,7 @@
 import { UsageError } from "./remote-exit"
 
-// The arguments of `omo remote open|send|model|interrupt|close`, parsed before the service is contacted.
-export const SESSION_VERBS = ["open", "send", "model", "interrupt", "close"] as const
+// The arguments of `omo remote open|send|model|interrupt|close|watch`, parsed before the service is contacted.
+export const SESSION_VERBS = ["open", "send", "model", "interrupt", "close", "watch"] as const
 export type SessionVerb = (typeof SESSION_VERBS)[number]
 export const isSessionVerb = (value: string): value is SessionVerb => SESSION_VERBS.some(verb => verb === value)
 
@@ -12,7 +12,7 @@ export type SessionArgs =
   | { readonly verb: "open"; readonly device: string; readonly project?: string; readonly model?: string }
   | { readonly verb: "send"; readonly target: Target; readonly text: string; readonly delivery: "auto" | "steer" | "follow_up"; readonly wait: boolean }
   | { readonly verb: "model"; readonly target: Target; readonly model: string }
-  | { readonly verb: "interrupt" | "close"; readonly target: Target }
+  | { readonly verb: "interrupt" | "close" | "watch"; readonly target: Target }
 
 function parseTarget(verb: string, value: string | undefined): Target {
   const slash = value?.indexOf("/") ?? -1
@@ -27,6 +27,7 @@ const SESSION_FLAGS: Readonly<Record<SessionVerb, { readonly values: readonly st
   model: { values: [], switches: [] },
   interrupt: { values: [], switches: [] },
   close: { values: [], switches: [] },
+  watch: { values: [], switches: [] },
 }
 
 export function parseSession(verb: SessionVerb, rest: readonly string[]): { readonly json: boolean; readonly session: SessionArgs } {

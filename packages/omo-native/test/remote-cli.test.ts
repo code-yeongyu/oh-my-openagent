@@ -423,7 +423,7 @@ describe("omo remote session verbs", () => {
       locate: (device, engineId, knownKey) => note("locate", port.locate(device, engineId, knownKey)),
       sessionCommand: (device, sessionId, rpc, options) => note(`command:${String(rpc["type"])}`, port.sessionCommand(device, sessionId, rpc, options)),
       read: (device, sessionId, tail) => note("read", port.read(device, sessionId, tail)),
-      watch: (device, sessionId, listener) => note("watch", port.watch(device, sessionId, listener)),
+      watch: (device, sessionId, handlers, options) => note("watch", port.watch(device, sessionId, handlers, options)),
     }
     return { calls, remote: { ...remote, sessions } }
   }
@@ -517,6 +517,38 @@ describe("omo remote session verbs", () => {
     expect([code, out, port.calls]).toEqual([REMOTE_EXIT.ok, [line], calls])
   })
 
+  test("watch prints where the session starts, each status change and turn end, what changed while detached, and the end", async () => {
+    const a = fixture.account({ engine: { ...ENGINE, streaming: true } })
+    const done = run(["watch", "b/dur-on-b"], undefined, SIGNED_IN, testBootstrap(), a.remote)
+    await a.watching
+    const [watch] = [...a.watchers]
+    watch?.status?.({ from: "running", to: "idle", derived: true, cause: "agent_settled" })
+    watch?.record({ type: "agent_settled", turnId: "7" })
+    watch?.lost?.("closed")
+    watch?.resynced?.({ from: "idle", state: { status: "running", sessionId: "dur-on-b" }, settledTurns: ["8"], restarted: false })
+    a.endWatches("session_closed")
+    const { code, out } = await done
+    expect([code, out]).toEqual([REMOTE_EXIT.ok, [
+      "Watching b/dur-on-b (running).",
+      "b/dur-on-b status running -> idle (agent_settled)",
+      "b/dur-on-b agent_settled turn 7",
+      "device b unreachable (closed); re-watching",
+      "b/dur-on-b status idle -> running (changed while detached)",
+      "b/dur-on-b turn 8 settled while detached",
+      "b/dur-on-b resynced (running)",
+      "b/dur-on-b watch ended (session_closed)",
+    ]])
+  })
+
+  test("watch ends failed when the access to the session ends", async () => {
+    const a = fixture.account()
+    const done = run(["watch", "b/dur-on-b", "--json"], undefined, SIGNED_IN, testBootstrap(), a.remote)
+    await a.watching
+    a.endWatches("access:peer_revoked")
+    const { code, out } = await done
+    expect([code, out.map(line => JSON.parse(line))]).toEqual([REMOTE_EXIT.failed, [{ kind: "watching", state: { status: "idle", sessionId: "dur-on-b" } }, { kind: "ended", end: "access:peer_revoked" }]])
+  })
+
   test("--json prints the remote op's typed result as is", async () => {
     const a = fixture.account({ engine: { ...ENGINE, interrupt: { turnId: "turn-b", interrupted: true } } })
     const { out } = await run(["interrupt", "b/dur-on-b", "--json"], undefined, SIGNED_IN, testBootstrap(), a.remote)
@@ -531,6 +563,7 @@ describe("omo remote session verbs", () => {
     [["open"], "omo remote open: the device is required (the DEVICE column of omo remote devices)"],
     [["open", "b", "--project"], "omo remote open: --project needs a value"],
     [["close", "b/dur-on-b", "--steer"], "omo remote close: unknown argument --steer"],
+    [["watch", "b"], "omo remote watch: name the session as <device>/<session> (the SESSION column of omo remote sessions)"],
   ])("refuses %p as usage before contacting the service", async (args, message) => {
     const { code, err } = await run(args, join(privateDir(), "absent"))
     expect(code).toBe(REMOTE_EXIT.usage)

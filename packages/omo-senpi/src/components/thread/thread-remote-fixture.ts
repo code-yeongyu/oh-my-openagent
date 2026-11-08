@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
-import type { AliasHolder, AliasRegistry, AliasResult, JsonObject, RemoteCommandOutcome, RemoteDevice, RemoteSessionRow, RemoteThreadSurface } from "./remote/ports"
+import type { AliasHolder, AliasRegistry, AliasResult, JsonObject, RemoteCommandOutcome, RemoteDevice, RemoteSessionRow, RemoteThreadSurface, RemoteWatchEnd, RemoteWatchHandlers } from "./remote/ports"
 import type { ThreadTranscriptEntry } from "./reader"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import type { ThreadCloseOutcome } from "./tools/ports"
@@ -34,8 +34,11 @@ export function createRemoteThreadFixture() {
     const engine = options.engine ?? ENGINE
     const sent: Sent[] = []
     // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
-    const watchers = new Set<(record: JsonObject) => void>()
-    const writeRecords = () => queueMicrotask(() => { for (const record of options.records ?? []) for (const listener of [...watchers]) listener(record) })
+    const watchers = new Set<RemoteWatchHandlers>()
+    const ends = new Set<(end: RemoteWatchEnd) => void>()
+    let watchStarted: () => void = () => {}
+    const watching = new Promise<void>((resolve) => { watchStarted = resolve })
+    const writeRecords = () => queueMicrotask(() => { for (const record of options.records ?? []) for (const handlers of [...watchers]) handlers.record(record) })
     const hops: number[] = []
     const aliases = options.aliases ?? new Map<string, AliasHolder>()
     // The sessions b's engine holds. Its close rules are senpi's (2026.11.5-1): close_session from a connection that never
@@ -130,11 +133,16 @@ export function createRemoteThreadFixture() {
           if (rpc["type"] === "prompt" && outcome.kind === "ok") writeRecords()
           return outcome
         },
-        watch: async (device, session, listener) => {
+        watch: async (device, session, handlers, watchOptions) => {
           sent.push({ via: "watch", device, session })
           if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
-          watchers.add(listener)
-          return { kind: "ok", watch: { ended: new Promise<string>(() => {}), stop: () => { watchers.delete(listener) } } }
+          watchers.add(handlers)
+          let end: (reason: RemoteWatchEnd) => void = () => {}
+          const ended = new Promise<RemoteWatchEnd>((resolve) => { end = resolve })
+          ends.add(end)
+          watchStarted()
+          const initial = watchOptions?.baseline === true ? { initial: { status: engine.streaming ? "running" : "idle", sessionId: session } } : {}
+          return { kind: "ok", watch: { ended, stop: () => { watchers.delete(handlers); end("stopped") }, ...initial } }
         },
         read: async (device, session) => { sent.push({ via: "read", device, session }); return { kind: "ok", response: { entries: [{ role: "user", content: "hi b" }, { role: "assistant", content: "hello from b" }] } } },
       },
@@ -142,7 +150,8 @@ export function createRemoteThreadFixture() {
       // The field senpi's prompt record carries the count in (S32, rpc.md `chainCount`).
       chain: { stamp: (record, hop) => { hops.push(hop); return { ...record, chainCount: hop } } },
     }
-    return { remote, sent, hops, aliases, live, registryCalls }
+    const endWatches = (reason: RemoteWatchEnd) => { for (const end of [...ends]) end(reason) }
+    return { remote, sent, hops, aliases, live, registryCalls, watchers, watching, endWatches }
   }
 
   function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?: () => string | undefined; sessions?: ThreadHostSession[]; engine?: Engine; caller?: string; diskSessions?: readonly string[]; closeOutcome?: ThreadCloseOutcome } = {}) {

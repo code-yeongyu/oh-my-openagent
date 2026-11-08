@@ -54,7 +54,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     const a = account({ engine: { ...ENGINE, messages: [{ role: "user", content: "hi b" }, { role: "assistant", content: "hello from b" }], interrupt: { turnId: "turn-b", interrupted: true } } })
     const { run } = surface(a.remote)
     expect(await run("thread_read", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", device: "b", items: [{ role: "user", content: JSON.stringify("hi b") }, { role: "assistant", content: JSON.stringify("hello from b") }] })
-    expect(await run("thread_send", { thread: "dur-on-b", message: "do the thing" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b", delivery: { kind: "started", turn_id: "turn-b" } })
+    expect(await run("thread_send", { thread: "dur-on-b", message: "do the thing" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b", delivery: { kind: "started", turn_id: "turn-b" }, monitor_target: "b/dur-on-b" })
     expect(await run("thread_interrupt", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", turn_id: "turn-b", interrupted: true })
     expect(a.sent.map((entry) => [entry.via, entry.rpc?.["type"]])).toEqual([["session", "get_messages"], ["session", "prompt"], ["session", "interrupt"]])
     // An idle engine starts a followUp prompt as it starts a bare one, and one that turned busy meanwhile queues it.

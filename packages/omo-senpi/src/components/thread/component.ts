@@ -14,6 +14,7 @@ import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
 import { createLazyLiveThreadSurface } from "./lazy-live-surface"
 import { createDefaultRemoteSurface } from "./remote/default-remote"
+import { registerRemoteMonitorTargets } from "./remote/lazy-ops"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import { defaultThreadStateDirectory } from "./live-surface-paths"
 
@@ -219,6 +220,8 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
             ? `thread gateway: completion report not written yet, retrying in ${store.busyTimeoutMs} ms: ${error instanceof Error ? error.message : String(error)}`
             : `thread gateway: completion reports were not written: ${error instanceof Error ? error.message : String(error)}`),
       })
+      const remote = options.remote ?? createDefaultRemoteSurface({ version: createOmoNativeProductConfig().packageVersion, log: (line) => ctx.logger.warn(line) })
+      registerRemoteMonitorTargets(pi, remote)
       const tools = registerThreadTools(pi, {
         host,
         stateDirectory,
@@ -237,7 +240,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerRunDeliveries: () => [...run.consumed],
         callerRunHasLocalInput: () => run.local,
         onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
-        remote: options.remote ?? createDefaultRemoteSurface({ version: createOmoNativeProductConfig().packageVersion, log: (line) => ctx.logger.warn(line) }),
+        remote,
       }, (line) => ctx.logger.warn(line))
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
       // crash before its write), or made by another process (`omo thread report ... completion`) - is
