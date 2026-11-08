@@ -257,11 +257,11 @@ describe("compiled omo entry launcher parity", () => {
       expect(isProvisionedExecutable("C:\\stra\u00dfe\\omo.exe", "C:\\STRA\u00dfE\\omo.exe", "win32", missing)).toBe(true)
     })
 
-    test("#when a name holds a surrogate pair or a lone surrogate #then each UTF-16 unit folds to itself", () => {
-      // U+1D400 (a surrogate pair) and a lone high surrogate have no single-unit uppercase, so neither changes.
+    test("#when a name holds a surrogate pair #then each of its UTF-16 units folds to itself", () => {
+      // U+1D400 is a surrogate pair; neither unit has a single-unit uppercase, so only the ASCII around it folds.
+      // (A lone surrogate is not testable here: Bun's win32.resolve replaces it with U+FFFD before folding.)
       expect(isProvisionedExecutable("C:\\\uD835\uDC00omo.exe", "C:\\\uD835\uDC00OMO.exe", "win32", missing)).toBe(true)
-      expect(isProvisionedExecutable("C:\\\uD835omo.exe", "C:\\\uD835OMO.exe", "win32", missing)).toBe(true)
-      expect(isProvisionedExecutable("C:\\\uD835omo.exe", "C:\\\uD836omo.exe", "win32", missing)).toBe(false)
+      expect(isProvisionedExecutable("C:\\\uD835\uDC00omo.exe", "C:\\\uD835\uDC01omo.exe", "win32", missing)).toBe(false)
     })
 
     test("#when POSIX paths differ only in case #then they stay different executables", () => {
