@@ -1957,6 +1957,7 @@
     "packages/senpi-task/src/run-stats.ts",
     "packages/senpi-task/src/runners/child-ancestry.ts",
     "packages/senpi-task/src/runners/child-extension-events.ts",
+    "packages/senpi-task/src/runners/designated-chain-error.ts",
     "packages/senpi-task/src/runners/designated-fallback-profile.ts",
     "packages/senpi-task/src/runners/engine-spawned-by.ts",
     "packages/senpi-task/src/runners/in-process.ts",
