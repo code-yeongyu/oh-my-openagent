@@ -52,25 +52,28 @@ function reflectionNoticeSpec(record: ReflectionCompletionEntry): NoticeSpec {
 
 /**
  * The report's own summary, cut to its first sentence: the reflection persona writes a numbered
- * "**Summary**:" item first, so that sentence is what the run learned. Markdown list, heading and
- * emphasis markers are dropped; a report without a summary item contributes its first prose line.
+ * "**Summary**:" item first, so that sentence is what the run learned. Markdown markers around
+ * the label are dropped; a report without a summary item contributes its first prose line.
  */
 export function reflectionHeadline(text: string): string | undefined {
   const lines = sanitizeReflectionReport(text).split("\n").map(stripMarkdown).filter((line) => line.length > 0)
-  const summaryAt = lines.findIndex((line) => /^summary\b/iu.test(line))
+  const summaryPrefix = /^(?:(?:\d+[.)]|[-*+])\s+)*summary\b\s*[:-]?\s*/iu
+  const summaryAt = lines.findIndex((line) => summaryPrefix.test(line))
   const body = summaryAt < 0
     ? lines[0]
-    : lines[summaryAt]?.replace(/^summary\b\s*[:-]?\s*/iu, "") || lines[summaryAt + 1]
+    : lines[summaryAt]?.replace(summaryPrefix, "") || lines[summaryAt + 1]
   if (body === undefined || body.length === 0) return undefined
-  const sentence = /^(.+?[.!?])(?:\s|$)/u.exec(body)?.[1] ?? body
-  return normalizeRendererText(sentence)
+  const prefix = /^(?:\d+\.\s+)*/u.exec(body)?.[0] ?? ""
+  const content = body.slice(prefix.length)
+  const sentence = /^(.+?[.!?])(?:\s|$)/u.exec(content)?.[1] ?? content
+  return normalizeRendererText(prefix + sentence)
 }
 
 function stripMarkdown(line: string): string {
   return line.trim()
     .replace(/\*\*|__|`/gu, "")
     .replace(/^#+\s*/u, "")
-    .replace(/^(?:(?:\d+[.)]|[-*+])\s+)+/u, "")
+    .replace(/^(?:[-*+]\s+)+/u, "")
     .trim()
 }
 

@@ -208,6 +208,27 @@ describe("memory reflection entry rendering", () => {
       ])
     })
 
+    test.each([
+      ["2024. A year in review. More detail.", "2024. A year in review."],
+      ["Summary: 2024. A year in review. More detail.", "2024. A year in review."],
+      ["**1. Summary**\n2024. A year in review. More detail.", "2024. A year in review."],
+      ["- 2024. A year in review. More detail.", "2024. A year in review."],
+      ["42. Steps remain. More detail.", "42. Steps remain."],
+      ["Summary: 42. Steps remain", "42. Steps remain"],
+      ["1999) The earlier review. More detail.", "1999) The earlier review."],
+      ["1. First item.\n2. Second item.", "1. First item."],
+    ])("#when report content starts with a number %s #then the notice preserves it", (text, expected) => {
+      const data = { ...completion(), recap: {
+        schemaVersion: 1, key: "synthetic", identity: "project-a1b2c3d4", runId: "reflection-run-2",
+        startedAt: "2026-08-13T09:00:00.000Z", finishedAt: "2026-08-13T09:01:12.000Z",
+        conversationIds: ["conversation-a"], mergedCommitSha: "616af1ae9ca8b00bfbff798cff48047f79bc0c4a",
+        filesChanged: 1, changedPaths: ["reference/synthetic.md"],
+        report: { status: "available", text, preview: text, sourceTruncated: false },
+      } }
+
+      expect(render(renderReflectionCompletionEntry, data)[1]).toBe(expected)
+    })
+
     test.each(["no_changes", "failed", "timed_out", "merge_conflict", "parent_dirty", "dirty_uncommitted"] as const)(
       "#when the outcome is %s #then nothing draws in the transcript",
       (outcome) => {
