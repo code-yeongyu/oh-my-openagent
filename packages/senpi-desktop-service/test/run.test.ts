@@ -174,6 +174,23 @@ describe.each(SANDBOXES)("runComputerCode under %s", (sandbox) => {
 		expect(error).toMatchObject({ message: "thrown before any await" });
 	});
 
+	it("resolves a call whose result is undefined as undefined in the body", async () => {
+		// Given
+		const { service } = await openDesktop();
+		const code = `
+			const value = await (await desktop.ref("e1")).value();
+			await desktop.screenshot({ silent: true });
+			const clicked = await desktop.click(1, 1);
+			return [value === undefined, clicked === undefined];
+		`;
+
+		// When
+		const result = await run(service, code);
+
+		// Then
+		expect(result.returnValue).toEqual([true, true]);
+	});
+
 	it("rejects click in a read-only run before it reaches the engine", async () => {
 		// Given
 		const { service, log } = await openDesktop();
@@ -559,22 +576,22 @@ describe("the computer bridge in the QuickJS run cell", HANG_GUARD, () => {
 		expect(escaped).toBeInstanceOf(DesktopEngineRpcError);
 	});
 
-	it("returns null for an undefined result and refuses a non-JSON argument before any engine request", async () => {
-		// Given
+	it("drops an undefined snapshot field as JSON does and refuses a non-JSON argument before any engine request", async () => {
+		// Given: the fake button has no description, so its handle's snapshot field is undefined
 		const { service, log } = await openDesktop();
 		const code = `
-			const value = await (await computer.ref("e1")).value();
+			const el = await computer.ref("e1");
 			let refused;
 			try { await computer.windows(() => true); } catch (error) { refused = error.name; }
 			try { await computer.click(Number.NaN, 1); } catch (error) { refused += " " + error.name; }
-			return [value, refused];
+			return [Object.hasOwn(el, "description"), el.description === undefined, refused];
 		`;
 
 		// When
 		const result = await quickjs(service, code);
 
 		// Then
-		expect(result.returnValue).toEqual([null, "TypeError TypeError"]);
+		expect(result.returnValue).toEqual([false, true, "TypeError TypeError"]);
 		expect(methods(log)).not.toContain("windows");
 		expect(methods(log)).not.toContain("click");
 	});

@@ -5,8 +5,10 @@
  *
  * Arguments arrive as JSON and are passed to the facade method as they are, never merged into a host object.
  * A result crosses back as JSON through an explicit replacer: a window, element or display handle becomes a
- * descriptor (a handle number plus its snapshot fields) that the VM turns into a stub, `undefined` becomes
- * `null`, and a value JSON cannot carry faithfully (non-finite number, bigint, function, symbol) is refused.
+ * descriptor (a handle number plus its snapshot fields) that the VM turns into a stub, and a value JSON cannot
+ * carry faithfully (non-finite number, bigint, function, symbol) is refused. A result that is `undefined` crosses
+ * as a settle without a payload, which the VM resolves as `undefined`; an `undefined` nested in a result follows
+ * JSON (an object property is dropped, an array element becomes `null`).
  */
 import { randomUUID } from "node:crypto";
 import {
@@ -190,7 +192,7 @@ export function createComputerBridge(host: ComputerBridgeHost): ComputerBridge {
 		if (typeof fn !== "function") throw new TypeError(`computer run: ${entry.kind} method '${method}' is not callable`);
 		// The arguments are the parsed JSON itself: data handed to the facade method, never merged into host state.
 		const value: unknown = await Reflect.apply(fn, holder, methodArgs);
-		return new BridgedJson(JSON.stringify(value === undefined ? null : value, replacer));
+		return value === undefined ? undefined : new BridgedJson(JSON.stringify(value, replacer));
 	};
 
 	const tables: Record<HandleKind, readonly string[]> = {

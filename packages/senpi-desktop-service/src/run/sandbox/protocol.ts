@@ -62,7 +62,10 @@ export type WorkerToHostMessage =
 	| { readonly type: "done"; readonly ok: true; readonly value?: string }
 	| { readonly type: "done"; readonly ok: false; readonly error: SandboxErrorPayload };
 
-/** The answer to one `call`: `payload` is JSON of the value (ok) or of a `SandboxErrorPayload`. */
+/**
+ * The answer to one `call`: `payload` is JSON of the value (ok) or of a `SandboxErrorPayload`. An ok answer without
+ * `payload` is a value of `undefined`, which JSON cannot carry; the VM resolves the call with `undefined`.
+ */
 export interface HostToWorkerMessage {
 	readonly type: "settle";
 	readonly id: number;
