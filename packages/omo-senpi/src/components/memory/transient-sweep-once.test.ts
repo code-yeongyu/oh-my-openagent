@@ -28,4 +28,23 @@ describe("scheduleTransientSweepOnce", () => {
     first?.cancel()
     atBound?.cancel()
   })
+
+  test("#given an old claim whose sweep never started and a newer claim on the same root #when the old session shuts down #then the newer claim survives", () => {
+    // given
+    const memoryRoot = uniqueRoot()
+    let clock = 1_000_000
+    const claim = () => scheduleTransientSweepOnce({ memoryRoot, start: () => undefined, deferMs: 60_000, now: () => clock })
+    const old = claim()
+    clock += TRANSIENT_RUN_MAX_AGE_MS
+    const newer = claim()
+
+    // when
+    old?.cancel()
+    const afterOldShutdown = claim()
+
+    // then
+    expect(newer).toBeDefined()
+    expect(afterOldShutdown).toBeUndefined()
+    newer?.cancel()
+  })
 })
