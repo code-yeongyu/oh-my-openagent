@@ -78,6 +78,18 @@ const sendWrite = (child: Subprocess): void => {
 
 const exitedEarly = (child: Subprocess): Promise<never> => child.exited.then((code) => { throw new Error(`writer exited early: ${code}`) })
 
+// #12050 review LOW: the writer sends "written" and disconnects in the same turn, so its clean exit can
+// be reported before the IPC callback runs. The message is still required: a non-zero exit fails at
+// once, while a clean exit only keeps waiting for the message the writer says it sent, bounded by the
+// step deadline that wraps this call.
+const wroteMessage = async (child: Subprocess, written: Promise<void>): Promise<void> => {
+  const message = written.then(() => "written" as const)
+  const first = await Promise.race([message, child.exited])
+  if (first === "written") return
+  if (first !== 0) throw new Error(`writer exited early: ${first}`)
+  await message
+}
+
 for (const change of ["replacement", "aba", "refresh", "signing", "sealing"] as const) {
   test(`pin boundary serializes a sibling credential ${change} without notification`, async () => {
     let child: Subprocess | undefined
@@ -119,7 +131,7 @@ for (const change of ["replacement", "aba", "refresh", "signing", "sealing"] as 
     const result = outcomeOf(pinTrustAnchor(f.input.pinDir, ACCOUNT, verified.state.pin, { authority }))
     const first = await step("boundary entry", Promise.race([entered.promise.then(() => "boundary"), result.then(() => "published")]))
     sendWrite(writer)
-    await step("writer wrote", Promise.race([written.promise, exitedEarly(writer)]))
+    await step("writer wrote", wroteMessage(writer, written.promise))
     const writerExit = await step("writer exit", writer.exited)
     expect(first).toBe("boundary")
     if (first !== "boundary") return
@@ -223,7 +235,7 @@ test("pin boundary taken first publishes once, and a sibling replacement waiting
   order.push("published")
   await step("writer locked", Promise.race([locked.promise, exitedEarly(writer)]))
   sendWrite(writer)
-  await step("writer wrote", Promise.race([written.promise, exitedEarly(writer)]))
+  await step("writer wrote", wroteMessage(writer, written.promise))
   const writerExit = await step("writer exit", writer.exited)
 
   // then: publication won the lock, renamed once at generation 1, and the replacement followed it
