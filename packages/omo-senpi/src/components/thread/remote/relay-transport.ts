@@ -177,11 +177,10 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
     const after = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
     const pending = after.kind === "ok" ? engineStateOf(replyData(after.response)).pending : null
     if (kind === "held_draft") void retryHeld(row, record, delivery_id)
-    if (pending === null) {
-      if (kind === "already_admitted") return ok({ kind: "queued", queue_position: 1 }, true)
-      return fail("idempotency_uncertain", `Device ${row.device} accepted the message but did not report where it waits.`, "Read the thread before deciding whether to send again.", { device: row.device, delivery_id })
-    }
-    return ok({ kind: "queued", queue_position: pending }, kind === "already_admitted")
+    // An idle receiver reports pendingMessageCount 0 while it holds (held_draft) or already took (already_admitted) the
+    // delivery: the message is still first in line there, so those two kinds answer position 1, never uncertain.
+    if (kind === "queued" && pending === null) return fail("idempotency_uncertain", `Device ${row.device} accepted the message but did not report where it waits.`, "Read the thread before deciding whether to send again.", { device: row.device, delivery_id })
+    return ok({ kind: "queued", queue_position: pending ?? 1 }, kind === "already_admitted")
   }
 
   return {

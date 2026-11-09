@@ -95,8 +95,22 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
       await new Promise((resolve) => setTimeout(resolve, 5))
     }
     relay.dispose()
+    // The armed wait is released after the dispose: a dispose that did nothing would let the re-send go out here.
+    for (const wait of waits.splice(0)) wait.release()
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(admits(a.sent)).toHaveLength(1)
+  })
+
+  test.each([
+    ["held_draft", { heldDraft: 1 }, false],
+    ["already_admitted", { admitOutcome: { kind: "ok" as const, response: { type: "response", command: "admit_external_message", success: true, data: { kind: "already_admitted", turnId: "9" } } } }, true],
+  ])("#given an IDLE receiver (pendingMessageCount 0) that answers %s #when a message is sent #then the send is queued at position 1 (the delivery is first in line there), never idempotency_uncertain", async (_kind, options, deduplicated) => {
+    const a = account({ ...options, engine: { ...ENGINE, pending: 0 } })
+    const { relay, released } = transport(a.remote)
+    released.value = false
+    expect(await relay.deliver(delivery("to an idle b", "k5"))).toMatchObject({ kind: "ok", device: "b", deduplicated, delivery: { kind: "queued", queue_position: 1 } })
+    expect(admits(a.sent)).toHaveLength(1)
+    relay.dispose()
   })
 
   test("#given b already holds the delivery (a lost reply retried) #when the retry reaches b #then the send is deduplicated at b's real pending count, not an invented 1", async () => {
