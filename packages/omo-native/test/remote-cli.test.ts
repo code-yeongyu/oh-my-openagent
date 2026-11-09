@@ -520,7 +520,7 @@ describe("omo remote session verbs", () => {
   test("--json prints the remote op's typed result as is", async () => {
     const a = fixture.account({ engine: { ...ENGINE, interrupt: { turnId: "turn-b", interrupted: true } } })
     const { out } = await run(["interrupt", "b/dur-on-b", "--json"], undefined, SIGNED_IN, testBootstrap(), a.remote)
-    expect(JSON.parse(out.join(""))).toEqual({ kind: "ok", thread_id: "dur-on-b", turn_id: "turn-b", interrupted: true })
+    expect(JSON.parse(out.join(""))).toEqual({ kind: "ok", thread_id: "dur-on-b", turn_id: "turn-b", interrupted: true, device: "b" })
   })
 
   test.each([

@@ -2,18 +2,27 @@ import { describe, expect, test } from "bun:test"
 import { connectDeviceService, LocalApiError, type CommandResult, type DeviceService, type RemoteAttach } from "@oh-my-opencode/device-service-core"
 import { withContractHost } from "../../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
 import type { ThreadReadInput } from "../contracts"
+import { answered, closeThread, interruptThread, setModelOn } from "../control/operations"
+import { createRelayControl } from "../control/relay-control"
 import { createLiveThreadSurface } from "../live-surface"
+import { liveReadResult } from "../tools/read-ops"
 import { createDeviceServiceSessions } from "./device-service"
 import { createLazyRemoteSurface } from "./lazy-remote"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
-import { setModelRemote } from "./remote-controls"
-import { closeRemote, interruptRemote, openRemote, promptRemote, readRemote } from "./remote-ops"
+import { openRemote, promptRemote } from "./remote-ops"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createGatewayStore } from "../gateway/store"
 import type { OutboundDelivery } from "../gateway/transport"
 import { createRelayTransport } from "./relay-transport"
+
+// The thread tools' bodies over the relay control of `row`: what thread_set_model, thread_interrupt, thread_close
+// and thread_read send once the device is found online.
+const setModelRemote = (surface: RemoteThreadSurface, row: RemoteSessionRow, request: { readonly model: string }) => answered(() => setModelOn(createRelayControl(surface, row), request.model, undefined))
+const interruptRemote = (surface: RemoteThreadSurface, row: RemoteSessionRow, turnId: string | undefined) => answered(() => interruptThread(createRelayControl(surface, row), turnId))
+const closeRemote = (surface: RemoteThreadSurface, row: RemoteSessionRow) => answered(() => closeThread(createRelayControl(surface, row)))
+const readRemote = (surface: RemoteThreadSurface, row: RemoteSessionRow, view: ThreadReadInput) => answered(async () => { const control = createRelayControl(surface, row); return liveReadResult(control.thread_id, control.title, await control.getMessages(), view) })
 
 // An attach whose session stream stays silent: no record, frame or channel loss ever arrives.
 const quietStream = { onEvent: () => () => {}, onFrame: () => () => {}, onChannelLoss: () => () => {} }

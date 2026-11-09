@@ -3,9 +3,6 @@ import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { REFUSAL_CODES } from "../gateway/result"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
 import { threadLink } from "../thread-link"
-import type { ThreadReadInput } from "../contracts"
-import type { ThreadTranscriptEntry } from "../reader"
-import { liveReadResult } from "../tools/read-ops"
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
 import type { AliasError, AliasHolder, JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 
@@ -285,56 +282,3 @@ export async function followRemote(remote: RemoteThreadSurface, row: RemoteSessi
   return { settled, stop: watched.watch.stop }
 }
 
-/** The local engine's own `interrupt` record, so an idle session answers interrupted:false exactly as on this device. */
-export async function interruptRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, turnId: string | undefined): Promise<ThreadToolResult> {
-  const offline = await deviceOnline(remote, row.device)
-  if (offline !== undefined) return offline
-  const outcome = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "interrupt", sessionId: row.session_id, ...(turnId === undefined ? {} : { turnId }) })
-  if (outcome.kind !== "ok") return outcomeFailure(outcome, row.device)
-  const reply = replyData(outcome.response)
-  const reported = reply["turnId"]
-  return { kind: "ok", thread_id: row.session_id, ...(typeof reported === "string" ? { turn_id: reported } : {}), interrupted: reply["interrupted"] === true }
-}
-
-// The refusals that mean the session was no longer on the other device's engine when the command reached it.
-const SESSION_GONE: ReadonlySet<string> = new Set(["session_not_found", "unknown_session", "session_identity_mismatch"])
-
-/**
- * The other device's engine ends the session for every client that holds it, as a local close does: an attached
- * `unload_session` with force (a `close_session` would release only this device's own hold). A session with no file
- * yet cannot be unloaded, so it gets an attached `close_session` and a `get_state` that proves it ended. A session
- * that is not live there answers `closed: false`.
- */
-export async function closeRemote(remote: RemoteThreadSurface, row: RemoteSessionRow): Promise<ThreadToolResult> {
-  const offline = await deviceOnline(remote, row.device)
-  if (offline !== undefined) return offline
-  const closed = (value: boolean): ThreadToolResult => ({ kind: "ok", thread_id: row.session_id, closed: value, device: row.device })
-  if (row.state === "ended") return closed(false)
-  const unload = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "unload_session", sessionId: row.session_id, force: true, interrupt: true, children: "detach" })
-  if (unload.kind === "refused" && SESSION_GONE.has(unload.reason)) return closed(false)
-  if (unload.kind !== "ok") return outcomeFailure(unload, row.device)
-  const unloaded = replyData(unload.response)
-  const reason = unloaded["reason"]
-  if (unloaded["outcome"] === "unloaded") return closed(true)
-  if (reason === "session_closing") return closed(false)
-  if (reason !== "unsupported") return fail("unsupported", `Device ${row.device} refused to close ${row.session_id} (${String(reason)}).`, "Read the thread on that device and retry once its work settles.", { device: row.device, reason, detail: unloaded["detail"] })
-  const close = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "close_session", sessionId: row.session_id })
-  if (close.kind === "refused" && SESSION_GONE.has(close.reason)) return closed(false)
-  if (close.kind !== "ok") return outcomeFailure(close, row.device)
-  const after = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
-  if (after.kind === "ok") return fail("foreign_live_owner", `Thread ${row.session_id} on device ${row.device} has no session file yet and another client still holds it, so only this device's hold was released.`, "Close it from the client that holds it, or send it a message first so it can be closed for every holder.", { device: row.device })
-  if (SESSION_GONE.has(after.reason) || after.reason === "not_attached") return closed(true)
-  return fail("idempotency_uncertain", `Device ${row.device} accepted the close of ${row.session_id} but did not confirm the session ended (${after.reason}).`, "Call thread_list with all_scope to see whether it is still live.", { device: row.device, reason: after.reason })
-}
-
-/** The local engine's `get_messages`, read through the same bounded reader as a live local thread (cursor, max_bytes, truncated). */
-export async function readRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, window: ThreadReadInput): Promise<ThreadToolResult> {
-  const offline = await deviceOnline(remote, row.device)
-  if (offline !== undefined) return offline
-  const outcome = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_messages", sessionId: row.session_id })
-  if (outcome.kind !== "ok") return outcomeFailure(outcome, row.device)
-  const listed = replyData(outcome.response)["messages"]
-  const messages = Array.isArray(listed) ? listed as ThreadTranscriptEntry[] : []
-  const result = liveReadResult(row.session_id, row.title, messages, window)
-  return result.kind === "ok" ? { ...result, device: row.device } as ThreadToolResult : result
-}

@@ -1,12 +1,12 @@
 import type { DeviceService } from "../device-service-core/src/index.ts"
 import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
+import { answered, closeThread, interruptThread, setModelOn } from "../omo-senpi/src/components/thread/control/operations"
+import { createRelayControl } from "../omo-senpi/src/components/thread/control/relay-control"
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
 import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
-import { setModelRemote } from "../omo-senpi/src/components/thread/remote/remote-controls"
 import {
-  closeRemote,
+  deviceOnline,
   followRemote,
-  interruptRemote,
   openRemote,
   promptRemote,
   remoteAvailable,
@@ -33,8 +33,9 @@ type Show = (result: ThreadToolResult, label: string) => number
 const NO_SUCH_SESSION: ReadonlySet<string> = new Set(["session_not_found", "unknown_session"])
 
 /**
- * The session verbs: each is one of the thread tools' remote ops (omo-senpi thread/remote), so the agent and this CLI
- * reach another device's session the same way. --json prints the op's typed result as is.
+ * The session verbs: each runs the thread tools' one body for that operation (omo-senpi thread/control) over the relay
+ * control of the session, so the agent and this CLI reach another device's session the same way. --json prints the
+ * body's typed result as is.
  */
 export async function runSession(service: DeviceService, args: SessionArgs, json: boolean, dependencies: RemoteCommandDependencies): Promise<number> {
   const remote = (dependencies.remote ?? deviceServiceSurface)(service)
@@ -60,15 +61,18 @@ export async function runSession(service: DeviceService, args: SessionArgs, json
   // Addressed directly, as the SDK does: its device refuses a session it does not hold (unknown_session). The
   // account listing settles only with the slowest device (seconds) and lags a session just opened.
   const row: RemoteSessionRow = { device: args.target.device, session_id: args.target.session, title: "", project: "", path: "", state: "idle", updated_ms: 0 }
+  if (args.verb === "send") return sendTo(remote, row, args, { label, json, show }, dependencies)
+  // The device is found online once, before its control is used, as the thread tools' locate does (A3).
+  const offline = await deviceOnline(remote, row.device)
+  if (offline !== undefined) return show(offline, label)
+  const control = createRelayControl(remote, row)
   switch (args.verb) {
     case "model":
-      return show(await setModelRemote(remote, row, { model: args.model }), label)
+      return show(await answered(() => setModelOn(control, args.model, undefined)), label)
     case "interrupt":
-      return show(await interruptRemote(remote, row, undefined), label)
+      return show(await answered(() => interruptThread(control, undefined)), label)
     case "close":
-      return show(await closeRemote(remote, row), label)
-    case "send":
-      return sendTo(remote, row, args, { label, json, show }, dependencies)
+      return show(await answered(() => closeThread(control)), label)
   }
 }
 
@@ -87,10 +91,11 @@ async function openOn(
     return REMOTE_EXIT.usage
   }
   const opened = await openRemote({ ...remote, permissionPreset: () => mode }, { kind: "create", device: args.device, ...(args.project === undefined ? {} : { cwd: args.project }) })
-  if (opened.kind !== "ok" || !("thread" in opened) || args.model === undefined) return show(opened, "")
+  const wanted = args.model
+  if (opened.kind !== "ok" || !("thread" in opened) || wanted === undefined) return show(opened, "")
   const label = `${args.device}/${opened.thread.thread_id}`
   const created: RemoteSessionRow = { device: args.device, session_id: opened.thread.thread_id, title: opened.thread.name, project: opened.thread.cwd, path: "", state: "idle", updated_ms: 0 }
-  const model = await setModelRemote(remote, created, { model: args.model })
+  const model = await answered(() => setModelOn(createRelayControl(remote, created), wanted, undefined))
   if (model.kind === "error") {
     // The session exists on its device (opened to be kept), so the failure names it: a retry must not leave another one
     // behind unseen. --json: the model's typed error with the thread that was opened.
