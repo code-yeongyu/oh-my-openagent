@@ -16,7 +16,8 @@ export function accountSourceFromSelection(options: {
   let selected: Promise<MemorySyncSelection> | undefined
   let cliSource: DeviceAccountSource | undefined
   let current: DesktopSyncAccount | undefined
-  // Concurrent resolves with no current account share one open, so the channel sees one descriptor request (#12799).
+  // One open in flight per source: resolves that overlap before an account is current share it, so the claimed
+  // channel carries one descriptor request, not one per caller (#12799).
   let opening: Promise<DesktopSyncAccount> | undefined
   const unavailable = (reason: DesktopSyncUnavailable["reason"]): DesktopSyncUnavailable => ({ kind: "unavailable", reason })
   return async (): Promise<DeviceAccount | null> => {
@@ -29,12 +30,20 @@ export function accountSourceFromSelection(options: {
     if (selection.kind === "unavailable") return unavailable(selection.reason)
     const channel = selection.channel
     if (channel.signal.aborted) return unavailable("private_channel_unavailable")
-    if (current !== undefined && await current.isCurrent()) return current
-    current = undefined
+    const seen = current
+    if (seen !== undefined && await seen.isCurrent()) return seen
+    // A resolve that overlapped this check may already have stored a fresh account: that one is the answer, and it
+    // is never overwritten by this caller's verdict on the account it saw (#12804).
+    if (current !== seen) {
+      if (current !== undefined) return current
+    } else current = undefined
     try {
-      opening ??= open(channel).finally(() => { opening = undefined })
-      current = await opening
-      return current
+      // The account is stored by the open itself, before `opening` clears, so no resolve ever finds neither set
+      // and opens a second time while the first open's waiters are still resuming (#12804).
+      opening ??= open(channel)
+        .then((account) => { current = account; return account })
+        .finally(() => { opening = undefined })
+      return await opening
     } catch (error) {
       if (channel.signal.aborted) return unavailable("private_channel_unavailable")
       // Main has no account to describe (signed out, or retired mid-capture): signed out until the next resolve.
