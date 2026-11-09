@@ -89,12 +89,40 @@ describe("retention as a host-sweep step (6b driver 2 / --fix; A34, A38 driver h
     }
   })
 
-  test("#given --dry-run #when the step runs #then retention changes nothing", async () => {
+  test("#given --dry-run #when the step runs #then it lists what each identity's pass would remove and changes nothing (#12932)", async () => {
     const memoryRoot = await host()
     const result = await sweepHostIdentities({ memoryRoot, steps: [createRetentionHostSweepStep({ settings: SETTINGS, now, dryRun: true })], dryRun: true, now })
     if (result.status !== "swept") throw new Error("expected a sweep")
     expect(result.visited).toHaveLength(30)
-    expect(existsSync(join(memoryRoot, "agents", "id-05", "runtime", "reflection", "runs", "reflection-run-1"))).toBe(true)
+    expect(result.lines).toEqual([
+      "WOULD FIX id-05 retention would remove 1 (runs 1, journals 0, sidecars 0)",
+      "WOULD FIX id-07 retention would remove 1 (runs 1, journals 0, sidecars 0)",
+      "WOULD FIX id-15 retention would remove 1 (runs 0, journals 1, sidecars 0)",
+      "WOULD FIX id-20 retention would remove 1 (runs 1, journals 0, sidecars 0)",
+    ])
+    for (const name of ["id-05", "id-07", "id-20"]) {
+      expect(existsSync(join(memoryRoot, "agents", name, "runtime", "reflection", "runs", "reflection-run-1"))).toBe(true)
+      expect(existsSync(join(memoryRoot, "agents", name, "runtime", "retention-log.jsonl"))).toBe(false)
+      expect(existsSync(join(memoryRoot, "agents", name, "runtime", "reflection", "run-id.json"))).toBe(false)
+    }
+    expect(existsSync(join(memoryRoot, "agents", "id-15", "runtime", "transcripts", "s-never"))).toBe(true)
+  })
+
+  test("#given --dry-run and an identity over its size cap #when the step runs #then it also says what the cap would evict (#12932)", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "memory-host-dry-cap-"))
+    roots.push(memoryRoot)
+    const paths = buildIdentityPaths(memoryRoot, "id-big")
+    await mkdir(paths.repo, { recursive: true })
+    await reflectionRun(paths, "reflection-run-1", { finishedAt: daysAgo(8) })
+    await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
+
+    const result = await sweepHostIdentities({ memoryRoot, steps: [createRetentionHostSweepStep({ settings: { runtime: { max_bytes: 1 } }, now, dryRun: true })], dryRun: true, now })
+
+    if (result.status !== "swept") throw new Error("expected a sweep")
+    expect(result.lines[0]).toBe("WOULD FIX id-big retention would remove 1 (runs 1, journals 0, sidecars 0)")
+    expect(result.lines[1]).toStartWith("WOULD FIX id-big size cap: cap exceeded by ")
+    expect(result.lines).toHaveLength(2)
+    expect(existsSync(join(paths.reflection, "runs", "reflection-run-1"))).toBe(true)
   })
 
   test("#given global retention_days 30 and an agent override of 3 #when the host sweep step visits #then each identity keeps the windows its global layer sets (REVIEW-5 M1)", async () => {
