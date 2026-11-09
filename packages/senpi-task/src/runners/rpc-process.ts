@@ -15,6 +15,7 @@ import { createTaskRecordStore } from "../store"
 import { InputUncertainError } from "./input-effects"
 import type { ChildDialogForwarder } from "./child-dialogs/forwarder"
 import { ChildParentLink, type ParentPermissionMode } from "./parent-link"
+import { withProbeRequestExtension } from "./probe-request"
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000
 /** senpi capability: a single-session `--mode rpc` process accepts `set_retry_fallback` before its first turn. */
@@ -80,10 +81,10 @@ export class RpcProcessRunner {
   }
 
   async start(specInput: RpcRunnerSpec): Promise<RpcChildHandle> {
-    const spec =
+    const spec = withProbeRequestExtension(
       specInput.extensions === undefined && this.inheritedExtensions.length > 0
         ? { ...specInput, extensions: this.inheritedExtensions }
-        : specInput
+        : specInput)
     await this.modelAdmission(spec)
     const parent = new ChildParentLink(spec.task_id, this.options.dialogs, this.options.parentPermission, (message, token) => this.onWarning(message, token))
     const descriptor = this.buildSpawn(parent.named(spec))

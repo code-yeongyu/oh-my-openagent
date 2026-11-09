@@ -20,6 +20,7 @@ export type RpcSpawnSpec = {
 }
 
 export type RpcRunnerSpec = {
+  readonly probeProviderRequest?: boolean
   readonly taskStoreDir?: string
   readonly task_id: string
   readonly cwd: string
