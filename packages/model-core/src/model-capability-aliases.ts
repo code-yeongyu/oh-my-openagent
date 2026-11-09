@@ -22,6 +22,12 @@ export type ModelIDAliasResolution = {
 }
 
 const EXACT_ALIAS_RULES: ReadonlyArray<ExactAliasRule> = [
+	{
+		aliasModelID: "deepseek-v4.1-flash-maas",
+		ruleID: "vertex-garden-deepseek-maas-alias",
+		canonicalModelID: "deepseek-flash",
+		rationale: "Vertex Model Garden serves the same DeepSeek V4.1 Flash under a publisher-namespaced MaaS id.",
+	},
   {
     aliasModelID: "gemini-3-pro-high",
     ruleID: "gemini-3-pro-tier-alias",
