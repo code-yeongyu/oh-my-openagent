@@ -1,5 +1,11 @@
 import { LOCAL_BLOB_MAX, LOCAL_CHUNK_MAX, LOCAL_INLINE_MAX, lineBytes } from "./limits.ts";
-import type { CommandBlobRef, CommandEvent, SessionCandidate, SessionEndpointsData } from "./protocol-delegated.ts";
+import type {
+  CommandBlobRef,
+  CommandEvent,
+  CommandLocated,
+  SessionCandidate,
+  SessionEndpointsData,
+} from "./protocol-delegated.ts";
 import {
   base64Bytes,
   commandId,
@@ -71,6 +77,12 @@ const blobRefOf = (v: unknown): CommandBlobRef => {
     sha256: sha256Field(m["sha256"], "blob sha256"),
   };
 };
+// Decision 0018 amendment 2026-11-06: {key, session}, the same pair session.locate answers for the event's device.
+const locatedOf = (device: string, v: unknown): CommandLocated => {
+  const m = exactly(v, ["key", "session"], [], "located");
+  const key = endpointKey(m["key"], "located key");
+  return m["session"] === `${device}.${key}` ? { key, session: `${device}.${key}` } : fail("located session");
+};
 const commandEventOf = (v: Fields): CommandEvent => {
   const head = { type: "event", kind: "session.command_event" } as const;
   if (Object.hasOwn(v, "blob")) {
@@ -83,12 +95,14 @@ const commandEventOf = (v: Fields): CommandEvent => {
     const m = eventFields(v, ["device", "frame"]);
     return { ...head, device: deviceId(m["device"]), frame: jsonObject(m["frame"], "frame") };
   }
-  const m = eventFields(v, ["device", "command_id", "response"]);
+  const m = eventFields(v, ["device", "command_id", "response"], ["located"]);
+  const device = deviceId(m["device"]);
   return {
     ...head,
-    device: deviceId(m["device"]),
+    device,
     command_id: commandId(m["command_id"]),
     response: jsonObject(m["response"], "response"),
+    ...(m["located"] === undefined ? {} : { located: locatedOf(device, m["located"]) }),
   };
 };
 
