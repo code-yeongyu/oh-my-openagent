@@ -68,11 +68,13 @@ export function isHostSessionMissing(error: unknown): boolean {
   )
 }
 
-const uiRequestSchema = z.object({
-  type: z.literal("extension_ui_request"),
-  id: z.string().min(1),
-  method: z.string().min(1),
-})
+const uiRequestSchema = z
+  .object({
+    type: z.literal("extension_ui_request"),
+    id: z.string().min(1),
+    method: z.string().min(1),
+  })
+  .passthrough()
 
 const parkedSchema = z.object({
   type: z.literal("session_parked"),

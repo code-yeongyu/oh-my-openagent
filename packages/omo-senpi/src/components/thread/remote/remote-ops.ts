@@ -302,6 +302,8 @@ export async function openRemote(remote: RemoteThreadSurface, request: RemoteOpe
     request.kind === "open" || request.skills === undefined || request.skills.length === 0
       ? {}
       : { context: { [INITIAL_SKILLS_CONTEXT_KEY]: JSON.stringify(request.skills) } }
+  // A created or forked session names its creator's mode, so remote work never falls to the engine's delegated default.
+  const mode = request.kind === "open" ? undefined : remote.permissionPreset?.()
   const opened: JsonObject =
     request.kind === "create"
       ? { type: "open_session", retain_on_disconnect: true, ...(request.cwd === undefined ? {} : { cwd: request.cwd }) }
@@ -316,7 +318,7 @@ export async function openRemote(remote: RemoteThreadSurface, request: RemoteOpe
   // A create or fork asks for its new session's listing key on the reply (decision 0018 amendment 2026-11-06).
   const outcome = await remote.sessions.endpointCommand(
     device,
-    { ...opened, ...skills },
+    { ...opened, ...skills, ...(mode === undefined ? {} : { permissionPreset: mode }) },
     request.kind === "open" ? undefined : { locate: true },
   )
   if (outcome.kind !== "ok") return outcomeFailure(outcome, device)
@@ -412,11 +414,10 @@ export async function promptRemote(
   if (refused !== undefined) return refused
   const offline = await deviceOnline(remote, row.device)
   if (offline !== undefined) return offline
-  const here = sender.kind === "peer" ? await remote.sessions.thisDevice() : null
   // A peer's text never reaches the receiver's command dispatch or prompt templates (senpi prompt `expandPromptTemplates`).
   const text = (effective: EffectiveLane) =>
     sender.kind === "peer"
-      ? { message: peerText(sender, here, request, effective), expandPromptTemplates: false }
+      ? { message: peerText(sender, request, effective), expandPromptTemplates: false }
       : { message: request.message }
   if (request.delivery === "steer") {
     const state = await remote.sessions.sessionCommand(row.device, row.session_id, {

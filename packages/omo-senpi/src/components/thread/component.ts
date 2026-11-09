@@ -324,6 +324,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
             createDefaultRemoteSurface({
               version: createOmoNativeProductConfig().packageVersion,
               log: (line) => ctx.logger.warn(line),
+              permissionPreset: () => pi.getPermissionPreset?.(),
             }),
         },
         (line) => ctx.logger.warn(line),

@@ -255,7 +255,8 @@ describe("remote == local, round 2: send modes, handoff, list and alias order", 
 })
 
 // #12852: a send to another device carries the provenance a local gateway delivery carries (gateway/provenance.ts), set by
-// the sending side from its own runtime facts, so b's model reads "agent planner on device here", never bare user text.
+// the sending side from its own runtime facts, so b's model reads "agent planner", never bare user text. Q (2026-11-09):
+// the receiver need not know the sender is on another device, so the text names no device and equals the local one.
 describe("#12852: a send to another device carries the sender's gateway provenance", () => {
   const ENV = { OMO_PROVENANCE_WORKSPACE: "Owner workspace", OMO_PROVENANCE_PROJECT: "sender-project" }
   // The machine header's fields, keyed by name: the one line `From ... [OMO_GATEWAY v=1 key=value ...]` the model reads.
@@ -269,7 +270,7 @@ describe("#12852: a send to another device carries the sender's gateway provenan
   const promptLines = (sent: readonly { readonly rpc?: Readonly<Record<string, unknown>> }[]) =>
     sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => String(entry.rpc?.["message"]).split("\n"))
 
-  test("#given one caller #when it sends to a thread here and to b #then b's text carries the local delivery's provenance block, sentence and body, plus the sender's device", async () => {
+  test("#given one caller #when it sends to a thread here and to b #then b's text is the local delivery's provenance block, sentence and body, naming no device", async () => {
     const a = account()
     const { run, store } = surface(a.remote, { callerName: () => "planner", env: ENV })
     const message = "review the patch"
@@ -284,7 +285,7 @@ describe("#12852: a send to another device carries the sender's gateway provenan
     expect(remote).toHaveLength(3)
     expect(remote.slice(1)).toEqual(local.slice(1))
     const from = (line: string) => line.slice(0, line.indexOf(" ["))
-    expect(from(remote[0] ?? "")).toBe(`${from(local[0] ?? "")} / device "here"`)
+    expect(from(remote[0] ?? "")).toBe(from(local[0] ?? ""))
     const shared = ["v", "source", "workspace", "project", "session", "actor", "sender_session", "requested", "hop"]
     const pick = (line: string) => {
       const all = fields(line)
@@ -297,7 +298,7 @@ describe("#12852: a send to another device carries the sender's gateway provenan
       actor: "planner",
       sender_session: "dur-caller",
     })
-    expect(fields(remote[0] ?? "")["device"]).toBe('"here"')
+    expect(fields(remote[0] ?? "")["device"]).toBeUndefined()
   })
 
   test.each([
@@ -321,15 +322,15 @@ describe("#12852: a send to another device carries the sender's gateway provenan
       const lines = String(record["message"]).split("\n")
       expect(lines).toHaveLength(3)
       expect(lines[0]).toStartWith(
-        'From Owner workspace / sender-project / session "planner" / device "here" [OMO_GATEWAY v=1 source=peer_agent ',
+        'From Owner workspace / sender-project / session "planner" [OMO_GATEWAY v=1 source=peer_agent ',
       )
       expect(fields(lines[0] ?? "")).toMatchObject({
         actor: "planner",
         sender_session: "dur-caller",
-        device: '"here"',
         requested,
         effective,
       })
+      expect(fields(lines[0] ?? "")["device"]).toBeUndefined()
       expect(lines[1]).toBe(GATEWAY_PROVENANCE_SENTENCE)
       expect(lines[2]).toBe(JSON.stringify(forged))
     },

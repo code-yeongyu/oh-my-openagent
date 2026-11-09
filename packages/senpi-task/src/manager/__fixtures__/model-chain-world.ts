@@ -109,18 +109,26 @@ export async function createModelChainWorld(
       return [...calls, ...engines.flatMap((engine) => engine.calls.map((model) => ({ model, toolResults: 0 })))]
     },
     toolRuns: () => toolRuns,
+    // The parent's UI allows the child's gated call: from senpi 2026.11.6-3 a delegated child whose parent session is not
+    // live asks before running the shared tool (it would be refused with no UI), so the count tool would never run.
     runner: () =>
-      createInProcessManagedRunner(new InProcessRunner({ sharedParentTools: [countTool] }), (spec) => {
-        const [provider, id] = (spec.model ?? "").split("/")
-        const model = provider === undefined || id === undefined ? undefined : modelRegistry.find(provider, id)
-        return {
-          agentDir,
-          projectTrusted: false,
-          modelRegistry,
-          modelRuntime,
-          ...(model === undefined ? {} : { model }),
-        }
-      }),
+      createInProcessManagedRunner(
+        new InProcessRunner({
+          sharedParentTools: [countTool],
+          dialogs: { forward: async () => ({ kind: "value", value: "Allow once" }) },
+        }),
+        (spec) => {
+          const [provider, id] = (spec.model ?? "").split("/")
+          const model = provider === undefined || id === undefined ? undefined : modelRegistry.find(provider, id)
+          return {
+            agentDir,
+            projectTrusted: false,
+            modelRegistry,
+            modelRuntime,
+            ...(model === undefined ? {} : { model }),
+          }
+        },
+      ),
     engineRunner: async (kind, engineOptions = {}) => {
       const engine = await startEngineRunner(kind, { root, settingsPath, scripts, ...engineOptions })
       engines.push(engine)

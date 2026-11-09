@@ -11,6 +11,7 @@ import {
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { CategoryConfigGenerations } from "./category-config-generation"
 import { createInheritedExtensionsResolver, type RunnerBuildContext } from "./engine-runners"
+import { createChildParentWiring } from "./child-parent-wiring"
 import { createEngineHostRuntime, type EngineHostRuntime } from "./host-execution-mode"
 import type { TaskRuntimeContext } from "./runtime-context"
 
@@ -73,6 +74,7 @@ export function composeEngineHostWiring(input: EngineHostWiringInput): EngineHos
   })
 
   const hostRouting = { ...host.routing, storeDir: baseStore.stateDir }
+  const parentLink = createChildParentWiring({ pi, runtime, labelOf: (taskId) => childLabel(baseStore, taskId) })
   const baseRunnerContext: RunnerBuildContext = {
     runtime,
     sharedParentTools: input.sharedParentTools,
@@ -81,6 +83,7 @@ export function composeEngineHostWiring(input: EngineHostWiringInput): EngineHos
     agentDir: host.agentDir,
     onHostWarning: host.notices.add,
     hostRouting,
+    ...parentLink,
     ...(input.omoConfig.exclude_models === undefined ? {} : { excludeModels: input.omoConfig.exclude_models }),
   }
   // One resolver for the whole session, so an ordinary spawn, a revival, a team member and a
@@ -92,4 +95,9 @@ export function composeEngineHostWiring(input: EngineHostWiringInput): EngineHos
     resolveInheritedExtensions,
     runnerContext: { ...baseRunnerContext, resolveInheritedExtensions },
   }
+}
+
+function childLabel(store: TaskRecordStore, taskId: string): string {
+  const record = store.load(taskId)
+  return record?.name ?? record?.task_summary ?? record?.description ?? taskId
 }

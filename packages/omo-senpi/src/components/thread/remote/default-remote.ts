@@ -9,6 +9,7 @@ import type { RemoteThreadSurface } from "./ports"
 export function createDefaultRemoteSurface(options: {
   readonly version: string
   readonly log?: (line: string) => void
+  readonly permissionPreset?: () => string | undefined
 }): RemoteThreadSurface {
   return createLazyRemoteSurface({
     version: options.version,
@@ -26,5 +27,6 @@ export function createDefaultRemoteSurface(options: {
         }),
       )
     },
+    ...(options.permissionPreset === undefined ? {} : { permissionPreset: options.permissionPreset }),
   })
 }

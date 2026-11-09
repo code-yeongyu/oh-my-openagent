@@ -84,7 +84,7 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
       await Promise.all(pendingTeardowns)
     },
     openChild: async (spec, socket, sessionPath) => {
-      const client = input.createClient(socket)
+      const client = input.createClient(socket, spec.task_id)
       if (spec.resumeSessionPath === undefined) await mkdir(dirname(sessionPath), { recursive: true })
       const opened = await openAdmitted(client, spec, sessionPath)
       const handle = createHostSessionHandle({
@@ -108,7 +108,7 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
           spec,
           delaysMs: input.reattachDelaysMs,
           sleep: input.sleep,
-          createClient: input.createClient,
+          createClient: (port) => input.createClient(port, spec.task_id),
           open: (port, path) => openAdmitted(port, spec, path),
         }),
       })
