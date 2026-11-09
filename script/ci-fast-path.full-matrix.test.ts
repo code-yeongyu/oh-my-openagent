@@ -290,6 +290,7 @@ describe("full-matrix classification", () => {
       ["the senpi-task record lock", "packages/senpi-task/src/store/record-lock.ts"],
       ["basename contains darwin", "packages/utils/src/open-darwin.ts"],
       ["basename contains macos", "script/macos-signing-workflow.test.ts"],
+      ["team state atomic write (win32 rename retry branch)", "packages/team-core/src/team-state-store/locks.ts"],
     ])("#then %s forces the full matrix", (_name, changedPath) => {
       // given / when
       const mode = classify({

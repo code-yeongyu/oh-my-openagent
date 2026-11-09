@@ -29,6 +29,7 @@ const platformSensitiveExactPaths = new Set([
   "script/ci-leg-tests-guard.mjs",
   "script/root-test-serial-quarantine.ts",
   "packages/openclaw-core/src/reply-listener-process.ts",
+  "packages/team-core/src/team-state-store/locks.ts",
 ])
 const platformSensitivePrefixes = [
   "crates/",
