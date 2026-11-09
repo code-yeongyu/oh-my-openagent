@@ -83,6 +83,7 @@ export function createRpcManagedRunner(runner: RpcRunnerLike): ManagedRunner {
     settleTeardowns: () => runner.settleTeardowns?.() ?? Promise.resolve(),
     async start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
       const rpcSpec: RpcRunnerSpec = {
+        ...(spec.probeProviderRequest === true ? { probeProviderRequest: true } : {}),
         task_id: spec.taskId,
         cwd: spec.cwd,
         state_dir: spec.stateDir,
@@ -107,6 +108,7 @@ export function createRpcManagedRunner(runner: RpcRunnerLike): ManagedRunner {
 
 function toChildSpec(spec: ManagedStartSpec, context: InProcessSessionContext): ChildSpec {
   return {
+    ...(spec.onProviderRequest === undefined ? {} : { onProviderRequest: spec.onProviderRequest }),
     taskId: spec.taskId,
     cwd: spec.cwd,
     // ManagedStartSpec.stateDir is already join(stateDir, "children", taskId); the session dir

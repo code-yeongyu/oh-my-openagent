@@ -86,6 +86,7 @@ export type ProcessSignaller = {
 
 export type RespawnFailureCode =
   | "model_unavailable"
+  | "usage_limit"
   | "tools_unavailable"
   | "spawn_spec_unavailable"
   | "session_unavailable"

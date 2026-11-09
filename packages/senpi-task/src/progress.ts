@@ -89,10 +89,8 @@ export function createChildProgress(
         awaitingInput = true
         return true
       }
-      if (event.type === "model_changed") {
-        fallbackSwitch = readFallbackSwitch(event)
-        return statsChanged
-      }
+      if (event.type === "model_changed") fallbackSwitch = readFallbackSwitch(event)
+      let appliedLevel: string | undefined
       if (event.type === "retry_fallback_applied" && event.to !== undefined) {
         // Keep provider/model_id and the applied level: a selector suffix when present, else the level of the
         // fallback switch senpi announced for this same model.
@@ -102,6 +100,7 @@ export function createChildProgress(
           ? fallbackSwitch.level
           : undefined
         fallbackSwitch = undefined
+        appliedLevel = parsed?.reasoning ?? level
         if (parsed !== undefined) {
           resolvedModel = level === undefined ? parsed : { ...parsed, reasoning: level, reasoning_effort: level }
           model = parsed.display
@@ -113,10 +112,12 @@ export function createChildProgress(
       }
       const moved = effectiveModelFromEvent(event)
       if (moved !== undefined) {
-        effectiveModel = moved
+        // A bare fallback selector carries no level; keep the one senpi announced on model_changed (#7934).
+        effectiveModel = moved.reasoning === undefined && appliedLevel !== undefined ? { ...moved, reasoning: appliedLevel } : moved
         return true
       }
       if (event.type === "retry_fallback_applied" && event.to !== undefined) return true
+      if (event.type === "model_changed") return statsChanged
       if (event.type === "tool_execution_start" && typeof event.toolName === "string") {
         currentTool = formatToolActivity(event.toolName, event.args ?? event.input)
         return true

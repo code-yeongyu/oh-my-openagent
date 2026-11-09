@@ -21,6 +21,20 @@ export async function reviveTerminal(
 ): Promise<SendOutcome> {
   if (!beginSend(record.task_id)) return evictionRefusal(record.task_id)
   try {
+    const prepared = await port.prepareRevival?.(record, handle)
+    if (prepared !== undefined) {
+      if ("refused" in prepared) {
+        if (granted?.ok) granted.release()
+        return { kind: "not_continuable", task_id: record.task_id, reason: prepared.refused,
+          failure_kind: prepared.failure_kind, suggestion: "Retry after the limit resets or select another provider." }
+      }
+      if (prepared.record.model !== record.model && granted?.ok) {
+        granted.release()
+        granted = undefined
+      }
+      record = prepared.record
+      handle = prepared.handle
+    }
     return await deliverRevivedTerminal(port, record, handle, message, nowIso, granted ?? port.reserveForRevive(record.task_id), false)
   } finally {
     endSend(record.task_id)
