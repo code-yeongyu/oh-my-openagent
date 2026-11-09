@@ -25,9 +25,13 @@ async function harness() {
   const store = memorySecrets().store(api)
   await store.write(identityA)
   // The lock would otherwise live under the real home directory; running the action keeps the locked path observable.
-  const lock = spyOn(credentialLock, "withCredentialLock").mockImplementation(async (_api, action) => action())
+  // The action takes the lock lease: the keystore keys its per-section view by it.
+  const lease = { handOver: async () => {}, restore: async () => {} }
+  const lock = spyOn(credentialLock, "withCredentialLock").mockImplementation(async (_api, action) => action(lease))
   onTestFinished(() => lock.mockRestore())
   const context = await signedInSyncContext({ env: { OMO_SERVICE_API_URL: api }, cwd: await temporaryHome(), store })
+  // Building the context records the account under the lock (#12280); only the token path after it must stay lock-free.
+  lock.mockClear()
   return { context, store, requests, lock }
 }
 
