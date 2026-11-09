@@ -31,6 +31,7 @@ fn window() -> DesktopWindow {
         focused: false,
         is_on_screen: None,
         elevated: None,
+        identity: None,
     }
 }
 
