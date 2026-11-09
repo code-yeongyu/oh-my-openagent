@@ -29,13 +29,13 @@ ln -s /path/to/your/clone ~/.agents/skills/ast-grep
 
 ```bash
 # Search by AST pattern (the helper validates patterns offline first)
-python3 scripts/ast_grep_helper.py search 'console.log($MSG)' --lang ts src/
+python3 scripts/ast_grep_helper.py search 'console.log($MSG)' src/ --lang ts
 
 # Rewrite (dry-run preview by default)
-python3 scripts/ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' --lang ts src/
+python3 scripts/ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' src/ --lang ts
 
 # Apply the rewrite (two-pass: preview JSON + then --update-all)
-python3 scripts/ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' --lang ts src/ --apply
+python3 scripts/ast_grep_helper.py replace 'console.log($MSG)' 'logger.info($MSG)' src/ --lang ts --apply
 
 # Run YAML lint rules from sgconfig.yml
 python3 scripts/ast_grep_helper.py scan src/
@@ -85,7 +85,7 @@ ast-grep-skill/
 
 1. **Wraps `sg`** with a single Python 3 stdlib script that works the same on macOS, Linux, Windows, WSL, Git Bash.
 2. **Validates patterns offline** before calling `sg` — catches the regex-misuse class of mistakes (`\w`, `.*`, `|`, `[a-z]`) plus language-specific traps (Python trailing colons, JS/Go/Rust missing function bodies).
-3. **Resolves the binary** through 6 candidate paths: cached → PATH (with Linux `setgroups` collision detection) → Homebrew. Falls through to a clear install hint with copy-paste commands.
+3. **Resolves the binary** through 5 candidates: `OMO_AST_GREP_SG_PATH` override → OMO runtime dirs → cached → PATH (with Linux `setgroups` collision detection) → Homebrew. Falls through to a clear install hint with copy-paste commands.
 4. **Runs the two-pass write trick** when applying rewrites — `sg run` silently ignores `--update-all` when `--json` is set, so `replace --apply` runs two invocations: pass 1 collects JSON matches, pass 2 mutates files.
 5. **Ships per-OS installers** that try every reasonable package manager and fall back to a GitHub release tarball.
 6. **Documents the failure modes** the model will hit (regex misuse, incomplete patterns, `--update-all` + `--json` trap, scope/type questions ast-grep can't answer) in `references/pitfalls.md`.

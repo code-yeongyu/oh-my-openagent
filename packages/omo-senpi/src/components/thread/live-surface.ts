@@ -17,6 +17,10 @@ import type { ThreadHostView, ThreadHostViewRequest, ThreadSessionPort } from ".
 import { acceptedControls, LEGACY_TUI_COMMANDS, tuiCommandsFrom } from "./endpoint-controls"
 import { answerUiRequest } from "./ui-answer"
 import { fencedCommand } from "./attachment-fence"
+import { createServiceAliasRegistry, type ServiceAccess } from "./remote/alias-registry"
+import { createDeviceServiceSessions } from "./remote/device-service"
+import { createLazyRemoteSurface } from "./remote/lazy-remote"
+import type { RemoteThreadSurface } from "./remote/ports"
 
 type RpcFrame = { readonly success?: boolean; readonly data?: unknown; readonly error?: unknown; readonly errorCode?: unknown; readonly errorData?: unknown }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value) }
@@ -351,6 +355,31 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     getAvailableThinkingLevels: async (sessionId) => (await send<{ levels: string[] }>("get_available_thinking_levels", { sessionId })).levels,
     wake: async (sessionId, deliveryIds, durableId) => wakeReply(await send<{ admitted?: unknown }>("wake", { sessionId, delivery_ids: [...deliveryIds] }, durableId)),
     releaseSession: async (sessionId, release, durableId) => releaseReply(await callFrame(socket ?? legacy, "release_session", { sessionId, ...release }, undefined, durableId)),
+    closeSession: async (sessionId, durableId) => {
+      // unload_session with force ends the session for every client that holds it (senpi session-unload.ts, drained
+      // through tearDownUnloaded); close_session releases only this connection's own hold. Both are sent attached.
+      const left = (error: unknown) => error instanceof Error && /^(unknown_session|session_identity_mismatch):/.test(error.message)
+      let answer: Record<string, unknown>
+      try {
+        answer = await send<Record<string, unknown>>("unload_session", { sessionId, force: true, interrupt: true, children: "detach" }, durableId)
+      } catch (error) {
+        if (left(error)) return "not_live"
+        throw error
+      }
+      if (answer.outcome === "unloaded") return "closed"
+      if (answer.reason === "session_closing") return "not_live"
+      if (answer.reason === "host_draining") throw new Error(`host_unavailable:${socket ?? legacy}`)
+      if (answer.reason !== "unsupported") throw new Error(`thread RPC request failed: ${JSON.stringify(answer)}`)
+      // A session with no file yet cannot be unloaded: close it attached, then read whether another client still holds it.
+      try {
+        await send("close_session", { sessionId }, durableId)
+      } catch (error) {
+        if (left(error)) return "not_live"
+        throw error
+      }
+      const { sessions } = await callOn<{ sessions: ThreadHostSession[] }>(socket ?? legacy, "list_sessions", OBSERVE)
+      return sessions.some((session) => session.sessionId === sessionId && session.status !== "closed") ? "held_elsewhere" : "closed"
+    },
   })
 
   const liveness = async (endpoint: GatewayEndpointRef): Promise<EndpointLiveness> => {
@@ -455,3 +484,22 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     ...sessionMethods(undefined, call),
   }
 }
+
+export { createDeviceServiceSessions } from "./remote/device-service"
+export { createServiceAliasRegistry } from "./remote/alias-registry"
+
+/**
+ * The remote surface the `omo thread` CLI hands its SDK (#12833), from this sidecar's own device-service and alias clients;
+ * `loadAccess` is the CLI sign-in (the device-account sidecar's `cliServiceAccess`), loaded only when an alias is used.
+ * The caller closes it with `sessions.close` before it exits.
+ */
+export function createCliRemoteSurface(options: { readonly version: string; readonly loadAccess: () => Promise<ServiceAccess> }): RemoteThreadSurface {
+  return createLazyRemoteSurface({
+    version: options.version,
+    loadRuntime: async () => ({ createDeviceServiceSessions }),
+    loadAliasRegistry: async () => createServiceAliasRegistry(await options.loadAccess()),
+  })
+}
+export { crossTarget, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
+export { closeRemote, deviceOnline, interruptRemote, outcomeFailure, promptRemote, readRemote } from "./remote/remote-ops"
+export { setModelRemote } from "./remote/remote-controls"

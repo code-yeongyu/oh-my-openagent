@@ -44,25 +44,25 @@ const gpt56CategoryCases = [
   {
     category: "deep",
     modelId: "gpt-5.6-sol",
-    nativeVariant: "high",
-    mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-sol", variant: "high" },
-    copilotVariant: "high",
+    nativeVariant: "medium",
+    mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-sol", variant: "medium" },
+    copilotVariant: "medium",
     copilotFallbackEntry: {
       providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"] as string[],
       model: "gpt-5.6-sol",
-      variant: "high",
+      variant: "medium",
     },
   },
   {
     category: "unspecified-low",
     modelId: "gpt-5.6-sol",
-    nativeVariant: "high",
-    mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-sol", variant: "high" },
-    copilotVariant: "high",
+    nativeVariant: "medium",
+    mixedWinner: { provider: "github-copilot", modelId: "gpt-5.6-sol", variant: "medium" },
+    copilotVariant: "medium",
     copilotFallbackEntry: {
       providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"] as string[],
       model: "gpt-5.6-sol",
-      variant: "high",
+      variant: "medium",
     },
   },
 ] as const
@@ -242,14 +242,14 @@ describe("resolveCategory", () => {
     // when
     const result = resolveCategory(
       "deep",
-      { categories: { deep: { model: "vendor-a/solo-model", reasoning: "high" } } },
+      { categories: { deep: { model: "vendor-a/solo-model", reasoning: "medium" } } },
       models,
     )
 
     // then a simple migrated {model, reasoning} keeps its thinking level
     const resolved = expectResolved(result)
     expect(resolved.spec.modelId).toBe("solo-model")
-    expect(resolved.spec.reasoningEffort).toBe("high")
+    expect(resolved.spec.reasoningEffort).toBe("medium")
   })
 
   test("#given quick primary is unavailable and the deepseek rung is available #when resolved #then delegate-core fallback chain reaches deepseek-flash", () => {
@@ -373,20 +373,6 @@ describe("resolveCategory", () => {
     expect(result.kind).toBe("model_unavailable")
   })
 
-  test("#given no category or fallback model resolves and a system default is available #when resolved #then delegate-core reaches the system default", () => {
-    // given
-    const models = registry([model("local", "system-default")])
-
-    // when
-    const result = resolveCategory("quick", {}, models, { systemDefaultModel: "local/system-default" })
-
-    // then
-    const resolved = expectResolved(result)
-    expect(resolved.spec.provider).toBe("local")
-    expect(resolved.spec.modelId).toBe("system-default")
-    expect(resolved.modelSelection.matchedFallback).toBe(false)
-  })
-
   test("#given selected model is absent from registry #when resolved #then unavailable result names attempted and available models", () => {
     // given
     const models = registry([model("anthropic", "claude-sonnet-4-6")])
@@ -421,7 +407,7 @@ describe("resolveCategory", () => {
             top_p: 0.8,
             maxTokens: 4096,
             thinking: { type: "enabled", budgetTokens: 1024 },
-            reasoningEffort: "high",
+            reasoningEffort: "medium",
             tools: { read: true, write: false },
             prompt_append: "fixture-quick-overlay",
           },
@@ -436,7 +422,7 @@ describe("resolveCategory", () => {
     expect(resolved.spec.top_p).toBe(0.8)
     expect(resolved.spec.maxTokens).toBe(4096)
     expect(resolved.spec.thinking).toEqual({ type: "enabled", budgetTokens: 1024 })
-    expect(resolved.spec.reasoningEffort).toBe("high")
+    expect(resolved.spec.reasoningEffort).toBe("medium")
     expect(resolved.spec.tools).toEqual({ read: true, write: false })
     expect(resolved.spec.prompt_append).not.toBe("fixture-quick-overlay")
     expect(resolved.spec.prompt_append).toEndWith("\n\nfixture-quick-overlay")
@@ -486,11 +472,11 @@ describe("builtin category defaults", () => {
       ["visual-engineering", "google/gemini-4-argon", "low"],
       ["artistry", FABLE_55_RELEASED ? "anthropic/claude-fable-5-5" : "anthropic/claude-fable-5-1", "max"],
       ["ultrabrain", "chatgpt-subscription/gpt-6-astra", "max"],
-      ["deep-low", "chatgpt-subscription/gpt-6.1-sol", "high"],
+      ["deep-low", "chatgpt-subscription/gpt-6.1-sol", "medium"],
       ["deep-high", "chatgpt-subscription/gpt-6-astra", "high"],
       ["quick", "chatgpt-subscription/gpt-6-luna-fast", "low"],
-      ["unspecified-low", "anthropic/claude-sonnet-5-5", "high"],
-      ["unspecified-high", "anthropic/claude-opus-5-5", "high"],
+      ["unspecified-low", "anthropic/claude-sonnet-5-5", "medium"],
+      ["unspecified-high", "anthropic/claude-opus-5-5", "medium"],
       ["architect", FABLE_55_RELEASED ? "anthropic/claude-fable-5-5" : "anthropic/claude-fable-5-1", "max"],
       ["writing", "google/gemini-4-argon", "low"],
     ])

@@ -1,11 +1,12 @@
 import { type ChildProcess, spawn } from "node:child_process"
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import { Transform } from "node:stream"
 import { fileURLToPath } from "node:url"
 
 import { RpcHostRunner } from "../../runners/rpc-host"
 import { HostSessionClient } from "../../runners/rpc-host/session-client"
+import { shortSocketDir } from "../../runners/rpc-host/short-socket-dir.test-support"
 import { buildRpcSpawn } from "../../runners/rpc/spawn"
 import { RpcProcessRunner } from "../../runners/rpc-process"
 import { createRpcManagedRunner } from "../runner"
@@ -22,6 +23,8 @@ export type EngineInput = {
   readonly root: string
   readonly settingsPath: string
   readonly scripts: Readonly<Record<string, readonly Step[]>>
+  /** Capabilities the per-child engine's `get_protocol_info` answer drops: the real engine as an older one. */
+  readonly hiddenCapabilities?: readonly string[]
 }
 
 export type EngineRunner = {
@@ -40,14 +43,17 @@ export async function startEngineRunner(kind: EngineRunnerKind, input: EngineInp
   const home = join(input.root, "home")
   const agentDir = engineAgentDir(input.root, kind)
   mkdirSync(home, { recursive: true })
-  mkdirSync(agentDir, { recursive: true })
+  // #12131: the senpi host refuses a group/other-writable agent dir
+  // (`key_publication_failed: unsafe_key_record`), so pin the mode explicitly
+  // instead of inheriting the process umask (0002 hosts failed 5/13).
+  mkdirSync(agentDir, { recursive: true, mode: 0o700 })
   const providers = startHttpProviders(input.scripts)
   copyFileSync(input.settingsPath, join(agentDir, "settings.json"))
   writeFileSync(join(agentDir, "models.json"), providers.modelsJson)
   writeFileSync(join(agentDir, "auth.json"), JSON.stringify(Object.fromEntries(Object.keys(ENGINE_MODELS).map((provider) => [provider, { type: "api_key", key: "test-key" }]))), { mode: 0o600 })
   const env = { PATH: process.env["PATH"] ?? "", HOME: home, SENPI_CODING_AGENT_DIR: agentDir, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" }
   try {
-    const engine = kind === "process" ? processEngine(env) : await hostEngine(input.root, env)
+    const engine = kind === "process" ? processEngine(env, input.hiddenCapabilities ?? []) : await hostEngine(input.root, env)
     return {
       runner: engine.runner,
       calls: providers.calls,
@@ -64,7 +70,7 @@ export async function startEngineRunner(kind: EngineRunnerKind, input: EngineInp
 
 type Engine = Omit<EngineRunner, "calls">
 
-function processEngine(env: Readonly<Record<string, string>>): Engine {
+function processEngine(env: Readonly<Record<string, string>>, hiddenCapabilities: readonly string[]): Engine {
   const children: ChildProcess[] = []
   const runner = new RpcProcessRunner({
     modelAdmission: async () => {},
@@ -72,6 +78,9 @@ function processEngine(env: Readonly<Record<string, string>>): Engine {
     spawnChild: (descriptor) => {
       const child = spawn(descriptor.command, [...descriptor.args], { cwd: descriptor.cwd, env: descriptor.env, stdio: ["pipe", "pipe", "pipe"] })
       children.push(child)
+      if (hiddenCapabilities.length > 0 && child.stdout !== null) {
+        Object.defineProperty(child, "stdout", { value: child.stdout.pipe(withoutCapabilities(hiddenCapabilities)) })
+      }
       return child
     },
   })
@@ -85,11 +94,39 @@ function processEngine(env: Readonly<Record<string, string>>): Engine {
   }
 }
 
+/** Rewrites each `get_protocol_info` response line without `hidden`; every other line passes unchanged. */
+function withoutCapabilities(hidden: readonly string[]): Transform {
+  let pending = ""
+  const rewrite = (line: string): string => {
+    try {
+      const frame: unknown = JSON.parse(line)
+      if (typeof frame !== "object" || frame === null || Reflect.get(frame, "command") !== "get_protocol_info") return line
+      const data: unknown = Reflect.get(frame, "data")
+      if (typeof data !== "object" || data === null) return line
+      const capabilities: unknown = Reflect.get(data, "capabilities")
+      if (!Array.isArray(capabilities)) return line
+      return JSON.stringify({ ...frame, data: { ...data, capabilities: capabilities.filter((entry) => !hidden.includes(entry)) } })
+    } catch {
+      return line
+    }
+  }
+  return new Transform({
+    transform(chunk: Buffer, _encoding, done) {
+      pending += chunk.toString()
+      const lines = pending.split("\n")
+      pending = lines.pop() ?? ""
+      done(null, lines.map((line) => `${rewrite(line)}\n`).join(""))
+    },
+    flush(done) {
+      done(null, pending.length > 0 ? rewrite(pending) : "")
+    },
+  })
+}
+
 async function hostEngine(root: string, engineEnv: Readonly<Record<string, string>>): Promise<Engine> {
   // A socket host advertises `extension_events` (a capability omo requires of a task host) only for this client set.
   const env = { ...engineEnv, SENPI_RPC_CLIENT_CAPABILITIES: "extension_events" }
-  const socketDir = mkdtempSync(join(tmpdir(), "mch-"))
-  const socket = join(socketDir, "h.sock")
+  const { dir: socketDir, socket } = shortSocketDir("model-chain-host", "h.sock")
   const rpcEntry = fileURLToPath(import.meta.resolve("@code-yeongyu/senpi/rpc-entry"))
   const host = spawn(
     process.execPath,

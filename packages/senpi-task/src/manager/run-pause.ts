@@ -6,7 +6,7 @@ import { ResumeCapacity, type ResumeAllocation } from "./resume-capacity"
 import { PendingPauses } from "./pending-pauses"
 import type { AdmissionBarrier, ResumeCredential } from "../pause/admission-barrier"
 import { buildRevived } from "../steering/engine-policy"
-import type { TaskRecord } from "../state"
+import { transitionTaskRecord, type TaskRecord, type TaskTransitionResult } from "../state"
 import { savedRunOwner } from "./paused-restore"
 
 export type ResumeTaskRequest = RunPauseOwner & {
@@ -36,6 +36,7 @@ export type TaskPauseMethods = {
   holdTaskInput(taskId: string, input: HeldTaskInput): Promise<EngineHoldInputResult>
   observeTaskHold(taskId: string, parentSessionId: string): Promise<ObservedHold | undefined>
   resumeLostTask(taskId: string, request: LostResumeRequest): Promise<LostResumeResult>
+  endLostPausedTask(taskId: string, reason: string): boolean
 }
 
 export type HeldTaskInput = { readonly inputId: string; readonly revision: number; readonly text: string }
@@ -261,6 +262,33 @@ export function createTaskRunPause(ports: {
     return ack
   }
 
+  // A paused child the run's Resume could not reach, with no live handle left: its run ends as an
+  // error the parent is told about; its transcript stays readable through task_output (#12249).
+  // The status check, the caller's ownership check and the end are one locked read-modify-write,
+  // so a host that takes the record over in between is never ended from here.
+  function endLostPausedTask(taskId: string, reason: string, mayEnd: (fresh: TaskRecord) => boolean = () => true): boolean {
+    if (ports.liveHandle(taskId) !== undefined) return false
+    let ended: TaskTransitionResult | undefined
+    ports.store.mutate(taskId, (fresh) => {
+      if (fresh.status !== "paused" || !mayEnd(fresh)) return fresh
+      const { run_pause: _ended, ...unpaused } = fresh
+      const result = transitionTaskRecord(unpaused, {
+        type: "fail",
+        timestamp: new Date(ports.now()).toISOString(),
+        error_message: `The run's Resume could not restore this paused child (${reason}), so its run ended. Its transcript is kept for task_output.`,
+        failure_kind: "session_unavailable",
+      })
+      if (!result.applied) return fresh
+      ended = result
+      return result.record
+    })
+    if (ended === undefined) return false
+    ports.store.appendEvent(taskId, { type: ended.audit.type, payload: ended.audit })
+    forget(taskId)
+    ports.concurrency.releaseTask(taskId)
+    return true
+  }
+
   function forget(taskId: string): void {
     owners.delete(taskId)
     intents.clear(taskId)
@@ -271,5 +299,5 @@ export function createTaskRunPause(ports: {
     resumed.delete(taskId)
   }
 
-  return { pauseTask, resumePausedTask, holdTaskInput, observeTaskHold, resumeLostTask, joinIdlePause, park, forget, settlement: (taskId: string, epoch: number) => intents.settlement(taskId, epoch) }
+  return { pauseTask, resumePausedTask, holdTaskInput, observeTaskHold, resumeLostTask, endLostPausedTask, joinIdlePause, park, forget, settlement: (taskId: string, epoch: number) => intents.settlement(taskId, epoch) }
 }

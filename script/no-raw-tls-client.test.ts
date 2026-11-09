@@ -28,18 +28,18 @@ import {
 // destructuring; variable/const-folded module specifiers; Reflect.get(Bun, "connect").
 // This is a regression guard, not a complete data-flow or evasion detector.
 const ALLOWLIST: AllowlistEntry[] = [
+  {
+    file: "packages/omo-senpi/plugin/runtime/bunshin-ts/sdk.js",
+    call: "t.connect()",
+    count: 1,
+    reason: "no TLS and no remote host: `t` is the SDK's relay transport, whose connect() opens the local device service through node:net createConnection({ path: <stateDir>/<socket> }) or, on Windows, { host: \"127.0.0.1\", port } (vendor/bunshin-ts-relay/index.js:766); the bundle imports no node:tls/https/http2 and has no wss URL (#12258, senpi#3078).",
+  },
   ...["omo-codex", "omo-senpi"].flatMap((edition) => ["https", "tls"].map((module) => ({
     file: `packages/${edition}/plugin/skills/browser/runtime/omowright/index.js`,
     call: `__require("${module}")`,
     count: 1,
     reason: "bundled ws@8.21.3 acquisition: request options and tls.connect(options) derive host/servername from new URL(address).hostname; the connector call remains independently pinned (omowright#40, senpi#3078).",
   }))),
-  {
-    file: "packages/omo-native/compiled-ca-trust.ts",
-    call: 'import * as nodeTls from "node:tls"',
-    count: 1,
-    reason: "no connection and no host: the module reads getCACertificates and sets setDefaultCACertificates at engine startup (#10215); it never calls connect, createConnection, TLSSocket, createSecureContext or checkServerIdentity.",
-  },
   {
     file: "packages/omo-native/trust-acquisition.ts",
     call: 'import { getCACertificates} from "node:tls"',

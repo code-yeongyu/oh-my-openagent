@@ -6,7 +6,7 @@ import type { LocalEvent } from "../src/local-api/protocol.ts"
 import { defaultWorld } from "./local-api/conformance/world.ts"
 
 // A local API connection whose attach events the test emits itself, through the SDK's connect seam.
-function scriptedClient() {
+function scriptedClient(onCommand: (commandId: string) => void = () => {}) {
   const listeners = new Set<(event: LocalEvent) => void>()
   let close!: () => void
   const closed = new Promise<void>(resolve => {
@@ -24,7 +24,11 @@ function scriptedClient() {
       listeners.add(listener)
       return () => listeners.delete(listener)
     },
-    command: async () => "c",
+    command: async (_attach, _rpc, commandId) => {
+      queueMicrotask(() => onCommand(commandId ?? "c"))
+      return commandId ?? "c"
+    },
+    endpointCommand: async () => "c",
     list: async () => ({ query_id: "q", revision: 0, rows: [], incomplete: [], devices: {} }),
     read: async () => ({ entries: [], next_before: null }),
     oversizedLines: () => 0,
@@ -57,6 +61,45 @@ describe("attach events", () => {
     const seen: string[] = []
     attach.onEvent(event => seen.push(event.kind === "snapshot" ? `snapshot ${event.snapshot.attach_id}` : event.kind === "records" ? `records ${event.attach_id}` : event.kind))
     expect(seen).toEqual(["snapshot 2", "records 2"])
+  })
+
+  // A command whose engine ends its own session (close_session, unload_session {force}): the host ends the attachment
+  // (session.detached session_closed) while the command's reply and final state still arrive on the connection's
+  // delegated channel toward that device, in either order relative to the end.
+  const reply = (commandId: string): LocalEvent => ({ type: "event", kind: "session.command_event", device: "dev-peer-1", command_id: commandId, response: { type: "response", command: "unload_session", success: true, data: { outcome: "unloaded" } } })
+  const applied = (commandId: string): LocalEvent => ({ type: "event", kind: "session.command_state", command_id: commandId, state: "engine_applied", retryable: false })
+  const endedBy = (reason: "session_closed" | "peer_detached"): LocalEvent => ({ type: "event", kind: "session.detached", attach: "a1", reason })
+  const ended = endedBy("session_closed")
+  const within = <T>(promise: Promise<T>, what: string): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const bound = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`waited 5s for ${what}, it never settled`)), 5_000) })
+    return Promise.race([promise, bound]).finally(() => clearTimeout(timer))
+  }
+
+  test.each([
+    ["the end, then the reply and the applied state", "session_closed", (id: string) => [ended, reply(id), applied(id)]],
+    ["the reply, then the end, then the applied state", "session_closed", (id: string) => [reply(id), ended, applied(id)]],
+    // A client below its version entry is told peer_detached for the same end (docs/local-api.md, decision 0013).
+    ["the older-client end, then the reply and the applied state", "peer_detached", (id: string) => [endedBy("peer_detached"), reply(id), applied(id)]],
+  ] as const)("#given a command that ends its own session #when the host sends %s #then the command settles applied with the engine's reply", async (_label, reason, order) => {
+    let script!: ReturnType<typeof scriptedClient>
+    script = scriptedClient(commandId => { for (const event of order(commandId)) script.emit(event) })
+    const attach = await attachOver(script)
+    const result = await within(attach.command({ type: "unload_session", sessionId: "s1", force: true }), "the unload's outcome")
+    expect(result.outcome.state).toBe("engine_applied")
+    expect(result.response).toEqual({ type: "response", command: "unload_session", success: true, data: { outcome: "unloaded" } })
+    expect(await attach.detached).toBe(reason)
+  })
+
+  test("#given the attach ended with a command in flight #when the connection then closes #then the command rejects instead of waiting", async () => {
+    let script!: ReturnType<typeof scriptedClient>
+    script = scriptedClient(() => {
+      script.emit(ended)
+      script.client.close()
+    })
+    const attach = await attachOver(script)
+    const error = await within(attach.command({ type: "close_session", sessionId: "s1" }).then(() => undefined, (e: unknown) => e), "the command's rejection")
+    expect(String(error)).toContain("the attach ended before the command settled")
   })
 
   test("a listener that throws ends the attach with listener_failed and never reaches the connection", async () => {
