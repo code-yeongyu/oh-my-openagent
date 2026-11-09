@@ -1,4 +1,5 @@
 import { UsageError } from "./remote-exit"
+import { isPermissionPreset, PERMISSION_PRESETS } from "./remote-permission-preset"
 
 // The arguments of `omo remote open|send|model|interrupt|close`, parsed before the service is contacted.
 export const SESSION_VERBS = ["open", "send", "model", "interrupt", "close"] as const
@@ -9,7 +10,7 @@ export const isSessionVerb = (value: string): value is SessionVerb => SESSION_VE
 type Target = { readonly device: string; readonly session: string }
 
 export type SessionArgs =
-  | { readonly verb: "open"; readonly device: string; readonly project?: string; readonly model?: string }
+  | { readonly verb: "open"; readonly device: string; readonly project?: string; readonly model?: string; readonly permissionPreset?: string }
   | { readonly verb: "send"; readonly target: Target; readonly text: string; readonly delivery: "auto" | "steer" | "follow_up"; readonly wait: boolean }
   | { readonly verb: "model"; readonly target: Target; readonly model: string }
   | { readonly verb: "interrupt" | "close"; readonly target: Target }
@@ -22,7 +23,7 @@ function parseTarget(verb: string, value: string | undefined): Target {
 }
 
 const SESSION_FLAGS: Readonly<Record<SessionVerb, { readonly values: readonly string[]; readonly switches: readonly string[] }>> = {
-  open: { values: ["--project", "--model"], switches: [] },
+  open: { values: ["--project", "--model", "--permission-preset"], switches: [] },
   send: { values: [], switches: ["--steer", "--follow-up", "--no-wait"] },
   model: { values: [], switches: [] },
   interrupt: { values: [], switches: [] },
@@ -53,7 +54,11 @@ export function parseSession(verb: SessionVerb, rest: readonly string[]): { read
     if (device === undefined) throw new UsageError("omo remote open: the device is required (the DEVICE column of omo remote devices)")
     const project = values.get("--project")
     const model = values.get("--model")
-    return { json, session: { verb, device, ...(project === undefined ? {} : { project }), ...(model === undefined ? {} : { model }) } }
+    const permissionPreset = values.get("--permission-preset")
+    if (permissionPreset !== undefined && !isPermissionPreset(permissionPreset))
+      throw new UsageError(`omo remote open: --permission-preset is one of ${PERMISSION_PRESETS.join(", ")}`)
+    const named = permissionPreset === undefined ? {} : { permissionPreset }
+    return { json, session: { verb, device, ...(project === undefined ? {} : { project }), ...(model === undefined ? {} : { model }), ...named } }
   }
   const target = parseTarget(verb, positional[0])
   if (verb === "send") {
