@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { DOCTOR_PLUGIN_ARTIFACTS } from "../bin/lib/doctor.js"
 import { createHash } from "node:crypto"
 import { spawnSync } from "node:child_process"
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
@@ -143,10 +144,7 @@ function createLauncherFixture(fixture: Fixture): string {
   write(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
   write(join(senpiRoot, "dist", "cli.js"), "process.exit(0)\n")
   write(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
-  for (const artifact of [
-    "plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js",
-
-  ]) write(join(packageRoot, artifact), "fixture\n")
+  for (const [, artifact] of DOCTOR_PLUGIN_ARTIFACTS) write(join(packageRoot, artifact), "fixture\n")
   return join(packageRoot, "bin", "omo.js")
 }
 

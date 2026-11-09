@@ -5,13 +5,11 @@ import { delimiter, dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
+import { DOCTOR_PLUGIN_ARTIFACTS } from "../bin/lib/doctor.js"
+
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const roots: string[] = []
-const artifacts = [
-  ["plugin manifest", "plugin/package.json"],
-  ["extension", "plugin/extensions/omo.js"],
-  ["lsp-daemon runtime", "plugin/runtime/lsp-daemon/dist/cli.js"],
-] as const
+const artifacts = DOCTOR_PLUGIN_ARTIFACTS
 
 type Fixture = { root: string; packageRoot: string; launcher: string; agentDir: string }
 
@@ -86,12 +84,20 @@ afterEach(() => {
 })
 
 describe("omo doctor", () => {
+  test("#given a missing credential-gated x-search payload #when doctor runs #then diagnostics fail", () => {
+    const fixture = createFixture()
+    rmSync(join(fixture.packageRoot, "plugin/skills-conditional/x-search/SKILL.md"), { force: true })
+    const result = run(fixture)
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain("FAIL x-search skill: missing plugin/skills-conditional/x-search/SKILL.md")
+  })
+
   describe("#given a complete packaged installation", () => {
     describe("#when diagnostics run", () => {
       test("#then every required check passes", () => {
         const fixture = createFixture()
         const result = run(fixture)
-        expect(result.status).toBe(0)
+        expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
         for (const [label] of artifacts) expect(result.stdout).toContain(`PASS ${label}`)
         expect(result.stdout).toContain("PASS senpi CLI")
         expect(result.stdout).toContain("PASS senpi version 2026.8.9")
