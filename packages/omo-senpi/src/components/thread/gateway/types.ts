@@ -122,6 +122,8 @@ export type EnqueueRequest = {
   readonly sender_node: string
   readonly sender_turn: string | null
   readonly cause_delivery_id: string | null
+  /** The highest hop an input of the sender's run arrived with from another device (no row here); the chain continues from it (K8). */
+  readonly inbound_hop?: number
   readonly claimed_root_id: string | null
   readonly origin: EnvelopeOrigin
   readonly actor: string

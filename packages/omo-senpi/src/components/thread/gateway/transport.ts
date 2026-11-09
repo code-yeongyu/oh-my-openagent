@@ -23,6 +23,8 @@ export type OutboundDelivery = {
   readonly idempotency_key: string
   /** The call's parsed arguments, hashed by a transport that keeps its own receipt. */
   readonly args: unknown
+  /** The highest chain hop an input of the caller's run arrived with from another device; both transports continue it (K8). */
+  readonly inbound_hop?: number
 }
 
 /** A delivery to another device has no gateway row on this device, so it names the device it reached instead of a row sequence. */
