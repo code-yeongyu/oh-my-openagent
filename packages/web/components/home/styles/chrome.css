@@ -17,7 +17,8 @@
   max-width: 1080px;
   height: 56px;
   margin-inline: auto;
-  padding-inline: var(--space-4) var(--space-2);
+  /* Same inset at both ends, so the last control (Install, or the menu button) clears the rounded edge (#12892). */
+  padding-inline: var(--space-4);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--bg-raised) 96%, transparent);

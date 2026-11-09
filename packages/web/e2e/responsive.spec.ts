@@ -75,6 +75,32 @@ test.describe("Responsive QA matrix — landing", () => {
     }
   }
 
+  // #12892: the floating nav pill insets its last control (Install, or the menu button where Install hides)
+  // as far from the right edge as the brand mark sits from the left edge.
+  for (const viewport of VIEWPORTS) {
+    test(`${viewport.name} nav pill insets both ends equally`, async ({ page }) => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height })
+      await page.goto("/", { waitUntil: "domcontentloaded" })
+      const insets = await page.evaluate(() => {
+        const inner = document.querySelector(".nav__inner")
+        const brand = inner?.querySelector(".brand")
+        const controls = Array.from(inner?.querySelectorAll(".nav__end > *") ?? []).filter(
+          (el) => getComputedStyle(el).display !== "none",
+        )
+        const last = controls.at(-1)
+        if (!inner || !brand || !last) return null
+        const box = inner.getBoundingClientRect()
+        return {
+          left: brand.getBoundingClientRect().left - box.left,
+          right: box.right - last.getBoundingClientRect().right,
+          last: last.className,
+        }
+      })
+      expect(insets, "nav pill, brand or last control missing").not.toBeNull()
+      expect(Math.abs(insets!.right - insets!.left), JSON.stringify(insets)).toBeLessThanOrEqual(1)
+    })
+  }
+
   /*
    * The /docs page has a known pre-existing horizontal overflow caused by the
    * fixed-width sidebar interacting with code blocks at certain viewport sizes.
