@@ -62,7 +62,8 @@ export type ThreadHostViewRequest = {
 export type ThreadHost = {
   readonly socket: string
   readonly listSessions: () => Promise<readonly ThreadHostSession[]>
-  readonly openSession: (params: { readonly cwd?: string; readonly sessionPath?: string; readonly name?: string; readonly forkFrom?: string; readonly initialSkills?: readonly string[] }) => Promise<ThreadHostSession>
+  /** `permissionPreset` is the approval mode the new session starts in (its creator's, #12884); absent, the host's default applies. */
+  readonly openSession: (params: { readonly cwd?: string; readonly sessionPath?: string; readonly name?: string; readonly forkFrom?: string; readonly initialSkills?: readonly string[]; readonly permissionPreset?: string }) => Promise<ThreadHostSession>
   readonly getMessages: (sessionId: string) => Promise<readonly ThreadTranscriptEntry[]>
   readonly getState: (sessionId: string) => Promise<{ readonly isStreaming?: boolean; readonly activeTurnId?: string }>
   readonly prompt: (sessionId: string, message: string, options?: { readonly streamingBehavior?: "steer" | "followUp" }, durable_session_id?: string) => Promise<{ readonly turnId?: string }>
