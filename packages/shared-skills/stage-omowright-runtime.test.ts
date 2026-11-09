@@ -39,6 +39,7 @@ async function makeSourceFixture(layouts: readonly Layout[] = ["js"], root?: str
   if (root === undefined) tempDirs.push(sourceRoot)
   await mkdir(sourceRoot, { recursive: true })
   await writeFile(join(sourceRoot, "package.json"), JSON.stringify({ name: "omowright", version: "0.0.1-fixture", type: "module" }))
+  await writeFile(join(sourceRoot, "LICENSE"), "MIT License\n\nfixture notice\n")
   for (const layout of layouts) await writeLayout(sourceRoot, layout)
   return sourceRoot
 }
@@ -69,7 +70,9 @@ describe("omowright runtime staging", () => {
     expect(loaded.connectBrowserSkill()).toBe("fixture-session")
     expect(loaded.pageBundle).toContain("globalThis.__omowright")
     const manifest = JSON.parse(await readFile(join(targetDir, "manifest.json"), "utf8"))
-    expect(Object.keys(manifest.files).sort()).toEqual(["index.js", "page-bundle.js"])
+    expect(Object.keys(manifest.files).sort()).toEqual(["LICENSE", "index.js", "page-bundle.js"])
+    // License contract (omowright#290): omowright's MIT text ships byte-for-byte beside the bundle.
+    expect(await readFile(join(targetDir, "LICENSE"), "utf8")).toBe(await readFile(join(sourceRoot, "LICENSE"), "utf8"))
     expect(await checkOmowrightRuntimeFresh({ sourceRoot, targetDir })).toMatchObject({ ok: true, version: "0.0.1-fixture" })
   })
 
@@ -134,6 +137,15 @@ describe("omowright runtime staging", () => {
     await writeFile(join(targetDir, "page-bundle.js"), "tampered\n")
 
     await expect(checkOmowrightRuntimeFresh({ sourceRoot, targetDir })).rejects.toThrow(/page-bundle\.js sha256/)
+  })
+
+  test("#given an omowright source without LICENSE #when staged #then staging refuses instead of shipping the bundle without its notice", async () => {
+    const sourceRoot = await makeSourceFixture()
+    await rm(join(sourceRoot, "LICENSE"))
+    const targetParent = await mkdtemp(join(tmpdir(), "omowright-stage-target-"))
+    tempDirs.push(targetParent)
+
+    await expect(stageOmowrightRuntime({ sourceRoot, targetDir: join(targetParent, "omowright") })).rejects.toThrow(/no LICENSE/)
   })
 
   test("#given no staged runtime #when checked #then it reports the missing manifest", async () => {
