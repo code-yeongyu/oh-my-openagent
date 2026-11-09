@@ -40,6 +40,19 @@ const USAGE_LIMIT =
 // A `/model` command hint (senpi's own limit text says "Switch to another provider with /model") names no model.
 const MODEL_SCOPED_LIMIT = /(?<!\/)\bmodels?\b|\bpremium\b|\b(?:opus|sonnet|haiku|fable|mythos)\b/i
 
+// The route does not serve the configured model id (#11355): the OpenAI-compatible `model_not_found` code and OpenAI's
+// "The model `<id>` does not exist" prose, a gateway's "unknown provider for model", Anthropic's not_found_error whose
+// message names the model ("model: <id>"; any other not_found_error is not one), and Google's "models/<id> is not found".
+// The same shapes as senpi's matcher (senpi#4283). The answer is about that one model, like a usage limit scoped to it,
+// so the next entry of the record's own chain takes over (a same-provider sibling included); it wins over every other
+// class, a 401 in the same answer included.
+const MODEL_NOT_FOUND =
+  /\bmodel_not_found\b|\bunknown provider for model\b|\bthe model\s+[`'"]?[\w.:/-]+[`'"]?\s+does not exist\b|\bnot_found_error\b[^}]{0,120}?\bmodel:\s*[\w.:/-]|\bmodels\/[\w.:-]+ is not found\b/i
+
+export function isModelNotFound(message: string): boolean {
+  return MODEL_NOT_FOUND.test(message)
+}
+
 export type UsageLimitScope = "model" | "account"
 
 export function usageLimitScope(message: string): UsageLimitScope | undefined {
@@ -83,7 +96,7 @@ function modelIdOf(record: TaskRecord): string | undefined {
  */
 export function terminalFailureMessage(record: TaskRecord | null | undefined, failureMessage: string): string {
   const provider = record == null ? undefined : providerOf(record)
-  if (provider === undefined || record == null) return failureMessage
+  if (provider === undefined || record == null || isModelNotFound(failureMessage)) return failureMessage
   if (isCredentialFailure(failureMessage, modelIdOf(record))) {
     const missing = !CREDENTIAL_REJECTED.test(failureMessage) && isMissingCredential(failureMessage, modelIdOf(record))
     const cause = missing
@@ -111,6 +124,7 @@ export type RuntimeFallbackCandidates = {
  */
 export function runtimeFallbackCandidates(record: TaskRecord, failureMessage: string): RuntimeFallbackCandidates {
   const fallbacks = record.fallback_models ?? []
+  if (isModelNotFound(failureMessage)) return { remaining: fallbacks, skipped: [] }
   const provider = providerOf(record)
   if (provider !== undefined && isCredentialFailure(failureMessage, modelIdOf(record))) {
     return {
