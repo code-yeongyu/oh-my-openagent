@@ -62,6 +62,57 @@ describe("compiled omo doctor", () => {
     expect(lines).toContain("WARN task categories: 0 of 10 usable with your connected providers")
   })
 
+  test("#given a dropped default file #when doctor runs #then it names the drop as INFO and the exit code stays 0 (design r11)", async () => {
+    const root = runtimeRoot()
+    const drop = "INFO engine trust: default file /etc/ssl/cert.pem dropped: pem-noncanonical, block 0, narrowing=true"
+    let exitCode: number | undefined
+    const output = await captureLog(async () => {
+      await runCompiledLauncher(["doctor"], root, "2026.8.28", root, {
+        computerUseLines: async () => [],
+        coverageLines: async () => [],
+        trustLines: async () => [drop],
+      })
+      exitCode = Number(process.exitCode)
+    })
+    expect(output.split("\n")).toContain(drop)
+    expect(exitCode).toBe(0)
+  })
+
+  test("#given a memory home #when doctor runs #then it prints the memory-runtime section the npm doctor prints (binary/npm parity)", async () => {
+    const root = runtimeRoot()
+    const memoryHome = temp()
+    mkdirSync(join(memoryHome, "agents", "fixture-agent", "repo"), { recursive: true })
+    mkdirSync(join(memoryHome, "agents", "fixture-agent", "runtime"), { recursive: true })
+    writeFileSync(join(memoryHome, "agents", "fixture-agent", "runtime", "note.txt"), "x".repeat(2048))
+    const output = await captureLog(() => runCompiledLauncher(["doctor"], root, "2026.8.28", root, {
+      env: { ...process.env, OMO_MEMORY_HOME: memoryHome },
+      computerUseLines: async () => [],
+      coverageLines: async () => [],
+      trustLines: async () => [],
+    }))
+    const lines = output.split("\n")
+    expect(lines.filter((line) => line.startsWith("INFO memory runtime: fixture-agent "))).toHaveLength(1)
+    expect(lines.filter((line) => line.startsWith("INFO memory runtime total: "))).toHaveLength(1)
+  })
+
+  test("#given a memory-runtime report that throws #when doctor runs #then it prints one WARN line and the rest of the report, exit code 0", async () => {
+    const root = runtimeRoot()
+    let exitCode: number | undefined
+    const output = await captureLog(async () => {
+      await runCompiledLauncher(["doctor"], root, "2026.8.28", root, {
+        computerUseLines: async () => [],
+        coverageLines: async () => [],
+        trustLines: async () => [],
+        memoryRuntimeLines: async () => { throw new Error("EACCES: permission denied, scandir runtime/locked") },
+      })
+      exitCode = Number(process.exitCode)
+    })
+    const lines = output.split("\n")
+    expect(lines).toContain("WARN memory runtime: unavailable: EACCES: permission denied, scandir runtime/locked")
+    expect(lines).toContain("INFO Update: omo update")
+    expect(exitCode).toBe(0)
+  })
+
   test("#given a computer-use FAIL line #when doctor runs #then the exit code is 1", async () => {
     const root = runtimeRoot()
     let exitCode: number | undefined

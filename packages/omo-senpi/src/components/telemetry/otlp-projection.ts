@@ -2,6 +2,7 @@ import type { OtlpWireProjection, SpanAllowlist, WireAttributes } from "@oh-my-o
 import { isOtlpEvent, type OtlpEvent } from "./otlp-events"
 export { isOtlpEvent } from "./otlp-events"
 
+import { OMO_NATIVE_EVENT_SCHEMAS, type OmoNativePropertySchema } from "./event-schemas"
 import { pinnedModelId } from "./pinned-model-ids"
 
 // Derived from omo-telemetry origin/main 13c6e61b40c49141868e7430e02a7b4b949d0c5d:
@@ -351,6 +352,26 @@ const SUPPRESSION_CAUSES = [
   "child_session", "embedded_directive", "skill_expansion", "skill_name_only",
 ]
 
+// The collector refuses a whole record for one unlisted enum value (invalid_enum). A closed string property
+// therefore never leaves raw when its value is outside the client vocabulary: it becomes that vocabulary's own
+// catch-all (custom, then unknown, then other), or is left out when the vocabulary has none.
+const CLOSED_FALLBACKS = ["custom", "unknown", "other"] as const
+
+function closedValues(event: OtlpEvent, property: string): readonly string[] | undefined {
+  const schema: Readonly<Record<string, OmoNativePropertySchema>> | undefined = OMO_NATIVE_EVENT_SCHEMAS[event]
+  return schema?.[property]?.values
+}
+
+function isOutsideClosedVocabulary(event: OtlpEvent, property: string, value: string): boolean {
+  const values = closedValues(event, property)
+  return values !== undefined && !values.includes(value)
+}
+
+function closedFallback(event: OtlpEvent, property: string): string | undefined {
+  const values = closedValues(event, property)
+  return CLOSED_FALLBACKS.find((fallback) => values?.includes(fallback) === true)
+}
+
 export const projectOtlpEvent: OtlpWireProjection = (event, properties) => {
   if (!isOtlpEvent(event)) return {}
   const attributes: WireAttributes = {}
@@ -363,6 +384,9 @@ export const projectOtlpEvent: OtlpWireProjection = (event, properties) => {
       attributes[wire] = pinnedModelId(value)
     } else if (typeof value === "string" && RANKED_MODEL_WIRE_KEYS.has(wire)) {
       attributes[wire] = value === "none" ? value : pinnedModelId(value)
+    } else if (typeof value === "string" && isOutsideClosedVocabulary(event, property, value)) {
+      const fallback = closedFallback(event, property)
+      if (fallback !== undefined) attributes[wire] = fallback
     } else if (typeof value === "string" || typeof value === "boolean" || (typeof value === "number" && Number.isFinite(value))) {
       attributes[wire] = value
     }

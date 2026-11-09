@@ -59,11 +59,11 @@ def cffi_fetch(url, locale="ko-KR"):
 
 generic alias는 항상 최신 버전으로 해석된다. **2026년에 chrome99 같은 옛 버전은 WAF가 의심하므로 generic alias 사용 권장.**
 
-| Alias | 해석 (2026.04) | 용도 |
+| Alias | 해석 (v0.15.0) | 용도 |
 |-------|---------------|------|
-| `safari` | safari260 | **한국 사이트 최적** (쿠팡, 에펨코리아) |
+| `safari` | safari2601 | **한국 사이트 최적** (쿠팡, 에펨코리아) |
 | `chrome` | chrome146 | 범용 (Cloudflare, Akamai) |
-| `firefox` | firefox135 | chrome/safari 실패 시 대안 |
+| `firefox` | firefox147 | chrome/safari 실패 시 대안 |
 | `chrome_android` | chrome131_android | 모바일 API 엔드포인트 |
 | `safari_ios` | safari260_ios | iOS 모바일 |
 
@@ -71,14 +71,19 @@ generic alias는 항상 최신 버전으로 해석된다. **2026년에 chrome99 
 <summary>핀 버전 전체 (클릭)</summary>
 
 ```
+edge99, edge101,
 chrome99, chrome100, chrome101, chrome104, chrome107, chrome110,
 chrome116, chrome119, chrome120, chrome123, chrome124, chrome131,
 chrome133a, chrome136, chrome142, chrome145, chrome146,
-chrome131_android, edge99, edge101,
-safari15_3, safari15_5, safari17_0, safari17_2_ios,
-safari18_0, safari18_0_ios, safari260, safari260_ios,
-firefox133, firefox135
+chrome99_android, chrome131_android,
+safari153, safari155, safari170, safari172_ios,
+safari180, safari180_ios, safari184, safari184_ios,
+safari260, safari2601, safari260_ios,
+firefox133, firefox135, firefox144, firefox147,
+tor145
 ```
+
+구 표기(`safari15_3`, `safari15_5`, `safari17_0`, `safari17_2_ios`, `safari18_0`, `safari18_0_ios`, `safari18_4`, `safari18_4_ios`)는 deprecated alias로 아직 받는다.
 
 </details>
 
