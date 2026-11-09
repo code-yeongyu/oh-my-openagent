@@ -1197,6 +1197,7 @@
     "packages/omo-senpi/src/components/memory/transient-age.ts",
     "packages/omo-senpi/src/components/memory/transient-identity.ts",
     "packages/omo-senpi/src/components/memory/transient-stranded.ts",
+    "packages/omo-senpi/src/components/memory/transient-sweep-once.ts",
     "packages/omo-senpi/src/components/memory/transient-sweep.ts",
     "packages/omo-senpi/src/components/memory/trigger-wiring.ts",
     "packages/omo-senpi/src/components/memory/user-activity.ts",
