@@ -10,7 +10,7 @@ import { createLockRecord, LockContentionError, withLock } from "@oh-my-opencode
 const TEST_TIMEOUT_MS = 60_000
 
 test("#given a supervisor exits before TCP start #then the start wait reports its exit and artifacts", async () => {
-  const harness = await slotHarness(3_000)
+  const harness = await slotHarness(TEST_TIMEOUT_MS)
   try {
     const run = await harness.makeRun("exits-before-start")
     await writeRunJsonAtomic(join(run.runDir, "launch.json"), {

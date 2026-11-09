@@ -1,7 +1,10 @@
 import { toGatewayAddressEntries } from "../address-book"
 import type { GatewayEndpointPort, GatewayEndpointRef } from "../gateway/adapter"
 import { createGatewayEngine, resolveFromEntries, type GatewayEngine, type GatewayResolve } from "../gateway/engine"
+import { createLocalTransport } from "../gateway/local-transport"
+import { createDeliveryPipeline, type DeliveryPipeline } from "../gateway/pipeline"
 import { createGatewayRelay, type GatewayRelay } from "../gateway/relay"
+import { createRelayTransport } from "../remote/lazy-ops"
 import type { GatewayStore } from "../gateway/store"
 import type { Provenance } from "../gateway/types"
 import { resolveProvenance } from "../gateway/provenance-resolver"
@@ -20,6 +23,8 @@ export type GatewayServices = {
   readonly store: GatewayStore
   readonly endpoints: GatewayEndpointPort
   readonly engine: GatewayEngine
+  /** The one send path: the engine behind the local transport, the device service behind the relay transport. */
+  readonly pipeline: DeliveryPipeline
   readonly relay: GatewayRelay
   /** The calling session's workspace and project, as the engine stamps a delivery with them; a send to another device carries the same. */
   readonly senderProvenance: () => Promise<Provenance>
@@ -60,5 +65,15 @@ export function createGatewayServices(options: ThreadToolSurfaceOptions, view: (
     return entry === undefined || entry.liveness !== "routable" ? null : entry.endpoint
   }
   const relay = createGatewayRelay({ store, engine, endpoints, locate, now })
-  return { store, endpoints, engine, relay, senderProvenance, locate }
+  const pipeline = createDeliveryPipeline({
+    local: createLocalTransport(engine),
+    ...(options.remote === undefined ? {} : {
+      relay: createRelayTransport({
+        remote: options.remote, store, now, senderProvenance,
+        ...(options.callerCause === undefined ? {} : { callerCause: options.callerCause }),
+        ...(options.callerName === undefined ? {} : { callerName: options.callerName }),
+      }),
+    }),
+  })
+  return { store, endpoints, engine, pipeline, relay, senderProvenance, locate }
 }

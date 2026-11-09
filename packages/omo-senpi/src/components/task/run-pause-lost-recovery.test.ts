@@ -7,6 +7,7 @@ import type { EnginePauseState, ObservedHold } from "../../../../senpi-task/src/
 import { PauseRegistry, type PauseParticipant } from "../../../../senpi-task/src/pause/registry"
 import { RunPauseController, type RunPauseEffects } from "../../../../senpi-task/src/pause/run-controller"
 import { EngineRunPauseBridge, type LostParticipantRecovery } from "./run-pause-bridge"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -84,7 +85,7 @@ test("delta M1: a lost child with no live hold at Resume is left alone and admis
 
 function within<T>(promise: Promise<T>, what: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
-  const deadline = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error(`waited 5s for ${what}`)), 5000) })
+  const deadline = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error(`waited out the test budget for ${what}`)), remainingTestTime()) })
   return Promise.race([promise, deadline]).finally(() => clearTimeout(timer))
 }
 
