@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url"
 
 import { gatewayDatabasePath } from "./paths"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+import { remainingTestTime, useTestTimeout } from "../../../../../../test-support/test-deadline"
 
 let harness: GatewayHarness | undefined
 afterEach(async () => { await harness?.dispose(); harness = undefined })
@@ -12,6 +13,7 @@ const moduleUrl = new URL("./testing/store-extension.mjs", import.meta.url).href
 const descriptor = { name: "alpha", moduleUrl, migrations: [["CREATE TABLE alpha_items (id INTEGER PRIMARY KEY, value TEXT)"]] }
 
 test("#given two processes released together #when ensuring the same extension #then each migration applies exactly once", async () => {
+  useTestTimeout(30_000)
   const h = (harness = createGatewayHarness())
   await h.store().identity()
   const racers = [0, 1].map(() => {
@@ -28,7 +30,7 @@ test("#given two processes released together #when ensuring the same extension #
     const exited = new Promise<number | null>((resolve, reject) => { child.once("exit", resolve); child.once("error", reject) })
     return { child, ready, exited, output: () => output, stderr: () => stderr }
   })
-  const timeout = setTimeout(() => { for (const racer of racers) racer.child.kill("SIGKILL") }, 20_000)
+  const timeout = setTimeout(() => { console.error("the racing store-extension children did not exit within the test budget; killing them"); for (const racer of racers) racer.child.kill("SIGKILL") }, remainingTestTime())
   try {
     await Promise.all(racers.map((racer) => racer.ready))
     for (const racer of racers) racer.child.send("go")

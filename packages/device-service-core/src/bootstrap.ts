@@ -12,6 +12,8 @@ export type BootstrapStopState =
   | "keychain_locked"
   | "store_unavailable"
   | "service_degraded"
+  /** The pinned release is not on the release origin yet (#12656); nothing for the user to act on at start-up. */
+  | "not_published"
   | "account_unavailable"
   | "update_required"
 

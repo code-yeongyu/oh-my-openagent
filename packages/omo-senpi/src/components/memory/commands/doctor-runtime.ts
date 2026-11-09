@@ -15,12 +15,15 @@ import {
   checkLocks,
   checkRepository,
   checkReflectionHealth,
+  checkRuntimeSize,
   checkSoulSeed,
   checkTokens,
   checkWorktrees,
   type CheckLevel,
   type DoctorCheck,
+  type RuntimeSizeReport,
 } from "./doctor-checks"
+import { resolveRuntimeMaxBytes, resolveRuntimeRetentionPolicy } from "../memory-runtime-retention"
 import { checkQuarantinedRuns, checkReceipts, type QuarantinedRun, type ReceiptSummaries } from "./doctor-receipts"
 import { checkGhostReservation } from "./doctor-reservation"
 import { factsParkedCauseSummary } from "./facts-failure-cause"
@@ -104,6 +107,7 @@ export async function runDoctor(deps: MemoryCommandDeps, ctx: MemoryCommandConte
   let skills = { scanned: 0, repaired: 0 }
   let receipts: ReceiptSummaries | null = null
   let quarantinedRuns: readonly QuarantinedRun[] = []
+  let runtimeSize: RuntimeSizeReport | null = null
 
   if (repository.level === "ok") {
     const settings = deps.loadSettings().settings
@@ -114,6 +118,15 @@ export async function runDoctor(deps: MemoryCommandDeps, ctx: MemoryCommandConte
     const quarantine = await checkQuarantinedRuns(identity.identityPaths.reflection)
     receipts = receiptCheck.receipts
     quarantinedRuns = quarantine.runs
+    const runtime = await checkRuntimeSize(identity.identityPaths, {
+      maxBytes: resolveRuntimeMaxBytes(settings, identity.identity),
+      policy: resolveRuntimeRetentionPolicy(settings, identity.identity),
+      now: deps.now?.() ?? Date.now(),
+      reflectionEnabled: settings.agents[identity.identity]?.reflection?.enabled ?? settings.reflection.enabled,
+      discardUnreflectedJournals: resolveRuntimeRetentionPolicy(settings, identity.identity).discardUnreflectedJournals ?? false,
+      measureBudgetMs: resolveRuntimeRetentionPolicy(settings, identity.identity).passBudgetMs ?? 60_000,
+    })
+    runtimeSize = runtime.report
     checks.push(
       ...(await checkFrontmatter(repoDir, audit)),
       await checkSoulSeed(repoDir),
@@ -125,6 +138,7 @@ export async function runDoctor(deps: MemoryCommandDeps, ctx: MemoryCommandConte
       await checkGhostReservation(identity.identityPaths, deps),
       await checkReflectionHealth(identity.identityPaths.reflection, { now: deps.now?.() ?? Date.now() }),
       await checkTokens(repoDir, warnTokens, systemTokens),
+      runtime.check,
     )
     const projection = await checkProjection(repoDir, identity.identity, projectionLimits(settings, identity.identity))
     if (projection !== undefined) checks.push(projection)
@@ -157,7 +171,7 @@ export async function runDoctor(deps: MemoryCommandDeps, ctx: MemoryCommandConte
   const level = worstLevel(checks)
   const notifyLevel = level === "fail" ? "error" : level === "warn" ? "warning" : "info"
   if (parsed.flags.has("json")) {
-    return respond(ctx, JSON.stringify(redactReportStrings({ identity: identity.identity, level, checks, audit, skills, receipts, quarantinedRuns }), null, 2), notifyLevel)
+    return respond(ctx, JSON.stringify(redactReportStrings({ identity: identity.identity, level, checks, audit, skills, receipts, quarantinedRuns, runtimeSize }), null, 2), notifyLevel)
   }
   const lines = [
     `# Memory doctor: ${identity.identity}`,
