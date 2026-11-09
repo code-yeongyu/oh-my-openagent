@@ -80,7 +80,7 @@ User Request
     +--> task(category: "...")        -> the category worker (fresh session, category's model + skills)
     +--> task(subagent_type: "explore")    -> fast codebase grep
     +--> task(subagent_type: "librarian")  -> documentation and OSS code search
-    +--> task(category: "architect")       -> the architect consult lane (read-only design advice)
+    +--> task(category: "architect")       -> the architect lane (design + broad debugging, edits when needed)
     +--> [Kibitzer]                        -> resident memory recall sidecar, read-only, nudges only
 
 Planning path (same session, no agent switching):

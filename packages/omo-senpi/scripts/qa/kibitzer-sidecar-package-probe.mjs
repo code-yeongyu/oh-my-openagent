@@ -23,6 +23,7 @@ import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { dirname, isAbsolute, join, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
+import { sameVersion } from "../../../omo-native/bin/lib/same-version.js"
 
 export const DRIVER = "kibitzer-sidecar-package-probe"
 export const LAYER = "probe"
@@ -194,7 +195,7 @@ export function probePackage({ manifestPath, pluginRootOverride, senpiCliOverrid
   record("host.is-declared-bin", typeof binEntry === "string" && packageDir !== undefined && canonical(resolve(packageDir, binEntry)) === canonicalExecutable, `bin.senpi=${JSON.stringify(binEntry ?? null)}`, "host-not-declared-bin")
   const pinned = readPinnedSenpiVersion(pluginRoot)
   facts.pin = { manifestPath: pinned.manifestPath, pin: pinned.pin ?? null, field: pinned.field ?? null, exact: isExactVersion(pinned.pin) }
-  record("host.version-matches-pin", !isExactVersion(pinned.pin) || pinned.pin === hostPackage?.version, `pin=${pinned.pin ?? "none"} host=${hostPackage?.version ?? "none"}${isExactVersion(pinned.pin) ? "" : " (pin not exact; recorded, not judged)"}`, "senpi-version-drift")
+  record("host.version-matches-pin", !isExactVersion(pinned.pin) || sameVersion(pinned.pin, hostPackage?.version), `pin=${pinned.pin ?? "none"} host=${hostPackage?.version ?? "none"}${isExactVersion(pinned.pin) ? "" : " (pin not exact; recorded, not judged)"}`, "senpi-version-drift")
   return finish()
 
   function finish() {

@@ -1,9 +1,13 @@
-import { MemoryBlockCache } from "@oh-my-opencode/memory-core"
+import { homedir } from "node:os"
+
+import { InFlightReads, MemoryBlockCache } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { buildDreamTriggerWiring } from "./dream-runtime-wiring"
 import { resolveMemorySettings } from "./identity-runtime"
 import { createMemoryMaintenance } from "./memory-maintenance"
+import { resolveAgentReflectionSettings } from "./reflection-settings"
+import { encodeKibitzerSessionId } from "./kibitzer/observe-paths"
 import { createMemoryNudgeWiring } from "./nudge-wiring"
 import type { PalacePeopleOptions } from "./palace/people"
 import { registerMemoryFilesystemPolicy } from "./policy-guard"
@@ -28,11 +32,19 @@ import {
 } from "./wiring-reflection-live"
 import { createMemoryRuntimeWiring } from "./wiring-runtime"
 import { registerMemoryStatic } from "./wiring-static"
-import { recoverStaleReflectionHolder } from "./reflection-stale-active"
+import { reconcileThroughStaleLockReaper, recoverStaleReflectionHolder } from "./reflection-stale-active"
+import { runMemorySessionShutdown } from "./wiring-shutdown"
 import type { MemoryCommandSettings } from "./commands/types"
 import type { MemoryWiring, MemoryWiringOptions } from "./wiring-types"
 
 export type { MemorySessionStateLike, MemoryWiring, MemoryWiringOptions } from "./wiring-types"
+
+const PER_TURN_SETTLE_BUDGET_MS = 10_000
+
+function boundedTurnSignal(signal: AbortSignal | undefined): AbortSignal {
+  const budget = AbortSignal.timeout(PER_TURN_SETTLE_BUDGET_MS)
+  return signal === undefined ? budget : AbortSignal.any([signal, budget])
+}
 
 export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   // Persisted compiled blocks: a relaunch reads the block of a commit an earlier process compiled (the store ships
@@ -50,6 +62,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     }),
   })
   const promptPrebuild: { current?: (context: MemoryIdentityContext) => Promise<void> } = {}
+  const work = options.work ?? new InFlightReads()
   const lastEventCtx: { current?: unknown } = {}
   const activeSession: { current?: string } = {}
   const userActivity = createMemoryUserActivity(options.env)
@@ -67,7 +80,8 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     try {
       const recovery = await recoverStaleReflectionHolder({
         reflectionDir: identity.identityPaths.reflection,
-        reconcile: () => runtimeFor(identity).reconcile(signal),
+        // Per turn: no deadline waits (DESIGN.r3 c.15); the 10 s bound is only an outer guard.
+        reconcile: () => runtimeFor(identity).reconcile(boundedTurnSignal(signal), { waitPolicy: "none" }),
         // A holder that one reconciliation could not release is reported, not reconciled every turn.
         shouldReconcile: (runId) => {
           signal?.throwIfAborted()
@@ -151,6 +165,14 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   const kibitzerRef: { current?: KibitzerComposition } = {}
   const maintenance = (options.createMaintenance ?? createMemoryMaintenance)({
     isLiveSession: (sessionId) => options.sessions.has(sessionId),
+    memorySettings: () => resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory),
+    reflectionEnabled: (context) =>
+      resolveAgentReflectionSettings(options.loadConfig({ cwd: options.cwd() }).config.memory, context.identity).enabled,
+    ownedSidecars: () => new Set([...options.sessions.keys()].map(encodeKibitzerSessionId)),
+    // Driver 2 never runs under CI or in a task child; foreign identities use the global layer only.
+    hostSweep: () => process.env.CI !== undefined || process.env.OMO_SENPI_TASK_RPC_CHILD === "1"
+      ? undefined
+      : { settings: resolveMemorySettings(options.loadConfig({ cwd: homedir() }).config.memory) },
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
 
@@ -185,9 +207,10 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     },
   })
 
-  const dreamTriggerWiring = buildDreamTriggerWiring(options, runtimeWiring, activeSession, userActivity.has)
+  const dreamTriggerWiring = buildDreamTriggerWiring(options, runtimeWiring, activeSession, userActivity.has, work)
   const pressureDreamAdmission = createPressureDreamAdmission({
     request: (sessionId) => dreamTriggerWiring.requestPressureDream(sessionId),
+    work,
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
   shutdownDrain.registerEvaluator(dreamTriggerWiring.shutdownEvaluator())
@@ -256,6 +279,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         memoryUsageTrackersRef,
         hasUserActivity: userActivity.has,
         onReflectionLaunch: reflectionLive.onReflectionLaunched,
+        onJournalSettled: reflectionLive.syncJournal,
         onSettled: async (sessionId, eventCtx, observer) => {
           const identity = resolveContext(sessionId)
           if (identity !== undefined) {
@@ -264,7 +288,14 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
             observer?.phase("onSettled.reflection.reconcile")
             await userActivity.reconcileOnce(sessionId, async () => {
               try {
-                await runtimeFor(identity).reconcile(observer?.signal)
+                await reconcileThroughStaleLockReaper({
+                  runtimeDir: identity.identityPaths.runtime,
+                  reconcile: () => runtimeFor(identity).reconcile(observer?.signal),
+                  onLoadFailure: (error) => {
+                    if (options.logger !== undefined) logBindReconcileFailure(options.logger, error)
+                  },
+                  ...(options.reflectionHolderSeams === undefined ? {} : { probe: options.reflectionHolderSeams }),
+                })
                 observer?.signal.throwIfAborted()
               } catch (error) {
                 observer?.signal.throwIfAborted()
@@ -316,43 +347,13 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       await flushSkillsUsageTrackers()
     },
 
-    async onSessionShutdown(input: ShutdownDrainInput): Promise<void> {
-      // Background packing is never worth holding an exit for: stop it before the drain.
-      maintenance.dispose()
-      // The journal flush runs FIRST, before the pre-drain awaits can consume the fixed budget:
-      // the transcript bytes are already on disk (append writes immediately, flush is fsync), so
-      // one first-position flush captures everything and the drain must never re-run it.
-      const journalFlushed = await shutdownDrain.flushJournal(input)
-      // dispose() stops a running pass but does not wait for it, and the bind/settle status refreshes
-      // run git in the identity dir unawaited. Work still running there holds its files open past
-      // shutdown, which Windows reports as EBUSY/EFAULT on the next remove (#10154).
-      await shutdownDrain.raceDetached(input, "maintenance-settle", () => maintenance.settled())
-      await shutdownDrain.raceDetached(input, "status-settle", () => reflectionLive.settled())
-      // A recall ranking saves the repository's terms into its `.git` after the prompt; let that write finish.
-      await shutdownDrain.raceDetached(input, "recall-store-settle", () => corpusCache.settled())
-      await shutdownDrain.raceDetached(input, "memory-block-settle", () => promptCache.settled())
-      reflectionLive.shutdown(options.sessions.get(input.sessionId)?.context?.identity)
-      // senpi awaits this handler with no host cap, so neither cleanup may be awaited past the
-      // drain deadline: both are started and raced against it, and whichever loses keeps running
-      // detached (the Kibitzer wake lease and the sidecar directory lock are still released).
-      const kibitzer = kibitzerRef.current
-      if (kibitzer !== undefined) {
-        await shutdownDrain.raceDetached(input, "kibitzer-shutdown", () => kibitzer.onSessionShutdown(input.sessionId))
+    onSessionShutdown(input: ShutdownDrainInput): Promise<void> {
+      const resetSession = (sessionId: string): void => {
+        pressureDreamAdmission.reset(sessionId)
+        userActivity.reset(sessionId)
       }
-      const identity = resolveContext(input.sessionId)
-      if (identity !== undefined) {
-        const facts = factsWiringFor(identity)
-        if (facts.cancelActive !== undefined) {
-          await shutdownDrain.raceDetached(input, "facts-cancel", async () => { await facts.cancelActive?.() })
-        }
-      }
-      await shutdownDrain.run(input, { journalFlushed })
-      // A reflection launch runs its child under the identity dir too. It is awaited last, on what
-      // budget is left: a run that outlives it keeps going detached (by design), and it never
-      // displaces the drain's own steps (#10154).
-      await shutdownDrain.raceDetached(input, "reflection-launch-settle", () => runtimeWiring.settled())
-      pressureDreamAdmission.reset(input.sessionId)
-      userActivity.reset(input.sessionId)
+      const parts = { shutdownDrain, maintenance, reflectionLive, corpusCache, promptCache, kibitzerRef, resolveContext, factsWiringFor }
+      return runMemorySessionShutdown({ ...parts, sessions: options.sessions, launches: runtimeWiring, work, resetSession }, input)
     },
 
     registerShutdownEvaluator(evaluator: ShutdownEvaluator): void {

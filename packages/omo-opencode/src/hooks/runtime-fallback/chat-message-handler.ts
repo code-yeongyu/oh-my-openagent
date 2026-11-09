@@ -7,8 +7,37 @@ import { createFallbackState, isModelInCooldown, stringifyRuntimeModelWithVarian
 import { buildRetryModelPayload } from "./retry-model-payload"
 import { resolveRuntimeModelSettings } from "./runtime-model-settings"
 import { getSessionAgent } from "../../features/claude-code-session-state"
+import { hasInternalInitiatorMarker } from "../../shared/internal-initiator-marker"
+import { hasRuntimeFallbackRetryMarker, isRuntimeFallbackRetryTextParts } from "../../shared/runtime-fallback-retry-marker"
+import { hasCompactionPart } from "../../shared/compaction-marker"
 
 declare function clearTimeout(timeout: RuntimeFallbackTimeout): void
+
+function isAutomatedPromptPart(part: object): boolean {
+  const { synthetic, metadata } = part as { synthetic?: unknown; metadata?: unknown }
+  if (synthetic === true) return true
+  return typeof metadata === "object"
+    && metadata !== null
+    && (metadata as { compaction_continue?: unknown }).compaction_continue === true
+}
+
+function isHumanPromptParts(parts: unknown): boolean {
+  if (!Array.isArray(parts) || parts.length === 0 || hasCompactionPart(parts)) return false
+
+  let hasSubstantiveText = false
+  for (const part of parts) {
+    if (typeof part !== "object" || part === null || (part as { type?: unknown }).type !== "text") continue
+    const text = (part as { text?: unknown }).text
+    if (typeof text !== "string" || text.trim().length === 0) continue
+    if (hasInternalInitiatorMarker(text) || hasRuntimeFallbackRetryMarker(text)) return false
+    // Automated prompts can be marker-less (reissueCompactionContinue sends only metadata.compaction_continue),
+    // while human prompts can carry synthetic attachment parts: skip the part, not the whole message.
+    if (isAutomatedPromptPart(part)) continue
+    hasSubstantiveText = true
+  }
+
+  return hasSubstantiveText
+}
 
 export function createChatMessageHandler(deps: HookDeps) {
   const {
@@ -85,6 +114,29 @@ export function createChatMessageHandler(deps: HookDeps) {
       state.pendingFallbackPromptMayHaveBeenAccepted = false
       clearModelLessRetryKeys(sessionID)
       return
+    }
+
+    // Our own retry dispatches carry the runtime-fallback marker in their
+    // parts. If state was replaced mid-cycle (losing pendingFallbackModel),
+    // this dispatch would otherwise be misread as a manual model change and
+    // reset originalModel to the fallback model, enabling a backward hop to
+    // the just-failed primary (issue #6751). Never reset on marked dispatches.
+    if (isRuntimeFallbackRetryTextParts(output.parts)) {
+      if (requestedModel && requestedModel !== state.currentModel) {
+        log(`[${HOOK_NAME}] Ignoring model mismatch on marked fallback retry dispatch`, {
+          sessionID,
+          currentModel: state.currentModel,
+          requestedModel,
+        })
+      }
+      return
+    }
+
+    const cappedState = config.max_fallback_attempts > 0 && state.attemptCount >= config.max_fallback_attempts
+    if (cappedState && isHumanPromptParts(output.parts)) {
+      log(`[${HOOK_NAME}] capped-state-reset-on-human-prompt`, { sessionID })
+      state.attemptCount = 0
+      state.fallbackIndex = -1
     }
 
     if (requestedModel && requestedModel !== state.currentModel) {

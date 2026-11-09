@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { GitMemoryRepo, readReflectionParkFile } from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "./context"
-import type { SyncStatusReader } from "./sync-status-surface"
+import { shownSyncFailure, type SyncStatusReader } from "./sync-status-surface"
 import { readReflectionHealth } from "./worker/health"
 
 export const MEMORY_STATUS_KEY = "memory"
@@ -14,6 +14,8 @@ export const MEMORY_STATUS_MAX_WIDTH = 60
 /** A streak at or above this many consecutive failures earns the `!N` badge. */
 const STREAK_BADGE_THRESHOLD = 3
 export const SYNC_BLOCKED_SEGMENT = " sync blocked"
+/** Files too large to sync are held back while everything else syncs (#12284): also never trimmed. */
+export const SYNC_HELD_SEGMENT = " sync held"
 /** Shared health history bound so footer and RPC streaks are computed from the same window. */
 export const MEMORY_HEALTH_SCAN_LIMIT = 20
 const SECOND_MS = 1_000
@@ -42,6 +44,8 @@ export interface MemoryStatusSegments {
   readonly parked: boolean
   /** Memory sync for this repository is failing (#10637); never trimmed from the line. */
   readonly syncBlocked?: boolean
+  /** Files are held out of the push for being too large (#12284); never trimmed either. */
+  readonly syncHeld?: boolean
 }
 
 export interface MemoryStatusResult {
@@ -116,20 +120,20 @@ export async function readMemoryStatusSegments(
   sessionId: string | undefined,
   syncStatus?: SyncStatusReader,
 ): Promise<MemoryStatusSegments> {
-  const [dirty, backlogSteps, streak, parked, syncBlocked] = await Promise.all([
+  const [dirty, backlogSteps, streak, parked, sync] = await Promise.all([
     readDirty(repo),
     readBacklogSteps(context, sessionId),
     readStreak(context),
     readParked(context),
-    readSyncBlocked(context, syncStatus),
+    readSyncState(context, syncStatus),
   ])
-  return { dirty, backlogSteps, streak, parked, syncBlocked }
+  return { dirty, backlogSteps, streak, parked, ...sync }
 }
 
 /**
- * Assembles `mem:<identity> <age>[*][ (+N)][ !N][ paused][ sync blocked]`, dropping the optional
- * segments right-to-left to fit. ` sync blocked` is never dropped: it is the one segment that asks
- * the person to act.
+ * Assembles `mem:<identity> <age>[*][ (+N)][ !N][ paused][ sync blocked| sync held]`, dropping the optional
+ * segments right-to-left to fit. ` sync blocked` and ` sync held` are never dropped: they are the
+ * segments that ask the person to act.
  */
 export function formatMemoryStatusLine(
   identity: string,
@@ -137,7 +141,7 @@ export function formatMemoryStatusLine(
   segments: MemoryStatusSegments,
 ): string {
   const base = `mem:${identity} ${age}`
-  const sync = segments.syncBlocked === true ? SYNC_BLOCKED_SEGMENT : ""
+  const sync = segments.syncBlocked === true ? SYNC_BLOCKED_SEGMENT : segments.syncHeld === true ? SYNC_HELD_SEGMENT : ""
   const optional: string[] = [
     segments.dirty ? "*" : "",
     segments.backlogSteps >= 1 ? ` (+${segments.backlogSteps})` : "",
@@ -152,12 +156,18 @@ export function formatMemoryStatusLine(
   return base + sync
 }
 
-async function readSyncBlocked(context: MemoryIdentityContext, syncStatus: SyncStatusReader | undefined): Promise<boolean> {
-  if (syncStatus === undefined) return false
+async function readSyncState(context: MemoryIdentityContext, syncStatus: SyncStatusReader | undefined): Promise<{ syncBlocked: boolean; syncHeld: boolean }> {
+  const none = { syncBlocked: false, syncHeld: false }
+  if (syncStatus === undefined) return none
   try {
-    return (await syncStatus(context.identityPaths.repo))?.kind === "failing"
+    const status = await syncStatus(context.identityPaths.repo)
+    // A service freeze blocks every push (#12280), like a failing cycle; a held file alone only holds (#12284).
+    if (status?.kind === "frozen") return { syncBlocked: true, syncHeld: false }
+    const failure = shownSyncFailure(status)
+    if (failure === undefined) return none
+    return failure.kind === "oversized_item" ? { syncBlocked: false, syncHeld: true } : { syncBlocked: true, syncHeld: false }
   } catch {
-    return false
+    return none
   }
 }
 

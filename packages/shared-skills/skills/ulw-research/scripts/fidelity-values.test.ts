@@ -212,6 +212,32 @@ describe("verification claims are structural (data-claim-kind)", () => {
 	})
 })
 
+describe("foreignObject (omo #11570)", () => {
+	const chartFO = (inner: string) =>
+		`<figure data-chart-source="assets/share.csv"><svg viewBox="0 0 200 100"><foreignObject><div xmlns="http://www.w3.org/1999/xhtml">${inner}</div></foreignObject></svg><figcaption>Share by segment [S4].</figcaption></figure>`
+	const valueFact = (id: string, text: string, value: string) => `<data class="fact" data-fact="${id}" value="${value}">${text}</data>`
+
+	const CASES: [string, string, string[]][] = [
+		["fact element unit change", chartFO(`<p>Span ${fact("F1", "110.6 mm", "mm")} long [S4].</p>`), ["unit_mismatch", "chart_value_untraceable"]],
+		["fact element digit change", chartFO(`<p>Units ${fact("F2", "1,273")} sold [S4].</p>`), ["value_mismatch", "chart_value_untraceable"]],
+		["fact element digit plus value attribute", chartFO(`<p>Units ${valueFact("F2", "1,273", "1,273")} sold [S4].</p>`), ["value_mismatch", "chart_value_untraceable"]],
+		["bare numeral sentence", chartFO(`<p>Growth 1234567 m [S4].</p>`), ["chart_value_untraceable"]],
+		["numeral-free control", chartFO(`<p>Share by segment, no numbers here [S4].</p>`), []],
+		["clean fact at a plot value", chartFO(`<p>Share ${fact("F5", "12%", "%")} total [S4].</p>`), []],
+	]
+	for (const [name, body, want] of CASES) {
+		test(`#given ${name} inside foreignObject #when checked #then ${want.length ? want.join(" + ") : "clean"}`, () => {
+			expect(codes(run(body))).toEqual(want)
+		})
+	}
+
+	test("#given the same fact mutations in prose #when checked #then the same fact codes", () => {
+		expect(codes(run(`<p>Span ${fact("F1", "110.6 mm", "mm")} long [S4].</p>`))).toEqual(["unit_mismatch"])
+		expect(codes(run(`<p>Units ${valueFact("F2", "1,273", "1,273")} sold [S4].</p>`))).toEqual(["value_mismatch"])
+		expect(codes(run("<p>Growth 1234567 m [S4].</p>"))).toEqual(["untraceable_number"])
+	})
+})
+
 describe("charts", () => {
 	const SRC = 'data-chart-source="assets/share.csv"'
 

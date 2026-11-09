@@ -27,8 +27,10 @@ afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await c
 // leaked `expect(...).rejects` of the timed-out body held the file open for 20 minutes. Every wait is
 // therefore a named step under one deadline that ends before the test timeout, and no async matcher
 // is ever left pending: a stall fails one case with the step's name and leaves nothing running.
-const TEST_TIMEOUT_MS = 15_000
-const STEP_BUDGET_MS = 11_000
+// The test timeout is the canonical 20 s runner budget, stated here so the step deadline stays under
+// it even when the file runs without `--timeout 20000`.
+const TEST_TIMEOUT_MS = 20_000
+const STEP_BUDGET_MS = 16_000
 const REAP_BOUND_MS = 2_000
 
 class StepStalled extends Error {

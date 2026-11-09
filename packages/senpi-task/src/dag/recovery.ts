@@ -82,6 +82,9 @@ export type DagRecovery = {
   readonly installResumedRun: (runId: DagRunId, parentSessionId: string, pauseSeq: number, credential?: ResumeCredential) => Promise<InstalledDagRun | DagRecoveryOutcome>
   readonly pauseRunsForShutdown: (parentSessionId: string) => readonly DagRunId[]
   readonly resumePausedRuns: (parentSessionId: string, forkSourceSessionId?: string) => Promise<readonly DagRecoveryOutcome[]>
+  // Claims and installs like `resumePausedRuns` but resolves once every claimed run is installed;
+  // `adopt` owns each run's `settled` from then on.
+  readonly installPausedRuns: (parentSessionId: string, adopt: (installed: InstalledDagRun) => void, forkSourceSessionId?: string) => Promise<readonly DagRecoveryOutcome[]>
 }
 
 export type InstalledDagRun = {
@@ -140,6 +143,7 @@ export function createDagRecovery(options: DagRecoveryOptions): DagRecovery {
     },
     pauseRunsForShutdown: (parentSessionId) => pauseRunsForShutdown(context, parentSessionId),
     resumePausedRuns: (parentSessionId, forkSourceSessionId) => resumePausedRuns(context, parentSessionId, forkSourceSessionId),
+    installPausedRuns: (parentSessionId, adopt, forkSourceSessionId) => installPausedRuns(context, parentSessionId, adopt, forkSourceSessionId),
   }
 }
 
@@ -168,6 +172,32 @@ async function resumePausedRuns(
   parentSessionId: string,
   forkSourceSessionId?: string,
 ): Promise<readonly DagRecoveryOutcome[]> {
+  return visitPausedRuns(context, parentSessionId, forkSourceSessionId, async (claimed, foreign) => {
+    const outcome = await resumeClaimedRun(context, claimed)
+    return foreign && outcome.kind === "resumed" ? { ...outcome, kind: "adopted" } : outcome
+  })
+}
+
+// Session start must not wait for a recovered run to FINISH: each claimed run is handed to `adopt`
+// as soon as its scheduler is installed (`dag.run.resumed` journaled) and keeps running there.
+async function installPausedRuns(
+  context: RecoveryContext,
+  parentSessionId: string,
+  adopt: (installed: InstalledDagRun) => void,
+  forkSourceSessionId?: string,
+): Promise<readonly DagRecoveryOutcome[]> {
+  return visitPausedRuns(context, parentSessionId, forkSourceSessionId, async (claimed, foreign) => {
+    adopt(await installResumedRun(context, claimed))
+    return { runId: claimed.runId, kind: foreign ? "adopted" : "resumed" }
+  })
+}
+
+async function visitPausedRuns(
+  context: RecoveryContext,
+  parentSessionId: string,
+  forkSourceSessionId: string | undefined,
+  recover: (claimed: RecoverableRecord, foreign: boolean) => Promise<DagRecoveryOutcome>,
+): Promise<readonly DagRecoveryOutcome[]> {
   const outcomes: DagRecoveryOutcome[] = []
   const forkSource = normalizeSessionId(forkSourceSessionId)
   for (const observed of listRunRecords(context.store)) {
@@ -183,8 +213,7 @@ async function resumePausedRuns(
       }
       continue
     }
-    const outcome = await resumeClaimedRun(context, claim.record)
-    outcomes.push(foreign && outcome.kind === "resumed" ? { ...outcome, kind: "adopted" } : outcome)
+    outcomes.push(await recover(claim.record, foreign))
   }
   return outcomes
 }
@@ -538,7 +567,6 @@ function startSpec(record: DagRunRecordV1, nodeId: DagNodeId, sessionDepth: numb
     ...(persisted.task_summary === undefined ? {} : { task_summary: persisted.task_summary }),
     parent_session_id: record.parentSessionId,
     root_session_id: record.rootSessionId,
-    ...(record.parentModel === undefined ? {} : { parent_model: record.parentModel }),
     depth: sessionDepth + 1,
     ...(node.route.kind === "category"
       ? { category: node.route.category }

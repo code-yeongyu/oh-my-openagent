@@ -158,3 +158,51 @@ test("#given session_summary top-model ranks #when they are projected #then unpi
   expect(projected["omo.m2_model"]).toBe("claude-opus-5-5")
   expect(projected["omo.m3_model"]).toBe("none")
 })
+
+// Every string the projection emits is masked, pinned to its closed vocabulary, or listed here as open on purpose
+// (hashes, dates, versions, fingerprints). A new raw field must not silently reopen invalid_enum on the collector.
+const OPEN_STRING_PROPERTIES = new Set([
+  "$session_id", "day_utc", "summary_epoch", "combo_fingerprint",
+  "crashed_bun_version", "crashed_engine_version", "crashed_omo_version",
+])
+
+test("OTLP never emits an unlisted value for a closed string property, and only the listed properties pass raw", () => {
+  const unlisted = "zz-unlisted-raw"
+  const leaked: string[] = []
+  for (const [event, schema] of Object.entries(OMO_NATIVE_EVENT_SCHEMAS)) {
+    if (!isOtlpEvent(event)) continue
+    const properties: Readonly<Record<string, OmoNativePropertySchema>> = schema
+    for (const [property, spec] of Object.entries(properties)) {
+      if (spec.type !== "string") continue
+      const attributes = projectOtlpEvent(event, { ...clientBag(properties), [property]: unlisted })
+      const raw = Object.values(attributes).includes(unlisted)
+      if (raw && !OPEN_STRING_PROPERTIES.has(property)) leaked.push(`${event}.${property}`)
+      if (spec.values !== undefined) {
+        for (const value of Object.values(attributes)) {
+          if (typeof value === "string" && value === unlisted) leaked.push(`${event}.${property} (closed)`)
+        }
+      }
+    }
+  }
+  expect(leaked).toEqual([])
+})
+
+test("OTLP maps an unlisted closed value to that vocabulary's own catch-all", () => {
+  expect(projectOtlpEvent("session_started", { ...clientBag(OMO_NATIVE_EVENT_SCHEMAS.session_started), session_role: "main" })["omo.session.role"]).toBe("unknown")
+  expect(projectOtlpEvent("delegation_started", { ...clientBag(OMO_NATIVE_EVENT_SCHEMAS.delegation_started), name: "my-custom-agent" })["omo.name"]).toBe("custom")
+})
+
+test("session_summary re-masks a provider recovered from an older window", () => {
+  const window = openWindow(0, 1)
+  addTurn(window, {
+    turnIndex: 1, provider: "retired-provider", modelId: "gemini-3.1-pro",
+    inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0,
+    reasoningTokens: 0, totalTokens: 2, cost1e4: 1, usageValid: true,
+    stopReason: "stop", toolResultCount: 0, toolErrorCount: 0,
+  }, 1)
+  const properties = summaryProperties("a".repeat(64), window, {
+    endedBy: "shutdown", epoch: "a".repeat(16), seq: 1, sampleRate: 1,
+    sampled: true, sessionRole: "root", droppedEvents: 0,
+  })
+  expect(properties["m1_provider"]).toBe("custom")
+})

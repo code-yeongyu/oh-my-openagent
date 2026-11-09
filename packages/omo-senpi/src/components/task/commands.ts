@@ -4,8 +4,8 @@ import type { CancelOutcome, ListScope, ListedTask, TaskRecord, TaskStatus } fro
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { formatTaskRow } from "./status-ui"
 
-// Cancellable = anything still holding a live/resident child worth stopping.
-const CANCELLABLE_STATUSES: ReadonlySet<TaskStatus> = new Set(["running", "pending", "interrupted"])
+// Cancellable = anything still holding a live/resident child worth stopping, a run-paused one included (#12249).
+const CANCELLABLE_STATUSES: ReadonlySet<TaskStatus> = new Set(["running", "pending", "interrupted", "paused"])
 
 // The manager read/act seam the commands need: a scoped list plus cancellation.
 export interface CommandManager {
