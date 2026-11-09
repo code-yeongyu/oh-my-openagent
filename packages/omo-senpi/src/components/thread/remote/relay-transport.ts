@@ -125,44 +125,56 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
     if (offline !== undefined) return offline
     const expected = delivery.expected_turn_id === undefined ? null : Number(delivery.expected_turn_id)
     let lane: EffectiveLane = "follow_up"
-    let state: EngineState | undefined
-    if (delivery.mode === "steer") {
+    let steerTurn: number | null = null
+    // One get_state decides the lane the way the local drain does (gateway/decision.ts): a steer must name the running
+    // turn, and the default (auto) steers whatever turn is running and starts one when the target is idle.
+    if (delivery.mode === "steer" || delivery.mode === "auto") {
       const probed = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
       if (probed.kind !== "ok") return outcomeFailure(probed, row.device)
-      state = engineStateOf(replyData(probed.response))
-      const decision = decideDelivery(state.phase, "steer", expected, state.turnEpoch)
+      const state: EngineState = engineStateOf(replyData(probed.response))
+      const decision = decideDelivery(state.phase, delivery.mode, expected, state.turnEpoch)
       if (decision.kind !== "admit") {
         const reason = decision.kind === "refuse" ? decision.reason : "turn_conflict"
         const mapped = REFUSAL_CODES[reason] ?? { code: "internal_error" as const, next: "Call thread_list and check the target." }
         return fail(mapped.code, `A steer to ${row.session_id} on device ${row.device} was refused: ${reason}.`, mapped.next, { device: row.device, ...(state.turnEpoch === null ? {} : { current_turn_id: String(state.turnEpoch) }) })
       }
-      lane = "steer"
+      if (decision.deliverAs === "steer") {
+        lane = "steer"
+        steerTurn = decision.expected_turn_id ?? expected
+      }
     }
     const facts = senderFacts(delivery.sender, await options.senderProvenance())
     const { delivery_id, root_id, hop } = await chain(delivery.caller_id)
-    const text = renderDeliveryText({
-      delivery_id,
-      envelope: { provenance: facts.provenance, origin: facts.origin(delivery_id), actor: facts.actor, via: [facts.node], root_id, hop, delivery_id },
-      body: delivery.text,
-      mode_requested: delivery.mode,
-      mode_effective: lane,
-      binding_id: null,
-      binding_revision: null,
-    })
     const name = delivery.sender.kind === "session" ? delivery.sender.name?.trim() : undefined
-    const record = remote.chain.stamp({
+    const recordFor = (effective: EffectiveLane) => remote.chain.stamp({
       type: ADMIT_RECORD,
       sessionId: row.session_id,
       deliveryId: delivery_id,
-      text,
+      text: renderDeliveryText({
+        delivery_id,
+        envelope: { provenance: facts.provenance, origin: facts.origin(delivery_id), actor: facts.actor, via: [facts.node], root_id, hop, delivery_id },
+        body: delivery.text,
+        mode_requested: delivery.mode,
+        mode_effective: effective,
+        binding_id: null,
+        binding_revision: null,
+      }),
       displayText: `${deliveryProvenanceLine(facts.provenance)}\n${delivery.text}`,
       sender: { kind: "agent", session_id: delivery.caller_id, ...(name === undefined || name === "" ? {} : { name }) },
-      deliverAs: lane === "steer" ? "steer" : "followUp",
-      ...(lane === "steer" && expected !== null ? { expectedTurnId: String(expected) } : {}),
+      deliverAs: effective === "steer" ? "steer" : "followUp",
+      ...(effective === "steer" && steerTurn !== null ? { expectedTurnId: String(steerTurn) } : {}),
       chainCount: hop,
     }, hop)
+    let record = recordFor(lane)
     const ok = (kind: GatewayDeliveryDelivery, deduplicated = false): RelayDeliverySuccess => ({ kind: "ok", thread_id: row.session_id, delivery: kind, deduplicated, device: row.device, delivery_id, effective_mode: lane })
-    const sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
+    let sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
+    if (delivery.mode === "auto" && lane === "steer" && sent.kind === "ok" && replyData(sent.response)["kind"] === "turn_conflict") {
+      // The turn the probe saw ended before the record arrived. The default never fails on that race: it takes the lane the
+      // target has now (started when idle, queued behind a turn that began since), as a local drain re-decides at admission.
+      lane = "follow_up"
+      record = recordFor(lane)
+      sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
+    }
     if (sent.kind === "refused" && (ADMIT_UNSUPPORTED.has(sent.reason) || sent.reason.startsWith("Unknown command"))) return fail("unsupported", `Device ${row.device} runs an engine without admit_external_message (${sent.reason}); a peer message cannot be delivered there as a delivery.`, "Update omo and senpi on that device, then retry.", { device: row.device, reason: sent.reason })
     if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
     const reply = replyData(sent.response)

@@ -231,7 +231,7 @@ export const ThreadBindParams = Type.Object({
   ),
   inbound_mode: Type.Optional(
     Type.Union([Type.Literal("auto"), Type.Literal("follow_up")], {
-      description: "How inbound messages are delivered: auto starts a turn when the session is idle and queues behind a running one; follow_up always queues behind the running turn.",
+      description: "How inbound messages are delivered: auto steers the running turn and starts a turn when the session is idle; follow_up always queues behind the running turn.",
     }),
   ),
   outbound_events: Type.Optional(
