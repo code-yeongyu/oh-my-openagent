@@ -79,6 +79,9 @@ export async function stageOmowrightRuntime(options = {}) {
   const bunExecutable = options.bunExecutable ?? process.env.BUN ?? "bun"
   const version = await readSourceVersion(sourceRoot)
   const layout = resolveLayout(sourceRoot)
+  if (!existsSync(join(sourceRoot, "LICENSE"))) {
+    throw new Error(`omowright has no LICENSE to ship beside the bundle: ${join(sourceRoot, "LICENSE")}`)
+  }
   const digest = await sourceDigest(sourceRoot, layout)
 
   await mkdir(dirname(targetDir), { recursive: true })
@@ -91,12 +94,7 @@ export async function stageOmowrightRuntime(options = {}) {
     await mkdir(tempDir, { recursive: true })
     bundle({ sourceRoot, layout, outFile: join(tempDir, "index.js"), bunExecutable })
     await copyFile(join(sourceRoot, layout.pageBundle), join(tempDir, "page-bundle.js"))
-    try {
-      await copyFile(join(sourceRoot, "LICENSE"), join(tempDir, "LICENSE"))
-    } catch (error) {
-      if (error.code === "ENOENT") throw new Error(`omowright has no LICENSE to ship beside the bundle: ${join(sourceRoot, "LICENSE")}`)
-      throw error
-    }
+    await copyFile(join(sourceRoot, "LICENSE"), join(tempDir, "LICENSE"))
     const files = {}
     for (const name of STAGED_FILES) files[name] = await sha256(join(tempDir, name))
     await writeFile(
