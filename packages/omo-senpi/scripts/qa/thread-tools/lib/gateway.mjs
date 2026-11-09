@@ -34,6 +34,7 @@ import { fileURLToPath } from "node:url"
 
 import { withTelemetryOptOut } from "../../telemetry-opt-out-env.mjs"
 import { requireEngineVersion } from "./engine-version.mjs"
+import { calledToolName, planModelToolCall } from "./eval-call.mjs"
 import { QA_TMP_ROOT } from "./qa-tmp.mjs"
 import { sameVersion } from "../../../../../omo-native/bin/lib/same-version.js"
 
@@ -523,7 +524,10 @@ export async function startFakeModel() {
       let turn
       if (last?.role === "tool") {
         const call = [...messages].reverse().find((message) => message.role === "assistant" && Array.isArray(message.tool_calls))
-        const nameOf = (message) => call?.tool_calls?.find((toolCall) => toolCall.id === message.tool_call_id)?.function?.name ?? "unknown"
+        const nameOf = (message) => {
+          const fn = call?.tool_calls?.find((toolCall) => toolCall.id === message.tool_call_id)?.function
+          return fn === undefined ? "unknown" : calledToolName(fn.name, fn.arguments)
+        }
         // Parallel tool calls come back as one request carrying every result after the assistant message.
         const trailing = messages.slice(messages.lastIndexOf(call) + 1).filter((message) => message.role === "tool")
         const name = nameOf(last)
@@ -534,7 +538,9 @@ export async function startFakeModel() {
         const delivery = parseDeliveryText(raw.trim())
         const text = delivery?.body ?? raw
         const scripted = [...text.matchAll(/QA:SCRIPT ([A-Za-z0-9_-]+)/g)].flatMap((match) => scripts.get(match[1]) ?? [])
-        const calls = [...scripted, ...[...text.matchAll(/QA:CALL ([A-Za-z0-9_]+) ([A-Za-z0-9_-]+)/g)].map((match) => ({ name: match[1], args: JSON.parse(Buffer.from(match[2], "base64url").toString("utf8")) }))]
+        const requested = [...scripted, ...[...text.matchAll(/QA:CALL ([A-Za-z0-9_]+) ([A-Za-z0-9_-]+)/g)].map((match) => ({ name: match[1], args: JSON.parse(Buffer.from(match[2], "base64url").toString("utf8")) }))]
+        // An eval-only tool (the thread family, #12903) is absent from `body.tools` while `eval` is present: reach it through an eval cell.
+        const calls = requested.map((requestedCall) => planModelToolCall(requestedCall, record.tools))
         const hold = /QA:HOLD ([A-Za-z0-9_-]+)/.exec(text)?.[1]
         const tokens = [...new Set(text.match(/QA-TOKEN-[A-Za-z0-9_-]+/g) ?? [])]
         if (calls.length > 0) {

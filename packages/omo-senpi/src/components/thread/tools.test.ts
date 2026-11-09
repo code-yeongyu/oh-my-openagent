@@ -82,7 +82,7 @@ describe("thread tool registration", () => {
     expect(f.setModel.mock.calls[0]).toEqual(["route-peer", "openai", "gpt-x", "dur-peer"])
   })
 
-  test("registers exactly the eighteen contract tools with search metadata", () => {
+  test("registers exactly the eighteen contract tools with eval-only exposure", () => {
     const tools: Record<string, unknown>[] = []
     const f = fixture()
     registerThreadTools({ registerTool: (tool) => tools.push(tool) }, { ...f, callerSessionId: () => "caller", callerWorkspaceRoot: () => process.cwd() })
@@ -90,7 +90,8 @@ describe("thread tool registration", () => {
       "thread_create", "thread_list", "thread_read", "thread_send", "thread_interrupt", "thread_close", "thread_handoff", "thread_rename", "thread_set_model", "thread_set_reasoning",
       "thread_bind", "thread_unbind", "thread_rebind", "thread_bindings", "thread_report", "thread_outbox", "thread_outbox_ack", "thread_answer",
     ])
-    expect(tools.every((tool) => tool.exposure === "search" && tool.searchGroup === "threads")).toBe(true)
+    expect(tools.every((tool) => tool.exposure === "eval" && tool.runs === "brain")).toBe(true)
+    expect(tools.some((tool) => "searchKeywords" in tool || "searchText" in tool || "searchGroup" in tool || "allowLazyActivation" in tool)).toBe(false)
   })
 
   test("#given live threads in two workspaces #when thread_list runs in the default scope #then only the caller's workspace is listed and all_scope widens it", async () => {

@@ -3,7 +3,7 @@ import { assembleAddressBook, findDiskSessions, toThreadAddressEntries, type Add
 import { resolveTarget, workspaceDirectories, type ThreadAddressEntry } from "../addressing"
 import type { ThreadToolName, ThreadToolResult, ThreadTranscriptItem } from "../contracts"
 import { threadToolFailure, type ThreadErrorCode } from "../errors"
-import { THREAD_TOOL_SEARCH_METADATA } from "../metadata"
+import { THREAD_TOOL_METADATA, type ThreadToolEntry } from "../metadata"
 import { readSessionFacts, threadTitle } from "../session-facts"
 import { threadLink } from "../thread-link"
 import { UNKNOWN_CALLER, type ThreadHostSession, type ThreadHostView, type ThreadHostViewRequest, type ThreadSessionPort, type ThreadToolSurfaceOptions } from "./ports"
@@ -34,25 +34,12 @@ export type ThreadToolSummary = Omit<ThreadHostSession, "name" | "status" | "cre
   readonly link: string
 }
 
-export type ThreadToolMetadata = {
-  readonly name: string
-  readonly label: string
-  readonly description: string
-  readonly exposure: "search"
-  readonly searchText: string
-  readonly searchKeywords: readonly string[]
-  readonly searchGroup: string
-  readonly allowLazyActivation: true
-}
+export type ThreadToolMetadata = ThreadToolEntry
 
 export function metadata(name: ThreadToolName): ThreadToolMetadata {
-  const entry = THREAD_TOOL_SEARCH_METADATA.find((candidate) => candidate.name === name)
+  const entry = THREAD_TOOL_METADATA.find((candidate) => candidate.name === name)
   if (entry === undefined) throw new Error(`missing thread metadata for ${name}`)
-  return {
-    name: entry.name, label: entry.label, description: entry.description,
-    exposure: entry.exposure, searchText: entry.searchText, searchKeywords: entry.searchKeywords,
-    searchGroup: entry.group, allowLazyActivation: entry.allowLazyActivation,
-  }
+  return { name: entry.name, label: entry.label, description: entry.description, exposure: entry.exposure }
 }
 
 /**

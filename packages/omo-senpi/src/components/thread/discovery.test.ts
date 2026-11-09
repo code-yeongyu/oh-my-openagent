@@ -1,13 +1,15 @@
 import { describe, expect, test } from "bun:test"
 
 // The public @code-yeongyu/senpi export map exposes neither ToolSearchService
-// nor the search engine, so this test drives the installed package's compiled
-// dist file directly. Everything under test is shipped code: catalog
-// eligibility, extension-document derivation, and the BM25 index are all real.
+// nor normalizeToolExposure, so this test drives the installed package's
+// compiled dist files directly. Everything under test is shipped code: the
+// exposure normalization senpi's eval-only policy reads, catalog eligibility
+// and the hidden-tool hint path of tool_search.
 import { ToolSearchService } from "../../../node_modules/@code-yeongyu/senpi/dist/core/extensions/builtin/tool-search/service.js"
+import { normalizeToolExposure } from "../../../node_modules/@code-yeongyu/senpi/dist/core/extensions/types.js"
 import type { ToolInfo } from "../../../node_modules/@code-yeongyu/senpi/dist/core/extensions/types.js"
 
-import { THREAD_FAMILY_PROMPT_GUIDELINES, type ThreadToolSearchEntry, THREAD_TOOL_SEARCH_METADATA } from "./metadata"
+import { THREAD_FAMILY_PROMPT_GUIDELINES, THREAD_TOOL_EXPOSURE, THREAD_TOOL_METADATA, type ThreadToolEntry } from "./metadata"
 
 const THREAD_TOOL_NAMES = [
 	"thread_create",
@@ -40,35 +42,18 @@ function makeSourceInfo(path: string) {
 	return { path, source: "test", scope: "project" as const, origin: "top-level" as const }
 }
 
-function entryToolInfos(entries: readonly ThreadToolSearchEntry[]): ToolInfo[] {
+function entryToolInfos(entries: readonly ThreadToolEntry[]): ToolInfo[] {
 	return entries.map((entry) => ({
 		name: entry.name,
 		label: entry.label,
 		description: entry.description,
 		parameters: sampleParameters,
 		sourceInfo: makeSourceInfo("/virtual/components/thread/metadata.ts"),
-		exposure: entry.exposure,
-		searchText: entry.searchText,
-		searchKeywords: entry.searchKeywords,
-		searchGroup: entry.group,
-		allowLazyActivation: entry.allowLazyActivation,
+		...normalizeToolExposure(entry),
 	}))
 }
 
-function bareToolInfos(names: readonly string[]): ToolInfo[] {
-	return names.map((name) => ({
-		name,
-		label: name,
-		description: "",
-		parameters: sampleParameters,
-		sourceInfo: makeSourceInfo("/virtual/components/thread/metadata.ts"),
-		exposure: "search",
-		searchKeywords: [],
-		allowLazyActivation: true,
-	}))
-}
-
-/** Minimal competitor named `task`: name, label, one sentence, nothing else. */
+/** A search-exposed competitor named `task`, the way senpi-task registers its rare tools. */
 function taskCompetitorInfo(): ToolInfo {
 	return {
 		name: "task",
@@ -96,98 +81,53 @@ function createServiceWithTools(tools: readonly ToolInfo[]): ToolSearchService {
 	})
 }
 
-describe("thread tool discovery through the real tool-search service", () => {
-	test("bare names leave thread_send unranked for a message query", () => {
-		// given the six tools registered with bare names and no search text
-		const service = createServiceWithTools(bareToolInfos(THREAD_TOOL_NAMES))
-		// when the user phrasing for messaging a live session is searched
-		const results = service.search("message another session that is already running")
-		// then no bare document matches it, so ranking must come from the metadata
-		expect(results.find((result) => result.name === "thread_send")).toBeUndefined()
-	})
-
-	test("each intent phrase ranks its intended tool first", () => {
-		// given the six tools carrying their full search metadata
-		const service = createServiceWithTools(entryToolInfos(THREAD_TOOL_SEARCH_METADATA))
-		const cases: ReadonlyArray<readonly [query: string, expected: string]> = [
-			["create a new parallel session", "thread_create"],
-			["list my saved sessions", "thread_list"],
-			["read what another session output", "thread_read"],
-			["message another session that is already running", "thread_send"],
-			["stop the turn running in another session", "thread_interrupt"],
-			["close that session, I am done with it", "thread_close"],
-			["hand this off to the old session about the payments bug", "thread_handoff"],
-			["rename this session", "thread_rename"],
-			["switch this session to a different model", "thread_set_model"],
-			["set the reasoning level for this session", "thread_set_reasoning"],
-			["connect a discord thread to this session", "thread_bind"],
-			["disconnect the chat thread from this session", "thread_unbind"],
-			["move the chat to another session", "thread_rebind"],
-			["which chats are connected to sessions", "thread_bindings"],
-			["post progress to the discord thread", "thread_report"],
-			["drain the outbox for the chat", "thread_outbox"],
-			["confirm the reports were posted to chat", "thread_outbox_ack"],
-			["answer the relayed question from the chat", "thread_answer"],
-		]
-		for (const [query, expected] of cases) {
-			// when each user phrase goes through the real BM25 scorer
-			const results = service.search(query)
-			// then the intended tool is the top result
-			expect(results[0]?.name, `top-1 for "${query}"`).toBe(expected)
+describe("thread tool exposure as senpi's eval-only policy reads it", () => {
+	test("every entry normalizes to the eval exposure that joins the policy", () => {
+		// given the eighteen entries
+		for (const entry of THREAD_TOOL_METADATA) {
+			// when senpi normalizes the definition the way _resolveEvalOnlyToolNames does
+			const normalized = normalizeToolExposure(entry)
+			// then the tool is eval-exposed and carries nothing the search catalog would index
+			expect(normalized.exposure, entry.name).toBe("eval")
+			expect(normalized.searchText, entry.name).toBeUndefined()
+			expect(normalized.searchKeywords, entry.name).toEqual([])
 		}
+		expect(THREAD_TOOL_EXPOSURE).toBe("eval")
 	})
 
-	test("a spawn-worker query ranks the task competitor above every thread tool", () => {
-		// given the full family plus a minimal bare competitor named task
-		const service = createServiceWithTools([...entryToolInfos(THREAD_TOOL_SEARCH_METADATA), taskCompetitorInfo()])
-		// when the user asks to spawn background work
-		const results = service.search("spawn a background worker task")
-		// then the competitor wins and the routing clauses do not cannibalize it
-		expect(results[0]?.name).toBe("task")
+	test("the tool-search catalog indexes none of the family while a search competitor stays searchable", () => {
+		// given the family beside one search-exposed competitor
+		const service = createServiceWithTools([...entryToolInfos(THREAD_TOOL_METADATA), taskCompetitorInfo()])
+		// when the catalog is derived
+		const catalog = service.getCatalog().map((doc) => doc.name)
+		// then only the competitor is a search document
+		expect(catalog).toEqual(["task"])
+		expect(service.search("message another session that is already running").map((result) => result.name)).not.toContain("thread_send")
 	})
 
-	test("no keyword string repeats across the family", () => {
-		const all = THREAD_TOOL_SEARCH_METADATA.flatMap((entry) => [...entry.searchKeywords])
-		expect(new Set(all).size).toBe(all.length)
-	})
-
-	test("every tool carries 4 to 6 keywords", () => {
-		for (const entry of THREAD_TOOL_SEARCH_METADATA) {
-			expect(entry.searchKeywords.length, entry.name).toBeGreaterThanOrEqual(4)
-			expect(entry.searchKeywords.length, entry.name).toBeLessThanOrEqual(6)
-		}
-	})
-
-	test("the family policy lives in exactly one guidelines entry", () => {
-		// given the per-tool entries
-		for (const entry of THREAD_TOOL_SEARCH_METADATA) {
-			expect("promptGuidelines" in entry, entry.name).toBe(false)
-		}
-		// then a single non-empty family string carries it
-		expect(typeof THREAD_FAMILY_PROMPT_GUIDELINES).toBe("string")
-		expect(THREAD_FAMILY_PROMPT_GUIDELINES.length).toBeGreaterThan(0)
-	})
-
-	test("indexed text contains no negated-use wording", () => {
-		// BM25 indexes negated words positively, so indexed fields must route instead
-		for (const entry of THREAD_TOOL_SEARCH_METADATA) {
-			const indexed = [entry.description, entry.searchText, ...entry.searchKeywords]
-			for (const text of indexed) {
-				expect(text.match(/\b(?:not|never)\b/i), `${entry.name}: ${text}`).toBeNull()
-			}
-		}
+	test("a query naming a thread tool answers with the host's eval redirect hint", () => {
+		// given a host that publishes removed-tool hints for the withheld family
+		const service = createServiceWithTools(entryToolInfos(THREAD_TOOL_METADATA))
+		const hint = "Run thread_send inside an eval cell via tool.thread_send({ ... }); hooks and permissions still apply."
+		service.bindRemovedToolHints(() => ({ thread_send: hint }))
+		// when the model searches for the tool by name (the shipped matcher compares the whole query and its
+		// whitespace tokens against the hidden names, so a sentence embedding the name is not a lookup)
+		const hints = service.hiddenToolHints("thread_send")
+		// then the redirect names the tool and its eval form
+		expect(hints).toEqual([{ name: "thread_send", hint }])
+		expect(service.hiddenToolHints("thread_list")).toEqual([])
 	})
 })
 
 describe("thread family metadata shape", () => {
 	test("the family carries eighteen entries with unique names", () => {
-		expect(THREAD_TOOL_SEARCH_METADATA.map((entry) => entry.name)).toEqual([...THREAD_TOOL_NAMES])
-		const names = THREAD_TOOL_SEARCH_METADATA.map((entry) => entry.name)
+		expect(THREAD_TOOL_METADATA.map((entry) => entry.name)).toEqual([...THREAD_TOOL_NAMES])
+		const names = THREAD_TOOL_METADATA.map((entry) => entry.name)
 		expect(new Set(names).size).toBe(names.length)
 	})
 
 	test("every label leads with its verb, pinned literally", () => {
-		expect(THREAD_TOOL_SEARCH_METADATA.map((entry) => entry.label)).toEqual([
+		expect(THREAD_TOOL_METADATA.map((entry) => entry.label)).toEqual([
 			"Create session",
 			"List sessions",
 			"Read session",
@@ -209,10 +149,13 @@ describe("thread family metadata shape", () => {
 		])
 	})
 
-	test("every entry is search-exposed and lazily activatable", () => {
-		for (const entry of THREAD_TOOL_SEARCH_METADATA) {
-			expect(entry.exposure, entry.name).toBe("search")
-			expect(entry.allowLazyActivation, entry.name).toBe(true)
+	test("the family policy lives in exactly one guidelines entry", () => {
+		// given the per-tool entries
+		for (const entry of THREAD_TOOL_METADATA) {
+			expect("promptGuidelines" in entry, entry.name).toBe(false)
 		}
+		// then a single non-empty family string carries it
+		expect(typeof THREAD_FAMILY_PROMPT_GUIDELINES).toBe("string")
+		expect(THREAD_FAMILY_PROMPT_GUIDELINES.length).toBeGreaterThan(0)
 	})
 })
