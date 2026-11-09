@@ -22,6 +22,7 @@ import { changedSnapshotPaths, protectedSnapshotsUntouched, snapshotProtectedSta
 import { messageText, readEntries, watchUntil } from "./kibitzer-sidecar-support.mjs"
 import { startMockCompletionsServer } from "./mock-completions-server.mjs"
 import { isolatedChildEnv } from "./sandbox-child-env.mjs"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "../../../..")
@@ -256,7 +257,7 @@ async function stop(session, ownedPids = new Set([session.child.pid])) {
     // Certify termination from actual PID liveness, not the utility's exit alone.
     const inventory = spawnSync("powershell", ["-NoProfile", "-Command",
       "Get-CimInstance Win32_Process | Select-Object -ExpandProperty ProcessId | ConvertTo-Json -Compress"],
-      { encoding: "utf8", timeout: TIMEOUT })
+      { encoding: "utf8", timeout: TIMEOUT, env: withTelemetryOptOut(process.env) })
     if (inventory.status !== 0) throw new Error(`termination inventory failed: ${inventory.error ?? inventory.stderr}`)
     const live = new Set([JSON.parse(inventory.stdout)].flat())
     const remainingPids = [...ownedPids].filter(pid => pid !== process.pid && live.has(pid))
@@ -362,7 +363,7 @@ function collectOwnedPids(pid) {
   const windows = process.platform === "win32"
   const result = spawnSync(windows ? "powershell.exe" : "ps", windows
     ? ["-NoProfile", "-Command", "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId | ConvertTo-Json -Compress"]
-    : ["-axo", "pid=,ppid="], { encoding: "utf8", timeout: 5000 })
+    : ["-axo", "pid=,ppid="], { encoding: "utf8", timeout: 5000, env: withTelemetryOptOut(process.env) })
   if (result.status !== 0) throw new Error(`process ownership scan failed: ${result.error ?? result.stderr}`)
   const rows = windows
     ? [JSON.parse(result.stdout)].flat().map((row) => [row.ProcessId, row.ParentProcessId])
@@ -379,7 +380,7 @@ function collectOwnedPids(pid) {
 function openFileOwners(file) {
   if (process.platform === "win32" || !existsSync(file)) return []
   const result = spawnSync(process.platform === "darwin" ? "/usr/sbin/lsof" : "lsof",
-    ["-t", "--", file], { encoding: "utf8", timeout: 5000 })
+    ["-t", "--", file], { encoding: "utf8", timeout: 5000, env: withTelemetryOptOut(process.env) })
   if (result.status !== 0) return []
   return result.stdout.trim().split(/\s+/u).map(Number).filter((pid) => Number.isSafeInteger(pid) && pid > 0)
 }
@@ -749,7 +750,7 @@ async function selfTest(evidenceDir) {
     assert.equal(smallJson(sandbox.agentDir), undefined)
     // Subscribe before terminating a real idle child; no timing-based readiness.
     const child = spawn(process.execPath, ["-e", 'process.stdout.write("ready"); process.stdin.on("data", () => {})'], {
-      cwd: sandbox.cwd, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"],
+      cwd: sandbox.cwd, detached: process.platform !== "win32", stdio: ["pipe", "pipe", "pipe"], env: withTelemetryOptOut(process.env),
     })
     const exited = new Promise((done) => child.once("close", (code, signal) => done({ code, signal })))
     await deadline(new Promise((done, reject) => {
