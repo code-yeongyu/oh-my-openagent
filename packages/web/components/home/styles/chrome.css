@@ -262,8 +262,9 @@
   color: var(--ink);
 }
 
-/* The section links need about 860 px beside the brand, the theme switch and Open the app. */
-@media (max-width: 859px) {
+/* The section links fit beside the brand, theme switch, stars and Install from 1000 px: the widest locales (es, fr)
+   measured 962 px with the pill's 16 px inset, and the margin covers a longer star count (#12892). */
+@media (max-width: 999px) {
   .nav__links {
     display: none;
   }
@@ -366,12 +367,12 @@
   width: 100%;
   margin-top: var(--space-2);
 }
-@media (max-width: 859px) {
+@media (max-width: 999px) {
   .nav__menu-btn {
     display: grid;
   }
 }
-@media (min-width: 860px) {
+@media (min-width: 1000px) {
   .nav__sheet {
     display: none !important;
   }
