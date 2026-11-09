@@ -21,9 +21,9 @@ export type RelayTransportOptions = {
   /** The highest chain hop an input of the caller's current run arrived with from another device (K8). */
   readonly callerChainHop?: () => number
   readonly log?: (line: string) => void
-  /** The waits between retries of a delivery the receiver's open draft holds; the last one used gives up. Test seam. */
+  /** The waits between background re-sends of a delivery the receiver's open draft holds; after the last one it gives up. Test seam. */
   readonly heldRetryDelaysMs?: readonly number[]
-  readonly retryDelay?: (ms: number) => Promise<void>
+  readonly retryDelay?: (ms: number, signal: AbortSignal) => Promise<void>
 }
 
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
@@ -35,8 +35,19 @@ const fail = (code: ThreadToolFailure["code"], message: string, next: string, de
 // connection refuses an unclassified type (`delegation_unclassified`), and an older engine refuses an unknown command.
 const ADMIT_UNSUPPORTED: ReadonlySet<string> = new Set(["method_unclassified", "delegation_unclassified", "unknown_command", "engine_capability_missing", "unsupported_command", "method_unknown"])
 
-// About half an hour of retries while the receiver's user keeps a draft open (the engine admits nothing then).
+// About half an hour of background re-sends while the receiver's user keeps a draft open (the engine admits nothing then);
+// the same delivery id each time, so the engine answers already_admitted once it took one.
 const HELD_RETRY_DELAYS_MS: readonly number[] = [5_000, 15_000, 30_000, 60_000, 120_000, 300_000, 300_000, 300_000, 300_000, 300_000, 300_000]
+
+function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    if (signal.aborted) return resolve()
+    const timer = setTimeout(() => { signal.removeEventListener("abort", onAbort); resolve() }, ms)
+    ;(timer as { unref?: () => void }).unref?.()
+    const onAbort = () => { clearTimeout(timer); resolve() }
+    signal.addEventListener("abort", onAbort, { once: true })
+  })
+}
 
 const ADMIT_RECORD = "admit_external_message"
 
@@ -59,12 +70,25 @@ function engineStateOf(reply: JsonObject): EngineState {
  * keeps the same promise through the tool receipt store: a retry under the same key replays the first answer and sends
  * nothing; a retry that crossed is `already_admitted` on the engine. The chain the caller's run consumed continues (K8).
  */
-export function createRelayTransport(options: RelayTransportOptions): DeliveryTransport {
+export function createRelayTransport(options: RelayTransportOptions): DeliveryTransport & { readonly dispose: () => void } {
   const { remote, store } = options
   const now = options.now ?? store.now
   const log = options.log ?? (() => undefined)
   const retryDelays = options.heldRetryDelaysMs ?? HELD_RETRY_DELAYS_MS
-  const retryDelay = options.retryDelay ?? ((ms: number) => new Promise<void>((resolve) => { const timer = setTimeout(resolve, ms); (timer as { unref?: () => void }).unref?.() }))
+  const retryDelay = options.retryDelay ?? abortableDelay
+  // Background re-sends of held deliveries; dispose aborts them (a receiver that already took one answers already_admitted).
+  const disposed = new AbortController()
+  const retryHeld = async (row: RemoteSessionRow, record: JsonObject, deliveryId: string): Promise<void> => {
+    for (const [attempt, wait] of retryDelays.entries()) {
+      log(`relay_delivery_held: delivery ${deliveryId} to ${row.session_id} on device ${row.device} waits behind an open draft; re-send ${attempt + 1} of ${retryDelays.length} in ${Math.round(wait / 1000)} s.`)
+      await retryDelay(wait, disposed.signal)
+      if (disposed.signal.aborted) return
+      const sent = await remote.sessions.sessionCommand(row.device, row.session_id, record).catch((error: unknown) => ({ kind: "uncertain" as const, reason: error instanceof Error ? error.message : String(error) }))
+      if (sent.kind !== "ok") { log(`relay_delivery_failed: delivery ${deliveryId} to ${row.session_id} on device ${row.device}: re-send ${attempt + 1} ended ${sent.kind} (${sent.reason}).`); return }
+      if (replyData(sent.response)["kind"] !== "held_draft") return
+    }
+    log(`relay_delivery_failed: delivery ${deliveryId} to ${row.session_id} on device ${row.device} was held behind that session's open draft through ${retryDelays.length} re-sends.`)
+  }
   const unsettled = new Map<string, string>()
   const receiptKey = (scope: { readonly principal: string; readonly operation: string; readonly idempotency_key: string }) => `${scope.principal}\u0000${scope.operation}\u0000${scope.idempotency_key}`
 
@@ -138,32 +162,26 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
       chainCount: hop,
     }, hop)
     const ok = (kind: GatewayDeliveryDelivery, deduplicated = false): RelayDeliverySuccess => ({ kind: "ok", thread_id: row.session_id, delivery: kind, deduplicated, device: row.device, delivery_id, effective_mode: lane })
-    for (let attempt = 0; ; attempt++) {
-      const sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
-      if (sent.kind === "refused" && (ADMIT_UNSUPPORTED.has(sent.reason) || sent.reason.startsWith("Unknown command"))) return fail("unsupported", `Device ${row.device} runs an engine without admit_external_message (${sent.reason}); a peer message cannot be delivered there as a delivery.`, "Update omo and senpi on that device, then retry.", { device: row.device, reason: sent.reason })
-      if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
-      const reply = replyData(sent.response)
-      const kind = reply["kind"]
-      const turnId = typeof reply["turnId"] === "string" ? reply["turnId"] : ""
-      if (kind === "started" || kind === "steered") return ok({ kind, turn_id: turnId })
+    const sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
+    if (sent.kind === "refused" && (ADMIT_UNSUPPORTED.has(sent.reason) || sent.reason.startsWith("Unknown command"))) return fail("unsupported", `Device ${row.device} runs an engine without admit_external_message (${sent.reason}); a peer message cannot be delivered there as a delivery.`, "Update omo and senpi on that device, then retry.", { device: row.device, reason: sent.reason })
+    if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
+    const reply = replyData(sent.response)
+    const kind = reply["kind"]
+    const turnId = typeof reply["turnId"] === "string" ? reply["turnId"] : ""
+    if (kind === "started" || kind === "steered") return ok({ kind, turn_id: turnId })
+    if (kind === "turn_conflict") return fail(REFUSAL_CODES.turn_conflict.code, `Turn ${delivery.expected_turn_id ?? "?"} is no longer the running turn of ${row.session_id} on device ${row.device}.`, REFUSAL_CODES.turn_conflict.next, { device: row.device, ...(turnId === "" ? {} : { current_turn_id: turnId }) })
+    if (kind !== "queued" && kind !== "held_draft" && kind !== "already_admitted") return fail("idempotency_uncertain", `Device ${row.device} accepted the message but answered an unknown admission (${String(kind)}).`, "Read the thread before deciding whether to send again.", { device: row.device, delivery_id })
+    // Queued, held behind the receiver's open draft, or already taken: the delivery waits on that device exactly as a
+    // same-device delivery waits in its inbox (gateway/drain.ts answers held_draft as queued and re-admits it on the next
+    // edge). Its place is the engine's own pending count. A held one is re-sent in the background under the same id.
+    const after = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
+    const pending = after.kind === "ok" ? engineStateOf(replyData(after.response)).pending : null
+    if (kind === "held_draft") void retryHeld(row, record, delivery_id)
+    if (pending === null) {
       if (kind === "already_admitted") return ok({ kind: "queued", queue_position: 1 }, true)
-      if (kind === "turn_conflict") return fail(REFUSAL_CODES.turn_conflict.code, `Turn ${delivery.expected_turn_id ?? "?"} is no longer the running turn of ${row.session_id} on device ${row.device}.`, REFUSAL_CODES.turn_conflict.next, { device: row.device, ...(turnId === "" ? {} : { current_turn_id: turnId }) })
-      if (kind === "held_draft") {
-        const wait = retryDelays[attempt]
-        if (wait === undefined) {
-          log(`relay_delivery_failed: delivery ${delivery_id} to ${row.session_id} on device ${row.device} was held behind that session's open draft through ${attempt} retries.`)
-          return fail("idempotency_uncertain", `Device ${row.device} held delivery ${delivery_id} behind the session's open draft and did not take it.`, "Read the thread before deciding whether to send again.", { device: row.device, delivery_id, reason: "held_draft" })
-        }
-        log(`relay_delivery_held: delivery ${delivery_id} to ${row.session_id} on device ${row.device} waits behind an open draft; retry ${attempt + 1} of ${retryDelays.length} in ${Math.round(wait / 1000)} s.`)
-        await retryDelay(wait)
-        continue
-      }
-      if (kind !== "queued") return fail("idempotency_uncertain", `Device ${row.device} accepted the message but answered an unknown admission (${String(kind)}).`, "Read the thread before deciding whether to send again.", { device: row.device, delivery_id })
-      const after = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
-      const pending = after.kind === "ok" ? engineStateOf(replyData(after.response)).pending : null
-      if (pending === null) return fail("idempotency_uncertain", `Device ${row.device} accepted the message but did not report where it waits.`, "Read the thread before deciding whether to send again.", { device: row.device, delivery_id })
-      return ok({ kind: "queued", queue_position: pending })
+      return fail("idempotency_uncertain", `Device ${row.device} accepted the message but did not report where it waits.`, "Read the thread before deciding whether to send again.", { device: row.device, delivery_id })
     }
+    return ok({ kind: "queued", queue_position: pending }, kind === "already_admitted")
   }
 
   return {
@@ -177,5 +195,6 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
       if (delivery.expected_turn_id !== undefined && !/^\d+$/.test(delivery.expected_turn_id)) return fail("turn_conflict", `Turn ${delivery.expected_turn_id} is not a turn of the target session.`, "Read the target again and steer with the turn_id a started or steered result returned.")
       return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, () => send(delivery, row))
     },
+    dispose: () => disposed.abort(),
   }
 }

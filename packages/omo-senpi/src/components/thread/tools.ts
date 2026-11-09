@@ -310,6 +310,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   }
   const relayTools = createRelayTools({ options, relay, view, failure })
   const dispose = () => {
+    pipeline.dispose()
     unanswered.clear()
     relay.dispose()
   }
