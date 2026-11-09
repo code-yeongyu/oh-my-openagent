@@ -110,6 +110,9 @@ export interface ComposeTaskEngineDeps {
   readonly childCreationPort?: ChildCreationPort
   readonly pi: SenpiExtensionAPI
   readonly omoConfig: OmoConfig
+  // Live user-config source for the planner seam. Defaults to the composition-time snapshot;
+  // the task component passes a re-loader so mid-session omo.json(c) edits apply to new plans.
+  readonly getOmoConfig?: () => OmoConfig
   readonly cwd: string
   readonly sharedParentTools: () => readonly ToolDefinition[]
   readonly coordinator?: IdleInjectionCoordinator
@@ -215,9 +218,10 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   // with it, and the lifecycle salvages and sweeps a crashed host's clones through the same object.
   // Without it every `isolated: true` spawn is refused as `isolation_unavailable`.
   const isolation = createIsolationRuntime()
+  const getOmoConfig = deps.getOmoConfig ?? (() => deps.omoConfig)
   const { host, lifecycle, resolveInheritedExtensions, runnerContext } = composeEngineHostWiring({
     pi: deps.pi,
-    omoConfig: deps.omoConfig,
+    getOmoConfig,
     settings,
     runtime,
     sharedParentTools: deps.sharedParentTools,
@@ -235,8 +239,8 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   const resolveDefaultRoute = () =>
     readSettingsDefaultRoute({ cwd: runtime.cwd(), agentDir: host.agentDir ?? resolveAgentHome({ env: deps.env ?? process.env }) })
   const basePlanner = createGenerationObservingPlanner({
-    planner: createTaskChildPlanner(deps.omoConfig, agents, resolveRegistry, () => runtime.parentServiceTier(), resolveDefaultRoute),
-    omoConfig: deps.omoConfig,
+    planner: createTaskChildPlanner(getOmoConfig, agents, resolveRegistry, () => runtime.parentServiceTier(), resolveDefaultRoute),
+    omoConfig: getOmoConfig,
     resolveRegistry,
     generations: categoryConfigGenerations,
   })

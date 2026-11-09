@@ -6,7 +6,7 @@ import {
   type SenpiModelPort,
 } from "@oh-my-opencode/senpi-task"
 
-import type { ResolveModelRegistry, TaskModelRegistry } from "./planner"
+import type { ConfigScopedChildPlanner, ResolveModelRegistry, TaskModelRegistry } from "./planner"
 
 const BUILTIN_CATEGORY_NAMES: readonly string[] = BUILTIN_CATEGORY_DEFAULTS.map((definition) => definition.name)
 
@@ -71,17 +71,20 @@ export function createCategoryConfigGenerations(mask: MaskCategoryModel = identi
  * fails the plan it rides along with.
  */
 export function createGenerationObservingPlanner(input: {
-  readonly planner: ChildPlanner
-  readonly omoConfig: OmoConfig
+  readonly planner: ConfigScopedChildPlanner
+  readonly omoConfig: OmoConfig | (() => OmoConfig)
   readonly resolveRegistry: ResolveModelRegistry
   readonly generations: CategoryConfigGenerations
 }): ChildPlanner {
   const { planner, omoConfig, resolveRegistry, generations } = input
   return (spec) => {
-    const resolution = planner(spec)
+    // Read the live config once per plan and hand that snapshot to the planner, so the generation
+    // bumps on a mid-session edit and always describes the map this plan was resolved against.
+    const planConfig = typeof omoConfig === "function" ? omoConfig() : omoConfig
+    const resolution = planner(spec, planConfig)
     if (resolution.kind !== "resolved") return resolution
     const registry = resolveRegistry()
-    if (registry !== undefined) generations.observe({ omoConfig, registry })
+    if (registry !== undefined) generations.observe({ omoConfig: planConfig, registry })
     return resolution
   }
 }

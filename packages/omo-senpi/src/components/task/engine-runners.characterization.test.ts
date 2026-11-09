@@ -159,7 +159,7 @@ describe("E1 characterization: respawn runner launch spec", () => {
     const seen = captureProcessStarts()
     const runner = buildRespawnRunner(buildContext({
       settings: { process_runner: "child-process" },
-      excludeModels: ["zai/glm-5.3"],
+      excludeModels: () => ["zai/glm-5.3"],
       resolveInheritedExtensions: () => Promise.resolve([]),
     }))
 

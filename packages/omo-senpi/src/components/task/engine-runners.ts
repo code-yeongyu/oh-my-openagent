@@ -57,8 +57,8 @@ export interface RunnerBuildContext {
   // records. The engine always passes it; the host runner cannot be built without it.
   readonly hostRouting?: TaskHostRouting
   // omo.json exclude_models: an in-process child respawned or resumed on an excluded model fails
-  // model_unavailable instead of running it.
-  readonly excludeModels?: readonly string[]
+  // model_unavailable instead of running it. Read at every launch, so a mid-session edit applies.
+  readonly excludeModels?: () => readonly string[] | undefined
   // Where children ask: the parent's UI, and the parent's approval mode they open with and follow (#6189).
   readonly dialogForwarder?: ChildDialogForwarder
   readonly parentPermission?: ParentPermissionMode
@@ -89,7 +89,7 @@ function buildInProcessRunner(build: RunnerBuildContext): ManagedRunner {
   const context = createParentRegistrySessionContext(
     () => build.runtime.modelRegistry(),
     () => build.runtime.projectTrusted(),
-    () => build.excludeModels,
+    () => build.excludeModels?.(),
   )
   return withoutExcludedFallbacks(createInProcessManagedRunner(inProcess, context), build.excludeModels)
 }
@@ -165,7 +165,7 @@ function buildProcessRunner(build: RunnerBuildContext): ManagedRunner {
   return createRpcManagedRunner({
     settleTeardowns: () => runner.settleTeardowns(),
     async start(spec) {
-      const filtered = withoutExcludedRpcFallbacks(spec, build.excludeModels)
+      const filtered = withoutExcludedRpcFallbacks(spec, build.excludeModels?.())
       if (filtered.extensions !== undefined) return runner.start(filtered)
       return runner.start({ ...filtered, extensions: await resolveInheritedExtensions() })
     },
@@ -189,7 +189,7 @@ export function buildRespawnRunner(
   return {
     settleTeardowns: () => runner.settleTeardowns(),
     start: async (spec) => {
-      const filtered = withoutExcludedRpcFallbacks(spec, build.excludeModels)
+      const filtered = withoutExcludedRpcFallbacks(spec, build.excludeModels?.())
       return runner.start(filtered.extensions === undefined ? { ...filtered, extensions: await resolveInheritedExtensions() } : filtered)
     },
   }
