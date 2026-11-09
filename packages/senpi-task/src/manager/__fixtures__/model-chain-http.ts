@@ -56,6 +56,7 @@ export function startHttpProviders(scripts: Readonly<Record<string, readonly Ste
 
 function respond(model: string, step: Step): Response {
   if (typeof step !== "string") throw new Error(`${model}: an engine world scripts no tool steps`)
+  if (step === "missing") throw new Error(`${model}: an engine world scripts no ${step} steps`)
   if (step !== "complete") {
     const { status, message, type } = ERRORS[step]
     return Response.json({ error: { message, type } }, { status })

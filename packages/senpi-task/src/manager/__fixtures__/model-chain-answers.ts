@@ -9,8 +9,10 @@ const QUOTA_ERROR =
 // A content-policy refusal and a rejected credential: neither is a usage limit.
 const REFUSAL_ERROR = "400: This request was flagged as a possible cybersecurity risk and refused under the content policy."
 const AUTH_ERROR = "401: Unauthorized - invalid api key"
+// The route does not serve the model, carried on a 401 so a provider-wide credential reading would also match.
+const MODEL_NOT_FOUND_ERROR = '401 {"code":"model_not_found","message":"unknown provider for model primary"}'
 
-const ERRORS = { quota: QUOTA_ERROR, refusal: REFUSAL_ERROR, auth: AUTH_ERROR } as const
+const ERRORS = { quota: QUOTA_ERROR, refusal: REFUSAL_ERROR, auth: AUTH_ERROR, missing: MODEL_NOT_FOUND_ERROR } as const
 
 export type Step = keyof typeof ERRORS | "complete" | { readonly tool: string } | { readonly partialTool: string }
 

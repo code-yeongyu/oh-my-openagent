@@ -18,7 +18,7 @@ import type { TaskRunStats } from "./run-stats-types"
 /** An interrupt the parent did not request: the host replaced the child's session mid-turn. */
 export type TaskInterruptCause = "session_replaced"
 
-export const MODEL_REFUSAL_REASONS = ["usage_limit", "not_signed_in", "unavailable", "refused", "error"] as const
+export const MODEL_REFUSAL_REASONS = ["usage_limit", "not_signed_in", "model_not_found", "unavailable", "refused", "error"] as const
 
 export type ModelRefusalReason = (typeof MODEL_REFUSAL_REASONS)[number]
 
