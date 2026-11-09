@@ -1,4 +1,4 @@
-export const SEED_HANDOFF_CHAR_LIMIT = 60_000
+const SEED_HANDOFF_CHAR_LIMIT = 60_000
 export const SEED_OPEN_TAG = "<omo-context-handoff-seed>"
 export const CONTEXT_HANDOFF_REQUEST_OPEN_TAG = "<omo-context-handoff>"
 // Second line of a seed; the number counts the chained handoffs that led to the seeded session.

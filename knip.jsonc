@@ -2969,6 +2969,8 @@
         "scripts/qa/computer-control-rpc-e2e.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/computer-use-e2e.mjs",
+        // the context-handoff live QA driver, run by path (scripts/qa/AGENTS.md); nothing imports it
+        "scripts/qa/context-handoff-e2e.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/curated-agents-e2e-mock-provider.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
