@@ -368,6 +368,12 @@ describe("checkExtensionCurrent", () => {
       "packages/omo-senpi/src/components/memory/commands/facts.ts",
       // A dream fire loads its conversation selection from this sidecar (keeps omo.js inside its byte budget).
       "packages/omo-senpi/src/components/memory/dream-selector.ts",
+      // The maintenance pass loads runtime retention and the host sweep from this sidecar when one is due (keeps omo.js inside its byte budget).
+      "packages/omo-senpi/src/components/memory/memory-retention-pass.ts",
+      // A finalized dream or reflection run loads the archive link repair (#12642) from this sidecar (keeps omo.js inside its byte budget).
+      "packages/memory-core/src/reflection/completion-links.ts",
+      "packages/memory-core/src/reflection/link-removals.ts",
+      "packages/memory-core/src/reflection/link-rewrite.ts",
     ]) {
       expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
       expect(memoryCommandsInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
@@ -556,6 +562,7 @@ describe("checkExtensionCurrent", () => {
     expect(main).toContain('import("#omo-memory-memfs-runtime")')
     expect(main).toContain('import("#omo-memory-palace-runtime")')
     expect(main).toContain('import("#omo-memory-commands-runtime")')
+    expect(main).toContain('import("#memory-completion-links")')
     expect(main).toContain('import("#omo-device-account-runtime")')
     expect(main).toContain('import("#omo-session-history-runtime")')
     expect(main).toContain('import("#omo-recall-store-runtime")')
@@ -581,6 +588,7 @@ describe("checkExtensionCurrent", () => {
       "#omo-memory-memfs-runtime": "./extensions/omo-memory-memfs.js",
       "#omo-memory-palace-runtime": "./extensions/omo-memory-palace.js",
       "#omo-memory-commands-runtime": "./extensions/omo-memory-commands.js",
+      "#memory-completion-links": "./extensions/omo-memory-commands.js",
       "#omo-device-account-runtime": "./extensions/omo-device-account.js",
       "#omo-session-history-runtime": "./extensions/omo-session-history.js",
       "#omo-recall-store-runtime": "./extensions/omo-recall-store.js",

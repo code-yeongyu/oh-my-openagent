@@ -55,24 +55,23 @@ describe("a daemon-hosted child's own fallback chain (#9512)", () => {
     await handle.terminate()
   })
 
-  test("#given an older host without retry_fallback_profile #when two children with fallback models start #then both still open without the field and the user is told once", async () => {
+  // Such a host would build the child's session from its own fallback settings (the user's chains, senpi's
+  // shipped chains) and could move it to a model outside its designated chain. It is refused as a host
+  // missing a required capability, before any session opens or any prompt reaches a model (#12006).
+  test("#given an older host without retry_fallback_profile #when a child starts #then the host is refused as missing that capability and no session is opened or prompted", async () => {
     // given
     const host = await fakeHost({ capabilities: BEFORE_PROFILE })
-    const warnings: string[] = []
-    const runner = runnerOver(host, { onWarning: (message) => void warnings.push(message) })
+    const runner = runnerOver(host)
 
     // when
-    const first = await runner.start(childSpec({ task_id: "st_31", fallbackModels: ["openai/gpt-5.6-sol"] }))
-    const second = await runner.start(childSpec({ task_id: "st_32", fallbackModels: ["openai/gpt-5.6-sol"] }))
+    const started = runner.start(childSpec({ task_id: "st_31", fallbackModels: ["openai/gpt-5.6-sol"] }))
 
     // then
-    const opens = openPayloads(host.commands)
-    expect(opens).toHaveLength(2)
-    expect(opens.map((payload) => "retryFallback" in payload)).toEqual([false, false])
-    const notices = warnings.filter((message) => message.includes("retry_fallback_profile"))
-    expect(notices).toHaveLength(1)
-    await first.terminate()
-    await second.terminate()
+    await expect(started).rejects.toThrow("task daemon unavailable (capability): missing retry_fallback_profile")
+    await expect(started).rejects.toThrow("designated models (anthropic/claude-sonnet-4-5 -> openai/gpt-5.6-sol)")
+    const types = host.commands.map((command) => command.type)
+    expect(types).not.toContain("open_session")
+    expect(types).not.toContain("prompt")
   })
 
   test("#given a resumed child #when it reopens on a capable host #then the reopen carries the same chain", async () => {

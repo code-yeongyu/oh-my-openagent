@@ -9,10 +9,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { captureIdentity, killIfAlive, pidAlive, pidTerminalWithin, readPidFileWhenWritten, waitForFileToExist } from "./process-liveness.test-support"
+import { remainingTestTime, useTestTimeout } from "../../../../../../test-support/test-deadline"
 
 const holdLockFixture = join(import.meta.dir, "__fixtures__", "hold-lock.ts")
-const READY_TIMEOUT_MS = 10_000
-const EXIT_TIMEOUT_MS = 5_000
 
 type ExitInfo = { readonly code: number | null; readonly signal: NodeJS.Signals | null }
 
@@ -26,7 +25,7 @@ function exitWithin(child: ChildProcess, boundMs: number): Promise<ExitInfo> {
 
 function waitForReady(child: ChildProcessWithoutNullStreams): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("lock holder never reported ready")), READY_TIMEOUT_MS)
+    const timer = setTimeout(() => reject(new Error("lock holder never reported ready")), remainingTestTime())
     let output = ""
     const onData = (chunk: Buffer): void => {
       output += chunk.toString("utf8")
@@ -53,11 +52,12 @@ function listenOnLoopback(control: Server): Promise<number> {
 
 describe("hold-lock fixture lifecycle", () => {
   test("exits on the parent-owned stdin EOF event", async () => {
+    useTestTimeout(30_000)
     const root = await mkdtemp(join(tmpdir(), "omo-hold-lock-lifecycle-"))
     const child = spawn(process.execPath, [holdLockFixture, join(root, "finalize.lock")], { stdio: ["pipe", "pipe", "pipe"] })
     try {
       await waitForReady(child)
-      const exit = exitWithin(child, EXIT_TIMEOUT_MS)
+      const exit = exitWithin(child, remainingTestTime())
       child.stdin.end()
       expect((await exit).signal).toBeNull()
     } finally {
@@ -67,6 +67,7 @@ describe("hold-lock fixture lifecycle", () => {
   }, 30_000)
 
   test("exits when ONLY the parent-owned control channel closes while stdin stays open", async () => {
+    useTestTimeout(30_000)
     // given: a holder whose stdin never closes; the fixture's CONTROL_PORT branch is the only
     // possible exit path, so a fixture without it (origin/dev) can never produce the marker.
     const root = await mkdtemp(join(tmpdir(), "omo-hold-lock-control-"))
@@ -81,7 +82,7 @@ describe("hold-lock fixture lifecycle", () => {
     })
     try {
       await waitForReady(child)
-      const exit = exitWithin(child, EXIT_TIMEOUT_MS)
+      const exit = exitWithin(child, remainingTestTime())
 
       // when
       for (const socket of connections) socket.destroy()
@@ -99,6 +100,7 @@ describe("hold-lock fixture lifecycle", () => {
   }, 30_000)
 
   test("an abruptly killed wrapper takes the ORIGINAL holder down with it", async () => {
+    useTestTimeout(30_000)
     // given: a wrapper that spawns the real holder, records the holder's own pid, then SIGKILLs
     // itself; the test observes THAT original holder (pid identity + exit marker + terminal
     // state), never a substitute process.
@@ -123,7 +125,7 @@ child.stdout.on("data", (chunk) => {
     // Subscribe to the wrapper's death BEFORE it can fire: the wrapper SIGKILLs itself in the
     // same tick it writes the pid file, so listening only after the read would miss the event.
     const wrapperExit = new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("wrapper did not terminate after holder readiness")), READY_TIMEOUT_MS)
+      const timer = setTimeout(() => reject(new Error("wrapper did not terminate after holder readiness")), remainingTestTime())
       const onExit = (code: number | null, signal: NodeJS.Signals | null): void => {
         clearTimeout(timer)
         try {
@@ -141,7 +143,7 @@ child.stdout.on("data", (chunk) => {
     })
     let holderIdentityForCleanup: import("./process-liveness.test-support").ProcessIdentity | null = null
     try {
-      const holderPid = await readPidFileWhenWritten(holderPidPath, READY_TIMEOUT_MS)
+      const holderPid = await readPidFileWhenWritten(holderPidPath, remainingTestTime())
       // The holder is alive at this point (the wrapper dies only after writing the pid file), so
       // the identity snapshot doubles as the fail-safe's PID-reuse guard.
       holderIdentityForCleanup = captureIdentity(holderPid)
@@ -153,7 +155,7 @@ child.stdout.on("data", (chunk) => {
       // liveness probe against the captured identity) instead of being asserted from a single
       // point-in-time probe, because the holder's death trails the wrapper's by a beat.
       if (holderIdentityForCleanup !== null) {
-        expect(await pidTerminalWithin(holderIdentityForCleanup, EXIT_TIMEOUT_MS)).toBe(true)
+        expect({ "lock holder exited": await pidTerminalWithin(holderIdentityForCleanup, remainingTestTime()) }).toEqual({ "lock holder exited": true })
       } else {
         expect(pidAlive(holderPid)).toBe(false)
       }
@@ -161,7 +163,7 @@ child.stdout.on("data", (chunk) => {
       // its stdin-EOF path, which is what writes the marker. Windows tears the whole tree down
       // with the wrapper, so the holder never gets to run that handler - the marker is a
       // graceful-shutdown observable there, not a termination one.
-      if (process.platform !== "win32") expect(await waitForFileToExist(marker, EXIT_TIMEOUT_MS)).toBe(true)
+      if (process.platform !== "win32") expect({ "marker written": await waitForFileToExist(marker, remainingTestTime()) }).toEqual({ "marker written": true })
     } finally {
       wrapper.kill("SIGKILL")
       if (holderIdentityForCleanup !== null) killIfAlive(holderIdentityForCleanup)

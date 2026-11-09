@@ -10,6 +10,7 @@ import { gatewayDatabasePath, gatewayInboxDirectory, gatewayRootDirectory } from
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { resumeProcess, suspendProcess } from "./gateway/testing/job-control"
 import type { ThreadHost } from "./tools"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 function host(): ThreadHost {
   return {
@@ -105,13 +106,13 @@ async function holdWriteLock(databasePath: string) {
     child.stdout.on("data", (chunk: Buffer) => { text += chunk.toString(); if (text.includes("LOCKED")) resolve() })
     child.once("exit", (code) => reject(new Error(`the lock holder exited (${code}) before locking`)))
   })
-  await within(locked, 10_000, "the lock holder to take BEGIN IMMEDIATE")
+  await within(locked, remainingTestTime(), "the lock holder to take BEGIN IMMEDIATE")
   const pid = child.pid
   if (pid === undefined) throw new Error("the lock holder has no pid")
   return {
     child,
     pid,
-    release: async () => { child.stdin.write("release\n"); await within(exited, 10_000, "the lock holder to commit and exit") },
+    release: async () => { child.stdin.write("release\n"); await within(exited, remainingTestTime(), "the lock holder to commit and exit") },
     kill: async () => { if (child.exitCode === null && child.signalCode === null) { child.kill("SIGKILL"); await exited } },
   }
 }
@@ -257,7 +258,7 @@ describe("thread component steer into a session waiting on a question", () => {
     try {
       createThreadComponent({ host: host(), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store }).register(f.pi as never, context([]) as never)
       await f.dispatch("session_start", ctx)
-      await within(endpointReady, 10_000, "the control endpoint to register")
+      await within(endpointReady, remainingTestTime(), "the control endpoint to register")
       const target: GatewayAddressEntry = { thread_id: "dur-1", name: "lane", status: "live", cwd: agentDir, created_at: new Date(0).toISOString(), updated_at: new Date(0).toISOString(), endpoint: { kind: "tui", socket, routing_id: null, durable_session_id: "dur-1" }, liveness: "routable" }
       const engine = createGatewayEngine({
         store,
@@ -322,7 +323,7 @@ describe("thread component legacy mailbox import", () => {
       const f = eventApi()
       createThreadComponent({ host: host(), stateDirectory, agentDir: () => agentDir }).register(f.pi as never, logger as never)
       await f.dispatch("session_start", sessionCtx("dur-sender"))
-      await within(skippedReport, 10_000, "the skipped legacy item to be reported")
+      await within(skippedReport, remainingTestTime(), "the skipped legacy item to be reported")
       await f.dispatch("session_shutdown")
       const store = createGatewayStore({ agentDir })
       try {
@@ -353,9 +354,9 @@ describe("thread component legacy mailbox import", () => {
       const f = eventApi()
       createThreadComponent({ host: host(), stateDirectory, agentDir: () => agentDir, store }).register(f.pi as never, context(warnings) as never)
       await store.stats()
-      await within(firstRetire, 10_000, "the idle store worker to retire")
+      await within(firstRetire, remainingTestTime(), "the idle store worker to retire")
       await store.stats()
-      await within(reopened, 10_000, "the reopened store to retry the unreadable mailbox")
+      await within(reopened, remainingTestTime(), "the reopened store to retry the unreadable mailbox")
       expect(warnings.filter((message) => message.includes("legacy thread mailbox"))).toHaveLength(1)
       await store.dispose()
     } finally {
@@ -402,7 +403,7 @@ describe("thread component startup and shutdown touch no store they do not need"
       createThreadComponent({ host: host(), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir }).register(f.pi as never, context(warnings) as never)
       const ctx = { sessionManager: { getSessionId: () => "dur-win", getSessionFile: () => join(agentDir, "dur-win.jsonl") }, isIdle: () => true }
       await f.dispatch("session_start", ctx)
-      await within(registrarAnswered, 10_000, "senpi's registrar to be asked")
+      await within(registrarAnswered, remainingTestTime(), "senpi's registrar to be asked")
       // Shutdown waits for the registration still in flight, then disposes the store.
       await f.dispatch("session_shutdown", ctx)
       const database = gatewayDatabasePath(agentDir)
@@ -479,6 +480,7 @@ describe("thread component settle never waits on the gateway store", () => {
   })
 
   test("#given an armed completion and another process holding the store's write lock #when the session settles #then the settle returns within its bound, and the completion is written once the lock frees", async () => {
+    useTestTimeout(30_000)
     const agentDir = mkdtempSync(join(tmpdir(), "thr-component-held-"))
     const store = createGatewayStore({ agentDir, _test: { busyTimeoutMs: 100 } })
     let holder: Awaited<ReturnType<typeof holdWriteLock>> | undefined
@@ -490,10 +492,10 @@ describe("thread component settle never waits on the gateway store", () => {
       await f.dispatch("agent_end", sessionCtx("dur-1"), { messages: [{ role: "assistant", stopReason: "stop" }] })
       holder = await holdWriteLock(gatewayDatabasePath(agentDir))
       const started = performance.now()
-      await within(f.dispatch("agent_settled", sessionCtx("dur-1")), 10_000, "agent_settled to return while another process holds the write lock")
+      await within(f.dispatch("agent_settled", sessionCtx("dur-1")), remainingTestTime(), "agent_settled to return while another process holds the write lock")
       expect(performance.now() - started).toBeLessThan(COMPLETION_SETTLE_WAIT_MS + 2_750)
       await holder.release()
-      expect(await within(outboxRows(store, bindingId), 10_000, "the outbox read queued behind the completion write")).toEqual([{ event: "completion", outcome: "completed", text: "all done" }])
+      expect(await within(outboxRows(store, bindingId), remainingTestTime(), "the outbox read queued behind the completion write")).toEqual([{ event: "completion", outcome: "completed", text: "all done" }])
       expect(warnings).toEqual([])
     } finally {
       await holder?.kill()
@@ -504,6 +506,7 @@ describe("thread component settle never waits on the gateway store", () => {
 
   // win32 has no job control: nothing there can suspend the lock holder the way SIGSTOP does
   test.skipIf(process.platform === "win32")("#given an armed settle whose write outlasts the lock-wait bound behind a SIGSTOPped holder #when the holder resumes #then exactly one completion row lands in the background with the original run's outcome, and later settles add none", async () => {
+    useTestTimeout(60_000)
     const agentDir = mkdtempSync(join(tmpdir(), "thr-component-stopped-"))
     const store = createGatewayStore({ agentDir, _test: { busyTimeoutMs: 100, lockWaitMaxMs: 1_000 } })
     let holder: Awaited<ReturnType<typeof holdWriteLock>> | undefined
@@ -519,9 +522,9 @@ describe("thread component settle never waits on the gateway store", () => {
       holder = await holdWriteLock(gatewayDatabasePath(agentDir))
       await suspendProcess(holder.pid)
       const started = performance.now()
-      await within(f.dispatch("agent_settled", sessionCtx("dur-1")), 10_000, "agent_settled to return while a stopped process holds the write lock")
+      await within(f.dispatch("agent_settled", sessionCtx("dur-1")), remainingTestTime(), "agent_settled to return while a stopped process holds the write lock")
       expect(performance.now() - started).toBeLessThan(COMPLETION_SETTLE_WAIT_MS + 2_750)
-      const warning = await within(firstWarning, 15_000, "the delayed completion write to be reported")
+      const warning = await within(firstWarning, remainingTestTime(), "the delayed completion write to be reported")
       expect(warning).toContain("retrying")
       const waited = Number(/waited (\d+) ms/.exec(warning)?.[1])
       // The store gives up once another busy step could carry the wait past lockWaitMaxMs (1_000), i.e. at a
@@ -531,7 +534,7 @@ describe("thread component settle never waits on the gateway store", () => {
       expect(waited).toBeGreaterThan(1_000 - 2 * 100)
       await f.dispatch("agent_start", sessionCtx("dur-1"))
       await f.dispatch("agent_end", sessionCtx("dur-1"), { messages: [{ role: "assistant", stopReason: "stop" }] })
-      await within(f.dispatch("agent_settled", sessionCtx("dur-1")), 10_000, "a later settle to return while the first write is still outstanding")
+      await within(f.dispatch("agent_settled", sessionCtx("dur-1")), remainingTestTime(), "a later settle to return while the first write is still outstanding")
       const emitted = new Promise<void>((resolve) => {
         const stop = store.onEvent((event) => {
           if (event.kind !== "completions_emitted" || event.cursors.length === 0) return
@@ -541,7 +544,7 @@ describe("thread component settle never waits on the gateway store", () => {
       })
       await resumeProcess(holder.pid)
       await holder.release()
-      await within(emitted, 15_000, "the background retry to write the completion once the lock frees")
+      await within(emitted, remainingTestTime(), "the background retry to write the completion once the lock frees")
       expect(await outboxRows(store, bindingId)).toEqual([{ event: "completion", outcome: "failed", text: "all done" }])
       await f.dispatch("agent_start", sessionCtx("dur-1"))
       await f.dispatch("agent_end", sessionCtx("dur-1"), { messages: [{ role: "assistant", stopReason: "stop" }] })
@@ -572,7 +575,7 @@ describe("thread component settle never waits on the gateway store", () => {
       expect(await second.pendingCompletionArms("dur-1")).toBe(1)
       await after.dispatch("agent_start", sessionCtx("dur-1"))
       await after.dispatch("agent_end", sessionCtx("dur-1"), { messages: [{ role: "assistant", stopReason: "stop" }] })
-      await within(after.dispatch("agent_settled", sessionCtx("dur-1")), 10_000, "the settle after the restart")
+      await within(after.dispatch("agent_settled", sessionCtx("dur-1")), remainingTestTime(), "the settle after the restart")
       expect(await outboxRows(second, bindingId)).toEqual([{ event: "completion", outcome: "completed", text: "all done" }])
       await after.dispatch("agent_end", sessionCtx("dur-1"), { messages: [{ role: "assistant", stopReason: "stop" }] })
       await after.dispatch("agent_settled", sessionCtx("dur-1"))
