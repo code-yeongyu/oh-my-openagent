@@ -393,9 +393,10 @@ function placeCausally(ctx: StoreContext, request: EnqueueRequest): CausalPlacem
     }
     // `via` names only the session that sent this hop: with no hop cap a stored path would grow with every hop
     // (one id per row, quadratic in total), while `hop` already carries the chain's count.
-    placement = { root_id: cause.root_id, hop: cause.hop + 1, via: [request.sender_node], new_root: false }
+    placement = { root_id: cause.root_id, hop: Math.max(cause.hop, request.inbound_hop ?? 0) + 1, via: [request.sender_node], new_root: false }
   } else {
-    placement = { root_id: `root-${randomUUID()}`, hop: 1, via: [request.sender_node], new_root: true }
+    // An input from another device has no row here, so the chain starts a new root but keeps counting from its hop (K8).
+    placement = { root_id: `root-${randomUUID()}`, hop: (request.inbound_hop ?? 0) + 1, via: [request.sender_node], new_root: true }
   }
   if (request.claimed_root_id !== null && request.claimed_root_id !== placement.root_id) {
     return refused("invalid_arguments", "The causal root is derived by the gateway and cannot be chosen by the caller.", { guard: "forged_root" })

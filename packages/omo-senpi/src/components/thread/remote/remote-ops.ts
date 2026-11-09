@@ -1,7 +1,6 @@
 import type { ThreadToolResult } from "../contracts"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { REFUSAL_CODES } from "../gateway/result"
-import type { EffectiveLane } from "../gateway/types"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
 import { threadLink } from "../thread-link"
 import type { ThreadReadInput } from "../contracts"
@@ -9,7 +8,6 @@ import type { ThreadTranscriptEntry } from "../reader"
 import { liveReadResult } from "../tools/read-ops"
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
 import type { AliasError, AliasHolder, JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "./ports"
-import { peerText, type RemoteSender } from "./peer-text"
 
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
 const fail = (code: ThreadToolFailure["code"], message: string, next: string, details?: Readonly<Record<string, unknown>>): Failure => ({ kind: "error", error: threadToolFailure(code, message, next, details) })
@@ -183,30 +181,25 @@ export async function openRemote(remote: RemoteThreadSurface, request: RemoteOpe
 }
 
 /**
- * thread_send / thread_handoff to another device's session: one `prompt`, carrying the chain's count (K8, R8.c).
- * Every result field comes from the remote engine: the turn it started, or its own pending-message count.
+ * A person's own input sent to another device's session (`omo remote send`): one `prompt`, exactly as they would type it
+ * there, so slash commands and prompt templates are theirs. A peer session never takes this path; its message is a
+ * delivery (`relay-transport.ts`). Every result field comes from the remote engine: the turn it started, or its own
+ * pending-message count.
  */
 export type RemoteSendRequest = { readonly message: string; readonly delivery?: "auto" | "steer" | "follow_up"; readonly expected_turn_id?: string }
 
-/**
- * The send-time refusals a local send makes (tools.ts deliverThroughGateway, then gateway/engine.ts deliver), in the
- * same order and words; the unknown-caller refusal comes first, in tools.ts, before any receipt is written. The engine's
- * 1 MiB message_too_large cannot be reached by either leg: the shared param schema caps a message at
- * THREAD_MESSAGE_MAX_BYTES before any send.
- */
 export function sendArgumentFailure(request: RemoteSendRequest): Failure | undefined {
   if (request.expected_turn_id !== undefined && !/^\d+$/.test(request.expected_turn_id)) return fail("turn_conflict", `Turn ${request.expected_turn_id} is not a turn of the target session.`, "Read the target again and steer with the turn_id a started or steered result returned.")
   if (request.delivery === "steer" && request.expected_turn_id === undefined) return fail("invalid_arguments", "A steer needs expected_turn_id (the target's current turn_epoch).", "Fix the arguments and send again.")
   return undefined
 }
 
-export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, request: RemoteSendRequest, sender: RemoteSender): Promise<ThreadToolResult> {
+export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, request: RemoteSendRequest): Promise<ThreadToolResult> {
   const refused = sendArgumentFailure(request)
   if (refused !== undefined) return refused
   const offline = await deviceOnline(remote, row.device)
   if (offline !== undefined) return offline
-  // A peer's text never reaches the receiver's command dispatch or prompt templates (senpi prompt `expandPromptTemplates`).
-  const text = (effective: EffectiveLane) => sender.kind === "peer" ? { message: peerText(sender, request, effective), expandPromptTemplates: false } : { message: request.message }
+  const text = () => ({ message: request.message })
   if (request.delivery === "steer") {
     const state = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
     if (state.kind !== "ok") return outcomeFailure(state, row.device)
@@ -220,7 +213,7 @@ export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessi
     if (typeof current !== "string" || current.length === 0) return fail(REFUSAL_CODES.turn_conflict.code, `Turn ${request.expected_turn_id} of ${row.session_id} cannot be confirmed on device ${row.device}.`, REFUSAL_CODES.turn_conflict.next, { device: row.device, reason: "remote_turn_not_verifiable" })
     if (current !== request.expected_turn_id) return fail(REFUSAL_CODES.turn_conflict.code, `Turn ${request.expected_turn_id} is not the running turn of ${row.session_id} on device ${row.device}.`, REFUSAL_CODES.turn_conflict.next, { device: row.device, current_turn_id: current })
     // The engine checks expectedTurnId again when the steer arrives, so a turn that ended in between is refused there.
-    const steer = remote.chain.stamp({ type: "prompt", sessionId: row.session_id, ...text("steer"), streamingBehavior: "steer", expectedTurnId: current }, sender.hop)
+    const steer = remote.chain.stamp({ type: "prompt", sessionId: row.session_id, ...text(), streamingBehavior: "steer", expectedTurnId: current }, 1)
     const steered = await remote.sessions.sessionCommand(row.device, row.session_id, steer)
     if (steered.kind === "refused" && (steered.reason === "turn_conflict" || steered.reason === "not_steerable")) return fail(REFUSAL_CODES[steered.reason].code, `A steer to ${row.session_id} was refused: ${steered.reason}.`, REFUSAL_CODES[steered.reason].next, { device: row.device })
     if (steered.kind !== "ok") return outcomeFailure(steered, row.device)
@@ -229,7 +222,7 @@ export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessi
   // One round trip (#12320): no get_state goes first. The engine itself starts a followUp prompt on an idle session and
   // queues it behind a running turn, deciding both in one step (senpi agent-session `_prompt`, 2026.11.2-3 and later),
   // and its reply's disposition says which happened.
-  const record = remote.chain.stamp({ type: "prompt", sessionId: row.session_id, ...text("follow_up"), streamingBehavior: "followUp" }, sender.hop)
+  const record = remote.chain.stamp({ type: "prompt", sessionId: row.session_id, ...text(), streamingBehavior: "followUp" }, 1)
   const sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
   if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
   const reply = replyData(sent.response)
