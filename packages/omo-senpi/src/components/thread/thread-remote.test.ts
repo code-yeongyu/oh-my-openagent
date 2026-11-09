@@ -146,7 +146,7 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     const a = account({ rows: [titled("b", "dur-on-b", "Release Train"), titled("here", "dur-local", "local peer"), titled("b", "dur-old-on-b", "stale", "ended")] })
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "release  train", message: "go" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
-    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => [entry.device, entry.session])).toEqual([["b", "dur-on-b"]])
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => [entry.device, entry.session])).toEqual([["b", "dur-on-b"]])
     expect(await run("thread_send", { thread: "local peer", message: "here" })).toMatchObject({ kind: "ok", thread_id: "dur-local" })
     expect(await run("thread_send", { thread: "stale", message: "x" })).toMatchObject({ kind: "error", error: { code: "not_found" } })
   })
@@ -184,7 +184,7 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "tui-b", message: "go" })).toMatchObject({ kind: "ok", thread_id: "sJMySZH_wlx9qQ25AU60qQ", device: "b" })
     expect(await run("thread_send", { thread: "rpc-b", message: "go" })).toMatchObject({ kind: "ok", thread_id: "JkMGhxKatogMmrmtCW-oFA", device: "b" })
-    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => [entry.device, entry.session])).toEqual([["b", "sJMySZH_wlx9qQ25AU60qQ"], ["b", "JkMGhxKatogMmrmtCW-oFA"]])
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => [entry.device, entry.session])).toEqual([["b", "sJMySZH_wlx9qQ25AU60qQ"], ["b", "JkMGhxKatogMmrmtCW-oFA"]])
   })
 
   test("#given an alias held by a thread on this device outside the caller's workspace #when thread_read and thread_send name the alias #then both reach it without all_scope, while its raw id alone stays scope_denied as before", async () => {
@@ -419,9 +419,9 @@ describe("K8 / R8.c: a chain carries its count across devices; no count or cost 
     return answers
   }
 
-  const prompts = (sent: readonly { readonly rpc?: Readonly<Record<string, unknown>> }[]) => sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => entry.rpc ?? {})
+  const prompts = (sent: readonly { readonly rpc?: Readonly<Record<string, unknown>> }[]) => sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => entry.rpc ?? {})
 
-  test("#given a caller at every hop of a chain past 12 #when it sends to b #then b's prompt carries the caller's hop + 1, nothing is refused and no cost field is sent", async () => {
+  test("#given a caller at every hop of a chain past 12 #when it sends to b #then b's record carries the caller's hop + 1, nothing is refused and no cost field is sent", async () => {
     const a = account()
     const callerHops = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     const answers = await sendFromHops(a.remote, callerHops)

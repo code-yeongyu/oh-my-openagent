@@ -19,6 +19,7 @@ export function createLocalTransport(engine: GatewayEngine): DeliveryTransport {
         ...(expected === undefined ? {} : { expected_turn_id: expected }),
         all_scope: delivery.target.all_scope,
         idempotency_key: delivery.idempotency_key,
+        ...(delivery.inbound_hop === undefined ? {} : { inbound_hop: delivery.inbound_hop }),
       })
     },
   }
