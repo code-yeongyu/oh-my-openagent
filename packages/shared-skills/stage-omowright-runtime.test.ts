@@ -127,6 +127,15 @@ describe("omowright runtime staging", () => {
     await expect(checkOmowrightRuntimeFresh({ sourceRoot, targetDir })).rejects.toThrow(/sourceDigest/)
   })
 
+  test("#given a staged runtime #when omowright's LICENSE changes #then the freshness check rejects it", async () => {
+    const sourceRoot = await makeSourceFixture()
+    const targetDir = await stageInto(sourceRoot)
+
+    await writeFile(join(sourceRoot, "LICENSE"), "MIT License\n\nchanged notice\n")
+
+    await expect(checkOmowrightRuntimeFresh({ sourceRoot, targetDir })).rejects.toThrow(/sourceDigest/)
+  })
+
   test("#given a staged runtime #when a staged file is edited by hand #then the freshness check rejects it", async () => {
     const sourceRoot = await makeSourceFixture()
     const targetParent = await mkdtemp(join(tmpdir(), "omowright-stage-target-"))

@@ -56,7 +56,7 @@ function resolveLayout(sourceRoot) {
 }
 
 async function sourceDigest(sourceRoot, layout) {
-  const entries = ["package.json", layout.entry, layout.pageBundle, ...layout.sources]
+  const entries = ["package.json", "LICENSE", layout.entry, layout.pageBundle, ...layout.sources]
   const hash = createHash("sha256")
   for (const entry of entries) hash.update(entry).update("\0").update(await readFile(join(sourceRoot, entry)))
   return hash.digest("hex")

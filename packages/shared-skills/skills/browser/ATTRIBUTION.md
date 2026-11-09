@@ -19,8 +19,8 @@ Both engines this skill documents are provided by **omowright**.
   `manifest.json` recording the version and file digests. Staging fails when omowright has no
   `LICENSE`. The repository holds no copy; the staged files are gitignored and packed through the
   sibling `.npmignore`.
-- omowright releases after 0.3.0 also open their entry with a `/*!` MIT banner that survives
-  bundling (omowright#290); the staged `LICENSE` is the notice for every version.
+- Once omowright#297 is released, its entry also opens with a `/*!` MIT banner that survives
+  bundling. Until then, and for every version, the staged `LICENSE` is the notice.
 
 ## BrowserSkill — driven, not vendored
 
