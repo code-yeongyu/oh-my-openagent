@@ -3,7 +3,9 @@
 // codemode loaded (#12903): the fake model first calls `thread_list` and `generate_image` directly
 // and must get the eval redirect for each, then calls `thread_list` from a js cell and a py cell and
 // gets the listing, then calls `generate_image` from a cell and reaches the tool body (senpi#6269;
-// the mock provider serves no images endpoint, so the body answers a provider failure).
+// the mock provider serves no images endpoint, so the body answers a provider failure), then calls
+// `thread_read` without arguments from a cell and gets an eval error naming the tool. The system
+// prompt the host sent must carry the cell form of every withheld tool.
 import { join } from "node:path"
 import { mkdirSync } from "node:fs"
 import { HostClient, makeScratch, startRealHost, startFakeModelServer, writeMockModelsJson, installCleanupHooks, cleanupAllAndWait, createReport, flag, pgrepPids, stopOwnedShardHosts, verifyCleanup } from "./lib/harness.mjs"
@@ -19,6 +21,9 @@ const fake = await startFakeModelServer([
   { toolCalls: [evalCall("js", "QA: thread_list from a js cell", 'const v = JSON.parse((await tool.thread_list({ all_scope: true })).text); print(JSON.stringify({ kind: v.kind, scope: v.scope, threads: v.threads.length }))')] },
   { toolCalls: [evalCall("py", "QA: thread_list from a py cell", 'import json\nv = json.loads(tool.thread_list(all_scope=True)["text"])\nprint(json.dumps({"kind": v["kind"], "scope": v["scope"], "threads": len(v["threads"])}, separators=(",", ":")))')] },
   { toolCalls: [evalCall("js", "QA: generate_image from a js cell", 'const r = await tool.generate_image({ prompt: "qa" }); print(JSON.stringify(r.details))')] },
+  // A failing call inside a cell is an eval error that names the tool: thread_read without its
+  // required `thread` argument.
+  { toolCalls: [evalCall("js", "QA: thread_read without arguments", "try { await tool.thread_read({}); print('NO_ERROR') } catch (e) { print('CELL_ERROR ' + String(e.message)) }")] },
   { text: "plugin-ready" },
 ])
 writeMockModelsJson(scratch.agentDir, fake)
@@ -63,6 +68,14 @@ const cellFor = (language, needle) => evalCalls.find((call) => call.args?.langua
 const jsList = cellFor("js", "thread_list")
 const pyList = cellFor("py", "thread_list")
 const jsImage = cellFor("js", "generate_image")
+const jsBadRead = cellFor("js", "thread_read({})")
+// The system prompt the host sent the model on its first request: the eval-only paragraph must name
+// every withheld tool's cell form, so the names stay discoverable.
+const systemPrompt = (() => {
+  const first = fake.requests.find((request) => Array.isArray(request.messages))
+  const system = first?.messages.find((message) => message.role === "system")
+  return typeof system?.content === "string" ? system.content : Array.isArray(system?.content) ? system.content.map((part) => part?.text ?? "").join("") : ""
+})()
 // A cell prints one JSON object; take the first balanced object that starts at the expected key.
 const jsonObjectAt = (text, start) => {
   let depth = 0
@@ -100,6 +113,8 @@ const jsListing = listingOf(jsList?.text)
 const pyListing = listingOf(pyList?.text)
 const image = imageDetails(jsImage?.text)
 report.assert("direct-generate-image-refused-with-eval-hint", directImage !== undefined && /Tool generate_image not found/.test(directImage.text) && directImage.text.includes('tool.generate_image({ prompt: "..." })'), `direct=${JSON.stringify(directImage?.text ?? null).slice(0, 400)}`)
+report.assert("system-prompt-names-eval-forms", systemPrompt.includes("tool.thread_list(") && systemPrompt.includes("tool.thread_send(") && systemPrompt.includes('tool.generate_image({ prompt: "..." })'), `system_prompt_eval_paragraph=${JSON.stringify(systemPrompt.slice(systemPrompt.indexOf("Eval-only tools"), systemPrompt.indexOf("Eval-only tools") + 300))}`)
+report.assert("js-cell-failure-names-the-tool", jsBadRead !== undefined && /CELL_ERROR .*Validation failed for tool "thread_read"/.test(jsBadRead.text), `bad_read_cell=${JSON.stringify(jsBadRead?.text ?? null).slice(0, 300)}`)
 report.assert("js-cell-thread-list-result", isListing(jsListing), `threads=${jsListing?.threads ?? "none"} scope=${jsListing?.scope ?? "none"} js_cell=${JSON.stringify(jsList?.text ?? null).slice(0, 400)}`)
 report.assert("py-cell-thread-list-result", isListing(pyListing), `threads=${pyListing?.threads ?? "none"} scope=${pyListing?.scope ?? "none"} py_cell=${JSON.stringify(pyList?.text ?? null).slice(0, 400)}`)
 report.assert("js-cell-generate-image-reaches-tool", reachedImageTool(image), `model=${image?.model ?? "none"} reason=${image?.reason ?? "none"} generated=${image?.generated ?? "none"} image_cell=${JSON.stringify(jsImage?.text ?? null).slice(0, 400)}`)
