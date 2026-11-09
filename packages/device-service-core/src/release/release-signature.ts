@@ -24,7 +24,13 @@ export const parseReleaseKeySet = (value: unknown): readonly string[] => {
   })
 }
 
-export const DEVICE_SERVICE_RELEASE_KEYS: readonly string[] = parseReleaseKeySet(committedReleaseKey)
+export const DEVICE_SERVICE_RELEASE_KEYS: readonly string[] = (() => {
+  try {
+    return parseReleaseKeySet(committedReleaseKey)
+  } catch {
+    return []
+  }
+})()
 
 export type SignatureVerdict = { readonly ok: true } | { readonly ok: false; readonly refusal: "malformed" | "signature" }
 

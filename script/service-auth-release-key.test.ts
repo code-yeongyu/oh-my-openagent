@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test"
 import { generateKeyPairSync } from "node:crypto"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { pathToFileURL } from "node:url"
 import committedReleaseKey from "../packages/device-service-core/src/release/release-key.json"
 import { assertReleaseKeySet } from "./service-auth-release-key"
 
@@ -69,5 +72,34 @@ describe("the release step refuses a service-auth bundle it cannot verify", () =
     const bundle = await Bun.file(join(import.meta.dir, "../packages/omo-native/bin/lib/service-auth.generated.js")).text()
 
     expect(assertReleaseKeySet(bundle)).toEqual(committedReleaseKey.public_keys_hex)
+  })
+
+  test("the generated native entry imports with structurally malformed compiled key documents", async () => {
+    const bundle = await Bun.file(join(import.meta.dir, "../packages/omo-native/bin/lib/service-auth.generated.js")).text()
+    const documents = [...bundle.matchAll(/\{alg:"Ed25519",public_keys_hex:\[[^\]]*\]\}/g)]
+    expect(documents).toHaveLength(1)
+    const document = documents[0]?.[0]
+    if (document === undefined) throw new Error("compiled key document missing")
+    const root = mkdtempSync(join(tmpdir(), "release-key-entry-"))
+    try {
+      for (const fixture of [
+        committedReleaseKey,
+        { ...committedReleaseKey, unexpected: true },
+        { ...committedReleaseKey, alg: "Ed448" },
+        { ...committedReleaseKey, public_keys_hex: ["AB".repeat(32)] },
+        { ...committedReleaseKey, public_keys_hex: ["ab".repeat(32), "ab".repeat(32)] },
+      ]) {
+        const entry = join(root, "entry.mjs")
+        await Bun.write(entry, bundle.replace(document, JSON.stringify(fixture)))
+        const child = Bun.spawnSync([process.execPath, "--eval", `
+          const native = await import(${JSON.stringify(pathToFileURL(entry).href)})
+          console.log(typeof native.runRemoteCommand)
+        `], { timeout: 20_000 })
+        expect(child.exitCode, child.stderr.toString()).toBe(0)
+        expect(child.stdout.toString().trim()).toBe("function")
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })
