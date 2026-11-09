@@ -4,6 +4,7 @@ import type { Static } from "typebox"
 
 import type { TaskStatus } from "../../state"
 import { withDroppedSteeringNotice } from "../../state/queued-steering"
+import { TASK_FAMILY_EXPOSURE } from "../exposure"
 import { renderTaskCancelCall, renderTaskCancelResult } from "./renderers"
 import { toolResult } from "./tool-result"
 import type { CancelManager, CancelResultDetails, CancelToolResult } from "./types"
@@ -79,8 +80,7 @@ export function createTaskCancelTool(deps: TaskCancelDeps): ToolDefinition<typeo
     name: "task_cancel",
     label: "Task Cancel",
     description: DESCRIPTION,
-    // Rarely used: searchable and activated by name on first call (#11454).
-    exposure: "search", allowLazyActivation: true, searchKeywords: ["cancel child", "stop task", "abort subagent"],
+    exposure: TASK_FAMILY_EXPOSURE,
     parameters: TaskCancelParams,
     execute: (_toolCallId, params) => runTaskCancel(deps.manager, params),
     renderCall: (args, theme) => renderTaskCancelCall(args, theme),

@@ -10,6 +10,7 @@ import {
   TeamTaskInvalidTransitionError,
 } from "../../team"
 import { toolErrorResult, toolResult } from "../control"
+import { TASK_FAMILY_EXPOSURE } from "../exposure"
 import type { ToolExecutionResult } from "../control"
 import { isMissingStateError } from "./classify-error"
 import { renderTeamTaskCall, renderTeamTaskResult } from "./renderers"
@@ -131,16 +132,13 @@ export async function runTeamTaskUpdate(service: TeamToolsService, params: TeamT
   }
 }
 
-// The four lead tasklist tools only matter once a team exists, so they ride the
-// tool-search catalog (exposure "search") instead of the resident tool list:
-// zero prompt tokens until a tasklist operation is actually searched for. Each
-// description leads with the situation that selects the tool.
-const TEAM_TASK_SEARCH_GROUP = "team-tasklist" as const
+// The four lead tasklist tools are part of the eval-only task family (Q 2026-11-09): withheld from the
+// model's direct list while an eval tool exists and called as tool.task_create(...) etc. in a cell, so
+// they cost no prompt tokens there either. Each description leads with the situation that selects the tool.
+type TaskExposureMeta = Pick<ToolDefinition, "exposure">
 
-type TaskSearchMeta = Pick<ToolDefinition, "exposure" | "searchText" | "searchKeywords" | "searchGroup" | "allowLazyActivation">
-
-function taskSearchMeta(searchText: string, searchKeywords: readonly string[]): TaskSearchMeta {
-  return { exposure: "search", searchText, searchKeywords, searchGroup: TEAM_TASK_SEARCH_GROUP, allowLazyActivation: true }
+function taskSearchMeta(_searchText: string, _searchKeywords: readonly string[]): TaskExposureMeta {
+  return { exposure: TASK_FAMILY_EXPOSURE }
 }
 
 export function createTeamTaskCreateTool(deps: TeamToolDeps): ToolDefinition<typeof TeamTaskCreateParams, TeamTaskCreateDetails> {

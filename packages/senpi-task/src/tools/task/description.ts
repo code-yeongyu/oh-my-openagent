@@ -10,8 +10,8 @@ export const TASK_PROMPT_SNIPPET = "Spawn one child or fan out a batch; use task
 export const TASK_PROMPT_GUIDELINES: readonly string[] = [
   "Spawn children with run_in_background=true.",
   "NEVER pass model together with category: category-routed tasks take their model from omo.json (categories.<name>.models).",
-  "Continue an existing child with task_send(to=\"st_...\", message=\"...\"); task always spawns.",
-  "Use task_output for one midpoint status or transcript peek; use task_cancel to end a child.",
+  "Continue an existing child with tool.task_send({ to: \"st_...\", message: \"...\" }) in an eval cell; task always spawns.",
+  "Use tool.task_output({ task_id }) for one midpoint status or transcript peek; use tool.task_cancel to end a child.",
   "Pass task_summary (one line, <=80 chars) on every spawn: the user's footer/widget UI shows it instead of the raw prompt, so it should say WHAT was delegated.",
 ]
 
