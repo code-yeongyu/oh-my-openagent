@@ -170,8 +170,9 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
     deliver: async (delivery: OutboundDelivery): Promise<DeliveryOutcome> => {
       if (delivery.target.kind !== "remote") throw new Error("the relay transport delivers only to sessions on other devices")
       const row = delivery.target.row
-      if (delivery.caller_id === UNKNOWN_CALLER) return fail("caller_context_missing", "A gateway send needs the calling session's durable id.", "Retry from a session that passes its execution context.")
+      // senpi admit-external-message-command: a command_line sender is admitted only from the engine's own machine.
       if (delivery.sender.kind === "cli") return fail("unsupported", `A command-line sender cannot reach a session on device ${row.device}: the engine admits a command-line delivery only from its own machine.`, `Use omo remote send ${row.device}/${row.session_id} instead.`, { device: row.device, reason: "sender_not_allowed" })
+      if (delivery.caller_id === UNKNOWN_CALLER) return fail("caller_context_missing", "A gateway send needs the calling session's durable id.", "Retry from a session that passes its execution context.")
       if (delivery.mode === "steer" && delivery.expected_turn_id === undefined) return fail("invalid_arguments", "A steer needs expected_turn_id (the target's current turn_epoch).", "Fix the arguments and send again.")
       if (delivery.expected_turn_id !== undefined && !/^\d+$/.test(delivery.expected_turn_id)) return fail("turn_conflict", `Turn ${delivery.expected_turn_id} is not a turn of the target session.`, "Read the target again and steer with the turn_id a started or steered result returned.")
       return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, () => send(delivery, row))
