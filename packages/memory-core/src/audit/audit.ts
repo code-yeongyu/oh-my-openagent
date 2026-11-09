@@ -142,7 +142,8 @@ function isDirectory(resolved: string, existing: ReadonlySet<string>): boolean {
   return false
 }
 
-function withoutFences(body: string): string {
+/** The body with fenced blocks and inline code blanked, line count preserved, so quoted link syntax is not a link. */
+export function withoutFences(body: string): string {
   let fence: { readonly char: string; readonly length: number } | undefined
   return body.split("\n").map((line) => {
     const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line)
