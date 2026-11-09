@@ -27,6 +27,9 @@ async function runTree(maxDepth: number, hostedParent = false) {
       value: { role: "child", depth: "4", root_session_id: "tree-root" },
     })
   }
+  // senpi#6206: this scripted root is no live engine session, so its in-process children ask (a child of a parent
+  // not live in its process asks); the root's person allows each delegation through the forwarded prompt.
+  Object.defineProperty(pi, "sessionDialog", { value: { select: async () => "Allow once", confirm: async () => true } })
   // Only the provider is scripted. The sessions execute the inherited task tool,
   // the composed manager and the in-process runner without replacing their seams.
   Reflect.apply(machine.modelRegistry.registerProvider, machine.modelRegistry, [PROVIDER, {
