@@ -218,9 +218,10 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   // with it, and the lifecycle salvages and sweeps a crashed host's clones through the same object.
   // Without it every `isolated: true` spawn is refused as `isolation_unavailable`.
   const isolation = createIsolationRuntime()
+  const getOmoConfig = deps.getOmoConfig ?? (() => deps.omoConfig)
   const { host, lifecycle, resolveInheritedExtensions, runnerContext } = composeEngineHostWiring({
     pi: deps.pi,
-    omoConfig: deps.omoConfig,
+    getOmoConfig,
     settings,
     runtime,
     sharedParentTools: deps.sharedParentTools,
@@ -232,7 +233,6 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
 
   const factories = deps.runnerFactories ?? DEFAULT_RUNNER_FACTORIES
   const resolveRegistry: ResolveModelRegistry = () => runtime.modelRegistry()
-  const getOmoConfig = deps.getOmoConfig ?? (() => deps.omoConfig)
   // The default route a pin-less child would ride, named in model_unavailable refusals (#9722) so
   // the caller sees the substitution the failure prevented. Read lazily per plan: a mid-session
   // default change reaches the next spawn's message.
