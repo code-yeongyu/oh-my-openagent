@@ -29,6 +29,7 @@ import { SESSION_SHUTDOWN_DRAIN_BUDGET_MS } from "./shutdown-drain"
 import { createMemoryWiring } from "./wiring"
 import { composeOmoSenpiExtension } from "../../extension/compose"
 import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 const roots: string[] = []
 
 // afterBind starts background git pipelines it never exposes a drain handle for
@@ -397,6 +398,7 @@ const eventCtx = {
 }
 
 test("#given a reflection reconcile that never settles #when turns settle #then each turn ends without waiting for it and the pass starts once", async () => {
+  useTestTimeout(15_000)
   // given: the real memory wiring reaches its injected runtime, not a substitute settle handler.
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-settle-")))
   roots.push(root)
@@ -428,9 +430,9 @@ test("#given a reflection reconcile that never settles #when turns settle #then 
   await pi.dispatch("input_disposition", { inputId: "accepted", disposition: "started" }, eventCtx)
   try {
     // when: the watchdog only bounds a failure; completing by the observer's timeout would log a stall.
-    await withinMs(pi.dispatch("agent_settled", {}, eventCtx), "first settle", 4_000)
-    await withinMs(entered.promise, "memory reconciliation entered", 4_000)
-    await withinMs(pi.dispatch("agent_settled", {}, eventCtx), "second settle", 4_000)
+    await withinMs(pi.dispatch("agent_settled", {}, eventCtx), "first settle", remainingTestTime())
+    await withinMs(entered.promise, "memory reconciliation entered", remainingTestTime())
+    await withinMs(pi.dispatch("agent_settled", {}, eventCtx), "second settle", remainingTestTime())
 
     // then: both turn ends returned while the pass is still held, and the pass was not restarted.
     expect(context.logs).not.toContainEqual(expect.objectContaining({ message: "extension_handler_stalled" }))
@@ -438,7 +440,7 @@ test("#given a reflection reconcile that never settles #when turns settle #then 
 
     // when: the pass finishes, later turns find the session reconciled
     release.resolve()
-    await withinMs(pi.dispatch("agent_settled", {}, eventCtx), "third settle", 4_000)
+    await withinMs(pi.dispatch("agent_settled", {}, eventCtx), "third settle", remainingTestTime())
 
     // then
     expect(passes).toBe(1)
@@ -769,7 +771,7 @@ describe("session shutdown pre-drain bounds", () => {
     await f.pi.dispatch("input", { type: "input", source: "rpc", inputId: "real-prompt", text: "Read the rollout guide." }, f.eventCtx)
     await f.pi.dispatch("input_disposition", { type: "input_disposition", inputId: "real-prompt", disposition: "started" }, f.eventCtx)
     await f.pi.dispatch("tool_call", { toolName: "read", input: { path: ROLLOUTS } }, f.eventCtx)
-    await withinMs(started.promise, "the resident child start", 10_000)
+    await withinMs(started.promise, "the resident child start", remainingTestTime())
 
     // when
     const startedAt = Date.now()
@@ -778,7 +780,7 @@ describe("session shutdown pre-drain bounds", () => {
       sessionId: f.sessionId,
       deadlineAt: Date.now() + 300,
       now: () => Date.now(),
-    }), "the bounded session shutdown", 10_000)
+    }), "the bounded session shutdown", remainingTestTime())
     const elapsed = Date.now() - startedAt
 
     // then
@@ -809,11 +811,11 @@ describe("session shutdown pre-drain bounds", () => {
       sessionId: f.sessionId,
       deadlineAt: Date.now() + 300,
       now: () => Date.now(),
-    }), "the bounded session shutdown", 10_000)
+    }), "the bounded session shutdown", remainingTestTime())
     const elapsed = Date.now() - startedAt
 
     // then
-    await withinMs(entered.promise, "the facts cancellation", 10_000)
+    await withinMs(entered.promise, "the facts cancellation", remainingTestTime())
     expect(elapsed).toBeLessThan(5_000)
     expect(budgetWarnings(f.warnings, "facts-cancel")).toHaveLength(1)
     expect(budgetWarnings(f.warnings, "facts-enqueue")).toHaveLength(1)

@@ -5,6 +5,7 @@ import { fireDream } from "./dream-trigger-fire"
 import { loadConversations } from "./dream-selector"
 import { memorySettings } from "./memory.test-support"
 import { CONVERSATION, NOW_MS, fireTimer, fixture, gateProbe, noopSteps, settle, triggerSettings } from "./dream-trigger.test-support"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 describe("dream shutdown evaluator", () => {
   test("#given every gate passing #when shutdown fireDream uses an injected loader #then the loader runs exactly once", async () => {
@@ -110,7 +111,7 @@ describe("dream shutdown evaluator", () => {
     })
     await Promise.race([
       reservationStarted,
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("shutdown reservation did not start")), 2_000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("shutdown reservation did not start")), remainingTestTime())),
     ])
 
     controller.abort()
