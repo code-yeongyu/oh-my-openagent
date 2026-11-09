@@ -69,7 +69,7 @@ export function pruneProvisionedRuntimes(options: {
     }
     // Rename first so a launch of this version that races the delete re-provisions a whole runtime
     // instead of running from a half-deleted one.
-    const pruning = join(options.root, `${PRUNE_PREFIX}${version}-${process.pid}`)
+    const pruning = join(options.root, `${PRUNE_PREFIX}${version}-${process.pid}-${Date.now()}`)
     try {
       renameSync(directory, pruning)
       renamed.push({ version, directory, pruning })
@@ -132,10 +132,17 @@ function listRunningCommands(): readonly string[] | undefined {
   return commands.length === 0 ? undefined : commands
 }
 
-// `.prune-<version>-<pid>`: signal 0 probes the pid without touching it; EPERM means it exists.
-function pruneOwnerAlive(entry: string): boolean {
-  const pid = Number(/-(\d+)$/.exec(entry)?.[1])
+// `.prune-<version>-<pid>-<ms>`: signal 0 probes the pid without touching it; EPERM means it exists.
+// A live pruner holds its tree for a moment, so a tree older than the ceiling belongs to a crashed
+// pruner whose pid was reused (after a reboot, say) and is swept anyway.
+const PRUNE_TREE_MAX_AGE_MS = 60 * 60 * 1000
+
+function pruneOwnerAlive(entry: string, now = Date.now()): boolean {
+  const match = /-(\d+)(?:-(\d+))?$/.exec(entry)
+  const pid = Number(match?.[1])
   if (!Number.isSafeInteger(pid) || pid <= 0 || pid === process.pid) return false
+  const renamedAt = Number(match?.[2])
+  if (Number.isSafeInteger(renamedAt) && now - renamedAt > PRUNE_TREE_MAX_AGE_MS) return false
   try {
     process.kill(pid, 0)
     return true

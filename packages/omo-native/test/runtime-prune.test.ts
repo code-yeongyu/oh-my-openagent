@@ -140,6 +140,18 @@ describe("pruneProvisionedRuntimes", () => {
     expect(result.failed).toEqual([])
   })
 
+  test("#given a live pruner's tree renamed longer ago than the age ceiling #when a fresh runtime prunes #then it is swept as a crashed pruner's leftover", () => {
+    // given: the pid is alive (reused after a crash), but the tree was renamed two hours ago
+    const stale = `.prune-5.1.39-${process.ppid}-${Date.now() - 2 * 60 * 60 * 1000}`
+    const fresh = `.prune-5.1.38-${process.ppid}-${Date.now()}`
+    provision(stale, fresh, "5.1.62")
+    // when
+    pruneProvisionedRuntimes({ root, current: "5.1.62", platform: "linux", listRunning: () => [] })
+    // then
+    expect(present(stale)).toBe(false)
+    expect(present(fresh)).toBe(true)
+  })
+
   test("#given a concurrent pruner that renames a runtime before this one does #when a fresh runtime prunes #then it counts as removed, not failed", () => {
     // given: the other pruner takes 5.1.40 between this pruner's listing and its rename
     provision("5.1.40", "5.1.56", "5.1.61", "5.1.62")
