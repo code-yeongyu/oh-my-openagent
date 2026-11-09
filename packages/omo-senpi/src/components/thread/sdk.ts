@@ -19,6 +19,10 @@ import { createGatewayResolver, createGatewayServices } from "./tools/gateway-se
 import { addressBook, hostView, resolution, resolveEntries, resolveStoredSession } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread } from "./tools/read-ops"
+import { crossTarget } from "./remote/cross-device"
+import type { RemoteThreadSurface } from "./remote/ports"
+import { localScope } from "./remote/local-scope"
+import { readRemote } from "./remote/remote-ops"
 
 export type ThreadSdkOptions = {
   readonly agentDir: string
@@ -39,6 +43,11 @@ export type ThreadSdkOptions = {
   readonly host?: ThreadHost
   readonly store?: GatewayStore
   readonly now?: () => number
+  /**
+   * The account's other devices and its alias registry (the CLI passes the thread client sidecar's `createCliRemoteSurface`):
+   * `read` then resolves an address exactly as the agent's `thread_read` does. Absent, it reads this device only.
+   */
+  readonly remote?: RemoteThreadSurface
 }
 
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
@@ -182,7 +191,16 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     extensionCall: store.extensionCall,
     principal,
     list: (request) => guarded(async () => listThreads(surface, await view(), request.all_scope)),
-    read: (request) => guarded(async () => readThread(surface, await view(), { thread: request.thread, max_bytes: request.max_bytes, cursor: request.cursor, all_scope: request.all_scope }, UNKNOWN_CALLER)),
+    read: (request) => guarded(async () => {
+      const current = await view()
+      const value = { thread: request.thread, max_bytes: request.max_bytes, cursor: request.cursor, all_scope: request.all_scope }
+      const remote = options.remote
+      if (remote === undefined) return readThread(surface, current, value, UNKNOWN_CALLER)
+      const target = await crossTarget(remote, value.thread, resolution(surface, resolveEntries(surface, current), value.thread, UNKNOWN_CALLER, true))
+      if (target.kind === "error") return target.result
+      if (target.kind === "remote") return await readRemote(remote, target.row, value)
+      return readThread(surface, current, { ...value, thread: target.address, all_scope: localScope(target, value.all_scope) }, UNKNOWN_CALLER)
+    }),
     send: (request) => guarded(async () => {
       if (request.binding_id !== undefined) return await inbound({ ...request, binding_id: request.binding_id })
       if (request.thread === undefined) return fail("invalid_arguments", "A send without a binding needs a target session.", "Pass the target session, or --binding to deliver through a binding.")
@@ -259,8 +277,9 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         return { success: false, error: failure.error.code, errorData: { hint: failure.error.message } }
       }
     },
-    dispose: () => {
+    dispose: async () => {
       relay.dispose()
+      await options.remote?.sessions.close?.().catch(() => undefined)
       return store.dispose()
     },
   }

@@ -42,6 +42,11 @@ const REFUSED_BEFORE_SENDING: ReadonlySet<LocalApiError["code"]> = new Set<Local
 
 const notSentReason = (error: unknown): string => (error instanceof LocalApiError ? error.code : "attach_failed")
 
+// The device service refuses a session the other device does not hold with session_not_found; an engine answers a
+// command for such a session unknown_session, on that device and on this one. A refusal of a session-scoped command or
+// read reports the engine's code, so a remote command answers exactly what the same command does locally (#12755).
+const sessionReason = (code: string): string => (code === "session_not_found" ? "unknown_session" : code)
+
 // The engine records the thread tools send that change nothing on the other device (thread_read, the pre-send probe).
 // Like the port's read, every failure of one is a typed refusal: there is nothing that may have run.
 const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages"])
@@ -89,7 +94,7 @@ function outcomeOf(result: CommandResult): RemoteCommandOutcome {
     const error = response["error"]
     return { kind: "refused", reason: typeof code === "string" && code.length > 0 ? code : typeof error === "string" && error.length > 0 ? error : "engine_failed" }
   }
-  return { kind: "ok", response }
+  return result.located === undefined ? { kind: "ok", response } : { kind: "ok", response, located: result.located.key }
 }
 
 /**
@@ -130,7 +135,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     sessions: async () => (await (await svc()).sessions()).rows.map((row) => ({ device: row.device, session_id: row.session_id, title: row.title, project: row.project, path: row.path, state: row.state, updated_ms: row.updated_ms })),
     // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
     // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
-    endpointCommand: async (device, rpc) => {
+    endpointCommand: async (device, rpc, endpointOptions) => {
       let record: WireRpc
       try {
         record = wireRecord(rpc)
@@ -144,7 +149,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         return { kind: "refused", reason: notSentReason(error) }
       }
       try {
-        return outcomeOf(await connected.endpointCommand(device, record))
+        return outcomeOf(await connected.endpointCommand(device, record, endpointOptions))
       } catch (error) {
         // The SDK marks a failure before session.command was written (the endpoint lookup timing out or the connection
         // closing during it) not_sent: nothing ran, so it is refused. The same codes after sending stay uncertain.
@@ -154,7 +159,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       }
     },
     sessionCommand: async (device, sessionId, rpc, commandOptions) => {
-      // Before the command goes out nothing can have run: an attach that fails (session_not_found, peer_not_found,
+      // Before the command goes out nothing can have run: an attach that fails (session_not_found, as unknown_session; peer_not_found,
       // host_not_answering, a lost connection) or a record that is not JSON is refused with its code, typed.
       let session: Session
       let record: WireRpc
@@ -166,7 +171,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       try {
         session = await attach(device, sessionId)
       } catch (error) {
-        return { kind: "refused", reason: notSentReason(error) }
+        return { kind: "refused", reason: sessionReason(notSentReason(error)) }
       }
       const { attached, catalog } = session
       const readOnly = READ_ONLY_RECORDS.has(String(rpc["type"]))
@@ -183,10 +188,10 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         return readOnly && outcome.kind === "uncertain" ? { kind: "refused", reason: outcome.reason } : outcome
       } catch (error) {
         // The attach succeeded, so a failure without a local API code is a lost reply, not a failed attach.
-        if (readOnly) return { kind: "refused", reason: error instanceof LocalApiError ? error.code : "reply_lost" }
+        if (readOnly) return { kind: "refused", reason: error instanceof LocalApiError ? sessionReason(error.code) : "reply_lost" }
         // Only a code that answers before sending ran nothing. Anything else - a timeout after sending, the attach or
         // connection ending, a broken protocol - may have run on the other device, so it is uncertain and never retried.
-        if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code)) return { kind: "refused", reason: error.code }
+        if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code)) return { kind: "refused", reason: sessionReason(error.code) }
         return { kind: "uncertain", reason: "reply_lost" }
       }
     },
@@ -196,10 +201,31 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       try {
         page = await (await attach(device, sessionId)).attached.read({ tail })
       } catch (error) {
-        return { kind: "refused", reason: notSentReason(error) }
+        return { kind: "refused", reason: sessionReason(notSentReason(error)) }
       }
       const entries: JsonObject[] = page.entries.flatMap((item) => ("entry" in item && typeof item.entry === "object" && item.entry !== null && !Array.isArray(item.entry) ? [item.entry as JsonObject] : []))
       return { kind: "ok", response: { entries } }
+    },
+    watch: async (device, sessionId, listener) => {
+      let attached: RemoteAttach
+      try {
+        attached = (await attach(device, sessionId)).attached
+      } catch (error) {
+        return { kind: "refused", reason: notSentReason(error) }
+      }
+      // onEvent replays the attach's history to a new listener before it returns: only what arrives after is delivered.
+      let live = false
+      const stop = attached.onEvent((event) => {
+        if (live && event.kind === "records") for (const record of event.records) listener(record)
+      })
+      live = true
+      return { kind: "ok", watch: { ended: attached.detached, stop } }
+    },
+    close: async () => {
+      const open = service
+      service = undefined
+      attaches.clear()
+      if (open !== undefined) (await open.catch(() => undefined))?.close()
     },
     locate: async (device, engineId, knownKey) => {
       let connected: DeviceService
