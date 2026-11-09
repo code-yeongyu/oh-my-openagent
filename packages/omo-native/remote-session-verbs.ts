@@ -1,6 +1,7 @@
 import type { DeviceService } from "../device-service-core/src/index.ts"
 import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
+import type { RemoteSender } from "../omo-senpi/src/components/thread/remote/peer-text"
 import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { setModelRemote } from "../omo-senpi/src/components/thread/remote/remote-controls"
 import {
@@ -14,8 +15,9 @@ import {
   runningTurnRemote,
 } from "../omo-senpi/src/components/thread/remote/remote-ops"
 import type { RemoteCommandDependencies } from "./remote-cli"
-import { REMOTE_EXIT } from "./remote-exit"
+import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import { sessionVerbLines } from "./remote-render"
+import { localPermissionPreset } from "./remote-permission-preset"
 import type { SessionArgs } from "./remote-session-args"
 
 // The surface the agent's thread tools reach other devices through, on this command's own connection. The chain count
@@ -25,7 +27,8 @@ const deviceServiceSurface = (service: DeviceService): RemoteThreadSurface => ({
   chain: { stamp: record => record },
 })
 
-const CHAIN_START = 1
+// The person at this terminal sends their own input, not a peer session's message (#12852).
+const PERSON: RemoteSender = { kind: "person", hop: 1 }
 
 type Show = (result: ThreadToolResult, label: string) => number
 
@@ -79,7 +82,15 @@ async function openOn(
   { json, show }: { readonly json: boolean; readonly show: Show },
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
-  const opened = await openRemote(remote, { kind: "create", device: args.device, ...(args.project === undefined ? {} : { cwd: args.project }) })
+  let mode: string
+  try {
+    mode = args.permissionPreset ?? (dependencies.localPermissionPreset ?? localPermissionPreset)()
+  } catch (error) {
+    if (!(error instanceof UsageError)) throw error
+    dependencies.error(error.message)
+    return REMOTE_EXIT.usage
+  }
+  const opened = await openRemote({ ...remote, permissionPreset: () => mode }, { kind: "create", device: args.device, ...(args.project === undefined ? {} : { cwd: args.project }) })
   if (opened.kind !== "ok" || !("thread" in opened) || args.model === undefined) return show(opened, "")
   const label = `${args.device}/${opened.thread.thread_id}`
   const created: RemoteSessionRow = { device: args.device, session_id: opened.thread.thread_id, title: opened.thread.name, project: opened.thread.cwd, path: "", state: "idle", updated_ms: 0 }
@@ -118,7 +129,7 @@ async function sendTo(
     }
     request = { ...request, expected_turn_id: running.turn_id }
   }
-  if (!args.wait) return show(await promptRemote(remote, row, request, CHAIN_START), label)
+  if (!args.wait) return show(await promptRemote(remote, row, request, PERSON), label)
   // Followed before the send, so no delta of the turn it starts can arrive unseen.
   let reply = ""
   const follow = await followRemote(remote, row, text => {
@@ -127,7 +138,7 @@ async function sendTo(
   })
   if ("kind" in follow) return show(follow, label)
   try {
-    const sent = await promptRemote(remote, row, request, CHAIN_START)
+    const sent = await promptRemote(remote, row, request, PERSON)
     if (sent.kind === "error") return show(sent, label)
     const end = await follow.settled
     if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")
