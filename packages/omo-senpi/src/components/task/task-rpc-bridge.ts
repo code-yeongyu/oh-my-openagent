@@ -159,6 +159,7 @@ export function wireTaskRpcBridge(
           category: record.category,
           agentType: record.agent_type,
           resolvedModel: record.resolved_model,
+          ...(record.effective_model === undefined ? {} : { effectiveModel: record.effective_model }),
           model: record.model,
         },
         Date.parse(record.created_at),
