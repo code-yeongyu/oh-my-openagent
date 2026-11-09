@@ -12,9 +12,11 @@ import {
   auditMemoryRepo,
   countRuntimePastRetention,
   describeRuntimeCapExcess,
+  factsNotesOverBudget,
   formatRuntimeBytes,
   isMemoryContentPath,
   measureRuntimeCapEvictableBytes,
+  measureFactsNotesInDir,
   measureRuntimeSizeWithinBudget,
   measureUnreflectedJournalBytes,
   parseLockRecord,
@@ -290,6 +292,22 @@ export async function checkTokens(repoDir: string, warnTokens: number, estimate?
     name: "tokens",
     level: "warn",
     detail: `~${estimate.totalTokens} tokens in system/ reached the ${warnTokens} warning threshold; trim system/ and move detail into external memory`,
+  }
+}
+
+/** Facts notes over `facts_note_max_bytes` (#10884): the next pressure dream consolidates them. */
+export async function checkFactsNotes(repoDir: string, maxBytes: number): Promise<DoctorCheck> {
+  const notes = await measureFactsNotesInDir(repoDir)
+  if (maxBytes <= 0) return { name: "facts-notes", level: "ok", detail: `${notes.length} facts notes (no size budget)` }
+  const over = factsNotesOverBudget(notes, maxBytes)
+  if (over.length === 0) {
+    return { name: "facts-notes", level: "ok", detail: `${notes.length} facts notes, all within ${formatRuntimeBytes(maxBytes)}` }
+  }
+  const listed = over.map((note) => `${note.path} ${formatRuntimeBytes(note.bytes)} (${note.lines} lines)`).join(", ")
+  return {
+    name: "facts-notes",
+    level: "warn",
+    detail: `${over.length} facts notes over ${formatRuntimeBytes(maxBytes)}: ${listed}; the next memory pressure dream consolidates them, or run /dream`,
   }
 }
 

@@ -17,6 +17,7 @@ import {
   checkReflectionHealth,
   checkRuntimeSize,
   checkSoulSeed,
+  checkFactsNotes,
   checkTokens,
   checkWorktrees,
   type CheckLevel,
@@ -138,6 +139,7 @@ export async function runDoctor(deps: MemoryCommandDeps, ctx: MemoryCommandConte
       await checkGhostReservation(identity.identityPaths, deps),
       await checkReflectionHealth(identity.identityPaths.reflection, { now: deps.now?.() ?? Date.now() }),
       await checkTokens(repoDir, warnTokens, systemTokens),
+      await checkFactsNotes(repoDir, settings.facts_note_max_bytes),
       runtime.check,
     )
     const projection = await checkProjection(repoDir, identity.identity, projectionLimits(settings, identity.identity))

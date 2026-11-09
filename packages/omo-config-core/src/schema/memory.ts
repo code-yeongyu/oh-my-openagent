@@ -329,6 +329,7 @@ export const OmoMemorySettingsSchema = z.object({
   projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 0, max_bytes: 40960 }),
   runtime: OmoMemoryRuntimeSchema.default({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30, pass_budget_ms: 60000, discard_unreflected_journals: false, max_bytes: 2 * 1024 * 1024 * 1024 }),
   compile_warn_tokens: z.number().int().positive().default(30000),
+  facts_note_max_bytes: z.number().int().nonnegative().default(48 * 1024),
   agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).default({}),
 }).strict()
 
@@ -351,6 +352,7 @@ export const OmoMemorySettingsLayerSchema = z.object({
   projection: OmoMemoryProjectionLayerSchema.optional(),
   runtime: OmoMemoryRuntimeLayerSchema.optional(),
   compile_warn_tokens: z.number().int().positive().optional(),
+  facts_note_max_bytes: z.number().int().nonnegative().optional(),
   agents: z.record(z.string(), OmoMemoryAgentOverridesSchema).optional(),
 }).strict()
 

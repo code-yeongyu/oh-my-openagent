@@ -13,6 +13,7 @@ export interface ReflectionSpawnPaths {
   readonly dreamState?: string
   readonly dreamPolicy?: string
   readonly systemTokens?: string
+  readonly factsNotes?: string
   readonly dreamTarget?: string
 }
 
@@ -89,6 +90,8 @@ export interface PrepareReflectionSpawnInput {
   readonly peoplePolicy: DreamPeoplePolicy
   readonly systemTokenBudget?: number
   readonly systemTokenTarget?: number
+  /** `memory.facts_note_max_bytes`; omitted uses the shipped default (#10884). */
+  readonly factsNoteMaxBytes?: number
   readonly senpiCommand?: string
   readonly senpiPrefixArgs?: readonly string[]
   readonly chmodFile?: (path: string, mode: number) => Promise<void>
