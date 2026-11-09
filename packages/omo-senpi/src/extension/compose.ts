@@ -13,6 +13,7 @@ import { publishWakeQueueBaselineOnSessionStart, publishWakeQueueChildWork } fro
 import { createFirstPaintScheduler, createStartupDeferral, type StartupWorkScheduler } from "./startup-deferral"
 import { installToolCaptureRegistry } from "./tool-capture-registry"
 import { createPrewarmDiagnostics } from "./prewarm-diagnostics"
+import { absentSenpiSeamsNotice, installRemoteWakeRefusal } from "./senpi-seams"
 import type { ComponentContext, ComponentLogger, OmoSenpiComponent, SenpiExtensionAPI } from "./types"
 import { releaseHerdrAgentHint } from "./herdr-agent-hint"
 
@@ -122,6 +123,10 @@ export function composeOmoSenpiExtension(
       logger.info("omo-senpi disabled by flag")
       return
     }
+
+    const absentSeams = absentSenpiSeamsNotice(pi)
+    if (absentSeams !== undefined) logger.warn(absentSeams)
+    installRemoteWakeRefusal(pi)
 
     // Install the capture registry and idle coordinator BEFORE the component loop so every component
     // (lsp registers earlier than task) has its tools captured and shares one injection arbiter.

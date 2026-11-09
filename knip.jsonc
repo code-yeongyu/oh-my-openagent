@@ -511,8 +511,6 @@
       "packages/omo-native/bin/lib/bun-runtime.js": ["BUN_MIN_VERSION", "resolveBunGuard", "findNodeBinary"],
       // pre-existing at origin dev 4686e425b5: unused export(s) COMPUTER_USE_RUNTIME
       "packages/omo-native/bin/lib/computer-use-doctor.js": ["COMPUTER_USE_RUNTIME"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) TASK_CONFIG_RUNTIME
-      "packages/omo-native/bin/lib/daemon-config.js": ["TASK_CONFIG_RUNTIME"],
       // pre-existing at origin dev 4686e425b5: unused export(s) aggregateEndpoints
       "packages/omo-native/bin/lib/daemon-status.js": ["aggregateEndpoints"],
       // pre-existing at origin dev 4686e425b5: unused export(s) omoInstallsOnPath, findLegacyPackages, findOpenCodeRegistrations, formatMigrationLines, openCodeRoutingReport
@@ -558,7 +556,8 @@
       // pre-existing at origin dev 4d3161eabd (#11430, 950c2dd65f): unused export(s) HashDirectoryRuntimeError
       "packages/omo-native/openssl-hash-dir.ts": ["HashDirectoryRuntimeError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) resolveDaemonTaskSettings
-      "packages/omo-native/task-config-entry.ts": ["resolveDaemonTaskSettings"],
+      // resolveGlobalMemorySettings: read by omo doctor --fix through the staged plugin/runtime/task-config bundle (#12479)
+      "packages/omo-native/task-config-entry.ts": ["resolveDaemonTaskSettings", "resolveGlobalMemorySettings"],
       // pre-existing at origin dev 4686e425b5: unused export(s) SOURCE_ROOT
       "packages/omo-native/test/bun-bin-shim.fixture.ts": ["SOURCE_ROOT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) identityRealpath, existsOnly
@@ -1133,8 +1132,6 @@
       "packages/omo-senpi/src/components/memory/commands/types.ts": ["identityFor"],
       // pre-existing at origin dev 4686e425b5: unused export(s) getMemoryRepo
       "packages/omo-senpi/src/components/memory/context.ts": ["getMemoryRepo"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_SERVICE_API
-      "packages/omo-senpi/src/components/memory/device-session/account-source.ts": ["DEFAULT_SERVICE_API"],
       // pre-existing at origin dev 4686e425b5: unused export(s) FakeScheduler
       "packages/omo-senpi/src/components/memory/dream-trigger.test-support.ts": ["FakeScheduler"],
       // pre-existing at origin dev 4686e425b5: unused export(s) factsAgreementContract
@@ -1535,8 +1532,6 @@
       "packages/senpi-task/src/manager/held-send.ts": ["holdsInChild"],
       // pre-existing at origin dev 4686e425b5: unused export(s) TaskConcurrency, decideDepthPolicy, NameRegistry, AUTO_HOST_CAPABILITIES, adaptInProcessHandle, adaptRpcHandle, TASK_AWAITING_INPUT_EVENT, TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT, logTranscriptEvent and 1 more
       "packages/senpi-task/src/manager/index.ts": ["TaskConcurrency", "decideDepthPolicy", "NameRegistry", "AUTO_HOST_CAPABILITIES", "adaptInProcessHandle", "adaptRpcHandle", "TASK_AWAITING_INPUT_EVENT", "TRANSCRIPT_ASSISTANT_EVENT", "TRANSCRIPT_TOOL_EVENT", "logTranscriptEvent", "subscribeTranscriptLog"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) START_REPORT_WINDOW_MS
-      "packages/senpi-task/src/manager/manager.ts": ["START_REPORT_WINDOW_MS"],
       // pre-existing at origin dev 4686e425b5: unused export(s) readObservedModel, observeChildEffectiveModel
       "packages/senpi-task/src/manager/observed-model.ts": ["readObservedModel", "observeChildEffectiveModel"],
       // pre-existing at origin dev 4686e425b5: unused export(s) PausedChildLostError, PausedChildOwnedElsewhereError
@@ -1681,8 +1676,8 @@
       "packages/shared-skills/skill-source-filter.mjs": ["ignoredSkillSourceFileNames"],
       // pre-existing at origin dev 4686e425b5: unused export(s) BROWSER_ENGINE_ENV
       "packages/shared-skills/skills/browser/scripts/browser-engine-guard.mjs": ["BROWSER_ENGINE_ENV"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) BROWSER_ENGINE_ENV, resolveOmowrightEntry, loadOmowright
-      "packages/shared-skills/skills/browser/scripts/omowright.mjs": ["BROWSER_ENGINE_ENV", "resolveOmowrightEntry", "loadOmowright"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) BROWSER_ENGINE_ENV, resolveOmowrightEntry
+      "packages/shared-skills/skills/browser/scripts/omowright.mjs": ["BROWSER_ENGINE_ENV", "resolveOmowrightEntry"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MAX_ROWS, MAX_OUTPUT_BYTES
       "packages/shared-skills/skills/debugging/references/scripts/dap.mjs": ["MAX_ROWS", "MAX_OUTPUT_BYTES"],
       // pre-existing at origin dev 4686e425b5: unused export(s) classifyName
@@ -2635,6 +2630,8 @@
         "**/*.test-d.ts",
         "src/git/test-repo-config.test-support.ts",
         "src/recall/bm25-persist.ts",
+        // bundled by path by script/build-reflection-lock.ts into the doctor CLI's reflection-lock.generated.js
+        "src/reflection/reflection-lock-bundle.ts",
         "src/sync/item/test-support.ts",
         "src/sync/account/testing/credential-writer.test-support.ts",
         "src/sync/keyring-port.ts",

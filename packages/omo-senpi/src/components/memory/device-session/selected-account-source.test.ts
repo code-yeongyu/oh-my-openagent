@@ -50,6 +50,46 @@ describe("the account source built from the engine's one selection", () => {
     expect(opened).toBe(2)
   })
 
+  test("concurrent resolves with no current account share one open and get the same account", async () => {
+    let opened = 0
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const source = accountSourceFromSelection({
+      selection: desktop(wire()), cli: cliCanary,
+      openAccount: async () => { opened += 1; await gate; return desktopAccount(`generation-${opened}`, () => true) },
+    })
+    const both = Promise.all([source(), source()])
+    release()
+    const [first, second] = await both
+    expect(opened).toBe(1)
+    expect(first?.kind).toBe("desktop")
+    expect(second).toBe(first)
+  })
+
+  test("a rejected open rejects every concurrent resolve once, and the next resolve opens again", async () => {
+    let opened = 0
+    let failing = true
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const failure = new Error("descriptor request failed")
+    const source = accountSourceFromSelection({
+      selection: desktop(wire()), cli: cliCanary,
+      openAccount: async () => {
+        opened += 1
+        await gate
+        if (failing) throw failure
+        return desktopAccount(`generation-${opened}`, () => true)
+      },
+    })
+    const both = Promise.allSettled([source(), source()])
+    release()
+    expect(await both).toEqual([{ status: "rejected", reason: failure }, { status: "rejected", reason: failure }])
+    expect(opened).toBe(1)
+    failing = false
+    expect((await source())?.kind).toBe("desktop")
+    expect(opened).toBe(2)
+  })
+
   test("main with no account to describe is signed out, then the next resolve opens the account", async () => {
     let signedIn = false
     const source = accountSourceFromSelection({

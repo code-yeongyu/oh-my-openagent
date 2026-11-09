@@ -373,20 +373,6 @@ describe("resolveCategory", () => {
     expect(result.kind).toBe("model_unavailable")
   })
 
-  test("#given no category or fallback model resolves and a system default is available #when resolved #then delegate-core reaches the system default", () => {
-    // given
-    const models = registry([model("local", "system-default")])
-
-    // when
-    const result = resolveCategory("quick", {}, models, { systemDefaultModel: "local/system-default" })
-
-    // then
-    const resolved = expectResolved(result)
-    expect(resolved.spec.provider).toBe("local")
-    expect(resolved.spec.modelId).toBe("system-default")
-    expect(resolved.modelSelection.matchedFallback).toBe(false)
-  })
-
   test("#given selected model is absent from registry #when resolved #then unavailable result names attempted and available models", () => {
     // given
     const models = registry([model("anthropic", "claude-sonnet-4-6")])

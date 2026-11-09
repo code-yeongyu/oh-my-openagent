@@ -133,6 +133,7 @@ export function buildChildSessionOptions(input: BuildChildSessionOptionsInput): 
       settingsManager,
       ...(spec.agentDir === undefined ? {} : { agentDir: spec.agentDir }),
       ...(spec.systemPrompt === undefined ? {} : { systemPrompt: spec.systemPrompt }),
+      ...(spec.ownApprovalMode === undefined ? {} : { allowTools: spec.ownApprovalMode.allowTools }),
     }),
     customTools,
     ...(spec.agentDir !== undefined && { agentDir: spec.agentDir }),
