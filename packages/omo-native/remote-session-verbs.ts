@@ -138,7 +138,7 @@ async function sendTo(
   // The person at this terminal sends their own input through the same transport port the thread tools deliver through
   // (#12885): a `person` sender keeps the engine's prompt record; its receipt is written to this device's gateway store
   // under a key minted per invocation (a person's retry is a new send, so nothing dedupes it).
-  const anchor = gatewayWorkerAnchor()
+  const anchor = gatewayWorkerAnchor(dependencies.packageRoot ?? packageRoot)
   const store = createGatewayStore({ agentDir: canonicalAgentDir(), ...(anchor === undefined ? {} : { workerModuleUrl: anchor }) })
   const transport = createRelayTransport({ remote, store, senderProvenance: () => resolveProvenance({ cwd: process.cwd(), env: process.env }) })
   const person = { kind: "person" as const, uid: process.getuid?.() ?? 0, user: userInfo().username }

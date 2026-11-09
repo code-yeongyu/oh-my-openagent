@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { connectDeviceService, DEVICE_SERVICE_VERSION } from "../../device-service-core/src/index.ts"
@@ -48,7 +48,7 @@ const testBootstrap = (overrides: Partial<BootstrapSetup> = {}): BootstrapSetup 
   ...overrides,
 })
 
-async function run(args: readonly string[], stateDir?: string, account = SIGNED_IN, bootstrap = testBootstrap(), remote?: RemoteThreadSurface) {
+async function run(args: readonly string[], stateDir?: string, account = SIGNED_IN, bootstrap = testBootstrap(), remote?: RemoteThreadSurface, extra: { readonly packageRoot?: string } = {}) {
   let dir = stateDir
   if (dir === undefined) {
     const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
@@ -70,6 +70,7 @@ async function run(args: readonly string[], stateDir?: string, account = SIGNED_
       error: line => err.push(line),
       bootstrap,
       ...(remote === undefined ? {} : { remote: () => remote }),
+      ...extra,
     },
     args,
   )
@@ -416,6 +417,29 @@ describe("omo remote send: the gateway store's worker in the shipped layout", ()
       const anchor = gatewayWorkerAnchor(root)
       expect(anchor && fileURLToPath(anchor)).toBe(join(extensions, "omo.js"))
       expect(anchor && fileURLToPath(new URL("./gateway-store-worker.mjs", anchor))).toBe(join(extensions, "gateway-store-worker.mjs"))
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given the staged plugin's real worker sidecar under a package root the launcher names #when omo remote send runs #then the send goes through a store on that worker and b's engine takes the prompt", async () => {
+    // The sidecar the build ships (packages/omo-senpi/plugin/extensions/gateway-store-worker.mjs) under <root>/plugin/extensions/,
+    // as the npm package and the compiled runtime directory lay it out; the launcher passes that root as packageRoot.
+    const root = mkdtempSync(join(tmpdir(), "omo-remote-staged-"))
+    const extensions = join(root, "plugin", "extensions")
+    mkdirSync(extensions, { recursive: true })
+    const sidecar = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "omo-senpi", "plugin", "extensions", "gateway-store-worker.mjs")
+    copyFileSync(sidecar, join(extensions, "gateway-store-worker.mjs"))
+    try {
+      const fixture = createRemoteThreadFixture()
+      const a = fixture.account()
+      try {
+        const { code, out } = await run(["send", "b/dur-on-b", "hi", "--no-wait"], undefined, SIGNED_IN, testBootstrap(), a.remote, { packageRoot: root })
+        expect([code, out]).toEqual([REMOTE_EXIT.ok, ["Sent to b/dur-on-b: turn turn-b started."]])
+        expect(a.sent.filter(entry => entry.rpc?.["type"] === "prompt")).toHaveLength(1)
+      } finally {
+        await fixture.cleanup()
+      }
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
