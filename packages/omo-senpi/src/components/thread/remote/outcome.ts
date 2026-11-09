@@ -53,4 +53,3 @@ export function outcomeFailure(outcome: Exclude<RemoteCommandOutcome, { readonly
   if (outcome.reason === "record_too_large") return fail("unsupported", `The thread on device ${device} is too large to send back in one relay record (record_too_large).`, "Read it on that device, or ask that thread for a summary with thread_send.", { device, reason: outcome.reason })
   return fail("unsupported", `Device ${device} refused the command (${outcome.reason}).`, "Update omo on that device, or address a thread on this device.", { device, reason: outcome.reason })
 }
-
