@@ -67,6 +67,14 @@ describe("run process liveness across start-identity schemes", () => {
     expect(verdict).toBe("dead")
   })
 
+  test("#given a dead pid recorded with no start #when classified by reconciliation #then it stays unknown, so queued and deadline waits are unchanged (C20 control)", async () => {
+    // when
+    const verdict = await classifyRunProcess(424242, undefined, { getPidLiveness: dead, getProcessStartIdentity: async () => null })
+
+    // then
+    expect(verdict).toBe("unknown")
+  })
+
   test("#given scheme-less legacy identities that differ #when classified #then raw inequality still means pid reuse", async () => {
     // when
     const verdict = await classifyRunProcess(222, "supervisor-start", {

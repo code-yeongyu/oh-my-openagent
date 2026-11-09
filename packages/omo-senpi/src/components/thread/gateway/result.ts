@@ -2,7 +2,7 @@ import { threadToolFailure, type ThreadErrorCode } from "../errors"
 import type { GatewayEndpointKind } from "./adapter"
 import type { DeliveryRow, GatewayDeliveryResult } from "./types"
 
-const REFUSAL_CODES: Readonly<Record<string, { readonly code: ThreadErrorCode; readonly next: string }>> = {
+export const REFUSAL_CODES: Readonly<Record<string, { readonly code: ThreadErrorCode; readonly next: string }>> = {
   not_steerable: { code: "not_steerable", next: "Send with delivery auto or follow_up; a steer needs a running turn." },
   turn_conflict: { code: "turn_conflict", next: "Read the target again and retry with its current turn id, or send with delivery auto." },
   expired: { code: "not_resumable", next: "The target did not take the message within its lifetime; send it again if it still matters." },

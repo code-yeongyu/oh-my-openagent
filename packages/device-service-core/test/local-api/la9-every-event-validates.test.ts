@@ -19,6 +19,26 @@ const examples: { readonly [K in EventKind]: Extract<LocalEvent, { kind: K }> } 
     state: "open",
     devices: { [PEER]: "pending" },
   },
+  "session.command_event": {
+    type: "event",
+    kind: "session.command_event",
+    device: PEER,
+    frame: { type: "session_status" },
+  },
+  "session.command_blob_chunk": {
+    type: "event",
+    kind: "session.command_blob_chunk",
+    id: "b4",
+    off: 0,
+    b: "YWJj",
+  },
+  "session.command_blob_done": { type: "event", kind: "session.command_blob_done", id: "b4" },
+  "session.channel_closed": {
+    type: "event",
+    kind: "session.channel_closed",
+    device: PEER,
+    reason: "idle",
+  },
   "sessions.listing_begin": {
     type: "event",
     kind: "sessions.listing_begin",
@@ -221,7 +241,7 @@ describe("LA9 every event validates", () => {
       client,
       (e): e is LocalEvent => e.kind === "session.command_state" && e.state === "engine_applied",
     );
-    await client.command(attach, { op: "abort" });
+    await client.command(attach, { type: "abort" });
     await applied;
     await client.read(attach, { before_entry_id: "e-3" });
     for (const event of seen) expect(validateEvent(event)).toEqual(event);

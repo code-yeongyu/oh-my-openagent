@@ -82,8 +82,6 @@ const pendingPersonaNameRetirements: readonly {
   readonly linePattern: RegExp
 }[] = [
   { pathSuffix: "coding-agent-sessions/references/opencode.md", linePattern: /`Sisyphus-Junior`/ },
-  { pathSuffix: "frontend/references/designpowers/lane-a-direction.md", linePattern: /\bPrometheus\b/ },
-  { pathSuffix: "frontend/references/designpowers/routing.md", linePattern: /\bPrometheus\b/ },
 ]
 
 function listDirectoryNames(path: string): string[] {

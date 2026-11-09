@@ -38,8 +38,8 @@ function longActiveRecord(): TaskRecord {
 }
 
 describe("buildWidgetRows", () => {
-  it("#given completed resident team members beside active records #when building rows #then only the active records render", () => {
-    // given finished members whose handles are still resident (revivable), an ordinary finished task, and a running member
+  it("#given completed records beside a running record #when building rows #then completed records leave the widget and the running one stays", () => {
+    // given completed members whose handles are still resident (revivable), an ordinary completed task, and a running member
     const alpha = record({ task_id: "st_alpha", name: "team:12345678-1234-1234-1234-123456789abc:alpha", task_summary: "settled alpha", status: "completed" })
     const beta = record({ task_id: "st_beta", name: "team:12345678-1234-1234-1234-123456789abc:beta", task_summary: "settled beta", status: "completed" })
     const ordinary = record({ task_id: "st_ordinary", task_summary: "ordinary task", status: "completed" })
@@ -48,7 +48,7 @@ describe("buildWidgetRows", () => {
     // when
     const rows = buildWidgetRows([alpha, ordinary, gamma, beta])
 
-    // then finished work leaves the live widget; the running member stays
+    // then completed work leaves the live widget; the running member stays
     expect(rows).toHaveLength(1)
     expect(rows[0]).toContain("working gamma")
     expect(rows.join("\n")).not.toMatch(/settled alpha|settled beta|ordinary task|completed/u)

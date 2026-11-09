@@ -182,7 +182,7 @@ function renderReport(root: string, results: readonly DetectionResult[], configS
 		missing.length === 0
 			? `All ${results.length} detected server(s) installed.`
 			: `${missing.length}/${results.length} server(s) NOT installed: ${missing.map((m) => m.server.language).join(", ")}`,
-		"Next: read references/<language>/README.md, then configure .codex/lsp-client.json AND .opencode/lsp.json.",
+		"Next: read references/<language>/README.md, then configure your harness's project config (SKILL.md, Configure step).",
 	)
 	return lines.join("\n")
 }

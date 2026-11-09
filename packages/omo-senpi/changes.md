@@ -1,3 +1,67 @@
+## 2026-11-08 - A send to another device carries the sender's gateway provenance (#12858, part of #12852)
+
+`thread/remote/remote-ops.ts` `promptRemote` takes a `RemoteSender`: `{ kind: "peer" } & RemotePeer` from the thread tools (`tools.ts` `remotePeer`: caller durable id, caller name, `resolveProvenance` through `tools/gateway-services.ts` `senderProvenance`, the engine's own closure, a fresh delivery id, the cause's `root_id` and hop + 1), or `{ kind: "person", hop: 1 }` from `omo remote send` (`omo-native/remote-session-verbs.ts`), whose text is sent as before. A peer prompt's `message` is `gateway/provenance.ts` `renderDeliveryText` over the delivery the send makes, with the sender's device (`device.info`) as the new optional `Provenance.device` (`From ... / device "<id>"`, header `device=`), and the record sets `expandPromptTemplates: false`. `renderDeliveryText` takes `RenderedDelivery` (the fields it reads, plus any of a stored row). Still open in #12852: the receiver writes the text as `role: "user"` and fires `input` hooks on it until senpi#6233 gives RPC an `admit_external_message` record.
+
+## 2026-11-07 - A remote command on a closed session answers unknown_session (#12755, part of #12320)
+
+`thread/remote/device-service.ts` `sessionReason` maps the device service's `session_not_found` to the engine's `unknown_session` for every session-scoped refusal of the port: a failed attach for `sessionCommand` or `read`, and a command or read-only record refused before sending. Every other code is unchanged, and the attach retry inside `locate` still keys on the raw `session_not_found`. `device-service.test.ts` runs one prompt for a closed session through the local surface (contract host) and through the remote port and asserts both answer the same code; the remote fixture refuses a no-longer-live session with `unknown_session`, as the port does.
+
+## 2026-11-05 - Ancestor enumeration is denied only when a foreign identity exists (#12301)
+
+`guard.ts` used to deny every recursive tool rooted at an ancestor of a memory area. It now lists every area in the call's denied set (lexical and canonical forms, including a transient run's own `transient-runs/<token>/agents`) through `guard-foreign-roots.ts`. Each physical area is listed once by its canonical form, so the verdict does not depend on whether a symlinked home or a case-variant path reached it. Regular files (`.DS_Store`, `desktop.ini`) are skipped because an identity root is a directory; any other entry counts as the caller's own only if it is, or contains, one of the own roots, compared lexically and never resolved, so a dangling link or a link aliasing the own root counts as foreign. A missing area is empty, and any other listing error denies. Because the host checks only the walk's root, an allowed ancestor walk is recorded by `toolCallId`; its `tool_result` re-lists the areas and replaces the whole result with the deny when a foreign root appeared or an area can no longer be listed. The hard filesystem policy still has no ancestor rule, so this soft guard alone covers ancestor enumeration until the host prunes per directory.
+
+## 2026-11-04 - Config-watch creation targets stop at the project root (#12397)
+
+`resolveOmoConfigWatchTargetResolution` bounds the ancestor list used for creation targets with `creationAncestors()`: it stops after the first ancestor holding `.git`, and before any ancestor that contains the user config directory's parent or is the filesystem root. The walk for existing `.omo` config targets is unchanged. Measured on macOS: a session's CPU during 12 s of HOME writes went from 1.69-1.78 s to 0.03-0.04 s.
+
+## 2026-11-02 - Import guard for the shared launch classification module (#11997)
+
+`desktop-sync/launchClassification.test.ts` bundles `launchClassification.ts` on its own and requires the module to be
+its only input, with no imports. The rule that the module stays free of sidecar and private-fds imports used to be a
+comment only; omo.js's registration half imports the module before any sidecar loads, so a later import would have
+pulled that code into omo.js. Test only.
+
+## 2026-11-01 - Shared launch classification for the compiled desktop-sync test (#11997)
+
+`launchCarriedPrivateTable` moved from `device-session/account-runtime-loader.ts` (module-private) to the sidecar-free
+`desktop-sync/launchClassification.ts`; the loader and `desktop-sync/channel-compiled.fixture.ts` both import it, so the
+compiled test can no longer pass on a stale copy of the classification. The fixture header now describes the loader
+wiring it uses. Must not break: the module stays free of sidecar and private-fds imports, because omo.js's
+registration half imports it.
+
+## 2026-10-31 - Desktop memory sync attaches on Windows over senpi's pipe pair (#11997)
+
+`components/memory/desktop-sync/channel.ts` no longer refuses win32. It attaches to the stream senpi's
+`takeInheritedPrivateChannel("memory-sync")` hands over on every platform; on win32 senpi builds that stream
+from two one-way pipes (engine fd 5 read, fd 6 write) and clears their inherit flag before adoption, so the
+receiver opens no descriptor, clears no flag and spawns nothing itself. A declared channel that senpi did not
+adopt (no stream) is `unavailable: private_channel_unavailable` on every platform, never the CLI source.
+Must not break: the receiver stays platform-neutral; Windows handle work belongs to senpi. `channel-compiled.test.ts`
+runs in the Windows Senpi compatibility job and skips the win32 pair case only while the bundled senpi predates
+the pair gate (senpi#5125).
+
+## 2026-11-05 - An applied onboarding scan stays retained for understanding (#12509)
+
+`omo.onboarding.apply` used to delete the scan from the process-wide store before applying it, so `omo.onboarding.understand` on the same `scanId`, which the desktop sends right after About you's apply, answered `unavailable`. Apply now marks the held scan `applied` (checked and set before its first `await`, so racing applies still produce one success) and leaves it retained with its in-memory digests until the ten-minute TTL or the eight-scan eviction removes it; a failed or expired scan is still dropped at apply. A second apply answers `unavailable` as before. The understand refusal no longer lists "was applied" among its causes.
+
+## 2026-11-04 - A timed-out bwrap probe is not cached (#12378)
+
+`probeBwrapUsability` used to memoize every verdict for the process lifetime, including a smoke test that hit its 3000 ms timeout. Under `auto` every later reflection child then ran unsandboxed, and under `required` every later reflection was refused. Only definitive verdicts are memoized now (exited 0, exited nonzero such as the user-namespace denial, or spawn failure). A timeout is returned to its caller and the next spawn's probe runs the smoke again. Concurrent callers still share one in-flight smoke.
+
+Because a timed-out spawn now runs unsandboxed under `auto` while the next one re-probes, the deferred (async) probe path reports per spawn: the transform's `wasSandboxed` and `warning` describe the latest spawn instead of the build-time guess, and `identity-runtime` logs `memory reflection sandbox degraded` when the state changes to a new degradation reason (and `memory reflection sandbox restored` when it recovers), never once per spawn. `required` still fails closed. A test also pins that a spawn-error verdict stays cached (the smoke never runs again).
+
+## 2026-11-04 - The next turn releases a run Stop whose Resume was missed (#12343)
+
+When the run-pause bridge misses the Resume of a user Stop, the pause ledger stays `applied` with admission closed while the engine holds no Stop, and no later hold-change event can arrive. `EngineRunPauseBridge.releaseStale()` resumes the recorded Stop through the normal Resume path when the engine's live ledger is at or past it and holds no user Stop, and every real `before_agent_start` starts it in the background. It acts only on a Stop left `applied` with no Resume already in flight, so the ordinary Stop-then-message path keeps its own Resume, and the turn never waits on child resume turns; a failure is logged.
+
+## 2026-11-03 - Run-paused task children resume and never stay paused forever (#12268)
+
+A user Stop pauses the background children of that run. The run's Resume now reaches them: the bridge resumes the recorded Stop whenever the resumed event's seq is at or above it, because the Stop's own `run_fence` holds raise the engine seq. A participant the released Resume could not restore is retried on a bounded schedule; one still lost after that has its paused run ended as `error` with `failure_kind: session_unavailable`, its lane slot freed and its parent notified. A paused child a live foreign host owns is never ended. The widget renders a paused child as paused with no clock, and `/task-kill` lists paused children.
+
+## 2026-10-28 - Memory shutdown waits for in-flight memory work (#11671)
+
+`MemoryBlockCache.settled()` and `RecallCorpusCache.settled()` now cover every call from its first repository read (HEAD, the persisted-store load, the compile or corpus load) through a shared `InFlightReads` tracker, and the prompt prebuild runs its HEAD read through `MemoryBlockCache.track()`. The memory component registers its hooks through `trackMemoryHooks()`, which tracks every hook's promise (`session_shutdown` itself excepted) and every memory tool execute in one component-wide tracker (on quit the host runs the drain before it aborts a running tool); the bind-time reconcile, the registration-time transient sweep, the sync-status refresh, pressure dream requests and idle dream fires run through it too, and the shutdown drain awaits it in a `memory-work-settle` step that runs last, after the drain's own steps (`wiring-shutdown.ts`), so work that stalls cannot starve the facts enqueue, the skills-usage flush or the shutdown evaluators. To keep `omo.js` inside its byte budget, the dream conversation selection (`dream-selector.ts`) moves out of the entry bundle into the memory commands sidecar (`extensions/omo-memory-commands.js`), which a dream fire loads through the shared commands loader only when it selects conversations.
+
 ## 2026-11-02 - Finished team members leave the task widget (#12160)
 
 The below-editor task widget now shows only running or parked work. A team member that completes its turn leaves the widget even while its handle stays resident, instead of lingering as a `process completed` row until the team shuts down. `/tasks` still lists it, `task_send` still revives it, and its row returns while it runs again. Task lifecycle, residency and messaging are unchanged.

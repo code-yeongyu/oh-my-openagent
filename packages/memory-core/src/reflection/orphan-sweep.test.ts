@@ -12,11 +12,10 @@ import {
 import { removeTree } from "../../../../test-support/remove-tree"
 
 const roots: string[] = []
-const INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 30_000 : 10_000
 const HOUR_MS = 60 * 60_000
 const exec = createNodeGitExec()
 
-setDefaultTimeout(INTEGRATION_TEST_TIMEOUT)
+if (process.platform === "win32") setDefaultTimeout(30_000)
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) =>

@@ -16,6 +16,12 @@ for await (const line of createInterface({ input: process.stdin })) {
     send({ type: "response", command: command.type, id: command.id, success: true })
     break
   }
+  // A task child's engine must hold its designated model chain before its first prompt (#12759).
+  if (command.type === "get_protocol_info") {
+    send({ type: "response", command: command.type, id: command.id, success: true,
+      data: { protocolVersion: 1, capabilities: ["retry_fallback_command"] } })
+    continue
+  }
   if (command.type === "get_state") {
     send({ type: "response", command: command.type, id: command.id, success: true,
       data: { sessionId: fixture.session.sessionId, isStreaming: false, isCompacting: false } })

@@ -1,6 +1,6 @@
 {
   "name": "@code-yeongyu/omo-senpi",
-  "version": "5.1.60",
+  "version": "5.1.65",
   "private": true,
   "description": "OMO Senpi adapter packaged as one local-path Pi package.",
   "type": "module",
@@ -18,6 +18,7 @@
     "#omo-memory-palace-runtime": "./extensions/omo-memory-palace.js",
     "#omo-device-account-runtime": "./extensions/omo-device-account.js",
     "#omo-memory-commands-runtime": "./extensions/omo-memory-commands.js",
+    "#memory-completion-links": "./extensions/omo-memory-commands.js",
     "#omo-session-history-runtime": "./extensions/omo-session-history.js",
     "#omo-recall-store-runtime": "./extensions/omo-recall-store.js",
     "#memory-external-projection": "./extensions/omo-recall-store.js",
@@ -25,7 +26,8 @@
     "#omo-memory-sync-runtime": "./extensions/omo-memory-sync.js",
     "#omo-feedback-runtime": "./extensions/omo-feedback.js",
     "#omo-claim-receipt-runtime": "./extensions/omo-claim-receipt.js",
-    "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js"
+    "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",
+    "#bunshin-ts": "./runtime/bunshin-ts/sdk.js"
   },
   "keywords": [
     "pi-package",
