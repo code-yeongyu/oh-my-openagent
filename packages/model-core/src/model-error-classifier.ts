@@ -122,6 +122,10 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
     return true
   }
 
+  if (errorNameLower === "unknownerror") {
+    return true
+  }
+
   if (errorNameLower !== undefined && RETRYABLE_ERROR_NAMES.has(errorNameLower)) {
     return true
   }
