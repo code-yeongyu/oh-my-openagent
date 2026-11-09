@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:adc0c9ae0db7b2199d87a87956f2a065f91ef403e2c0816a4fe17111125c47b1:6fec9dd74fa6bb69f9064c703c94e024377de335a2c86ac93c5bd141b1290e69
+// omo-codex-install:3235f687e8872e8b288a5fddc738a7a2438c7c6b21fe612d5fa7656c24dd7081:bdb45b2161ed4da38b0547cf91f3955cd735d7f6c64e5937ee6979c858952868
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10949,11 +10949,13 @@ function posixRuntimeWrapper(binName, cliPath, codexHome, binDir, nodeCliPath) {
 `);
 }
 function windowsRuntimeWrapper(binName, cliPath, codexHome, binDir, nodeCliPath) {
-  const ulwLoopBin = join3(binDir, "omo-ulw-loop.cmd");
+  const ulwLoopBin = escapeCmdQuoted(join3(binDir, "omo-ulw-loop.cmd"));
+  const cli = escapeCmdQuoted(cliPath);
+  const nodeCli = escapeCmdQuoted(nodeCliPath);
   return [
     "@echo off",
     `rem ${RUNTIME_WRAPPER_MARKER}`,
-    `if not defined CODEX_HOME set "CODEX_HOME=${codexHome}"`,
+    `if not defined CODEX_HOME set "CODEX_HOME=${escapeCmdQuoted(codexHome, false)}"`,
     `set "OMO_INVOCATION_NAME=${binName}"`,
     'set "OMO_EDITION=codex"',
     ...windowsNodeDiscoveryLines(),
@@ -10962,28 +10964,32 @@ function windowsRuntimeWrapper(binName, cliPath, codexHome, binDir, nodeCliPath)
     `  "${ulwLoopBin}" ulw-loop %*`,
     "  exit /b %ERRORLEVEL%",
     ")",
-    `if "%OMO_RUNTIME%"=="node" if defined OMO_NODE_BINARY if exist "${nodeCliPath}" (`,
-    `  "%OMO_NODE_BINARY%" "${nodeCliPath}" %*`,
+    `if "%OMO_RUNTIME%"=="node" if defined OMO_NODE_BINARY if exist "${nodeCli}" (`,
+    `  "%OMO_NODE_BINARY%" "${nodeCli}" %*`,
     "  exit /b %ERRORLEVEL%",
     ")",
     'if not defined BUN_BINARY where bun >nul 2>nul && set "BUN_BINARY=bun"',
     'if not defined BUN_BINARY if exist "%USERPROFILE%\\.bun\\bin\\bun.exe" set "BUN_BINARY=%USERPROFILE%\\.bun\\bin\\bun.exe"',
     "if not defined BUN_BINARY (",
-    `  if defined OMO_NODE_BINARY if exist "${nodeCliPath}" (`,
-    `    "%OMO_NODE_BINARY%" "${nodeCliPath}" %*`,
+    `  if defined OMO_NODE_BINARY if exist "${nodeCli}" (`,
+    `    "%OMO_NODE_BINARY%" "${nodeCli}" %*`,
     "    exit /b %ERRORLEVEL%",
     "  )",
-    `  echo ${binName}: bun runtime not found, no Node runtime was discovered from NODE_REPL_NODE_PATH or PATH, or the node fallback CLI is missing at ${nodeCliPath}; install bun from https://bun.sh or rerun LazyCodex install from Codex Desktop 1>&2`,
+    `  echo ${binName}: bun runtime not found, no Node runtime was discovered from NODE_REPL_NODE_PATH or PATH, or the node fallback CLI is missing at "${nodeCli}"; install bun from https://bun.sh or rerun LazyCodex install from Codex Desktop 1>&2`,
     "  exit /b 127",
     ")",
-    `if not exist "${cliPath}" (`,
-    `  echo ${binName}: runtime target missing at ${cliPath}; reinstall with: npx --yes lazycodex-ai@latest install --no-tui 1>&2`,
+    `if not exist "${cli}" (`,
+    `  echo ${binName}: runtime target missing at "${cli}"; reinstall with: npx --yes lazycodex-ai@latest install --no-tui 1>&2`,
     "  exit /b 1",
     ")",
-    `"%BUN_BINARY%" "${cliPath}" %*`,
+    `"%BUN_BINARY%" "${cli}" %*`,
     ""
   ].join(`\r
 `);
+}
+function escapeCmdQuoted(value, delayedExpansion = true) {
+  const percent = value.replaceAll("%", "%%");
+  return delayedExpansion && percent.includes("!") ? percent.replaceAll("^", "^^").replaceAll("!", "^!") : percent;
 }
 function toPosixPath(path) {
   return path.replaceAll("\\", "/");

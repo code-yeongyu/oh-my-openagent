@@ -101,6 +101,109 @@ describe("the account source built from the engine's one selection", () => {
     expect((await source())?.kind).toBe("desktop")
   })
 
+  test("#given no account is current #when two resolves overlap #then they share one open and get the same account", async () => {
+    // given
+    let opened = 0
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const source = accountSourceFromSelection({
+      selection: desktop(wire()), cli: cliCanary,
+      openAccount: async () => { opened += 1; await gate; return desktopAccount(`generation-${opened}`, () => true) },
+    })
+
+    // when
+    const first = source()
+    const second = source()
+    release()
+
+    // then
+    const [a, b] = await Promise.all([first, second])
+    expect(opened).toBe(1)
+    expect(b).toBe(a)
+  })
+
+  test("#given a shared open that main refuses #when it settles #then both resolves are signed out and the next resolve opens again", async () => {
+    // given
+    let opened = 0
+    const source = accountSourceFromSelection({
+      selection: desktop(wire()), cli: cliCanary,
+      openAccount: async () => { opened += 1; if (opened === 1) throw new DesktopSyncRefused(); return desktopAccount("generation-2", () => true) },
+    })
+
+    // when
+    const both = await Promise.all([source(), source()])
+    const next = await source()
+
+    // then
+    expect(both).toEqual([null, null])
+    expect(next?.kind).toBe("desktop")
+    expect(opened).toBe(2)
+  })
+
+  test("#given a resolve still checking an old account #when another resolve stores a fresh one first #then the late resolve returns the fresh account and nothing reopens (#12804)", async () => {
+    // given: generation-1 is stored; each later isCurrent() check on it waits on its own deferred answer
+    let opened = 0
+    const checks: PromiseWithResolvers<boolean>[] = []
+    const stale = { kind: "desktop", descriptor: { generation: "generation-1" }, isCurrent: () => { const check = Promise.withResolvers<boolean>(); checks.push(check); return check.promise } } as unknown as DesktopSyncAccount
+    const source = accountSourceFromSelection({
+      selection: desktop(wire()), cli: cliCanary,
+      openAccount: async () => { opened += 1; return opened === 1 ? stale : desktopAccount(`generation-${opened}`, () => true) },
+    })
+    expect(await source()).toBe(stale)
+
+    // when: A starts checking the old account, then B checks it too, finds it stale and stores generation-2
+    const late = source()
+    const early = source()
+    while (checks.length < 2) await Promise.resolve()
+    checks[1]?.resolve(false)
+    const fresh = await early
+    checks[0]?.resolve(false)
+
+    // then
+    expect((fresh as DesktopSyncAccount).descriptor.generation).toBe("generation-2")
+    expect(await late).toBe(fresh)
+    expect(await source()).toBe(fresh)
+    expect(opened).toBe(2)
+  })
+
+  test("#given a shared open that settles #when a resolve starts at any microtask while it settles #then it gets the stored account and nothing reopens (#12804)", async () => {
+    // The gap between the open settling and its waiter storing the account is a few microtasks wide, and how many
+    // depends on the engine's await and finally steps, so the late resolve starts at every offset across it. Under
+    // Node (the default engine runtime) `finally` reaches its waiter later than under Bun; an open whose
+    // then-callbacks each run one microtask late reproduces that width here.
+    class LateSettling<T> extends Promise<T> {
+      override then<A = T, B = never>(onFulfilled?: ((value: T) => A | PromiseLike<A>) | null, onRejected?: ((reason: unknown) => B | PromiseLike<B>) | null): Promise<A | B> {
+        const late = onFulfilled == null ? onFulfilled : (value: T) => Promise.resolve().then(() => onFulfilled(value))
+        return super.then(late, onRejected)
+      }
+    }
+    for (let offset = 0; offset <= 12; offset += 1) {
+      // given: the open returns this exact promise, so a reaction the test adds to it runs right after the source's own
+      let opened = 0
+      const called = Promise.withResolvers<void>()
+      const pending = LateSettling.withResolvers<DesktopSyncAccount>()
+      const source = accountSourceFromSelection({
+        selection: desktop(wire()), cli: cliCanary,
+        openAccount: () => { opened += 1; called.resolve(); return opened === 1 ? pending.promise : Promise.resolve(desktopAccount(`generation-${opened}`, () => true)) },
+      })
+      const first = source()
+      await called.promise
+
+      // when
+      let second: Promise<unknown> | undefined
+      const started = pending.promise.then(async () => {
+        for (let tick = 0; tick < offset; tick += 1) await Promise.resolve()
+        second = source()
+      })
+      pending.resolve(desktopAccount("generation-1", () => true))
+      await started
+
+      // then
+      const stored = await first
+      expect({ offset, same: await second === stored, opened }).toEqual({ offset, same: true, opened: 1 })
+    }
+  })
+
   test("a closed channel stays unavailable and the resolver reports why without loading the sync runtime", async () => {
     const channel = wire()
     const source = accountSourceFromSelection({

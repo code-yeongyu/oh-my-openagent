@@ -23,9 +23,9 @@ function repairCommand() {
   return `bunx ${releaseChannel() === "beta" ? "oh-my-openagent@beta" : "oh-my-openagent"} install --platform=native`
 }
 
-const CODEX_LIGHT_WRAPPER_MARKER = "# OMO_GENERATED_RUNTIME_WRAPPER"
-// The Windows `.cmd` wrapper writes `rem OMO_GENERATED_RUNTIME_WRAPPER` instead, so it never
-// matches this marker and broken detection does not run for `.cmd` files (pre-existing limit).
+// The bare marker, as legacy-omo-bin.ts matches it: the POSIX wrapper writes it after `#`, the
+// Windows `.cmd` wrapper after `rem` (codex-cache-runtime-wrapper.ts), so a `#` prefix missed every .cmd (#12560).
+const CODEX_LIGHT_WRAPPER_MARKER = "OMO_GENERATED_RUNTIME_WRAPPER"
 const CODEX_LIGHT_CACHE_VERSION = /[\\/]plugins[\\/]cache[\\/]sisyphuslabs[\\/]omo[\\/]([^\\/"'\s]+)[\\/]/
 const WINDOWS_BIN_SUFFIXES = ["", ".cmd", ".ps1", ".exe"]
 const OWNER_WALK_UP_LIMIT = 6
@@ -142,14 +142,27 @@ function brokenLaunchTarget(binPath, owner, homeDir) {
 // broken and miss a wrapper that really fails. `~` and `$HOME` resolve against the home dir;
 // anything else must already be absolute to be resolvable.
 function codexLightCacheTarget(shim, homeDir) {
-  const posix = shim.match(/exec "\$BUN_BINARY" "([^"]+)" "\$@"/)
+  // The POSIX generator escapes \, ", $ and ` inside that double-quoted target, so the capture
+  // allows escaped characters and is unescaped back to the real path (#12560).
+  const posix = shim.match(/exec "\$BUN_BINARY" "((?:[^"\\]|\\.)+)" "\$@"/)
   const windows = posix === null ? shim.match(/"%+BUN_BINARY%+"\s+"([^"]+)"\s+%+\*/) : null
-  const raw = posix?.[1] ?? windows?.[1]
+  const raw = posix === null ? (windows === null ? undefined : unescapeCmdQuoted(windows[1])) : unescapePosixDoubleQuoted(posix[1])
   if (raw === undefined) return null
   if (!/[\\/]plugins[\\/]cache[\\/]sisyphuslabs[\\/]omo[\\/]/.test(raw)) return null
   if (raw.startsWith("~/") || raw.startsWith("~\\")) return join(homeDir, raw.slice(2))
   if (raw.startsWith("$HOME/") || raw.startsWith("$HOME\\")) return join(homeDir, raw.slice(6))
   return isAbsolute(raw) || win32.isAbsolute(raw) ? raw : null
+}
+
+// The `.cmd` generator doubles `%` and, for a value holding `!`, escapes `^` and `!` for delayed expansion
+// (escapeCmdQuoted in codex-cache-runtime-wrapper.ts): cmd runs the literal path, so that is the one checked (#12811).
+function unescapeCmdQuoted(value) {
+  const carets = value.includes("!") ? value.replace(/\^([\^!])/g, "$1") : value
+  return carets.replaceAll("%%", "%")
+}
+
+function unescapePosixDoubleQuoted(value) {
+  return value.replace(/\\([\\"$`])/g, "$1")
 }
 
 function resolveOwner(binPath) {
