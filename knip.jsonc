@@ -1351,7 +1351,8 @@
       // pre-existing at origin dev 4686e425b5: unused export(s) registerIncarnation, clearEndpoint, sessionOwner
       "packages/omo-senpi/src/components/thread/gateway/store-ownership.ts": ["registerIncarnation", "clearEndpoint", "sessionOwner"],
       // pre-existing at origin dev 4686e425b5: unused export(s) toolReceiptBegin, toolReceiptSettle, registerIncarnation, pendingCompletionArms, latestCompletionArm, closeQuestion
-      "packages/omo-senpi/src/components/thread/gateway/store-relay-ops.ts": ["toolReceiptBegin", "toolReceiptSettle", "registerIncarnation", "pendingCompletionArms", "latestCompletionArm", "closeQuestion"],
+      // #12925: toolReceiptRelease is called only by store-worker.ts, which runs as a worker thread knip does not reach (same as toolReceiptBegin/Settle)
+      "packages/omo-senpi/src/components/thread/gateway/store-relay-ops.ts": ["toolReceiptBegin", "toolReceiptSettle", "toolReceiptRelease", "registerIncarnation", "pendingCompletionArms", "latestCompletionArm", "closeQuestion"],
       // pre-existing at origin dev 4686e425b5: unused export(s) sweepRetention
       "packages/omo-senpi/src/components/thread/gateway/store-retention.ts": ["sweepRetention"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_STORE_WORKER_BUNDLE_NAME
