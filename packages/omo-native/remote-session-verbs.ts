@@ -15,8 +15,9 @@ import {
   runningTurnRemote,
 } from "../omo-senpi/src/components/thread/remote/remote-ops"
 import type { RemoteCommandDependencies } from "./remote-cli"
-import { REMOTE_EXIT } from "./remote-exit"
+import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import { sessionVerbLines } from "./remote-render"
+import { localPermissionPreset } from "./remote-permission-preset"
 import type { SessionArgs } from "./remote-session-args"
 
 // The surface the agent's thread tools reach other devices through, on this command's own connection. The chain count
@@ -81,7 +82,15 @@ async function openOn(
   { json, show }: { readonly json: boolean; readonly show: Show },
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
-  const opened = await openRemote(remote, { kind: "create", device: args.device, ...(args.project === undefined ? {} : { cwd: args.project }) })
+  let mode: string
+  try {
+    mode = args.permissionPreset ?? (dependencies.localPermissionPreset ?? localPermissionPreset)()
+  } catch (error) {
+    if (!(error instanceof UsageError)) throw error
+    dependencies.error(error.message)
+    return REMOTE_EXIT.usage
+  }
+  const opened = await openRemote({ ...remote, permissionPreset: () => mode }, { kind: "create", device: args.device, ...(args.project === undefined ? {} : { cwd: args.project }) })
   if (opened.kind !== "ok" || !("thread" in opened) || args.model === undefined) return show(opened, "")
   const label = `${args.device}/${opened.thread.thread_id}`
   const created: RemoteSessionRow = { device: args.device, session_id: opened.thread.thread_id, title: opened.thread.name, project: opened.thread.cwd, path: "", state: "idle", updated_ms: 0 }

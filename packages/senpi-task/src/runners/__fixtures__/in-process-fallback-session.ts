@@ -8,11 +8,14 @@ import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import { createMinimalSenpiResourceLoader } from "../../senpi/minimal-resource-loader"
 import { createRuntimeFallbackSettings } from "../in-process/runtime-fallback-settings"
 
-type StopReason = "stop" | "error"
+type StopReason = "stop" | "error" | "toolUse"
 
 type AssistantMessage = {
   readonly role: "assistant"
-  readonly content: readonly { readonly type: "text"; readonly text: string }[]
+  readonly content: readonly (
+    | { readonly type: "text"; readonly text: string }
+    | { readonly type: "toolCall"; readonly id: string; readonly name: string; readonly arguments: Readonly<Record<string, unknown>> }
+  )[]
   readonly api: "openai-completions"
   readonly provider: string
   readonly model: string
