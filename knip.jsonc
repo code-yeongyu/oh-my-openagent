@@ -2108,6 +2108,8 @@
         "script/senpi-worker-compile.ts",
         "test-support/remove-tree.ts",
         "test-support/test-deadline.ts",
+        // preloaded by path from the package bunfig.toml files (the bun plugin adds it with exports unchecked)
+        "test-support/test-deadline.preload.ts",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "script/build-binaries.ts",

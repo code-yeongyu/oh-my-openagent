@@ -142,15 +142,15 @@ Every member `prompt` contains, in order:
 2. The budget lift: "This is an explicit exhaustive-research assignment. Your default retrieval budget and stop-when-answered rules do not apply — run the full protocol below and raise every lead."
 3. Scope — the axis, the sources to hit, and what a complete answer contains.
 4. The role protocol (Phase 2). A web member's brief names the `browser` skill's `SKILL.md` to read first (`team_create` members carry no `load_skills`); a web `task` lane loads it with `load_skills: ["browser"]`.
-5. The raise law and the reply tail. EXPAND markers, observation candidates, and claim candidates travel back as message text to `to: "lead"`, never as files. Every substantial report ends with:
+5. The raise law and the reply tail. EXPAND markers, observation candidates, and claim candidates travel back as message text to `to: "lead"`, never as files. Each claim candidate carries `OBSERVED: <URL read | file:line | command and its output>`; a claim the member only remembers goes into the tail as a LEAD. Every substantial report ends with:
 
 ```
 ## EXPAND
 - LEAD: <discovery not yet investigated> — WHY: <why it matters> — ANGLE: <suggested search>
-- DEAD END: <lead explored to exhaustion>
+- DEAD END: <lead explored to exhaustion> — PROBED: <the searches, reads, or commands that exhausted it>
 ```
 
-A member with nothing to expand sends `## EXPAND` followed by `none — <one-line reason>`. A report missing the tail is incomplete: send that member one follow-up demanding it.
+A member with nothing to expand sends `## EXPAND` followed by `none — <one-line reason>`. A report missing the tail, or a claim or DEAD END missing its `OBSERVED:`/`PROBED:` line, is incomplete: send that member one follow-up demanding it.
 
 ## Phase 2 — Saturation wave
 
@@ -194,7 +194,7 @@ This loop is what makes the mode research rather than search. Collect returns as
 task(category: "deep-low", load_skills: ["browser"], run_in_background: true, prompt: "TASK: expansion wave <N> — investigate: <lead>.
 PARENT: <which return surfaced it>. This is an explicit exhaustive-research assignment; budgets do not apply.
 <role protocol for the lead's territory>
-End your reply with the ## EXPAND tail.")
+Tag every claim OBSERVED: <URL | file:line | command>. End your reply with the ## EXPAND tail.")
 ```
 
 4. **Debate rounds (the ultradebate/hyperdebate engine).** The moment a contested, high-risk, or surprising claim lands, `task_send` it to the skeptic (and the contrarian, when stood up): "ATTACK: <claim> — EVIDENCE: <what supports it> — find the weakest assumption, the missing counter-source, the independence failure." Relay the attack to the claim's owner for defense, collect both sides, then record your verdict in `debate-log.md` and update the claim node. A claim that never drew an attack still gets one skeptic pass before it may enter the synthesis as supported.

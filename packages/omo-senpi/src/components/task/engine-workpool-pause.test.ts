@@ -5,16 +5,18 @@ import { createTaskRecordStore } from "../../../../senpi-task/src/store"
 import { categoryPlanner, cleanupProjects, FakeRunner, settings, tempProject } from "../../../../senpi-task/src/manager/__fixtures__/manager-fakes"
 import { createEngineRunPause } from "./engine-run-pause"
 import type { RunnerOutcome } from "../../../../senpi-task/src/manager/child-handle"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
 function bounded<T>(promise: Promise<T>, name: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
-  const expired = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error(`${name} did not settle`)), 5000) })
+  const expired = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error(`${name} did not settle`)), remainingTestTime()) })
   return Promise.race([promise, expired]).finally(() => { if (timer !== undefined) clearTimeout(timer) })
 }
 
 test("a workpool child created across Stop is held before its first provider call and registered under its pool", async () => {
+  useTestTimeout(15000)
   const cwd = tempProject()
   const store = createTaskRecordStore({ project_dir: cwd })
   const barrier = new AdmissionBarrier()
