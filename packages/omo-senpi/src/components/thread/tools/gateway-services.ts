@@ -71,7 +71,7 @@ export function createGatewayServices(options: ThreadToolSurfaceOptions, view: (
       relay: createRelayTransport({
         remote: options.remote, store, now, senderProvenance,
         ...(options.callerCause === undefined ? {} : { callerCause: options.callerCause }),
-        ...(options.callerName === undefined ? {} : { callerName: options.callerName }),
+        ...(options.callerChainHop === undefined ? {} : { callerChainHop: options.callerChainHop }),
       }),
     }),
   })
