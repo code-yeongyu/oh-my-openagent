@@ -51,12 +51,12 @@ export function normalizeExclusiveTaskTarget(input: ExclusiveTaskTarget): Exclus
   const category = nonemptyString(input.category)
   const subagentType = nonemptyString(input.subagent_type)
 
-  if (isNamedSubagentTarget(subagentType) && !isKnownTaskCategory(category)) {
-    return { subagent_type: sanitizeSubagentType(subagentType!) }
+  if (subagentType !== undefined && isNamedSubagentTarget(subagentType) && !isKnownTaskCategory(category)) {
+    return { subagent_type: sanitizeSubagentType(subagentType) }
   }
 
-  if (isNamedSubagentTarget(category)) {
-    return { subagent_type: sanitizeSubagentType(category!) }
+  if (category !== undefined && isNamedSubagentTarget(category)) {
+    return { subagent_type: sanitizeSubagentType(category) }
   }
 
   if (category) {

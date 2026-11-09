@@ -1,5 +1,4 @@
-declare const require: (name: string) => any
-const { describe, expect, test } = require("bun:test")
+import { describe, expect, test } from "bun:test"
 import { prepareDelegateTaskArgs } from "./tool-argument-preparation"
 
 function createCtx(): { metadata: (input: { title?: string }) => Promise<void> } {
