@@ -242,6 +242,19 @@ export async function toolReceiptSettle(
   })
 }
 
+/**
+ * Drops a `prepared` receipt this instance holds for a call that wrote nothing before it failed, so the next call under
+ * the same key runs again instead of replaying that failure. A receipt another instance holds, or one already settled,
+ * is left alone.
+ */
+export async function toolReceiptRelease(ctx: StoreContext, request: Omit<ReceiptKey, "args_hash">): Promise<boolean> {
+  return await transaction(ctx, "tool_receipt_release", () => write(
+    ctx,
+    "DELETE FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ? AND status = 'prepared' AND owner_instance = ?",
+    [request.principal, request.operation, request.idempotency_key, ctx.config.instance_id],
+  ) === 1)
+}
+
 export type BindOpRequest = { readonly now: number; readonly receipt: ReceiptKey | null; readonly binding: BindRequest }
 
 export async function bindThread(ctx: StoreContext, request: BindOpRequest): Promise<RelayOutcome<{ readonly binding: BindingRecord }>> {

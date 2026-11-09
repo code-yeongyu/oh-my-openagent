@@ -9,12 +9,12 @@ import type { GatewayStore } from "../gateway/store"
 import type { DeliveryOutcome, DeliveryTransport, OutboundDelivery, RelayDeliverySuccess } from "../gateway/transport"
 import type { EffectiveLane, GatewayDeliveryDelivery, Provenance } from "../gateway/types"
 import { UNKNOWN_CALLER } from "../tools/ports"
-import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
+import type { JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { deviceOnline, outcomeFailure, replyData } from "./remote-ops"
 
 export type RelayTransportOptions = {
   readonly remote: RemoteThreadSurface
-  readonly store: Pick<GatewayStore, "now" | "toolReceiptBegin" | "toolReceiptSettle" | "deliveryView">
+  readonly store: Pick<GatewayStore, "now" | "toolReceiptBegin" | "toolReceiptSettle" | "toolReceiptRelease" | "deliveryView">
   readonly now?: () => number
   readonly senderProvenance: () => Promise<Provenance>
   readonly callerCause?: () => string | undefined
@@ -50,6 +50,13 @@ function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 const ADMIT_RECORD = "admit_external_message"
+
+// The get_state probe is read-only and runs before any record is sent: one that ends uncertain changed nothing on that
+// device, so it is a transport failure that is safe to retry, never idempotency_uncertain (#12925).
+function probeFailure(outcome: Exclude<RemoteCommandOutcome, { readonly kind: "ok" }>, device: string): Failure {
+  if (outcome.kind !== "uncertain") return outcomeFailure(outcome, device)
+  return fail("host_unavailable", `Device ${device} did not answer the state read (${outcome.reason}); nothing was sent there.`, "Retry; nothing needs to be checked first.", { device, reason: outcome.reason })
+}
 
 type EngineState = { readonly phase: "idle" | "mid_turn"; readonly turnEpoch: number | null; readonly pending: number | null }
 
@@ -92,7 +99,9 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
   const unsettled = new Map<string, string>()
   const receiptKey = (scope: { readonly principal: string; readonly operation: string; readonly idempotency_key: string }) => `${scope.principal}\u0000${scope.operation}\u0000${scope.idempotency_key}`
 
-  async function once(callerId: string, idempotencyKey: string, args: unknown, run: () => Promise<SendOutcome>): Promise<SendOutcome> {
+  // `run` calls `sending` right before the admit record leaves this device. A call that ends before that wrote nothing, so
+  // its receipt is dropped instead of settled and the next call under the same key runs again (#12925).
+  async function once(callerId: string, idempotencyKey: string, args: unknown, run: (sending: () => void) => Promise<SendOutcome>): Promise<SendOutcome> {
     const scope = { principal: `session:${callerId}`, operation: "thread_send:remote", idempotency_key: idempotencyKey }
     const admission = await store.toolReceiptBegin({ ...scope, now: now(), args_hash: hashArgs(args) })
     if (admission.kind === "replay") { const first = admission.result as SendOutcome; return first.kind === "ok" ? { ...first, deduplicated: true } : first }
@@ -102,13 +111,21 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
     if (admission.kind === "in_progress") return fail("idempotency_in_progress", "The same operation is already in progress.", "Wait for the earlier call to settle, then retry.")
     if (admission.kind === "uncertain") return fail("idempotency_uncertain", "The earlier operation may have been delivered.", "Read the target transcript before deciding whether to retry.")
     const unrecorded = (what: string) => (settleError: unknown) => { unsettled.set(receiptKey(scope), `${what}, and its receipt could not be recorded: ${settleError instanceof Error ? settleError.message : String(settleError)}`) }
+    let sent = false
+    // A receipt that cannot be dropped is settled as before, so a retry still answers instead of waiting on it.
+    const release = async (settle: () => Promise<unknown>) => { if (!await store.toolReceiptRelease(scope).catch(() => false)) await settle() }
     let result: SendOutcome
     try {
-      result = await run()
+      result = await run(() => { sent = true })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      await store.toolReceiptSettle({ ...scope, now: now(), error_note: message }).catch(unrecorded(`the send failed (${message})`))
+      const settle = () => store.toolReceiptSettle({ ...scope, now: now(), error_note: message }).catch(unrecorded(`the send failed (${message})`))
+      await (sent ? settle() : release(settle))
       throw error
+    }
+    if (!sent) {
+      await release(() => store.toolReceiptSettle({ ...scope, now: now(), result }).catch(unrecorded("the send ran")))
+      return result
     }
     await store.toolReceiptSettle({ ...scope, now: now(), result }).catch(unrecorded("the send ran"))
     return result
@@ -120,7 +137,7 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
     return { delivery_id: randomUUID(), root_id: prior?.root_id ?? `root-${randomUUID()}`, hop: Math.max(prior?.hop ?? 0, options.callerChainHop?.() ?? 0) + 1 }
   }
 
-  async function send(delivery: OutboundDelivery, row: RemoteSessionRow): Promise<SendOutcome> {
+  async function send(delivery: OutboundDelivery, row: RemoteSessionRow, sending: () => void): Promise<SendOutcome> {
     const offline = await deviceOnline(remote, row.device)
     if (offline !== undefined) return offline
     const expected = delivery.expected_turn_id === undefined ? null : Number(delivery.expected_turn_id)
@@ -128,7 +145,7 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
     let state: EngineState | undefined
     if (delivery.mode === "steer") {
       const probed = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
-      if (probed.kind !== "ok") return outcomeFailure(probed, row.device)
+      if (probed.kind !== "ok") return probeFailure(probed, row.device)
       state = engineStateOf(replyData(probed.response))
       const decision = decideDelivery(state.phase, "steer", expected, state.turnEpoch)
       if (decision.kind !== "admit") {
@@ -162,6 +179,7 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
       chainCount: hop,
     }, hop)
     const ok = (kind: GatewayDeliveryDelivery, deduplicated = false): RelayDeliverySuccess => ({ kind: "ok", thread_id: row.session_id, delivery: kind, deduplicated, device: row.device, delivery_id, effective_mode: lane })
+    sending()
     const sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
     if (sent.kind === "refused" && (ADMIT_UNSUPPORTED.has(sent.reason) || sent.reason.startsWith("Unknown command"))) return fail("unsupported", `Device ${row.device} runs an engine without admit_external_message (${sent.reason}); a peer message cannot be delivered there as a delivery.`, "Update omo and senpi on that device, then retry.", { device: row.device, reason: sent.reason })
     if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
@@ -192,7 +210,7 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
       if (delivery.caller_id === UNKNOWN_CALLER) return fail("caller_context_missing", "A gateway send needs the calling session's durable id.", "Retry from a session that passes its execution context.")
       if (delivery.mode === "steer" && delivery.expected_turn_id === undefined) return fail("invalid_arguments", "A steer needs expected_turn_id (the target's current turn_epoch).", "Fix the arguments and send again.")
       if (delivery.expected_turn_id !== undefined && !/^\d+$/.test(delivery.expected_turn_id)) return fail("turn_conflict", `Turn ${delivery.expected_turn_id} is not a turn of the target session.`, "Read the target again and steer with the turn_id a started or steered result returned.")
-      return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, () => send(delivery, row))
+      return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, (sending) => send(delivery, row, sending))
     },
     dispose: () => disposed.abort(),
   }

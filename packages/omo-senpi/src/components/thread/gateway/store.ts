@@ -288,6 +288,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     legacyMigrated: () => track(async () => (await start()).legacy_migrated),
     toolReceiptBegin: (request) => call("tool_receipt_begin", request),
     toolReceiptSettle: (request) => call("tool_receipt_settle", request),
+    toolReceiptRelease: (request) => call("tool_receipt_release", request),
     bind: (request) => call("bind", request),
     unbind: (request) => call("unbind", request),
     rebind: (request) => call("rebind", request),

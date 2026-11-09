@@ -30,13 +30,15 @@ export function createRemoteThreadFixture() {
     for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
   }
 
-  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; admitRefuse?: string; admitOutcome?: RemoteCommandOutcome; heldDraft?: number; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[]; rows?: readonly RemoteSessionRow[]; registryDown?: "refused" | "throws"; chainCountLimit?: number; relayKeys?: ReadonlyMap<string, string> } = {}) {
+  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; admitRefuse?: string; admitOutcome?: RemoteCommandOutcome; stateOutcomes?: readonly RemoteCommandOutcome[]; heldDraft?: number; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[]; rows?: readonly RemoteSessionRow[]; registryDown?: "refused" | "throws"; chainCountLimit?: number; relayKeys?: ReadonlyMap<string, string> } = {}) {
     const engine = options.engine ?? ENGINE
     const sent: Sent[] = []
     // b's engine ledger of admitted delivery ids (senpi external-admission: a repeated id is already_admitted), and how many
     // admissions its user's open draft still holds (held_draft, taken by nothing).
     const admitted = new Set<string>()
     let heldDraft = options.heldDraft ?? 0
+    // How b's next get_state calls end before its engine answers them (a lost reply, a restarted hand), one per call.
+    const stateOutcomes = [...(options.stateOutcomes ?? [])]
     // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
     const watchers = new Set<(record: JsonObject) => void>()
     const writeRecords = () => queueMicrotask(() => { for (const record of options.records ?? []) for (const listener of [...watchers]) listener(record) })
@@ -68,6 +70,7 @@ export function createRemoteThreadFixture() {
         live.add(opened)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
+      if (rpc["type"] === "get_state" && stateOutcomes.length > 0) return stateOutcomes.shift() as RemoteCommandOutcome
       if (rpc["type"] === "get_state") return ok({ isStreaming: engine.streaming, pendingMessageCount: engine.pending, ...(engine.currentTurnId === undefined ? {} : { currentTurnId: engine.currentTurnId }) })
       if (rpc["type"] === "get_messages") return ok({ messages: [...engine.messages] })
       if (rpc["type"] === "interrupt") return ok(engine.interrupt)
