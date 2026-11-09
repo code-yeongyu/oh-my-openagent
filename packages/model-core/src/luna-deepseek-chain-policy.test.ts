@@ -56,48 +56,48 @@ describe("Luna and DeepSeek chain policy", () => {
 })
 
 const VERTEX_FLASH_OFF = {
-	providers: ["vertex-garden"],
-	model: "deepseek-v4.1-flash-maas",
-	variant: "off",
+  providers: ["vertex-garden"],
+  model: "deepseek-v4.1-flash-maas",
+  variant: "off",
 } satisfies FallbackEntry
 
 const VERTEX_FLASH_MEDIUM = {
-	providers: ["vertex-garden"],
-	model: "deepseek-v4.1-flash-maas",
-	variant: "medium",
+  providers: ["vertex-garden"],
+  model: "deepseek-v4.1-flash-maas",
+  variant: "medium",
 } satisfies FallbackEntry
 
 describe("Vertex Model Garden DeepSeek lane", () => {
-	test("quick adds the non-reasoning Vertex Flash rung right after first-party DeepSeek", () => {
-		const quick = CATEGORY_MODEL_REQUIREMENTS["quick"].fallbackChain
+  test("quick adds the non-reasoning Vertex Flash rung right after first-party DeepSeek", () => {
+    const quick = CATEGORY_MODEL_REQUIREMENTS["quick"].fallbackChain
 
-		expect(quick[3]).toEqual(VERTEX_FLASH_OFF)
-	})
+    expect(quick[3]).toEqual(VERTEX_FLASH_OFF)
+  })
 
-	test.each(["explore", "librarian"])(
-		"%s keeps first-party DeepSeek max, then the Vertex Flash medium lane",
-		(agentName) => {
-			const chain = AGENT_MODEL_REQUIREMENTS[agentName].fallbackChain
+  test.each(["explore", "librarian"])(
+    "%s keeps first-party DeepSeek max, then the Vertex Flash medium lane",
+    (agentName) => {
+      const chain = AGENT_MODEL_REQUIREMENTS[agentName].fallbackChain
 
-			expect(chain[4]).toEqual(VERTEX_FLASH_MEDIUM)
-		},
-	)
+      expect(chain[4]).toEqual(VERTEX_FLASH_MEDIUM)
+    },
+  )
 
-	test("unspecified-low follows deepseek-v4-pro with the Vertex Flash medium lane", () => {
-		const chain = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"].fallbackChain
-		const proIndex = chain.findIndex((entry) => entry.model === "deepseek-v4-pro")
+  test("unspecified-low follows deepseek-v4-pro with the Vertex Flash medium lane", () => {
+    const chain = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"].fallbackChain
+    const proIndex = chain.findIndex((entry) => entry.model === "deepseek-v4-pro")
 
-		expect(proIndex).toBeGreaterThanOrEqual(0)
-		expect(chain[proIndex + 1]).toEqual(VERTEX_FLASH_MEDIUM)
-	})
+    expect(proIndex).toBeGreaterThanOrEqual(0)
+    expect(chain[proIndex + 1]).toEqual(VERTEX_FLASH_MEDIUM)
+  })
 
-	test("a Vertex-only machine resolves the quick chain onto the Garden Flash model", () => {
-		const resolved = resolveModelWithFallback({
-			fallbackChain: CATEGORY_MODEL_REQUIREMENTS["quick"].fallbackChain,
-			availableModels: new Set(["vertex-garden/deepseek-ai/deepseek-v4.1-flash-maas"]),
-		})
+  test("a Vertex-only machine resolves the quick chain onto the Garden Flash model", () => {
+    const resolved = resolveModelWithFallback({
+      fallbackChain: CATEGORY_MODEL_REQUIREMENTS["quick"].fallbackChain,
+      availableModels: new Set(["vertex-garden/deepseek-ai/deepseek-v4.1-flash-maas"]),
+    })
 
-		expect(resolved?.model).toBe("vertex-garden/deepseek-ai/deepseek-v4.1-flash-maas")
-		expect(resolved?.source).toBe("provider-fallback")
-	})
+    expect(resolved?.model).toBe("vertex-garden/deepseek-ai/deepseek-v4.1-flash-maas")
+    expect(resolved?.source).toBe("provider-fallback")
+  })
 })
