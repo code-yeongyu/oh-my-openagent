@@ -11,6 +11,7 @@ import { SettingsManager } from "../../senpi-test-runtime"
 import type { ComponentLogger } from "../../extension/types"
 import { createMemoryComponent } from "./index"
 import { withinMs } from "./kibitzer/sidecar.test-support"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 import { componentContext, loadedMemoryConfig, memorySettings, MemoryFakeExtensionAPI, sessionContext } from "./memory.test-support"
 import {
   SESSION_SHUTDOWN_DRAIN_BUDGET_MS,
@@ -397,7 +398,7 @@ describe("session shutdown drain budget", () => {
     await pi.dispatch("input", { source: "interactive", inputId: "reconcile-input", text: "Continue." }, eventCtx)
     await pi.dispatch("input_disposition", { inputId: "reconcile-input", disposition: "started" }, eventCtx)
     await pi.dispatch("agent_settled", {}, eventCtx)
-    await withinMs(failureLogged.promise, "bind-time reconcile failure logged", 5_000)
+    await withinMs(failureLogged.promise, "bind-time reconcile failure logged", remainingTestTime())
     // The shutdown drain awaits the retired pass, so nothing it started outlives this test's memory home.
     await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" }, eventCtx)
 
