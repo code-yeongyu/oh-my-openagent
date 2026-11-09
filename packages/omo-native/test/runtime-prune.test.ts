@@ -152,7 +152,7 @@ describe("pruneProvisionedRuntimes", () => {
     expect(present(fresh)).toBe(true)
   })
 
-  test("#given a concurrent pruner that renames a runtime before this one does #when a fresh runtime prunes #then it counts as removed, not failed", () => {
+  test("#given a concurrent pruner that renames a runtime before this one does #when a fresh runtime prunes #then it is neither failed nor claimed as removed", () => {
     // given: the other pruner takes 5.1.40 between this pruner's listing and its rename
     provision("5.1.40", "5.1.56", "5.1.61", "5.1.62")
     let calls = 0
@@ -164,7 +164,7 @@ describe("pruneProvisionedRuntimes", () => {
     const result = pruneProvisionedRuntimes({ root, current: "5.1.62", platform: "linux", listRunning })
     // then
     expect(result.failed).toEqual([])
-    expect(result.removed.toSorted()).toEqual(["5.1.40", "5.1.56"])
+    expect(result.removed).toEqual(["5.1.56"])
     expect(result.kept).toEqual(["5.1.61"])
   })
 

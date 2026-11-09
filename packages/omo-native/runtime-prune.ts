@@ -75,10 +75,7 @@ export function pruneProvisionedRuntimes(options: {
       renamed.push({ version, directory, pruning })
     } catch (error) {
       // Gone since the listing: a concurrent pruner renamed it first and is removing it.
-      if (errorCode(error) === "ENOENT") {
-        result.removed.push(version)
-        continue
-      }
+      if (errorCode(error) === "ENOENT") continue
       result.kept.push(version)
       if (!(platform === "win32" && isBusy(error))) result.failed.push({ version, reason: errorMessage(error) })
     }
