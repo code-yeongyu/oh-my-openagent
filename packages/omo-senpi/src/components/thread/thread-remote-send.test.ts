@@ -22,7 +22,8 @@ describe("#12882: a send to another device is one admit_external_message, admitt
     const a = account()
     const { run } = surface(a.remote, { callerName: () => "planner", env: ENV })
     expect(await run("thread_send", { thread: "dur-on-b", message: "do the thing" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b", delivery: { kind: "started", turn_id: "turn-b" }, deduplicated: false })
-    expect(commands(a.sent)).toEqual([ADMIT])
+    // The default mode reads b's state first, as the local drain reads its own phase, then one admission and no prompt.
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT])
     const [record = {}] = admits(a.sent)
     expect(record["deliveryId"]).toMatch(UUID)
     expect(record).toMatchObject({ sessionId: "dur-on-b", deliverAs: "followUp", chainCount: 1, sender: { kind: "agent", session_id: "dur-caller", name: "planner" } })
@@ -83,20 +84,47 @@ describe("remote == local: the same call answers the same on b as on this device
     expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({ kind: "ok", device: "b", deduplicated: true, delivery: { kind: "queued", queue_position: 1 } })
   })
 
-  test("#given b is busy with 3 pending messages #when a message is sent #then it is queued at the position b reports and no gateway sequence is invented", async () => {
+  test("#given b is busy with 3 pending messages on an engine that reports no turn id #when a message is sent #then it is queued at the position b reports (the one case the default queues) and no gateway sequence is invented", async () => {
     const a = account({ engine: { ...ENGINE, streaming: true, pending: 3 } })
     const { run } = surface(a.remote)
     const sent = await run("thread_send", { thread: "dur-on-b", message: "later" })
-    expect(sent).toMatchObject({ kind: "ok", delivery: { kind: "queued", queue_position: 3 } })
+    expect(sent).toMatchObject({ kind: "ok", delivery: { kind: "queued", queue_position: 3 }, effective_mode: "follow_up" })
     expect("message_seq" in sent).toBe(false)
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT, "get_state"])
+  })
+
+  test("#given b is busy on an engine that reports its turn id #when a message is sent with no delivery mode #then it is steered into that turn at the epoch read, like a same-device send (#12914)", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, pending: 2, currentTurnId: "7" } })
+    const { run } = surface(a.remote)
+    const sent = await run("thread_send", { thread: "dur-on-b", message: "now" })
+    expect(sent).toMatchObject({ kind: "ok", device: "b", delivery: { kind: "steered", turn_id: "7" }, effective_mode: "steer" })
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT])
+    expect(admits(a.sent).map((record) => [record["deliverAs"], record["expectedTurnId"]])).toEqual([["steer", "7"]])
+  })
+
+  test("#given b is busy #when a message asks to queue explicitly #then no state is read first and it waits behind the turn", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, pending: 2, currentTurnId: "7" } })
+    const { run } = surface(a.remote)
+    const sent = await run("thread_send", { thread: "dur-on-b", message: "later", delivery: "follow_up" })
+    expect(sent).toMatchObject({ kind: "ok", delivery: { kind: "queued", queue_position: 2 }, effective_mode: "follow_up" })
     expect(commands(a.sent)).toEqual([ADMIT, "get_state"])
+    expect(admits(a.sent).map((record) => [record["deliverAs"], "expectedTurnId" in record])).toEqual([["followUp", false]])
+  })
+
+  test("#given b's turn ends between the state read and the admission #when the default mode is sent #then the send decides again against b's new state and starts a turn, never answering turn_conflict", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, pending: 1, currentTurnId: "7" }, turnEndsAfterFirstProbe: true })
+    const { run } = surface(a.remote)
+    const sent = await run("thread_send", { thread: "dur-on-b", message: "racing" })
+    expect(sent).toMatchObject({ kind: "ok", delivery: { kind: "started" }, effective_mode: "follow_up" })
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT, "get_state", ADMIT])
+    expect(admits(a.sent).map((record) => record["deliverAs"])).toEqual(["steer", "followUp"])
   })
 
   test("#given the record's reply is lost on the way back #when a message is sent #then the send is idempotency_uncertain naming the reason, and nothing else is sent", async () => {
     const a = account({ admitOutcome: { kind: "uncertain", reason: "reply_lost" } })
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain", details: { device: "b", reason: "reply_lost" } } })
-    expect(commands(a.sent)).toEqual([ADMIT])
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT])
   })
 
   test.each([
@@ -113,14 +141,14 @@ describe("remote == local: the same call answers the same on b as on this device
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({ kind: "error", error: { code: "unsupported", details: { device: "b" } } })
     expect(prompts(a.sent)).toEqual([])
-    expect(commands(a.sent)).toEqual([ADMIT])
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT])
   })
 
   test("#given b's chain limit is below this hop #when a message is sent #then the engine's refusal is the answer and nothing else is sent", async () => {
     const a = account({ chainCountLimit: 0 })
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({ kind: "error", error: { details: { device: "b", reason: "chain_count_limit" } } })
-    expect(commands(a.sent)).toEqual([ADMIT])
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT])
   })
 })
 

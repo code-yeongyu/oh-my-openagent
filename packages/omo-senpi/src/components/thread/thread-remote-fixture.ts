@@ -30,9 +30,12 @@ export function createRemoteThreadFixture() {
     for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
   }
 
-  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; admitRefuse?: string; admitOutcome?: RemoteCommandOutcome; heldDraft?: number; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[]; rows?: readonly RemoteSessionRow[]; registryDown?: "refused" | "throws"; chainCountLimit?: number; relayKeys?: ReadonlyMap<string, string> } = {}) {
+  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; admitRefuse?: string; admitOutcome?: RemoteCommandOutcome; heldDraft?: number; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[]; rows?: readonly RemoteSessionRow[]; registryDown?: "refused" | "throws"; chainCountLimit?: number; relayKeys?: ReadonlyMap<string, string>; turnEndsAfterFirstProbe?: boolean } = {}) {
     const engine = options.engine ?? ENGINE
     const sent: Sent[] = []
+    // The race a sender cannot see: b's turn ends after the sender read its state and before the admission arrives, so the
+    // first steer is turn_conflict and the next get_state reports an idle session.
+    let probes = 0
     // b's engine ledger of admitted delivery ids (senpi external-admission: a repeated id is already_admitted), and how many
     // admissions its user's open draft still holds (held_draft, taken by nothing).
     const admitted = new Set<string>()
@@ -68,7 +71,11 @@ export function createRemoteThreadFixture() {
         live.add(opened)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
-      if (rpc["type"] === "get_state") return ok({ isStreaming: engine.streaming, pendingMessageCount: engine.pending, ...(engine.currentTurnId === undefined ? {} : { currentTurnId: engine.currentTurnId }) })
+      if (rpc["type"] === "get_state") {
+        probes += 1
+        const ended = options.turnEndsAfterFirstProbe === true && probes >= 2
+        return ok({ isStreaming: engine.streaming && !ended, pendingMessageCount: ended ? 0 : engine.pending, ...(engine.currentTurnId === undefined || ended ? {} : { currentTurnId: engine.currentTurnId }) })
+      }
       if (rpc["type"] === "get_messages") return ok({ messages: [...engine.messages] })
       if (rpc["type"] === "interrupt") return ok(engine.interrupt)
       // b's user set `threads.chainCountLimit` (senpi S32): its engine answers `{success: false, errorCode: "chain_count_limit"}`,
@@ -85,12 +92,14 @@ export function createRemoteThreadFixture() {
         if (admitted.has(id)) return ok({ kind: "already_admitted", turnId: epoch })
         if (heldDraft > 0) { heldDraft -= 1; return ok({ kind: "held_draft", turnId: epoch }) }
         if (rpc["deliverAs"] === "steer") {
+          if (options.turnEndsAfterFirstProbe === true && probes === 1) return ok({ kind: "turn_conflict", turnId: epoch })
           if (!engine.streaming || rpc["expectedTurnId"] !== engine.currentTurnId) return ok({ kind: "turn_conflict", turnId: epoch })
           admitted.add(id)
           return ok({ kind: "steered", turnId: epoch })
         }
         admitted.add(id)
-        return ok(engine.streaming ? { kind: "queued", turnId: epoch } : { kind: "started", turnId: epoch })
+        const streaming = engine.streaming && !(options.turnEndsAfterFirstProbe === true && probes >= 2)
+        return ok(streaming ? { kind: "queued", turnId: epoch } : { kind: "started", turnId: epoch })
       }
       if (rpc["type"] === "get_available_models") return ok({ models: [{ provider: "anthropic", id: "claude-opus", name: "Opus" }, { provider: "openai", id: "gpt-6" }] })
       if (rpc["type"] === "set_model") return ok({ provider: rpc["provider"] ?? null, id: rpc["modelId"] ?? null })

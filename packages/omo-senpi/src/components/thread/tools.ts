@@ -381,9 +381,11 @@ async function deliverThrough(
   if ("device" in sent) {
     const row = target.kind === "remote" ? target.row : undefined
     const title = row?.title
-    if (resolvedBy === undefined || row === undefined) return { kind: "ok", thread_id: sent.thread_id, link: threadLink(sent.thread_id, title), delivery: sent.delivery, deduplicated: sent.deduplicated, device: sent.device }
+    // The same lane facts a same-device result carries (#12914): the caller reads which lane the other device used.
+    const lane = { delivery_id: sent.delivery_id, ...(sent.effective_mode === undefined ? {} : { effective_mode: sent.effective_mode }) }
+    if (resolvedBy === undefined || row === undefined) return { kind: "ok", thread_id: sent.thread_id, link: threadLink(sent.thread_id, title), delivery: sent.delivery, deduplicated: sent.deduplicated, device: sent.device, ...lane }
     const seen = new Date(row.updated_ms).toISOString()
-    return { kind: "ok", thread: { thread_id: row.session_id, name: row.title, status: "live", cwd: row.project, created_at: seen, updated_at: seen, device: row.device, link: threadLink(row.session_id, row.title) }, resolved_by: resolvedBy, delivery: sent.delivery, deduplicated: sent.deduplicated, device: row.device } as ThreadToolResult
+    return { kind: "ok", thread: { thread_id: row.session_id, name: row.title, status: "live", cwd: row.project, created_at: seen, updated_at: seen, device: row.device, link: threadLink(row.session_id, row.title) }, resolved_by: resolvedBy, delivery: sent.delivery, deduplicated: sent.deduplicated, device: row.device, ...lane } as ThreadToolResult
   }
   const threadId = sent.thread_id
   const facts = { delivery_id: sent.delivery_id, effective_mode: sent.effective_mode, endpoint: sent.endpoint_kind === null ? null : { kind: sent.endpoint_kind } }

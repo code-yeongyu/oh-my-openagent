@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { hashArgs } from "../gateway/bindings"
+import type { RuntimePhase } from "../gateway/adapter"
 import { decideDelivery } from "../gateway/decision"
 import { senderFacts } from "../gateway/envelope"
 import { deliveryProvenanceLine, renderDeliveryText } from "../gateway/provenance"
@@ -51,15 +52,22 @@ function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
 
 const ADMIT_RECORD = "admit_external_message"
 
-type EngineState = { readonly phase: "idle" | "mid_turn"; readonly turnEpoch: number | null; readonly pending: number | null }
+type EngineState = { readonly phase: RuntimePhase; readonly turnEpoch: number | null; readonly pending: number | null }
 
+// The same phase the local receiver derives for its own drain (gateway/registration.ts), read from the engine's get_state.
 function engineStateOf(reply: JsonObject): EngineState {
   const pendingQuestions = reply["pendingQuestions"]
-  const midTurn = reply["isStreaming"] === true && reply["isCompacting"] !== true && !(Array.isArray(pendingQuestions) && pendingQuestions.length > 0)
+  const phase: RuntimePhase = reply["isCompacting"] === true
+    ? "compacting"
+    : reply["isStreaming"] !== true
+      ? "idle"
+      : Array.isArray(pendingQuestions) && pendingQuestions.length > 0
+        ? "waiting_question"
+        : "mid_turn"
   const current = reply["currentTurnId"]
   const turnEpoch = typeof current === "string" && /^\d+$/.test(current) ? Number(current) : null
   const pending = reply["pendingMessageCount"]
-  return { phase: midTurn ? "mid_turn" : "idle", turnEpoch, pending: typeof pending === "number" && Number.isInteger(pending) && pending >= 1 ? pending : null }
+  return { phase, turnEpoch, pending: typeof pending === "number" && Number.isInteger(pending) && pending >= 1 ? pending : null }
 }
 
 /**
@@ -120,24 +128,30 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
     return { delivery_id: randomUUID(), root_id: prior?.root_id ?? `root-${randomUUID()}`, hop: Math.max(prior?.hop ?? 0, options.callerChainHop?.() ?? 0) + 1 }
   }
 
-  async function send(delivery: OutboundDelivery, row: RemoteSessionRow): Promise<SendOutcome> {
+  // The same table the local drain applies (gateway/decision.ts), over the remote engine's own state: auto steers a busy
+  // session at its live turn epoch and starts an idle one; follow_up never probes. A remote engine that reports no turn id
+  // (before senpi 2026.11.2) cannot be steered at an epoch it will accept, so auto queues there - the one case it does.
+  async function decideLane(delivery: OutboundDelivery, row: RemoteSessionRow, expected: number | null): Promise<Failure | { readonly lane: EffectiveLane; readonly expectedTurnId: number | null }> {
+    if (delivery.mode === "follow_up") return { lane: "follow_up", expectedTurnId: null }
+    const probed = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
+    if (probed.kind !== "ok") return outcomeFailure(probed, row.device)
+    const state = engineStateOf(replyData(probed.response))
+    const decision = decideDelivery(state.phase, delivery.mode, expected, state.turnEpoch)
+    if (decision.kind !== "admit") {
+      const reason = decision.kind === "refuse" ? decision.reason : "turn_conflict"
+      const mapped = REFUSAL_CODES[reason] ?? { code: "internal_error" as const, next: "Call thread_list and check the target." }
+      return fail(mapped.code, `A steer to ${row.session_id} on device ${row.device} was refused: ${reason}.`, mapped.next, { device: row.device, ...(state.turnEpoch === null ? {} : { current_turn_id: String(state.turnEpoch) }) })
+    }
+    return decision.deliverAs === "steer" ? { lane: "steer", expectedTurnId: decision.expected_turn_id ?? null } : { lane: "follow_up", expectedTurnId: null }
+  }
+
+  async function send(delivery: OutboundDelivery, row: RemoteSessionRow, attempt = 0): Promise<SendOutcome> {
     const offline = await deviceOnline(remote, row.device)
     if (offline !== undefined) return offline
     const expected = delivery.expected_turn_id === undefined ? null : Number(delivery.expected_turn_id)
-    let lane: EffectiveLane = "follow_up"
-    let state: EngineState | undefined
-    if (delivery.mode === "steer") {
-      const probed = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
-      if (probed.kind !== "ok") return outcomeFailure(probed, row.device)
-      state = engineStateOf(replyData(probed.response))
-      const decision = decideDelivery(state.phase, "steer", expected, state.turnEpoch)
-      if (decision.kind !== "admit") {
-        const reason = decision.kind === "refuse" ? decision.reason : "turn_conflict"
-        const mapped = REFUSAL_CODES[reason] ?? { code: "internal_error" as const, next: "Call thread_list and check the target." }
-        return fail(mapped.code, `A steer to ${row.session_id} on device ${row.device} was refused: ${reason}.`, mapped.next, { device: row.device, ...(state.turnEpoch === null ? {} : { current_turn_id: String(state.turnEpoch) }) })
-      }
-      lane = "steer"
-    }
+    const decided = await decideLane(delivery, row, expected)
+    if ("kind" in decided) return decided
+    const lane = decided.lane
     const facts = senderFacts(delivery.sender, await options.senderProvenance())
     const { delivery_id, root_id, hop } = await chain(delivery.caller_id)
     const text = renderDeliveryText({
@@ -158,7 +172,7 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
       displayText: `${deliveryProvenanceLine(facts.provenance)}\n${delivery.text}`,
       sender: { kind: "agent", session_id: delivery.caller_id, ...(name === undefined || name === "" ? {} : { name }) },
       deliverAs: lane === "steer" ? "steer" : "followUp",
-      ...(lane === "steer" && expected !== null ? { expectedTurnId: String(expected) } : {}),
+      ...(lane === "steer" && decided.expectedTurnId !== null ? { expectedTurnId: String(decided.expectedTurnId) } : {}),
       chainCount: hop,
     }, hop)
     const ok = (kind: GatewayDeliveryDelivery, deduplicated = false): RelayDeliverySuccess => ({ kind: "ok", thread_id: row.session_id, delivery: kind, deduplicated, device: row.device, delivery_id, effective_mode: lane })
@@ -169,6 +183,9 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
     const kind = reply["kind"]
     const turnId = typeof reply["turnId"] === "string" ? reply["turnId"] : ""
     if (kind === "started" || kind === "steered") return ok({ kind, turn_id: turnId })
+    // The turn this send read ended before the engine admitted it: the sender named no turn, so decide again against the
+    // engine's new state, once - the same re-decision the local drain makes by requeueing.
+    if (kind === "turn_conflict" && delivery.mode === "auto" && attempt === 0) return await send(delivery, row, 1)
     if (kind === "turn_conflict") return fail(REFUSAL_CODES.turn_conflict.code, `Turn ${delivery.expected_turn_id ?? "?"} is no longer the running turn of ${row.session_id} on device ${row.device}.`, REFUSAL_CODES.turn_conflict.next, { device: row.device, ...(turnId === "" ? {} : { current_turn_id: turnId }) })
     if (kind !== "queued" && kind !== "held_draft" && kind !== "already_admitted") return fail("idempotency_uncertain", `Device ${row.device} accepted the message but answered an unknown admission (${String(kind)}).`, "Read the thread before deciding whether to send again.", { device: row.device, delivery_id })
     // Queued, held behind the receiver's open draft, or already taken: the delivery waits on that device exactly as a
