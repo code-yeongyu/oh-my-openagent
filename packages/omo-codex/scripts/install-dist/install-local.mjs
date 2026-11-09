@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:310c109d38c33051e331c8093b9d50dbd3ec1b69436e8d0d4e70f5a3175a2372:7514cd470223edec63516e727a710d705b6d664d1a3a148a49ea6254b7222814
+// omo-codex-install:adc0c9ae0db7b2199d87a87956f2a065f91ef403e2c0816a4fe17111125c47b1:6fec9dd74fa6bb69f9064c703c94e024377de335a2c86ac93c5bd141b1290e69
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10205,7 +10205,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.64",
+    version: "5.1.65",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -21877,13 +21877,6 @@ function resolveOmoConfigView(options) {
 }
 
 // packages/omo-config-core/src/loader/loader.ts
-function positionAt(content, offset) {
-  const before = content.slice(0, offset);
-  const lineStart = before.lastIndexOf(`
-`) + 1;
-  return { line: before.split(`
-`).length, column: offset - lineStart + 1 };
-}
 function parseJsoncSafe(content) {
   const errors = [];
   const data = parse4(content.charCodeAt(0) === 65279 ? content.slice(1) : content, errors, {
@@ -21930,14 +21923,12 @@ function readConfigSource(path, scope, fileSystem) {
     };
   }
   const parsed = parseJsoncSafe(content);
-  const firstError = parsed.errors[0];
-  if (firstError !== undefined) {
+  if (parsed.errors.length > 0) {
     return {
       diagnostics: [{
         kind: "parse",
         message: `JSONC parse error in ${path}: ${parsed.errors.map((error) => error.message).join(", ")}`,
-        path,
-        position: positionAt(content.charCodeAt(0) === 65279 ? content.slice(1) : content, firstError.offset)
+        path
       }],
       source: { exists: true, loaded: false, path, scope }
     };

@@ -13,6 +13,8 @@ import { type RpcSpawnDescriptor, buildRpcSpawn } from "./rpc/spawn"
 import { discardUnstartedRpcHandle } from "./rpc/start-cleanup"
 import { createTaskRecordStore } from "../store"
 import { InputUncertainError } from "./input-effects"
+import type { ChildDialogForwarder } from "./child-dialogs/forwarder"
+import { ChildParentLink, type ParentPermissionMode } from "./parent-link"
 
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 10_000
 /** senpi capability: a single-session `--mode rpc` process accepts `set_retry_fallback` before its first turn. */
@@ -33,6 +35,12 @@ export type RpcProcessRunnerOptions = {
   // The parent's `-e` extension entries, forwarded to every child so a detached process reproduces the
   // parent's extensions. Applied only when a spec does not already carry its own extensions.
   readonly inheritedExtensions?: readonly string[]
+  // Where a child that did not follow its parent's approval mode is reported (#6189 F2e), under a per-task token.
+  readonly onWarning?: (message: string, token?: string) => void | (() => void)
+  // The parent session's UI a child's dialogs are answered on, and the approval mode it opens with and follows
+  // (#6189 F2c-F2e). Absent: dialogs get the safe deny/cancel default and the child keeps its own mode.
+  readonly dialogs?: ChildDialogForwarder
+  readonly parentPermission?: ParentPermissionMode
 }
 
 /**
@@ -49,11 +57,15 @@ export class RpcProcessRunner {
   private readonly now: () => number
   private readonly modelAdmission: RpcModelAdmission
   private readonly inheritedExtensions: readonly string[]
+  private readonly onWarning: (message: string, token?: string) => void | (() => void)
   private readonly fallbackChainDeadlineMs: number
   private readonly pendingTeardowns = new Set<Promise<void>>()
   private readonly terminateChild: CreateRpcChildHandleOptions["terminateChild"]
+  private readonly options: RpcProcessRunnerOptions
 
   constructor(options: RpcProcessRunnerOptions = {}) {
+    this.options = options
+    this.onWarning = options.onWarning ?? ((message) => log("senpi-task process runner", { message }))
     this.terminateChild = options.terminateChild
     this.spawnChild =
       options.spawnChild ??
@@ -73,9 +85,10 @@ export class RpcProcessRunner {
         ? { ...specInput, extensions: this.inheritedExtensions }
         : specInput
     await this.modelAdmission(spec)
-    const descriptor = this.buildSpawn(spec)
+    const parent = new ChildParentLink(spec.task_id, this.options.dialogs, this.options.parentPermission, (message, token) => this.onWarning(message, token))
+    const descriptor = this.buildSpawn(parent.named(spec))
     const child = this.spawnChild(descriptor)
-    const client = new RpcProtocolClient({ child, onMalformedLine: this.onMalformedLine })
+    const client = new RpcProtocolClient({ child, onMalformedLine: this.onMalformedLine, parent })
     const handle = createRpcChildHandle({
       client,
       child,

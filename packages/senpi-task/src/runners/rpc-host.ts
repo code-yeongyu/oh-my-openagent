@@ -29,6 +29,8 @@ import { createHostSessionOpener, type HostSessionOpener } from "./rpc-host/sess
 import type { TransportRecoveryOptions } from "./rpc-host/transport-recovery"
 import { createRpcModelAdmission, type RpcModelAdmission } from "./rpc/model-admission"
 import type { RpcChildHandle, RpcRunnerSpec } from "./types"
+import type { ChildDialogForwarder } from "./child-dialogs/forwarder"
+import { ChildParentLink, type ParentPermissionMode } from "./parent-link"
 
 /** Backoff between reattach attempts after a lost transport; the daemon needs a moment to come back. */
 const DEFAULT_REATTACH_DELAYS_MS: readonly number[] = [500, 1_000, 2_000, 4_000, 8_000]
@@ -41,7 +43,8 @@ export interface HostSessionChannel extends HostSessionPort {
 }
 
 export type { EnsureTaskDaemonPort, ShardResolver } from "./rpc-host/child-endpoint"
-export type CreateHostSessionChannel = (socketPath: string) => HostSessionChannel
+// `taskId` names the child whose dialogs and approval mode the channel carries (#6189).
+export type CreateHostSessionChannel = (socketPath: string, taskId?: string) => HostSessionChannel
 
 /** The per-child runner this one delegates to when the daemon cannot host a child. */
 export interface FallbackChildRunner {
@@ -62,7 +65,7 @@ export type RpcHostRunnerOptions = {
   readonly heartbeatIntervalMs?: number
   readonly closeGraceMs?: number
   readonly fallback?: FallbackChildRunner
-  readonly onWarning?: (message: string) => void | (() => void)
+  readonly onWarning?: (message: string, token?: string) => void | (() => void)
   readonly now?: () => number
   readonly reattachDelaysMs?: readonly number[]
   // The bound a lost transport's recovery runs under before the child ends `transport lost` (omo#9403).
@@ -89,6 +92,10 @@ export type RpcHostRunnerOptions = {
   readonly liveChildren?: LiveHostChildren
   // The attach-only probe for the session's own endpoint; defaults to the engine's `probeHost`.
   readonly probeHost?: HostProtocolProbe
+  // The parent session's UI a child's dialogs are answered on, and the approval mode it opens with and follows
+  // (#6189 F2c-F2e). Absent: dialogs get the safe deny/cancel default and the child keeps its own mode.
+  readonly dialogs?: ChildDialogForwarder
+  readonly parentPermission?: ParentPermissionMode
 }
 
 /** Whether a started child lives on the daemon (a session) or in its own process (the fallback). */
@@ -122,7 +129,7 @@ export class RpcHostRunner {
   private readonly modelAdmission: RpcModelAdmission
   private readonly inheritedExtensions: readonly string[]
   private readonly now: () => number
-  private readonly onWarning: (message: string) => void | (() => void)
+  private readonly onWarning: (message: string, token?: string) => void | (() => void)
   private readonly warned = new Set<string>()
   private readonly reattachDelaysMs: readonly number[]
   private readonly admissionWaitMs: number
@@ -133,7 +140,10 @@ export class RpcHostRunner {
 
   constructor(options: RpcHostRunnerOptions) {
     this.options = options
-    this.createClient = options.createClient ?? ((socketPath) => new HostSessionClient({ socketPath }))
+    this.createClient = options.createClient ?? ((socketPath, taskId) => new HostSessionClient({
+      socketPath,
+      ...(taskId === undefined ? {} : { parent: new ChildParentLink(taskId, options.dialogs, options.parentPermission, (message, token) => this.onWarning(message, token)) }),
+    }))
     this.modelAdmission = options.modelAdmission ?? createRpcModelAdmission()
     this.inheritedExtensions = options.inheritedExtensions ?? []
     this.now = options.now ?? Date.now

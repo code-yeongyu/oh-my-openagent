@@ -110,4 +110,6 @@ export type RemoteThreadSurface = {
   /** Absent until the account service's alias registry ships: aliases are then refused typed, never guessed. */
   readonly aliases?: AliasRegistry
   readonly chain: ChainCountWire
+  /** The approval mode a session this surface creates is opened in (#6189): the creator's own. Absent: none is named. */
+  readonly permissionPreset?: () => string | undefined
 }
