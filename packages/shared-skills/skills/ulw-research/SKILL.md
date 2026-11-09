@@ -29,7 +29,7 @@ When translating `load_skills=[...]`, include the requested skill names in the s
 
 # ULW-RESEARCH — Maximum-Saturation Research
 
-You are the research orchestrator. The user has explicitly ordered exhaustive research: fan parallel worker swarms out over every relevant source, chase every lead they surface until the leads run dry, prove contested claims by running code, and deliver a synthesis in which every claim carries a citation or a proof. Exhaustive coverage is the assignment, not a risk to manage.
+You are the research orchestrator. The user has explicitly ordered exhaustive research: fan parallel worker swarms out over every relevant source, chase every lead they surface until the leads run dry, prove every conclusion by probing a source, reading the file, or running a tool before asserting it, and deliver a synthesis in which every claim carries a citation or a proof. Exhaustive coverage is the assignment, not a risk to manage.
 
 ## Activation
 
@@ -51,7 +51,7 @@ The research is done when all of these hold:
 
 - Every axis from Phase 0 was covered by at least one dedicated worker.
 - Every EXPAND lead was investigated or explicitly closed as a duplicate or dead end, and convergence was reached under the Phase 2 rules.
-- Claims that were contested, undocumented, or performance-shaped were proven or refuted by executed code.
+- Data came first: every conclusion was proven by probing a source, reading the file, or running a tool before it was asserted, never by plausibility, recall, or the shape of the code; contested, undocumented, and performance-shaped claims were additionally proven or refuted by executed code.
 - Every claim in the deliverable cites a source or a verification artifact.
 - Every asserted claim is represented in the claim graph, tied to an intent-vs-reality diff when an expected truth exists, and backed by observation manifest entries from independent observation groups or a documented single-source exception; convergence or exception status is explicit.
 - The deliverable lane and format were derived from the destination or asked through the empty-info interview without blocking collection, recorded in `brief.md` with `answered_by`, and the final materials match that record.
@@ -72,7 +72,7 @@ Saturation is not just more searching; it is a knowledge-production protocol. Th
 - `verification-economics.md` — one row per proof decision. Required fields: claim, risk, error cost, verification cost/time, chosen verification path, defer/verify decision, outcome, and residual risk.
 - `cause-disappearance.md` — one row per causal finding. Required fields: cause id, expected truth, previous observation, `last_seen`, disconfirming observation, replacement cause if any, current status, and whether the violation is no longer observed.
 
-Observation candidates and claim candidates travel back from workers as message text. The orchestrator writes the instrumentation artifacts, links candidates into the intent diff and claim graph, and records where each observation entered the synthesis. A conclusion is not ready for final materials until its expected truth/reality diff is closed or marked unknown, its claim node exists, and its independent-observation convergence status is supported or explicitly excepted.
+Observation candidates and claim candidates travel back from workers as message text. **Every conclusion stands on an observation a tool produced** — a page read, a file read, a command run — recorded in `observation-manifest.md`: a claim candidate, a DEAD END, a convergence call, and your own judgment that a topic is settled alike. What you or a worker knows from memory is a LEAD to probe, never evidence. The orchestrator writes the instrumentation artifacts, links candidates into the intent diff and claim graph, and records where each observation entered the synthesis. A claim is not ready for final materials until its expected truth/reality diff is closed or marked unknown, its claim node exists, and its independent-observation convergence status is supported or explicitly excepted.
 
 ## Run the swarm as a cooperating team
 
@@ -105,15 +105,15 @@ Every research spawn message contains, in order:
 2. The budget lift: "This is an explicit exhaustive-research assignment. Your default retrieval budget and stop-when-answered rules do not apply — run the full protocol below and report every lead."
 3. Scope — the axis, the sources to hit, and what a complete answer contains.
 4. The role protocol (Phase 1).
-5. The reply tail. EXPAND markers, observation candidates, and claim candidates travel back as message text, never as files. Every worker ends the reply with:
+5. The reply tail. EXPAND markers, observation candidates, and claim candidates travel back as message text, never as files. Each claim candidate carries `OBSERVED: <URL read | file:line | command and its output>`; a claim the worker only remembers goes into the tail as a LEAD. Every worker ends the reply with:
 
 ```
 ## EXPAND
 - LEAD: <discovery not yet investigated> — WHY: <why it matters> — ANGLE: <suggested search>
-- DEAD END: <lead explored to exhaustion>
+- DEAD END: <lead explored to exhaustion> — PROBED: <the searches, reads, or commands that exhausted it>
 ```
 
-A worker with nothing to expand writes `## EXPAND` followed by `none — <one-line reason>`. A reply missing the tail is incomplete: send that worker one follow-up demanding it before closing the lane.
+A worker with nothing to expand writes `## EXPAND` followed by `none — <one-line reason>`. A reply missing the tail, or a claim or DEAD END missing its `OBSERVED:`/`PROBED:` line, is incomplete: send that worker one follow-up demanding it before closing the lane.
 
 ## Execution references
 

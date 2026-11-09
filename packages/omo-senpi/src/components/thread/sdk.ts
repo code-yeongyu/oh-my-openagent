@@ -13,6 +13,7 @@ import { resolveProvenance, type ProvenanceWorkspaces } from "./gateway/provenan
 import type { ReportOpResult } from "./gateway/store-relay-ops"
 import type { StoreExtensionApi } from "./gateway/store-extensions"
 export type { StoreExtensionApi, StoreExtensionRegistration, StoreExtensionTransaction, StoreExtensionOperation, StoreExtensionResult, StoreExtensionRefusal, StoreExtensionRefusalCode } from "./gateway/store-extensions"
+import type { DeliveryTarget } from "./gateway/transport"
 import type { ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult } from "./gateway/types"
 import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
 import { createGatewayResolver, createGatewayServices } from "./tools/gateway-services"
@@ -131,7 +132,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
   const workspaces = options.provenanceWorkspaces
   const surface: ThreadToolSurfaceOptions = { host, store, env, ...(workspaces === undefined ? {} : { loadProvenanceWorkspaces: () => workspaces }), stateDirectory: options.agentDir, sessionsDirectory: () => join(options.agentDir, "sessions"), callerSessionId: () => UNKNOWN_CALLER, callerWorkspaceRoot: () => options.cwd, now }
   const view = () => hostView(surface)
-  const { engine, relay, endpoints, locate } = createGatewayServices(surface, () => hostView(surface, { offline: true }))
+  const { relay, endpoints, locate, pipeline } = createGatewayServices({ ...surface, ...(options.remote === undefined ? {} : { remote: options.remote }) }, () => hostView(surface, { offline: true }))
   // An extension call resolves its target while the store worker runs that call's transaction, so it
   // takes the store-free live-and-disk resolver: the send path's `resolve` first asks this same store
   // for the session's owner, a request the busy worker would only answer after the call's budget.
@@ -205,28 +206,31 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
       if (request.binding_id !== undefined) return await inbound({ ...request, binding_id: request.binding_id })
       if (request.thread === undefined) return fail("invalid_arguments", "A send without a binding needs a target session.", "Pass the target session, or --binding to deliver through a binding.")
       if (request.author !== undefined) return fail("invalid_arguments", "An author names a human in a bound external thread; a send without a binding has none.", "Pass binding_id with the author, or drop the author.")
-      // Resolved like read: an alias or account id held on this device is account-wide, so the workspace scope does not apply.
-      // Like the agent's thread_send, a published id needs no lookup, and any other address resolves over the offline view
-      // and the send address book, so a thread that is not running with nothing live answering still queues offline.
-      let target = request.thread
-      let allScope = request.all_scope
-      if (options.remote !== undefined && await store.sessionOwner(target) === null) {
+      // The same road as an agent's send: the address resolves across the account, and the target's kind picks the transport.
+      // Like the agent's thread_send, a published id needs no lookup (no host listing, no account call), and any other address
+      // resolves over the offline view and the send address book, so an own alias is account-wide and a thread that is not
+      // running with nothing live answering still queues offline.
+      let target: DeliveryTarget = { kind: "local", thread_id: request.thread, ...(request.all_scope === undefined ? {} : { all_scope: request.all_scope }) }
+      const remote = options.remote
+      if (remote !== undefined && await store.sessionOwner(request.thread) === null) {
         const offline = await hostView(surface, { offline: true })
-        const across = await crossTarget(options.remote, target, resolution(surface, toThreadAddressEntries(sendAddressBook(surface, offline, target, true)), target, UNKNOWN_CALLER, true))
-        if (across.kind === "local") {
-          target = across.address
-          allScope = localScope(across, request.all_scope)
-        }
+        const across = await crossTarget(remote, request.thread, resolution(surface, toThreadAddressEntries(sendAddressBook(surface, offline, request.thread, true)), request.thread, UNKNOWN_CALLER, true))
+        if (across.kind === "error") return across.result.kind === "error" ? across.result : fail("internal_error", "The target could not be resolved.", "Run omo thread list and retry.")
+        const scope = across.kind === "local" ? localScope(across, request.all_scope) : undefined
+        target = across.kind === "remote" ? { kind: "remote", row: across.row } : { kind: "local", thread_id: across.address, ...(scope === undefined ? {} : { all_scope: scope }) }
       }
-      return await engine.deliver({
+      const sent = await pipeline.deliver({
         sender: { kind: "cli", uid: options.uid, user: options.user },
+        caller_id: principal,
         target,
         text: request.text,
-        ...(request.mode === undefined ? {} : { mode: request.mode }),
-        ...(request.expected_turn_id === undefined ? {} : { expected_turn_id: request.expected_turn_id }),
-        ...(allScope === undefined ? {} : { all_scope: allScope }),
-        ...(request.idempotency_key === undefined ? {} : { idempotency_key: request.idempotency_key }),
+        mode: request.mode ?? "auto",
+        ...(request.expected_turn_id === undefined ? {} : { expected_turn_id: String(request.expected_turn_id) }),
+        idempotency_key: request.idempotency_key ?? `auto:${randomUUID()}`,
+        args: request,
       })
+      if (sent.kind === "ok" && "device" in sent) return fail("internal_error", `A command-line send reached a session on device ${sent.device}, which the engine does not admit.`, "Report this: the relay transport must refuse a command-line sender before sending.")
+      return sent
     }),
     bind: (request) => guarded(async () => {
       const session = await sessionId(request.session, request.all_scope)

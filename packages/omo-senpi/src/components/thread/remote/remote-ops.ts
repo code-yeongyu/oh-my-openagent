@@ -145,13 +145,15 @@ export async function openRemote(remote: RemoteThreadSurface, request: RemoteOpe
   const offline = await deviceOnline(remote, device)
   if (offline !== undefined) return offline
   const skills = request.kind === "open" || request.skills === undefined || request.skills.length === 0 ? {} : { context: { [INITIAL_SKILLS_CONTEXT_KEY]: JSON.stringify(request.skills) } }
+  // A created or forked session names its creator's mode, so remote work never falls to the engine's delegated default.
+  const mode = request.kind === "open" ? undefined : remote.permissionPreset?.()
   const opened: JsonObject = request.kind === "create"
     ? { type: "open_session", retain_on_disconnect: true, ...(request.cwd === undefined ? {} : { cwd: request.cwd }) }
     : request.kind === "open"
       ? { type: "open_session", retain_on_disconnect: true, sessionPath: request.row.path }
       : { type: "open_session", retain_on_disconnect: true, forkFrom: request.row.session_id, ...(request.cwd === undefined ? {} : { cwd: request.cwd }) }
   // A create or fork asks for its new session's listing key on the reply (decision 0018 amendment 2026-11-06).
-  const outcome = await remote.sessions.endpointCommand(device, { ...opened, ...skills }, request.kind === "open" ? undefined : { locate: true })
+  const outcome = await remote.sessions.endpointCommand(device, { ...opened, ...skills, ...(mode === undefined ? {} : { permissionPreset: mode }) }, request.kind === "open" ? undefined : { locate: true })
   if (outcome.kind !== "ok") return outcomeFailure(outcome, device)
   // An opened row is already addressed by its listing id; a created or forked session is located by its engine id.
   let threadId: string
@@ -179,28 +181,25 @@ export async function openRemote(remote: RemoteThreadSurface, request: RemoteOpe
 }
 
 /**
- * thread_send / thread_handoff to another device's session: one `prompt`, carrying the chain's count (K8, R8.c).
- * Every result field comes from the remote engine: the turn it started, or its own pending-message count.
+ * A person's own input sent to another device's session (`omo remote send`): one `prompt`, exactly as they would type it
+ * there, so slash commands and prompt templates are theirs. A peer session never takes this path; its message is a
+ * delivery (`relay-transport.ts`). Every result field comes from the remote engine: the turn it started, or its own
+ * pending-message count.
  */
 export type RemoteSendRequest = { readonly message: string; readonly delivery?: "auto" | "steer" | "follow_up"; readonly expected_turn_id?: string }
 
-/**
- * The send-time refusals a local send makes (tools.ts deliverThroughGateway, then gateway/engine.ts deliver), in the
- * same order and words; the unknown-caller refusal comes first, in tools.ts, before any receipt is written. The engine's
- * 1 MiB message_too_large cannot be reached by either leg: the shared param schema caps a message at
- * THREAD_MESSAGE_MAX_BYTES before any send.
- */
 export function sendArgumentFailure(request: RemoteSendRequest): Failure | undefined {
   if (request.expected_turn_id !== undefined && !/^\d+$/.test(request.expected_turn_id)) return fail("turn_conflict", `Turn ${request.expected_turn_id} is not a turn of the target session.`, "Read the target again and steer with the turn_id a started or steered result returned.")
   if (request.delivery === "steer" && request.expected_turn_id === undefined) return fail("invalid_arguments", "A steer needs expected_turn_id (the target's current turn_epoch).", "Fix the arguments and send again.")
   return undefined
 }
 
-export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, request: RemoteSendRequest, hop: number): Promise<ThreadToolResult> {
+export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessionRow, request: RemoteSendRequest): Promise<ThreadToolResult> {
   const refused = sendArgumentFailure(request)
   if (refused !== undefined) return refused
   const offline = await deviceOnline(remote, row.device)
   if (offline !== undefined) return offline
+  const text = () => ({ message: request.message })
   if (request.delivery === "steer") {
     const state = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
     if (state.kind !== "ok") return outcomeFailure(state, row.device)
@@ -214,7 +213,7 @@ export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessi
     if (typeof current !== "string" || current.length === 0) return fail(REFUSAL_CODES.turn_conflict.code, `Turn ${request.expected_turn_id} of ${row.session_id} cannot be confirmed on device ${row.device}.`, REFUSAL_CODES.turn_conflict.next, { device: row.device, reason: "remote_turn_not_verifiable" })
     if (current !== request.expected_turn_id) return fail(REFUSAL_CODES.turn_conflict.code, `Turn ${request.expected_turn_id} is not the running turn of ${row.session_id} on device ${row.device}.`, REFUSAL_CODES.turn_conflict.next, { device: row.device, current_turn_id: current })
     // The engine checks expectedTurnId again when the steer arrives, so a turn that ended in between is refused there.
-    const steer = remote.chain.stamp({ type: "prompt", sessionId: row.session_id, message: request.message, streamingBehavior: "steer", expectedTurnId: current }, hop)
+    const steer = remote.chain.stamp({ type: "prompt", sessionId: row.session_id, ...text(), streamingBehavior: "steer", expectedTurnId: current }, 1)
     const steered = await remote.sessions.sessionCommand(row.device, row.session_id, steer)
     if (steered.kind === "refused" && (steered.reason === "turn_conflict" || steered.reason === "not_steerable")) return fail(REFUSAL_CODES[steered.reason].code, `A steer to ${row.session_id} was refused: ${steered.reason}.`, REFUSAL_CODES[steered.reason].next, { device: row.device })
     if (steered.kind !== "ok") return outcomeFailure(steered, row.device)
@@ -223,7 +222,7 @@ export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessi
   // One round trip (#12320): no get_state goes first. The engine itself starts a followUp prompt on an idle session and
   // queues it behind a running turn, deciding both in one step (senpi agent-session `_prompt`, 2026.11.2-3 and later),
   // and its reply's disposition says which happened.
-  const record = remote.chain.stamp({ type: "prompt", sessionId: row.session_id, message: request.message, streamingBehavior: "followUp" }, hop)
+  const record = remote.chain.stamp({ type: "prompt", sessionId: row.session_id, ...text(), streamingBehavior: "followUp" }, 1)
   const sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
   if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
   const reply = replyData(sent.response)
