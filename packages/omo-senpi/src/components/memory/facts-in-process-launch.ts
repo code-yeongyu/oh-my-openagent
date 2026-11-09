@@ -161,6 +161,7 @@ function buildStart(
   agreementTool: FactsAgreementTool | undefined,
 ): StartChildInput {
   const childRegistry = isChildModelRegistry(input.modelRegistry) ? input.modelRegistry : undefined
+  const ownTools = agreementTool === undefined ? [FACTS_RECORD_TOOL_NAME] : [FACTS_RECORD_TOOL_NAME, FACTS_AGREEMENT_TOOL_NAME]
   return {
     taskId: `facts-${input.runId}`,
     cwd: input.runDir,
@@ -171,11 +172,12 @@ function buildStart(
     ...childModelChainSpec({ model: candidate.model, fallbacks }),
     ...(input.oversized === true ? { retry: { maxRetries: 0 } } : {}),
     ...(candidate.thinking === undefined ? {} : { thinkingLevel: candidate.thinking }),
-    toolAllowlist: agreementTool === undefined ? [FACTS_RECORD_TOOL_NAME] : [FACTS_RECORD_TOOL_NAME, FACTS_AGREEMENT_TOOL_NAME],
+    toolAllowlist: ownTools,
     memberScopedTools: agreementTool === undefined ? [tool] : [tool, agreementTool],
     depth: 1,
     parentSessionId: `facts-${input.runId}`,
     rootSessionId: `facts-${input.runId}`,
+    ownApprovalMode: { allowTools: ownTools },
     systemPrompt: loadFactsPersona(),
     promptEnvelope: "bare",
     completion: "turn",

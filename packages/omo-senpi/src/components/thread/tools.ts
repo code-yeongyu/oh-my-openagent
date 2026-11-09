@@ -1,4 +1,5 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
+import { randomUUID } from "node:crypto"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
 import { checkNameConflict, fuzzyMatch, normalizeThreadName, workspaceEntries, type ThreadAddressEntry } from "./addressing"
@@ -29,7 +30,9 @@ import { isLockWaitExceeded } from "./gateway/lock-wait"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
+import { localScope } from "./remote/local-scope"
 import { closeRemote, crossTarget, deviceOnline, interruptRemote, listAcross, outcomeFailure, planCreate, promptRemote, readRemote, renameAlias, setModelRemote, withAlias } from "./remote/lazy-ops"
+import type { RemotePeer } from "./remote/peer-text"
 import { matchModel, modelPatternFailure } from "./tools/model-match"
 import { recordThreadCreator, registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
@@ -62,7 +65,7 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
 }
 
 function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: readonly AnyTool[]; readonly dispose: () => void } {
-  const { store, engine, relay } = createGatewayServices(options, () => view({ offline: true }))
+  const { store, engine, relay, senderProvenance } = createGatewayServices(options, () => view({ offline: true }))
   const now = options.now ?? store.now
   async function view(request?: ThreadHostViewRequest): Promise<ThreadHostView> { await options.ensureHost?.(); return hostView(options, request) }
   // Receipts this process began but could not settle (the store gave up at its lock-wait bound):
@@ -198,10 +201,10 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     const target = options.remote === undefined ? { kind: "local" as const, address: value.thread } : await crossTarget(options.remote, value.thread, resolution(options, resolveEntries(options, current), value.thread, callerId, true))
     if (target.kind === "error") return target.result
     if (target.kind === "remote" && options.remote !== undefined) return await readRemote(options.remote, target.row, value)
-    return readThread(options, current, { ...value, thread: target.kind === "local" ? target.address : value.thread }, callerId)
+    return readThread(options, current, { ...value, thread: target.kind === "local" ? target.address : value.thread, all_scope: localScope(target, value.all_scope) }, callerId)
   }) }
   const send: AnyTool = { ...metadata("thread_send"), parameters: threadToolParamSchemas.thread_send, execute: (id: string, args: ThreadSendInput, _signal, _onUpdate, ectx) => execute("thread_send", id, args, ectx, async (current, value, operationId, callerId) => deliver(current, value.thread, value, operationId, callerId)) }
-  const interrupt: AnyTool = { ...metadata("thread_interrupt"), parameters: threadToolParamSchemas.thread_interrupt, execute: (id: string, args: ThreadInterruptInput, _signal, _onUpdate, ectx) => execute("thread_interrupt", id, args, ectx, async (current, value, _operationId, callerId) => { const target = options.remote === undefined ? { kind: "local" as const, address: value.thread } : await crossTarget(options.remote, value.thread, resolution(options, resolveEntries(options, current), value.thread, callerId, true)); if (target.kind === "error") return target.result; if (target.kind === "remote" && options.remote !== undefined) return await interruptRemote(options.remote, target.row, value.turn_id); const resolved = resolution(options, resolveEntries(options, current), target.kind === "local" ? target.address : value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; const session = targetSession(current, resolved.entry.thread_id); if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live."); const result = await sessionPort(options, session).interrupt(session.sessionId, value.turn_id, resolved.entry.thread_id); return { kind: "ok", thread_id: resolved.entry.thread_id, ...(result.turnId === undefined ? {} : { turn_id: result.turnId }), interrupted: result.interrupted === true } }) }
+  const interrupt: AnyTool = { ...metadata("thread_interrupt"), parameters: threadToolParamSchemas.thread_interrupt, execute: (id: string, args: ThreadInterruptInput, _signal, _onUpdate, ectx) => execute("thread_interrupt", id, args, ectx, async (current, value, _operationId, callerId) => { const target = options.remote === undefined ? { kind: "local" as const, address: value.thread } : await crossTarget(options.remote, value.thread, resolution(options, resolveEntries(options, current), value.thread, callerId, true)); if (target.kind === "error") return target.result; if (target.kind === "remote" && options.remote !== undefined) return await interruptRemote(options.remote, target.row, value.turn_id); const resolved = resolution(options, resolveEntries(options, current), target.kind === "local" ? target.address : value.thread, callerId, localScope(target, value.all_scope)); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; const session = targetSession(current, resolved.entry.thread_id); if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live."); const result = await sessionPort(options, session).interrupt(session.sessionId, value.turn_id, resolved.entry.thread_id); return { kind: "ok", thread_id: resolved.entry.thread_id, ...(result.turnId === undefined ? {} : { turn_id: result.turnId }), interrupted: result.interrupted === true } }) }
   const close: AnyTool = {
     ...metadata("thread_close"),
     parameters: threadToolParamSchemas.thread_close,
@@ -209,7 +212,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       const target = options.remote === undefined ? { kind: "local" as const, address: value.thread } : await crossTarget(options.remote, value.thread, resolution(options, resolveEntries(options, current), value.thread, callerId, true))
       if (target.kind === "error") return target.result
       if (target.kind === "remote" && options.remote !== undefined) return await closeRemote(options.remote, target.row)
-      const resolved = resolution(options, resolveEntries(options, current), target.kind === "local" ? target.address : value.thread, callerId, value.all_scope)
+      const resolved = resolution(options, resolveEntries(options, current), target.kind === "local" ? target.address : value.thread, callerId, localScope(target, value.all_scope))
       if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult
       const session = targetSession(current, resolved.entry.thread_id)
       // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
@@ -232,7 +235,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       const target = options.remote === undefined ? { kind: "local" as const, address: value.thread } : await crossTarget(options.remote, value.thread, resolution(options, entries, value.thread, callerId, true))
       if (target.kind === "error") return target.result
       const remoteRow = target.kind === "remote" && options.remote !== undefined ? target.row : undefined
-      const resolved = remoteRow === undefined ? resolution(options, entries, target.kind === "local" ? target.address : value.thread, callerId, value.all_scope) : undefined
+      const resolved = remoteRow === undefined ? resolution(options, entries, target.kind === "local" ? target.address : value.thread, callerId, localScope(target, value.all_scope)) : undefined
       if (resolved?.kind === "error") return { kind: "error", error: resolved }
       const threadId = remoteRow?.session_id ?? (resolved?.kind === "ok" ? resolved.entry.thread_id : value.thread)
       // Both legs run the same refusals, all before the alias or the name changes anywhere: first the target's own
@@ -266,7 +269,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       const target = options.remote === undefined ? { kind: "local" as const, address: value.thread } : await crossTarget(options.remote, value.thread, resolution(options, resolveEntries(options, current), value.thread, callerId, true))
       if (target.kind === "error") return target.result
       if (target.kind === "remote" && options.remote !== undefined) return await setModelRemote(options.remote, target.row, value)
-      const resolved = resolution(options, resolveEntries(options, current), target.kind === "local" ? target.address : value.thread, callerId, value.all_scope)
+      const resolved = resolution(options, resolveEntries(options, current), target.kind === "local" ? target.address : value.thread, callerId, localScope(target, value.all_scope))
       if (resolved.kind === "error") return { kind: "error", error: resolved }
       const session = targetSession(current, resolved.entry.thread_id)
       if (session === undefined) return failure("not_resumable", "The thread has no live owner.", "Retry when the target is live.")
@@ -296,11 +299,22 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       return { kind: "ok", thread_id: resolved.entry.thread_id, level: value.level, scope: value.scope ?? "session" }
     }),
   }
-  // K8 / R8.c: the hop a send to another device carries, continuing the caller's own chain.
-  async function nextHop(): Promise<number> {
+  // K8 / R8.c: a send to another device continues the caller's own chain (its hop and root), and names its sender the way
+  // a local delivery does (gateway/engine.ts senderFacts): the session, its name, and its workspace and project (#12852).
+  async function remotePeer(callerId: string): Promise<RemotePeer> {
     const cause = options.callerCause?.()
-    if (cause === undefined) return 1
-    return ((await store.deliveryView(cause))?.row.hop ?? 0) + 1
+    const prior = cause === undefined ? undefined : (await store.deliveryView(cause))?.row
+    const name = options.callerName?.()?.trim()
+    const deliveryId = randomUUID()
+    const provenance = await senderProvenance()
+    return {
+      session_id: callerId,
+      ...(name === undefined || name === "" ? {} : { name }),
+      provenance: name === undefined || name === "" ? provenance : { ...provenance, session: name },
+      delivery_id: deliveryId,
+      root_id: prior?.root_id ?? deliveryId,
+      hop: (prior?.hop ?? 0) + 1,
+    }
   }
   async function openLocal(current: ThreadHostView, address: string, callerId: string): Promise<ThreadToolResult> {
     const resolved = resolution(options, toThreadAddressEntries(sendAddressBook(options, current, address, true)), address, callerId, true)
@@ -346,6 +360,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   }
 
   async function deliver(current: ThreadHostView, address: string, value: ThreadSendInput | ThreadHandoffInput, idempotencyKey: string, callerId: string, resolvedBy?: "exact_name" | "fuzzy"): Promise<ThreadToolResult> {
+    let scope = value.all_scope
     if (options.remote !== undefined && current !== PUBLISHED_SEND_VIEW) {
       const target = await crossTarget(options.remote, address, resolution(options, toThreadAddressEntries(sendAddressBook(options, current, address, true)), address, callerId, true))
       if (target.kind === "error") return target.result
@@ -355,17 +370,18 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
         // Before remoteOnce writes a receipt, exactly where a local gateway send refuses an unknown caller (deliverThroughGateway).
         if (callerId === UNKNOWN_CALLER) return failure("caller_context_missing", "A gateway send needs the calling session's durable id.", "Retry from a session that passes its execution context.")
         const request = { message: value.message, ...("delivery" in value && value.delivery !== undefined ? { delivery: value.delivery } : {}), ...("expected_turn_id" in value && value.expected_turn_id !== undefined ? { expected_turn_id: value.expected_turn_id } : {}) }
-        const sent = await remoteOnce(callerId, idempotencyKey, value, async () => await promptRemote(remote, row, request, await nextHop()))
+        const sent = await remoteOnce(callerId, idempotencyKey, value, async () => await promptRemote(remote, row, request, { kind: "peer", ...await remotePeer(callerId) }))
         if (resolvedBy === undefined || sent.kind !== "ok" || !("delivery" in sent)) return sent
         const seen = new Date(row.updated_ms).toISOString()
         return { kind: "ok", thread: { thread_id: row.session_id, name: row.title, status: "live", cwd: row.project, created_at: seen, updated_at: seen, device: row.device, link: threadLink(row.session_id, row.title) }, resolved_by: resolvedBy, delivery: sent.delivery, deduplicated: sent.deduplicated, device: row.device } as ThreadToolResult
       }
       address = target.address
+      scope = localScope(target, value.all_scope)
     }
     if (current === PUBLISHED_SEND_VIEW) return await deliverThroughGateway(options, engine, current, address, value, idempotencyKey, callerId, resolvedBy)
-    const resolved = resolution(options, toThreadAddressEntries(sendAddressBook(options, current, address, value.all_scope)), address, callerId, value.all_scope)
+    const resolved = resolution(options, toThreadAddressEntries(sendAddressBook(options, current, address, scope)), address, callerId, scope)
     if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult
-    return await deliverThroughGateway(options, engine, current, resolved.entry.thread_id, value, idempotencyKey, callerId, resolvedBy)
+    return await deliverThroughGateway(options, engine, current, resolved.entry.thread_id, { ...value, all_scope: scope }, idempotencyKey, callerId, resolvedBy)
   }
 }
 

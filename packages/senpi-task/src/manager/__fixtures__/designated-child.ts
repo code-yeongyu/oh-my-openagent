@@ -28,6 +28,8 @@ export type DesignatedChildInput = {
   readonly scripts: Readonly<Record<string, readonly Step[]>>
   readonly runner?: RunnerKind
   readonly userFallbackChains?: Readonly<Record<string, readonly string[]>>
+  /** Capabilities the process runner's real engine hides (an older engine); process runner only. */
+  readonly engineHides?: readonly string[]
 }
 
 /**
@@ -68,7 +70,7 @@ export async function runCategoryChildren(
   const [parentProvider = "", parentId = ""] = chainIds(kind).parent.split("/")
   const manager = createTaskManager({
     store: createTaskRecordStore({ project_dir: project }),
-    runners: { "in-process": inProcess, process: kind === "in-process" ? inProcess : await world.engineRunner(kind) },
+    runners: { "in-process": inProcess, process: kind === "in-process" ? inProcess : await world.engineRunner(kind, first.engineHides === undefined ? {} : { hiddenCapabilities: first.engineHides }) },
     planner: (spec) => ({ kind: "resolved", plan: chainPlan(spec.category ?? "", chains.get(spec.category ?? "") ?? []) }),
     config: settings({ default_concurrency: inputs.length + 1, max_depth: 1 }),
     cwd: project,
