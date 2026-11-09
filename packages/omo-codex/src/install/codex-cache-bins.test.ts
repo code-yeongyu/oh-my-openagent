@@ -4,9 +4,10 @@ import { describe, expect, it, test } from "bun:test"
 import { mkdtempSync } from "node:fs"
 import { chmod, lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { linkRootRuntimeBin } from "./codex-cache-bins"
 import { windowsCommandShim } from "./codex-cache-command-shim"
+import { windowsRuntimeWrapper } from "./codex-cache-runtime-wrapper"
 
 async function createRepoFixture(): Promise<{ repoRoot: string; binDir: string; codexHome: string }> {
   const root = mkdtempSync(join(tmpdir(), "omo-codex-cache-bins-"))
@@ -171,6 +172,27 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
     // then
     expect(stderr).not.toContain("syntax of the command is incorrect")
     expect(stdout).toContain("SHIM_REACHED")
+    expect(exitCode).toBe(0)
+    await rm(root, { recursive: true, force: true })
+  })
+
+  windowsOnly("#given a runtime target path holding %VAR% text, !, ^ and parentheses #when cmd runs the generated wrapper #then it runs that literal path (#12811)", async () => {
+    // given
+    const root = mkdtempSync(join(tmpdir(), "omo-codex-cmd-escape-"))
+    const codexHome = join(root, "odd %TEMP% !bang^ (x)", ".codex")
+    const cliPath = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "1.0.0", "dist", "cli", "index.js")
+    await mkdir(dirname(cliPath), { recursive: true })
+    await writeFile(cliPath, 'console.log("WRAPPER_REACHED " + process.argv.slice(2).join(" "))\n')
+    const wrapper = join(root, "omo-agent-toolkit.cmd")
+    await writeFile(wrapper, windowsRuntimeWrapper("omo-agent-toolkit", cliPath, codexHome, root, join(dirname(cliPath), "..", "cli-node", "index.js")))
+
+    // when
+    const child = Bun.spawn(["cmd.exe", "/d", "/c", wrapper, "probe"], { env: { ...Bun.env, BUN_BINARY: process.execPath, CODEX_HOME: codexHome }, stderr: "pipe", stdout: "pipe" })
+    const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+
+    // then
+    expect(stderr).not.toContain("runtime target missing")
+    expect(stdout).toContain("WRAPPER_REACHED probe")
     expect(exitCode).toBe(0)
     await rm(root, { recursive: true, force: true })
   })
