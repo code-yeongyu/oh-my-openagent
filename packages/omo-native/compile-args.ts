@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { isEngineCommand } from "./bin/lib/engine-commands.js"
 import { isSelfUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 import { serviceAccountsOpen } from "../omo-opencode/src/cli/service-auth/accounts-gate"
+import { parsesAsClosedDeviceLogin } from "../omo-opencode/src/cli/service-auth/closed-device-login"
 
 /**
  * How the compiled binary reads its own argv before it hands the argv to the engine. Only the
@@ -24,8 +25,9 @@ export function trustLaunchKind(args: readonly string[]): "static" | "long-lived
   if (isSelfUpdate(args) && updateUsageAnswer(args) !== undefined) return "static"
   // While accounts are closed, every login/logout/whoami argv refuses from the build switch alone and
   // opens no connection: a static answer, the way update usage is static beside the network `update`.
-  // #12639: the device-code login is the one closed sign-in that runs (service-auth/commands.ts).
-  const deviceLogin = args[0] === "login" && (args.includes("--device") || args.includes("--no-browser"))
+  // #12639: the device-code login is the one closed sign-in that runs (service-auth/commands.ts). #12646: it is
+  // recognised with the same option parse commands.ts uses, so `login -- --device` stays a static refusal here too.
+  const deviceLogin = parsesAsClosedDeviceLogin(args)
   if (!serviceAccountsOpen() && ["login", "logout", "whoami"].includes(args[0] ?? "") && !deviceLogin) return "static"
   const options = launchOptions(args)
   // 5.2: `trust ensure` imports with 1.5 s and exits; only `--wait` takes the one-shot hard cap.

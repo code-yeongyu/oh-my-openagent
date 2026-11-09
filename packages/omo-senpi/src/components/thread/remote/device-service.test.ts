@@ -1,11 +1,19 @@
 import { describe, expect, test } from "bun:test"
 import { connectDeviceService, LocalApiError, type CommandResult, type DeviceService, type RemoteAttach } from "@oh-my-opencode/device-service-core"
+import { withContractHost } from "../../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
 import type { ThreadReadInput } from "../contracts"
+import { createLiveThreadSurface } from "../live-surface"
 import { createDeviceServiceSessions } from "./device-service"
 import { createLazyRemoteSurface } from "./lazy-remote"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { setModelRemote } from "./remote-controls"
 import { closeRemote, interruptRemote, openRemote, promptRemote, readRemote } from "./remote-ops"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { createGatewayStore } from "../gateway/store"
+import type { OutboundDelivery } from "../gateway/transport"
+import { createRelayTransport } from "./relay-transport"
 
 // An attach whose session stream stays silent: no record, frame or channel loss ever arrives.
 const quietStream = { onEvent: () => () => {}, onFrame: () => () => {}, onChannelLoss: () => () => {} }
@@ -114,12 +122,12 @@ describe("device-service adapter: a session created on another device is address
     expect(attached.every((id) => id === KEY)).toBe(true)
   })
 
-  test("#given the create reply names the session's listing key #when the session is created #then no session.locate is sent and the thread is that key", async () => {
+  test("#given the create reply carries the located session #when the session is created #then no session.locate is sent and the thread is that key", async () => {
     const located: string[] = []
     const service = {
       ...fakeService([], []),
       devices: async () => [{ device: "b", label: "studio", kind: "cli", platform: "linux", last_seen_ms: 1, online: true }],
-      endpointCommand: async () => state({ state: "engine_applied" }, { ...opened, session_key: KEY }),
+      endpointCommand: async () => ({ ...state({ state: "engine_applied" }, opened), located: { key: KEY, session: `b.${KEY}` } }),
       locate: async (_device: string, engineId: string) => { located.push(engineId); throw new LocalApiError("session_not_found", "not expected") },
     } as unknown as DeviceService
     const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => service, retryDelay: async () => {} })
@@ -135,13 +143,23 @@ describe("device-service adapter: relay round trips per thread op", () => {
   // connection: every frame that leaves this device toward the relay is counted, so each op's round trips are measured.
   const RELAY_FRAMES: ReadonlySet<string> = new Set(["session.attach", "session.command", "session.read", "session.locate", "session.endpoints", "sessions.list"])
   const row: RemoteSessionRow = { device: "b", session_id: "s1", title: "t", project: "/p", path: "/p/s1.jsonl", state: "idle", updated_ms: 2 }
+  // What a create on b answers: the engine's own session id, and the key b's listing names the new session by.
+  const CREATED_ENGINE_ID = "01a1b2c4-0000-7000-8000-000000000001"
+  const CREATED_KEY = "Ab3dEfGh1jKlMnOpQrStUv"
 
-  function relayWorld() {
+  // `relayd`: how this device's service and b's host treat an open that asks for its located session (decision 0018
+  // amendment 2026-11-06): `located` answers {key, session} on the reply, an `older-host` never adds it, and an
+  // `older-local` service refuses the `locate` field as unknown before anything leaves this device.
+  function relayWorld(relayd: "located" | "older-host" | "older-local" = "located") {
     const frames: string[] = []
+    // Whether each endpoint command this device wrote asked for the located session.
+    const locateAsked: boolean[] = []
     const listeners = new Set<(event: JsonObject) => void>()
     const emit = (event: JsonObject) => { for (const listener of [...listeners]) listener(event) }
     const models: Array<{ provider: string; id: string }> = [{ provider: "a", id: "m1" }, { provider: "a", id: "m2" }]
-    const engine = { model: models[0], streaming: false }
+    const engine = { model: models[0], streaming: false, currentTurnId: undefined as string | undefined, admitAnswer: undefined as JsonObject | undefined }
+    // Every session.command record exactly as the local-API client writes it: the real wire shape.
+    const records: JsonObject[] = []
     // Runs before the command's reply when set: an event of the session that lands while the command is in flight.
     let beforeReply: (() => void) | undefined
     // How the next set_model ends instead of applying, and how catalog reads end after it (a channel that lost one reply).
@@ -149,7 +167,8 @@ describe("device-service adapter: relay round trips per thread op", () => {
     let catalogRefused: string | undefined
     const data = (rpc: JsonObject): JsonObject => {
       switch (rpc["type"]) {
-        case "get_state": return { isStreaming: engine.streaming, model: engine.model, pendingMessageCount: 0 }
+        case "get_state": return { isStreaming: engine.streaming, model: engine.model, pendingMessageCount: 0, ...(engine.currentTurnId === undefined ? {} : { currentTurnId: engine.currentTurnId }) }
+        case "admit_external_message": return engine.admitAnswer ?? { kind: engine.streaming ? "queued" : "started", turnId: engine.currentTurnId ?? "7" }
         case "get_messages": return { messages: [{ role: "user", content: [{ type: "text", text: "hi" }], timestamp: 1 }] }
         case "get_available_models": return { models: models.map((model) => ({ ...model })) }
         case "set_model": engine.model = models.find((model) => model.id === rpc["modelId"]) ?? engine.model; return { ...engine.model }
@@ -166,14 +185,19 @@ describe("device-service adapter: relay round trips per thread op", () => {
       request: async (type: string) => {
         frames.push(type)
         if (type === "session.attach") return { attach: "a1" }
+        if (type === "session.endpoints") return { endpoints: ["e1"] }
+        if (type === "session.locate") return { device: "b", key: CREATED_KEY, session: `b.${CREATED_KEY}` }
         if (type === "status.get") return { state: "connected" }
         if (type === "devices.list") return { devices: [{ device: "b", label: "studio", kind: "cli", platform: "linux", last_seen_ms: 1, online: true }] }
+        // A peer send names the device it left from: a local read, never a relay frame.
+        if (type === "device.info") return { device: { id: "a", label: "here" } }
         if (type === "session.detach") return {}
         throw new Error(`unexpected request ${type}`)
       },
       onEvent: (listener: (event: JsonObject) => void) => { listeners.add(listener); return () => listeners.delete(listener) },
       command: async (_attach: string, rpc: JsonObject, commandId: string) => {
         frames.push("session.command")
+        records.push(rpc)
         const scripted = rpc["type"] === "set_model" ? nextSet : rpc["type"] === "get_available_models" && catalogRefused !== undefined ? { state: "engine_refused" as const, reason: catalogRefused } : undefined
         if (rpc["type"] === "set_model") { nextSet = undefined; if (scripted !== undefined && "catalogAfter" in scripted) catalogRefused = scripted.catalogAfter }
         const known = rpc["type"] !== "set_model" || models.some((model) => model.provider === rpc["provider"] && model.id === rpc["modelId"])
@@ -190,7 +214,19 @@ describe("device-service adapter: relay round trips per thread op", () => {
       },
       read: async () => { frames.push("session.read"); return { entries: [], next_before: null } },
       list: async () => { frames.push("sessions.list"); return { query_id: "q", revision: 1, rows: [], incomplete: [], devices: {} } },
-      endpointCommand: async () => { frames.push("session.command"); return "c" },
+      endpointCommand: async (_device: string, _endpoint: string, rpc: JsonObject, commandId: string, options?: { readonly locate?: boolean }) => {
+        frames.push("session.command")
+        const asked = options?.locate === true
+        locateAsked.push(asked)
+        if (asked && relayd === "older-local") throw new LocalApiError("invalid_request", "request has an unknown field")
+        const response = { type: "response", command: rpc["type"], success: true, data: { state: { sessionId: CREATED_ENGINE_ID }, sessionId: CREATED_ENGINE_ID } }
+        const located = asked && relayd === "located" ? { located: { key: CREATED_KEY, session: `b.${CREATED_KEY}` } } : {}
+        queueMicrotask(() => {
+          emit({ type: "event", kind: "session.command_event", device: "b", command_id: commandId, response, ...located })
+          emit({ type: "event", kind: "session.command_state", command_id: commandId, state: "engine_applied", retryable: false })
+        })
+        return commandId
+      },
       oversizedLines: () => 0,
       close: () => close(),
       closed,
@@ -205,8 +241,79 @@ describe("device-service adapter: relay round trips per thread op", () => {
     // The device's catalog changes after this device read it.
     const removeModel = (id: string) => { models.splice(models.findIndex((model) => model.id === id), 1) }
     const addModel = (model: { provider: string; id: string }) => { models.push(model) }
-    return { port, surface, take, snapshot, removeModel, addModel, setEnds: (end: NonNullable<typeof nextSet>) => { nextSet = end }, inFlight: (event: () => void) => { beforeReply = event } }
+    return { port, surface, take, snapshot, removeModel, addModel, locateAsked, engine, records, setEnds: (end: NonNullable<typeof nextSet>) => { nextSet = end }, inFlight: (event: () => void) => { beforeReply = event } }
   }
+
+  // The relay transport over the real device-service SDK: what reaches the wire is what the client's command() receives.
+  function relayOver(surface: RemoteThreadSurface, callerChainHop?: () => number) {
+    const agentDir = mkdtempSync(join(tmpdir(), "relay-wire-"))
+    const store = createGatewayStore({ agentDir })
+    const transport = createRelayTransport({ remote: surface, store, senderProvenance: async () => ({ workspace: "w", project: "p" }), ...(callerChainHop === undefined ? {} : { callerChainHop }) })
+    const send = (extra: Partial<OutboundDelivery> = {}) => transport.deliver({ sender: { kind: "session", durable_id: "dur-a", name: "a" }, caller_id: "dur-a", target: { kind: "remote", row }, text: "hello b", mode: "auto", idempotency_key: `k-${Math.random()}`, args: {}, ...extra })
+    const done = async () => { transport.dispose(); await store.dispose(); rmSync(agentDir, { recursive: true, force: true }) }
+    return { send, done }
+  }
+
+  test("#given the caller's run continues a chain at hop 2 #when it sends to b over the device service #then the serialized admit_external_message record on the wire carries chainCount 3 and no remote_origin, and a fresh send carries 1", async () => {
+    const w = relayWorld()
+    const r = relayOver(w.surface, () => 2)
+    try {
+      expect(await r.send()).toMatchObject({ kind: "ok", device: "b", delivery: { kind: "started", turn_id: "7" } })
+      const admitted = w.records.filter((record) => record["type"] === "admit_external_message")
+      expect(admitted).toHaveLength(1)
+      const [record = {}] = admitted
+      // What the device service serializes (wireRecord drops undefined, keeps finite numbers): the fields senpi's admit-external-message-wire reads.
+      expect(JSON.parse(JSON.stringify(record))).toMatchObject({ type: "admit_external_message", sessionId: "s1", deliverAs: "followUp", chainCount: 3, sender: { kind: "agent", session_id: "dur-a", name: "a" } })
+      expect(typeof record["deliveryId"]).toBe("string")
+      expect(Object.keys(record).sort()).toEqual(["chainCount", "deliverAs", "deliveryId", "displayText", "sender", "sessionId", "text", "type"])
+    } finally {
+      await r.done()
+    }
+    const fresh = relayOver(w.surface)
+    try {
+      expect(await fresh.send()).toMatchObject({ kind: "ok" })
+      expect(w.records.filter((record) => record["type"] === "admit_external_message").map((record) => record["chainCount"])).toEqual([3, 1])
+    } finally {
+      await fresh.done()
+    }
+  })
+
+  test("#given b is mid-turn on turn 3 when the steer's preflight reads it #when b's turn ends before the record lands and its engine answers turn_conflict #then the send is turn_conflict naming b's current turn, from the engine's answer, and nothing is retried", async () => {
+    const w = relayWorld()
+    w.engine.streaming = true
+    w.engine.currentTurnId = "3"
+    // The race: between the preflight get_state and the admit record, b's turn 3 ends and turn 4 runs.
+    w.inFlight(() => { w.engine.currentTurnId = "4"; w.engine.admitAnswer = { kind: "turn_conflict", turnId: "4" } })
+    const r = relayOver(w.surface)
+    try {
+      expect(await r.send({ mode: "steer", expected_turn_id: "3" })).toMatchObject({ kind: "error", error: { code: "turn_conflict", details: { device: "b", current_turn_id: "4" } } })
+      const admitted = w.records.filter((record) => record["type"] === "admit_external_message")
+      expect(admitted.map((record) => [record["deliverAs"], record["expectedTurnId"]])).toEqual([["steer", "3"]])
+    } finally {
+      await r.done()
+    }
+  })
+
+  test.each([
+    ["a relayd that answers the open with its located session", "located", ["session.endpoints", "session.command", "session.attach"], [true]],
+    ["an older host relayd that never adds the located session", "older-host", ["session.endpoints", "session.command", "session.locate", "session.attach"], [true]],
+    ["an older local relayd that refuses the locate field", "older-local", ["session.endpoints", "session.command", "session.command", "session.locate", "session.attach"], [true, false]],
+  ] as const)("#given %s #when a thread is created on b #then the open asks for its located session and session.locate runs only when the reply lacks it", async (_label, relayd, frames, asked) => {
+    const w = relayWorld(relayd)
+    const created = await openRemote(w.surface, { kind: "create", device: "b" })
+    if (created.kind !== "ok" || !("thread" in created)) throw new Error(`create failed: ${JSON.stringify(created)}`)
+    expect(created.thread.thread_id).toBe(CREATED_KEY)
+    expect(w.take()).toEqual([...frames])
+    expect(w.locateAsked).toEqual([...asked])
+  })
+
+  test("#given an existing row of b #when it is opened #then the open does not ask for a located session and nothing is located", async () => {
+    const w = relayWorld()
+    const opened = await openRemote(w.surface, { kind: "open", row })
+    expect(opened.kind).toBe("ok")
+    expect(w.take()).toEqual(["session.endpoints", "session.command"])
+    expect(w.locateAsked).toEqual([false])
+  })
 
   test("#given one remote session #when the thread ops run in turn #then the attach is opened once, status and the transcript are read from the device every time, an exact model in the held catalog is one set_model, and each command is one round trip", async () => {
     const w = relayWorld()
@@ -216,7 +323,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
       ["status", () => w.port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })],
       ["view (cold)", () => readRemote(w.surface, row, view)],
       ["view", () => readRemote(w.surface, row, view)],
-      ["send", () => promptRemote(w.surface, row, { message: "x" }, 0)],
+      ["send", () => promptRemote(w.surface, row, { message: "x" })],
       ["status after send", () => w.port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })],
       ["model (cold catalog)", () => setModelRemote(w.surface, row, { model: "m2" })],
       ["model (exact provider/id)", () => setModelRemote(w.surface, row, { model: "a/m1" })],
@@ -316,7 +423,7 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
   }
 
   test.each([
-    ["the session is not on that device", new LocalApiError("session_not_found", "no such session"), "session_not_found"],
+    ["the session is not on that device", new LocalApiError("session_not_found", "no such session"), "unknown_session"],
     ["the host does not answer the attach", new LocalApiError("host_not_answering", "no answer"), "host_not_answering"],
     ["the connection is lost before the attach", new Error("socket gone"), "attach_failed"],
   ] as const)("#given %s #when a command or a read is made #then each is refused typed with its code and no command is sent", async (_label, error, reason) => {
@@ -326,6 +433,19 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     expect(await port.sessionCommand("b", "s1", { type: "abort" })).toEqual({ kind: "refused", reason })
     expect(await port.read("b", "s1", 10)).toEqual({ kind: "refused", reason })
     expect(l.calls.sent).toBe(0)
+  })
+
+  test("#given a closed session #when the same prompt goes to this device's engine and to b #then both answer the same code (#12755)", async () => {
+    let local: unknown
+    await withContractHost({ auth: true, attachRefusal: "unknown_session" }, async (host) => {
+      const client = createLiveThreadSurface(undefined, { env: { OMO_CODING_AGENT_DIR: host.root, SENPI_RPC_SOCKET: host.socket, SENPI_RPC_KEY_ROOT: host.root }, statusAll: async () => undefined, registry: async () => [] })
+      local = await client.prompt("rpc-1", "hello", undefined, "dur-selected").then(() => "answered", (error: unknown) => (error as { code?: unknown }).code)
+    })
+    const l = lifecycle()
+    l.failAttach(new LocalApiError("session_not_found", "no such session"))
+    const remote = await createDeviceServiceSessions({ version: "0.0.0-test", connect: l.connect }).sessionCommand("b", "s1", { type: "prompt", message: "hello" })
+    expect(local).toBe("unknown_session")
+    expect(remote).toEqual({ kind: "refused", reason: String(local) })
   })
 
   test.each([

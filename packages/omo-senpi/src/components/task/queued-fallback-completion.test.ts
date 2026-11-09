@@ -7,6 +7,7 @@ import { baseSpec, cleanupProjects, makeHandle, tempProject } from "../../../../
 import type { ManagedRunner } from "../../../../senpi-task/src/manager/types"
 import { createTaskRecordStore } from "../../../../senpi-task/src/store"
 import { createCompletionObservingStore } from "./completion-bridge"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -39,7 +40,7 @@ for (const buffered of [false, true]) {
     store.mutate(started.task_id, record => ({
       ...record, pending_steering: [{ id: "queued", message: "Q1", deliver_as: "steer" }],
     }))
-    const completed = h.manager.waitFor(started.task_id, { signal: AbortSignal.timeout(5000) })
+    const completed = h.manager.waitFor(started.task_id, { signal: testBudgetSignal("h.manager.waitFor to settle") })
     try {
       // When runtime fallback cannot close its failed rung, and the real orphan cleanup finishes.
       first.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
