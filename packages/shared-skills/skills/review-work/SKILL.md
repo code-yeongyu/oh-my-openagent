@@ -121,7 +121,7 @@ For GOAL, CONSTRAINTS, BACKGROUND - review the full conversation history. The us
 
 ## Phase 1: Manual QA (you run it)
 
-You are the QA lane. Do not delegate hands-on QA to a sub-agent: the orchestrator owns the real-surface proof, exactly as the ulw-loop final gate records `manualQa` under the main session.
+You are the QA lane. Do not delegate hands-on QA to a sub-agent: the orchestrator owns the real-surface proof, exactly as the ulw-loop final gate records `manualQa` under the main session. One exception: inside a `ulw-execute` run, whose root never runs QA itself, dispatch these scenarios to one QA worker and build the matrix from the artifacts it captures.
 
 1. **Reuse first.** If this session already captured real-surface evidence for the FINAL tree (an ultrawork or ulw-loop evidence directory, a `visual-qa` verdict on this same build), consume it as QA rows instead of re-running. A fix committed after a capture stales that capture: re-run the rows it covered.
 2. **Pick the channel that faithfully exercises the surface** and capture the artifact:
@@ -240,7 +240,7 @@ Store the lane verdicts independently:
 | Manual QA (Phase 1) | PASS/FAIL | rows, artifact paths |
 | Gate review | pending/APPROVE/REJECT/INCONCLUSIVE | - |
 
-If the reviewer stays silent after the reliability followup, record the lane INCONCLUSIVE and respawn one smaller reviewer scoped to the same inputs. If that retry also ends without a verdict, close the still-running agent if safe, keep the lane INCONCLUSIVE, and emit the final result naming the incomplete lane. Do not spin in repeated wait/followup cycles, and do not use a queued followup as a cancellation.
+If the reviewer ends without a verdict (it completed without one, answered ack-only to one follow-up, or reported `BLOCKED:`), record the lane INCONCLUSIVE and respawn one smaller reviewer scoped to the same inputs. A reviewer that is still running is alive, not silent. If that retry also ends without a verdict, close the still-running agent if safe, keep the lane INCONCLUSIVE, and emit the final result naming the incomplete lane. Do not spin in repeated wait/followup cycles, and do not use a queued followup as a cancellation.
 
 After the lane reaches a terminal state and before delivering the verdict, tear down the review worktree: run `git worktree unlock <path>` followed by `git worktree remove <path>`. The reviewer runs inside that worktree, so removing it earlier destroys its working directory; a crashed review leaves the locked tree as a recoverable marker for manual cleanup.
 

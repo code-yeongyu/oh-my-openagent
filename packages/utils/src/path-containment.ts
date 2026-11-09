@@ -98,7 +98,7 @@ export function resolveSegmentwise(target: string, options: SegmentwiseResolveOp
       missing.push(segment)
       continue
     }
-    if (!lstat(resolved).isDirectory()) throw pathError("ENOTDIR", `not a directory: ${target}`)
+    if (!lstat(resolved).isDirectory()) throw notDirectory(target)
     if (segment === "" || segment === ".") continue
     if (segment === "..") {
       resolved = posix.dirname(resolved)
@@ -128,12 +128,17 @@ function unresolvable(target: string): Error {
   return pathError("ENOENT", `unresolvable remainder: ${target}`)
 }
 
+function notDirectory(target: string): Error {
+  return pathError("ENOTDIR", `not a directory: ${target}`)
+}
+
 function isEntry(input: string, lstat: (path: string) => unknown): boolean {
   try {
     lstat(input)
     return true
-  } catch {
-    return false
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return false
+    throw error
   }
 }
 
@@ -160,12 +165,12 @@ function resolveWindowsLexical(
       continue
     }
     if (missing.length === 0) {
-      if ((target.endsWith("/") || target.endsWith("\\")) && !lstat(ancestor).isDirectory()) {
-        throw pathError("ENOTDIR", `not a directory: ${target}`)
+      if ((target.endsWith("\\") || target.endsWith("/")) && !lstat(ancestor).isDirectory()) {
+        throw notDirectory(target)
       }
       return ancestor
     }
-    if (!lstat(ancestor).isDirectory()) throw pathError("ENOTDIR", `not a directory: ${ancestor}`)
+    if (!lstat(ancestor).isDirectory()) throw notDirectory(ancestor)
     if (allowMissing === false) throw unresolvable(target)
     return win32.join(ancestor, ...missing)
   }

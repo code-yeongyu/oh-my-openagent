@@ -75,12 +75,17 @@ const fixtures = [
   { id: "long-label", text: rootPem + pem(hex("3000"), "A".repeat(201)), expected: dropped("pem-noncanonical", 1, true) },
   { id: "mid-cr", text: rootPem + "plain\rtext\n", expected: dropped("pem-noncanonical", 1, true) },
   { id: "form-feed", text: rootPem + "plain\ftext\n", expected: dropped("pem-noncanonical", 1, true) },
-  { id: "high-byte", text: rootPem + "plain\u00fftext\n", expected: dropped("pem-noncanonical", 1, true) },
+  // Fedora's tls-ca-bundle.pem carries UTF-8 comment lines between blocks; PEM_read_bio skips text outside blocks.
+  { id: "non-ascii-comment", text: `${pem(hex("3000"), "OTHER")}\n# NetLock Arany (Class Gold) F\u0151tan\u00fas\u00edtv\u00e1ny\n${rootPem}`,
+    expected: { ...kept, certificates: [{ der: rootDer, index: 1 }] } },
+  { id: "non-ascii-in-block", text: rootPem.replace(/\n([A-Za-z0-9+/=]+)\n/, "\n$1\u00e9\n"), expected: dropped("pem-noncanonical", 0, true) },
   { id: "lowercase-label", text: rootPem + pem(hex("3000"), "other"), expected: dropped("pem-noncanonical", 1, true) },
   { id: "crlf", text: rootPem.replaceAll("\n", "\r\n"), expected: kept },
   { id: "bad-padding", text: rootPem + pem(hex("3000"), "OTHER").replace("MAA=", "MAA"), expected: dropped("pem-read-error") },
   { id: "blank-body", text: rootPem.replace("\n", "\n\n"), expected: dropped("pem-noncanonical", 0, true) },
   { id: "bom", text: `\uFEFF${rootPem}`, expected: dropped("pem-noncanonical", 0, true) },
+  // Any high byte on a BEGIN line drops the file, not only a BOM: a UTF-8 e-acute is no byte-order mark.
+  { id: "high-byte-begin", text: `\u00e9${rootPem}`, expected: dropped("pem-noncanonical", 0, true) },
   { id: "space-only-header-line", text: rootPem.replace(/^(-----BEGIN CERTIFICATE-----\n)([A-Za-z0-9+/=]+\n)/, "$1   \n$2\n"), expected: dropped("pem-noncanonical", 0, true) },
   { id: "mismatched-end", text: rootPem + "-----BEGIN OTHER-----\nMAA=\n-----END WRONG-----\n", expected: dropped("pem-noncanonical", 1, true) },
 ]
@@ -266,7 +271,7 @@ test.skipIf(process.platform === "win32")("never imports R beyond real Bun's acc
     const exposed = ["c4s", "c4t"].filter((id) => outcomes.get(id)?.every((value) => value === "1"))
     expect(exposed).toHaveLength(1)
     console.log(`oracle narrowings: ${narrowings.join(", ")}`)
-    expect([...narrowings].sort()).toEqual(["c4", ...exposed, "long-label", "mid-cr", "form-feed", "high-byte",
+    expect([...narrowings].sort()).toEqual(["c4", ...exposed, "long-label", "mid-cr", "form-feed", "non-ascii-in-block",
       "lowercase-label", "blank-body", "space-only-header-line"].sort())
   } finally {
     const closed = once(server, "close", { signal: AbortSignal.timeout(10_000) })

@@ -13,6 +13,7 @@ import { acquireWithoutDirectorySweep } from "../locks/acquire"
 import { exitedWithin, probeUntil } from "../locks/process-liveness.test-support"
 import { link } from "../fs/resilient"
 import { sweepStrandedGitLockFiles } from "./repo-lock-sweep"
+import { settlesWithin } from "./settles-within.test-support"
 
 // omo #10199 r5 delta review LOW: the proof that the writer lock's previous owner died authorizes
 // reclaiming git locks only for the acquisition that took the lock over FROM that owner. If a live
@@ -64,20 +65,33 @@ describe("the dead-owner proof goes only to the dead owner's immediate successor
     // A live writer B publishes the moment THIS acquisition tries to: B is this process (alive).
     const mine = await createLockRecord("memory-write")
     const writerB = await createLockRecord("memory-write")
+    // B may finish only after this acquisition's link has run into B's record (#12338): releasing B
+    // while that link is still in flight lets the link land on an empty path, so B's whole tenure
+    // happens before the publish, invisible to it, and the case under test never occurs.
     let injected = false
+    let injectedLinkError: string | undefined
+    let markInjectedLinkSettled!: () => void
+    const injectedLinkSettled = new Promise<void>((resolve) => { markInjectedLinkSettled = resolve })
     restoreFs = setLockCandidateFsForTests({
       link: async (candidate, target) => {
-        if (!injected && target === writerLockPath && readFileSync(candidate, "utf8").includes(mine.nonce)) {
-          injected = true
-          writeFileSync(target, JSON.stringify(writerB), "utf8")
+        if (injected || target !== writerLockPath || !readFileSync(candidate, "utf8").includes(mine.nonce)) return link(candidate, target)
+        injected = true
+        writeFileSync(target, JSON.stringify(writerB), "utf8")
+        try {
+          return await link(candidate, target)
+        } catch (error) {
+          injectedLinkError = error instanceof Error && "code" in error ? String(error.code) : String(error)
+          throw error
+        } finally {
+          markInjectedLinkSettled()
         }
-        return link(candidate, target)
       },
     })
 
-    // #when: this acquisition waits behind B, B finishes, then this acquisition holds the lock
+    // #when: this acquisition loses its publish to B, B finishes, then this acquisition holds the lock
     const acquired = acquire(writerLockPath, mine, { waitTimeoutMs: 10_000, retryDelayMs: 5 })
-    expect(await probeUntil(() => injected, 10_000)).toBe(true)
+    expect(await settlesWithin(injectedLinkSettled, 10_000)).toEqual({ kind: "settled", value: undefined })
+    expect(injectedLinkError).toBe("EEXIST")
     expect(await releaseLock(writerLockPath, writerB)).toBe(true)
     await acquired
     try {

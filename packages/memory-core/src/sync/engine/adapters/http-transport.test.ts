@@ -117,6 +117,7 @@ test("the event stream delivers sync.advanced heads and reports the connection",
         connected.push(up)
         if (up) void pushOne(a, new TextEncoder().encode("live"), 0)
       },
+      onStateChanged: () => undefined,
     })
   })
   await first
@@ -124,4 +125,29 @@ test("the event stream delivers sync.advanced heads and reports the connection",
   expect(heads).toEqual([1])
   expect(connected[0]).toBe(true)
   expect(await server.untilStreamsClosed()).toBe(0)
+})
+
+// #12280 R-A9 (wire): a revoke through the real route freezes the account; the stream announces it as
+// `sync.state.changed`, the state route shows the flag, and a push is refused `stale_base`.
+test("#given a subscribed device #when another device is signed out through the sign-out route #then the stream delivers a state change and pushes are refused stale_base", async () => {
+  const { server, a, b } = await pair()
+  let stop: () => void = () => undefined
+  const changed = new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("waited 10s for sync.state.changed, never fired")), 10_000)
+    stop = a.subscribe({
+      onAdvanced: () => undefined,
+      onConnected: (up) => {
+        if (up) void fetch(`${server.url}/v1/session/sign-out`, { method: "POST", headers: { authorization: `Bearer ${server.tokenOf("b")}` } })
+      },
+      onStateChanged: () => {
+        clearTimeout(timer)
+        resolve()
+      },
+    })
+  })
+  await changed
+  stop()
+  expect(server.freeze.pending).toBe(true)
+  expect(await pushOne(a, new TextEncoder().encode("frozen"), 0)).toMatchObject({ ok: false, error: "stale_base" })
+  await expect(b.pull(0, 500)).rejects.toMatchObject({ code: "device_revoked", status: 401 })
 })

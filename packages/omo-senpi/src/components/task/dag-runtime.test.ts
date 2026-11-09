@@ -27,6 +27,7 @@ import { runDagTool } from "./dag-tool"
 import { composeTaskEngine, type TaskEngine, type TaskRunnerFactories } from "./engine"
 import type { CapturedUi } from "./runtime-context"
 import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const cleanupRoots: string[] = []
 // Every engine a test composes starts an idle reclaimer timer; its lifecycle is disposed when the
@@ -54,13 +55,6 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-/**
- * A single awaited step must settle well inside Bun's 5s per-test budget. 3s leaves room for a
- * loaded Windows runner (this test measured 802ms idle and 1339ms on a PR runner) while still
- * failing before the suite-level timeout, so the failure names the step instead of the test.
- */
-const STEP_BUDGET_MS = 3000
-
 /** Wall-clock budget for the multi-run cancellation case; see its trailing comment. */
 const TEST_BUDGET_MS = 20_000
 
@@ -70,7 +64,7 @@ const TEST_BUDGET_MS = 20_000
  * step (CI measured 9.3s on windows-latest for a step that takes ~0.8s idle) failed the
  * test as an anonymous "timed out after 5000ms" instead of naming what never settled.
  */
-function within<T>(promise: Promise<T>, ms = STEP_BUDGET_MS, step = "step"): Promise<T> {
+function within<T>(promise: Promise<T>, ms: number, step: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const bound = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => {
@@ -217,6 +211,7 @@ function fakeUi(widgetRows: string[][]): CapturedUi {
 
 describe("assembled DAG runtime", () => {
   test("#given a running DAG node #when its assembled child emits progress #then RPC and the live widget share one activity subscription that tears down", async () => {
+    useTestTimeout(15_000)
     // given
     const cwd = fs.mkdtempSync(join(tmpdir(), "omo-senpi-dag-activity-"))
     cleanupRoots.push(cwd)
@@ -262,8 +257,8 @@ describe("assembled DAG runtime", () => {
         nodes: [{ id: "active", prompt: "work", subagent_type: "explore", model: "omo-mock/mock-1" }],
       },
     })
-    await within(runner.whenStarted(1), STEP_BUDGET_MS, "runner.whenStarted(1)")
-    await within(taskAttached.promise, STEP_BUDGET_MS, "dag.node.task-attached")
+    await within(runner.whenStarted(1), remainingTestTime(), "runner.whenStarted(1)")
+    await within(taskAttached.promise, remainingTestTime(), "dag.node.task-attached")
     const attachedListenerCount = runner.handles[0]?.listenerCount() ?? 0
     expect(attachedListenerCount).toBeGreaterThan(0)
     await runtime.attach()
@@ -291,7 +286,7 @@ describe("assembled DAG runtime", () => {
       expect.arrayContaining([expect.stringContaining("read src/live.ts")]),
     ]))
     runner.handles[0]?.settle("done")
-    await within(runtime.wait(started.snapshot.runId, "session-activity"))
+    await within(runtime.wait(started.snapshot.runId, "session-activity"), remainingTestTime(), "runtime.wait(started.snapshot.runId, \"session-activity\")")
     expect(runner.handles[0]?.listenerCount()).toBe(attachedListenerCount - 1)
     await runtime.attach()
     expect(runner.handles[0]?.listenerCount()).toBe(attachedListenerCount - 1)
@@ -331,7 +326,7 @@ describe("assembled DAG runtime", () => {
         }],
       },
     })
-    await within(runner.whenStarted(1), STEP_BUDGET_MS, "runner.whenStarted(1)")
+    await within(runner.whenStarted(1), remainingTestTime(), "runner.whenStarted(1)")
     const snapshot = runtime.manager.snapshot(started.snapshot.runId, "session-missing-skill")
 
     // then
@@ -342,11 +337,12 @@ describe("assembled DAG runtime", () => {
     }))
     expect(runner.handles[0]?.spec.prompt).toBe("original prompt")
     runner.handles[0]?.settle("done")
-    await within(runtime.wait(started.snapshot.runId, "session-missing-skill"))
+    await within(runtime.wait(started.snapshot.runId, "session-missing-skill"), remainingTestTime(), "runtime.wait(started.snapshot.runId, \"session-missing-skill\")")
     runtime.dispose()
   })
 
   test("#given a terminal wake buffered during compaction #when the assembled runtime attaches on session start #then it redelivers exactly once", async () => {
+    useTestTimeout(15_000)
     // given
     const cwd = fs.mkdtempSync(join(tmpdir(), "omo-senpi-dag-wake-redelivery-"))
     cleanupRoots.push(cwd)
@@ -379,9 +375,9 @@ describe("assembled DAG runtime", () => {
         nodes: [{ id: "complete", prompt: "complete", subagent_type: "explore", model: "omo-mock/mock-1" }],
       },
     })
-    await within(runner.whenStarted(1), STEP_BUDGET_MS, "runner.whenStarted(1)")
+    await within(runner.whenStarted(1), remainingTestTime(), "runner.whenStarted(1)")
     runner.handles[0]?.settle("done")
-    await within(runtime.wait(started.snapshot.runId, "session-wake-redelivery"))
+    await within(runtime.wait(started.snapshot.runId, "session-wake-redelivery"), remainingTestTime(), "runtime.wait(started.snapshot.runId, \"session-wake-redelivery\")")
     expect(coordinator.pendingCount()).toBe(0)
     expect(deliveries).toEqual([])
 
@@ -446,12 +442,12 @@ describe("assembled DAG runtime", () => {
     )
     if (started.details.kind !== "started") throw new Error("expected dag start")
     const runId = started.details.run_id as DagRunId
-    await within(runner.whenStarted(1))
+    await within(runner.whenStarted(1), remainingTestTime(), "runner.whenStarted(1)")
     const beforeSettle = [...completedRuns]
 
     // when
     runner.handles[0]?.settle("only output")
-    const result = await within(runtime.wait(runId, "session-run-completed"))
+    const result = await within(runtime.wait(runId, "session-run-completed"), remainingTestTime(), "runtime.wait(runId, \"session-run-completed\")")
 
     // then
     expect(result.status).toBe("completed")
@@ -625,6 +621,7 @@ describe("assembled DAG runtime", () => {
   }, { timeout: 15_000 })
 
   test("#given a live-shaped in-process child whose abort rejects #when the assembled runtime cancels #then no unhandled rejection escapes and a later run still completes", async () => {
+    useTestTimeout(TEST_BUDGET_MS)
     // given
     // The engine's idle reclaimer is a timer of the default resident_idle_timeout_ms (15 min). Left
     // running past this test, it suspends the resident survivor through handle.abort(), and this
@@ -682,8 +679,8 @@ describe("assembled DAG runtime", () => {
           nodes: [{ id: "active", prompt: "active", subagent_type: "explore", model: "omo-mock/mock-1" }],
         },
       })
-      await within(runner.whenStarted(1), STEP_BUDGET_MS, "runner.whenStarted(1)")
-      await within(taskAttached.promise, STEP_BUDGET_MS, "dag.node.task-attached")
+      await within(runner.whenStarted(1), remainingTestTime(), "runner.whenStarted(1)")
+      await within(taskAttached.promise, remainingTestTime(), "dag.node.task-attached")
       const unhandled: unknown[] = []
       const onUnhandled = (reason: unknown): void => { unhandled.push(reason) }
       process.on("unhandledRejection", onUnhandled)
@@ -701,9 +698,9 @@ describe("assembled DAG runtime", () => {
             nodes: [{ id: "survivor", prompt: "survive", subagent_type: "explore", model: "omo-mock/mock-1" }],
           },
         })
-        await within(runner.whenStarted(2), STEP_BUDGET_MS, "runner.whenStarted(2)")
+        await within(runner.whenStarted(2), remainingTestTime(), "runner.whenStarted(2)")
         runner.handles[1]?.settle("runtime survived")
-        const survived = await within(runtime.wait(survivor.snapshot.runId, sessionId))
+        const survived = await within(runtime.wait(survivor.snapshot.runId, sessionId), remainingTestTime(), "runtime.wait(survivor.snapshot.runId, sessionId)")
 
         // then
         expect(cancelled.status).toBe("cancelled")
@@ -715,7 +712,7 @@ describe("assembled DAG runtime", () => {
         runner.handles[0]?.settle("cancelled child reached its natural boundary")
         const disposed = runner.handles[0]?.disposed
         if (disposed === undefined) throw new Error("cancelled child handle was not retained")
-        await within(disposed, STEP_BUDGET_MS, "cancelled child dispose")
+        await within(disposed, remainingTestTime(), "cancelled child dispose")
         expect(runner.disposeCalls).toBe(1)
       } finally {
         runtime.dispose()
@@ -730,8 +727,8 @@ describe("assembled DAG runtime", () => {
     expect(liveReclaimerTimers.size).toBe(0)
     // Budget is stated, not inherited: this case drives two full runs plus a cancel and a dispose
     // (802ms idle, 1339ms on a PR runner, 9.3s on a saturated windows-latest runner). Bun's 5s
-    // default was never chosen for it. Each awaited step stays bounded by STEP_BUDGET_MS, so a
-    // genuine hang still fails fast and names the step rather than consuming this budget.
+    // default was never chosen for it. Each awaited step is bounded by the remaining test budget, so a
+    // genuine hang still fails by name, naming the step it was awaiting.
   }, TEST_BUDGET_MS)
 
   test("#given an active run #when detach switches sessions before its task settles #then the old scheduler terminates without resolving ownership against the new session", async () => {
@@ -765,7 +762,7 @@ describe("assembled DAG runtime", () => {
       },
     })
     const runId = started.snapshot.runId
-    await within(runner.whenStarted(1), STEP_BUDGET_MS, "runner.whenStarted(1)")
+    await within(runner.whenStarted(1), remainingTestTime(), "runner.whenStarted(1)")
     const waiting = runtime.wait(runId, "session-old")
 
     // when
@@ -773,7 +770,7 @@ describe("assembled DAG runtime", () => {
     engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "session-new" } })
     await runtime.attach()
     runner.handles[0]?.settle("late output")
-    const result = await within(waiting)
+    const result = await within(waiting, remainingTestTime(), "waiting")
 
     // then
     expect(result.status).toBe("cancelled")
@@ -817,9 +814,9 @@ describe("assembled DAG runtime", () => {
     })
     const runId = started.snapshot.runId
     const waiting = runtime.wait(runId, "session-subscriber")
-    await within(runner.whenStarted(1), STEP_BUDGET_MS, "runner.whenStarted(1)")
+    await within(runner.whenStarted(1), remainingTestTime(), "runner.whenStarted(1)")
     runner.handles[0]?.settle("survived")
-    const result = await within(waiting)
+    const result = await within(waiting, remainingTestTime(), "waiting")
 
     // then
     expect(result.status).toBe("completed")
@@ -952,9 +949,9 @@ describe("assembled DAG runtime", () => {
   })
 
   test("#given a paused run and a non-default subscriber ring #when the assembled runtime resumes it #then the overflow is journaled and shipped RPC receives the recovered snapshot", async () => {
-    // given - the bridge attaches AFTER recovery (#7316), so recovery-window events are never
-    // pushed live; the overflow marker must be durable in the journal for history-paging viewers,
-    // and RPC's first wholesale snapshot must already carry the recovered run.
+    // given - the bridge attaches AFTER recovery installs the run (#7316, #12113), so recovery-window
+    // events are never pushed live; the overflow marker must be durable in the journal for
+    // history-paging viewers, and RPC's first wholesale snapshot must carry the recovered (live) run.
     const cwd = fs.mkdtempSync(join(tmpdir(), "omo-senpi-dag-recovery-ring-"))
     cleanupRoots.push(cwd)
     const runId = "dag-adapter-recovery-ring" as DagRunId
@@ -996,11 +993,10 @@ describe("assembled DAG runtime", () => {
     const runtime = createDagRuntime({ pi, engine, logger: logger() })
 
     // when
-    const attaching = runtime.attach()
-    await within(runner.whenStarted(1), STEP_BUDGET_MS, "runner.whenStarted(1)")
+    await within(runtime.attach(), remainingTestTime(), "runtime.attach()")
+    const delivered = await within(recoveredSnapshot.promise, remainingTestTime(), "recoveredSnapshot.promise")
+    await within(runner.whenStarted(1), remainingTestTime(), "runner.whenStarted(1)")
     runner.handles[0]?.settle("resumed through configured ring")
-    await within(attaching)
-    const delivered = await within(recoveredSnapshot.promise)
 
     // then the overflow survived durably for history paging, and the pushed snapshot is recovered
     const journaled = dagEvents(cwd, runId).find(
@@ -1009,8 +1005,8 @@ describe("assembled DAG runtime", () => {
     expect(journaled).toBeDefined()
     expect(journaled?.droppedCount).toBeGreaterThan(0)
     expect(journaled?.recoverAfterSeq).toBeGreaterThanOrEqual(0)
-    expect(delivered.status).toBe("completed")
-    expect(runtime.manager.snapshot(runId, sessionId).status).toBe("completed")
+    expect(delivered.status).toBe("running")
+    expect((await within(runtime.wait(runId, sessionId), remainingTestTime(), "runtime.wait(runId, sessionId)")).status).toBe("completed")
     runtime.dispose()
   })
 
@@ -1201,16 +1197,17 @@ describe("assembled DAG runtime control verbs", () => {
   }
 
   test("#given a control verb re-registered a controller after the shutdown pause #when the committed shutdown detaches #then the run is retired, not cancelled, and stays reclaimable", async () => {
+    useTestTimeout(20_000)
     // given a run whose child is resident and whose scheduler the committed shutdown retired
     const { cwd, runner, runtime, sessionId, runId, whenAttached } = await controlFixture("pause-then-detach", [{ id: "solo" }])
-    await within(runner.whenStarted(1), STEP_BUDGET_MS, "runner.whenStarted(1)")
-    await within(whenAttached("solo"), 5_000, "solo attached")
+    await within(runner.whenStarted(1), remainingTestTime(), "runner.whenStarted(1)")
+    await within(whenAttached("solo"), remainingTestTime(), "solo attached")
     await runtime.pauseForShutdown()
     expect(dagStore(cwd).readCheckpoint<DagRunRecordV1>(runId)?.status).toBe("paused")
 
     // given a control verb that registers a controller which never runs a frontier, so nothing ever
     // settles it out of the scheduler map on its own
-    await within(runtime.send(runId, "solo", "steer while paused"), 5_000, "send")
+    await within(runtime.send(runId, "solo", "steer while paused"), remainingTestTime(), "send")
 
     // when the committed shutdown retires that controller too and only then detaches
     await runtime.pauseForShutdown()
@@ -1220,7 +1217,7 @@ describe("assembled DAG runtime control verbs", () => {
     // the surviving child carries it to completion. A cancelling detach would have made it terminal.
     const attaching = runtime.attach()
     runner.handles[0]?.settle("survived the committed shutdown")
-    await within(attaching, 5_000, "attach")
+    await within(attaching, remainingTestTime(), "attach")
     expect(runner.handles).toHaveLength(1)
     const finished = dagStore(cwd).readCheckpoint<DagRunRecordV1>(runId)
     expect(finished?.status).toBe("completed")
@@ -1229,23 +1226,24 @@ describe("assembled DAG runtime control verbs", () => {
   }, { timeout: 20_000 })
 
   test("#given a failed node #when the runtime retry entry point runs #then a fresh scheduler re-registers and the run completes", async () => {
+    useTestTimeout(20_000)
     // given
     const { runner, runtime, sessionId, runId } = await controlFixture("retry-reentry", [
       { id: "plan" },
       { id: "build", dependsOn: ["plan"] },
     ])
-    await within(runner.whenStarted(1), STEP_BUDGET_MS, "runner.whenStarted(1)")
+    await within(runner.whenStarted(1), remainingTestTime(), "runner.whenStarted(1)")
     runner.handles[0]?.fail("plan blew up")
-    const failed = await within(runtime.wait(runId, sessionId), 5_000)
+    const failed = await within(runtime.wait(runId, sessionId), remainingTestTime(), "runtime.wait(runId, sessionId)")
     expect(failed.status).toBe("failed")
 
     // when
-    const retried = await within(runtime.retry(runId), 5_000)
-    await within(runner.whenStarted(2), 5_000)
+    const retried = await within(runtime.retry(runId), remainingTestTime(), "runtime.retry(runId)")
+    await within(runner.whenStarted(2), remainingTestTime(), "runner.whenStarted(2)")
     runner.handles[1]?.settle("plan retried")
-    await within(runner.whenStarted(3), 5_000)
+    await within(runner.whenStarted(3), remainingTestTime(), "runner.whenStarted(3)")
     runner.handles[2]?.settle("build output")
-    const result = await within(runtime.wait(runId, sessionId), 5_000)
+    const result = await within(runtime.wait(runId, sessionId), remainingTestTime(), "runtime.wait(runId, sessionId)")
 
     // then
     expect(retried.status).toBe("running")
@@ -1256,13 +1254,14 @@ describe("assembled DAG runtime control verbs", () => {
   }, { timeout: 20_000 })
 
   test("#given a run paused for shutdown and resumed in the SAME process #when a node is retried #then admission is un-latched and the retry completes", async () => {
+    useTestTimeout(20_000)
     // given
     const { runner, runtime, sessionId, runId, whenAttached, whenState } = await controlFixture("retry-after-pause", [
       { id: "solo" },
       { id: "next", dependsOn: ["solo"] },
     ])
-    await within(runner.whenStarted(1), STEP_BUDGET_MS, "runner.whenStarted(1)")
-    await within(whenAttached("solo"), 5_000)
+    await within(runner.whenStarted(1), remainingTestTime(), "runner.whenStarted(1)")
+    await within(whenAttached("solo"), remainingTestTime(), "whenAttached(\"solo\")")
     // pausing a RUNNING run is the ONLY thing that latches admission, and nothing ever un-latches it
     await runtime.pauseForShutdown()
     // #8020: the committed shutdown RETIRED this runtime's scheduler, so the reopen reclaims the run
@@ -1270,20 +1269,20 @@ describe("assembled DAG runtime control verbs", () => {
     // child's failure has to be delivered before the attach is awaited.
     const attaching = runtime.attach()
     runner.handles[0]?.fail("solo blew up")
-    await within(whenState("solo", "failed"), 5_000)
-    await within(attaching, 5_000)
-    const failed = await within(runtime.wait(runId, sessionId), 5_000)
+    await within(whenState("solo", "failed"), remainingTestTime(), "whenState(\"solo\", \"failed\")")
+    await within(attaching, remainingTestTime(), "attaching")
+    const failed = await within(runtime.wait(runId, sessionId), remainingTestTime(), "runtime.wait(runId, sessionId)")
     expect(failed.status).toBe("failed")
     // the retirement reused the durable child instead of admitting a second one
     expect(runner.handles).toHaveLength(1)
 
     // when the stoppedAdmissions latch is NOT cleared, this retry hangs forever
-    await within(runtime.retry(runId), 5_000)
-    await within(runner.whenStarted(2), 5_000)
+    await within(runtime.retry(runId), remainingTestTime(), "runtime.retry(runId)")
+    await within(runner.whenStarted(2), remainingTestTime(), "runner.whenStarted(2)")
     runner.handles[1]?.settle("solo retried")
-    await within(runner.whenStarted(3), 5_000)
+    await within(runner.whenStarted(3), remainingTestTime(), "runner.whenStarted(3)")
     runner.handles[2]?.settle("next output")
-    const result = await within(runtime.wait(runId, sessionId), 5_000)
+    const result = await within(runtime.wait(runId, sessionId), remainingTestTime(), "runtime.wait(runId, sessionId)")
 
     // then
     expect(result.status).toBe("completed")
@@ -1293,58 +1292,61 @@ describe("assembled DAG runtime control verbs", () => {
   }, { timeout: 20_000 })
 
   test("#given a run resumed by retry #when attach re-runs the schedulable gate #then the re-registered scheduler is reused instead of a second one starting the node twice", async () => {
+    useTestTimeout(20_000)
     // given
     const { runner, runtime, sessionId, runId, whenAttached } = await controlFixture("retry-registration", [{ id: "solo" }])
-    await within(runner.whenStarted(1), STEP_BUDGET_MS, "runner.whenStarted(1)")
+    await within(runner.whenStarted(1), remainingTestTime(), "runner.whenStarted(1)")
     runner.handles[0]?.fail("solo blew up")
-    await within(runtime.wait(runId, sessionId), 5_000)
+    await within(runtime.wait(runId, sessionId), remainingTestTime(), "runtime.wait(runId, sessionId)")
     const retryAttached = whenAttached("solo", 2)
-    const resumed = await within(runtime.retry(runId), 5_000)
-    await within(retryAttached, 5_000)
+    const resumed = await within(runtime.retry(runId), remainingTestTime(), "runtime.retry(runId)")
+    await within(retryAttached, remainingTestTime(), "retryAttached")
     const childrenAfterRetry = runner.handles.length
 
     // when the resumed run passes back through the schedulable-status gate
-    await within(runtime.attach(), 5_000)
-    await within(runtime.attach(), 5_000)
+    await within(runtime.attach(), remainingTestTime(), "runtime.attach()")
+    await within(runtime.attach(), remainingTestTime(), "runtime.attach()")
 
     // then no second scheduler admitted the node again
     expect(resumed.status).toBe("running")
     expect(runner.handles).toHaveLength(childrenAfterRetry)
     runner.handles[childrenAfterRetry - 1]?.settle("solo retried")
-    const result = await within(runtime.wait(runId, sessionId), 5_000)
+    const result = await within(runtime.wait(runId, sessionId), remainingTestTime(), "runtime.wait(runId, sessionId)")
     expect(result.status).toBe("completed")
     runtime.dispose()
   }, { timeout: 20_000 })
 
   test("#given a running node #when the runtime send entry point runs #then the message is steered to its child", async () => {
+    useTestTimeout(20_000)
     // given
     const { runner, runtime, sessionId, runId, whenAttached } = await controlFixture("send-steer", [{ id: "live" }])
-    await within(runner.whenStarted(1), STEP_BUDGET_MS, "runner.whenStarted(1)")
-    await within(whenAttached("live"), 5_000)
+    await within(runner.whenStarted(1), remainingTestTime(), "runner.whenStarted(1)")
+    await within(whenAttached("live"), remainingTestTime(), "whenAttached(\"live\")")
 
     // when
-    const sent = await within(runtime.send(runId, "live", "focus on the failing test"), 5_000)
+    const sent = await within(runtime.send(runId, "live", "focus on the failing test"), remainingTestTime(), "runtime.send(runId, \"live\", \"focus on the failing test\")")
 
     // then
     expect(sent.delivery).toBe("steer")
     expect(String(sent.nodeId)).toBe("live")
     expect(sent.taskId).toBe(runner.handles[0]?.spec.taskId)
     runner.handles[0]?.settle("done")
-    await within(runtime.wait(runId, sessionId), 5_000)
+    await within(runtime.wait(runId, sessionId), remainingTestTime(), "runtime.wait(runId, sessionId)")
     runtime.dispose()
   }, { timeout: 20_000 })
 
   test("#given a settled run #when the runtime amend entry point edits a node #then only the changed node re-runs and the run re-enters", async () => {
+    useTestTimeout(20_000)
     // given
     const { runner, runtime, sessionId, runId } = await controlFixture("amend-reentry", [
       { id: "plan" },
       { id: "build", dependsOn: ["plan"] },
     ])
-    await within(runner.whenStarted(1), STEP_BUDGET_MS, "runner.whenStarted(1)")
+    await within(runner.whenStarted(1), remainingTestTime(), "runner.whenStarted(1)")
     runner.handles[0]?.settle("plan output")
-    await within(runner.whenStarted(2), 5_000)
+    await within(runner.whenStarted(2), remainingTestTime(), "runner.whenStarted(2)")
     runner.handles[1]?.fail("build blew up")
-    const failed = await within(runtime.wait(runId, sessionId), 5_000)
+    const failed = await within(runtime.wait(runId, sessionId), remainingTestTime(), "runtime.wait(runId, sessionId)")
     expect(failed.status).toBe("failed")
     const planTaskId = runtime.manager.record(runId, sessionId).nodes.find((node) => String(node.id) === "plan")?.taskId
 
@@ -1356,10 +1358,10 @@ describe("assembled DAG runtime control verbs", () => {
         { id: "plan", prompt: "do plan", subagent_type: "explore", model: "omo-mock/mock-1" },
         { id: "build", prompt: "do build CAREFULLY", subagent_type: "explore", model: "omo-mock/mock-1", dependsOn: ["plan"] },
       ],
-    }), 5_000)
-    await within(runner.whenStarted(3), 5_000)
+    }), remainingTestTime(), "runtime.amend(amend-reentry)")
+    await within(runner.whenStarted(3), remainingTestTime(), "runner.whenStarted(3)")
     runner.handles[2]?.settle("build amended")
-    const result = await within(runtime.wait(runId, sessionId), 5_000)
+    const result = await within(runtime.wait(runId, sessionId), remainingTestTime(), "runtime.wait(runId, sessionId)")
 
     // then
     expect(result.status).toBe("completed")

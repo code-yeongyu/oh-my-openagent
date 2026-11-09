@@ -192,12 +192,36 @@ describe("resolveSegmentwise resolves in the order open(2) does", () => {
     )
   })
 
-  test("win32 throws ENOTDIR when a resolved file path ends in a slash", () => {
+  test.each(["\\", "/"])("win32 throws ENOTDIR when a resolved file path ends in %s", (separator) => {
     const root = "C:\\"
     const realpath = (path: string) => win32.normalize(path)
     const lstat = (path: string) => ({ isDirectory: () => path === root })
-    const target = `${root}note.md\\`
+    const target = `${root}note.md${separator}`
     expect(pathErrorCode(() => resolveSegmentwise(target, { platform: "win32", realpath, lstat }))).toBe("ENOTDIR")
+  })
+
+  test.each([
+    { platform: "linux", root: "/", target: "/denied" },
+    { platform: "win32", root: "C:\\", target: "C:\\denied" },
+  ] as const)("propagates an lstat failure instead of treating it as a missing $platform entry", ({ platform, root, target }) => {
+    const missing = Object.assign(new Error("missing"), { code: "ENOENT" })
+    const denied = Object.assign(new Error("denied"), { code: "EACCES" })
+    const realpath = (path: string) => {
+      if (path === root) return root
+      throw missing
+    }
+    const lstat = (path: string) => {
+      if (path === root) return directory()
+      throw denied
+    }
+
+    let caught: unknown
+    try {
+      resolveSegmentwise(target, { platform, realpath, lstat })
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toBe(denied)
   })
 })
 

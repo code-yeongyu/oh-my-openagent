@@ -335,7 +335,7 @@ const cases = [
 			if (!options.lspDir || !existsSync(join(options.lspDir, "typescript-language-server")))
 				throw new Error("E24 needs the pinned typescript-language-server: pass --lsp-dir <dir> (or EQ_LSP_DIR)");
 			prepareCaseSandbox(run, {});
-			if (options.commentChecker) run.env.OMO_COMMENT_CHECKER_BIN = options.commentChecker;
+			run.env.OMO_COMMENT_CHECKER_BIN = await options.commentChecker();
 			await openSettled(run);
 			answerUiRequests(run);
 			const warmEnd = run.nextEvent((event) => event.type === "tool_execution_end" && event.toolCallId === "call_warm");
@@ -355,12 +355,33 @@ const cases = [
 	},
 ];
 
-function resolveCommentChecker() {
+/**
+ * E24's comment checker: the installed `@code-yeongyu/comment-checker` binary at the release the plugin pins. Without
+ * `OMO_COMMENT_CHECKER_BIN` the plugin downloads that release from GitHub into the case's fresh XDG cache on every run,
+ * so a slow or failed download silently turned the checker off and E24 red (#12835). The repo root stopped depending
+ * on the package in 79e44db1cb; the workspace that still declares it is the Codex comment-checker component. A missing
+ * package or a version other than the pin fails the case: a checker E24 did not pin is never what it observes.
+ */
+async function resolveCommentChecker() {
+	const requireFrom = createRequire(
+		join(repoRoot, "packages", "omo-codex", "plugin", "components", "comment-checker", "package.json"),
+	);
+	const { COMMENT_CHECKER_RELEASE_VERSION } = await import(
+		pathToFileURL(join(repoRoot, "packages", "comment-checker-core", "src", "release.ts")).href
+	);
+	const install = "npm --prefix packages/omo-codex/plugin ci --ignore-scripts";
+	let version;
 	try {
-		return createRequire(join(repoRoot, "package.json")).resolve("@code-yeongyu/comment-checker/cli.js");
-	} catch {
-		return undefined;
+		({ version } = requireFrom("@code-yeongyu/comment-checker/package.json"));
+	} catch (error) {
+		if (error?.code !== "MODULE_NOT_FOUND") throw error;
+		throw new Error(`E24: @code-yeongyu/comment-checker is not installed in the Codex plugin workspace: run ${install}`);
 	}
+	if (version !== COMMENT_CHECKER_RELEASE_VERSION)
+		throw new Error(
+			`E24: installed @code-yeongyu/comment-checker is ${version}, the plugin pins ${COMMENT_CHECKER_RELEASE_VERSION}: run ${install}`,
+		);
+	return requireFrom("@code-yeongyu/comment-checker").getBinaryPath();
 }
 
 const sha256File = async (path) => {
@@ -376,6 +397,8 @@ function summarizeDiffs(diffs) {
 				`    ${row.path}: golden=${JSON.stringify(row.golden)?.slice(0, 160)} actual=${JSON.stringify(row.actual)?.slice(0, 160)}`,
 		);
 }
+
+const SANDBOX_MCP_CONFIG = { mcpServers: { context7: { enabled: false }, grep_app: { enabled: false } } };
 
 async function main() {
 	const options = parseArgs(process.argv.slice(2));
@@ -401,7 +424,7 @@ async function main() {
 		const guard = guardRealAuth();
 		const caseOptions = {
 			desktopEngine: options.desktopEngine,
-			commentChecker: resolveCommentChecker(),
+			commentChecker: resolveCommentChecker,
 			lspDir: options.lspDir,
 		};
 		const pathForChild = childPath(options.lspDir);
@@ -425,6 +448,10 @@ async function main() {
 					throw new Error(`no desktop engine at ${options.desktopEngine}; run cargo build --release -p senpi-desktop-engine`);
 				for (let index = 0; index < options.repeat; index++) {
 					const run = await startCaseRun({ ...testCase.spec(), label: `omo-${testCase.id.toLowerCase()}` });
+					// The builtin remote MCPs (context7, grep_app) inject their servers' live instructions into the system
+					// prompt, so a third party's wording change broke E21-E24 with no omo change (#12256). Turn them off in
+					// the sandbox's own mcp.json, the documented switch that wins over the extension declarations.
+					writeFileSync(join(run.box.agentDir, "mcp.json"), `${JSON.stringify(SANDBOX_MCP_CONFIG, null, 2)}\n`);
 					// The checkout and engine locations are run-scoped prefixes, like the sandbox root.
 					run.extraRoots.push(
 						{ prefix: repoRoot, token: "<omo-repo>" },

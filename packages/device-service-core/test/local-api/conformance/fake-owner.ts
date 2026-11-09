@@ -14,13 +14,16 @@ import { LocalApiError } from "../../../src/local-api/errors.ts";
 import { encodeLine, LineDecoder, parseLine } from "../../../src/local-api/framing.ts";
 import {
   CAPABILITIES,
+  type Capability,
   type ClientInfo,
   type ErrorCode,
   type JsonObject,
+  type LocalRequest,
 } from "../../../src/local-api/protocol.ts";
 import { listenLocal, type LocalListener, type Transport } from "../../../src/local-api/transport.ts";
 import { UploadAssembler } from "../../../src/local-api/upload.ts";
 import { validateHello, validateRequest } from "../../../src/local-api/validate.ts";
+import { compareVersions } from "../../../src/release/version.ts";
 import { dispatch } from "./fake-owner-handlers.ts";
 import type { Conn, OwnerState } from "./fake-owner-state.ts";
 import type { World } from "./world.ts";
@@ -40,6 +43,10 @@ export type FakeOwnerOptions = {
   readonly world: World;
   readonly secure?: SecureFile;
   readonly now?: () => number;
+  /** The welcome's capabilities; every required one by default. A narrower list stands in for an older service. */
+  readonly capabilities?: readonly Capability[];
+  /** Called after each authenticated request was answered, so a test can await one instead of polling the state. */
+  readonly onRequest?: (type: LocalRequest["type"]) => void;
 };
 
 const noopSecure: SecureFile = async () => {};
@@ -79,6 +86,7 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
     conns: new Set(),
     log: [],
     adoptions: 0,
+    adoptRequests: [],
     attaches: new Map(),
     bindings: new Map(),
     commands: [],
@@ -86,6 +94,7 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
     endpoints: new Set(),
     reports: [],
     refresher: null,
+    attach: { attached: true, changedAt: "" },
     now: options.now ?? Date.now,
     mint: mintId,
     stop: async () => {},
@@ -125,13 +134,13 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
           owner: "service",
           server_proof: serverProof(token, hello.hello.client_nonce, transport.endpoint),
           server_nonce: serverNonce,
-          capabilities: [...CAPABILITIES],
+          capabilities: options.capabilities ?? [...CAPABILITIES],
           state: state.status,
         });
         phase = "proof";
         return;
       }
-      const parsed = validateRequest(message);
+      const parsed = validateRequest(acceptAdoptAccount(state, message));
       if (!parsed.ok) {
         if (parsed.id !== null) send(errorReply(parsed.id, parsed.code, parsed.reason));
         return;
@@ -165,6 +174,7 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
           : { id: request.id, type: "response", ok: true, data: outcome.reply.data },
       );
       outcome.after?.();
+      options.onRequest?.(request.type);
     };
     const decoder = new LineDecoder(
       (line) => {
@@ -197,4 +207,15 @@ export const startFakeOwner = async (options: FakeOwnerOptions): Promise<FakeOwn
     connections: () => listener?.accepted() ?? 0,
     stop: () => state.stop(),
   };
+};
+
+// A relayd at or above 0.1.3 (relay-spec ADOPT_ACCOUNT_MIN_SERVICE_VERSION) accepts device.adopt's optional `account`
+// (omo-relay-daemon#730); an older one runs the shipped strict validator, which refuses any unknown field. Every
+// raw device.adopt is recorded as sent, so a test can see exactly which fields went over the wire.
+const acceptAdoptAccount = (state: OwnerState, message: unknown): unknown => {
+  if (typeof message !== "object" || message === null || Reflect.get(message, "type") !== "device.adopt") return message;
+  state.adoptRequests.push({ ...message });
+  if (compareVersions(state.world.service_version, "0.1.3") < 0 || !("account" in message)) return message;
+  const { account, ...rest } = message as Record<string, unknown>;
+  return typeof account === "string" && account !== "" ? rest : message;
 };

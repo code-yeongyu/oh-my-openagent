@@ -86,7 +86,7 @@ describe.each(["in-process", "process", "host"] as const)("senpi's shipped defau
     // Precondition: the engine still ships that chain, or this case would pass without proving anything.
     const { SettingsManager } = await loadSenpiBarrel()
     const shipped = SettingsManager.inMemory({}).getRetryFallbackSettings().chains
-    expect(shipped[modelId(opus55)]).toContain(`${modelId(opus5)}:max`)
+    expect(shipped[modelId(opus55)]?.map((rung) => rung.split(":")[0])).toContain(modelId(opus5))
     const { record, world } = await runCategoryChild({ runner, category: "deep-high", chain: [opus55], scripts: { [opus55]: ["quota"] } })
 
     // then
@@ -95,6 +95,32 @@ describe.each(["in-process", "process", "host"] as const)("senpi's shipped defau
     expect(record.status).toBe("error")
     expect(record.failure_kind).toBe("model_chain_exhausted")
     expect(record.error_message).toContain(`${opus55}: usage limit (resets 3:20am)`)
+  }, 60_000)
+})
+
+describe("a process child whose engine cannot hold its designated chain (#12759)", () => {
+  const { primary, second, parent } = chainIds("process")
+
+  test("#given an engine without retry_fallback_command, a working parent model and user chains that walk to it #when the child's model would hit its usage limit #then the child never starts, fails naming its chain, and no model is called, the parent's included", async () => {
+    // given: the user's settings chain the child's only model to the parent's working model, so an engine
+    // left on its own fallback settings would carry the child onto the parent's model after the limit.
+    // when
+    const { record, world } = await runCategoryChild({
+      runner: "process",
+      category: "deep-high",
+      chain: [primary],
+      scripts: { [primary]: ["quota"] },
+      userFallbackChains: { [primary]: [parent, second] },
+      engineHides: ["retry_fallback_command"],
+    })
+
+    // then
+    expect(calledModels(world)).not.toContain(parent)
+    expect(calledModels(world)).toEqual([])
+    expect(record.status).toBe("error")
+    expect(record.error_message).toBe(
+      `Child prompt failed to start: the engine could not hold its designated model chain (${primary}) (chain_not_held: unsupported), and a child never runs outside its designated models.`,
+    )
   }, 60_000)
 })
 

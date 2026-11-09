@@ -6,6 +6,7 @@ import { afterEach, expect, test } from "bun:test"
 import { gatewayDatabasePath } from "./paths"
 import { GATEWAY_MIGRATIONS } from "./schema"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 let harness: GatewayHarness | undefined
 afterEach(async () => { await harness?.dispose(); harness = undefined })
@@ -121,7 +122,7 @@ test("#given an extension row orphaned on bindings (a pre-existing violation) #w
     const off = store.onEvent((event) => {
       if (event.kind === "store_closed") { off(); resolve() }
     })
-    setTimeout(() => { off(); reject(new Error("waited for the worker to close the failed migration's database; store_closed never fired")) }, 15000).unref?.()
+    setTimeout(() => { off(); reject(new Error("waited for the worker to close the failed migration's database; store_closed never fired within the test budget")) }, remainingTestTime()).unref?.()
   })
   let error: unknown
   try {

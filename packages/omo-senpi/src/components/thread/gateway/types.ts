@@ -44,6 +44,8 @@ export type Provenance = {
   readonly project: string
   readonly lane?: string
   readonly session?: string
+  /** The account device a send to another device left from (remote/remote-ops.ts); absent on a send within one device. */
+  readonly device?: string
 }
 
 export type DeliveryEnvelope = {
@@ -120,6 +122,8 @@ export type EnqueueRequest = {
   readonly sender_node: string
   readonly sender_turn: string | null
   readonly cause_delivery_id: string | null
+  /** The highest hop an input of the sender's run arrived with from another device (no row here); the chain continues from it (K8). */
+  readonly inbound_hop?: number
   readonly claimed_root_id: string | null
   readonly origin: EnvelopeOrigin
   readonly actor: string

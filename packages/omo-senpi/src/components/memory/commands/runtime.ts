@@ -18,6 +18,16 @@ import { registerSleeptimeCommand } from "./sleeptime"
 import type { MemoryCommandContext, MemoryCommandDeps, MemoryCommandHandler } from "./types"
 
 export { planFactsMutation, FactsPlanParentDirtyError } from "@oh-my-opencode/memory-core"
+// Dream conversation loading and selection run only when a dream fires, so the entry bundle loads them from here.
+export { computeUnreflectedVolumeFast, loadConversations, selectLoadedConversations } from "../dream-selector"
+// The background maintenance pass runs runtime retention and the host sweep only when one is due, so the entry bundle loads them from here.
+export { retentionResumePending, runMaintenanceHostSweep, runMaintenanceRetention } from "../memory-retention-pass"
+// The stale reflection-lock reaper runs once per session on the first settled turn, on a stuck holder, and from
+// /doctor fix, so the entry bundle loads it from here.
+export { formatStaleLockFixLines, reclaimDeadOwnerLocks, runStaleLockReaper } from "@oh-my-opencode/memory-core"
+// memory-core's `#memory-completion-links` (the dream archive link repair, #12642) maps here in the plugin manifest:
+// it runs only when a dream or reflection run is finalized, so the entry bundle loads it from here.
+export { applyLinkRepair, recognizeLinkRepair } from "@oh-my-opencode/memory-core/completion-links"
 
 type CommandRegistrar = (pi: MemoryCommandPort, deps: MemoryCommandDeps) => void
 

@@ -6,6 +6,7 @@ use crate::types::{CaptureCaps, CaptureRegion, DesktopWindow};
 
 fn window(width: u32, x: i32) -> DesktopWindow {
     DesktopWindow {
+        identity: None,
         id: "101".into(),
         title: String::new(),
         app: String::new(),

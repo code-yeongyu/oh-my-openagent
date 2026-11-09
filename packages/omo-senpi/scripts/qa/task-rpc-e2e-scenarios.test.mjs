@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import { readRecords } from "./task-rpc-e2e-helpers.mjs"
 import { killSenpiHost, prepareScenarioSandbox, waitForProcessCompletion, waitForRunningRpcChild } from "./task-rpc-e2e-scenarios.mjs"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 test("the PID-based RPC scenario selects the child-process runner on every platform", () => {
   const { sandbox } = prepareScenarioSandbox()
@@ -123,7 +124,7 @@ test("#given the parent session returned before its child's completion write #wh
     const singleRead = readRecords(stateDir).some((r) => r.status === "completed" && r.execution_mode === "process")
 
     // when: the check starts waiting, and only then does the child's completion land
-    const waiting = waitForProcessCompletion(stateDir, 10_000)
+    const waiting = waitForProcessCompletion(stateDir, remainingTestTime())
     writeRecord(stateDir, { ...runningProcessTask, status: "completed" })
 
     // then: the old single read reported no completion; the wait reports it

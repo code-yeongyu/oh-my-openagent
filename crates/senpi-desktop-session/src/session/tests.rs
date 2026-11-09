@@ -52,3 +52,22 @@ async fn hold_deadline_waits_for_worker_release_before_timeout_reply() {
     reply.send(Ok(Response::Unit)).unwrap();
     assert_eq!(result.await.unwrap_err().code, ErrorCode::Timeout);
 }
+
+#[tokio::test]
+async fn a_timeout_names_the_sleep_of_the_display_the_request_aimed_at() {
+    // Given a probe whose displays are asleep and a request aimed at display 2.
+    let screen = crate::test_support::FakeScreen::default();
+    screen.set(senpi_desktop_core::types::ScreenState { locked: false, display_asleep: true });
+    let notes = crate::screen_notes::ScreenNotes::default();
+    notes.install(Some(Arc::new(screen.clone())));
+    let (_reply, replied) = flume::bounded(1);
+    let mut pending = Pending::new(PendingKind::Reply(replied), Duration::ZERO);
+    let display = senpi_desktop_core::types::DisplaySelector::Id("2".to_owned());
+    pending.notes = Some((notes, Some(display.clone())));
+    // When its deadline passes with no reply.
+    let error = pending.wait().await.unwrap_err();
+    // Then the Timeout says the display is asleep, read for that display.
+    assert_eq!(error.code, ErrorCode::Timeout);
+    assert!(error.message.ends_with(" (the display is asleep)"), "{}", error.message);
+    assert_eq!(screen.asked(), [Some(display)]);
+}

@@ -11,10 +11,10 @@ import { approve, createWorld, type Device, freshStateDir, newDevice, removeWorl
 import { SealRefusedError } from "./sealer.ts"
 import { type AccountSessionOutcome, openAccountSession } from "./session.ts"
 import { type ChainWireServer, startChainWireServer } from "./testing/chain-wire-server.test-support.ts"
+import { pushBatch } from "./testing/push-batch.test-support.ts"
 
 const SPACE = new Uint8Array(16).fill(7)
 const OTHER_SPACE = new Uint8Array(16).fill(9)
-const encoder = new TextEncoder()
 
 const servers: ChainWireServer[] = []
 afterEach(async () => {
@@ -46,17 +46,6 @@ function ready(outcome: AccountSessionOutcome): SyncSession {
   return outcome.session
 }
 
-async function push(session: SyncSession, baseSeq: number, key: string, text: string): Promise<number> {
-  const batchId = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url")
-  const sealed = await session.sealer.seal(batchId, baseSeq, { items: [{ key, ops: encoder.encode(text) }] })
-  const digest = new Bun.CryptoHasher("sha256").update(sealed.bytes).digest("hex")
-  const uploadId = await session.transport.reserve(sealed.bytes.length, digest)
-  await session.transport.upload(uploadId, sealed.bytes)
-  const appended = await session.transport.append({ uploadId, digest, baseSeq, batchId, epoch: sealed.epoch, link: sealed.link, recordSig: sealed.recordSig })
-  if (!appended.ok) throw new Error("the append was refused as stale")
-  return appended.seq
-}
-
 async function verifyAt(session: SyncSession, seq: number) {
   const page = await session.transport.pull(seq - 1, 1)
   const entry = page.entries[0]
@@ -79,7 +68,7 @@ describe("account sync session", () => {
       transport,
     }))
     expect(session.transport).toBe(transport)
-    const seq = await push(session, 1, "notes/proxy.md", "main-owned transport")
+    const seq = await pushBatch(session, { baseSeq: 1, key: "notes/proxy.md", text: "main-owned transport" })
     expect(await verifyAt(session, seq)).toMatchObject({ ok: true })
   }, 30_000)
 
@@ -88,7 +77,7 @@ describe("account sync session", () => {
     const second = await newDevice()
     await approve(world, second)
     const ownerSession = ready(await open(world.owner, await pinnedDir(world)))
-    const seq = await push(ownerSession, world.server.chain(world.account).length, "notes/a.md", "hello from the owner")
+    const seq = await pushBatch(ownerSession, { baseSeq: world.server.chain(world.account).length, key: "notes/a.md", text: "hello from the owner" })
 
     const verdict = await verifyAt(ready(await open(second, await pinnedDir(world))), seq)
     expect(verdict.ok).toBe(true)
@@ -104,14 +93,14 @@ describe("account sync session", () => {
     const session = ready(await open(world.owner, await pinnedDir(world)))
     const keyringVerdict = await verifyAt(session, 1)
     expect(keyringVerdict).toMatchObject({ ok: true, payload: { items: [] } })
-    const seq = await push(session, 1, "notes/b.md", "second")
+    const seq = await pushBatch(session, { baseSeq: 1, key: "notes/b.md", text: "second" })
     expect(await verifyAt(session, seq)).toMatchObject({ ok: true })
   }, 30_000)
 
   test("an object swapped on the server is refused and opens nothing", async () => {
     const { world, server, open } = await setup()
     const session = ready(await open(world.owner, await pinnedDir(world)))
-    const seq = await push(session, 1, "notes/a.md", "genuine")
+    const seq = await pushBatch(session, { baseSeq: 1, key: "notes/a.md", text: "genuine" })
     const tampered = new Uint8Array(server.objectOf(seq) ?? new Uint8Array())
     tampered[tampered.length - 1] = (tampered.at(-1) ?? 0) ^ 1
     server.replaceObject(seq, tampered)
@@ -123,7 +112,7 @@ describe("account sync session", () => {
   test("a batch row whose link the server rewrote is refused as a chain break", async () => {
     const { world, open } = await setup()
     const session = ready(await open(world.owner, await pinnedDir(world)))
-    const seq = await push(session, 1, "notes/a.md", "genuine")
+    const seq = await pushBatch(session, { baseSeq: 1, key: "notes/a.md", text: "genuine" })
     const pinDir = await pinnedDir(world)
     const chain = world.server.chain(world.account)
     const row = chain[seq - 1]

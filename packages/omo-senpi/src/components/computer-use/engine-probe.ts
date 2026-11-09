@@ -61,6 +61,7 @@ const CapabilitiesSchema = z.object({
   stopReason: z.string().nullable().optional(),
   integrityLevel: z.string().nullable().optional(),
   screenLocked: z.boolean(),
+  displayAsleep: z.boolean().default(false),
 })
 const RpcResponseSchema = z.object({
   id: z.union([z.literal(1), z.literal(2)]),

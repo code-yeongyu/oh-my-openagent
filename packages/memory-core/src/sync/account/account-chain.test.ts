@@ -5,15 +5,14 @@ import { appendEntries, emptyChain } from "../crypto/chain.ts"
 import type { KeyringEntry } from "../crypto/entry.ts"
 import { createRejectionCounter } from "../crypto/rejection.ts"
 import { loadTrustAnchor, pinTrustAnchor } from "../crypto/trust-pin.ts"
-import type { SyncSession } from "../engine/open.ts"
 import { approve, createWorld, freshStateDir, newDevice, removeWorldStateDirs, type World } from "../recovery/testing/world.test-support.ts"
 import { openAccountChain } from "./account-chain.ts"
 import { createAccountHttp } from "./http.ts"
 import { openAccountSession } from "./session.ts"
 import { type ChainWireServer, startChainWireServer } from "./testing/chain-wire-server.test-support.ts"
+import { pushBatch } from "./testing/push-batch.test-support.ts"
 
 const SPACE = new Uint8Array(16).fill(7)
-const encoder = new TextEncoder()
 
 const servers: ChainWireServer[] = []
 afterEach(async () => {
@@ -29,29 +28,18 @@ async function pinnedDir(world: World): Promise<string> {
   return dir
 }
 
-async function push(session: SyncSession, baseSeq: number, text: string): Promise<number> {
-  const batchId = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url")
-  const sealed = await session.sealer.seal(batchId, baseSeq, { items: [{ key: "notes/a.md", ops: encoder.encode(text) }] })
-  const digest = new Bun.CryptoHasher("sha256").update(sealed.bytes).digest("hex")
-  const uploadId = await session.transport.reserve(sealed.bytes.length, digest)
-  await session.transport.upload(uploadId, sealed.bytes)
-  const appended = await session.transport.append({ uploadId, digest, baseSeq, batchId, epoch: sealed.epoch, link: sealed.link, recordSig: sealed.recordSig })
-  if (!appended.ok) throw new Error("the append was refused as stale")
-  return appended.seq
-}
-
 // Seq 1 is the genesis keyring row, 2 a batch, 3 the keyring row that approves a second device, 4 a batch.
-async function fourRowAccount() {
+async function fourRowAccount(wire: { readonly entriesBatchId?: boolean } = {}) {
   const world = await createWorld("acct-chain")
-  const server = startChainWireServer(world.account, world.server.chain(world.account))
+  const server = startChainWireServer(world.account, world.server.chain(world.account), wire)
   servers.push(server)
   const token = server.tokenFor({ ...world.owner.principal })
   const pinDir = await pinnedDir(world)
   const opened = await openAccountSession({ baseUrl: server.url, token: () => token, account: world.account, keyring: world.owner.keyring, pinDir, spaceId: SPACE })
   if (!opened.ok) throw new Error(`no session: ${opened.reason}`)
-  await push(opened.session, 1, "before")
+  await pushBatch(opened.session, { baseSeq: 1, key: "notes/a.md", text: "before" })
   await approve(world, await newDevice())
-  await push(opened.session, 3, "after")
+  await pushBatch(opened.session, { baseSeq: 3, key: "notes/a.md", text: "after" })
   expect(world.server.chain(world.account).map((entry) => entry.kind)).toEqual(["keyring", "batch", "keyring", "batch"])
   return { world, server, token, pinDir }
 }
@@ -113,8 +101,13 @@ describe("account chain over served pages", () => {
     expect((await chain.reach(4)).kind).toBe("batch")
   }, 30_000)
 
-  test("rows served one page at a time are all walked, so membership past the first page is found", async () => {
-    const { world, server, token, pinDir } = await fourRowAccount()
+  // Both /entries shapes the service has served: the contract SyncPullEntry row (batch_id on batch
+  // rows, null on keyring rows) and, since it dropped that field, the SyncEntry row (no batch_id).
+  test.each([
+    ["with batch_id (the contract SyncPullEntry shape)", true],
+    ["without batch_id (the SyncEntry shape)", false],
+  ] as const)("rows served one page at a time are all walked, so membership past the first page is found: %s", async (_shape, entriesBatchId) => {
+    const { world, server, token, pinDir } = await fourRowAccount({ entriesBatchId })
     const { http } = servedHttp({ url: server.url, token, page: 1 })
     const { chain } = await openChain(world, pinDir, http)
     expect(chain.state().head?.seq).toBe(4)
