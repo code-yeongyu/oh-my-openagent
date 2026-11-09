@@ -123,6 +123,8 @@ export type ThreadToolSurfaceOptions = {
    * count, and a send with none starts a new root. A delivery still queued behind the run is not it.
    */
   readonly callerCause?: () => string | undefined
+  /** The highest chain hop an input of the caller's current run arrived with from another device; a send continues it (K8). */
+  readonly callerChainHop?: () => number
   /** The deliveries the caller's current answer is for (`component.ts` `RunContext.consumed`); a report without `binding_id` goes to their binding. */
   readonly callerRunDeliveries?: () => readonly string[]
   /** A `user` message (typed in the caller's terminal, or an extension's) is part of that same answer (`RunContext.local`); with a bound delivery there and another outbound binding, a report without `binding_id` is refused. */
