@@ -65,6 +65,7 @@ pub(super) fn select(element: &AXUIElement, request: &TextSelectRequest) -> Core
         length: to_u32(applied.length)?,
         text: utf16_slice(&before, applied).unwrap_or_default().to_owned(),
         focused: copy_bool(element, "AXFocused").unwrap_or(false),
+        report: None,
     })
 }
 

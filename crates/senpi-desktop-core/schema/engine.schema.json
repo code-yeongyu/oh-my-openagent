@@ -3284,6 +3284,17 @@
         },
         "focused": {
           "type": "boolean"
+        },
+        "report": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ActionReport"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The action report, in a session opened with `reportMode: \"object\"`."
         }
       },
       "required": [

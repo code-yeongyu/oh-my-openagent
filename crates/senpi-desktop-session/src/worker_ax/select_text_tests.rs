@@ -8,7 +8,8 @@ use senpi_desktop_core::error::ErrorCode;
 use senpi_desktop_core::methods::Method;
 use senpi_desktop_core::protocol_params::{AxQueryParams, AxRefParams, AxSelectTextParams, AxSetValueParams, AxTypeTextParams};
 use senpi_desktop_core::protocol_results::AxTextSelection;
-use senpi_desktop_core::types::AxQuery;
+use senpi_desktop_core::report::{Disposition, ReportMode};
+use senpi_desktop_core::types::{AxQuery, DesktopSessionOptions};
 use serde_json::json;
 
 use crate::request::{Op, Response};
@@ -80,6 +81,7 @@ fn the_located_range_is_selected_and_a_following_type_replaces_it() {
             length: 4,
             text: "beta".to_owned(),
             focused: true,
+            report: None,
         })
     );
     assert_eq!(selections(&harness), [(6, 4)]);
@@ -113,7 +115,52 @@ fn a_caret_is_placed_by_context_alone() {
             length: 0,
             text: String::new(),
             focused: true,
+            report: None,
         })
+    );
+}
+
+#[test]
+fn an_object_mode_selection_carries_an_action_report_naming_its_audit() {
+    // Given a session opened with reportMode "object"
+    let mut harness = harness(&json!({}));
+    harness.worker.open(DesktopSessionOptions {
+        report_mode: ReportMode::Object,
+        ..DesktopSessionOptions::default()
+    });
+    let reference = textarea(&mut harness);
+    // When
+    let reply = harness.process(select(&reference, "beta", Some("alpha "), None));
+    // Then the selection keeps its fields and adds the report of its audit
+    let Ok(Response::TextSelection(selection)) = reply else {
+        panic!("expected an AxTextSelection, got {reply:?}");
+    };
+    assert_eq!(
+        (selection.start, selection.length, selection.text.as_str()),
+        (6, 4, "beta")
+    );
+    let report = selection.report.expect("object mode adds the report");
+    assert_eq!(report.disposition, Disposition::DELIVERED_UNVERIFIED);
+    let audit_id = harness
+        .audits()
+        .pop()
+        .and_then(|event| event.id)
+        .expect("the audit carries an id");
+    assert_eq!(report.audit_ids, vec![audit_id]);
+    // And a refusal before dispatch gets the not-delivered fallback
+    assert!(Method::AxSelectText.reports_action());
+}
+
+#[test]
+fn a_null_mode_selection_has_no_report_on_the_wire() {
+    let mut harness = harness(&json!({}));
+    let reference = textarea(&mut harness);
+    let reply = harness
+        .process(select(&reference, "beta", Some("alpha "), None))
+        .expect("selected");
+    assert_eq!(
+        serde_json::to_value(&reply).expect("serializes"),
+        json!({"start": 6, "length": 4, "text": "beta", "focused": true})
     );
 }
 

@@ -70,6 +70,9 @@ pub struct AxTextSelection {
     pub length: u32,
     pub text: String,
     pub focused: bool,
+    /// The action report, in a session opened with `reportMode: "object"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub report: Option<Box<ActionReport>>,
 }
 
 /// `ax.typeText` reply.

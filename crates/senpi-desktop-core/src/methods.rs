@@ -151,7 +151,7 @@ impl Method {
         METHODS.iter().find(|spec| spec.name == name).map(|spec| spec.method)
     }
 
-    /// Whether the method answers an `ActionReport` (or, for `ax.typeText` and a
+    /// Whether the method answers an `ActionReport` (or, for `ax.typeText`, `ax.selectText` and a
     /// press that lists the menu it opened, carries one) in a session opened with `reportMode: "object"`.
     #[must_use]
     pub const fn reports_action(self) -> bool {
@@ -174,6 +174,7 @@ impl Method {
                 | Self::AxFocus
                 | Self::AxClick
                 | Self::AxTypeText
+                | Self::AxSelectText
                 | Self::AxKeyChord
         )
     }

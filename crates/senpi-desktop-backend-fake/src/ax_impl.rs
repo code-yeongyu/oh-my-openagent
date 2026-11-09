@@ -107,6 +107,7 @@ impl AxBackend for FakeBackend {
             length: to_u32(range.length)?,
             text: utf16_slice(&value, range).unwrap_or_default().to_owned(),
             focused: self.ax_tree.props(node)?.focused,
+            report: None,
         })
     }
 
