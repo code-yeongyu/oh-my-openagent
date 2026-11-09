@@ -97,7 +97,8 @@ test.describe("Responsive QA matrix — landing", () => {
         }
       })
       expect(insets, "nav pill, brand or last control missing").not.toBeNull()
-      expect(Math.abs(insets!.right - insets!.left), JSON.stringify(insets)).toBeLessThanOrEqual(1)
+      if (!insets) return
+      expect(Math.abs(insets.right - insets.left), JSON.stringify(insets)).toBeLessThanOrEqual(1)
     })
   }
 
