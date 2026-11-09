@@ -17,7 +17,7 @@ import { TRANSIENT_RUN_MAX_AGE_MS } from "./transient-sweep"
 
 const CLAIMS = Symbol.for("omo.memory.transient-sweep.claims")
 
-export const TRANSIENT_SWEEP_DEFER_MS = 1_000
+const TRANSIENT_SWEEP_DEFER_MS = 1_000
 
 export interface TransientSweepSchedule {
   readonly cancel: () => void

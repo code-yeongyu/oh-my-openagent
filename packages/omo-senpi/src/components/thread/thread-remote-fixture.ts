@@ -13,7 +13,7 @@ export const B_ROW: RemoteSessionRow = { device: "b", session_id: "dur-on-b", ti
 
 type Sent = { readonly via: "endpoint" | "session" | "read" | "watch"; readonly device: string; readonly session?: string; readonly rpc?: JsonObject }
 
-type Engine = { readonly messages: readonly ThreadTranscriptEntry[]; readonly interrupt: JsonObject; readonly streaming: boolean; readonly pending: number; readonly currentTurnId?: string }
+type Engine = { readonly messages: readonly ThreadTranscriptEntry[]; readonly interrupt: JsonObject; readonly streaming: boolean; readonly pending: number; readonly currentTurnId?: string; readonly turnEpoch?: string }
 
 export const ENGINE: Engine = { messages: Array.from({ length: 30 }, (_, index) => ({ role: index % 2 === 0 ? "user" : "assistant", content: `message ${index} ${"x".repeat(60)}` })), interrupt: { interrupted: false }, streaming: false, pending: 0 }
 
@@ -30,9 +30,13 @@ export function createRemoteThreadFixture() {
     for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
   }
 
-  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[]; rows?: readonly RemoteSessionRow[]; registryDown?: "refused" | "throws"; chainCountLimit?: number; relayKeys?: ReadonlyMap<string, string> } = {}) {
+  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; admitRefuse?: string; admitOutcome?: RemoteCommandOutcome; heldDraft?: number; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[]; rows?: readonly RemoteSessionRow[]; registryDown?: "refused" | "throws"; chainCountLimit?: number; relayKeys?: ReadonlyMap<string, string> } = {}) {
     const engine = options.engine ?? ENGINE
     const sent: Sent[] = []
+    // b's engine ledger of admitted delivery ids (senpi external-admission: a repeated id is already_admitted), and how many
+    // admissions its user's open draft still holds (held_draft, taken by nothing).
+    const admitted = new Set<string>()
+    let heldDraft = options.heldDraft ?? 0
     // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
     const watchers = new Set<(record: JsonObject) => void>()
     const writeRecords = () => queueMicrotask(() => { for (const record of options.records ?? []) for (const listener of [...watchers]) listener(record) })
@@ -72,6 +76,22 @@ export function createRemoteThreadFixture() {
       if (rpc["type"] === "prompt" && options.chainCountLimit !== undefined && Number(rpc["chainCount"]) > options.chainCountLimit) return { kind: "refused", reason: "chain_count_limit" }
       if (rpc["type"] === "prompt" && options.promptOutcome !== undefined) return options.promptOutcome
       if (rpc["type"] === "prompt") return ok(options.promptResponse ?? (engine.streaming ? { disposition: "queued" } : { disposition: "started", turnId: "turn-b" }))
+      if (rpc["type"] === "admit_external_message") {
+        if (options.admitRefuse !== undefined) return { kind: "refused", reason: options.admitRefuse }
+        if (options.admitOutcome !== undefined) return options.admitOutcome
+        if (options.chainCountLimit !== undefined && Number(rpc["chainCount"]) > options.chainCountLimit) return { kind: "refused", reason: "chain_count_limit" }
+        const epoch = engine.turnEpoch ?? engine.currentTurnId ?? "turn-b"
+        const id = String(rpc["deliveryId"])
+        if (admitted.has(id)) return ok({ kind: "already_admitted", turnId: epoch })
+        if (heldDraft > 0) { heldDraft -= 1; return ok({ kind: "held_draft", turnId: epoch }) }
+        if (rpc["deliverAs"] === "steer") {
+          if (!engine.streaming || rpc["expectedTurnId"] !== engine.currentTurnId) return ok({ kind: "turn_conflict", turnId: epoch })
+          admitted.add(id)
+          return ok({ kind: "steered", turnId: epoch })
+        }
+        admitted.add(id)
+        return ok(engine.streaming ? { kind: "queued", turnId: epoch } : { kind: "started", turnId: epoch })
+      }
       if (rpc["type"] === "get_available_models") return ok({ models: [{ provider: "anthropic", id: "claude-opus", name: "Opus" }, { provider: "openai", id: "gpt-6" }] })
       if (rpc["type"] === "set_model") return ok({ provider: rpc["provider"] ?? null, id: rpc["modelId"] ?? null })
       return ok({})
@@ -145,7 +165,7 @@ export function createRemoteThreadFixture() {
     return { remote, sent, hops, aliases, live, registryCalls }
   }
 
-  function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?: () => string | undefined; callerName?: () => string | undefined; env?: Readonly<Record<string, string | undefined>>; sessions?: ThreadHostSession[]; engine?: Engine; caller?: string; diskSessions?: readonly string[]; closeOutcome?: ThreadCloseOutcome } = {}) {
+  function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?: () => string | undefined; callerChainHop?: () => number; callerName?: () => string | undefined; env?: Readonly<Record<string, string | undefined>>; sessions?: ThreadHostSession[]; engine?: Engine; caller?: string; diskSessions?: readonly string[]; closeOutcome?: ThreadCloseOutcome } = {}) {
     const engine = extra.engine ?? ENGINE
     const local: ThreadHostSession = { sessionId: "route-local", durableSessionId: "dur-local", cwd: process.cwd(), name: "local peer", status: "open" }
     const sessions = extra.sessions ?? [local]
@@ -177,7 +197,7 @@ export function createRemoteThreadFixture() {
     // Session files with no live owner: the address book lists them from disk, and no host holds them.
     const disk = (extra.diskSessions ?? []).map((id) => ({ durable_id: id, name: null, cwd: process.cwd(), created_at: "2026-11-01T00:00:00Z", updated_at: null, session_path: join(agentDir, `${id}.jsonl`), source_host: null }))
     const caller = extra.caller ?? "dur-caller"
-    const tools = createThreadTools({ host, store, stateDirectory: join(agentDir, "state"), diskSessions: () => disk, callerSessionId: () => caller, callerWorkspaceRoot: () => process.cwd(), remote, ...(extra.callerCause === undefined ? {} : { callerCause: extra.callerCause }), ...(extra.callerName === undefined ? {} : { callerName: extra.callerName }), ...(extra.env === undefined ? {} : { env: extra.env }) })
+    const tools = createThreadTools({ host, store, stateDirectory: join(agentDir, "state"), diskSessions: () => disk, callerSessionId: () => caller, callerWorkspaceRoot: () => process.cwd(), remote, ...(extra.callerCause === undefined ? {} : { callerCause: extra.callerCause }), ...(extra.callerChainHop === undefined ? {} : { callerChainHop: extra.callerChainHop }), ...(extra.callerName === undefined ? {} : { callerName: extra.callerName }), ...(extra.env === undefined ? {} : { env: extra.env }) })
     const run = async (name: ThreadToolName, args: unknown): Promise<ThreadToolResult> => {
       const tool = tools.find((candidate) => candidate.name === name)
       if (tool === undefined) throw new Error(`${name} is not registered`)
