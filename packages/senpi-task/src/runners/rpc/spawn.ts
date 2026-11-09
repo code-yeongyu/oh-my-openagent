@@ -104,6 +104,7 @@ export function buildChildArgs(spec: RpcRunnerSpec): readonly string[] {
   if (thinkingLevel !== undefined) {
     args.push("--thinking", thinkingLevel)
   }
+  if (spec.permissionPreset !== undefined) args.push("--permission-preset", spec.permissionPreset)
   return args
 }
 

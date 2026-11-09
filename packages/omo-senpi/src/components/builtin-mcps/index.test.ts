@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "bun:test"
 
-import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+import { FakeExtensionAPI, withInertSenpiSeams } from "../../../test-support/fake-extension-api"
 import { composeOmoSenpiExtension } from "../../extension/compose"
 import type { ComponentLogger } from "../../extension/types"
 import { createBuiltinMcpsComponent } from "./index"
@@ -134,7 +134,7 @@ describe("createBuiltinMcpsComponent", () => {
 
   it("#given omo-senpi-builtin-mcps-disabled #when composed #then no builtin MCP server is declared", async () => {
     // given
-    const pi = new FakeExtensionAPI()
+    const pi = withInertSenpiSeams(new FakeExtensionAPI())
     const logger = recordingLogger()
     pi.setFlag("omo-senpi-builtin-mcps-disabled", true)
 
