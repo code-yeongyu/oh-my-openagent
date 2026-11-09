@@ -17,6 +17,7 @@ function createEngine(): string {
   const rpcPath = join(root, RPC_MODE)
   mkdirSync(dirname(rpcPath), { recursive: true })
   writeFileSync(rpcPath, readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"))
+  writeFileSync(join(root, "dist", "main.js"), "const selection = created.session.thinkingSelection;\ncreated.session.setThinkingLevel(selection?.requested ?? created.session.thinkingLevel);\n")
   return root
 }
 
@@ -37,6 +38,9 @@ describe("launcher engine preparation (#8713)", () => {
       const root = createEngine()
       prepareOnce(root)
       expect(readRpc(root)).toContain("invalid_stream_event")
+      expect(readFileSync(join(root, "dist", "main.js"), "utf8")).toBe(
+        "const selection = created.session.thinkingSelection;\ncreated.session.setSessionThinkingLevel(selection?.requested ?? created.session.thinkingLevel);\n",
+      )
       expect(readStamp(root)).toBe(OMO_VERSION)
     })
   })

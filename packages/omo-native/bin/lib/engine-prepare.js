@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import { prepareCliThinkingSession } from "./cli-thinking-session.js"
 import { prepareCompileSafeEngine } from "./compile-safe-engine.js"
 import { LAUNCH_SPEC_FILENAME, normalizeLaunchSpecMode } from "./launch-spec-mode.js"
 import { prepareRpcStreamErrors } from "./rpc-stream-errors.js"
@@ -10,6 +11,7 @@ export const ENGINE_PREPARED_STAMP = ".omo-engine-prepared"
 export function prepareInstalledEngine(senpiRoot) {
   prepareCompileSafeEngine(senpiRoot)
   prepareRpcStreamErrors(senpiRoot)
+  prepareCliThinkingSession(senpiRoot)
 }
 
 export function writeEnginePreparedStamp(senpiRoot, omoVersion) {
