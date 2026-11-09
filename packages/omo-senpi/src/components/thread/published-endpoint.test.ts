@@ -172,9 +172,9 @@ test("a row only a delivery created keeps legacy discovery for the next send", a
   db.close()
   expect(await w.send()).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
   expect(await w.store.sessionOwner("target")).toBeNull()
-  // The target is still busy with the first message: the live endpoint takes the second as a follow-up behind it.
+  // The target is still busy with the first message: the live endpoint steers the second into that turn (#12914).
   const second = await w.send()
-  expect(second).toMatchObject({ kind: "ok", delivery: { kind: "queued" }, endpoint: { kind: "rpc_host" } })
+  expect(second).toMatchObject({ kind: "ok", delivery: { kind: "steered" }, effective_mode: "steer", endpoint: { kind: "rpc_host" } })
   expect(target.runtime.enqueueCalls).toHaveLength(2)
 }, 15000)
 
@@ -188,11 +188,11 @@ test("a live owner that lists slower than 200 ms is still reached", async () => 
   expect(w.discovery()).toBe(0)
 }, 10000)
 
-/** One thread_list, one auto send and one steer at the same owner, issued together as a caller would. */
+/** One thread_list, one default send and one explicit steer at the same owner, issued together as a caller would. */
 async function listSendSteer(w: Awaited<ReturnType<typeof publishedWorld>>, target: Awaited<ReturnType<Awaited<ReturnType<typeof publishedWorld>>["owner"]>>) {
   const [list, send, steer] = await Promise.all([
     w.sdk.list({}),
-    w.sdk.send({ thread: "target", text: "busy followup" }),
+    w.sdk.send({ thread: "target", text: "busy default" }),
     w.sdk.send({ thread: "target", text: "busy steer", mode: "steer", expected_turn_id: target.runtime.epoch }),
   ])
   const listed = list.kind === "ok" && "threads" in list ? (list.threads as ReadonlyArray<{ readonly thread_id: string; readonly alive?: boolean }>).find((thread) => thread.thread_id === "target") : undefined
@@ -207,9 +207,9 @@ test("a busy RPC owner that lists after 1.8 s is live to thread_list, send and s
   target.listing.delayMs = 1800
   const { listed, send, steer } = await listSendSteer(w, target)
   expect(listed).toMatchObject({ alive: true })
-  expect(send).toMatchObject({ kind: "ok", endpoint_kind: "rpc_host", delivery: { kind: "queued" } })
+  expect(send).toMatchObject({ kind: "ok", endpoint_kind: "rpc_host", delivery: { kind: "steered" }, effective_mode: "steer" })
   expect(steer).toMatchObject({ kind: "ok", endpoint_kind: "rpc_host", delivery: { kind: "steered" } })
-  expect(target.runtime.enqueueCalls.map((call) => call.lane).sort()).toEqual(["followUp", "steer"])
+  expect(target.runtime.enqueueCalls.map((call) => call.lane).sort()).toEqual(["steer", "steer"])
 }, 15000)
 
 test("a published listener that never answers is not live to thread_list, send or steer, and nothing is delivered", async () => {

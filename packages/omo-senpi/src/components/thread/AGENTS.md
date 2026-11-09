@@ -67,7 +67,7 @@ Relay tools (bindings are connector-neutral; nothing here talks to a chat platfo
 
 Stable surface a downstream connector consumes, through the `omo thread` CLI (`docs/reference/omo-thread.md`: JSON shapes, exit codes) or `sdk.ts` (`plugin/runtime/thread-sdk/sdk.js`), both built on: `gateway/relay.ts` `createGatewayRelay({ store, engine, endpoints, locate })` with `bind`/`unbind`/`rebind`/`bindings`/`report`/`outbox`/`ack`/`answer`/`inbound`/`settle`; results are the same data unions as the tools. A connector drives ONLY `outbox` + `ack` (read what sessions posted), `answer` (with the binding its message arrived through) and `inbound` (`{ binding_id, event_id, text }`: delivered with the binding's `inbound_mode`, idempotency key `event:<event_id>` so one platform message is admitted once; the provenance header says `source=external`, `actor=<account_id>`, `binding=<id>@<revision>`). Principals: `session:<durable id>`, `cli:<uid>`, `binding:<id>`. The store is `<agentDir>/gateway/gateway.sqlite`; the binding record is the closed schema in `gateway/bindings.ts` (`schema_version: 1`). No connector, no resident process, and no auto-broadcast to a session's bindings live in this directory, and neither does session lifecycle: the CLI and SDK never create or resume a session (a connector opens one through the host API, the operator endpoint's `open_session` that `thread_create` uses, and binds it). A completion row carries the text armed with it, not the model's reply (`thread_report` or a transcript read gives the answer). The per-author rate bucket is keyed by the author id the connector supplies: a trusted local connector, still bounded by the target's 128-message backlog.
 
-`ThreadDeliveryMode` is an enum, not a boolean. Every send goes through the gateway (the tools, the `omo thread` CLI and the SDK alike), where `auto` never steers: it starts a turn on an idle session and otherwise queues as a follow-up; `steer` and `follow_up` behave as the "Delivery table" below says.
+`ThreadDeliveryMode` is an enum, not a boolean. Every send goes through the gateway (the tools, the `omo thread` CLI and the SDK alike), where `auto` (the default) steers every busy session at the turn epoch the receiver's drain reads in the same pass, starts a turn on an idle one and waits for an offline one (#12914); `follow_up` is the explicit way to queue behind the running turn instead; `steer` is the caller's "only while it is still that turn" and behaves as the "Delivery table" below says. A steer is an enqueue into senpi's steering queue, consumed at the turn's next tool boundary, so nothing is injected into an in-flight request.
 
 ## Endpoint kinds
 
@@ -85,10 +85,12 @@ The receiver decides with `gateway/decision.ts` (`decideDelivery`), from the tar
 | Target state | `auto` | `steer` (needs `expected_turn_id`) | `follow_up` |
 | --- | --- | --- | --- |
 | `idle` | admit followUp -> `started` | refuse `not_steerable` | admit followUp -> `started` |
-| `mid_turn` | admit followUp -> `queued` | epoch matches: admit steer -> `steered`; else refuse `turn_conflict` | admit followUp -> `queued` |
-| `waiting_question` | admit followUp -> `queued` | refuse `not_steerable` | admit followUp -> `queued` |
-| `compacting` | admit followUp -> `queued` | refuse `not_steerable` | admit followUp -> `queued` |
+| `mid_turn` | admit steer at the live epoch -> `steered` | epoch matches: admit steer -> `steered`; else refuse `turn_conflict` | admit followUp -> `queued` |
+| `waiting_question` | admit steer at the live epoch -> `steered` | refuse `not_steerable` | admit followUp -> `queued` |
+| `compacting` | admit steer at the live epoch -> `steered` | refuse `not_steerable` | admit followUp -> `queued` |
 | `offline` | `queued_offline` | refuse `turn_conflict` | `queued_offline` |
+
+An `auto` steer whose turn ends between the drain's claim and its admission (senpi answers `turn_conflict` for the epoch the pass read) is requeued with its lane cleared, not refused: the turn-end wake, chained behind that pass, decides it again against the new state, so the sender sees `queued`/`effective_mode: auto` for that instant and then `started` or `steered`. An explicit `steer` keeps its `turn_conflict` refusal, because the caller named the turn.
 
 senpi's admission may still answer `held_draft` (the user is composing, or a submission has not reached the runtime): nothing is enqueued, the row stays claimable and the next wake retries, and the drain shows `queuedNotice` once. `already_admitted` settles a replayed claim without a second entry. A question answer never travels as a delivery: it goes through `thread_answer`.
 

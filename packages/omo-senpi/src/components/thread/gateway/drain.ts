@@ -129,6 +129,13 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
         break
       }
       if (result.kind === "queued") noticeQueued(claimed.row)
+      if (result.kind === "turn_conflict" && row.mode_requested === "auto") {
+        // The turn this pass read ended during the claim (#12914): the sender named no turn, so the row goes back
+        // to queued and the turn-end wake, chained behind this pass, decides it against the target's new state.
+        await options.store.recordOutcome({ now: now(), delivery_id: row.delivery_id, self, outcome: { kind: "requeue" } })
+        admitted.push({ delivery_id: row.delivery_id, kind: result.kind })
+        continue
+      }
       if (result.kind === "turn_conflict") {
         await options.store.recordOutcome({ now: now(), delivery_id: row.delivery_id, self, outcome: { kind: "refused", reason: "turn_conflict" } })
       } else {

@@ -8,9 +8,9 @@ const MODES: readonly GatewayDeliveryMode[] = ["auto", "steer", "follow_up"]
 
 const EXPECTED: Readonly<Record<TargetState, Readonly<Record<GatewayDeliveryMode, string>>>> = {
   idle: { auto: "admit:followUp:started", steer: "refuse:not_steerable", follow_up: "admit:followUp:started" },
-  mid_turn: { auto: "admit:followUp:queued", steer: "admit:steer:steered", follow_up: "admit:followUp:queued" },
-  waiting_question: { auto: "admit:followUp:queued", steer: "refuse:not_steerable", follow_up: "admit:followUp:queued" },
-  compacting: { auto: "admit:followUp:queued", steer: "refuse:not_steerable", follow_up: "admit:followUp:queued" },
+  mid_turn: { auto: "admit:steer:steered", steer: "admit:steer:steered", follow_up: "admit:followUp:queued" },
+  waiting_question: { auto: "admit:steer:steered", steer: "refuse:not_steerable", follow_up: "admit:followUp:queued" },
+  compacting: { auto: "admit:steer:steered", steer: "refuse:not_steerable", follow_up: "admit:followUp:queued" },
   offline: { auto: "queued_offline", steer: "refuse:turn_conflict", follow_up: "queued_offline" },
 }
 
@@ -31,5 +31,13 @@ describe("gateway decision table", () => {
   test("#given a mid-turn target #when a steer names a stale or missing epoch #then it is a turn conflict, never admitted", () => {
     expect(decideDelivery("mid_turn", "steer", 2, 3)).toEqual({ kind: "refuse", reason: "turn_conflict" })
     expect(decideDelivery("mid_turn", "steer", null, 3)).toEqual({ kind: "refuse", reason: "turn_conflict" })
+  })
+
+  test("#given a busy target #when the default mode is decided #then it steers at the epoch the pass read, naming no expectation of its own", () => {
+    // given / when: auto carries no expected_turn_id of the sender's; the receiver's live epoch is the one named
+    expect(decideDelivery("mid_turn", "auto", null, 7)).toEqual({ kind: "admit", deliverAs: "steer", expected_turn_id: 7, expect: "steered" })
+    // then: a stale sender epoch is irrelevant to auto, and only the sender's offline pre-check ever lacks an epoch
+    expect(decideDelivery("mid_turn", "auto", 2, 7)).toEqual({ kind: "admit", deliverAs: "steer", expected_turn_id: 7, expect: "steered" })
+    expect(decideDelivery("mid_turn", "auto", null, null)).toEqual({ kind: "admit", deliverAs: "followUp", expect: "queued" })
   })
 })

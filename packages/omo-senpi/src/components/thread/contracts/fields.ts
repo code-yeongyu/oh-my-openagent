@@ -61,5 +61,5 @@ export const RelayText = Type.String({
 // R6: an enum instead of a boolean because delivery has three plausible states.
 export const ThreadDeliveryMode = Type.Union([Type.Literal("auto"), Type.Literal("steer"), Type.Literal("follow_up")], {
   description:
-    "auto steers the running turn when one is active and starts a new turn otherwise; steer requires expected_turn_id and becomes turn_conflict when the active turn changed; follow_up queues the message behind the running turn.",
+    "auto (the default) steers the running turn when one is active, starts a new turn when the session is idle, and waits for the session to come back when it is offline; follow_up is the explicit way to queue the message behind the running turn instead of steering it; steer requires expected_turn_id and becomes turn_conflict when the active turn changed.",
 })

@@ -71,8 +71,8 @@ function crashedTarget(h: GatewayHarness): { readonly runtime: FakeSessionRuntim
   return { runtime, view: async (id) => (await store.deliveryView(id))?.row }
 }
 
-async function sendToB(h: GatewayHarness, text: string): Promise<string> {
-  return okId(await h.get("A").engine.deliver({ sender: { kind: "session", durable_id: "A" }, target: "B", text }))
+async function sendToB(h: GatewayHarness, text: string, mode?: "follow_up"): Promise<string> {
+  return okId(await h.get("A").engine.deliver({ sender: { kind: "session", durable_id: "A" }, target: "B", text, ...(mode === undefined ? {} : { mode }) }))
 }
 
 function freshProcess(h: GatewayHarness, sessionPath: string): { readonly runtime: FakeSessionRuntime; readonly drain: ReturnType<typeof createInboxDrain>; readonly log: string[] } {
@@ -133,7 +133,7 @@ describe("claim_reconciliation", () => {
     h.session("A")
     const b = crashedTarget(h)
     b.runtime.beginUserTurn()
-    const id = await sendToB(h, "iv")
+    const id = await sendToB(h, "iv", "follow_up")
     await crashingPass(h, b.runtime, await deadIdentity(), "afterAdmit")
     expect({ state: (await b.view(id))?.state, entries: b.runtime.transcriptEntries(id) }).toEqual({ state: "admitting", entries: 0 })
     const next = freshProcess(h, b.runtime.sessionPath)
@@ -149,7 +149,7 @@ describe("claim_reconciliation", () => {
     const b = crashedTarget(h)
     const drain = createInboxDrain({ store: h.store(), runtime: b.runtime, durableId: "B", sessionPath: () => b.runtime.sessionPath })
     b.runtime.beginUserTurn()
-    const id = await sendToB(h, "dropped by the runtime")
+    const id = await sendToB(h, "dropped by the runtime", "follow_up")
     expect((await drain.drain({ reason: "start" })).admitted).toEqual([{ delivery_id: id, kind: "queued" }])
     expect(b.runtime.dropQueues()).toEqual([id])
     expect(b.runtime.listAdmittedDeliveries()).toEqual({ pending: [], emitted: [] })
@@ -165,7 +165,7 @@ describe("claim_reconciliation", () => {
     const b = crashedTarget(h)
     const host = createInboxDrain({ store: h.store({ runtimeInstance: "host-1" }), runtime: b.runtime, durableId: "B", sessionPath: () => b.runtime.sessionPath, now: () => h.clock.now })
     const written = await sendToB(h, "written before release")
-    const unwritten = await sendToB(h, "queued behind the turn")
+    const unwritten = await sendToB(h, "queued behind the turn", "follow_up")
     const firstEmitted = new Promise<string>((resolve) => b.runtime.onEmitted(resolve))
     expect((await host.drain({ reason: "start" })).admitted).toEqual([{ delivery_id: written, kind: "started" }, { delivery_id: unwritten, kind: "queued" }])
     expect(await firstEmitted).toBe(written)

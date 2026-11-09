@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { ROOT_LIFETIME_MS } from "./constants"
+import { createInboxDrain } from "./drain"
 import type { GatewayDeliverRequest } from "./engine"
 import { gatewayInboxDirectory } from "./paths"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
@@ -54,9 +55,9 @@ describe("all_fifteen_delivery_state_cases", () => {
     h.session("A")
     const expected: Record<string, readonly [string, string | null]> = {
       "idle/auto": ["started", "applied"], "idle/steer": ["error:not_steerable", "refused"], "idle/follow_up": ["started", "applied"],
-      "mid_turn/auto": ["queued", "admitted"], "mid_turn/steer": ["steered", "admitted"], "mid_turn/follow_up": ["queued", "admitted"],
-      "waiting_question/auto": ["queued", "admitted"], "waiting_question/steer": ["error:not_steerable", "refused"], "waiting_question/follow_up": ["queued", "admitted"],
-      "compacting/auto": ["queued", "admitted"], "compacting/steer": ["error:not_steerable", "refused"], "compacting/follow_up": ["queued", "admitted"],
+      "mid_turn/auto": ["steered", "admitted"], "mid_turn/steer": ["steered", "admitted"], "mid_turn/follow_up": ["queued", "admitted"],
+      "waiting_question/auto": ["steered", "admitted"], "waiting_question/steer": ["error:not_steerable", "refused"], "waiting_question/follow_up": ["queued", "admitted"],
+      "compacting/auto": ["steered", "admitted"], "compacting/steer": ["error:not_steerable", "refused"], "compacting/follow_up": ["queued", "admitted"],
       "offline/auto": ["queued_offline", "queued"], "offline/steer": ["error:turn_conflict", null], "offline/follow_up": ["queued_offline", "queued"],
     }
     const observed: Record<string, readonly [string, string | null]> = {}
@@ -76,6 +77,74 @@ describe("all_fifteen_delivery_state_cases", () => {
     // Fifteen sessions, each opening its own store worker, sent to in sequence; nothing here waits on a
     // timer, so a loaded runner only needs room past the 5 s default (it took 5.1 s in a CPU-capped run).
   }, 30_000)
+})
+
+describe("steer_all_default", () => {
+  function lane(result: GatewayDeliveryResult): string {
+    return result.kind === "ok" ? `${result.delivery.kind}/${result.effective_mode}` : `error:${result.error.code}`
+  }
+
+  test("#given a busy target #when A sends with no delivery mode #then it is steered into the running turn and the result says so", async () => {
+    const h = open()
+    h.session("A")
+    const b = h.session("B")
+    b.runtime.beginUserTurn()
+    const result = await send(h, "A", "B", "steer me")
+    expect(lane(result)).toBe("steered/steer")
+    expect(b.runtime.enqueueCalls.map((call) => call.lane)).toEqual(["steer"])
+    b.runtime.toolBoundary()
+    await h.quiesce()
+    expect(await stateOf(h, okId(result))).toBe("applied")
+  })
+
+  test("#given a busy target #when A asks to queue explicitly #then it waits behind the running turn and the result says so", async () => {
+    const h = open()
+    h.session("A")
+    const b = h.session("B")
+    b.runtime.beginUserTurn()
+    const result = await send(h, "A", "B", "queue me", { mode: "follow_up" })
+    expect(lane(result)).toBe("queued/follow_up")
+    expect(b.runtime.enqueueCalls.map((call) => call.lane)).toEqual(["followUp"])
+    b.runtime.toolBoundary()
+    expect(b.runtime.transcriptEntries(okId(result))).toBe(0)
+    b.runtime.endTurn()
+    await h.quiesce()
+    expect(await stateOf(h, okId(result))).toBe("applied")
+  })
+
+  test("#given an idle target #when A sends with no delivery mode #then it starts a turn as before", async () => {
+    const h = open()
+    h.session("A")
+    const b = h.session("B")
+    const result = await send(h, "A", "B", "start me")
+    expect(lane(result)).toBe("started/follow_up")
+    expect(b.runtime.enqueueCalls.map((call) => call.lane)).toEqual(["start"])
+  })
+
+  test("#given the target's turn changes between the drain's claim and its admission #when the default mode is in flight #then the row is re-decided against the new turn instead of being refused", async () => {
+    const h = open()
+    h.session("A")
+    const b = h.session("B", { drainRegistered: false })
+    b.runtime.beginUserTurn()
+    let raced = false
+    const racing = createInboxDrain({
+      store: b.store, runtime: b.runtime, durableId: "B", sessionPath: () => b.runtime.sessionPath, now: () => h.clock.now,
+      _test: { afterClaim: () => { if (!raced) { raced = true; b.runtime.beginUserTurn() } } },
+    })
+    const id = okId(await send(h, "A", "B", "race"))
+
+    const first = await racing.drain({ reason: "inbox" })
+    const requeued = (await b.store.deliveryView(id))?.row
+    expect(first.admitted).toEqual([{ delivery_id: id, kind: "turn_conflict" }])
+    expect({ state: requeued?.state, lane: requeued?.mode_effective, enqueued: b.runtime.enqueueCalls }).toEqual({ state: "queued", lane: null, enqueued: [] })
+
+    const second = await racing.drain({ reason: "command" })
+    const steered = (await b.store.deliveryView(id))?.row
+    expect(second.admitted).toEqual([{ delivery_id: id, kind: "steered" }])
+    expect({ state: steered?.state, lane: steered?.mode_effective, epoch: steered?.turn_epoch, enqueued: b.runtime.enqueueCalls.map((call) => call.lane) })
+      .toEqual({ state: "admitted", lane: "steer", epoch: b.runtime.epoch, enqueued: ["steer"] })
+    racing.stop()
+  })
 })
 
 describe("turn_epoch_cas_and_fifo", () => {
@@ -155,7 +224,7 @@ describe("repeated_wake_during_streaming", () => {
     h.session("A")
     const b = h.session("B")
     b.runtime.beginUserTurn()
-    const result = await send(h, "A", "B", "M1", { mode: "auto" })
+    const result = await send(h, "A", "B", "M1", { mode: "follow_up" })
     expect(summary(result)).toBe("queued")
     const m1 = okId(result)
     for (let wake = 0; wake < 3; wake++) await b.drain.drain({ reason: "command" })
@@ -215,7 +284,8 @@ describe("lost_ack_and_durable_recovery", () => {
     await b.drain.drain({ reason: "start" })
     await h.quiesce()
     const replayed = await retrying.deliver(request("admitted"))
-    expect(replayed.kind === "ok" && { delivery: replayed.delivery.kind, deduplicated: replayed.deduplicated }).toEqual({ delivery: "queued", deduplicated: true })
+    // The first row started B's turn, so the second was steered into it (#12914); the replay repeats that outcome.
+    expect(replayed.kind === "ok" && { delivery: replayed.delivery.kind, deduplicated: replayed.deduplicated }).toEqual({ delivery: "steered", deduplicated: true })
 
     const stillUncertain = await retrying.deliver(request("unadmitted"))
     expect(summary(stillUncertain)).toBe("error:idempotency_uncertain")
