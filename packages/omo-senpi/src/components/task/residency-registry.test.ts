@@ -7,6 +7,7 @@ afterEach(cleanupProjects)
 import type { ManagedChildHandle } from "@oh-my-opencode/senpi-task"
 
 import { createManagerResidencyRegistry } from "./residency-registry"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 type HandleCalls = {
   abort: number
@@ -96,7 +97,7 @@ describe("createManagerResidencyRegistry rpc teardown bridge", () => {
     const pending = [{ id: "p1", message: "PENDING", deliver_as: "steer" as const }]
     try {
       expect((await h.send()).kind).toBe("revived")
-      const terminal = h.manager.waitFor(h.record.task_id, { signal: AbortSignal.timeout(5000) })
+      const terminal = h.manager.waitFor(h.record.task_id, { signal: testBudgetSignal("h.manager.waitFor to settle") })
       h.fake.settle({ status: "completed", finalResponse: "DONE" })
       await terminal
       h.store.mutate(h.record.task_id, (record) => ({ ...record, pending_steering: pending }))

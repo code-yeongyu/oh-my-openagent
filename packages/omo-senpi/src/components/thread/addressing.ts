@@ -41,6 +41,8 @@ export type ThreadCandidate = {
   readonly preview: string
   readonly updatedAt: string | null
   readonly state: ThreadStatus
+  /** The account device that holds it, when the candidates span devices (a name matched across the account). */
+  readonly device?: string
 }
 
 /** How a resolveTarget hit was found. */
@@ -75,7 +77,7 @@ export type ThreadFuzzyResult =
 
 export type ThreadNameConflictResult = { readonly kind: "ok" } | ThreadAddressError
 
-const AMBIGUOUS_CANDIDATE_LIMIT = 10
+export const AMBIGUOUS_CANDIDATE_LIMIT = 10
 const FUZZY_MIN_QUERY_LENGTH = 3
 const FUZZY_MAX_CANDIDATES = 500
 const FUZZY_PREVIEW_WEIGHT = 0.85

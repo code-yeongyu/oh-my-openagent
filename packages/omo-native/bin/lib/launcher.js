@@ -15,6 +15,7 @@ import { runThreadCommand } from "./thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./host-status.js"
 import { runDoctor } from "./doctor.js"
 import { reflectionLockFix, reflectionLockReport } from "./doctor-reflection-lock.js"
+import { memoryRuntimeDiscardResolver, memoryRuntimeMaxBytesResolver, memoryRuntimeReport } from "./doctor-memory-runtime.js"
 import { ensureEnginePrepared, preparePluginLaunchSpec } from "./engine-prepare.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { removeLegacyServiceCredentials } from "./legacy-service-credentials.js"
@@ -230,13 +231,17 @@ export async function runLauncher(args = process.argv.slice(2)) {
       process.exitCode = result.failed ? 1 : 0
       return
     }
-    const [categoryCoverage, computerUse, configDiagnostics, reflectionLock] = args[1] === "--reap"
-      ? [[], [], [], []]
+    const [categoryCoverage, computerUse, configDiagnostics, reflectionLock, memoryRuntime] = args[1] === "--reap"
+      ? [[], [], [], [], []]
       : await Promise.all([
           doctorCoverageLines({ agentDir: canonicalAgentDir() }),
           doctorComputerUseLines(),
           doctorConfigLines(),
           reflectionLockReport(),
+          memoryRuntimeReport({
+            maxBytesFor: memoryRuntimeMaxBytesResolver({ pluginRoot: join(packageRoot, "plugin") }),
+            discardFor: memoryRuntimeDiscardResolver({ pluginRoot: join(packageRoot, "plugin") }),
+          }).then((report) => report.lines, (error) => [`WARN memory runtime: unavailable: ${error instanceof Error ? error.message : String(error)}`]),
         ])
     runDoctor(await detectHarnesses(), args.slice(1), {
       daemonEngine: { run: engineHostCall },
@@ -244,6 +249,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
       computerUse,
       configDiagnostics,
       reflectionLock,
+      memoryRuntime,
     })
     return
   }

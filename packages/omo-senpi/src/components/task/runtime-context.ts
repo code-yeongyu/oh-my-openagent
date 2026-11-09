@@ -1,6 +1,8 @@
 import type { ChildModelRegistry, ParentState } from "@oh-my-opencode/senpi-task"
 import { RELEASE_RUN_FENCE, type EnginePauseState, type EngineRunHoldContext, type RunRef } from "../../../../senpi-task/src/pause/ports"
 
+import type { DialogUi } from "../../extension/types"
+
 // Structural slice of senpi's ExtensionContext the task runtime reads. ExtensionContext satisfies it;
 // tests pass a tiny fake. `ui` lives on ExtensionContext (event/command contexts), NOT ExtensionAPI,
 // so it is captured here on entry and cleared on switch/shutdown (the todo-18 bridge constraint).
@@ -29,14 +31,12 @@ export interface LiveTaskContext extends EngineRunHoldContext {
 // The slice of senpi's ExtensionUIContext the task component drives (setStatus/setWidget power the
 // footer + below-editor widget, select/confirm power /task-kill, notify powers headless-safe warnings).
 // senpi's real ExtensionUIContext satisfies this structurally.
-export interface CapturedUi {
+export interface CapturedUi extends DialogUi {
   notify(message: string, type?: "info" | "warning" | "error"): void
   setStatus(key: string, text: string | undefined): void
   // senpi#2471: absent on engines before it, so the footer simply shows no subagent figure there.
   setSubagentCost?(costUsd: number | undefined): void
   setWidget(key: string, content: string[] | undefined, options?: { placement?: "belowEditor" | "aboveEditor" }): void
-  select(title: string, options: string[], opts?: { signal?: unknown; timeout?: number }): Promise<string | undefined>
-  confirm(title: string, message: string, opts?: { signal?: unknown; timeout?: number }): Promise<boolean>
 }
 
 export type ParentTransition = "compacting" | "session_switching" | "session_shutdown" | undefined

@@ -11,7 +11,7 @@ import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "../fs/res
 import { LockContentionError, withLock } from "../locks/acquire"
 import { createLockRecord } from "../locks/lock-record"
 
-const HOST_SWEEP_STATE_FILE = "runtime-sweep.json"
+export const HOST_SWEEP_STATE_FILE = "runtime-sweep.json"
 export const HOST_SWEEP_LOCK_FILE = "runtime-sweep.lock"
 
 export interface HostSweepState {
