@@ -35,7 +35,7 @@ export type ChildSession = RunHoldSession & {
   readonly sessionId: string
   readonly model?: CatalogModelIdentity
   readonly effectiveServiceTier?: string
-  prompt(text: string, options?: InputIdentity & { readonly signal?: AbortSignal }): Promise<void>
+  prompt(text: string, options?: Partial<InputIdentity> & { readonly signal?: AbortSignal }): Promise<void>
   steer(text: string, images?: undefined, options?: InputIdentity): Promise<QueuedInputDisposition>
   followUp(text: string, images?: undefined, options?: InputIdentity): Promise<QueuedInputDisposition>
   abort(): Promise<void>

@@ -12,45 +12,45 @@ beforeEach(() => {
 
 describe("addIgnoredAgentOverrideWarnings", () => {
   test("warns when a non-built-in agent name carries a prompt", () => {
-    const config = {
+    const config: OhMyOpenCodeConfig = {
       agents: {
         "document-writer": { prompt: "You are a doc writer" },
       },
-    } as unknown as OhMyOpenCodeConfig
+    }
 
     addIgnoredAgentOverrideWarnings(config)
 
     const errors = getConfigLoadErrors()
     expect(errors.length).toBe(1)
-    expect(errors[0]!.path).toBe("agents.document-writer")
-    expect(errors[0]!.error).toContain("prompt")
-    expect(errors[0]!.error).toContain("not a built-in agent")
-    expect(errors[0]!.error).toContain("agent/document-writer.md")
+    expect(errors[0]?.path).toBe("agents.document-writer")
+    expect(errors[0]?.error).toContain("prompt")
+    expect(errors[0]?.error).toContain("not a built-in agent")
+    expect(errors[0]?.error).toContain("agent/document-writer.md")
   })
 
   test("lists every ignored merge-path-only field", () => {
-    const config = {
+    const config: OhMyOpenCodeConfig = {
       agents: {
         "my-agent": { prompt: "p", prompt_append: "a", mode: "subagent" },
       },
-    } as unknown as OhMyOpenCodeConfig
+    }
 
     addIgnoredAgentOverrideWarnings(config)
 
     const errors = getConfigLoadErrors()
     expect(errors.length).toBe(1)
-    expect(errors[0]!.error).toContain("prompt")
-    expect(errors[0]!.error).toContain("prompt_append")
-    expect(errors[0]!.error).toContain("mode")
+    expect(errors[0]?.error).toContain("prompt")
+    expect(errors[0]?.error).toContain("prompt_append")
+    expect(errors[0]?.error).toContain("mode")
   })
 
   test("does not warn for built-in agent names", () => {
-    const config = {
+    const config: OhMyOpenCodeConfig = {
       agents: {
         explore: { prompt: "override", mode: "subagent" },
         atlas: { prompt_append: "x" },
       },
-    } as unknown as OhMyOpenCodeConfig
+    }
 
     addIgnoredAgentOverrideWarnings(config)
 
@@ -58,7 +58,7 @@ describe("addIgnoredAgentOverrideWarnings", () => {
   })
 
   test("does not warn when a custom agent only sets name-keyed fields", () => {
-    const config = {
+    const config: OhMyOpenCodeConfig = {
       agents: {
         "custom-router": {
           model: "github-copilot/gpt-5.5",
@@ -66,7 +66,7 @@ describe("addIgnoredAgentOverrideWarnings", () => {
           variant: "high",
         },
       },
-    } as unknown as OhMyOpenCodeConfig
+    }
 
     addIgnoredAgentOverrideWarnings(config)
 
@@ -74,7 +74,7 @@ describe("addIgnoredAgentOverrideWarnings", () => {
   })
 
   test("is a no-op when agents is undefined", () => {
-    addIgnoredAgentOverrideWarnings({} as unknown as OhMyOpenCodeConfig)
+    addIgnoredAgentOverrideWarnings({})
     expect(getConfigLoadErrors()).toHaveLength(0)
   })
 })
