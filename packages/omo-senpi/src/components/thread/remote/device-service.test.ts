@@ -7,7 +7,8 @@ import { createDeviceServiceSessions } from "./device-service"
 import { createLazyRemoteSurface } from "./lazy-remote"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { setModelRemote } from "./remote-controls"
-import { closeRemote, interruptRemote, openRemote, promptRemote, readRemote } from "./remote-ops"
+import { createRelaySessionHost } from "../control/relay-session-host"
+import { closeRemote, interruptRemote, promptRemote, readRemote } from "./remote-ops"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -114,7 +115,7 @@ describe("device-service adapter: a session created on another device is address
       },
     } as unknown as DeviceService
     const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => service, retryDelay: async () => {} })
-    const created = await openRemote({ sessions: port, chain: { stamp: (record) => record } }, { kind: "create", device: "b" })
+    const created = await createRelaySessionHost({ sessions: port, chain: { stamp: (record: JsonObject) => record } }, "b").open({})
     if (created.kind !== "ok" || !("thread" in created)) throw new Error(`create failed: ${JSON.stringify(created)}`)
     expect(created.thread.thread_id).toBe(KEY)
     const status = await port.sessionCommand("b", created.thread.thread_id, { type: "get_state", sessionId: created.thread.thread_id })
@@ -131,7 +132,7 @@ describe("device-service adapter: a session created on another device is address
       locate: async (_device: string, engineId: string) => { located.push(engineId); throw new LocalApiError("session_not_found", "not expected") },
     } as unknown as DeviceService
     const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => service, retryDelay: async () => {} })
-    const created = await openRemote({ sessions: port, chain: { stamp: (record) => record } }, { kind: "create", device: "b" })
+    const created = await createRelaySessionHost({ sessions: port, chain: { stamp: (record: JsonObject) => record } }, "b").open({})
     if (created.kind !== "ok" || !("thread" in created)) throw new Error(`create failed: ${JSON.stringify(created)}`)
     expect(created.thread.thread_id).toBe(KEY)
     expect(located).toEqual([])
@@ -300,7 +301,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
     ["an older local relayd that refuses the locate field", "older-local", ["session.endpoints", "session.command", "session.command", "session.locate", "session.attach"], [true, false]],
   ] as const)("#given %s #when a thread is created on b #then the open asks for its located session and session.locate runs only when the reply lacks it", async (_label, relayd, frames, asked) => {
     const w = relayWorld(relayd)
-    const created = await openRemote(w.surface, { kind: "create", device: "b" })
+    const created = await createRelaySessionHost(w.surface, "b").open({})
     if (created.kind !== "ok" || !("thread" in created)) throw new Error(`create failed: ${JSON.stringify(created)}`)
     expect(created.thread.thread_id).toBe(CREATED_KEY)
     expect(w.take()).toEqual([...frames])
@@ -309,7 +310,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
 
   test("#given an existing row of b #when it is opened #then the open does not ask for a located session and nothing is located", async () => {
     const w = relayWorld()
-    const opened = await openRemote(w.surface, { kind: "open", row })
+    const opened = await createRelaySessionHost(w.surface, "b", row).open({ sessionPath: row.path })
     expect(opened.kind).toBe("ok")
     expect(w.take()).toEqual(["session.endpoints", "session.command"])
     expect(w.locateAsked).toEqual([false])
