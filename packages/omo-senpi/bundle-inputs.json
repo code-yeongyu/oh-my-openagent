@@ -1537,6 +1537,8 @@
     "packages/omo-senpi/src/components/thread/contracts/params.ts",
     "packages/omo-senpi/src/components/thread/contracts/parse.ts",
     "packages/omo-senpi/src/components/thread/contracts/results.ts",
+    "packages/omo-senpi/src/components/thread/control/local-session-host.ts",
+    "packages/omo-senpi/src/components/thread/control/relay-session-host.ts",
     "packages/omo-senpi/src/components/thread/endpoint-controls.ts",
     "packages/omo-senpi/src/components/thread/endpoint-registry.ts",
     "packages/omo-senpi/src/components/thread/errors.ts",
