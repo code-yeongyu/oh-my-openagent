@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
-import { buildIdentityPaths, GitMemoryRepo, LockContentionError, type ReservedRun } from "@oh-my-opencode/memory-core"
+import { buildIdentityPaths, GitMemoryRepo, InFlightReads, LockContentionError, type ReservedRun } from "@oh-my-opencode/memory-core"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
@@ -189,7 +189,9 @@ describe("memory rpc wiring", () => {
       },
       launch: () => {},
     } as unknown as MemoryIdentityRuntime
+    const work = new InFlightReads()
     const wiring = createMemoryWiring({
+      work,
       sessions: new Map([[fixture.sessionId, { context: fixture.context }]]),
       loadConfig: () => loadedMemoryConfig(memorySettings({ facts: { enabled: false, debounce_settles: 4 } })),
       cwd: () => fixture.cwd,
@@ -205,6 +207,8 @@ describe("memory rpc wiring", () => {
     await pi.dispatch("input_disposition", { inputId: "lock-input", disposition: "started" }, eventCtx)
 
     await pi.dispatch("agent_settled", {}, eventCtx)
+    // The pass runs detached from the turn: the next settle must find it finished, not still in flight.
+    await work.settled()
     await pi.dispatch("agent_settled", {}, eventCtx)
 
     expect(reconciles).toBe(1)
