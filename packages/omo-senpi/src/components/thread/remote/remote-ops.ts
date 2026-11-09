@@ -205,9 +205,8 @@ export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessi
   if (refused !== undefined) return refused
   const offline = await deviceOnline(remote, row.device)
   if (offline !== undefined) return offline
-  const here = sender.kind === "peer" ? await remote.sessions.thisDevice() : null
   // A peer's text never reaches the receiver's command dispatch or prompt templates (senpi prompt `expandPromptTemplates`).
-  const text = (effective: EffectiveLane) => sender.kind === "peer" ? { message: peerText(sender, here, request, effective), expandPromptTemplates: false } : { message: request.message }
+  const text = (effective: EffectiveLane) => sender.kind === "peer" ? { message: peerText(sender, request, effective), expandPromptTemplates: false } : { message: request.message }
   if (request.delivery === "steer") {
     const state = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
     if (state.kind !== "ok") return outcomeFailure(state, row.device)
