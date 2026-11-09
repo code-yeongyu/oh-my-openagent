@@ -22,15 +22,17 @@ export type RemotePeer = {
 export type RemoteSender = { readonly kind: "person"; readonly hop: number } | ({ readonly kind: "peer" } & RemotePeer)
 
 /**
- * The text another device's session receives: the provenance header, authority sentence and JSON body a local delivery's
- * receiver renders (gateway/provenance.ts), plus the device it left from. The receiving engine still writes it as a user
- * prompt; admitting it as a peer delivery needs a senpi record that admits external messages over RPC (senpi#6233).
+ * The text another device's session receives: exactly the provenance header, authority sentence and JSON body a local
+ * delivery's receiver renders (gateway/provenance.ts). It names no device: a session on another device reads like a
+ * session on this one, and replies by the sender_session id, which the account list resolves. The receiving engine
+ * still writes it as a user prompt; admitting it as a peer delivery needs a senpi record that admits external messages
+ * over RPC (senpi#6233).
  */
-export function peerText(peer: RemotePeer, device: string | null, request: RemoteSendRequest, effective: EffectiveLane): string {
+export function peerText(peer: RemotePeer, request: RemoteSendRequest, effective: EffectiveLane): string {
   return renderDeliveryText({
     delivery_id: peer.delivery_id,
     envelope: {
-      provenance: device === null ? peer.provenance : { ...peer.provenance, device },
+      provenance: peer.provenance,
       origin: { session: peer.session_id },
       actor: peer.name ?? peer.session_id,
       via: [peer.session_id],
