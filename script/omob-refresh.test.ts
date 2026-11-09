@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -51,10 +51,31 @@ if (args.includes(path.join('script', 'build-omo-binary.ts'))) {
 })().catch((error) => { console.error(error); process.exitCode = 1; });
 `
 
+// The stand-in reads everything from env and cwd, so one compiled copy serves every fixture.
+// Compiled per case, a fresh ~100 MB executable's first run landed inside each build's 30 s
+// spawn budget and blew it on serial Windows runs (#11558).
+let sharedTools: string | undefined
+
+function compileSharedTools(): void {
+	const directory = mkdtempSync(join(tmpdir(), "omob-refresh-tools-"))
+	sharedTools = directory
+	const stub = join(directory, process.platform === "win32" ? "bun.exe" : "bun")
+	writeTestExecutable(stub, compiler)
+	// Pay the first execution of the freshly written binary here, outside every build budget.
+	const warm = spawnSync(stub, [], { encoding: "utf8", timeout: 30_000 })
+	if (warm.error) throw warm.error
+	if (warm.status !== 0) throw new Error(`fixture tools warm-up failed: ${warm.stderr}`)
+}
+
+function fixtureTools(): string {
+	if (sharedTools === undefined) throw new Error("fixture tools are compiled once in beforeAll")
+	return sharedTools
+}
+
 function fixture() {
 	const root = mkdtempSync(join(tmpdir(), "omob-refresh-"))
 	const omo = join(root, "upstream-omo"), senpi = join(root, "upstream-senpi")
-	const cache = join(root, "cache"), tools = join(root, "tools"), builds = join(root, "builds")
+	const cache = join(root, "cache"), tools = fixtureTools(), builds = join(root, "builds")
 	const env = { ...process.env, PATH: `${tools}${delimiter}${process.env.PATH}`, OMOB_TEST_BUN: process.execPath, OMOB_TEST_BUILDER: builder, OMOB_TEST_BUILDS: builds, OMOB_TEST_BUILD_INFO: resolve(import.meta.dir, "../packages/omo-native/build-info.ts"),
 		GIT_CONFIG_COUNT: "5", GIT_CONFIG_KEY_0: "user.name", GIT_CONFIG_VALUE_0: "Test", GIT_CONFIG_KEY_1: "user.email", GIT_CONFIG_VALUE_1: "test@example.com",
 		GIT_CONFIG_KEY_2: `url.${pathToFileURL(omo).href}.insteadOf`, GIT_CONFIG_VALUE_2: canonical, GIT_CONFIG_KEY_3: "protocol.file.allow", GIT_CONFIG_VALUE_3: "always", GIT_CONFIG_KEY_4: `url.${pathToFileURL(senpi).href}.insteadOf`, GIT_CONFIG_VALUE_4: "https://github.com/code-yeongyu/senpi.git" }
@@ -78,8 +99,6 @@ function fixture() {
 	git(root, ["clone", "-q", canonical, join(cache, "omo")])
 	git(omo, ["switch", "-qc", "feature"])
 	writeFileSync(join(omo, "uncommitted"), "keep me")
-	mkdirSync(tools)
-	writeTestExecutable(join(tools, process.platform === "win32" ? "bun.exe" : "bun"), compiler)
 	writeFileSync(builds, "")
 	const options = parseOmobArgs(["--cache-dir", cache, "--install-dir", join(root, "install")], process.platform, process.arch, root)
 	const args = [builder, "--if-changed", "--binary-only", "--cache-dir", cache, "--install-dir", join(cache, "bin")]
@@ -89,6 +108,9 @@ function fixture() {
 }
 
 describe("omob refresh integration", () => {
+	beforeAll(compileSharedTools, 60_000)
+	afterAll(() => { if (sharedTools !== undefined) removeTempRoot(sharedTools) })
+
 	test.skipIf(process.platform === "win32")("#given an ordinary managed install #when ordinary install repeats #then auto-refresh remains installed", () => {
 		const f = fixture()
 		try {

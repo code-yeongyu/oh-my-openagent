@@ -44,7 +44,12 @@ export function buildAuthorizationUrl(
 
 const CALLBACK_TIMEOUT_MS = 5 * 60 * 1000
 
-export function startCallbackServer(port: number): Promise<OAuthCallbackResult> {
+type IssuerValidation = {
+  readonly issuer: string
+  readonly authorizationResponseIssParameterSupported?: boolean
+}
+
+export function startCallbackServer(port: number, validation?: IssuerValidation): Promise<OAuthCallbackResult> {
   return new Promise((resolve, reject) => {
     let timeoutId: ReturnType<typeof setTimeout>
 
@@ -52,6 +57,17 @@ export function startCallbackServer(port: number): Promise<OAuthCallbackResult> 
       clearTimeout(timeoutId)
 
       const requestUrl = new URL(request.url ?? "/", `http://localhost:${port}`)
+      const issuer = requestUrl.searchParams.get("iss")
+      if (validation && (
+        (issuer !== null && issuer !== validation.issuer)
+        || (issuer === null && validation.authorizationResponseIssParameterSupported)
+      )) {
+        response.writeHead(400, { "content-type": "text/html" })
+        response.end("<html><body><h1>Authorization failed</h1></body></html>")
+        server.close()
+        reject(new Error("OAuth authorization response issuer mismatch or missing issuer"))
+        return
+      }
       const code = requestUrl.searchParams.get("code")
       const state = requestUrl.searchParams.get("state")
       const error = requestUrl.searchParams.get("error")
@@ -117,7 +133,7 @@ function openBrowser(url: string): void {
   }
 }
 
-export async function runAuthorizationCodeRedirect(options: {
+export async function runAuthorizationCodeRedirect(options: IssuerValidation & {
   authorizationEndpoint: string
   callbackPort: number
   clientId: string
@@ -138,7 +154,7 @@ export async function runAuthorizationCodeRedirect(options: {
     resource: options.resource,
   })
 
-  const callbackPromise = startCallbackServer(options.callbackPort)
+  const callbackPromise = startCallbackServer(options.callbackPort, options)
   openBrowser(authorizationUrl)
 
   const result = await callbackPromise

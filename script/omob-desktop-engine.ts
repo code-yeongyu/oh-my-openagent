@@ -8,7 +8,7 @@
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { existsSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { desktopEngineRustTarget, loadDesktopEngineTargets } from "./release-desktop-engine-target"
 
 export const DESKTOP_ENGINE_SOURCE_PATHS = ["crates", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml"] as const
@@ -19,16 +19,38 @@ export function desktopEngineCargoArgs(rustTarget: string): string[] {
 	return ["build", "--release", "-p", "senpi-desktop-engine", "--locked", "--target", rustTarget]
 }
 
+// One cargo call per package, as the release workflows build them: a shared call would unify
+// dependency features across both packages (resolver 2) and build an engine release never ships.
+interface CargoCall {
+	readonly args: readonly string[]
+	readonly rustflags?: string
+}
+
+/** Per-package RUSTFLAGS the release workflows build with (publish-platform.yml); every other package gets none. */
+const RELEASE_RUSTFLAGS: Readonly<Record<string, string>> = { "omo-git-job-helper": "-C target-feature=+crt-static" }
+
+function desktopEngineCargoCalls(rustTarget: string, helperPackages: readonly string[]): CargoCall[] {
+	return [
+		{ args: desktopEngineCargoArgs(rustTarget) },
+		...helperPackages.map((name) => ({ args: ["build", "--release", "-p", name, "--locked", "--target", rustTarget], rustflags: RELEASE_RUSTFLAGS[name] })),
+	]
+}
+
+function describeCall(call: CargoCall): string {
+	return call.rustflags === undefined ? call.args.join(" ") : `RUSTFLAGS=${call.rustflags} ${call.args.join(" ")}`
+}
+
 /**
  * Identifies the engine inputs of the checked-out commit. The cache clone is reset to its ref
  * before every build, so the committed tree ids are exact and cost one git process.
  */
-export function desktopEngineFingerprint(repoRoot: string, rustTarget: string): string {
+export function desktopEngineFingerprint(repoRoot: string, rustTarget: string, helperPackages: readonly string[] = []): string {
 	const result = spawnSync("git", ["ls-tree", "HEAD", "--", ...DESKTOP_ENGINE_SOURCE_PATHS], { cwd: repoRoot, encoding: "utf8" })
 	if (result.error !== undefined) throw result.error
 	if (result.status !== 0) throw new Error(`git ls-tree failed in ${repoRoot}: ${result.stderr.trim()}`)
 	if (result.stdout.trim() === "") throw new Error(`no desktop engine sources (${DESKTOP_ENGINE_SOURCE_PATHS.join(", ")}) at HEAD in ${repoRoot}`)
-	return createHash("sha256").update(desktopEngineCargoArgs(rustTarget).join(" ")).update("\n").update(result.stdout).digest("hex")
+	const calls = desktopEngineCargoCalls(rustTarget, helperPackages).map(describeCall).join("\n")
+	return createHash("sha256").update(calls).update("\n").update(result.stdout).digest("hex")
 }
 
 interface DesktopEngineStamp {
@@ -80,28 +102,48 @@ export function ensureDesktopEngine(
 	}
 	const rustTarget = desktopEngineRustTarget(entry.host)
 	const binary = join(repoRoot, entry.source)
+	// A checkout that carries a helper crate also stages that helper from the same target directory as the engine: the
+	// engine trust helper on Darwin and Windows hosts (omo#10762), the git job helper on Windows hosts (omo#10391).
+	const windows = entry.host.startsWith("win32-")
+	const exe = windows ? ".exe" : ""
+	const helpers = [
+		{ packageName: "omo-engine-trust-helper", label: "engine trust helper", ships: windows || entry.host.startsWith("darwin-") },
+		{ packageName: "omo-git-job-helper", label: "git job helper", ships: windows },
+	]
+		.filter((helper) => helper.ships && existsSync(join(repoRoot, "crates", helper.packageName)))
+		.map((helper) => ({ ...helper, path: join(dirname(binary), `${helper.packageName}${exe}`) }))
+	const helperPackages = helpers.map((helper) => helper.packageName)
 	const stampPath = `${binary}.omob-build.json`
-	const fingerprint = desktopEngineFingerprint(repoRoot, rustTarget)
-	if (stampMatches(stampPath, binary, fingerprint)) {
+	const fingerprint = desktopEngineFingerprint(repoRoot, rustTarget, helperPackages)
+	if (stampMatches(stampPath, binary, fingerprint) && helpers.every((helper) => binaryIdentity(helper.path) !== undefined)) {
 		log(`[omob] reusing desktop engine ${entry.source}`)
 		return "reused"
 	}
-	const args = desktopEngineCargoArgs(rustTarget)
-	log(`[omob] building desktop engine: cargo ${args.join(" ")}`)
 	rmSync(stampPath, { force: true })
-	// build-omo-binary stages from <repoRoot>/target; a caller's CARGO_TARGET_DIR would build elsewhere.
-	const result = spawnSync("cargo", args, { cwd: repoRoot, stdio: "inherit", env: { ...env, CARGO_TARGET_DIR: join(repoRoot, "target") } })
-	if (result.error !== undefined) {
-		if ((result.error as NodeJS.ErrnoException).code === "ENOENT") {
-			throw new Error(`omob needs a Rust toolchain to build the desktop engine for ${target}: cargo is not on PATH (install Rust from https://rustup.rs)`)
+	const calls = desktopEngineCargoCalls(rustTarget, helperPackages)
+	for (const call of calls) {
+		const args = [...call.args]
+		log(`[omob] building desktop engine: cargo ${describeCall(call)}`)
+		// build-omo-binary stages from <repoRoot>/target; a caller's CARGO_TARGET_DIR would build elsewhere.
+		const callEnv = { ...env, CARGO_TARGET_DIR: join(repoRoot, "target"), ...(call.rustflags === undefined ? {} : { RUSTFLAGS: call.rustflags }) }
+		const result = spawnSync("cargo", args, { cwd: repoRoot, stdio: "inherit", env: callEnv })
+		if (result.error !== undefined) {
+			if ((result.error as NodeJS.ErrnoException).code === "ENOENT") {
+				throw new Error(`omob needs a Rust toolchain to build the desktop engine for ${target}: cargo is not on PATH (install Rust from https://rustup.rs)`)
+			}
+			throw result.error
 		}
-		throw result.error
-	}
-	if (result.status !== 0) {
-		throw new Error(`cargo ${args.join(" ")} failed with exit code ${result.status ?? 1} (a missing Rust target installs with: rustup target add ${rustTarget})`)
+		if (result.status !== 0) {
+			throw new Error(`cargo ${args.join(" ")} failed with exit code ${result.status ?? 1} (a missing Rust target installs with: rustup target add ${rustTarget})`)
+		}
 	}
 	const identity = binaryIdentity(binary)
-	if (identity === undefined) throw new Error(`cargo ${args.join(" ")} produced no desktop engine at ${binary}`)
+	if (identity === undefined) throw new Error(`cargo ${desktopEngineCargoArgs(rustTarget).join(" ")} produced no desktop engine at ${binary}`)
+	for (const helper of helpers) {
+		if (binaryIdentity(helper.path) === undefined) {
+			throw new Error(`cargo build --release -p ${helper.packageName} --locked --target ${rustTarget} produced no ${helper.label} at ${helper.path}`)
+		}
+	}
 	const stamp: DesktopEngineStamp = { fingerprint, ...identity }
 	writeFileSync(stampPath, `${JSON.stringify(stamp)}\n`)
 	return "built"

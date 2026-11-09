@@ -100,7 +100,13 @@ export function resolveCategory<TModel extends SenpiModelPort>(
     return { kind: "not_found", category: categoryName, availableCategories: gatedAvailableCategories(omoConfig, senpiModelRegistry) }
   }
 
-  const config = { ...builtinConfig, ...userConfig }
+  const mergedConfig = { ...builtinConfig, ...userConfig }
+  const config = mergedConfig.models && options.distributeModels
+    ? {
+        ...mergedConfig,
+        models: [...options.distributeModels(`category:${categoryName}`, mergedConfig.models, mergedConfig.models_distribution)],
+      }
+    : mergedConfig
   const availableModelsResult = parseAvailableModels(senpiModelRegistry.getAvailable())
   const availableModels = availableModelsResult.models
   if (!availableModelsResult.validContainer) {
@@ -143,9 +149,9 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   // Dead-chain short-circuit: a builtin chain with zero resolvable rungs can never produce a model,
   // so fail before resolution with the rungs that were attempted. An explicit user model or user
   // fallback list opts the category out (its failure stays a plain user-model miss without chain
-  // details), and a caller-supplied system default remains the resolver's last resort.
+  // details). There is no last resort: a category never resolves to a model outside its own chain.
   const userHasCanonicalModels = (userConfig?.models?.length ?? 0) > 0
-  if (deadChain !== undefined && !userHasCanonicalModels && userConfig?.model === undefined && userConfig?.fallback_models === undefined && options.systemDefaultModel === undefined) {
+  if (deadChain !== undefined && !userHasCanonicalModels && userConfig?.model === undefined && userConfig?.fallback_models === undefined) {
     return {
       kind: "model_unavailable",
       category: categoryName,
@@ -176,7 +182,6 @@ export function resolveCategory<TModel extends SenpiModelPort>(
       isUserConfiguredCategoryModel: false,
       fallbackChain,
       availableModels: new Set(availableModels),
-      systemDefaultModel: options.systemDefaultModel,
     },
     {
       connectedProviders: null,
@@ -236,7 +241,10 @@ export function resolveCategory<TModel extends SenpiModelPort>(
         availableModels: availableModelSet,
       })
   const runtimeModelChain = buildRuntimeModelChain({
-    candidates: [...categoryModelCandidates(config), ...chainCandidates],
+    candidates: [
+      ...categoryModelCandidates(config),
+      ...(canonicalChain !== undefined && config.models_distribution === "round_robin" ? [] : chainCandidates),
+    ],
     selectedModel: selection.selectedModel,
     availableModels: availableModelSet,
     source: "category",

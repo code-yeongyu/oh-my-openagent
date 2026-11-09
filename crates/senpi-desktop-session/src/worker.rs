@@ -8,9 +8,12 @@ use senpi_desktop_core::ax::{AxBackend, AxRegistry};
 use senpi_desktop_core::backend::Backend;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::protocol_results::AuditEvent;
+use senpi_desktop_core::report::{Disposition, ReportMode};
 use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions, DesktopWindow, Target};
 
 use crate::audit::ArtifactGc;
+use crate::display_awake::DisplayAwake;
+use crate::screen_notes::ScreenNotes;
 use crate::mutate::SessionSafety;
 use crate::pointer::FrameCache;
 use crate::request::{Op, Response};
@@ -31,6 +34,8 @@ pub(crate) struct Worker {
     pub(crate) registry: AxRegistry,
     pub(crate) frames: FrameCache,
     capabilities: Arc<Mutex<DesktopCapabilities>>,
+    /// Published copy of the applied `reportMode`, read by the session handle.
+    report_mode: Arc<Mutex<ReportMode>>,
     pub(crate) safety: SessionSafety,
     pub(crate) session_id: String,
     pub(crate) run_id: String,
@@ -39,6 +44,12 @@ pub(crate) struct Worker {
     pub(crate) instance: u64,
     /// This session's live foreground control grant, when it holds the slot.
     pub(crate) control: Option<crate::grant::ControlGrant>,
+    pub(crate) awake: Arc<DisplayAwake>,
+    pub(crate) notes: ScreenNotes,
+    /// Whether this backend's watch of the user's own input was started.
+    pub(crate) watching_user_input: bool,
+    /// The user's input into the apps this session works in (#11459).
+    pub(crate) intervention: crate::intervention::Intervention,
 }
 
 /// A mutating request's reply and the audit event it emitted.
@@ -50,7 +61,9 @@ impl Worker {
     pub(crate) fn new(
         factory: Box<dyn BackendFactory>,
         capabilities: Arc<Mutex<DesktopCapabilities>>,
+        report_mode: Arc<Mutex<ReportMode>>,
         safety: SessionSafety,
+        (awake, notes): (Arc<DisplayAwake>, ScreenNotes),
     ) -> Self {
         let backend = factory.create(&DesktopSessionOptions {
             show_cursor: false,
@@ -65,15 +78,31 @@ impl Worker {
             registry: AxRegistry::default(),
             frames: FrameCache::default(),
             capabilities,
+            report_mode,
             safety,
             session_id: String::new(),
             run_id: String::new(),
             gc: ArtifactGc::default(),
             instance: crate::grant::next_instance(),
             control: None,
+            awake,
+            notes,
+            watching_user_input: false,
+            intervention: crate::intervention::Intervention::new(),
         };
+        worker.install_screen_probe();
         worker.refresh_capabilities();
         worker
+    }
+
+    /// Takes the display-awake hold for an activity request.
+    pub(crate) fn begin_activity(&mut self) {
+        let backend = self.backend.as_mut().ok();
+        self.awake.begin(|| backend.and_then(|backend| backend.hold_display_awake()));
+    }
+
+    fn install_screen_probe(&self) {
+        self.notes.install(self.backend.as_ref().ok().and_then(|backend| backend.screen_probe()));
     }
 
     /// Applies cursor-only display changes in place; every other change
@@ -92,23 +121,34 @@ impl Worker {
                 backend.set_show_cursor(options.show_cursor);
             }
             self.options = Some(options);
+            self.publish_report_mode();
             return self.refresh_capabilities();
         }
         self.backend = self.factory.create(&options);
+        self.watching_user_input = false;
+        self.intervention = crate::intervention::Intervention::new();
         self.emergency = self.backend.as_ref().ok().and_then(|backend| backend.emergency_release());
         if let Some(release) = &self.emergency {
             if let Err(error) = self.safety.supervisor.register_emergency_release(release) {
                 self.backend = Err(error);
             }
         }
-        self.registry = AxRegistry::default();
-        self.frames = FrameCache::default();
+        self.install_screen_probe();
+        self.registry = AxRegistry::with_report_mode(options.report_mode);
+        self.frames = FrameCache::with_report_mode(options.report_mode);
         self.options = Some(options);
         self.session_id = ulid::Ulid::generate().to_string();
         self.run_id = ulid::Ulid::generate().to_string();
         self.gc = ArtifactGc::default();
         self.maybe_gc();
+        self.publish_report_mode();
         self.refresh_capabilities()
+    }
+
+    /// Publishes the mode the registry now serves under; only an open that
+    /// ran to here changes what the session handle reports.
+    fn publish_report_mode(&self) {
+        *self.report_mode.lock() = self.registry.report_mode();
     }
 
     pub(crate) fn artifact_dir(&self) -> PathBuf {
@@ -138,7 +178,25 @@ impl Worker {
         }
         self.reconcile_grant();
         self.maybe_gc();
-        let served = |audited: CoreResult<Audited>| audited.map(|(response, _audit)| response);
+        if crate::user_input_watch::reads_or_acts_on_an_app(&op) {
+            self.watch_user_input();
+            self.attach_user_input_feed();
+            self.drain_user_input();
+        }
+        self.serve(op, cancelled)
+    }
+
+    fn serve(&mut self, op: Op, cancelled: &dyn Fn() -> bool) -> CoreResult<Response> {
+        let mode = self.registry.report_mode();
+        let served = |audited: CoreResult<Audited>| match audited {
+            Ok((response, audit)) => Ok(crate::report::respond(mode, response, &audit)),
+            // `mutate` reports every error it returns in object mode, so an
+            // unreported one was refused before it (bad params): nothing was sent.
+            Err(error) if mode == ReportMode::Object => {
+                Err(error.with_fallback_disposition(Disposition::NOT_DELIVERED_SAFE))
+            }
+            Err(error) => Err(error),
+        };
         // Every mutating request goes through `mutate`; reads bypass it.
         match op {
             Op::Displays => Ok(Response::Displays(self.backend()?.displays()?)),
@@ -167,6 +225,7 @@ impl Worker {
             Op::AxSetValue(params) => served(self.ax_set_value(&params.ref_, &params.value, cancelled)),
             Op::AxFocus(params) => served(self.ax_focus(&params.ref_, cancelled)),
             Op::AxClick(params) => served(self.ax_click(&params, cancelled)),
+            Op::AxTypeText(params) => served(self.ax_type_text(&params, cancelled)),
             Op::ClipboardRead => self.clipboard_read(),
             Op::ClipboardWrite(params) => served(self.clipboard_write(&params, cancelled)),
             Op::ControlGrant(params) => self.control_grant(&params),

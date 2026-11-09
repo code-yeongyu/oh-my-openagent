@@ -3,7 +3,9 @@
 // plugin and the omo mock provider, against the real senpi-desktop-engine on its fake backend (no real
 // input ever reaches this machine). Each scenario is one scripted `senpi -p` turn in a fresh sandbox.
 //
-// Usage: SENPI_BIN=<senpi> node packages/omo-senpi/scripts/qa/computer-use-e2e.mjs [--engine <path>] [--evidence-dir <dir>]
+// Usage: SENPI_BIN=<senpi> node packages/omo-senpi/scripts/qa/computer-use-e2e.mjs [--scenario baseline] [--engine <path>] [--evidence-dir <dir>]
+// SENPI_BIN is the compiled senpi binary, or the built senpi CLI script (.js/.mjs/.cjs), which then runs on Bun
+// (`bun` on PATH). `baseline` (the default) is today's scenario set; the report records the child runtime.
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
@@ -13,6 +15,7 @@ import { fileURLToPath } from "node:url"
 
 import { createSandbox, seedSandbox } from "./drive.mjs"
 import { isolatedChildEnv } from "./sandbox-child-env.mjs"
+import { withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const repoRoot = resolve(scriptDir, "..", "..", "..", "..")
@@ -24,7 +27,10 @@ function argValue(name) {
   return index === -1 ? undefined : process.argv[index + 1]
 }
 
+const SCENARIO_SETS = ["baseline"]
+const scenarioSet = argValue("--scenario") ?? "baseline"
 const senpiBin = process.env.SENPI_BIN?.trim()
+const senpiRunsOnBun = senpiBin !== undefined && /\.(?:c|m)?js$/.test(senpiBin)
 const enginePath = resolve(argValue("--engine") ?? join(repoRoot, "target", "release", "senpi-desktop-engine"))
 const evidenceDir = argValue("--evidence-dir")
 
@@ -92,7 +98,7 @@ function runScenario({ name, permission, steps, computer = {} }) {
     const args = ["-e", mockProviderEntry, "-p", "--provider", "omo-mock", "--model", "mock-1"]
     if (permission !== undefined) args.push("--permission", permission)
     args.push(`computer-use QA: ${name}`)
-    const run = spawnSync(senpiBin, args, {
+    const run = spawnSync(senpiRunsOnBun ? "bun" : senpiBin, senpiRunsOnBun ? [senpiBin, ...args] : args, {
       cwd: sandbox.cwd,
       env: {
         ...isolatedChildEnv(scrubbedEnv(), sandbox.agentDir),
@@ -326,10 +332,20 @@ const scenarios = [
   },
 ]
 
+if (!SCENARIO_SETS.includes(scenarioSet)) {
+  console.log(JSON.stringify({ verdict: "FAIL", reason: `unknown --scenario ${scenarioSet}; expected one of ${SCENARIO_SETS.join(", ")}` }))
+  process.exit(2)
+}
 if (!senpiBin) {
   console.log(JSON.stringify({ verdict: "SKIP", reason: "SENPI_BIN is unset; this is not a pass" }))
   process.exit(1)
 }
+const bunVersion = senpiRunsOnBun ? spawnSync("bun", ["--version"], { encoding: "utf8", env: withTelemetryOptOut(process.env) }).stdout?.trim() : undefined
+if (senpiRunsOnBun && !bunVersion) {
+  console.log(JSON.stringify({ verdict: "FAIL", reason: `SENPI_BIN ${senpiBin} is a CLI script, but no bun is on PATH to run it` }))
+  process.exit(1)
+}
+const childRuntime = senpiRunsOnBun ? `bun:${bunVersion} cli:${senpiBin}` : `binary:${senpiBin}`
 if (!existsSync(enginePath)) {
   console.log(JSON.stringify({ verdict: "FAIL", reason: `no engine at ${enginePath}; run cargo build --release -p senpi-desktop-engine` }))
   process.exit(1)
@@ -344,5 +360,7 @@ const report = scenarios.map((scenario) => {
 })
 const realStateUntouched = protectedFiles.map(fileDigest).every((digest, index) => digest === before[index])
 const passed = realStateUntouched && report.every(({ exit, checks }) => exit === 0 && checks.every(({ ok }) => ok))
-console.log(JSON.stringify({ verdict: passed ? "PASS" : "FAIL", senpiBin, enginePath, realStateUntouched, report }, null, 2))
+console.log(
+  JSON.stringify({ verdict: passed ? "PASS" : "FAIL", scenario: scenarioSet, child_runtime: childRuntime, senpiBin, enginePath, realStateUntouched, report }, null, 2),
+)
 process.exit(passed ? 0 : 1)

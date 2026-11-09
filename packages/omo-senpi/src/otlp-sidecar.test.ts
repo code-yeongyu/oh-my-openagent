@@ -3,11 +3,14 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { useTestTimeout } from "../../../test-support/test-deadline"
+import { spawnTimeout } from "../test-support/spawn-timeout"
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url))
 
 for (const mode of ["no-key", "missing-chunk", "unused", "legacy-event", "opted-out", "unsupported-platform"] as const) {
   test(`#given ${mode} #when the default telemetry transport runs #then OTLP import stays gated and PostHog is independent`, async () => {
+    useTestTimeout(45_000)
     // A fresh runtime prevents the suite's other imports or mocks from hiding an eager exporter.
     const probe = `
 import { mock } from "bun:test"
@@ -46,10 +49,6 @@ try {
     await transport.flush()
   }
   await transport.shutdown()
-  if (${JSON.stringify(mode)} === "no-key") {
-    const result = await createSenpiOtlpTransport(input, { distinctId: "synthetic", event: "daily_active" })
-    if (result !== null) throw new Error("missing key did not disable OTLP")
-  }
 } catch (value) { error = String(value) }
 console.log(JSON.stringify({ resolved, captured, diagnostics, error }))
 `
@@ -63,7 +62,7 @@ console.log(JSON.stringify({ resolved, captured, diagnostics, error }))
       const child = Bun.spawn([process.execPath, "--eval", probe], {
         cwd: packageRoot,
         env: { PATH: process.env.PATH, HOME: home, TMPDIR: process.env.TMPDIR, OMO_TELEMETRY_INGEST_KEY: "" },
-        stdout: "pipe", stderr: "pipe", timeout: 30_000,
+        stdout: "pipe", stderr: "pipe", timeout: spawnTimeout(),
       })
       ;[exitCode, stdout, stderr] = await Promise.all([
         child.exited, new Response(child.stdout).text(), new Response(child.stderr).text(),
@@ -74,8 +73,8 @@ console.log(JSON.stringify({ resolved, captured, diagnostics, error }))
     expect(exitCode, stderr).toBe(0)
     const result = JSON.parse(stdout)
     expect(result.error).toBeUndefined()
-    expect(result.resolved).toBe(mode === "missing-chunk" ? 1 : 0)
+    expect(result.resolved).toBe(mode === "missing-chunk" || mode === "no-key" ? 1 : 0)
     expect(result.captured).toEqual(mode === "unused" ? [] : [mode === "legacy-event" ? "omo_senpi_daily_active" : "daily_active"])
-    expect(result.diagnostics).toEqual(mode === "missing-chunk" ? ["telemetry_otlp_send_failed"] : [])
+    expect(result.diagnostics).toEqual(mode === "missing-chunk" || mode === "no-key" ? ["telemetry_otlp_send_failed"] : [])
   }, 45_000)
 }

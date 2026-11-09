@@ -11,8 +11,8 @@
 //   geeky-normal-gpt6-only-unavailable  only unranked GPT-6 Sol ids served: unavailable; the lane's Astra head is not served.
 //   geeky-normal-sol serves gpt-6.1-sol next to gpt-5.6-sol and proves the first Sol rung applies when Astra is absent.
 //   geeky-normal-api-sol / geeky-normal-copilot-sol  the gpt-5.6-sol medium fallback through the openai / github-copilot ids.
-//   unset            empty omo.json starts on Daily · Normal (kimi-k3 on kimi-coding here; #10029).
-//   unset-skips-gateway  the default never takes opengateway's vendor-prefixed Opus; kimi-k3 wins.
+//   unset            empty omo.json starts on Daily · Normal (kimi-k3.1-pro on kimi-coding here; #10029).
+//   unset-skips-gateway  the default never takes opengateway's vendor-prefixed Opus; kimi-k3.1-pro wins.
 //   unset-gpt-6-1-sol / unset-copilot-gpt-6-sol  GPT beside GLM: Daily · Normal's glm-5.3 max wins.
 //   unset-chatgpt-only-geeky-normal  no Daily lane resolves: Obsessive · Normal's gpt-6.1-sol applies (Astra not served).
 //   retired-recommended  model_profile "recommended" (retired, #10029) starts Daily · Normal (glm-5.3 max).

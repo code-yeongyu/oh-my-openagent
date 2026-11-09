@@ -1,7 +1,8 @@
-import type { RpcClient, RpcExtensionUIResponse, RpcSessionState, RpcTransportGoneError } from "@code-yeongyu/senpi"
+import type { NewSessionOptions, RpcClient, RpcExtensionUIResponse, RpcSessionState, RpcTransportGoneError } from "@code-yeongyu/senpi"
 
 import { loadSenpiBarrel, senpiProbeHost, senpiRpcClient, type SenpiHostProtocolInfo } from "../../lazy/senpi-barrel"
 import type { SenpiThinkingLevel } from "../../senpi/thinking-level"
+import { designatedChainOf } from "../designated-fallback-profile"
 import type { RpcEntriesResult, RpcSwitchSessionResult } from "../types"
 import { HostUnavailableError, TASK_DAEMON_PROTOCOL_VERSION, TASK_DAEMON_REQUIRED_CAPABILITIES } from "./daemon"
 import type { HostRunHoldClient } from "./task-parent-wire"
@@ -46,25 +47,25 @@ export interface HostRetryFallbackProfile {
   readonly fallbackChains: Readonly<Record<string, readonly string[]>>
 }
 
-/** The capability a host advertises when it honors `open_session.retryFallback`. */
-export const RETRY_FALLBACK_PROFILE_CAPABILITY = "retry_fallback_profile"
-
 /** The wire shape of `open_session`, in the engine's names. */
 export interface HostOpenSessionWire {
+  readonly spawnedBy?: NewSessionOptions["spawnedBy"]
   readonly sessionPath: string
   readonly cwd: string
   readonly provider?: string
   readonly modelId?: string
   readonly thinkingLevel?: SenpiThinkingLevel
-  readonly kind: string
+  readonly kind: HostSessionOpenInput["kind"]
   readonly context: Readonly<Record<string, string>>
   readonly retain_on_disconnect: boolean
   readonly auto_title: boolean
   readonly retryFallback?: HostRetryFallbackProfile
+  readonly permissionPreset?: string
 }
 
 /** The immutable launch profile of one child session, in omo's names. */
 export interface HostSessionOpenInput {
+  readonly spawnedBy?: NewSessionOptions["spawnedBy"]
   readonly sessionPath: string
   readonly cwd: string
   readonly provider?: string
@@ -74,8 +75,10 @@ export interface HostSessionOpenInput {
   readonly context: Readonly<Record<string, string>>
   readonly retainOnDisconnect: boolean
   readonly autoTitle: boolean
-  /** Sent only to a host advertising `retry_fallback_profile`; an older host opens without it. */
+  /** Every host that opens a child advertises `retry_fallback_profile` (a required capability). */
   readonly retryFallback?: HostRetryFallbackProfile
+  /** The parent's approval mode a child in the task host opens with (#6189 F2c); the host cannot see the parent. */
+  readonly permissionPreset?: string
 }
 
 export interface HostRpcClientOptions {
@@ -102,6 +105,7 @@ export function toWireOpen(input: HostSessionOpenInput): HostOpenSessionWire {
   return {
     sessionPath: input.sessionPath,
     cwd: input.cwd,
+    ...(input.spawnedBy === undefined ? {} : { spawnedBy: input.spawnedBy }),
     ...(input.provider === undefined ? {} : { provider: input.provider }),
     ...(input.modelId === undefined ? {} : { modelId: input.modelId }),
     ...(input.thinkingLevel === undefined ? {} : { thinkingLevel: input.thinkingLevel }),
@@ -110,6 +114,7 @@ export function toWireOpen(input: HostSessionOpenInput): HostOpenSessionWire {
     retain_on_disconnect: input.retainOnDisconnect,
     auto_title: input.autoTitle,
     ...(input.retryFallback === undefined ? {} : { retryFallback: input.retryFallback }),
+    ...(input.permissionPreset === undefined ? {} : { permissionPreset: input.permissionPreset }),
   }
 }
 
@@ -119,7 +124,10 @@ export function toWireOpen(input: HostSessionOpenInput): HostOpenSessionWire {
  * child-process runner (`capability`); anything else fails closed - a refused client never starts a
  * second host beside the daemon (invariant I1).
  */
-export function assertHostUsable(info: SenpiHostProtocolInfo | undefined): SenpiHostProtocolInfo {
+export function assertHostUsable(
+  info: SenpiHostProtocolInfo | undefined,
+  retryFallback?: HostRetryFallbackProfile,
+): SenpiHostProtocolInfo {
   if (info === undefined) {
     throw new HostUnavailableError("host_unreachable", {
       fallbackAllowed: false,
@@ -134,7 +142,10 @@ export function assertHostUsable(info: SenpiHostProtocolInfo | undefined): Senpi
   }
   const missing = TASK_DAEMON_REQUIRED_CAPABILITIES.filter((capability) => !info.capabilities.includes(capability))
   if (missing.length > 0) {
-    throw new HostUnavailableError("capability", { fallbackAllowed: true, detail: `missing ${missing.join(", ")}` })
+    const chain = retryFallback === undefined || !missing.includes("retry_fallback_profile")
+      ? ""
+      : `; the child's designated models (${designatedChainOf(retryFallback)}) cannot be held to on this host`
+    throw new HostUnavailableError("capability", { fallbackAllowed: true, detail: `missing ${missing.join(", ")}${chain}` })
   }
   return info
 }

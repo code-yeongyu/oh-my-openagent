@@ -1,9 +1,12 @@
-import { accessSync, existsSync, readdirSync } from "node:fs"
-import { isAbsolute, join } from "node:path"
+import { existsSync, readdirSync } from "node:fs"
+import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { readDisabledSkills, readDiscoverCwd } from "./contributed-skill"
+import { type BundledSkillsOverrideLogger, type NoticeUi, resolveBundledSkillsOverride } from "./override"
+
+export { type BundledSkillsOverrideLogger, resolveBundledSkillsOverride } from "./override"
 
 export const BUNDLED_SKILLS_COMPONENT_NAME = "bundled-skills"
 
@@ -13,15 +16,9 @@ export interface BundledSkillsComponentOptions {
   readonly skillsDir?: string
 }
 
-export interface BundledSkillsOverrideLogger {
-  error(message: string): void
-}
-
 export interface BundledSkillsDirOptions {
   readonly logger?: BundledSkillsOverrideLogger
 }
-
-type NoticeUi = { readonly notify?: (message: string, type: "error") => void }
 
 /**
  * Contributes the plugin's bundled skills through `resources_discover`, minus `disabled_skills`.
@@ -84,36 +81,4 @@ export function resolveBundledSkillsDir(
     fileURLToPath(new URL("../skills", importerUrl)),
     fileURLToPath(new URL("../../../plugin/skills", importerUrl)),
   ].find((candidate) => existsSync(candidate))
-}
-
-/**
- * A valid OMO_BUNDLED_SKILLS_DIR (an absolute, readable, listable directory), or undefined when it
- * is absent, empty or invalid. Every bundled-skill consumer calls this, so an invalid value is
- * logged once per process and shown once through `ui` when given; the callers then fall back to the
- * plugin's own skills. The ledger lives on globalThis because omo.js and omo-task.js each bundle
- * this module.
- */
-export function resolveBundledSkillsOverride(
-  env: Record<string, string | undefined>,
-  logger: BundledSkillsOverrideLogger = console,
-  ui?: NoticeUi,
-): string | undefined {
-  const value = env["OMO_BUNDLED_SKILLS_DIR"]
-  if (!value) return undefined
-  let problem: string | undefined = "relative"
-  if (isAbsolute(value)) {
-    try {
-      accessSync(value, 5) // R_OK | X_OK
-      readdirSync(value) // ENOTDIR for a file
-      return value
-    } catch (error) {
-      problem = (error as NodeJS.ErrnoException).code
-    }
-  }
-  const message = `OMO_BUNDLED_SKILLS_DIR=${value} ignored (${problem}); needs a readable absolute dir`
-  const seen = ((globalThis as Record<symbol, unknown>)[Symbol.for("omo.skillsDir")] ??= new Set<string>()) as Set<string>
-  const once = (key: string) => seen.size < seen.add(key + message).size
-  if (once("log")) logger.error(message)
-  if (ui?.notify && once("ui")) ui.notify(message, "error")
-  return undefined
 }

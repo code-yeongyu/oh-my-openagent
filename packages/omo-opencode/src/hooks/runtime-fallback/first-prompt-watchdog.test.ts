@@ -42,9 +42,11 @@ function installFakeTimers(): FakeTimers {
   return {
     async advanceBy(ms) {
       const target = now + ms
+      let fired = 0
       while (true) {
         const nextTimer = nextTimerDueBefore(target)
         if (!nextTimer) break
+        if (++fired > 10_000) throw new Error("fake clock fired more than 10000 timers in one advance: a timer keeps rescheduling itself")
         now = dueTimes.get(nextTimer) ?? now
         const callback = callbacks.get(nextTimer)
         callbacks.delete(nextTimer)
@@ -192,6 +194,25 @@ describe("first-prompt-watchdog", () => {
     expect(calls.autoRetry[0].sessionID).toBe(sessionID)
     expect(calls.autoRetry[0].newModel).toBe(FALLBACK_MODEL)
     expect(calls.autoRetry[0].source).toBe("first-prompt-watchdog")
+
+    watchdog.dispose()
+  })
+
+  it("#given a bound of 0 (disabled) #when a subagent stays silent #then the watchdog never aborts or dispatches", async () => {
+    // given
+    const sessionID = "session-watchdog-disabled"
+    subagentSessions.add(sessionID)
+    const deps = createDeps(PLUGIN_CONFIG_WITH_FALLBACK)
+    const calls: RecordedCalls = { abort: [], autoRetry: [] }
+    const watchdog = createFirstPromptWatchdog(deps, createHelpers(calls, AGENT), 0)
+
+    // when
+    watchdog.onUserMessage(sessionID, PRIMARY_MODEL, AGENT)
+    await getFakeTimers().advanceBy(SAFE_WAIT_AFTER_FIRE_MS)
+
+    // then
+    expect(calls.abort).toEqual([])
+    expect(calls.autoRetry).toEqual([])
 
     watchdog.dispose()
   })

@@ -7,6 +7,7 @@ import { gatewayDatabasePath } from "./paths"
 import { createGatewayRelay } from "./relay"
 import { ANSWER_IN_FLIGHT_MAX_MS } from "./store-relay-ops"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 let harness: GatewayHarness | undefined
 
@@ -111,7 +112,7 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-function within<T>(promise: Promise<T>, label: string, ms = 10_000): Promise<T> {
+function within<T>(promise: Promise<T>, label: string, ms = remainingTestTime()): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   return Promise.race([promise, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`waited ${ms} ms for ${label}`)), ms) })]).finally(() => clearTimeout(timer))
 }

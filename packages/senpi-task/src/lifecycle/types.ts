@@ -1,5 +1,6 @@
 import type { AgentLimitReached } from "./errors"
 import type { TaskRecord } from "../state"
+import type { HostSessionCancelPort } from "./host-session"
 import type { HostSessionParkOptions, HostSessionParkOutcome } from "./host-session-revive"
 import type { DestroyCause, DetachedRevivalRollbackResult } from "./port"
 
@@ -84,6 +85,8 @@ export type TaskLifecycle = {
   reclaimIdleResidents?(): Promise<readonly string[]>
   // Release a finished child still resident here (task_cancel on a terminal task, omo#9785); false when there is none.
   parkTerminalResident(taskId: string): Promise<boolean>
+  // A cancel of a daemon-hosted child this process holds no handle for (omo#11765): its confirmed end, and its retry driver.
+  hostSessionCancel?: HostSessionCancelPort
   // Stop the unref'd idle resident reclaimer when its owning session is disposed.
   dispose?(): void
   admitResident(parentSessionId: string): Promise<AdmissionResult>

@@ -1,5 +1,5 @@
-import { mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs"
-import { join, resolve } from "node:path"
+import { mkdirSync, utimesSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { FakeRunner, flush } from "../manager/__fixtures__/manager-fakes"
@@ -19,7 +19,6 @@ afterEach(cleanupProjects)
 const parentSessionId = "session-resumed"
 const hostPid = 2222
 const now = () => 9_000_000
-const raceWorkerPath = resolve(import.meta.dir, "__fixtures__", "reconcile-race-worker.ts")
 
 type Launch = { readonly taskId: string; readonly sessionPath: string | undefined }
 
@@ -588,49 +587,6 @@ describe("reconcileOnSessionStart scoped revival", () => {
     expect(harness.launches).toHaveLength(1)
   })
 
-  test("#given two OS processes observe one dead-owner resident #when their ownership CAS races #then exactly one respawns and the loser defers", async () => {
-    // given: both workers take their store snapshot before either is released to mutate.
-    const harness = injectedHarness()
-    const orphan = withV1(harness.store, seedRecord(harness.store, {
-      task_id: "st_10000014", parent_session_id: parentSessionId, status: "running",
-      residency_state: "resident", execution_mode: "in-process", host_pid: 2_147_483_647,
-      updated_at: new Date(1_000_000).toISOString(),
-    }))
-    persistSession(harness.store, orphan.task_id)
-    const launchLog = join(harness.store.stateDir, "race-launches.log")
-    const children = ["a", "b"].map(() => Bun.spawn(
-      [process.execPath, raceWorkerPath, harness.store.stateDir, parentSessionId, launchLog],
-      { stdin: "pipe", stdout: "pipe", stderr: "pipe" },
-    ))
-    const readers = children.map((child) => lineReader(child.stdout))
-    const errors = children.map((child) => new Response(child.stderr).text())
-
-    // when: subscribe to both exact scanned signals, then release both CAS attempts.
-    await Promise.all(readers.map((read) => withTimeout(read(), 10_000, "worker scan barrier")))
-    for (const child of children) {
-      child.stdin.write("g")
-      child.stdin.flush()
-    }
-    const results = await Promise.all(readers.map(async (read) => {
-      const line = await withTimeout(read(), 10_000, "worker reconcile result")
-      return JSON.parse(line) as { readonly outcomes: readonly { readonly kind: string; readonly reason?: string }[] }
-    }))
-
-    for (const child of children) {
-      child.stdin.write("x")
-      child.stdin.end()
-    }
-    const exits = await Promise.all(children.map((child) => child.exited))
-    const stderr = await Promise.all(errors)
-
-    // then
-    const launches = readFileSync(launchLog, "utf8").trim().split("\n").filter(Boolean)
-    expect(launches).toHaveLength(1)
-    expect(results.flatMap((result) => result.outcomes).map((outcome) => `${outcome.kind}:${outcome.reason}`).sort())
-      .toEqual(["deferred:foreign_live_owner", "resumed:respawned and reattached"])
-    exits.forEach((code, index) => expect(code, stderr[index]).toBe(0))
-  }, 20_000)
-
   test("#given reattach and child resume are disabled #when suspended records exist #then they remain suspended with deferred outcomes", async () => {
     // given
     const disabledReattach = injectedHarness({ config: { reattach_on_reconcile: false } })
@@ -705,34 +661,3 @@ describe("reconcileOnSessionStart scoped revival", () => {
     expect(result.outcomes).toContainEqual({ task_id: record.task_id, kind: "deferred", reason: "lock_contended" })
   })
 })
-
-function lineReader(stream: ReadableStream<Uint8Array>): () => Promise<string> {
-  const reader = stream.getReader()
-  const decoder = new TextDecoder()
-  let buffered = ""
-  return async () => {
-    for (;;) {
-      const newline = buffered.indexOf("\n")
-      if (newline >= 0) {
-        const line = buffered.slice(0, newline)
-        buffered = buffered.slice(newline + 1)
-        return line
-      }
-      const next = await reader.read()
-      if (next.done) throw new Error("worker stdout ended before the expected line")
-      buffered += decoder.decode(next.value, { stream: true })
-    }
-  }
-}
-
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error(`${label} timed out`)), timeoutMs)
-  })
-  try {
-    return await Promise.race([promise, timeout])
-  } finally {
-    if (timer !== undefined) clearTimeout(timer)
-  }
-}

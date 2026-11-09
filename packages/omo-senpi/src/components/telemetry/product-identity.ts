@@ -2,13 +2,14 @@ import { createHash, randomBytes } from "node:crypto"
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { fileURLToPath } from "node:url"
-import { dirname, join } from "node:path"
+import { dirname, join, sep } from "node:path"
 import {
   DEFAULT_POSTHOG_HOST,
   type TelemetryEnv,
   type TelemetryProductConfig,
 } from "@oh-my-opencode/telemetry-core/injected"
 import { AGENT_DIR_ENV_NAMES, resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { type BundledSkillsOverrideLogger, resolveBundledSkillsOverride } from "../bundled-skills/override"
 import { ALL_KNOWN_MODEL_IDS, KNOWN_MODELS, KNOWN_PROVIDERS, type KnownProvider } from "./model-vocabulary"
 
 export const OMO_NATIVE_POSTHOG_API_KEY = "phc_r6UYQzNZcGYSzKw4PxCiVrZepGqV3dw9qcvcKtRNUWAn"
@@ -67,7 +68,17 @@ export function getOmoNativeStateDir(env: TelemetryEnv = process.env): string {
   return join(resolveAgentHome({ env }), "omo-senpi", "omo-native")
 }
 
-export function getBuiltinSkillsRoot(): string {
+/**
+ * The bundled skills directory, ending in a path separator (callers append `<skill>/SKILL.md`). A valid
+ * OMO_BUNDLED_SKILLS_DIR wins through the bundled-skills loader's own resolver, so both name the same tree; an
+ * invalid value is reported once per process by that resolver and falls back to the plugin's skills.
+ */
+export function getBuiltinSkillsRoot(
+  env: Record<string, string | undefined> = process.env,
+  logger?: BundledSkillsOverrideLogger,
+): string {
+  const override = resolveBundledSkillsOverride(env, logger)
+  if (override !== undefined) return override.endsWith(sep) || override.endsWith("/") ? override : `${override}${sep}`
   // Source entrypoints and generated plugin bundles have different directory depths.
   return fileURLToPath(new URL(import.meta.url.endsWith(".ts") ? "../../../skills/" : "../skills/", import.meta.url))
 }

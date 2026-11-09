@@ -23,6 +23,7 @@ export const SENPI_LOADER_ALIASES = [
   "@earendil-works/pi-ai/compat",
   "@earendil-works/pi-ai/oauth",
   "@code-yeongyu/senpi",
+  "@code-yeongyu/senpi/session-worker-data",
   "@mariozechner/pi-coding-agent",
   "@mariozechner/pi-agent-core",
   "@mariozechner/pi-tui",
@@ -60,6 +61,8 @@ const gatewayStoreWorkerEntryPath = join(packageRoot, "src", "components", "thre
 const gatewayStoreWorkerOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", GATEWAY_STORE_WORKER_NAME)
 const toolkitSdkEntryPath = join(packageRoot, "src", "extension", "agent-toolkit-sdk.ts")
 const toolkitSdkOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "runtime", "agent-toolkit-sdk", "sdk.js")
+const bunshinTsEntryPath = join(packageRoot, "src", "extension", "bunshin-ts-sdk.ts")
+const bunshinTsOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "runtime", "bunshin-ts", "sdk.js")
 // The `omo thread` CLI and connector scripts import this SDK without an agent session; it points
 // the gateway store at the worker sidecar in `extensions/` (two levels up from its own file).
 export const THREAD_SDK_RELATIVE_PATH = join("runtime", "thread-sdk", "sdk.js")
@@ -80,6 +83,7 @@ const deviceAccountEntryPath = join(packageRoot, "src", "components", "memory", 
 const memoryCommandsEntryPath = join(packageRoot, "src", "components", "memory", "commands", "runtime.ts")
 const sessionHistoryEntryPath = join(packageRoot, "src", "components", "onboarding", "session-history", "runtime.ts")
 const recallStoreEntryPath = join(packageRoot, "src", "components", "memory", "recall-store-runtime.ts")
+const deviceServiceEntryPath = join(packageRoot, "src", "components", "device-service", "runtime.ts")
 const telemetryPosthogEntryPath = join(packageRoot, "src", "components", "telemetry", "posthog-runtime.ts")
 const telemetryOtlpEntryPath = join(packageRoot, "src", "components", "telemetry", "otlp-runtime.ts")
 // The sync engine sidecar carries the Loro runtime; its wasm is emitted beside it under this fixed name
@@ -103,6 +107,7 @@ export function loroWasmSourcePath() {
 const threadClientEntryPath = join(packageRoot, "src", "components", "thread", "live-surface.ts")
 const telemetryRecoveryEntryPath = join(packageRoot, "src", "components", "telemetry", "session-summary-recovery.ts")
 const feedbackEntryPath = join(packageRoot, "src", "components", "feedback", "runtime.ts")
+const desktopToolkitEntryPath = join(packageRoot, "src", "components", "desktop-toolkit", "runtime.ts")
 const claimReceiptEntryPath = join(packageRoot, "src", "components", "claim-receipt", "runtime.ts")
 const memoryDoctorOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-doctor.js")
 const memoryMemfsOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-memfs.js")
@@ -111,12 +116,14 @@ const deviceAccountOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? plug
 const memoryCommandsOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-commands.js")
 const sessionHistoryOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-session-history.js")
 const recallStoreOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-recall-store.js")
+const deviceServiceOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-device-service.js")
 const telemetryPosthogOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-telemetry-posthog.js")
 const telemetryOtlpOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-telemetry-otlp.js")
 const memorySyncOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-memory-sync.js")
 const threadClientOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-thread-client.js")
 const telemetryRecoveryOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-telemetry-recovery.js")
 const feedbackOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-feedback.js")
+const desktopToolkitOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-desktop-toolkit.js")
 const claimReceiptOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "extensions", "omo-claim-receipt.js")
 // The computer-use prelude JSON: bundled modules read it from beside the bundle (extensions/), the
 // same contract as the staged personas, so omo.js carries none of the ~29 KB of prelude text (#9113).
@@ -126,6 +133,7 @@ const rollbackRuntimeEntryPath = join(packageRoot, "src", "extension", "rollback
 const rollbackRuntimeOutputPath = join(process.env.OMO_SENPI_PLUGIN_OUTPUT ?? pluginRoot, "runtime", "rollback-migrate.js")
 const builtinModuleNames = builtinModules.filter((moduleName) => !moduleName.startsWith("_")).sort()
 const externalSpecifiers = [
+  "#omo-desktop-toolkit-runtime",
   "#omo-task-runtime",
   "#omo-computer-use-runtime",
   "#omo-memory-doctor-runtime",
@@ -133,8 +141,13 @@ const externalSpecifiers = [
   "#omo-memory-palace-runtime",
   "#omo-device-account-runtime",
   "#omo-memory-commands-runtime",
+  // memory-core's lazy dream archive link repair; the plugin manifest maps it to the memory-commands sidecar.
+  "#memory-completion-links",
   "#omo-session-history-runtime",
   "#omo-recall-store-runtime",
+  "#omo-device-service-runtime",
+  // memory-core's lazy <external_projection> renderer; the plugin manifest maps it to the recall-store sidecar.
+  "#memory-external-projection",
   "#omo-telemetry-posthog-runtime",
   "#omo-telemetry-otlp-runtime",
   "#omo-memory-sync-runtime",
@@ -145,6 +158,7 @@ const externalSpecifiers = [
   "#omo-feedback-runtime",
   "#omo-claim-receipt-runtime",
   "#omo-agent-toolkit-sdk",
+  "#bunshin-ts",
   ...SENPI_LOADER_ALIASES,
   ...builtinModuleNames,
   ...builtinModuleNames.map((moduleName) => `node:${moduleName}`),
@@ -170,6 +184,7 @@ export const extensionBuildPaths = {
   memberOutputPath,
   supervisorOutputPath,
   toolkitSdkOutputPath,
+  bunshinTsOutputPath,
   threadSdkOutputPath,
   advisorRuntimeOutputPath,
   sidePanelRuntimeOutputPath,
@@ -183,12 +198,14 @@ export const extensionBuildPaths = {
   memoryCommandsOutputPath,
   sessionHistoryOutputPath,
   recallStoreOutputPath,
+  deviceServiceOutputPath,
   telemetryPosthogOutputPath,
   telemetryOtlpOutputPath,
   memorySyncOutputPath,
   threadClientOutputPath,
   telemetryRecoveryOutputPath,
   feedbackOutputPath,
+  desktopToolkitOutputPath,
   claimReceiptOutputPath,
   gatewayStoreWorkerOutputPath,
 }
@@ -207,6 +224,7 @@ export function resolveOutputs(options) {
     sidePanelRuntimeOutput: sibling(options.sidePanelRuntimeOutputPath, sidePanelRuntimeOutputPath, "omo-side-panel.js"),
     onboardingScanRuntimeOutput: sibling(options.onboardingScanRuntimeOutputPath, onboardingScanRuntimeOutputPath, "omo-onboarding-scan.js"),
     toolkitSdkOutput: sibling(options.toolkitSdkOutputPath, toolkitSdkOutputPath, join("runtime", "agent-toolkit-sdk", "sdk.js")),
+    bunshinTsOutput: sibling(options.bunshinTsOutputPath, bunshinTsOutputPath, join("runtime", "bunshin-ts", "sdk.js")),
     threadSdkOutput: sibling(options.threadSdkOutputPath, threadSdkOutputPath, THREAD_SDK_RELATIVE_PATH),
     rollbackRuntimeOutput: sibling(options.rollbackRuntimeOutputPath, rollbackRuntimeOutputPath, join("runtime", "rollback-migrate.js")),
     memoryDoctorOutput: sibling(options.memoryDoctorOutputPath, memoryDoctorOutputPath, "omo-memory-doctor.js"),
@@ -216,12 +234,14 @@ export function resolveOutputs(options) {
     memoryCommandsOutput: sibling(options.memoryCommandsOutputPath, memoryCommandsOutputPath, "omo-memory-commands.js"),
     sessionHistoryOutput: sibling(options.sessionHistoryOutputPath, sessionHistoryOutputPath, "omo-session-history.js"),
     recallStoreOutput: sibling(options.recallStoreOutputPath, recallStoreOutputPath, "omo-recall-store.js"),
+    deviceServiceOutput: sibling(options.deviceServiceOutputPath, deviceServiceOutputPath, "omo-device-service.js"),
     telemetryPosthogOutput: sibling(options.telemetryPosthogOutputPath, telemetryPosthogOutputPath, "omo-telemetry-posthog.js"),
     telemetryOtlpOutput: sibling(options.telemetryOtlpOutputPath, telemetryOtlpOutputPath, "omo-telemetry-otlp.js"),
     memorySyncOutput: sibling(options.memorySyncOutputPath, memorySyncOutputPath, "omo-memory-sync.js"),
     threadClientOutput: sibling(options.threadClientOutputPath, threadClientOutputPath, "omo-thread-client.js"),
     telemetryRecoveryOutput: sibling(options.telemetryRecoveryOutputPath, telemetryRecoveryOutputPath, "omo-telemetry-recovery.js"),
     feedbackOutput: sibling(options.feedbackOutputPath, feedbackOutputPath, "omo-feedback.js"),
+    desktopToolkitOutput: sibling(options.desktopToolkitOutputPath, desktopToolkitOutputPath, "omo-desktop-toolkit.js"),
     claimReceiptOutput: sibling(options.claimReceiptOutputPath, claimReceiptOutputPath, "omo-claim-receipt.js"),
     computerUseOutput: sibling(options.computerUseOutputPath, computerUseOutputPath, "omo-computer-use.js"),
     gatewayStoreWorkerOutput: sibling(options.gatewayStoreWorkerOutputPath, gatewayStoreWorkerOutputPath, GATEWAY_STORE_WORKER_NAME),
@@ -246,6 +266,7 @@ export async function buildExtension(options = {}) {
     sidePanelRuntimeOutput,
     onboardingScanRuntimeOutput,
     toolkitSdkOutput,
+    bunshinTsOutput,
     threadSdkOutput,
     rollbackRuntimeOutput,
     computerUseOutput,
@@ -256,20 +277,20 @@ export async function buildExtension(options = {}) {
     memoryCommandsOutput,
     sessionHistoryOutput,
     recallStoreOutput,
+    deviceServiceOutput,
     telemetryPosthogOutput,
     telemetryOtlpOutput,
     memorySyncOutput,
     threadClientOutput,
     telemetryRecoveryOutput,
     feedbackOutput,
+    desktopToolkitOutput,
     claimReceiptOutput,
     gatewayStoreWorkerOutput,
   } = resolveOutputs(options)
   const toolkitSdkInputs = await buildEntry(toolkitSdkEntryPath, toolkitSdkOutput, buildDefines, sdkExternalSpecifiers)
-  const mainInputs = await buildEntry(entryPath, output, {
-    ...buildDefines,
-    OMO_TELEMETRY_INGEST_KEY: process.env.OMO_TELEMETRY_INGEST_KEY ?? "",
-  })
+  const bunshinTsInputs = await buildEntry(bunshinTsEntryPath, bunshinTsOutput, buildDefines, sdkExternalSpecifiers)
+  const mainInputs = await buildEntry(entryPath, output, buildDefines)
   const taskInputs = await buildEntry(taskEntryPath, taskOutput, buildDefines)
   const memberInputs = await buildEntry(memberEntryPath, memberOutput, buildDefines)
   const supervisorInputs = await buildEntry(supervisorEntryPath, supervisorOutput, buildDefines)
@@ -284,12 +305,14 @@ export async function buildExtension(options = {}) {
   const memoryCommandsInputs = await buildEntry(memoryCommandsEntryPath, memoryCommandsOutput, buildDefines)
   const sessionHistoryInputs = await buildEntry(sessionHistoryEntryPath, sessionHistoryOutput, buildDefines)
   const recallStoreInputs = await buildEntry(recallStoreEntryPath, recallStoreOutput, buildDefines)
+  const deviceServiceInputs = await buildEntry(deviceServiceEntryPath, deviceServiceOutput, buildDefines)
   const telemetryPosthogInputs = await buildEntry(telemetryPosthogEntryPath, telemetryPosthogOutput, buildDefines)
   const telemetryOtlpInputs = await buildEntry(telemetryOtlpEntryPath, telemetryOtlpOutput, buildDefines)
   const memorySyncInputs = await buildEntry(memorySyncEntryPath, memorySyncOutput, buildDefines, externalSpecifiers, { assets: true })
   const threadClientInputs = await buildEntry(threadClientEntryPath, threadClientOutput, buildDefines)
   const telemetryRecoveryInputs = await buildEntry(telemetryRecoveryEntryPath, telemetryRecoveryOutput, buildDefines)
   const feedbackInputs = await buildEntry(feedbackEntryPath, feedbackOutput, buildDefines)
+  const desktopToolkitInputs = await buildEntry(desktopToolkitEntryPath, desktopToolkitOutput, buildDefines)
   const claimReceiptInputs = await buildEntry(claimReceiptEntryPath, claimReceiptOutput, buildDefines)
   const computerUseInputs = await buildEntry(computerUseEntryPath, computerUseOutput, buildDefines)
   const gatewayStoreWorkerInputs = await buildEntry(gatewayStoreWorkerEntryPath, gatewayStoreWorkerOutput, buildDefines, sdkExternalSpecifiers)
@@ -309,6 +332,7 @@ export async function buildExtension(options = {}) {
     sidePanelRuntimeInputs,
     onboardingScanRuntimeInputs,
     toolkitSdkInputs,
+    bunshinTsInputs,
     rollbackRuntimeInputs,
     computerUseInputs,
     memoryDoctorInputs,
@@ -318,12 +342,14 @@ export async function buildExtension(options = {}) {
     memoryCommandsInputs,
     sessionHistoryInputs,
     recallStoreInputs,
+    deviceServiceInputs,
     telemetryPosthogInputs,
     telemetryOtlpInputs,
     memorySyncInputs,
     threadClientInputs,
     telemetryRecoveryInputs,
     feedbackInputs,
+    desktopToolkitInputs,
     claimReceiptInputs,
     gatewayStoreWorkerInputs,
     threadSdkInputs,

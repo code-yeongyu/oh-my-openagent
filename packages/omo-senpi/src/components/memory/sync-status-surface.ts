@@ -3,7 +3,7 @@
 // kind, then one more when sync recovers. The engine reports transitions only, so a cycle that
 // keeps failing the same way never repeats the notice.
 
-import type { EngineStatus } from "@oh-my-opencode/memory-core/sync-engine"
+import type { EngineStatus, SyncFailure } from "@oh-my-opencode/memory-core/sync-engine"
 
 import type { SyncConfigInvalidStatus, SyncUnavailableStatus } from "./sync-runner"
 
@@ -20,6 +20,16 @@ export interface SyncStatusNotifier {
 }
 
 export const SYNC_RECOVERED_NOTICE = "Memory sync is working again."
+/** How a notice opens: blocked for a failing cycle, holding back for files too large to sync (#12284) while all else syncs. */
+export const SYNC_BLOCKED_NOTICE_PREFIX = "Memory sync is blocked."
+export const SYNC_HELD_NOTICE_PREFIX = "Memory sync is holding back a file."
+
+/** The failure a status asks the person about: a failing cycle, or files held while a refused entry pauses sync. */
+export function shownSyncFailure(status: Awaited<ReturnType<SyncStatusReader>> | undefined): SyncFailure | undefined {
+  if (status?.kind === "failing") return status.failure
+  if (status?.kind === "paused") return status.held?.failure
+  return undefined
+}
 
 export function createSyncStatusNotifier(read: SyncStatusReader): SyncStatusNotifier {
   const announced = new Map<string, string>()
@@ -28,7 +38,7 @@ export function createSyncStatusNotifier(read: SyncStatusReader): SyncStatusNoti
       // A failed read says nothing about sync, so it changes no notice; the next change reads again.
       const status = await read(repo).catch(() => undefined)
       if (status === undefined) return
-      const failure = status?.kind === "failing" ? status.failure : undefined
+      const failure = status?.kind === "frozen" ? (await import("#omo-memory-sync-runtime")).freezeFailure(status) : shownSyncFailure(status)
       const previous = announced.get(repo)
       if (failure === undefined) {
         announced.delete(repo)
@@ -36,9 +46,11 @@ export function createSyncStatusNotifier(read: SyncStatusReader): SyncStatusNoti
         return
       }
       const key = `${failure.kind}\n${failure.action}`
-      if (previous === key) return
+      // Background transitions must not consume a notice the person has never seen.
+      if (previous === key || ui === undefined) return
+      const prefix = failure.kind === "oversized_item" ? SYNC_HELD_NOTICE_PREFIX : SYNC_BLOCKED_NOTICE_PREFIX
+      ui.notify(`${prefix} ${failure.reason} ${failure.action}`, "warning")
       announced.set(repo, key)
-      ui?.notify(`Memory sync is blocked. ${failure.reason} ${failure.action}`, "warning")
     },
   }
 }

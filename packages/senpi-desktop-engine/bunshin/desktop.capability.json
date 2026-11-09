@@ -37,6 +37,7 @@
 		"desktop.ax.setValue",
 		"desktop.ax.focus",
 		"desktop.ax.click",
+		"desktop.ax.typeText",
 		"desktop.stopPath.status",
 		"desktop.stop"
 	],
@@ -74,6 +75,7 @@
 		"desktop.ax.setValue": "mutate",
 		"desktop.ax.focus": "mutate",
 		"desktop.ax.click": "mutate",
+		"desktop.ax.typeText": "mutate",
 		"desktop.stopPath.status": "read",
 		"desktop.stop": "read"
 	},
@@ -370,6 +372,41 @@
 								"null"
 							],
 							"default": null
+						},
+						"timeoutMs": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint64",
+							"minimum": 0,
+							"default": null
+						},
+						"since": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint64",
+							"minimum": 0,
+							"description": "Only nodes changed since this generation.",
+							"default": null
+						},
+						"skeleton": {
+							"type": [
+								"boolean",
+								"null"
+							],
+							"description": "Roles and refs only, no values.",
+							"default": null
+						},
+						"root": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "Snapshot only under this ref.",
+							"default": null
 						}
 					},
 					"additionalProperties": false
@@ -451,6 +488,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -532,6 +574,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -627,6 +674,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -717,6 +769,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -784,6 +841,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -811,6 +873,10 @@
 							"type": "null"
 						}
 					]
+				},
+				"force": {
+					"type": "boolean",
+					"description": "Sends a chord the engine treats as dangerous (`cmd+q`, `alt+f4`)."
 				}
 			},
 			"required": [
@@ -854,6 +920,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -930,6 +1001,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -1030,6 +1106,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -1160,6 +1241,41 @@
 								"boolean",
 								"null"
 							],
+							"default": null
+						},
+						"timeoutMs": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint64",
+							"minimum": 0,
+							"default": null
+						},
+						"since": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint64",
+							"minimum": 0,
+							"description": "Only nodes changed since this generation.",
+							"default": null
+						},
+						"skeleton": {
+							"type": [
+								"boolean",
+								"null"
+							],
+							"description": "Roles and refs only, no values.",
+							"default": null
+						},
+						"root": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "Snapshot only under this ref.",
 							"default": null
 						}
 					},
@@ -1403,6 +1519,84 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
+						}
+					},
+					"additionalProperties": false
+				}
+			}
+		},
+		"desktop.ax.typeText": {
+			"type": "object",
+			"properties": {
+				"ref": {
+					"type": "string"
+				},
+				"text": {
+					"type": "string"
+				},
+				"opts": {
+					"anyOf": [
+						{
+							"$ref": "#/definitions/PointerOptions"
+						},
+						{
+							"type": "null"
+						}
+					]
+				}
+			},
+			"required": [
+				"ref",
+				"text"
+			],
+			"description": "`ax.typeText`: types `text` into the element `ref` names. Only\n`opts.deliveryMode` is read: an omitted delivery is background (no focus\nchange for the user); `foreground` raises the element's window under the\ncontrol grant, like `ax.click`.",
+			"additionalProperties": false,
+			"definitions": {
+				"PointerOptions": {
+					"type": "object",
+					"properties": {
+						"button": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"count": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint32",
+							"minimum": 0,
+							"default": null
+						},
+						"modifiers": {
+							"type": [
+								"array",
+								"null"
+							],
+							"items": {
+								"type": "string"
+							},
+							"default": null
+						},
+						"deliveryMode": {
+							"type": [
+								"string",
+								"null"
+							],
+							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false

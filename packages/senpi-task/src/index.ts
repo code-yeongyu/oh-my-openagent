@@ -96,7 +96,6 @@ export {
   toolCountSuffix,
 } from "./status-line"
 export type { LiveStatsTokens, StatusLineInput, StatusLineStats, StatusTargetInput, TaskIdentityInput } from "./status-line"
-export { activeParentModelFallback } from "./manager/parent-model-rung"
 export { TASK_SUMMARY_MAX_LENGTH, clampTaskSummary } from "./task-summary"
 export {
   assistantLastLine,
@@ -228,6 +227,16 @@ export {
   RpcProtocolClient,
   createLiveHostChildren,
   buildAutoUiResponse,
+  CANCELLED_CHILD_DIALOG,
+  createForegroundDialogOrigins,
+  sharedForegroundDialogOrigins,
+  type ChildDialogForwarder,
+  type ForegroundDialogOrigins,
+  type ForwardableDialog,
+  type ForwardedAnswer,
+  type ForwardedChild,
+  type ParentPermissionMode,
+  type RunInOrigin,
   buildChildArgs,
   buildRpcSpawn,
   OMO_SENPI_TASK_RPC_CHILD,
@@ -244,6 +253,7 @@ export {
   terminateRpcChild,
 } from "./runners"
 export { resolveInheritedExtensionList, selectPackageExtensionPaths } from "./runners/rpc/parent-extensions"
+export { createHostGenerationView } from "./runners/rpc-host/generation-view"
 export type { InheritedExtensions } from "./runners/rpc/parent-extensions"
 export type {
   ChildEventListener,

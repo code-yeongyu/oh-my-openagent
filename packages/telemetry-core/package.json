@@ -24,6 +24,10 @@
       "types": "./immediate-send.d.ts",
       "import": "./src/posthog-immediate-send.ts"
     },
+    "./install-disclosure": {
+      "types": "./src/install-disclosure.ts",
+      "import": "./src/install-disclosure.ts"
+    },
     "./otlp-opt-out": {
       "types": "./src/otlp-spool-purge.ts",
       "import": "./src/otlp-spool-purge.ts"

@@ -131,9 +131,6 @@
   "packages/omo-native/test/setup-summary.test.ts": {
     "typescript/no-explicit-any": 1
   },
-  "packages/omo-opencode/src/agents/gpt-prompt-identity.ts": {
-    "typescript/no-non-null-assertion": 1
-  },
   "packages/omo-opencode/src/cli/run/continuation-state.json-backend.test.ts": {
     "typescript/no-explicit-any": 1
   },
@@ -199,9 +196,6 @@
   "packages/omo-opencode/src/features/tmux-subagent/manager.test.ts": {
     "typescript/no-non-null-assertion": 3
   },
-  "packages/omo-opencode/src/hooks/agent-usage-reminder/hook.ts": {
-    "typescript/no-non-null-assertion": 1
-  },
   "packages/omo-opencode/src/hooks/anthropic-context-window-limit-recovery/recovery-deduplication.test.ts": {
     "typescript/no-non-null-assertion": 1
   },
@@ -221,9 +215,6 @@
     "typescript/no-non-null-assertion": 9
   },
   "packages/omo-opencode/src/hooks/ralph-loop/oracle-double-fire-race.test.ts": {
-    "typescript/no-non-null-assertion": 1
-  },
-  "packages/omo-opencode/src/hooks/ulw-execute/index.test.ts": {
     "typescript/no-non-null-assertion": 1
   },
   "packages/omo-opencode/src/hooks/zauc-sync-mocks/sync-package-json.test.ts": {
@@ -247,9 +238,6 @@
   },
   "packages/omo-opencode/src/shared/dist-bundle-prompt-content.test.ts": {
     "typescript/no-non-null-assertion": 1
-  },
-  "packages/omo-opencode/src/shared/git-worktree/collect-git-diff-stats.test.ts": {
-    "typescript/no-non-null-assertion": 3
   },
   "packages/omo-opencode/src/shared/model-availability.test.ts": {
     "typescript/no-explicit-any": 5
@@ -404,9 +392,6 @@
   "packages/omo-senpi/src/components/onboarding/claim-takeover-race.test.ts": {
     "typescript/no-non-null-assertion": 1
   },
-  "packages/omo-senpi/src/components/onboarding/component.test.ts": {
-    "typescript/no-non-null-assertion": 1
-  },
   "packages/omo-senpi/src/components/onboarding/state.test.ts": {
     "typescript/no-non-null-assertion": 1
   },
@@ -494,9 +479,6 @@
   "packages/utils/src/process-sweep/sweeper.ts": {
     "typescript/no-non-null-assertion": 1
   },
-  "packages/web/e2e/landing.spec.ts": {
-    "typescript/no-non-null-assertion": 1
-  },
   "packages/web/e2e/manifesto-glyph-oracle.spec.ts": {
     "typescript/no-non-null-assertion": 1
   },
@@ -505,9 +487,6 @@
   },
   "packages/web/e2e/manifesto-reading.spec.ts": {
     "typescript/no-non-null-assertion": 8
-  },
-  "packages/web/e2e/secret-reading-state.ts": {
-    "typescript/no-non-null-assertion": 5
   },
   "packages/web/lib/install-targets.test.ts": {
     "typescript/no-non-null-assertion": 2

@@ -49,7 +49,7 @@ function harness(plan: ResolvedChildPlan) {
 afterEach(cleanupProjects)
 
 describe("runtime fallback after a credential failure", () => {
-  test("#given a failure that is not about credentials and no rung left #when the child turn fails #then the error text is kept as is", async () => {
+  test("#given an overload on the only designated model #when the child turn fails #then the provider's text leads and the task fails typed as an exhausted chain", async () => {
     const { runner, manager } = harness(chainPlan(GO_M3, []))
     const task = await manager.start(baseSpec())
     if (task.kind !== "started") throw new Error("expected started")
@@ -57,7 +57,10 @@ describe("runtime fallback after a credential failure", () => {
     const terminal = manager.waitFor(task.task_id)
     runner.handles.get(task.task_id)?.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
 
-    expect((await terminal).error_message).toBe("500: upstream overloaded")
+    const record = await terminal
+    expect(record.failure_kind).toBe("model_chain_exhausted")
+    expect(record.error_message?.split("\n")[0]).toBe("500: upstream overloaded")
+    expect(record.error_message).toContain(`- ${GO_M3.display}: overloaded or unavailable`)
   })
 
   test("#given a provider error that is not about credentials #when the child turn fails #then the next rung on the same provider is still tried", async () => {

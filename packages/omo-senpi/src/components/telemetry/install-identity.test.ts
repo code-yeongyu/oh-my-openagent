@@ -120,6 +120,45 @@ describe("telemetry is off by default for automated runs that cannot hold a stab
     expect(automatedRunReason({ HOME: "/var/folders/ab/T/fake-home" }, posixDeps("/var/folders/ab/T"))).toBe("ephemeral_home")
   })
 
+  it("#given a darwin HOME outside /Users #when the automation check runs #then it never resolves an automount trigger (/home, /net), which blocks the host loop when wedged (#11545)", () => {
+    const triggers = (p: string) => ["/home", "/net"].some((t) => p === t || p.startsWith(`${t}/`))
+    const cases: ReadonlyArray<{ readonly home: string; readonly tmp: string; readonly verdict: "ephemeral_home" | undefined }> = [
+      { home: "/Users/Shared/app-home", tmp: "/var/folders/ab/T", verdict: undefined },
+      { home: "/opt/app/home", tmp: "/var/folders/ab/T", verdict: undefined },
+      { home: "/Volumes/ext/home", tmp: "/var/folders/ab/T", verdict: undefined },
+      { home: "/var/folders/ab/T/omo-x", tmp: "/var/folders/ab/T", verdict: "ephemeral_home" },
+      { home: "/Users/Shared/app-home", tmp: "/home/tmp", verdict: undefined },
+      { home: "/Users/Shared/app-home", tmp: "/net/host/tmp", verdict: undefined },
+      { home: "/Users/someone", tmp: "/var/folders/ab/T", verdict: undefined },
+    ]
+    for (const { home: h, tmp, verdict } of cases) {
+      const resolved: string[] = []
+      const deps = { platform: "darwin" as const, realpath: (p: string) => (resolved.push(p), p), tmpdir: () => tmp, posixTempRoots: [] }
+      expect({ home: h, tmp, verdict: automatedRunReason({ HOME: h }, deps) }).toEqual({ home: h, tmp, verdict })
+      expect({ home: h, tmp, triggers: resolved.filter(triggers) }).toEqual({ home: h, tmp, triggers: [] })
+    }
+  })
+
+  it("#given a darwin account home under /home (resolving to the /System/Volumes/Data firmlink) #then it is a real profile, never ephemeral, whatever TMPDIR says (#11547)", () => {
+    const firmlink = (p: string) => (p === "/home" || p.startsWith("/home/") ? `/System/Volumes/Data${p}` : p)
+    for (const tmp of ["/home/me", "/home", "/"]) {
+      const deps = { platform: "darwin" as const, realpath: firmlink, tmpdir: () => tmp, posixTempRoots: [] }
+      expect({ tmp, verdict: automatedRunReason({ HOME: "/home/me" }, deps) }).toEqual({ tmp, verdict: undefined })
+    }
+  })
+
+  it("#given a darwin HOME inside a temp dir under an automount trigger #then only that HOME itself is resolved and the run still counts as ephemeral", () => {
+    const resolved: string[] = []
+    const deps = { platform: "darwin" as const, realpath: (p: string) => (resolved.push(p), p), tmpdir: () => "/home/tmp", posixTempRoots: [] }
+    expect(automatedRunReason({ HOME: "/home/tmp/run-1" }, deps)).toBe("ephemeral_home")
+    expect(new Set(resolved.filter((p) => p === "/home" || p.startsWith("/home/")))).toEqual(new Set(["/home/tmp/run-1"]))
+  })
+
+  it("#given linux, where /home is a real directory #then the users-dir candidates are still resolved (a /home symlink keeps counting as the users dir)", () => {
+    const deps = { platform: "linux" as const, realpath: (p: string) => (p === "/home" ? "/var/home" : p), tmpdir: () => "/var/home", posixTempRoots: [] }
+    expect(automatedRunReason({ HOME: "/var/home/someone" }, deps)).toBeUndefined()
+  })
+
   it("#given the automation check throws (os.userInfo with no passwd entry) #then the consent gate never throws and telemetry is OFF for that run", () => {
     const spy = spyOn(os, "tmpdir").mockImplementation(() => {
       throw new Error("ENOENT: no such file or directory, uv_os_tmpdir")

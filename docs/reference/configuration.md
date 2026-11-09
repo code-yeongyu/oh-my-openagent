@@ -148,7 +148,7 @@ Here's a practical starting `~/.omo/omo.jsonc`. OpenCode plugin settings live in
       // writing - docs/prose
       "writing": { "model": "anthropic/claude-opus-5-5", "reasoning": "low" },
 
-      // visual-engineering - Fable 5.1 max, then Opus 5 max and Kimi K3 max
+      // visual-engineering - Fable 5.1 max, then Opus 5 max and Kimi K3.1 Pro max
       "visual-engineering": {
         "model": "anthropic/claude-opus-5-5",
         "reasoning": "max",
@@ -211,6 +211,7 @@ This table is the `[opencode].agents` surface only. Shared-base agents use the c
 | ----------------- | ----------------------- | --------------------------------------------------------------- |
 | `model`           | string                  | Model override (`provider/model`)                               |
 | `models`          | array                   | Ordered model chain; entries are strings or per-model objects   |
+| `models_distribution` | `sequential \| round_robin` | Starting model policy for new children; defaults to `sequential` |
 | `fallback_models` | string\|array           | Deprecated compatibility fallback chain                         |
 | `reasoning`       | string                  | Canonical reasoning level or harness-native preset token        |
 | `temperature`     | number                  | Sampling temperature                                            |
@@ -360,6 +361,7 @@ Domain-specific model delegation used by the `task()` tool. When the main agent 
 | ------------------- | ------------- | ------- | ------------------------------------------------------------------- |
 | `model`             | string        | -       | Model override                                                      |
 | `models`            | array         | -       | Ordered model chain; entries are strings or per-model objects       |
+| `models_distribution` | `sequential \| round_robin` | `sequential` | Rotate the starting entry per new child with `round_robin` |
 | `fallback_models`   | string\|array | -       | Deprecated compatibility fallback chain                            |
 | `reasoning`         | string        | -       | Canonical reasoning level or harness-native preset token            |
 | `temperature`       | number        | -       | Sampling temperature                                                |
@@ -428,7 +430,7 @@ The main agent has no chain of its own: it runs on your session model (Claude Op
 | --- | --- | --- |
 | **explore** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `anthropic\|github-copilot/claude-haiku-5-5 (medium)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7`
 | **librarian** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `anthropic\|github-copilot/claude-haiku-5-5 (medium)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7`
-| **plan-consultant** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai\|opencode/kimi-k3 (max)`
+| **plan-consultant** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai/kimi-k3.1-pro (max)` → `opencode/kimi-k3 (max)`
 | **plan-reviewer** | `gpt-6-astra` | `openai\|chatgpt-subscription/gpt-6-astra (xhigh)` → `github-copilot/gpt-6-astra (high)` → `openai\|chatgpt-subscription\|opencode/gpt-6-astra (high)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `google\|google-vertex\|opencode/gemini-4-argon (high)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.2`
 
 #### Category Provider Chains
@@ -437,14 +439,14 @@ This table mirrors the authoritative hardcoded category fallback chains: the cha
 
 | Category | Provider Chain Primary | Provider Priority |
 | --- | --- | --- |
-| **Visual Engineering** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` |
+| **Visual Engineering** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` → `kimi-for-coding\|moonshotai\|opencode-go/kimi-k3.1-pro (max)` → `opencode/kimi-k3 (max)` |
 | **Ultrabrain** | `gpt-6-astra` | `openai\|chatgpt-subscription/gpt-6-astra (max)` → `github-copilot/gpt-6-astra (max)` → `openai\|chatgpt-subscription\|opencode/gpt-6-astra (max)` → `openai\|chatgpt-subscription/gpt-5.6-sol (max)` → `github-copilot/gpt-5.6-sol (max)` → `openai\|chatgpt-subscription\|opencode/gpt-5.6-sol (max)` |
 | **Deep Low** | `gpt-6.1-sol` | `openai\|chatgpt-subscription/gpt-6.1-sol (medium)` → `openai\|chatgpt-subscription/gpt-6.1-sol-fast (medium)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `openai\|chatgpt-subscription/gpt-5.6-sol-fast (medium)` |
 | **Deep High** | `gpt-6-astra` | `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-6-astra (high)` |
-| **Artistry** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` |
+| **Artistry** | `claude-fable-5-1` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `kimi-for-coding\|moonshotai\|opencode-go/kimi-k3.1-pro (max)` → `opencode/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` |
 | **Quick** | `gpt-6-luna-fast` | `chatgpt-subscription/gpt-6-luna-fast (low)` → `anthropic\|anthropic-api\|github-copilot/claude-haiku-5-5 (medium)` → `deepseek/deepseek-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan/qwen3.6-flash (low)` → `opencode-go/minimax-m3 (max)` → `opencode-go/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `zai-coding-plan/glm-5.3-flash (low)` → `xiaomi/mimo-v2.6-flash (low)` |
 | **Unspecified Low** | `claude-sonnet-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5-5 (medium)` → `xiaomi\|opencode-go/mimo-v2.6-pro (max)` → `xai\|github-copilot\|opencode-go/grok-4.7 (xhigh)` → `zai-coding-plan\|opencode-go/glm-5.3 (high)` → `openai\|chatgpt-subscription/gpt-6.1-sol (medium)` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go/deepseek-v4-pro (max)` → `xiaomi\|opencode-go/mimo-v2.5-pro (max)` |
-| **Unspecified High** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (medium)` → `zai-coding-plan\|opencode-go/glm-5.3 (max)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode/kimi-k3 (max)` |
+| **Unspecified High** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (medium)` → `zai-coding-plan\|opencode-go/glm-5.3 (max)` → `kimi-for-coding\|moonshotai\|opencode-go/kimi-k3.1-pro (max)` → `opencode/kimi-k3 (max)` |
 | **Writing** | `claude-opus-5-5` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-4-6 (max)` |
 
 Run `bunx oh-my-openagent doctor --verbose` to see effective model resolution for your config.
@@ -618,16 +620,22 @@ repository, and grants are revoked when the session shuts down.
 #### Memory file list in the prompt
 
 Every turn the compiled memory block ends with `<external_projection>`, one line per directory
-naming the memory files outside `system/`. Two limits keep it small on a large corpus. Each
-directory lists its most recently committed files first (ties by name). Names that do not fit are
-counted as `(+N more; read $MEMORY_DIR/<dir>/ to list)`, and every directory keeps its line.
+naming the memory files outside `system/`, most recently committed first (ties by name). Names drop
+`.md` (other files stay quoted and exact), and markdown names sharing a `-YYYYMMDD` suffix are
+grouped as `{a, b}-YYYYMMDD`. Names that carry no hint fold into one entry: runs of at least three
+names that differ only by a date, month chunk, clock time or part (`2026-06-p1 … 2026-10-p11 (91
+files)`), generated-id names (`<id> (N files)`), sibling directories named by generated ids
+(`jobs/<id>/ (72 dirs)`), and sibling directories holding the same file names
+(`people/{ann, bob, cy}/`). A legend line at the top says how an entry maps back to its file.
+Names that do not fit a limit are counted as `(+N more; read $MEMORY_DIR/<dir>/ to list)`, and
+every directory keeps its line.
 
 | Option                                 | Default | Description                                                                   |
 | -------------------------------------- | ------- | ----------------------------------------------------------------------------- |
-| `projection.max_entries_per_directory` | `40`    | Names listed per directory, newest first                                       |
-| `projection.max_bytes`                 | `24576` | Byte budget for the whole list; the largest directory gives up names first     |
+| `projection.max_entries_per_directory` | `0`     | Entries listed per directory, newest first; `0` lists every entry              |
+| `projection.max_bytes`                 | `40960` | Byte budget for the whole list; the largest directory gives up entries first   |
 
-`0` disables a limit; both at `0` list every name in name order, as before. A budget smaller
+`0` disables a limit; both at `0` list every entry in name order. A budget smaller
 than one line per directory cannot be met: the list then shows only the directory lines with
 their counts, and `/doctor` reports the overflow. Both keys can be set per harness, per profile
 and per agent under `agents.<name>.projection`. `/doctor` prints a `projection` line with the
@@ -793,6 +801,30 @@ It runs opportunistically when the session goes idle, and optionally at shutdown
 | `dream.shutdown_launch`       | `true`   | Allow a dream to be launched at shutdown                      |
 | `dream.auto_select_max`       | `5`      | Conversations `--auto` may select (1-10)                      |
 | `dream.auto_select_max_chars` | `150000` | Byte budget for auto-selected conversations                   |
+
+#### Runtime retention
+
+Each memory identity keeps working files next to its repository under `runtime/`: reflection
+run directories, completion records, per-session transcript journals, recall sidecars and ledgers.
+The background maintenance pass (at most once every 12 hours per identity, the same pass that
+packs the memory repository) removes what is past these windows. Anything a live session owns,
+anything locked, reserved or not yet finished, and the newest and highest-numbered reflection run
+are always kept. Identities no session on this machine binds any more are visited by the host sweep
+(a bounded slice after a bound identity's own pass, at most once every 12 hours per machine) and by
+`omo doctor --fix`; identities a session in the running process binds are left to their own pass.
+
+| Option                           | Default | Description                                                                                      |
+| -------------------------------- | ------- | ------------------------------------------------------------------------------------------------ |
+| `runtime.retention_days`         | `7`     | Days before a merged or no-change reflection run, a fully reflected transcript, an idle recall sidecar and the legacy `recall/runs` and `reflection-sessions` stores are removed |
+| `runtime.discard_unreflected_journals` | `false` | Allow deleting transcript input that reflection never folded into memory (never- and partly-reflected journals). When on, it runs only while the identity's newest reflection outcome is a success, it never reflected, or reflection is disabled. `false` keeps that input forever |
+| `runtime.abandoned_journal_days` | `14`    | With `discard_unreflected_journals` on: days before an idle never-reflected journal is removed, or the transcript of a partly reflected one. Suspended while the identity's newest reflection outcome is a failure |
+| `runtime.completions_days`       | `30`    | Days before a delivered completion record (beyond the newest 50) and a recall ledger are removed  |
+| `runtime.pass_budget_ms`         | `60000` | Time one pass may spend on one identity; an interrupted pass resumes where it stopped at the next session start |
+| `runtime.max_bytes`              | `2147483648` (2 GiB) | Per-identity cap on everything under `runtime/`; `0` is unbounded. After retention the maintenance pass evicts oldest-first, inside the same `pass_budget_ms`, until the identity fits (the host sweep and `omo doctor --fix` run the same cap on identities no running session hosts, with the global `max_bytes` and its agent override, and keep every journal idle less than `retention_days` because they cannot see live sessions): folded reflection runs, fully reflected transcripts, sidecars idle 1 h, journals never reflected and idle 24 h and partly reflected transcripts idle 24 h (both only when `discard_unreflected_journals` is on and reflection is healthy for the identity), then failed runs past `retention_days` beyond the newest 10. Live sessions, in-flight runs and the run-id high water are never evicted. `omo doctor` and `/doctor` show the size and warn at 80 % |
+
+Every key accepts a per-agent override under `agents.<id>.runtime`. For identities a session does not host (`omo doctor --fix` and the background host sweep), only the global config counts: every window comes from the global `runtime` and that identity's own global `agents.<id>.runtime` override, and unreflected input is discarded there only when the global `discard_unreflected_journals` is on and that identity's own override does not turn it off. A transcript removed from a
+journal keeps its reflection cursor in `state.json`; a resumed session rebuilds the transcript from
+its own history and continues after the last reflected message.
 
 #### Memory doctor
 
@@ -1089,6 +1121,7 @@ Auto-switches to backup models on API errors.
     "max_fallback_attempts": 3,
     "cooldown_seconds": 60,
     "timeout_seconds": 30,
+    "first_prompt_timeout_seconds": 300,
     "notify_on_fallback": true
   }
 }
@@ -1101,6 +1134,7 @@ Auto-switches to backup models on API errors.
 | `max_fallback_attempts` | `3`                 | Max fallback attempts per session (1–20)                                                                                       |
 | `cooldown_seconds`      | `60`                | Seconds before retrying a failed model                                                                                         |
 | `timeout_seconds`       | `30`                | Seconds before forcing next fallback. **Set to `0` to disable timeout-based escalation and `message.updated` provider retry signal detection.** Structured `session.status` retry events can still trigger fallback. |
+| `first_prompt_timeout_seconds` | `300` | Seconds a subagent may produce no progress after its prompt before it is aborted and handed to the fallback model. Reasoning-heavy models can legitimately take minutes to start. **Set to `0` to disable.** |
 | `notify_on_fallback`    | `true`              | Toast notification on model switch                                                                                             |
 | `restore_primary_after_cooldown` | `false` | Return to the primary model after its cooldown expires                                                                       |
 

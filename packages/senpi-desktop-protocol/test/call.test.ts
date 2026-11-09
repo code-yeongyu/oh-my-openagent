@@ -48,6 +48,10 @@ describe("isReadOnlyComputerCall", () => {
 		expect(isReadOnlyComputerCall([{ method: "ref" }, { method: "press" }])).toBe(false);
 	});
 
+	it("requires exec for typing into an element", () => {
+		expect(isReadOnlyComputerCall([{ method: "ref", args: ["e1"] }, { method: "type", args: ["hello"] }])).toBe(false);
+	});
+
 	it("throws tooLong when a call chain is longer than two steps", () => {
 		expect(rejectionReason([{ method: "window" }, { method: "screenshot" }, { method: "click" }])).toBe("tooLong");
 	});

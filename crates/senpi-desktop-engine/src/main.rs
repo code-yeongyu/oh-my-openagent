@@ -64,6 +64,11 @@ fn main() -> ExitCode {
     if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--release-helper")) {
         return release_helper();
     }
+    // The private keyboard-layout helper (#11466): reads the current layout on
+    // its main thread for typing into a remote screen.
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--keymap-helper")) {
+        return keymap_helper();
+    }
     match Cli::parse().mode() {
         Mode::XpcAgent { .. } => fail("--xpc-agent must be the first argument"),
         Mode::Schema => print_schema(),
@@ -178,6 +183,22 @@ fn release_helper() -> ExitCode {
 #[cfg(not(target_os = "macos"))]
 fn release_helper() -> ExitCode {
     fail("the input release helper is unavailable on this platform")
+}
+
+#[cfg(target_os = "macos")]
+fn keymap_helper() -> ExitCode {
+    let Some(path) = std::env::args_os().nth(2) else {
+        return ExitCode::from(64);
+    };
+    match senpi_desktop_backend_macos::run_keymap_helper(std::path::Path::new(&path)) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(status) => ExitCode::from(u8::try_from(status).unwrap_or(1)),
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn keymap_helper() -> ExitCode {
+    fail("the keyboard layout helper is unavailable on this platform")
 }
 
 fn print_schema() -> ExitCode {

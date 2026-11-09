@@ -1,7 +1,7 @@
 import { access, mkdir, readFile, unlink, writeFile } from "../fs/resilient"
 import { dirname, relative } from "node:path"
 
-import { parseMemoryFile, renderMemoryFile } from "../memfs/frontmatter"
+import { isMissingFrontmatterError, parseMemoryFile, renderMemoryFile } from "../memfs/frontmatter"
 import { MemoryPathError, validateMemoryPath } from "../memfs/paths"
 import type { ClaimReceipt } from "../provenance"
 import { hasLegacyUserHeader, restampContent } from "./claim-frontmatter"
@@ -124,6 +124,9 @@ function parseForTool(content: string): ReturnType<typeof parseMemoryFile> {
   try {
     return parseMemoryFile(content)
   } catch (error) {
+    if (isMissingFrontmatterError(error)) {
+      throw new Error("memory apply_patch: target file is missing required frontmatter; add frontmatter with update_description")
+    }
     throw new Error(`memory apply_patch: ${errorMessage(error).replace(/^frontmatter: /, "")}`)
   }
 }

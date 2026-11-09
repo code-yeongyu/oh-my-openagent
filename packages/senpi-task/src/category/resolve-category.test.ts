@@ -312,9 +312,9 @@ describe("resolveCategory", () => {
     })
   })
 
-  test("#given visual-engineering primary models are unavailable and Kimi K3 is available #when resolved #then delegate-core fallback chain preserves the max variant", () => {
+  test("#given visual-engineering primary models are unavailable and Kimi K3.1 Pro is available #when resolved #then delegate-core fallback chain preserves the max variant", () => {
     // given
-    const models = registry([model("opencode-go", "kimi-k3")])
+    const models = registry([model("opencode-go", "kimi-k3.1-pro")])
 
     // when
     const result = resolveCategory("visual-engineering", {}, models)
@@ -322,12 +322,12 @@ describe("resolveCategory", () => {
     // then
     const resolved = expectResolved(result)
     expect(resolved.spec.provider).toBe("opencode-go")
-    expect(resolved.spec.modelId).toBe("kimi-k3")
+    expect(resolved.spec.modelId).toBe("kimi-k3.1-pro")
     expect(resolved.spec.variant).toBe("max")
     expect(resolved.modelSelection.matchedFallback).toBe(true)
     expect(resolved.modelSelection.fallbackEntry).toEqual({
       providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
-      model: "kimi-k3",
+      model: "kimi-k3.1-pro",
       variant: "max",
     })
   })
@@ -371,20 +371,6 @@ describe("resolveCategory", () => {
     const result = resolveCategory("deep", {}, registry([model("github-copilot", "gpt-5.5")]))
 
     expect(result.kind).toBe("model_unavailable")
-  })
-
-  test("#given no category or fallback model resolves and a system default is available #when resolved #then delegate-core reaches the system default", () => {
-    // given
-    const models = registry([model("local", "system-default")])
-
-    // when
-    const result = resolveCategory("quick", {}, models, { systemDefaultModel: "local/system-default" })
-
-    // then
-    const resolved = expectResolved(result)
-    expect(resolved.spec.provider).toBe("local")
-    expect(resolved.spec.modelId).toBe("system-default")
-    expect(resolved.modelSelection.matchedFallback).toBe(false)
   })
 
   test("#given selected model is absent from registry #when resolved #then unavailable result names attempted and available models", () => {

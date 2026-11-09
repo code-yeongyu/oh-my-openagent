@@ -1,8 +1,10 @@
 import type { RpcTransportGoneError } from "@code-yeongyu/senpi"
+import { log } from "@oh-my-opencode/utils"
 import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
+import { engineAcceptsSpawnedBy } from "../engine-spawned-by"
 import { HostUnavailableError } from "./daemon"
 import {
-  assertHostUsable, RETRY_FALLBACK_PROFILE_CAPABILITY, toWireOpen,
+  assertHostUsable, toWireOpen,
   type HostProtocolProbe, type HostRpcClient, type HostRpcClientFactory, type HostSessionOpenInput,
 } from "./session-transport"
 import { toOpenFailure } from "./session-wire"
@@ -26,14 +28,20 @@ export async function openHostSessionConnection(input: HostSessionOpenInput, por
       detail: "the daemon accepts connections but did not answer get_protocol_info",
     })
   }
-  const identity = assertHostUsable(probed)
+  const identity = assertHostUsable(probed, input.retryFallback)
   const client = await ports.createClient({ socketPath: ports.socketPath, onDisconnect: ports.onDisconnect })
   client.onEvent(ports.onEvent)
   await client.start()
   ports.bindClient(client)
-  const profileHonored = identity.capabilities.includes(RETRY_FALLBACK_PROFILE_CAPABILITY)
-  const retryFallbackDropped = !profileHonored && input.retryFallback !== undefined
-  const wire = toWireOpen(profileHonored ? input : withoutRetryFallback(input))
+  // No capability names spawnedBy, so the host's engine version decides; an unproven host opens without it.
+  const spawnedByHonored = engineAcceptsSpawnedBy(identity.engineVersion)
+  if (!spawnedByHonored && input.spawnedBy !== undefined) {
+    log("senpi-task host engine does not accept spawnedBy; opening the child without ancestry", {
+      socket: ports.socketPath,
+      engineVersion: identity.engineVersion,
+    })
+  }
+  const wire = toWireOpen(spawnedByHonored ? input : withoutSpawnedBy(input))
   const opened = await client.openSession(wire).catch(async (error: unknown) => {
     ports.bindClient(undefined)
     await client.stop()
@@ -46,10 +54,10 @@ export async function openHostSessionConnection(input: HostSessionOpenInput, por
     }
     throw toOpenFailure(error, input.sessionPath)
   })
-  return { opened, identity, retryFallbackDropped }
+  return { opened, identity }
 }
 
-function withoutRetryFallback(input: HostSessionOpenInput): HostSessionOpenInput {
-  const { retryFallback: _retryFallback, ...rest } = input
+function withoutSpawnedBy(input: HostSessionOpenInput): HostSessionOpenInput {
+  const { spawnedBy: _spawnedBy, ...rest } = input
   return rest
 }

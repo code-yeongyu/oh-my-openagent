@@ -63,6 +63,7 @@ function createFakeTimeouts(): FakeTimeouts {
 
   const advanceBy = async (ms: number) => {
     const target = now + Math.max(0, ms)
+    let fired = 0
     while (true) {
       let next: { id: number; time: number; callback: TimerCallback; args: unknown[] } | undefined
       for (const timer of timers.values()) {
@@ -71,6 +72,7 @@ function createFakeTimeouts(): FakeTimeouts {
         }
       }
       if (!next) break
+      if (++fired > 10_000) throw new Error("fake clock fired more than 10000 timers in one advance: a timer keeps rescheduling itself")
 
       now = next.time
       timers.delete(next.id)

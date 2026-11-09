@@ -1,11 +1,10 @@
-import { readFileSync } from "node:fs"
-
 import type { CreateAgentSessionOptions, ToolDefinition } from "@code-yeongyu/senpi"
 
 import type { ResolvedModelRecord } from "../state"
 import type { KernelToolBindingRegistry } from "../kernel-tools/bindings"
 import type { KernelToolGrant } from "../kernel-tools/resolve"
 import { loadSenpiBarrel } from "../lazy/senpi-barrel"
+import type { ChildDialogForwarder } from "./child-dialogs/forwarder"
 import { isWorkpoolYieldTool } from "../workpool/worker-tool-identity"
 import {
   createRestoredChildHandle,
@@ -16,7 +15,9 @@ import {
   type ChildSession,
 } from "./in-process/child-handle"
 import { buildChildSessionOptions, requireChildSessionDir, resolveMemberScopedToolNames } from "./in-process/child-options"
+import { defaultCreateChildSession, type ChildDialogBinding, type CreateChildSession } from "./in-process/create-child-session"
 import { assertPinnedModelHonoured } from "./in-process/pin-check"
+import { assertUsableSessionFile } from "./in-process/session-file-guard"
 import { RunnerError } from "./in-process/runner-error"
 import type { ChildRetryOverride } from "./in-process/runtime-fallback-settings"
 import { buildSubagentPrompt } from "./in-process/subagent-prompt"
@@ -104,6 +105,11 @@ export type ChildSpec = {
   readonly depth: number
   readonly parentSessionId: string
   readonly rootSessionId: string
+  // An engine-owned worker (the facts extractor) whose parent ids name its run, not a live session. It opens without
+  // spawnedBy and without a preset flag, so its preset is the one the engine's own resolver gives its settings (senpi
+  // rule 4), never inherited and never loosened; `allowTools` (its own task tools only) run without asking, and every
+  // other gated call is decided by that preset as usual.
+  readonly ownApprovalMode?: { readonly allowTools: readonly string[] }
   readonly agentType?: string
   readonly instructions?: string
   readonly prompt: string
@@ -126,7 +132,7 @@ export type ChildSpec = {
   readonly completion?: ChildCompletionPolicy
 }
 
-export type CreateChildSession = (options: CreateAgentSessionOptions) => Promise<ChildSession>
+export type { CreateChildSession } from "./in-process/create-child-session"
 
 export type InProcessRunnerOptions = {
   // The parent extension's registered ToolDefinitions (same-process, same execute closures). The
@@ -141,16 +147,8 @@ export type InProcessRunnerOptions = {
    * and the revived child fails closed instead.
    */
   readonly kernelToolBindings?: KernelToolBindingRegistry
-}
-
-const defaultCreateChildSession: CreateChildSession = async (options) => {
-  // SDK callers that supply a ResourceLoader own its reload and extension binding. Load the
-  // builtin-only child surface, then run session_start so model-aware builtins (apply_patch, web
-  // search, terminal) select the same variants and active names as a process child.
-  await options.resourceLoader?.reload()
-  const session = (await (await loadSenpiBarrel()).createAgentSession(options)).session
-  await session.bindExtensions({ mode: "print" })
-  return session
+  // The parent's UI for the child's select/confirm/input/editor (#6189 F2d); absent, the child has no UI.
+  readonly dialogs?: ChildDialogForwarder
 }
 
 export class InProcessRunner {
@@ -159,13 +157,19 @@ export class InProcessRunner {
   readonly #depthPolicy: DepthPolicy
   readonly #createSession: CreateChildSession
   readonly #kernelToolBindings: KernelToolBindingRegistry | undefined
+  readonly #dialogs: ChildDialogForwarder | undefined
 
   constructor(options: InProcessRunnerOptions = {}) {
+    this.#dialogs = options.dialogs
     this.#sharedParentTools = options.sharedParentTools ?? []
     this.#uiOnlyToolNames = [...(options.uiOnlyToolNames ?? [])]
     this.#depthPolicy = options.depthPolicy ?? { maxDepth: DEFAULT_MAX_CHILD_DEPTH }
     this.#createSession = options.createSession ?? defaultCreateChildSession
     this.#kernelToolBindings = options.kernelToolBindings
+  }
+
+  #dialogBinding(taskId: string): ChildDialogBinding | undefined {
+    return this.#dialogs === undefined ? undefined : { forwarder: this.#dialogs, taskId }
   }
 
   async start(spec: ChildSpec): Promise<ChildHandle> {
@@ -191,12 +195,14 @@ export class InProcessRunner {
       const { SessionManager } = await loadSenpiBarrel()
       const options = buildChildSessionOptions({
         spec,
-        sessionManager: SessionManager.create(spec.cwd, requireChildSessionDir(spec)),
+        sessionManager: SessionManager.create(spec.cwd, requireChildSessionDir(spec), spec.ownApprovalMode !== undefined ? {} : {
+          spawnedBy: { parentSessionId: spec.parentSessionId, rootSessionId: spec.rootSessionId, taskId: spec.taskId },
+        }),
         sharedParentTools: this.#sharedParentTools,
         uiOnlyToolNames: this.#uiOnlyToolNames,
         ...(this.#kernelToolBindings === undefined ? {} : { kernelToolBindings: this.#kernelToolBindings }),
       })
-      session = await this.#createSession(options)
+      session = await this.#createSession(options, this.#dialogBinding(spec.taskId))
       createdSession = session
       assertPinnedModelHonoured(spec, session)
     } catch (error) {
@@ -288,7 +294,7 @@ export class InProcessRunner {
         revivedSessionPath: sessionPath,
         ...(this.#kernelToolBindings === undefined ? {} : { kernelToolBindings: this.#kernelToolBindings }),
       })
-      session = await this.#createSession(options)
+      session = await this.#createSession(options, this.#dialogBinding(spec.taskId))
     } catch (error) {
       if (RunnerError.is(error)) throw error
       throw new RunnerError({ kind: "session_unavailable", message: sessionResumeMessage(error), cause: error })
@@ -308,52 +314,4 @@ function sessionCreateMessage(error: unknown): string {
 
 function sessionResumeMessage(error: unknown): string {
   return `Failed to resume in-process child session: ${error instanceof Error ? error.message : String(error)}`
-}
-
-function isSessionHeaderEntry(entry: unknown): entry is { readonly type: "session"; readonly id: string } {
-  return (
-    typeof entry === "object" &&
-    entry !== null &&
-    "type" in entry &&
-    entry.type === "session" &&
-    "id" in entry &&
-    typeof entry.id === "string"
-  )
-}
-
-// Eager resume-time validation of the transcript. senpi's loader TOLERATES unparseable lines and
-// treats a file whose first parsed entry is not a session header as empty, and SessionManager.open
-// is lazy - so without this check a corrupt/unreadable path would silently resurrect a child with
-// no transcript instead of failing typed. Mirrors senpi's validity notion exactly: skip blank and
-// unparseable lines, then require the first parsed entry to be a session header with a string id.
-function assertUsableSessionFile(sessionPath: string): void {
-  let content: string
-  try {
-    content = readFileSync(sessionPath, "utf8")
-  } catch (error) {
-    throw new RunnerError({
-      kind: "session_unavailable",
-      message: `Child session file is unreadable: ${sessionPath}`,
-      cause: error,
-    })
-  }
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim()
-    if (trimmed.length === 0) continue
-    let entry: unknown
-    try {
-      entry = JSON.parse(trimmed)
-    } catch {
-      continue
-    }
-    if (isSessionHeaderEntry(entry)) return
-    throw new RunnerError({
-      kind: "session_unavailable",
-      message: `Child session file has no session header: ${sessionPath}`,
-    })
-  }
-  throw new RunnerError({
-    kind: "session_unavailable",
-    message: `Child session file has no session header: ${sessionPath}`,
-  })
 }

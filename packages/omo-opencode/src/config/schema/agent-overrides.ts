@@ -8,6 +8,7 @@ export const AgentOverrideConfigSchema = z.object({
   model: z.string().optional(),
   /** Ordered model chain; the first entry is primary and the rest are fallbacks. */
   models: z.array(z.union([z.string(), FallbackModelObjectSchema])).optional(),
+  models_distribution: z.enum(["sequential", "round_robin"]).optional(),
   fallback_models: FallbackModelsSchema.optional(),
   reasoning: OmoReasoningSchema.optional(),
   /** @deprecated Use `reasoning` instead. */

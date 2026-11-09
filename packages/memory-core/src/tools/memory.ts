@@ -2,7 +2,7 @@ import { existsSync } from "../fs/resilient"
 import { mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from "../fs/resilient"
 import { dirname, join, relative } from "node:path"
 import type { GitCommitAuthor, GitMemoryRepo } from "../git"
-import { parseMemoryFile, renderMemoryFile, type ParsedMemoryFile } from "../memfs/frontmatter"
+import { isMissingDescriptionError, isMissingFrontmatterError, parseMemoryFile, renderMemoryFile, type ParsedMemoryFile } from "../memfs/frontmatter"
 import { describeDescriptionViolation } from "../memfs/frontmatter-validation"
 import { validateMemoryPath, validateRepositoryPath } from "../memfs/paths"
 import { MemoryPatchHunkError, MemoryPatchParseError, applyMemoryPatch } from "./patch-apply"
@@ -180,9 +180,45 @@ async function updateDescription(root: string, params: MemoryToolParams): Promis
   const source = required(params.file_path, "file_path", "update_description")
   const description = acceptableDescription(params.description, "update_description")
   const path = validateMemoryPath(root, source, { fieldName: "file_path" })
-  const file = await loadEditable(path, source)
-  await writeFile(path, renderMemoryFile(stampReceipt(file, { ...file.frontmatter, description }, file.body, params.provenance?.claim), file.body), "utf8")
-  return affected(root, path, file)
+  const content = await readUtf8(path, source)
+  let parsed: ParsedMemoryFile | undefined
+  try {
+    parsed = parseMemoryFile(content)
+  } catch (error) {
+    if (isMissingFrontmatterError(error)) {
+      // A header buried under leading blank lines is not "no frontmatter": adding
+      // another header in front would strand the real one as body text, so refuse
+      // and say what to fix instead of treating the whole file as the body. A note
+      // that starts directly with a --- line (an unclosed rule, not a buried header)
+      // is still frontmatter-less, so it keeps the add-a-header path below.
+      const stripped = content.replace(/^\s+/, "")
+      if (stripped !== content && /^---(\r?\n|$)/.test(stripped)) {
+        throw toolError(
+          `${source} has blank lines before a --- line, so a frontmatter header below them is not at the top of the file and cannot be trusted. Remove the leading blank lines so the file starts with --- (or, if that --- line is body text, move it below a real frontmatter header), then retry update_description`,
+        )
+      }
+    } else if (isMissingDescriptionError(error)) {
+      // The opening --- block may be body text, not frontmatter: a note whose body
+      // starts with a --- rule, then text, then --- parses exactly this way.
+      throw toolError(
+        `${errorMessage(error)} (suggestion: if this note has no frontmatter, its opening --- line is body text, such as a horizontal rule, that was read as a header. Move that opening --- line below a real frontmatter header, then retry update_description)`,
+        error,
+      )
+    } else {
+      throw error
+    }
+  }
+  if (parsed === undefined) {
+    // A frontmatter-less note has no read_only key to protect, and the whole file is the body:
+    // this is the one edit allowed to add the missing block, rendered like a create.
+    await writeFile(path, renderMemoryFile(stampReceipt(undefined, { description }, content, params.provenance?.claim), content), "utf8")
+    return affected(root, path)
+  }
+  if (parsed.frontmatter.read_only === "true") {
+    throw toolError(`${source} is read_only and cannot be modified`)
+  }
+  await writeFile(path, renderMemoryFile(stampReceipt(parsed, { ...parsed.frontmatter, description }, parsed.body, params.provenance?.claim), parsed.body), "utf8")
+  return affected(root, path, parsed)
 }
 
 function acceptableDescription(value: string | undefined, command: MemoryCommand): string {
@@ -194,7 +230,15 @@ function acceptableDescription(value: string | undefined, command: MemoryCommand
 
 async function loadEditable(path: string, source: string): Promise<ParsedMemoryFile> {
   const content = await readUtf8(path, source)
-  const parsed = parseMemoryFile(content)
+  let parsed: ParsedMemoryFile
+  try {
+    parsed = parseMemoryFile(content)
+  } catch (error) {
+    if (isMissingFrontmatterError(error)) {
+      throw toolError("frontmatter: target file is missing required frontmatter; add frontmatter with update_description")
+    }
+    throw error
+  }
   if (parsed.frontmatter.read_only === "true") {
     throw toolError(`${source} is read_only and cannot be modified`)
   }

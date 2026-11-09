@@ -3,13 +3,14 @@
 use senpi_desktop_core::menus::MenuItem;
 use senpi_desktop_core::protocol_params::{
     AxClickParams, AxElementAtParams, AxPerformParams, AxQueryParams, AxRefParams, AxSetValueParams, AxSnapshotParams,
-    CaptureParams, CaptureRegionParams, ClipboardText, ControlGrantParams, DragParams, KeyChordParams, MenuPathParams, MenuSelectParams, PointParams,
+    AxTypeTextParams, CaptureParams, CaptureRegionParams, ClipboardText, ControlGrantParams, DragParams, KeyChordParams, MenuPathParams, MenuSelectParams, PointParams,
     HoldKeysParams, HoldMouseParams, ObserveParams, RaiseWindowParams, ScrollParams, TypeTextParams,
 };
-use senpi_desktop_core::protocol_results::ControlStateResult;
+use senpi_desktop_core::protocol_results::{AxInputResult, ControlStateResult};
 use senpi_desktop_core::types::{
     AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopWindow, ObserveResult,
 };
+use senpi_desktop_core::report::ActionReport;
 use serde::Serialize;
 
 /// One backend request of an open session, carrying its engine method's
@@ -42,6 +43,7 @@ pub enum Op {
     AxSetValue(AxSetValueParams),
     AxFocus(AxRefParams),
     AxClick(AxClickParams),
+    AxTypeText(AxTypeTextParams),
     ClipboardRead,
     ClipboardWrite(ClipboardText),
     ControlGrant(ControlGrantParams),
@@ -67,7 +69,10 @@ pub enum Response {
     MaybeNode(Option<AxNode>),
     Nodes(Vec<AxNode>),
     Attributes(Vec<(String, String)>),
+    AxInput(AxInputResult),
     Clipboard(ClipboardText),
     ControlState(ControlStateResult),
     MenuItems(Vec<MenuItem>),
+    /// A mutating request's report in a `reportMode: "object"` session.
+    Action(Box<ActionReport>),
 }

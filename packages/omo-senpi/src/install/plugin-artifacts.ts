@@ -18,6 +18,7 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("extensions", "omo-memory-commands.js"),
   join("extensions", "omo-session-history.js"),
   join("extensions", "omo-recall-store.js"),
+  join("extensions", "omo-device-service.js"),
   join("extensions", "omo-telemetry-posthog.js"),
   join("extensions", "omo-telemetry-otlp.js"),
   // The sync engine sidecar and the Loro wasm it loads from beside itself.
@@ -27,6 +28,7 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("extensions", "omo-thread-client.js"),
   join("extensions", "omo-telemetry-recovery.js"),
   join("extensions", "omo-feedback.js"),
+  join("extensions", "omo-desktop-toolkit.js"),
   join("extensions", "omo-claim-receipt.js"),
   join("extensions", "assets.generated.json"),
   join("extensions", "omo-member.js"),
@@ -62,6 +64,7 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("skills", "visual-qa", "SKILL.md"),
   join("skills-conditional", "x-search", "SKILL.md"),
   join("runtime", "agent-toolkit-sdk", "sdk.js"),
+  join("runtime", "bunshin-ts", "sdk.js"),
   join("runtime", "thread-sdk", "sdk.js"),
   join("runtime", "ast-grep-mcp", "cli.js"),
   join("runtime", "lsp-daemon", "dist", "cli.js"),

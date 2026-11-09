@@ -53,7 +53,9 @@ test.each([["linux", "riscv64"], ["win32", "ia32"]])("status preserves %s-%s abs
     expect(starts).toBe(0)
     await handler("on", ctx)
     expect(starts).toBe(1)
-    expect(messages.at(-1)).toContain("native-unavailable")
+    expect(messages.at(-1)).toBe(
+      "/computer on: Computer use is unavailable: no usable desktop engine was found for this host. Run /computer status to see the engine path and what is wrong with it.",
+    )
     await handler("status", ctx)
     expect(messages.at(-1)).toContain(`No senpi-desktop-engine is built for ${platform}-${arch}`)
     expect(messages.at(-1)).toContain("engine: native-unavailable")

@@ -43,3 +43,30 @@ describe("attachment fence: deny by default, like the host's gate", () => {
     expect(await run(type)).toEqual([type])
   })
 })
+
+describe("attachment fence refusal identity", () => {
+  test.each(
+    (["unknown_session", "session_identity_mismatch"] as const)
+      .flatMap((code) => (["errorCode", "error"] as const).map((field) => [code, field] as const)),
+  )("#given an attach refusal %s in %s #when an ordinary mutation runs #then the error keeps its code and nothing is sent afterward", async (code, field) => {
+    const sent: string[] = []
+    const refusal = await fencedCommand(
+      async (command) => {
+        sent.push(String(command.type))
+        return { success: false, [field]: code }
+      },
+      "/tmp/host.sock",
+      { type: "set_session_name", sessionId: "rpc-1", name: "renamed" },
+      CAPABILITIES,
+      "dur-selected",
+      async () => {
+        sent.push("set_session_name")
+        return { success: true, data: {} }
+      },
+    ).then(() => undefined, (error: unknown) => error)
+
+    expect(refusal).toBeInstanceOf(Error)
+    expect(refusal).toMatchObject({ code })
+    expect(sent).toEqual(["attach_session"])
+  })
+})

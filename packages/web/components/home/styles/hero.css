@@ -1,0 +1,67 @@
+/* 4.1 Hero */
+.hero {
+  position: relative;
+  padding-block: var(--space-9) var(--space-8);
+  isolation: isolate;
+  overflow-x: clip;
+}
+
+/* A static dot field behind the headline, fading out toward the window; no motion, one paint. */
+/* A static dot field behind the headline, fading toward the window; one paint, no motion. */
+.hero__bg {
+  position: absolute;
+  inset: -64px 0 auto;
+  height: 760px;
+  z-index: -1;
+  background-image: radial-gradient(var(--dot) 1px, transparent 1.4px);
+  background-size: 18px 18px;
+  mask-image: radial-gradient(60% 55% at 50% 38%, #000 10%, transparent 70%);
+  pointer-events: none;
+}
+
+.hero__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.display {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-display);
+  font-weight: var(--weight-display);
+  line-height: 0.96;
+  letter-spacing: var(--tracking-display);
+  text-wrap: balance;
+}
+
+.display__accent {
+  color: var(--accent);
+}
+
+.hero__sub {
+  max-width: 44ch;
+  margin: var(--space-5) 0 0;
+  font-size: var(--text-lede);
+  line-height: 1.55;
+  color: var(--ink-soft);
+  text-wrap: pretty;
+}
+
+.hero__makers {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-xs);
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+}
+
+.hero__makers a {
+  color: var(--ink);
+  text-underline-offset: 3px;
+  text-decoration-color: var(--line-strong);
+}
+
+.hero__makers a:hover {
+  text-decoration-color: currentColor;
+}

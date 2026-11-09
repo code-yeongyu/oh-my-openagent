@@ -4,6 +4,8 @@
  * OAuth credentials are provider-bound tokens, so they are never copied; the user has to sign in
  * again. That sign-in lives in the interactive session (`/login <provider>`), NOT in `omo auth`,
  * which only prints or checks credentials that already exist.
+ *
+ * `commandCodeGuidance` describes the optional zero-data-retention header for a planned provider.
  */
 
 function oauthLoginTarget(provider, providerMap) {
@@ -29,4 +31,13 @@ export function credentialGuidance(result, providerMap, existing = {}) {
     logins: result.skippedOauth.map((provider) => oauthLogin(provider, providerMap, existing)),
     unmapped: result.skippedUnmapped,
   }
+}
+
+/**
+ * The zero-data-retention header stays a hand edit: setup never adds headers of its own.
+ */
+export function commandCodeGuidance() {
+  return [
+    "To make the Command Code provider enforce zero data retention, add the header \"x-cmd-zdr: 1\" to its models.json entry by hand.",
+  ]
 }

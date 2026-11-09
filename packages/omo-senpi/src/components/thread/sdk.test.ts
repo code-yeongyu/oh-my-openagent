@@ -5,8 +5,11 @@ import { join } from "node:path"
 
 import type { GatewayEndpointRef, ReleaseSessionRequest } from "./gateway/adapter"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
+import type { RemoteThreadSurface } from "./remote/ports"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
+import { createRemoteThreadFixture } from "./thread-remote-fixture"
 import type { ThreadHost, ThreadHostSession } from "./tools"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const TUI_SOCKET = "/tmp/t-0123456789abcdef.sock"
 const HOST_SOCKET = "/tmp/i-0123456789abcdef.sock"
@@ -18,7 +21,7 @@ afterEach(async () => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
-function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, request: ReleaseSessionRequest) => Promise<never>; readonly store?: (agentDir: string) => GatewayStore; readonly sdkOwnsStore?: boolean } = {}) {
+function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, request: ReleaseSessionRequest) => Promise<never>; readonly store?: (agentDir: string) => GatewayStore; readonly sdkOwnsStore?: boolean; readonly remote?: RemoteThreadSurface; readonly cwd?: string } = {}) {
   const agentDir = mkdtempSync(join(tmpdir(), "thread-sdk-"))
   directories.push(agentDir)
   const store: GatewayStore = options.store?.(agentDir) ?? createGatewayStore({ agentDir })
@@ -64,7 +67,7 @@ function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, re
       }),
     },
   }
-  const sdk = createThreadSdk({ agentDir, cwd: process.cwd(), uid: 501, user: "qa-user", host, ...(options.sdkOwnsStore === true ? {} : { store }) })
+  const sdk = createThreadSdk({ agentDir, cwd: options.cwd ?? process.cwd(), uid: 501, user: "qa-user", host, ...(options.sdkOwnsStore === true ? {} : { store }), ...(options.remote === undefined ? {} : { remote: options.remote }) })
   sdks.push(sdk)
   return { sdk, store, wakes, releases }
 }
@@ -99,6 +102,26 @@ describe("thread SDK: sessions", () => {
     const { sdk, store } = fixture()
     expect(await sdk.send({ thread: "my-tui", text: "ping", author: { platform_user_id: "U1", display: "Jane" } })).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
     expect(await store.list()).toEqual([])
+  })
+})
+
+describe("thread SDK: read reaches the account like the agent tools (#12833)", () => {
+  const remoteFixture = createRemoteThreadFixture()
+  afterEach(remoteFixture.cleanup)
+
+  test("#given aliases held by a thread here and by one on b #when omo thread read names each alias #then the first reads this device's transcript and the second b's", async () => {
+    const account = remoteFixture.account({ aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }], ["lane-b", { session_id: "dur-on-b", device: "b" }]]) })
+    const { sdk } = fixture({ remote: account.remote })
+    expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread_id: "dur-host" })
+    expect(await sdk.read({ thread: "lane-b" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+    expect(account.sent.filter((entry) => entry.via === "session").map((entry) => [entry.device, entry.rpc?.["type"]])).toEqual([["b", "get_messages"]])
+  })
+
+  test("#given an alias held by a thread on this device and omo thread run from another workspace #when read names the alias without all_scope #then it reads that thread; the raw id alone stays scope_denied", async () => {
+    const account = remoteFixture.account({ aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]) })
+    const { sdk } = fixture({ remote: account.remote, cwd: "/thread-sdk-other-workspace" })
+    expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread_id: "dur-host" })
+    expect(await sdk.read({ thread: "dur-host" })).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
   })
 })
 
@@ -213,7 +236,7 @@ describe("thread SDK: store extensions", () => {
   async function settled<T>(what: string, call: Promise<T>): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined
     const bound = new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => reject(new Error(`${what} did not settle within ${SETTLE_MS} ms`)), SETTLE_MS)
+      timer = setTimeout(() => reject(new Error(`${what} did not settle within the test budget`)), remainingTestTime())
     })
     try {
       return await Promise.race([call, bound])
@@ -226,6 +249,7 @@ describe("thread SDK: store extensions", () => {
   // one extension call that binds or enqueues inside the store worker's transaction. That target
   // lookup runs while the worker is busy with the call, so it must not ask the same store anything.
   test("#given the SDK's own store #when an extension operation binds a session and enqueues through that binding #then both settle and the delivery is written", async () => {
+    useTestTimeout(SETTLE_MS * 3)
     const { sdk } = fixture({ sdkOwnsStore: true })
     expect((await sdk.registerStoreExtension(EXTENSION)).kind).toBe("ok")
     const bound = await settled("tx.bind", sdk.extensionCall<{ kind: string; binding?: { binding_id: string } }>("alpha", "core", { op: "bind", request: { principal: "test", binding: { platform: "custom", account_id: "qa", chat_id: "c1", session_durable_id: "dur-tui", ttl_seconds: null } } }))

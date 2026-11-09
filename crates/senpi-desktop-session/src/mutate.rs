@@ -16,6 +16,7 @@ use parking_lot::{Mutex, MutexGuard};
 use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode, TccPermission};
 use senpi_desktop_core::protocol_results::AuditEvent;
+use senpi_desktop_core::report::ReportMode;
 use senpi_desktop_safety::{
     gate, FrameContext, FrameId, GateError, LockState, MonotonicClock, MutatingAction, PermissionGate, StopPathReason,
     StopPolicy, Supervisor,
@@ -23,6 +24,7 @@ use senpi_desktop_safety::{
 
 use crate::audit::audit_event;
 use crate::grant::ControlSlot;
+use crate::report::{error_report, Stage};
 use crate::restore::{Guard, TransactionError};
 use crate::session::guarded;
 use crate::worker::Worker;
@@ -74,6 +76,8 @@ pub(crate) struct Mutation<'a> {
     /// backend call while this single transaction owns the input lock.
     pub(crate) text_delivered: Cell<u32>,
     pub(crate) keys: Option<&'a [String]>,
+    /// How far the transaction got; decides the object-mode disposition.
+    pub(crate) stage: Cell<Stage>,
 }
 
 impl Mutation<'_> {
@@ -86,6 +90,7 @@ impl Mutation<'_> {
             text: None,
             text_delivered: Cell::new(0),
             keys: None,
+            stage: Cell::new(Stage::Admission),
         }
     }
 }
@@ -135,12 +140,27 @@ impl Worker {
             Ok(_transaction) => self.transaction(mutation, cancelled, act),
             Err(stopped) => (Err(TransactionError::Primary(stopped)), None),
         };
+        let primary = match &result {
+            Ok(_) => None,
+            Err(TransactionError::Primary(error)) => Some(error.code),
+            Err(TransactionError::FocusRestoreFailed { primary, .. } | TransactionError::CursorRestoreFailed { primary, .. }) => {
+                primary.as_ref().map(|error| error.code)
+            }
+        };
         let result = result.map_err(DesktopError::from);
         let code = result.as_ref().err().map(|error| error.code);
-        let event = audit_event(mutation, code, focus_restored, started.elapsed());
+        let mut event = audit_event(mutation, code, focus_restored, started.elapsed());
+        let object = self.registry.report_mode() == ReportMode::Object;
+        if object {
+            event.id = Some(ulid::Ulid::generate().to_string());
+        }
         (self.safety.audit)(&event);
         self.persist_audit(&event, result.as_ref().err());
-        result.map(|value| (value, event))
+        match result {
+            Ok(value) => Ok((value, event)),
+            Err(error) if object => Err(error.with_report(error_report(primary, mutation.stage.get(), &event))),
+            Err(error) => Err(error),
+        }
     }
 
     /// The gate and the transaction proper; `focus_restored` is `None` when
@@ -159,15 +179,23 @@ impl Worker {
         if let Err(refused) = self.admit_control(mutation) {
             return (Err(TransactionError::Primary(refused)), None);
         }
+        let _watch = match self.admit_intervention(mutation, cancelled) {
+            Ok(watch) => watch,
+            Err(refused) => return (Err(TransactionError::Primary(refused)), None),
+        };
         let guard = match Guard::begin(self, mutation.action, mutation.delivery) {
             Ok(guard) => guard,
             Err(error) => return (Err(TransactionError::Primary(error)), None),
         };
         let mut result = match self.stop_observed(cancelled) {
             Some(stopped) => Err(stopped),
-            None => guarded(|| act(self)),
+            None => {
+                mutation.stage.set(Stage::Acting);
+                guarded(|| act(self))
+            }
         };
         if result.is_ok() {
+            mutation.stage.set(Stage::Acted);
             result = self.after_action(mutation, result);
         }
         if let Err(primary) = &mut result {
@@ -302,6 +330,8 @@ mod permission_tests;
 #[cfg(test)]
 mod stop_tests;
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 #[cfg(test)]
 mod typing_tests;
+#[cfg(test)]
+mod remote_typing_tests;

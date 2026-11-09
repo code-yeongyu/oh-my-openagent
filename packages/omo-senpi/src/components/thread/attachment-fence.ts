@@ -2,8 +2,9 @@ import { log } from "@oh-my-opencode/utils/logger"
 import { authRequiredError, type RpcObject, type RpcRequest } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 
 // The commands the host lets an unattached connection send (senpi session-attachment-gate.ts: ATTACH_GATE_EXEMPT,
-// plus close_session, set_session_context and release_attachment, which its gate skips). Every other session
-// command is fenced: deny by default, so a command the client learns later is never sent unattached.
+// plus set_session_context and release_attachment, which its gate skips). Every other session command is fenced: deny
+// by default, so a command the client learns later is never sent unattached. close_session is fenced too: the gate
+// skips it, but close() refuses a connection that holds no attachment with unknown_session (senpi#1782).
 const UNFENCED: ReadonlySet<string> = new Set([
   "get_protocol_info", "list_sessions", "subscribe_sessions", "unsubscribe_sessions", "get_subscription_limits", "warm",
   "detach_connection", "open_session", "attach_session", "reclaim_session", "get_effect_status", "get_state", "get_messages",
@@ -11,7 +12,7 @@ const UNFENCED: ReadonlySet<string> = new Set([
   "get_available_models", "get_available_thinking_levels", "get_fast_mode", "get_session_stats", "get_pending_inputs",
   "get_steering_messages", "get_follow_up_messages", "get_auth_providers", "get_provider_accounts", "resolve_path",
   "memory_report", "eval_cells.list", "eval_cells.peek", "check_reload_veto",
-  "close_session", "set_session_context", "release_attachment",
+  "set_session_context", "release_attachment",
 ])
 
 function errorCodeOf(frame: RpcObject): unknown {
@@ -28,6 +29,12 @@ function errorReasonOf(frame: RpcObject): unknown {
 const TYPED_REFUSAL: ReadonlySet<string> = new Set(["release_session", "extension_ui_response"])
 
 type AttachRefusal = { readonly code: string; readonly errorData?: unknown; readonly frame: RpcObject }
+
+class SessionAttachmentError extends Error {
+  constructor(readonly code: "unknown_session" | "session_identity_mismatch", sessionId: unknown) {
+    super(`${code}:${String(sessionId)}`)
+  }
+}
 
 /**
  * Attaches the selected session on this connection; undefined once attached, else the refusal. A
@@ -48,6 +55,7 @@ async function attachSelectedSession(request: RpcRequest, socketPath: string, se
 function attachRefusalError(refusal: AttachRefusal, socketPath: string, sessionId: unknown): Error {
   if (refusal.code === "host_draining") return new Error(`host_draining:${socketPath}`)
   if (refusal.code === "session_not_attached") return new Error(`session_not_attached:${String(sessionId)}`)
+  if (refusal.code === "unknown_session" || refusal.code === "session_identity_mismatch") return new SessionAttachmentError(refusal.code, sessionId)
   return new Error(`thread RPC request failed: ${JSON.stringify(refusal.frame.error ?? refusal.frame)}`)
 }
 

@@ -1,17 +1,19 @@
 import { homedir } from "node:os"
 import { join } from "node:path"
 
-import type { MemoryBlockCache, ReservedRun } from "@oh-my-opencode/memory-core"
+import type { MemoryBlockCache, ReservedRun, TranscriptProjection } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext, SenpiExtensionAPI, SettleObserver } from "../../extension/types"
 import { hasMemoryCapabilities } from "./capabilities"
 import { registerMemoryCommands } from "./commands/register"
+import { loadMemoryCommandsRuntime } from "./commands/runtime-loader"
 import type { MemoryCommandIdentity, MemoryCommandSettings } from "./commands/types"
 import type { DreamTriggerWiring } from "./dream-trigger"
 import type { MemoryFactsWiring } from "./facts-wiring"
 import { registerMemoryGuard } from "./guard"
 import type { MemoryIdentityRuntime } from "./identity-runtime"
 import type { MemoryJournalWiring } from "./journal-wiring"
+import { registerJournalSettleDelivery } from "./journal-settle-delivery"
 import type { createMemoryNudgeWiring } from "./nudge-wiring"
 import { registerPalaceCommand } from "./palace/command"
 import { registerMemorySkillsScope } from "./skills-scope"
@@ -69,6 +71,8 @@ export function registerMemoryStatic(input: {
   readonly onReflectionLaunch?: (identity: string, run: ReservedRun) => void | Promise<void>
   /** Fires after each settle so the footer can refresh its segments behind the fingerprint gate. */
   readonly onSettled?: (sessionId: string, eventCtx: unknown, observer?: SettleObserver) => void | Promise<void>
+  /** Required journal snapshot delivery, before optional facts/reflection observation. */
+  readonly onJournalSettled?: (sessionId: string, entries: readonly TranscriptProjection[]) => void | Promise<void>
   /** Fires after every successful memory write, independent of the once-only footer latch. */
   readonly onMemoryWrite?: (sessionId: string) => void | Promise<void>
 }): void {
@@ -76,7 +80,7 @@ export function registerMemoryStatic(input: {
     pi, ctx, options, promptCache, promptPrebuild, nudgeWiring, noticeWiring, recallWiring, dreamTriggerWiring,
     completionApi, resolveContext, journalWiringFor, factsWiringFor, runtimeFor,
     triggerSessionFor, resolvePalacePeople, loadCommandSettings, lastEventCtx,
-    activeSession, skillsUsageTrackersRef, memoryUsageTrackersRef, onReflectionLaunch, onSettled, onMemoryWrite,
+    activeSession, skillsUsageTrackersRef, memoryUsageTrackersRef, onReflectionLaunch, onSettled, onJournalSettled, onMemoryWrite,
   } = input
   const api = completionApi(pi)
   if (api !== undefined) {
@@ -131,6 +135,7 @@ export function registerMemoryStatic(input: {
   pi.on("session_start", (_payload, eventCtx) => {
     if (eventCtx !== undefined) lastEventCtx.current = eventCtx
   })
+  registerJournalSettleDelivery(pi, { resolveContext, lastEventCtx, activeSession, ...(onJournalSettled === undefined ? {} : { deliver: onJournalSettled }) })
   pi.on("agent_settled", async (_payload, eventCtx, observer) => {
     lastEventCtx.current = eventCtx
     const sessionId = sessionIdFrom(eventCtx)
@@ -213,6 +218,21 @@ export function registerMemoryStatic(input: {
       promptCache.clear()
       projectionPins.requestRefresh()
     },
+    reflectionLockFix: async (sessionId, { dryRun }) => {
+      const identity = resolveContext(sessionId)
+      if (identity === undefined) return []
+      const runtime = runtimeFor(identity)
+      const { formatStaleLockFixLines, reclaimDeadOwnerLocks, runStaleLockReaper } = await loadMemoryCommandsRuntime()
+      const report = await runStaleLockReaper({
+        runtimeDir: identity.identityPaths.runtime,
+        // Interactive: like the per-turn pass, never wait on another run's deadline here.
+        settle: () => runtime.reconcile(undefined, { waitPolicy: "none" }),
+        dryRun,
+        ...(options.reflectionHolderSeams === undefined ? {} : { probe: options.reflectionHolderSeams }),
+      })
+      const locks = dryRun ? undefined : await reclaimDeadOwnerLocks(identity.identityPaths.locks)
+      return formatStaleLockFixLines(identity.identity, report, locks)
+    },
     reflectionSink: {
       request: async (request) => {
         if (activeSession.current === undefined) throw new Error("no bound memory session")
@@ -241,7 +261,7 @@ export function registerMemoryStatic(input: {
         return {
           disposition: "pending",
           runId: result.run.runId,
-          ...(recovery.verdict.state === "dead" && recovery.notice === undefined ? { recoveredRunId: recovery.verdict.runId } : {}),
+          ...(recovery.recoveredRunId === undefined ? {} : { recoveredRunId: recovery.recoveredRunId }),
           ...(recovery.notice === undefined ? {} : { stuck: recovery.notice }),
         }
       },

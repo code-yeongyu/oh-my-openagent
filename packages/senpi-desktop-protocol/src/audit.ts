@@ -1,4 +1,5 @@
 import type { EngineMethod, ErrorCode } from "./engine-schema.generated";
+import type { UnknownAuditValue } from "./wire";
 
 /** Outcome of one audited desktop action. */
 export type AuditStatus = "success" | "error" | "suspended";
@@ -18,13 +19,13 @@ export interface AuditRecord {
 	readonly timestamp: string;
 	readonly sessionId: string;
 	readonly runId: string;
-	readonly action: EngineMethod;
+	readonly action: EngineMethod | UnknownAuditValue;
 	readonly target: string;
 	/** `background`, `foreground`, or `control` (a `control.*` method's own record). */
 	readonly delivery: string;
 	readonly frameId: string | null;
 	/** `null` when the action succeeded. */
-	readonly code: ErrorCode | null;
+	readonly code: ErrorCode | UnknownAuditValue | null;
 	readonly status: AuditStatus;
 	readonly primaryError?: AuditPrimaryError;
 	readonly durationMs: number;

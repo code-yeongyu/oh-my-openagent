@@ -21,12 +21,17 @@
     "packages/isolation-core/src/owner.ts",
     "packages/isolation-core/src/process-identity.ts",
     "packages/isolation-core/src/sweep.ts",
+    "packages/memory-core/src/compile/external-projection.ts",
     "packages/memory-core/src/recall/bm25-persist.ts",
+    "packages/memory-core/src/reflection/completion-links.ts",
     "packages/memory-core/src/sync/keyring-port.ts",
     "packages/omo-codex/scripts/install-local.mjs",
+    "packages/omo-native/test/fixtures/linux-trust-containers/probe.mjs",
     "packages/omo-senpi/plugin/extensions/omo-claim-receipt.js",
     "packages/omo-senpi/plugin/extensions/omo-computer-use.js",
+    "packages/omo-senpi/plugin/extensions/omo-desktop-toolkit.js",
     "packages/omo-senpi/plugin/extensions/omo-device-account.js",
+    "packages/omo-senpi/plugin/extensions/omo-device-service.js",
     "packages/omo-senpi/plugin/extensions/omo-feedback.js",
     "packages/omo-senpi/plugin/extensions/omo-memory-commands.js",
     "packages/omo-senpi/plugin/extensions/omo-memory-doctor.js",
@@ -41,8 +46,10 @@
     "packages/omo-senpi/plugin/extensions/omo-telemetry-recovery.js",
     "packages/omo-senpi/plugin/extensions/omo-thread-client.js",
     "packages/omo-senpi/plugin/runtime/agent-toolkit-sdk/sdk.js",
+    "packages/omo-senpi/plugin/runtime/bunshin-ts/sdk.js",
     "packages/omo-senpi/src/components/claim-receipt/runtime.ts",
     "packages/omo-senpi/src/components/computer-use/runtime.ts",
+    "packages/omo-senpi/src/components/device-service/runtime.ts",
     "packages/omo-senpi/src/components/feedback/runtime.ts",
     "packages/omo-senpi/src/components/memory/commands/runtime.ts",
     "packages/omo-senpi/src/components/memory/device-session/account-runtime.ts",
@@ -74,6 +81,7 @@
     "packages/skills-loader-core/src/shared/project-discovery-dirs.ts",
     "packages/skills-loader-core/src/shared/skill-path-resolver.ts",
     "packages/telemetry-core/src/posthog-immediate-send.ts",
-    "packages/utils/src/logger.ts"
+    "packages/utils/src/logger.ts",
+    "script/omo-native-trust-mutations.ts"
   ]
 }

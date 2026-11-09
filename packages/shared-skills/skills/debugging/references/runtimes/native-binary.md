@@ -20,7 +20,7 @@ Quick check:
 ```bash
 file ./target                                                    # Mach-O / ELF / PE - inconclusive
 du -h ./target                                                   # 50 MB+ for a "simple CLI" → suspect bundled
-strings -n 12 ./target | rg -iE 'bun|node_modules|webpack|esbuild|deno|pkg/lib|electron|pyinstaller|nexe|NODE_SEA_FUSE|tauri' | head -5
+strings -n 12 ./target | rg -i 'bun|node_modules|webpack|esbuild|deno|pkg/lib|electron|pyinstaller|nexe|NODE_SEA_FUSE|tauri' | head -5
 ```
 
 **If any hits** → close this file, open [bundled-js-binary.md](bundled-js-binary.md) instead. Following the Ghidra/pwndbg path on a bundled-app binary wastes hours decompiling the runtime VM while the app-level bundle is recoverable with the right per-bundler tool (plaintext for Bun/pkg/nexe/Electron-asar; eszip / V8-cache / `.pyc` for Deno / Node SEA / PyInstaller).

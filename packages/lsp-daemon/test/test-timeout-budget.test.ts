@@ -9,20 +9,35 @@ import { MAX_IN_TEST_BUDGET_MS, TEST_TIMEOUT_MS } from "../vitest.config.js";
 const testDirectory = fileURLToPath(new URL(".", import.meta.url));
 
 /**
- * Numeric literals a test hands to a subprocess or a timed promise guard:
- * `timeout: 10_000` option bags, and `setTimeout(..., 10_000)` deadlines.
- * Underscore digit separators are preserved so `10_000` is read as 10000.
+ * Budgets a test or test helper hands to a subprocess or a timed promise guard:
+ * `timeout: 10_000` option bags and `setTimeout(..., 10_000)` deadlines, as a
+ * numeric literal (underscore separators kept, so `10_000` reads as 10000) or as
+ * a named `*_MS` constant. Lower-case arguments are forwarded parameters whose
+ * literal is counted where the caller writes it.
  */
-const budgetPatterns = [/\btimeout:\s*([\d_]+)\b/g, /\bsetTimeout\([\s\S]*?,\s*([\d_]+)\s*\)/g] as const;
+const budgetPatterns = [/\btimeout:\s*([\w]+)\b/g, /\bsetTimeout\([\s\S]*?,\s*([\w]+)\s*\)/g] as const;
+
+/** The named budgets the guard can read; any other `*_MS` constant is an unresolved budget and fails it. */
+const namedBudgets: Readonly<Record<string, number>> = { MAX_IN_TEST_BUDGET_MS, TEST_TIMEOUT_MS };
 
 interface Budget {
 	readonly file: string;
 	readonly milliseconds: number;
 }
 
+function budgetValue(raw: string, file: string): number | undefined {
+	if (/^[\d_]+$/.test(raw)) return Number.parseInt(raw.replaceAll("_", ""), 10);
+	if (!/^[A-Z][A-Z0-9_]*_MS$/.test(raw)) return undefined;
+	const value = namedBudgets[raw];
+	if (value === undefined)
+		throw new Error(`${file}: budget ${raw} is not one the guard can read; add it to namedBudgets`);
+	return value;
+}
+
 function declaredBudgets(): readonly Budget[] {
 	const budgets: Budget[] = [];
-	for (const file of readdirSync(testDirectory).filter((name) => name.endsWith(".test.ts"))) {
+	// Helpers count too: `bun-child.ts` arms the ceiling every `runBunChild` call gets.
+	for (const file of readdirSync(testDirectory).filter((name) => name.endsWith(".ts"))) {
 		// This guard's own patterns would otherwise match themselves.
 		if (file === "test-timeout-budget.test.ts") continue;
 		const source = readFileSync(join(testDirectory, file), "utf8");
@@ -30,9 +45,9 @@ function declaredBudgets(): readonly Budget[] {
 			for (const match of source.matchAll(pattern)) {
 				const raw = match[1];
 				if (raw === undefined) continue;
-				const milliseconds = Number.parseInt(raw.replaceAll("_", ""), 10);
+				const milliseconds = budgetValue(raw, file);
 				// Sub-second values are intra-test sequencing waits, not process budgets.
-				if (Number.isNaN(milliseconds) || milliseconds < 1_000) continue;
+				if (milliseconds === undefined || Number.isNaN(milliseconds) || milliseconds < 1_000) continue;
 				budgets.push({ file, milliseconds });
 			}
 		}

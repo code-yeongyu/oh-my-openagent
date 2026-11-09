@@ -11,6 +11,7 @@ import type { Principal, RecoveryKey } from "../crypto/parse.ts";
 import { openWrap } from "../crypto/unwrap.ts";
 import { jcsBytes, sha256B64 } from "../crypto/vendor/sync-format/jcs.ts";
 import type { DeviceKeyring } from "../keyring-port.ts";
+import { admitSyncOperation, type SyncOperationOptions } from "../operation-authority.ts";
 import { type EpochMaterial, sealWrap } from "./key-material.ts";
 import type { KeyringAppendRequest } from "./ports.ts";
 
@@ -20,6 +21,7 @@ export const signedAppend = async (
 	head: Head,
 	body: KeyringBody,
 	wraps: ReadonlyArray<WrapEntry>,
+	operation: SyncOperationOptions = {},
 ): Promise<KeyringAppendRequest> => {
 	const digest = await sha256B64(jcsBytes(body));
 	const link = await nextLink(head.link, digest);
@@ -39,7 +41,7 @@ export const signedAppend = async (
 		base_seq: head.seq,
 		link,
 		keyring_link: keyringLink,
-		record_sig: await signRecord(keyring, fields),
+		record_sig: await admitSyncOperation(operation, () => signRecord(keyring, fields)),
 		wraps,
 	};
 };

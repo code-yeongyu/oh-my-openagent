@@ -10,6 +10,9 @@ import { createSkillCommandsComponent } from "../skill-commands"
 import { createTaskComponent } from "../task"
 import { createBundledSkillsComponent } from "./index"
 
+// This suite is not about job widgets: keep the task component off the real senpi job-widget host.
+const noJobWidgetHost = async (): Promise<Record<string, never>> => ({})
+
 const variable = "OMO_BUNDLED_SKILLS_DIR"
 let root: string
 let saved: string | undefined
@@ -72,9 +75,9 @@ describe("invalid bundled skills override at registration", () => {
       try {
         // when
         const first = new FakeExtensionAPI()
-        await createTaskComponent({ resolveCwd: () => root }).register(first, ctxFor(first, logger))
+        await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => root }).register(first, ctxFor(first, logger))
         const second = new FakeExtensionAPI()
-        await createTaskComponent({ resolveCwd: () => root }).register(second, ctxFor(second, logger))
+        await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => root }).register(second, ctxFor(second, logger))
 
         // then
         for (const pi of [first, second]) {

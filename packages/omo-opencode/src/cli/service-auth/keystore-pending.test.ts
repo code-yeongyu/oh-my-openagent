@@ -100,14 +100,16 @@ describe("a credential read the OS store does not answer", () => {
       },
     }, platform: "darwin", lockProbe: unlocked, notice: quiet, wait: bounded })
     const b = createCredentialStore(api, { secrets: native, platform: "darwin", lockProbe: unlocked, notice: quiet, wait: bounded })
-    const session = createSession({ api, store: a, home: await temporaryHome() })
+    const session = createSession({ beforeKeysDiscarded: async () => undefined, api, store: a, home: await temporaryHome() })
     expectApprovalPending(await settled(session.accessToken()))
     approval.resolve(item)
     await approval.promise
     await b.write(rotated)
     const outcome = await settled(session.accessToken())
     expect(outcome).toEqual({ state: "resolved", value: rotated.accessToken })
-    expect(item === null ? null : JSON.parse(item)).toEqual(rotated)
+    const saved = await b.read()
+    expect(saved?.credentialGeneration).toEqual(expect.any(String))
+    expect(item === null ? null : JSON.parse(item)).toEqual({ ...rotated, credentialGeneration: saved?.credentialGeneration })
     expect(refreshes).toBe(0)
     expect(clears).toBe(0)
   })
@@ -134,14 +136,16 @@ describe("a credential read the OS store does not answer", () => {
       else await store.clear()
       approval.resolve(old)
       await approval.promise
-      expect(await store.read()).toEqual(action === "write" ? fresh : null)
+      const saved = await store.read()
+      if (action === "write") expect(saved?.credentialGeneration).toEqual(expect.any(String))
+      expect(saved).toEqual(action === "write" ? { ...fresh, credentialGeneration: saved?.credentialGeneration } : null)
     })
   }
 
   test("#given an unanswered keychain dialog #when two token requests run one after the other #then each fails fast and the session lock is not held", async () => {
     const secrets = pendingSecrets()
     const store = createCredentialStore("https://api.omo.dev", { secrets: secrets.api, platform: "darwin", lockProbe: unlocked, notice: quiet, wait: bounded })
-    const session = createSession({ api: "https://api.omo.dev", store, home: await temporaryHome() })
+    const session = createSession({ beforeKeysDiscarded: async () => undefined, api: "https://api.omo.dev", store, home: await temporaryHome() })
     expectApprovalPending(await settled(session.accessToken()))
     expectApprovalPending(await settled(session.accessToken()))
   })

@@ -150,7 +150,14 @@
         "$ref": "#/definitions/PointParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ActionReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "moveMouse": {
@@ -161,7 +168,14 @@
         "$ref": "#/definitions/PointParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ActionReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "drag": {
@@ -172,7 +186,14 @@
         "$ref": "#/definitions/DragParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ActionReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "scroll": {
@@ -183,7 +204,14 @@
         "$ref": "#/definitions/ScrollParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ActionReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "typeText": {
@@ -194,7 +222,14 @@
         "$ref": "#/definitions/TypeTextParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ActionReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "keyChord": {
@@ -205,7 +240,14 @@
         "$ref": "#/definitions/KeyChordParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ActionReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "holdKeys": {
@@ -216,7 +258,14 @@
         "$ref": "#/definitions/HoldKeysParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ActionReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "holdMouse": {
@@ -227,7 +276,14 @@
         "$ref": "#/definitions/HoldMouseParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ActionReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "raiseWindow": {
@@ -238,7 +294,14 @@
         "$ref": "#/definitions/RaiseWindowParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ActionReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "menus.items": {
@@ -263,7 +326,14 @@
         "$ref": "#/definitions/MenuSelectParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ActionReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "clipboard.read": {
@@ -285,7 +355,14 @@
         "$ref": "#/definitions/ClipboardText"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ActionReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "ax.snapshot": {
@@ -424,7 +501,14 @@
         "$ref": "#/definitions/AxPerformParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ActionReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "ax.setValue": {
@@ -435,7 +519,14 @@
         "$ref": "#/definitions/AxSetValueParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ActionReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "ax.focus": {
@@ -446,7 +537,14 @@
         "$ref": "#/definitions/AxRefParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ActionReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
       }
     },
     "ax.click": {
@@ -457,7 +555,25 @@
         "$ref": "#/definitions/AxClickParams"
       },
       "result": {
-        "type": "null"
+        "anyOf": [
+          {
+            "$ref": "#/definitions/ActionReport"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "ax.typeText": {
+      "effect": "exec",
+      "hostOnly": false,
+      "testOnly": false,
+      "params": {
+        "$ref": "#/definitions/AxTypeTextParams"
+      },
+      "result": {
+        "$ref": "#/definitions/AxInputResult"
       }
     },
     "stopPath.start": {
@@ -553,6 +669,11 @@
       "params": {
         "$ref": "#/definitions/EngineLog"
       }
+    },
+    "epoch.changed": {
+      "params": {
+        "$ref": "#/definitions/EpochChanged"
+      }
     }
   },
   "errors": {
@@ -579,7 +700,14 @@
     "TransactionFailed": -32020,
     "InputBusy": -32021,
     "ControlRequired": -32022,
-    "CaptureUnavailable": -32023
+    "CaptureUnavailable": -32023,
+    "UserIntervened": -32024,
+    "AxUnconfirmed": -32025,
+    "SpaceUnsupported": -32026,
+    "SpaceMoveDenied": -32027,
+    "AmbiguousTarget": -32028,
+    "CaptureConsentRequired": -32029,
+    "ProtectedProcess": -32030
   },
   "standardErrors": {
     "parseError": -32700,
@@ -609,6 +737,16 @@
         "abi": {
           "type": "string",
           "description": "Always `ABI`; a host refuses an engine whose ABI differs."
+        },
+        "features": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Opt-in behaviours this engine supports, e.g. `action-report`. Absent\nfrom older engines: read as `[]`."
         }
       },
       "required": [
@@ -687,6 +825,38 @@
               "$ref": "#/definitions/CaptureCaps"
             }
           ]
+        },
+        "reportMode": {
+          "default": "null",
+          "description": "`object` makes every mutating request return an `ActionReport` and its\nerrors carry `disposition`; send it only to an engine whose\n`engine.hello` lists `action-report`.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ReportMode"
+            }
+          ]
+        },
+        "intervention": {
+          "default": "pause",
+          "description": "What a background action does when the user is using the target app.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/InterventionPolicy"
+            }
+          ]
+        },
+        "macosKeyPriming": {
+          "default": "off",
+          "description": "macOS background key priming; accepted and stored, not acted on yet.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/KeyPriming"
+            }
+          ]
+        },
+        "trace": {
+          "type": "boolean",
+          "description": "Per-request timing traces; accepted and stored, not acted on yet.",
+          "default": false
         }
       },
       "description": "`session.open` parameters supplied by the host.",
@@ -754,6 +924,30 @@
         }
       },
       "additionalProperties": false
+    },
+    "ReportMode": {
+      "type": "string",
+      "enum": [
+        "null",
+        "object"
+      ],
+      "description": "What a mutating request returns: `null` (protocol 1 default) or an\n`ActionReport`."
+    },
+    "InterventionPolicy": {
+      "type": "string",
+      "enum": [
+        "continue",
+        "pause"
+      ],
+      "description": "What a background action does when the user is using the target app."
+    },
+    "KeyPriming": {
+      "type": "string",
+      "enum": [
+        "on",
+        "off"
+      ],
+      "description": "Whether macOS background keys first make the target window key."
     },
     "SessionOpenResult": {
       "type": "object",
@@ -845,9 +1039,36 @@
         "screenLocked": {
           "type": "boolean"
         },
+        "displayAsleep": {
+          "type": "boolean",
+          "description": "Every display the session can capture is asleep (macOS; read live on\neach `capabilities` call). Other backends always report `false`.",
+          "default": false
+        },
         "legacyCapture": {
           "type": "boolean",
           "description": "Captures run through the legacy `screencapture` path, not the\nScreenCaptureKit worker (B9: macOS < 14, helper missing, or the\nhelper failed to start)."
+        },
+        "interventionWatch": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/InterventionWatch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The watch of the user's own key presses and clicks in the apps the\nsession works in; absent on backends without one."
+        },
+        "windowInput": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/WindowInput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether window-addressed input works here, and why not (object mode)."
         }
       },
       "required": [
@@ -867,6 +1088,45 @@
         "screenLocked"
       ],
       "description": "Runtime truth about what this host's backend can do right now.\n\nSchema-backed field set; additions update Rust, generated schema and TS together.",
+      "additionalProperties": false
+    },
+    "InterventionWatch": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "on",
+          "description": "Watching: every key press and click the user makes is recorded."
+        },
+        {
+          "type": "string",
+          "const": "off",
+          "description": "The system refused the watch: nothing is watched, and background\ninput is not held back for it."
+        },
+        {
+          "type": "string",
+          "const": "not_started",
+          "description": "No request has read or acted on an app yet."
+        }
+      ],
+      "description": "The state of the backend's watch of the user's own input (macOS: a\nlisten-only event tap). It starts with the session's first request that\nreads or acts on an app."
+    },
+    "WindowInput": {
+      "type": "object",
+      "properties": {
+        "available": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "available"
+      ],
+      "description": "Window-addressed input availability; `reason` is an open token set\n(`no_eis`, `portal_missing`, `kwin_dbus_missing`,\n`gnome_extension_missing`).",
       "additionalProperties": false
     },
     "ControlGrantParams": {
@@ -1043,6 +1303,17 @@
             "null"
           ],
           "description": "Whether the owning process runs above the engine's integrity level\n(Windows); `None` where the platform has no such notion."
+        },
+        "identity": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/WindowIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Who owns the window, so a reused window number is told apart (object\nmode)."
         }
       },
       "required": [
@@ -1056,6 +1327,33 @@
         "focused"
       ],
       "description": "One capturable top-level window in global logical desktop coordinates.\n`is_on_screen` distinguishes an on-Space window from a same-app window on\nanother Space: both resolve as capture targets, but only an on-screen one\nis user-visible right now.",
+      "additionalProperties": false
+    },
+    "WindowIdentity": {
+      "type": "object",
+      "properties": {
+        "windowNumber": {
+          "type": "string"
+        },
+        "pid": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "processStart": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "windowNumber",
+        "pid"
+      ],
+      "description": "A window's identity: its number plus the owning process and that\nprocess's start time (`null` where the OS has none).",
       "additionalProperties": false
     },
     "CaptureParams": {
@@ -1182,6 +1480,17 @@
         "legacyCapture": {
           "type": "boolean",
           "description": "`true` when this capture ran through the legacy `screencapture`\nfallback instead of the ScreenCaptureKit worker (B9)."
+        },
+        "identity": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/WindowIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The captured window's identity at capture time (object mode)."
         }
       },
       "required": [
@@ -1330,6 +1639,41 @@
             "null"
           ],
           "default": null
+        },
+        "timeoutMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "default": null
+        },
+        "since": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Only nodes changed since this generation.",
+          "default": null
+        },
+        "skeleton": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Roles and refs only, no values.",
+          "default": null
+        },
+        "root": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Snapshot only under this ref.",
+          "default": null
         }
       },
       "additionalProperties": false
@@ -1425,6 +1769,17 @@
         "legacyCapture": {
           "type": "boolean",
           "description": "`true` when this capture ran through the legacy `screencapture`\nfallback instead of the ScreenCaptureKit worker (B9)."
+        },
+        "identity": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/WindowIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The captured window's identity at capture time (object mode)."
         },
         "ax": {
           "type": "string"
@@ -1531,9 +1886,394 @@
             "null"
           ],
           "default": null
+        },
+        "consume": {
+          "type": "boolean",
+          "description": "After this action the frame may not be used for input again.",
+          "default": false
         }
       },
       "additionalProperties": false
+    },
+    "ActionReport": {
+      "type": "object",
+      "properties": {
+        "disposition": {
+          "$ref": "#/definitions/Disposition"
+        },
+        "delivered": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Delivered"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "effect": {
+          "$ref": "#/definitions/ActionEffect"
+        },
+        "route": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ActionRoute"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Absent when the engine does not name the channel."
+        },
+        "hit": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ActionHit"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "focusRestoration": {
+          "$ref": "#/definitions/FocusRestoration"
+        },
+        "openedSurfaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OpenedSurface"
+          }
+        },
+        "nextCall": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "warning": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Open token set, e.g. `secure_field`."
+        },
+        "auditIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ids of the `audit` notifications this request emitted.",
+          "minItems": 1
+        }
+      },
+      "required": [
+        "disposition",
+        "effect",
+        "focusRestoration",
+        "auditIds"
+      ],
+      "description": "Result of a mutating request in a session opened with\n`reportMode: \"object\"`.",
+      "additionalProperties": false
+    },
+    "Disposition": {
+      "description": "Whether input reached the target, and whether sending the same request again could duplicate it. Five delivery classes, seven (delivery, retry) pairs.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "type": "string",
+              "const": "not_delivered"
+            },
+            "retry": {
+              "type": "string",
+              "enum": [
+                "safe",
+                "after_user"
+              ]
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "description": "Nothing reached the target. `safe`: sending again cannot duplicate input; `after_user`: only after the human acts (resume, permission, unlock, a control grant, a pause in their own typing).",
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "type": "string",
+              "const": "delivery_uncertain"
+            },
+            "retry": {
+              "type": "string",
+              "enum": [
+                "unsafe",
+                "unknown"
+              ]
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "description": "Input may have reached the target. `unsafe`: sending again may duplicate it; `unknown`: the engine cannot tell. Read the target first.",
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "type": "string",
+              "const": "delivered_unverified"
+            },
+            "retry": {
+              "type": "string",
+              "const": "unsafe"
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "description": "Input was delivered, in full or up to `delivered.count`, and its effect was not read back.",
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "type": "string",
+              "const": "delivered_verified"
+            },
+            "retry": {
+              "type": "string",
+              "const": "unsafe"
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "description": "Input was delivered in full and its effect was read back.",
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "type": "string",
+              "const": "unknown"
+            },
+            "retry": {
+              "type": "string",
+              "const": "unknown"
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "description": "The engine cannot say what happened: an internal error, an epoch change during input, a reply quarantined after a stop, or an engine restart.",
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Delivered": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Units delivered: Unicode scalars for typed text."
+        },
+        "of": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Units requested."
+        }
+      },
+      "required": [
+        "count",
+        "of"
+      ],
+      "description": "Partial delivery, `count <= of`.",
+      "additionalProperties": false
+    },
+    "ActionEffect": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "confirmed",
+            "unverifiable",
+            "no_change"
+          ]
+        },
+        {
+          "type": "string",
+          "const": "refused",
+          "description": "Only in SDK batch reports, never in an engine reply."
+        }
+      ],
+      "description": "What a read-back of the target showed."
+    },
+    "ActionRoute": {
+      "type": "string",
+      "enum": [
+        "ax",
+        "background_window",
+        "background_pid",
+        "foreground_hid"
+      ],
+      "description": "The channel the input took."
+    },
+    "ActionHit": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string"
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "`null` for a secure field or an element without a label.",
+          "default": null
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "description": "The element under the point before input was sent.",
+      "additionalProperties": false
+    },
+    "FocusRestoration": {
+      "type": "string",
+      "enum": [
+        "not_needed",
+        "restored",
+        "user_moved_on",
+        "not_confirmed"
+      ],
+      "description": "The front window and key window after the action."
+    },
+    "OpenedSurface": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "Open token set: `sheet`, `dialog`, `menu`, `popover`, `window`."
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "windowId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "description": "A surface the action opened.",
+      "additionalProperties": false
+    },
+    "NextCall": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "$ref": "#/definitions/Method"
+        },
+        "args": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Params of `method`."
+        }
+      },
+      "required": [
+        "method",
+        "args"
+      ],
+      "description": "The suggested next request; never followed automatically.",
+      "additionalProperties": false
+    },
+    "Method": {
+      "type": "string",
+      "enum": [
+        "engine.hello",
+        "session.open",
+        "session.close",
+        "control.grant",
+        "control.revoke",
+        "control.state",
+        "capabilities",
+        "displays",
+        "windows",
+        "capture",
+        "captureRegion",
+        "observe",
+        "click",
+        "moveMouse",
+        "drag",
+        "scroll",
+        "typeText",
+        "keyChord",
+        "holdKeys",
+        "holdMouse",
+        "raiseWindow",
+        "menus.items",
+        "menus.select",
+        "clipboard.read",
+        "clipboard.write",
+        "ax.snapshot",
+        "ax.query",
+        "ax.elementAt",
+        "ax.focused",
+        "ax.node",
+        "ax.attributes",
+        "ax.children",
+        "ax.parent",
+        "ax.perform",
+        "ax.setValue",
+        "ax.focus",
+        "ax.click",
+        "ax.typeText",
+        "stopPath.start",
+        "stopPath.status",
+        "stopPath.heartbeat",
+        "stopPath.stop",
+        "stopPath.resume",
+        "$/cancel",
+        "$/test.advanceClock"
+      ],
+      "description": "Every engine method, by wire name."
     },
     "DragParams": {
       "type": "object",
@@ -1685,6 +2425,10 @@
               "type": "null"
             }
           ]
+        },
+        "force": {
+          "type": "boolean",
+          "description": "Sends a chord the engine treats as dangerous (`cmd+q`, `alt+f4`)."
         }
       },
       "required": [
@@ -1931,6 +2675,47 @@
         },
         "truncated": {
           "type": "boolean"
+        },
+        "generation": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "The ref generation this snapshot registered (object mode)."
+        },
+        "parent": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "The generation this drill-down snapshot hangs under (object mode)."
+        },
+        "complete": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "Whether every node under the root was read (object mode)."
+        },
+        "nodesObserved": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0,
+          "description": "Nodes read, including those left out of `text` (object mode)."
+        },
+        "cuts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AxCut"
+          },
+          "description": "The nodes whose children were cut (object mode)."
         }
       },
       "required": [
@@ -1938,6 +2723,25 @@
         "nodeCount",
         "truncated"
       ],
+      "additionalProperties": false
+    },
+    "AxCut": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "childCount": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "ref",
+        "childCount"
+      ],
+      "description": "A node whose children the snapshot left out; its text line renders as\n`[... <childCount> more]`.",
       "additionalProperties": false
     },
     "AxQueryParams": {
@@ -2069,6 +2873,25 @@
           "type": "integer",
           "format": "uint32",
           "minimum": 0
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AxEvidence"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How each field was obtained (object mode)."
+        },
+        "subtreeTruncated": {
+          "type": "boolean",
+          "description": "The walk stopped above this node's children (object mode)."
+        },
+        "secure": {
+          "type": "boolean",
+          "description": "A secure text field: its value is never read (object mode)."
         }
       },
       "required": [
@@ -2080,6 +2903,48 @@
         "childCount"
       ],
       "additionalProperties": false
+    },
+    "AxEvidence": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "$ref": "#/definitions/EvidenceState"
+        },
+        "value": {
+          "$ref": "#/definitions/EvidenceState"
+        },
+        "description": {
+          "$ref": "#/definitions/EvidenceState"
+        },
+        "enabled": {
+          "$ref": "#/definitions/EvidenceState"
+        },
+        "focused": {
+          "$ref": "#/definitions/EvidenceState"
+        },
+        "bounds": {
+          "$ref": "#/definitions/EvidenceState"
+        }
+      },
+      "required": [
+        "title",
+        "value",
+        "description",
+        "enabled",
+        "focused",
+        "bounds"
+      ],
+      "description": "How each `AxNode` field was obtained.",
+      "additionalProperties": false
+    },
+    "EvidenceState": {
+      "type": "string",
+      "enum": [
+        "known",
+        "absent",
+        "unknown"
+      ],
+      "description": "`known`: read and present; `absent`: read and not there; `unknown`: not\nread (timeout, error, or withheld for a secure field)."
     },
     "AxElementAtParams": {
       "type": "object",
@@ -2170,6 +3035,72 @@
         "ref"
       ],
       "additionalProperties": false
+    },
+    "AxTypeTextParams": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "opts": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PointerOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "ref",
+        "text"
+      ],
+      "description": "`ax.typeText`: types `text` into the element `ref` names. Only\n`opts.deliveryMode` is read: an omitted delivery is background (no focus\nchange for the user); `foreground` raises the element's window under the\ncontrol grant, like `ax.click`.",
+      "additionalProperties": false
+    },
+    "AxInputResult": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "$ref": "#/definitions/AxInputMethod"
+        },
+        "report": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ActionReport"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The action report, in a session opened with `reportMode: \"object\"`."
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "description": "`ax.typeText` reply.",
+      "additionalProperties": false
+    },
+    "AxInputMethod": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "inserted",
+          "description": "Written through the element's own selection (`AXSelectedText` on\nmacOS) and read back exactly; no key was sent and no focus moved."
+        },
+        {
+          "type": "string",
+          "const": "keys",
+          "description": "Sent as keystrokes once the element held its application's keyboard\nfocus."
+        }
+      ],
+      "description": "How `ax.typeText` delivered its text."
     },
     "StopPathStartParams": {
       "type": "object",
@@ -2375,6 +3306,13 @@
           "items": {
             "type": "string"
           }
+        },
+        "id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Names this event in an `ActionReport.auditIds` (object mode only)."
         }
       },
       "required": [
@@ -2385,56 +3323,6 @@
       ],
       "description": "The `audit` notification: one per mutating request, success or failure.",
       "additionalProperties": false
-    },
-    "Method": {
-      "type": "string",
-      "enum": [
-        "engine.hello",
-        "session.open",
-        "session.close",
-        "control.grant",
-        "control.revoke",
-        "control.state",
-        "capabilities",
-        "displays",
-        "windows",
-        "capture",
-        "captureRegion",
-        "observe",
-        "click",
-        "moveMouse",
-        "drag",
-        "scroll",
-        "typeText",
-        "keyChord",
-        "holdKeys",
-        "holdMouse",
-        "raiseWindow",
-        "menus.items",
-        "menus.select",
-        "clipboard.read",
-        "clipboard.write",
-        "ax.snapshot",
-        "ax.query",
-        "ax.elementAt",
-        "ax.focused",
-        "ax.node",
-        "ax.attributes",
-        "ax.children",
-        "ax.parent",
-        "ax.perform",
-        "ax.setValue",
-        "ax.focus",
-        "ax.click",
-        "stopPath.start",
-        "stopPath.status",
-        "stopPath.heartbeat",
-        "stopPath.stop",
-        "stopPath.resume",
-        "$/cancel",
-        "$/test.advanceClock"
-      ],
-      "description": "Every engine method, by wire name."
     },
     "ErrorCode": {
       "oneOf": [
@@ -2482,9 +3370,44 @@
           "type": "string",
           "const": "CaptureUnavailable",
           "description": "The capture target exists but cannot be captured right now; `data`\nsays why (e.g. `{ \"reason\": \"minimized\" }`)."
+        },
+        {
+          "type": "string",
+          "const": "UserIntervened",
+          "description": "The user was using the target app, or brought another window to the\nfront, before or during the action, so the action stopped; the message\nsays whether any input was sent. Read the window again once the user\npauses; never repeat the action blindly."
+        },
+        {
+          "type": "string",
+          "const": "AxUnconfirmed",
+          "description": "An accessibility request was made, but the app did not confirm its\noutcome (it did not reply in time or messaging failed, e.g. while the\naction opened a modal dialog). It may already have taken effect: read\nthe element back before any retry."
+        },
+        {
+          "type": "string",
+          "const": "SpaceUnsupported",
+          "description": "Moving a window between Spaces is not available on this backend or OS\nversion."
+        },
+        {
+          "type": "string",
+          "const": "SpaceMoveDenied",
+          "description": "The window server refused the Space move, or the move could not be\nverified."
+        },
+        {
+          "type": "string",
+          "const": "AmbiguousTarget",
+          "description": "A target description matched more than one window or element; the\ncaller must name one of the candidates."
+        },
+        {
+          "type": "string",
+          "const": "CaptureConsentRequired",
+          "description": "Capturing this target needs the user's consent first."
+        },
+        {
+          "type": "string",
+          "const": "ProtectedProcess",
+          "description": "The target process is protected: the engine never sends it input."
         }
       ],
-      "description": "Desktop error vocabulary shared by the engine, the wire, and the host.\n\nFROZEN: oh-my-pi's codes plus the stop-path, suspension, lock-screen,\ncancellation, and restore-transaction codes. Adding a code needs a plan\namendment because the TS protocol and numeric JSON-RPC codes derive from it."
+      "description": "Desktop error vocabulary shared by the engine, the wire, and the host.\n\nFROZEN: oh-my-pi's codes plus the stop-path, suspension, lock-screen,\ncancellation, and restore-transaction codes. Adding a code needs a plan\namendment because the TS protocol and numeric JSON-RPC codes derive from it.\nThe enum is append-only: a new code takes the next ordinal, so no existing\nnumeric code moves. Amendment 1 (macOS shared-screen parity, #11459 /\n#11461) appended `UserIntervened`, `AxUnconfirmed`, `SpaceUnsupported` and\n`SpaceMoveDenied` (-32024..-32027) without a protocol version change.\nAmendment 2 (computer-use v2 P1a) appended `AmbiguousTarget`,\n`CaptureConsentRequired` and `ProtectedProcess` (-32028..-32030), also\nwithout a protocol version change."
     },
     "EngineLog": {
       "type": "object",
@@ -2511,6 +3434,31 @@
         "info",
         "debug"
       ]
+    },
+    "EpochChanged": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "$ref": "#/definitions/EpochReason"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "description": "The `epoch.changed` notification.",
+      "additionalProperties": false
+    },
+    "EpochReason": {
+      "type": "string",
+      "enum": [
+        "display",
+        "lock",
+        "sleep",
+        "space",
+        "engine_restarted",
+        "idle_flush"
+      ],
+      "description": "Why earlier frames, refs and beliefs about the desktop no longer hold."
     },
     "RpcRequest": {
       "type": "object",
@@ -2684,6 +3632,44 @@
               "type": "null"
             }
           ]
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Machine-readable cause, an open token set per code (object mode),\ne.g. `InvalidCoordinateFrame`: `resized`, `consumed`, `zoom`,\n`wrong_target`, `out_of_bounds`; `WindowNotFound`: `identity_changed`;\n`InvalidTarget`: `ambiguous`; `BackgroundUnavailable`:\n`key_route_unproven`, `user_active_in_target`,\n`pointer_reading_toolkit`, `electron_select`,\n`wayland_window_targeting`; `InvalidKey`: `dangerous_chord`;\n`ControlRequired`: `headless_host`, `spawn_inside_session`,\n`lease_missing`; `Suspended`: `stop_marker`; `Internal`:\n`request_too_large`, `other`."
+        },
+        "disposition": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Disposition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether input reached the target (object mode)."
+        },
+        "delivered": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Delivered"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "focusRestoration": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/FocusRestoration"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -2791,7 +3777,8 @@
       "enum": [
         "audit",
         "stopPath.changed",
-        "engine.log"
+        "engine.log",
+        "epoch.changed"
       ],
       "description": "Every server-to-client notification, by wire name."
     }

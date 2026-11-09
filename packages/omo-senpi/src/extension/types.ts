@@ -18,6 +18,8 @@ export interface BeforeAgentStartHandlerOptions {
   previewSafe?: boolean
   /** Stable omo subscriber name, retained in bundled settle diagnostics. */
   hookLabel?: string
+  /** Required read-only status delivery before host settlement; never journal writes, reflection or recovery. */
+  settleDelivery?: boolean
 }
 
 export interface SettleObserver {
@@ -26,8 +28,25 @@ export interface SettleObserver {
   phase(label: string): void
 }
 
+type DialogOptions = { readonly signal?: AbortSignal; readonly timeout?: number; readonly toolCallId?: string; readonly parentToolCallId?: string }
+
+/** The prompting dialogs of senpi's ExtensionUIContext; `input`/`editor` are optional so narrow fakes still fit. */
+export interface DialogUi {
+  select(title: string, options: string[], opts?: DialogOptions): Promise<string | undefined>
+  confirm(title: string, message: string, opts?: DialogOptions): Promise<boolean>
+  input?(title: string, placeholder?: string, opts?: DialogOptions): Promise<string | undefined>
+  editor?(title: string, prefill?: string, opts?: DialogOptions): Promise<string | undefined>
+}
+
 /** Figures for one section of senpi's on-demand memory report. */
 export type MemoryReporter = () => Readonly<Record<string, number>>
+
+/** Structural transport capability; absent on internal calls and older hosts. */
+export interface ExtensionRpcRequestContext {
+  readonly ownerId: string
+  readonly disconnectSignal: AbortSignal
+  readonly admit: <T>(dispatch: () => T) => T
+}
 
 export interface SenpiExtensionAPI {
   readonly sessionKind?: "interactive" | "worker"
@@ -51,7 +70,7 @@ export interface SenpiExtensionAPI {
   ): void
   rpc?: {
     emit(name: string, data: unknown): void
-    handle?(name: string, handler: (data: unknown) => unknown | Promise<unknown>): void
+    handle?(name: string, handler: (data: unknown, context?: ExtensionRpcRequestContext) => unknown | Promise<unknown>): void
   }
   events?: {
     emit(name: string, data: unknown): void
@@ -77,6 +96,8 @@ export interface SenpiExtensionAPI {
   getSessionName?(): string | undefined
   /** The permission preset senpi enforces for this session (senpi #3301); undefined without the permission system. */
   getPermissionPreset?(): string | undefined
+  /** Dialogs every client attached to the session may answer (senpi#6204); absent on older engines. */
+  readonly sessionDialog?: DialogUi
   sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void | Promise<void>
   sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void
   /** senpi's slash-command registry: extension commands, prompt templates, and `skill:<name>` entries. */

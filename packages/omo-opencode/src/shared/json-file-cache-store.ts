@@ -10,12 +10,23 @@ type JsonFileCacheStoreOptions<TValue> = {
 	cacheLabel: string
 	describe: (value: TValue) => Record<string, unknown>
 	serialize?: (value: TValue) => string
+	/**
+	 * The part of a value that decides whether writeIfChanged rewrites the file.
+	 * Lets a store ignore volatile fields such as a generation timestamp.
+	 */
+	comparable?: (value: TValue) => unknown
 }
 
 type JsonFileCacheStore<TValue> = {
 	read: () => TValue | null
 	has: () => boolean
 	write: (value: TValue) => void
+	/**
+	 * Write only when the content differs from what is already on disk.
+	 * Returns true when the file was rewritten, false when the write was
+	 * skipped because nothing changed.
+	 */
+	writeIfChanged: (value: TValue) => boolean
 	resetMemory: () => void
 }
 
@@ -98,6 +109,46 @@ export function createJsonFileCacheStore<TValue>(
 		}
 	}
 
+	function writeIfChanged(value: TValue): boolean {
+		ensureCacheDir()
+		const cacheFile = getCacheFilePath()
+		const serialized = options.serialize?.(value) ?? JSON.stringify(value, null, 2)
+
+		try {
+			const existing = existsSync(cacheFile) ? readFileSync(cacheFile, "utf-8") : undefined
+			const unchanged = existing !== undefined && (
+				existing === serialized ||
+				(options.comparable !== undefined &&
+					JSON.stringify(options.comparable(JSON.parse(existing) as TValue)) ===
+						JSON.stringify(options.comparable(value)))
+			)
+			if (unchanged) {
+				memoryValue = value
+				writtenInCurrentProcess = true
+				log(
+					`[${options.logPrefix}] ${options.cacheLabel} unchanged; skipped write`,
+					options.describe(value),
+				)
+				return false
+			}
+		} catch {
+			// A read failure must not block the write below.
+		}
+
+		try {
+			writeFileSync(cacheFile, serialized)
+			memoryValue = value
+			writtenInCurrentProcess = true
+			log(`[${options.logPrefix}] ${options.cacheLabel} written`, options.describe(value))
+			return true
+		} catch (error) {
+			log(`[${options.logPrefix}] Error writing ${toLogLabel(options.cacheLabel)}`, {
+				error: String(error),
+			})
+			return false
+		}
+	}
+
 	function resetMemory(): void {
 		memoryValue = undefined
 		writtenInCurrentProcess = false
@@ -107,6 +158,7 @@ export function createJsonFileCacheStore<TValue>(
 		read,
 		has,
 		write,
+		writeIfChanged,
 		resetMemory,
 	}
 }

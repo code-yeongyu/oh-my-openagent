@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { isolateTelemetryEnv } from "../../../../test-support/telemetry-env.test-helpers"
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { DEFAULT_POSTHOG_API_KEY as TELEMETRY_CORE_DEFAULT_POSTHOG_API_KEY } from "@oh-my-opencode/telemetry-core"
+import {
+  DEFAULT_POSTHOG_API_KEY as TELEMETRY_CORE_DEFAULT_POSTHOG_API_KEY,
+  TELEMETRY_INSTALL_ID_FILE_NAME,
+} from "@oh-my-opencode/telemetry-core"
 
 import { CACHE_DIR_NAME } from "./product-identity"
 
@@ -28,6 +31,15 @@ function createDataHomePath(): string {
   mkdirSync(join(tempPath, CACHE_DIR_NAME), { recursive: true })
   tempPaths.push(tempPath)
   return tempPath
+}
+
+// Privacy-notice contract (#11583): the install id file exists only once telemetry is on.
+function installIdFileCount(): number {
+  const dataHome = process.env.XDG_DATA_HOME
+  if (dataHome === undefined) throw new Error("XDG_DATA_HOME is not isolated")
+  return readdirSync(dataHome, { recursive: true }).filter(
+    (entry) => String(entry).split(/[\\/]/).at(-1) === TELEMETRY_INSTALL_ID_FILE_NAME,
+  ).length
 }
 
 function clearTelemetryEnv(): void {
@@ -104,6 +116,7 @@ describe("omo-codex posthog telemetry", () => {
 
     // then
     expect(capturedMessages).toHaveLength(0)
+    expect(installIdFileCount()).toBe(0)
   })
 
   it("matrix row 2 disabled when OMO_SEND_ANONYMOUS_TELEMETRY=0", async () => {
@@ -121,6 +134,7 @@ describe("omo-codex posthog telemetry", () => {
 
     // then
     expect(capturedMessages).toHaveLength(0)
+    expect(installIdFileCount()).toBe(0)
   })
 
   it("matrix row 3 disabled when OMO_CODEX_DISABLE_POSTHOG=1", async () => {
@@ -138,6 +152,7 @@ describe("omo-codex posthog telemetry", () => {
 
     // then
     expect(capturedMessages).toHaveLength(0)
+    expect(installIdFileCount()).toBe(0)
   })
 
   it("matrix row 4 disabled when OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0", async () => {
@@ -155,6 +170,7 @@ describe("omo-codex posthog telemetry", () => {
 
     // then
     expect(capturedMessages).toHaveLength(0)
+    expect(installIdFileCount()).toBe(0)
   })
 
   it("matrix row 5 enabled when all vars unset", async () => {
@@ -172,6 +188,7 @@ describe("omo-codex posthog telemetry", () => {
 
     // then
     expect(capturedMessages).toHaveLength(1)
+    expect(installIdFileCount()).toBe(1)
   })
 
   it("captures omo_codex_daily_active with omo-codex platform", async () => {

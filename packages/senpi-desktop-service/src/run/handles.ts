@@ -1,11 +1,13 @@
 import { ELEMENT_METHODS, type EngineMethod, WINDOW_METHODS } from "@oh-my-opencode/senpi-desktop-protocol";
 import { type FacadeMethod, facadeMethod, type RunScope } from "./context";
 import {
+	type AxInputResult,
 	type AxNode,
 	type DesktopWindow,
 	type MenuItem,
 	expectResult,
 	isAttributePairs,
+	isAxInputResult,
 	isAxNode,
 	isMenuItem,
 	isText,
@@ -178,6 +180,18 @@ export class ElementHandle {
 
 	click(options?: DeliveryOptions): Promise<void> {
 		return this.#send("click", "ax.click", { opts: pointerOptions(options) });
+	}
+
+	/**
+	 * Types into this element without taking the user's focus: a native text field takes the text through its own
+	 * selection (`inserted`), anything else takes keys once it holds its app's keyboard focus (`keys`); keys are never sent
+	 * to an element that did not take focus. Foreground delivery raises the window first and needs the control grant.
+	 */
+	type(text: string, options?: DeliveryOptions): Promise<AxInputResult> {
+		return this.#method("type", async ({ call }) => {
+			const result = await call("ax.typeText", { ref: this.ref, text, opts: pointerOptions(options) });
+			return expectResult("ax.typeText", result, isAxInputResult);
+		});
 	}
 
 	focus(): Promise<void> {

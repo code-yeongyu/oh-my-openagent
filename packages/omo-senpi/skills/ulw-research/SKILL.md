@@ -52,7 +52,7 @@ The research is done when all of these hold:
 - Every claim in the deliverable cites a source or a verification artifact.
 - Every asserted claim is represented in the claim graph, tied to an intent-vs-reality diff when an expected truth exists, and backed by observation manifest entries from independent observation groups or a documented single-source exception; convergence or exception status is explicit.
 - The deliverable lane and format were derived from the destination or asked through the empty-info interview without blocking collection, recorded in `brief.md` with `answered_by`, and the final materials match that record.
-- The delivered artifact passed the delivery gates in order (static gates, layout gates, fidelity gate, visual QA, and the proofread pass where the harness provides one), each status is in `outcome.json`, and `outcome verify` passed.
+- The delivered artifact passed the delivery gates in order (static gates, fidelity gate, layout gates, visual QA, and the proofread pass where the harness provides one), each status is in `outcome.json`, and `outcome verify` passed.
 - Every excursion opened during the run was closed by an EXIT rule, folded back into the claim or axis that triggered it, and recorded in both `excursion-log.md` and the ulw-loop ledger.
 - When this session has `show_html_page`, the report was shown inline in the thread before the artifact paths.
 - When the ask reproduces a visual source, the report carries side-by-side pairs of real source frames and the output rendered at the same moments, each with its critique, and the differences they surfaced were fixed or listed as gaps. A simple or well-understood topic shortens the research, never this comparison.

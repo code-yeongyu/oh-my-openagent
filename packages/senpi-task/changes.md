@@ -1,3 +1,65 @@
+## 2026-11-07 - A child whose engine cannot hold its designated chain is never started (#12759)
+
+`RpcProcessRunner.applyFallbackChain` throws when `set_retry_fallback` is unsupported, refused, unanswered within `fallbackChainDeadlineMs`, or interrupted by the child's exit; the message names the designated chain (`designatedChainText`), and the start fails before `prompt` is written (`child-prompt-failed` / `session_unavailable`, not `model_unavailable`, so the manager does not walk the same refusal across every rung). The runner's `onWarning` option is gone. `retry_fallback_profile` joins `TASK_DAEMON_REQUIRED_CAPABILITIES`, so `assertHostUsable` refuses a host without it (`capability`, fallback allowed to the per-child process runner, which enforces the chain); `retryFallbackDropped`, `withoutRetryFallback`, `RETRY_FALLBACK_PROFILE_CAPABILITY` and the host notice are deleted. `ResolveCategoryOptions.systemDefaultModel`, an unused last resort outside the category's chain, is deleted. The fake RPC child advertises `retry_fallback_command` unless `FAKE_CAPABILITIES` is set.
+
+## 2026-10-28 - Nothing arms a timer after a stdio child is disposed (#11687)
+
+`RpcProtocolClient.detach()` marks the client detached: `send`/`sendTaskParent` then reject with `RPC client detached` before arming a deadline or writing to the child, nothing else is written to the child either (an `extension_ui_request` arriving after detach gets no auto-answer), and a closed-pipe write error no longer arms the 100 ms exit grace timer. `startHeartbeat` and `startHostHeartbeat` launch their state probe only if they have not been stopped by the time the launch microtask runs. `handle-dispose-timers.test.ts` drives each of these sites in one table.
+
+## 2026-11-03 - The architect category implements and debugs instead of only proposing (#12239)
+
+The builtin `architect` category's caller-facing description said "propose designs rather than implement" and its prompt append opened with "NOT an implementer", so callers kept file-changing work away from it and children stopped at a proposal. No tool policy was involved: a category plan carries no agent type or tool list, so the child already had the parent's full tool set. The description now covers design plus broad multi-source debugging carried through to implementation, the append's first line tells the child to make and verify a needed change and a new step covers multi-source debugging, and the existing `<Advisory_Mode>` block still turns a task marked advisory-only into a no-edit write-up. The plan-consultant tool list and the guide pages stop calling the category read-only. `requiresModel` and the fallback chain are unchanged.
+
+## 2026-11-02 - A child runs only on its designated models; the parent-model rung is gone (#12006, #11781)
+
+`withParentModelRung` (#10750) and the workflow node copy of it (#10783/#11439) are deleted, with `parent_model`, `parent_model_fallback`, `DagRunRecordV1.parentModel`, the `model_note:` line and the `parent-model:` status token. The runtime and start-time walks only ever hop along the record's own `fallback_models`. Each hop appends a `model_refusals` entry (model, reason, first error line, reset); when a recognized refusal ends the chain the task fails with `failure_kind: "model_chain_exhausted"` and lists them (`manager/model-refusals.ts`). Records and runs persisted with the removed fields load unchanged and ignore them.
+
+Every runner now hands the child the same pinned fallback policy (`runners/designated-fallback-profile.ts`): the child's chain keyed by its model, plus an empty chain (senpi's tombstone) for every designated model's base. A one-model child gets `modelFallback: false`. The process runner sends it as `set_retry_fallback` and the host runner as `open_session.retryFallback` for every child with a model, not only for children with fallback models. Before this, a one-model child on those runners kept the user's `retry.fallbackChains` and senpi's shipped chains, and on every runner a chain whose last rung has a shipped default (`claude-opus-5-5` -> `claude-opus-5:max`) walked on past its last rung.
+
+## 2026-10-30 - Rotate configured category and agent model chains (#11905)
+
+Resolve round-robin chains from their reserved starting entry, preserve tuning and availability checks, and carry the remaining ordered models into runtime fallback. Keep omitted and sequential policies unchanged.
+
+## 2026-10-29 - Confirm a host-session child's end before recording a cancel (#11783)
+
+A cancel of a daemon-hosted child this process holds no handle for is written durably, then cancelled only after `endHostSessionChild` confirms the end: a close the host answered, or the three-part proof that the generation the record names is gone (serving listing without the path, no handover-parked entry, a second listing). The pending-cancel finish and the TTL sweep no longer read "not listed on the recorded socket" as ended. A retry driver re-drives an unconfirmed cancel on the deferred backoff with explicit exits, all entrants share one in-flight pass per task, and a handle's end counts only when its port's close was answered (`HostSessionPort.close(): Promise<boolean>`).
+
+## 2026-10-25 - Record child session spawn ancestry (#11298)
+
+Thread parent, root, and task identity through child-session creation and
+respawn paths. `runners/engine-spawned-by.ts` holds the minimum engine
+(`2026.10.24-4`, senpi#4205) and compares versions field by field. The
+standalone `--spawned-by` argument follows the version of the engine actually
+launched (`resolveSenpiLaunchTarget`: the running engine for the compiled engine
+and the rpc-entry fallback, the launched package manifest for SENPI_BIN, sibling,
+PATH and Windows shim targets), and the host path drops `open_session.spawnedBy`
+unless the host's `get_protocol_info.engineVersion` meets the same minimum. An
+absent or unparseable version sends nothing.
+
+## 2026-10-27 - Workflow category nodes keep the parent model as their last rung (#11439)
+
+A DAG run records the parent session's model at start (`DagRunRecordV1.parentModel`), and scheduler admission, node retry and crash/resume recovery pass it as `parent_model`, so `withParentModelRung` adds the same last rung a task child gets (#10750). Runs persisted before this change behave as before.
+
+## 2026-10-27 - A queued steer reaches the child under its own id; a lost acknowledgment is read before any resend (desktop #2838 step 4) (#11427)
+
+`drainPending` sends each `pending_steering` entry with `{ clientMessageId: entry.id }`, and every handle
+layer (`ManagedChildHandle` and both adapters, the in-process handle, both RPC runners, `input-delivery`)
+passes that identity to the engine; `input-effects` sends a caller's own id as it is and mints one only when
+none is given. A drain repeated after a lost acknowledgment or a parent restart therefore replays the same id
+on the child instead of delivering a second copy.
+
+An unacknowledged input is resolved through the child's `get_pending_inputs` read (senpi#3549) before
+anything is sent again: `admitted` settles it, `not_admitted` resends the same id, a failed read keeps it
+uncertain. An earlier run's uncertain input is still never sent into a later run, but it now fails as
+`superseded_by_new_run` only when the read says it was not admitted; admitted settles it and a failed read
+keeps it uncertain. The run an uncertain input was sent in is stored on it (`run_epoch`), since a queue
+entry's id carries no epoch. A child that cannot answer the read keeps the previous same-id resend.
+
+Not in this change: TTL/terminal retention of queued entries (T45/T46) and the engine's custody receipt on
+`steer`/`prompt` answers (senpi#4383).
+
+An error answer other than an unknown command, and an id the child leaves out of its answer, both count as unreadable, so nothing is sent on them.
+
 ## 2026-10-26 - Keep parent Resume independent of a failed child restore (#11401)
 
 The run controller records resume-effect failures for acknowledged participants as well as participants already outside custody. A persisted acknowledgement supplies the retry cutoff when the failed child's engine is unavailable. A newer Stop still supersedes the failed old Resume.

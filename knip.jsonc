@@ -9,14 +9,73 @@
   // Remove an entry when its finding is fixed. Root-workspace file ignores live at the top level (knip reads the root
   // workspace's ignoreIssues only there).
   // Third-party projects vendored as git submodules; the build materializes them, they are not this repository's code.
-  "ignore": ["packages/shared-skills/upstreams/**"],
+  // The bunshin-ts build output, vendored with only its dependency imports rewritten (pinned by packages/omo-senpi/vendor/PIN.json) is upstream code too.
+  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**"],
   // Unused exports already present at origin dev 4686e425b5, named per symbol. knip has no per-symbol ignore and a file-wide
   // ignoreIssues "exports" entry would also hide a new unused export in that file, so script/knip-preexisting-exports.ts
   // (shared byte for byte with omo-relay-daemon, sha256-pinned by script/knip-coverage.test.ts) drops exactly these names, and
   // every other export of these files stays checked. script/knip-coverage.test.ts fails if a row is no longer reported.
-  "preprocessor": "./script/knip-preexisting-exports.ts",
+  // script/knip-next-route-segment-exports.ts drops the Next.js route-segment config exports (read by name from the app
+  // directory's special files by the framework, so never dead) of the web app only, named below. It is scoped to those file
+  // names under that one directory, so every other export of those files - and every file elsewhere - stays checked.
+  "preprocessor": ["./script/knip-preexisting-exports.ts", "./script/knip-next-route-segment-exports.ts"],
   "preprocessorOptions": {
+    // Next.js reads these exports by name from the app directory's special files (route segment config and the metadata
+    // exports): https://nextjs.org/docs/app/api-reference/file-conventions/route-segment-config. script/knip-next-route-segment.test.ts
+    // proves a new page's `revalidate` is not reported while an unrelated unused export of that same page still is.
+    "nextRouteSegmentExports": {
+      "dir": "packages/web/app",
+      "files": [
+        "layout",
+        "page",
+        "route",
+        "template",
+        "default",
+        "error",
+        "loading",
+        "not-found",
+        "forbidden",
+        "unauthorized",
+        "global-error",
+        "global-not-found",
+        "icon",
+        "apple-icon",
+        "opengraph-image",
+        "twitter-image",
+        "sitemap",
+        "robots",
+        "manifest"
+      ],
+      "names": [
+        "revalidate",
+        "dynamic",
+        "dynamicParams",
+        "fetchCache",
+        "runtime",
+        "preferredRegion",
+        "maxDuration",
+        "generateStaticParams",
+        "generateMetadata",
+        "metadata",
+        "viewport"
+      ]
+    },
     "preExistingExports": {
+      // The device-service local API keeps its server-side halves beside the client (the reference service its tests run
+      // against, the Windows DACL writer): these exports serve that side, never omo's commands; every other export stays checked.
+      "packages/device-service-core/src/local-api/access.ts": ["applyExactDacl", "verifyExactDacl", "windowsSecureFile", "TOKEN_FILE", "TOKEN_BYTES", "NONCE_BYTES"],
+      "packages/device-service-core/src/local-api/chunking.ts": ["pageListing", "checkCommandText", "UploadAssembler", "uploadParts"],
+      "packages/device-service-core/src/local-api/dacl.ts": ["CURRENT_USER_SID_SCRIPT"],
+      "packages/device-service-core/src/local-api/limits.ts": ["LOCAL_JSON_EXPANSION_MAX"],
+      "packages/device-service-core/src/local-api/transport.ts": ["readEndpointPort"],
+      "packages/device-service-core/src/local-api/validate-fields.ts": ["ENTRY_ID_MAX_BYTES", "NONCE_CHARS"],
+      "packages/device-service-core/src/local-api/validate-shapes.ts": ["millis"],
+      "packages/device-service-core/src/local-api/validate.ts": ["EVENT_KINDS"],
+      "packages/device-service-core/src/local-api/vocabulary.ts": ["CLIENT_ERROR_CODES"],
+      "packages/device-service-core/test/local-api/conformance/fake-owner.ts": ["errorReply"],
+      "packages/device-service-core/test/local-api/conformance/raw-peer.ts": ["NEXT_TIMEOUT_MS"],
+      "packages/device-service-core/test/local-api/conformance/runner.ts": ["FIXTURE_DIR"],
+      "packages/device-service-core/test/local-api/support.ts": ["WAIT_MS", "listenRaw"],
       // pre-existing at origin dev 4686e425b5: unused export(s) resolveFilePath, getSessionCache
       "packages/agents-md-core/src/index.ts": ["resolveFilePath", "getSessionCache"],
       // pre-existing at origin dev 4686e425b5: unused export(s) AST_GREP_ERROR_CODES, AST_GREP_MCP_TOOLS, runMcpStdioServer
@@ -250,14 +309,10 @@
       "packages/memory-core/src/sync/crypto/vendor/sync-format/stream.ts": ["PLAINTEXT_LIMIT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) SyncCommitError
       "packages/memory-core/src/sync/engine/adapters/git-sync-repo.ts": ["SyncCommitError"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) OversizedItemError
-      "packages/memory-core/src/sync/engine/batches.ts": ["OversizedItemError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ManualClock, inProcessLock
       "packages/memory-core/src/sync/engine/engine-harness.test-support.ts": ["ManualClock", "inProcessLock"],
       // pre-existing at origin dev 4686e425b5: unused export(s) POLL_MS
       "packages/memory-core/src/sync/engine/engine.ts": ["POLL_MS"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) sha256Hex
-      "packages/memory-core/src/sync/engine/fake-server.test-support.ts": ["sha256Hex"],
       // pre-existing at origin dev 4686e425b5: unused export(s) createHttpTransport, SyncHttpError, SyncEngine
       "packages/memory-core/src/sync/engine/index.ts": ["createHttpTransport", "SyncHttpError", "SyncEngine"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MAX_RECEIPTS
@@ -336,8 +391,9 @@
       "packages/omo-codex/plugin/components/teammode/skills/teammode/scripts/team-worktree.mjs": ["deriveMemberBranch", "memberWorktreePath", "listWorktrees"],
       // pre-existing at origin dev 4686e425b5: unused export(s) parsePostToolUsePayload
       "packages/omo-codex/plugin/components/teammode/src/codex-hook.ts": ["parsePostToolUsePayload"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_POSTHOG_API_KEY, DEFAULT_POSTHOG_HOST, getComponentVersion, __createPluginPostHogForTesting, getPostHogDistinctIdForTesting
-      "packages/omo-codex/plugin/components/telemetry/src/posthog.ts": ["DEFAULT_POSTHOG_API_KEY", "DEFAULT_POSTHOG_HOST", "getComponentVersion", "__createPluginPostHogForTesting", "getPostHogDistinctIdForTesting"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_POSTHOG_API_KEY, DEFAULT_POSTHOG_HOST, getComponentVersion
+      // #11572 (origin dev 4c87d16a73) removed the exports __createPluginPostHogForTesting and getPostHogDistinctIdForTesting; their rows are gone with them.
+      "packages/omo-codex/plugin/components/telemetry/src/posthog.ts": ["DEFAULT_POSTHOG_API_KEY", "DEFAULT_POSTHOG_HOST", "getComponentVersion"],
       // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_POSTHOG_API_KEY, DEFAULT_POSTHOG_HOST, PRODUCT_NAME, PACKAGE_NAME, EVENT_NAME, LEGACY_PARENT_PACKAGE, PRODUCT_ENV_PREFIX
       "packages/omo-codex/plugin/components/telemetry/src/product-identity.ts": ["DEFAULT_POSTHOG_API_KEY", "DEFAULT_POSTHOG_HOST", "PRODUCT_NAME", "PACKAGE_NAME", "EVENT_NAME", "LEGACY_PARENT_PACKAGE", "PRODUCT_ENV_PREFIX"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
@@ -420,8 +476,9 @@
       "packages/omo-codex/src/telemetry/index.ts": ["__resetActivityStateProviderForTesting", "__resetOsProviderForTesting", "__setActivityStateProviderForTesting", "__setOsProviderForTesting", "createCliPostHog", "createPluginPostHog"],
       // pre-existing at origin dev 4686e425b5: unused export(s) getPostHogActivityStateFilePath
       "packages/omo-codex/src/telemetry/posthog-activity-state.ts": ["getPostHogActivityStateFilePath"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_POSTHOG_API_KEY, DEFAULT_POSTHOG_HOST, createCliPostHog, createPluginPostHog, __createPostHogForTesting, __setOsProviderForTesting, __resetOsProviderForTesting, __setActivityStateProviderForTesting, __resetActivityStateProviderForTesting, __setTransportFactoryForTesting and 1 more
-      "packages/omo-codex/src/telemetry/posthog.ts": ["DEFAULT_POSTHOG_API_KEY", "DEFAULT_POSTHOG_HOST", "createCliPostHog", "createPluginPostHog", "__createPostHogForTesting", "__setOsProviderForTesting", "__resetOsProviderForTesting", "__setActivityStateProviderForTesting", "__resetActivityStateProviderForTesting", "__setTransportFactoryForTesting", "__resetTransportFactoryForTesting"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_POSTHOG_API_KEY, DEFAULT_POSTHOG_HOST, createCliPostHog, createPluginPostHog, __createPostHogForTesting
+      // #11572 (origin dev 4c87d16a73) removed the six __set/__reset provider, activity-state and transport-factory testing exports; their rows are gone with them.
+      "packages/omo-codex/src/telemetry/posthog.ts": ["DEFAULT_POSTHOG_API_KEY", "DEFAULT_POSTHOG_HOST", "createCliPostHog", "createPluginPostHog", "__createPostHogForTesting"],
       // pre-existing at origin dev 4686e425b5: unused export(s) PRODUCT_NAME, PACKAGE_NAME, EVENT_NAME, LEGACY_PARENT_PACKAGE, PRODUCT_ENV_PREFIX
       "packages/omo-codex/src/telemetry/product-identity.ts": ["PRODUCT_NAME", "PACKAGE_NAME", "EVENT_NAME", "LEGACY_PARENT_PACKAGE", "PRODUCT_ENV_PREFIX"],
       // pre-existing at origin dev 4686e425b5: unused export(s) posixJoin
@@ -434,8 +491,6 @@
       "packages/omo-config-core/src/schema/agent.ts": ["OmoAgentModelEntrySchema", "OmoAgentPermissionSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) OmoHarnessIdSchema, OmoOpenCodeHarnessConfigSchema, OmoDisabledSkillsSchema, OmoExcludedModelsSchema
       "packages/omo-config-core/src/schema/config.ts": ["OmoHarnessIdSchema", "OmoOpenCodeHarnessConfigSchema", "OmoDisabledSkillsSchema", "OmoExcludedModelsSchema"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) LEGACY_CATEGORY_NAME_ALIASES
-      "packages/omo-config-core/src/schema/legacy-category-names.ts": ["LEGACY_CATEGORY_NAME_ALIASES"],
       // pre-existing at origin dev 4686e425b5: unused export(s) OmoMemoryReflectionTriggerSchema, OmoMemoryReflectionSchema, OmoMemorySyncSchema, OmoMemorySearchSchema, OmoMemoryRecallEventCapsSchema, OmoMemoryProjectScopeSchema, OmoMemoryProjectScopeLayerSchema, OmoMemoryNudgeSchema, OmoMemoryFactsSchema, OmoMemoryDreamSchema and 18 more
       "packages/omo-config-core/src/schema/memory.ts": ["OmoMemoryReflectionTriggerSchema", "OmoMemoryReflectionSchema", "OmoMemorySyncSchema", "OmoMemorySearchSchema", "OmoMemoryRecallEventCapsSchema", "OmoMemoryProjectScopeSchema", "OmoMemoryProjectScopeLayerSchema", "OmoMemoryNudgeSchema", "OmoMemoryFactsSchema", "OmoMemoryDreamSchema", "OmoMemoryPeopleSchema", "OmoMemorySoulSchema", "OmoMemoryWriteNoticeSchema", "OmoMemoryReflectionTriggerLayerSchema", "OmoMemoryReflectionLayerSchema", "OmoMemorySyncLayerSchema", "OmoMemorySearchLayerSchema", "OmoMemoryRecallEventCapsLayerSchema", "OmoMemoryNudgeLayerSchema", "OmoMemoryFactsLayerSchema", "OmoMemoryDreamLayerSchema", "OmoMemoryPeopleLayerSchema", "OmoMemorySoulLayerSchema", "OmoMemoryWriteNoticeLayerSchema", "OmoMemoryProjectionSchema", "OmoMemoryProjectionLayerSchema", "OmoMemoryAgentOverridesSchema", "OmoMemoryAutoIdentitySchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) OmoModelCatalogEntrySchema, OmoModelCatalogEntryLayerSchema
@@ -454,12 +509,8 @@
       "packages/omo-native/bin/lib/brand-logo.generated.d.ts": ["OMO_BRAND_LOGO"],
       // pre-existing at origin dev 4686e425b5: unused export(s) BUN_MIN_VERSION, resolveBunGuard, findNodeBinary
       "packages/omo-native/bin/lib/bun-runtime.js": ["BUN_MIN_VERSION", "resolveBunGuard", "findNodeBinary"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) claudeCodeVersionFloor
-      "packages/omo-native/bin/lib/claude-code-floor.js": ["claudeCodeVersionFloor"],
       // pre-existing at origin dev 4686e425b5: unused export(s) COMPUTER_USE_RUNTIME
       "packages/omo-native/bin/lib/computer-use-doctor.js": ["COMPUTER_USE_RUNTIME"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) TASK_CONFIG_RUNTIME
-      "packages/omo-native/bin/lib/daemon-config.js": ["TASK_CONFIG_RUNTIME"],
       // pre-existing at origin dev 4686e425b5: unused export(s) aggregateEndpoints
       "packages/omo-native/bin/lib/daemon-status.js": ["aggregateEndpoints"],
       // pre-existing at origin dev 4686e425b5: unused export(s) omoInstallsOnPath, findLegacyPackages, findOpenCodeRegistrations, formatMigrationLines, openCodeRoutingReport
@@ -505,7 +556,8 @@
       // pre-existing at origin dev 4d3161eabd (#11430, 950c2dd65f): unused export(s) HashDirectoryRuntimeError
       "packages/omo-native/openssl-hash-dir.ts": ["HashDirectoryRuntimeError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) resolveDaemonTaskSettings
-      "packages/omo-native/task-config-entry.ts": ["resolveDaemonTaskSettings"],
+      // resolveGlobalMemorySettings: read by omo doctor --fix through the staged plugin/runtime/task-config bundle (#12479)
+      "packages/omo-native/task-config-entry.ts": ["resolveDaemonTaskSettings", "resolveGlobalMemorySettings"],
       // pre-existing at origin dev 4686e425b5: unused export(s) SOURCE_ROOT
       "packages/omo-native/test/bun-bin-shim.fixture.ts": ["SOURCE_ROOT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) identityRealpath, existsOnly
@@ -524,38 +576,8 @@
       "packages/omo-opencode/src/agents/momus.ts": ["MOMUS_SYSTEM_PROMPT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) PROMETHEUS_SYSTEM_PROMPT
       "packages/omo-opencode/src/agents/prometheus/index.ts": ["PROMETHEUS_SYSTEM_PROMPT"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) PROMETHEUS_SYSTEM_PROMPT
-      "packages/omo-opencode/src/agents/prometheus/system-prompt.ts": ["PROMETHEUS_SYSTEM_PROMPT"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) buildDynamicSisyphusPrompt
-      "packages/omo-opencode/src/agents/sisyphus-dynamic-prompt.ts": ["buildDynamicSisyphusPrompt"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) buildDefaultSisyphusJuniorPrompt, buildKimiK26SisyphusJuniorPrompt, buildKimiK27SisyphusJuniorPrompt, buildKimiK3SisyphusJuniorPrompt, buildKimiK31SisyphusJuniorPrompt, buildGptSisyphusJuniorPrompt, buildGpt54SisyphusJuniorPrompt, buildGpt55SisyphusJuniorPrompt, buildGeminiSisyphusJuniorPrompt, buildGlm52SisyphusJuniorPrompt
-      "packages/omo-opencode/src/agents/sisyphus-junior/index.ts": ["buildDefaultSisyphusJuniorPrompt", "buildKimiK26SisyphusJuniorPrompt", "buildKimiK27SisyphusJuniorPrompt", "buildKimiK3SisyphusJuniorPrompt", "buildKimiK31SisyphusJuniorPrompt", "buildGptSisyphusJuniorPrompt", "buildGpt54SisyphusJuniorPrompt", "buildGpt55SisyphusJuniorPrompt", "buildGeminiSisyphusJuniorPrompt", "buildGlm52SisyphusJuniorPrompt"],
       // pre-existing at origin dev 4686e425b5: unused export(s) SISYPHUS_PROMPT_METADATA
       "packages/omo-opencode/src/agents/sisyphus.ts": ["SISYPHUS_PROMPT_METADATA"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/claude-fable-5.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/claude-opus-4-7.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/claude-opus-4-8.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/claude-opus-5.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) buildDefaultSisyphusPrompt, categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/default.ts": ["buildDefaultSisyphusPrompt", "categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/glm-5-2.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/gpt-5-4.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/grok-4.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/kimi-k2-6.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/kimi-k2-7.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/kimi-k3-1.ts": ["categorizeTools"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) categorizeTools
-      "packages/omo-opencode/src/agents/sisyphus/kimi-k3.ts": ["categorizeTools"],
       // pre-existing at origin dev 4686e425b5: unused export(s) isClaudeFableOrMythosModel, isClaudeOpus46Model, isKimiK27Model, isKimiK28Model
       "packages/omo-opencode/src/agents/types.ts": ["isClaudeFableOrMythosModel", "isClaudeOpus46Model", "isKimiK27Model", "isKimiK28Model"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ACCOUNT_KEYS_RECORD_NAME, runAccountKeysCommand
@@ -592,8 +614,6 @@
       "packages/omo-opencode/src/cli/run/index.ts": ["resolveRunAgent", "resolveRunModel", "createServerConnection", "resolveSession", "createJsonOutputManager", "executeOnCompleteHook", "createEventState", "processEvents", "serializeError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) UnknownRunAgentError
       "packages/omo-opencode/src/cli/run/runnable-agent-resolver.ts": ["UnknownRunAgentError"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) InvalidCredentialState, SESSION_READ_WAIT
-      "packages/omo-opencode/src/cli/service-auth/keystore.ts": ["InvalidCredentialState", "SESSION_READ_WAIT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) platformSchema
       "packages/omo-opencode/src/cli/service-auth/protocol.ts": ["platformSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) expandHome
@@ -610,8 +630,8 @@
       "packages/omo-opencode/src/config/schema.ts": ["AnyMcpNameSchema", "McpNameSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) AgentDefinitionPathSchema
       "packages/omo-opencode/src/config/schema/agent-definitions.ts": ["AgentDefinitionPathSchema"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) BuiltinAgentNameSchema, OverridableAgentNameSchema, AgentNameSchema
-      "packages/omo-opencode/src/config/schema/agent-names.ts": ["BuiltinAgentNameSchema", "OverridableAgentNameSchema", "AgentNameSchema"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) AgentNameSchema
+      "packages/omo-opencode/src/config/schema/agent-names.ts": ["AgentNameSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) FallbackModelStringArraySchema, FallbackModelObjectArraySchema, FallbackModelMixedArraySchema
       "packages/omo-opencode/src/config/schema/fallback-models.ts": ["FallbackModelStringArraySchema", "FallbackModelObjectArraySchema", "FallbackModelMixedArraySchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) PermissionValueSchema
@@ -776,8 +796,8 @@
       "packages/omo-opencode/src/hooks/model-fallback/hook.ts": ["getSessionFallbackChain", "getNextFallback", "hasPendingModelFallback", "getFallbackState"],
       // pre-existing at origin dev 4686e425b5: unused export(s) snoozedState, decidedState
       "packages/omo-opencode/src/hooks/native-edition-nudge/decide.ts": ["snoozedState", "decidedState"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) detectNativeEdition, snoozeNativeEditionNudge
-      "packages/omo-opencode/src/hooks/native-edition-nudge/hook.ts": ["detectNativeEdition", "snoozeNativeEditionNudge"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) detectNativeEdition
+      "packages/omo-opencode/src/hooks/native-edition-nudge/hook.ts": ["detectNativeEdition"],
       // pre-existing at origin dev 4686e425b5: unused export(s) decideNativeEditionNudge, detectNativeEdition, NATIVE_NUDGE_TOAST_MESSAGE, NATIVE_NUDGE_TOAST_TITLE, NUDGE_STATE_FILE, parseNudgeState
       "packages/omo-opencode/src/hooks/native-edition-nudge/index.ts": ["decideNativeEditionNudge", "detectNativeEdition", "NATIVE_NUDGE_TOAST_MESSAGE", "NATIVE_NUDGE_TOAST_TITLE", "NUDGE_STATE_FILE", "parseNudgeState"],
       // pre-existing at origin dev 4686e425b5: unused export(s) HephaestusRequiresGptError
@@ -812,8 +832,6 @@
       "packages/omo-opencode/src/hooks/runtime-fallback/agent-resolver.ts": ["AGENT_NAMES"],
       // pre-existing at origin dev 4686e425b5: unused export(s) extractRetryableSignal
       "packages/omo-opencode/src/hooks/runtime-fallback/error-classifier.ts": ["extractRetryableSignal"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) getLastUserRetryParts
-      "packages/omo-opencode/src/hooks/runtime-fallback/last-user-retry-parts.ts": ["getLastUserRetryParts"],
       // pre-existing at origin dev 4686e425b5: unused export(s) hasVisibleAssistantResponse
       "packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts": ["hasVisibleAssistantResponse"],
       // pre-existing at origin dev 4686e425b5: unused export(s) HOOK_NAME
@@ -846,8 +864,6 @@
       "packages/omo-opencode/src/plugin/ultrawork-model-override.ts": ["detectUltrawork"],
       // pre-existing at origin dev 4686e425b5: unused export(s) validateAgentOrder
       "packages/omo-opencode/src/shared/agent-ordering.ts": ["validateAgentOrder"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) hasCompactionPart
-      "packages/omo-opencode/src/shared/compaction-marker.ts": ["hasCompactionPart"],
       // pre-existing at origin dev 4686e425b5: unused export(s) createConnectedProvidersCacheStore, findProviderModelMetadata
       "packages/omo-opencode/src/shared/connected-providers-cache.ts": ["createConnectedProvidersCacheStore", "findProviderModelMetadata"],
       // pre-existing at origin dev 4686e425b5: unused export(s) containsPath
@@ -966,8 +982,6 @@
       "packages/omo-senpi/plugin/scripts/build-daemon-launch-spec.mjs": ["DAEMON_LAUNCH_SPEC_FILENAME", "daemonLaunchSpecDocument", "renderDaemonLaunchSpec", "resolveDaemonLaunchSpecOutput", "buildDaemonLaunchSpec", "checkDaemonLaunchSpecCurrent"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_STORE_WORKER_NAME, THREAD_SDK_RELATIVE_PATH
       "packages/omo-senpi/plugin/scripts/build-extension.mjs": ["GATEWAY_STORE_WORKER_NAME", "THREAD_SDK_RELATIVE_PATH"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) outputPathsIn
-      "packages/omo-senpi/plugin/scripts/build-extension.test-support.mjs": ["outputPathsIn"],
       // pre-existing at origin dev 4686e425b5: unused export(s) buildInstallCli, checkInstallCliCurrent
       "packages/omo-senpi/plugin/scripts/build-install.mjs": ["buildInstallCli", "checkInstallCliCurrent"],
       // pre-existing at origin dev 4686e425b5: unused export(s) traceBundleInputs, INSTALL_LIFECYCLES
@@ -1066,8 +1080,6 @@
       "packages/omo-senpi/src/components/comment-checker/failure-notice.ts": ["commentCheckerFailureNotice"],
       // pre-existing at origin dev 4686e425b5: unused export(s) downloadSenpiCommentCheckerBinary, defaultCommentCheckerCacheDir
       "packages/omo-senpi/src/components/comment-checker/index.ts": ["downloadSenpiCommentCheckerBinary", "defaultCommentCheckerCacheDir"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) ComputerEngineUnavailableError
-      "packages/omo-senpi/src/components/computer-use/engine-status.ts": ["ComputerEngineUnavailableError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) COMPUTER_USE_COMPONENT_NAME
       "packages/omo-senpi/src/components/computer-use/index.ts": ["COMPUTER_USE_COMPONENT_NAME"],
       // pre-existing at origin dev 4686e425b5: unused export(s) toComputerSettingsInput
@@ -1078,14 +1090,12 @@
       "packages/omo-senpi/src/components/config-watch/paths.ts": ["PLAN9_FILE_SYSTEM_TYPE", "OMO_CONFIG_FILE_FILTER_GLOBS", "OMO_CONFIG_DIRECTORY_FILTER_GLOBS"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MERGED_OMO_CONFIG_DIAGNOSTIC_PATH
       "packages/omo-senpi/src/components/config-watch/validate.ts": ["MERGED_OMO_CONFIG_DIAGNOSTIC_PATH"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) TOOLKITS_CONTEXT_KEY
-      "packages/omo-senpi/src/components/desktop-toolkit/index.ts": ["TOOLKITS_CONTEXT_KEY"],
       // pre-existing at origin dev 4686e425b5: unused export(s) FABLE_FIVE_ID_PREFIX, isDemotedEmptyToolUse
       "packages/omo-senpi/src/components/fallback-architect/detection.ts": ["FABLE_FIVE_ID_PREFIX", "isDemotedEmptyToolUse"],
       // pre-existing at origin dev 4686e425b5: unused export(s) TRANSCRIPT_MESSAGE_LIMIT, LOG_WINDOW_MS
       "packages/omo-senpi/src/components/feedback/collect.ts": ["TRANSCRIPT_MESSAGE_LIMIT", "LOG_WINDOW_MS"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) FEEDBACK_SECTION_IDS, REPORT_RETENTION_DAYS, byteLength
-      "packages/omo-senpi/src/components/feedback/draft.ts": ["FEEDBACK_SECTION_IDS", "REPORT_RETENTION_DAYS", "byteLength"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) REPORT_RETENTION_DAYS, byteLength
+      "packages/omo-senpi/src/components/feedback/draft.ts": ["REPORT_RETENTION_DAYS", "byteLength"],
       // pre-existing at origin dev 4686e425b5: unused export(s) REPORT_SECTION_IDS, REPORT_KINDS, REPORT_MAX_BYTES, ANONYMOUS_REPORT_MAX_BYTES, REPORT_IDEMPOTENCY_HEADER, REPORT_IDEMPOTENCY_KEY, REPORT_DELETE_TOKEN_HEADER, readCreateReportRequest, createReportResponseSchema, reportListSchema and 1 more
       "packages/omo-senpi/src/components/feedback/fixtures/service-contract/reports.ts": ["REPORT_SECTION_IDS", "REPORT_KINDS", "REPORT_MAX_BYTES", "ANONYMOUS_REPORT_MAX_BYTES", "REPORT_IDEMPOTENCY_HEADER", "REPORT_IDEMPOTENCY_KEY", "REPORT_DELETE_TOKEN_HEADER", "readCreateReportRequest", "createReportResponseSchema", "reportListSchema", "compareReportVersions"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ContractError, isRecord, readBoolean, readTrue, readNullable, HTTP_URL, HOSTNAME, ENVIRONMENT_NAME
@@ -1122,8 +1132,6 @@
       "packages/omo-senpi/src/components/memory/commands/types.ts": ["identityFor"],
       // pre-existing at origin dev 4686e425b5: unused export(s) getMemoryRepo
       "packages/omo-senpi/src/components/memory/context.ts": ["getMemoryRepo"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_SERVICE_API
-      "packages/omo-senpi/src/components/memory/device-session/account-source.ts": ["DEFAULT_SERVICE_API"],
       // pre-existing at origin dev 4686e425b5: unused export(s) FakeScheduler
       "packages/omo-senpi/src/components/memory/dream-trigger.test-support.ts": ["FakeScheduler"],
       // pre-existing at origin dev 4686e425b5: unused export(s) factsAgreementContract
@@ -1137,6 +1145,8 @@
       // pre-existing at origin dev 4686e425b5: unused export(s) AVAILABLE_MODEL
       "packages/omo-senpi/src/components/memory/facts-runner.test-support.ts": ["AVAILABLE_MODEL"],
       // pre-existing at origin dev 4686e425b5: unused export(s) getMemoryRepo
+      // the senpi engine loads this extension's default export by path (`senpi -e <file>` in index-engine.test.ts)
+      "packages/omo-senpi/src/components/memory/index-engine.fixture.ts": ["default"],
       "packages/omo-senpi/src/components/memory/index.ts": ["getMemoryRepo"],
       // pre-existing at origin dev 4686e425b5: unused export(s) UNAVAILABLE_CATEGORY_MAX_CHARS, GATE_MODEL_MAX_CHARS
       "packages/omo-senpi/src/components/memory/kibitzer/notice.ts": ["UNAVAILABLE_CATEGORY_MAX_CHARS", "GATE_MODEL_MAX_CHARS"],
@@ -1160,8 +1170,8 @@
       "packages/omo-senpi/src/components/memory/memory-notice-spec.ts": ["REMEMBERED_TITLE", "LET_GO_TITLE", "ordinal", "formatBytes"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MEMORY_REFLECTIONS_RPC_METHOD
       "packages/omo-senpi/src/components/memory/memory-rpc-bridge.ts": ["MEMORY_REFLECTIONS_RPC_METHOD"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) readMemoryRpcRepoState, readMemoryRpcJournalState, readMemoryRpcHealth
-      "packages/omo-senpi/src/components/memory/memory-rpc-snapshot-state.ts": ["readMemoryRpcRepoState", "readMemoryRpcJournalState", "readMemoryRpcHealth"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) readMemoryRpcRepoState, readMemoryRpcHealth
+      "packages/omo-senpi/src/components/memory/memory-rpc-snapshot-state.ts": ["readMemoryRpcRepoState", "readMemoryRpcHealth"],
       // pre-existing at origin dev 4686e425b5: unused export(s) IDENTITY
       "packages/omo-senpi/src/components/memory/memory-usage.test-support.ts": ["IDENTITY"],
       // pre-existing at origin dev 4686e425b5: unused export(s) incrementMemoryUsage, readMemoryUsageLedger, extractMemoryUsagePath
@@ -1318,8 +1328,6 @@
       "packages/omo-senpi/src/components/thread/gateway/author.ts": ["AUTHOR_ID_MAX_LENGTH", "AUTHOR_DISPLAY_MAX_LENGTH"],
       // pre-existing at origin dev 4686e425b5: unused export(s) BINDING_SCHEMA_VERSION, BINDING_PLATFORMS, BINDING_STATUSES, COMPLETION_OUTCOMES, BINDING_MAX_TTL_SECONDS, BINDING_DEFAULT_POLICY_ID
       "packages/omo-senpi/src/components/thread/gateway/bindings.ts": ["BINDING_SCHEMA_VERSION", "BINDING_PLATFORMS", "BINDING_STATUSES", "COMPLETION_OUTCOMES", "BINDING_MAX_TTL_SECONDS", "BINDING_DEFAULT_POLICY_ID"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) reaches
-      "packages/omo-senpi/src/components/thread/gateway/causal.ts": ["reaches"],
       // pre-existing at origin dev 4686e425b5: unused export(s) completionOutcome
       "packages/omo-senpi/src/components/thread/gateway/completion.ts": ["completionOutcome"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_SCHEMA_VERSION
@@ -1418,8 +1426,6 @@
       "packages/senpi-desktop-engine/src/locator.ts": ["DESKTOP_ENGINE_BINARY", "QUARANTINE_ATTRIBUTE"],
       // pre-existing at origin dev 4686e425b5: unused export(s) HANG_GUARD_MS, CHORD
       "packages/senpi-desktop-engine/test/support/engine.ts": ["HANG_GUARD_MS", "CHORD"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) ELEMENT_SNAPSHOT
-      "packages/senpi-desktop-prelude/test/harness.ts": ["ELEMENT_SNAPSHOT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/senpi-desktop-prelude/test/python-setup.ts": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
@@ -1448,8 +1454,6 @@
       "packages/senpi-desktop-tool/src/permission.ts": ["computerTier"],
       // pre-existing at origin dev 4686e425b5: unused export(s) defaultStopHotkey, COMPUTER_PERMISSION, computerTier, ComputerSettingsError, ComputerSettingsSchema, computerSkillMarkdown
       "packages/senpi-desktop-tool/src/registration.ts": ["defaultStopHotkey", "COMPUTER_PERMISSION", "computerTier", "ComputerSettingsError", "ComputerSettingsSchema", "computerSkillMarkdown"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) usesCoordinateSafeImageSizing
-      "packages/senpi-desktop-tool/src/session.ts": ["usesCoordinateSafeImageSizing"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ComputerSettingsSchema
       "packages/senpi-desktop-tool/src/settings.ts": ["ComputerSettingsSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) computerSkillMarkdown
@@ -1524,14 +1528,10 @@
       "packages/senpi-task/src/lifecycle/revive-policy.ts": ["ACTIVE_REVIVE_DRIFT_POLICY"],
       // pre-existing at origin dev 4686e425b5: unused export(s) HOST_PID
       "packages/senpi-task/src/manager/__fixtures__/fallback-launch-fakes.ts": ["HOST_PID"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) QUOTA_ERROR
-      "packages/senpi-task/src/manager/__fixtures__/parent-model-world.ts": ["QUOTA_ERROR"],
       // pre-existing at origin dev 4686e425b5: unused export(s) holdsInChild
       "packages/senpi-task/src/manager/held-send.ts": ["holdsInChild"],
       // pre-existing at origin dev 4686e425b5: unused export(s) TaskConcurrency, decideDepthPolicy, NameRegistry, AUTO_HOST_CAPABILITIES, adaptInProcessHandle, adaptRpcHandle, TASK_AWAITING_INPUT_EVENT, TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT, logTranscriptEvent and 1 more
       "packages/senpi-task/src/manager/index.ts": ["TaskConcurrency", "decideDepthPolicy", "NameRegistry", "AUTO_HOST_CAPABILITIES", "adaptInProcessHandle", "adaptRpcHandle", "TASK_AWAITING_INPUT_EVENT", "TRANSCRIPT_ASSISTANT_EVENT", "TRANSCRIPT_TOOL_EVENT", "logTranscriptEvent", "subscribeTranscriptLog"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) START_REPORT_WINDOW_MS
-      "packages/senpi-task/src/manager/manager.ts": ["START_REPORT_WINDOW_MS"],
       // pre-existing at origin dev 4686e425b5: unused export(s) readObservedModel, observeChildEffectiveModel
       "packages/senpi-task/src/manager/observed-model.ts": ["readObservedModel", "observeChildEffectiveModel"],
       // pre-existing at origin dev 4686e425b5: unused export(s) PausedChildLostError, PausedChildOwnedElsewhereError
@@ -1666,8 +1666,8 @@
       "packages/shared-skills/index.d.ts": ["sharedSkillsRootPath"],
       // pre-existing at origin dev 4686e425b5: unused export(s) designpowersUpstreamName, excludedDesignpowersSkills, designpowersAgentFiles
       "packages/shared-skills/scripts/designpowers-refs-manifest.mjs": ["designpowersUpstreamName", "excludedDesignpowersSkills", "designpowersAgentFiles"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) sharedSkillsRoot, tasteSkillFiles, uiUxDbFileRenames, brandDesignFiles, designMaterializeMap, uiUxDbMaterializeMap, keptDesignRelativePaths
-      "packages/shared-skills/scripts/frontend-refs-manifest.mjs": ["sharedSkillsRoot", "tasteSkillFiles", "uiUxDbFileRenames", "brandDesignFiles", "designMaterializeMap", "uiUxDbMaterializeMap", "keptDesignRelativePaths"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) sharedSkillsRoot, tasteSkillFiles, uiUxDbFileRenames, brandDesignFiles, designMaterializeMap, uiUxDbMaterializeMap
+      "packages/shared-skills/scripts/frontend-refs-manifest.mjs": ["sharedSkillsRoot", "tasteSkillFiles", "uiUxDbFileRenames", "brandDesignFiles", "designMaterializeMap", "uiUxDbMaterializeMap"],
       // pre-existing at origin dev 4686e425b5: unused export(s) __scriptPath
       "packages/shared-skills/scripts/materialize-frontend-refs.mjs": ["__scriptPath"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ignoredSkillSourceDirNames, ignoredSkillSourceFileNames, createSkillSourceCopyFilter
@@ -1676,8 +1676,8 @@
       "packages/shared-skills/skill-source-filter.mjs": ["ignoredSkillSourceFileNames"],
       // pre-existing at origin dev 4686e425b5: unused export(s) BROWSER_ENGINE_ENV
       "packages/shared-skills/skills/browser/scripts/browser-engine-guard.mjs": ["BROWSER_ENGINE_ENV"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) BROWSER_ENGINE_ENV, resolveOmowrightEntry, loadOmowright
-      "packages/shared-skills/skills/browser/scripts/omowright.mjs": ["BROWSER_ENGINE_ENV", "resolveOmowrightEntry", "loadOmowright"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) BROWSER_ENGINE_ENV, resolveOmowrightEntry
+      "packages/shared-skills/skills/browser/scripts/omowright.mjs": ["BROWSER_ENGINE_ENV", "resolveOmowrightEntry"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MAX_ROWS, MAX_OUTPUT_BYTES
       "packages/shared-skills/skills/debugging/references/scripts/dap.mjs": ["MAX_ROWS", "MAX_OUTPUT_BYTES"],
       // pre-existing at origin dev 4686e425b5: unused export(s) classifyName
@@ -1801,9 +1801,13 @@
       // pre-existing at origin dev 4686e425b5: unused export(s) createImmediateSender, TelemetryDeliveryError
       "packages/telemetry-core/immediate-send.d.ts": ["createImmediateSender", "TelemetryDeliveryError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_POSTHOG_HOST, DEFAULT_POSTHOG_API_KEY, UNCONFIGURED_POSTHOG_API_KEY, createEventTelemetryClient, TelemetryDeliveryError, createImmediateSender, createDefaultPostHogTransport, isTelemetryClientEnabled, createConsentGatedFetch, createTelemetryClient and 20 more
-      "packages/telemetry-core/index.d.ts": ["DEFAULT_POSTHOG_HOST", "DEFAULT_POSTHOG_API_KEY", "UNCONFIGURED_POSTHOG_API_KEY", "createEventTelemetryClient", "TelemetryDeliveryError", "createImmediateSender", "createDefaultPostHogTransport", "isTelemetryClientEnabled", "createConsentGatedFetch", "createTelemetryClient", "shouldDisableTelemetry", "getTelemetryApiKey", "isConfiguredTelemetryApiKey", "createUuidV7Generator", "createEventId", "hasTelemetryApiKey", "getTelemetryHost", "getDefaultTelemetryOsProvider", "getTelemetryDistinctId", "resolveTelemetryStateDir", "getTelemetryActivityStateFilePath", "getDailyActiveCaptureState", "getTelemetryDiagnosticsFilePath", "writeTelemetryDiagnostic", "cleanupTelemetryDiagnostics", "recordDailyActive", "isTraceparent", "publishTurnTraceparent", "clearTurnTraceparent", "readTurnTraceparent"],
+      // #11572 (origin dev 4c87d16a73) renamed getTelemetryDistinctId to getTelemetryInstallDistinctId and added TELEMETRY_INSTALL_ID_FILE_NAME: the new names are
+      // declared here for the package's own consumers, which import the implementation (src/index.ts) and never this declaration file, so knip reports them unused
+      // exactly as it did the old name. The exports stay; only their rows move.
+      "packages/telemetry-core/index.d.ts": ["DEFAULT_POSTHOG_HOST", "DEFAULT_POSTHOG_API_KEY", "UNCONFIGURED_POSTHOG_API_KEY", "createEventTelemetryClient", "TelemetryDeliveryError", "createImmediateSender", "createDefaultPostHogTransport", "isTelemetryClientEnabled", "createConsentGatedFetch", "createTelemetryClient", "shouldDisableTelemetry", "getTelemetryApiKey", "isConfiguredTelemetryApiKey", "createUuidV7Generator", "createEventId", "hasTelemetryApiKey", "getTelemetryHost", "getDefaultTelemetryOsProvider", "resolveTelemetryStateDir", "getTelemetryActivityStateFilePath", "getDailyActiveCaptureState", "getTelemetryDiagnosticsFilePath", "writeTelemetryDiagnostic", "cleanupTelemetryDiagnostics", "recordDailyActive", "isTraceparent", "publishTurnTraceparent", "clearTurnTraceparent", "readTurnTraceparent", "TELEMETRY_INSTALL_ID_FILE_NAME", "getTelemetryInstallDistinctId"],
       // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_POSTHOG_HOST, DEFAULT_POSTHOG_API_KEY, UNCONFIGURED_POSTHOG_API_KEY, isTelemetryClientEnabled, createConsentGatedFetch, shouldDisableTelemetry, getTelemetryApiKey, isConfiguredTelemetryApiKey, createUuidV7Generator, createEventId and 13 more
-      "packages/telemetry-core/injected.d.ts": ["DEFAULT_POSTHOG_HOST", "DEFAULT_POSTHOG_API_KEY", "UNCONFIGURED_POSTHOG_API_KEY", "isTelemetryClientEnabled", "createConsentGatedFetch", "shouldDisableTelemetry", "getTelemetryApiKey", "isConfiguredTelemetryApiKey", "createUuidV7Generator", "createEventId", "hasTelemetryApiKey", "getTelemetryHost", "getDefaultTelemetryOsProvider", "getTelemetryDistinctId", "resolveTelemetryStateDir", "getTelemetryActivityStateFilePath", "getDailyActiveCaptureState", "getTelemetryDiagnosticsFilePath", "writeTelemetryDiagnostic", "cleanupTelemetryDiagnostics", "createTelemetryClient", "createEventTelemetryClient", "recordDailyActive"],
+      // #11572 (origin dev 4c87d16a73): the getTelemetryDistinctId row became TELEMETRY_INSTALL_ID_FILE_NAME and getTelemetryInstallDistinctId, as in index.d.ts above.
+      "packages/telemetry-core/injected.d.ts": ["DEFAULT_POSTHOG_HOST", "DEFAULT_POSTHOG_API_KEY", "UNCONFIGURED_POSTHOG_API_KEY", "isTelemetryClientEnabled", "createConsentGatedFetch", "shouldDisableTelemetry", "getTelemetryApiKey", "isConfiguredTelemetryApiKey", "createUuidV7Generator", "createEventId", "hasTelemetryApiKey", "getTelemetryHost", "getDefaultTelemetryOsProvider", "resolveTelemetryStateDir", "getTelemetryActivityStateFilePath", "getDailyActiveCaptureState", "getTelemetryDiagnosticsFilePath", "writeTelemetryDiagnostic", "cleanupTelemetryDiagnostics", "createTelemetryClient", "createEventTelemetryClient", "recordDailyActive", "TELEMETRY_INSTALL_ID_FILE_NAME", "getTelemetryInstallDistinctId"],
       // pre-existing at origin dev 4686e425b5: unused export(s) createDefaultPostHogTransport
       "packages/telemetry-core/posthog-transport.d.ts": ["createDefaultPostHogTransport"],
       // pre-existing at origin dev 4686e425b5: unused export(s) getTelemetryDayClaimFilePath
@@ -1869,36 +1873,37 @@
       // pre-existing at origin dev 4686e425b5: unused export(s) parseTarListingOutput
       "packages/utils/src/zip-entry-listing/tar-zip-entry-listing.ts": ["parseTarListingOutput"],
       // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
-      "packages/web/app/[locale]/[...rest]/page.tsx": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) generateStaticParams, generateMetadata, default
-      "packages/web/app/[locale]/docs/[slug]/page.tsx": ["generateStaticParams", "generateMetadata", "default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) generateMetadata, default
-      "packages/web/app/[locale]/docs/install/page.tsx": ["generateMetadata", "default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) metadata, default
-      "packages/web/app/[locale]/docs/layout.tsx": ["metadata", "default"],
+      "packages/web/app/[locale]/(site)/[...rest]/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/docs/page.tsx": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) dynamic, generateMetadata, default
-      "packages/web/app/[locale]/download/page.tsx": ["dynamic", "generateMetadata", "default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) generateMetadata, generateStaticParams, default
-      // added on dev after the last merge (origin dev 2b5831715e): unused export(s) revalidate, viewport
-      "packages/web/app/[locale]/layout.tsx": ["generateMetadata", "generateStaticParams", "default", "revalidate", "viewport"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) metadata, default
-      "packages/web/app/[locale]/manifesto/2026-01/layout.tsx": ["metadata", "default"],
+      "packages/web/app/[locale]/(site)/docs/[slug]/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/manifesto/2026-01/page.tsx": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) metadata, default
-      "packages/web/app/[locale]/manifesto/layout.tsx": ["metadata", "default"],
+      "packages/web/app/[locale]/(site)/docs/install/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/manifesto/page.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/docs/layout.tsx": ["default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/(site)/docs/page.tsx": ["default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/(site)/download/page.tsx": ["default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/(site)/layout.tsx": ["default"],
+      // the home page has its own root layout (omo.dev renewal draft)
+      "packages/web/app/[locale]/(home)/layout.tsx": ["default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/(site)/manifesto/2026-01/layout.tsx": ["default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/(site)/manifesto/2026-01/page.tsx": ["default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/(site)/manifesto/layout.tsx": ["default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/(site)/manifesto/page.tsx": ["default"],
       // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
-      "packages/web/app/[locale]/not-found.tsx": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) generateMetadata, default
-      "packages/web/app/[locale]/page.tsx": ["generateMetadata", "default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) dynamic, generateMetadata, default
-      "packages/web/app/[locale]/support/page.tsx": ["dynamic", "generateMetadata", "default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) generateLandingMetadata
-      "packages/web/app/_components/landing-page.tsx": ["generateLandingMetadata"],
+      "packages/web/app/[locale]/(site)/not-found.tsx": ["default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/(home)/page.tsx": ["default"],
+      // re-exported as the home page's generateMetadata (app/[locale]/(home)/page.tsx), which knip does not follow
+      "packages/web/components/home/home-page.tsx": ["generateHomeMetadata"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/[locale]/(site)/support/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GET
       "packages/web/app/api/downloads/route.ts": ["GET"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GET
@@ -1907,35 +1912,31 @@
       "packages/web/app/api/stats/route.ts": ["GET"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/web/app/design/graph/page.tsx": ["default"],
-      // added on dev after the last merge (origin dev 2b5831715e): unused export(s) viewport, generateMetadata, default
-      // pre-existing at origin dev 88a2b06e3f (#11587, b469db9cfe): unused export(s) revalidate (Next.js route segment config)
-      "packages/web/app/design/layout.tsx": ["viewport", "generateMetadata", "default", "revalidate"],
+      // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
+      // #11646 (origin dev 88a2b06e3f) named this file's revalidate here; nextRouteSegmentExports covers it, so that row is gone.
+      "packages/web/app/design/layout.tsx": ["default"],
       // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
       "packages/web/app/design/not-found.tsx": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) dynamic, metadata, default
-      "packages/web/app/design/page.tsx": ["dynamic", "metadata", "default"],
-      // added on dev after the last merge (origin dev 2b5831715e): unused export(s) metadata, viewport, default
-      "packages/web/app/global-not-found.tsx": ["metadata", "viewport", "default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) alt, size, contentType, dynamic
-      "packages/web/app/opengraph-image.tsx": ["alt", "size", "contentType", "dynamic"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default
+      "packages/web/app/design/page.tsx": ["default"],
+      // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
+      "packages/web/app/global-not-found.tsx": ["default"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) alt, size, contentType
+      "packages/web/app/opengraph-image.tsx": ["alt", "size", "contentType"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/web/app/robots.ts": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/web/app/sitemap.ts": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) default, alt, size, contentType, dynamic
-      "packages/web/app/twitter-image.tsx": ["default", "alt", "size", "contentType", "dynamic"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) default, alt, size, contentType
+      "packages/web/app/twitter-image.tsx": ["default", "alt", "size", "contentType"],
       // pre-existing at origin dev 4686e425b5: unused export(s) findHashSectionId
       "packages/web/components/docs/use-docs-navigation.ts": ["findHashSectionId"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) STAGE_STATES
-      "packages/web/components/landing/crafted/stage-states.ts": ["STAGE_STATES"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ROW_GAP, WAVE_HEADER_HEIGHT
       "packages/web/components/landing/dag/layout.ts": ["ROW_GAP", "WAVE_HEADER_HEIGHT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) eventIndexAt
       "packages/web/components/landing/dag/scenario.ts": ["eventIndexAt"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/web/components/landing/graph/graph-hero.tsx": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) TerminalTypewriter
-      "packages/web/components/landing/motion-wrappers.tsx": ["TerminalTypewriter"],
       // pre-existing at origin dev 4686e425b5: unused export(s) KIBITZER_STEP_COUNT
       "packages/web/components/landing/story-data.ts": ["KIBITZER_STEP_COUNT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) LEGACY_MANIFESTO_PATH
@@ -2087,6 +2088,7 @@
         "script/check-temp-leak-report-only.mjs",
         "script/bun-panic-retry.ts",
         "script/ci-leg-tests-guard.mjs",
+        "script/engine-trust-helper-smoke.ts",
         "script/published-install-smoke.mjs",
         "script/verify-omo-ai-payload.mjs",
         "script/release-announce.ts",
@@ -2096,6 +2098,9 @@
         "script/wait-registry-versions.mjs",
         "script/senpi-worker-compile.ts",
         "test-support/remove-tree.ts",
+        "test-support/test-deadline.ts",
+        // preloaded by path from the package bunfig.toml files (the bun plugin adds it with exports unchecked)
+        "test-support/test-deadline.preload.ts",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "script/build-binaries.ts",
@@ -2108,6 +2113,7 @@
         "script/build-omo-schema.ts",
         "script/build-omob.ts",
         "script/build-schema.ts",
+        "script/build-service-auth.ts",
         "script/build.ts",
         "script/changelog-section.ts",
         "script/check-cargo-pinned-deps.mjs",
@@ -2119,6 +2125,7 @@
         "script/install-codex-dev.ts",
         "script/installer/channel-maintenance.ts",
         "script/installer/mirror-release-to-r2.ts",
+        "script/keychain-helper-release.ts",
         "script/lint-ratchet.ts",
         "script/oxlint/biome-ports.ts",
         "script/patch-node-require-shim.ts",
@@ -2291,6 +2298,7 @@
         "@oh-my-opencode/ast-grep-mcp",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
         "@oh-my-opencode/boulder-state",
+        "@oh-my-opencode/device-service-core",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
         "@oh-my-opencode/claude-code-compat-core",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
@@ -2559,6 +2567,9 @@
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "src/team-state-store/locks.ts",
+        "src/team-state-store/lock-worker.fixture.ts",
+        "src/team-state-store/lock-worker-host.fixture.ts",
+        "src/team-state-store/lock-worker-exit.fixture.ts",
         "src/team-tasklist/test-support.ts",
       ],
     },
@@ -2589,6 +2600,24 @@
         "**/*.test-d.ts",
       ],
     },
+    "packages/device-service-core": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "test/local-api/support.ts",
+        "test/local-api/support-windows.ts",
+        "test/local-api/conformance/*.ts",
+        "test/registrant-support.ts",
+        "test/release-fixture.ts",
+        "test/strict-ed25519/native-control.ts",
+      ],
+    },
     "packages/memory-core": {
       "includeEntryExports": true,
       // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
@@ -2601,7 +2630,10 @@
         "**/*.test-d.ts",
         "src/git/test-repo-config.test-support.ts",
         "src/recall/bm25-persist.ts",
+        // bundled by path by script/build-reflection-lock.ts into the doctor CLI's reflection-lock.generated.js
+        "src/reflection/reflection-lock-bundle.ts",
         "src/sync/item/test-support.ts",
+        "src/sync/account/testing/credential-writer.test-support.ts",
         "src/sync/keyring-port.ts",
         "src/sync/space/test-support.ts",
       ],
@@ -2746,6 +2778,11 @@
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
+        "skills/frontend/scripts/detect/cli.ts",
+        "skills/programming/scripts/{python,rust,go}/new-*.ts",
+        "scripts/detect-parity.ts",
+        "scripts/detect-parity-oracle.ts",
+        "scripts/detect-source-parity.ts",
       ],
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -2872,11 +2909,23 @@
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
+        "scripts/qa/fused-equivalence-e2e.mjs",
+        // run by path as the bunshin-ts eval SDK's live QA driver (scripts/qa/AGENTS.md)
+        "scripts/qa/bunshin-ts-eval-sdk-qa.mjs",
         "src/components/claim-receipt/runtime.ts",
         "src/components/computer-use/runtime.ts",
+        "src/components/device-service/runtime.ts",
         "src/components/feedback/runtime.ts",
         "src/components/memory/commands/runtime.ts",
         "src/components/memory/device-session/account-runtime.ts",
+        // spawned by path from tests: a child process or Worker entry, never imported
+        // compiled by path with `bun build --compile` in channel-compiled.test.ts
+        "src/components/memory/desktop-sync/channel-compiled.fixture.ts",
+        "src/components/memory/desktop-sync/hostSelection.fixture.ts",
+        "src/components/memory/device-session/sibling-writer.fixture.ts",
+        "src/components/memory/index-engine.fixture.ts",
+        "src/components/memory/index-observer.fixture.ts",
+        "src/components/memory/index-selection.fixture.ts",
         "src/components/memory/kibitzer/tools/test-support.ts",
         "src/components/memory/palace/runtime.ts",
         "src/components/memory/recall-store-runtime.ts",
@@ -3421,6 +3470,7 @@
         "test/refusal-child.ts",
         "test/support/engine.ts",
         "test/support/error-code-cases.ts",
+        "test/support/input-calls.ts",
       ],
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -3543,8 +3593,6 @@
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/__tests__/perf/fixtures/in-tree/src/lib/file-15.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
-        "src/agents/sisyphus/index.ts",
-        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/install-codex/codex-cache-bins.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/install-codex/codex-cache-bundled-mcps.ts",
@@ -3624,6 +3672,8 @@
         "src/cli/service-auth/accounts-closed.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/service-auth/cli-keystore.fixture.ts",
+        // a --preload fixture: closed-device-login.test.ts runs it in a launcher child, nothing imports it (#12639)
+        "src/cli/service-auth/closed-device-login.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/service-auth/refresh-child.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -3847,18 +3897,27 @@
         "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "bin/senpi-patch.mjs",
+        // the engine entry the npm launcher spawns by path for a launch that claims memory sync at boot (launcher.js)
+        "bin/lib/engine-boot.js",
+        // the manual GUI-session QA runner for the keychain helper: a person runs it by path in a dedicated QA login session
+        "keychain-helper/gui-session-runner.ts",
+        "keychain-helper/build.ts",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "test/account-linux-no-gdbus.fixture.ts",
         "test/bun-bin-shim.fixture.ts",
         "test/bun-bin-shim.test-support.ts",
         "test/daemon-test-support.ts",
+        "test/keychain-helper.test-support.ts",
         "test/fixtures/compiled-setup/entry.ts",
         "test/fixtures/provisioned-handoff/entry.ts",
         "test/fixtures/senpi-hooks-state-child.mjs",
         "test/fixtures/senpi-hooks-state-consumer.mjs",
+        "test/fixtures/trust-ensure-probe.ts",
+        "test/fixtures/trust-stage-probe.ts",
         "test/packed-consumer.mjs",
         "test/teardown.test-support.ts",
+        "test/trust-certificate-fixtures.ts",
       ],
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -3887,8 +3946,9 @@
         "**/*.test-d.ts",
         // Every Next.js special file at any depth: these are the knip 6.43.0 Next.js plugin's own entry patterns
         // (dist/plugins/next/index.js getEntryFilePatterns, this app has no src/ dir and the default pageExtensions), which it
-        // adds with exports unchecked, so they are listed here to be export-checked. Their framework-consumed exports (default,
-        // metadata, generateMetadata, GET, ...) are named per symbol in preExistingExports.
+        // adds with exports unchecked, so they are listed here to be export-checked. Their route-segment config exports
+        // (revalidate, metadata, generateMetadata, ...) are dropped by name by script/knip-next-route-segment-exports.ts;
+        // the remaining framework-consumed ones (default, GET, ...) are named per symbol in preExistingExports.
         "app/{,[(]*[)]/}{manifest,robots}.{js,ts}",
         "app/**/sitemap.{js,ts}",
         "app/**/{icon,apple-icon,opengraph-image,twitter-image}.{js,jsx,ts,tsx}",
@@ -3979,6 +4039,7 @@
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "test/daemon-path-fixture.ts",
+        "test/bun-child.ts",
         "vitest.config.ts",
       ],
       "ignoreFiles": [
@@ -4124,6 +4185,7 @@
         "**/*.test-d.ts",
         "extensions/omo-claim-receipt.js",
         "extensions/omo-computer-use.js",
+        "extensions/omo-desktop-toolkit.js",
         "extensions/omo-device-account.js",
         "extensions/omo-feedback.js",
         "extensions/omo-memory-commands.js",
@@ -4132,6 +4194,7 @@
         "extensions/omo-memory-palace.js",
         "extensions/omo-memory-sync.js",
         "extensions/omo-recall-store.js",
+        "extensions/omo-device-service.js",
         "extensions/omo-session-history.js",
         "extensions/omo-task.js",
         "extensions/omo-telemetry-otlp.js",

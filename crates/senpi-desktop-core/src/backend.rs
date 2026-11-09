@@ -10,9 +10,16 @@ use crate::ax::{AxHandle, AxProps};
 use crate::error::{CoreResult, DesktopError, TccPermission};
 use crate::frame::FrameGeometry;
 use crate::keys::KeyName;
+pub use crate::protocol_results::AxInputMethod;
 use crate::types::{
-    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
+    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector, FrontWindow,
+    ScreenState, Target,
 };
+use crate::user_input::{UserInputFeed, UserPresses};
+
+/// Keeps the display awake until dropped (macOS: a
+/// `PreventUserIdleDisplaySleep` power assertion).
+pub type DisplayAwakeHold = Box<dyn Send>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum DeliveryMode {
@@ -85,6 +92,23 @@ pub enum PointerEvent {
     },
 }
 
+/// Where an application has keyboard focus, for the refusal of keys an
+/// element never took: its focused window as [`Backend::windows`] lists it,
+/// and the focused element.
+#[derive(Clone, Default)]
+pub struct KeyboardFocus {
+    pub window: Option<String>,
+    pub element: Option<AxHandle>,
+}
+
+/// How text or keys addressed to an element ended ([`Backend::ax_type_text`]).
+pub enum ElementDelivery {
+    Delivered(AxInputMethod),
+    /// The element did not take keyboard focus when asked to, so no key was
+    /// sent; the focus is where the value says.
+    Unfocused(KeyboardFocus),
+}
+
 pub trait Backend: Send {
     /// Independent release ownership, usable without borrowing a busy backend.
     /// Owners register this before admitting input into bounded fatal-stop mode.
@@ -147,7 +171,36 @@ pub trait Backend: Send {
         }
         Ok(())
     }
+    /// Types `text` into the element `h` names (`ax.typeText`): by AX
+    /// insertion into a native text field, else as keys once the element
+    /// holds its application's keyboard focus, never unconfirmed.
+    /// `check_stop` runs before every key press and `delivered` reports each
+    /// fully delivered Unicode scalar. Backends without element input keep
+    /// this default and refuse.
+    fn ax_type_text(
+        &mut self,
+        _h: &AxHandle,
+        _text: &str,
+        _mode: DeliveryMode,
+        _check_stop: &dyn Fn() -> CoreResult<()>,
+        _delivered: &mut dyn FnMut(),
+    ) -> CoreResult<ElementDelivery> {
+        Err(DesktopError::ax_unsupported())
+    }
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()>;
+    /// [`Self::key_chord`] with `check_stop` before every key press, so a stop
+    /// or a cancellation lands between presses. The default checks once,
+    /// before the chord, for backends that press a chord in one call.
+    fn key_chord_interruptible(
+        &mut self,
+        target: &Target,
+        keys: &[KeyName],
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        check_stop()?;
+        self.key_chord(target, keys, mode)
+    }
     /// Native press/release around a session-owned interruptible wait.
     /// Backends without bounded input refuse rather than synthesizing clicks.
     fn hold_keys(
@@ -230,6 +283,42 @@ pub trait Backend: Send {
     fn screen_locked(&mut self) -> CoreResult<bool> {
         Ok(false)
     }
+
+    /// Starts watching the user's own key presses and clicks; idempotent.
+    /// Backends without a watch keep this no-op and report no
+    /// `interventionWatch`.
+    fn watch_user_input(&mut self) {}
+
+    /// The user's presses the watch recorded since the last call.
+    fn take_user_presses(&mut self) -> UserPresses {
+        UserPresses::default()
+    }
+
+    /// Starts keeping the display awake while the agent operates. `None` when
+    /// the platform has no such hold or refused it; the display then sleeps
+    /// as it would without the agent, and failures say so.
+    fn hold_display_awake(&mut self) -> Option<DisplayAwakeHold> {
+        None
+    }
+
+    /// Lock and display-sleep reads that need no backend borrow, so a waiter
+    /// can explain its timeout while the backend is busy.
+    fn screen_probe(&self) -> Option<std::sync::Arc<dyn ScreenProbe>> {
+        None
+    }
+
+    /// The watch's shared feed, once `watch_user_input` ran; `None` while
+    /// nothing is watched. The session reads it between and inside requests.
+    fn user_input_feed(&mut self) -> Option<std::sync::Arc<dyn UserInputFeed>> {
+        None
+    }
+}
+
+/// Live lock and display-sleep state, safe to read from any thread.
+pub trait ScreenProbe: Send + Sync {
+    /// `display` names the display a request aims at; `None` means every
+    /// display of the session.
+    fn screen_state(&self, display: Option<&DisplaySelector>) -> ScreenState;
 }
 
 /// Replays only tracked downs. Must not wait for the backend's input scope.
