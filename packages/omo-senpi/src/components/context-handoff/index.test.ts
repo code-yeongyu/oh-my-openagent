@@ -348,6 +348,17 @@ describe("context-handoff trigger", () => {
     }
   })
 
+  it("#given a seeded session at the chained handoff limit whose seed is not the first user message #when compaction fails #then it does not hand off again", async () => {
+    const earlyUserMessage = { type: "message", message: { role: "user", content: [{ type: "text", text: "queued before the seed" }] } }
+    const harness = await createHarness(ENABLED, [earlyUserMessage, ...seedEntries(MAX_CHAINED_HANDOFFS)])
+    await harness.settle()
+
+    await harness.compactionFailed()
+    await harness.settle()
+
+    expect(handoffRequests(harness.pi)).toHaveLength(0)
+  })
+
   it("#given a run that ends in an unrelated provider error #when it settles #then no handoff is requested", async () => {
     const harness = await createHarness(ENABLED)
 

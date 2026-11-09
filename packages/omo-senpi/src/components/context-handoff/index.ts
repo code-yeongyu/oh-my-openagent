@@ -528,7 +528,8 @@ function handoffWritten(cwd: string, path: string, sinceMs: number): boolean {
   }
 }
 
-// How many chained handoffs produced this session: 0 when its first user message is not a handoff seed.
+// How many chained handoffs produced this session: 0 when no user message is a handoff seed. Every user
+// message is scanned, not only the first, so a message delivered before the seed cannot hide it.
 // A fresh session that starts at or above the threshold (an oversized handoff, a very low threshold)
 // would otherwise hand off again on its first run and loop.
 function seedGenerationOf(eventCtx: unknown): number {
@@ -541,7 +542,7 @@ function seedGenerationOf(eventCtx: unknown): number {
     if (!isRecord(entry) || entry["type"] !== "message" || !isRecord(entry["message"])) continue
     if (entry["message"]["role"] !== "user") continue
     const text = messageText(entry["message"]["content"]).trimStart()
-    if (!text.startsWith(SEED_OPEN_TAG)) return 0
+    if (!text.startsWith(SEED_OPEN_TAG)) continue
     const line = text.split("\n").find((candidate) => candidate.startsWith(SEED_GENERATION_PREFIX))
     const generation = line === undefined ? Number.NaN : Number(line.slice(SEED_GENERATION_PREFIX.length))
     return Number.isInteger(generation) && generation > 0 ? generation : 1
