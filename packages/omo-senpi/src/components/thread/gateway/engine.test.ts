@@ -261,6 +261,21 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     expect(self.kind === "error" && self.error.details?.guard).toBe("self_send")
   })
 
+  test("#given a run woken by a delivery from another device (no row here, chain_count 2) #when it sends here #then the row continues at hop 3 under a fresh root, and a local cause at hop 1 beside an inbound hop 4 continues at hop 5", async () => {
+    const h = open()
+    for (const id of ["A", "B", "C"]) h.session(id)
+    const fromDevice = okId(await send(h, "A", "B", "continued from device", { inbound_hop: 2 }))
+    await h.quiesce()
+    const first = (await h.get("A").store.deliveryView(fromDevice))?.row
+    expect([first?.hop, first?.root_id?.startsWith("root-")]).toEqual([3, true])
+    const local = okId(await send(h, "B", "C", "local cause"))
+    await h.quiesce()
+    const both = okId(await send(h, "C", "A", "both", { cause_delivery_id: local, inbound_hop: 4 }))
+    await h.quiesce()
+    const row = (await h.get("A").store.deliveryView(both))?.row
+    expect([row?.hop, row?.root_id]).toEqual([5, (await h.get("A").store.deliveryView(local))?.row.root_id])
+  })
+
   test("#given P and Q under one root #when P->Q and Q->P are sent concurrently from two processes #then both are accepted", async () => {
     const h = open()
     for (const id of ["W", "X", "P", "Q"]) h.session(id)
