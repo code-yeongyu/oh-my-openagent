@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url"
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
@@ -240,7 +241,7 @@ describe("supervised supervisor-stderr diagnostics", () => {
 
     // when
     const run = runReflectionChild(prepared.spawnArgs, {
-      supervisorPath: join(import.meta.dir, "__fixtures__", "supervisor-throws.ts"),
+      supervisorPath: fileURLToPath(new URL("./__fixtures__/supervisor-throws.ts", import.meta.url)),
     })
 
     // then
@@ -273,7 +274,7 @@ describe("supervised supervisor-stderr diagnostics", () => {
     // when
     const run = runReflectionChild(prepared.spawnArgs, {
       maxOutputBytes,
-      supervisorPath: join(import.meta.dir, "__fixtures__", "supervisor-throws-oversized.ts"),
+      supervisorPath: fileURLToPath(new URL("./__fixtures__/supervisor-throws-oversized.ts", import.meta.url)),
     })
 
     // then
