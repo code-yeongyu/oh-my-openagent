@@ -445,6 +445,26 @@ describe("omo remote send: the gateway store's worker in the shipped layout", ()
     }
   })
 
+  test("#given a package root whose staged sidecar cannot start (an empty worker module) #when omo remote send runs with that root #then the send fails before b is asked, which proves the store ran on the named root and not on the source fallback", async () => {
+    const root = mkdtempSync(join(tmpdir(), "omo-remote-broken-"))
+    const extensions = join(root, "plugin", "extensions")
+    mkdirSync(extensions, { recursive: true })
+    writeFileSync(join(extensions, "gateway-store-worker.mjs"), "")
+    try {
+      const fixture = createRemoteThreadFixture()
+      const a = fixture.account()
+      try {
+        const { code } = await run(["send", "b/dur-on-b", "hi", "--no-wait"], undefined, SIGNED_IN, testBootstrap(), a.remote, { packageRoot: root })
+        expect(code).not.toBe(REMOTE_EXIT.ok)
+        expect(a.sent.filter(entry => entry.rpc?.["type"] === "prompt")).toHaveLength(0)
+      } finally {
+        await fixture.cleanup()
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   test("#given a package root with no staged plugin (the source tree) #when the anchor is resolved #then there is none and the store resolves its own worker", () => {
     const root = mkdtempSync(join(tmpdir(), "omo-remote-noworker-"))
     try {
