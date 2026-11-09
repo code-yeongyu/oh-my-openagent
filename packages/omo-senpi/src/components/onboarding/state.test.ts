@@ -19,6 +19,7 @@ import {
   writeGlobalDecline,
   writeProjectDecline,
 } from "./state"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const tempDirs: string[] = []
 
@@ -153,7 +154,7 @@ describe("claimOnboarding", () => {
         })
         children.push({
           child,
-          ready: waitForReady(child, 5_000),
+          ready: waitForReady(child, remainingTestTime()),
           exit: observeExit(child),
         })
       }
@@ -163,7 +164,7 @@ describe("claimOnboarding", () => {
       for (const { child } of children) child.send("release")
 
       const exitCodes = await Promise.all(children.map(({ exit }) => (
-        withTimeout(exit, 10_000, "child did not exit in time")
+        withTimeout(exit, remainingTestTime(), "child did not exit in time")
       )))
 
       // then
@@ -182,7 +183,7 @@ describe("claimOnboarding", () => {
     const child = fork(raceChildPath, [dir], {
       stdio: ["ignore", "ignore", "ignore", "ipc"],
     })
-    const ready = waitForReady(child, 5_000)
+    const ready = waitForReady(child, remainingTestTime())
     const exit = observeExit(child)
 
     try {

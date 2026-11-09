@@ -7,10 +7,9 @@ import { describe, expect, test } from "bun:test"
 import type { ComputerHostContext } from "@oh-my-opencode/senpi-desktop-tool"
 
 import { type ControlTimeoutScheduler, confirmComputerControl, fullAccessControlNote } from "./control-confirm"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const REASON = "click Run"
-const SETTLE_LIMIT_MS = 5_000
-
 type FullAccess = "on" | "off" | "absent"
 
 interface Row {
@@ -143,7 +142,7 @@ const ROWS: readonly Row[] = [
 async function settledWithin<T>(promise: Promise<T>, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const limit = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`waited ${SETTLE_LIMIT_MS} ms for ${label} to settle; it never did`)), SETTLE_LIMIT_MS)
+    timer = setTimeout(() => reject(new Error(`waited out the test budget for ${label} to settle; it never did`)), remainingTestTime())
   })
   try {
     return await Promise.race([promise, limit])
