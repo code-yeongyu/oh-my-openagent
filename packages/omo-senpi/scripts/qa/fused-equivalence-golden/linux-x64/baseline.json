@@ -1,12 +1,12 @@
 {
  "repo": {
-  "head": "1e2deb382dafa94b3ad1f010fc9e82496ec0b6e6",
+  "head": "c61b0288ebc327a27de0b56f5e0a3402515cc443",
   "harness": "5ab795e3392325c961596d7944a1740f4d0a9e20"
  },
  "platform": "linux-x64",
  "runtimes": {
   "harness": "node@24.22.0",
-  "child": "bun@1.4.4 @code-yeongyu/senpi@2026.11.6-3 (pinned)"
+  "child": "bun@1.4.4 @code-yeongyu/senpi@2026.11.9 (pinned)"
  },
  "hashes": {
   "driver": "sha256:ee2ba671d8895f353cd4bd2eca0d4fe06a67f3bb49c011f7a03fb3a8470cc661",
