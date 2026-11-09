@@ -41,9 +41,10 @@ export async function runMemorySessionShutdown(parts: MemorySessionShutdownParts
   await drain.raceDetached(input, "recall-store-settle", () => parts.corpusCache.settled())
   await drain.raceDetached(input, "memory-block-settle", () => parts.promptCache.settled())
   parts.reflectionLive.shutdown(parts.sessions.get(input.sessionId)?.context?.identity)
-  // senpi awaits this handler with no host cap, so neither cleanup may be awaited past the
-  // drain deadline: both are started and raced against it, and whichever loses keeps running
-  // detached (the Kibitzer wake lease and the sidecar directory lock are still released).
+  // senpi bounds this handler with its own warn threshold, per-handler timeout and quit budget
+  // (defaults 2 s / 10 s / 2 s, all user-tunable), so neither cleanup may be awaited past the drain
+  // deadline: both are started and raced against it, and whichever loses keeps running detached (the
+  // Kibitzer wake lease and the sidecar directory lock are still released).
   const kibitzer = parts.kibitzerRef.current
   if (kibitzer !== undefined) {
     await drain.raceDetached(input, "kibitzer-shutdown", () => kibitzer.onSessionShutdown(input.sessionId))

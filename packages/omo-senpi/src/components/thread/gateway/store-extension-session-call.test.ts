@@ -4,6 +4,7 @@ import type { Worker } from "node:worker_threads"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 import type { StoreExtensionRegistration } from "./store-extensions"
 import { UNKNOWN_CALLER } from "../tools/ports"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 let harness: GatewayHarness | undefined
 afterEach(async () => { await harness?.dispose(); harness = undefined })
@@ -92,7 +93,7 @@ test.each([
 function rawWorkerRequest(worker: Worker, op: string, args: unknown): Promise<unknown> {
   const id = 1_000_000
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { worker.off("message", listen); reject(new Error(`waited 5 s for the worker's reply to a raw ${op}, none came`)) }, 5_000)
+    const timer = setTimeout(() => { worker.off("message", listen); reject(new Error(`waited out the test budget for the worker's reply to a raw ${op}, none came`)) }, remainingTestTime())
     function listen(message: { readonly type?: string; readonly id?: number; readonly ok?: boolean; readonly value?: unknown; readonly error?: { readonly message: string } }): void {
       if (message.type !== "response" || message.id !== id) return
       clearTimeout(timer)

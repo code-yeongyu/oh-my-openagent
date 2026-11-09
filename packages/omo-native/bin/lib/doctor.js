@@ -427,6 +427,7 @@ export function runDoctor(inventory, args = [], options = {}) {
   lines.push(...retiredPayloadReport(options))
   lines.push(...transientMemoryReport(options))
   lines.push(...(options.reflectionLock ?? []))
+  lines.push(...(options.memoryRuntime ?? []))
   const launchSpec = launchSpecDoctorLines(options.pluginRoot ?? join(packageRoot, "plugin"), options.launchSpecIo)
   if (launchSpec.some((line) => line.startsWith("FAIL "))) failed = true
   lines.push(...launchSpec)

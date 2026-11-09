@@ -153,7 +153,7 @@ const MUTATIONS: readonly Mutation[] = [
   {
     id: "leak-generation", designRow: "Leak the generation file into the agent shell", file: STAGE,
     find: "    applyEngineTrustRestore(env, addressed.restore, platform)\n", replace: "",
-    test: STAGE_TEST, testNamePattern: "a compiled child adopts native extras, scrubs plumbing, and restores old desktop values",
+    test: STAGE_TEST, testNamePattern: "a compiled child adopts native extras, scrubs plumbing, restores old desktop values, and adds no NODE_USE_SYSTEM_CA",
   },
   {
     id: "refuse-foreign-marker", designRow: "Refuse a foreign marker without a hop (revision 2's rule)", file: STAGE,
