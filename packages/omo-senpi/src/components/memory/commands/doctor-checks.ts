@@ -18,6 +18,7 @@ import {
   measureRuntimeSizeWithinBudget,
   measureUnreflectedJournalBytes,
   parseLockRecord,
+  readLastRetentionLogEntry,
   readUnreflectedRetentionGate,
   readReflectionParkFile,
   runtimeSizeStanding,
@@ -314,6 +315,8 @@ export interface RuntimeSizeReport {
   readonly evictableBytes?: number
   /** Abandoned-journal retention is suspended by the health gate since this failed completion. */
   readonly suspendedSince?: string
+  /** The newest entry of the runtime's removal log (#12932); absent when no cleanup is recorded. */
+  readonly lastCleanup?: { readonly at: string; readonly total: number }
 }
 
 /** The number the size cap acts on (memory-core measureRuntimeSize), with what retention would still free. */
@@ -328,12 +331,21 @@ export async function checkRuntimeSize(
     ...(input.measureBudgetMs === undefined ? {} : { budgetMs: input.measureBudgetMs }),
     ...(signal === undefined ? {} : { signal }),
   })
-  if ("sizeUnknown" in measured) return sizeUnknownResult(measured.sizeUnknown, input)
-  try {
-    return await measuredRuntimeSize(identityPaths, measured.size, input, signal)
-  } catch (error) {
-    if (signal?.aborted !== true) throw error
-    return sizeUnknownResult({ budgetMs: input.measureBudgetMs ?? 0, at: new Date(input.now).toISOString() }, input)
+  const result = await (async () => {
+    if ("sizeUnknown" in measured) return sizeUnknownResult(measured.sizeUnknown, input)
+    try {
+      return await measuredRuntimeSize(identityPaths, measured.size, input, signal)
+    } catch (error) {
+      if (signal?.aborted !== true) throw error
+      return sizeUnknownResult({ budgetMs: input.measureBudgetMs ?? 0, at: new Date(input.now).toISOString() }, input)
+    }
+  })()
+  // An unreadable removal log reads as none recorded; it never hides the size check.
+  const lastCleanup = await readLastRetentionLogEntry(identityPaths.runtime).catch(() => undefined)
+  const cleanup = lastCleanup === undefined ? "no cleanup recorded" : `last cleanup ${lastCleanup.at} removed ${lastCleanup.total}`
+  return {
+    check: { ...result.check, detail: `${result.check.detail}; ${cleanup}` },
+    report: lastCleanup === undefined ? result.report : { ...result.report, lastCleanup },
   }
 }
 

@@ -8,9 +8,11 @@ import { dirname } from "node:path"
 
 import { buildIdentityPaths } from "../identity/layout"
 import type { HostSweepIdentity, HostSweepStep } from "../reflection/host-sweep"
+import { describeRuntimeCapExcess, measureRuntimeCapEvictableBytes } from "./cap"
 import { runRuntimeRetention, summarizeRuntimeRetention } from "./pass"
+import { countRuntimePastRetention, measureUnreflectedJournalBytes } from "./past-retention"
 import { DAY_MS, DEFAULT_RUNTIME_RETENTION, type RuntimeRetentionPolicy } from "./policy"
-import { DEFAULT_RUNTIME_MAX_BYTES } from "./size"
+import { DEFAULT_RUNTIME_MAX_BYTES, measureRuntimeSizeWithinBudget } from "./size"
 
 /** The memory settings shape this decision reads; plain data so the CLI bundle can pass parsed JSON. */
 export interface ForeignRuntimeLayer {
@@ -76,16 +78,46 @@ export interface RetentionHostSweepStepOptions {
   readonly signal?: AbortSignal
   /** End of the driver's slice: each identity's budget is `min(pass budget, slice remaining)`. */
   readonly deadline?: number
-  /** `--fix --dry-run`: retention changes nothing and prints nothing. */
+  /** `--fix --dry-run`: retention changes nothing and prints what the pass would remove (#12932). */
   readonly dryRun?: boolean
+}
+
+/**
+ * The dry-run preview for one identity: the read-only counts `/doctor` shows for what is past its
+ * window, and over the cap what the cap could evict. Locks, reservations and live sessions are decided
+ * only by the real pass, so the preview is an upper bound of what it removes.
+ */
+async function previewRetention(identity: string, root: string, policy: RuntimeRetentionPolicy, maxBytes: number, now: () => number, signal: AbortSignal): Promise<string[]> {
+  const paths = buildIdentityPaths(dirname(dirname(root)), identity)
+  const past = await countRuntimePastRetention({ paths, policy, now, reflectionEnabled: true, signal })
+  const total = past.runs + past.journals + past.sidecars
+  const lines = total === 0 ? [] : [`WOULD FIX ${identity} retention would remove ${total} (runs ${past.runs}, journals ${past.journals}, sidecars ${past.sidecars})`]
+  if (maxBytes <= 0) return lines
+  const measured = await measureRuntimeSizeWithinBudget(paths.runtime, { budgetMs: policy.passBudgetMs, now: now(), signal })
+  if ("sizeUnknown" in measured || measured.size.bytes <= maxBytes) return lines
+  const excess = describeRuntimeCapExcess({
+    overCapBytes: measured.size.bytes - maxBytes,
+    evictableBytes: await measureRuntimeCapEvictableBytes({ paths, policy, now, reflectionEnabled: true, journalFloorMs: policy.retentionDays * DAY_MS, signal }),
+    unreflectedBytes: policy.discardUnreflectedJournals ? 0 : await measureUnreflectedJournalBytes({ paths, policy, signal }),
+    discardUnreflectedJournals: policy.discardUnreflectedJournals,
+  })
+  return excess === undefined ? lines : [...lines, `WOULD FIX ${identity} size cap: ${excess}`]
 }
 
 export function createRetentionHostSweepStep(options: RetentionHostSweepStepOptions = {}): HostSweepStep {
   const now = options.now ?? Date.now
   return async (identity: HostSweepIdentity) => {
-    if (options.dryRun === true) return []
     if (options.isHostedIdentity?.(identity.name) === true) return []
     const policy = resolveForeignIdentityRetentionPolicy(options.settings, identity.name)
+    if (options.dryRun === true) {
+      const signal = options.signal === undefined ? AbortSignal.timeout(policy.passBudgetMs) : AbortSignal.any([options.signal, AbortSignal.timeout(policy.passBudgetMs)])
+      try {
+        return await previewRetention(identity.name, identity.root, policy, resolveForeignIdentityMaxBytes(options.settings, identity.name), now, signal)
+      } catch (error) {
+        if (options.signal?.aborted === true) throw error
+        return [`WOULD FIX ${identity.name} retention preview unavailable: ${error instanceof Error ? error.message : String(error)}`]
+      }
+    }
     const remaining = options.deadline === undefined ? policy.passBudgetMs : Math.max(1, options.deadline - now())
     try {
       const report = await runRuntimeRetention({
