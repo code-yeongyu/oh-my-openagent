@@ -7,6 +7,7 @@ import { MEMORY_AUTHORITY_RULE } from "../provenance"
 import { redactSecretLikeMaterial } from "../sync/redact"
 import type { ExternalProjectionInput, ExternalProjectionStats } from "./external-projection"
 import { DEFAULT_EXTERNAL_PROJECTION_LIMITS, type ExternalProjectionLimits } from "./external-projection-limits"
+import { loadExternalProjectionRenderer, type ExternalProjectionRendererLoad } from "./external-projection-loader"
 import { renderSystemTree, type CompiledSystemFile } from "./render"
 
 const PERSONA_PATH = "system/persona.md"
@@ -61,6 +62,7 @@ export async function compileMemoryBlockWithReads(
   revision: string | null,
   options: CompileMemoryBlockOptions,
   asOfMs: number = Date.now(),
+  loadRenderer: () => Promise<ExternalProjectionRendererLoad> = loadExternalProjectionRenderer,
 ): Promise<{ readonly block: string; readonly degraded: readonly string[]; readonly expiries: readonly MemoryExpiry[] }> {
   const reads: CompileReads = { degraded: [] }
   const paths = revision ? await repo.lsTree(revision) : []
@@ -82,10 +84,13 @@ export async function compileMemoryBlockWithReads(
   const externalPaths = paths.filter(isExternalPath)
   const external = await projectionInput(repo, revision, externalPaths, options.projection)
   if (external.recencyUnavailable === true) reads.degraded.push(`commit times unavailable: ${external.recencyError ?? "unknown error"}`)
-  // The listing renderer is a lazy sidecar in bundles that map `#memory-external-projection` (omo-senpi's omo.js).
-  const listing = externalPaths.length === 0
-    ? ""
-    : (await import("#memory-external-projection")).renderExternalProjection(externalPaths, external)
+  // The listing renderer is a lazy sidecar in bundles that map `#memory-external-projection` (omo-senpi's omo.js);
+  // when it cannot load, the block goes out without the listing and is degraded, so it is never persisted.
+  const loaded = externalPaths.length === 0 ? undefined : await loadRenderer()
+  if (loaded !== undefined && "unavailable" in loaded) reads.degraded.push(loaded.unavailable)
+  const listing = loaded !== undefined && "renderer" in loaded
+    ? loaded.renderer.renderExternalProjection(externalPaths, external)
+    : ""
   const projection = renderProjection(
     live(persona),
     live(identity),
@@ -105,7 +110,9 @@ export async function externalProjectionStatsAt(
 ): Promise<ExternalProjectionStats> {
   const externalPaths = (await repo.lsTree(revision)).filter(isExternalPath)
   const input = await projectionInput(repo, revision, externalPaths, limits)
-  return (await import("#memory-external-projection")).renderExternalProjectionStats(externalPaths, input)
+  const loaded = await loadExternalProjectionRenderer()
+  if ("unavailable" in loaded) throw new Error(loaded.unavailable)
+  return loaded.renderer.renderExternalProjectionStats(externalPaths, input)
 }
 
 async function projectionInput(

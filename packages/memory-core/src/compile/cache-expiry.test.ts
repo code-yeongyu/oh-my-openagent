@@ -96,4 +96,33 @@ describe("MemoryBlockCache expiry", () => {
     expect(visible(after)).toEqual(["freeze body"])
     expect(clocked.size).toBe(1)
   })
+
+  it("#given a first compile whose read of an expiring file failed #when the revision is compiled again before and after that file's instant #then the expiry still applies", async () => {
+    // given
+    const repo = await createRepo()
+    const revision = await repo.head()
+    const show = repo.show.bind(repo)
+    let failOutage = true
+    repo.show = async (at, path) => {
+      if (path === "system/outage.md" && failOutage) {
+        failOutage = false
+        throw new Error("git show timed out")
+      }
+      return show(at, path)
+    }
+    const degraded: (readonly string[])[] = []
+    const retried = new MemoryBlockCache({ onDegraded: ({ reasons }) => degraded.push(reasons) })
+    caches.push(retried)
+    const partial = await retried.compile(repo, TEMPLATE, OPTIONS, revision, FIRST - 10)
+
+    // when
+    const before = await retried.compile(repo, TEMPLATE, OPTIONS, revision, FIRST - 5)
+    const after = await retried.compile(repo, TEMPLATE, OPTIONS, revision, FIRST)
+
+    // then
+    expect(degraded).toEqual([[expect.stringContaining("system/outage.md unread")]])
+    expect(visible(partial)).toEqual(["freeze body"])
+    expect(visible(before)).toEqual(["outage body", "freeze body"])
+    expect(visible(after)).toEqual(["freeze body"])
+  })
 })
