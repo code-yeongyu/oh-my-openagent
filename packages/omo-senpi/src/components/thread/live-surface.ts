@@ -473,7 +473,8 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
       // host DETACH instead of closing when a connection drops. This client is one-shot - the
       // connection that opens the session ends immediately - so without the flag the new session
       // goes straight to `closing` and every later call answers `session_closing`.
-      // `initialSkills` rides on the open_session context (`initial-skills.ts`), never as a wire field.
+      // `initialSkills` rides on the open_session context (`initial-skills.ts`), never as a wire field; `cwd`,
+      // `sessionPath`, `forkFrom` and `permissionPreset` (the mode the session starts in, #12884) are wire fields.
       const { initialSkills, name, ...openParams } = params
       const result = dataRecord(await callFrame(legacy, "open_session", { ...openParams, retain_on_disconnect: true, ...(initialSkills === undefined ? {} : { context: { [INITIAL_SKILLS_CONTEXT_KEY]: JSON.stringify(initialSkills) } }) }, undefined, undefined, name), "open_session") as { sessionId: string; state: ThreadHostSession }
       const routingId = result.sessionId

@@ -1,5 +1,6 @@
 import type { DeviceService } from "../device-service-core/src/index.ts"
 import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
+import { createRelaySessionHost } from "../omo-senpi/src/components/thread/control/relay-session-host"
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
 import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { setModelRemote } from "../omo-senpi/src/components/thread/remote/remote-controls"
@@ -18,7 +19,6 @@ import {
   closeRemote,
   followRemote,
   interruptRemote,
-  openRemote,
   remoteAvailable,
   type RemoteSendRequest,
   runningTurnRemote,
@@ -107,7 +107,8 @@ async function openOn(
     dependencies.error(error.message)
     return REMOTE_EXIT.usage
   }
-  const opened = await openRemote({ ...remote, permissionPreset: () => mode }, { kind: "create", device: args.device, ...(args.project === undefined ? {} : { cwd: args.project }) })
+  const open = await createRelaySessionHost(remote, args.device).open({ permissionPreset: mode, ...(args.project === undefined ? {} : { cwd: args.project }) })
+  const opened: ThreadToolResult = open.kind === "ok" ? { kind: "ok", thread: open.thread, deduplicated: false } : open
   if (opened.kind !== "ok" || !("thread" in opened) || args.model === undefined) return show(opened, "")
   const label = `${args.device}/${opened.thread.thread_id}`
   const created: RemoteSessionRow = { device: args.device, session_id: opened.thread.thread_id, title: opened.thread.name, project: opened.thread.cwd, path: "", state: "idle", updated_ms: 0 }
