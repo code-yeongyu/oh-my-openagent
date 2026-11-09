@@ -1,7 +1,8 @@
 import type { ThreadToolResult } from "../contracts"
 import { matchModel, modelPatternFailure, type ModelChoice } from "../tools/model-match"
 import type { JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "./ports"
-import { deviceOnline, outcomeFailure, replyData } from "./remote-ops"
+import { deviceOnline, replyData } from "./remote-ops"
+import { outcomeFailure } from "./outcome"
 
 const isObject = (value: unknown): value is JsonObject => typeof value === "object" && value !== null && !Array.isArray(value)
 

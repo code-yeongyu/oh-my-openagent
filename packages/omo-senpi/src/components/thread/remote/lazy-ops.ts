@@ -1,10 +1,11 @@
 import type * as CrossDevice from "./cross-device"
 import type * as RemoteOps from "./remote-ops"
+import type * as Outcome from "./outcome"
 import type * as RemoteControls from "./remote-controls"
 import type * as RelayTransport from "./relay-transport"
 import type { DeliveryTransport } from "../gateway/transport"
 
-type Runtime = Pick<typeof CrossDevice, "crossTarget" | "listAcross" | "planCreate" | "renameAlias" | "withAlias"> & Pick<typeof RemoteOps, "closeRemote" | "deviceOnline" | "interruptRemote" | "outcomeFailure" | "readRemote"> & Pick<typeof RemoteControls, "setModelRemote"> & Pick<typeof RelayTransport, "createRelayTransport">
+type Runtime = Pick<typeof CrossDevice, "crossTarget" | "listAcross" | "planCreate" | "renameAlias" | "withAlias"> & Pick<typeof RemoteOps, "closeRemote" | "deviceOnline" | "interruptRemote" | "readRemote"> & Pick<typeof Outcome, "outcomeFailure"> & Pick<typeof RemoteControls, "setModelRemote"> & Pick<typeof RelayTransport, "createRelayTransport">
 
 // The cross-device half ships in the thread client sidecar (`#omo-thread-client-runtime`), which every thread
 // operation already loads for the live host, so `omo.js` carries none of it.

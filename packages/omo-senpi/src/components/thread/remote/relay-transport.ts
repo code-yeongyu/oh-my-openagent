@@ -10,7 +10,8 @@ import type { DeliveryOutcome, DeliveryTransport, OutboundDelivery, RelayDeliver
 import type { EffectiveLane, GatewayDeliveryDelivery, Provenance } from "../gateway/types"
 import { UNKNOWN_CALLER } from "../tools/ports"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
-import { deviceOnline, outcomeFailure, replyData } from "./remote-ops"
+import { deviceOnline, replyData } from "./remote-ops"
+import { outcomeFailure } from "./outcome"
 
 export type RelayTransportOptions = {
   readonly remote: RemoteThreadSurface
@@ -183,15 +184,50 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
     return ok({ kind: "queued", queue_position: pending ?? 1 }, kind === "already_admitted")
   }
 
+  // The person at a terminal sends their own input: the engine's `prompt` record, raw text with no envelope (they are
+  // that session's user, not a peer), kept by design (#12885). The same preflight as a session's steer, the same
+  // idempotency through the tool receipt store, and the same outcome mapping as every other relay request.
+  const prompt = async (delivery: OutboundDelivery, row: RemoteSessionRow): Promise<SendOutcome> => {
+    const offline = await deviceOnline(remote, row.device)
+    if (offline !== undefined) return offline
+    const ok = (kind: GatewayDeliveryDelivery): RelayDeliverySuccess => ({ kind: "ok", thread_id: row.session_id, delivery: kind, deduplicated: false, device: row.device, effective_mode: delivery.mode === "steer" ? "steer" : "follow_up" })
+    if (delivery.mode === "steer") {
+      const state = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
+      if (state.kind !== "ok") return outcomeFailure(state, row.device)
+      const engine = engineStateOf(replyData(state.response))
+      if (engine.phase !== "mid_turn") return fail(REFUSAL_CODES.not_steerable.code, `A steer to ${row.session_id} was refused: not_steerable.`, REFUSAL_CODES.not_steerable.next, { device: row.device })
+      if (engine.turnEpoch === null) return fail(REFUSAL_CODES.turn_conflict.code, `Turn ${delivery.expected_turn_id} of ${row.session_id} cannot be confirmed on device ${row.device}.`, REFUSAL_CODES.turn_conflict.next, { device: row.device })
+      if (String(engine.turnEpoch) !== delivery.expected_turn_id) return fail(REFUSAL_CODES.turn_conflict.code, `Turn ${delivery.expected_turn_id} is not the running turn of ${row.session_id} on device ${row.device}.`, REFUSAL_CODES.turn_conflict.next, { device: row.device, current_turn_id: String(engine.turnEpoch) })
+      const steer = remote.chain.stamp({ type: "prompt", sessionId: row.session_id, message: delivery.text, streamingBehavior: "steer", expectedTurnId: String(engine.turnEpoch) }, 1)
+      const steered = await remote.sessions.sessionCommand(row.device, row.session_id, steer)
+      if (steered.kind === "refused" && (steered.reason === "turn_conflict" || steered.reason === "not_steerable")) return fail(REFUSAL_CODES[steered.reason].code, `A steer to ${row.session_id} was refused: ${steered.reason}.`, REFUSAL_CODES[steered.reason].next, { device: row.device })
+      if (steered.kind !== "ok") return outcomeFailure(steered, row.device)
+      return ok({ kind: "steered", turn_id: String(engine.turnEpoch) })
+    }
+    // One round trip: the engine starts a followUp prompt on an idle session and queues it behind a running turn.
+    const sent = await remote.sessions.sessionCommand(row.device, row.session_id, remote.chain.stamp({ type: "prompt", sessionId: row.session_id, message: delivery.text, streamingBehavior: "followUp" }, 1))
+    if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
+    const reply = replyData(sent.response)
+    const turnId = reply["turnId"]
+    if (reply["disposition"] === "started" && typeof turnId === "string" && turnId.length > 0) return ok({ kind: "started", turn_id: turnId })
+    const after = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
+    const settled = after.kind === "ok" ? engineStateOf(replyData(after.response)) : { phase: "idle" as const, turnEpoch: null, pending: null }
+    // An engine whose prompt reply names no turn (senpi through 2026.11.5-1) reports the running turn in get_state.
+    if (reply["disposition"] === "started" && settled.turnEpoch !== null) return ok({ kind: "started", turn_id: String(settled.turnEpoch) })
+    if (settled.pending === null) return fail("idempotency_uncertain", `Device ${row.device} accepted the message but did not report where it waits.`, "Read the thread before deciding whether to send again.", { device: row.device })
+    return ok({ kind: "queued", queue_position: settled.pending })
+  }
+
   return {
     deliver: async (delivery: OutboundDelivery): Promise<DeliveryOutcome> => {
       if (delivery.target.kind !== "remote") throw new Error("the relay transport delivers only to sessions on other devices")
       const row = delivery.target.row
       // senpi admit-external-message-command: a command_line sender is admitted only from the engine's own machine.
       if (delivery.sender.kind === "cli") return fail("unsupported", `A command-line sender cannot reach a session on device ${row.device}: the engine admits a command-line delivery only from its own machine.`, `Use omo remote send ${row.device}/${row.session_id} instead.`, { device: row.device, reason: "sender_not_allowed" })
-      if (delivery.caller_id === UNKNOWN_CALLER) return fail("caller_context_missing", "A gateway send needs the calling session's durable id.", "Retry from a session that passes its execution context.")
       if (delivery.mode === "steer" && delivery.expected_turn_id === undefined) return fail("invalid_arguments", "A steer needs expected_turn_id (the target's current turn_epoch).", "Fix the arguments and send again.")
       if (delivery.expected_turn_id !== undefined && !/^\d+$/.test(delivery.expected_turn_id)) return fail("turn_conflict", `Turn ${delivery.expected_turn_id} is not a turn of the target session.`, "Read the target again and steer with the turn_id a started or steered result returned.")
+      if (delivery.sender.kind === "person") return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, () => prompt(delivery, row))
+      if (delivery.caller_id === UNKNOWN_CALLER) return fail("caller_context_missing", "A gateway send needs the calling session's durable id.", "Retry from a session that passes its execution context.")
       return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, () => send(delivery, row))
     },
     dispose: () => disposed.abort(),

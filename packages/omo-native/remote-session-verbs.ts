@@ -3,12 +3,18 @@ import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contra
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
 import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { setModelRemote } from "../omo-senpi/src/components/thread/remote/remote-controls"
+import { randomUUID } from "node:crypto"
+import { userInfo } from "node:os"
+import { createGatewayStore } from "../omo-senpi/src/components/thread/gateway/store"
+import { resolveProvenance } from "../omo-senpi/src/components/thread/gateway/provenance-resolver"
+import { createRelayTransport } from "../omo-senpi/src/components/thread/remote/relay-transport"
+import { threadLink } from "../omo-senpi/src/components/thread/thread-link"
+import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import {
   closeRemote,
   followRemote,
   interruptRemote,
   openRemote,
-  promptRemote,
   remoteAvailable,
   type RemoteSendRequest,
   runningTurnRemote,
@@ -114,6 +120,17 @@ async function sendTo(
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
   let request: RemoteSendRequest = { message: args.text, delivery: args.delivery }
+  // The person at this terminal sends their own input through the same transport port the thread tools deliver through
+  // (#12885): a `person` sender keeps the engine's prompt record, its receipt lives in this device's gateway store.
+  const store = createGatewayStore({ agentDir: canonicalAgentDir() })
+  const transport = createRelayTransport({ remote, store, senderProvenance: () => resolveProvenance({ cwd: process.cwd(), env: process.env }) })
+  const person = { kind: "person" as const, uid: process.getuid?.() ?? 0, user: userInfo().username }
+  const deliver = async (): Promise<ThreadToolResult> => {
+    const sent = await transport.deliver({ sender: person, caller_id: `person:${person.uid}`, target: { kind: "remote", row }, text: request.message, mode: request.delivery ?? "follow_up", ...(request.expected_turn_id === undefined ? {} : { expected_turn_id: request.expected_turn_id }), idempotency_key: randomUUID(), args: { target: label, text: request.message, delivery: request.delivery } })
+    if (sent.kind === "error") return sent
+    return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: sent.delivery, deduplicated: sent.deduplicated, device: row.device }
+  }
+  const dispose = async () => { transport.dispose(); await store.dispose() }
   // A person steers whatever runs; the op still checks that turn, and the engine checks it again on arrival.
   if (args.delivery === "steer") {
     const running = await runningTurnRemote(remote, row)
@@ -126,7 +143,7 @@ async function sendTo(
     request = { ...request, expected_turn_id: running.turn_id }
   }
   // The person at this terminal sends their own input as a prompt; a peer session's message is a delivery (#12882).
-  if (!args.wait) return show(await promptRemote(remote, row, request), label)
+  if (!args.wait) { try { return show(await deliver(), label) } finally { await dispose() } }
   // Followed before the send, so no delta of the turn it starts can arrive unseen.
   let reply = ""
   const follow = await followRemote(remote, row, text => {
@@ -135,7 +152,7 @@ async function sendTo(
   })
   if ("kind" in follow) return show(follow, label)
   try {
-    const sent = await promptRemote(remote, row, request)
+    const sent = await deliver()
     if (sent.kind === "error") return show(sent, label)
     const end = await follow.settled
     if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")
@@ -148,5 +165,6 @@ async function sendTo(
     return REMOTE_EXIT.ok
   } finally {
     follow.stop()
+    await dispose()
   }
 }
