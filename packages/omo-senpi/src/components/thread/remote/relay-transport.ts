@@ -85,7 +85,10 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
       if (disposed.signal.aborted) return
       const sent = await remote.sessions.sessionCommand(row.device, row.session_id, record).catch((error: unknown) => ({ kind: "uncertain" as const, reason: error instanceof Error ? error.message : String(error) }))
       if (sent.kind !== "ok") { log(`relay_delivery_failed: delivery ${deliveryId} to ${row.session_id} on device ${row.device}: re-send ${attempt + 1} ended ${sent.kind} (${sent.reason}).`); return }
-      if (replyData(sent.response)["kind"] !== "held_draft") return
+      const kind = replyData(sent.response)["kind"]
+      // A steer the receiver held past the end of its turn is refused here; the sender was told queued, so say so in the log.
+      if (kind === "turn_conflict") { log(`relay_delivery_failed: delivery ${deliveryId} to ${row.session_id} on device ${row.device}: re-send ${attempt + 1} ended turn_conflict (the turn it steered ended while the draft held it).`); return }
+      if (kind !== "held_draft") return
     }
     log(`relay_delivery_failed: delivery ${deliveryId} to ${row.session_id} on device ${row.device} was held behind that session's open draft through ${retryDelays.length} re-sends.`)
   }
@@ -188,7 +191,16 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
     // edge). Its place is the engine's own pending count. A held one is re-sent in the background under the same id.
     const after = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
     const pending = after.kind === "ok" ? engineStateOf(replyData(after.response)).pending : null
-    if (kind === "held_draft") void retryHeld(row, record, delivery_id)
+    if (kind === "held_draft") {
+      // The receiver's draft gate answers before its turn check. A default-mode steer it holds would be re-sent against a
+      // turn that may have ended by the time the draft goes (turn_conflict, silently lost); the re-sends take the lane
+      // the local drain would re-decide at admission, followUp, and the sender's answer names that lane.
+      if (delivery.mode === "auto" && lane === "steer") {
+        lane = "follow_up"
+        record = recordFor(lane)
+      }
+      void retryHeld(row, record, delivery_id)
+    }
     // An idle receiver reports pendingMessageCount 0 while it holds (held_draft) or already took (already_admitted) the
     // delivery: the message is still first in line there, so those two kinds answer position 1, never uncertain.
     if (kind === "queued" && pending === null) return fail("idempotency_uncertain", `Device ${row.device} accepted the message but did not report where it waits.`, "Read the thread before deciding whether to send again.", { device: row.device, delivery_id })
