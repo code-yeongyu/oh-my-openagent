@@ -37,6 +37,11 @@ function createTestLogger(): ComponentLogger & { warnings: Array<{ message: stri
   }
 }
 
+function createFakeClock(): { readonly now: () => number; readonly advance: (ms: number) => void } {
+  let current = 1_000
+  return { now: () => current, advance: (ms) => { current += ms } }
+}
+
 function mockResult(config: OmoConfig, diagnostics: readonly SenpiConfigDiagnostic[] = []): SenpiOmoConfigResult {
   return {
     config,
@@ -49,6 +54,7 @@ function mockResult(config: OmoConfig, diagnostics: readonly SenpiConfigDiagnost
 describe("createLiveConfigProvider", () => {
   it("#given an initial config #when read immediately #then returns the initial config without reloading", () => {
     // given
+    const clock = createFakeClock()
     const initialConfig: OmoConfig = { categories: { quick: { model: "initial-provider/model-a" } } }
     let loadCount = 0
     const loadConfig = (): SenpiOmoConfigResult => {
@@ -63,6 +69,7 @@ describe("createLiveConfigProvider", () => {
       initialResult: mockResult(initialConfig),
       logger,
       cacheTtlMs: 250,
+      now: clock.now,
     })
 
     // when read multiple times within TTL
@@ -75,8 +82,9 @@ describe("createLiveConfigProvider", () => {
     expect(loadCount).toBe(0)
   })
 
-  it("#given an updated config without diagnostics #when cache TTL expires #then adopts the new config", async () => {
+  it("#given an updated config without diagnostics #when cache TTL expires #then adopts the new config", () => {
     // given
+    const clock = createFakeClock()
     const initialConfig: OmoConfig = { categories: { quick: { model: "initial-provider/model-a" } } }
     const updatedConfig: OmoConfig = { categories: { quick: { model: "updated-provider/model-b" } } }
     let currentConfig = initialConfig
@@ -94,13 +102,14 @@ describe("createLiveConfigProvider", () => {
       initialResult: mockResult(initialConfig),
       logger,
       cacheTtlMs: 10,
+      now: clock.now,
     })
 
     expect(provider()).toEqual(initialConfig)
 
     // when time passes beyond TTL and config changes cleanly
     currentConfig = updatedConfig
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    clock.advance(20)
     const reloaded = provider()
 
     // then
@@ -109,8 +118,9 @@ describe("createLiveConfigProvider", () => {
     expect(logger.warnings).toHaveLength(0)
   })
 
-  it("#given a reload with diagnostics #when read #then retains last good config and logs a warning", async () => {
+  it("#given a reload with diagnostics #when read #then retains last good config and logs a warning", () => {
     // given
+    const clock = createFakeClock()
     const goodConfig: OmoConfig = { categories: { quick: { model: "good-provider/model-good" } } }
     const brokenConfig: OmoConfig = {} // would be empty/default fallback on loader error
     const diagnostic: SenpiConfigDiagnostic = {
@@ -134,13 +144,14 @@ describe("createLiveConfigProvider", () => {
       initialResult: mockResult(goodConfig),
       logger,
       cacheTtlMs: 10,
+      now: clock.now,
     })
 
     expect(provider()).toEqual(goodConfig)
 
     // when reload produces diagnostics
     returnDiagnostics = true
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    clock.advance(20)
     const result = provider()
 
     // then
@@ -197,8 +208,9 @@ describe("createLiveConfigProvider", () => {
     expect(logger.warnings[0].message).toContain("retaining last good configuration")
   })
 
-  it("#given a reload that throws an error #when read #then retains last good config and logs a warning", async () => {
+  it("#given a reload that throws an error #when read #then retains last good config and logs a warning", () => {
     // given
+    const clock = createFakeClock()
     const goodConfig: OmoConfig = { categories: { quick: { model: "good-provider/model-good" } } }
     let shouldThrow = false
 
@@ -216,13 +228,14 @@ describe("createLiveConfigProvider", () => {
       initialResult: mockResult(goodConfig),
       logger,
       cacheTtlMs: 10,
+      now: clock.now,
     })
 
     expect(provider()).toEqual(goodConfig)
 
     // when loader throws
     shouldThrow = true
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    clock.advance(20)
     const result = provider()
 
     // then

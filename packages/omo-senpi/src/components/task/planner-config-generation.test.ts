@@ -194,6 +194,37 @@ describe("category config generations at the planner seam", () => {
     expect(generations.current()?.generation).toBe(1)
   })
 
+  test("#given a config getter #when one category plan resolves #then the getter is read once and the observation uses that snapshot", () => {
+    // given a getter whose every read returns a different model, as a cache window expiring mid-plan would
+    const reads: string[] = []
+    const getOmoConfig = (): OmoConfig => {
+      const model = reads.length === 0 ? "kimi-coding/kimi-for-coding-highspeed-unlocked" : "meta/muse-spark-1.3-contributor"
+      reads.push(model)
+      return { categories: { quick: { model } } }
+    }
+    const models: FakeModel[] = [
+      { provider: "kimi-coding", id: "kimi-for-coding-highspeed-unlocked" },
+      { provider: "meta", id: "muse-spark-1.3-contributor" },
+    ]
+    const generations = createCategoryConfigGenerations()
+    const resolveRegistry = (): TaskModelRegistry => registry(models)
+    const planner = createGenerationObservingPlanner({
+      planner: createTaskChildPlanner(getOmoConfig, {}, resolveRegistry),
+      omoConfig: getOmoConfig,
+      resolveRegistry,
+      generations,
+    })
+
+    // when
+    const result = plan(planner, "quick")
+
+    // then
+    expect(reads).toHaveLength(1)
+    expect(result.kind).toBe("resolved")
+    if (result.kind === "resolved") expect(result.plan.model).toBe("kimi-coding/kimi-for-coding-highspeed-unlocked")
+    expect(generations.current()?.categories["quick"]).toStartWith("kimi-coding/kimi-for-coding-highspeed-unlocked")
+  })
+
   test("#given a config getter whose content never changes #when planning twice #then the same generation is reused", () => {
     // given
     const getOmoConfig = (): OmoConfig => ({

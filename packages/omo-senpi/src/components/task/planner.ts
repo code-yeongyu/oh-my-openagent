@@ -30,6 +30,10 @@ export type ResolveModelRegistry = () => TaskModelRegistry | undefined
 
 export type { ResolveDefaultRoute } from "./planner-explicit-pin"
 
+// A ChildPlanner that can be handed the config snapshot to plan against, so a caller that reads the
+// live config for the same plan (the generation observer) observes exactly what the planner used.
+export type ConfigScopedChildPlanner = (spec: Parameters<ChildPlanner>[0], omoConfig?: OmoConfig) => PlanResolution
+
 // The category-and-agent resolving ChildPlanner the manager consumes. Resolution order:
 // 1. a subagent_type naming a known agent wins: an explicit `model` pin is parsed ONCE with
 //    senpi's own resolver and must resolve against the live registry, or the spawn fails typed
@@ -47,7 +51,7 @@ export function createTaskChildPlanner(
   resolveRegistry: ResolveModelRegistry,
   resolveParentServiceTier: ResolveParentServiceTier = () => undefined,
   resolveDefaultRoute?: ResolveDefaultRoute,
-): ChildPlanner {
+): ConfigScopedChildPlanner {
   const distributeModels = createModelDistributor()
   const availableAgents = listAvailableAgents(agents)
   const planChild = (spec: Parameters<ChildPlanner>[0], liveConfig: OmoConfig): PlanResolution => {
@@ -96,10 +100,10 @@ export function createTaskChildPlanner(
     }
     return plan
   }
-  return (spec): PlanResolution => {
+  return (spec, planConfig): PlanResolution => {
     // Mid-session omo.json(c) edits must reach new plans: resolve the config per plan instead of
     // closing over the composition-time snapshot (a stale object silently pins old category models).
-    const liveConfig = typeof omoConfig === "function" ? omoConfig() : omoConfig
+    const liveConfig = planConfig ?? (typeof omoConfig === "function" ? omoConfig() : omoConfig)
     const resolution = planChild(spec, liveConfig)
     if (resolution.kind !== "resolved") return resolution
     const fast = inheritParentFastMode(resolution.plan, resolveRegistry(), resolveParentServiceTier())
