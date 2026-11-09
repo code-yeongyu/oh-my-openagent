@@ -13,6 +13,7 @@ export {
 import {
   getRuntimeFallbackErrorMessage,
   getRuntimeFallbackErrorName,
+  getRuntimeFallbackProviderID,
   getRuntimeFallbackRetryableSignal,
   getRuntimeFallbackStatusCode,
 } from "./runtime-fallback-error-shape"
@@ -203,6 +204,23 @@ export function isRuntimeFallbackRetryableError(
     }
 
     options.onUnsafeRetryableSignalRejected?.({ statusCode, retryOnErrors })
+  }
+
+  const errorName = getRuntimeFallbackErrorName(error)?.toLowerCase().replace(/[_-]/g, "")
+
+  if (errorName?.includes("unknownerror")) {
+    const providerID = getRuntimeFallbackProviderID(error)
+    const has5xxStatus = statusCode !== undefined && statusCode >= 500 && statusCode < 600
+    const hasProviderOrigin = has5xxStatus || providerID !== undefined
+
+    if (hasProviderOrigin && /unexpected\s+server\s+error/i.test(message)) {
+      return true
+    }
+
+    const authExpiredPattern = /auth(?:entication)?(?:\s+has)?\s+expired/i
+    if (authExpiredPattern.test(message) && statusCode === 401 && retryOnErrors.includes(401)) {
+      return true
+    }
   }
 
   return RUNTIME_FALLBACK_RETRYABLE_ERROR_PATTERNS.some((pattern) => pattern.test(message))
