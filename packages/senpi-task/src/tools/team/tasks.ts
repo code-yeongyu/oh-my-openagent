@@ -137,7 +137,7 @@ export async function runTeamTaskUpdate(service: TeamToolsService, params: TeamT
 // they cost no prompt tokens there either. Each description leads with the situation that selects the tool.
 type TaskExposureMeta = Pick<ToolDefinition, "exposure">
 
-function taskSearchMeta(_searchText: string, _searchKeywords: readonly string[]): TaskExposureMeta {
+function taskExposure(): TaskExposureMeta {
   return { exposure: TASK_FAMILY_EXPOSURE }
 }
 
@@ -150,7 +150,7 @@ export function createTeamTaskCreateTool(deps: TeamToolDeps): ToolDefinition<typ
     execute: (_toolCallId: string, params: TeamTaskCreateInput) => runTeamTaskCreate(deps.service, params),
     renderCall: (args, theme) => renderTeamTaskCall("create", args, theme),
     renderResult: (result, options, theme) => renderTeamTaskResult("create", result, options, theme),
-    ...taskSearchMeta("add a task to the team board, register a work item for the team to claim, break work into claimable team tasks", ["add team task", "claimable work item", "team tasklist entry"]),
+    ...taskExposure(),
   }
 }
 
@@ -163,7 +163,7 @@ export function createTeamTaskListTool(deps: TeamToolDeps): ToolDefinition<typeo
     execute: (_toolCallId: string, params: TeamTaskListInput) => runTeamTaskList(deps.service, params),
     renderCall: (args, theme) => renderTeamTaskCall("list", args, theme),
     renderResult: (result, options, theme) => renderTeamTaskResult("list", result, options, theme),
-    ...taskSearchMeta("see the team task board, what work items are pending or claimed, who owns which team task", ["team task list", "task board", "who owns a task", "pending team tasks"]),
+    ...taskExposure(),
   }
 }
 
@@ -176,7 +176,7 @@ export function createTeamTaskGetTool(deps: TeamToolDeps): ToolDefinition<typeof
     execute: (_toolCallId: string, params: TeamTaskGetInput) => runTeamTaskGet(deps.service, params),
     renderCall: (args, theme) => renderTeamTaskCall("get", args, theme),
     renderResult: (result, options, theme) => renderTeamTaskResult("get", result, options, theme),
-    ...taskSearchMeta("read one team task, check a work item's status or description by id", ["read team task", "task details", "task by id"]),
+    ...taskExposure(),
   }
 }
 
@@ -189,6 +189,6 @@ export function createTeamTaskUpdateTool(deps: TeamToolDeps): ToolDefinition<typ
     execute: (_toolCallId: string, params: TeamTaskUpdateInput) => runTeamTaskUpdate(deps.service, params),
     renderCall: (args, theme) => renderTeamTaskCall("update", args, theme),
     renderResult: (result, options, theme) => renderTeamTaskResult("update", result, options, theme),
-    ...taskSearchMeta("mark a team task done or in progress, claim or release a work item, change a task's status on the team board", ["mark task done", "claim task", "update task status", "task progress"]),
+    ...taskExposure(),
   }
 }

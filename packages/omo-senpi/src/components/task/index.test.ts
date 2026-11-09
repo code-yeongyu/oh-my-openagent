@@ -308,7 +308,7 @@ describe("omo-senpi task component wiring", () => {
     // then
     expect(hints).toEqual([{
       name: "team_wait",
-      hint: "team_wait was removed - team messages arrive as steered notifications; send updates with task_send and end your turn.",
+      hint: "team_wait was removed - team messages arrive as steered notifications; send updates with tool.task_send in an eval cell and end your turn.",
     }])
   })
 

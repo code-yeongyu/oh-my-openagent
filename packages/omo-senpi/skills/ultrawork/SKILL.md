@@ -418,7 +418,7 @@ always woken.
 names any such state, work out what they will want next and watch it
 RIGHT THEN: "check the deploy" = watch its status, "I pushed a fix" =
 watch that CI run, "the other session is doing X" = watch its output.
-A session without monitors while state moves around it is asleep. Peek (`bash_output`, `task_output({ mode: "tail" })`) ONLY for
+A session without monitors while state moves around it is asleep. Peek (`bash_output`, `tool.task_output({ task_id, mode: "tail" })`) ONLY for
 a midpoint decision, never to wait.
 
 # omo-senpi task + team tools
@@ -427,8 +427,8 @@ Delegate through the `task` tool: `prompt` plus exactly ONE of
 (a direct agent — the curated read-only agents `explore`, `librarian`,
 `plan-consultant`, `plan-reviewer` work with zero configuration);
 `run_in_background: true` for parallel waves, `load_skills` to arm a
-child with skills, `name` to track it. Read a child back with
-`task_output`, steer it with `task_send`, end it with `task_cancel`;
+child with skills, `name` to track it. The task family is eval-only:
+call `tool.task_output`, `tool.task_send`, `tool.task_cancel` in a cell;
 `/tasks` lists what this session spawned. Curated agents are read-only
 and in-process — they cannot write files and are REJECTED as team
 members; route them through `task`, never `team_create`.
@@ -441,7 +441,7 @@ shared work through the team tasklist (`task_create`, `task_list`,
 replies arrive as injected notifications — end your turn or keep
 doing root work instead of waiting on them. Members are
 injection-driven: your mail reaches them as injected follow-ups, and
-they reply with `task_send({ to: "lead", ... })`.
+they reply with `tool.task_send({ to: "lead", ... })`.
 
 # Child execution and transitions
 Every child prompt starts with `TASK: <imperative assignment>` and

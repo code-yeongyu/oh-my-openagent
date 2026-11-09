@@ -60,8 +60,8 @@ export function deliveryUncertain(record: TaskRecord, runEpoch: number): SendOut
     kind: "delivery_uncertain",
     task_id: record.task_id,
     run_epoch: runEpoch,
-    reason: "Message delivery could not be confirmed durably; inspect task_output before continuing.",
-    suggestion: "Do not resend automatically; inspect task_output and explicitly resolve the recorded delivery first.",
+    reason: "Message delivery could not be confirmed durably; inspect tool.task_output({ task_id }) in an eval cell before continuing.",
+    suggestion: "Do not resend automatically; inspect tool.task_output({ task_id }) in an eval cell and explicitly resolve the recorded delivery first.",
   }
 }
 
@@ -82,7 +82,7 @@ export function lazyRevivalFailure(record: TaskRecord, reason: string): SendOutc
     kind: "not_continuable",
     task_id: record.task_id,
     reason: `Task ${record.task_id} could not be revived: ${reason}`,
-    suggestion: "Use task_output to read the final result.",
+    suggestion: "Use tool.task_output({ task_id }) in an eval cell to read the final result.",
   }
 }
 
@@ -121,7 +121,7 @@ export function evictionRefusal(taskId: string): SendOutcome {
     kind: "not_continuable",
     task_id: taskId,
     reason: `Task ${taskId} is being evicted; send was not started.`,
-    suggestion: "Use task_output to read the final result.",
+    suggestion: "Use tool.task_output({ task_id }) in an eval cell to read the final result.",
   }
 }
 
