@@ -29,7 +29,7 @@ function nonemptyString(value: string | undefined): string | undefined {
   return trimmed === "" ? undefined : trimmed
 }
 
-export function isNamedSubagentTarget(value: string | undefined): boolean {
+function isNamedSubagentTarget(value: string | undefined): boolean {
   const raw = nonemptyString(value)
   if (!raw) return false
   const key = getAgentConfigKey(sanitizeSubagentType(raw))
