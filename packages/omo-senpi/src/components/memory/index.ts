@@ -105,10 +105,11 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         },
       })
       primeMemoryPersonaAssets({ logger: ctx.logger })
-      // Reclaim runs an abnormal exit left behind (#7765): once per process and memory root, after
-      // the open, never inside it. A slow or failing sweep must never delay or break binding.
+      // Reclaim runs an abnormal exit left behind (#7765): once per memory root per day in this
+      // process, after the open, never inside it. A slow or failing sweep must never delay or break binding.
       const transientSweep = scheduleTransientSweepOnce({
         memoryRoot,
+        now,
         ...(options.transientSweepDeferMs === undefined ? {} : { deferMs: options.transientSweepDeferMs }),
         start: () => {
           void work.track(() => sweepTransientRuns({
