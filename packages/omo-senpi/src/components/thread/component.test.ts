@@ -9,6 +9,7 @@ import { createGatewayEngine, resolveFromEntries, type GatewayAddressEntry } fro
 import { gatewayDatabasePath, gatewayInboxDirectory, gatewayRootDirectory } from "./gateway/paths"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { resumeProcess, suspendProcess } from "./gateway/testing/job-control"
+import { createRemoteThreadFixture } from "./thread-remote-fixture"
 import type { ThreadHost } from "./tools"
 import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
@@ -224,6 +225,35 @@ describe("thread component control endpoint registration", () => {
       expect(calls).toEqual(["persistHeaderNow", "registerControlEndpoint", "dispose"])
       expect(registered?.inboxDir).toBe(gatewayInboxDirectory(agentDir, "dur-1"))
     } finally {
+      rmSync(agentDir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("K8: a run woken from another device continues that chain's hop on its next send", () => {
+  const remoteFixture = createRemoteThreadFixture()
+
+  test("#given the run consumed a delivery the engine stamped as arriving from another device at chain_count 2 #when it sends to b, and again after the run settles #then the first record is hop 3 and the next run starts a chain at hop 1", async () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "thr-component-chain-"))
+    const store = createGatewayStore({ agentDir })
+    const account = remoteFixture.account()
+    try {
+      const f = eventApi()
+      createThreadComponent({ host: host(), stateDirectory: join(agentDir, "state"), agentDir: () => agentDir, store, remote: account.remote }).register(f.pi as never, context([]) as never)
+      const ctx = sessionCtx("dur-1")
+      await f.dispatch("agent_start", ctx)
+      await f.dispatch("message_start", ctx, { message: { role: "custom", customType: "session_control_delivery", details: { delivery_id: "d-from-b", source: "session_control", deliverAs: "followUp", remote_origin: { deviceId: "b" }, chain_count: 2 } } })
+      const first = (await f.tool("thread_send").execute("call-1", { thread: "dur-on-b", message: "continue" }, undefined, undefined, ctx)) as { details: { result: unknown } }
+      expect(first.details.result).toMatchObject({ kind: "ok", device: "b" })
+      await settleRun(f, "dur-1")
+      await f.dispatch("agent_start", ctx)
+      const next = (await f.tool("thread_send").execute("call-2", { thread: "dur-on-b", message: "fresh" }, undefined, undefined, ctx)) as { details: { result: unknown } }
+      expect(next.details.result).toMatchObject({ kind: "ok", device: "b" })
+      expect(account.hops).toEqual([3, 1])
+      expect(account.sent.map((entry) => [entry.rpc?.["type"], entry.rpc?.["chainCount"]])).toEqual([["admit_external_message", 3], ["admit_external_message", 1]])
+    } finally {
+      await store.dispose()
+      await remoteFixture.cleanup()
       rmSync(agentDir, { recursive: true, force: true })
     }
   })
