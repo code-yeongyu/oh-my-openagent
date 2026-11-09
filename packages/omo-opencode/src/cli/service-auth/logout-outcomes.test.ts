@@ -7,9 +7,13 @@ import { tlsTestCertificate } from "./tls-test-certificate"
 
 const expired = { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" }
 
-async function logoutHarness(reply: () => Response | Promise<Response>, overrideApi?: string) {
+// #12000 review LOW: the journal write keeps the generation the store already held, so the fixture
+// states it before logout instead of reading the expected value back out of the object under assertion.
+const generationBeforeLogout = "generation-before-logout"
+
+async function logoutHarness(reply: () => Response | Promise<Response>, overrideApi?: string, initial: Credentials = expired) {
   const home = await temporaryHome()
-  let stored: string | null = JSON.stringify(expired)
+  let stored: string | null = JSON.stringify(initial)
   const writes: Credentials[] = []
   const calls: string[] = []
   const atRefresh: (Credentials | null)[] = []
@@ -129,14 +133,12 @@ for (const outcome of ["500", "500-terminal", "lost-response", "timeout", "netwo
       if (outcome === "500" || outcome === "500-terminal") return refusal(outcome === "500" ? "internal" : "unauthorized", undefined, 500)
       if (terminal) return refusal(outcome, undefined, outcome === "account_deleted" ? 410 : outcome === "invalid_grant" ? 400 : 401)
       return Response.json({ ...grant, refreshToken: "rotated" })
-    }, tlsServer?.url.origin)
+    }, tlsServer?.url.origin, { ...expired, credentialGeneration: generationBeforeLogout })
     const fault = outcome === "network" ? "offline" : outcome === "lost-response" || outcome === "timeout" ? outcome : ""
     const result = await h.launch("logout", fault).result
     expect(result.code).toBe(0)
     expect(result.stdout.length).toBeGreaterThan(0)
-    const credentialGeneration = h.writes[0]?.credentialGeneration
-    expect(typeof credentialGeneration).toBe("string")
-    expect(h.writes[0]).toEqual({ ...expired, refreshState: "uncertain", credentialGeneration })
+    expect(h.writes[0]).toEqual({ ...expired, refreshState: "uncertain", credentialGeneration: generationBeforeLogout })
     expect(h.readStored()).toBeNull()
     expect(h.calls).toEqual(outcome === "network" || outcome === "tls" ? [] : ["POST /v1/session/refresh"])
     expect(tlsRequests).toBe(0)
