@@ -14,6 +14,7 @@ import { detectHarnesses } from "./setup-detect.js"
 import { applyCredentials, credentialCounts, credentialPlanLines, credentialQuestion, opencodeOauthProviders, planCredentials } from "./setup-credentials.js"
 import { applyAssets, assetCounts, assetPlanLines, assetQuestion, planAssets } from "./setup-assets-import.js"
 import { planOpencodeProviders } from "./setup-opencode-providers.js"
+import { withCommandCodeProvider } from "./setup-commandcode.js"
 import { applyProviders, planProviders, providerCounts, providerPlanLines, providerQuestion } from "./setup-providers-import.js"
 import { applyModelChoices, modelChoiceCounts, modelChoicePlanLines, modelChoiceQuestion, planModelChoices } from "./setup-model-choices-import.js"
 import { setupStageItems } from "./setup-stream-items.js"
@@ -41,7 +42,8 @@ function stageResult(source, settled, disabled = false) {
 
 /**
  * Streams every source's plan. Custom providers (OpenCode `provider.<id>` blocks and catalog
- * providers) are read only with `includeCustomProviders`; without it the provider stage yields
+ * providers, plus the baked Command Code preset when `CMD_API_KEY` or `COMMANDCODE_API_KEY` is
+ * set) are read only with `includeCustomProviders`; without it the provider stage yields
  * disabled and empty, and a key for such a provider stays unmapped. `onSourceStart` is called
  * right before an enabled source starts reading. A source that throws yields its `error` and the
  * stream goes on with the sources after it.
@@ -57,7 +59,7 @@ export async function* scanSetup(runtime, agentDir, options = {}) {
   if (includeCustomProviders) start("providers")
   let providerSource = NO_PROVIDERS
   const providers = await settle(() => {
-    if (includeCustomProviders) providerSource = planOpencodeProviders(runtime)
+    if (includeCustomProviders) providerSource = withCommandCodeProvider(planOpencodeProviders(runtime), runtime.env)
     return planProviders(providerSource, agentDir)
   })
   if (providers.error !== undefined) providerSource = NO_PROVIDERS

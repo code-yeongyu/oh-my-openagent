@@ -13,6 +13,7 @@ import {
 import { readdir } from "@oh-my-opencode/memory-core/fs"
 
 import { childFailureCause } from "../worker/failure-detail"
+import { dominantFixFirstCause, parkedRunPath } from "./facts-failure-cause"
 
 /** How many failing conversations the status view lists, newest failure first. */
 const MAX_LISTED_CONVERSATIONS = 5
@@ -23,6 +24,8 @@ export interface FactsOverview {
   readonly pending: number
   readonly records: readonly FactsFailureRecord[]
   readonly now: Date
+  /** The identity's facts dir; parked rows resolve their run log path under it. */
+  readonly factsDir?: string
   /** Present only when the ledger could not be parsed; counts are meaningless then. */
   readonly corrupt?: string
 }
@@ -61,14 +64,24 @@ export function formatFactsAdvisory(state: FactsOverview): string | undefined {
   return `facts: ${parkedCount} parked / ${backoffCount} backoff${suffix}`
 }
 
-/** Advisory remediation: parked state names the one manual remedy, `/facts retry`. */
+/**
+ * Advisory remediation as a plain-words to-do with the one action to take. A transient
+ * cause makes `/facts retry` itself the action; a cause only the user can fix names that
+ * fix (the setting, when the fix is a setting). Cause counts and the run log path ride
+ * along separately via `factsParkedCauseSummary`, never inside the to-do.
+ */
 export function factsRemediationHint(state: FactsOverview): string | undefined {
   if (state.corrupt !== undefined) {
     return `facts failure ledger is unreadable (${state.corrupt}); repair or delete failures.json to resume launches`
   }
-  const parkedCount = parked(state).length
-  if (parkedCount > 0) {
-    return `${parkedCount} parked facts batch${parkedCount === 1 ? "" : "es"} need${parkedCount === 1 ? "s" : ""} a manual unpark; run /facts retry after fixing the cause`
+  const parkedRecords = parked(state)
+  if (parkedRecords.length > 0) {
+    const fix = dominantFixFirstCause(parkedRecords)
+    if (fix === undefined) return "Some facts weren't saved yet. Run /facts retry."
+    if (fix.setting !== undefined) {
+      return `Some facts weren't saved yet. Set ${fix.setting}, then run /facts retry.`
+    }
+    return `Some facts weren't saved yet (${fix.label}). Run /facts retry once that is fixed.`
   }
   const backoffCount = backoff(state).length
   if (backoffCount === 0) return undefined
@@ -106,8 +119,9 @@ export function formatFactsStatus(identity: string, state: FactsOverview): strin
   )
   for (const record of newestFirst.slice(0, MAX_LISTED_CONVERSATIONS)) {
     const detail = childFailureCause(record.lastDetail)
+    const runPath = record.state === "parked" ? parkedRunPath([record], state.factsDir) : undefined
     lines.push(
-      `- ${record.conversationId}: ${record.state} after ${record.streak} (${record.lastReason})${detail === undefined ? "" : ` - ${detail}`}`,
+      `- ${record.conversationId}: ${record.state} after ${record.streak} (${record.lastReason})${detail === undefined ? "" : ` - ${detail}`}${runPath === undefined ? "" : ` (last run: ${runPath})`}`,
     )
   }
   if (newestFirst.length > MAX_LISTED_CONVERSATIONS) {
@@ -141,11 +155,11 @@ export async function readFactsOverview(input: ReadFactsOverviewInput): Promise<
   const store = new FactsFailureStore({ identityPaths: input.identityPaths, now: () => input.now })
   try {
     const failures = await store.readFailures()
-    return { pending, records: failures.entries, now: input.now }
+    return { pending, records: failures.entries, now: input.now, factsDir: input.identityPaths.facts }
   } catch (error) {
     const corrupt = error instanceof FactsFailuresCorruptError
       ? error.message
       : `failure ledger unreadable: ${error instanceof Error ? error.message : String(error)}`
-    return { pending, records: [], now: input.now, corrupt }
+    return { pending, records: [], now: input.now, factsDir: input.identityPaths.facts, corrupt }
   }
 }

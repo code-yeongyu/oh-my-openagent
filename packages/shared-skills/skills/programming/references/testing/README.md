@@ -56,12 +56,12 @@ When delegating test-writing, hand the child the behavior the test must distingu
 
 ## After writing: test your test
 
-A test earns its place by failing. Before the PR, for each new or reshaped test:
+A test earns its place by failing. Before the PR, run `bun run scripts/typescript/check-test-junk.ts <test files>` for the classes a regex can see (source grep, prose pin, fixed sleep, `.only`/`.skip`, self-comparison, lower bound), then for each new or reshaped test:
 
 1. **Break the owner** (flip the condition, drop the branch, return a constant, skip the write) and run the test. Confirm the mutated bytes are actually in the file before reading the result; a no-op edit "passes" identically to the original.
 2. **Red for the intended reason?** Read the failure message: a loose pattern can match the base's generic error by coincidence (a false red), and a fake that simulates the failure by a different mechanism than the guard reads fails with the fix present.
 3. **Still green?** Then one of: the test is vacuous (fix the assertion); the mutant is equivalent (a `try/catch`, fallback, or normalization maps it back to the same outcome: retarget the mutation at the observable claim); a second rule already produces the same outcome (make the input exercise only the rule under test and assert the recorded reason); or the mutated code is dead (delete the code, not the test's teeth).
-4. **Restore byte for byte.** Never commit a mutation.
+4. **Restore byte for byte.** Never commit a mutation. `bun run scripts/typescript/mutation-proof.ts --file <owner> --find <text> --replace <text> --test 'candidate=bun test <file>' --test 'keeper=bun test <file>'` does steps 1, 3 and 4 in one run and prints red/green per test.
 
 Assertion shapes that survive this step:
 

@@ -823,6 +823,9 @@
           "AxUnconfirmed",
           "SpaceUnsupported",
           "SpaceMoveDenied",
+          "AmbiguousTarget",
+          "CaptureConsentRequired",
+          "ProtectedProcess",
           "native-unavailable",
           "quarantined",
           "abi-mismatch",
@@ -3037,6 +3040,7 @@
           "dag-library",
           "data-scientist",
           "debugging",
+          "eval-integrity",
           "frontend",
           "git-master",
           "give-me-tips",
@@ -3846,5 +3850,5 @@
       }
     }
   },
-  "sha256": "5c6d03d2200ea313bcc13af54281419073a0bd74b0d284f391d5127b0baa18c7"
+  "sha256": "608830f1b345c6884bfadf55e8bb619a360eab1c2573b783a96df8dcb1f9ca30"
 }

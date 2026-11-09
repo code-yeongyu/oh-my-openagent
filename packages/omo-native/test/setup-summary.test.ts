@@ -54,11 +54,22 @@ function env(item: Sandbox): NodeJS.ProcessEnv {
   for (const name of Object.keys(scrubbed)) {
     if (/^(OMO_|SENPI_|PI_|OPENCODE_|XDG_)/.test(name) || name.endsWith("_CODING_AGENT_DIR")) delete scrubbed[name]
   }
+  delete scrubbed.CMD_API_KEY
+  delete scrubbed.COMMANDCODE_API_KEY
   return scrubbed
 }
 
 function run(item: Sandbox, args: string[]): string {
   const result = spawnSync(process.execPath, [LAUNCHER, "setup", ...args], { encoding: "utf8", env: env(item) })
+  if (result.error) throw result.error
+  expect(result.status).toBe(0)
+  return result.stdout
+}
+
+// Like run, with extra env vars the home's setup findings are keyed from (never scrubbed: they carry
+// no OMO_/OPENCODE_ prefix the scrubber removes).
+function runWithEnv(item: Sandbox, keys: Record<string, string>, args: string[]): string {
+  const result = spawnSync(process.execPath, [LAUNCHER, "setup", ...args], { encoding: "utf8", env: { ...env(item), ...keys } })
   if (result.error) throw result.error
   expect(result.status).toBe(0)
   return result.stdout
@@ -157,6 +168,98 @@ describe("omo setup migration summary", () => {
       expect(files.map((path) => readFileSync(path, "utf8"))).toEqual(before)
       expect(stdout).toContain("imported: 0")
       expect(stdout).toContain("mcp-imported: 0")
+    })
+  })
+
+  describe("#given a home with no OpenCode config and CMD_API_KEY set", () => {
+    // A home with nothing setup can import from OpenCode's config: the Command Code provider is
+    // setup's own finding, keyed from the environment.
+    function commandCodeUser(): Sandbox {
+      const root = mkdtempSync(join(tmpdir(), "omo-setup-summary-cc-"))
+      roots.push(root)
+      const home = join(root, "home")
+      return { home, agentDir: join(home, ".omo", "agent"), omoConfig: join(home, ".omo", "omo.jsonc") }
+    }
+
+    test("#when setup runs with --yes #then the Command Code provider is planned, named as its own source, and written to models.json and auth.json", () => {
+      // given
+      const item = commandCodeUser()
+
+      // when
+      const output = runWithEnv(item, { CMD_API_KEY: "SK-CMD-SENTINEL-SUMMARY" }, ["--yes"])
+
+      // then
+      expect(output).toContain("Found your Command Code setup")
+      expect(output).toContain("commandcode -> https://api.commandcode.ai/provider/v1, 12 models")
+      expect(output).toContain("key from environment variable CMD_API_KEY - will be imported")
+      // The key env var's value never appears anywhere; the engine interpolates the reference.
+      expect(output).not.toContain("SK-CMD-SENTINEL-SUMMARY")
+      // The plan has the provider, so the summary includes the optional ZDR hand edit.
+      expect(output).toContain("To make the Command Code provider enforce zero data retention, add the header \"x-cmd-zdr: 1\" to its models.json entry by hand.")
+      const models = readJson(join(item.agentDir, "models.json")).providers
+      expect(Object.keys(models)).toEqual(["commandcode"])
+      expect(models.commandcode.baseUrl).toBe("https://api.commandcode.ai/provider/v1")
+      expect(models.commandcode.models.length).toBeGreaterThanOrEqual(8)
+      expect(readJson(join(item.agentDir, "auth.json")).commandcode).toEqual({ type: "api_key", key: `\${CMD_API_KEY}` })
+    })
+
+    test("#when setup is a dry run #then the Command Code provider is announced alongside its guidance", () => {
+      // given
+      const item = commandCodeUser()
+
+      // when
+      const stdout = runWithEnv(item, { CMD_API_KEY: "SK-CMD-SENTINEL-SUMMARY" }, ["--dry-run", "--yes"])
+
+      // then
+      expect(stdout).toContain("Found your Command Code setup")
+      expect(stdout).toContain("commandcode -> https://api.commandcode.ai/provider/v1")
+      expect(existsSync(join(item.home, ".omo"))).toBe(false)
+      expect(stdout).toContain("To make the Command Code provider enforce zero data retention, add the header \"x-cmd-zdr: 1\" to its models.json entry by hand.")
+    })
+  })
+
+  describe("#given a home with no key for Command Code set", () => {
+    test("#when setup runs #then no Command Code guidance is printed", () => {
+      // given
+      const root = mkdtempSync(join(tmpdir(), "omo-setup-summary-cc-"))
+      roots.push(root)
+      const home = join(root, "home")
+      const item: Sandbox = { home, agentDir: join(home, ".omo", "agent"), omoConfig: join(home, ".omo", "omo.jsonc") }
+
+      // when
+      const stdout = runWithEnv(item, {}, ["--dry-run", "--yes"])
+
+      // then: no key env var is set and no commandcode entry exists, so the summary names no
+      // Command Code guidance at all; no row, no files.
+      expect(stdout).not.toContain("To make the Command Code provider enforce zero data retention, add the header \"x-cmd-zdr: 1\" to its models.json entry by hand.")
+      expect(existsSync(join(item.home, ".omo"))).toBe(false)
+    })
+  })
+
+  describe("#given an OpenCode config whose only provider is already in omo's models.json", () => {
+    test("#when setup is a dry run #then OpenCode is still named and no Command Code guidance is printed", () => {
+      // given: no opencode auth.json, so detection does not install the harness; the provider stage
+      // is the only config with something found, and it classifies as nothing added and nothing skipped.
+      const root = mkdtempSync(join(tmpdir(), "omo-setup-summary-opencode-providers-"))
+      roots.push(root)
+      const home = join(root, "home")
+      const opencodeDir = join(home, ".config", "opencode")
+      write(join(opencodeDir, "opencode.json"), {
+        provider: { acme: { options: { baseURL: "https://api.acme.example/v1", apiKey: "acme-key" }, models: { "acme-large": {} } } },
+      })
+      const agentDir = join(home, ".omo", "agent")
+      write(join(agentDir, "models.json"), {
+        providers: { acme: { baseUrl: "https://api.acme.example/v1", models: [{ id: "acme-large" }] } },
+      })
+      const item: Sandbox = { home, agentDir, omoConfig: join(home, ".omo", "omo.jsonc") }
+
+      // when
+      const stdout = run(item, ["--dry-run", "--yes"])
+
+      // then
+      expect(stdout).toContain("Found your OpenCode setup")
+      expect(stdout).toContain("1 already in omo's models.json (acme) - kept as is")
+      expect(stdout).not.toContain("Command Code")
     })
   })
 })

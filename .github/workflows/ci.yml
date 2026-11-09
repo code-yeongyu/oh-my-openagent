@@ -247,6 +247,25 @@ jobs:
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun run script/remove-stale-self-package-tests.ts
 
+      # device-service-core's LA17 DACL tests prove that a second local user cannot read the
+      # protected token file, so the Windows leg creates that user with a fresh random password.
+      - name: Create the second local user for the DACL tests
+        if: runner.os == 'Windows' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        shell: pwsh
+        run: |
+          # Every character comes from the random bytes (no literal prefix), one per Windows complexity class.
+          $bytes = [byte[]]::new(20)
+          [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+          $upper = [char](65 + $bytes[0] % 26)
+          $lower = [char](97 + $bytes[1] % 26)
+          $digit = [char](48 + $bytes[2] % 10)
+          $symbol = [char](35 + $bytes[3] % 3)
+          $password = "$upper$lower$digit$symbol" + [Convert]::ToHexString($bytes, 4, 16)
+          Write-Output "::add-mask::$password"
+          net user omoqa2 $password /add /y | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "net user omoqa2 /add failed with exit $LASTEXITCODE" }
+          "OMOQA2_PASSWORD=$password" >> $env:GITHUB_ENV
+
       # The full install runs the root `prepare` (`bun run build`), whose
       # `build:lsp-daemon` step already runs `npm ci && npm run build` in
       # packages/lsp-daemon, so its node_modules and dist exist before the tests.
@@ -855,6 +874,9 @@ jobs:
           git -C "$RUNNER_TEMP/senpi-eq" -c advice.detachedHead=false checkout -q FETCH_HEAD
           # E24 observes the pinned TypeScript language server only; the runner's own servers never reach a case.
           npm install --prefix "$RUNNER_TEMP/eq-lsp" --no-save --no-audit --no-fund typescript-language-server@5.3.0 typescript@5.9.3
+          # E24 runs the pinned comment-checker binary from the Codex plugin workspace (the root install does not carry it);
+          # the binaries ship inside the npm tarball, so --ignore-scripts still installs them and nothing is downloaded mid-case.
+          npm --prefix packages/omo-codex/plugin ci --ignore-scripts --no-audit --no-fund
           node packages/omo-senpi/scripts/qa/fused-equivalence-e2e.mjs --compare --placement fused --senpi-repo "$RUNNER_TEMP/senpi-eq" \
             --lsp-dir "$RUNNER_TEMP/eq-lsp/node_modules/.bin" --evidence-dir "$RUNNER_TEMP/eq-omo"
 
@@ -1201,6 +1223,10 @@ jobs:
           cargo build --release -p senpi-desktop-engine --locked --target ${{ matrix.rust-target }}
           # build-omo-binary.ts stages the engine trust helper on Darwin and Windows (omo#10762); its own call, as release builds it.
           cargo build --release -p omo-engine-trust-helper --locked --target ${{ matrix.rust-target }}
+          # It stages the git job helper on Windows only (omo#10391); its own call, static CRT as released.
+          if [[ "${{ matrix.target }}" == windows-* ]]; then
+            RUSTFLAGS="-C target-feature=+crt-static" cargo build --release -p omo-git-job-helper --locked --target ${{ matrix.rust-target }}
+          fi
 
       # build-omo-binary embeds the keychain helper into darwin binaries (#11262); the release lane
       # signs it, this parity leg embeds an unsigned build.

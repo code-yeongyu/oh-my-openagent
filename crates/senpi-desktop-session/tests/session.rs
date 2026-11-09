@@ -308,3 +308,63 @@ impl Backend for PanicsOnDisplays {
         None
     }
 }
+
+fn object_mode() -> DesktopSessionOptions {
+    DesktopSessionOptions {
+        report_mode: senpi_desktop_core::report::ReportMode::Object,
+        ..DesktopSessionOptions::default()
+    }
+}
+
+#[tokio::test]
+async fn the_report_mode_changes_only_when_the_thread_applies_the_open() {
+    use senpi_desktop_core::report::ReportMode;
+    // Given: a null-mode session whose thread is busy with a slow request.
+    let session = start(r#"{"delay_ms": {"windows": 300}}"#, SessionTimeouts::default());
+    session.open(DesktopSessionOptions::default()).wait().await.expect("opens");
+    let slow = session.submit(Op::Windows);
+    // When: an object-mode open is queued behind it.
+    let reopen = session.open(object_mode());
+    // Then: the handle still reports the applied mode until the thread runs the open.
+    assert_eq!(session.report_mode(), ReportMode::Null);
+    slow.wait().await.expect("windows answers");
+    reopen.wait().await.expect("reopens");
+    assert_eq!(session.report_mode(), ReportMode::Object);
+}
+
+#[tokio::test]
+async fn a_request_keeps_the_report_mode_it_was_served_under_when_a_later_open_switches_it() {
+    use senpi_desktop_core::report::ReportMode;
+    // Given: a null-mode session serving a slow request.
+    let session = start(r#"{"delay_ms": {"windows": 300}}"#, SessionTimeouts::default());
+    session.open(DesktopSessionOptions::default()).wait().await.expect("opens");
+    let slow = session.submit(Op::Windows);
+    let slow_mode = slow.request_mode().expect("an op carries its mode");
+    // When: an object-mode open and one more request are queued behind it.
+    let reopen = session.open(object_mode());
+    let after = session.submit(Op::Displays);
+    let after_mode = after.request_mode().expect("an op carries its mode");
+    slow.wait().await.expect("windows answers");
+    reopen.wait().await.expect("reopens");
+    after.wait().await.expect("displays answers");
+    // Then: the slow request is still answered under null mode, while the
+    // request served after the open is answered under object mode.
+    assert_eq!(session.report_mode(), ReportMode::Object);
+    assert_eq!(slow_mode.get(), ReportMode::Null);
+    assert_eq!(after_mode.get(), ReportMode::Object);
+}
+
+#[tokio::test]
+async fn an_abandoned_open_never_changes_the_report_mode() {
+    use senpi_desktop_core::report::ReportMode;
+    // Given: a null-mode session whose thread is busy with a slow request.
+    let session = start(r#"{"delay_ms": {"windows": 300}}"#, SessionTimeouts::default());
+    session.open(DesktopSessionOptions::default()).wait().await.expect("opens");
+    let slow = session.submit(Op::Windows);
+    // When: an object-mode open's waiter gives up before the thread reaches it.
+    drop(session.open(object_mode()));
+    slow.wait().await.expect("windows answers");
+    session.submit(Op::Displays).wait().await.expect("displays answers");
+    // Then: the open never ran, so the session still serves null mode.
+    assert_eq!(session.report_mode(), ReportMode::Null);
+}

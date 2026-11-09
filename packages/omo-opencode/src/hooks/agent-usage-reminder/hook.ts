@@ -52,17 +52,17 @@ export function createAgentUsageReminderHook(_ctx: PluginInput) {
   const sessionStates = new Map<string, AgentUsageState>();
 
   function getOrCreateState(sessionID: string): AgentUsageState {
-    if (!sessionStates.has(sessionID)) {
-      const persisted = loadAgentUsageState(sessionID);
-      const state: AgentUsageState = persisted ?? {
-        sessionID,
-        agentUsed: false,
-        reminderCount: 0,
-        updatedAt: Date.now(),
-      };
-      sessionStates.set(sessionID, state);
-    }
-    return sessionStates.get(sessionID)!;
+    const cached = sessionStates.get(sessionID);
+    if (cached !== undefined) return cached;
+
+    const state: AgentUsageState = loadAgentUsageState(sessionID) ?? {
+      sessionID,
+      agentUsed: false,
+      reminderCount: 0,
+      updatedAt: Date.now(),
+    };
+    sessionStates.set(sessionID, state);
+    return state;
   }
 
   function markAgentUsed(sessionID: string): void {
@@ -112,10 +112,8 @@ export function createAgentUsageReminderHook(_ctx: PluginInput) {
   };
 
   const eventHandler = async ({ event }: EventInput) => {
-    const props = event.properties as Record<string, unknown> | undefined;
-
     if (event.type === "session.deleted") {
-      const sessionID = resolveSessionEventID(props);
+      const sessionID = resolveSessionEventID(event.properties);
       if (sessionID) {
         resetState(sessionID);
       }

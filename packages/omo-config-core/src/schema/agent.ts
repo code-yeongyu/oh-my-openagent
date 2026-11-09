@@ -36,6 +36,7 @@ const OmoAgentDefInputSchema = z.object({
   prompt: z.string().optional(),
   model: z.string().optional(),
   models: z.array(OmoAgentModelEntrySchema).optional(),
+  models_distribution: z.enum(["sequential", "round_robin"]).optional(),
   reasoning: OmoReasoningSchema.optional(),
   /** @deprecated Use reasoning. */
   variant: z.string().optional(),

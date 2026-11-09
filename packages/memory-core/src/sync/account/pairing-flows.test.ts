@@ -16,6 +16,7 @@ import { type CeremonyClock, joinAccount } from "./join.ts"
 import { createPairingHttp } from "./pairing-http.ts"
 import { openAccountSession } from "./session.ts"
 import { type ChainWireServer, startChainWireServer } from "./testing/chain-wire-server.test-support.ts"
+import { pushBatch } from "./testing/push-batch.test-support.ts"
 
 const servers: ChainWireServer[] = []
 afterEach(async () => {
@@ -59,15 +60,27 @@ async function setup() {
 }
 
 describe("pairing a new device", () => {
-  test("both screens show one code, the approval admits the device, and it then gets a sync session", async () => {
+  // The batch row: the approver and the joiner walk the chain past a batch row, and the joiner is
+  // admitted after it (#12277).
+  test.each([
+    ["an account with no batch", false],
+    ["an account with a batch sealed before pairing", true],
+  ] as const)("both screens show one code, the approval admits the device, and it then gets a sync session: %s", async (_account, withBatch) => {
     const { world, server, http } = await setup()
+    const approverPins = await pinnedDir(world)
+    if (withBatch) {
+      const ownerToken = server.tokenFor({ ...world.owner.principal })
+      const owner = await openAccountSession({ baseUrl: server.url, token: () => ownerToken, account: world.account, keyring: world.owner.keyring, pinDir: approverPins, spaceId: new Uint8Array(16) })
+      if (!owner.ok) throw new Error(`no owner session: ${owner.reason}`)
+      await pushBatch(owner.session, { baseSeq: 1, key: "notes/a.md", text: "before pairing" })
+    }
     const joining = await newDevice()
     const joinerPins = freshStateDir()
     const codes: string[] = []
     const join = joinAccount({ account: world.account, keyring: joining.keyring, pinDir: joinerPins, ...http(joining), clock: clock(), showCode: (code) => { codes.push(`joining ${code}`) } })
     const pending = await until(() => server.pending()[0], "the joining device's pending pairing")
     const approved = await approveDevice({
-      account: world.account, keyring: world.owner.keyring, pinDir: await pinnedDir(world), ...http(world.owner), clock: clock(), pendingId: pending.id,
+      account: world.account, keyring: world.owner.keyring, pinDir: approverPins, ...http(world.owner), clock: clock(), pendingId: pending.id,
       confirmCode: async (code) => { codes.push(`approver ${code}`); return true },
     })
     expect(approved.kind).toBe("approved")

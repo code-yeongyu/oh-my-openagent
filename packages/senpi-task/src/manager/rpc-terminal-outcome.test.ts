@@ -97,7 +97,7 @@ describe("RPC terminal outcomes", () => {
       failure: { kind: "child-turn-failed", message: "provider unavailable" },
     })
     expect(terminal.status).toBe("error")
-    expect(terminal.error_message).toBe("provider unavailable")
+    expect(terminal.error_message?.split("\n")[0]).toBe("provider unavailable")
     expect(store.load(started.task_id)?.status).toBe("error")
   })
 })

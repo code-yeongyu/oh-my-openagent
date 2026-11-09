@@ -7,6 +7,7 @@ import {
   buildIdentityPaths,
   ReflectionReservationStore,
   TranscriptJournal,
+  type InFlightReads,
   type MemoryIdentity,
   type ReservedRun,
   type TranscriptEntry,
@@ -83,6 +84,7 @@ export async function fixture(options: {
   readonly conversationText?: string | null
   readonly reservationStore?: DreamTriggerSession["store"]
   readonly now?: () => number
+  readonly work?: InFlightReads
 } = {}): Promise<Fixture> {
   const root = await mkdtemp(join(tmpdir(), "omo-dream-trigger-"))
   onTestFinished(() => rm(root, { recursive: true, force: true }))
@@ -129,6 +131,7 @@ export async function fixture(options: {
     resolveSettings: () => triggerSettings(options.settings),
     now: options.now ?? (() => NOW_MS),
     scheduler,
+    ...(options.work === undefined ? {} : { work: options.work }),
     logger: {
       info: () => {},
       warn: (message, details) => warnings.push({ message, details }),

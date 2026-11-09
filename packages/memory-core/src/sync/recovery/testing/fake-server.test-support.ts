@@ -1,4 +1,5 @@
 import type {
+	BatchEntry,
 	KeyringEntry,
 	SyncAuthor,
 	SyncEntry,
@@ -11,6 +12,20 @@ import type {
 	RecoveryTransport,
 	RecoveryWrapRow,
 } from "../ports.ts";
+
+/** A stored batch row with the id its sealed header carries, as the service keeps `sync_entries.batch_id`. */
+export type StoredBatchRow = BatchEntry & { readonly batch_id: string };
+
+/**
+ * The `batch_id` a contract-shaped `/v1/sync/entries` row serves: the stored id on a batch row, and
+ * null on a keyring row or on a batch stored without one (which the client must refuse).
+ */
+export const servedBatchId = (entry: SyncEntry): string | null =>
+	entry.kind === "batch" &&
+	"batch_id" in entry &&
+	typeof entry.batch_id === "string"
+		? entry.batch_id
+		: null;
 
 /**
  * An in-memory sync server for one or more accounts. It admits appends by the base check alone and
@@ -82,32 +97,21 @@ export class FakeSyncServer {
 			);
 		return {
 			listKeys: async () => keyringRows(),
+			// The contract SyncPullEntry row minus object_id and bytes: batch_id on batch rows, null on keyring rows.
 			listEntries: async (): Promise<ReadonlyArray<ChainRow>> =>
-				this.served(account).map(
-					({
-						seq,
-						base_seq,
-						kind,
-						account: owner,
-						epoch,
-						author: by,
-						digest,
-						link,
-						keyring_link,
-						record_sig,
-					}) => ({
-						seq,
-						base_seq,
-						kind,
-						account: owner,
-						epoch,
-						author: by,
-						digest,
-						link,
-						keyring_link,
-						record_sig,
-					}),
-				),
+				this.served(account).map((entry) => ({
+					seq: entry.seq,
+					base_seq: entry.base_seq,
+					kind: entry.kind,
+					account: entry.account,
+					epoch: entry.epoch,
+					author: entry.author,
+					digest: entry.digest,
+					link: entry.link,
+					keyring_link: entry.keyring_link,
+					record_sig: entry.record_sig,
+					batch_id: servedBatchId(entry),
+				})),
 			listRecoveryWraps: async (): Promise<ReadonlyArray<RecoveryWrapRow>> =>
 				keyringRows().flatMap((entry) =>
 					entry.wraps
