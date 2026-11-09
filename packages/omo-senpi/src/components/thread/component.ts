@@ -237,7 +237,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerRunDeliveries: () => [...run.consumed],
         callerRunHasLocalInput: () => run.local,
         onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
-        remote: options.remote ?? createDefaultRemoteSurface({ version: createOmoNativeProductConfig().packageVersion, log: (line) => ctx.logger.warn(line) }),
+        remote: options.remote ?? createDefaultRemoteSurface({ version: createOmoNativeProductConfig().packageVersion, log: (line) => ctx.logger.warn(line), permissionPreset: () => pi.getPermissionPreset?.() }),
       }, (line) => ctx.logger.warn(line))
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
       // crash before its write), or made by another process (`omo thread report ... completion`) - is
