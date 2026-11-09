@@ -49,10 +49,10 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     expect(scoped.kind === "ok" && "threads" in scoped && scoped.threads.map((thread) => thread.thread_id)).toEqual(["dur-local"])
   })
 
-  test("#given a thread on b #when thread_create names it by id #then b opens that session file; no device is passed or needed", async () => {
-    const a = account()
+  test("#given an ended thread on b #when thread_create names it by id #then b opens that session file; no device is passed or needed", async () => {
+    const a = account({ rowState: "ended" })
     const { run } = surface(a.remote)
-    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread: { thread_id: "dur-on-b", device: "b" } })
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread: { thread_id: "dur-on-b", device: "b" }, deduplicated: false })
     expect(a.sent).toEqual([{ via: "endpoint", device: "b", rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_ROW.path } }])
   })
 
@@ -304,13 +304,14 @@ describe("remote == local: the same call answers the same on b as on this device
     expect(a.sent.filter((entry) => entry.rpc?.["type"] === "set_session_name")).toEqual([])
   })
 
-  test("#given a name another visible thread holds #when thread_create makes it here and on b #then both are name_conflict and nothing is opened", async () => {
+  test("#given a name a thread on the target device holds #when thread_create makes it here and on b #then both are name_conflict with one shape and nothing is opened", async () => {
     const a = account()
     const { run, openSession } = surface(a.remote)
     const here = await run("thread_create", { name: "local peer" })
-    const there = await run("thread_create", { device: "studio", name: "local peer" })
-    expect(comparable(there)).toEqual(comparable(here))
+    const there = await run("thread_create", { device: "studio", name: "on b" })
+    expect(Object.keys(comparable(there) as object)).toEqual(Object.keys(comparable(here) as object))
     expect(here).toMatchObject({ kind: "error", error: { code: "name_conflict" } })
+    expect(there).toMatchObject({ kind: "error", error: { code: "name_conflict" } })
     expect(openSession).not.toHaveBeenCalled()
     expect(a.sent).toEqual([])
   })
