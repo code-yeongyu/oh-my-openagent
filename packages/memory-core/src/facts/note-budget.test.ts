@@ -1,10 +1,16 @@
 import { describe, expect, test } from "bun:test"
 
-import { factsNotesOverBudget, isFactsNotePath, measureFactsNote } from "./note-budget"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+
+import { factsNotesOverBudget, isFactsNotePath, measureFactsNote, measureFactsNotesInDir } from "./note-budget"
 
 describe("facts note budget (#10884)", () => {
   test("#given repo paths #when classified #then only top-level monthly markdown under notes/facts counts", () => {
     expect(isFactsNotePath("notes/facts/2026-10.md")).toBe(true)
+    expect(isFactsNotePath("notes/facts/README.md")).toBe(false)
+    expect(isFactsNotePath("notes/facts/2026-1.md")).toBe(false)
     expect(isFactsNotePath("notes/facts/archive/2026-01.md")).toBe(false)
     expect(isFactsNotePath("notes/facts/2026-10.txt")).toBe(false)
     expect(isFactsNotePath("reference/notes/facts/2026-10.md")).toBe(false)
@@ -24,6 +30,18 @@ describe("facts note budget (#10884)", () => {
     ]
 
     expect(factsNotesOverBudget(notes, 100).map((note) => note.path)).toEqual(["notes/facts/2026-11.md", "notes/facts/2026-10.md"])
+  })
+
+  test("#given a directory named like a month note #when the folder is measured #then it is skipped and the real notes are still measured", async () => {
+    const repo = await mkdtemp(join(tmpdir(), "omo-facts-notes-"))
+    try {
+      await mkdir(join(repo, "notes", "facts", "2026-09.md"), { recursive: true })
+      await writeFile(join(repo, "notes", "facts", "2026-10.md"), "- a\n")
+
+      expect(await measureFactsNotesInDir(repo)).toEqual([{ path: "notes/facts/2026-10.md", bytes: 4, lines: 1 }])
+    } finally {
+      await rm(repo, { recursive: true, force: true })
+    }
   })
 
   test("#given a zero budget #when filtered #then the check is disabled", () => {

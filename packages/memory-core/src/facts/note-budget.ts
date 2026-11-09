@@ -5,11 +5,11 @@
 
 import { join } from "node:path"
 
-import { readdir, readFile } from "../fs/resilient"
+import { lstat, readdir, readFile } from "../fs/resilient"
 
 export const DEFAULT_FACTS_NOTE_MAX_BYTES = 48 * 1024
 
-const FACTS_NOTE_PATH = /^notes\/facts\/[^/]+\.md$/
+const FACTS_NOTE_PATH = /^notes\/facts\/\d{4}-\d{2}\.md$/
 
 export interface FactsNoteSize {
   readonly path: string
@@ -38,7 +38,9 @@ export async function measureFactsNotesInDir(repoDir: string): Promise<FactsNote
     throw error
   }
   const paths = names.map((name) => `notes/facts/${name}`).filter(isFactsNotePath).sort()
-  return Promise.all(paths.map(async (path) => measureFactsNote(path, await readFile(join(repoDir, path), "utf8"))))
+  const files = await Promise.all(paths.map(async (path) => (await lstat(join(repoDir, path))).isFile() ? path : undefined))
+  const notes = files.filter((path): path is string => path !== undefined)
+  return Promise.all(notes.map(async (path) => measureFactsNote(path, await readFile(join(repoDir, path), "utf8"))))
 }
 
 /** Notes strictly over `maxBytes`, largest first; a budget of `0` or less disables the check. */
