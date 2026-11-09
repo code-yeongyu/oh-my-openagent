@@ -183,6 +183,7 @@ export async function transitionRuntimeState(
   teamRunId: string,
   transition: (runtimeState: RuntimeState) => RuntimeState,
   config: TeamModeConfig,
+  options?: { readonly force?: boolean },
 ): Promise<RuntimeState> {
   const baseDir = resolveBaseDir(config)
   const runtimeDirectoryPath = getRuntimeStateDir(baseDir, teamRunId)
@@ -191,7 +192,8 @@ export async function transitionRuntimeState(
     const currentRuntimeState = await loadRuntimeState(teamRunId, config)
     const nextRuntimeState = validateRuntimeState(transition(currentRuntimeState), teamRunId)
 
-    if (!isValidTransition(currentRuntimeState.status, nextRuntimeState.status)) {
+    // force exists for force-deleting creating/orphaned teams, which the FSM deliberately has no edge for
+    if (options?.force !== true && !isValidTransition(currentRuntimeState.status, nextRuntimeState.status)) {
       throw new InvalidTransitionError(currentRuntimeState.status, nextRuntimeState.status)
     }
 
