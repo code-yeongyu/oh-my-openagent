@@ -310,6 +310,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   }
   const relayTools = createRelayTools({ options, relay, view, failure })
   const dispose = () => {
+    pipeline.dispose()
     unanswered.clear()
     relay.dispose()
   }
@@ -364,6 +365,7 @@ async function deliverThrough(
   const turn = options.callerTurnId?.()
   const cause = options.callerCause?.()
   const name = options.callerName?.()?.trim()
+  const inboundHop = options.callerChainHop?.()
   const sent = await pipeline.deliver({
     sender: { kind: "session", durable_id: callerId, ...(name === undefined || name === "" ? {} : { name }), ...(turn === undefined ? {} : { turn_id: turn }), ...(cause === undefined ? {} : { cause_delivery_id: cause }) },
     caller_id: callerId,
@@ -373,6 +375,7 @@ async function deliverThrough(
     ...(value.expected_turn_id === undefined ? {} : { expected_turn_id: value.expected_turn_id }),
     idempotency_key: idempotencyKey,
     args: value,
+    ...(inboundHop === undefined || inboundHop <= 0 ? {} : { inbound_hop: inboundHop }),
   })
   if (sent.kind === "error") return { kind: "error", error: sent.error }
   if ("device" in sent) {
