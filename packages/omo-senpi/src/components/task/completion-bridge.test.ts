@@ -19,6 +19,7 @@ import {
 
 import { seedRecord } from "../../../../senpi-task/src/lifecycle/__fixtures__/lifecycle-fakes"
 import { createCompletionObservingStore } from "./completion-bridge"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const projects: string[] = []
 
@@ -252,7 +253,10 @@ describe("completion bridge live background promotion", () => {
     const message = await Promise.race([
       arrived.promise,
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("waited 2s for the start-failure notification, it never came")), 2_000),
+        setTimeout(
+          () => reject(new Error("waited out the test budget for the start-failure notification, it never came")),
+          remainingTestTime(),
+        ),
       ),
     ])
 
@@ -280,7 +284,10 @@ describe("completion bridge live background promotion", () => {
     const message = await Promise.race([
       arrived.promise,
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("waited 2s for the ended-run notification, it never came")), 2_000),
+        setTimeout(
+          () => reject(new Error("waited out the test budget for the ended-run notification, it never came")),
+          remainingTestTime(),
+        ),
       ),
     ])
 

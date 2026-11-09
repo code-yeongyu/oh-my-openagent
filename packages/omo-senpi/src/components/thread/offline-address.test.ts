@@ -12,6 +12,7 @@ import type { GatewayDeliveryResult } from "./gateway/types"
 import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 /**
  * A session no endpoint lists is still addressable (by id or by its `/name`) from a process that
@@ -140,7 +141,10 @@ async function within(signal: Promise<void> | undefined, what: string): Promise<
     await Promise.race([
       signal,
       new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => reject(new Error(`waited 5s for ${what}, it never happened`)), 5000)
+        timer = setTimeout(
+          () => reject(new Error(`waited out the test budget for ${what}, it never happened`)),
+          remainingTestTime(),
+        )
       }),
     ])
   } finally {

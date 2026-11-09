@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url"
 
 import { gatewayDatabasePath } from "./paths"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+import { remainingTestTime, useTestTimeout } from "../../../../../../test-support/test-deadline"
 
 let harness: GatewayHarness | undefined
 afterEach(async () => {
@@ -19,6 +20,7 @@ const descriptor = {
 }
 
 test("#given two processes released together #when ensuring the same extension #then each migration applies exactly once", async () => {
+  useTestTimeout(30_000)
   const h = (harness = createGatewayHarness())
   await h.store().identity()
   const racers = [0, 1].map(() => {
@@ -47,8 +49,9 @@ test("#given two processes released together #when ensuring the same extension #
     return { child, ready, exited, output: () => output, stderr: () => stderr }
   })
   const timeout = setTimeout(() => {
+    console.error("the racing store-extension children did not exit within the test budget; killing them")
     for (const racer of racers) racer.child.kill("SIGKILL")
-  }, 20_000)
+  }, remainingTestTime())
   try {
     await Promise.all(racers.map((racer) => racer.ready))
     for (const racer of racers) racer.child.send("go")

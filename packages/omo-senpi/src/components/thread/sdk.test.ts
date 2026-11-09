@@ -9,6 +9,7 @@ import type { RemoteThreadSurface } from "./remote/ports"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
 import { createRemoteThreadFixture } from "./thread-remote-fixture"
 import type { ThreadHost, ThreadHostSession } from "./tools"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const TUI_SOCKET = "/tmp/t-0123456789abcdef.sock"
 const HOST_SOCKET = "/tmp/i-0123456789abcdef.sock"
@@ -208,6 +209,22 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     const { sdk } = fixture({ remote: account.remote, cwd: "/thread-sdk-other-workspace" })
     expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread_id: "dur-host" })
     expect(await sdk.read({ thread: "dur-host" })).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
+  })
+
+  test("#given a thread on b #when omo thread send names it #then the command-line sender is refused there as data (the engine admits one only from its own machine) and nothing is sent, while a send to a thread here still delivers as cli", async () => {
+    const account = remoteFixture.account({ aliases: new Map([["lane-b", { session_id: "dur-on-b", device: "b" }]]) })
+    const { sdk, store } = fixture({ remote: account.remote })
+    expect(await sdk.send({ thread: "lane-b", text: "ping b" })).toMatchObject({
+      kind: "error",
+      error: { code: "unsupported", details: { device: "b", reason: "sender_not_allowed" } },
+    })
+    expect(account.sent.filter((entry) => entry.via === "session")).toEqual([])
+    expect(await sdk.send({ thread: "my-tui", text: "ping here" })).toMatchObject({
+      kind: "ok",
+      endpoint_kind: "tui",
+      deduplicated: false,
+    })
+    expect((await store.list({ target_durable_id: "dur-tui" })).map((row) => row.sender)).toEqual(["cli:501"])
   })
 })
 
@@ -427,7 +444,7 @@ describe("thread SDK: store extensions", () => {
   async function settled<T>(what: string, call: Promise<T>): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined
     const bound = new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => reject(new Error(`${what} did not settle within ${SETTLE_MS} ms`)), SETTLE_MS)
+      timer = setTimeout(() => reject(new Error(`${what} did not settle within the test budget`)), remainingTestTime())
     })
     try {
       return await Promise.race([call, bound])
@@ -442,6 +459,7 @@ describe("thread SDK: store extensions", () => {
   test(
     "#given the SDK's own store #when an extension operation binds a session and enqueues through that binding #then both settle and the delivery is written",
     async () => {
+      useTestTimeout(SETTLE_MS * 3)
       const { sdk } = fixture({ sdkOwnsStore: true })
       expect((await sdk.registerStoreExtension(EXTENSION)).kind).toBe("ok")
       const bound = await settled(

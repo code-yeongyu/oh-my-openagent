@@ -257,7 +257,9 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
       device: "b",
     })
     expect(
-      a.sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => [entry.device, entry.session]),
+      a.sent
+        .filter((entry) => entry.rpc?.["type"] === "admit_external_message")
+        .map((entry) => [entry.device, entry.session]),
     ).toEqual([["b", "dur-on-b"]])
     expect(await run("thread_send", { thread: "local peer", message: "here" })).toMatchObject({
       kind: "ok",
@@ -342,7 +344,9 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
       device: "b",
     })
     expect(
-      a.sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => [entry.device, entry.session]),
+      a.sent
+        .filter((entry) => entry.rpc?.["type"] === "admit_external_message")
+        .map((entry) => [entry.device, entry.session]),
     ).toEqual([
       ["b", "sJMySZH_wlx9qQ25AU60qQ"],
       ["b", "JkMGhxKatogMmrmtCW-oFA"],
@@ -698,9 +702,9 @@ describe("K8 / R8.c: a chain carries its count across devices; no count or cost 
   }
 
   const prompts = (sent: readonly { readonly rpc?: Readonly<Record<string, unknown>> }[]) =>
-    sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => entry.rpc ?? {})
+    sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => entry.rpc ?? {})
 
-  test("#given a caller at every hop of a chain past 12 #when it sends to b #then b's prompt carries the caller's hop + 1, nothing is refused and no cost field is sent", async () => {
+  test("#given a caller at every hop of a chain past 12 #when it sends to b #then b's record carries the caller's hop + 1, nothing is refused and no cost field is sent", async () => {
     const a = account()
     const callerHops = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     const answers = await sendFromHops(a.remote, callerHops)

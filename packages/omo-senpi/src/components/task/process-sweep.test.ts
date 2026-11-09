@@ -10,6 +10,7 @@ import { resolveSenpiDaemonRuntime } from "../lsp/daemon-runtime"
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task"
 import { wireSessionStartProcessSweep } from "./process-sweep"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 interface RecordedLog {
   level: "info" | "warn" | "error"
@@ -67,7 +68,7 @@ describe("wireSessionStartProcessSweep()", () => {
     const currentVersion = await Promise.race([
       staleSweepCalled,
       new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("stale-version sweep was not called")), 1_000)
+        setTimeout(() => reject(new Error("stale-version sweep was not called")), remainingTestTime())
       }),
     ])
     expect(currentVersion).toBe("9.8.7")
@@ -113,7 +114,7 @@ describe("wireSessionStartProcessSweep()", () => {
     const currentVersion = await Promise.race([
       resolvedVersion,
       new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("override version was not resolved")), 1_000)
+        setTimeout(() => reject(new Error("override version was not resolved")), remainingTestTime())
       }),
     ])
     await sweepStaleLspDaemonVersions({
@@ -178,7 +179,7 @@ describe("wireSessionStartProcessSweep()", () => {
     await Promise.race([
       unrelatedCleanupCompleted,
       new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("unrelated cleanup families did not complete")), 1_000)
+        setTimeout(() => reject(new Error("unrelated cleanup families did not complete")), remainingTestTime())
       }),
     ])
     expect(completedFamilies).toEqual(["lsp-proxies"])

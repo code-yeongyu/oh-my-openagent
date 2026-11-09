@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
 import { ENDPOINT_LIST_TIMEOUT_MS } from "./live-surface"
 import { publishedWorld } from "./published-endpoint-fixture"
+import { useTestTimeout } from "../../../../../test-support/test-deadline"
 
 /** A listener process killed with SIGKILL never unlinks its socket file: connects to it are refused. */
 async function leaveStaleSocket(socketPath: string) {
@@ -31,6 +32,7 @@ async function world() {
 }
 
 test("registered exact-id tool send delivers without global discovery", async () => {
+  useTestTimeout(15000)
   const w = await world()
   const target = await w.owner("a")
   const result = await w.send()
@@ -40,6 +42,7 @@ test("registered exact-id tool send delivers without global discovery", async ()
 }, 15000)
 
 test("registered exact-id send to a terminal owner delivers without global discovery", async () => {
+  useTestTimeout(15000)
   const w = await world()
   const target = await w.owner("a", undefined, "target", true)
   const tool = await w.send()
@@ -51,6 +54,7 @@ test("registered exact-id send to a terminal owner delivers without global disco
 }, 15000)
 
 test("registered exact-id SDK send delivers without global discovery", async () => {
+  useTestTimeout(15000)
   const w = await world()
   const target = await w.owner("a")
   const result = await w.sdk.send({ thread: "target", text: "hello sdk" })
@@ -60,6 +64,7 @@ test("registered exact-id SDK send delivers without global discovery", async () 
 }, 15000)
 
 test("bound exact-id SDK send validates its target without global discovery", async () => {
+  useTestTimeout(15000)
   const w = await world()
   const target = await w.owner("a")
   const bound = await w.sdk.bind({
@@ -74,6 +79,7 @@ test("bound exact-id SDK send validates its target without global discovery", as
 }, 15000)
 
 test("cleanly closed target queues offline without global discovery", async () => {
+  useTestTimeout(15000)
   const w = await world()
   const target = await w.owner("a")
   await target.stop()
@@ -83,6 +89,7 @@ test("cleanly closed target queues offline without global discovery", async () =
 }, 15000)
 
 test("dead published socket queues offline after the close event without discovery", async () => {
+  useTestTimeout(10000)
   const w = await world()
   const target = await w.owner("a")
   await target.crash()
@@ -93,6 +100,7 @@ test("dead published socket queues offline after the close event without discove
 }, 10000)
 
 test("owner killed uncleanly leaves its socket file and the send queues offline after a refused connect without discovery", async () => {
+  useTestTimeout(10000)
   const w = await world()
   const target = await w.owner("a")
   await target.crash()
@@ -106,6 +114,7 @@ test("owner killed uncleanly leaves its socket file and the send queues offline 
 }, 10000)
 
 test("old owner late shutdown cannot erase the takeover endpoint", async () => {
+  useTestTimeout(15000)
   const w = await world()
   const a = await w.owner("a")
   const b = await w.owner("b")
@@ -118,6 +127,7 @@ test("old owner late shutdown cannot erase the takeover endpoint", async () => {
 }, 15000)
 
 test("moved owner receives the send and stale socket is never dialed", async () => {
+  useTestTimeout(15000)
   const w = await world()
   const a = await w.owner("a")
   const b = await w.owner("b")
@@ -129,6 +139,7 @@ test("moved owner receives the send and stale socket is never dialed", async () 
 }, 15000)
 
 test("same durable id new incarnation replaces its own published record", async () => {
+  useTestTimeout(15000)
   const w = await world()
   const a = await w.owner("a")
   const before = await w.store.sessionOwner("target")
@@ -141,6 +152,7 @@ test("same durable id new incarnation replaces its own published record", async 
 }, 15000)
 
 test("foreign workspace is refused without a target entry or global discovery", async () => {
+  useTestTimeout(15000)
   const w = await world()
   const target = await w.owner("a", "/")
   const result = await w.send()
@@ -151,6 +163,7 @@ test("foreign workspace is refused without a target entry or global discovery", 
 }, 15000)
 
 test("missing metadata row preserves legacy discovery and delivery", async () => {
+  useTestTimeout(15000)
   const w = await world()
   const target = await w.owner("a")
   // A legacy session can answer list_sessions but never published ownership.
@@ -165,6 +178,7 @@ test("missing metadata row preserves legacy discovery and delivery", async () =>
 }, 15000)
 
 test("a row only a delivery created keeps legacy discovery for the next send", async () => {
+  useTestTimeout(15000)
   const w = await world()
   const target = await w.owner("a")
   await w.store.identity()
@@ -181,6 +195,7 @@ test("a row only a delivery created keeps legacy discovery for the next send", a
 }, 15000)
 
 test("a live owner that lists slower than 200 ms is still reached", async () => {
+  useTestTimeout(10000)
   const w = await world()
   const target = await w.owner("a")
   target.listing.delayMs = 400
@@ -209,6 +224,7 @@ async function listSendSteer(
 }
 
 test("a busy RPC owner that lists after 1.8 s is live to thread_list, send and steer alike", async () => {
+  useTestTimeout(15000)
   const w = await world()
   const target = await w.owner("a")
   target.runtime.beginUserTurn()
@@ -221,6 +237,7 @@ test("a busy RPC owner that lists after 1.8 s is live to thread_list, send and s
 }, 15000)
 
 test("a published listener that never answers is not live to thread_list, send or steer, and nothing is delivered", async () => {
+  useTestTimeout(30000)
   const w = await world()
   const target = await w.owner("a")
   target.runtime.beginUserTurn()
@@ -233,6 +250,7 @@ test("a published listener that never answers is not live to thread_list, send o
 }, 30000)
 
 test("a dead owner whose connects are refused is offline to send and steer without waiting out the listing budget", async () => {
+  useTestTimeout(15000)
   const w = await world()
   const target = await w.owner("a")
   target.runtime.beginUserTurn()
@@ -251,6 +269,7 @@ test("a dead owner whose connects are refused is offline to send and steer witho
 }, 15000)
 
 test("reused socket with a different live identity queues offline without delivery", async () => {
+  useTestTimeout(15000)
   const w = await world()
   const target = await w.owner("a")
   target.listing.durableId = "unrelated"
@@ -260,6 +279,7 @@ test("reused socket with a different live identity queues offline without delive
 }, 15000)
 
 test("a slow reused socket with a different identity never receives the target's send or steer", async () => {
+  useTestTimeout(15000)
   const w = await world()
   const target = await w.owner("a")
   target.runtime.beginUserTurn()
@@ -276,6 +296,7 @@ test("a slow reused socket with a different identity never receives the target's
 }, 15000)
 
 test("a terminal the engine still reports dead is offline to thread_list, send and steer alike inside the verdict window, and nothing is admitted", async () => {
+  useTestTimeout(15000)
   const w = await world()
   const target = await w.owner("a", undefined, "target", true)
   await w.owner("spectator", undefined, "spectator")
@@ -311,6 +332,7 @@ test("a terminal the engine still reports dead is offline to thread_list, send a
 }, 15000)
 
 test("a bound send to a never-answering owner settles within one listing budget", async () => {
+  useTestTimeout(30000)
   const w = await world()
   const target = await w.owner("a")
   const bound = await w.sdk.bind({

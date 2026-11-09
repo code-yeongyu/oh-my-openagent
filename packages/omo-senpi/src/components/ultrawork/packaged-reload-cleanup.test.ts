@@ -11,6 +11,7 @@ import {
   type ReloadHost,
   reloadRootParent,
 } from "./packaged-reload-cleanup.test-support"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 function fakeClock(): ReloadCleanupClock & { advance(ms: number): Promise<void> } {
   let now = 0
@@ -56,7 +57,7 @@ function fakeHost(): { host: ReloadHost; signals: NodeJS.Signals[] } {
 }
 
 // Circuit breaker for the cleanup's own deadline: the budget is the behavior under test here.
-async function settledWithin<T>(work: Promise<T>, ms: number): Promise<{ value?: T; error?: unknown }> {
+async function settledWithin<T>(work: Promise<T>, ms: number, what: string): Promise<{ value?: T; error?: unknown }> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     return await Promise.race([
@@ -65,7 +66,7 @@ async function settledWithin<T>(work: Promise<T>, ms: number): Promise<{ value?:
         (error: unknown) => ({ error }),
       ),
       new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`cleanup did not settle within ${ms} ms`)), ms)
+        timer = setTimeout(() => reject(new Error(`${what} did not settle within ${ms} ms`)), ms)
       }),
     ])
   } finally {
@@ -165,7 +166,11 @@ describe("cleanUpReloadRun", () => {
       if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL")
     })
     const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))
-    await settledWithin(new Promise<void>((resolve) => child.stdout?.once("data", () => resolve())), 10_000)
+    await settledWithin(
+      new Promise<void>((resolve) => child.stdout?.once("data", () => resolve())),
+      remainingTestTime(),
+      "the reload child's first stdout line (ready)",
+    )
     let restored = 0
 
     // when
@@ -181,7 +186,8 @@ describe("cleanUpReloadRun", () => {
         termGraceMs: 200,
         killWaitMs: 3_000,
       }),
-      5_000,
+      remainingTestTime(),
+      "cleanUpReloadRun with an exited host",
     )
 
     // then
@@ -214,7 +220,8 @@ describe("cleanUpReloadRun", () => {
         termGraceMs: 100,
         killWaitMs: 100,
       }),
-      2_000,
+      remainingTestTime(),
+      "cleanUpReloadRun with a hanging shutdown",
     )
 
     // then
@@ -327,7 +334,7 @@ describe("cleanUpReloadRun", () => {
     })
 
     // then
-    const outcome = await settledWithin(cleanup, 2_000)
+    const outcome = await settledWithin(cleanup, remainingTestTime(), "cleanup")
     expect(outcome.error).toBeInstanceOf(AggregateError)
     expect((outcome.error as AggregateError).errors.map((error: Error) => error.message)).toEqual([
       "supervisor did not finish graceful shutdown within 50ms",

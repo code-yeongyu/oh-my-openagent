@@ -41,6 +41,7 @@ type Engine = {
   readonly streaming: boolean
   readonly pending: number
   readonly currentTurnId?: string
+  readonly turnEpoch?: string
 }
 
 export const ENGINE: Engine = {
@@ -76,6 +77,9 @@ export function createRemoteThreadFixture() {
       engine?: Engine
       promptResponse?: JsonObject
       promptOutcome?: RemoteCommandOutcome
+      admitRefuse?: string
+      admitOutcome?: RemoteCommandOutcome
+      heldDraft?: number
       openData?: JsonObject
       failSessionsList?: boolean
       failAliasesOf?: boolean
@@ -93,6 +97,10 @@ export function createRemoteThreadFixture() {
   ) {
     const engine = options.engine ?? ENGINE
     const sent: Sent[] = []
+    // b's engine ledger of admitted delivery ids (senpi external-admission: a repeated id is already_admitted), and how many
+    // admissions its user's open draft still holds (held_draft, taken by nothing).
+    const admitted = new Set<string>()
+    let heldDraft = options.heldDraft ?? 0
     // The session's records a prompt makes it write, delivered to every watch after the prompt is answered.
     const watchers = new Set<(record: JsonObject) => void>()
     const writeRecords = () =>
@@ -154,6 +162,27 @@ export function createRemoteThreadFixture() {
           options.promptResponse ??
             (engine.streaming ? { disposition: "queued" } : { disposition: "started", turnId: "turn-b" }),
         )
+      if (rpc["type"] === "admit_external_message") {
+        if (options.admitRefuse !== undefined) return { kind: "refused", reason: options.admitRefuse }
+        if (options.admitOutcome !== undefined) return options.admitOutcome
+        if (options.chainCountLimit !== undefined && Number(rpc["chainCount"]) > options.chainCountLimit)
+          return { kind: "refused", reason: "chain_count_limit" }
+        const epoch = engine.turnEpoch ?? engine.currentTurnId ?? "turn-b"
+        const id = String(rpc["deliveryId"])
+        if (admitted.has(id)) return ok({ kind: "already_admitted", turnId: epoch })
+        if (heldDraft > 0) {
+          heldDraft -= 1
+          return ok({ kind: "held_draft", turnId: epoch })
+        }
+        if (rpc["deliverAs"] === "steer") {
+          if (!engine.streaming || rpc["expectedTurnId"] !== engine.currentTurnId)
+            return ok({ kind: "turn_conflict", turnId: epoch })
+          admitted.add(id)
+          return ok({ kind: "steered", turnId: epoch })
+        }
+        admitted.add(id)
+        return ok(engine.streaming ? { kind: "queued", turnId: epoch } : { kind: "started", turnId: epoch })
+      }
       if (rpc["type"] === "get_available_models")
         return ok({
           models: [
@@ -300,6 +329,7 @@ export function createRemoteThreadFixture() {
     remote: RemoteThreadSurface | undefined,
     extra: {
       callerCause?: () => string | undefined
+      callerChainHop?: () => number
       callerName?: () => string | undefined
       env?: Readonly<Record<string, string | undefined>>
       sessions?: ThreadHostSession[]
@@ -372,6 +402,7 @@ export function createRemoteThreadFixture() {
       callerWorkspaceRoot: () => process.cwd(),
       remote,
       ...(extra.callerCause === undefined ? {} : { callerCause: extra.callerCause }),
+      ...(extra.callerChainHop === undefined ? {} : { callerChainHop: extra.callerChainHop }),
       ...(extra.callerName === undefined ? {} : { callerName: extra.callerName }),
       ...(extra.env === undefined ? {} : { env: extra.env }),
     })

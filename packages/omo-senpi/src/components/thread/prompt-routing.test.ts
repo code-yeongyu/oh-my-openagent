@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { PromptRouter, type PromptRoutePolicy, type RoutedPrompt } from "./prompt-routing"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 type Confirm = { type: "extension_ui_request"; id: string; method: "confirm"; title: string; message: string }
 type Response =
@@ -15,10 +16,12 @@ const confirm = (id = "prompt-1"): Confirm => ({
   message: "Proceed",
 })
 
-async function withTimeout<T>(promise: Promise<T>): Promise<T> {
+async function withTimeout<T>(promise: Promise<T>, what: string): Promise<T> {
   return Promise.race([
     promise,
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("test timeout")), 250)),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${what} did not settle within the test budget`)), remainingTestTime()),
+    ),
   ])
 }
 
@@ -38,7 +41,7 @@ describe("PromptRouter", () => {
     expect(router.respond("A", { type: "extension_ui_response", id: "prompt-1", confirmed: true })).toEqual({
       ok: true,
     })
-    expect(await withTimeout(pending.result)).toEqual({
+    expect(await withTimeout(pending.result, "pending.result")).toEqual({
       type: "extension_ui_response",
       id: "prompt-1",
       confirmed: true,
@@ -62,7 +65,7 @@ describe("PromptRouter", () => {
       code: "prompt_response_not_authorized",
     })
     router.respond("B", { type: "extension_ui_response", id: "prompt-1", cancelled: true })
-    await expect(withTimeout(pending.result)).resolves.toEqual({
+    await expect(withTimeout(pending.result, "pending.result")).resolves.toEqual({
       type: "extension_ui_response",
       id: "prompt-1",
       cancelled: true,
@@ -87,7 +90,7 @@ describe("PromptRouter", () => {
       request: confirm(),
       deliver: () => undefined,
     })
-    await expect(withTimeout(auto.result)).resolves.toEqual({
+    await expect(withTimeout(auto.result, "auto.result")).resolves.toEqual({
       type: "extension_ui_response",
       id: "prompt-1",
       cancelled: true,
@@ -100,7 +103,7 @@ describe("PromptRouter", () => {
       request: confirm("prompt-2"),
       deliver: () => undefined,
     })
-    await expect(withTimeout(timeout.result)).resolves.toEqual({
+    await expect(withTimeout(timeout.result, "timeout.result")).resolves.toEqual({
       type: "extension_ui_response",
       id: "prompt-2",
       cancelled: true,
@@ -118,7 +121,7 @@ describe("PromptRouter", () => {
       deliver: () => undefined,
     })
     router.close("host restart")
-    await expect(withTimeout(pending.result)).resolves.toEqual({
+    await expect(withTimeout(pending.result, "pending.result")).resolves.toEqual({
       type: "extension_ui_response",
       id: "prompt-1",
       cancelled: true,

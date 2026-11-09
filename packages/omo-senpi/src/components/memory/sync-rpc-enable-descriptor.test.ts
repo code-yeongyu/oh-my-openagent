@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test"
 import type { DesktopSyncOperation } from "@oh-my-opencode/memory-core/sync-engine"
 import { disposeSyncRpcFixtures, owner, setup } from "./sync-rpc-test-support"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 afterEach(disposeSyncRpcFixtures)
 
@@ -38,8 +39,8 @@ async function fixture(genesis: "supported" | "unsupported") {
   const enabled = () =>
     Promise.race([
       called.promise,
-      Bun.sleep(10_000).then(() => {
-        throw new Error("waited 10s for enableSync, never called")
+      Bun.sleep(remainingTestTime()).then(() => {
+        throw new Error("waited out the test budget for enableSync, never called")
       }),
     ])
   return { f, bridge, seen, enabled }

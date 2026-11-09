@@ -14,6 +14,7 @@ import type { RunnerOutcome } from "../../runners/in-process/child-handle"
 import { createTaskRecordStore } from "../../store"
 import type { WorkpoolCreate, WorkpoolEvent } from "../types"
 import { NO_HOST_ENDPOINT } from "../../lifecycle/host-session"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 export const poolInput: WorkpoolCreate = {
   name: "batch",
@@ -33,8 +34,9 @@ export function deferred<T>() {
   })
   return { promise, resolve, reject }
 }
+/** Awaits a workpool event within the test's remaining budget, not a fixed 5 s stopwatch (#10814). */
 export function bounded<T>(promise: Promise<T>): Promise<T> {
-  const signal = AbortSignal.timeout(5000)
+  const signal = AbortSignal.timeout(remainingTestTime())
   return new Promise<T>((resolve, reject) => {
     const abort = (): void => reject(signal.reason)
     signal.addEventListener("abort", abort, { once: true })

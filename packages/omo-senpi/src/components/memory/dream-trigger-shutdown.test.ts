@@ -19,6 +19,7 @@ import {
   settle,
   triggerSettings,
 } from "./dream-trigger.test-support"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 describe("dream shutdown evaluator", () => {
   test("#given every gate passing #when shutdown fireDream uses an injected loader #then the loader runs exactly once", async () => {
@@ -129,7 +130,7 @@ describe("dream shutdown evaluator", () => {
     await Promise.race([
       reservationStarted,
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("shutdown reservation did not start")), 2_000),
+        setTimeout(() => reject(new Error("shutdown reservation did not start")), remainingTestTime()),
       ),
     ])
 

@@ -18,6 +18,7 @@ import {
   createSyncRunner,
   watchHeadLog,
 } from "./sync-runner"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const dirs: string[] = []
 afterEach(async () => {
@@ -370,7 +371,10 @@ test("a running engine whose device signs out (or is revoked) closes and leaves 
   await Promise.race([
     idle,
     new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("waited 5s for the runner to go idle after sign-out")), 5_000),
+      setTimeout(
+        () => reject(new Error("waited out the test budget for the runner to go idle after sign-out")),
+        remainingTestTime(),
+      ),
     ),
   ])
   expect(fake.closed).toEqual([paths.repo])

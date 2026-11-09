@@ -8,6 +8,7 @@ import type { RegisterControlEndpointOptions } from "./gateway/adapter"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { createThreadSdk } from "./sdk"
 import type { ThreadHost, ThreadHostSession } from "./tools"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 /**
  * A completion armed from outside the session (`omo thread report <s> completion`, the thread SDK)
@@ -19,7 +20,6 @@ import type { ThreadHost, ThreadHostSession } from "./tools"
 
 const HOST_SOCKET = "/tmp/i-0123456789abcdef.sock"
 /** Registration records the session's incarnation in the store first; past this bound it never happened. */
-const ENDPOINT_WAIT_MS = 3_000
 
 /** Awaits `work`, failing with what was awaited once `ms` pass: a circuit breaker, not a sleep. */
 async function within<T>(work: Promise<T>, ms: number, what: string): Promise<T> {
@@ -202,7 +202,11 @@ async function setup(options: { readonly wakeReachesSession: boolean | "unroutab
   })
   if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
   await target.dispatch("session_start")
-  await within(target.endpointReady, ENDPOINT_WAIT_MS, "the component to call registerControlEndpoint on session_start")
+  await within(
+    target.endpointReady,
+    remainingTestTime(),
+    "the component to call registerControlEndpoint on session_start",
+  )
   // The store worker is serial: this read returns after the session_start pickup's read, so that
   // pickup has seen no arm and only the wake edge can arm the tracker for the report below.
   expect(await runtimeStore.pendingCompletionArms("dur-1")).toBe(0)

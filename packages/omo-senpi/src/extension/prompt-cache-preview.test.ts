@@ -13,6 +13,7 @@ import {
   getMcpService,
 } from "../senpi-test-runtime"
 import omoExtension from "./index"
+import { testBudgetSignal, useTestTimeout, remainingTestTime } from "../../../../test-support/test-deadline"
 
 const ENV_KEYS = [
   "HOME",
@@ -59,6 +60,8 @@ type Observed = {
   settledAfterPreview: Settle
 }
 const TEARDOWN_STEP_MS = 15_000
+/** The attach wait's share of the test budget: what is left after the three teardown steps the scenario reserves. */
+const attachBudget = (teardownStepMs: number): number => Math.max(0, remainingTestTime() - 3 * teardownStepMs)
 
 /** Resolves or rejects with `step`, or rejects once `ms` passes so a hung teardown step cannot hold the test. */
 async function bounded<T>(step: Promise<T>, ms: number, label: string): Promise<T> {
@@ -208,7 +211,9 @@ async function runPrefixScenario(options: {
     const serversBefore = servers()
     const connectionsBefore = service.getSnapshot().connectionCount
     // when
-    const result = await context.getPromptCachePrefixRequest({ signal: AbortSignal.timeout(10_000) })
+    const result = await context.getPromptCachePrefixRequest({
+      signal: testBudgetSignal("context.getPromptCachePrefixRequest to settle"),
+    })
     console.info("OMO_PREWARM_PREFIX", JSON.stringify(result.status === "ready" ? { status: result.status } : result))
     observed = {
       status: result.status,
@@ -218,8 +223,11 @@ async function runPrefixScenario(options: {
       serversAfter: servers(),
       connectionsBefore,
       connectionsAfter: service.getSnapshot().connectionCount,
-      // Anything the preview started would still be pending here; await that signal, bounded.
-      settledAfterPreview: await service.whenAttachSettled(10_000),
+      // Anything the preview started would still be pending here; await that signal within the test budget,
+      // keeping the three teardown steps of the budget for the teardown below.
+      settledAfterPreview: await service.whenAttachSettled(
+        Math.max(0, remainingTestTime() - 3 * (options.teardownStepMs ?? TEARDOWN_STEP_MS)),
+      ),
     }
   } catch (caught) {
     failure = caught
@@ -296,8 +304,9 @@ async function runPrefixScenario(options: {
 }
 
 test("#given a real OmO session #when the engine builds its prewarm prefix #then it is ready rather than skipped by unsafe handlers", async () => {
+  useTestTimeout(90_000)
   // given / when
-  const run = await runPrefixScenario({ attachSettleMs: 30_000 })
+  const run = await runPrefixScenario({ attachSettleMs: attachBudget(TEARDOWN_STEP_MS) })
   // then: teardown already restored the process, so these assertions cannot leak state into later tests
   if (run.failure !== undefined) throw run.failure
   expect(run.teardown.errors).toEqual([])
@@ -322,6 +331,7 @@ test("#given a real OmO session #when the engine builds its prewarm prefix #then
 const boundElapsedBeforeSettle: AttachWait = async () => "timeout"
 
 test("#given an MCP attach that never settles within the bound #when the prefix scenario fails #then the process env, cwd and temp HOME are restored before it reports", async () => {
+  useTestTimeout(90_000)
   // given: an eager stdio server that is spawned but never answers initialize. Its connect times out at 3 s, which is
   // meant to land inside teardown's bounded settle wait, so the dispose normally finds nothing still connecting; on a
   // loaded host, or when the settle wait answers early (the race senpi#4028 fixes), it can still be connecting.
@@ -347,13 +357,18 @@ test("#given an MCP attach that never settles within the bound #when the prefix 
 }, 90_000)
 
 test("#given a session dispose that never settles #when the scenario tears down #then the bound reports it and env, cwd and the HOME are still restored", async () => {
+  useTestTimeout(90_000)
   // given: dispose does its real work, then never settles
   const hangingDispose = async (live: Session): Promise<void> => {
     await live.dispose()
     await new Promise<void>(() => {})
   }
   // when
-  const run = await runPrefixScenario({ attachSettleMs: 30_000, teardownStepMs: 1_000, disposeSession: hangingDispose })
+  const run = await runPrefixScenario({
+    attachSettleMs: attachBudget(1_000),
+    teardownStepMs: 1_000,
+    disposeSession: hangingDispose,
+  })
   // then
   expect(run.failure).toBeUndefined()
   expect(run.teardown.errors.map(String)).toEqual(["Error: session.dispose() did not settle within 1000 ms"])

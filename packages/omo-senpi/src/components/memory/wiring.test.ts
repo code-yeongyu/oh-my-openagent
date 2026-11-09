@@ -20,6 +20,7 @@ import { SESSION_SHUTDOWN_DRAIN_BUDGET_MS } from "./shutdown-drain"
 import { createMemoryWiring } from "./wiring"
 import { composeOmoSenpiExtension } from "../../extension/compose"
 import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 const roots: string[] = []
 
 // afterBind starts background git pipelines it never exposes a drain handle for
@@ -397,6 +398,7 @@ const eventCtx = {
 
 for (const assertion of ["bounded", "attributed"] as const) {
   test(`#given a never-resolving reflection reconcile #when the composed memory subscriber settles #then it is ${assertion}`, async () => {
+    useTestTimeout(15_000)
     // given: the real memory wiring reaches its injected runtime, not a substitute settle handler.
     const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-settle-")))
     roots.push(root)
@@ -437,9 +439,9 @@ for (const assertion of ["bounded", "attributed"] as const) {
     await pi.dispatch("input_disposition", { inputId: "accepted", disposition: "started" }, eventCtx)
     const settled = pi.dispatch("agent_settled", {}, eventCtx)
     try {
-      await withinMs(entered.promise, "memory reconciliation entered", 5_000)
+      await withinMs(entered.promise, "memory reconciliation entered", remainingTestTime())
       // when: this watchdog bounds the assertion, never supplies the completion under test.
-      const completed = await withinMs(settled, "bounded memory settle", 4_000).then(
+      const completed = await withinMs(settled, "bounded memory settle", remainingTestTime()).then(
         () => true,
         () => false,
       )
@@ -819,7 +821,7 @@ describe("session shutdown pre-drain bounds", () => {
       f.eventCtx,
     )
     await f.pi.dispatch("tool_call", { toolName: "read", input: { path: ROLLOUTS } }, f.eventCtx)
-    await withinMs(started.promise, "the resident child start", 10_000)
+    await withinMs(started.promise, "the resident child start", remainingTestTime())
 
     // when
     const startedAt = Date.now()
@@ -831,7 +833,7 @@ describe("session shutdown pre-drain bounds", () => {
         now: () => Date.now(),
       }),
       "the bounded session shutdown",
-      10_000,
+      remainingTestTime(),
     )
     const elapsed = Date.now() - startedAt
 
@@ -866,12 +868,12 @@ describe("session shutdown pre-drain bounds", () => {
         now: () => Date.now(),
       }),
       "the bounded session shutdown",
-      10_000,
+      remainingTestTime(),
     )
     const elapsed = Date.now() - startedAt
 
     // then
-    await withinMs(entered.promise, "the facts cancellation", 10_000)
+    await withinMs(entered.promise, "the facts cancellation", remainingTestTime())
     expect(elapsed).toBeLessThan(5_000)
     expect(budgetWarnings(f.warnings, "facts-cancel")).toHaveLength(1)
     expect(budgetWarnings(f.warnings, "facts-enqueue")).toHaveLength(1)

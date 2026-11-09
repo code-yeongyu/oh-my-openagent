@@ -775,3 +775,4 @@ export {
   readRemote,
 } from "./remote/remote-ops"
 export { setModelRemote } from "./remote/remote-controls"
+export { createRelayTransport } from "./remote/relay-transport"

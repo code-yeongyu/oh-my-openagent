@@ -12,10 +12,12 @@ import {
 } from "./task-rpc-diagnostics.mjs"
 import { waitForRecord } from "./task-rpc-record-wait.mjs"
 import { summarizeRuns } from "./task-rpc-reconcile-batch.mjs"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 test.each([undefined, "0", "1"])(
   "a failed initial parent retains diagnostics and opts into stage stderr with %s",
   async (stageEnv) => {
+    useTestTimeout(20_000)
     // Given a Bun executable receiving Senpi-only arguments, the parent really fails to launch.
     const env = { ...process.env }
     delete env.OMO_RECONCILE_STAGES
@@ -36,7 +38,9 @@ test.each([undefined, "0", "1"])(
     const capture = captureChild(child)
     let output
     try {
-      output = await withinDeadline(capture.closed, 15_000, () => child.kill("SIGKILL"))
+      output = await withinDeadline(capture.closed, remainingTestTime(), () => child.kill("SIGKILL")).catch((error) => {
+        throw new Error("the captured child did not close within the test budget", { cause: error })
+      })
     } finally {
       if (child.exitCode === null) child.kill("SIGKILL")
       await capture.closed
