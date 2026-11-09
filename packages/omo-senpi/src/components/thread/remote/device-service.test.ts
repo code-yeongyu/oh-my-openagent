@@ -8,6 +8,12 @@ import { createLazyRemoteSurface } from "./lazy-remote"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { setModelRemote } from "./remote-controls"
 import { closeRemote, interruptRemote, openRemote, promptRemote, readRemote } from "./remote-ops"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { createGatewayStore } from "../gateway/store"
+import type { OutboundDelivery } from "../gateway/transport"
+import { createRelayTransport } from "./relay-transport"
 
 // An attach whose session stream stays silent: no record, frame or channel loss ever arrives.
 const quietStream = { onEvent: () => () => {}, onFrame: () => () => {}, onChannelLoss: () => () => {} }
@@ -151,7 +157,9 @@ describe("device-service adapter: relay round trips per thread op", () => {
     const listeners = new Set<(event: JsonObject) => void>()
     const emit = (event: JsonObject) => { for (const listener of [...listeners]) listener(event) }
     const models: Array<{ provider: string; id: string }> = [{ provider: "a", id: "m1" }, { provider: "a", id: "m2" }]
-    const engine = { model: models[0], streaming: false }
+    const engine = { model: models[0], streaming: false, currentTurnId: undefined as string | undefined, admitAnswer: undefined as JsonObject | undefined }
+    // Every session.command record exactly as the local-API client writes it: the real wire shape.
+    const records: JsonObject[] = []
     // Runs before the command's reply when set: an event of the session that lands while the command is in flight.
     let beforeReply: (() => void) | undefined
     // How the next set_model ends instead of applying, and how catalog reads end after it (a channel that lost one reply).
@@ -159,7 +167,8 @@ describe("device-service adapter: relay round trips per thread op", () => {
     let catalogRefused: string | undefined
     const data = (rpc: JsonObject): JsonObject => {
       switch (rpc["type"]) {
-        case "get_state": return { isStreaming: engine.streaming, model: engine.model, pendingMessageCount: 0 }
+        case "get_state": return { isStreaming: engine.streaming, model: engine.model, pendingMessageCount: 0, ...(engine.currentTurnId === undefined ? {} : { currentTurnId: engine.currentTurnId }) }
+        case "admit_external_message": return engine.admitAnswer ?? { kind: engine.streaming ? "queued" : "started", turnId: engine.currentTurnId ?? "7" }
         case "get_messages": return { messages: [{ role: "user", content: [{ type: "text", text: "hi" }], timestamp: 1 }] }
         case "get_available_models": return { models: models.map((model) => ({ ...model })) }
         case "set_model": engine.model = models.find((model) => model.id === rpc["modelId"]) ?? engine.model; return { ...engine.model }
@@ -188,6 +197,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
       onEvent: (listener: (event: JsonObject) => void) => { listeners.add(listener); return () => listeners.delete(listener) },
       command: async (_attach: string, rpc: JsonObject, commandId: string) => {
         frames.push("session.command")
+        records.push(rpc)
         const scripted = rpc["type"] === "set_model" ? nextSet : rpc["type"] === "get_available_models" && catalogRefused !== undefined ? { state: "engine_refused" as const, reason: catalogRefused } : undefined
         if (rpc["type"] === "set_model") { nextSet = undefined; if (scripted !== undefined && "catalogAfter" in scripted) catalogRefused = scripted.catalogAfter }
         const known = rpc["type"] !== "set_model" || models.some((model) => model.provider === rpc["provider"] && model.id === rpc["modelId"])
@@ -231,8 +241,58 @@ describe("device-service adapter: relay round trips per thread op", () => {
     // The device's catalog changes after this device read it.
     const removeModel = (id: string) => { models.splice(models.findIndex((model) => model.id === id), 1) }
     const addModel = (model: { provider: string; id: string }) => { models.push(model) }
-    return { port, surface, take, snapshot, removeModel, addModel, locateAsked, setEnds: (end: NonNullable<typeof nextSet>) => { nextSet = end }, inFlight: (event: () => void) => { beforeReply = event } }
+    return { port, surface, take, snapshot, removeModel, addModel, locateAsked, engine, records, setEnds: (end: NonNullable<typeof nextSet>) => { nextSet = end }, inFlight: (event: () => void) => { beforeReply = event } }
   }
+
+  // The relay transport over the real device-service SDK: what reaches the wire is what the client's command() receives.
+  function relayOver(surface: RemoteThreadSurface, callerChainHop?: () => number) {
+    const agentDir = mkdtempSync(join(tmpdir(), "relay-wire-"))
+    const store = createGatewayStore({ agentDir })
+    const transport = createRelayTransport({ remote: surface, store, senderProvenance: async () => ({ workspace: "w", project: "p" }), ...(callerChainHop === undefined ? {} : { callerChainHop }) })
+    const send = (extra: Partial<OutboundDelivery> = {}) => transport.deliver({ sender: { kind: "session", durable_id: "dur-a", name: "a" }, caller_id: "dur-a", target: { kind: "remote", row }, text: "hello b", mode: "auto", idempotency_key: `k-${Math.random()}`, args: {}, ...extra })
+    const done = async () => { transport.dispose(); await store.dispose(); rmSync(agentDir, { recursive: true, force: true }) }
+    return { send, done }
+  }
+
+  test("#given the caller's run continues a chain at hop 2 #when it sends to b over the device service #then the serialized admit_external_message record on the wire carries chainCount 3 and no remote_origin, and a fresh send carries 1", async () => {
+    const w = relayWorld()
+    const r = relayOver(w.surface, () => 2)
+    try {
+      expect(await r.send()).toMatchObject({ kind: "ok", device: "b", delivery: { kind: "started", turn_id: "7" } })
+      const admitted = w.records.filter((record) => record["type"] === "admit_external_message")
+      expect(admitted).toHaveLength(1)
+      const [record = {}] = admitted
+      // What the device service serializes (wireRecord drops undefined, keeps finite numbers): the fields senpi's admit-external-message-wire reads.
+      expect(JSON.parse(JSON.stringify(record))).toMatchObject({ type: "admit_external_message", sessionId: "s1", deliverAs: "followUp", chainCount: 3, sender: { kind: "agent", session_id: "dur-a", name: "a" } })
+      expect(typeof record["deliveryId"]).toBe("string")
+      expect(Object.keys(record).sort()).toEqual(["chainCount", "deliverAs", "deliveryId", "displayText", "sender", "sessionId", "text", "type"])
+    } finally {
+      await r.done()
+    }
+    const fresh = relayOver(w.surface)
+    try {
+      expect(await fresh.send()).toMatchObject({ kind: "ok" })
+      expect(w.records.filter((record) => record["type"] === "admit_external_message").map((record) => record["chainCount"])).toEqual([3, 1])
+    } finally {
+      await fresh.done()
+    }
+  })
+
+  test("#given b is mid-turn on turn 3 when the steer's preflight reads it #when b's turn ends before the record lands and its engine answers turn_conflict #then the send is turn_conflict naming b's current turn, from the engine's answer, and nothing is retried", async () => {
+    const w = relayWorld()
+    w.engine.streaming = true
+    w.engine.currentTurnId = "3"
+    // The race: between the preflight get_state and the admit record, b's turn 3 ends and turn 4 runs.
+    w.inFlight(() => { w.engine.currentTurnId = "4"; w.engine.admitAnswer = { kind: "turn_conflict", turnId: "4" } })
+    const r = relayOver(w.surface)
+    try {
+      expect(await r.send({ mode: "steer", expected_turn_id: "3" })).toMatchObject({ kind: "error", error: { code: "turn_conflict", details: { device: "b", current_turn_id: "4" } } })
+      const admitted = w.records.filter((record) => record["type"] === "admit_external_message")
+      expect(admitted.map((record) => [record["deliverAs"], record["expectedTurnId"]])).toEqual([["steer", "3"]])
+    } finally {
+      await r.done()
+    }
+  })
 
   test.each([
     ["a relayd that answers the open with its located session", "located", ["session.endpoints", "session.command", "session.attach"], [true]],
