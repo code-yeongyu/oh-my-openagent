@@ -1,8 +1,12 @@
 import { toGatewayAddressEntries } from "../address-book"
 import type { GatewayEndpointPort, GatewayEndpointRef } from "../gateway/adapter"
 import { createGatewayEngine, resolveFromEntries, type GatewayEngine, type GatewayResolve } from "../gateway/engine"
+import { createLocalTransport } from "../gateway/local-transport"
+import { createDeliveryPipeline, type DeliveryPipeline } from "../gateway/pipeline"
 import { createGatewayRelay, type GatewayRelay } from "../gateway/relay"
+import { createRelayTransport } from "../remote/lazy-ops"
 import type { GatewayStore } from "../gateway/store"
+import type { Provenance } from "../gateway/types"
 import { resolveProvenance } from "../gateway/provenance-resolver"
 import { addressBook, sendAddressBook } from "./internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
@@ -19,7 +23,11 @@ export type GatewayServices = {
   readonly store: GatewayStore
   readonly endpoints: GatewayEndpointPort
   readonly engine: GatewayEngine
+  /** The one send path: the engine behind the local transport, the device service behind the relay transport. */
+  readonly pipeline: DeliveryPipeline
   readonly relay: GatewayRelay
+  /** The calling session's workspace and project, as the engine stamps a delivery with them; a send to another device carries the same. */
+  readonly senderProvenance: () => Promise<Provenance>
   /** The endpoint serving a session right now, or null when nothing answers for it. */
   readonly locate: (durableId: string) => Promise<GatewayEndpointRef | null>
 }
@@ -50,11 +58,22 @@ export function createGatewayServices(options: ThreadToolSurfaceOptions, view: (
   const now = options.now ?? store.now
   const endpoints = options.host.gateway ?? UNREACHABLE
   const entries = async () => toGatewayAddressEntries(addressBook(options, await view()))
-  const engine = createGatewayEngine({ store, endpoints, resolve, now, senderProvenance: () => resolveProvenance({ cwd: options.callerWorkspaceRoot(), env: options.env, ...(options.loadProvenanceWorkspaces === undefined ? {} : { loadWorkspaces: options.loadProvenanceWorkspaces }), ...(options.onProvenanceWarning === undefined ? {} : { onWarning: options.onProvenanceWarning }) }) })
+  const senderProvenance = () => resolveProvenance({ cwd: options.callerWorkspaceRoot(), env: options.env, ...(options.loadProvenanceWorkspaces === undefined ? {} : { loadWorkspaces: options.loadProvenanceWorkspaces }), ...(options.onProvenanceWarning === undefined ? {} : { onWarning: options.onProvenanceWarning }) })
+  const engine = createGatewayEngine({ store, endpoints, resolve, now, senderProvenance })
   const locate = async (durableId: string): Promise<GatewayEndpointRef | null> => {
     const entry = (await entries()).find((candidate) => candidate.thread_id === durableId)
     return entry === undefined || entry.liveness !== "routable" ? null : entry.endpoint
   }
   const relay = createGatewayRelay({ store, engine, endpoints, locate, now })
-  return { store, endpoints, engine, relay, locate }
+  const pipeline = createDeliveryPipeline({
+    local: createLocalTransport(engine),
+    ...(options.remote === undefined ? {} : {
+      relay: createRelayTransport({
+        remote: options.remote, store, now, senderProvenance,
+        ...(options.callerCause === undefined ? {} : { callerCause: options.callerCause }),
+        ...(options.callerName === undefined ? {} : { callerName: options.callerName }),
+      }),
+    }),
+  })
+  return { store, endpoints, engine, pipeline, relay, senderProvenance, locate }
 }

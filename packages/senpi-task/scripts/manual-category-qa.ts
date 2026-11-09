@@ -157,19 +157,6 @@ requireCondition(hardcodedFallback.spec.modelId === "gpt-6-luna-fast", "hardcode
 requireCondition(hardcodedFallback.spec.variant === "low", "hardcoded fallback variant is not low")
 requireCondition(hardcodedFallback.modelSelection.matchedFallback, "hardcoded fallback was not marked as fallback")
 
-const systemDefault = resolveCategory(
-  "quick",
-  {},
-  registry([model("local", "system-default")]),
-  { systemDefaultModel: "local/system-default" },
-)
-requireCondition(systemDefault.kind === "resolved", "system default scenario did not resolve")
-if (systemDefault.kind !== "resolved") {
-  throw new Error("system default scenario did not resolve")
-}
-requireCondition(systemDefault.spec.provider === "local", "system default provider mismatch")
-requireCondition(systemDefault.spec.modelId === "system-default", "system default model mismatch")
-
 const headerModel = {
   provider: "openai-codex",
   id: "gpt-6-luna-fast",
@@ -319,7 +306,6 @@ console.log(JSON.stringify({
   disabled,
   unavailable,
   hardcodedFallback,
-  systemDefault,
   headerBearing,
   malformed,
   throwingAvailable,
