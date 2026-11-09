@@ -332,7 +332,7 @@ describe("maybeCreateSisyphusConfig", () => {
           disabledAgents: [],
           agentOverrides: {},
           availableModels: new Set(),
-          systemDefaultModel: "github-copilot/claude-opus-5",
+          systemDefaultModel: "github-copilot/claude-opus-5-5",
           isFirstRunNoCache: true,
           availableAgents: [],
           availableSkills: [],
@@ -343,7 +343,7 @@ describe("maybeCreateSisyphusConfig", () => {
 
         // then
         expect(config).toBeDefined();
-        expect(config?.model).toBe("github-copilot/claude-opus-5");
+        expect(config?.model).toBe("github-copilot/claude-opus-5-5");
       } finally {
         cacheSpy.mockRestore();
       }
@@ -358,8 +358,8 @@ describe("maybeCreateSisyphusConfig", () => {
         const config = maybeCreateSisyphusConfig({
           disabledAgents: [],
           agentOverrides: {},
-          availableModels: new Set(["github-copilot/claude-opus-5"]),
-          systemDefaultModel: "anthropic/claude-opus-5",
+          availableModels: new Set(["github-copilot/claude-opus-5-5"]),
+          systemDefaultModel: "anthropic/claude-opus-5-5",
           isFirstRunNoCache: true,
           availableAgents: [],
           availableSkills: [],
@@ -370,7 +370,7 @@ describe("maybeCreateSisyphusConfig", () => {
 
         // then
         expect(config).toBeDefined();
-        expect(config?.model).toBe("github-copilot/claude-opus-5");
+        expect(config?.model).toBe("github-copilot/claude-opus-5-5");
       } finally {
         cacheSpy.mockRestore();
       }
@@ -396,7 +396,7 @@ describe("maybeCreateSisyphusConfig", () => {
 
         // then
         expect(config).toBeDefined();
-        expect(config?.model).toBe("anthropic/claude-opus-5");
+        expect(config?.model).toBe("anthropic/claude-opus-5-5");
       } finally {
         cacheSpy.mockRestore();
       }
