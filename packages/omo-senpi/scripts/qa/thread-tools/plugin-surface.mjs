@@ -112,8 +112,18 @@ report.assert("direct-thread-list-refused-with-eval-hint", direct !== undefined 
 const jsListing = listingOf(jsList?.text)
 const pyListing = listingOf(pyList?.text)
 const image = imageDetails(jsImage?.text)
-report.assert("direct-generate-image-refused-with-eval-hint", directImage !== undefined && /Tool generate_image not found/.test(directImage.text) && directImage.text.includes('tool.generate_image({ prompt: "..." })'), `direct=${JSON.stringify(directImage?.text ?? null).slice(0, 400)}`)
-report.assert("system-prompt-names-eval-forms", systemPrompt.includes("tool.thread_list(") && systemPrompt.includes("tool.thread_send(") && systemPrompt.includes('tool.generate_image({ prompt: "..." })'), `system_prompt_eval_paragraph=${JSON.stringify(systemPrompt.slice(systemPrompt.indexOf("Eval-only tools"), systemPrompt.indexOf("Eval-only tools") + 300))}`)
+// generate_image is eval-only from senpi#6272 on; an engine before it (the omo pin until it carries that
+// release) still exposes it for search, so the generate_image rows are skipped there and the thread rows
+// stand on their own.
+const engineHidesGenerateImage = systemPrompt.includes("tool.generate_image(")
+const evalParagraph = systemPrompt.slice(systemPrompt.indexOf("Eval-only tools"))
+const namedForms = ["tool.thread_list(", "tool.thread_send(", "tool.thread_report(", "tool.generate_image("].filter((form) => evalParagraph.includes(form))
+report.assert("system-prompt-names-thread-eval-forms", namedForms.includes("tool.thread_list(") && namedForms.includes("tool.thread_send(") && namedForms.includes("tool.thread_report("), `named=${JSON.stringify(namedForms)} paragraph_head=${JSON.stringify(evalParagraph.slice(0, 200))}`)
+if (engineHidesGenerateImage) {
+  report.assert("direct-generate-image-refused-with-eval-hint", directImage !== undefined && /Tool generate_image not found/.test(directImage.text) && directImage.text.includes('tool.generate_image({ prompt: "..." })'), `direct=${JSON.stringify(directImage?.text ?? null).slice(0, 400)}`)
+} else {
+  report.skip("direct-generate-image-refused-with-eval-hint", "this engine exposes generate_image for search (before senpi#6272); the direct call ran the tool")
+}
 report.assert("js-cell-failure-names-the-tool", jsBadRead !== undefined && /CELL_ERROR .*Validation failed for tool "thread_read"/.test(jsBadRead.text), `bad_read_cell=${JSON.stringify(jsBadRead?.text ?? null).slice(0, 300)}`)
 report.assert("js-cell-thread-list-result", isListing(jsListing), `threads=${jsListing?.threads ?? "none"} scope=${jsListing?.scope ?? "none"} js_cell=${JSON.stringify(jsList?.text ?? null).slice(0, 400)}`)
 report.assert("py-cell-thread-list-result", isListing(pyListing), `threads=${pyListing?.threads ?? "none"} scope=${pyListing?.scope ?? "none"} py_cell=${JSON.stringify(pyList?.text ?? null).slice(0, 400)}`)
