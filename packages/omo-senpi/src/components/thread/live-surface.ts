@@ -503,3 +503,4 @@ export function createCliRemoteSurface(options: { readonly version: string; read
 export { crossTarget, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
 export { closeRemote, deviceOnline, interruptRemote, outcomeFailure, promptRemote, readRemote } from "./remote/remote-ops"
 export { setModelRemote } from "./remote/remote-controls"
+export { createRelayTransport } from "./remote/relay-transport"

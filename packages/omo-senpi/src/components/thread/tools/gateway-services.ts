@@ -4,7 +4,7 @@ import { createGatewayEngine, resolveFromEntries, type GatewayEngine, type Gatew
 import { createLocalTransport } from "../gateway/local-transport"
 import { createDeliveryPipeline, type DeliveryPipeline } from "../gateway/pipeline"
 import { createGatewayRelay, type GatewayRelay } from "../gateway/relay"
-import { createRelayTransport } from "../remote/relay-transport"
+import { createRelayTransport } from "../remote/lazy-ops"
 import type { GatewayStore } from "../gateway/store"
 import type { Provenance } from "../gateway/types"
 import { resolveProvenance } from "../gateway/provenance-resolver"
