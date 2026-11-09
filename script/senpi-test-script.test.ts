@@ -147,6 +147,8 @@ describe("Senpi compatibility test script", () => {
       await writeFile(join(pluginRoot, "extensions", "assets.generated.json"), "{}\n")
       await mkdir(join(pluginRoot, "runtime", "agent-toolkit-sdk"), { recursive: true })
       await writeFile(join(pluginRoot, "runtime", "agent-toolkit-sdk", "sdk.js"), "export {}\n")
+      await mkdir(join(pluginRoot, "runtime", "bunshin-ts"), { recursive: true })
+      await writeFile(join(pluginRoot, "runtime", "bunshin-ts", "sdk.js"), "export {}\n")
       await mkdir(join(pluginRoot, "runtime", "thread-sdk"), { recursive: true })
       await writeFile(join(pluginRoot, "runtime", "thread-sdk", "sdk.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")

@@ -13,7 +13,7 @@ import type {
 export * from "./vocabulary.ts";
 export * from "./protocol-events.ts";
 export type * from "./protocol-delegated.ts";
-import type { SessionEndpoints, SessionEndpointsData } from "./protocol-delegated.ts";
+import type { SessionCandidate, SessionEndpoints, SessionEndpointsData, SessionLocate } from "./protocol-delegated.ts";
 import type { SessionCommand, SessionCommandPart } from "./protocol-command.ts";
 export type * from "./protocol-command.ts";
 export type * from "./protocol-control.ts";
@@ -112,6 +112,8 @@ export type DeviceAdopt = {
   readonly device: DeviceRef;
   readonly signing_private_key: string;
   readonly sealing_private_key: string;
+  /** omo addition: sent only to a service at or above ADOPT_ACCOUNT_MIN_SERVICE_VERSION (device-service.ts). */
+  readonly account?: string;
 };
 export type DeviceForget = { readonly id: string; readonly type: "device.forget" };
 export type DeviceInfo = { readonly id: string; readonly type: "device.info" };
@@ -185,6 +187,7 @@ export type LocalRequest =
   | EnforcementReport
   | ShutdownForUpgrade
   | SessionEndpoints
+  | SessionLocate
   | ControlAttachGet
   | ControlAttachSet;
 export type RequestType = LocalRequest["type"];
@@ -218,6 +221,7 @@ export type ResponseData = {
   readonly "enforcement.report": Empty;
   readonly "owner.shutdown_for_upgrade": Empty;
   readonly "session.endpoints": SessionEndpointsData;
+  readonly "session.locate": SessionCandidate;
   readonly "control.attach.get": ControlAttachState;
   readonly "control.attach.set": ControlAttachState;
 };

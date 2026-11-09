@@ -6,6 +6,7 @@ import type { MemoryBlockCache, ReservedRun, TranscriptProjection } from "@oh-my
 import type { ComponentContext, SenpiExtensionAPI, SettleObserver } from "../../extension/types"
 import { hasMemoryCapabilities } from "./capabilities"
 import { registerMemoryCommands } from "./commands/register"
+import { loadMemoryCommandsRuntime } from "./commands/runtime-loader"
 import type { MemoryCommandIdentity, MemoryCommandSettings } from "./commands/types"
 import type { DreamTriggerWiring } from "./dream-trigger"
 import type { MemoryFactsWiring } from "./facts-wiring"
@@ -217,6 +218,21 @@ export function registerMemoryStatic(input: {
       promptCache.clear()
       projectionPins.requestRefresh()
     },
+    reflectionLockFix: async (sessionId, { dryRun }) => {
+      const identity = resolveContext(sessionId)
+      if (identity === undefined) return []
+      const runtime = runtimeFor(identity)
+      const { formatStaleLockFixLines, reclaimDeadOwnerLocks, runStaleLockReaper } = await loadMemoryCommandsRuntime()
+      const report = await runStaleLockReaper({
+        runtimeDir: identity.identityPaths.runtime,
+        // Interactive: like the per-turn pass, never wait on another run's deadline here.
+        settle: () => runtime.reconcile(undefined, { waitPolicy: "none" }),
+        dryRun,
+        ...(options.reflectionHolderSeams === undefined ? {} : { probe: options.reflectionHolderSeams }),
+      })
+      const locks = dryRun ? undefined : await reclaimDeadOwnerLocks(identity.identityPaths.locks)
+      return formatStaleLockFixLines(identity.identity, report, locks)
+    },
     reflectionSink: {
       request: async (request) => {
         if (activeSession.current === undefined) throw new Error("no bound memory session")
@@ -245,7 +261,7 @@ export function registerMemoryStatic(input: {
         return {
           disposition: "pending",
           runId: result.run.runId,
-          ...(recovery.verdict.state === "dead" && recovery.notice === undefined ? { recoveredRunId: recovery.verdict.runId } : {}),
+          ...(recovery.recoveredRunId === undefined ? {} : { recoveredRunId: recovery.recoveredRunId }),
           ...(recovery.notice === undefined ? {} : { stuck: recovery.notice }),
         }
       },

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
-import { X509Certificate } from "node:crypto"
-import { mkdtemp, rm } from "node:fs/promises"
+import { createHash, X509Certificate } from "node:crypto"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { acquireEngineTrust } from "../trust-acquisition"
@@ -60,6 +60,42 @@ test("a malformed Linux bundle is discarded as a whole", async () => {
 test.each(["darwin", "win32"] as const)("a missing shipped %s helper is fallback, never system enumeration", async (platform) => {
   expect(await acquireEngineTrust({ deadlineMs: 1500, platform, environment: {} }))
     .toMatchObject({ certificates: [], fallbackReason: "helper-missing" })
+})
+
+// 4.4 item 6: macOS reads /etc/ssl/cert.pem through the same bundle reader; a malformed file is one structured drop.
+test.skipIf(process.platform === "win32")("a malformed macOS OpenSSL default file is reported as a structured drop", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "omo-trust-acquire-"))
+  try {
+    const document = JSON.stringify({
+      schema: 1, os: "macos", complete: true, certificates: [],
+      sources: ["trust-settings-user", "trust-settings-admin", "trust-settings-system", "keychain-search-list"]
+        .map((name) => ({ name, outcome: "read", status: 0 })),
+    })
+    // The helper runs with only HOME set, so it prints through the shell builtin.
+    const script = `#!/bin/sh\nprintf '%s' '${document}'\n`
+    const helper = join(directory, "helper")
+    await writeFile(helper, script, { mode: 0o755 })
+    const reads: string[] = []
+    const result = await acquireEngineTrust({
+      deadlineMs: 20_000, platform: "darwin", environment: {},
+      helper: { path: helper, sha256: createHash("sha256").update(script).digest("hex") },
+      linux: {
+        osRelease: async () => { throw new Error("macOS never reads os-release") },
+        available: async () => { throw new Error("macOS never selects a Linux bundle") },
+        read: async (path) => {
+          reads.push(path)
+          return { kind: "success", path, bytes: Buffer.from("-----BEGIN CERTIFICATE-----\nMAA=\n-----END CERTIFICATE-----\n") }
+        },
+      },
+    })
+    const drop = {
+      code: "openssl-default-file-malformed", file: "/etc/ssl/cert.pem",
+      cause: "ordinary-block-not-indexable", blockIndex: 0, narrowing: false,
+    } as const
+    expect(reads).toEqual(["/etc/ssl/cert.pem"])
+    expect(result.defaultFileDrop).toEqual(drop)
+    expect(result.codes).toContainEqual(drop)
+  } finally { await rm(directory, { recursive: true, force: true }) }
 })
 
 test("Linux acquisition applies the shared server-auth policy to a synthetic selected bundle", async () => {

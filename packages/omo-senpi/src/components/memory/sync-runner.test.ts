@@ -8,9 +8,10 @@ import { join } from "node:path"
 import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 import type { DeviceSync, EngineStatus, SyncSession } from "@oh-my-opencode/memory-core/sync-engine"
 
-import { lazyCliAccountSource } from "./device-session/account-runtime-loader"
+import { selectedDeviceAccountSource } from "./device-session/account-runtime-loader"
 import { createDeviceSessionResolver } from "./device-session/resolver"
 import { SYNC_CLOSE_WAIT_EXCEEDED, SYNC_CONFIG_INVALID, SYNC_IDLE_NO_DEVICE_SESSION, SYNC_UNAVAILABLE, createSyncRunner, watchHeadLog } from "./sync-runner"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const dirs: string[] = []
 afterEach(async () => {
@@ -162,7 +163,7 @@ test("an unloadable device account sidecar reports sync-unavailable with its rea
       error: (message: string) => errors.push(message),
     },
     resolveSession: createDeviceSessionResolver({
-      source: lazyCliAccountSource({ env: {} }, async () => {
+      source: selectedDeviceAccountSource({ env: {} }, async () => {
         throw missing
       }),
       pinDir: join(paths.runtime, "pins"),
@@ -190,7 +191,7 @@ test("an invalid OMO_SERVICE_API_URL is reported as a configuration error naming
       error: (message: string, meta?: Record<string, unknown>) => errors.push({ message, code: meta?.code, variable: meta?.variable }),
     },
     resolveSession: createDeviceSessionResolver({
-      source: lazyCliAccountSource({ env: { OMO_SERVICE_API_URL: "not a url" } }),
+      source: selectedDeviceAccountSource({ env: { OMO_SERVICE_API_URL: "not a url" } }),
       pinDir: join(paths.runtime, "pins"),
       loadRuntime: () => Promise.reject(new Error("the engine sidecar is not reached when the account cannot be built")),
     }),
@@ -311,7 +312,7 @@ test("a running engine whose device signs out (or is revoked) closes and leaves 
   await runner.acquire("agent", paths, { enabled: true })
   expect(fake.opened).toEqual([paths.repo])
   endSignIn()
-  await Promise.race([idle, new Promise((_, reject) => setTimeout(() => reject(new Error("waited 5s for the runner to go idle after sign-out")), 5_000))])
+  await Promise.race([idle, new Promise((_, reject) => setTimeout(() => reject(new Error("waited out the test budget for the runner to go idle after sign-out")), remainingTestTime()))])
   expect(fake.closed).toEqual([paths.repo])
   expect(await runner.status(paths.repo)).toBeNull()
   expect(lines).toEqual([SYNC_IDLE_NO_DEVICE_SESSION])

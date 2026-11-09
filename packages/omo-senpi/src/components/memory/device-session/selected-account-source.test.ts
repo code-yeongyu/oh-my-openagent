@@ -6,6 +6,7 @@ import type { MemorySyncSelection } from "../desktop-sync/hostSelection"
 import type { DesktopSyncAccount, DeviceAccountSource } from "./account-source"
 import { createDeviceSessionResolver } from "./resolver"
 import { accountSourceFromSelection } from "./selected-account-source"
+import { remainingTestTime, useTestTimeout } from "../../../../../../test-support/test-deadline"
 
 // Security contract (account-transport-api v9 section 7): a desktop host never constructs the CLI credential source,
 // in the main thread or in any session Worker; only a CLI selection does, and only the main thread selects.
@@ -28,7 +29,7 @@ describe("the account source built from the engine's one selection", () => {
   })
 
   test("an unavailable selection passes its reason through and never builds the CLI source", async () => {
-    for (const reason of ["private_channel_unavailable", "platform_not_supported"] as const) {
+    for (const reason of ["private_channel_unavailable", "selection_failed"] as const) {
       const source = accountSourceFromSelection({ selection: async () => ({ kind: "unavailable", reason }), cli: cliCanary })
       expect(await source()).toEqual({ kind: "unavailable", reason })
     }
@@ -46,6 +47,46 @@ describe("the account source built from the engine's one selection", () => {
     expect(await source()).toBe(first)
     current = false
     expect(await source()).not.toBe(first)
+    expect(opened).toBe(2)
+  })
+
+  test("concurrent resolves with no current account share one open and get the same account", async () => {
+    let opened = 0
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const source = accountSourceFromSelection({
+      selection: desktop(wire()), cli: cliCanary,
+      openAccount: async () => { opened += 1; await gate; return desktopAccount(`generation-${opened}`, () => true) },
+    })
+    const both = Promise.all([source(), source()])
+    release()
+    const [first, second] = await both
+    expect(opened).toBe(1)
+    expect(first?.kind).toBe("desktop")
+    expect(second).toBe(first)
+  })
+
+  test("a rejected open rejects every concurrent resolve once, and the next resolve opens again", async () => {
+    let opened = 0
+    let failing = true
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    const failure = new Error("descriptor request failed")
+    const source = accountSourceFromSelection({
+      selection: desktop(wire()), cli: cliCanary,
+      openAccount: async () => {
+        opened += 1
+        await gate
+        if (failing) throw failure
+        return desktopAccount(`generation-${opened}`, () => true)
+      },
+    })
+    const both = Promise.allSettled([source(), source()])
+    release()
+    expect(await both).toEqual([{ status: "rejected", reason: failure }, { status: "rejected", reason: failure }])
+    expect(opened).toBe(1)
+    failing = false
+    expect((await source())?.kind).toBe("desktop")
     expect(opened).toBe(2)
   })
 
@@ -77,7 +118,7 @@ describe("the account source built from the engine's one selection", () => {
 type EngineReport = { readonly source: string; readonly cliBuilt: boolean; readonly handle?: string; readonly foreignEnd?: string; readonly events?: readonly string[] }
 async function engine(scenario: string): Promise<{ readonly claims: number; readonly ends: number; readonly reports: readonly EngineReport[]; readonly open?: readonly string[] }> {
   const child = Bun.spawn([process.execPath, join(import.meta.dirname, "../desktop-sync/hostSelection.fixture.ts"), scenario], { stdout: "pipe", stderr: "pipe" })
-  const deadline = new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`the ${scenario} engine fixture did not exit within 20s`)), 20_000))
+  const deadline = new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`the ${scenario} engine fixture did not exit within the test budget`)), remainingTestTime()))
   const code = await Promise.race([child.exited, deadline])
   const out = await new Response(child.stdout).text()
   if (code !== 0) throw new Error(`engine fixture ${scenario} exited ${code}: ${await new Response(child.stderr).text()}`)
@@ -87,6 +128,7 @@ async function engine(scenario: string): Promise<{ readonly claims: number; read
 describe("session Workers in a shared-worker engine", () => {
   for (const scenario of ["desktop", "late"] as const) {
     test(`a ${scenario} desktop launch: each Worker owns only its handles and events on its own port, with one claim`, async () => {
+      useTestTimeout(30_000)
       const result = await engine(scenario)
       expect(result.claims).toBe(1)
       expect(result.ends).toBe(2)
@@ -107,6 +149,7 @@ describe("session Workers in a shared-worker engine", () => {
 
   for (const scenario of ["declared-null", "unparseable"] as const) {
     test(`a ${scenario} launch: every Worker gets the unavailable desktop source, never the CLI`, async () => {
+      useTestTimeout(30_000)
       const result = await engine(scenario)
       expect(result.claims).toBe(1)
       for (const report of result.reports) expect(report).toEqual({ source: "unavailable:private_channel_unavailable", cliBuilt: false })
@@ -114,12 +157,14 @@ describe("session Workers in a shared-worker engine", () => {
   }
 
   test("an in-process host: the main-thread registration reads the one selection and gets the desktop source", async () => {
+    useTestTimeout(30_000)
     const result = await engine("in-process")
     expect(result.claims).toBe(1)
     expect(result.reports).toEqual([{ source: "desktop", cliBuilt: false }])
   }, 30_000)
 
   test("an attachment that connects after the deadline is closed, and the unavailable answer stands", async () => {
+    useTestTimeout(30_000)
     const result = await engine("late-connected") as unknown as { claims: number; answer: string; closed: string; opened: boolean; source: string }
     expect(result.claims).toBe(1)
     expect(result.answer).toBe("unavailable:private_channel_unavailable")
@@ -129,6 +174,7 @@ describe("session Workers in a shared-worker engine", () => {
   }, 30_000)
 
   test("the selection is memoized per process: a second call returns the first and claims nothing again", async () => {
+    useTestTimeout(30_000)
     const result = await engine("memoized") as unknown as { claims: number; same: boolean; first: string; second: string }
     expect(result.same).toBe(true)
     expect(result.claims).toBe(1)
@@ -137,6 +183,7 @@ describe("session Workers in a shared-worker engine", () => {
   }, 30_000)
 
   test("an undeclared launch: Workers get the CLI selection and nothing is claimed", async () => {
+    useTestTimeout(30_000)
     const result = await engine("cli")
     expect(result.claims).toBe(0)
     for (const report of result.reports) expect(report).toEqual({ source: "null", cliBuilt: true })
@@ -150,6 +197,7 @@ describe("session Workers in a shared-worker engine", () => {
   ]
   for (const [scenario, expected] of failClosed) {
     test(`a ${scenario} launch: Workers are unavailable (${expected}), never the CLI`, async () => {
+      useTestTimeout(30_000)
       const result = await engine(scenario)
       for (const report of result.reports) expect(report).toEqual({ source: expected, cliBuilt: false })
     }, 30_000)

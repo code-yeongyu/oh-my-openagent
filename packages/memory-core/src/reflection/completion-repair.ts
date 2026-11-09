@@ -43,7 +43,7 @@ function parseTrailerValue(value: string): DroppedEntry | undefined {
  * the base; empty otherwise. Lets a second validation of an already-repaired tip report what was dropped.
  */
 export async function readDroppedTrailers(exec: GitExec, dir: string, baseSha: string, tipSha: string): Promise<DroppedEntry[]> {
-  const run = runner(exec, dir)
+  const run = literalPathspecRunner(exec, dir)
   const parent = await run(["rev-parse", "--verify", `${tipSha}^`])
   if (parent.code !== 0 || parent.stdout.trim() !== baseSha) return []
   const body = await must(run, [...STABLE_LOG_OUTPUT, "log", "-1", "--format=%B", tipSha])
@@ -56,14 +56,14 @@ export async function readDroppedTrailers(exec: GitExec, dir: string, baseSha: s
   return entries
 }
 
-type Run = (argv: readonly string[], env?: Readonly<Record<string, string>>) => Promise<{ code: number; stdout: string; stderr: string }>
+export type Run = (argv: readonly string[], env?: Readonly<Record<string, string>>) => Promise<{ code: number; stdout: string; stderr: string; stdoutBytes?: Buffer }>
 
 /**
  * Every git call here that names a note passes the agent-chosen path as a pathspec. GIT_LITERAL_PATHSPECS makes each
  * one match only that exact path: without it a name such as `k*.md`, `k[e]ep1.md` or `:!x.md` is a glob or magic
  * pathspec, and dropping it would delete or revert OTHER notes.
  */
-function runner(exec: GitExec, dir: string): Run {
+export function literalPathspecRunner(exec: GitExec, dir: string): Run {
   return (argv, env) =>
     exec.run(argv, {
       cwd: dir,
@@ -100,7 +100,7 @@ async function renameSources(run: Run, baseSha: string, tipSha: string): Promise
 }
 
 export async function commitCount(exec: GitExec, dir: string, baseSha: string, tipSha: string): Promise<number> {
-  const out = await must(runner(exec, dir), ["rev-list", "--count", `${baseSha}..${tipSha}`])
+  const out = await must(literalPathspecRunner(exec, dir), ["rev-list", "--count", `${baseSha}..${tipSha}`])
   return Number.parseInt(out.trim(), 10)
 }
 
@@ -120,7 +120,7 @@ export async function squashWithoutPaths(
   dropped: ReadonlySet<string>,
   record: readonly DroppedEntry[] = [],
 ): Promise<string> {
-  const run = runner(exec, dir)
+  const run = literalPathspecRunner(exec, dir)
   const sources = await renameSources(run, baseSha, tipSha)
   const identity = (await must(run, [...STABLE_LOG_OUTPUT, "log", "-1", "--format=%an%n%ae%n%s", tipSha])).split("\n")
   const restore = new Set(dropped)

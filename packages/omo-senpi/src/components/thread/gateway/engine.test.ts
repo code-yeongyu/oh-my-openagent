@@ -125,6 +125,30 @@ describe("turn_epoch_cas_and_fifo", () => {
   })
 })
 
+describe("wake_reached_no_drain", () => {
+  test("#given an idle live session whose control endpoint never registered #when A sends auto and follow_up #then nothing starts and each result says queued_offline, not queued", async () => {
+    const h = open()
+    h.session("A")
+    const target = h.session("T", { drainRegistered: false })
+    for (const mode of ["auto", "follow_up"] as const) {
+      expect(summary(await send(h, "A", "T", `brief ${mode}`, { mode }))).toBe("queued_offline")
+    }
+    await h.quiesce()
+    expect(h.wakes.filter((wake) => wake.target === "T")).toHaveLength(2)
+    expect(target.runtime.listAdmittedDeliveries().pending).toEqual([])
+    expect((await target.store.list({ target_durable_id: "T" })).map((row) => row.state)).toEqual(["queued", "queued"])
+  })
+
+  test("#given a live drain holding an earlier delivery behind the user's draft #when another delivery is sent #then it stays queued, because the drain reported the held row", async () => {
+    const h = open()
+    h.session("A")
+    const target = h.session("T")
+    target.runtime.editorHold = "draft"
+    expect(summary(await send(h, "A", "T", "first"))).toBe("queued")
+    expect(summary(await send(h, "A", "T", "second"))).toBe("queued")
+  })
+})
+
 describe("repeated_wake_during_streaming", () => {
   test("#given B streams #when M1 is queued and three more wakes arrive before the turn ends #then the follow-up is enqueued once and applied once, after it is emitted", async () => {
     const h = open()
@@ -235,6 +259,21 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     expect(views.map((view) => [view?.row.state === "admitted" || view?.row.state === "applied", view?.row.hop])).toEqual([[true, 3], [true, 4]])
     const self = await send(h, "A", "A", "me")
     expect(self.kind === "error" && self.error.details?.guard).toBe("self_send")
+  })
+
+  test("#given a run woken by a delivery from another device (no row here, chain_count 2) #when it sends here #then the row continues at hop 3 under a fresh root, and a local cause at hop 1 beside an inbound hop 4 continues at hop 5", async () => {
+    const h = open()
+    for (const id of ["A", "B", "C"]) h.session(id)
+    const fromDevice = okId(await send(h, "A", "B", "continued from device", { inbound_hop: 2 }))
+    await h.quiesce()
+    const first = (await h.get("A").store.deliveryView(fromDevice))?.row
+    expect([first?.hop, first?.root_id?.startsWith("root-")]).toEqual([3, true])
+    const local = okId(await send(h, "B", "C", "local cause"))
+    await h.quiesce()
+    const both = okId(await send(h, "C", "A", "both", { cause_delivery_id: local, inbound_hop: 4 }))
+    await h.quiesce()
+    const row = (await h.get("A").store.deliveryView(both))?.row
+    expect([row?.hop, row?.root_id]).toEqual([5, (await h.get("A").store.deliveryView(local))?.row.root_id])
   })
 
   test("#given P and Q under one root #when P->Q and Q->P are sent concurrently from two processes #then both are accepted", async () => {
