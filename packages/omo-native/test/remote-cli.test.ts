@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmodSync, existsSync, mkdtempSync, rmSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { connectDeviceService, DEVICE_SERVICE_VERSION } from "../../device-service-core/src/index.ts"
 import { deviceServiceAssetName } from "../../device-service-core/src/release/acquire.ts"
@@ -14,6 +15,7 @@ import { createRemoteThreadFixture, ENGINE } from "../../omo-senpi/src/component
 import { runAccountVerb } from "../account-cli"
 import { type BootstrapSetup, deviceServiceBootstrapSetup } from "../remote-bootstrap"
 import { prepareRemoteAttach, REMOTE_EXIT, runRemoteVerb } from "../remote-cli"
+import { gatewayWorkerAnchor } from "../remote-session-verbs"
 import { ago } from "../remote-render"
 
 const NOW = 1_790_000_400_000
@@ -402,6 +404,33 @@ describe("omo remote attach", () => {
 })
 
 // The session verbs are the thread tools' remote ops (omo-senpi thread/remote), driven here over that suite's fake account.
+// The shipped omo carries the gateway store's worker only beside the plugin's extension bundle; a send that resolved it
+// beside bin/lib (the store's default) failed on every remote send from the published package (#12911 review HIGH).
+describe("omo remote send: the gateway store's worker in the shipped layout", () => {
+  test("#given a package root whose plugin/extensions holds the worker sidecar #when the anchor is resolved #then it is the extension bundle beside that sidecar", () => {
+    const root = mkdtempSync(join(tmpdir(), "omo-remote-worker-"))
+    try {
+      const extensions = join(root, "plugin", "extensions")
+      mkdirSync(extensions, { recursive: true })
+      writeFileSync(join(extensions, "gateway-store-worker.mjs"), "")
+      const anchor = gatewayWorkerAnchor(root)
+      expect(anchor && fileURLToPath(anchor)).toBe(join(extensions, "omo.js"))
+      expect(anchor && fileURLToPath(new URL("./gateway-store-worker.mjs", anchor))).toBe(join(extensions, "gateway-store-worker.mjs"))
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a package root with no staged plugin (the source tree) #when the anchor is resolved #then there is none and the store resolves its own worker", () => {
+    const root = mkdtempSync(join(tmpdir(), "omo-remote-noworker-"))
+    try {
+      expect(gatewayWorkerAnchor(root)).toBeUndefined()
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe("omo remote session verbs", () => {
   const fixture = createRemoteThreadFixture()
   afterEach(fixture.cleanup)

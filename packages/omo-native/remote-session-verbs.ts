@@ -4,12 +4,16 @@ import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/
 import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { setModelRemote } from "../omo-senpi/src/components/thread/remote/remote-controls"
 import { randomUUID } from "node:crypto"
+import { existsSync } from "node:fs"
 import { userInfo } from "node:os"
-import { createGatewayStore } from "../omo-senpi/src/components/thread/gateway/store"
+import { join } from "node:path"
+import { pathToFileURL } from "node:url"
+import { createGatewayStore, GATEWAY_STORE_WORKER_BUNDLE_NAME } from "../omo-senpi/src/components/thread/gateway/store"
 import { resolveProvenance } from "../omo-senpi/src/components/thread/gateway/provenance-resolver"
 import { createRelayTransport } from "../omo-senpi/src/components/thread/remote/relay-transport"
 import { threadLink } from "../omo-senpi/src/components/thread/thread-link"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
+import { packageRoot } from "./bin/lib/package-paths.js"
 import {
   closeRemote,
   followRemote,
@@ -24,6 +28,17 @@ import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import { sessionVerbLines } from "./remote-render"
 import { localPermissionPreset } from "./remote-permission-preset"
 import type { SessionArgs } from "./remote-session-args"
+
+/**
+ * Where the gateway store's worker is in the shipped `omo`: the `gateway-store-worker.mjs` sidecar beside the plugin's
+ * extension bundle (`<package>/plugin/extensions/`), the one place the payload carries it; `bin/lib` holds no worker, so
+ * the store's default (a worker beside the module it runs in) finds nothing there. From source the sidecar is absent and
+ * the store resolves `store-worker.ts` itself. Returns the anchor the store resolves the sidecar from, or undefined.
+ */
+export function gatewayWorkerAnchor(root: string = packageRoot): URL | undefined {
+  const anchor = pathToFileURL(join(root, "plugin", "extensions", "omo.js"))
+  return existsSync(new URL(`./${GATEWAY_STORE_WORKER_BUNDLE_NAME}`, anchor)) ? anchor : undefined
+}
 
 // The surface the agent's thread tools reach other devices through, on this command's own connection. The chain count
 // (K8) starts at its first hop: a person at a terminal is no thread chain.
@@ -121,8 +136,10 @@ async function sendTo(
 ): Promise<number> {
   let request: RemoteSendRequest = { message: args.text, delivery: args.delivery }
   // The person at this terminal sends their own input through the same transport port the thread tools deliver through
-  // (#12885): a `person` sender keeps the engine's prompt record, its receipt lives in this device's gateway store.
-  const store = createGatewayStore({ agentDir: canonicalAgentDir() })
+  // (#12885): a `person` sender keeps the engine's prompt record; its receipt is written to this device's gateway store
+  // under a key minted per invocation (a person's retry is a new send, so nothing dedupes it).
+  const anchor = gatewayWorkerAnchor()
+  const store = createGatewayStore({ agentDir: canonicalAgentDir(), ...(anchor === undefined ? {} : { workerModuleUrl: anchor }) })
   const transport = createRelayTransport({ remote, store, senderProvenance: () => resolveProvenance({ cwd: process.cwd(), env: process.env }) })
   const person = { kind: "person" as const, uid: process.getuid?.() ?? 0, user: userInfo().username }
   const deliver = async (): Promise<ThreadToolResult> => {
@@ -130,28 +147,28 @@ async function sendTo(
     if (sent.kind === "error") return sent
     return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: sent.delivery, deduplicated: sent.deduplicated, device: row.device }
   }
-  const dispose = async () => { transport.dispose(); await store.dispose() }
-  // A person steers whatever runs; the op still checks that turn, and the engine checks it again on arrival.
-  if (args.delivery === "steer") {
-    const running = await runningTurnRemote(remote, row)
-    if (running.kind === "error") return show(running, label)
-    if (!("turn_id" in running) || running.turn_id === undefined) {
-      dependencies.error(`omo remote: nothing is running on ${label} to steer.`)
-      dependencies.error("Send without --steer to start a turn.")
-      return REMOTE_EXIT.failed
-    }
-    request = { ...request, expected_turn_id: running.turn_id }
-  }
-  // The person at this terminal sends their own input as a prompt; a peer session's message is a delivery (#12882).
-  if (!args.wait) { try { return show(await deliver(), label) } finally { await dispose() } }
-  // Followed before the send, so no delta of the turn it starts can arrive unseen.
-  let reply = ""
-  const follow = await followRemote(remote, row, text => {
-    reply += text
-    if (!json) dependencies.write(text)
-  })
-  if ("kind" in follow) return show(follow, label)
+  let follow: Awaited<ReturnType<typeof followRemote>> | undefined
   try {
+    // A person steers whatever runs; the op still checks that turn, and the engine checks it again on arrival.
+    if (args.delivery === "steer") {
+      const running = await runningTurnRemote(remote, row)
+      if (running.kind === "error") return show(running, label)
+      if (!("turn_id" in running) || running.turn_id === undefined) {
+        dependencies.error(`omo remote: nothing is running on ${label} to steer.`)
+        dependencies.error("Send without --steer to start a turn.")
+        return REMOTE_EXIT.failed
+      }
+      request = { ...request, expected_turn_id: running.turn_id }
+    }
+    // The person at this terminal sends their own input as a prompt; a peer session's message is a delivery (#12882).
+    if (!args.wait) return show(await deliver(), label)
+    // Followed before the send, so no delta of the turn it starts can arrive unseen.
+    let reply = ""
+    follow = await followRemote(remote, row, text => {
+      reply += text
+      if (!json) dependencies.write(text)
+    })
+    if ("kind" in follow) return show(follow, label)
     const sent = await deliver()
     if (sent.kind === "error") return show(sent, label)
     const end = await follow.settled
@@ -164,7 +181,9 @@ async function sendTo(
     }
     return REMOTE_EXIT.ok
   } finally {
-    follow.stop()
-    await dispose()
+    // Every exit, early refusals included, releases the follow and the store worker this send opened.
+    if (follow !== undefined && !("kind" in follow)) follow.stop()
+    transport.dispose()
+    await store.dispose()
   }
 }
