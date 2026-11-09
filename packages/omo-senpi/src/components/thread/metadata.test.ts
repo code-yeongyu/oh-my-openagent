@@ -6,7 +6,7 @@ import { describe, expect, test } from "bun:test"
 import { ToolSearchService } from "../../../node_modules/@code-yeongyu/senpi/dist/core/extensions/builtin/tool-search/service.js"
 import type { ToolInfo } from "../../../node_modules/@code-yeongyu/senpi/dist/core/extensions/types.js"
 
-import { THREAD_FAMILY_PROMPT_GUIDELINES, THREAD_TOOL_METADATA } from "./metadata"
+import { THREAD_FAMILY_PROMPT_GUIDELINES, THREAD_TOOL_EXPOSURE, THREAD_TOOL_METADATA } from "./metadata"
 
 const THREAD_TOOL_NAMES = [
 	"thread_create",
@@ -102,7 +102,8 @@ describe("thread family metadata shape", () => {
 
 	test("every entry is eval-exposed", () => {
 		for (const entry of THREAD_TOOL_METADATA) {
-			expect(entry.exposure, entry.name).toBe("eval")
+			expect(entry.exposure, entry.name).toBe(THREAD_TOOL_EXPOSURE)
+			expect(THREAD_TOOL_EXPOSURE).toBe("eval")
 			expect("searchKeywords" in entry, entry.name).toBe(false)
 		}
 	})
