@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::ErrorCode;
 use crate::methods::Method;
+use crate::report::ActionReport;
 use crate::types::DesktopCapabilities;
 
 /// `engine.hello` handshake reply.
@@ -18,6 +19,10 @@ pub struct HelloResult {
     pub build_sha: String,
     /// Always `ABI`; a host refuses an engine whose ABI differs.
     pub abi: String,
+    /// Opt-in behaviours this engine supports, e.g. `action-report`. Absent
+    /// from older engines: read as `[]`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub features: Option<Vec<String>>,
 }
 
 /// `session.open` reply. `resume_token` is the only way to lift a stop latch
@@ -56,10 +61,13 @@ pub enum AxInputMethod {
 }
 
 /// `ax.typeText` reply.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AxInputResult {
     pub method: AxInputMethod,
+    /// The action report, in a session opened with `reportMode: "object"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub report: Option<Box<ActionReport>>,
 }
 
 /// Which stop path currently guards input.
@@ -107,6 +115,28 @@ pub struct AuditEvent {
     /// never audited.
     pub text_sha256: Option<String>,
     pub keys: Option<Vec<String>>,
+    /// Names this event in an `ActionReport.auditIds` (object mode only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+}
+
+/// Why earlier frames, refs and beliefs about the desktop no longer hold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum EpochReason {
+    Display,
+    Lock,
+    Sleep,
+    Space,
+    EngineRestarted,
+    IdleFlush,
+}
+
+/// The `epoch.changed` notification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EpochChanged {
+    pub reason: EpochReason,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

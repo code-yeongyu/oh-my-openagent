@@ -49,7 +49,7 @@ const TASK_EVENTS = [
   "agent_end",
 ]
 const SKILL_INVOCATION_TRACKER_EVENTS = ["input", "tool_result", "session_start", "session_shutdown"]
-const DAG_LIFECYCLE_EVENTS = ["session_start", "session_shutdown", "session_shutdown"]
+const DAG_LIFECYCLE_EVENTS = ["session_start", "session_shutdown", "before_agent_start", "session_resumed", "session_shutdown"]
 const TASK_COMMANDS = ["dag", "task-kill", "tasks"]
 
 interface RecordedLog {
@@ -219,6 +219,8 @@ describe("omo-senpi task component wiring", () => {
     await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => tempProject() }).register(pi, ctxFor(pi, logger))
 
     expect(toolNames(pi)).toEqual([...ALL_TOOL_NAMES].sort())
+    // placement contract (engine `ToolDefinition.runs`): subagent, workflow and team tools run on the loop side
+    expect(pi.tools.filter((tool) => tool["runs"] !== "brain").map((tool) => tool["name"])).toEqual([])
     // the /tasks and /task-kill commands registered
     expect(pi.commands.map((entry) => entry.name).sort()).toEqual([...TASK_COMMANDS].sort())
     // Peer mail is a plain injected turn; completion, member liveness, and the dead-chain category
@@ -253,6 +255,7 @@ describe("omo-senpi task component wiring", () => {
       detach: () => { order.push("dag-detach") },
       pauseForShutdown: async () => { order.push("dag-pause") },
       dispose: () => { order.push("dag-dispose") },
+      resend: () => {},
     }, () => {
       pi.on("session_start", () => { order.push("task-reconcile") })
       pi.on("session_shutdown", () => { order.push("task-suspend") })

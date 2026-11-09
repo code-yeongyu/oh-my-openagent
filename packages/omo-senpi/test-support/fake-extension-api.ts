@@ -1,3 +1,4 @@
+import { absentSenpiSeams, SENPI_SEAMS } from "../src/extension/senpi-seams"
 import type { SenpiExtensionAPI } from "../src/extension/types"
 
 export type FakeEventHandler = (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>
@@ -111,6 +112,15 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
   // Absent by default, like a host that predates senpi#3684; a test installs the engine's limit store.
   getSubscriptionLimits?: SenpiExtensionAPI["getSubscriptionLimits"]
   onSubscriptionLimits?: SenpiExtensionAPI["onSubscriptionLimits"]
+  // Absent by default, like a host that predates `getCommands`; a test installs the listing.
+  // #12544 review: the onboarding harness assigns this, so it must exist on the fake type.
+  // Declared as a method (not a property) so test subclasses may override it with a method.
+  getCommands?(): readonly {
+    readonly name: string
+    readonly description?: string
+    readonly source: string
+    readonly sourceInfo?: { readonly path?: string }
+  }[]
   // Absent by default, like a host that predates senpi#3864; a test installs a recorder for run completions.
   lifecycle?: SenpiExtensionAPI["lifecycle"]
 
@@ -174,4 +184,22 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
     }
     return results
   }
+}
+
+// Gives a fake every listed senpi seam it lacks as an inert stand-in, so a composed fake reports no absent seam and a test
+// that watches the logger sees only the warnings it is about.
+export function withInertSenpiSeams<T extends object>(pi: T): T {
+  for (const path of absentSenpiSeams(pi)) {
+    const keys = path.split(".")
+    const last = keys.pop() ?? path
+    let holder: object = pi
+    for (const key of keys) {
+      const next: unknown = Reflect.get(holder, key)
+      if (typeof next === "object" && next !== null) holder = next
+      else { const created = {}; Reflect.set(holder, key, created); holder = created }
+    }
+    const kind = SENPI_SEAMS[path as keyof typeof SENPI_SEAMS]
+    Reflect.set(holder, last, kind === "function" ? () => undefined : kind === "object" ? {} : kind === "string" ? "/" : undefined)
+  }
+  return pi
 }

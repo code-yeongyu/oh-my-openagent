@@ -208,9 +208,10 @@ sg completions powershell >> $PROFILE
 sg run -p 'console.log($_)' --lang ts --json=compact . \
   | jq -r '.[].file' | sort | uniq -c | sort -rn
 
-# Find all unique kinds in a file (great for figuring out kind names)
-sg run -p '$_' --lang ts --debug-query=cst src/foo.ts \
-  | grep -oE 'kind: [a-z_]+' | sort -u
+# Find all unique kinds in a file (great for figuring out kind names).
+# --debug-query dumps the PATTERN's tree to stderr, so pass the file's code as the pattern.
+sg run -p "$(cat src/foo.ts)" --lang ts --debug-query=ast src/foo.ts 2>&1 >/dev/null \
+  | grep -oE '[a-z_]+ \(' | tr -d ' (' | sort -u
 
 # Rewrite only in a subset of files
 sg run -p 'foo()' -r 'bar()' --update-all --globs 'src/**/*.ts' --globs '!src/legacy/**' .

@@ -68,11 +68,13 @@ export function installRuntimeFallbackTestClock(startAt = Date.now()): RuntimeFa
   const clock: RuntimeFallbackTestClock = {
     advanceBy: async (ms: number) => {
       const target = now + ms
+      let fired = 0
       while (true) {
         const timer = timers
           .filter((candidate) => candidate.active && candidate.dueAt <= target)
           .sort((left, right) => left.dueAt - right.dueAt)[0]
         if (!timer) break
+        if (++fired > 10_000) throw new Error("fake clock fired more than 10000 timers in one advance: a timer keeps rescheduling itself")
 
         now = timer.dueAt
         timer.active = false

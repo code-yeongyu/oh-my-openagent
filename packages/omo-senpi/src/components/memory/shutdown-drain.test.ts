@@ -7,6 +7,7 @@ import { rmEfaultTolerant } from "./teardown.test-support"
 
 import { TranscriptJournal, resolveMemoryIdentity, type TranscriptEntry } from "@oh-my-opencode/memory-core"
 
+import { SettingsManager } from "../../senpi-test-runtime"
 import type { ComponentLogger } from "../../extension/types"
 import { createMemoryComponent } from "./index"
 import { componentContext, loadedMemoryConfig, memorySettings, MemoryFakeExtensionAPI, sessionContext } from "./memory.test-support"
@@ -517,5 +518,56 @@ describe("session shutdown drain budget", () => {
     // then
     expect(order).toEqual(["b", "c-prime"])
     expect(warnings).toHaveLength(1)
+  })
+})
+
+// senpi bounds one `session_shutdown` handler with three settings whose DEFAULTS come from the host
+// itself: a warn threshold, a per-handler hard timeout, and a total quit budget across handlers
+// (senpi#3711). Users can retune each - `sessionShutdownHandlerWarnMs`,
+// `sessionShutdownHandlerTimeoutMs`, `sessionShutdownQuitBudgetMs` - and 0 turns a bound off, so the
+// fit below is stated against the defaults and read from the installed senpi rather than restated
+// here: a senpi release that lowers a default under the drain budget must fail this test.
+const senpiShutdownBudget = SettingsManager.inMemory({})
+
+describe("session shutdown drain against senpi's per-handler cap", () => {
+  test("#given senpi's session_shutdown handler defaults #when the drain budget is sized #then it sits below the warn threshold, the handler timeout and the quit budget", () => {
+    // given
+    const budget = SESSION_SHUTDOWN_DRAIN_BUDGET_MS
+
+    // when: senpi's own numbers, read through senpi's own settings manager
+    const warnMs = senpiShutdownBudget.getSessionShutdownHandlerWarnMs()
+    const timeoutMs = senpiShutdownBudget.getSessionShutdownHandlerTimeoutMs()
+    const quitBudgetMs = senpiShutdownBudget.getSessionShutdownQuitBudgetMs()
+
+    // then: under the host's shipped defaults the drain, and the teardown that follows it inside the
+    // same handler, finish before any of the three bounds can bite. omo adds no cap of its own.
+    expect(warnMs).toBeGreaterThan(0)
+    expect(timeoutMs).toBeGreaterThan(warnMs)
+    expect(quitBudgetMs).toBeGreaterThan(0)
+    expect(budget).toBeGreaterThan(0)
+    expect(budget).toBeLessThan(warnMs)
+    expect(budget).toBeLessThan(timeoutMs)
+    expect(budget).toBeLessThan(quitBudgetMs)
+  })
+
+  test("#given several shutdown evaluators that all stall forever #when quit drains #then only the first is admitted and the run stays inside the budget", async () => {
+    // given
+    const order: string[] = []
+    let clock = 0
+    const drain = createShutdownDrain({ steps: recordingSteps(order) })
+    for (let index = 1; index <= 3; index += 1) {
+      drain.registerEvaluator(async () => {
+        order.push(`d${index}`)
+        clock = SESSION_SHUTDOWN_DRAIN_BUDGET_MS
+        await new Promise<void>(() => {})
+      })
+    }
+
+    // when
+    await drain.run({ reason: "quit", sessionId: SESSION, deadlineAt: shutdownDeadlineAt(() => 0), now: () => clock })
+
+    // then: the budget admits the first stalling handler only - d2 and d3 never start - so the drain
+    // ends inside its own budget, which the test above pins under senpi's default bounds
+    expect(order).toEqual(["a", "b", "c-prime", "d1"])
   })
 })

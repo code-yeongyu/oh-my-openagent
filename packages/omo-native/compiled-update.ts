@@ -1,10 +1,11 @@
 import { spawnSync } from "node:child_process"
 import { realpathSync } from "node:fs"
 import { updateUsageAnswer } from "./bin/lib/update-args.js"
+import { isProvisionedExecutable } from "./compile-runtime"
 
 export const RELEASES_URL = "https://github.com/code-yeongyu/oh-my-openagent/releases"
 const RELEASES_API = "https://api.github.com/repos/code-yeongyu/oh-my-openagent/releases?per_page=100"
-const RELEASE_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$/
+export const RELEASE_VERSION = /^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$/
 const RELEASE_TARGET = /^(?:darwin|linux|windows)-(?:x64|arm64)(?:-musl)?(?:-baseline)?$/
 
 export type FetchReleases = () => Promise<unknown>
@@ -53,6 +54,11 @@ export function pickUpdateVersion(currentVersion: string, releases: unknown, ass
   }
   if (newest === undefined) throw new Error(`no ${stableOnly ? "stable " : ""}release ships ${asset}`)
   return Bun.semver.order(newest, currentVersion) > 0 ? newest : undefined
+}
+
+// The documented installer. It replaces the launcher in its install dir (OMO_INSTALL_DIR, default ~/.local/bin).
+export function installCommand(platform: NodeJS.Platform): string {
+  return platform === "win32" ? "irm https://get.omo.dev/install.ps1 | iex" : "curl -fsSL https://get.omo.dev/install.sh | bash"
 }
 
 const posixQuote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
@@ -120,6 +126,8 @@ export async function compiledUpdate(options: {
   readonly omoAiVersion: string
   readonly releaseTarget: unknown
   readonly destination: string
+  /** The provisioned runtime executable under ~/.omo/binary-runtime/<version>/. */
+  readonly provisioned?: string
   readonly platform: NodeJS.Platform
   readonly arch: string
   readonly fetchReleases: FetchReleases
@@ -142,6 +150,15 @@ export async function compiledUpdate(options: {
     return { output: `omo update could not resolve a release (${reason}). Download ${asset} from ${RELEASES_URL}`, exitCode: 1 }
   }
   if (target === undefined) return { output: `omo ${current} is the newest ${current.includes("-") ? "beta" : "stable"} release`, exitCode: 0 }
+  // The launcher rewrites its runtime copy on every launch, so a replace command aimed there is undone
+  // by the next run. Reached only when the runtime copy was started directly, without a launcher.
+  if (options.provisioned !== undefined && isProvisionedExecutable(options.destination, options.provisioned)) {
+    return {
+      output: `omo ${target} is available (running ${current}), but ${options.destination} is the provisioned runtime copy, not the installed omo. Update the installed omo with:\n${installCommand(options.platform)}`,
+      exitCode: 1,
+      stream: "stderr",
+    }
+  }
   const command = replaceCommand(`${RELEASES_URL}/download/v${target}/${asset}`, options.destination, options.platform)
   return { output: `omo ${target} is available (running ${current}). Replace this binary with:\n${command}`, exitCode: 0 }
 }

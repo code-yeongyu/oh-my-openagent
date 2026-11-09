@@ -16,7 +16,8 @@ import {
   toPortableBuildPath,
 } from "./build-extension.mjs"
 import { npmPackStage, runBoundedStage, systemTar } from "./bounded-stage.test-support.mjs"
-import { createBuildFixture } from "./build-extension.test-support.mjs"
+import { createBuildFixture, outputPathsIn } from "./build-extension.test-support.mjs"
+import { SENPI_ASTRA_ULTRAWORK_DIRECTIVE, SENPI_ULTRAWORK_DIRECTIVE } from "../../src/components/ultrawork/generated-directive.ts"
 import { runtimePersonaSources } from "./persona-artifacts.mjs"
 import { removeTestRootBestEffort } from "../../../../test-support/held-test-root.mjs"
 
@@ -215,6 +216,27 @@ describe("checkExtensionCurrent", () => {
     expect(advisorRuntime).not.toMatch(/^[\t ]+$/m)
   })
 
+  // Generated payload confinement (#9913): the shared directive parts are dropped from every bundle
+  // that imports the ultrawork module without using the directives. The probe is a line both
+  // directives share, read from the generated module rather than pinned here.
+  test("#given the split extension build #when bundles are inspected #then only the main entry carries the ultrawork directive text", async () => {
+    // given
+    const outputs = await sharedOutputs()
+    const sharedLine = SENPI_ULTRAWORK_DIRECTIVE.split("\n")
+      .filter((line) => /^[A-Za-z0-9 ,.:;()-]+$/.test(line) && SENPI_ASTRA_ULTRAWORK_DIRECTIVE.includes(line))
+      .sort((left, right) => right.length - left.length)[0]
+
+    // when
+    const carriers = []
+    for (const [name, path] of Object.entries(outputPathsIn(outputs.root))) {
+      if ((await readFile(path, "utf8")).includes(sharedLine)) carriers.push(name)
+    }
+
+    // then
+    expect(sharedLine.length).toBeGreaterThan(40)
+    expect(carriers).toEqual(["outputPath"])
+  })
+
   test("#given the split extension build #when metafile inputs are inspected #then task sources live only in the lazy sidecar", async () => {
     // given / when
     const { mainInputs, taskInputs } = await sharedOutputs()
@@ -344,6 +366,14 @@ describe("checkExtensionCurrent", () => {
       "packages/omo-senpi/src/components/memory/commands/memory-unlock.ts",
       "packages/omo-senpi/src/components/memory/commands/search.ts",
       "packages/omo-senpi/src/components/memory/commands/facts.ts",
+      // A dream fire loads its conversation selection from this sidecar (keeps omo.js inside its byte budget).
+      "packages/omo-senpi/src/components/memory/dream-selector.ts",
+      // The maintenance pass loads runtime retention and the host sweep from this sidecar when one is due (keeps omo.js inside its byte budget).
+      "packages/omo-senpi/src/components/memory/memory-retention-pass.ts",
+      // A finalized dream or reflection run loads the archive link repair (#12642) from this sidecar (keeps omo.js inside its byte budget).
+      "packages/memory-core/src/reflection/completion-links.ts",
+      "packages/memory-core/src/reflection/link-removals.ts",
+      "packages/memory-core/src/reflection/link-rewrite.ts",
     ]) {
       expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
       expect(memoryCommandsInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
@@ -377,6 +407,20 @@ describe("checkExtensionCurrent", () => {
       expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
       expect(deviceAccountInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
     }
+  })
+
+  test("#given the split extension build #when device-service inputs are inspected #then the start-up bootstrap runtime loads only from its lazy entry", async () => {
+    const { mainInputs, deviceServiceInputs, deviceServiceOutputPath, outputPath } = await sharedOutputs()
+    for (const suffix of [
+      "packages/omo-senpi/src/components/device-service/runtime.ts",
+      "packages/omo-senpi/src/components/device-service/runner.ts",
+    ]) {
+      expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
+      expect(deviceServiceInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
+    }
+    expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith("packages/omo-senpi/src/components/device-service/index.ts"))).toBe(true)
+    expect(await readFile(outputPath, "utf8")).toContain('import("#omo-device-service-runtime")')
+    expect(await readFile(deviceServiceOutputPath, "utf8")).not.toContain("#omo-device-service-runtime")
   })
 
   test("#given the split extension build #when onboarding inputs are inspected #then the session-history scan loads only from its lazy entry", async () => {
@@ -518,6 +562,7 @@ describe("checkExtensionCurrent", () => {
     expect(main).toContain('import("#omo-memory-memfs-runtime")')
     expect(main).toContain('import("#omo-memory-palace-runtime")')
     expect(main).toContain('import("#omo-memory-commands-runtime")')
+    expect(main).toContain('import("#memory-completion-links")')
     expect(main).toContain('import("#omo-device-account-runtime")')
     expect(main).toContain('import("#omo-session-history-runtime")')
     expect(main).toContain('import("#omo-recall-store-runtime")')
@@ -543,10 +588,12 @@ describe("checkExtensionCurrent", () => {
       "#omo-memory-memfs-runtime": "./extensions/omo-memory-memfs.js",
       "#omo-memory-palace-runtime": "./extensions/omo-memory-palace.js",
       "#omo-memory-commands-runtime": "./extensions/omo-memory-commands.js",
+      "#memory-completion-links": "./extensions/omo-memory-commands.js",
       "#omo-device-account-runtime": "./extensions/omo-device-account.js",
       "#omo-session-history-runtime": "./extensions/omo-session-history.js",
       "#omo-recall-store-runtime": "./extensions/omo-recall-store.js",
       "#memory-external-projection": "./extensions/omo-recall-store.js",
+      "#omo-device-service-runtime": "./extensions/omo-device-service.js",
       "#omo-telemetry-posthog-runtime": "./extensions/omo-telemetry-posthog.js",
       "#omo-telemetry-otlp-runtime": "./extensions/omo-telemetry-otlp.js",
       "#omo-memory-sync-runtime": "./extensions/omo-memory-sync.js",
@@ -557,6 +604,7 @@ describe("checkExtensionCurrent", () => {
       "#omo-telemetry-recovery-runtime": "./extensions/omo-telemetry-recovery.js",
       "#telemetry-immediate-send": "./extensions/omo-telemetry-recovery.js",
       "#omo-agent-toolkit-sdk": "./runtime/agent-toolkit-sdk/sdk.js",
+      "#bunshin-ts": "./runtime/bunshin-ts/sdk.js",
     })
   })
 })

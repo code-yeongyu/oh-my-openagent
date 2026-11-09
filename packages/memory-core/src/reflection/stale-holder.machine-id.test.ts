@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
+import { spawnSync } from "node:child_process"
 
-import { createMachineIdResolver, createPlatformUuidReader, parsePlatformUuid } from "./stale-holder"
+import { createMachineIdResolver, parsePlatformUuid } from "./stale-holder"
 
 describe("machine id resolver", () => {
   test("#given a probe that cannot answer #when it recovers #then the failure was not cached", async () => {
@@ -54,20 +55,14 @@ describe("platform uuid parse", () => {
 })
 
 describe("platform uuid reader", () => {
-  test("#given a sanitised PATH-less environment #when the uuid is read #then ioreg is invoked by absolute path", async () => {
-    const calls: Array<{ command: string; args: readonly string[]; timeoutMs: number }> = []
-    const read = createPlatformUuidReader(async (command, args, timeoutMs) => {
-      calls.push({ command, args, timeoutMs })
-      return `      "IOPlatformUUID" = "C79FE553-52A7-5542-9639-3A49B5C119CD"\n`
-    })
+  test.if(process.platform === "darwin")("#given an empty PATH #when the production probe runs #then it returns the machine id", () => {
+    const source = new URL("./stale-holder.ts", import.meta.url).href
+    const result = spawnSync(process.execPath, [
+      "-e",
+      `import { getStableLocalHostId } from ${JSON.stringify(source)}; console.log(await getStableLocalHostId())`,
+    ], { encoding: "utf8", env: { ...process.env, PATH: "" }, timeout: 10_000 })
 
-    expect(await read()).toBe("C79FE553-52A7-5542-9639-3A49B5C119CD")
-    expect(calls).toEqual([
-      { command: "/usr/sbin/ioreg", args: ["-rd1", "-c", "IOPlatformExpertDevice"], timeoutMs: 1_000 },
-    ])
-  })
-
-  test("#given a runner that cannot answer #when the uuid is read #then there is no uuid", async () => {
-    expect(await createPlatformUuidReader(async () => null)()).toBeNull()
+    expect(result.status, result.stderr).toBe(0)
+    expect(result.stdout.trim()).toMatch(/^darwin-uuid:[0-9A-Fa-f-]{36}$/)
   })
 })

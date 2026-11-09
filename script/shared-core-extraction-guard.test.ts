@@ -20,7 +20,8 @@ const forbiddenSourcePatterns: readonly ForbiddenSourcePattern[] = [
   { pattern: /plugin\/components/ },
   {
     pattern: /\b(?:SessionStart|UserPromptSubmit|PreToolUse|PostToolUse|PostCompact|Stop|SubagentStop)\b/,
-    allowPackagePaths: ["packages/claude-code-compat-core"],
+    // The device-service local API's Windows DACL code runs PowerShell with $ErrorActionPreference = 'Stop'; it names no hook.
+    allowPackagePaths: ["packages/claude-code-compat-core", "packages/device-service-core/src/local-api", "packages/device-service-core/test/local-api"],
   },
   { pattern: /\bsession\.prompt(?:Async)?\s*\(/ },
 ] as const

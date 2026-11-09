@@ -3,11 +3,73 @@
 import { afterEach, describe, expect, it } from "bun:test"
 
 import { createDesktopToolkitComponent, TOOLKIT_GRANT_RPC, TOOLKIT_REQUEST_EVENT } from "./index"
-import { cleanup, content, execute, mcp, schema, setup } from "./thread-tools-test-support"
+import { cleanup, content, execute, mcp, schema, session, setup } from "./thread-tools-test-support"
 
 afterEach(cleanup)
 
+const ATTACHED = {
+  name: "render_page",
+  description: "Render a host page.",
+  inputSchema: schema,
+  _meta: { "senpi/host-tool": { name: "host_page", label: "Host page", exposure: "search", allowLazyActivation: true } },
+}
+
+function routeOf(routes: readonly unknown[]): ((...args: unknown[]) => Promise<unknown>) | undefined {
+  const last = routes.at(-1)
+  if (typeof last !== "object" || last === null || !("execute" in last) || typeof last.execute !== "function") return undefined
+  const execute = last.execute
+  return (...args) => Promise.resolve(Reflect.apply(execute, undefined, args))
+}
+
 describe("desktop thread toolkit", () => {
+  for (const { ending, mcpOptions, reply } of [
+    { ending: "refused grant", mcpOptions: {}, reply: () => ({ refusal: { reason: "unavailable" } }) },
+    { ending: "timed-out grant", mcpOptions: {}, reply: () => undefined },
+    { ending: "failed discovery", mcpOptions: { listFailure: true }, reply: "grant" as const },
+  ]) {
+    it(`#11897: a ${ending} sets no host route and registers no second tool`, async () => {
+      const stub = await mcp({ ...mcpOptions, tools: [ATTACHED] })
+      const host = await setup({
+        timeoutMs: 50, offer: "host", hostToolNames: "host_page",
+        reply: reply === "grant" ? () => ({ grant: stub.grant }) : reply,
+      })
+      await host.start()
+      expect(host.routes).toEqual([])
+      expect(host.pi.tools.map((tool) => tool.name)).not.toContain("host_page")
+    })
+  }
+
+  it("#11897: a confirmed grant routes the declared callable to the host and keeps details out of model content", async () => {
+    const details = { html: "<p>host-only-page</p>", title: "Page", height: 300, prepared: true, path: "/work/.senpi/html-pages/page.html" }
+    const stub = await mcp({ tools: [ATTACHED], callResult: { content, _meta: { "senpi/tool-result-details": details } } })
+    const host = await setup({ offer: "host", hostToolNames: "host_page", reply: () => ({ grant: stub.grant }) })
+    await host.start()
+    expect(host.pi.tools.map((tool) => tool.name)).not.toContain("host_page")
+    expect(host.routes).toHaveLength(1)
+    expect(host.routes[0]).toMatchObject({ name: "host_page" })
+    const route = routeOf(host.routes)
+    if (route === undefined) throw new Error("no host route")
+    const result = await route("call-1", { title: "Grouped" }, undefined, undefined, session("A"))
+    expect(result).toEqual({ content, details })
+    expect(JSON.stringify(content)).not.toContain("host-only-page")
+    expect(stub.requests.filter((request) => request.method === "tools/call")).toEqual([
+      { method: "tools/call", params: { name: "render_page", arguments: { title: "Grouped" } }, authorized: true },
+    ])
+    await host.shutdown()
+    expect(host.routes.at(-1)).toEqual({ name: "host_page" })
+  })
+
+  it("#11897: a lost grant makes the route report unavailable so senpi runs the standalone tool", async () => {
+    const stub = await mcp({ tools: [ATTACHED], callFailure: true })
+    const host = await setup({ offer: "host", hostToolNames: "host_page", reply: () => ({ grant: stub.grant }) })
+    await host.start()
+    const route = routeOf(host.routes)
+    if (route === undefined) throw new Error("no host route")
+    await expect(route("call-1", { title: "Grouped" }, undefined, undefined, session("A"))).rejects.toMatchObject({ name: "HostToolRouteUnavailable" })
+    await expect(route("call-2", { title: "Grouped" }, undefined, undefined, session("B"))).rejects.toMatchObject({ name: "HostToolRouteUnavailable" })
+    expect(JSON.stringify(host.logs)).not.toContain(stub.token())
+  })
+
   it("#given no thread offer #when session starts #then no request or desktop tool", async () => {
     const host = await setup({ offer: "browser" })
     await host.start()

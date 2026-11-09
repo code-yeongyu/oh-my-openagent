@@ -57,6 +57,15 @@ export type RemoveInput = {
 	readonly onEvent?: (event: RecoveryEvent) => void;
 };
 
+/** The epochs at which `credentialId` was removed (a credential id is enrolled at most once). */
+const removalEpochs = (state: ChainState, credentialId: string): number[] =>
+	state.history.flatMap((record, index) =>
+		record.body.kind === "recovery-key-removed" &&
+		record.body.credentialId === credentialId
+			? [state.received[index]?.epoch ?? 0]
+			: [],
+	);
+
 /** A removal recorded at the current epoch with no rotation after it: the retry resumes there. */
 const removalPending = (
 	state: ChainState,
@@ -64,12 +73,19 @@ const removalPending = (
 	credentialId: string,
 ): boolean =>
 	!authority.registry.has(credentialId) &&
-	state.history.some(
-		(record, index) =>
-			record.body.kind === "recovery-key-removed" &&
-			record.body.credentialId === credentialId &&
-			state.received[index]?.epoch === authority.epoch,
-	);
+	removalEpochs(state, credentialId).includes(authority.epoch);
+
+/**
+ * A removal followed by a rotation, which wraps only the folded registry: the key is already
+ * excluded. Another member's generic rotation on revoke may be the one that landed (#12280).
+ */
+const removalRotated = (
+	state: ChainState,
+	authority: Authority,
+	credentialId: string,
+): boolean =>
+	!authority.registry.has(credentialId) &&
+	removalEpochs(state, credentialId).some((epoch) => epoch < authority.epoch);
 
 /**
  * Removes one recovery key (sync-design section 7): a member-signed `recovery-key-removed` record,
@@ -105,6 +121,18 @@ export const removeRecoveryKey = async (
 			input.keyring.publicKeys().signing
 	) {
 		return { ok: false, reason: "not-member" };
+	}
+	if (removalRotated(served.state, authority, input.credentialId)) {
+		input.onEvent?.("sync.recovery.removed");
+		return {
+			ok: true,
+			epoch: authority.epoch,
+			platformSignal:
+				input.bridge === null
+					? "unsupported"
+					: await input.bridge.signalRemoved(input.rpId, input.credentialId),
+			deleteFromPasskeyManager: true,
+		};
 	}
 	const resuming = removalPending(served.state, authority, input.credentialId);
 	if (!resuming && !authority.registry.has(input.credentialId))

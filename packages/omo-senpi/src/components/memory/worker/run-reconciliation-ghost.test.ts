@@ -8,6 +8,7 @@ import { writeRunJsonAtomic } from "./run-artifacts"
 import { reconcileReflectionRuns } from "./run-reconciliation"
 import {
   cleanupReconciliationFixtures,
+  FIXTURE_HOST,
   reconciliationFixture as fixture,
 } from "./run-reconciliation.test-support"
 
@@ -17,7 +18,7 @@ const OLDER_STARTED_AT = "2026-08-09T23:59:54.000Z"
 
 function deadLauncher() {
   return {
-    hostname: () => "fixture-host",
+    hostname: () => FIXTURE_HOST,
     now: () => Date.parse("2026-08-10T00:01:01.001Z"),
     getPidLiveness: () => "dead" as const,
   }
@@ -25,7 +26,7 @@ function deadLauncher() {
 
 function liveLauncher() {
   return {
-    hostname: () => "fixture-host",
+    hostname: () => FIXTURE_HOST,
     now: () => Date.parse("2026-08-10T00:01:01.001Z"),
     getPidLiveness: (pid: number) => pid === 111 || pid === 222 ? "alive" as const : "dead" as const,
     getProcessStartIdentity: async (pid: number) => pid === 111 ? "launcher-start" : pid === 222 ? "supervisor-two" : null,
@@ -76,6 +77,39 @@ describe("ghost active reservation reconciliation", () => {
     // then
     expect(results).toEqual([])
     expect((await item.store.readState()).active?.runId).toBe("run-orphan")
+    expect(retiredArtifactsIntact(item)).toBe(true)
+  }, 30_000)
+
+  test("#given a local machine id but no hostname #when its launcher is alive #then the reservation is kept", async () => {
+    const item = await fixture()
+    await writeRunJsonAtomic(join(item.runDir, "ledger.json"), { ...item.ledger, ...LIVE_SUPERVISOR_LEDGER })
+    const lock = join(item.identity.paths.reflection, "active.lock")
+    const active = JSON.parse(await readFile(lock, "utf8"))
+    delete active.launcherHostname
+    await writeFile(lock, JSON.stringify({ ...active, launcherHostId: "local-machine" }))
+
+    const results = await reconcileReflectionRuns({
+      identity: item.identity, reservation: item.store, ...liveLauncher(), hostId: () => "local-machine",
+    })
+
+    expect(results).toEqual([])
+    expect((await item.store.readState()).active?.runId).toBe("run-orphan")
+    expect(retiredArtifactsIntact(item)).toBe(true)
+  }, 30_000)
+
+  test("#given a local machine id but no hostname #when its launcher is dead #then the reservation is reclaimed", async () => {
+    const item = await fixture()
+    const lock = join(item.identity.paths.reflection, "active.lock")
+    const active = JSON.parse(await readFile(lock, "utf8"))
+    delete active.launcherHostname
+    await writeFile(lock, JSON.stringify({ ...active, launcherHostId: "local-machine" }))
+
+    const results = await reconcileReflectionRuns({
+      identity: item.identity, reservation: item.store, ...deadLauncher(), hostId: () => "local-machine",
+    })
+
+    expect(results).toEqual([{ runId: "run-orphan", outcome: "failed" }])
+    expect((await item.store.readState()).active).toBeUndefined()
     expect(retiredArtifactsIntact(item)).toBe(true)
   }, 30_000)
 

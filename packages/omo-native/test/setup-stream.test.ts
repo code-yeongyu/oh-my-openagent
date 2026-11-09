@@ -175,3 +175,115 @@ describe("setup-stream", () => {
     expect(auth.anthropic).toBeUndefined()
   })
 })
+
+describe("setup-stream commandcode", () => {
+  // A home with no OpenCode config at all: the Command Code preset is setup's own finding.
+  function commandCodeFixture(env: Record<string, string>): Fixture {
+    const root = mkdtempSync(join(tmpdir(), "omo-setup-stream-cc-"))
+    roots.push(root)
+    const home = join(root, "home")
+    return { home, agentDir: join(home, ".omo", "agent"), env: { HOME: home, ...env } }
+  }
+
+  const SENTINEL = "SK-CMD-SENTINEL-STREAM"
+
+  test("#given no OpenCode config and CMD_API_KEY set #when the scan plans with custom providers on #then the providers stage plans the Command Code preset", async () => {
+    // given
+    const { home, agentDir, env } = commandCodeFixture({ CMD_API_KEY: SENTINEL })
+
+    // when
+    const results = await drain(scanSetup({ home, env }, agentDir, { includeCustomProviders: true }))
+
+    // then
+    const providers = results.find((result) => result.source === "providers")
+    expect(providers?.items).toContainEqual({ id: "commandcode", kind: "provider", state: "import", detail: "12 model(s)" })
+    // Items travel over RPC: a key never rides in one.
+    expect(JSON.stringify(results.map((result) => result.items))).not.toContain(SENTINEL)
+  })
+
+  test("#given collected plans #when apply accepts them #then one commandcode entry lands in models.json with both wires, and the key lands in auth.json as the env reference", async () => {
+    // given
+    const { home, agentDir, env } = commandCodeFixture({ CMD_API_KEY: SENTINEL })
+    const { plans } = await collectSetupPlans(scanSetup({ home, env }, agentDir, { includeCustomProviders: true }))
+
+    // when
+    const applied = await applySetupStages(plans, (stage) => stage.id === "providers", () => {})
+
+    // then
+    expect([...applied]).toEqual(["providers"])
+    const models = JSON.parse(readFileSync(join(agentDir, "models.json"), "utf8")).providers
+    expect(Object.keys(models)).toEqual(["commandcode"])
+    expect(models.commandcode.name).toBe("Command Code")
+    expect(models.commandcode.baseUrl).toBe("https://api.commandcode.ai/provider/v1")
+    expect(models.commandcode.api).toBe("openai-completions")
+    expect(models.commandcode.models.length).toBeGreaterThanOrEqual(8)
+    const claude = models.commandcode.models.find((model: { id: string }) => model.id === "claude-sonnet-4-6")
+    expect(claude.api).toBe("anthropic-messages")
+    expect(claude.baseUrl).toBe("https://api.commandcode.ai/provider")
+    expect(claude.maxTokens).toBe(32000)
+    expect(models.commandcode.models.some((model: { id: string }) => model.id === "deepseek/deepseek-v4-pro")).toBe(true)
+    // The engine interpolates the `${NAME}` reference; the env value itself is never stored.
+    const authText = readFileSync(join(agentDir, "auth.json"), "utf8")
+    expect(JSON.parse(authText).commandcode).toEqual({ type: "api_key", key: `\${CMD_API_KEY}` })
+    expect(readFileSync(join(agentDir, "models.json"), "utf8")).not.toContain(SENTINEL)
+    expect(authText).not.toContain(SENTINEL)
+  })
+
+  test("#given only COMMANDCODE_API_KEY #then it is used, and #given both #then CMD_API_KEY wins", async () => {
+    // given
+    const { home, agentDir, env } = commandCodeFixture({ COMMANDCODE_API_KEY: SENTINEL })
+    const { plans } = await collectSetupPlans(scanSetup({ home, env }, agentDir, { includeCustomProviders: true }))
+
+    // then
+    const providers = plans.providers as { result: { added: Array<{ id: string; key: { source: string } }> } }
+    expect(providers.result.added[0]?.id).toBe("commandcode")
+    expect(providers.result.added[0]?.key.source).toBe("environment variable COMMANDCODE_API_KEY")
+
+    // given: both env vars set
+    const both = await drain(scanSetup({ home, env: { ...env, CMD_API_KEY: SENTINEL } }, agentDir, { includeCustomProviders: true }))
+    const providersBoth = both.find((result) => result.source === "providers")
+    expect(providersBoth?.items).toContainEqual(expect.objectContaining({ id: "commandcode", state: "import" }))
+  })
+
+  test("#given no key env var #when the scan plans #then nothing is planned for Command Code", async () => {
+    // given
+    const { home, agentDir, env } = commandCodeFixture({})
+
+    // when
+    const results = await drain(scanSetup({ home, env }, agentDir, { includeCustomProviders: true }))
+
+    // then
+    const providers = results.find((result) => result.source === "providers")
+    expect(providers?.items).toEqual([])
+    expect(providers?.plan.pending).toBe(0)
+    expect(existsSync(join(agentDir, "models.json"))).toBe(false)
+  })
+
+  test("#given the user's own provider.commandcode block in OpenCode #when the scan plans #then their entry wins and the preset is not added behind it", async () => {
+    // given
+    const root = mkdtempSync(join(tmpdir(), "omo-setup-stream-cc-"))
+    roots.push(root)
+    const home = join(root, "home")
+    write(join(home, ".config", "opencode", "opencode.json"), JSON.stringify({
+      provider: { commandcode: { npm: "@ai-sdk/openai-compatible", options: { baseURL: "https://mine.example/v1", apiKey: "their-key" }, models: { m1: {} } } },
+    }))
+    const agentDir = join(home, ".omo", "agent")
+
+    // when
+    const { plans } = await collectSetupPlans(scanSetup({ home, env: { HOME: home, CMD_API_KEY: SENTINEL } }, agentDir, { includeCustomProviders: true }))
+
+    // then
+    const providers = plans.providers as { result: { added: Array<{ id: string; config: { baseUrl: string } }> } }
+    expect(providers.result.added.map((provider) => provider.id)).toEqual(["commandcode"])
+    expect(providers.result.added[0]?.config.baseUrl).toBe("https://mine.example/v1")
+
+    // when
+    await applySetupStages(plans, (stage) => stage.id === "providers", () => {})
+
+    // then
+    const models = JSON.parse(readFileSync(join(agentDir, "models.json"), "utf8")).providers
+    expect(models.commandcode.baseUrl).toBe("https://mine.example/v1")
+    expect(models.commandcode.models.map((model: { id: string }) => model.id)).toEqual(["m1"])
+    expect(JSON.parse(readFileSync(join(agentDir, "auth.json"), "utf8")).commandcode).toEqual({ type: "api_key", key: "their-key" })
+  })
+})

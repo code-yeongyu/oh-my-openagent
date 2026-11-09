@@ -30,6 +30,8 @@ export async function createSenpiOtlpTransport(
   const version = typeof properties["package_version"] === "string" ? properties["package_version"] : "0.0.0"
   const os = platform()
   const machineArch = arch()
+  let rejected = false
+  let stopping: Promise<void> | undefined
   const transport = await createOtlpTelemetryTransport({
     productEnvPrefix: "OMO_SENPI",
     ingestKey,
@@ -40,8 +42,7 @@ export async function createSenpiOtlpTransport(
     diagnostics: input.diagnostics,
     source: input.source,
     ...(explicitKey ? {} : (() => {
-      // After a 401 the key is dead for this process: answer later batches locally instead of resending them.
-      let rejected = false
+      // Keep in-flight batches local while the core transport's shutdown settles.
       return {
         fetch: async (url: string, init: RequestInit) => {
           if (rejected) return new Response(null, { status: 401 })
@@ -49,6 +50,8 @@ export async function createSenpiOtlpTransport(
           if (response.status === 401) {
             rejected = true
             invalidateInstallIngestKey(spoolRoot, ingestKey)
+            // Do not await: shutdown's final flush is waiting for this response.
+            stopping = transport?.shutdown()
           }
           return response
         },
@@ -77,8 +80,13 @@ export async function createSenpiOtlpTransport(
   if (transport === null) return null
   return {
     ...transport,
+    async flush() {
+      await (stopping ?? transport.flush())
+      await stopping
+    },
+    shutdown: () => stopping ?? transport.shutdown(),
     capture(value) {
-      if (isOtlpEvent(value.event)) transport.capture(value)
+      if (!rejected && isOtlpEvent(value.event)) transport.capture(value)
     },
   }
 }

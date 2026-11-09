@@ -6,7 +6,8 @@ import { AdmissionBarrier } from "../../../../senpi-task/src/pause/admission-bar
 import type { EnginePauseState, ObservedHold } from "../../../../senpi-task/src/pause/ports"
 import { PauseRegistry, type PauseParticipant } from "../../../../senpi-task/src/pause/registry"
 import { RunPauseController, type RunPauseEffects } from "../../../../senpi-task/src/pause/run-controller"
-import { EngineRunPauseBridge } from "./run-pause-bridge"
+import { EngineRunPauseBridge, type LostParticipantRecovery } from "./run-pause-bridge"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const roots: string[] = []
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
@@ -19,7 +20,7 @@ const child: PauseParticipant = {
   state: "pending", at: "2026-01-01T00:00:00.000Z",
 }
 
-function hostOver(overrides: Partial<RunPauseEffects>) {
+function hostOver(overrides: Partial<RunPauseEffects>, lostRecovery?: LostParticipantRecovery) {
   const root = mkdtempSync(join(tmpdir(), "run-pause-lost-"))
   roots.push(root)
   const barrier = new AdmissionBarrier()
@@ -41,7 +42,7 @@ function hostOver(overrides: Partial<RunPauseEffects>) {
     ...overrides,
   }
   let live: EnginePauseState = stopped(7)
-  const bridge = new EngineRunPauseBridge(new RunPauseController(registry, effects), { getPauseState: () => live })
+  const bridge = new EngineRunPauseBridge(new RunPauseController(registry, effects), { getPauseState: () => live }, undefined, lostRecovery)
   return { barrier, registry, bridge, resumed, setState: (next: EnginePauseState) => { live = next } }
 }
 
@@ -80,6 +81,60 @@ test("delta M1: a lost child with no live hold at Resume is left alone and admis
   expect(h.resumed).toEqual([])
   expect(h.registry.require(PARENT).participants.st_b?.state).toBe("lost")
   expect(h.barrier.state(PARENT)).toEqual({ kind: "open" })
+})
+
+function within<T>(promise: Promise<T>, what: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const deadline = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error(`waited out the test budget for ${what}`)), remainingTestTime()) })
+  return Promise.race([promise, deadline]).finally(() => clearTimeout(timer))
+}
+
+function restoreFailure(): Error {
+  return new Error("paused child st_b restore failed (respawn_failed): rpc respawn failed")
+}
+
+test("#12249: a child a released Resume could not restore is retried on the schedule, then its run is ended with the reason", async () => {
+  const slept: number[] = []
+  const ended = Promise.withResolvers<{ readonly key: string; readonly reason: string }>()
+  let attempts = 0
+  const h = hostOver({
+    pause: async () => ({ kind: "held", childSeq: 0 }),
+    resume: async () => { attempts += 1; throw restoreFailure() },
+    endLost: async (participant, reason) => { ended.resolve({ key: participant.key, reason }); return true },
+  }, { delaysMs: [5, 30], sleep: async ms => { slept.push(ms) } })
+
+  await stopThenResume(h)
+  const result = await within(ended.promise, "the lost run to be ended")
+
+  expect(result.key).toBe("st_b")
+  expect(result.reason).toContain("respawn_failed")
+  expect(slept).toEqual([5, 30])
+  expect(attempts).toBe(3)
+  expect(h.barrier.state(PARENT)).toEqual({ kind: "open" })
+})
+
+test("#12249: a retry that reaches the lost child resumes it and never ends its run", async () => {
+  const retried = Promise.withResolvers<void>()
+  let attempts = 0
+  const endedKeys: string[] = []
+  const h = hostOver({
+    pause: async () => ({ kind: "held", childSeq: 0 }),
+    resume: async () => {
+      attempts += 1
+      if (attempts === 1) throw restoreFailure()
+      retried.resolve()
+      return { kind: "resumed", turnId: "turn-b" }
+    },
+    endLost: async participant => { endedKeys.push(participant.key); return true },
+  }, { delaysMs: [5, 30], sleep: async () => undefined })
+
+  await stopThenResume(h)
+  await within(retried.promise, "the scheduled retry")
+  // The recovery itself settles only after it either resumed every lost child or ended them.
+  await within(h.bridge.lostRecoverySettled(PARENT), "the lost-child recovery to settle")
+
+  expect(h.registry.require(PARENT).participants.st_b?.state).toBe("resumed")
+  expect(endedKeys).toEqual([])
 })
 
 test("delta LOW: a propagation failure Resume runs past is recorded as the lost child's reason, never discarded", async () => {

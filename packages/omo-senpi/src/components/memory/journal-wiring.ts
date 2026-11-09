@@ -48,7 +48,10 @@ function isJournalLockFailure(error: unknown): boolean {
 
 export function createMemoryJournalWiring(options: MemoryJournalWiringOptions): MemoryJournalWiring {
   const createJournal =
-    options.createJournal ?? ((journalDir: string) => new TranscriptJournal({ journalDir }))
+    options.createJournal ?? ((journalDir: string) => new TranscriptJournal({
+      journalDir,
+      warn: (message, fields) => options.logger?.warn(message, { ...fields }),
+    }))
   const journals = new Map<string, TranscriptJournal>()
 
   function journalFor(sessionId: string): TranscriptJournal {
@@ -94,7 +97,7 @@ interface BranchSurface {
   readonly entries: readonly unknown[]
 }
 
-function readBranchSurface(eventCtx: unknown): BranchSurface | undefined {
+export function readBranchSurface(eventCtx: unknown): BranchSurface | undefined {
   if (!isRecord(eventCtx)) return undefined
   const manager = eventCtx.sessionManager
   if (!isRecord(manager)) return undefined

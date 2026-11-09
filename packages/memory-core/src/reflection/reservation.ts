@@ -8,6 +8,7 @@ import { createLockRecord, reflectionSchedulerLockPath, withLock } from "../lock
 import {
   completeTransition,
   evaluateTransitions,
+  promoteTransition,
   reserveTransition,
   type CapturedConversation,
   type JournalSnapshot,
@@ -203,6 +204,35 @@ export class ReflectionReservationStore {
         park,
       }
     }, undefined, options)
+  }
+
+  /**
+   * Promotes a lone `pending.json` (no `active.lock`) under THIS process as launcher. Only a release
+   * without promotion leaves that state (DESIGN.r2 4.1b); session reconcile calls this first.
+   */
+  async promotePending(lockOptions?: ReflectionReservationLockOptions): Promise<ReservedRun | undefined> {
+    return this.locked(undefined, async () => {
+      const current = await this.readStateUnlocked()
+      if (current.active !== undefined || current.pending === undefined) return undefined
+      const snapshots = new Map<string, JournalSnapshot>()
+      for (const conversationId of current.pending.request.conversationIds) {
+        const journal = await this.options.getJournal(conversationId)
+        snapshots.set(conversationId, { conversationId, state: await journal.getState(), snapshot: null })
+      }
+      const transition = promoteTransition(current, snapshots, this.options.config)
+      // The same park gate tryReserve applies (DESIGN.r3 c.17): a parked identity drops an automatic run.
+      const now = this.now().toISOString()
+      const park = await this.parkFile.read()
+      const gate = transition.launch === undefined ? undefined : gateReflectionRequest(park, transition.launch.request, now)
+      if (gate?.kind === "parked") {
+        await this.writeStateUnlocked({})
+        return undefined
+      }
+      if (gate?.kind === "probe") await this.parkFile.write(markReflectionProbe(park, now))
+      const promoted = await this.withLaunchOwner(transition.launch)
+      await this.writeStateUnlocked(promoted === undefined ? transition.state : { ...transition.state, active: promoted })
+      return promoted
+    }, undefined, lockOptions)
   }
 
   async readState(lockOptions?: ReflectionReservationLockOptions): Promise<ReservationState> {

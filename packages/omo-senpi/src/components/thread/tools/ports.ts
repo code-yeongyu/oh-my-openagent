@@ -5,6 +5,7 @@ import type { GatewayEndpointPort, GatewayWakeReply, ReleaseSessionReply, Releas
 import type { ProvenanceRuntime } from "../gateway/provenance-resolver"
 import type { GatewayStore } from "../gateway/store"
 import type { ThreadTranscriptEntry } from "../reader"
+import type { RemoteThreadSurface } from "../remote/ports"
 
 export type ThreadHostSession = {
   readonly sessionId: string
@@ -35,7 +36,7 @@ export type ThreadHostSession = {
 /** The per-session half of the host surface, bound to the ONE endpoint that holds the session. */
 export type ThreadSessionPort = Pick<
   ThreadHost,
-  "getMessages" | "getState" | "prompt" | "interrupt" | "setSessionName" | "setModel" | "getAvailableModels" | "setThinkingLevel" | "getAvailableThinkingLevels" | "wake" | "releaseSession"
+  "getMessages" | "getState" | "prompt" | "interrupt" | "setSessionName" | "setModel" | "getAvailableModels" | "setThinkingLevel" | "getAvailableThinkingLevels" | "wake" | "releaseSession" | "closeSession"
 >
 
 /**
@@ -61,7 +62,8 @@ export type ThreadHostViewRequest = {
 export type ThreadHost = {
   readonly socket: string
   readonly listSessions: () => Promise<readonly ThreadHostSession[]>
-  readonly openSession: (params: { readonly cwd?: string; readonly sessionPath?: string; readonly name?: string; readonly forkFrom?: string; readonly initialSkills?: readonly string[] }) => Promise<ThreadHostSession>
+  /** `permissionPreset` is the approval mode the new session starts in (its creator's, #12884); absent, the host's default applies. */
+  readonly openSession: (params: { readonly cwd?: string; readonly sessionPath?: string; readonly name?: string; readonly forkFrom?: string; readonly initialSkills?: readonly string[]; readonly permissionPreset?: string }) => Promise<ThreadHostSession>
   readonly getMessages: (sessionId: string) => Promise<readonly ThreadTranscriptEntry[]>
   readonly getState: (sessionId: string) => Promise<{ readonly isStreaming?: boolean; readonly activeTurnId?: string }>
   readonly prompt: (sessionId: string, message: string, options?: { readonly streamingBehavior?: "steer" | "followUp" }, durable_session_id?: string) => Promise<{ readonly turnId?: string }>
@@ -75,6 +77,8 @@ export type ThreadHost = {
   readonly wake?: (sessionId: string, deliveryIds: readonly string[], durable_session_id?: string) => Promise<GatewayWakeReply>
   /** Hands a quiet host session to another runtime (`release_session`); hosts only. */
   readonly releaseSession?: (sessionId: string, request: ReleaseSessionRequest, durable_session_id?: string) => Promise<ReleaseSessionReply>
+  /** Ends one session on its host for every client that holds it; hosts only, a terminal keeps its own session. */
+  readonly closeSession?: (sessionId: string, durable_session_id?: string) => Promise<ThreadCloseOutcome>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */
   readonly listView?: (request?: ThreadHostViewRequest) => Promise<ThreadHostView>
   /** Fresh identity validation on exactly one published endpoint, without enumeration. */
@@ -116,10 +120,12 @@ export type ThreadToolSurfaceOptions = {
   readonly callerName?: () => string | undefined
   /**
    * The newest delivery whose message the caller's current run has consumed (`component.ts`
-   * `RunContext.cause`), when one has: a send continues that causal root (hop, cycle and budget
-   * guards), and a send with none starts a new root. A delivery still queued behind the run is not it.
+   * `RunContext.cause`), when one has: a send continues that causal root and its hop
+   * count, and a send with none starts a new root. A delivery still queued behind the run is not it.
    */
   readonly callerCause?: () => string | undefined
+  /** The highest chain hop an input of the caller's current run arrived with from another device; a send continues it (K8). */
+  readonly callerChainHop?: () => number
   /** The deliveries the caller's current answer is for (`component.ts` `RunContext.consumed`); a report without `binding_id` goes to their binding. */
   readonly callerRunDeliveries?: () => readonly string[]
   /** A `user` message (typed in the caller's terminal, or an extension's) is part of that same answer (`RunContext.local`); with a bound delivery there and another outbound binding, a report without `binding_id` is refused. */
@@ -127,8 +133,13 @@ export type ThreadToolSurfaceOptions = {
   /** `thread_report {kind: "completion"}` armed a completion (`arm_seq`) for this session; the component writes it at the next settle. */
   readonly onCompletionArmed?: (durableId: string, armSeq: number) => void
   readonly now?: () => number
+  /** Sessions on the account's other devices and the account-wide alias (O8, A3); absent, the tools reach only this device. */
+  readonly remote?: RemoteThreadSurface
 }
 
 
 /** Placeholder the component supplies when the host passes no per-call caller identity. */
 export const UNKNOWN_CALLER = "unknown-caller"
+
+/** How a close ended: the session ended, no live session held it any more, or another client still holds it. */
+export type ThreadCloseOutcome = "closed" | "not_live" | "held_elsewhere"

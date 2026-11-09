@@ -157,8 +157,9 @@ async function streamLoop(options: HttpTransportOptions, doFetch: typeof fetch, 
         buffer += decoder.decode(chunk, { stream: true })
         let end = buffer.indexOf("\n\n")
         while (end >= 0) {
-          const head = advancedHead(buffer.slice(0, end))
-          if (head !== null) handlers.onAdvanced(head)
+          const event = streamEvent(buffer.slice(0, end))
+          if (event?.kind === "advanced") handlers.onAdvanced(event.head)
+          else if (event?.kind === "state") handlers.onStateChanged()
           buffer = buffer.slice(end + 2)
           end = buffer.indexOf("\n\n")
         }
@@ -173,7 +174,9 @@ async function streamLoop(options: HttpTransportOptions, doFetch: typeof fetch, 
   }
 }
 
-function advancedHead(frame: string): number | null {
+type StreamEvent = { readonly kind: "advanced"; readonly head: number } | { readonly kind: "state" }
+
+function streamEvent(frame: string): StreamEvent | null {
   const data = frame
     .split("\n")
     .filter((line) => line.startsWith("data:"))
@@ -181,6 +184,7 @@ function advancedHead(frame: string): number | null {
     .join("\n")
   if (data === "") return null
   const event = JSON.parse(data) as { type?: string; head?: { seq?: number } }
+  if (event.type === "sync.state.changed") return { kind: "state" }
   if (event.type !== "sync.advanced" && event.type !== "sync.keyring.changed") return null
-  return typeof event.head?.seq === "number" ? event.head.seq : null
+  return typeof event.head?.seq === "number" ? { kind: "advanced", head: event.head.seq } : null
 }

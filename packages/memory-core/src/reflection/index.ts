@@ -10,4 +10,19 @@ export * from "./machine"
 export * from "./park"
 export * from "./park-file"
 export * from "./quarantine"
-export * from "./stale-holder"
+export {
+  classifyReflectionLockHolder,
+  getStableLocalHostId,
+  isReflectionHostLocal,
+  reflectionLauncherLiveness,
+} from "./stale-holder"
+export type { ReflectionLockProbe, ReflectionLockVerdict } from "./stale-holder"
+export * from "./abandoned"
+export * from "./run-id-high-water"
+export * from "./run-ledger"
+export * from "./run-process"
+export * from "./stale-lock-reaper"
+export * from "./release-without-promotion"
+export * from "./terminal-claim"
+export * from "./host-sweep"
+export * from "./identity-orphan-sweep"

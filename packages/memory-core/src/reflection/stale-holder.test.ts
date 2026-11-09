@@ -1,7 +1,17 @@
 import { describe, expect, test } from "bun:test"
 
-import { classifyReflectionLockHolder, getStableLocalHostId, isLocalHost } from "./stale-holder"
+import { classifyReflectionLockHolder, getStableLocalHostId, isReflectionHostLocal } from "./stale-holder"
 import { REFLECTION_DIR, SCENARIOS, probeFor } from "./stale-holder.scenarios.test-support"
+
+function sameHost(
+  recorded: { readonly hostname: string; readonly hostId?: string },
+  current: { readonly hostname: string; readonly hostId?: string | null },
+): Promise<boolean> {
+  return isReflectionHostLocal(recorded.hostname, recorded.hostId, {
+    hostname: () => current.hostname,
+    hostId: () => current.hostId ?? null,
+  })
+}
 
 describe("reflection lock holder decision (#10377)", () => {
   // Each fail-closed rule has its own scenario that changes exactly one fact of a provably dead
@@ -21,11 +31,11 @@ describe("reflection lock holder decision (#10377)", () => {
   })
 
   describe("stable host identity across roaming and multi-device sync (#11818)", () => {
-    test("#given two different Mac-NNN hosts with different ids #when checked #then they stay foreign", () => {
+    test("#given matching hostnames with different machine ids #when checked #then they stay foreign", async () => {
       expect(
-        isLocalHost(
+        await sameHost(
           { hostname: "Mac-765", hostId: "mac-a" },
-          { hostname: "Mac-424", hostId: "mac-b" },
+          { hostname: "Mac-765", hostId: "mac-b" },
         ),
       ).toBe(false)
     })
@@ -60,15 +70,15 @@ describe("reflection lock holder decision (#10377)", () => {
       })
     })
 
-    test("#given a legacy record with only the old hostname field #when checked #then it matches only when equal to os.hostname()", () => {
+    test("#given a legacy record with only the old hostname field #when checked #then it matches only the same hostname", async () => {
       expect(
-        isLocalHost(
+        await sameHost(
           { hostname: "my-workstation" },
           { hostname: "my-workstation", hostId: "host-123" },
         ),
       ).toBe(true)
       expect(
-        isLocalHost(
+        await sameHost(
           { hostname: "old-hostname" },
           { hostname: "new-hostname", hostId: "host-123" },
         ),
@@ -101,10 +111,8 @@ describe("reflection lock holder decision (#10377)", () => {
       })
     })
 
-    // No `hostname` and no `isLocalHost`: only the scutil result is injected, so the production
-    // hostname read and the production comparison both run. A record from another machine must stay
-    // foreign even when its pid happens to be alive in this process table.
-    test("#given the production comparison over an injected scutil result #when the lock belongs to another machine #then it stays stuck", async () => {
+    // The production hostname read and comparison run with only the machine-id probe injected.
+    test("#given the production comparison and a foreign machine id #when the lock is classified #then it stays stuck", async () => {
       const facts = {
         files: {
           [`${REFLECTION_DIR}/active.lock`]: JSON.stringify({
@@ -141,24 +149,18 @@ describe("reflection lock holder decision (#10377)", () => {
 
     // An id lookup that fails or times out answers `null`. Treating that as "another host" would
     // leave the machine unable to reclaim its own lock, so the hostname rule has to decide.
-    test("#given a recorded id and an unknown current id #when the hostnames match #then it is still this host", () => {
+    test("#given a recorded id and an unknown current id #when the hostnames match #then it is still this host", async () => {
       expect(
-        isLocalHost(
+        await sameHost(
           { hostname: "MacBook-Pro", hostId: "our-machine" },
           { hostname: "MacBook-Pro", hostId: null },
         ),
       ).toBe(true)
-      expect(
-        isLocalHost(
-          { hostname: "MacBook-Pro", hostId: "our-machine" },
-          { hostname: "MacBook-Pro", hostId: undefined },
-        ),
-      ).toBe(true)
     })
 
-    test("#given a recorded id and an unknown current id #when the hostnames differ #then it stays foreign", () => {
+    test("#given a recorded id and an unknown current id #when the hostnames differ #then it stays foreign", async () => {
       expect(
-        isLocalHost(
+        await sameHost(
           { hostname: "Mac-765", hostId: "our-machine" },
           { hostname: "Mac-424", hostId: null },
         ),

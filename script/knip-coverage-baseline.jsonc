@@ -111,7 +111,8 @@
     "test-support/environment-integrity.ts": ["exports"],
   },
   // Third-party projects vendored as git submodules; the build materializes them, they are not this repository's code.
-  "ignore": ["packages/shared-skills/upstreams/**"],
+  // Vendored build output pinned by packages/omo-senpi/vendor/PIN.json: upstream code, never export-checked here either.
+  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**"],
   "workspaces": {
     ".": {
       "includeEntryExports": true,
@@ -1477,6 +1478,7 @@
         "**/*.test-d.ts",
         "src/components/claim-receipt/runtime.ts",
         "src/components/computer-use/runtime.ts",
+        "src/components/device-service/runtime.ts",
         "src/components/feedback/runtime.ts",
         "src/components/memory/commands/runtime.ts",
         "src/components/memory/device-session/account-runtime.ts",
@@ -2277,8 +2279,6 @@
         "src/components/thread/gateway/author.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) BINDING_SCHEMA_VERSION, BINDING_PLATFORMS, BINDING_STATUSES, COMPLETION_OUTCOMES, BINDING_MAX_TTL_SECONDS, BINDING_DEFAULT_POLICY_ID
         "src/components/thread/gateway/bindings.ts": ["exports"],
-        // pre-existing at origin dev 4686e425b5: unused export(s) reaches
-        "src/components/thread/gateway/causal.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) completionOutcome
         "src/components/thread/gateway/completion.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_SCHEMA_VERSION
@@ -2473,8 +2473,6 @@
         "src/manager/held-send.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) TaskConcurrency, decideDepthPolicy, NameRegistry, AUTO_HOST_CAPABILITIES, adaptInProcessHandle, adaptRpcHandle, TASK_AWAITING_INPUT_EVENT, TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT, logTranscriptEvent and 1 more
         "src/manager/index.ts": ["exports"],
-        // pre-existing at origin dev 4686e425b5: unused export(s) START_REPORT_WINDOW_MS
-        "src/manager/manager.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) readObservedModel, observeChildEffectiveModel
         "src/manager/observed-model.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) PausedChildLostError, PausedChildOwnedElsewhereError
@@ -3590,8 +3588,6 @@
         "bin/lib/agent-dir.js": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) BUN_MIN_VERSION, resolveBunGuard, findNodeBinary
         "bin/lib/bun-runtime.js": ["exports"],
-        // pre-existing at origin dev 4686e425b5: unused export(s) claudeCodeVersionFloor
-        "bin/lib/claude-code-floor.js": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) COMPUTER_USE_RUNTIME
         "bin/lib/computer-use-doctor.js": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) TASK_CONFIG_RUNTIME
@@ -4001,6 +3997,7 @@
         "extensions/omo-memory-palace.js",
         "extensions/omo-memory-sync.js",
         "extensions/omo-recall-store.js",
+        "extensions/omo-device-service.js",
         "extensions/omo-session-history.js",
         "extensions/omo-task.js",
         "extensions/omo-telemetry-otlp.js",

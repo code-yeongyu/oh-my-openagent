@@ -17,6 +17,7 @@ import type { DelegatedModelConfig } from "./types"
 import { applyCategoryParams } from "./delegated-model-config"
 import { applyFallbackEntrySettings } from "./fallback-entry-settings"
 import { lowerReasoningForModel } from "../../shared/agent-variant"
+import { distributeTaskModels } from "./models-distribution"
 
 function getConfiguredModel(entry: string | { model: string } | undefined): string | undefined {
   return typeof entry === "string" ? entry : entry?.model
@@ -70,7 +71,8 @@ export async function resolveCategoryExecution(
   inheritedModel: string | undefined,
   systemDefaultModel: string | undefined
 ): Promise<CategoryResolutionResult> {
-  const { client, userCategories, sisyphusJuniorModel } = executorCtx
+  const { client, sisyphusJuniorModel } = executorCtx
+  let userCategories = executorCtx.userCategories
 
   // A retired builtin name resolves to its replacement so third-party skills and AGENTS.md text
   // spawning the old category keep working; a user category of that name still wins over the alias.
@@ -84,6 +86,17 @@ export async function resolveCategoryExecution(
   if (!categoryExists) {
     const allCategoryNames = Object.keys(enabledCategories).join(", ")
     return categoryResolutionError(`Unknown category: "${categoryName}". Available: ${allCategoryNames}`)
+  }
+
+  const configuredCategory = userCategories?.[categoryName]
+  if (configuredCategory?.models_distribution === "round_robin" && configuredCategory.models?.length) {
+    userCategories = {
+      ...userCategories,
+      [categoryName]: {
+        ...configuredCategory,
+        models: [...distributeTaskModels(`category:${categoryName}`, configuredCategory.models, "round_robin")],
+      },
+    }
   }
 
   const availableModels = await getAvailableModelsForDelegateTask(client)

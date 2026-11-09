@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
-import { cleanupReconciliationFixtures, reconciliationFixture } from "./run-reconciliation.test-support"
+import { cleanupReconciliationFixtures, FIXTURE_HOST, reconciliationFixture } from "./run-reconciliation.test-support"
 import { writeRunJsonAtomic } from "./run-artifacts"
 import { reconcileReflectionRuns } from "./run-reconciliation"
 import { abandonReservationRun } from "./run-finalization"
@@ -18,7 +18,7 @@ test.each(["known", "unknown"] as const)("a queued live supervisor with %s start
   const context = {
     identity: item.identity, reservation: item.store,
     now: () => Date.parse(item.ledger.startedAt) + 90_000,
-    hostname: () => "fixture-host",
+    hostname: () => FIXTURE_HOST,
     getPidLiveness: (pid: number) => pid === 222 ? "alive" as const : "dead" as const,
     getProcessStartIdentity: async () => identity === "known" ? "supervisor-start" : null,
     waitForOutcome: async () => { throw new Error("queued runs must defer, not wait on an expired deadline") },
@@ -39,7 +39,7 @@ test("a queued supervisor proven dead still settles as failed", async () => {
   })
   expect(await reconcileReflectionRuns({
     identity: item.identity, reservation: item.store, now: () => 99_000,
-    hostname: () => "fixture-host",
+    hostname: () => FIXTURE_HOST,
     getPidLiveness: () => "dead",
     getProcessStartIdentity: async () => null,
   })).toEqual([{ runId: item.ledger.runId, outcome: "failed" }])

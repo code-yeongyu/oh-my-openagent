@@ -11,7 +11,8 @@ import {
   type EmbeddedFile,
   type EmbeddedManifest,
 } from "./compile-runtime"
-import { handOffToProvisionedRuntime, planProvisionedLaunch } from "./provisioned-handoff"
+import { handOffToProvisionedRuntime, planProvisionedLaunch, type ProvisionedLaunch } from "./provisioned-handoff"
+import { pruneProvisionedRuntimes, removeReplacedLauncher, type RuntimePruneResult } from "./runtime-prune"
 import { parseBuildInfo, parseEngineBuildStamp, versionLines } from "./build-info"
 import { compiledUpdate, fetchGitHubReleases, probePackageOwner, releaseAssetName, RELEASES_URL } from "./compiled-update"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
@@ -19,7 +20,8 @@ import { removeLegacyServiceCredentials } from "./bin/lib/legacy-service-credent
 import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { readJson, releaseBanner } from "./bin/lib/package-paths.js"
 import { remapSenpiEnvironment } from "./compiled-environment"
-import { runServiceAuthCommand, SERVICE_ACCOUNTS_OPEN } from "../omo-opencode/src/cli/service-auth/commands"
+import { SERVICE_ACCOUNTS_OPEN } from "../omo-opencode/src/cli/service-auth/commands"
+import { runServiceAuthCommand } from "./service-auth-command"
 import { runDaemonCommand } from "./bin/lib/daemon.js"
 import { runThreadCommand } from "./bin/lib/thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./bin/lib/host-status.js"
@@ -32,14 +34,20 @@ import { compiledDiagnosticRuntimeLoader, loadCompiledCoverageEngine, loadCompil
 import { isInternalSupervisorLaunch, runInternalSupervisor } from "./supervisor-fast-path"
 import { registerEngineRuntimeModules } from "./engine-runtime-modules"
 import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/index"
-import { buildSenpiArgs, shouldPrintCompiledBanner } from "./compile-args"
+import { buildSenpiArgs, shouldPrintCompiledBanner, trustLaunchKind } from "./compile-args"
 import { runLoroSmoke } from "./loro-smoke"
 import { runAccountCommand } from "./account-cli"
+import { registerHelperCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
+import { runRemoteAttachCommand, runRemoteCommand } from "./remote-entry"
 import { runSyncCommand } from "./sync-cli"
 import { spawnSync } from "node:child_process"
 import { compiledRollbackMigration } from "./compiled-rollback"
 import { refuseRetiredCommand } from "./bin/lib/retired-command.js"
-import { ExtraCaCertificatesError, installEngineCaTrust } from "./compiled-ca-trust"
+import { ExtraCaCertificatesError, parseExtraCaCertificates } from "./compiled-ca-trust"
+import { adoptedEngineTrust, buildTrustLaunchEnvironment } from "@code-yeongyu/senpi/engine-trust"
+import { runTrustStage } from "./trust-stage"
+import { resolveEngineTrustHelperPath } from "./engine-trust-helper-path"
+import { claimMemorySyncAtBoot } from "./memory-sync-boot"
 
 // The engine is imported via a RELATIVE string LITERAL, inlined at both import
 // sites, and both properties are load-bearing:
@@ -132,7 +140,13 @@ export function compiledBannerLines(manifest: Pick<EmbeddedManifest, "omoAiVersi
 /** Test seam: the thread SDK `omo daemon adopt` locates and releases through (the plugin's by default). */
 type CompiledLauncherSeams = { readonly threadSdk?: (options: Record<string, unknown>) => Promise<{ sdk?: unknown; error?: string }> }
 
+/** RULING-74: the runtime's keychain helper sits directly beside the binary (the desktop layout); every command uses it first. */
+export function compiledKeychainHelper(execDir: string): string {
+  return join(execDir, "omo-keychain")
+}
+
 export async function runCompiledLauncher(args: string[], execDir: string, enginePin = "unknown", compiledPackageRoot?: string, migration: CompiledLauncherOptions = {}, seams: CompiledLauncherSeams = {}): Promise<boolean> {
+  registerHelperCandidates([compiledKeychainHelper(execDir)])
   if (args[0] === "loro-smoke") {
     process.exitCode = await runLoroSmoke()
     return true
@@ -147,6 +161,17 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   }
   if (args[0] === "account") {
     await runAccountCommand(args)
+    return true
+  }
+  if (args[0] === "remote" && args[1] === "attach") {
+    // The compiled binary is the engine: the attach TUI runs in this process, beside the endpoint it attaches to.
+    const engineArgs = await runRemoteAttachCommand(args)
+    if (engineArgs === undefined) return true
+    process.argv.splice(2, process.argv.length - 2, ...engineArgs)
+    return false
+  }
+  if (args[0] === "remote") {
+    await runRemoteCommand(args)
     return true
   }
   const packageJson = readJson(join(execDir, "package.json")) as { version: string; omoBuild?: unknown }
@@ -166,7 +191,10 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
   // node path here would re-enter omo itself and leave a phantom session behind.
   const engine = {
     run(engineArgs: string[], options: { env: Record<string, string | undefined> }) {
-      const result = spawnSync(process.execPath, engineArgs, { encoding: "utf8", env: options.env, windowsHide: true })
+      const marker = adoptedEngineTrust()
+      const env = marker === undefined ? options.env
+        : buildTrustLaunchEnvironment(options.env, { marker, hop: false, platform: process.platform })
+      const result = spawnSync(process.execPath, engineArgs, { encoding: "utf8", env, windowsHide: true })
       return { exitCode: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" }
     },
   }
@@ -250,6 +278,35 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
 
 export { reexecProvisionedRuntime } from "./provisioned-handoff"
 
+/**
+ * Whether this launch prunes old runtimes: only the runtime a launcher handed a real launch to.
+ * Never a static answer or self-update (the installers run `omo --version`), never the launcher
+ * that is about to hand off, and never the engine's own re-runs of the runtime copy (no launcher).
+ */
+export function launchPrunesRuntimes(args: readonly string[], launch: Pick<ProvisionedLaunch, "handOff" | "launcher">): boolean {
+  if (launch.launcher === undefined || launch.handOff) return false
+  return trustLaunchKind(args) !== "static" && !isSelfUpdate([...args])
+}
+
+// Pruning old runtimes never blocks a launch, but a runtime that could not be removed is reported.
+function reportRuntimePrune(result: RuntimePruneResult): void {
+  for (const { version, reason } of result.failed) {
+    process.stderr.write(`omo: could not remove the old runtime ${version}: ${reason}\n`)
+  }
+}
+
+/** A refusal is 78 (5.2) and a malformed `trust` argv the launcher's usage status 2; an exec keeps the status it propagated. */
+function setTrustExitCode(action: "static" | "import-exec" | "ensure" | "usage" | "refuse"): void {
+  if (action === "refuse") process.exitCode = 78
+  else if (action === "usage") process.exitCode = 2
+}
+
+const STATIC_HELP = `Usage: omo [options] [message...]
+       omo <command> [args]
+
+Commands: setup, doctor, update, daemon, thread, login, logout, whoami, sync, account
+Options: --version, -v, --help, -p, --print, --mode <json|rpc>, --session <file>`
+
 const HELP_WITHOUT_ENGINE = `Usage: omo [options] [message...]
        omo <command> [args]
 
@@ -286,7 +343,8 @@ async function main(): Promise<void> {
   // exact argv `--version` or `--help` is answered, from static local data, before anything else runs
   // (#10236): the engine's own help loads extensions, which can install packages over the network.
   try {
-    installEngineCaTrust()
+    const extras = process.env.OMO_EXTRA_CA_CERTIFICATES
+    if (extras) parseExtraCaCertificates(extras)
   } catch (error) {
     if (!(error instanceof ExtraCaCertificatesError)) throw error
     if (await answerUnderRefusedTrust(process.argv.slice(2))) {
@@ -300,9 +358,25 @@ async function main(): Promise<void> {
   const embedded = (globalThis as typeof globalThis & { Bun?: { embeddedFiles?: EmbeddedFile[] } }).Bun?.embeddedFiles as EmbeddedFile[] | undefined
   if (!embedded?.length) {
     const execDir = dirname(fileURLToPath(import.meta.url))
+    const args = process.argv.slice(2)
+    if (args.length === 1 && args[0] === "--help") {
+      console.log(STATIC_HELP)
+      return
+    }
+    // Design 5.2 step 3: a static answer never reaches the trust stage.
+    if (trustLaunchKind(args) === "static") {
+      await runCompiledLauncher(args, execDir)
+      return
+    }
+    const trust = await runTrustStage({ args, argv: process.argv.slice(1) })
+    if (trust.action !== "adopt") {
+      setTrustExitCode(trust.action)
+      return
+    }
     if (await runCompiledLauncher(process.argv.slice(2), execDir)) return
     process.argv.splice(2, process.argv.length - 2, ...buildSenpiArgs(process.argv.slice(2), execDir))
     Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))
+    await claimMemorySyncAtBoot(process.argv.slice(2))
     await registerEngineRuntimeModules()
     await import("../../node_modules/@code-yeongyu/senpi/dist/cli.js") // literal: see import note above
     return
@@ -322,11 +396,37 @@ async function main(): Promise<void> {
     await provisionEmbeddedRuntime(manifest, embedded, dirname(expected))
     materializeProvisionedExecutable(runningExecutable, expected)
   }
+  const args = process.argv.slice(2)
+  if (args.length === 1 && args[0] === "--help") {
+    console.log(STATIC_HELP)
+    return
+  }
+  // Design 5.2 step 3: a static answer never reaches the trust stage; the rest is a closed account command.
+  if (trustLaunchKind(args) === "static") {
+    if (!answerCompiledFastPath(args, manifest)) await runServiceAuthCommand(args)
+    return
+  }
+  const helperPath = resolveEngineTrustHelperPath({ OMO_PACKAGE_DIR: dirname(expected) })
+  const helperEntry = helperPath === null ? undefined : manifest.entries.find((entry) => join(dirname(expected), entry.relPath) === helperPath)
+  const trust = await runTrustStage({
+    args,
+    executable: launch.handOff ? expected : process.execPath,
+    helper: helperPath !== null && helperEntry !== undefined ? { path: helperPath, sha256: helperEntry.sha256 } : undefined,
+    ...(launch.handOff
+      ? { exec: (file: string, argv: string[], env: NodeJS.ProcessEnv) => handOffToProvisionedRuntime(file, { argv, env, launcher: launch.launcher }) }
+      : {}),
+  })
+  if (trust.action !== "adopt") {
+    setTrustExitCode(trust.action)
+    return
+  }
   if (isSelfUpdate(process.argv.slice(2)) && parseBuildInfo(manifest.buildInfo) === undefined) {
     const result = await compiledUpdate({
       omoAiVersion: manifest.omoAiVersion,
       releaseTarget: manifest.releaseTarget,
-      destination: runningExecutable,
+      // The handed-off runtime copy answers here; the binary to replace is the one the user launched.
+      destination: launch.launcher ?? runningExecutable,
+      provisioned: expected,
       platform: process.platform,
       arch: process.arch,
       fetchReleases: fetchGitHubReleases,
@@ -338,8 +438,17 @@ async function main(): Promise<void> {
     return
   }
   if (answerCompiledFastPath(process.argv.slice(2), manifest)) return
+  if (launchPrunesRuntimes(process.argv.slice(2), launch) && launch.launcher !== undefined) {
+    reportRuntimePrune(pruneProvisionedRuntimes({ root: dirname(dirname(expected)), current: manifest.omoAiVersion }))
+    removeReplacedLauncher(launch.launcher)
+  }
   if (launch.handOff) {
-    await handOffToProvisionedRuntime(expected)
+    const marker = adoptedEngineTrust()
+    if (marker === undefined) throw new Error("trust stage did not record its adopted generation")
+    await handOffToProvisionedRuntime(expected, {
+      env: buildTrustLaunchEnvironment(process.env, { marker, hop: false, platform: process.platform }),
+      launcher: launch.launcher,
+    })
     return
   }
   const execDir = launch.execDir
@@ -354,6 +463,7 @@ async function main(): Promise<void> {
   Object.assign(process.env, remapSenpiEnvironment(process.env, execDir))
   applyCachedClaudeCode(process.env, execDir)
   if (isInternalSupervisorLaunch(process.argv.slice(2)) && await runInternalSupervisor(process.argv.slice(2))) return
+  await claimMemorySyncAtBoot(process.argv.slice(2))
   await registerEngineRuntimeModules()
   await import("../../node_modules/@code-yeongyu/senpi/dist/cli.js") // literal: see import note above
 }

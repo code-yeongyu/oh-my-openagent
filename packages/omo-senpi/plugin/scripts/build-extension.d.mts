@@ -6,6 +6,7 @@ export interface BuildExtensionOptions {
   advisorRuntimeOutputPath?: string
   sidePanelRuntimeOutputPath?: string
   toolkitSdkOutputPath?: string
+  bunshinTsOutputPath?: string
   rollbackRuntimeOutputPath?: string
   memoryDoctorOutputPath?: string
   memoryMemfsOutputPath?: string
@@ -14,6 +15,7 @@ export interface BuildExtensionOptions {
   memoryCommandsOutputPath?: string
   sessionHistoryOutputPath?: string
   recallStoreOutputPath?: string
+  deviceServiceOutputPath?: string
   telemetryPosthogOutputPath?: string
   memorySyncOutputPath?: string
   threadClientOutputPath?: string
@@ -39,6 +41,7 @@ export function buildExtension(options?: BuildExtensionOptions): Promise<{
   memoryCommandsInputs: string[]
   sessionHistoryInputs: string[]
   recallStoreInputs: string[]
+  deviceServiceInputs: string[]
   telemetryPosthogInputs: string[]
   memorySyncInputs: string[]
   threadClientInputs: string[]
@@ -48,6 +51,7 @@ export function buildExtension(options?: BuildExtensionOptions): Promise<{
   claimReceiptInputs: string[]
   computerUseInputs: string[]
   toolkitSdkInputs: string[]
+  bunshinTsInputs: string[]
   rollbackRuntimeInputs: string[]
   gatewayStoreWorkerInputs: string[]
   threadSdkInputs: string[]
@@ -70,6 +74,7 @@ export const SENPI_LOADER_ALIASES: readonly [
   "@earendil-works/pi-ai/compat",
   "@earendil-works/pi-ai/oauth",
   "@code-yeongyu/senpi",
+  "@code-yeongyu/senpi/session-worker-data",
   "@mariozechner/pi-coding-agent",
   "@mariozechner/pi-agent-core",
   "@mariozechner/pi-tui",
