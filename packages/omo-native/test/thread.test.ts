@@ -248,5 +248,26 @@ describe("omo thread: SDK loading", () => {
     const statusAll = received.engineStatusAll as () => Promise<string>
     expect(await statusAll()).toBe("{\"endpoints\":[]}")
     expect(engineCalls).toEqual([{ args: ["host", "status", "--json", "--all", "--include-workers"], env: { KEEP: "1", OMO_AGENT_DIR: "/agent" } }])
+    expect("remote" in received).toBe(false)
+  })
+
+  test("#given a plugin thread client that offers the CLI remote surface #when the SDK loads #then the SDK reads through that surface, whose sign-in loads only when an alias is used (#12833)", async () => {
+    let received: Record<string, unknown> = {}
+    let offered: Record<string, unknown> = {}
+    const surface = { sessions: {}, chain: {} }
+    const loaded = await loadThreadSdk({
+      pluginRoot: "/plugin",
+      agentDir: "/agent",
+      env: {},
+      cwd: "/work",
+      engine: { run: () => ({ exitCode: 0, stdout: "", stderr: "" }) },
+      loadSqlite: async () => ({}),
+      importSdk: async () => ({ createThreadSdk: (options: Record<string, unknown>) => { received = options; return {} } }),
+      importThreadClient: async () => ({ createCliRemoteSurface: (options: Record<string, unknown>) => { offered = options; return surface } }),
+      identity: { uid: 501, user: "qa" },
+    })
+    expect(loaded.error).toBeUndefined()
+    expect(received.remote).toBe(surface)
+    expect(typeof offered.loadAccess).toBe("function")
   })
 })
