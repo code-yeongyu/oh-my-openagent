@@ -3,6 +3,7 @@ import { chmodSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { createTempCwd } from "./comment-checker.test-support"
+import { testBudgetSignal, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const RUNNER_URL = new URL("./runner.ts", import.meta.url).href
 const PAYLOAD_SIZES = [1_000, 1_000_000]
@@ -51,7 +52,7 @@ async function runCheckerRounds(binaryPath: string, cwd?: string): Promise<{ exi
     ...(cwd === undefined ? {} : { cwd }),
     stdout: "pipe",
     stderr: "pipe",
-    signal: AbortSignal.timeout(30_000),
+    signal: testBudgetSignal("the comment-checker child to exit"),
   })
   const [exitCode, stdout, stderr] = await Promise.all([
     child.exited,
@@ -66,6 +67,7 @@ const EMPTY_ROUNDS = Array.from({ length: PAYLOAD_SIZES.length * ROUNDS_PER_SIZE
 
 describe("comment-checker child stdin (#6396)", () => {
   it("#given a checker binary that exits without reading stdin #when edits of any size are checked #then the host survives and every check is empty", async () => {
+    useTestTimeout(60_000)
     // given
     const onWindows = process.platform === "win32"
     const binaryPath = onWindows ? process.execPath : writeShellChecker("dead-checker", "exit 0")
@@ -85,6 +87,7 @@ describe("comment-checker child stdin (#6396)", () => {
   it.skipIf(process.platform === "win32")(
     "#given a checker that reads all of stdin and reports comments #when edits of any size are checked #then exit-code-2 feedback still arrives",
     async () => {
+      useTestTimeout(60_000)
       // given
       const binaryPath = writeShellChecker("reporting-checker", "cat >/dev/null\necho 'COMMENT/DOCSTRING DETECTED' >&2\nexit 2")
 
