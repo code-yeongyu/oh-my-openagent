@@ -55,6 +55,12 @@ function transformModelForProviderUsingAnthropicBehavior(
 	if (provider === "anthropic") {
 		return model
 	}
+	if (provider === "vertex-garden") {
+		// The Garden's global OpenAPI endpoint namespaces open-model ids by publisher
+		// (deepseek-ai/…): bare requirement ids need the publisher prefix to resolve.
+		if (model === "deepseek-v4.1-flash-maas") return "deepseek-ai/deepseek-v4.1-flash-maas"
+		return model
+	}
 	if (provider === "kimi-coding" || provider === "kimi-for-coding") {
 		if (model === "kimi-k3") return "k3"
 		if (model === "kimi-k3-256k") return "k3-256k"

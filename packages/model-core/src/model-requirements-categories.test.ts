@@ -149,6 +149,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         variant: "off",
       },
       {
+        providers: ["vertex-garden"],
+        model: "deepseek-v4.1-flash-maas",
+        variant: "off",
+      },
+      {
         providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan"],
         model: "qwen3.6-flash",
         variant: "low",
@@ -225,6 +230,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         providers: ["deepseek", "opencode-go"],
         model: "deepseek-v4-pro",
         variant: "max",
+      },
+      {
+        providers: ["vertex-garden"],
+        model: "deepseek-v4.1-flash-maas",
+        variant: "medium",
       },
       {
         providers: ["xiaomi", "opencode-go"],

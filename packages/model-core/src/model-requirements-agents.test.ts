@@ -70,6 +70,7 @@ describe("AGENT_MODEL_REQUIREMENTS", () => {
         { providers: ["openai", "chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" },
         { providers: ["anthropic", "github-copilot"], model: "claude-haiku-5-5", variant: "medium" },
         { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
+        { providers: ["vertex-garden"], model: "deepseek-v4.1-flash-maas", variant: "medium" },
         { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
         { providers: ["opencode-go"], model: "minimax-m2.7" },
       ])
