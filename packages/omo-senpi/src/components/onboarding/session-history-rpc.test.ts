@@ -12,13 +12,12 @@ import {
   OMO_SESSION_THREADS_RPC_METHOD,
   registerSessionHistoryRpc,
 } from "./session-history-rpc"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const temp = createTempDirectories()
 afterEach(() => temp.cleanup())
 
 const nowMs = Date.parse("2026-08-24T12:00:00.000Z")
-const EVENT_TIMEOUT_MS = 10_000
-
 type Handler = (data: unknown) => unknown | Promise<unknown>
 
 /**
@@ -44,7 +43,7 @@ function rpcOnlyHost() {
   }) as unknown as SenpiExtensionAPI
   const terminal = (scanId: () => string | undefined) =>
     new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`waited ${EVENT_TIMEOUT_MS}ms for a done/failed event, never fired`)), EVENT_TIMEOUT_MS)
+      const timer = setTimeout(() => reject(new Error(`waited out the test budget for a done/failed event, never fired`)), remainingTestTime())
       listeners.push(() => {
         const last = emits.at(-1)?.data as { scanId?: string; kind?: string } | undefined
         if (last !== undefined && last.scanId === scanId() && (last.kind === "done" || last.kind === "failed")) {

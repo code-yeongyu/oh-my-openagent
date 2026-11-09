@@ -8,11 +8,12 @@ import type { Server, Socket } from "node:net"
 import { preflightMemoryModels, resetModelPreflightCacheForTests } from "./model-preflight"
 import type { MemoryModelChain } from "./memory-model-attempts"
 import { identityMatches, killIfAlive, pidAlive, pidTerminalWithin, readPidFileWhenWritten, readPidOnce, readPidWhenWritten, waitForFileToExist } from "./process-liveness.test-support"
+import { remainingTestTime, useTestTimeout } from "../../../../../../test-support/test-deadline"
 
 const roots: string[] = []
-
-const HELPER_EXIT_BOUND_MS = 5_000
+/** Fail-safe wait in finally for a leaked grandchild: fixed, because the test budget may already be spent there. */
 const HELPER_FAILSAFE_BOUND_MS = 5_000
+
 
 afterEach(async () => {
   resetModelPreflightCacheForTests()
@@ -208,6 +209,7 @@ process.stdout.write("builtin/fallback\\n")
   })
 
   test("#given a launcher whose grandchild holds the output pipes #when the probe times out #then it degrades without waiting for the grandchild", async () => {
+    useTestTimeout(30_000)
     // given: wrapper and grandchild park on a control socket owned by THIS test process, so both
     // die when that socket closes - through teardown or through this process dying outright.
     // The grandchild keeps holding the inherited output pipes even after the launcher itself is
@@ -285,7 +287,7 @@ control.once("error", () => process.exit(0))
 
       // and then: the ORIGINAL wrapper is observed through its own pid file - production must
       // have killed the launcher rather than merely abandoning it.
-      const wrapperPid = await readPidFileWhenWritten(wrapperPidPath, HELPER_EXIT_BOUND_MS)
+      const wrapperPid = await readPidFileWhenWritten(wrapperPidPath, remainingTestTime())
       expect(pidAlive(wrapperPid)).toBe(false)
 
       // and then (POSIX only): the grandchild outlives the killed launcher while still holding the
@@ -295,19 +297,19 @@ control.once("error", () => process.exit(0))
       // suite tree-kills there instead of asserting survival), so the surviving-grandchild
       // premise cannot be staged on that platform at all.
       if (process.platform !== "win32") {
-        const grandchildIdentity = await readPidWhenWritten(grandchildPidPath, HELPER_EXIT_BOUND_MS, "grandchild.mjs")
+        const grandchildIdentity = await readPidWhenWritten(grandchildPidPath, remainingTestTime(), "grandchild.mjs")
         grandchildIdentityForCleanup = grandchildIdentity
         expect(identityMatches(grandchildIdentity) && pidAlive(grandchildIdentity.pid)).toBe(true)
         // The grandchild writes its pid file BEFORE connect(); awaiting its explicit connected
         // marker guarantees the control snapshot below contains its socket on every runner.
-        expect(await waitForFileToExist(grandchildConnectedPath, HELPER_EXIT_BOUND_MS)).toBe(true)
+        expect({ "grandchild connected marker written": await waitForFileToExist(grandchildConnectedPath, remainingTestTime()) }).toEqual({ "grandchild connected marker written": true })
         const helperClosures = [...connections].map((socket) => new Promise<void>((resolve) => {
           if (socket.destroyed) return resolve()
           socket.once("close", () => resolve())
         }))
         closeControlChannel(control, connections)
         await Promise.all(helperClosures)
-        expect(await pidTerminalWithin(grandchildIdentity, HELPER_EXIT_BOUND_MS)).toBe(true)
+        expect({ "grandchild exited": await pidTerminalWithin(grandchildIdentity, remainingTestTime()) }).toEqual({ "grandchild exited": true })
       }
     } finally {
       // Fail-safe: even when an assertion above failed - or when the win32 branch never captured an
