@@ -378,6 +378,41 @@
 								"null"
 							],
 							"default": null
+						},
+						"timeoutMs": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint64",
+							"minimum": 0,
+							"default": null
+						},
+						"since": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint64",
+							"minimum": 0,
+							"description": "Only nodes changed since this generation.",
+							"default": null
+						},
+						"skeleton": {
+							"type": [
+								"boolean",
+								"null"
+							],
+							"description": "Roles and refs only, no values.",
+							"default": null
+						},
+						"root": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "Snapshot only under this ref.",
+							"default": null
 						}
 					},
 					"additionalProperties": false
@@ -469,6 +504,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -560,6 +600,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -655,6 +700,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -745,6 +795,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -812,6 +867,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -839,6 +899,10 @@
 							"type": "null"
 						}
 					]
+				},
+				"force": {
+					"type": "boolean",
+					"description": "Sends a chord the engine treats as dangerous (`cmd+q`, `alt+f4`)."
 				}
 			},
 			"required": [
@@ -882,6 +946,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -958,6 +1027,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -1058,6 +1132,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -1201,6 +1280,41 @@
 								"boolean",
 								"null"
 							],
+							"default": null
+						},
+						"timeoutMs": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint64",
+							"minimum": 0,
+							"default": null
+						},
+						"since": {
+							"type": [
+								"integer",
+								"null"
+							],
+							"format": "uint64",
+							"minimum": 0,
+							"description": "Only nodes changed since this generation.",
+							"default": null
+						},
+						"skeleton": {
+							"type": [
+								"boolean",
+								"null"
+							],
+							"description": "Roles and refs only, no values.",
+							"default": null
+						},
+						"root": {
+							"type": [
+								"string",
+								"null"
+							],
+							"description": "Snapshot only under this ref.",
 							"default": null
 						}
 					},
@@ -1464,6 +1578,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -1532,6 +1651,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false
@@ -1638,6 +1762,11 @@
 								"null"
 							],
 							"default": null
+						},
+						"consume": {
+							"type": "boolean",
+							"description": "After this action the frame may not be used for input again.",
+							"default": false
 						}
 					},
 					"additionalProperties": false

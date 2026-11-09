@@ -9,7 +9,8 @@
   // Remove an entry when its finding is fixed. Root-workspace file ignores live at the top level (knip reads the root
   // workspace's ignoreIssues only there).
   // Third-party projects vendored as git submodules; the build materializes them, they are not this repository's code.
-  "ignore": ["packages/shared-skills/upstreams/**"],
+  // The bunshin-ts build output, vendored with only its dependency imports rewritten (pinned by packages/omo-senpi/vendor/PIN.json) is upstream code too.
+  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**"],
   // Unused exports already present at origin dev 4686e425b5, named per symbol. knip has no per-symbol ignore and a file-wide
   // ignoreIssues "exports" entry would also hide a new unused export in that file, so script/knip-preexisting-exports.ts
   // (shared byte for byte with omo-relay-daemon, sha256-pinned by script/knip-coverage.test.ts) drops exactly these names, and
@@ -67,7 +68,7 @@
       "packages/device-service-core/src/local-api/dacl.ts": ["CURRENT_USER_SID_SCRIPT"],
       "packages/device-service-core/src/local-api/limits.ts": ["LOCAL_JSON_EXPANSION_MAX"],
       "packages/device-service-core/src/local-api/transport.ts": ["readEndpointPort"],
-      "packages/device-service-core/src/local-api/validate-fields.ts": ["PATH_MAX_CHARS", "ENTRY_ID_MAX_BYTES", "NONCE_CHARS"],
+      "packages/device-service-core/src/local-api/validate-fields.ts": ["ENTRY_ID_MAX_BYTES", "NONCE_CHARS"],
       "packages/device-service-core/src/local-api/validate-shapes.ts": ["millis"],
       "packages/device-service-core/src/local-api/validate.ts": ["EVENT_KINDS"],
       "packages/device-service-core/src/local-api/vocabulary.ts": ["CLIENT_ERROR_CODES"],
@@ -308,8 +309,6 @@
       "packages/memory-core/src/sync/crypto/vendor/sync-format/stream.ts": ["PLAINTEXT_LIMIT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) SyncCommitError
       "packages/memory-core/src/sync/engine/adapters/git-sync-repo.ts": ["SyncCommitError"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) OversizedItemError
-      "packages/memory-core/src/sync/engine/batches.ts": ["OversizedItemError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ManualClock, inProcessLock
       "packages/memory-core/src/sync/engine/engine-harness.test-support.ts": ["ManualClock", "inProcessLock"],
       // pre-existing at origin dev 4686e425b5: unused export(s) POLL_MS
@@ -492,8 +491,6 @@
       "packages/omo-config-core/src/schema/agent.ts": ["OmoAgentModelEntrySchema", "OmoAgentPermissionSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) OmoHarnessIdSchema, OmoOpenCodeHarnessConfigSchema, OmoDisabledSkillsSchema, OmoExcludedModelsSchema
       "packages/omo-config-core/src/schema/config.ts": ["OmoHarnessIdSchema", "OmoOpenCodeHarnessConfigSchema", "OmoDisabledSkillsSchema", "OmoExcludedModelsSchema"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) LEGACY_CATEGORY_NAME_ALIASES
-      "packages/omo-config-core/src/schema/legacy-category-names.ts": ["LEGACY_CATEGORY_NAME_ALIASES"],
       // pre-existing at origin dev 4686e425b5: unused export(s) OmoMemoryReflectionTriggerSchema, OmoMemoryReflectionSchema, OmoMemorySyncSchema, OmoMemorySearchSchema, OmoMemoryRecallEventCapsSchema, OmoMemoryProjectScopeSchema, OmoMemoryProjectScopeLayerSchema, OmoMemoryNudgeSchema, OmoMemoryFactsSchema, OmoMemoryDreamSchema and 18 more
       "packages/omo-config-core/src/schema/memory.ts": ["OmoMemoryReflectionTriggerSchema", "OmoMemoryReflectionSchema", "OmoMemorySyncSchema", "OmoMemorySearchSchema", "OmoMemoryRecallEventCapsSchema", "OmoMemoryProjectScopeSchema", "OmoMemoryProjectScopeLayerSchema", "OmoMemoryNudgeSchema", "OmoMemoryFactsSchema", "OmoMemoryDreamSchema", "OmoMemoryPeopleSchema", "OmoMemorySoulSchema", "OmoMemoryWriteNoticeSchema", "OmoMemoryReflectionTriggerLayerSchema", "OmoMemoryReflectionLayerSchema", "OmoMemorySyncLayerSchema", "OmoMemorySearchLayerSchema", "OmoMemoryRecallEventCapsLayerSchema", "OmoMemoryNudgeLayerSchema", "OmoMemoryFactsLayerSchema", "OmoMemoryDreamLayerSchema", "OmoMemoryPeopleLayerSchema", "OmoMemorySoulLayerSchema", "OmoMemoryWriteNoticeLayerSchema", "OmoMemoryProjectionSchema", "OmoMemoryProjectionLayerSchema", "OmoMemoryAgentOverridesSchema", "OmoMemoryAutoIdentitySchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) OmoModelCatalogEntrySchema, OmoModelCatalogEntryLayerSchema
@@ -514,8 +511,6 @@
       "packages/omo-native/bin/lib/bun-runtime.js": ["BUN_MIN_VERSION", "resolveBunGuard", "findNodeBinary"],
       // pre-existing at origin dev 4686e425b5: unused export(s) COMPUTER_USE_RUNTIME
       "packages/omo-native/bin/lib/computer-use-doctor.js": ["COMPUTER_USE_RUNTIME"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) TASK_CONFIG_RUNTIME
-      "packages/omo-native/bin/lib/daemon-config.js": ["TASK_CONFIG_RUNTIME"],
       // pre-existing at origin dev 4686e425b5: unused export(s) aggregateEndpoints
       "packages/omo-native/bin/lib/daemon-status.js": ["aggregateEndpoints"],
       // pre-existing at origin dev 4686e425b5: unused export(s) omoInstallsOnPath, findLegacyPackages, findOpenCodeRegistrations, formatMigrationLines, openCodeRoutingReport
@@ -561,7 +556,8 @@
       // pre-existing at origin dev 4d3161eabd (#11430, 950c2dd65f): unused export(s) HashDirectoryRuntimeError
       "packages/omo-native/openssl-hash-dir.ts": ["HashDirectoryRuntimeError"],
       // pre-existing at origin dev 4686e425b5: unused export(s) resolveDaemonTaskSettings
-      "packages/omo-native/task-config-entry.ts": ["resolveDaemonTaskSettings"],
+      // resolveGlobalMemorySettings: read by omo doctor --fix through the staged plugin/runtime/task-config bundle (#12479)
+      "packages/omo-native/task-config-entry.ts": ["resolveDaemonTaskSettings", "resolveGlobalMemorySettings"],
       // pre-existing at origin dev 4686e425b5: unused export(s) SOURCE_ROOT
       "packages/omo-native/test/bun-bin-shim.fixture.ts": ["SOURCE_ROOT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) identityRealpath, existsOnly
@@ -634,8 +630,8 @@
       "packages/omo-opencode/src/config/schema.ts": ["AnyMcpNameSchema", "McpNameSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) AgentDefinitionPathSchema
       "packages/omo-opencode/src/config/schema/agent-definitions.ts": ["AgentDefinitionPathSchema"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) BuiltinAgentNameSchema, OverridableAgentNameSchema, AgentNameSchema
-      "packages/omo-opencode/src/config/schema/agent-names.ts": ["BuiltinAgentNameSchema", "OverridableAgentNameSchema", "AgentNameSchema"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) AgentNameSchema
+      "packages/omo-opencode/src/config/schema/agent-names.ts": ["AgentNameSchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) FallbackModelStringArraySchema, FallbackModelObjectArraySchema, FallbackModelMixedArraySchema
       "packages/omo-opencode/src/config/schema/fallback-models.ts": ["FallbackModelStringArraySchema", "FallbackModelObjectArraySchema", "FallbackModelMixedArraySchema"],
       // pre-existing at origin dev 4686e425b5: unused export(s) PermissionValueSchema
@@ -836,8 +832,6 @@
       "packages/omo-opencode/src/hooks/runtime-fallback/agent-resolver.ts": ["AGENT_NAMES"],
       // pre-existing at origin dev 4686e425b5: unused export(s) extractRetryableSignal
       "packages/omo-opencode/src/hooks/runtime-fallback/error-classifier.ts": ["extractRetryableSignal"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) getLastUserRetryParts
-      "packages/omo-opencode/src/hooks/runtime-fallback/last-user-retry-parts.ts": ["getLastUserRetryParts"],
       // pre-existing at origin dev 4686e425b5: unused export(s) hasVisibleAssistantResponse
       "packages/omo-opencode/src/hooks/runtime-fallback/message-update-handler.ts": ["hasVisibleAssistantResponse"],
       // pre-existing at origin dev 4686e425b5: unused export(s) HOOK_NAME
@@ -870,8 +864,6 @@
       "packages/omo-opencode/src/plugin/ultrawork-model-override.ts": ["detectUltrawork"],
       // pre-existing at origin dev 4686e425b5: unused export(s) validateAgentOrder
       "packages/omo-opencode/src/shared/agent-ordering.ts": ["validateAgentOrder"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) hasCompactionPart
-      "packages/omo-opencode/src/shared/compaction-marker.ts": ["hasCompactionPart"],
       // pre-existing at origin dev 4686e425b5: unused export(s) createConnectedProvidersCacheStore, findProviderModelMetadata
       "packages/omo-opencode/src/shared/connected-providers-cache.ts": ["createConnectedProvidersCacheStore", "findProviderModelMetadata"],
       // pre-existing at origin dev 4686e425b5: unused export(s) containsPath
@@ -1140,8 +1132,6 @@
       "packages/omo-senpi/src/components/memory/commands/types.ts": ["identityFor"],
       // pre-existing at origin dev 4686e425b5: unused export(s) getMemoryRepo
       "packages/omo-senpi/src/components/memory/context.ts": ["getMemoryRepo"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_SERVICE_API
-      "packages/omo-senpi/src/components/memory/device-session/account-source.ts": ["DEFAULT_SERVICE_API"],
       // pre-existing at origin dev 4686e425b5: unused export(s) FakeScheduler
       "packages/omo-senpi/src/components/memory/dream-trigger.test-support.ts": ["FakeScheduler"],
       // pre-existing at origin dev 4686e425b5: unused export(s) factsAgreementContract
@@ -1155,6 +1145,8 @@
       // pre-existing at origin dev 4686e425b5: unused export(s) AVAILABLE_MODEL
       "packages/omo-senpi/src/components/memory/facts-runner.test-support.ts": ["AVAILABLE_MODEL"],
       // pre-existing at origin dev 4686e425b5: unused export(s) getMemoryRepo
+      // the senpi engine loads this extension's default export by path (`senpi -e <file>` in index-engine.test.ts)
+      "packages/omo-senpi/src/components/memory/index-engine.fixture.ts": ["default"],
       "packages/omo-senpi/src/components/memory/index.ts": ["getMemoryRepo"],
       // pre-existing at origin dev 4686e425b5: unused export(s) UNAVAILABLE_CATEGORY_MAX_CHARS, GATE_MODEL_MAX_CHARS
       "packages/omo-senpi/src/components/memory/kibitzer/notice.ts": ["UNAVAILABLE_CATEGORY_MAX_CHARS", "GATE_MODEL_MAX_CHARS"],
@@ -1540,8 +1532,6 @@
       "packages/senpi-task/src/manager/held-send.ts": ["holdsInChild"],
       // pre-existing at origin dev 4686e425b5: unused export(s) TaskConcurrency, decideDepthPolicy, NameRegistry, AUTO_HOST_CAPABILITIES, adaptInProcessHandle, adaptRpcHandle, TASK_AWAITING_INPUT_EVENT, TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT, logTranscriptEvent and 1 more
       "packages/senpi-task/src/manager/index.ts": ["TaskConcurrency", "decideDepthPolicy", "NameRegistry", "AUTO_HOST_CAPABILITIES", "adaptInProcessHandle", "adaptRpcHandle", "TASK_AWAITING_INPUT_EVENT", "TRANSCRIPT_ASSISTANT_EVENT", "TRANSCRIPT_TOOL_EVENT", "logTranscriptEvent", "subscribeTranscriptLog"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) START_REPORT_WINDOW_MS
-      "packages/senpi-task/src/manager/manager.ts": ["START_REPORT_WINDOW_MS"],
       // pre-existing at origin dev 4686e425b5: unused export(s) readObservedModel, observeChildEffectiveModel
       "packages/senpi-task/src/manager/observed-model.ts": ["readObservedModel", "observeChildEffectiveModel"],
       // pre-existing at origin dev 4686e425b5: unused export(s) PausedChildLostError, PausedChildOwnedElsewhereError
@@ -1676,8 +1666,8 @@
       "packages/shared-skills/index.d.ts": ["sharedSkillsRootPath"],
       // pre-existing at origin dev 4686e425b5: unused export(s) designpowersUpstreamName, excludedDesignpowersSkills, designpowersAgentFiles
       "packages/shared-skills/scripts/designpowers-refs-manifest.mjs": ["designpowersUpstreamName", "excludedDesignpowersSkills", "designpowersAgentFiles"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) sharedSkillsRoot, tasteSkillFiles, uiUxDbFileRenames, brandDesignFiles, designMaterializeMap, uiUxDbMaterializeMap, keptDesignRelativePaths
-      "packages/shared-skills/scripts/frontend-refs-manifest.mjs": ["sharedSkillsRoot", "tasteSkillFiles", "uiUxDbFileRenames", "brandDesignFiles", "designMaterializeMap", "uiUxDbMaterializeMap", "keptDesignRelativePaths"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) sharedSkillsRoot, tasteSkillFiles, uiUxDbFileRenames, brandDesignFiles, designMaterializeMap, uiUxDbMaterializeMap
+      "packages/shared-skills/scripts/frontend-refs-manifest.mjs": ["sharedSkillsRoot", "tasteSkillFiles", "uiUxDbFileRenames", "brandDesignFiles", "designMaterializeMap", "uiUxDbMaterializeMap"],
       // pre-existing at origin dev 4686e425b5: unused export(s) __scriptPath
       "packages/shared-skills/scripts/materialize-frontend-refs.mjs": ["__scriptPath"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ignoredSkillSourceDirNames, ignoredSkillSourceFileNames, createSkillSourceCopyFilter
@@ -1686,8 +1676,8 @@
       "packages/shared-skills/skill-source-filter.mjs": ["ignoredSkillSourceFileNames"],
       // pre-existing at origin dev 4686e425b5: unused export(s) BROWSER_ENGINE_ENV
       "packages/shared-skills/skills/browser/scripts/browser-engine-guard.mjs": ["BROWSER_ENGINE_ENV"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) BROWSER_ENGINE_ENV, resolveOmowrightEntry, loadOmowright
-      "packages/shared-skills/skills/browser/scripts/omowright.mjs": ["BROWSER_ENGINE_ENV", "resolveOmowrightEntry", "loadOmowright"],
+      // pre-existing at origin dev 4686e425b5: unused export(s) BROWSER_ENGINE_ENV, resolveOmowrightEntry
+      "packages/shared-skills/skills/browser/scripts/omowright.mjs": ["BROWSER_ENGINE_ENV", "resolveOmowrightEntry"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MAX_ROWS, MAX_OUTPUT_BYTES
       "packages/shared-skills/skills/debugging/references/scripts/dap.mjs": ["MAX_ROWS", "MAX_OUTPUT_BYTES"],
       // pre-existing at origin dev 4686e425b5: unused export(s) classifyName
@@ -1883,35 +1873,37 @@
       // pre-existing at origin dev 4686e425b5: unused export(s) parseTarListingOutput
       "packages/utils/src/zip-entry-listing/tar-zip-entry-listing.ts": ["parseTarListingOutput"],
       // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
-      "packages/web/app/[locale]/[...rest]/page.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/[...rest]/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/docs/[slug]/page.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/docs/[slug]/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/docs/install/page.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/docs/install/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/docs/layout.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/docs/layout.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/docs/page.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/docs/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/download/page.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/download/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/layout.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/layout.tsx": ["default"],
+      // the home page has its own root layout (omo.dev renewal draft)
+      "packages/web/app/[locale]/(home)/layout.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/manifesto/2026-01/layout.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/manifesto/2026-01/layout.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/manifesto/2026-01/page.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/manifesto/2026-01/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/manifesto/layout.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/manifesto/layout.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/manifesto/page.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/manifesto/page.tsx": ["default"],
       // added on dev after the last merge (origin dev 2b5831715e): unused export(s) default
-      "packages/web/app/[locale]/not-found.tsx": ["default"],
+      "packages/web/app/[locale]/(site)/not-found.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/page.tsx": ["default"],
+      "packages/web/app/[locale]/(home)/page.tsx": ["default"],
+      // re-exported as the home page's generateMetadata (app/[locale]/(home)/page.tsx), which knip does not follow
+      "packages/web/components/home/home-page.tsx": ["generateHomeMetadata"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
-      "packages/web/app/[locale]/support/page.tsx": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) generateLandingMetadata
-      "packages/web/app/_components/landing-page.tsx": ["generateLandingMetadata"],
+      "packages/web/app/[locale]/(site)/support/page.tsx": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GET
       "packages/web/app/api/downloads/route.ts": ["GET"],
       // pre-existing at origin dev 4686e425b5: unused export(s) GET
@@ -1939,16 +1931,12 @@
       "packages/web/app/twitter-image.tsx": ["default", "alt", "size", "contentType"],
       // pre-existing at origin dev 4686e425b5: unused export(s) findHashSectionId
       "packages/web/components/docs/use-docs-navigation.ts": ["findHashSectionId"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) STAGE_STATES
-      "packages/web/components/landing/crafted/stage-states.ts": ["STAGE_STATES"],
       // pre-existing at origin dev 4686e425b5: unused export(s) ROW_GAP, WAVE_HEADER_HEIGHT
       "packages/web/components/landing/dag/layout.ts": ["ROW_GAP", "WAVE_HEADER_HEIGHT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) eventIndexAt
       "packages/web/components/landing/dag/scenario.ts": ["eventIndexAt"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/web/components/landing/graph/graph-hero.tsx": ["default"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) TerminalTypewriter
-      "packages/web/components/landing/motion-wrappers.tsx": ["TerminalTypewriter"],
       // pre-existing at origin dev 4686e425b5: unused export(s) KIBITZER_STEP_COUNT
       "packages/web/components/landing/story-data.ts": ["KIBITZER_STEP_COUNT"],
       // pre-existing at origin dev 4686e425b5: unused export(s) LEGACY_MANIFESTO_PATH
@@ -2640,6 +2628,8 @@
         "**/*.test-d.ts",
         "src/git/test-repo-config.test-support.ts",
         "src/recall/bm25-persist.ts",
+        // bundled by path by script/build-reflection-lock.ts into the doctor CLI's reflection-lock.generated.js
+        "src/reflection/reflection-lock-bundle.ts",
         "src/sync/item/test-support.ts",
         "src/sync/account/testing/credential-writer.test-support.ts",
         "src/sync/keyring-port.ts",
@@ -2918,6 +2908,8 @@
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "scripts/qa/fused-equivalence-e2e.mjs",
+        // run by path as the bunshin-ts eval SDK's live QA driver (scripts/qa/AGENTS.md)
+        "scripts/qa/bunshin-ts-eval-sdk-qa.mjs",
         "src/components/claim-receipt/runtime.ts",
         "src/components/computer-use/runtime.ts",
         "src/components/device-service/runtime.ts",
@@ -2925,8 +2917,13 @@
         "src/components/memory/commands/runtime.ts",
         "src/components/memory/device-session/account-runtime.ts",
         // spawned by path from tests: a child process or Worker entry, never imported
+        // compiled by path with `bun build --compile` in channel-compiled.test.ts
+        "src/components/memory/desktop-sync/channel-compiled.fixture.ts",
         "src/components/memory/desktop-sync/hostSelection.fixture.ts",
         "src/components/memory/device-session/sibling-writer.fixture.ts",
+        "src/components/memory/index-engine.fixture.ts",
+        "src/components/memory/index-observer.fixture.ts",
+        "src/components/memory/index-selection.fixture.ts",
         "src/components/memory/kibitzer/tools/test-support.ts",
         "src/components/memory/palace/runtime.ts",
         "src/components/memory/recall-store-runtime.ts",
@@ -3673,6 +3670,8 @@
         "src/cli/service-auth/accounts-closed.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/service-auth/cli-keystore.fixture.ts",
+        // a --preload fixture: closed-device-login.test.ts runs it in a launcher child, nothing imports it (#12639)
+        "src/cli/service-auth/closed-device-login.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/service-auth/refresh-child.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -3896,6 +3895,8 @@
         "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "bin/senpi-patch.mjs",
+        // the engine entry the npm launcher spawns by path for a launch that claims memory sync at boot (launcher.js)
+        "bin/lib/engine-boot.js",
         // the manual GUI-session QA runner for the keychain helper: a person runs it by path in a dedicated QA login session
         "keychain-helper/gui-session-runner.ts",
         "keychain-helper/build.ts",

@@ -112,6 +112,8 @@ Before the first task command, create one `RUN_TMP=$(mktemp -d)` per task, track
 At task end, after owned processes exit, remove only owned directories, including runtime caches. Never wipe shared caches; retain worktrees still needed by open PRs and any parent directory containing them.
 
 ## 0. Survey the skills, gather context, then size the work
+This section records into the notepad, so run section 2's `NOTE=`
+command first; section 2 then initialises that same file.
 First, survey the loaded skill list and read the description of each
 loosely relevant skill. Decide explicitly which skills this task will
 use and prefer using every genuinely applicable one — name them in the

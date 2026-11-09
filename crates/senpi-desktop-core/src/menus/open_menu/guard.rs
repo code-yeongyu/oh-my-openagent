@@ -64,7 +64,7 @@ pub fn guard<B>(
                 items,
                 ..
             }),
-        ) if matches!(watch, Watch::ListAndClose) => Ok(Some(MenuReport { items })),
+        ) if matches!(watch, Watch::ListAndClose) => Ok(Some(MenuReport { items, report: None })),
         (Ok(()), Ok(Settled::Unchosen { refusal, items, .. })) => Err(DesktopError::input_failed(
             unchosen_message(press, refusal.as_deref(), &items),
         )),

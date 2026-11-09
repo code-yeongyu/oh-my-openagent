@@ -22,20 +22,20 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 | `capture` | read | no | no | `CaptureParams` | `CaptureResult` | `ErrorCode` |
 | `captureRegion` | read | no | no | `CaptureRegionParams` | `CaptureResult` | `ErrorCode` |
 | `observe` | read | no | no | `ObserveParams` | `ObserveResult` | `ErrorCode` |
-| `click` | exec | no | no | `PointParams` | `Option<MenuReport>` | `ErrorCode` |
-| `moveMouse` | exec | no | no | `PointParams` | `null` | `ErrorCode` |
-| `drag` | exec | no | no | `DragParams` | `Option<MenuReport>` | `ErrorCode` |
-| `scroll` | exec | no | no | `ScrollParams` | `null` | `ErrorCode` |
-| `typeText` | exec | no | no | `TypeTextParams` | `null` | `ErrorCode` |
-| `keyChord` | exec | no | no | `KeyChordParams` | `null` | `ErrorCode` |
-| `holdKeys` | exec | no | no | `HoldKeysParams` | `null` | `ErrorCode` |
-| `holdMouse` | exec | no | no | `HoldMouseParams` | `null` | `ErrorCode` |
-| `raiseWindow` | exec | no | no | `RaiseWindowParams` | `null` | `ErrorCode` |
-| `window.bringToCurrentSpace` | exec | no | no | `BringToCurrentSpaceParams` | `null` | `ErrorCode` |
+| `click` | exec | no | no | `PointParams` | `Option<PressReport>` | `ErrorCode` |
+| `moveMouse` | exec | no | no | `PointParams` | `Option<ActionReport>` | `ErrorCode` |
+| `drag` | exec | no | no | `DragParams` | `Option<PressReport>` | `ErrorCode` |
+| `scroll` | exec | no | no | `ScrollParams` | `Option<ActionReport>` | `ErrorCode` |
+| `typeText` | exec | no | no | `TypeTextParams` | `Option<ActionReport>` | `ErrorCode` |
+| `keyChord` | exec | no | no | `KeyChordParams` | `Option<ActionReport>` | `ErrorCode` |
+| `holdKeys` | exec | no | no | `HoldKeysParams` | `Option<ActionReport>` | `ErrorCode` |
+| `holdMouse` | exec | no | no | `HoldMouseParams` | `Option<ActionReport>` | `ErrorCode` |
+| `raiseWindow` | exec | no | no | `RaiseWindowParams` | `Option<ActionReport>` | `ErrorCode` |
+| `window.bringToCurrentSpace` | exec | no | no | `BringToCurrentSpaceParams` | `Option<ActionReport>` | `ErrorCode` |
 | `menus.items` | read | no | no | `MenuPathParams` | `Vec<MenuItem>` | `ErrorCode` |
-| `menus.select` | exec | no | no | `MenuSelectParams` | `null` | `ErrorCode` |
+| `menus.select` | exec | no | no | `MenuSelectParams` | `Option<ActionReport>` | `ErrorCode` |
 | `clipboard.read` | read | no | no | `EmptyParams` | `ClipboardText` | `ErrorCode` |
-| `clipboard.write` | exec | no | no | `ClipboardText` | `null` | `ErrorCode` |
+| `clipboard.write` | exec | no | no | `ClipboardText` | `Option<ActionReport>` | `ErrorCode` |
 | `ax.snapshot` | read | no | no | `AxSnapshotParams` | `AxSnapshot` | `ErrorCode` |
 | `ax.query` | read | no | no | `AxQueryParams` | `Vec<AxNode>` | `ErrorCode` |
 | `ax.elementAt` | read | no | no | `AxElementAtParams` | `Option<AxNode>` | `ErrorCode` |
@@ -44,13 +44,13 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 | `ax.attributes` | read | no | no | `AxRefParams` | `Vec<(String, String)>` | `ErrorCode` |
 | `ax.children` | read | no | no | `AxRefParams` | `Vec<AxNode>` | `ErrorCode` |
 | `ax.parent` | read | no | no | `AxRefParams` | `Option<AxNode>` | `ErrorCode` |
-| `ax.perform` | exec | no | no | `AxPerformParams` | `Option<MenuReport>` | `ErrorCode` |
-| `ax.setValue` | exec | no | no | `AxSetValueParams` | `null` | `ErrorCode` |
-| `ax.focus` | exec | no | no | `AxRefParams` | `null` | `ErrorCode` |
-| `ax.click` | exec | no | no | `AxClickParams` | `Option<MenuReport>` | `ErrorCode` |
+| `ax.perform` | exec | no | no | `AxPerformParams` | `Option<PressReport>` | `ErrorCode` |
+| `ax.setValue` | exec | no | no | `AxSetValueParams` | `Option<ActionReport>` | `ErrorCode` |
+| `ax.focus` | exec | no | no | `AxRefParams` | `Option<ActionReport>` | `ErrorCode` |
+| `ax.click` | exec | no | no | `AxClickParams` | `Option<PressReport>` | `ErrorCode` |
 | `ax.typeText` | exec | no | no | `AxTypeTextParams` | `AxInputResult` | `ErrorCode` |
 | `ax.selectText` | exec | no | no | `AxSelectTextParams` | `AxTextSelection` | `ErrorCode` |
-| `ax.keyChord` | exec | no | no | `AxKeyChordParams` | `null` | `ErrorCode` |
+| `ax.keyChord` | exec | no | no | `AxKeyChordParams` | `Option<ActionReport>` | `ErrorCode` |
 | `stopPath.start` | exec | yes | no | `StopPathStartParams` | `StopPathStatus` | `ErrorCode`; `-32601` hostOnly via a bridge |
 | `stopPath.status` | read | no | no | `EmptyParams` | `StopPathStatus` | `ErrorCode` |
 | `stopPath.heartbeat` | read | yes | no | `EmptyParams` | `null` | `ErrorCode`; `-32601` hostOnly via a bridge |
@@ -66,10 +66,11 @@ Protocol version `1`, ABI `senpi-desktop/1`. JSON-RPC 2.0, one JSON message per 
 | `audit` | `AuditEvent` |
 | `stopPath.changed` | `StopPathStatus` |
 | `engine.log` | `EngineLog` |
+| `epoch.changed` | `EpochChanged` |
 
 ## Errors
 
-An engine error is `{code, message, data: {code: <ErrorCode>, hint}}`. A method-level rejection is the standard `-32601 Method not found` with `data: {reason: "unknown" | "hostOnly" | "testOnly"}`. Malformed input uses the standard `-32700`, `-32600`, and `-32602`. `CaptureUnavailable` also carries `data: {captureUnavailable: {reason}}`; B9 defines the reason `"minimized"` for a window that exists but is minimized. The table is append-only: a new code takes the next ordinal, so no existing numeric code moves.
+An engine error is `{code, message, data: {code: <ErrorCode>, hint}}`. A method-level rejection is the standard `-32601 Method not found` with `data: {reason: "unknown" | "hostOnly" | "testOnly"}`. Malformed input uses the standard `-32700`, `-32600`, and `-32602`. `CaptureUnavailable` also carries `data: {captureUnavailable: {reason}}`; B9 defines the reason `"minimized"` for a window that exists but is minimized. In a session opened with `reportMode: "object"`, every error of a mutating request also carries `data.disposition` (and, when they apply, `reason`, `delivered`, `focusRestoration`), and its result is an `ActionReport` instead of `null`; `engine.hello` lists `action-report` in `features` when the engine supports it. The table is append-only: a new code takes the next ordinal, so no existing numeric code moves.
 
 | ErrorCode | JSON-RPC code |
 |---|---|
@@ -101,6 +102,9 @@ An engine error is `{code, message, data: {code: <ErrorCode>, hint}}`. A method-
 | `AxUnconfirmed` | `-32025` |
 | `SpaceUnsupported` | `-32026` |
 | `SpaceMoveDenied` | `-32027` |
+| `AmbiguousTarget` | `-32028` |
+| `CaptureConsentRequired` | `-32029` |
+| `ProtectedProcess` | `-32030` |
 
 ## Conformance corpus
 

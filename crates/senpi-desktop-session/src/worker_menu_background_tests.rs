@@ -6,7 +6,8 @@
 use senpi_desktop_backend_fake::{RecordedPointer, SinkOp};
 use senpi_desktop_core::protocol_params::{AxPerformParams, DragParams, PointParams};
 use senpi_desktop_core::protocol_results::MenuReport;
-use senpi_desktop_core::types::{DesktopPoint, PointerOptions};
+use senpi_desktop_core::report::{Disposition, ReportMode};
+use senpi_desktop_core::types::{DesktopPoint, DesktopSessionOptions, PointerOptions};
 use serde_json::{json, Value};
 
 use crate::request::{Op, Response};
@@ -41,6 +42,7 @@ const LISTED: &str = "\"Rename\", \"Duplicate\", \"Delete\" (disabled)";
 fn listed() -> Response {
     Response::MenuOutcome(Some(MenuReport {
         items: LISTED.to_owned(),
+        report: None,
     }))
 }
 
@@ -199,4 +201,28 @@ fn show_menu_without_a_path_on_a_background_element_lists_and_closes() {
     }));
     assert_eq!(reply, Ok(Response::MenuOutcome(None)));
     assert_eq!(menu_ops(&harness).len(), 1);
+}
+
+#[test]
+fn an_object_mode_press_that_lists_a_menu_carries_its_action_report() {
+    // Given an object-mode session over a background window with a menu
+    let mut harness = harness(&fixture(false));
+    harness.worker.open(DesktopSessionOptions {
+        report_mode: ReportMode::Object,
+        ..DesktopSessionOptions::default()
+    });
+    let frame = harness.capture("101");
+    // When a right click opens the menu, which is listed and closed
+    let reply = harness.process(click(&frame, 300.0, 300.0, "right"));
+    // Then the listing stays and the action report rides along with it
+    let Ok(Response::MenuOutcome(Some(menu))) = reply else {
+        panic!("expected a menu listing, got {reply:?}");
+    };
+    assert_eq!(menu.items, LISTED);
+    let report = menu.report.expect("object mode carries the action report");
+    assert_eq!(report.disposition, Disposition::DELIVERED_UNVERIFIED);
+    // And a press that opens no menu answers a plain action report
+    let frame = harness.capture("101");
+    let reply = harness.process(click(&frame, 720.0, 570.0, "left"));
+    assert!(matches!(reply, Ok(Response::Action(_))), "{reply:?}");
 }

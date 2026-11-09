@@ -47,7 +47,7 @@ impl Worker {
                 &mut || mutation.text_delivered.set(mutation.text_delivered.get().saturating_add(1)),
             )?;
             match delivered {
-                ElementDelivery::Delivered(method) => Ok(Response::AxInput(AxInputResult { method })),
+                ElementDelivery::Delivered(method) => Ok(Response::AxInput(AxInputResult { method, report: None })),
                 ElementDelivery::Unfocused(focus) => Err(worker.element_focus_refusal(&params.ref_, focus, mode)),
             }
         })

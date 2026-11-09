@@ -22,7 +22,7 @@ describe("device authorization", () => {
       return outcome === "approved" ? Response.json(grant) : refusal(outcome ?? "invalid_grant")
     })
     const shown: unknown[] = []
-    await loginDevice(createSession({ api, store: secrets.store(api), home: await temporaryHome() }), {
+    await loginDevice(createSession({ beforeKeysDiscarded: async () => undefined, api, store: secrets.store(api), home: await temporaryHome() }), {
       name: "Test CLI", platform: "linux", ...time,
       show: value => { shown.push(value) }, chooseDevice: async () => null,
     })
@@ -42,7 +42,7 @@ describe("device authorization", () => {
         polls++
         return refusal(code)
       })
-      await expect(loginDevice(createSession({ api, store: secrets.store(api), home: await temporaryHome() }), {
+      await expect(loginDevice(createSession({ beforeKeysDiscarded: async () => undefined, api, store: secrets.store(api), home: await temporaryHome() }), {
         name: "Test", platform: "linux", ...clock(), show: () => {}, chooseDevice: async () => null,
       })).rejects.toThrow()
       expect(polls).toBe(1)
@@ -58,7 +58,7 @@ describe("device authorization", () => {
       polls++
       return refusal("authorization_pending")
     })
-    await expect(loginDevice(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
+    await expect(loginDevice(createSession({ beforeKeysDiscarded: async () => undefined, api, store: memorySecrets().store(api), home: await temporaryHome() }), {
       name: "Test", platform: "linux", ...time, show: () => {}, chooseDevice: async () => null,
     })).rejects.toThrow()
     expect(polls).toBe(0)
@@ -82,7 +82,7 @@ describe("device authorization", () => {
         return request.method === "DELETE" ? new Response(null, { status: 204 })
           : Response.json({ devices: [{ id: "old", name: "Old", revokedAt: null }], browsers: [] })
       })
-      const result = loginDevice(createSession({ api, store: secrets.store(api), home: await temporaryHome() }), {
+      const result = loginDevice(createSession({ beforeKeysDiscarded: async () => undefined, api, store: secrets.store(api), home: await temporaryHome() }), {
         name: "Test", platform: "linux", ...clock(), show: () => {},
         chooseDevice: async devices => { expect(devices[0]?.id).toBe("old"); return chosen },
       })
@@ -99,7 +99,7 @@ describe("device authorization", () => {
     "invalid entitlement detail never offers revoke (%j)", async detail => {
       let offers = 0
       const api = fakeApi(request => request.url.endsWith("/code") ? Response.json(minted) : refusal("entitlement_required", detail, 403))
-      await expect(loginDevice(createSession({ api, store: memorySecrets().store(api), home: await temporaryHome() }), {
+      await expect(loginDevice(createSession({ beforeKeysDiscarded: async () => undefined, api, store: memorySecrets().store(api), home: await temporaryHome() }), {
         name: "Test", platform: "linux", ...clock(), show: () => {}, chooseDevice: async () => { offers++; return "old" },
       })).rejects.toThrow()
       expect(offers).toBe(0)

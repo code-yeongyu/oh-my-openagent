@@ -36,10 +36,15 @@ async function run(dependencies: SyncCommandDependencies, action: (context: Sync
   }
 }
 
+// A ceremony pinned a different memory root than this device held before its keys were discarded (#12280).
+const ROOT_CHANGED_JOINED = "This account's memory history changed since this device last joined. If you did not reset memory sync, stop and check your devices."
+const ROOT_CHANGED_CREATED = "This device started a new memory history for this account."
+
 async function enable(dependencies: SyncCommandDependencies, context: SyncContext): Promise<number> {
   const outcome = await enableSync(context)
   if (outcome.kind === "joined") {
     dependencies.output("Memory sync is on for this device.")
+    if (outcome.rootChanged === true) dependencies.error(ROOT_CHANGED_CREATED)
     return 0
   }
   if (outcome.kind === "needs_first_device") {
@@ -51,6 +56,7 @@ async function enable(dependencies: SyncCommandDependencies, context: SyncContex
   switch (joined.kind) {
     case "joined":
       dependencies.output("This device joined your memory. Memory sync is on.")
+      if (joined.rootChanged === true) dependencies.error(ROOT_CHANGED_JOINED)
       return 0
     case "expired":
       dependencies.error("The request expired before another device approved it. Run `omo sync enable` again.")

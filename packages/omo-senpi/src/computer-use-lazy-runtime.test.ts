@@ -47,7 +47,7 @@ const PRELUDE_ASSET_FIELDS: readonly (readonly [field: string, marker: string, s
   [
     "COMPUTER_DOCUMENTATION",
     "host desktop facade, experimental (present while the `computer` tool is active)",
-    "710f136f0cceed194d29693d0fbfaf9c61fb17f01fb83b1c09abb687029210bc",
+    "559989eb14e03915e6f42d8f8033d71cea9c18c13491aa4fc49e4fa3800528de",
   ],
   ["COMPUTER_SAFETY", "<critical>", "bd44e5231c66f4b65c9ac41f8e37234bf6ec70dea6242042ec7246b1a8658db2"],
 ]

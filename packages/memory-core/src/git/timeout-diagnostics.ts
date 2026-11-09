@@ -24,7 +24,7 @@ function processSnapshot(pid: number): string {
   return `${command.stdout}${command.stderr}`
 }
 
-export function recordGitTimeout(environment: NodeJS.ProcessEnv, pid: number | undefined, argv: readonly string[], cwd: string, timeoutMs: number): void {
+export function recordGitTimeout(environment: NodeJS.ProcessEnv, pid: number | undefined, argv: readonly string[], cwd: string, timeoutMs: number, snapshot: (pid: number) => string = processSnapshot): void {
   const directory = environment[GIT_TIMEOUT_DIAGNOSTICS_ENV]
   if (!directory || pid === undefined) return
   try {
@@ -36,7 +36,7 @@ export function recordGitTimeout(environment: NodeJS.ProcessEnv, pid: number | u
       timeoutMs,
       argv: argv.slice(0, 12),
       argCount: argv.length,
-      processes: processSnapshot(pid),
+      processes: snapshot(pid),
     }, null, 2)}\n`)
   } catch (error) {
     process.stderr.write(`git timeout diagnostics could not be written to ${directory}: ${String(error)}\n`)

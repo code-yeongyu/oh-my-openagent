@@ -20,6 +20,7 @@ fn background_window(app: &str) -> DesktopWindow {
         focused: false,
         is_on_screen: None,
         elevated: None,
+        identity: None,
     }
 }
 

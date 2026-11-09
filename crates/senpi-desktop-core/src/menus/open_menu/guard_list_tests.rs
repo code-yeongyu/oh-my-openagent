@@ -43,7 +43,8 @@ fn a_press_watched_without_a_path_lists_the_menu_it_closed() {
     assert_eq!(
         report,
         Some(MenuReport {
-            items: "\"New Folder\"".to_string()
+            items: "\"New Folder\"".to_string(),
+            report: None,
         })
     );
     // The same press that failed after opening its menu reports its own

@@ -17,8 +17,10 @@ use crate::protocol_params::{
     StopPathStartParams, StopPathStopParams, TypeTextParams,
 };
 use crate::protocol_results::{
-    AuditEvent, AxInputResult, AxTextSelection, ControlStateResult, EngineLog, HelloResult, SessionOpenResult, StopPathStatus, MenuReport,
+    AuditEvent, AxInputResult, AxTextSelection, ControlStateResult, EngineLog, EpochChanged, HelloResult, PressReport,
+    SessionOpenResult, StopPathStatus,
 };
+use crate::report::ActionReport;
 use crate::types::{
     AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, ObserveResult,
 };
@@ -97,20 +99,20 @@ method_table! {
     Capture = "capture", Read, Public, CaptureParams => CaptureResult;
     CaptureRegion = "captureRegion", Read, Public, CaptureRegionParams => CaptureResult;
     Observe = "observe", Read, Public, ObserveParams => ObserveResult;
-    Click = "click", Exec, Public, PointParams => Option<MenuReport>;
-    MoveMouse = "moveMouse", Exec, Public, PointParams => ();
-    Drag = "drag", Exec, Public, DragParams => Option<MenuReport>;
-    Scroll = "scroll", Exec, Public, ScrollParams => ();
-    TypeText = "typeText", Exec, Public, TypeTextParams => ();
-    KeyChord = "keyChord", Exec, Public, KeyChordParams => ();
-    HoldKeys = "holdKeys", Exec, Public, HoldKeysParams => ();
-    HoldMouse = "holdMouse", Exec, Public, HoldMouseParams => ();
-    RaiseWindow = "raiseWindow", Exec, Public, RaiseWindowParams => ();
-    RaiseToSpace = "window.bringToCurrentSpace", Exec, Public, BringToCurrentSpaceParams => ();
+    Click = "click", Exec, Public, PointParams => Option<PressReport>;
+    MoveMouse = "moveMouse", Exec, Public, PointParams => Option<ActionReport>;
+    Drag = "drag", Exec, Public, DragParams => Option<PressReport>;
+    Scroll = "scroll", Exec, Public, ScrollParams => Option<ActionReport>;
+    TypeText = "typeText", Exec, Public, TypeTextParams => Option<ActionReport>;
+    KeyChord = "keyChord", Exec, Public, KeyChordParams => Option<ActionReport>;
+    HoldKeys = "holdKeys", Exec, Public, HoldKeysParams => Option<ActionReport>;
+    HoldMouse = "holdMouse", Exec, Public, HoldMouseParams => Option<ActionReport>;
+    RaiseWindow = "raiseWindow", Exec, Public, RaiseWindowParams => Option<ActionReport>;
+    RaiseToSpace = "window.bringToCurrentSpace", Exec, Public, BringToCurrentSpaceParams => Option<ActionReport>;
     MenusItems = "menus.items", Read, Public, MenuPathParams => Vec<MenuItem>;
-    MenusSelect = "menus.select", Exec, Public, MenuSelectParams => ();
+    MenusSelect = "menus.select", Exec, Public, MenuSelectParams => Option<ActionReport>;
     ClipboardRead = "clipboard.read", Read, Public, EmptyParams => ClipboardText;
-    ClipboardWrite = "clipboard.write", Exec, Public, ClipboardText => ();
+    ClipboardWrite = "clipboard.write", Exec, Public, ClipboardText => Option<ActionReport>;
     AxSnapshot = "ax.snapshot", Read, Public, AxSnapshotParams => AxSnapshot;
     AxQuery = "ax.query", Read, Public, AxQueryParams => Vec<AxNode>;
     AxElementAt = "ax.elementAt", Read, Public, AxElementAtParams => Option<AxNode>;
@@ -119,13 +121,13 @@ method_table! {
     AxAttributes = "ax.attributes", Read, Public, AxRefParams => Vec<(String, String)>;
     AxChildren = "ax.children", Read, Public, AxRefParams => Vec<AxNode>;
     AxParent = "ax.parent", Read, Public, AxRefParams => Option<AxNode>;
-    AxPerform = "ax.perform", Exec, Public, AxPerformParams => Option<MenuReport>;
-    AxSetValue = "ax.setValue", Exec, Public, AxSetValueParams => ();
-    AxFocus = "ax.focus", Exec, Public, AxRefParams => ();
-    AxClick = "ax.click", Exec, Public, AxClickParams => Option<MenuReport>;
+    AxPerform = "ax.perform", Exec, Public, AxPerformParams => Option<PressReport>;
+    AxSetValue = "ax.setValue", Exec, Public, AxSetValueParams => Option<ActionReport>;
+    AxFocus = "ax.focus", Exec, Public, AxRefParams => Option<ActionReport>;
+    AxClick = "ax.click", Exec, Public, AxClickParams => Option<PressReport>;
     AxTypeText = "ax.typeText", Exec, Public, AxTypeTextParams => AxInputResult;
     AxSelectText = "ax.selectText", Exec, Public, AxSelectTextParams => AxTextSelection;
-    AxKeyChord = "ax.keyChord", Exec, Public, AxKeyChordParams => ();
+    AxKeyChord = "ax.keyChord", Exec, Public, AxKeyChordParams => Option<ActionReport>;
     StopPathStart = "stopPath.start", Exec, HostOnly, StopPathStartParams => StopPathStatus;
     StopPathStatus = "stopPath.status", Read, Public, EmptyParams => StopPathStatus;
     StopPathHeartbeat = "stopPath.heartbeat", Read, HostOnly, EmptyParams => ();
@@ -148,6 +150,33 @@ impl Method {
     pub fn from_name(name: &str) -> Option<Self> {
         METHODS.iter().find(|spec| spec.name == name).map(|spec| spec.method)
     }
+
+    /// Whether the method answers an `ActionReport` (or, for `ax.typeText` and a
+    /// press that lists the menu it opened, carries one) in a session opened with `reportMode: "object"`.
+    #[must_use]
+    pub const fn reports_action(self) -> bool {
+        matches!(
+            self,
+            Self::Click
+                | Self::MoveMouse
+                | Self::Drag
+                | Self::Scroll
+                | Self::TypeText
+                | Self::KeyChord
+                | Self::HoldKeys
+                | Self::HoldMouse
+                | Self::RaiseWindow
+                | Self::RaiseToSpace
+                | Self::MenusSelect
+                | Self::ClipboardWrite
+                | Self::AxPerform
+                | Self::AxSetValue
+                | Self::AxFocus
+                | Self::AxClick
+                | Self::AxTypeText
+                | Self::AxKeyChord
+        )
+    }
 }
 
 /// Every server-to-client notification, by wire name.
@@ -159,10 +188,12 @@ pub enum Notification {
     StopPathChanged,
     #[serde(rename = "engine.log")]
     EngineLog,
+    #[serde(rename = "epoch.changed")]
+    EpochChanged,
 }
 
 impl Notification {
-    pub const ALL: [Self; 3] = [Self::Audit, Self::StopPathChanged, Self::EngineLog];
+    pub const ALL: [Self; 4] = [Self::Audit, Self::StopPathChanged, Self::EngineLog, Self::EpochChanged];
 
     #[must_use]
     pub const fn name(self) -> &'static str {
@@ -170,6 +201,7 @@ impl Notification {
             Self::Audit => "audit",
             Self::StopPathChanged => "stopPath.changed",
             Self::EngineLog => "engine.log",
+            Self::EpochChanged => "epoch.changed",
         }
     }
 
@@ -180,6 +212,7 @@ impl Notification {
             Self::Audit => "AuditEvent",
             Self::StopPathChanged => "StopPathStatus",
             Self::EngineLog => "EngineLog",
+            Self::EpochChanged => "EpochChanged",
         }
     }
 
@@ -188,6 +221,7 @@ impl Notification {
             Self::Audit => generator.subschema_for::<AuditEvent>(),
             Self::StopPathChanged => generator.subschema_for::<StopPathStatus>(),
             Self::EngineLog => generator.subschema_for::<EngineLog>(),
+            Self::EpochChanged => generator.subschema_for::<EpochChanged>(),
         }
     }
 }

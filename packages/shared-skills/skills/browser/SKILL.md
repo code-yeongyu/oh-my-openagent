@@ -14,7 +14,8 @@ One library, two engines. omowright ships inside this skill; choose the engine b
 | A 403/WAF host the attached engine cannot open, a platform with a native reader, an archive snapshot | neither | the `ultimate-browsing` skill |
 
 **Attached is the default,** because it is the only engine carrying the user's logins and the only
-one where a human is a single call away. Never substitute one engine for the other silently: if
+one where a human is a single call away. It works in an Agent Window inside the user's own browser profile, never in
+a copy of that profile, and exists only where the user installed and enabled the BrowserSkill extension. Never substitute one engine for the other silently: if
 the attached engine is not set up, run the onboarding script and tell the user its one remaining
 step.
 
@@ -58,6 +59,7 @@ node "<skill-root>/scripts/browser-doctor.mjs" --json
 | `no-cli` / `no-daemon` / `no-extension` | something is missing | `node "<skill-root>/scripts/browser-install.mjs" [--browser=<id>]` prepares everything it can for **the browser the user uses**, then prints the **single** step only the user can do (relaunch that browser and click **Enable**); relay it verbatim, wait, re-run the doctor |
 | `choose-browser` | the signals do not single out one browser (Safari/Firefox default, an idle default while another browser runs, several in use) | nothing was installed; take the browser from memory or ask the user, then `browser-install.mjs --browser=<id>` |
 | `no-browser-support` | no Chromium-family profile on this machine | say so and stop |
+| `outdated-extension` | the only connected extension is BrowserSkill 0.4.0, which leaves a "BrowserSkill" tab group in the user's browser after every task | start no session; relay the doctor's remedy (update the extension to 0.4.1 or later, delete saved "BrowserSkill" groups by hand), then re-run the doctor |
 
 **Install into the browser the user actually uses, never into whatever happens to be on disk.** Before
 installing, check your memory for the user's browser; otherwise read the doctor's `browser` (picked
@@ -117,9 +119,8 @@ changing the extension's automation settings.
   out everywhere. No flow here needs it.
 - **`focused: false` by default.** The browser belongs to someone who is probably using it.
 - **One short, named session per task,** always stopped.
-- **Bot-scored or WAF targets go to the owned engine**, in the terminal and inside OmO Desktop alike. The attached engine's daemon enables console
-  capture on every tab it drives, which is a known automation signal; CloakBrowser through
-  `connectCloakProfile()` is the stealth path.
+- **Bot-scored or WAF targets never go through the attached engine** — route them to the `ultimate-browsing` skill, whose browser tier is the owned engine (`connectCloakProfile()`). The attached engine's daemon enables console
+  capture on every tab it drives, which is a known automation signal.
 
 ## Where the rest lives
 

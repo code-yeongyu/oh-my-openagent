@@ -13,6 +13,9 @@ fn node_to_wire(reference: String, props: AxProps) -> AxNode {
         (Some(b.x), Some(b.y), Some(b.width), Some(b.height))
     });
     AxNode {
+        evidence: None,
+        subtree_truncated: false,
+        secure: false,
         ref_: reference,
         role: props.role,
         native_role: props.native_role,
