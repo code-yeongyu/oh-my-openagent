@@ -194,6 +194,7 @@ describe("runTaskSend", () => {
     const result = await runTaskSend(manager, { to: "ghost", message: "hi" }, "p1")
 
     expect(result.details.kind).toBe("not_found")
+    expect(result.isError).toBe(true)
   })
 
   test("#given a cancelled child #when task_send targets it #then it is not continuable", async () => {
@@ -205,6 +206,7 @@ describe("runTaskSend", () => {
     const result = await runTaskSend(manager, { to: started.task_id, message: "revive?" }, "p1")
 
     expect(result.details.kind).toBe("not_continuable")
+    expect(result.isError).toBe(true)
   })
 })
 
@@ -229,6 +231,7 @@ describe("runTaskSend one-shot agent refusal", () => {
     expect(text).toContain("<system-reminder>")
     expect(inProcess.handles.get(started.task_id)?.steerCalls).toEqual([])
     expect(inProcess.handles.get(started.task_id)?.followUpCalls).toEqual([])
+    expect(result.isError).toBe(true)
   })
 
   test("#given a completed resident plan-reviewer child #when task_send targets it #then the send is refused with the registry reminder and no revive occurs", async () => {

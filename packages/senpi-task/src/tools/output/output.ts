@@ -8,7 +8,7 @@ import type { ListScope, ListedTask } from "../../manager"
 import type { TaskRecord } from "../../state"
 import { hostLivenessText } from "../../state/host-liveness"
 import { isolationLine } from "../../isolation/details"
-import { defaultResolveCallerSessionId, toolResult } from "../control"
+import { defaultResolveCallerSessionId, toolErrorResult, toolResult } from "../control"
 import { renderTaskOutputCall, renderTaskOutputResult, taskOutputModelText } from "./renderers"
 import { renderTranscript } from "./render"
 import { buildTaskSnapshot } from "./snapshot"
@@ -171,11 +171,11 @@ function statusText(snapshot: TaskSnapshot): string {
 function notFound(candidates: readonly TaskRecord[], idOrName: string): TaskOutputToolResult {
   const known = candidates.map((record) => record.name ?? record.task_id)
   const listText = known.length > 0 ? ` Known tasks in this session: ${known.join(", ")}.` : ""
-  return toolResult(`No task '${idOrName}' in this session.${listText}`, { kind: "not_found", reason: `No task '${idOrName}' in this session.`, known_tasks: known })
+  return toolErrorResult(`No task '${idOrName}' in this session.${listText}`, { kind: "not_found", reason: `No task '${idOrName}' in this session.`, known_tasks: known })
 }
 
 function invalidArguments(reason: string): TaskOutputToolResult {
-  return toolResult(reason, { kind: "invalid_arguments", reason })
+  return toolErrorResult(reason, { kind: "invalid_arguments", reason })
 }
 
 function noProgress(record: TaskRecord): TaskOutputToolResult {

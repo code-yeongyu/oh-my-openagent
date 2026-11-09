@@ -160,6 +160,7 @@ describe("runTaskOutput", () => {
 
     // then
     expect(result.details.kind).toBe("not_found")
+    expect(result.isError).toBe(true)
   })
 
   test("#given no caller session #when read #then it fails closed as not found", async () => {
@@ -172,6 +173,7 @@ describe("runTaskOutput", () => {
 
     // then
     expect(result.details.kind).toBe("not_found")
+    expect(result.isError).toBe(true)
   })
 
   test("#given neither task_id nor name #when read #then invalid arguments are reported", async () => {
@@ -183,6 +185,7 @@ describe("runTaskOutput", () => {
 
     // then
     expect(result.details.kind).toBe("invalid_arguments")
+    expect(result.isError).toBe(true)
   })
 
   test("#given a name instead of an id #when read #then the task is resolved by name", async () => {

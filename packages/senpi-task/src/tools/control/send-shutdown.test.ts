@@ -195,6 +195,7 @@ describe("runTaskSend shutdown routing", () => {
       reason: "Team member is unavailable.",
     })
     expect(JSON.stringify(result)).not.toContain("raw unknown member detail")
+    expect(result.isError).toBe(true)
   })
 
   test("#given an unexpected shutdown service error #when routed through task_send #then the original exception propagates", async () => {
