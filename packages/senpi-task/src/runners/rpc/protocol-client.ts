@@ -15,6 +15,7 @@ export { isHarmlessRpcShutdownError } from "./protocol-errors"
 
 const STDERR_BUFFER_CAP = 16_384
 const WRITE_EXIT_GRACE_MS = 100
+export const RPC_REQUEST_DEADLINE_MS = 30_000
 
 export type MalformedLineHandler = (line: string, error: unknown) => void
 
@@ -112,7 +113,7 @@ export class RpcProtocolClient {
           reject(new RpcRequestTimeout(command.type, ms))
         }, ms)
       }
-      arm(options.deadlineMs ?? (command.type === "get_state" ? 10_000 : command.type === "abort" ? TEARDOWN_STEP_BUDGET_MS : 30_000))
+      arm(options.deadlineMs ?? (command.type === "get_state" ? 10_000 : command.type === "abort" ? TEARDOWN_STEP_BUDGET_MS : RPC_REQUEST_DEADLINE_MS))
       const pending: PendingRequest = {
         resolve: (response) => { clearTimeout(timer); resolve(response) },
         reject: (error) => { clearTimeout(timer); reject(error) },
