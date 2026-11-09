@@ -141,6 +141,8 @@ const externalSpecifiers = [
   "#omo-memory-palace-runtime",
   "#omo-device-account-runtime",
   "#omo-memory-commands-runtime",
+  // memory-core's lazy dream archive link repair; the plugin manifest maps it to the memory-commands sidecar.
+  "#memory-completion-links",
   "#omo-session-history-runtime",
   "#omo-recall-store-runtime",
   "#omo-device-service-runtime",
