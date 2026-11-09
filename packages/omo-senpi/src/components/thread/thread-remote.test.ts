@@ -49,10 +49,10 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     expect(scoped.kind === "ok" && "threads" in scoped && scoped.threads.map((thread) => thread.thread_id)).toEqual(["dur-local"])
   })
 
-  test("#given a thread on b #when thread_create names it by id #then b opens that session file; no device is passed or needed", async () => {
-    const a = account()
+  test("#given an ended thread on b #when thread_create names it by id #then b opens that session file; no device is passed or needed", async () => {
+    const a = account({ rowState: "ended" })
     const { run } = surface(a.remote)
-    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread: { thread_id: "dur-on-b", device: "b" } })
+    expect(await run("thread_create", { thread: "dur-on-b" })).toMatchObject({ kind: "ok", thread: { thread_id: "dur-on-b", device: "b" }, deduplicated: false })
     expect(a.sent).toEqual([{ via: "endpoint", device: "b", rpc: { type: "open_session", retain_on_disconnect: true, sessionPath: B_ROW.path } }])
   })
 
@@ -146,7 +146,7 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     const a = account({ rows: [titled("b", "dur-on-b", "Release Train"), titled("here", "dur-local", "local peer"), titled("b", "dur-old-on-b", "stale", "ended")] })
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "release  train", message: "go" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
-    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => [entry.device, entry.session])).toEqual([["b", "dur-on-b"]])
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => [entry.device, entry.session])).toEqual([["b", "dur-on-b"]])
     expect(await run("thread_send", { thread: "local peer", message: "here" })).toMatchObject({ kind: "ok", thread_id: "dur-local" })
     expect(await run("thread_send", { thread: "stale", message: "x" })).toMatchObject({ kind: "error", error: { code: "not_found" } })
   })
@@ -184,7 +184,7 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "tui-b", message: "go" })).toMatchObject({ kind: "ok", thread_id: "sJMySZH_wlx9qQ25AU60qQ", device: "b" })
     expect(await run("thread_send", { thread: "rpc-b", message: "go" })).toMatchObject({ kind: "ok", thread_id: "JkMGhxKatogMmrmtCW-oFA", device: "b" })
-    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => [entry.device, entry.session])).toEqual([["b", "sJMySZH_wlx9qQ25AU60qQ"], ["b", "JkMGhxKatogMmrmtCW-oFA"]])
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => [entry.device, entry.session])).toEqual([["b", "sJMySZH_wlx9qQ25AU60qQ"], ["b", "JkMGhxKatogMmrmtCW-oFA"]])
   })
 
   test("#given an alias held by a thread on this device outside the caller's workspace #when thread_read and thread_send name the alias #then both reach it without all_scope, while its raw id alone stays scope_denied as before", async () => {
@@ -304,13 +304,14 @@ describe("remote == local: the same call answers the same on b as on this device
     expect(a.sent.filter((entry) => entry.rpc?.["type"] === "set_session_name")).toEqual([])
   })
 
-  test("#given a name another visible thread holds #when thread_create makes it here and on b #then both are name_conflict and nothing is opened", async () => {
+  test("#given a name a thread on the target device holds #when thread_create makes it here and on b #then both are name_conflict with one shape and nothing is opened", async () => {
     const a = account()
     const { run, openSession } = surface(a.remote)
     const here = await run("thread_create", { name: "local peer" })
-    const there = await run("thread_create", { device: "studio", name: "local peer" })
-    expect(comparable(there)).toEqual(comparable(here))
+    const there = await run("thread_create", { device: "studio", name: "on b" })
+    expect(Object.keys(comparable(there) as object)).toEqual(Object.keys(comparable(here) as object))
     expect(here).toMatchObject({ kind: "error", error: { code: "name_conflict" } })
+    expect(there).toMatchObject({ kind: "error", error: { code: "name_conflict" } })
     expect(openSession).not.toHaveBeenCalled()
     expect(a.sent).toEqual([])
   })
@@ -419,9 +420,9 @@ describe("K8 / R8.c: a chain carries its count across devices; no count or cost 
     return answers
   }
 
-  const prompts = (sent: readonly { readonly rpc?: Readonly<Record<string, unknown>> }[]) => sent.filter((entry) => entry.rpc?.["type"] === "prompt").map((entry) => entry.rpc ?? {})
+  const prompts = (sent: readonly { readonly rpc?: Readonly<Record<string, unknown>> }[]) => sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => entry.rpc ?? {})
 
-  test("#given a caller at every hop of a chain past 12 #when it sends to b #then b's prompt carries the caller's hop + 1, nothing is refused and no cost field is sent", async () => {
+  test("#given a caller at every hop of a chain past 12 #when it sends to b #then b's record carries the caller's hop + 1, nothing is refused and no cost field is sent", async () => {
     const a = account()
     const callerHops = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     const answers = await sendFromHops(a.remote, callerHops)

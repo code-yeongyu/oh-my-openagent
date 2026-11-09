@@ -1,14 +1,13 @@
 import type { DeviceService } from "../device-service-core/src/index.ts"
 import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
+import { createRelaySessionHost } from "../omo-senpi/src/components/thread/control/relay-session-host"
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
-import type { RemoteSender } from "../omo-senpi/src/components/thread/remote/peer-text"
 import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { setModelRemote } from "../omo-senpi/src/components/thread/remote/remote-controls"
 import {
   closeRemote,
   followRemote,
   interruptRemote,
-  openRemote,
   promptRemote,
   remoteAvailable,
   type RemoteSendRequest,
@@ -26,9 +25,6 @@ const deviceServiceSurface = (service: DeviceService): RemoteThreadSurface => ({
   sessions: createDeviceServiceSessions({ version: service.serviceVersion, connect: async () => service }),
   chain: { stamp: record => record },
 })
-
-// The person at this terminal sends their own input, not a peer session's message (#12852).
-const PERSON: RemoteSender = { kind: "person", hop: 1 }
 
 type Show = (result: ThreadToolResult, label: string) => number
 
@@ -90,7 +86,8 @@ async function openOn(
     dependencies.error(error.message)
     return REMOTE_EXIT.usage
   }
-  const opened = await openRemote({ ...remote, permissionPreset: () => mode }, { kind: "create", device: args.device, ...(args.project === undefined ? {} : { cwd: args.project }) })
+  const open = await createRelaySessionHost(remote, args.device).open({ permissionPreset: mode, ...(args.project === undefined ? {} : { cwd: args.project }) })
+  const opened: ThreadToolResult = open.kind === "ok" ? { kind: "ok", thread: open.thread, deduplicated: false } : open
   if (opened.kind !== "ok" || !("thread" in opened) || args.model === undefined) return show(opened, "")
   const label = `${args.device}/${opened.thread.thread_id}`
   const created: RemoteSessionRow = { device: args.device, session_id: opened.thread.thread_id, title: opened.thread.name, project: opened.thread.cwd, path: "", state: "idle", updated_ms: 0 }
@@ -129,7 +126,8 @@ async function sendTo(
     }
     request = { ...request, expected_turn_id: running.turn_id }
   }
-  if (!args.wait) return show(await promptRemote(remote, row, request, PERSON), label)
+  // The person at this terminal sends their own input as a prompt; a peer session's message is a delivery (#12882).
+  if (!args.wait) return show(await promptRemote(remote, row, request), label)
   // Followed before the send, so no delta of the turn it starts can arrive unseen.
   let reply = ""
   const follow = await followRemote(remote, row, text => {
@@ -138,7 +136,7 @@ async function sendTo(
   })
   if ("kind" in follow) return show(follow, label)
   try {
-    const sent = await promptRemote(remote, row, request, PERSON)
+    const sent = await promptRemote(remote, row, request)
     if (sent.kind === "error") return show(sent, label)
     const end = await follow.settled
     if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")
