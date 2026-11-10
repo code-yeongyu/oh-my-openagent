@@ -1,7 +1,7 @@
 import type { ThreadAddressEntry } from "../addressing"
 import type { ThreadStatus } from "../contracts/results"
 import type { ThreadToolFailure } from "../errors"
-import type { RemoteSessionRow, RemoteThreadSurface } from "./ports"
+import { rowThreadId, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
 import { holderTarget, remoteAvailable } from "./remote-ops"
 
 // Decision 0027 section 1: the relay transport's address book. The account listing becomes entries of the SAME shape the
@@ -9,12 +9,6 @@ import { holderTarget, remoteAvailable } from "./remote-ops"
 // alias, then the name ladder across every entry (two devices sharing a name are ambiguous_target naming each device).
 const statusOf = (state: string): ThreadStatus => (state === "ended" ? "resumable" : "live")
 
-/**
- * The listing row's identity above the port (decision 0027 D2): its durable id, and nothing else. A row from an older
- * device that publishes none has no id above the port - it is reachable by alias or name, and its send still dispatches
- * by the transport row (the listing key stays inside the transport reference).
- */
-export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? ""
 
 export function relayAddressEntry(row: RemoteSessionRow, aliases?: readonly string[]): ThreadAddressEntry {
   const updated = new Date(row.updated_ms).toISOString()

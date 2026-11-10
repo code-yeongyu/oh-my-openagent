@@ -115,3 +115,6 @@ export type RemoteThreadSurface = {
   /** The approval mode a session this surface creates is opened in (#6189): the creator's own. Absent: none is named. */
   readonly permissionPreset?: () => string | undefined
 }
+
+/** The id a listing row has ABOVE the ports (decision 0027 D2): its durable id and nothing else; "" when the device publishes none. */
+export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? ""

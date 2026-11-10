@@ -323,7 +323,12 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
    */
   async function locate(current: ThreadHostView, address: string, allScope: boolean | undefined, callerId: string): Promise<DeliveryTarget | { readonly kind: "error"; readonly result: ThreadToolResult }> {
     const scope = allScope
-    if (current === PUBLISHED_SEND_VIEW) return { kind: "local", thread_id: address, all_scope: scope }
+    if (current === PUBLISHED_SEND_VIEW) {
+      // A reply approved by the sender's stated name must still land on that sender, not on a published thread that happens to carry the same spelling as its id.
+      const mismatch = replyTargetMismatch(options, address, { thread_id: address, name: address, status: "live", cwd: "", created_at: "", updated_at: null })
+      if (mismatch !== undefined) return { kind: "error", result: { kind: "error", error: mismatch } as ThreadToolResult }
+      return { kind: "local", thread_id: address, all_scope: scope }
+    }
     // Decision 0027: ONE resolver over this device's book and the relay transport's book (the account's other devices);
     // the entry it returns says which transport carries the send. An unreachable relay leaves the local book alone.
     const resolved = await resolveAcross(options, toThreadAddressEntries(sendAddressBook(options, current, address, true)), address, callerId, scope)

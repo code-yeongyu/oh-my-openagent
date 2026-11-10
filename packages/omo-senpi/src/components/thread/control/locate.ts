@@ -1,4 +1,5 @@
 import type { ThreadToolResult } from "../contracts"
+import { rowThreadId } from "../remote/ports"
 import { createRelayControl, deviceOnline } from "../remote/lazy-ops"
 import { localScope } from "../remote/local-scope"
 import { resolution, resolveEntries, targetSession, resolveAcross } from "../tools/internals"
@@ -25,7 +26,7 @@ export async function locateControl(options: ThreadToolSurfaceOptions, current: 
     const row = resolved.entry.transport.row
     const offline = await deviceOnline(options.remote, row.device)
     if (offline !== undefined) return { kind: "error", result: offline }
-    if (row.state === "ended") return { kind: "not_live", thread_id: row.session_id, title: row.title, device: row.device }
+    if (row.state === "ended") return { kind: "not_live", thread_id: rowThreadId(row), title: row.title, device: row.device }
     return { kind: "control", control: createRelayControl(options.remote, row) }
   }
   if (resolved.kind === "error") return { kind: "error", result: { kind: "error", error: resolved } }

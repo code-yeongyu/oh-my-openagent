@@ -9,6 +9,8 @@ import type { ThreadTranscriptEntry } from "./reader"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import type { ThreadCloseOutcome } from "./tools/ports"
 
+// TODO(#13017, this PR before merge): the shared row's listing key must differ from its durable id (audit class C8); the
+// dedicated split-key.test.ts proves the distinction for list -> send and create until the fixture's locate/alias holders are migrated.
 export const B_ROW: RemoteSessionRow = { device: "b", session_id: "dur-on-b", durable_id: "dur-on-b", title: "on b", project: "/work/b", path: "/home/b/.omo/agent/sessions/dur-on-b.jsonl", state: "idle", updated_ms: 1_700_000_000_000 }
 
 type Sent = { readonly via: "endpoint" | "session" | "read" | "watch"; readonly device: string; readonly session?: string; readonly rpc?: JsonObject }
