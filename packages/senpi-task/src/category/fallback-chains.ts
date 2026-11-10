@@ -1,9 +1,7 @@
-import { FABLE_55_LAUNCH, launchRungs } from "@oh-my-opencode/model-core"
 import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
 
 // Source of truth mirrored from packages/model-core/src/category-model-requirements.ts.
-// Model IDs share the launch block; chain rows remain independently mirrored for parity checks.
 // senpi-only differences (model-core/omo-opencode carry neither; the OpenCode and Codex editions have
 // no such providers):
 //   - kimi rungs carry BOTH provider ids ("kimi-coding" senpi registry id and the "kimi-for-coding"
@@ -27,7 +25,7 @@ import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models
 //     model-core lists "openai" first: it is OpenCode's single OpenAI provider id and already
 //     covers the ChatGPT login there.
 export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFallbackEntry[]>> = {
-  "visual-engineering": launchRungs([
+  "visual-engineering": [
     // Argon at its lowest accepted thinking level leads (#10187, owner decision 2026-10-15):
     // the catalog maps off/minimal to null for this model, so `low` is the floor. Copilot waits for
     // code-yeongyu/senpi#3379 (its row exposes no thinking control). A pinned engine whose catalog
@@ -35,12 +33,12 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     { providers: ["google", "google-vertex", "opencode"], model: LATEST_MODEL_BY_FAMILY.geminiPro, variant: "low" },
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: FABLE_55_LAUNCH.id,
+      model: LATEST_MODEL_BY_FAMILY.claudeFable,
       variant: "max",
     },
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: LATEST_MODEL_BY_FAMILY.claudeFable,
+      model: "claude-fable-5-1",
       variant: "max",
     },
     {
@@ -53,19 +51,19 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       model: LATEST_MODEL_BY_FAMILY.kimi,
       variant: "max",
     }
-  ]),
-  architect: launchRungs([
-    {
-      providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: FABLE_55_LAUNCH.id,
-      variant: "max",
-    },
+  ],
+  architect: [
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: LATEST_MODEL_BY_FAMILY.claudeFable,
       variant: "max",
+    },
+    {
+      providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-fable-5-1",
+      variant: "max",
     }
-  ]),
+  ],
   ultrabrain: [
     { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "max" },
     { providers: ["github-copilot"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "max" },
@@ -95,15 +93,15 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       variant: "high",
     }
   ],
-  artistry: launchRungs([
+  artistry: [
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: FABLE_55_LAUNCH.id,
+      model: LATEST_MODEL_BY_FAMILY.claudeFable,
       variant: "max",
     },
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: LATEST_MODEL_BY_FAMILY.claudeFable,
+      model: "claude-fable-5-1",
       variant: "max",
     },
     {
@@ -116,7 +114,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       model: LATEST_MODEL_BY_FAMILY.kimi,
       variant: "max",
     }
-  ]),
+  ],
   quick: [
     { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptLunaFast, variant: "low" },
     {
