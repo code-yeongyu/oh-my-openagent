@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:21d72a25a6fa11b93b369fc3615c75579165cbd3d22268f8d43090865c848cbf:63cdee403758ddb2d117cb925aab54dc5885e090ea7bbb0af7dff20cb9eef1e0
+// omo-codex-install:8a02426760692ccf0f16759c5e73262690733fcda6e7a73e23667d371b08d366:4767b88231b9e7d018585813e0887cbcc9c345ae57cf3ad751f7e65920b12317
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10205,7 +10205,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.68",
+    version: "5.1.64",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -13154,7 +13154,7 @@ var LATEST_MODEL_BY_FAMILY = {
   claudeOpus: "claude-opus-5-5",
   claudeSonnet: "claude-sonnet-5-5",
   claudeHaiku: "claude-haiku-5-5",
-  claudeFable: "claude-fable-5-2",
+  claudeFable: "claude-fable-5-1",
   gptAstra: "gpt-6-astra",
   gptSol: "gpt-6.1-sol",
   gptSolFast: "gpt-6.1-sol-fast",
@@ -19718,7 +19718,7 @@ var OmoComputerSettingsLayerSchema = object({
   engine_path: string2().min(1),
   cua_adapter: boolean2(),
   run_sandbox: _enum(["vm", "quickjs"]).describe("Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"),
-  intervention: _enum(["continue", "pause"]).describe("What a background action does while the user uses the target app (default: pause)"),
+  intervention: _enum(["continue", "pause"]).describe("What a background action does while the user uses the target app (default: continue)"),
   macos_key_priming: _enum(["on", "off"]).describe("macOS background keys first make the target window key (default: off)"),
   trace: boolean2().describe("Per-request timing traces (default: false)")
 }).partial().strict().describe("Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host.");

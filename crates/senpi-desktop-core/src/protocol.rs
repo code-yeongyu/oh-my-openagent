@@ -28,7 +28,10 @@ pub const ABI: &str = "senpi-desktop/1";
 /// `epoch`: an object-mode session supersedes its frames and refs and announces
 /// `epoch.changed` when the desktop changes; `interaction-lock`: input from this
 /// user's engines in every process is serialized by a machine-wide lock, and a lock
-/// held past its wait budget answers `InputBusy`.
+/// held past its wait budget answers `InputBusy`;
+/// `intervention-policy`: `session.open` takes `intervention`, and under
+/// `continue` the user's own presses in the target app are recorded but neither
+/// hold input back nor stop it (`pause`, the default, keeps `UserIntervened`).
 pub const FEATURES: &[&str] = &[
     "action-report",
     "frame-identity",
@@ -38,6 +41,7 @@ pub const FEATURES: &[&str] = &[
     "key-priming",
     "epoch",
     "interaction-lock",
+    "intervention-policy",
 ];
 
 /// Standard JSON-RPC 2.0 error codes the engine emits.
