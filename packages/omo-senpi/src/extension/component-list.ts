@@ -9,6 +9,7 @@ import { createCommentCheckerComponent } from "../components/comment-checker"
 import { createComputerUseComponent } from "../components/computer-use"
 import { createConfigStartupComponent } from "../components/config-startup"
 import { createConfigWatchComponent } from "../components/config-watch"
+import { createContextHandoffComponent } from "../components/context-handoff"
 import { createDeviceServiceComponent } from "../components/device-service"
 import { createFallbackArchitectComponent } from "../components/fallback-architect"
 import { createFeedbackComponent } from "../components/feedback"
@@ -57,6 +58,7 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createTodoFanoutReminderComponent(),
     createQuestionGatesComponent(),
     createClaimReceiptComponent(),
+    createContextHandoffComponent(),
     createGitMasterAttributionComponent(),
     createFallbackArchitectComponent(),
     createAstGrepComponent(),
