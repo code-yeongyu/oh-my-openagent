@@ -10,6 +10,7 @@ import { loadProvenanceWorkspaces } from "./gateway/provenance-config"
 import { resolveProvenance } from "./gateway/provenance-resolver"
 import { registerInitialSkills } from "./initial-skills"
 import { controlSessionOf, createControlEndpointRegistrant, hostInstanceOf, sessionControlOf, type ControlEndpointRegistrantOptions, type SessionControlActionsPort } from "./gateway/registration"
+import { createExtensionResolver } from "./gateway/extension-resolver"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
 import { createLazyLiveThreadSurface } from "./lazy-live-surface"
@@ -213,7 +214,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       const legacyMailbox = join(stateDirectory, "mailbox")
       const callerWorkspaceRoot = options.callerWorkspaceRoot ?? (() => pi.cwd ?? process.cwd())
       const onProvenanceWarning = (message: string) => ctx.logger.warn(`thread gateway: ${message}`)
-      const store = options.store ?? createGatewayStore({ agentDir: agentDir(), senderProvenance: () => resolveProvenance({ cwd: callerWorkspaceRoot(), env: options.env, loadWorkspaces: loadProvenanceWorkspaces, onWarning: onProvenanceWarning }), legacyMailboxDirectories: [legacyMailbox], ...(runtimeInstance === undefined ? {} : { runtimeInstance }) })
+      const store = options.store ?? createGatewayStore({ agentDir: agentDir(), resolveTarget: createExtensionResolver(agentDir()), senderProvenance: () => resolveProvenance({ cwd: callerWorkspaceRoot(), env: options.env, loadWorkspaces: loadProvenanceWorkspaces, onWarning: onProvenanceWarning }), legacyMailboxDirectories: [legacyMailbox], ...(runtimeInstance === undefined ? {} : { runtimeInstance }) })
       // Every store open retries an unreadable legacy mailbox, and an idle store reopens its worker on
       // the next call, so the same failure would repeat each time: it is reported once per session.
       const reportedInvalidMailboxes = new Set<string>()
