@@ -22,7 +22,9 @@ import {
   entryId,
   exactly,
   fail,
+  type FieldCheck,
   jsonObject,
+  known,
   jsonValue,
   LABEL_MAX_CHARS,
   nullable,
@@ -44,7 +46,9 @@ import {
 } from "./vocabulary.ts";
 
 // The object shapes shared by requests, responses, events and blob payloads. Field bounds come from the shared
-// session-list and command contracts, so a value valid here is valid across the transport.
+// session-list and command contracts, so a value valid here is valid across the transport. Every shape here except
+// deviceRef is only ever read from the service, so it ignores a field it does not define (`known`); deviceRef is
+// also a request field (device.adopt) and takes the check its caller names, strict by default.
 const CODE = /^[a-z_]{1,64}$/;
 const ATTACH_ID_MAX = 4_294_967_295;
 const MILLIS_MAX = Number.MAX_SAFE_INTEGER;
@@ -55,8 +59,8 @@ export const sessionId = (v: unknown): string => text(v, SESSION_ID_MAX_CHARS, "
 export const attachId = (v: unknown): number => uint(v, 1, ATTACH_ID_MAX, "attach_id");
 export const millis = (v: unknown, what: string): number => uint(v, 0, MILLIS_MAX, what);
 
-export const deviceRef = (v: unknown, what = "device"): DeviceRef => {
-  const m = exactly(v, ["id", "name"], [], what);
+export const deviceRef = (v: unknown, what = "device", fields: FieldCheck = exactly): DeviceRef => {
+  const m = fields(v, ["id", "name"], [], what);
   return {
     id: deviceId(m["id"], `${what}.id`),
     name: text(m["name"], LABEL_MAX_CHARS, `${what}.name`),
@@ -64,7 +68,7 @@ export const deviceRef = (v: unknown, what = "device"): DeviceRef => {
 };
 
 const policyOf = (v: unknown): Policy => {
-  const m = exactly(
+  const m = known(
     v,
     ["state", "generation", "this_device", "homes_pending", "unacked"],
     [],
@@ -78,7 +82,7 @@ const policyOf = (v: unknown): Policy => {
     this_device: oneOf(THIS_DEVICE_STATES, m["this_device"], "policy.this_device"),
     homes_pending: millis(m["homes_pending"], "policy.homes_pending"),
     unacked: unacked.map((u) => {
-      const entry = exactly(u, ["device", "label"], [], "policy.unacked");
+      const entry = known(u, ["device", "label"], [], "policy.unacked");
       return {
         device: deviceId(entry["device"]),
         label: text(entry["label"], LABEL_MAX_CHARS, "label", 0),
@@ -88,7 +92,7 @@ const policyOf = (v: unknown): Policy => {
 };
 
 export const statusOf = (v: unknown): Status => {
-  const m = exactly(
+  const m = known(
     v,
     ["state", "since_ms", "device", "origin_configured", "enabled"],
     ["detail", "policy"],
@@ -100,7 +104,7 @@ export const statusOf = (v: unknown): Status => {
     state: oneOf(STATUS_STATES, m["state"], "status.state"),
     since_ms: millis(m["since_ms"], "status.since_ms"),
     ...(detail === undefined ? {} : { detail: detailOf(detail) }),
-    device: nullable(m["device"], (d) => deviceRef(d, "status.device")),
+    device: nullable(m["device"], (d) => deviceRef(d, "status.device", known)),
     origin_configured: bool(m["origin_configured"], "status.origin_configured"),
     enabled: bool(m["enabled"], "status.enabled"),
     ...(policy === undefined ? {} : { policy: policyOf(policy) }),
@@ -108,7 +112,7 @@ export const statusOf = (v: unknown): Status => {
 };
 
 const detailOf = (v: unknown): { readonly code: string; readonly action: string | null } => {
-  const m = exactly(v, ["code", "action"], [], "status.detail");
+  const m = known(v, ["code", "action"], [], "status.detail");
   const code = m["code"];
   return {
     code: typeof code === "string" && CODE.test(code) ? code : fail("status.detail.code"),
@@ -117,7 +121,7 @@ const detailOf = (v: unknown): { readonly code: string; readonly action: string 
 };
 
 export const deviceRowOf = (v: unknown): DeviceRow => {
-  const m = exactly(
+  const m = known(
     v,
     ["device", "label", "kind", "platform", "last_seen_ms", "online"],
     [],
@@ -163,9 +167,11 @@ const rowLinks = (m: {
   };
 };
 export const listingRowOf = (v: unknown): ListingRow => {
-  const m = exactly(v, ROW_FIELDS, ["kind", "parent", "parent_listed"], "listing row");
+  const m = known(v, ROW_FIELDS, ["kind", "parent", "parent_listed", "durable_id"], "listing row");
+  const durable = m["durable_id"];
   return {
     ...rowLinks(m),
+    ...(durable === undefined ? {} : { durable_id: text(durable, SESSION_ID_MAX_CHARS, "durable_id") }),
     device: deviceId(m["device"]),
     session_id: sessionId(m["session_id"]),
     title: text(m["title"], SESSION_SUMMARY_TITLE_MAX_CHARS, "title", 0),
@@ -187,7 +193,7 @@ const BODY_FIELDS = [
   "oldest_entry_id",
 ];
 export const snapshotBodyOf = (m: { readonly [key: string]: unknown }): SnapshotBody => {
-  const cursor = exactly(m["cursor"], ["marker_id", "last_entry_id"], [], "cursor");
+  const cursor = known(m["cursor"], ["marker_id", "last_entry_id"], [], "cursor");
   const entries = m["entries"];
   if (!Array.isArray(entries)) return fail("entries");
   return {
@@ -203,11 +209,11 @@ export const snapshotBodyOf = (m: { readonly [key: string]: unknown }): Snapshot
   };
 };
 export const snapshotBlobOf = (v: unknown): SnapshotBody =>
-  snapshotBodyOf(exactly(v, BODY_FIELDS, [], "snapshot"));
+  snapshotBodyOf(known(v, BODY_FIELDS, [], "snapshot"));
 export const SNAPSHOT_FIELDS: readonly string[] = BODY_FIELDS;
 
 export const readEntryOf = (v: unknown): ReadEntry => {
-  const m = exactly(v, ["kind", "entry_id"], ["entry", "bytes", "sha256"], "read entry");
+  const m = known(v, ["kind", "entry_id"], ["entry", "bytes", "sha256"], "read entry");
   const entry_id = entryId(m["entry_id"], "entry_id");
   if (m["kind"] === "entry") {
     exactly(m, ["kind", "entry_id", "entry"], [], "read entry");
@@ -224,7 +230,7 @@ export const readEntryOf = (v: unknown): ReadEntry => {
 };
 
 const pathRefusalOf = (v: unknown): PathRefusal => {
-  const m = exactly(v, ["component", "problem"], [], "error.path_refusal");
+  const m = known(v, ["component", "problem"], [], "error.path_refusal");
   return {
     component: text(m["component"], PATH_MAX_CHARS, "error.path_refusal.component"),
     problem: oneOf(PATH_REFUSAL_PROBLEMS, m["problem"], "error.path_refusal.problem"),
@@ -232,7 +238,7 @@ const pathRefusalOf = (v: unknown): PathRefusal => {
 };
 
 export const errorBodyOf = (v: unknown): ErrorBody => {
-  const m = exactly(v, ["code", "reason", "action"], ["limit_chars", "path_refusal"], "error");
+  const m = known(v, ["code", "reason", "action"], ["limit_chars", "path_refusal"], "error");
   const code = oneOf(ERROR_CODES, m["code"], "error.code");
   const limit = m["limit_chars"];
   if ((code === "message_too_long") !== (limit !== undefined)) return fail("error.limit_chars");

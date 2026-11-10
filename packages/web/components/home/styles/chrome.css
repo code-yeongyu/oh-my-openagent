@@ -17,7 +17,8 @@
   max-width: 1080px;
   height: 56px;
   margin-inline: auto;
-  padding-inline: var(--space-4) var(--space-2);
+  /* Same inset at both ends, so the last control (Install, or the menu button) clears the rounded edge (#12892). */
+  padding-inline: var(--space-4);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--bg-raised) 96%, transparent);
@@ -261,8 +262,9 @@
   color: var(--ink);
 }
 
-/* The section links need about 860 px beside the brand, the theme switch and Open the app. */
-@media (max-width: 859px) {
+/* The section links fit beside the brand, theme switch, stars and Install from 1000 px: the widest locales (es, fr)
+   measured 962 px with the pill's 16 px inset, and the margin covers a longer star count (#12892). */
+@media (max-width: 999px) {
   .nav__links {
     display: none;
   }
@@ -365,12 +367,12 @@
   width: 100%;
   margin-top: var(--space-2);
 }
-@media (max-width: 859px) {
+@media (max-width: 999px) {
   .nav__menu-btn {
     display: grid;
   }
 }
-@media (min-width: 860px) {
+@media (min-width: 1000px) {
   .nav__sheet {
     display: none !important;
   }

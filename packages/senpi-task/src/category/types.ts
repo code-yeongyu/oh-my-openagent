@@ -43,7 +43,6 @@ export type ResolvedChildSpec<TModel extends SenpiModelPort> = {
 }
 
 export type ResolveCategoryOptions = {
-  readonly systemDefaultModel?: string
   readonly distributeModels?: import("@oh-my-opencode/omo-config-core").ModelDistributor
 }
 

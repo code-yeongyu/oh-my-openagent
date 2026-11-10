@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process"
+import { remainingTestTime } from "../../../../../../../test-support/test-deadline"
 
 /**
  * Suspends and resumes a real process for the tests that hold the gateway write lock in a stopped
@@ -9,7 +10,6 @@ import { execFileSync } from "node:child_process"
  * test never proceeds on the assumption that a signal landed.
  */
 
-const STATE_WAIT_MS = 10_000
 const POLL_MS = 5
 
 export async function suspendProcess(pid: number): Promise<void> {
@@ -27,9 +27,9 @@ function isStopped(pid: number): boolean {
 }
 
 async function untilState(pid: number, state: "stopped" | "running"): Promise<void> {
-  const deadline = performance.now() + STATE_WAIT_MS
+  const deadline = performance.now() + remainingTestTime()
   while (isStopped(pid) !== (state === "stopped")) {
-    if (performance.now() > deadline) throw new Error(`process ${pid} did not report ${state} within ${STATE_WAIT_MS} ms after its signal`)
+    if (performance.now() > deadline) throw new Error(`process ${pid} did not report ${state} within the test budget after its signal`)
     await Bun.sleep(POLL_MS)
   }
 }

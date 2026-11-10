@@ -16,6 +16,8 @@ export function accountSourceFromSelection(options: {
   let selected: Promise<MemorySyncSelection> | undefined
   let cliSource: DeviceAccountSource | undefined
   let current: DesktopSyncAccount | undefined
+  // Concurrent resolves with no current account share one open, so the channel sees one descriptor request (#12799).
+  let opening: Promise<DesktopSyncAccount> | undefined
   const unavailable = (reason: DesktopSyncUnavailable["reason"]): DesktopSyncUnavailable => ({ kind: "unavailable", reason })
   return async (): Promise<DeviceAccount | null> => {
     selected ??= options.selection()
@@ -30,7 +32,8 @@ export function accountSourceFromSelection(options: {
     if (current !== undefined && await current.isCurrent()) return current
     current = undefined
     try {
-      current = await open(channel)
+      opening ??= open(channel).finally(() => { opening = undefined })
+      current = await opening
       return current
     } catch (error) {
       if (channel.signal.aborted) return unavailable("private_channel_unavailable")
