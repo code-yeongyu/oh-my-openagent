@@ -446,7 +446,7 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
       // the one a listing could have shown, so the send and the steer read the same liveness. A send
       // never starts an enumeration itself - a published durable id needs none - so with no fresh
       // listing the direct probe decides, exactly as a fresh listing would.
-      const fresh = endpoint.kind === "tui" && enumeration !== undefined && enumeration.expiresAt > now() ? await enumeration.endpoints : undefined
+      const fresh = endpoint.kind === "tui" && enumeration?.expiresAt !== undefined && enumeration.expiresAt > now() ? await enumeration.endpoints : undefined
       const cached = fresh?.find((candidate) => resolve(candidate.socket) === resolve(endpoint.socket))?.verdict
       const listed = await listEndpoint({ socket: endpoint.socket, paths: [], kind: endpoint.kind, verdict: cached ?? {} })
       const target = listed.sessions.filter((session) => (session.durableSessionId ?? session.sessionId) === durableId && session.status !== "closed")
