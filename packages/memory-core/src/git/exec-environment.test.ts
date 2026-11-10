@@ -252,8 +252,10 @@ describe("memoryGitEnvironment (#12354)", () => {
     // git prints forward slashes on Windows; resolve() normalizes both sides to the platform separator.
     expect(resolve(result.stdout.trim())).toBe(resolve(join(memory, ".git")))
   })
+})
 
-  // #12368: an engine started from a git hook (or a test run from one) inherits that hook's GIT_INDEX_FILE.
+// #12368: an engine started from a git hook (or a test run from one) inherits that hook's GIT_INDEX_FILE.
+describe("memory git index isolation (#12368)", () => {
   test("#given an inherited GIT_INDEX_FILE naming another index #when memory git stages a file #then the memory repository's own index takes it and the other index is untouched", async () => {
     // #given
     const root = scratchRoot()
