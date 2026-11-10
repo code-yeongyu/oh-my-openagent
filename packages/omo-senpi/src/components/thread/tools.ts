@@ -352,11 +352,12 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
 
 /**
  * The one send: the resolved target, the caller as the gateway names it (`session:<durable id>`, its name, turn and
- * cause), the text and mode go through the delivery pipeline, whose transport the target's kind picks. A local target's
- * result keeps the send contract and adds `delivery_id`, `effective_mode` and `endpoint.kind`; an unreachable local
- * target is `queued_offline` (the row is durable); a target on another device names its `device`. A chain may come back
- * to a session it passed; only a session sending to itself is refused `loop_detected`. Answers may also travel through
- * thread_read, thread_report and thread_answer.
+ * cause), the text and mode go through the delivery pipeline, whose transport the target's kind picks. Both transports
+ * answer the same result (#13006): the delivery outcome, its `delivery_id` and the lane it took (`effective_mode`) are
+ * reported the same way whatever carried it; a gateway row's `message_seq` and `endpoint.kind` exist only for a session
+ * this device holds (an unreachable one is `queued_offline`, the row is durable), and `device` only names another one.
+ * A chain may come back to a session it passed; only a session sending to itself is refused `loop_detected`. Answers
+ * may also travel through thread_read, thread_report and thread_answer.
  */
 async function deliverThrough(
   options: ThreadToolSurfaceOptions,
@@ -386,11 +387,12 @@ async function deliverThrough(
   })
   if (sent.kind === "error") return { kind: "error", error: sent.error }
   if ("device" in sent) {
+    const facts = { ...(sent.delivery_id === undefined ? {} : { delivery_id: sent.delivery_id }), ...(sent.effective_mode === undefined ? {} : { effective_mode: sent.effective_mode }), device: sent.device }
     const row = target.kind === "remote" ? target.row : undefined
     const title = row?.title
-    if (resolvedBy === undefined || row === undefined) return { kind: "ok", thread_id: sent.thread_id, link: threadLink(sent.thread_id, title), delivery: sent.delivery, deduplicated: sent.deduplicated, device: sent.device }
+    if (resolvedBy === undefined || row === undefined) return { kind: "ok", thread_id: sent.thread_id, link: threadLink(sent.thread_id, title), delivery: sent.delivery, deduplicated: sent.deduplicated, ...facts }
     const seen = new Date(row.updated_ms).toISOString()
-    return { kind: "ok", thread: { thread_id: rowThreadId(row), name: row.title, status: "live", cwd: row.project, created_at: seen, updated_at: seen, device: row.device, link: threadLink(rowThreadId(row), row.title) }, resolved_by: resolvedBy, delivery: sent.delivery, deduplicated: sent.deduplicated, device: row.device } as ThreadToolResult
+    return { kind: "ok", thread: { thread_id: rowThreadId(row), name: row.title, status: "live", cwd: row.project, created_at: seen, updated_at: seen, device: row.device, link: threadLink(rowThreadId(row), row.title) }, resolved_by: resolvedBy, delivery: sent.delivery, deduplicated: sent.deduplicated, ...facts }
   }
   const threadId = sent.thread_id
   const facts = { delivery_id: sent.delivery_id, effective_mode: sent.effective_mode, endpoint: sent.endpoint_kind === null ? null : { kind: sent.endpoint_kind } }
