@@ -3,7 +3,7 @@ import type { ThreadStatus, ThreadToolResult } from "../contracts"
 import { createRelaySessionHost, listedThread } from "../control/relay-session-host"
 import type { HostedThread, SessionHost, SessionOpenRequest } from "../control/session-host"
 import { threadToolFailure } from "../errors"
-import type { AliasRegistry, RemoteSessionRow, RemoteThreadSurface } from "./ports"
+import { rowThreadId, type AliasRegistry, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
 import { aliasFailure, deviceOnline, remoteAvailable } from "./remote-ops"
 
 type LocalEntry = { readonly thread_id: string; readonly name?: string; readonly cwd?: string; readonly preview?: string; readonly updated_at?: string | null; readonly status?: ThreadStatus }
@@ -165,12 +165,12 @@ export async function listAcross(remote: RemoteThreadSurface | undefined, local:
   } catch {
     return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
   }
-  const others = listed.filter((row) => row.device !== here && !known.has(row.session_id))
+  const others = listed.filter((row) => row.device !== here && !known.has(rowThreadId(row)))
   const merged: ThreadToolResult = {
     ...local,
     threads: [...local.threads, ...others.map((row) => { const { sessionId: _routing, ...thread } = listedThread(row); return thread })],
   }
-  return withAliases(remote, merged, [...ids, ...others.map((row) => row.session_id)])
+  return withAliases(remote, merged, [...ids, ...others.map(rowThreadId).filter((id) => id !== "")])
 }
 
 async function withAliases(remote: RemoteThreadSurface, listed: ThreadToolResult, ids: readonly string[]): Promise<ThreadToolResult> {
