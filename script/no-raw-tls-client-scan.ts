@@ -104,7 +104,8 @@ export function isScannedSourceFile(relativePath: string): boolean {
 // probe is how the guard reaches them: scanned and pinned when present,
 // entries skipped when no build ran (nothing exists to guard). The list
 // is also the complete manifest of what stage-omowright-runtime.mjs
-// stages per plugin tree (STAGED_FILES: index.js + page-bundle.js):
+// stages per plugin tree (the JavaScript in STAGED_FILES: index.js +
+// page-bundle.js; the extensionless LICENSE is not a source file):
 // evaluateBuiltRuntimeProbe fails CI on a missing entry and on any
 // staged runtime file the list does not name, so a staging-path change
 // cannot silently shrink the guard's scope.

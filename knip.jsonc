@@ -335,8 +335,6 @@
       "packages/memory-core/src/sync/space/read-back.ts": ["toLf", "linesOf"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MemoryApplyPatchError
       "packages/memory-core/src/tools/memory-apply-patch.ts": ["MemoryApplyPatchError"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) FABLE_55_PREDECESSOR
-      "packages/model-core/src/fable-55-launch.ts": ["FABLE_55_PREDECESSOR"],
       // pre-existing at origin dev 4686e425b5: unused export(s) isModelAvailable
       "packages/model-core/src/index.ts": ["isModelAvailable"],
       // pre-existing at origin dev 4686e425b5: unused export(s) isModelAvailable
@@ -1132,8 +1130,6 @@
       "packages/omo-senpi/src/components/memory/commands/types.ts": ["identityFor"],
       // pre-existing at origin dev 4686e425b5: unused export(s) getMemoryRepo
       "packages/omo-senpi/src/components/memory/context.ts": ["getMemoryRepo"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) DEFAULT_SERVICE_API
-      "packages/omo-senpi/src/components/memory/device-session/account-source.ts": ["DEFAULT_SERVICE_API"],
       // pre-existing at origin dev 4686e425b5: unused export(s) FakeScheduler
       "packages/omo-senpi/src/components/memory/dream-trigger.test-support.ts": ["FakeScheduler"],
       // pre-existing at origin dev 4686e425b5: unused export(s) factsAgreementContract
@@ -1356,8 +1352,6 @@
       "packages/omo-senpi/src/components/thread/gateway/store-relay-ops.ts": ["toolReceiptBegin", "toolReceiptSettle", "registerIncarnation", "pendingCompletionArms", "latestCompletionArm", "closeQuestion"],
       // pre-existing at origin dev 4686e425b5: unused export(s) sweepRetention
       "packages/omo-senpi/src/components/thread/gateway/store-retention.ts": ["sweepRetention"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_STORE_WORKER_BUNDLE_NAME
-      "packages/omo-senpi/src/components/thread/gateway/store.ts": ["GATEWAY_STORE_WORKER_BUNDLE_NAME"],
       // pre-existing at origin dev 4686e425b5: unused export(s) matcherAwaits
       "packages/omo-senpi/src/components/thread/gateway/worker-reply-matchers.test.ts": ["matcherAwaits"],
       // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_TOOL_SEARCH_GROUP
@@ -2101,6 +2095,8 @@
         "script/senpi-worker-compile.ts",
         "test-support/remove-tree.ts",
         "test-support/test-deadline.ts",
+        // preloaded by path from the package bunfig.toml files (the bun plugin adds it with exports unchecked)
+        "test-support/test-deadline.preload.ts",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "script/build-binaries.ts",
