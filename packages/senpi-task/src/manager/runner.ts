@@ -7,6 +7,7 @@ import { modelSelector } from "../runners/in-process/runtime-fallback-settings"
 import { dirname } from "node:path"
 import type { RpcChildHandle, RpcPersona, RpcRunnerSpec } from "../runners/types"
 import { adaptInProcessHandle, adaptRpcHandle, type ManagedChildHandle } from "./child-handle"
+import { sandboxRequired } from "../runners/rpc/sandbox/policy"
 import type { ManagedRunner, ManagedStartSpec } from "./types"
 
 // The senpi-typed per-child context the component (todo 17) supplies: it owns agent-dir resolution
@@ -47,11 +48,13 @@ export function createInProcessManagedRunner(
   const startStaged = runner.startStaged?.bind(runner)
   return {
     async start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
+      refuseSandboxed(spec)
       const childSpec = toChildSpec(spec, context(spec))
       return adaptInProcessHandle(await runner.start(childSpec))
     },
     ...(startStaged === undefined ? {} : {
       async startStaged(spec: ManagedStartSpec) {
+        refuseSandboxed(spec)
         const staged = await startStaged(toChildSpec(spec, context(spec)))
         const child = adaptInProcessHandle(staged.handle)
         return {
@@ -65,6 +68,7 @@ export function createInProcessManagedRunner(
       },
     }),
     async resume(spec: ManagedStartSpec, sessionPath: string): Promise<ManagedChildHandle> {
+      refuseSandboxed(spec)
       const resolved = context.resolveResumeContext?.(spec)
       if (resolved !== undefined && !resolved.ok) {
         throw new RunnerError({ kind: resolved.code, message: resolved.reason })
@@ -76,6 +80,13 @@ export function createInProcessManagedRunner(
       return adaptInProcessHandle(await runner.resume(childSpec, sessionPath))
     },
   }
+}
+
+// The in-process runner shares the parent's process and permissions, so it never runs a child the
+// deny-live policy covers, whatever execution mode was asked for (senpi#6287).
+function refuseSandboxed(spec: ManagedStartSpec): void {
+  if (spec.sandbox === undefined) return
+  throw sandboxRequired(`${spec.agentType ?? "this agent"} runs only as a sandboxed process child; in-process execution is refused`)
 }
 
 export function createRpcManagedRunner(runner: RpcRunnerLike): ManagedRunner {
@@ -113,6 +124,7 @@ export function rpcPersona(spec: Pick<ManagedStartSpec, keyof RpcPersona>): RpcP
     ...(spec.toolAllowlist !== undefined ? { toolAllowlist: spec.toolAllowlist } : {}),
     ...(spec.toolDenylist !== undefined ? { toolDenylist: spec.toolDenylist } : {}),
     ...(spec.memberScopedToolNames !== undefined ? { memberScopedToolNames: spec.memberScopedToolNames } : {}),
+    ...(spec.sandbox !== undefined ? { sandbox: spec.sandbox } : {}),
   }
 }
 

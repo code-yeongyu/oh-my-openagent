@@ -10,7 +10,7 @@ export const CODE_REVIEWER_AGENT: AgentDefinition = {
   description:
     "OmO Native code-quality reviewer for ulw-loop final gates. Audits diffs, tests, and risk, then writes an artifact-backed review report.",
   mode: "subagent",
-  executionMode: "in-process",
+  executionMode: "process",
   categories: ["unspecified-high"],
   prompt: `Role: code quality reviewer. Do not implement fixes; your only write is the review report artifact.
 

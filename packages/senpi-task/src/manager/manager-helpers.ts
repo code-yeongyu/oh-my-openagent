@@ -1,4 +1,5 @@
 import { join } from "node:path"
+import { requiresDenyLive } from "../runners/rpc/sandbox/policy"
 
 import { isSpawnSpecV1, type BackgroundMode, type SpawnSpecV1, type TaskRecord, type TaskRecordInput } from "../state"
 import type { ResolvedModelRecord } from "../state"
@@ -136,6 +137,7 @@ export function buildManagedSpec(input: {
     ...(instructions !== undefined ? { instructions } : {}),
     ...(plan.toolAllowlist !== undefined ? { toolAllowlist: plan.toolAllowlist } : {}),
     ...(record.tool_deny !== undefined ? { toolDenylist: record.tool_deny } : {}),
+    ...(requiresDenyLive(record.agent_type) ? { sandbox: "deny-live" as const } : {}),
     includeTaskTools: record.owner?.kind !== "dag",
     ...(spec.memberScopedTools !== undefined ? { memberScopedTools: spec.memberScopedTools } : {}),
     ...(spec.memberScopedTools !== undefined
@@ -201,6 +203,7 @@ export function buildRespawnManagedSpec(record: TaskRecord, stateDir: string): B
       ...(spawnSpec.instructions !== undefined ? { instructions: spawnSpec.instructions } : {}),
       ...(record.tool_allow !== undefined ? { toolAllowlist: record.tool_allow } : {}),
       ...(record.tool_deny !== undefined ? { toolDenylist: record.tool_deny } : {}),
+      ...(requiresDenyLive(record.agent_type) ? { sandbox: "deny-live" as const } : {}),
       includeTaskTools: record.owner?.kind !== "dag",
       ...(spawnSpec.member_scoped_tool_names !== undefined
         ? { memberScopedToolNames: spawnSpec.member_scoped_tool_names }

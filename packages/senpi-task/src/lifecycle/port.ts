@@ -99,6 +99,8 @@ export type RespawnFailureCode =
   | "host_incompatible"
   // The child's run is stopped: nothing launches until its Resume (which respawns it paused).
   | "run_paused"
+  // A review-role child that cannot be sandboxed is never resumed unsandboxed (senpi#6287).
+  | "sandbox_required"
   | "respawn_failed"
 
 export type RespawnResult =

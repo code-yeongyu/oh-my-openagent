@@ -10,7 +10,7 @@ export const GATE_REVIEWER_AGENT: AgentDefinition = {
   description:
     "OmO Native final gate reviewer for ulw-loop. Re-audits executor, code review, and QA artifacts before final approval and writes the gate report.",
   mode: "subagent",
-  executionMode: "in-process",
+  executionMode: "process",
   categories: ["deep-high", "unspecified-high"],
   prompt: `Role: final gate reviewer. Do not implement fixes; your only write is the gate report artifact.
 

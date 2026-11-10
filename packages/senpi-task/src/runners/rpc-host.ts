@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { log } from "@oh-my-opencode/utils"
+import { sandboxRequired } from "./rpc/sandbox/policy"
 
 import type { HostEnginePolicy } from "../lazy/senpi-barrel"
 import { RunnerError } from "./in-process/runner-error"
@@ -181,6 +182,13 @@ export class RpcHostRunner {
   }
 
   async start(specInput: RpcRunnerSpec): Promise<RpcChildHandle> {
+    // One daemon hosts many sessions and cannot confine one of them: a sandboxed child is always its
+    // own process (senpi#6287), and never reattaches to a recorded host session.
+    if (specInput.sandbox !== undefined) {
+      if (this.options.fallback === undefined) throw sandboxRequired("review-role child refused: no per-child process runner is configured")
+      const { hostSocket: _recordedHost, ...perChild } = specInput
+      return await this.options.fallback.start(perChild)
+    }
     const spec =
       specInput.extensions === undefined && this.inheritedExtensions.length > 0
         ? { ...specInput, extensions: this.inheritedExtensions }

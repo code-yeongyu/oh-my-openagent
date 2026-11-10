@@ -74,7 +74,7 @@ describe("task engine builtin agent overlay", () => {
       "plan-reviewer",
     ])
     expect(engine.agents["explore"]?.executionMode).toBe("in-process")
-    expect(engine.agents["omo-native-code-reviewer"]?.executionMode).toBe("in-process")
+    expect(engine.agents["omo-native-code-reviewer"]?.executionMode).toBe("process")
   })
 
   test("#given an omo.json model override for a builtin agent #when the engine resolves agents #then the model wins and the builtin prompt and allowlist survive", () => {
@@ -141,18 +141,18 @@ describe("task engine builtin agent overlay", () => {
     }
   })
 
-  test("#given a process override for a reviewer agent #when the engine resolves agents #then in-process execution remains pinned", () => {
+  test("#given an in-process override for a reviewer agent #when the engine resolves agents #then the sandboxed process execution remains pinned (senpi#6287)", () => {
     // given
     const cwd = tempProject()
-    writeOmoJson(cwd, { agents: { "omo-native-code-reviewer": { execution_mode: "process" } } })
+    writeOmoJson(cwd, { agents: { "omo-native-code-reviewer": { execution_mode: "in-process" } } })
 
     // when
     const engine = composeIn(cwd)
 
     // then
-    expect(engine.agents["omo-native-code-reviewer"]?.executionMode).toBe("in-process")
-    expect(engine.agents["omo-native-qa-executor"]?.executionMode).toBe("in-process")
-    expect(engine.agents["omo-native-gate-reviewer"]?.executionMode).toBe("in-process")
+    expect(engine.agents["omo-native-code-reviewer"]?.executionMode).toBe("process")
+    expect(engine.agents["omo-native-qa-executor"]?.executionMode).toBe("process")
+    expect(engine.agents["omo-native-gate-reviewer"]?.executionMode).toBe("process")
   })
 
   test("#given a process-mode user agent #when the engine resolves agents #then its execution mode remains configurable", () => {

@@ -4,6 +4,7 @@ import { RunnerError } from "../runners/in-process/runner-error"
 export function classifyResumeFailure(error: unknown): RespawnResult {
   if (RunnerError.is(error)) {
     const { kind, message } = error.failure
+    if (kind === "sandbox_required") return failure("unrecoverable", kind, message)
     if (kind === "model_unavailable" || kind === "tools_unavailable" || kind === "session_unavailable") {
       return failure("retryable", kind, message)
     }

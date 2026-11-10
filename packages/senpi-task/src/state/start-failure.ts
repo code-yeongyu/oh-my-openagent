@@ -10,6 +10,8 @@ export const TASK_START_FAILURE_KINDS = [
   "session_unavailable",
   "host_unavailable",
   "model_chain_exhausted",
+  // A review-role child that cannot run under the deny-live sandbox (senpi#6287): never launched.
+  "sandbox_required",
 ] as const
 
 export type TaskStartFailureKind = (typeof TASK_START_FAILURE_KINDS)[number]

@@ -10,6 +10,7 @@ import { createRpcChildHandle, type CreateRpcChildHandleOptions } from "./rpc/ha
 import { createRpcModelAdmission, type RpcModelAdmission } from "./rpc/model-admission"
 import { type MalformedLineHandler, RpcProtocolClient } from "./rpc/protocol-client"
 import { type RpcSpawnDescriptor, buildRpcSpawn } from "./rpc/spawn"
+import { confineRpcSpawn } from "./rpc/sandbox/confine"
 import { discardUnstartedRpcHandle } from "./rpc/start-cleanup"
 import { createTaskRecordStore } from "../store"
 import { InputUncertainError } from "./input-effects"
@@ -84,9 +85,12 @@ export class RpcProcessRunner {
       specInput.extensions === undefined && this.inheritedExtensions.length > 0
         ? { ...specInput, extensions: this.inheritedExtensions }
         : specInput
-    await this.modelAdmission(spec)
+    // A sandboxed child skips the catalog probe: that probe loads the child's extensions unconfined.
+    // Its own --model resolution still fails typed (childUnresolvedModelError) if the model is missing.
+    if (spec.sandbox === undefined) await this.modelAdmission(spec)
     const parent = new ChildParentLink(spec.task_id, this.options.dialogs, this.options.parentPermission, (message, token) => this.onWarning(message, token))
-    const descriptor = this.buildSpawn(parent.named(spec))
+    const built = this.buildSpawn(parent.named(spec))
+    const descriptor = spec.sandbox === undefined ? built : confineRpcSpawn(built, spec)
     const child = this.spawnChild(descriptor)
     const client = new RpcProtocolClient({ child, onMalformedLine: this.onMalformedLine, parent })
     const handle = createRpcChildHandle({

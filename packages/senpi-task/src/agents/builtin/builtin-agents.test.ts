@@ -62,10 +62,10 @@ describe("builtin curated agents", () => {
     }
   })
 
-  test("#given every builtin definition #when inspecting shape #then mode is subagent and executionMode is pinned in-process", () => {
+  test("#given every builtin definition #when inspecting shape #then curated agents run in-process and the review-role trio as sandboxed processes", () => {
     for (const definition of BUILTIN_AGENT_DEFAULTS) {
       expect(definition.mode).toBe("subagent")
-      expect(definition.executionMode).toBe("in-process")
+      expect(definition.executionMode).toBe(ULW_REVIEWER_AGENT_NAMES.has(definition.name) ? "process" : "in-process")
     }
   })
 

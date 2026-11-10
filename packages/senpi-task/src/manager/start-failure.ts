@@ -143,6 +143,8 @@ function publicMessage(
       return "The child could not be resumed."
     case "model_chain_exhausted":
       return "Every designated model for this task was refused, and a child never runs on any other model."
+    case "sandbox_required":
+      return "This review agent runs only as a sandboxed process, and no sandbox could be set up here. Action: install bubblewrap (Linux) or run on macOS; it never runs unsandboxed."
     default:
       return assertNever(kind)
   }

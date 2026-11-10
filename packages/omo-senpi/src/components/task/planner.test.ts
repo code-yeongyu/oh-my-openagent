@@ -716,7 +716,7 @@ describe("createTaskChildPlanner reviewer category routing", () => {
     expect(resolved.plan.variant).toBe("high")
     expect(resolved.plan.fallback_models?.map((record) => record.display)).toContain("anthropic/claude-opus-5-5")
     expect(resolved.plan.instructions).toBe(BUILTIN_AGENTS["omo-native-gate-reviewer"]?.prompt)
-    expect(resolved.plan.agentExecutionMode).toBe("in-process")
+    expect(resolved.plan.agentExecutionMode).toBe("process")
   })
 
   test("#given a registry without the deep-high gate model #when the gate reviewer is planned #then unspecified-high supplies the model", () => {
