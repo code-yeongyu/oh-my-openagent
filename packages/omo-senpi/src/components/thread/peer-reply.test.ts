@@ -19,7 +19,7 @@ function host(): ThreadHost {
 }
 
 type Handler = (payload: unknown, ctx?: unknown) => unknown
-type PermissionRequest = { readonly permission: string; readonly patterns: readonly string[]; readonly always: readonly string[] }
+type PermissionRequest = { readonly permission: string; readonly patterns: readonly string[]; readonly always: readonly string[]; readonly autoApproveAsk?: true }
 type CapturedTool = { readonly name: string; readonly permissionParser?: (input: Record<string, unknown>, cwd: string) => readonly PermissionRequest[] }
 
 function component(agentDir: string) {
@@ -45,6 +45,9 @@ function component(agentDir: string) {
 }
 
 const ASK = [{ permission: "thread_send", patterns: ["*"], always: ["*"] }]
+const SENDER = "0195f0c2-1a2b-7c3d-8e4f-a1b2c3d4e5f6"
+const OTHER = "0195f0c2-1a2b-7c3d-8e4f-0f0e0d0c0b0a"
+const REPLY = [{ permission: "thread_send", patterns: [SENDER], always: [SENDER], autoApproveAsk: true }]
 const delivery = (sender: Record<string, unknown>) => ({
   message: {
     role: "custom", customType: "session_control_delivery",
@@ -53,15 +56,17 @@ const delivery = (sender: Record<string, unknown>) => ({
 })
 
 describe("#12886 a peer-delivered run replies to its sender", () => {
-  test("#given a run woken by an agent's delivery #when it sends back to that agent's session #then no permission is asked, and any other target still asks", async () => {
+  test("#given a run woken by an agent's delivery #when it sends back to that agent's session id #then the request is scoped to it with the ask auto-approved, and any other target or spelling still asks", async () => {
     const agentDir = mkdtempSync(join(tmpdir(), "thr-peer-reply-"))
     const { store, dispatch, requests } = component(agentDir)
     try {
-      expect(requests("sess-a")).toEqual(ASK)
+      expect(requests(SENDER)).toEqual(ASK)
       await dispatch("agent_start")
-      await dispatch("message_start", delivery({ kind: "agent", session_id: "sess-a", name: "A" }))
-      expect(requests("sess-a")).toEqual([])
-      expect(requests("sess-other")).toEqual(ASK)
+      await dispatch("message_start", delivery({ kind: "agent", session_id: SENDER, name: "A" }))
+      expect(requests(SENDER)).toEqual(REPLY)
+      expect(requests(OTHER)).toEqual(ASK)
+      await dispatch("message_start", delivery({ kind: "agent", session_id: "planner", name: "planner" }))
+      expect(requests("planner")).toEqual(ASK)
     } finally {
       await store.dispose()
       rmSync(agentDir, { recursive: true, force: true })
@@ -74,7 +79,22 @@ describe("#12886 a peer-delivered run replies to its sender", () => {
     try {
       await dispatch("agent_start")
       await dispatch("message_start", delivery({ kind: "external", platform: "slack" }))
-      expect(requests("sess-a")).toEqual(ASK)
+      expect(requests(SENDER)).toEqual(ASK)
+    } finally {
+      await store.dispose()
+      rmSync(agentDir, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a run that replied to its sender #when the run settles #then a later send to that sender asks again", async () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "thr-peer-reply-"))
+    const { store, dispatch, requests } = component(agentDir)
+    try {
+      await dispatch("agent_start")
+      await dispatch("message_start", delivery({ kind: "agent", session_id: SENDER, name: "A" }))
+      expect(requests(SENDER)).toEqual(REPLY)
+      await dispatch("agent_settled")
+      expect(requests(SENDER)).toEqual(ASK)
     } finally {
       await store.dispose()
       rmSync(agentDir, { recursive: true, force: true })
