@@ -40,14 +40,16 @@ async function inProcessAccountShow(): Promise<AccountShowResult> {
   return { exitCode, stdout: lines.join("\n") }
 }
 
-function remoteDependencies(): RemoteVerbDependencies {
+function remoteDependencies(packageRoot?: string): RemoteVerbDependencies {
   const stateDir = deviceServiceStateDir()
   return {
     accountShow: inProcessAccountShow,
     stateDir,
+    ...(packageRoot === undefined ? {} : { packageRoot }),
     connect: () => connectDeviceService({ version: packageJson.version, stateDir }),
     now: () => Date.now(),
     output: line => process.stdout.write(`${line}\n`),
+    write: text => process.stdout.write(text),
     error: line => process.stderr.write(`${line}\n`),
     bootstrap: deviceServiceBootstrapSetup({
       stateDir,
@@ -67,6 +69,7 @@ export async function runRemoteAttachCommand(args: readonly string[]): Promise<r
   return prepared.engineArgs
 }
 
-export async function runRemoteCommand(args: readonly string[]): Promise<void> {
-  process.exitCode = await runRemoteVerb(remoteDependencies(), args.slice(1))
+/** `packageRoot`: the compiled binary's provisioned runtime directory (its staged `plugin/`); the npm launcher passes nothing. */
+export async function runRemoteCommand(args: readonly string[], packageRoot?: string): Promise<void> {
+  process.exitCode = await runRemoteVerb(remoteDependencies(packageRoot), args.slice(1))
 }

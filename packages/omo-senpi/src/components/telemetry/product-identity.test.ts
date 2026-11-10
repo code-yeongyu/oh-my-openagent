@@ -155,17 +155,17 @@ describe("OmO Native product identity", () => {
     })
   })
 
-  test("#given provisional Fable 5.5 #when masked #then only the exact model id is exportable", () => {
+  test("#given Fable 5.2 #when masked #then only the exact model id is exportable", () => {
     // given / when / then
-    expect(maskProviderAndModel("anthropic-subscription", "claude-fable-5-5")).toEqual({
+    expect(maskProviderAndModel("anthropic-subscription", "claude-fable-5-2")).toEqual({
       provider: "anthropic-subscription",
-      model_id: "claude-fable-5-5",
+      model_id: "claude-fable-5-2",
     })
-    expect(maskProviderAndModel("private-provider", "claude-fable-5-5")).toEqual({
+    expect(maskProviderAndModel("private-provider", "claude-fable-5-2")).toEqual({
       provider: "custom",
-      model_id: "claude-fable-5-5",
+      model_id: "claude-fable-5-2",
     })
-    expect(maskProviderAndModel("private-provider", "claude-fable-5-5-private")).toEqual({
+    expect(maskProviderAndModel("private-provider", "claude-fable-5-2-private")).toEqual({
       provider: "custom",
       model_id: "custom",
     })

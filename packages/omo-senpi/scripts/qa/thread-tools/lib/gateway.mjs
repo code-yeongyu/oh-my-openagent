@@ -418,7 +418,10 @@ export function makeScratch(label, fake) {
   const work = join(dir, "work")
   for (const path of [home, agentDir, work, join(agentDir, "omo-senpi", "omo-native")]) mkdirSync(path, { recursive: true })
   writeFileSync(join(agentDir, "models.json"), `${JSON.stringify(mockModels(fake.url), null, 2)}\n`)
-  writeFileSync(join(agentDir, "settings.json"), `${JSON.stringify({ defaultProvider: "mock", defaultModel: "mock-model", quietStartup: true }, null, 2)}\n`)
+  // The thread tools are eval-only while codemode's eval tool exists (#12903). These scenarios test the
+  // gateway through the fake model's DIRECT `QA:CALL thread_*` calls, so they run the no-eval surface,
+  // where the tools are direct; `plugin-surface.mjs` is the lane that proves the eval-only exposure.
+  writeFileSync(join(agentDir, "settings.json"), `${JSON.stringify({ defaultProvider: "mock", defaultModel: "mock-model", quietStartup: true, disabledBuiltinExtensions: ["codemode"] }, null, 2)}\n`)
   const omoConfig = `${JSON.stringify({ task: { host_shard_prewarm: "off" } }, null, 2)}\n`
   writeFileSync(join(agentDir, "omo.json"), omoConfig)
   mkdirSync(join(home, ".omo"), { recursive: true })

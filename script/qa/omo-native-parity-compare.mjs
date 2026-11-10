@@ -59,6 +59,7 @@ export const DOCTOR_EXPECTED_ONLY = {
     ["PASS computer use ", "the binary embeds the desktop engine, so its probe runs"],
     ["WARN computer use ", "results of that probe (permissions, display) on the runner"],
     ["INFO computer use stop path", "reported once the embedded engine answers"],
+    ["INFO computer use stop persistence", "printed by the ready branch the embedded engine reaches; the npm doctor skips computer use until the engine downloads"],
     ["INFO Claude Code", "the binary pins the Claude Code it downloads for the anthropic-subscription lane (#9262); npm has no pin"],
     ["PASS Claude Code", "the same pinned Claude Code, once it is downloaded"],
     ["INFO engine trust", "the engine-trust section is part of the compiled doctor only; the npm launcher's doctor has none (omo#10762)"],
