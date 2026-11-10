@@ -1358,8 +1358,6 @@
       "packages/omo-senpi/src/components/thread/gateway/store-retention.ts": ["sweepRetention"],
       // pre-existing at origin dev 4686e425b5: unused export(s) matcherAwaits
       "packages/omo-senpi/src/components/thread/gateway/worker-reply-matchers.test.ts": ["matcherAwaits"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_TOOL_SEARCH_GROUP
-      "packages/omo-senpi/src/components/thread/metadata.ts": ["THREAD_TOOL_SEARCH_GROUP"],
       // pre-existing at origin dev 4686e425b5: unused export(s) messageText, parseSessionLines, summarizeSessionEntries
       "packages/omo-senpi/src/components/thread/session-facts.ts": ["messageText", "parseSessionLines", "summarizeSessionEntries"],
       // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_LINK_SCHEME
