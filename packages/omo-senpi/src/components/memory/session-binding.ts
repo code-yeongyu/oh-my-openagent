@@ -96,11 +96,17 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
       ? resolveAutoIdentity(sessionCwd, env, sessionConfig.auto_identity)
       : resolveMemoryIdentity(sessionConfig.agent, sessionCwd, env)
     const previous = findLatestMemoryBinding(surface.readEntries())
+    // A recorded binding was made under the config read from the host folder before #10070; judging a
+    // resumed session by its own folder's config would turn an explicit agent nobody applied to it
+    // into a fail-closed conflict. A new session (no record) is judged by its own folder's config.
+    const adoptionAgentValue = previous === undefined || surface.cwd === undefined || surface.cwd === cwd
+      ? sessionConfig.agent
+      : deps.resolveConfig(loadConfig({ cwd })).agent
     const adoption = adoptSessionIdentity({
       recorded: previous,
       resolved,
       memoryRoot,
-      configAgentValue: sessionConfig.agent,
+      configAgentValue: adoptionAgentValue,
       verifyRepository: options.verifyRepository,
     })
     if (adoption.kind === "conflict") {
@@ -148,8 +154,10 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
       state.syncRepo = identity.paths.repo
       void syncRunner.acquire(identity.id, identity.paths, sessionConfig.sync, { profile: sessionConfig.agent, projectDir: sessionCwd })
     }
-    // `identity.json` is what `/memory-merge` maps old identities from (#10070); a failed write is logged, never a failed bind.
-    void deps.work.track(() => recordIdentityBind(run.paths.root, {
+    // `identity.json` is what `/memory-merge` maps old identities from (#10070), so it records only binds
+    // whose identity this config actually derived; a rebind to a recorded identity says nothing new about
+    // how that identity came to be. A failed write is logged, never a failed bind.
+    if (adoption.kind === "resolved") void deps.work.track(() => recordIdentityBind(run.paths.root, {
       id: identity.id,
       kind: autoAgent ? "auto" : "explicit",
       mode: sessionConfig.auto_identity,
