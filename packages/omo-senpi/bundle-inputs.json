@@ -48,6 +48,7 @@
     "packages/device-service-core/src/hand-device-keys.ts",
     "packages/device-service-core/src/index.ts",
     "packages/device-service-core/src/install.ts",
+    "packages/device-service-core/src/listing-rows.ts",
     "packages/device-service-core/src/local-api/access.ts",
     "packages/device-service-core/src/local-api/chunking.ts",
     "packages/device-service-core/src/local-api/client-assembly.ts",
