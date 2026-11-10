@@ -3,7 +3,7 @@
 // memory module supervisor and the end-to-end encrypted sync runner for durable sessions.
 
 import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
-import { isAutoAgentValue, resolveAutoIdentity, resolveMemoryIdentity, resolveMemoryRoot, type InFlightReads } from "@oh-my-opencode/memory-core"
+import { isAutoAgentValue, recordIdentityBind, resolveAutoIdentity, resolveMemoryIdentity, resolveMemoryRoot, type InFlightReads } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
@@ -91,7 +91,8 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
     if (!state.enabled) return
 
     const memoryRoot = resolveMemoryRoot(env, sessionCwd)
-    const resolved = isAutoAgentValue(sessionConfig.agent)
+    const autoAgent = isAutoAgentValue(sessionConfig.agent)
+    const resolved = autoAgent
       ? resolveAutoIdentity(sessionCwd, env, sessionConfig.auto_identity)
       : resolveMemoryIdentity(sessionConfig.agent, sessionCwd, env)
     const previous = findLatestMemoryBinding(surface.readEntries())
@@ -147,6 +148,16 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
       state.syncRepo = identity.paths.repo
       void syncRunner.acquire(identity.id, identity.paths, sessionConfig.sync, { profile: sessionConfig.agent, projectDir: sessionCwd })
     }
+    // `identity.json` is what `/memory-merge` maps old identities from (#10070); a failed write is logged, never a failed bind.
+    void deps.work.track(() => recordIdentityBind(run.paths.root, {
+      id: identity.id,
+      kind: autoAgent ? "auto" : "explicit",
+      mode: sessionConfig.auto_identity,
+      source: sessionCwd,
+      spelling: sessionCwd,
+    }, binding.boundAt)).catch((error: unknown) => {
+      ctx.logger.warn("omo-senpi memory identity record write failed", { sessionId: surface.id, error: error instanceof Error ? error.message : String(error) })
+    })
     // Disposable bookkeeping: a session closed without a conversation leaves no file (senpi#3263).
     pi.appendEntry(MEMORY_BINDING_CUSTOM_TYPE, binding, { startupBookkeeping: true })
     // Bind-time reconcile floats past the bind by design, but its rejection must not

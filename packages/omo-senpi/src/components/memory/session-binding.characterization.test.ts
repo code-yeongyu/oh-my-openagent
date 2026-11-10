@@ -7,7 +7,7 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
+import { readIdentityRecord, resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
 import { createMemoryBinding } from "./binding"
 import { MEMORY_BINDING_CUSTOM_TYPE, createMemoryComponent, memoryModuleSupervisor } from "./index"
 import {
@@ -147,6 +147,17 @@ describe("X8c memory binding at session_start (characterization)", () => {
 
     // then
     expect(configCwds).toContain(sessionCwd)
+    await pi.dispatch("session_shutdown", {}, sessionContext())
+    started.splice(started.findIndex((entry) => entry.pi === pi), 1)
+    expect(await readIdentityRecord(sessionIdentity.paths.root)).toMatchObject({
+      id: sessionIdentity.id,
+      kind: "explicit",
+      mode: "path",
+      source: sessionCwd,
+      spellings: [sessionCwd],
+      firstBoundAt: 1236,
+      lastBoundAt: 1236,
+    })
     expect(pi.entries.map((entry) => entry.data)).toEqual([
       createMemoryBinding({ identity: sessionIdentity.id, repoPath: sessionIdentity.paths.repo, boundAt: 1236 }),
     ])
