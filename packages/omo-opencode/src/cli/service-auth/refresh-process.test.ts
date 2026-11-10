@@ -52,3 +52,57 @@ test("two processes share the refresh lock and never persist credentials in HOME
     for (const secret of [grant.accessToken, grant.refreshToken, ...Object.values(privateKeys)]) expect(text).not.toContain(secret)
   }
 }, 10_000)
+
+// #12978: the credential item belongs to the OS account (Secret Service on the session bus, login Keychain), not to $HOME.
+// Two refreshers started with different HOME values must still share one lock, so the rotating refresh token reaches the
+// service once. An authoritative read from a child that does not hold the account's lock is held until the other child
+// reads too: without one shared lock both then refresh with the same token; with it, the second reads the successor.
+const passwdHome = async (): Promise<string> => {
+  const uid = String(process.getuid?.())
+  const entry = (await readFile("/etc/passwd", "utf8")).split("\n").map(line => line.split(":")).find(fields => fields[2] === uid)
+  if (entry?.[5] === undefined) throw new Error("this test needs the runner's uid in /etc/passwd")
+  return entry[5]
+}
+
+test.skipIf(process.platform !== "linux")("two refreshers with different HOME values present one refresh token once (#12978)", async () => {
+  const lockOwner = async (path: string): Promise<string | null> => (await readFile(path, "utf8").catch(() => null))?.split("\n")[1] ?? null
+  let saved: Credentials = { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" }
+  const presented: string[] = []
+  const unlocked: { pid: string; release: () => void }[] = []
+  let lockPath = ""
+  const api = fakeApi(async request => {
+    if (request.url.endsWith("/fake-store")) {
+      if (request.method === "PUT") saved = credentialSchema.parse(await request.json())
+      const pid = request.headers.get("x-pid") ?? ""
+      if (request.method === "GET" && request.headers.get("x-read") === "authoritative" && await lockOwner(lockPath) !== pid) {
+        const read = Promise.withResolvers<void>()
+        unlocked.push({ pid, release: read.resolve })
+        if (new Set(unlocked.map(entry => entry.pid)).size === 2) for (const entry of unlocked) entry.release()
+        await read.promise
+      }
+      return Response.json(saved)
+    }
+    presented.push(String((await request.json() as { refreshToken?: unknown }).refreshToken))
+    return Response.json({ ...grant, refreshToken: "rotated-once" })
+  })
+  lockPath = join(await passwdHome(), ".omo", "session-locks", `${credentialId(api)}.lock`)
+  const homes = [await temporaryHome(), await temporaryHome()]
+  const children = homes.map(home => Bun.spawn([process.execPath, join(import.meta.dir, "refresh-child.fixture.ts"), api], {
+    env: { PATH: process.env.PATH, HOME: home, USERPROFILE: home }, stdout: "pipe", stderr: "pipe",
+  }))
+  onTestFinished(async () => {
+    for (const child of children) {
+      if (child.exitCode === null) child.kill()
+      await child.exited
+    }
+  })
+  const exits = await Promise.all(children.map(child => child.exited))
+  const errors = await Promise.all(children.map(child => {
+    if (!child.stderr || typeof child.stderr === "number") throw new Error("child stderr must be piped")
+    return new Response(child.stderr).text()
+  }))
+  expect(errors).toEqual(["", ""])
+  expect(exits).toEqual([0, 0])
+  expect(presented).toEqual([grant.refreshToken])
+  expect(saved.refreshToken).toBe("rotated-once")
+}, 30_000)
