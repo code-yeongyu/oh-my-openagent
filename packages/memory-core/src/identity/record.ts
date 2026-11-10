@@ -21,8 +21,6 @@ export interface IdentityRecord {
   readonly mode: AutoIdentityMode
   readonly source: string
   readonly spellings: readonly string[]
-  readonly firstBoundAt: number
-  readonly lastBoundAt: number
   /** Set by `/memory-merge --apply`: the identity this one was merged into, and its head at that merge. */
   readonly mergedInto?: string
   readonly mergedHead?: string
@@ -68,16 +66,16 @@ async function withRecordLock<T>(identityRoot: string, operation: () => Promise<
  * session that never writes memory never creates the memory home. The store's first bind after it exists
  * records the spellings `/memory-merge` needs.
  */
-export async function recordIdentityBind(identityRoot: string, bind: IdentityBind, now: number): Promise<IdentityRecord | undefined> {
+export async function recordIdentityBind(identityRoot: string, bind: IdentityBind): Promise<IdentityRecord | undefined> {
   if (!(await isDirectory(identityRoot))) return undefined
-  return withRecordLock(identityRoot, () => writeIdentityBind(identityRoot, bind, now))
+  return withRecordLock(identityRoot, () => writeIdentityBind(identityRoot, bind))
 }
 
 async function isDirectory(path: string): Promise<boolean> {
   return (await stat(path).catch(() => undefined))?.isDirectory() === true
 }
 
-async function writeIdentityBind(identityRoot: string, bind: IdentityBind, now: number): Promise<IdentityRecord> {
+async function writeIdentityBind(identityRoot: string, bind: IdentityBind): Promise<IdentityRecord> {
   const previous = await readIdentityRecord(identityRoot).catch(() => undefined)
   const kept = previous?.id === bind.id ? previous : undefined
   const record: IdentityRecord = {
@@ -87,8 +85,6 @@ async function writeIdentityBind(identityRoot: string, bind: IdentityBind, now: 
     mode: bind.mode,
     source: bind.source,
     spellings: kept === undefined || kept.spellings.includes(bind.spelling) ? [...(kept?.spellings ?? [bind.spelling])] : [...kept.spellings, bind.spelling],
-    firstBoundAt: kept?.firstBoundAt ?? now,
-    lastBoundAt: now,
     ...(kept?.mergedInto === undefined ? {} : { mergedInto: kept.mergedInto }),
     ...(kept?.mergedHead === undefined ? {} : { mergedHead: kept.mergedHead }),
   }
@@ -96,15 +92,15 @@ async function writeIdentityBind(identityRoot: string, bind: IdentityBind, now: 
   return record
 }
 
-export function markIdentityMerged(identityRoot: string, id: string, mergedInto: string, mergedHead: string, now: number): Promise<IdentityRecord> {
-  return withRecordLock(identityRoot, () => writeIdentityMerged(identityRoot, id, mergedInto, mergedHead, now))
+export function markIdentityMerged(identityRoot: string, id: string, mergedInto: string, mergedHead: string): Promise<IdentityRecord> {
+  return withRecordLock(identityRoot, () => writeIdentityMerged(identityRoot, id, mergedInto, mergedHead))
 }
 
-async function writeIdentityMerged(identityRoot: string, id: string, mergedInto: string, mergedHead: string, now: number): Promise<IdentityRecord> {
+async function writeIdentityMerged(identityRoot: string, id: string, mergedInto: string, mergedHead: string): Promise<IdentityRecord> {
   const previous = await readIdentityRecord(identityRoot).catch(() => undefined)
   const base: IdentityRecord = previous?.id === id
     ? previous
-    : { version: 1, id, kind: "auto", mode: "path", source: "", spellings: [], firstBoundAt: now, lastBoundAt: now }
+    : { version: 1, id, kind: "auto", mode: "path", source: "", spellings: [] }
   const record: IdentityRecord = { ...base, mergedInto, mergedHead }
   await writeJsonAtomic(join(identityRoot, IDENTITY_RECORD_FILENAME), record)
   return record
@@ -118,7 +114,6 @@ function parseIdentityRecord(value: unknown): IdentityRecord | undefined {
   if (record.kind !== "auto" && record.kind !== "explicit") return undefined
   if (record.mode !== "path" && record.mode !== "git") return undefined
   if (!Array.isArray(spellings) || !spellings.every((spelling) => typeof spelling === "string")) return undefined
-  if (typeof record.firstBoundAt !== "number" || typeof record.lastBoundAt !== "number") return undefined
   return {
     version: 1,
     id: record.id,
@@ -126,8 +121,6 @@ function parseIdentityRecord(value: unknown): IdentityRecord | undefined {
     mode: record.mode,
     source: record.source,
     spellings,
-    firstBoundAt: record.firstBoundAt,
-    lastBoundAt: record.lastBoundAt,
     ...(typeof record.mergedInto === "string" ? { mergedInto: record.mergedInto } : {}),
     ...(typeof record.mergedHead === "string" ? { mergedHead: record.mergedHead } : {}),
   }

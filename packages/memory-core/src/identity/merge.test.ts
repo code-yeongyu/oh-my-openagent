@@ -37,7 +37,7 @@ async function identity(root: string, id: string, files: Record<string, string>,
   }
   if (written.length > 0) await repo.commitWrite(written, `seed ${id}`, AUTHOR)
   for (const [index, spelling] of spellings.entries()) {
-    await recordIdentityBind(paths.root, { id, kind: "auto", mode: "path", source: spelling, spelling }, 1000 + index)
+    await recordIdentityBind(paths.root, { id, kind: "auto", mode: "path", source: spelling, spelling })
   }
   return { id, paths, repo }
 }
@@ -90,8 +90,8 @@ describe("identity merge (#10070)", () => {
     }, ["/work/project-feature"])
     const sourceHead = await source.repo.head()
 
-    const first = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 5000 })
-    const second = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 6000 })
+    const first = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR })
+    const second = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR })
 
     expect(first.status).toBe("merged")
     expect(second.status).toBe("already-merged")
@@ -159,14 +159,14 @@ describe("identity merge (#10070)", () => {
     const root = await memoryRoot()
     const target = await identity(root, "project-aaaa1111", { "notes/diff.md": note("target") }, ["/work/project"])
     const source = await identity(root, "project-feature-bbbb2222", { "notes/diff.md": note("source v1") }, ["/work/project-feature"])
-    await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 5000 })
+    await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR })
     const aside = "reference/merged/project-feature-bbbb2222/notes/diff.md"
     await writeFile(join(target.paths.repo, aside), note("user edit"))
     await target.repo.commitWrite([aside], "edit aside", AUTHOR)
     await writeFile(join(source.paths.repo, "notes/diff.md"), note("source v2"))
     await source.repo.commitWrite(["notes/diff.md"], "v2", AUTHOR)
 
-    const rerun = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 6000 })
+    const rerun = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR })
 
     expect(rerun.status).toBe("merged")
     expect(await readFile(join(target.paths.repo, aside), "utf8")).toBe(note("user edit"))
@@ -210,7 +210,7 @@ describe("identity merge (#10070)", () => {
     const legacyId = resolveAutoIdentity(thread, env, "path").id
     const target = await identity(root, targetId, {}, [main])
     const legacy = await identity(root, legacyId, { "notes/old.md": note("old") }, [])
-    await applyIdentityMerge({ source: legacy.paths, target: target.paths, lock, author: AUTHOR, now: 5000 })
+    await applyIdentityMerge({ source: legacy.paths, target: target.paths, lock, author: AUTHOR })
 
     const found = await findMergePredecessors(root, targetId, resolveGit, await repositoryCandidateDirs([main]))
 
@@ -227,7 +227,7 @@ describe("identity merge (#10070)", () => {
     execFileSync("git", ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", "commit", "-q", "--no-verify", "-m", "icon"], { cwd: source.paths.repo, stdio: "ignore" })
     const before = await target.repo.head()
 
-    const outcome = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 5000 }).catch((error: unknown) => error)
+    const outcome = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR }).catch((error: unknown) => error)
 
     expect(outcome).toBeInstanceOf(Error)
     expect(String(outcome)).toContain("skills/icon.png")
@@ -239,7 +239,7 @@ describe("identity merge (#10070)", () => {
     const root = await memoryRoot()
     await identity(root, "project-aaaa1111", {}, ["/work/project"])
     const profile = await identity(root, "work-00e13ed7", { "notes/p.md": note("profile") }, [])
-    await recordIdentityBind(profile.paths.root, { id: "work-00e13ed7", kind: "explicit", mode: "git", source: "work", spelling: "/work/project" }, 1)
+    await recordIdentityBind(profile.paths.root, { id: "work-00e13ed7", kind: "explicit", mode: "git", source: "work", spelling: "/work/project" })
 
     const found = await findMergePredecessors(root, "project-aaaa1111", (spelling) => (spelling === "/work/project" ? "project-aaaa1111" : spelling))
 
@@ -267,7 +267,7 @@ describe("identity merge (#10070)", () => {
       return result
     }
 
-    await applyIdentityMerge({ source: source.paths, target: target.paths, lock: observingLock, author: AUTHOR, now: 5000 })
+    await applyIdentityMerge({ source: source.paths, target: target.paths, lock: observingLock, author: AUTHOR })
 
     expect(markedAtRelease).toBe("project-aaaa1111")
   }, 30_000)
@@ -282,7 +282,7 @@ describe("identity merge (#10070)", () => {
       return operation()
     }
 
-    const result = await applyIdentityMerge({ source: source.paths, target: target.paths, lock: racingLock, author: AUTHOR, now: 5000 })
+    const result = await applyIdentityMerge({ source: source.paths, target: target.paths, lock: racingLock, author: AUTHOR })
 
     expect(result.status).toBe("merged")
     expect(await readFile(join(target.paths.repo, "notes/new.md"), "utf8")).toBe(note("written meanwhile"))
@@ -298,7 +298,7 @@ describe("identity merge (#10070)", () => {
     execFileSync("git", ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", "commit", "-q", "--no-verify", "-m", "seed key"], { cwd: source.paths.repo, stdio: "ignore" })
     expect((await source.repo.lsTree("HEAD")).includes("notes/key.md")).toBe(true)
 
-    const outcome = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 5000 }).catch((error: unknown) => error)
+    const outcome = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR }).catch((error: unknown) => error)
 
     expect((await target.repo.status()).trim()).toBe("")
     expect(outcome).toBeInstanceOf(Error)
@@ -310,14 +310,14 @@ describe("identity merge (#10070)", () => {
     const source = await identity(root, "project-feature-bbbb2222", { "notes/old.md": note("old"), "notes/aside.md": note("source aside") }, ["/work/project-feature"])
     await writeFile(join(target.paths.repo, "notes/aside.md"), note("target aside"))
     await target.repo.commitWrite(["notes/aside.md"], "target aside", AUTHOR)
-    await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 5000 })
+    await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR })
     await rm(join(target.paths.repo, "notes/old.md"))
     await target.repo.commitWrite(["notes/old.md"], "drop old", AUTHOR)
     await writeFile(join(source.paths.repo, "notes/later.md"), note("later"))
     await source.repo.commitWrite(["notes/later.md"], "later", AUTHOR)
     const newHead = await source.repo.head()
 
-    const rerun = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 6000 })
+    const rerun = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR })
 
     expect(rerun.status).toBe("merged")
     expect(rerun.plan.actions.map((action) => action.path)).toEqual(["notes/later.md"])
@@ -330,12 +330,12 @@ describe("identity merge (#10070)", () => {
     const root = await memoryRoot()
     const target = await identity(root, "project-aaaa1111", { "notes/shared.md": note("shared"), "notes/diff.md": note("target diff") }, ["/work/project"])
     const source = await identity(root, "project-feature-bbbb2222", { "notes/one.md": note("one"), "notes/diff.md": note("source diff") }, ["/work/project-feature"])
-    await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 5000 })
+    await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR })
     await writeFile(join(source.paths.repo, "notes/shared.md"), note("shared"))
     await source.repo.commitWrite(["notes/shared.md"], "same as target", AUTHOR)
     const newHead = await source.repo.head()
 
-    const rerun = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 6000 })
+    const rerun = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR })
 
     expect(rerun.status).toBe("nothing-to-merge")
     expect(await readIdentityRecord(source.paths.root)).toMatchObject({ mergedHead: newHead })

@@ -60,7 +60,6 @@ async function runMemoryMerge(deps: MemoryCommandDeps, args: string, ctx: Memory
   }
 
   const lock = writerLock(identity)
-  const now = deps.now?.() ?? Date.now()
   const results: string[] = []
   let merged = false
   for (const predecessor of found.predecessors) {
@@ -70,7 +69,6 @@ async function runMemoryMerge(deps: MemoryCommandDeps, args: string, ctx: Memory
         target: identity.identityPaths,
         lock,
         author: { agentId: identity.identity, authorName: "Human" },
-        now,
       })
       if (result.status === "merged") {
         merged = true
