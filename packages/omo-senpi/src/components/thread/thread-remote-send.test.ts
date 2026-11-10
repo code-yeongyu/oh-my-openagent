@@ -26,7 +26,7 @@ describe("#12882: a send to another device is one admit_external_message, admitt
     expect(commands(a.sent)).toEqual(["get_state", ADMIT])
     const [record = {}] = admits(a.sent)
     expect(record["deliveryId"]).toMatch(UUID)
-    expect(record).toMatchObject({ sessionId: "dur-on-b", deliverAs: "followUp", chainCount: 1, sender: { kind: "agent", session_id: "dur-caller", name: "planner" } })
+    expect(record).toMatchObject({ sessionId: "rk-on-b", deliverAs: "followUp", chainCount: 1, sender: { kind: "agent", session_id: "dur-caller", name: "planner" } })
     expect("whenIdle" in record).toBe(false)
     expect("expectedTurnId" in record).toBe(false)
     expect("remote_origin" in record || "remoteOrigin" in record).toBe(false)
