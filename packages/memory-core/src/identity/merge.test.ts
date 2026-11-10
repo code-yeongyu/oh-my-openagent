@@ -272,6 +272,35 @@ describe("identity merge (#10070)", () => {
     expect(markedAtRelease).toBe("project-aaaa1111")
   }, 30_000)
 
+  it("#given a target identity whose memory repository does not exist yet #when a store is merged into it #then the target repository is created and receives the files (#12974 review r7)", async () => {
+    const root = await memoryRoot()
+    const target = buildIdentityPaths(root, "project-aaaa1111")
+    const source = await identity(root, "project-feature-bbbb2222", { "notes/new.md": note("new") }, ["/work/project-feature"])
+
+    const result = await applyIdentityMerge({ source: source.paths, target, lock, author: AUTHOR })
+
+    expect(result.status).toBe("merged")
+    expect(await readFile(join(target.repo, "notes/new.md"), "utf8")).toBe(note("new"))
+  }, 30_000)
+
+  it("#given a linked worktree that lives outside the repository #when candidates are collected from its spelling #then the main checkout and every sibling worktree are found (#12974 review r7)", async () => {
+    const root = await memoryRoot()
+    const main = join(root, "checkout", "project")
+    const outside = join(root, "desktop", "threads", "t1")
+    const sibling = join(root, "desktop", "threads", "t2")
+    await mkdir(main, { recursive: true })
+    await mkdir(dirname(outside), { recursive: true })
+    const git = (cwd: string, args: readonly string[]) => execFileSync("git", ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", ...args], { cwd, stdio: "ignore" })
+    git(main, ["init", "--quiet", "--initial-branch=main"])
+    git(main, ["commit", "--quiet", "--allow-empty", "-m", "init"])
+    git(main, ["worktree", "add", "--quiet", "-b", "t1", outside])
+    git(main, ["worktree", "add", "--quiet", "-b", "t2", sibling])
+
+    const dirs = await repositoryWorktreeDirs([outside])
+
+    expect(dirs).toEqual(expect.arrayContaining([realpathSync(main), realpathSync(sibling)]))
+  }, 30_000)
+
   it("#given another writer creates the same path between the plan and the lock #when the merge applies #then the target's file is kept and the source copy goes aside (#12974 review)", async () => {
     const root = await memoryRoot()
     const target = await identity(root, "project-aaaa1111", { "notes/base.md": note("base") }, ["/work/project"])

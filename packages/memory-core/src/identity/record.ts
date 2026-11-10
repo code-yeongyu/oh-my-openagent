@@ -1,7 +1,8 @@
 // `identity.json` (#10070): what the identity directory itself knows about how sessions reached it.
-// Written at every bind, it is the evidence `/memory-merge` maps old identities from: which mode
-// derived the id, from which source, and every directory spelling a session bound it from. A record
-// that cannot be read is replaced, never allowed to fail a bind.
+// Written on a bind whose store already exists on disk (binding itself creates nothing), it is the evidence
+// `/memory-merge` maps old identities from: which mode derived the id, from which source, and every
+// directory spelling a session bound it from. It holds no timestamps, so a repeated bind rewrites the same
+// bytes. A record that cannot be read is replaced, never allowed to fail a bind.
 
 import { join } from "node:path"
 
