@@ -344,6 +344,22 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
     })
   })
 
+  test("scope_reports_an_unreadable_plan_as_one_finding_line", () => {
+    withRepo((repo) => {
+      scopeRepo(repo)
+
+      // when --plan names a directory
+      const result = Bun.spawnSync([process.execPath, guardScript, "--scope", "2", "base", "--plan", repo.run], { cwd: repo.root, env: isolatedEnv, stdout: "pipe", stderr: "pipe" })
+
+      // then the CLI prints exactly one finding naming the plan and exits 1, not a stack trace
+      const lines = result.stdout.toString().split("\n").filter((line) => line.length > 0)
+      expect(lines).toHaveLength(1)
+      expect(lines[0]).toContain(`plan file ${repo.run}`)
+      expect(result.stderr.toString()).toBe("")
+      expect(result.exitCode).toBe(1)
+    })
+  })
+
   test("parse_write_scope_drops_notes_and_entries_outside_the_repository", () => {
     const parsed = parseWriteScope(
       "  Write scope: `Cargo.toml (workspace members, shared-append)`; `package.json (workspaces, `test:computer` script; shared-append)`; `crates/omo-computer-backend-macos/probes/*.{sh,ps1}`; `omo-desktop-app repository: `.github/workflows/release.yml`, `x.yml` (three places)`; `$CU_RUN/evidence/ (no repository change)`; `<session working directory>/.omo/omo.jsonc (one added key)`; `GitHub issues and PR comments`; `changes/unreleased/<pr>.md`",
@@ -426,6 +442,24 @@ describe("computer-v3-guards --parity", () => {
       expectFindings(repo.guard("--parity", "--final"), "C17", "line 3")
     })
   })
+
+  test("parity_refuses_an_empty_or_headerless_manifest_and_legs_file", () => {
+    withRepo((repo) => {
+      // given a zero-byte manifest and a zero-byte legs file
+      repo.write({ [manifestPath]: "", [legsPath]: "" })
+      repo.commit("empty")
+
+      // then --parity --final names both files and exits 1
+      expectFindings(repo.guard("--parity", "--final"), "test-parity-manifest.tsv is empty", "DEFERRED-LEGS.tsv is empty")
+
+      // when each file holds one data line and no header
+      repo.write({ [manifestPath]: "core\trust\tcore::a\tpending\t\n", [legsPath]: "C17\tthe serve leg\t28\t74\towed\n" })
+      repo.commit("headerless")
+
+      // then the missing header is a finding for each file, never a skipped row
+      expectFindings(repo.guard("--parity", "--final"), "test-parity-manifest.tsv line 1", "DEFERRED-LEGS.tsv line 1")
+    })
+  })
 })
 
 const provenancePath = "crates/omo-computer-core/parity/ORACLE-PROVENANCE.tsv"
@@ -455,7 +489,8 @@ const caseFile = (reportMode: string | undefined): string =>
 const parametersFile = JSON.stringify({ computer: { properties: { action: { type: "string", description: "call: one chain" } } } }, null, 2) + "\n"
 
 function oracleTree(deltaLines: string): Tree {
-  const files: Tree = { [objectCasePath]: caseFile("object"), [nullCasePath]: caseFile(undefined), [parametersPath]: parametersFile }
+  // The null-mode case opens reportMode "object" on purpose: only its place on the null-mode list may refuse a replaced line in it.
+  const files: Tree = { [objectCasePath]: caseFile("object"), [nullCasePath]: caseFile("object"), [parametersPath]: parametersFile }
   const provenance = Object.entries(files)
     .map(([path, content]) => `${path}\tcrates/senpi-desktop-core/x/${path.split("/").at(-1)}\td79bc6cc\t${sha256("old")}\t${sha256(content)}\t1;0;0\n`)
     .join("")
@@ -477,6 +512,24 @@ describe("computer-v3-guards --oracle", () => {
 
       // then each is a finding
       expectFindings(repo.guard("--oracle"), "action-report-object.json", "action-report-legacy.json", "extra.json")
+    })
+  })
+
+  test("oracle_refuses_an_empty_or_headerless_provenance_or_deltas_ledger", () => {
+    withRepo((repo) => {
+      // given zero-byte ORACLE-PROVENANCE and ORACLE-DELTAS files
+      repo.write({ [provenancePath]: "", [deltasPath]: "" })
+      repo.commit("empty")
+
+      // then --oracle names both files and exits 1
+      expectFindings(repo.guard("--oracle"), "ORACLE-PROVENANCE.tsv is empty", "ORACLE-DELTAS.tsv is empty")
+
+      // when each file holds one junk line instead of its header
+      repo.write({ [provenancePath]: "junk\n", [deltasPath]: `${objectCasePath}\t/result/abi\tadditive\tAC-1\t12\t\t\n` })
+      repo.commit("headerless")
+
+      // then the missing header is a finding for each file
+      expectFindings(repo.guard("--oracle"), "ORACLE-PROVENANCE.tsv line 1", "ORACLE-DELTAS.tsv line 1")
     })
   })
 
