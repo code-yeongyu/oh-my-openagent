@@ -113,7 +113,9 @@ describe("the account source built from the engine's one selection", () => {
     // when: A starts checking the old account, then B checks it too, finds it stale and stores generation-2
     const late = source()
     const early = source()
-    while (checks.length < 2) await Promise.resolve()
+    // Bounded, so a regression that makes fewer isCurrent() calls fails at the assertion instead of hanging.
+    for (let spins = 0; checks.length < 2 && spins < 50; spins++) await Promise.resolve()
+    expect(checks.length).toBe(2)
     checks[1]?.resolve(false)
     const fresh = await early
     checks[0]?.resolve(false)
