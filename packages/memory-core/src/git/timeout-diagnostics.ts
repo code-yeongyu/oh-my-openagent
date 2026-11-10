@@ -1,5 +1,7 @@
 import { spawnSync } from "node:child_process"
-import { mkdirSync, writeFileSync } from "../fs/resilient"
+import { randomUUID } from "node:crypto"
+import { tmpdir } from "node:os"
+import { closeSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from "../fs/resilient"
 import { join } from "node:path"
 
 // Opt-in evidence for a git that outlives its timeout (omo #10821): on Windows CI one `git add` stalls
@@ -12,16 +14,36 @@ export const GIT_TIMEOUT_DIAGNOSTICS_ENV = "OMO_GIT_TIMEOUT_DIAGNOSTICS_DIR"
 // That cost exists only in diagnostics mode and only on an actual timeout, where the evidence matters more.
 const SNAPSHOT_TIMEOUT_MS = 15_000
 
-function processSnapshot(pid: number): string {
-  const command = process.platform === "win32"
-    ? spawnSync("powershell", ["-NoProfile", "-Command", [
+function snapshotCommand(pid: number): readonly [string, readonly string[]] {
+  return process.platform === "win32"
+    ? ["powershell", ["-NoProfile", "-Command", [
       "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,CreationDate,CommandLine | Format-Table -AutoSize -Wrap | Out-String -Width 400",
       // Thread states for the git and every child it started, in case the stalled work runs in a child.
       `@(${pid}) + @(Get-CimInstance Win32_Process -Filter "ParentProcessId=${pid}" | ForEach-Object { $_.ProcessId }) | ForEach-Object { "threads of $_"; (Get-Process -Id $_ -ErrorAction SilentlyContinue).Threads | Group-Object ThreadState,WaitReason -NoElement | Format-Table -AutoSize | Out-String }`,
-    ].join("; ")], { encoding: "utf8", timeout: SNAPSHOT_TIMEOUT_MS, windowsHide: true })
-    : spawnSync("ps", ["-axo", "pid,ppid,stat,wchan,etime,command"], { encoding: "utf8", timeout: SNAPSHOT_TIMEOUT_MS, windowsHide: true })
-  if (command.error) return `process snapshot failed: ${command.error.message}`
-  return `${command.stdout}${command.stderr}`
+    ].join("; ")]]
+    : ["ps", ["-axo", "pid,ppid,stat,wchan,etime,command"]]
+}
+
+// The table goes to a temp file, never a pipe: spawnSync caps a pipe at maxBuffer (1 MiB by default),
+// and a host running thousands of processes overflows any fixed cap, which lost the whole table to
+// ENOBUFS (omo #12801). A file has no such cap, so both platforms write their output to one.
+function processSnapshot(pid: number): string {
+  const [file, args] = snapshotCommand(pid)
+  const output = join(tmpdir(), `omo-git-timeout-snapshot-${process.pid}-${randomUUID()}.txt`)
+  let fd: number | undefined
+  try {
+    fd = openSync(output, "wx", 0o600)
+    const command = spawnSync(file, args, { stdio: ["ignore", fd, fd], timeout: SNAPSHOT_TIMEOUT_MS, windowsHide: true })
+    if (command.error) return `process snapshot failed: ${command.error.message}`
+    return readFileSync(output, "utf8")
+  } catch (error) {
+    return `process snapshot failed: ${error instanceof Error ? error.message : String(error)}`
+  } finally {
+    if (fd !== undefined) {
+      closeSync(fd)
+      unlinkSync(output)
+    }
+  }
 }
 
 export function recordGitTimeout(environment: NodeJS.ProcessEnv, pid: number | undefined, argv: readonly string[], cwd: string, timeoutMs: number, snapshot: (pid: number) => string = processSnapshot): void {

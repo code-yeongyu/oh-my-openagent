@@ -17,6 +17,11 @@ import type { ThreadHostView, ThreadHostViewRequest, ThreadSessionPort } from ".
 import { acceptedControls, LEGACY_TUI_COMMANDS, tuiCommandsFrom } from "./endpoint-controls"
 import { answerUiRequest } from "./ui-answer"
 import { fencedCommand } from "./attachment-fence"
+import { closeLadder, SESSION_GONE } from "./control/close-ladder"
+import { createServiceAliasRegistry, type ServiceAccess } from "./remote/alias-registry"
+import { createDeviceServiceSessions } from "./remote/device-service"
+import { createLazyRemoteSurface } from "./remote/lazy-remote"
+import type { RemoteThreadSurface } from "./remote/ports"
 
 type RpcFrame = { readonly success?: boolean; readonly data?: unknown; readonly error?: unknown; readonly errorCode?: unknown; readonly errorData?: unknown }
 function record(value: unknown): value is Record<string, unknown> { return typeof value === "object" && value !== null && !Array.isArray(value) }
@@ -64,6 +69,8 @@ type RequestOptions = {
   readonly durableSessionId?: string
   readonly openedName?: string
   readonly rpcHost?: boolean
+  /** An exempt read sent attached anyway (`attachment-fence.ts`): the close ladder's "still held" probe. */
+  readonly attached?: boolean
 }
 
 /**
@@ -94,7 +101,7 @@ async function requestFrame(socketPath: string, command: Record<string, unknown>
         dataRecord(await request({ type: "set_session_name", sessionId: opened.sessionId, name: options.openedName }), "set_session_name")
       }
       return result
-    })
+    }, { attached: options.attached === true })
   })
 }
 
@@ -213,7 +220,8 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
   const registry = options.registry ?? (() => listRegistryEndpoints(resolveAgentHome({ env })))
   const readSecret = options.readSecret ?? ((socket: string) => readFileSync(controlSocketSecretPath(socket)))
   const legacy = options.socket ?? resolveThreadSocket(options.env)
-  let enumeration: { readonly expiresAt: number; readonly endpoints: Promise<readonly KnownEndpoint[]> } | undefined
+  type Enumeration = { expiresAt: number | undefined; readonly endpoints: Promise<readonly KnownEndpoint[]> }
+  let enumeration: Enumeration | undefined
   // Session files each endpoint listed on its last answer: a host that stopped cleanly released its
   // claims, and this is then the only record of which threads it held.
   const lastListed = new Map<string, readonly string[]>()
@@ -233,7 +241,7 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
 
   const kindOf = (socket: string): EndpointKind => kinds.get(resolve(socket)) ?? (isTuiControlSocket(socket) ? "tui" : "rpc_host")
 
-  const callFrame = async (socket: string, type: string, data: Record<string, unknown> = {}, timeoutMs?: number, durableSessionId?: string, openedName?: string): Promise<RpcFrame> => {
+  const callFrame = async (socket: string, type: string, data: Record<string, unknown> = {}, timeoutMs?: number, durableSessionId?: string, openedName?: string, attached?: boolean): Promise<RpcFrame> => {
     const tui = kindOf(socket) === "tui"
     if (tui && !LEGACY_TUI_COMMANDS.has(type) && !(await learnTuiCommands(socket)).has(type)) throw new Error(`unsupported:${type}`)
     let dial = connect
@@ -248,15 +256,15 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
       if (transport.address !== socket) dial = () => connect(transport.address)
     }
     const frame = await requestFrame(socket, { type, ...data }, dial, {
-      timeoutMs: timeoutMs ?? (tui ? TUI_REQUEST_TIMEOUT_MS : undefined), secret, durableSessionId, openedName,
+      timeoutMs: timeoutMs ?? (tui ? TUI_REQUEST_TIMEOUT_MS : undefined), secret, durableSessionId, openedName, ...(attached === true ? { attached } : {}),
       rpcHost: !tui,
       keyRoot: () => options.keyRoot ?? (env.SENPI_RPC_KEY_ROOT?.trim() || resolveAgentHome({ env })),
     })
     if (frame.success === false && (frame.errorCode ?? frame.error) === "auth_required") throw authRequiredError(socket)
     return frame
   }
-  const callOn = async <T>(socket: string, type: string, data: Record<string, unknown> = {}, timeoutMs?: number, durableSessionId?: string): Promise<T> =>
-    dataRecord(await callFrame(socket, type, data, timeoutMs, durableSessionId), type) as T
+  const callOn = async <T>(socket: string, type: string, data: Record<string, unknown> = {}, timeoutMs?: number, durableSessionId?: string, attached?: boolean): Promise<T> =>
+    dataRecord(await callFrame(socket, type, data, timeoutMs, durableSessionId, undefined, attached), type) as T
   const call = <T>(type: string, data: Record<string, unknown> = {}, durableSessionId?: string): Promise<T> => callOn<T>(legacy, type, data, undefined, durableSessionId)
 
   const enumerate = async (): Promise<readonly KnownEndpoint[]> => {
@@ -279,8 +287,15 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
   }
 
   const endpoints = async (): Promise<readonly KnownEndpoint[]> => {
-    if (enumeration === undefined || enumeration.expiresAt <= now()) {
-      enumeration = { expiresAt: now() + HOST_ENDPOINTS_CACHE_TTL_MS, endpoints: enumerate() }
+    // One enumeration at a time, and its window starts when it answers: a host whose `status --all` takes longer
+    // than the window shares the running one and reuses its answer, instead of enumerating once per view (#12989).
+    if (enumeration === undefined || (enumeration.expiresAt !== undefined && enumeration.expiresAt <= now())) {
+      const started: Enumeration = { expiresAt: undefined, endpoints: enumerate() }
+      enumeration = started
+      started.endpoints.then(
+        () => { started.expiresAt = now() + HOST_ENDPOINTS_CACHE_TTL_MS },
+        () => { if (enumeration === started) enumeration = undefined },
+      )
     }
     const known = await enumeration.endpoints
     for (const endpoint of known) kinds.set(resolve(endpoint.socket), endpoint.kind)
@@ -351,31 +366,17 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
     getAvailableThinkingLevels: async (sessionId) => (await send<{ levels: string[] }>("get_available_thinking_levels", { sessionId })).levels,
     wake: async (sessionId, deliveryIds, durableId) => wakeReply(await send<{ admitted?: unknown }>("wake", { sessionId, delivery_ids: [...deliveryIds] }, durableId)),
     releaseSession: async (sessionId, release, durableId) => releaseReply(await callFrame(socket ?? legacy, "release_session", { sessionId, ...release }, undefined, durableId)),
-    closeSession: async (sessionId, durableId) => {
-      // unload_session with force ends the session for every client that holds it (senpi session-unload.ts, drained
-      // through tearDownUnloaded); close_session releases only this connection's own hold. Both are sent attached.
-      const left = (error: unknown) => error instanceof Error && /^(unknown_session|session_identity_mismatch):/.test(error.message)
-      let answer: Record<string, unknown>
+    // Every rung of the ladder is sent attached (`durableId`), the `get_state` probe included although the host exempts
+    // that read from its gate: the probe's attach itself answers whether the engine still holds the session.
+    closeSession: (sessionId, durableId) => closeLadder(sessionId, async ({ type, ...data }) => {
       try {
-        answer = await send<Record<string, unknown>>("unload_session", { sessionId, force: true, interrupt: true, children: "detach" }, durableId)
+        return { kind: "ok", data: type === "get_state" ? await callOn<Record<string, unknown>>(socket ?? legacy, "get_state", data, undefined, durableId, true) : await send<Record<string, unknown>>(String(type), data, durableId) }
       } catch (error) {
-        if (left(error)) return "not_live"
+        const reason = error instanceof Error ? error.message.slice(0, Math.max(0, error.message.indexOf(":"))) : ""
+        if (SESSION_GONE.has(reason)) return { kind: "gone", reason }
         throw error
       }
-      if (answer.outcome === "unloaded") return "closed"
-      if (answer.reason === "session_closing") return "not_live"
-      if (answer.reason === "host_draining") throw new Error(`host_unavailable:${socket ?? legacy}`)
-      if (answer.reason !== "unsupported") throw new Error(`thread RPC request failed: ${JSON.stringify(answer)}`)
-      // A session with no file yet cannot be unloaded: close it attached, then read whether another client still holds it.
-      try {
-        await send("close_session", { sessionId }, durableId)
-      } catch (error) {
-        if (left(error)) return "not_live"
-        throw error
-      }
-      const { sessions } = await callOn<{ sessions: ThreadHostSession[] }>(socket ?? legacy, "list_sessions", OBSERVE)
-      return sessions.some((session) => session.sessionId === sessionId && session.status !== "closed") ? "held_elsewhere" : "closed"
-    },
+    }),
   })
 
   const liveness = async (endpoint: GatewayEndpointRef): Promise<EndpointLiveness> => {
@@ -445,7 +446,7 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
       // the one a listing could have shown, so the send and the steer read the same liveness. A send
       // never starts an enumeration itself - a published durable id needs none - so with no fresh
       // listing the direct probe decides, exactly as a fresh listing would.
-      const fresh = endpoint.kind === "tui" && enumeration !== undefined && enumeration.expiresAt > now() ? await enumeration.endpoints : undefined
+      const fresh = endpoint.kind === "tui" && enumeration?.expiresAt !== undefined && enumeration.expiresAt > now() ? await enumeration.endpoints : undefined
       const cached = fresh?.find((candidate) => resolve(candidate.socket) === resolve(endpoint.socket))?.verdict
       const listed = await listEndpoint({ socket: endpoint.socket, paths: [], kind: endpoint.kind, verdict: cached ?? {} })
       const target = listed.sessions.filter((session) => (session.durableSessionId ?? session.sessionId) === durableId && session.status !== "closed")
@@ -469,7 +470,8 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
       // host DETACH instead of closing when a connection drops. This client is one-shot - the
       // connection that opens the session ends immediately - so without the flag the new session
       // goes straight to `closing` and every later call answers `session_closing`.
-      // `initialSkills` rides on the open_session context (`initial-skills.ts`), never as a wire field.
+      // `initialSkills` rides on the open_session context (`initial-skills.ts`), never as a wire field; `cwd`,
+      // `sessionPath`, `forkFrom` and `permissionPreset` (the mode the session starts in, #12884) are wire fields.
       const { initialSkills, name, ...openParams } = params
       const result = dataRecord(await callFrame(legacy, "open_session", { ...openParams, retain_on_disconnect: true, ...(initialSkills === undefined ? {} : { context: { [INITIAL_SKILLS_CONTEXT_KEY]: JSON.stringify(initialSkills) } }) }, undefined, undefined, name), "open_session") as { sessionId: string; state: ThreadHostSession }
       const routingId = result.sessionId
@@ -482,6 +484,22 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
 }
 
 export { createDeviceServiceSessions } from "./remote/device-service"
-export { crossTarget, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
-export { closeRemote, deviceOnline, interruptRemote, outcomeFailure, promptRemote, readRemote } from "./remote/remote-ops"
-export { setModelRemote } from "./remote/remote-controls"
+export { createServiceAliasRegistry } from "./remote/alias-registry"
+
+/**
+ * The remote surface the `omo thread` CLI hands its SDK (#12833), from this sidecar's own device-service and alias clients;
+ * `loadAccess` is the CLI sign-in (the device-account sidecar's `cliServiceAccess`), loaded only when an alias is used.
+ * The caller closes it with `sessions.close` before it exits.
+ */
+export function createCliRemoteSurface(options: { readonly version: string; readonly loadAccess: () => Promise<ServiceAccess> }): RemoteThreadSurface {
+  return createLazyRemoteSurface({
+    version: options.version,
+    loadRuntime: async () => ({ createDeviceServiceSessions }),
+    loadAliasRegistry: async () => createServiceAliasRegistry(await options.loadAccess()),
+  })
+}
+export { listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
+export { deviceOnline, promptRemote } from "./remote/remote-ops"
+export { outcomeFailure } from "./remote/outcome"
+export { createRelayTransport } from "./remote/relay-transport"
+export { createRelayControl } from "./control/relay-control"

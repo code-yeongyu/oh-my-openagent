@@ -874,6 +874,9 @@ jobs:
           git -C "$RUNNER_TEMP/senpi-eq" -c advice.detachedHead=false checkout -q FETCH_HEAD
           # E24 observes the pinned TypeScript language server only; the runner's own servers never reach a case.
           npm install --prefix "$RUNNER_TEMP/eq-lsp" --no-save --no-audit --no-fund typescript-language-server@5.3.0 typescript@5.9.3
+          # E24 runs the pinned comment-checker binary from the Codex plugin workspace (the root install does not carry it);
+          # the binaries ship inside the npm tarball, so --ignore-scripts still installs them and nothing is downloaded mid-case.
+          npm --prefix packages/omo-codex/plugin ci --ignore-scripts --no-audit --no-fund
           node packages/omo-senpi/scripts/qa/fused-equivalence-e2e.mjs --compare --placement fused --senpi-repo "$RUNNER_TEMP/senpi-eq" \
             --lsp-dir "$RUNNER_TEMP/eq-lsp/node_modules/.bin" --evidence-dir "$RUNNER_TEMP/eq-omo"
 

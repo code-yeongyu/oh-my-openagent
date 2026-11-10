@@ -1,5 +1,4 @@
 import { fuzzyMatchModel } from "./model-availability"
-import { isLaunchGatedModel } from "./fable-55-launch"
 import type { FallbackEntry } from "./model-requirements"
 import { transformModelForProvider } from "./provider-model-id-transform"
 import { normalizeModel } from "./model-normalization"
@@ -153,8 +152,7 @@ export function resolveModelPipeline(
         return { model: normalizedCategoryDefault, provenance: "category-default", attempted }
       }
       const parts = normalizedCategoryDefault.split("/")
-      // A launch-gated id has no availability proof here, so it falls through to the chain.
-      if (parts.length >= 2 && !isLaunchGatedModel(normalizedCategoryDefault)) {
+      if (parts.length >= 2) {
         const provider = parts[0]
         if (connectedProviders.includes(provider)) {
           const modelName = parts.slice(1).join("/")
@@ -219,7 +217,6 @@ export function resolveModelPipeline(
         log("Model fallback chain skipped (no connected providers cache) - falling through to system default")
       } else {
         for (const entry of fallbackChain) {
-          if (isLaunchGatedModel(entry.model)) continue
           for (const provider of entry.providers) {
             if (connectedSet.has(provider)) {
               const entryModelID = modelIDForProvider(provider, entry.model)

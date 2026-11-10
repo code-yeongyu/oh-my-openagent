@@ -4,6 +4,8 @@ export type JsonObject = { readonly [key: string]: unknown }
 export type RemoteSessionRow = {
   readonly device: string
   readonly session_id: string
+  /** The session's omo durable id when its device publishes it (#12996); a delivery header names its sender by this id. */
+  readonly durable_id?: string
   readonly title: string
   readonly project: string
   /** The session file on its own device; `open_session` on that device takes it. */
@@ -20,8 +22,11 @@ export type RemoteDevice = { readonly device: string; readonly label: string; re
  * `uncertain` means it may have run (the relay lost the evidence), so it is never retried blindly.
  */
 export type RemoteCommandOutcome =
-  /** `local`: answered from the session's mirror on this device, with no round trip. */
-  | { readonly kind: "ok"; readonly response: JsonObject; readonly local?: true }
+  /**
+   * `local`: answered from the session's mirror on this device, with no round trip. `located`: the listing key of the
+   * session an endpoint open made, when the open asked for it and the host named it on the reply.
+   */
+  | { readonly kind: "ok"; readonly response: JsonObject; readonly local?: true; readonly located?: string }
   | { readonly kind: "refused"; readonly reason: string }
   | { readonly kind: "uncertain"; readonly reason: string }
 
@@ -48,9 +53,10 @@ export type RemoteSessionsPort = {
   readonly sessions: () => Promise<readonly RemoteSessionRow[]>
   /**
    * A session-less engine record (`open_session`, `list_sessions`) on `device`'s engine endpoint, with no
-   * attach: the attach-less `session.command {device, endpoint, rpc}` shape (relay daemon #393).
+   * attach: the attach-less `session.command {device, endpoint, rpc}` shape (relay daemon #393). `locate` asks a
+   * create or fork for its new session's listing key on the reply (`located`), so no session.locate follows it.
    */
-  readonly endpointCommand: (device: string, rpc: JsonObject) => Promise<RemoteCommandOutcome>
+  readonly endpointCommand: (device: string, rpc: JsonObject, options?: { readonly locate?: boolean }) => Promise<RemoteCommandOutcome>
   /**
    * The id a session just created on `device` is addressed by (its listing row's `session_id`, the key an attach
    * takes), from the durable engine session id the create reply names; settles once that id attaches.
@@ -67,6 +73,8 @@ export type RemoteSessionsPort = {
    * Refused, typed, when that attach cannot be made.
    */
   readonly watch: (device: string, sessionId: string, listener: (record: JsonObject) => void) => Promise<RemoteWatchOutcome>
+  /** Closes the device-service connection this port opened, if any; a short-lived caller (the CLI) calls it at the end. */
+  readonly close?: () => Promise<void>
 }
 
 /**
@@ -104,4 +112,9 @@ export type RemoteThreadSurface = {
   /** Absent until the account service's alias registry ships: aliases are then refused typed, never guessed. */
   readonly aliases?: AliasRegistry
   readonly chain: ChainCountWire
+  /** The approval mode a session this surface creates is opened in (#6189): the creator's own. Absent: none is named. */
+  readonly permissionPreset?: () => string | undefined
 }
+
+/** The id a listing row has ABOVE the ports (decision 0027 D2): its durable id and nothing else; "" when the device publishes none. */
+export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? ""
