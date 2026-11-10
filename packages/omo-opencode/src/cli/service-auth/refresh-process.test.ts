@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from "bun:test"
 import { withLock } from "@oh-my-opencode/team-core/team-state-store/locks"
 import { mkdir, readdir, readFile, stat } from "node:fs/promises"
 import { join } from "node:path"
+import { systemPlatformFacts, userRecordHome } from "./account-home"
 import { credentialId } from "./keystore"
 import { credentialSchema, type Credentials } from "./protocol"
 import { fakeApi, grant, privateKeys, temporaryHome } from "./test-support"
@@ -53,18 +54,13 @@ test("two processes share the refresh lock and never persist credentials in HOME
   }
 }, 10_000)
 
-// #12978: the credential item belongs to the OS account (Secret Service on the session bus, login Keychain), not to $HOME.
-// Two refreshers started with different HOME values must still share one lock, so the rotating refresh token reaches the
-// service once. An authoritative read from a child that does not hold the account's lock is held until the other child
-// reads too: without one shared lock both then refresh with the same token; with it, the second reads the successor.
-const passwdHome = async (): Promise<string> => {
-  const uid = String(process.getuid?.())
-  const entry = (await readFile("/etc/passwd", "utf8")).split("\n").map(line => line.split(":")).find(fields => fields[2] === uid)
-  if (entry?.[5] === undefined) throw new Error("this test needs the runner's uid in /etc/passwd")
-  return entry[5]
-}
-
-test.skipIf(process.platform !== "linux")("two refreshers with different HOME values present one refresh token once (#12978)", async () => {
+// #12978: the credential item belongs to the OS user (Secret Service on the session bus, login Keychain, Credential
+// Manager), not to $HOME. Two refreshers started with different HOME values must still share one lock, so the rotating
+// refresh token reaches the service once. Each child is told the OS user record's home (a temp dir, so no test writes a
+// lock outside its temp root). An authoritative read from a child that does not hold the account's lock is held until
+// the other child reads too: without one shared lock both then refresh with the same token; with it, the second reads
+// the successor.
+test("two refreshers with different HOME values present one refresh token once (#12978)", async () => {
   const lockOwner = async (path: string): Promise<string | null> => (await readFile(path, "utf8").catch(() => null))?.split("\n")[1] ?? null
   let saved: Credentials = { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" }
   const presented: string[] = []
@@ -85,9 +81,10 @@ test.skipIf(process.platform !== "linux")("two refreshers with different HOME va
     presented.push(String((await request.json() as { refreshToken?: unknown }).refreshToken))
     return Response.json({ ...grant, refreshToken: "rotated-once" })
   })
-  lockPath = join(await passwdHome(), ".omo", "session-locks", `${credentialId(api)}.lock`)
+  const account = await temporaryHome()
+  lockPath = join(account, ".omo", "session-locks", `${credentialId(api)}.lock`)
   const homes = [await temporaryHome(), await temporaryHome()]
-  const children = homes.map(home => Bun.spawn([process.execPath, join(import.meta.dir, "refresh-child.fixture.ts"), api], {
+  const children = homes.map(home => Bun.spawn([process.execPath, join(import.meta.dir, "refresh-child.fixture.ts"), api, "", account], {
     env: { PATH: process.env.PATH, HOME: home, USERPROFILE: home }, stdout: "pipe", stderr: "pipe",
   }))
   onTestFinished(async () => {
@@ -105,4 +102,18 @@ test.skipIf(process.platform !== "linux")("two refreshers with different HOME va
   expect(exits).toEqual([0, 0])
   expect(presented).toEqual([grant.refreshToken])
   expect(saved.refreshToken).toBe("rotated-once")
+}, 30_000)
+
+// #12978: the real lookup on this platform (passwd, `id -P`, the registry profile of the SID) names the same home in a
+// process started with a scratch HOME and USERPROFILE. It only resolves, so nothing is written.
+test("the OS user record names one home whatever HOME a process starts with (#12978)", async () => {
+  const scratch = await temporaryHome()
+  const child = Bun.spawn([process.execPath, join(import.meta.dir, "account-home.fixture.ts")], {
+    env: { ...process.env, HOME: scratch, USERPROFILE: scratch }, stdout: "pipe", stderr: "pipe",
+  })
+  const [exit, named] = await Promise.all([child.exited, new Response(child.stdout).text()])
+  expect(exit).toBe(0)
+  expect(named).not.toBe("")
+  expect(named).not.toBe(scratch)
+  expect(named).toBe(userRecordHome(systemPlatformFacts) ?? "")
 }, 30_000)
