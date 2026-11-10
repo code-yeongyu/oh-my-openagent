@@ -21,6 +21,8 @@ export interface RuntimePastRetention {
   readonly sidecars: number
   /** Journals no retention row classifies (kept, design r2 2.3 `unclassified`). */
   readonly unclassifiedJournals: number
+  /** Bytes of the counted runs, journals and sidecars; present only when `measureBytes` is set (#12959). */
+  readonly bytes?: number
 }
 
 /** Folded runs the next pass would remove, by its rules (reflection-runs.ts), minus what only the pass decides. */
@@ -51,9 +53,17 @@ export async function countRuntimePastRetention(input: {
   readonly reflectionEnabled?: boolean
   /** The doctors' measurement deadline; once it fires the count rejects with the abort. */
   readonly signal?: AbortSignal
+  /** Also sum the bytes of what is counted, for the `--fix --dry-run` size-cap line (#12959). */
+  readonly measureBytes?: boolean
 }): Promise<RuntimePastRetention> {
   const cutoff = input.now() - input.policy.retentionDays * DAY_MS
-  const runs = (await pastRetentionRunNames(input)).length
+  let bytes = 0
+  const charge = async (path: string): Promise<void> => {
+    if (input.measureBytes === true) bytes += await measureTreeBytes(path, input.signal)
+  }
+  const runNames = await pastRetentionRunNames(input)
+  for (const name of runNames) await charge(join(input.paths.reflection, "runs", name))
+  const runs = runNames.length
 
   let journals = 0
   let unclassifiedJournals = 0
@@ -64,8 +74,10 @@ export async function countRuntimePastRetention(input: {
     // A stray file is skipped and an unreadable journal is kept, as the pass does (#12538 review r3 M1).
     const verdict = await classifyJournalEntry(context, join(input.paths.transcripts, sessionId), gate)
     if (verdict === undefined) continue
-    if (typeof verdict !== "string") journals += 1
-    else if (verdict === "unclassified") unclassifiedJournals += 1
+    if (typeof verdict !== "string") {
+      journals += 1
+      await charge(join(input.paths.transcripts, sessionId))
+    } else if (verdict === "unclassified") unclassifiedJournals += 1
   }
 
   let sidecars = 0
@@ -73,9 +85,12 @@ export async function countRuntimePastRetention(input: {
   for (const name of await listNames(root)) {
     if (!KIBITZER_ENCODED_SESSION_PATTERN.test(name)) continue
     const stats = await lstat(join(root, name)).catch(() => undefined)
-    if (stats?.isDirectory() === true && (await idleSince(join(root, name), cutoff))) sidecars += 1
+    if (stats?.isDirectory() === true && (await idleSince(join(root, name), cutoff))) {
+      sidecars += 1
+      await charge(join(root, name))
+    }
   }
-  return { runs, journals, sidecars, unclassifiedJournals }
+  return { runs, journals, sidecars, unclassifiedJournals, ...(input.measureBytes === true ? { bytes } : {}) }
 }
 
 /**
@@ -115,6 +130,8 @@ export interface RuntimePastRetentionOtherStores {
   readonly ledgers: number
   /** Legacy `reflection-sessions` entries, plus one for `recall/runs`. */
   readonly legacy: number
+  /** Bytes of the counted completions, ledgers and legacy entries; present only when `measureBytes` is set (#12959). */
+  readonly bytes?: number
 }
 
 /**
@@ -128,7 +145,13 @@ export async function countRuntimePastRetentionOtherStores(input: {
   readonly policy: RuntimeRetentionPolicy
   readonly now: () => number
   readonly signal?: AbortSignal
+  /** Also sum the bytes of what is counted, for the `--fix --dry-run` size-cap line (#12959). */
+  readonly measureBytes?: boolean
 }): Promise<RuntimePastRetentionOtherStores> {
+  let bytes = 0
+  const charge = async (path: string): Promise<void> => {
+    if (input.measureBytes === true) bytes += await measureTreeBytes(path, input.signal)
+  }
   const highWater = await scanReflectionRunHighWater(input.paths)
   // The pass removes runs before completions, so a run it removes no longer keeps its completion (`run-present`).
   const removedRuns = new Set(await pastRetentionRunNames(input))
@@ -154,6 +177,7 @@ export async function countRuntimePastRetentionOtherStores(input: {
     if (!removedRuns.has(record.runId) && existsSync(join(input.paths.reflection, "runs", record.runId))) continue
     if (number === 0 || number > mark || number === highWater) continue
     completions += 1
+    await charge(join(dir, `${record.runId}.json`))
   }
 
   let ledgers = 0
@@ -161,15 +185,24 @@ export async function countRuntimePastRetentionOtherStores(input: {
     input.signal?.throwIfAborted()
     if (!name.endsWith(".json")) continue
     const stats = await lstat(join(input.paths.recallLedger, name)).catch(() => undefined)
-    if (stats?.isFile() === true && stats.mtimeMs <= completionsCutoff) ledgers += 1
+    if (stats?.isFile() === true && stats.mtimeMs <= completionsCutoff) {
+      ledgers += 1
+      await charge(join(input.paths.recallLedger, name))
+    }
   }
 
   let legacy = 0
   for (const name of await listNames(input.paths.reflectionSessions)) {
     input.signal?.throwIfAborted()
-    if (reflectionRunNumber(name) !== highWater && (await idleSince(join(input.paths.reflectionSessions, name), retentionCutoff))) legacy += 1
+    if (reflectionRunNumber(name) !== highWater && (await idleSince(join(input.paths.reflectionSessions, name), retentionCutoff))) {
+      legacy += 1
+      await charge(join(input.paths.reflectionSessions, name))
+    }
   }
   const recallRuns = join(input.paths.recall, "runs")
-  if (existsSync(recallRuns) && (await idleSince(recallRuns, retentionCutoff))) legacy += 1
-  return { completions, ledgers, legacy }
+  if (existsSync(recallRuns) && (await idleSince(recallRuns, retentionCutoff))) {
+    legacy += 1
+    await charge(recallRuns)
+  }
+  return { completions, ledgers, legacy, ...(input.measureBytes === true ? { bytes } : {}) }
 }

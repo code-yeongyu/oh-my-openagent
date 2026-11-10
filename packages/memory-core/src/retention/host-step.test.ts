@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -8,6 +8,7 @@ import { buildIdentityPaths } from "../identity/layout"
 import { acquireLock, createLockRecord, releaseLock } from "../locks"
 import { HOST_SWEEP_LOCK_FILE, HOST_SWEEP_STATE_FILE, sweepHostIdentities } from "../reflection/host-sweep"
 import { createRetentionHostSweepStep, resolveForeignIdentityDiscardUnreflected } from "./host-step"
+import { measureTreeBytes } from "./size"
 import { ageTree, completion, daysAgo, journal, now, reflectionRun, writeJson } from "./retention.test-support"
 
 const roots: string[] = []
@@ -166,6 +167,31 @@ describe("retention as a host-sweep step (6b driver 2 / --fix; A34, A38 driver h
     expect(result.lines[1]).toStartWith("WOULD FIX id-big size cap: cap exceeded by ")
     expect(result.lines).toHaveLength(2)
     expect(existsSync(join(paths.reflection, "runs", "reflection-run-1"))).toBe(true)
+  })
+
+  test("#given an identity that retention alone brings under its size cap #when --dry-run then --fix run #then neither reports nor evicts through the cap (#12959)", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "memory-host-dry-cap-after-"))
+    roots.push(memoryRoot)
+    const paths = buildIdentityPaths(memoryRoot, "id-edge")
+    await mkdir(paths.repo, { recursive: true })
+    const old = join(paths.reflection, "runs", "reflection-run-1")
+    await reflectionRun(paths, "reflection-run-1", { finishedAt: daysAgo(8) })
+    await writeFile(join(old, "padding.bin"), Buffer.alloc(256 * 1024))
+    await ageTree(old, daysAgo(8))
+    await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
+    // Over the cap now by half the past-retention run, so removing that run alone brings it under.
+    const maxBytes = (await measureTreeBytes(paths.runtime)) - Math.floor((await measureTreeBytes(old)) / 2)
+    const settings = { runtime: { max_bytes: maxBytes } }
+
+    const dry = await sweepHostIdentities({ memoryRoot, steps: [createRetentionHostSweepStep({ settings, now, dryRun: true })], dryRun: true, now })
+    const fixed = await sweepHostIdentities({ memoryRoot, steps: [createRetentionHostSweepStep({ settings, now })], now })
+
+    if (dry.status !== "swept" || fixed.status !== "swept") throw new Error("expected two sweeps")
+    expect(dry.lines).toEqual(["WOULD FIX id-edge retention would remove 1 (runs 1, completions 0, journals 0, sidecars 0, ledgers 0, legacy 0)"])
+    expect(fixed.lines).toHaveLength(1)
+    expect(fixed.lines[0]).toStartWith("FIXED id-edge retention removed 1 ")
+    expect(fixed.lines[0]).not.toContain("size cap")
+    expect(existsSync(join(paths.reflection, "runs", "reflection-run-9"))).toBe(true)
   })
 
   test("#given global retention_days 30 and an agent override of 3 #when the host sweep step visits #then each identity keeps the windows its global layer sets (REVIEW-5 M1)", async () => {
