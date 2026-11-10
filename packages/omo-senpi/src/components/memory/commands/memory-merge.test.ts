@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { execFileSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, realpathSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, realpathSync } from "node:fs"
 import { readFile, writeFile, mkdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
@@ -108,5 +108,29 @@ describe("/memory-merge (#10070)", () => {
     const text = await invoke(pi, "memory-merge", "", fakeCommandContext())
 
     expect(text).toContain(`no other memory store maps to ${target.id}`)
+  }, 60_000)
+  test("#given a repository-root identity with no store yet #when /memory-merge --apply creates it #then the new store is fully bootstrapped (seed files and hooks), like a first memory write (#12974 review r8)", async () => {
+    const parent = realpathSync.native(mkdtempSync(join(tmpdir(), "omo-memory-merge-new-")))
+    roots.push(parent)
+    const main = join(parent, "project")
+    const thread = join(parent, "project-thread-1")
+    mkdirSync(main)
+    git(main, ["init", "--quiet", "--initial-branch=main"])
+    git(main, ["commit", "--quiet", "--allow-empty", "-m", "init"])
+    git(main, ["worktree", "add", "--quiet", "-b", "thread-1", thread])
+    const env = { OMO_MEMORY_HOME: join(parent, "memory") }
+    const target = resolveAutoIdentity(main, env, "git")
+    const old = resolveAutoIdentity(thread, env, "path")
+    await seed(old, { "notes/habit.md": note("thread habit") })
+    await recordIdentityBind(old.paths.root, { id: old.id, kind: "auto", mode: "path", source: thread, spelling: thread })
+    const pi = new MemoryFakeExtensionAPI()
+    registerMemoryMergeCommand(pi, fakeDeps({ identity: target.id, identityPaths: target.paths }, { env }))
+
+    const text = await invoke(pi, "memory-merge", "--apply", fakeCommandContext())
+
+    expect(text).toContain(`merged ${old.id}`)
+    expect(await readFile(join(target.paths.repo, "notes/habit.md"), "utf8")).toBe(note("thread habit"))
+    expect(existsSync(join(target.paths.repo, "system/persona.md"))).toBe(true)
+    expect(existsSync(join(target.paths.repo, ".git/hooks/pre-commit"))).toBe(true)
   }, 60_000)
 })

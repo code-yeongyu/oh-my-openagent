@@ -277,7 +277,7 @@ describe("identity merge (#10070)", () => {
     const target = buildIdentityPaths(root, "project-aaaa1111")
     const source = await identity(root, "project-feature-bbbb2222", { "notes/new.md": note("new") }, ["/work/project-feature"])
 
-    const result = await applyIdentityMerge({ source: source.paths, target, lock, author: AUTHOR })
+    const result = await applyIdentityMerge({ source: source.paths, target, lock, author: AUTHOR, initTarget: (repo) => repo.init({ authorName: AUTHOR.authorName }) })
 
     expect(result.status).toBe("merged")
     expect(await readFile(join(target.repo, "notes/new.md"), "utf8")).toBe(note("new"))
