@@ -44,8 +44,9 @@ export function readUi(eventCtx: unknown): StatusUi | undefined {
         publishedStatus.set(ui, published)
       }
       if (text !== undefined && published.get(key) === text) return
-      published.set(key, text)
       Reflect.apply(ui.setStatus as (...args: unknown[]) => unknown, ui, [key, text])
+      // Recorded only once the host took it: a line the host never showed must not suppress the retry.
+      published.set(key, text)
     },
     notify: (message, level) => Reflect.apply(ui.notify as (...args: unknown[]) => unknown, ui, [message, level]),
   }
