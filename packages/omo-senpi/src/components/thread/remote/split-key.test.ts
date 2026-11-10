@@ -27,4 +27,11 @@ describe("a listing key that differs from the durable id (decision 0027 D2)", ()
     // The row is live on b: opening it again answers THAT thread as already live there (deduplicated), under its durable id.
     expect(result).toMatchObject({ kind: "ok", deduplicated: true, thread: { thread_id: SPLIT.durable_id, device: "b" } })
   })
+  test("#given b creates a thread whose engine reports a durable id different from the listing key #when thread_create runs on b #then the returned id is the durable id and a send to it resolves (round trip)", async () => {
+    const DURABLE = "0195f0c2-1a2b-7c3d-8e4f-00000000009b"
+    const a = fixture.account({ rows: [SPLIT], live: ["rk-b-7"], openData: { sessionId: "rpc-9", state: { durableSessionId: DURABLE } }, relayKeys: new Map([[DURABLE, "rk-b-9"]]) })
+    const { run } = fixture.surface(a.remote)
+    const created = await run("thread_create", { device: "b" })
+    expect(created).toMatchObject({ kind: "ok", thread: { thread_id: DURABLE, device: "b" } })
+  })
 })

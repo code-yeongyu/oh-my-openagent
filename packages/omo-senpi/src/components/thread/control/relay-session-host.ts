@@ -71,9 +71,13 @@ export function createRelaySessionHost(remote: RemoteThreadSurface, device: stri
       // The reply's state keyed by the id the device lists the session under; the far engine's own routing id and
       // endpoint facts name nothing on this device.
       const { sessionId: _engineId, durableSessionId: _durable, socket: _socket, endpoint_kind: _endpointKind, controls: _controls, ...facts } = state
+      // D2: the id the caller gets back is the durable id (the engine names it on open; a listed row carries it), never
+      // the listing key, which stays in sessionId for the relay transport.
+      const durable = nonEmpty(state["durableSessionId"]) ?? nonEmpty(data["durableSessionId"]) ?? listed?.durable_id
       const session: ThreadHostSession = {
         ...facts,
         sessionId: threadId,
+        ...(durable === undefined ? {} : { durableSessionId: durable }),
         cwd: nonEmpty(state["cwd"]) ?? request.cwd ?? listed?.project ?? "",
         name: name ?? nonEmpty(state["sessionName"]) ?? listed?.title ?? null,
       }
