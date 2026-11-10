@@ -1,0 +1,57 @@
+{
+  "displays": [
+    {
+      "id": "1",
+      "name": "Built-in Display",
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 1080,
+      "scale": 1.0,
+      "pixelX": 0,
+      "pixelY": 0,
+      "pixelWidth": 1920,
+      "pixelHeight": 1080,
+      "isPrimary": true
+    }
+  ],
+  "windows": [
+    {
+      "id": "101",
+      "title": "Fonts",
+      "app": "Font Book",
+      "pid": 4242,
+      "x": 100,
+      "y": 120,
+      "width": 800,
+      "height": 600,
+      "focused": false,
+      "elevated": null
+    }
+  ],
+  "ax": {
+    "101": {
+      "role": "window",
+      "native_role": "AXWindow",
+      "title": "Fonts",
+      "bounds": { "x": 100, "y": 120, "width": 800, "height": 600 },
+      "children": [
+        {
+          "role": "row",
+          "native_role": "AXRow",
+          "title": "Serif",
+          "bounds": { "x": 110, "y": 160, "width": 780, "height": 30 },
+          "actions": ["press", "showMenu"]
+        }
+      ]
+    }
+  },
+  "context_menus": {
+    "101": [
+      { "title": "Add to", "children": [{ "title": "Bench Holdout" }, { "title": "Serif…" }] },
+      { "title": "Remove", "enabled": false },
+      { "title": "Show in Finder" }
+    ]
+  },
+  "cursor": { "x": 960, "y": 540 }
+}

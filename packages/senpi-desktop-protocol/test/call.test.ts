@@ -40,12 +40,26 @@ describe("isReadOnlyComputerCall", () => {
 		expect(isReadOnlyComputerCall([{ method: "window" }, { method }])).toBe(false);
 	});
 
+	it("classifies window bringToCurrentSpace as exec and refuses it on a display handle", () => {
+		expect(isReadOnlyComputerCall([{ method: "window" }, { method: "bringToCurrentSpace" }])).toBe(false);
+		expect(rejectionReason([{ method: "display" }, { method: "bringToCurrentSpace" }])).toBe("unknownMethod");
+	});
+
 	it("returns false when clipboard.write is the only step", () => {
 		expect(isReadOnlyComputerCall([{ method: "clipboard.write" }])).toBe(false);
 	});
 
 	it("returns false when a ref press chain mutates", () => {
 		expect(isReadOnlyComputerCall([{ method: "ref" }, { method: "press" }])).toBe(false);
+	});
+
+	it("requires exec for selecting text in an element", () => {
+		expect(isReadOnlyComputerCall([{ method: "ref", args: ["e1"] }, { method: "selectText", args: ["beta"] }])).toBe(false);
+	});
+
+	it("requires exec for an element chord press and double-click", () => {
+		expect(isReadOnlyComputerCall([{ method: "ref", args: ["e1"] }, { method: "press", args: ["cmd+a"] }])).toBe(false);
+		expect(isReadOnlyComputerCall([{ method: "ref", args: ["e1"] }, { method: "doubleClick", args: [] }])).toBe(false);
 	});
 
 	it("requires exec for typing into an element", () => {

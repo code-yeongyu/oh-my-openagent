@@ -11,6 +11,9 @@ use crate::error::{CoreResult, DesktopError, TccPermission};
 use crate::frame::FrameGeometry;
 use crate::keys::KeyName;
 pub use crate::protocol_results::AxInputMethod;
+use crate::protocol_results::AxTextSelection;
+use crate::protocol_results::MenuReport;
+use crate::text_range::TextSelectRequest;
 use crate::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector, FrontWindow,
     ScreenState, Target,
@@ -64,6 +67,19 @@ pub struct Modifiers {
     pub alt: bool,
     pub shift: bool,
     pub meta: bool,
+}
+
+/// The menu item a press should choose in the menu it opens, and the stop
+/// check that runs before that item is pressed (the menu can take up to a
+/// second to appear).
+#[derive(Clone, Copy)]
+pub struct MenuChoice<'a> {
+    /// Item labels from the opened menu down to a command, as
+    /// `menus.select` matches them; `None` opens, lists and closes a menu the
+    /// press opens in the background (D1).
+    pub path: Option<&'a [String]>,
+    /// The request's cancel and stop-path check.
+    pub check_stop: &'a dyn Fn() -> CoreResult<()>,
 }
 
 #[derive(Debug, Clone)]
@@ -142,6 +158,25 @@ pub trait Backend: Send {
         frame: &FrameGeometry,
         mode: DeliveryMode,
     ) -> CoreResult<()>;
+    /// [`Self::pointer`] for a press that may open a menu: the press is
+    /// delivered; a menu it opens in the background is chosen from
+    /// (`choice.path`) or read and closed, and is closed before the call
+    /// returns, whatever happened. Backends without menu handling deliver a
+    /// press without a path plainly and refuse a path before anything is
+    /// sent.
+    fn pointer_menu(
+        &mut self,
+        target: &Target,
+        ev: PointerEvent,
+        frame: &FrameGeometry,
+        mode: DeliveryMode,
+        choice: MenuChoice<'_>,
+    ) -> CoreResult<Option<MenuReport>> {
+        if choice.path.is_some() {
+            return Err(DesktopError::ax_unsupported());
+        }
+        self.pointer(target, ev, frame, mode).map(|()| None)
+    }
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()>;
     /// The system clipboard's text. Backends without clipboard access keep
     /// this default and refuse instead of pretending.
@@ -187,6 +222,19 @@ pub trait Backend: Send {
     ) -> CoreResult<ElementDelivery> {
         Err(DesktopError::ax_unsupported())
     }
+    /// Presses the chord `keys` in the element `h` names (`ax.keyChord`):
+    /// as keys once the element holds its application's keyboard focus,
+    /// never unconfirmed; `check_stop` runs before every key press. Backends
+    /// without element input keep this default and refuse.
+    fn ax_key_chord(
+        &mut self,
+        _h: &AxHandle,
+        _keys: &[KeyName],
+        _mode: DeliveryMode,
+        _check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<ElementDelivery> {
+        Err(DesktopError::ax_unsupported())
+    }
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()>;
     /// [`Self::key_chord`] with `check_stop` before every key press, so a stop
     /// or a cancellation lands between presses. The default checks once,
@@ -223,6 +271,16 @@ pub trait Backend: Send {
         Err(DesktopError::input_failed("bounded mouse holds are unavailable on this backend"))
     }
     fn raise_window(&mut self, id: &str) -> CoreResult<()>;
+
+    /// Moves window `id` into the user's current Space without switching
+    /// Spaces or activating anything; a window already there is left alone.
+    /// Backends call `check_stop` before the move and while verifying it.
+    /// Backends without Spaces refuse with `SpaceUnsupported`.
+    fn bring_to_current_space(&mut self, _id: &str, _check_stop: &dyn Fn() -> CoreResult<()>) -> CoreResult<()> {
+        Err(DesktopError::space_unsupported(
+            "moving a window to the current Space is not available on this backend",
+        ))
+    }
 
     /// The immediate children of `window`'s menu at `path` (empty = the menu
     /// bar). Backends without menus yet refuse with `AxUnsupported`.
@@ -341,6 +399,18 @@ pub trait AxBackend {
     fn children(&mut self, h: &AxHandle) -> CoreResult<Vec<AxHandle>>;
     fn parent(&mut self, h: &AxHandle) -> CoreResult<Option<AxHandle>>;
     fn perform(&mut self, h: &AxHandle, action: &str) -> CoreResult<()>;
+    /// [`Self::perform`] for an action that may open a menu (`AXShowMenu`, or
+    /// `AXPress` on a menu button or popup button): a menu it opens in the
+    /// background is chosen from (`choice.path`) or read and closed, and is
+    /// closed before the call returns. Backends without menu handling perform
+    /// an action without a path plainly and refuse a path before anything is
+    /// performed.
+    fn perform_menu(&mut self, h: &AxHandle, action: &str, choice: MenuChoice<'_>) -> CoreResult<Option<MenuReport>> {
+        if choice.path.is_some() {
+            return Err(DesktopError::ax_unsupported());
+        }
+        self.perform(h, action).map(|()| None)
+    }
     fn set_value(&mut self, h: &AxHandle, value: &str) -> CoreResult<()>;
     fn focus(&mut self, h: &AxHandle) -> CoreResult<()>;
     fn element_at(&mut self, x: f64, y: f64) -> CoreResult<Option<AxHandle>>;
@@ -352,6 +422,13 @@ pub trait AxBackend {
     /// cannot name it keep this default.
     fn owner(&mut self, _h: &AxHandle, _windows: &[DesktopWindow]) -> CoreResult<AxOwner> {
         Ok(AxOwner::Unknown)
+    }
+
+    /// Selects the range `request` names in `h`'s value (`ax.selectText`) by
+    /// writing the element's selected text range: no key is sent and no
+    /// focus moves. Backends without text selection keep this default.
+    fn select_text(&mut self, _h: &AxHandle, _request: &TextSelectRequest) -> CoreResult<AxTextSelection> {
+        Err(DesktopError::ax_unsupported())
     }
 }
 

@@ -1,8 +1,9 @@
-//! The fake's element typing (`ax.typeText`).
+//! The fake's element typing (`ax.typeText`) and chords (`ax.keyChord`).
 
 use senpi_desktop_core::ax::AxHandle;
 use senpi_desktop_core::backend::{DeliveryMode, ElementDelivery, KeyboardFocus};
-use senpi_desktop_core::error::CoreResult;
+use senpi_desktop_core::error::{CoreResult, DesktopError};
+use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::protocol_results::AxInputMethod;
 
 use crate::ax_tree::node_id;
@@ -41,8 +42,14 @@ pub(crate) fn ax_type_text(
     }
     let inserts = remote.is_none() && matches!(native_role.as_str(), "AXTextField" | "AXTextArea" | "AXComboBox");
     if inserts {
+        if backend.faults().take_refused_focus(FakeMethod::AxTypeText) {
+            return Err(DesktopError::ax_failed(
+                "a refuse_focus fault was armed for an element that takes inserted text; the fault was \
+                 consumed and nothing was written (insertion never takes focus)",
+            ));
+        }
         let reply = backend.begin_write(AxWrite::AxTypeText)?;
-        backend.ax_tree.append_value(node, text)?;
+        backend.ax_tree.insert_text(node, text)?;
         backend.record(SinkOp::AxTypeText {
             node,
             text: text.to_owned(),
@@ -56,18 +63,8 @@ pub(crate) fn ax_type_text(
         return Ok(ElementDelivery::Delivered(AxInputMethod::Inserted));
     }
     backend.begin(FakeMethod::AxTypeText)?;
-    if backend.faults().take_refused_focus() {
-        // The app kept its focus where it was: the window of the focused
-        // element, and that element.
-        let focused = backend.ax_tree.focused();
-        let window = match focused {
-            Some(id) => backend.ax_tree.window_of(id)?,
-            None => None,
-        };
-        return Ok(ElementDelivery::Unfocused(KeyboardFocus {
-            window,
-            element: focused.map(AxHandle::Id),
-        }));
+    if backend.faults().take_refused_focus(FakeMethod::AxTypeText) {
+        return Ok(ElementDelivery::Unfocused(focus_kept(backend)?));
     }
     backend.ax_tree.focus(node)?;
     backend.record(SinkOp::AxFocus { node });
@@ -75,7 +72,7 @@ pub(crate) fn ax_type_text(
     for character in text.chars() {
         check_stop()?;
         typed.push(character);
-        backend.ax_tree.append_value(node, &character.to_string())?;
+        backend.ax_tree.insert_text(node, &character.to_string())?;
         delivered();
     }
     backend.record(SinkOp::AxTypeText {
@@ -85,4 +82,53 @@ pub(crate) fn ax_type_text(
         mode,
     });
     Ok(ElementDelivery::Delivered(AxInputMethod::Keys))
+}
+
+/// A chord is never inserted: the element is focused first, then takes the
+/// keys, one `check_stop` per key. A scripted `refuse_focus` for
+/// `ax.keyChord` keeps the focus where it was and nothing is pressed. The
+/// fake's text model honours one chord: `cmd+a` selects a text node's whole
+/// value, so a following `ax.typeText` replaces it (parity row E-3).
+pub(crate) fn ax_key_chord(
+    backend: &mut FakeBackend,
+    h: &AxHandle,
+    keys: &[KeyName],
+    mode: DeliveryMode,
+    check_stop: &dyn Fn() -> CoreResult<()>,
+) -> CoreResult<ElementDelivery> {
+    let node = node_id(h)?;
+    backend.begin(FakeMethod::AxKeyChord)?;
+    if backend.faults().take_refused_focus(FakeMethod::AxKeyChord) {
+        return Ok(ElementDelivery::Unfocused(focus_kept(backend)?));
+    }
+    backend.ax_tree.focus(node)?;
+    backend.record(SinkOp::AxFocus { node });
+    let mut pressed = Vec::new();
+    for &key in keys {
+        check_stop()?;
+        pressed.push(key);
+    }
+    if pressed == [KeyName::Meta, KeyName::Char('a')] {
+        backend.ax_tree.select_all(node)?;
+    }
+    backend.record(SinkOp::AxKeyChord {
+        node,
+        keys: pressed,
+        mode,
+    });
+    Ok(ElementDelivery::Delivered(AxInputMethod::Keys))
+}
+
+/// Where the app kept its focus: the window of the focused element, and
+/// that element.
+fn focus_kept(backend: &FakeBackend) -> CoreResult<KeyboardFocus> {
+    let focused = backend.ax_tree.focused();
+    let window = match focused {
+        Some(id) => backend.ax_tree.window_of(id)?,
+        None => None,
+    };
+    Ok(KeyboardFocus {
+        window,
+        element: focused.map(AxHandle::Id),
+    })
 }

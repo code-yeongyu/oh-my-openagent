@@ -56,7 +56,7 @@ impl Worker {
     /// The error for keys addressed to `reference` that were never sent
     /// because the element did not take keyboard focus: where focus is now,
     /// with the focused element's node line and a ref for it.
-    fn element_focus_refusal(&mut self, reference: &str, focus: KeyboardFocus, mode: DeliveryMode) -> DesktopError {
+    pub(super) fn element_focus_refusal(&mut self, reference: &str, focus: KeyboardFocus, mode: DeliveryMode) -> DesktopError {
         let window = match focus.window.as_deref() {
             None => "an unidentified window".to_owned(),
             Some(id) => {

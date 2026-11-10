@@ -21,6 +21,7 @@ fn click(harness: &mut Harness, reference: String) -> Result<Response, ErrorCode
         .process(Op::AxClick(AxClickParams {
             ref_: reference,
             opts: None,
+            menu: None,
         }))
         .map_err(|error| error.code)
 }
@@ -46,6 +47,7 @@ fn focused_ax_click_targets_owner_not_first_overlapping_window() {
     let result = harness.process(Op::AxClick(AxClickParams {
         ref_: reference,
         opts: None,
+        menu: None,
     }));
     // Then: only A receives coordinate input.
     assert!(result.is_ok(), "{result:?}");
@@ -68,6 +70,7 @@ fn ax_click_ignores_unrelated_hit_test_target_provenance() {
     let result = harness.process(Op::AxClick(AxClickParams {
         ref_: reference,
         opts: None,
+        menu: None,
     }));
     // Then: snapshot provenance is not evidence of element ownership.
     assert!(result.is_ok(), "{result:?}");
@@ -86,6 +89,7 @@ fn ax_click_window_enumeration_failure_posts_no_input() {
     let result = harness.process(Op::AxClick(AxClickParams {
         ref_: reference,
         opts: None,
+        menu: None,
     }));
     // Then: no pointer is delivered.
     assert_eq!(

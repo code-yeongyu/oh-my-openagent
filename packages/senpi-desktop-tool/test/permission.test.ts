@@ -31,6 +31,17 @@ describe("computerPermissionParser tiers", () => {
 		expect(patterns).toEqual(["exec"]);
 	});
 
+	it("classifies window->bringToCurrentSpace as exec", () => {
+		// Given
+		const input = { action: "call", chain: [windowStep, { method: "bringToCurrentSpace" }] };
+
+		// When
+		const patterns = patternsOf(input);
+
+		// Then
+		expect(patterns).toEqual(["exec"]);
+	});
+
 	it("classifies run without read_only as exec", () => {
 		// Given
 		const input = { action: "run", code: "return 1" };

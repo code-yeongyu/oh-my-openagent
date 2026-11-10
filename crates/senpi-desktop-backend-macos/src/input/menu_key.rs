@@ -1,7 +1,9 @@
-//! Making a window key for a menu command. Background: the sole-window rule
-//! and the activation record that background keystrokes use. Foreground (only
-//! under the session's control grant, #9888): the target app is raised and
-//! the window made main and key, so multi-window apps are allowed.
+//! Making a window key for a menu command. Background: only an application's
+//! sole window is made key, and the activation is recorded so key focus is
+//! handed back afterwards (background keystrokes no longer use this rule: they
+//! prove their key window through [`super::key_window::KeyWindow`]). Foreground
+//! (only under the session's control grant, #9888): the target app is raised
+//! and the window made main and key, so multi-window apps are allowed.
 
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::types::DesktopWindow;

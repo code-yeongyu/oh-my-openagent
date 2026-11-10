@@ -14,6 +14,7 @@ use senpi_desktop_core::menus::{validate_path, MenuItem};
 use senpi_desktop_core::types::DesktopWindow;
 
 pub(crate) use self::select::{preflight, select};
+pub(in crate::ax) use self::walk::{bounded_children, element_pid};
 
 #[cfg(test)]
 use self::describe::render_shortcut;

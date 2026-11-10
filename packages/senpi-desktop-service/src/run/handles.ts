@@ -3,20 +3,40 @@ import { type FacadeMethod, facadeMethod, type RunScope } from "./context";
 import {
 	type AxInputResult,
 	type AxNode,
+	type AxTextSelection,
 	type DesktopWindow,
 	type MenuItem,
+	type MenuReport,
 	expectResult,
+	isMenuReport,
 	isAttributePairs,
 	isAxInputResult,
 	isAxNode,
+	isAxTextSelection,
 	isMenuItem,
 	isText,
 	listOf,
 	optional,
 } from "./engine-results";
-import { type DeliveryOptions, InputTarget, pointerOptions, send } from "./input-target";
+import {
+	chordKeys,
+	type ClickOptions,
+	type DeliveryOptions,
+	InputTarget,
+	isChord,
+	type MenuOptions,
+	menuParam,
+	pointerOptions,
+	send,
+} from "./input-target";
 import { observeWindow, type ObserveOptions, type ObservationResult } from "./observe";
-export { type ClickOptions, type DeliveryOptions, InputTarget, type ScrollOptions } from "./input-target";
+export {
+	type ClickOptions,
+	type DeliveryOptions,
+	InputTarget,
+	type MenuOptions,
+	type ScrollOptions,
+} from "./input-target";
 
 export interface AxOptions {
 	readonly all?: boolean;
@@ -29,6 +49,13 @@ export interface AxQuery {
 	readonly title?: string;
 	readonly value?: string;
 	readonly limit?: number;
+}
+
+/** Where `selectText` looks: the match must follow `prefix` and precede `suffix`; `select` picks the match or a caret at its start or end. */
+export interface SelectTextOptions {
+	readonly prefix?: string;
+	readonly suffix?: string;
+	readonly select?: "text" | "start" | "end";
 }
 
 export interface Bounds {
@@ -61,6 +88,11 @@ export class WindowHandle extends InputTarget {
 
 	raise(): Promise<void> {
 		return send(this.#method, "raise", "raiseWindow", { windowId: this.id });
+	}
+
+	/** Moves this window into the user's current Space (macOS) without activating it or switching Spaces. */
+	bringToCurrentSpace(): Promise<void> {
+		return send(this.#method, "bringToCurrentSpace", "window.bringToCurrentSpace", { windowId: this.id });
 	}
 
 	/** The window's native menu: `items` lists children (empty path = the menu bar), `select` invokes a leaf. */
@@ -137,6 +169,12 @@ export class ElementHandle {
 		});
 	}
 
+	#sendPress(method: string, params: object): Promise<MenuReport | null> {
+		return this.#method(method, async ({ call }) =>
+			expectResult("ax.perform", (await call("ax.perform", { ref: this.ref, ...params })) ?? null, optional(isMenuReport)),
+		);
+	}
+
 	#node<T>(method: string, project: (node: AxNode) => T): Promise<T> {
 		return this.#method(method, async ({ call }) =>
 			project(expectResult("ax.node", await call("ax.node", { ref: this.ref }), isAxNode)),
@@ -170,16 +208,38 @@ export class ElementHandle {
 		return this.#node("actions", (node) => node.actions ?? []);
 	}
 
-	perform(action: string): Promise<void> {
-		return this.#send("perform", "ax.perform", { action });
+	perform(action: string, options?: MenuOptions): Promise<MenuReport | null> {
+		return this.#sendPress("perform", { action, ...menuParam(options) });
 	}
 
-	press(): Promise<void> {
-		return this.#send("press", "ax.perform", { action: "press" });
+	/**
+	 * Without a chord, the element's native press action; `menu` chooses that path in the menu the press opens. With a
+	 * chord (`"cmd+a"` or `["cmd", "a"]`), that chord pressed in this element without taking the user's focus: keys go out
+	 * only once the element holds its app's keyboard focus and are never sent to an element that did not take it.
+	 * Foreground delivery raises the window first and needs the grant.
+	 */
+	press(options?: MenuOptions): Promise<MenuReport | null>;
+	press(chord: string | readonly string[], options?: DeliveryOptions): Promise<void>;
+	press(chordOrOptions?: string | readonly string[] | MenuOptions, options?: DeliveryOptions): Promise<MenuReport | null | void> {
+		if (isChord(chordOrOptions)) {
+			return this.#send("press", "ax.keyChord", { keys: chordKeys(chordOrOptions), opts: pointerOptions(options) });
+		}
+		return this.#sendPress("press", { action: "press", ...menuParam(chordOrOptions) });
 	}
 
-	click(options?: DeliveryOptions): Promise<void> {
-		return this.#send("click", "ax.click", { opts: pointerOptions(options) });
+	click(options?: ClickOptions): Promise<MenuReport | null> {
+		return this.#method("click", async ({ call }) =>
+			expectResult(
+				"ax.click",
+				(await call("ax.click", { ref: this.ref, opts: pointerOptions(options), ...menuParam(options) })) ?? null,
+				optional(isMenuReport),
+			),
+		);
+	}
+
+	/** Two clicks at the element's center with native input (`ax.click` with `count: 2`). */
+	doubleClick(options?: Omit<ClickOptions, "count">): Promise<void> {
+		return this.#send("doubleClick", "ax.click", { opts: pointerOptions({ ...options, count: 2 }) });
 	}
 
 	/**
@@ -191,6 +251,17 @@ export class ElementHandle {
 		return this.#method("type", async ({ call }) => {
 			const result = await call("ax.typeText", { ref: this.ref, text, opts: pointerOptions(options) });
 			return expectResult("ax.typeText", result, isAxInputResult);
+		});
+	}
+
+	/**
+	 * Selects `text` inside this element's value by writing its selected range: no key is sent, no focus moves, and the
+	 * value stays. The match must be unique inside the given context. A following `type` replaces the selection.
+	 */
+	selectText(text: string, options?: SelectTextOptions): Promise<AxTextSelection> {
+		return this.#method("selectText", async ({ call }) => {
+			const params = { ref: this.ref, text, prefix: options?.prefix, suffix: options?.suffix, select: options?.select };
+			return expectResult("ax.selectText", await call("ax.selectText", params), isAxTextSelection);
 		});
 	}
 

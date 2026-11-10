@@ -1,6 +1,7 @@
 //! Text typed into one element (`ax.typeText`): AX insertion when the field
 //! takes it, else keys once the element holds its application's keyboard
-//! focus; keys are never sent unconfirmed (ported from oh-my-pi 0838d2ab44
+//! focus; and a chord pressed in one element (`ax.keyChord`), always keys.
+//! Keys are never sent unconfirmed (ported from oh-my-pi 0838d2ab44
 //! `window_type`, `element_keys`, `keys_after_focus`).
 
 use std::time::{Duration, Instant};
@@ -12,10 +13,14 @@ use senpi_desktop_core::ax::AxHandle;
 use senpi_desktop_core::backend::{DeliveryMode, ElementDelivery, KeyboardFocus};
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::intervention::check_press;
+use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::protocol_results::AxInputMethod;
 
 use super::held::KeyRoute;
-use super::{guard, keys, resolve_window, window_identity, MacInput};
+use super::insertion::{before_write, insert_unless_terminal, is_terminal};
+use super::key_front::EntryFront;
+use super::key_window::KeyWindow;
+use super::{chord, guard, keys, resolve_window, window_identity, MacInput};
 use crate::ax::element;
 use crate::capture::MacCapture;
 use crate::skylight;
@@ -30,10 +35,10 @@ const PROBE_TIMEOUT_SECONDS: f32 = 2.0;
 impl MacInput {
     /// Types `text` into `element`, an element of a window the capture
     /// lists. Insertion first ([`inserts_first`]); else, in the background,
-    /// the window is made key without raising it as window-level keys are,
-    /// and the keys go to the process once the element reports focus
-    /// ([`element_keys`]); in the foreground the window is raised under the
-    /// grant first.
+    /// the window is made key behind the user's app as window-level keys are
+    /// ([`KeyWindow`]), and the keys go to the process once the element
+    /// reports focus ([`element_keys`]); in the foreground the window is
+    /// raised under the grant first.
     pub(crate) fn ax_type_text(
         &mut self,
         element: &AXUIElement,
@@ -44,6 +49,7 @@ impl MacInput {
         delivered: &mut dyn FnMut(),
     ) -> CoreResult<ElementDelivery> {
         let _request = self.held.request();
+        let entry_front = EntryFront::now();
         let wid = owner_window(element)?;
         let window = resolve_window(capture, &wid.to_string())?;
         let (pid, wid) = window_identity(&window)?;
@@ -51,9 +57,18 @@ impl MacInput {
         // text goes out as the keys of the user's layout once the element holds
         // focus (plan todo 22).
         if let Some(remote) = super::remote::remote_screen(pid) {
-            return self.type_remote(&window, pid, wid, text, remote, mode, capture, check_stop, delivered, Some(element));
+            return self.type_remote(&window, pid, wid, text, remote, mode, entry_front, check_stop, delivered, Some(element));
         }
-        let insert = || crate::ax::insert_into_element(element, text);
+        // omp 18.13.1 `macos/input.rs:247-252`: text addressed to an element
+        // tries insertion in every mode, never into a terminal, and checks the
+        // target is still behind the user right before the write.
+        let insert = || {
+            insert_unless_terminal(
+                is_terminal(pid),
+                || before_write(mode, entry_front, skylight::front_pid, (pid, wid), check_stop),
+                |behind_user| crate::ax::insert_into_element(element, text, behind_user),
+            )
+        };
         match mode {
             // Insertion is an AX write like `ax.setValue`: it needs no SkyLight
             // posting, so it runs before the receipt canary; keys run under it.
@@ -64,15 +79,19 @@ impl MacInput {
                 }
                 self.background(|this| {
                     guard::guard(&window, "keyboard", None)?;
-                    guard::prepare_keys(&window, pid, wid, capture)?;
+                    let target = KeyWindow::prepare(&this.source, &window, (pid, wid), entry_front)?;
                     this.last_activated = Some((pid, wid));
+                    let check = || {
+                        check_stop()?;
+                        target.check()
+                    };
                     element_keys(pid, element, || {
                         keys::type_text_interruptible(
                             &this.source,
                             &mut this.held,
                             text,
                             KeyRoute::Process(pid),
-                            check_stop,
+                            &check,
                             delivered,
                         )
                     })
@@ -99,8 +118,50 @@ impl MacInput {
     }
 }
 
+impl MacInput {
+    /// Presses `keys` in `element`: never inserted, always keys through
+    /// [`element_keys`] once the element reports focus, with `check_stop`
+    /// and the key-window check before every key-down; the window is made key
+    /// behind the user's app in the background ([`KeyWindow`]) and raised
+    /// under the grant in the foreground, as for text.
+    pub(crate) fn ax_key_chord(
+        &mut self,
+        element: &AXUIElement,
+        keys: &[KeyName],
+        mode: DeliveryMode,
+        capture: &MacCapture,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<ElementDelivery> {
+        let _request = self.held.request();
+        let entry_front = EntryFront::now();
+        let wid = owner_window(element)?;
+        let window = resolve_window(capture, &wid.to_string())?;
+        let (pid, wid) = window_identity(&window)?;
+        match mode {
+            DeliveryMode::Background => self.background(|this| {
+                guard::guard(&window, "keyboard", None)?;
+                let target = KeyWindow::prepare(&this.source, &window, (pid, wid), entry_front)?;
+                this.last_activated = Some((pid, wid));
+                let check = || {
+                    check_stop()?;
+                    target.check()
+                };
+                element_keys(pid, element, || {
+                    chord::chord(&this.source, &mut this.held, keys, KeyRoute::Process(pid), &check)
+                })
+            }),
+            DeliveryMode::Foreground => skylight::with_foreground(pid, || {
+                crate::ax::prepare_foreground_input(&window)?;
+                element_keys(pid, element, || {
+                    chord::chord(&self.source, &mut self.held, keys, KeyRoute::Global, check_stop)
+                })
+            }),
+        }
+    }
+}
+
 /// Every scalar of an inserted text is delivered at once.
-fn report_delivered(text: &str, delivered: &mut dyn FnMut()) {
+pub(super) fn report_delivered(text: &str, delivered: &mut dyn FnMut()) {
     for _ in text.chars() {
         delivered();
     }

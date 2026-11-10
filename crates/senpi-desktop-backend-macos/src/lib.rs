@@ -21,6 +21,7 @@ mod screen;
 #[cfg(test)]
 mod partial_coverage_tests;
 mod skylight;
+mod spaces;
 mod stop_path;
 
 pub use ax::{is_trusted, MacAx};
