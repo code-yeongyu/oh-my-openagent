@@ -259,7 +259,7 @@ export async function estimateSystemTokens(repo: GitRepoForStatus, head: string)
   return Math.floor(totalBytes / 4)
 }
 
-export async function measureFactsNotes(repo: GitRepoForStatus, head: string): Promise<FactsNoteSize[]> {
+async function measureFactsNotes(repo: GitRepoForStatus, head: string): Promise<FactsNoteSize[]> {
   const paths = (await repo.lsTree(head)).filter(isFactsNotePath)
   return Promise.all(paths.map(async (path) => measureFactsNote(path, await repo.show(head, path))))
 }
