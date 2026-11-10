@@ -1352,8 +1352,6 @@
       "packages/omo-senpi/src/components/thread/gateway/store-relay-ops.ts": ["toolReceiptBegin", "toolReceiptSettle", "registerIncarnation", "pendingCompletionArms", "latestCompletionArm", "closeQuestion"],
       // pre-existing at origin dev 4686e425b5: unused export(s) sweepRetention
       "packages/omo-senpi/src/components/thread/gateway/store-retention.ts": ["sweepRetention"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_STORE_WORKER_BUNDLE_NAME
-      "packages/omo-senpi/src/components/thread/gateway/store.ts": ["GATEWAY_STORE_WORKER_BUNDLE_NAME"],
       // pre-existing at origin dev 4686e425b5: unused export(s) matcherAwaits
       "packages/omo-senpi/src/components/thread/gateway/worker-reply-matchers.test.ts": ["matcherAwaits"],
       // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_TOOL_SEARCH_GROUP

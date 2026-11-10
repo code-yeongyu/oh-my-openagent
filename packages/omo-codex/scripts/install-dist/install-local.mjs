@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:63589060a594ef1029331a87d2d7ca8d026857ed4dc2cfd03a059b68eea774b8:889eb311d9c2b33cd596f7314f23153b232b97cb7b7304761e8f57da662fb568
+// omo-codex-install:cdd45658775781f93e20bd61c5320b34ed32c29a81a96a0d4ab528d74c807dda:e41af6deb14deb208e4ed49aa5a5d5db7b4ffe13ae40a534d73753f5970b2a58
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10205,7 +10205,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.65",
+    version: "5.1.66",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -13154,7 +13154,7 @@ var LATEST_MODEL_BY_FAMILY = {
   claudeOpus: "claude-opus-5-5",
   claudeSonnet: "claude-sonnet-5-5",
   claudeHaiku: "claude-haiku-5-5",
-  claudeFable: "claude-fable-5-2",
+  claudeFable: "claude-fable-5-1",
   gptAstra: "gpt-6-astra",
   gptSol: "gpt-6.1-sol",
   gptSolFast: "gpt-6.1-sol-fast",
