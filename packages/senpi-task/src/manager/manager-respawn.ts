@@ -14,6 +14,7 @@ import type { ManagedRunner, TrustedRespawnLaunchResolver } from "./types"
 import { modelSelector } from "../runners/in-process/runtime-fallback-settings"
 import { HOST_RESPAWN_CONTINUATION } from "../runners/rpc-host/reconcile-turn"
 import { reconcileDaemonTurn } from "./reconcile-daemon-turn"
+import { rpcPersona } from "./runner"
 import { classifyResumeFailure, failure, hostRefusal, isTeamRuntimeUnavailable } from "./respawn-failure"
 
 const CONTINUATION_MESSAGE = HOST_RESPAWN_CONTINUATION
@@ -77,6 +78,7 @@ async function respawnFresh(input: {
       depth: input.record.depth,
       parent_session_id: input.record.parent_session_id,
       root_session_id: input.record.root_session_id,
+      ...rpcPersona(rebuilt.spec),
     })
     return { ok: true, handle: adaptRpcHandle(handle) }
   } catch (error) {
@@ -143,6 +145,7 @@ async function respawnProcess(input: {
   // JSONL yet). Read it BEFORE the open: a reopening host recreates it for its holder record and
   // starts a fresh, empty session there, which a continuation would then "finish".
   const sessionDirPresent = existsSync(dirname(sessionPath))
+  const resumed = buildRespawnManagedSpec(input.record, input.stateDir)
   let handle: RpcChildHandle | undefined
   try {
     const trusted = input.trustedLaunch === undefined ? undefined : await input.trustedLaunch(input.record)
@@ -164,6 +167,7 @@ async function respawnProcess(input: {
       depth: input.record.depth,
       parent_session_id: input.record.parent_session_id,
       root_session_id: input.record.root_session_id,
+      ...(resumed.ok ? rpcPersona(resumed.spec) : {}),
     })
     // An ATTACHED daemon session is the same live session, mid-turn and all: switching it would
     // reopen what is already open, and a continuation nudge would inject a second prompt into a

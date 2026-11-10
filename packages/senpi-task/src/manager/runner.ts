@@ -5,7 +5,7 @@ import { RunnerError, type ChildSpec } from "../runners/in-process"
 import { resolveChildSessionDir } from "../runners/rpc/spawn"
 import { modelSelector } from "../runners/in-process/runtime-fallback-settings"
 import { dirname } from "node:path"
-import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
+import type { RpcChildHandle, RpcPersona, RpcRunnerSpec } from "../runners/types"
 import { adaptInProcessHandle, adaptRpcHandle, type ManagedChildHandle } from "./child-handle"
 import type { ManagedRunner, ManagedStartSpec } from "./types"
 
@@ -99,9 +99,20 @@ export function createRpcManagedRunner(runner: RpcRunnerLike): ManagedRunner {
         parent_session_id: spec.parentSessionId,
         root_session_id: spec.rootSessionId,
         ...(spec.traceparent !== undefined ? { traceparent: spec.traceparent } : {}),
+        ...rpcPersona(spec),
       }
       return adaptRpcHandle(await runner.start(rpcSpec))
     },
+  }
+}
+
+/** The persona fields of a managed spec, for every RPC launch path (start and respawn). */
+export function rpcPersona(spec: Pick<ManagedStartSpec, keyof RpcPersona>): RpcPersona {
+  return {
+    ...(spec.instructions !== undefined ? { instructions: spec.instructions } : {}),
+    ...(spec.toolAllowlist !== undefined ? { toolAllowlist: spec.toolAllowlist } : {}),
+    ...(spec.toolDenylist !== undefined ? { toolDenylist: spec.toolDenylist } : {}),
+    ...(spec.memberScopedToolNames !== undefined ? { memberScopedToolNames: spec.memberScopedToolNames } : {}),
   }
 }
 

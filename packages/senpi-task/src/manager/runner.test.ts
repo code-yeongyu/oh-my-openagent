@@ -182,6 +182,26 @@ describe("createRpcManagedRunner", () => {
     expect(handle.pid).toBe(99)
   })
 
+  test("#given a managed spec with an agent persona #when started #then instructions and tool policy ride the rpc spec", async () => {
+    // given
+    let captured: RpcRunnerSpec | undefined
+    const runner: RpcRunnerLike = {
+      start: async (spec) => {
+        captured = spec
+        return fakeRpcHandle()
+      },
+    }
+    const managed = createRpcManagedRunner(runner)
+
+    // when
+    await managed.start({ ...managedSpec(), instructions: "Role: reviewer.", toolAllowlist: ["read"], toolDenylist: ["task"] })
+
+    // then: before this, a process child dropped all three and ran with the default prompt and every tool
+    expect(captured?.instructions).toBe("Role: reviewer.")
+    expect(captured?.toolAllowlist).toEqual(["read"])
+    expect(captured?.toolDenylist).toEqual(["task"])
+  })
+
   test("#given a managed spec with a model #when started #then the model is threaded onto the rpc spec for the detached child", async () => {
     // given
     let captured: RpcRunnerSpec | undefined
