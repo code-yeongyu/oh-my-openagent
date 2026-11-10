@@ -163,9 +163,11 @@ const rowLinks = (m: {
   };
 };
 export const listingRowOf = (v: unknown): ListingRow => {
-  const m = exactly(v, ROW_FIELDS, ["kind", "parent", "parent_listed"], "listing row");
+  const m = exactly(v, ROW_FIELDS, ["kind", "parent", "parent_listed", "durable_id"], "listing row");
+  const durable = m["durable_id"];
   return {
     ...rowLinks(m),
+    ...(durable === undefined ? {} : { durable_id: text(durable, SESSION_ID_MAX_CHARS, "durable_id") }),
     device: deviceId(m["device"]),
     session_id: sessionId(m["session_id"]),
     title: text(m["title"], SESSION_SUMMARY_TITLE_MAX_CHARS, "title", 0),
