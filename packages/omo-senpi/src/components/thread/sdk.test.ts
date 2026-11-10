@@ -9,6 +9,7 @@ import type { RemoteThreadSurface } from "./remote/ports"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
 import { createRemoteThreadFixture } from "./thread-remote-fixture"
 import type { ThreadHost, ThreadHostSession } from "./tools"
+import type { ThreadHostViewRequest } from "./tools/ports"
 import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const TUI_SOCKET = "/tmp/t-0123456789abcdef.sock"
@@ -21,7 +22,7 @@ afterEach(async () => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
-function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, request: ReleaseSessionRequest) => Promise<never>; readonly store?: (agentDir: string) => GatewayStore; readonly sdkOwnsStore?: boolean; readonly remote?: RemoteThreadSurface; readonly cwd?: string } = {}) {
+function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, request: ReleaseSessionRequest) => Promise<never>; readonly store?: (agentDir: string) => GatewayStore; readonly sdkOwnsStore?: boolean; readonly remote?: RemoteThreadSurface; readonly cwd?: string; readonly noHostAnswering?: boolean; readonly diskOnly?: readonly string[] } = {}) {
   const agentDir = mkdtempSync(join(tmpdir(), "thread-sdk-"))
   directories.push(agentDir)
   const store: GatewayStore = options.store?.(agentDir) ?? createGatewayStore({ agentDir })
@@ -29,23 +30,33 @@ function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, re
   const tuiSession: ThreadHostSession = { sessionId: "dur-tui", durableSessionId: "dur-tui", cwd: process.cwd(), name: "my-tui", status: "open", socket: TUI_SOCKET, endpoint_kind: "tui" }
   const sessionsDir = join(agentDir, "sessions", "--fixture--")
   mkdirSync(sessionsDir, { recursive: true })
-  for (const session of [hostSession, tuiSession]) writeFileSync(join(sessionsDir, `epoch_${session.durableSessionId}.jsonl`), JSON.stringify({ type: "session", id: session.durableSessionId, cwd: session.cwd, timestamp: "2026-10-02T00:00:00Z" }) + "\n")
+  const diskOnly = (options.diskOnly ?? []).map((id) => ({ durableSessionId: id, cwd: process.cwd() }))
+  for (const session of [hostSession, tuiSession, ...diskOnly]) writeFileSync(join(sessionsDir, `epoch_${session.durableSessionId}.jsonl`), JSON.stringify({ type: "session", id: session.durableSessionId, cwd: session.cwd, timestamp: "2026-10-02T00:00:00Z" }) + "\n")
   const wakes: { readonly endpoint: GatewayEndpointRef; readonly ids: readonly string[] }[] = []
   const releases: { readonly endpoint: GatewayEndpointRef; readonly request: ReleaseSessionRequest }[] = []
+  const views: (ThreadHostViewRequest | undefined)[] = []
   const unused = async (): Promise<never> => {
     throw new Error("not used by the SDK")
   }
   const host: ThreadHost = {
     socket: "/tmp/thread-sdk-legacy.sock",
     listSessions: async () => [hostSession, tuiSession],
-    listView: async () => ({
-      sessions: [hostSession, tuiSession],
-      hosts: [
-        { socket: HOST_SOCKET, list_sessions: { sessions: [hostSession] }, endpoint_kind: "rpc_host", alive: true },
-        { socket: TUI_SOCKET, list_sessions: { sessions: [tuiSession] }, endpoint_kind: "tui", alive: true },
-      ],
-      disk: [],
-    }),
+    listView: async (request) => {
+      views.push(request)
+      // The live surface's contract: when no endpoint answers it throws, unless the caller takes nothing live as the offline case.
+      if (options.noHostAnswering === true) {
+        if (request?.offline !== true) throw new Error("connect ECONNREFUSED")
+        return { sessions: [], hosts: [], disk: [] }
+      }
+      return {
+        sessions: [hostSession, tuiSession],
+        hosts: [
+          { socket: HOST_SOCKET, list_sessions: { sessions: [hostSession] }, endpoint_kind: "rpc_host", alive: true },
+          { socket: TUI_SOCKET, list_sessions: { sessions: [tuiSession] }, endpoint_kind: "tui", alive: true },
+        ],
+        disk: [],
+      }
+    },
     openSession: unused,
     getMessages: async () => [{ role: "user", content: "hello from the host" }],
     getState: async () => ({ isStreaming: false }),
@@ -69,7 +80,23 @@ function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, re
   }
   const sdk = createThreadSdk({ agentDir, cwd: options.cwd ?? process.cwd(), uid: 501, user: "qa-user", host, ...(options.sdkOwnsStore === true ? {} : { store }), ...(options.remote === undefined ? {} : { remote: options.remote }) })
   sdks.push(sdk)
-  return { sdk, store, wakes, releases }
+  return { sdk, store, wakes, releases, views }
+}
+
+/** The remote surface with every device-service and alias-registry call it takes recorded by method name. */
+function countingRemote(remote: RemoteThreadSurface): { readonly remote: RemoteThreadSurface; readonly calls: string[] } {
+  const calls: string[] = []
+  const counted = <T extends object>(port: T): T => new Proxy(port, {
+    get: (target, key, receiver) => {
+      const value: unknown = Reflect.get(target, key, receiver)
+      if (typeof value !== "function") return value
+      return (...args: unknown[]) => {
+        calls.push(String(key))
+        return Reflect.apply(value, target, args)
+      }
+    },
+  })
+  return { remote: { ...remote, sessions: counted(remote.sessions), ...(remote.aliases === undefined ? {} : { aliases: counted(remote.aliases) }) }, calls }
 }
 
 describe("thread SDK: sessions", () => {
@@ -117,11 +144,32 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     expect(account.sent.filter((entry) => entry.via === "session").map((entry) => [entry.device, entry.rpc?.["type"]])).toEqual([["b", "get_messages"]])
   })
 
-  test("#given an alias held by a thread on this device and omo thread run from another workspace #when read names the alias without all_scope #then it reads that thread; the raw id alone stays scope_denied", async () => {
+  test("#given an alias held by a thread on this device and omo thread run from another workspace #when read and send name the alias without all_scope #then both reach that thread; the raw id alone stays scope_denied", async () => {
     const account = remoteFixture.account({ aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]) })
-    const { sdk } = fixture({ remote: account.remote, cwd: "/thread-sdk-other-workspace" })
+    const { sdk, store } = fixture({ remote: account.remote, cwd: "/thread-sdk-other-workspace" })
     expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread_id: "dur-host" })
     expect(await sdk.read({ thread: "dur-host" })).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
+    expect(await sdk.send({ thread: "lane-here", text: "ping" })).toMatchObject({ kind: "ok", deduplicated: false })
+    expect((await store.list({ target_durable_id: "dur-host" })).map((row) => row.sender)).toEqual(["cli:501"])
+  })
+
+  test("#given a thread that is not running and no host or terminal answering #when omo thread send names it by id and by an own alias #then both are stored queued_offline, never internal_error (#12860)", async () => {
+    const account = remoteFixture.account({ aliases: new Map([["lane-off", { session_id: "dur-off", device: "here" }]]) })
+    const { sdk, store } = fixture({ remote: account.remote, noHostAnswering: true, diskOnly: ["dur-off"] })
+    expect(await sdk.send({ thread: "dur-off", text: "by id" })).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
+    expect(await sdk.send({ thread: "lane-off", text: "by alias" })).toMatchObject({ kind: "ok", delivery: { kind: "queued_offline" } })
+    expect((await store.list({ target_durable_id: "dur-off" })).map((row) => row.sender)).toEqual(["cli:501", "cli:501"])
+  })
+
+  test("#given a published thread id and the account surface set #when omo thread send names that id #then it is delivered with no host listing and no device-service or alias call (#12860)", async () => {
+    const account = remoteFixture.account({ aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]) })
+    const counting = countingRemote(account.remote)
+    const { sdk, store, views } = fixture({ remote: counting.remote })
+    await store.registerIncarnation({ durable_id: "dur-host", incarnation: "rpc-1", endpoint: { kind: "rpc_host", socket: HOST_SOCKET } })
+    expect(await sdk.send({ thread: "dur-host", text: "ping" })).toMatchObject({ kind: "ok", deduplicated: false })
+    expect((await store.list({ target_durable_id: "dur-host" })).map((row) => row.sender)).toEqual(["cli:501"])
+    expect(views).toEqual([])
+    expect(counting.calls).toEqual([])
   })
 
   test("#given a thread on b #when omo thread send names it #then the command-line sender is refused there as data (the engine admits one only from its own machine) and nothing is sent, while a send to a thread here still delivers as cli", async () => {
