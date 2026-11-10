@@ -1,9 +1,11 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
+import type { ThreadResolveResult } from "../addressing"
+import { relayAddressBook, type RelayAddressBook } from "../remote/address-book"
 import { assembleAddressBook, findDiskSessions, toThreadAddressEntries, type AddressEndpoint, type AddressEntry, type DiskSession, type ThreadSurface } from "../address-book"
 import { resolveTarget, workspaceDirectories, type ThreadAddressEntry } from "../addressing"
 import type { ThreadToolName, ThreadToolResult, ThreadTranscriptItem } from "../contracts"
 import { threadToolFailure, type ThreadErrorCode } from "../errors"
-import { THREAD_TOOL_SEARCH_METADATA } from "../metadata"
+import { THREAD_TOOL_EXPOSURE, THREAD_TOOL_METADATA } from "../metadata"
 import { readSessionFacts, threadTitle } from "../session-facts"
 import { threadLink } from "../thread-link"
 import { UNKNOWN_CALLER, type ThreadHostSession, type ThreadHostView, type ThreadHostViewRequest, type ThreadSessionPort, type ThreadToolSurfaceOptions } from "./ports"
@@ -38,21 +40,13 @@ export type ThreadToolMetadata = {
   readonly name: string
   readonly label: string
   readonly description: string
-  readonly exposure: "search"
-  readonly searchText: string
-  readonly searchKeywords: readonly string[]
-  readonly searchGroup: string
-  readonly allowLazyActivation: true
+  readonly exposure: typeof THREAD_TOOL_EXPOSURE
 }
 
 export function metadata(name: ThreadToolName): ThreadToolMetadata {
-  const entry = THREAD_TOOL_SEARCH_METADATA.find((candidate) => candidate.name === name)
+  const entry = THREAD_TOOL_METADATA.find((candidate) => candidate.name === name)
   if (entry === undefined) throw new Error(`missing thread metadata for ${name}`)
-  return {
-    name: entry.name, label: entry.label, description: entry.description,
-    exposure: entry.exposure, searchText: entry.searchText, searchKeywords: entry.searchKeywords,
-    searchGroup: entry.group, allowLazyActivation: entry.allowLazyActivation,
-  }
+  return { name: entry.name, label: entry.label, description: entry.description, exposure: entry.exposure }
 }
 
 /**
@@ -182,3 +176,22 @@ export function targetSession(view: ThreadHostView, durableId: string): ThreadHo
   return view.sessions.find((session) => (session.durableSessionId ?? session.sessionId) === durableId)
 }
 
+
+/**
+ * Decision 0027: ONE resolver over this device's entries and the relay transport's address book. A local hit never needs
+ * the relay; a local miss answers the relay's typed unavailability (plan, sign-in) or the alias holder's typed failure
+ * before any not_found. An alias or an entry on another device is account-wide: the local scope no longer applies to it.
+ */
+export async function resolveAcross(options: ThreadToolSurfaceOptions, local: readonly ThreadAddressEntry[], address: string, callerId: string, allScope: boolean | undefined): Promise<ThreadResolveResult & { readonly all_scope?: boolean | undefined }> {
+  const here = resolution(options, local, address, callerId, allScope)
+  if (options.remote === undefined || (here.kind === "ok" && here.resolution === "id")) return here
+  const book = await relayAddressBook(options.remote, address).catch((): RelayAddressBook => ({ entries: [] }))
+  if (book.entries.length === 0 && here.kind === "ok") return here
+  const across = resolution(options, [...local, ...book.entries], address, callerId, allScope)
+  if (across.kind === "ok") return { ...across, all_scope: across.resolution === "alias" || across.entry.transport !== undefined ? true : allScope }
+  if (book.aliasFailure !== undefined) return { kind: "error", ...book.aliasFailure } as ThreadResolveResult
+  // A5: the paid-plan refusal is the answer when other devices would have been needed; any other unavailability leaves
+  // the local answer as it is (not_found), exactly as without a device service.
+  if (book.unavailable?.code === "relay_requires_paid_plan" && here.kind === "error" && here.code === "not_found") return { kind: "error", ...book.unavailable } as ThreadResolveResult
+  return across
+}

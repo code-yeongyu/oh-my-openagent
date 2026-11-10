@@ -4,9 +4,10 @@
 
 import { join } from "node:path"
 
-import { lstat } from "../fs/resilient"
+import { existsSync, lstat } from "../fs/resilient"
 import type { MemoryIdentityPaths } from "../identity/layout"
-import { reflectionRunNumber, scanReflectionRunHighWater } from "../reflection/run-id-high-water"
+import { readReflectionRunIdMark, reflectionRunNumber, scanReflectionRunHighWater } from "../reflection/run-id-high-water"
+import { COMPLETIONS_KEEP_NEWEST, readCompletion } from "./completions"
 import { classifyJournalEntry } from "./journals"
 import { readUnreflectedRetentionGate } from "./reflection-health-signal"
 import { DAY_MS, idleSince, listNames, type RuntimeRetentionPolicy } from "./policy"
@@ -22,15 +23,8 @@ export interface RuntimePastRetention {
   readonly unclassifiedJournals: number
 }
 
-export async function countRuntimePastRetention(input: {
-  readonly paths: MemoryIdentityPaths
-  readonly policy: RuntimeRetentionPolicy
-  readonly now: () => number
-  readonly isLiveSession?: (sessionId: string) => boolean
-  readonly reflectionEnabled?: boolean
-  /** The doctors' measurement deadline; once it fires the count rejects with the abort. */
-  readonly signal?: AbortSignal
-}): Promise<RuntimePastRetention> {
+/** Folded runs the next pass would remove, by its rules (reflection-runs.ts), minus what only the pass decides. */
+async function pastRetentionRunNames(input: { readonly paths: MemoryIdentityPaths; readonly policy: RuntimeRetentionPolicy; readonly now: () => number }): Promise<string[]> {
   const cutoff = input.now() - input.policy.retentionDays * DAY_MS
   const runsDir = join(input.paths.reflection, "runs")
   const highWater = await scanReflectionRunHighWater(input.paths)
@@ -41,11 +35,25 @@ export async function countRuntimePastRetention(input: {
     if (typeof classified !== "string") folded.push({ name, finishedAt: classified.finishedAt })
   }
   const newest = folded.toSorted((left, right) => right.finishedAt - left.finishedAt || right.name.localeCompare(left.name))[0]?.name
-  let runs = 0
+  const names: string[] = []
   for (const run of folded) {
     if (run.name === newest || reflectionRunNumber(run.name) === highWater || run.finishedAt > cutoff) continue
-    if (await idleSince(join(runsDir, run.name), cutoff)) runs += 1
+    if (await idleSince(join(runsDir, run.name), cutoff)) names.push(run.name)
   }
+  return names
+}
+
+export async function countRuntimePastRetention(input: {
+  readonly paths: MemoryIdentityPaths
+  readonly policy: RuntimeRetentionPolicy
+  readonly now: () => number
+  readonly isLiveSession?: (sessionId: string) => boolean
+  readonly reflectionEnabled?: boolean
+  /** The doctors' measurement deadline; once it fires the count rejects with the abort. */
+  readonly signal?: AbortSignal
+}): Promise<RuntimePastRetention> {
+  const cutoff = input.now() - input.policy.retentionDays * DAY_MS
+  const runs = (await pastRetentionRunNames(input)).length
 
   let journals = 0
   let unclassifiedJournals = 0
@@ -100,4 +108,68 @@ export async function measureUnreflectedJournalBytes(input: {
     else if (verdict.kind === "partly") bytes += await measureTreeBytes(join(dir, "transcript.jsonl"))
   }
   return bytes
+}
+
+export interface RuntimePastRetentionOtherStores {
+  readonly completions: number
+  readonly ledgers: number
+  /** Legacy `reflection-sessions` entries, plus one for `recall/runs`. */
+  readonly legacy: number
+}
+
+/**
+ * The stores {@link countRuntimePastRetention} leaves out, counted read-only by the pass's own rules
+ * (completions.ts, recall-ledgers.ts, legacy.ts) for the `--fix --dry-run` preview. The pass records the
+ * scanned high water as `run-id.json` before it removes anything, so the preview reads the mark as at least
+ * that high water. Live sessions are unknown here, as they are to the host sweep.
+ */
+export async function countRuntimePastRetentionOtherStores(input: {
+  readonly paths: MemoryIdentityPaths
+  readonly policy: RuntimeRetentionPolicy
+  readonly now: () => number
+  readonly signal?: AbortSignal
+}): Promise<RuntimePastRetentionOtherStores> {
+  const highWater = await scanReflectionRunHighWater(input.paths)
+  // The pass removes runs before completions, so a run it removes no longer keeps its completion (`run-present`).
+  const removedRuns = new Set(await pastRetentionRunNames(input))
+  const mark = Math.max((await readReflectionRunIdMark(input.paths.reflection)) ?? 0, highWater)
+  const completionsCutoff = input.now() - input.policy.completionsDays * DAY_MS
+  const retentionCutoff = input.now() - input.policy.retentionDays * DAY_MS
+
+  const dir = join(input.paths.reflection, "completions")
+  const records: { readonly runId: string; readonly finishedAt: number; readonly consumed: boolean }[] = []
+  for (const name of await listNames(dir)) {
+    input.signal?.throwIfAborted()
+    if (!name.endsWith(".json")) continue
+    const record = await readCompletion(join(dir, name), name.slice(0, -".json".length))
+    if (record !== undefined) records.push(record)
+  }
+  const newest = new Set(
+    records.toSorted((left, right) => right.finishedAt - left.finishedAt || (left.runId < right.runId ? 1 : -1)).slice(0, COMPLETIONS_KEEP_NEWEST).map((record) => record.runId),
+  )
+  let completions = 0
+  for (const record of records) {
+    const number = reflectionRunNumber(record.runId)
+    if (newest.has(record.runId) || !record.consumed || record.finishedAt > completionsCutoff) continue
+    if (!removedRuns.has(record.runId) && existsSync(join(input.paths.reflection, "runs", record.runId))) continue
+    if (number === 0 || number > mark || number === highWater) continue
+    completions += 1
+  }
+
+  let ledgers = 0
+  for (const name of await listNames(input.paths.recallLedger)) {
+    input.signal?.throwIfAborted()
+    if (!name.endsWith(".json")) continue
+    const stats = await lstat(join(input.paths.recallLedger, name)).catch(() => undefined)
+    if (stats?.isFile() === true && stats.mtimeMs <= completionsCutoff) ledgers += 1
+  }
+
+  let legacy = 0
+  for (const name of await listNames(input.paths.reflectionSessions)) {
+    input.signal?.throwIfAborted()
+    if (reflectionRunNumber(name) !== highWater && (await idleSince(join(input.paths.reflectionSessions, name), retentionCutoff))) legacy += 1
+  }
+  const recallRuns = join(input.paths.recall, "runs")
+  if (existsSync(recallRuns) && (await idleSince(recallRuns, retentionCutoff))) legacy += 1
+  return { completions, ledgers, legacy }
 }

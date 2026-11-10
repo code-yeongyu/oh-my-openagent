@@ -15,6 +15,8 @@ import {
   type ManagedRunner,
   type RpcChildHandle,
   type RpcRunnerSpec,
+  type ChildDialogForwarder,
+  type ParentPermissionMode,
 } from "@oh-my-opencode/senpi-task"
 
 import { createRpcModelAdmission } from "@oh-my-opencode/senpi-task/rpc-model-admission"
@@ -50,13 +52,16 @@ export interface RunnerBuildContext {
   readonly resolveInheritedExtensions?: () => Promise<readonly string[]>
   // Where a daemon fallback reason goes. Defaults to the module logger; the engine passes the
   // session's deduped notice list so the same reason reaches `task_output` exactly once.
-  readonly onHostWarning?: (message: string) => void | (() => void)
+  readonly onHostWarning?: (message: string, token?: string) => void | (() => void)
   // WHERE this session's `process` children open (its own task host) and the task store the index
   // records. The engine always passes it; the host runner cannot be built without it.
   readonly hostRouting?: TaskHostRouting
   // omo.json exclude_models: an in-process child respawned or resumed on an excluded model fails
   // model_unavailable instead of running it.
   readonly excludeModels?: readonly string[]
+  // Where children ask: the parent's UI, and the parent's approval mode they open with and follow (#6189).
+  readonly dialogForwarder?: ChildDialogForwarder
+  readonly parentPermission?: ParentPermissionMode
 }
 
 export interface TaskRunnerFactories {
@@ -79,6 +84,7 @@ function buildInProcessRunner(build: RunnerBuildContext): ManagedRunner {
     uiOnlyToolNames: TASK_CHILD_UI_ONLY_TOOL_NAMES,
     depthPolicy: { maxDepth: Math.max(build.settings.max_depth + 1, 1) },
     ...(build.kernelToolBindings === undefined ? {} : { kernelToolBindings: build.kernelToolBindings }),
+    ...(build.dialogForwarder === undefined ? {} : { dialogs: build.dialogForwarder }),
   })
   const context = createParentRegistrySessionContext(
     () => build.runtime.modelRegistry(),
@@ -198,9 +204,14 @@ export function buildRespawnRunner(
 export function buildProcessChildRunner(build: RunnerBuildContext): RpcHostRunner | RpcProcessRunner {
   const inheritedExtensions = parseExtensionEntries(process.argv)
   const modelAdmission = build.excludeModels === undefined ? {} : { modelAdmission: createRpcModelAdmission({ excludeModels: build.excludeModels }) }
+  const parentLink = {
+    ...(build.dialogForwarder === undefined ? {} : { dialogs: build.dialogForwarder }),
+    ...(build.parentPermission === undefined ? {} : { parentPermission: build.parentPermission }),
+  }
   const perChild = new RpcProcessRunner({
     inheritedExtensions,
     ...modelAdmission,
+    ...parentLink,
     ...(build.onHostWarning === undefined ? {} : { onWarning: build.onHostWarning }),
   })
   const platform = build.platform ?? process.platform
@@ -214,6 +225,7 @@ export function buildProcessChildRunner(build: RunnerBuildContext): RpcHostRunne
     agentDir: build.agentDir ?? resolveAgentHome({ env }),
     env,
     inheritedExtensions,
+    ...parentLink,
     fallback: perChild,
     ...(build.onHostWarning === undefined ? {} : { onWarning: build.onHostWarning }),
     ensureDaemon: routing.ensureDaemon,

@@ -21,6 +21,8 @@ async function omo(args: string[], api: string) {
       env: {
         PATH: process.env.PATH, HOME: home, USERPROFILE: home, OMO_RUNTIME: "bun",
         OMO_SERVICE_API_URL: api, OMO_SERVICE_ACCOUNTS_URL: api, OMO_TEST_KEYSTORE_URL: keystore,
+        // The child's own lock home: the test preload's account seam does not reach a child process (#12978).
+        OMO_TEST_CREDENTIAL_LOCK_HOME: home,
       },
       stdin: "ignore", stdout: "pipe", stderr: "pipe",
     },

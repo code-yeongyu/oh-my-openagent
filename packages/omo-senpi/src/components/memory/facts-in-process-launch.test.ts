@@ -5,8 +5,10 @@ import { mkdir, readFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { launchFactsInProcess } from "./facts-in-process-launch"
+import { FACTS_AGREEMENT_TOOL_NAME } from "./facts-agreement-tool"
 import { FACTS_RECORD_TOOL_NAME } from "./facts-record-tool"
 import { fixture, registrySnapshot, runnerOptions } from "./facts-runner.test-support"
+import type { StartChildInput } from "./in-process-memory-child"
 import type { ReflectionModelCandidate } from "./worker/resolve-model"
 import { writeRunJsonAtomic, type RunOutcome } from "./worker/run-artifacts"
 
@@ -180,5 +182,54 @@ describe("launchFactsInProcess quick chain", () => {
 
     expect(outcome.childExit.code).toBe(0)
     expect(outcome.timedOut).toBe(false)
+  })
+})
+
+describe("launchFactsInProcess child grant", () => {
+  test("#given a facts launch with and without agreements #when the child starts #then it carries its own approval mode and may run only its own tools", async () => {
+    const { root, identity, queue } = await fixture()
+    const base = runnerOptions(root, identity, queue, "empty")
+    const started: StartChildInput[] = []
+    const options = runnerOptions(root, identity, queue, "empty", {
+      createRunner: (runnerInput) => ({
+        start: async (spec) => {
+          started.push(spec)
+          return base.createRunner?.(runnerInput).start(spec) ?? Promise.reject(new Error("runner missing"))
+        },
+      }),
+    })
+    for (const agreements of [undefined, []] as const) {
+      const runId = `facts-grant-${started.length}`
+      const runDir = join(root, runId)
+      await mkdir(runDir)
+      await writeRunJsonAtomic(join(runDir, "ledger.json"), { version: 1, runId, kind: "facts" })
+      await launchFactsInProcess({
+        runId,
+        runDir,
+        payload: {
+          version: 1,
+          identity: identity.id,
+          today: "2026-08-10",
+          entries: [],
+          knownPeople: [],
+          primaryHuman: { slug: "human", aliases: [] },
+          ...(agreements === undefined ? {} : { agreements }),
+        },
+        resolution: { kind: "resolved", category: "quick", model: PRIMARY, fallbacks: [] },
+        modelRegistry: registrySnapshot([{ id: "mock-1" }]),
+        options,
+        env: { HOME: root },
+        configSources: [],
+        batchId: `${runId}-batch`,
+        queued: [],
+        launchedAt: 0,
+        deadlineMs: 10_000,
+      })
+    }
+
+    expect(started.map((spec) => ({ toolAllowlist: spec.toolAllowlist, ownApprovalMode: spec.ownApprovalMode }))).toEqual([
+      { toolAllowlist: [FACTS_RECORD_TOOL_NAME], ownApprovalMode: { allowTools: [FACTS_RECORD_TOOL_NAME] } },
+      { toolAllowlist: [FACTS_RECORD_TOOL_NAME, FACTS_AGREEMENT_TOOL_NAME], ownApprovalMode: { allowTools: [FACTS_RECORD_TOOL_NAME, FACTS_AGREEMENT_TOOL_NAME] } },
+    ])
   })
 })

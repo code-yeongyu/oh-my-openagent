@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { readdirSync, readFileSync } from "node:fs"
-import { dirname, join, relative } from "node:path"
+import { dirname, join, relative, sep } from "node:path"
 import test from "node:test"
 import { fileURLToPath } from "node:url"
 
@@ -53,8 +53,9 @@ function isHostPackage(specifier) {
 }
 
 function isForbiddenBuiltin(file, specifier) {
+  const key = file.split(sep).join("/").split("\\").join("/")
   const name = (specifier.startsWith("node:") ? specifier.slice("node:".length) : specifier).split("/")[0]
-  return SDK_FORBIDDEN_BUILTINS.includes(name) && !(SDK_ALLOWED_BUILTINS[file] ?? []).includes(name)
+  return SDK_FORBIDDEN_BUILTINS.includes(name) && !(SDK_ALLOWED_BUILTINS[key] ?? []).includes(name)
 }
 
 function sourceFiles(dir) {
@@ -109,6 +110,12 @@ test("#given the sdk edge row #when checked #then the sdk may import -protocol o
   assert.deepEqual(ALLOWED_EDGES["senpi-desktop-sdk"], ["senpi-desktop-protocol"])
   assert.ok(ALLOWED_EDGES["senpi-desktop-service"].includes("senpi-desktop-sdk"))
   assert.ok(ALLOWED_EDGES["senpi-desktop-tool"].includes("senpi-desktop-sdk"))
+})
+
+test("#given a Windows checkout #when the sdk exception path arrives with win32-style separators #then the exception still matches", () => {
+  const win32 = "packages\\senpi-desktop-sdk\\src\\transport\\attach-uds.ts"
+  assert.equal(isForbiddenBuiltin(win32, "node:net"), false)
+  assert.equal(isForbiddenBuiltin("packages\\senpi-desktop-sdk\\src\\index.ts", "node:net"), true)
 })
 
 test("#given import forms #when extracting specifiers #then static, re-export, type, dynamic and require forms are all seen", () => {
