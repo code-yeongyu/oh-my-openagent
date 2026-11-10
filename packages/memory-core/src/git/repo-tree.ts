@@ -35,7 +35,12 @@ export function parseLsTreeBlobs(stdout: string): GitTreeBlobEntry[] {
 
 /** `<oid> <type> <size>\n<content>\n` records; `<oid> missing` records carry no content. */
 export function parseCatFileBatch(output: Buffer): Map<string, string> {
-  const blobs = new Map<string, string>()
+  return new Map([...parseCatFileBatchBytes(output)].map(([oid, bytes]) => [oid, bytes.toString("utf8")]))
+}
+
+/** The raw bytes of each blob, for callers that must not lose a non-UTF-8 file in decoding. */
+export function parseCatFileBatchBytes(output: Buffer): Map<string, Buffer> {
+  const blobs = new Map<string, Buffer>()
   let offset = 0
   while (offset < output.length) {
     const newline = output.indexOf(0x0a, offset)
@@ -48,7 +53,7 @@ export function parseCatFileBatch(output: Buffer): Map<string, string> {
     if (oid === undefined || !Number.isSafeInteger(size) || size < 0 || offset + size > output.length) {
       throw new Error(`git cat-file --batch output is malformed at "${header}"`)
     }
-    if (type === "blob") blobs.set(oid, output.toString("utf8", offset, offset + size))
+    if (type === "blob") blobs.set(oid, output.subarray(offset, offset + size))
     offset += size + 1
   }
   return blobs

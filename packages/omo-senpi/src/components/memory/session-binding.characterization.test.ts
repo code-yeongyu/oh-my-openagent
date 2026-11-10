@@ -152,7 +152,7 @@ describe("X8c memory binding at session_start (characterization)", () => {
     expect(await readIdentityRecord(sessionIdentity.paths.root)).toMatchObject({
       id: sessionIdentity.id,
       kind: "explicit",
-      mode: "path",
+      mode: "git",
       source: sessionCwd,
       spellings: [sessionCwd],
       firstBoundAt: 1236,
