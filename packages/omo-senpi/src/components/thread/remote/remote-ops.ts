@@ -146,7 +146,7 @@ export async function promptRemote(remote: RemoteThreadSurface, row: RemoteSessi
   if (reply["disposition"] === "started" && typeof turnId === "string" && turnId.length > 0) return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "started", turn_id: turnId }, deduplicated: false, device: row.device }
   const after = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
   const settled = after.kind === "ok" ? replyData(after.response) : {}
-  // An engine whose prompt reply names no turn (senpi through 2026.11.5-1) reports the running turn in get_state.
+  // An engine whose prompt reply names no turn (engines through 2026.11.5-1) reports the running turn in get_state.
   const current = settled["currentTurnId"]
   if (reply["disposition"] === "started" && typeof current === "string" && current.length > 0) return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: { kind: "started", turn_id: current }, deduplicated: false, device: row.device }
   const pending = settled["pendingMessageCount"]

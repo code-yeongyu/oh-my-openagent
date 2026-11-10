@@ -212,7 +212,7 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
     if (reply["disposition"] === "started" && typeof turnId === "string" && turnId.length > 0) return ok({ kind: "started", turn_id: turnId })
     const after = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
     const settled = after.kind === "ok" ? engineStateOf(replyData(after.response)) : { phase: "idle" as const, turnEpoch: null, pending: null }
-    // An engine whose prompt reply names no turn (senpi through 2026.11.5-1) reports the running turn in get_state.
+    // An engine whose prompt reply names no turn (engines through 2026.11.5-1) reports the running turn in get_state.
     if (reply["disposition"] === "started" && settled.turnEpoch !== null) return ok({ kind: "started", turn_id: String(settled.turnEpoch) })
     if (settled.pending === null) return fail("idempotency_uncertain", `Device ${row.device} accepted the message but did not report where it waits.`, "Read the thread before deciding whether to send again.", { device: row.device })
     return ok({ kind: "queued", queue_position: settled.pending })
