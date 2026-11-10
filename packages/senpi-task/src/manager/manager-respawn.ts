@@ -5,7 +5,7 @@ import { log } from "@oh-my-opencode/utils"
 
 import { hostSessionResumePath, readHostDrainingHold } from "../lifecycle/host-session"
 import type { RespawnResult } from "../lifecycle/port"
-import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
+import type { RpcChildHandle, RpcPersona, RpcRunnerSpec } from "../runners/types"
 import type { AwaitingInputReason, TaskRecord } from "../state"
 import { adaptRpcHandle, discardManagedHandle, discardRpcHandle, type ManagedChildHandle } from "./child-handle"
 import { sessionTailContinuationBlocker, sessionTailFinishedText, sessionTailNeedsContinuation } from "./interrupted-turn"
@@ -14,6 +14,7 @@ import type { ManagedRunner, TrustedRespawnLaunchResolver } from "./types"
 import { modelSelector } from "../runners/in-process/runtime-fallback-settings"
 import { HOST_RESPAWN_CONTINUATION } from "../runners/rpc-host/reconcile-turn"
 import { reconcileDaemonTurn } from "./reconcile-daemon-turn"
+import { PersonaTooLargeError } from "../runners/rpc/persona-args"
 import { rpcPersona } from "./runner"
 import { classifyResumeFailure, failure, hostRefusal, isTeamRuntimeUnavailable } from "./respawn-failure"
 
@@ -88,6 +89,7 @@ async function respawnFresh(input: {
     }
     const refused = hostRefusal(error)
     if (refused !== undefined) return refused
+    if (error instanceof PersonaTooLargeError) return failure("unrecoverable", "respawn_failed", error.message)
     log("senpi-task fresh rpc respawn failed", { taskId: input.record.task_id, error: String(error) })
     return failure("retryable", "respawn_failed", "rpc respawn failed")
   }
@@ -145,7 +147,10 @@ async function respawnProcess(input: {
   // JSONL yet). Read it BEFORE the open: a reopening host recreates it for its holder record and
   // starts a fresh, empty session there, which a continuation would then "finish".
   const sessionDirPresent = existsSync(dirname(sessionPath))
+  // A pre-v1 record cannot rebuild its instructions (it was never launched with any), but its tool
+  // policy lives on the record itself, so the resumed child keeps the denylist it was granted.
   const resumed = buildRespawnManagedSpec(input.record, input.stateDir)
+  const persona = resumed.ok ? rpcPersona(resumed.spec) : recordToolPolicy(input.record)
   let handle: RpcChildHandle | undefined
   try {
     const trusted = input.trustedLaunch === undefined ? undefined : await input.trustedLaunch(input.record)
@@ -167,7 +172,7 @@ async function respawnProcess(input: {
       depth: input.record.depth,
       parent_session_id: input.record.parent_session_id,
       root_session_id: input.record.root_session_id,
-      ...(resumed.ok ? rpcPersona(resumed.spec) : {}),
+      ...persona,
     })
     // An ATTACHED daemon session is the same live session, mid-turn and all: switching it would
     // reopen what is already open, and a continuation nudge would inject a second prompt into a
@@ -221,8 +226,18 @@ async function respawnProcess(input: {
     }
     const refused = hostRefusal(error)
     if (refused !== undefined) return refused
+    if (error instanceof PersonaTooLargeError) {
+      return failure("unrecoverable", "respawn_failed", cleaned ? error.message : RESPAWN_CLEANUP_FAILURE_REASON)
+    }
     log("senpi-task rpc respawn failed", { taskId: input.record.task_id, error: String(error) })
     return failure("retryable", "respawn_failed", cleaned ? "rpc respawn failed" : RESPAWN_CLEANUP_FAILURE_REASON)
+  }
+}
+
+function recordToolPolicy(record: TaskRecord): RpcPersona {
+  return {
+    ...(record.tool_allow === undefined ? {} : { toolAllowlist: record.tool_allow }),
+    ...(record.tool_deny === undefined ? {} : { toolDenylist: record.tool_deny }),
   }
 }
 
