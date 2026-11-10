@@ -2,7 +2,7 @@
 
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -99,18 +99,27 @@ const actionsExpression = (inner: string): string => `\${{ ${inner} }}`
 
 // Runs a workflow step's real script with `npm` stubbed: `npm view` answers from LATEST/BETA (VIEW_FAIL=1 fails the
 // dist-tags lookup, ADD_FAIL=1 fails `npm dist-tag add`), `sleep` returns at once, and every npm call is recorded.
-function runStep(run: string, env: Record<string, string>): { status: number | null; stderr: string; stdout: string; calls: string[] } {
+// A successful `npm dist-tag add` records the moved beta; `dist-tags.beta` reads keep answering the old BETA for the
+// first BETA_LAG reads (registry lag), then the moved version, else BETA_SETTLED, else BETA.
+// RUNNER_TEMP is its own directory, so `runnerTemp` lists exactly what the step left behind there.
+function runStep(run: string, env: Record<string, string>): { status: number | null; stderr: string; stdout: string; calls: string[]; runnerTemp: { name: string; content: string }[] } {
   const dir = mkdtempSync(join(tmpdir(), "omo-ai-beta-"))
   const calls = join(dir, "calls")
+  const runnerTempDir = join(dir, "runner-temp")
+  mkdirSync(runnerTempDir)
   const stub = [
     "npm() {",
     `  printf '%s\\n' "$*" >> "$CALLS"`,
     `  case "$*" in`,
-    `    "dist-tag add "*) [ "\${ADD_FAIL:-}" != 1 ] ;;`,
+    `    "dist-tag add "*) [ "\${ADD_FAIL:-}" != 1 ] || return 1`,
+    `      spec="\${*: -2:1}"; printf '%s\\n' "\${spec#omo-ai@}" > "$CALLS.moved" ;;`,
     `    *"--json omo-ai dist-tags") [ "\${VIEW_FAIL:-}" != 1 ] || return 1`,
     `      if [ -n "$BETA" ]; then printf '{"latest":"%s","beta":"%s"}\\n' "$LATEST" "$BETA"; else printf '{"latest":"%s"}\\n' "$LATEST"; fi ;;`,
     `    *dist-tags.latest*) printf '%s\\n' "$LATEST" ;;`,
-    `    *dist-tags.beta*) printf '%s\\n' "$BETA" ;;`,
+    `    *dist-tags.beta*) reads=$(( $(cat "$CALLS.beta-reads" 2>/dev/null || echo 0) + 1 )); echo "$reads" > "$CALLS.beta-reads"`,
+    `      if [ "$reads" -le "\${BETA_LAG:-0}" ]; then printf '%s\\n' "$BETA"`,
+    `      elif [ -f "$CALLS.moved" ]; then cat "$CALLS.moved"`,
+    `      else printf '%s\\n' "\${BETA_SETTLED:-$BETA}"; fi ;;`,
     "  esac",
     "}",
     "sleep() { :; }",
@@ -119,10 +128,13 @@ function runStep(run: string, env: Record<string, string>): { status: number | n
   try {
     const result = spawnSync("bash", ["-c", `${stub}${run}`], {
       cwd: repoRoot, encoding: "utf8", timeout: 20_000,
-      env: { ...process.env, CALLS: calls, RUNNER_TEMP: dir, ...env },
+      env: { ...process.env, CALLS: calls, RUNNER_TEMP: runnerTempDir, ...env },
     })
     const recorded = existsSync(calls) ? readFileSync(calls, "utf8").trim().split("\n").filter(Boolean) : []
-    return { status: result.status, stderr: result.stderr, stdout: result.stdout, calls: recorded }
+    const runnerTemp = readdirSync(runnerTempDir, { recursive: true, encoding: "utf8" })
+      .filter((name) => statSync(join(runnerTempDir, name)).isFile())
+      .map((name) => ({ name, content: readFileSync(join(runnerTempDir, name), "utf8") }))
+    return { status: result.status, stderr: result.stderr, stdout: result.stdout, calls: recorded, runnerTemp }
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -162,6 +174,36 @@ describe("beta follows latest on a stable release (#12987)", () => {
     }
   })
 
+  test("after a successful move the step waits until beta reads back the moved version", () => {
+    const result = runStep(betaMove.run ?? "", { OMO_AI_VERSION: "5.1.66", LATEST: "5.1.66", BETA: "5.1.0", BETA_LAG: "2", NODE_AUTH_TOKEN: "dummy" })
+    expect(result.status).toBe(0)
+    expect(result.calls.filter((call) => call.includes("dist-tags.beta"))).toHaveLength(3)
+    expect(result.stdout).toContain("omo-ai beta reads 5.1.66 (attempt 3/5)")
+    expect(result.stdout).not.toContain("::warning::")
+  })
+
+  test("a beta read-back that never converges is bounded and only warns", () => {
+    const result = runStep(betaMove.run ?? "", { OMO_AI_VERSION: "5.1.66", LATEST: "5.1.66", BETA: "5.1.0", BETA_LAG: "99", NODE_AUTH_TOKEN: "dummy" })
+    expect(result.status).toBe(0)
+    expect(result.calls.filter((call) => call.includes("dist-tags.beta"))).toHaveLength(5)
+    expect(result.stdout).toContain("::warning::omo-ai beta still reads 5.1.0 after the move to 5.1.66")
+    expect(result.stdout).not.toContain("::error::")
+  })
+
+  test.each<{ name: string; env: Record<string, string> }>([
+    { name: "success", env: { BETA: "5.1.0" } },
+    { name: "write failure", env: { BETA: "5.1.0", ADD_FAIL: "1" } },
+    { name: "lookup failure", env: { BETA: "", VIEW_FAIL: "1" } },
+  ])("after a $name the runner temp dir holds no npmrc and no raw token", ({ env }) => {
+    const token = "npm_test-token-value-12987"
+    const result = runStep(betaMove.run ?? "", { OMO_AI_VERSION: "5.1.66", LATEST: "5.1.66", NODE_AUTH_TOKEN: token, ...env })
+    expect(result.status).toBe(0)
+    expect(result.runnerTemp.map((file) => file.name).filter((name) => name.includes("npmrc"))).toEqual([])
+    expect(result.runnerTemp.filter((file) => file.content.includes(token))).toEqual([])
+    expect(result.stdout).not.toContain(token)
+    expect(result.stderr).not.toContain(token)
+  })
+
   test("a failed dist-tags lookup is retried, never read as a missing beta, and leaves beta untouched with a warning", () => {
     const result = runStep(betaMove.run ?? "", { OMO_AI_VERSION: "5.1.66", LATEST: "5.1.66", BETA: "", VIEW_FAIL: "1", NODE_AUTH_TOKEN: "dummy" })
     expect(result.status).toBe(0)
@@ -189,6 +231,22 @@ describe("beta follows latest on a stable release (#12987)", () => {
     const result = runStep(guard, { OMO_AI_VERSION: "5.1.66", OMO_AI_DIST_TAG: distTag, ALREADY_PUBLISHED: "false", LATEST: "5.1.66", BETA: beta })
     expect(result.status).toBe(passes ? 0 : 1)
     if (!passes) expect(result.stdout).toContain("older than latest 5.1.66")
+  })
+
+  test("the dist-tag guard re-reads a lagging beta until it reaches latest", () => {
+    const guard = namedStep("post-publish-verify", "Guard omo-ai dist-tags").run ?? ""
+    const result = runStep(guard, { OMO_AI_VERSION: "5.1.66", OMO_AI_DIST_TAG: "latest", ALREADY_PUBLISHED: "false", LATEST: "5.1.66", BETA: "5.1.0", BETA_LAG: "3", BETA_SETTLED: "5.1.66" })
+    expect(result.status).toBe(0)
+    expect(result.calls.filter((call) => call.includes("dist-tags.beta"))).toHaveLength(4)
+    expect(result.stdout).not.toContain("::error::")
+  })
+
+  test("the dist-tag guard fails after a bounded number of reads when beta never reaches latest", () => {
+    const guard = namedStep("post-publish-verify", "Guard omo-ai dist-tags").run ?? ""
+    const result = runStep(guard, { OMO_AI_VERSION: "5.1.66", OMO_AI_DIST_TAG: "latest", ALREADY_PUBLISHED: "false", LATEST: "5.1.66", BETA: "5.1.0", BETA_LAG: "99", BETA_SETTLED: "5.1.66" })
+    expect(result.status).toBe(1)
+    expect(result.calls.filter((call) => call.includes("dist-tags.beta"))).toHaveLength(5)
+    expect(result.stdout).toContain("::error::omo-ai beta points to 5.1.0, older than latest 5.1.66")
   })
 
   test("the dist-tag guard leaves a prerelease's older beta alone", () => {

@@ -1729,16 +1729,34 @@ jobs:
           NPMRC="$RUNNER_TEMP/omo-ai-dist-tag.npmrc"
           # shellcheck disable=SC2016
           printf '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}\n' > "$NPMRC"
+          trap 'rm -f "$NPMRC"' EXIT
+          MOVED=false
           for attempt in 1 2 3 4 5; do
             if npm dist-tag add --userconfig "$NPMRC" "omo-ai@$OMO_AI_VERSION" beta; then
-              rm -f "$NPMRC"
-              echo "omo-ai beta -> $OMO_AI_VERSION"
-              exit 0
+              MOVED=true
+              break
             fi
             [ "$attempt" = "5" ] || { echo "Retrying omo-ai beta dist-tag (attempt ${attempt}/5)"; sleep 15; }
           done
           rm -f "$NPMRC"
-          echo "::warning::Could not move omo-ai beta to $OMO_AI_VERSION; the dist-tag guard reports it. Fix: run 'npm dist-tag add omo-ai@$OMO_AI_VERSION beta' with a publish token"
+          if [ "$MOVED" != "true" ]; then
+            echo "::warning::Could not move omo-ai beta to $OMO_AI_VERSION; the dist-tag guard reports it. Fix: run 'npm dist-tag add omo-ai@$OMO_AI_VERSION beta' with a publish token"
+            exit 0
+          fi
+          echo "omo-ai beta -> $OMO_AI_VERSION"
+
+          # The registry serves a dist-tag write with lag, like the readiness wait above: wait until beta reads back the
+          # moved version so the guard below does not fail on a stale read. A read-back that never converges only warns;
+          # the guard re-reads it and stays the hard check.
+          for attempt in 1 2 3 4 5; do
+            BETA_VERSION=$(npm view --prefer-online omo-ai dist-tags.beta 2>/dev/null || true)
+            if [ "$BETA_VERSION" = "$OMO_AI_VERSION" ]; then
+              echo "omo-ai beta reads $OMO_AI_VERSION (attempt ${attempt}/5)"
+              exit 0
+            fi
+            [ "$attempt" = "5" ] || { echo "Waiting for omo-ai beta to read $OMO_AI_VERSION (attempt ${attempt}/5, 15s)"; sleep 15; }
+          done
+          echo "::warning::omo-ai beta still reads ${BETA_VERSION:-missing} after the move to $OMO_AI_VERSION; the dist-tag guard re-reads it"
 
       - name: Guard omo-ai dist-tags
         if: inputs.lazycodex_only != true
@@ -1764,13 +1782,20 @@ jobs:
             fi
           fi
 
-          # beta is never older than latest (#12987): the step above moved it with this stable release.
+          # beta is never older than latest (#12987): the step above moved it with this stable release. The registry can
+          # serve that write with lag, so the read is retried (bounded, like the readiness wait) before it fails.
           if [ "$OMO_AI_DIST_TAG" = "latest" ] && [ "$ALREADY_PUBLISHED" != "true" ]; then
-            BETA_VERSION=$(npm view --prefer-online omo-ai dist-tags.beta 2>/dev/null || true)
-            if [ "$(node script/beta-follows-latest.mjs "$LATEST_VERSION" "$BETA_VERSION")" != "move=false" ]; then
-              echo "::error::omo-ai beta points to ${BETA_VERSION:-missing}, older than latest ${LATEST_VERSION:-missing}; move beta to $LATEST_VERSION"
-              exit 1
-            fi
+            for attempt in 1 2 3 4 5; do
+              BETA_VERSION=$(npm view --prefer-online omo-ai dist-tags.beta 2>/dev/null || true)
+              BETA_DECISION=$(node script/beta-follows-latest.mjs "$LATEST_VERSION" "$BETA_VERSION" || true)
+              [ "$BETA_DECISION" != "move=false" ] || break
+              if [ "$attempt" = "5" ]; then
+                echo "::error::omo-ai beta points to ${BETA_VERSION:-missing}, older than latest ${LATEST_VERSION:-missing}; move beta to $LATEST_VERSION"
+                exit 1
+              fi
+              echo "Waiting for omo-ai beta to reach latest ${LATEST_VERSION:-missing} (attempt ${attempt}/5, 15s)"
+              sleep 15
+            done
           fi
 
       - name: Verify omo-ai live install
