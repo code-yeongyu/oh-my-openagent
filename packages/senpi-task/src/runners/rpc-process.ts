@@ -1,4 +1,5 @@
 import { type ChildProcess, type SpawnOptions, spawn } from "node:child_process"
+import { closeSync, openSync } from "node:fs"
 import { log } from "@oh-my-opencode/utils"
 
 import type { RpcChildHandle, RpcRunnerSpec } from "./types"
@@ -90,8 +91,16 @@ export class RpcProcessRunner {
     if (spec.sandbox === undefined) await this.modelAdmission(spec)
     const parent = new ChildParentLink(spec.task_id, this.options.dialogs, this.options.parentPermission, (message, token) => this.onWarning(message, token))
     const built = this.buildSpawn(parent.named(spec))
-    const descriptor = spec.sandbox === undefined ? built : confineRpcSpawn(built, spec)
-    const child = this.spawnChild(descriptor)
+    const confined = spec.sandbox === undefined ? undefined : confineRpcSpawn(built, spec)
+    const descriptor = confined?.descriptor ?? built
+    let child: ChildProcess
+    try {
+      child = this.spawnChild(descriptor)
+    } catch (error) {
+      confined?.release()
+      throw error
+    }
+    if (confined !== undefined) child.once("exit", confined.release)
     const client = new RpcProtocolClient({ child, onMalformedLine: this.onMalformedLine, parent })
     const handle = createRpcChildHandle({
       client,
@@ -102,7 +111,8 @@ export class RpcProcessRunner {
       }),
       heartbeatIntervalMs: this.heartbeatIntervalMs,
       now: this.now,
-      childEnv: descriptor.env,
+      // The unconfined env: the parent writes crash records from it, never into the child's view.
+      childEnv: built.env,
       terminateChild: this.terminateChild,
     })
     let resume: ReturnType<RpcProtocolClient["switchSession"]> | undefined
@@ -259,12 +269,18 @@ function defaultSpawnChild(
   descriptor: RpcSpawnDescriptor,
   spawnProcess: (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess,
 ): ChildProcess {
-  return spawnProcess(descriptor.command, [...descriptor.args], {
-    cwd: descriptor.cwd,
-    env: descriptor.env,
-    stdio: ["pipe", "pipe", "pipe"],
-    shell: false,
-    windowsHide: true,
-    detached: process.platform !== "win32",
-  })
+  const inherited = (descriptor.inheritFiles ?? []).map((path) => openSync(path, "r"))
+  try {
+    return spawnProcess(descriptor.command, [...descriptor.args], {
+      cwd: descriptor.cwd,
+      env: descriptor.env,
+      stdio: ["pipe", "pipe", "pipe", ...inherited],
+      shell: false,
+      windowsHide: true,
+      // Its own session: no controlling terminal, so a child cannot inject keystrokes into the user's tty.
+      detached: process.platform !== "win32",
+    })
+  } finally {
+    for (const fd of inherited) closeSync(fd)
+  }
 }

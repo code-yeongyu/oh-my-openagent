@@ -45,6 +45,8 @@ export type RpcSpawnDescriptor = {
   readonly args: readonly string[]
   readonly cwd: string
   readonly env: NodeJS.ProcessEnv
+  // Files the spawner opens read-only and hands to the child as fds 3, 4, ... (the sandbox's seccomp program).
+  readonly inheritFiles?: readonly string[]
 }
 
 export type RpcSpawnRuntime = {

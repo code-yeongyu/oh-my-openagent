@@ -52,6 +52,7 @@ interface LspComponentOptions {
 		readonly state?: LspPostEditSessionState;
 	};
 	readonly callDaemonTool?: DaemonToolCaller;
+	readonly env?: NodeJS.ProcessEnv;
 }
 
 const DEFAULT_POST_EDIT_SESSION_STATE = createLspPostEditSessionState();
@@ -76,6 +77,8 @@ export function createLspComponent(options: LspComponentOptions = {}): OmoSenpiC
 			}));
 			registerLspFlags(pi);
 			if (ctx.config.getFlag(LSP_TOOLS_ENABLED_FLAG) === false) return;
+			// A deny-live sandboxed review child (senpi#6287) cannot reach the LSP daemon's unix socket.
+			if ((options.env ?? process.env).OMO_SANDBOX === "deny-live") return;
 
 			// A startup diagnostic, not a precondition: reading both .pi configs is fs work the first
 			// paint should not wait for, and the warning still reaches the same logger one tick later.

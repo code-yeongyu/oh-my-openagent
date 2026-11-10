@@ -4,15 +4,26 @@ import type { RpcPersona } from "../types"
 // agent's allowlist (child-options.ts), so a process worker's allowlist must keep it too.
 const WORKPOOL_YIELD_TOOL_NAME = "workpool"
 
-// senpi reads `--append-system-prompt` as text unless it names a file; one argv entry stays well under
-// the kernel's per-argument limit (MAX_ARG_STRLEN, 128 KiB) at this size.
-const MAX_INSTRUCTIONS_CHARACTERS = 100_000
+// senpi reads `--append-system-prompt` as text unless it names a file. POSIX caps ONE argv entry at
+// MAX_ARG_STRLEN (128 KiB, in bytes), so the budget is UTF-8 bytes with headroom. win32 caps the WHOLE
+// command line at 32,767 UTF-16 units, so the budget there leaves room for the rest of the argv.
+const MAX_INSTRUCTIONS_BYTES = 100_000
+const MAX_INSTRUCTIONS_WIN32_UNITS = 24_000
 
 export class PersonaTooLargeError extends Error {
-  constructor(length: number) {
-    super(`agent instructions are ${length} characters; a process child accepts at most ${MAX_INSTRUCTIONS_CHARACTERS}`)
+  constructor(size: number, limit: number, unit: string) {
+    super(`agent instructions are ${size} ${unit}; a process child accepts at most ${limit}`)
     this.name = "PersonaTooLargeError"
   }
+}
+
+/** Whether a spec carries a persona a child must get: instructions or any tool policy. */
+export function hasPersona(persona: RpcPersona): boolean {
+  return (
+    (persona.instructions !== undefined && persona.instructions.length > 0) ||
+    persona.toolAllowlist !== undefined ||
+    (persona.toolDenylist !== undefined && persona.toolDenylist.length > 0)
+  )
 }
 
 /**
@@ -20,10 +31,10 @@ export class PersonaTooLargeError extends Error {
  * system prompt, the allowlist as `tools`, the denylist as `excludeTools`), as senpi CLI flags for a
  * separate-process child. An undefined allowlist means no tool policy; an EMPTY one means no tools.
  */
-export function personaArgs(persona: RpcPersona): readonly string[] {
+export function personaArgs(persona: RpcPersona, platform: NodeJS.Platform = process.platform): readonly string[] {
   const args: string[] = []
   if (persona.instructions !== undefined && persona.instructions.length > 0) {
-    if (persona.instructions.length > MAX_INSTRUCTIONS_CHARACTERS) throw new PersonaTooLargeError(persona.instructions.length)
+    assertInstructionsFit(persona.instructions, platform)
     args.push("--append-system-prompt", persona.instructions)
   }
   const allow = persona.toolAllowlist
@@ -37,4 +48,13 @@ export function personaArgs(persona: RpcPersona): readonly string[] {
     args.push("--exclude-tools", persona.toolDenylist.join(","))
   }
   return args
+}
+
+function assertInstructionsFit(instructions: string, platform: NodeJS.Platform): void {
+  if (platform === "win32") {
+    if (instructions.length > MAX_INSTRUCTIONS_WIN32_UNITS) throw new PersonaTooLargeError(instructions.length, MAX_INSTRUCTIONS_WIN32_UNITS, "UTF-16 units")
+    return
+  }
+  const bytes = Buffer.byteLength(instructions, "utf8")
+  if (bytes > MAX_INSTRUCTIONS_BYTES) throw new PersonaTooLargeError(bytes, MAX_INSTRUCTIONS_BYTES, "UTF-8 bytes")
 }

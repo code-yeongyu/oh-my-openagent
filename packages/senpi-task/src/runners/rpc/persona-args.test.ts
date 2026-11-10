@@ -40,6 +40,18 @@ describe("personaArgs", () => {
   })
 
   test("#given instructions over the argv budget #when building #then the launch is refused", () => {
-    expect(() => personaArgs({ instructions: "x".repeat(100_001) })).toThrow(PersonaTooLargeError)
+    expect(() => personaArgs({ instructions: "x".repeat(100_001) }, "linux")).toThrow(PersonaTooLargeError)
+  })
+
+  // The POSIX per-argument limit is in bytes: 40k three-byte characters are 120 KB on the argv.
+  test("#given multibyte instructions under the character count but over the byte budget #when building on POSIX #then the launch is refused", () => {
+    expect(() => personaArgs({ instructions: "\u{AC00}".repeat(40_000) }, "linux")).toThrow(PersonaTooLargeError)
+  })
+
+  // win32 caps the whole command line at 32,767 UTF-16 units, far below the POSIX per-argument limit.
+  test("#given instructions that fit POSIX but not the win32 command line #when building on win32 #then the launch is refused", () => {
+    const instructions = "x".repeat(30_000)
+    expect(personaArgs({ instructions }, "linux")).toContain(instructions)
+    expect(() => personaArgs({ instructions }, "win32")).toThrow(PersonaTooLargeError)
   })
 })

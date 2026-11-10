@@ -186,8 +186,12 @@ export class RpcHostRunner {
     // own process (senpi#6287), and never reattaches to a recorded host session.
     if (specInput.sandbox !== undefined) {
       if (this.options.fallback === undefined) throw sandboxRequired("review-role child refused: no per-child process runner is configured")
-      const { hostSocket: _recordedHost, ...perChild } = specInput
-      return await this.options.fallback.start(perChild)
+      // A review child recorded on a daemon before the sandbox existed may still be held there; reopening
+      // its session in a new process would make two writers on one transcript.
+      if (specInput.hostSocket !== undefined) {
+        throw sandboxRequired("review-role child refused: it was recorded on the task daemon and cannot be resumed sandboxed; start it again")
+      }
+      return await this.options.fallback.start(specInput)
     }
     const spec =
       specInput.extensions === undefined && this.inheritedExtensions.length > 0

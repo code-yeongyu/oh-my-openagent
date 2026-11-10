@@ -8,44 +8,48 @@ export type DenyLiveInput = {
   readonly platform: NodeJS.Platform
   readonly home: string
   readonly agentDir: string
-  readonly childStateDir: string
-  readonly tmpDir: string
+  readonly stateDir: string
   readonly cwd: string
-  // Code the child loads from outside the live roots (its -e extension packages, the engine launcher).
+  // Code the child loads (its -e extension entries, the engine launcher), resolved by the caller.
   readonly codeRoots: readonly string[]
-  readonly liveRoots?: readonly string[]
+  readonly liveRoot?: string
+  readonly uid?: number
   readonly which?: (command: string) => string | undefined
 }
 
 /**
- * One confinement: write-denied roots, the writable carve-outs inside them, and the code and config
- * re-denied inside those carve-outs. Rules apply in that order, so a later rule wins (bwrap mount
- * order, Seatbelt rule order). Every path appears by literal spelling and by realpath.
+ * One confinement (senpi#6287 design v5): every write is denied except the task cwd, the reviewer
+ * report dir and the child's own state dir; inside the cwd the dirs and files the engine and git load
+ * from are read-only again. Rules apply in field order and a later rule wins (bwrap mount order,
+ * Seatbelt rule order). Paths are the parent-resolved real paths.
  */
 export type DenyLivePlan = {
   readonly platform: "linux" | "darwin"
   readonly backend: string
-  readonly deny: readonly string[]
-  readonly allow: readonly string[]
-  readonly reDeny: readonly string[]
-  readonly tmpDir: string
+  readonly home: string
+  readonly liveRoot: string
+  readonly agentDir: string
   readonly cwd: string
+  readonly projectControl: readonly string[]
+  readonly artifactDir: string
+  readonly stateDir: string
+  readonly viewDir: string
+  readonly tmpDir: string
+  readonly codeRoots: readonly string[]
+  // Linux only: private tmpfs mounts (writable scratch, and the user sockets under them hidden).
+  readonly privateDirs: readonly string[]
 }
 
 export type DenyLiveDecision =
   | { readonly kind: "confined"; readonly plan: DenyLivePlan }
   | { readonly kind: "unavailable"; readonly reason: string }
 
-// Engine state under ~/.omo the child must write to run at all (measured, senpi#6287): the agent dir's
-// locks, session holders, caches and logs; memory, session locks and the LSP daemon's stamps.
-const STATE_DIRS_UNDER_LIVE_ROOT = ["agent", "memory", "session-locks", "lsp-daemon", "cache"] as const
+// What the engine and git load from a project: project-local extensions, skills, settings and MCP
+// servers (senpi package-manager / mcp config, the legacy `.pi` dir), and the repository config/hooks.
+export const PROJECT_CONTROL_ENTRIES = [".git", ".omo", ".agents", ".claude", ".senpi", ".pi", ".mcp.json"] as const
 
-// Code and configuration inside the agent dir: installed runtimes and binaries, seeded and user
-// extensions, the RPC host keys, and the settings, models and trust files the engine reads.
-const AGENT_DIR_CODE_AND_CONFIG = [
-  "runtime", "bin", "bundled-bun", "extensions", "extensions.disabled", "kill-guard", join("rpc", "keys"),
-  "settings.json", "models.json", "models-store.json", "trust.json", "config-identity.key",
-] as const
+// Reviewer reports land here (the curated reviewer prompts); it is writable again after `.omo`.
+export const ARTIFACT_DIR = join(".omo", "evidence")
 
 export function planDenyLive(input: DenyLiveInput): DenyLiveDecision {
   if (input.platform !== "linux" && input.platform !== "darwin") {
@@ -56,35 +60,42 @@ export function planDenyLive(input: DenyLiveInput): DenyLiveDecision {
   if (backend === undefined) {
     return { kind: "unavailable", reason: input.platform === "darwin" ? "sandbox-exec not found" : "bwrap not found" }
   }
-  const liveRoots = input.liveRoots ?? [join(input.home, ".omo")]
-  const agentDir = input.agentDir
-  if (liveRoots.some((root) => sameOrInside(root, agentDir) && !sameOrInside(join(root, "agent"), agentDir))) {
-    return { kind: "unavailable", reason: `agent dir ${agentDir} is a live root, not engine state inside one` }
+  const liveRootLiteral = input.liveRoot ?? join(input.home, ".omo")
+  if (!existsSync(liveRootLiteral)) return { kind: "unavailable", reason: `the live engine root ${liveRootLiteral} does not exist` }
+  const cwd = realOrSelf(input.cwd)
+  const stateDir = realOrSelf(input.stateDir)
+  const codeRoots = input.codeRoots.map(realOrSelf)
+  const inside = codeRoots.find((root) => sameOrInside(cwd, root) || sameOrInside(stateDir, root))
+  if (inside !== undefined) {
+    return { kind: "unavailable", reason: `the engine loads code from ${inside}, inside the child's writable tree; run the reviewer in an isolated checkout` }
   }
-  const deny = aliases(liveRoots)
-  const allow = aliases([
-    ...liveRoots.flatMap((root) => STATE_DIRS_UNDER_LIVE_ROOT.map((name) => join(root, name))),
-    agentDir,
-    input.childStateDir,
-    input.tmpDir,
-  ])
-  const reDeny = aliases([...AGENT_DIR_CODE_AND_CONFIG.map((name) => join(agentDir, name)), ...input.codeRoots])
+  const runUser = input.uid === undefined ? undefined : join("/run/user", String(input.uid))
   return {
     kind: "confined",
-    plan: { platform: input.platform, backend, deny, allow, reDeny, tmpDir: input.tmpDir, cwd: input.cwd },
+    plan: {
+      platform: input.platform,
+      backend,
+      home: realOrSelf(input.home),
+      liveRoot: realOrSelf(liveRootLiteral),
+      agentDir: realOrSelf(input.agentDir),
+      cwd,
+      projectControl: PROJECT_CONTROL_ENTRIES.map((name) => join(cwd, name)),
+      artifactDir: join(cwd, ARTIFACT_DIR),
+      stateDir,
+      viewDir: join(stateDir, "agent-view"),
+      tmpDir: join(stateDir, "sandbox-tmp"),
+      codeRoots,
+      privateDirs: input.platform === "linux" ? ["/tmp", ...(runUser !== undefined && existsSync(runUser) ? [runUser] : [])] : [],
+    },
   }
 }
 
-export function defaultLiveRoots(): readonly string[] {
-  return [join(homedir(), ".omo")]
+export function defaultLiveRoot(): string {
+  return join(homedir(), ".omo")
 }
 
-function aliases(paths: readonly string[]): readonly string[] {
-  const out: string[] = []
-  for (const path of paths) {
-    for (const spelling of [path, realOrSelf(path)]) if (!out.includes(spelling)) out.push(spelling)
-  }
-  return out
+export function sameOrInside(root: string, path: string): boolean {
+  return path === root || path.startsWith(root.endsWith("/") ? root : `${root}/`)
 }
 
 function realOrSelf(path: string): string {
@@ -93,12 +104,6 @@ function realOrSelf(path: string): string {
   } catch {
     return path
   }
-}
-
-function sameOrInside(root: string, path: string): boolean {
-  const r = realOrSelf(root)
-  const p = realOrSelf(path)
-  return p === r || p.startsWith(`${r}/`)
 }
 
 function whichOnPath(command: string): string | undefined {
