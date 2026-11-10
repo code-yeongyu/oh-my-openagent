@@ -3,13 +3,14 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { HostSessionClient } from "./session-client"
 import { childOpenInput, sessionClientHarness } from "./session-client.test-support"
 import { createSenpiRpcClient } from "./session-transport"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const harness = sessionClientHarness()
 afterEach(harness.release)
 
 async function observedWithin(signal: Promise<void>): Promise<boolean> {
   const deadline = Promise.withResolvers<boolean>()
-  const timer = setTimeout(() => deadline.resolve(false), 1_000)
+  const timer = setTimeout(() => deadline.resolve(false), remainingTestTime())
   try {
     return await Promise.race([signal.then(() => true), deadline.promise])
   } finally {

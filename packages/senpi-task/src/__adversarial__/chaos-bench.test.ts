@@ -5,6 +5,7 @@ import { runIteration } from "./chaos-drive"
 import { buildHarness } from "./chaos-harness"
 import type { InvariantId } from "./chaos-invariants"
 import { deriveSeed, hashSeed } from "./prng"
+import { useTestTimeout } from "../../../../test-support/test-deadline"
 
 // Seeded adversarial interleaving bench. Each iteration scripts fake runners through a randomized
 // mix of start/queue, completion, steer, interrupt, running/pending cancel, abortable parent waits,
@@ -48,6 +49,7 @@ describe("W1-V chaos bench", () => {
   test(
     "#given 200 randomized event interleavings #when each is driven to quiescence #then all thirteen invariants hold",
     async () => {
+      useTestTimeout(process.platform === "win32" ? 240_000 : 120_000)
       // given
       const failures: string[] = []
       expect(INVARIANT_IDS).toHaveLength(13)

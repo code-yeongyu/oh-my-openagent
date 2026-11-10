@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { cleanupProjects } from "./__fixtures__/manager-fakes"
 import { PARENT, runCategoryChild as runChild, type DesignatedChildInput } from "./__fixtures__/designated-child"
 import { ALT, CLAUDE, COUNT_TOOL, type ModelChainWorld } from "./__fixtures__/model-chain-world"
+import { useTestTimeout } from "../../../../test-support/test-deadline"
 
 const PRIMARY = `${CLAUDE}/primary`
 const SECOND = `${ALT}/rung`
@@ -25,6 +26,7 @@ describe("a child runs only on its designated models, never on the parent's mode
     ["deep-low", "refusal", "refused"],
     ["quick", "auth", "not signed in"],
   ] as const)("#given a %s child whose only model fails with %s #when the chain is exhausted #then the parent model is never called and the task fails typed naming the model and why", async (category, step, why) => {
+    useTestTimeout(30_000)
     // given / when
     const { record, world } = await runCategoryChild({ category, chain: [PRIMARY], scripts: { [PRIMARY]: [step] } })
 
@@ -37,6 +39,7 @@ describe("a child runs only on its designated models, never on the parent's mode
   }, 30_000)
 
   test.each(["quota", "refusal", "auth"] as const)("#given a two-model chain where both fail with %s #when the chain is exhausted #then both designated models ran, the parent never did, and the failure lists each", async (step) => {
+    useTestTimeout(30_000)
     // given / when
     const { record, world } = await runCategoryChild({
       category: "deep-high",
@@ -54,6 +57,7 @@ describe("a child runs only on its designated models, never on the parent's mode
   }, 30_000)
 
   test("#given the only designated model ran a tool and then hit its usage limit #when the turn fails #then the tool ran once, the parent was never called, and the task fails typed", async () => {
+    useTestTimeout(30_000)
     // given / when
     const { record, world } = await runCategoryChild({ category: "deep-high", chain: [PRIMARY], scripts: { [PRIMARY]: [{ tool: COUNT_TOOL }, "quota"] } })
 
@@ -66,6 +70,7 @@ describe("a child runs only on its designated models, never on the parent's mode
   }, 30_000)
 
   test("#given a designated second model that works #when the first hits its usage limit #then the child completes on the second, never on the parent", async () => {
+    useTestTimeout(30_000)
     // given / when
     const { record, world } = await runCategoryChild({ category: "unspecified-low", chain: [PRIMARY, SECOND], scripts: { [PRIMARY]: ["quota"] } })
 

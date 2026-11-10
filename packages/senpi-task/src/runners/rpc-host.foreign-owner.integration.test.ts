@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { defaultHostSessionProbe } from "../lifecycle/host-session-default"
 import type { TaskRecord } from "../state"
 import { startHostWorld, type HostWorld, type ParentSession } from "./rpc-host/__fixtures__/host-world"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 /**
  * #8932: a daemon-hosted child belongs to the omo process that launched it. Every OTHER omo process
@@ -75,7 +76,7 @@ describe("a daemon-hosted child stays with the process that launched it (#8932)"
     world.host.completeTurn(session?.routingId ?? "", "done")
 
     // then - the owner, and so any DAG node waiting on it, observes the terminal record
-    const terminal = await within(settled, 5_000, "the owner's waitFor")
+    const terminal = await within(settled, remainingTestTime(), "the owner's waitFor")
     expect(terminal.status).toBe("completed")
   })
 })

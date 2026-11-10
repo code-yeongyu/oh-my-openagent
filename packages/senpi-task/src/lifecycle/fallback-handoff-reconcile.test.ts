@@ -13,6 +13,7 @@ import { fixture, poolInput } from "../workpool/__fixtures__/admission"
 import { createTaskLifecycle } from "./create"
 import { hostLifecycleDeps } from "./__fixtures__/host-session-fakes"
 import { cleanupProjects, seedRecord, tempStore } from "./__fixtures__/lifecycle-fakes"
+import { testBudgetSignal } from "../../../../test-support/test-deadline"
 
 // A runtime-fallback handoff is the span between the failed rung's close and the next rung's spawn,
 // with no child of its own. A parent that dies in it must leave a task that another session revives
@@ -160,7 +161,7 @@ describe("reconcile of a dead workpool worker", () => {
     // given
     const pool = fixture({ config: { default_execution_mode: "process" } })
     const created = pool.manager.workpools.create(pool.caller, poolInput)
-    const dispatched = pool.manager.workpools.waitForEvent(created.pool_id, "dispatched", AbortSignal.timeout(5_000))
+    const dispatched = pool.manager.workpools.waitForEvent(created.pool_id, "dispatched", testBudgetSignal("pool.manager.workpools.waitForEvent to settle"))
     pool.manager.workpools.push(pool.caller, created.pool_id, [{ key: "once", input: "non-replayable work" }])
     const event = await dispatched
     if (event.task_id === undefined) throw new Error("the pool dispatched no worker")

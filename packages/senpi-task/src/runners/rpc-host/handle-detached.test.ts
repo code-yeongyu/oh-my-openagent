@@ -3,9 +3,11 @@ import { fakeClock } from "../rpc/__fixtures__/clock"
 import { runDetachedProbe } from "./detached-probe.test-support"
 import { createHostSessionHandle } from "./handle"
 import { FAKE_SESSION, fakeSessionPort } from "./handle.test-support"
+import { useTestTimeout } from "../../../../../test-support/test-deadline"
 
 for (const scenario of ["site-1", "site-1-rejection", "site-3", "site-3-close"]) {
   test(`#given ${scenario} detached session #when its background operation fails #then the process survives and logs the error`, async () => {
+    useTestTimeout(15_000)
     // given / when: the standalone process installs its counters before triggering the operation.
     const result = await runDetachedProbe(scenario)
     console.log(result.stdout.trim())

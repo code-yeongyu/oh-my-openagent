@@ -7,6 +7,7 @@ import { createTaskRecord } from "../state"
 import { createTaskRecordStore } from "../store"
 import { cleanupProjects, makeManager, tempProject } from "./__fixtures__/manager-fakes"
 import { respawnManagedTask } from "./manager-respawn"
+import { testBudgetSignal, useTestTimeout } from "../../../../test-support/test-deadline"
 
 const harness = hostRunnerHarness()
 afterEach(async () => { await harness.release(); cleanupProjects() })
@@ -58,6 +59,7 @@ async function detachedChild(deadline = false, aborted = false, rejectState = fa
 
 describe("respawn reconciliation on the real host runner", () => {
   test("a rejected get_state preserves the attached child and arms manager tracking without input", async () => {
+    useTestTimeout(5_000)
     const f = await detachedChild(false, false, true)
     try {
       expect(f.result.handle.kind).toBe("host-session")
@@ -70,7 +72,7 @@ describe("respawn reconciliation on the real host runner", () => {
       expect(f.store.load(f.record.task_id)?.status).toBe("running")
       expect(f.store.load(f.record.task_id)?.final_response).toBeUndefined()
       f.host.failReply("get_state", undefined)
-      const finished = f.manager.waitFor(f.record.task_id, { signal: AbortSignal.timeout(5_000) })
+      const finished = f.manager.waitFor(f.record.task_id, { signal: testBudgetSignal("f.manager.waitFor to settle") })
       const session = f.host.sessions()[0]
       if (session === undefined) throw new Error("missing attached session")
       f.host.completeTurn(session.routingId, "LIVE RESPAWN ANSWER")
@@ -85,7 +87,7 @@ describe("respawn reconciliation on the real host runner", () => {
     expect(await f.result.handle.waitForOutcome()).toEqual({ status: "completed", finalResponse: "REAL FINAL ANSWER" })
     expect(f.host.commands.filter((command) => command.type === "prompt")).toHaveLength(1)
     await f.manager.reattach(f.record, f.result.handle)
-    expect((await f.manager.waitFor(f.record.task_id, { signal: AbortSignal.timeout(5_000) })).final_response).toBe("REAL FINAL ANSWER")
+    expect((await f.manager.waitFor(f.record.task_id, { signal: testBudgetSignal("f.manager.waitFor to settle") })).final_response).toBe("REAL FINAL ANSWER")
     expect(f.store.load(f.record.task_id)?.host_session?.adopted_entry_id).toEqual(expect.any(String))
     await f.result.handle.dispose()
   })

@@ -14,15 +14,20 @@ export function signal<T>() {
  * fresh stopwatch: a fixed 2 s bound fired on hosted Windows whenever the runner stalled although the
  * event still arrived (#10814).
  */
-export async function bounded<T>(promise: Promise<T>): Promise<T> {
+/** Fixed bound for teardown awaits in finally blocks: the test budget may already be spent there. */
+export const LIVE_PARENT_TEARDOWN_BOUND_MS = 5_000
+
+export async function bounded<T>(promise: Promise<T>, fixedMs?: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     return await Promise.race([
       promise,
       new Promise<never>((_, reject) => {
         timer = setTimeout(
-          () => reject(new Error("live-parent lifecycle event did not arrive within the test budget")),
-          remainingTestTime(),
+          () => reject(new Error(fixedMs === undefined
+            ? "live-parent lifecycle event did not arrive within the test budget"
+            : `live-parent teardown did not settle within ${fixedMs} ms`)),
+          fixedMs ?? remainingTestTime(),
         )
       }),
     ])

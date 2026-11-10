@@ -9,6 +9,7 @@ import type { HostSessionParked } from "./rpc-host/session-client"
 import { readTaskStoreIndex, taskStoreIndexPath } from "./rpc-host/store-index"
 import { childSpec, fakeFallbackRunner, hostRunnerHarness } from "./rpc-host.test-support"
 import { cleanupTempDirs, ensureRecorder, posixShardTest, shardEndpoint, tempDir } from "./rpc-host-endpoint.test-support"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 const harness = hostRunnerHarness()
 const { fakeHost, runnerOver } = harness
@@ -23,7 +24,7 @@ const NO_WAIT = { reattachDelaysMs: [0, 0, 0, 0, 0], sleep: () => Promise.resolv
 function parkedOnce(handle: unknown): Promise<HostSessionParked> {
   if (!isHostSessionHandle(handle as never)) throw new Error("not a host-session handle")
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("waited 5s for the child to park, it never did")), 5_000)
+    const timer = setTimeout(() => reject(new Error("waited out the test budget for the child to park, it never did")), remainingTestTime())
     ;(handle as { onParked(listener: (event: HostSessionParked) => void): () => void }).onParked((event) => {
       clearTimeout(timer)
       resolve(event)

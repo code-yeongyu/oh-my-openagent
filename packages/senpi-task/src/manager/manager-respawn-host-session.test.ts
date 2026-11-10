@@ -9,6 +9,7 @@ import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { createTaskRecord, type HostSessionIdentity, type TaskRecord } from "../state"
 import { cleanupProjects, makeHandle, tempProject } from "./__fixtures__/manager-fakes"
 import { respawnManagedTask } from "./manager-respawn"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 const harness = hostRunnerHarness()
 
@@ -428,7 +429,7 @@ describe("respawn of a daemon-hosted child", () => {
 
     // then
     if (!result.ok) throw new Error("respawn failed")
-    const settled = await Promise.race([result.handle.waitForOutcome(), Bun.sleep(2_000).then(() => "unsettled" as const)])
+    const settled = await Promise.race([result.handle.waitForOutcome(), Bun.sleep(remainingTestTime()).then(() => "waitForOutcome did not settle within the test budget" as const)])
     expect(settled).toEqual({ status: "completed", finalResponse: "done" })
     expect(prompts(host)).toEqual([])
   })

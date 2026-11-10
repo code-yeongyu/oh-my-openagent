@@ -7,7 +7,9 @@ import { configureSharedSubunitLogger } from "@oh-my-opencode/utils/logger"
 import { startFakeHost } from "./__fixtures__/fake-host"
 import { askHost } from "./host-request"
 import { RpcIdentityError } from "./socket-auth"
-import { withContractHost, type ContractHost, type ContractHostOptions } from "./testing/contract-host"
+import { type ContractHost, type ContractHostOptions } from "./testing/contract-host"
+import { withBudgetedContractHost } from "./testing/contract-host-budget"
+import { useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const warm = (host: ContractHost) => Reflect.apply(askHost, undefined, [
   host.socket, { type: "warm", id: "warm-contract", cwd: host.root, kind: "worker" }, 2000, { keyRoot: host.root },
@@ -15,7 +17,7 @@ const warm = (host: ContractHost) => Reflect.apply(askHost, undefined, [
 
 describe.skipIf(process.platform === "win32")("POSIX raw task host challenge-response", () => {
   test("#given an enforcing authenticated host #when warm is sent #then authenticate succeeds before warm", async () => {
-    await withContractHost({ auth: true }, async (host) => {
+    await withBudgetedContractHost({ auth: true }, async (host) => {
       expect(await warm(host)).toMatchObject({ success: true, data: { warmed: true } })
       expect(host.frames.map(({ frame }) => frame.type)).toEqual(["get_protocol_info", "authenticate", "warm"])
       expect(host.frames[0].frame).toMatchObject({ observe: true, auth: { client_nonce: expect.stringMatching(/^[0-9a-f]{64}$/) } })
@@ -25,14 +27,14 @@ describe.skipIf(process.platform === "win32")("POSIX raw task host challenge-res
   })
 
   test("#given a today host #when warm runs #then no authenticate is sent", async () => {
-    await withContractHost({ legacy: true }, async (host) => {
+    await withBudgetedContractHost({ legacy: true }, async (host) => {
       expect(await warm(host)).toMatchObject({ success: true })
       expect(host.frames.some(({ frame }) => frame.type === "authenticate")).toBe(false)
     })
   })
 
   test("#given a wrong server proof #when warm runs #then the connection closes without sending client proof or warm", async () => {
-    await withContractHost({ auth: true, badProof: true }, async (host) => {
+    await withBudgetedContractHost({ auth: true, badProof: true }, async (host) => {
       await expect(warm(host)).rejects.toThrow("host_identity_unproven")
       expect(host.frames.map(({ frame }) => frame.type)).toEqual(["get_protocol_info"])
     })
@@ -56,14 +58,14 @@ describe.skipIf(process.platform === "win32")("POSIX raw task host challenge-res
     ["a 0755 rpc dir", (_path, root) => chmodSync(`${root}/rpc`, 0o755)],
   ]
   test.each(served)("#given %s #when warm runs #then the record is read and authentication succeeds", async (_name, prepareRecord) => {
-    await withContractHost({ auth: true, prepareRecord }, async (host) => {
+    await withBudgetedContractHost({ auth: true, prepareRecord }, async (host) => {
       expect(await warm(host)).toMatchObject({ success: true, data: { warmed: true } })
       expect(host.frames.map(({ frame }) => frame.type)).toEqual(["get_protocol_info", "authenticate", "warm"])
     })
   })
 
   test("#given a group-writable key root #when warm runs #then the typed refusal names the path, its mode and the remedy", async () => {
-    await withContractHost({ auth: true, prepareRecord: (_path, root) => chmodSync(root, 0o775) }, async (host) => {
+    await withBudgetedContractHost({ auth: true, prepareRecord: (_path, root) => chmodSync(root, 0o775) }, async (host) => {
       const refusal = await warm(host).then(() => undefined, (error: unknown) => error)
       expect(refusal).toBeInstanceOf(RpcIdentityError)
       expect((refusal as RpcIdentityError).code).toBe("unsafe_key_record")
@@ -74,14 +76,14 @@ describe.skipIf(process.platform === "win32")("POSIX raw task host challenge-res
   })
 
   test.each(unsafe)("#given unsafe key record: %s #when warm runs #then it refuses without fallback", async (_name, prepareRecord) => {
-    await withContractHost({ auth: true, prepareRecord }, async (host) => {
+    await withBudgetedContractHost({ auth: true, prepareRecord }, async (host) => {
       await expect(warm(host)).rejects.toThrow("unsafe_key_record")
       expect(host.frames.map(({ frame }) => frame.type)).toEqual(["get_protocol_info"])
     })
   })
 
   test("#given records belonging to another uid #when warm runs #then ownership is refused", async () => {
-    await withContractHost({ auth: true }, async (host) => {
+    await withBudgetedContractHost({ auth: true }, async (host) => {
       const uid = process.getuid?.()
       if (uid === undefined) throw new Error("process.getuid is unavailable on this platform")
       const getuid = spyOn(process, "getuid").mockReturnValue(uid + 1)
@@ -93,7 +95,7 @@ describe.skipIf(process.platform === "win32")("POSIX raw task host challenge-res
   })
 
   test("#given a missing record #when an enforcing host challenges twice #then grace logs the remedy once to the omo log, never stderr, and the refusal names the endpoint and the remedy", async () => {
-    await withContractHost({ auth: true, prepareRecord: (path) => rmSync(path) }, async (host) => {
+    await withBudgetedContractHost({ auth: true, prepareRecord: (path) => rmSync(path) }, async (host) => {
       const lines: string[] = []
       configureSharedSubunitLogger((message) => { lines.push(message) })
       const warning = spyOn(console, "error").mockImplementation(() => undefined)
@@ -115,14 +117,15 @@ describe.skipIf(process.platform === "win32")("POSIX raw task host challenge-res
   })
 
   test("#given a host that refuses the client proof and closes #when warm runs #then auth_failed surfaces and warm is never sent", async () => {
-    await withContractHost({ auth: true, rejectProof: true }, async (host) => {
+    await withBudgetedContractHost({ auth: true, rejectProof: true }, async (host) => {
       await expect(warm(host)).rejects.toThrow("auth_failed")
       expect(host.frames.map(({ frame }) => frame.type)).toEqual(["get_protocol_info", "authenticate"])
     })
   })
 
   test("#given a host whose handshake answer takes longer than 2 s #when askHost has a larger budget #then the handshake uses that budget and warm succeeds", async () => {
-    await withContractHost({ auth: true, protocolDelayMs: 2500 }, async (host) => {
+    useTestTimeout(10_000)
+    await withBudgetedContractHost({ auth: true, protocolDelayMs: 2500 }, async (host) => {
       const reply = await Reflect.apply(askHost, undefined, [host.socket, { type: "warm", id: "warm-slow-handshake", cwd: host.root, kind: "worker" }, 6000, { keyRoot: host.root }]) as Awaited<ReturnType<typeof askHost>>
       expect(reply).toMatchObject({ success: true, data: { warmed: true } })
       expect(host.frames.map(({ frame }) => frame.type)).toEqual(["get_protocol_info", "authenticate", "warm"])
@@ -130,7 +133,7 @@ describe.skipIf(process.platform === "win32")("POSIX raw task host challenge-res
   }, 10_000)
 
   test("#given a slow handshake and a host that never answers #when askHost runs #then timeoutMs bounds the whole exchange", async () => {
-    await withContractHost({ auth: true, protocolDelayMs: 600, silent: ["warm"] }, async (host) => {
+    await withBudgetedContractHost({ auth: true, protocolDelayMs: 600, silent: ["warm"] }, async (host) => {
       const started = performance.now()
       const reply = await Reflect.apply(askHost, undefined, [host.socket, { type: "warm", id: "warm-deadline", cwd: host.root, kind: "worker" }, 900, { keyRoot: host.root }]) as Awaited<ReturnType<typeof askHost>>
       const elapsed = performance.now() - started
@@ -142,7 +145,7 @@ describe.skipIf(process.platform === "win32")("POSIX raw task host challenge-res
   })
 
   test("#given a host that writes a non-JSON line before its answers #when warm runs #then the stray line is skipped and the reply arrives", async () => {
-    await withContractHost({ auth: true, strayLine: true }, async (host) => {
+    await withBudgetedContractHost({ auth: true, strayLine: true }, async (host) => {
       expect(await warm(host)).toMatchObject({ success: true, data: { warmed: true } })
       expect(host.frames.map(({ frame }) => frame.type)).toEqual(["get_protocol_info", "authenticate", "warm"])
     })
@@ -153,6 +156,7 @@ describe.skipIf(process.platform === "win32")("POSIX raw task host challenge-res
     ["the flat omo layout (~/.omo)", (home) => { mkdirSync(join(home, ".omo"), { mode: 0o700 }); writeFileSync(join(home, ".omo", "settings.json"), "{}"); return join(home, ".omo") }],
   ]
   test.each(layouts)("#given no agent-dir override on %s #when askHost runs without options #then it reads the key record where the thread client resolves the agent dir", async (_name, agentDirOf) => {
+    useTestTimeout(20_000)
     const home = mkdtempSync(join(tmpdir(), "rpc-home-"))
     try {
       const keyRoot = agentDirOf(home)

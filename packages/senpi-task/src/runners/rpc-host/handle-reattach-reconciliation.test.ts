@@ -4,6 +4,7 @@ import { isHostSessionHandle } from "../rpc-host"
 import { cleanupProjects, makeManager, tempProject } from "../../manager/__fixtures__/manager-fakes"
 import { adaptRpcHandle } from "../../manager/child-handle"
 import { createTaskRecord } from "../../state"
+import { testBudgetSignal, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const harness = hostRunnerHarness()
 afterEach(async () => { await harness.release(); cleanupProjects() })
@@ -11,6 +12,7 @@ afterEach(async () => { await harness.release(); cleanupProjects() })
 describe("host recovery adopts a turn finished during the transport gap", () => {
   for (const rejectState of [false, true]) {
     test(`${rejectState ? "a rejected get_state" : "streaming state"} outranks a finished tail and keeps the recovered child tracked without input`, async () => {
+      useTestTimeout(5_000)
       const recovering = Promise.withResolvers<void>()
       const reopen = Promise.withResolvers<void>()
       const reattached: string[] = []
@@ -53,7 +55,7 @@ describe("host recovery adopts a turn finished during the transport gap", () => 
 
         // A later outcome must still reach the manager, proving its tracker remains armed.
         host.failReply("get_state", undefined)
-        const finished = manager.waitFor(record.task_id, { signal: AbortSignal.timeout(5_000) })
+        const finished = manager.waitFor(record.task_id, { signal: testBudgetSignal("manager.waitFor to settle") })
         host.completeTurn(handle.hostSession.routingId, "LIVE TURN ANSWER")
         expect((await finished).final_response).toBe("LIVE TURN ANSWER")
       } finally {
@@ -64,6 +66,7 @@ describe("host recovery adopts a turn finished during the transport gap", () => 
   }
 
   test("a session the host reopened from its file is continued even when get_state fails", async () => {
+    useTestTimeout(5_000)
     const recovering = Promise.withResolvers<void>()
     const reopen = Promise.withResolvers<void>()
     const reattached: string[] = []

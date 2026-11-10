@@ -8,6 +8,7 @@ import { recordDetails } from "./result-details"
 import { CTX, makeDeps } from "./__fixtures__/task-tool-fakes"
 import type { TaskToolDetails } from "./types"
 import { realSessionHandle } from "./__fixtures__/typed-handle-session"
+import { useTestTimeout } from "../../../../../test-support/test-deadline"
 
 function matched(details: object, record: TaskRecord | null | undefined): void {
   if (!record) throw new Error("expected the authoritative task record")
@@ -101,6 +102,7 @@ describe("typed task handles", () => {
   })
 
   test("#given foreground progress #when a deadline promotes the task #then progress and handle retain the same identity", async () => {
+    useTestTimeout(20000)
     // given
     const { manager, store } = makeManager()
     const scheduled = Promise.withResolvers<() => void>()
@@ -121,6 +123,7 @@ describe("typed task handles", () => {
   }, 20000)
 
   test("#given a foreground batch #when deadlines promote both children #then aggregate and progress identities match", async () => {
+    useTestTimeout(20000)
     // given
     const { manager, store } = makeManager()
     const scheduled = Promise.withResolvers<void>()

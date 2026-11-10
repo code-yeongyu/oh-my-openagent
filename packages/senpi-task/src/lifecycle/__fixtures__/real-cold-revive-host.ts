@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 
 import { hostSuiteSettings, startHostWorld } from "../../runners/rpc-host/__fixtures__/host-world"
 import { runTaskSend } from "../../tools/control/send"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 /**
  * The host-session variant of the real cold revival: the SAME real manager, lifecycle, steering
@@ -47,7 +48,7 @@ export async function realColdReviveHostSession(): Promise<HostColdReviveResult>
     // The child answers its turn, so the record settles terminal - the only thing the idle
     // reclaimer ever parks.
     world.host.completeTurn(session.routingId, "COLD_HOST_SENTINEL")
-    const settled = await parent.manager.waitFor(taskId, { signal: AbortSignal.timeout(15_000) })
+    const settled = await parent.manager.waitFor(taskId, { signal: testBudgetSignal("parent.manager.waitFor to settle") })
     assert.equal(settled.status, "completed")
 
     now += settings.resident_idle_timeout_ms + 1

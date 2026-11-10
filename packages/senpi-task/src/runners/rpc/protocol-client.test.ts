@@ -8,6 +8,7 @@ import { RpcProcessRunner } from "../rpc-process"
 import { spawnFakeChild } from "./__fixtures__/spawn-fake"
 import { RpcProtocolClient } from "./protocol-client"
 import { terminateRpcChild } from "./terminate"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const spawned: ChildProcess[] = []
 
@@ -69,7 +70,7 @@ function spawnStderrFloodChild(): ChildProcess {
   })
 }
 
-async function waitFor(predicate: () => boolean, timeoutMs = 2_000): Promise<void> {
+async function waitFor(predicate: () => boolean, timeoutMs = remainingTestTime()): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (!predicate()) {
     if (Date.now() > deadline) {

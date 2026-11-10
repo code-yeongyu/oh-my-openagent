@@ -3,6 +3,7 @@ import { runTaskCancel } from "../../../tools/control/cancel"
 import type { FakeHost, FakeHostSession } from "./fake-host"
 import { startHostWorld, type HostWorld, type ParentOptions, type ParentSession } from "./host-world"
 import { manualRecoveryClock, type ManualRecoveryClock } from "./manual-recovery-clock"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 /**
  * A one-host world for the cancel suites (omo#9403): a lane of `slots` children whose sessions each
@@ -54,7 +55,7 @@ export function bounded<T>(work: Promise<T>, label: string): Promise<T> {
   return Promise.race([
     work,
     new Promise<never>((_, reject) => {
-      const timer = setTimeout(() => reject(new Error(`${label} did not settle within 10s`)), 10_000)
+      const timer = setTimeout(() => reject(new Error(`${label} did not settle within the test budget`)), remainingTestTime())
       timer.unref?.()
     }),
   ])

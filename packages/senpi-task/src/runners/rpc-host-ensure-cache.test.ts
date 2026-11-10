@@ -8,6 +8,7 @@ import { ensureTaskDaemon, type EnsureTaskDaemonInput } from "./rpc-host/daemon"
 import { RunnerError } from "./in-process/runner-error"
 import { isHostSessionHandle } from "./rpc-host"
 import { childSpec, ensuredDaemon, hostRunnerHarness } from "./rpc-host.test-support"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 // The daemon ensure is cached per socket for TASK_DAEMON_CACHE_TTL_MS. A host that dies inside that
 // window must not leave the cache answering for it: the next spawn, and a live child's reattach,
@@ -87,7 +88,7 @@ describe("RpcHostRunner ensure cache after a host death", () => {
       },
     })
     const breaker = Promise.withResolvers<"timed out">()
-    const timer = setTimeout(() => breaker.resolve("timed out"), 3_000)
+    const timer = setTimeout(() => breaker.resolve("timed out"), remainingTestTime())
 
     // when
     const failure = await Promise.race([

@@ -4,6 +4,7 @@ import { cleanupProjects, FakeRegistry, readEvents, seedRecord, settings, tempSt
 import { createTaskLifecycle } from "./create"
 import { DEFAULT_HOST_SESSION_RETRY_POLICY, NO_HOST_ENDPOINT } from "./host-session"
 import type { TaskRecordStore } from "../store"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -63,7 +64,7 @@ async function bounded<T>(promise: Promise<T>): Promise<T> {
   try {
     return await Promise.race([
       promise,
-      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("reconcile event missing")), 1_000) }),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("reconcile event missing")), remainingTestTime()) }),
     ])
   } finally {
     clearTimeout(timer)

@@ -10,6 +10,7 @@ import { RpcProcessRunner } from "../runners/rpc-process"
 import { createRpcManagedRunner } from "./runner"
 import { categoryPlanner, cleanupProjects, FakeRunner, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 const children: ChildProcess[] = []
 
@@ -57,7 +58,7 @@ describe("delegating turn trace context across the task bridge", () => {
     })
     const env = await Promise.race([
       spawned,
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("waited 10s for the child spawn, it never happened")), 10_000)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("waited out the test budget for the child spawn, it never happened")), remainingTestTime())),
     ])
 
     // then

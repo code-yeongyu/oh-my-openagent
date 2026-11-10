@@ -1,8 +1,10 @@
 import { expect, test } from "bun:test"
 import { runDetachedProbe } from "../rpc-host/detached-probe.test-support"
+import { useTestTimeout } from "../../../../../test-support/test-deadline"
 
 for (const scenario of ["site-2", "site-2-rejection", "site-4"]) {
   test(`#given ${scenario} disconnected client #when its background operation fails #then the process survives and logs the error`, async () => {
+    useTestTimeout(15_000)
     // given / when
     const result = await runDetachedProbe(scenario)
     console.log(result.stdout.trim())

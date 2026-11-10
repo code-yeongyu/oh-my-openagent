@@ -5,8 +5,9 @@ import { bounded, deferred, evidence, fixture, poolInput } from "./__fixtures__/
 import { runAdversarialCases } from "./__fixtures__/adversarial"
 import type { SpawnAdmission } from "../manager/types"
 import { failureEvidence, runCapacityCases, runModeCases, runReloadCases } from "./__fixtures__/cases"
+import { testBudgetSignal } from "../../../../test-support/test-deadline"
 
-const signal = () => AbortSignal.timeout(5000)
+const signal = () => testBudgetSignal("the awaited workpool event")
 
 test("#given exhausted lanes #when push returns before grant #then IDs are durable and exactly one dispatch follows grant", async () => {
   // given

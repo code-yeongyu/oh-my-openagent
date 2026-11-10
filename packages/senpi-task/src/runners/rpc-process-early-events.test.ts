@@ -8,6 +8,7 @@ import { spawnFakeChild } from "./rpc/__fixtures__/spawn-fake"
 import { terminateRpcChild } from "./rpc/terminate"
 import { RpcProcessRunner } from "./rpc-process"
 import type { ChildEventListener } from "./types"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 type ChildEvent = Parameters<ChildEventListener>[0]
 
@@ -64,7 +65,7 @@ describe("events a process child emits before the manager subscribes", () => {
     await Promise.resolve()
     const late: string[] = []
     const queued = new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("waited 5s for the follow-up's queue_update, never arrived")), 5_000)
+      const timer = setTimeout(() => reject(new Error("waited out the test budget for the follow-up's queue_update, never arrived")), remainingTestTime())
       handle.subscribe((event) => {
         late.push(event.type)
         if (event.type === "queue_update") {

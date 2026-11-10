@@ -10,6 +10,7 @@ import { createTaskManager } from "../manager/manager"
 import { FakeRunner } from "../manager/__fixtures__/manager-fakes"
 import { parkRealSession } from "./__fixtures__/idle-park-session"
 import { NO_HOST_ENDPOINT } from "./host-session"
+import { testBudgetSignal } from "../../../../test-support/test-deadline"
 
 const NOW = 2_000_000
 const OLD = new Date(NOW - settings().resident_idle_timeout_ms).toISOString()
@@ -125,7 +126,7 @@ describe("idle suspension", () => {
     const id = "st_00000205"
     seedRecord(store, { task_id: id, host_pid: process.pid, updated_at: OLD })
     const events = new EventEmitter()
-    const entered = once(events, "abort", { signal: AbortSignal.timeout(5000) })
+    const entered = once(events, "abort", { signal: testBudgetSignal("events to emit 'abort'") })
     const release = Promise.withResolvers<void>()
     const handle = fakeHandle(id, "in-process", trace)
     registry.add({ ...handle, abort: async () => { await handle.abort(); events.emit("abort"); await release.promise } })

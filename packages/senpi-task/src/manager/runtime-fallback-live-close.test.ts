@@ -11,6 +11,7 @@ import { baseSpec, cleanupProjects, launchSettled, settings, tempProject } from 
 import { createTaskManager } from "./manager"
 import type { ManagedRunner } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { testBudgetSignal, remainingTestTime } from "../../../../test-support/test-deadline"
 
 // The failed rung's live handle closes its daemon session best-effort and gives up after a bounded
 // wait. Runtime fallback must not take that as proof the session is gone: the next model starts only
@@ -85,12 +86,12 @@ describe("runtime fallback over a live daemon session", () => {
       // timer armed before the grace clock is frozen, so it arrives in real time either way.
       const releaseClose = lateReply ? host.holdReply("close_session") : undefined
       const lateClose = releaseClose === undefined ? undefined : setTimeout(releaseClose, 200)
-      const settled = acknowledged ? undefined : manager.waitFor(task.task_id, { signal: AbortSignal.timeout(10_000) })
+      const settled = acknowledged ? undefined : manager.waitFor(task.task_id, { signal: testBudgetSignal("manager.waitFor to settle") })
       const nextOpened = acknowledged ? host.waitForCommand("prompt") : undefined
       let timeout: ReturnType<typeof setTimeout> | undefined
       // Arm a real watchdog before freezing the grace clock: socket I/O still runs in real time.
       const deadline = new Promise<never>((_, reject) => {
-        timeout = setTimeout(() => reject(new Error(`fallback did not settle within 10s; task status: ${store.load(task.task_id)?.status ?? "missing"}`)), 10_000)
+        timeout = setTimeout(() => reject(new Error(`fallback did not settle within the test budget; task status: ${store.load(task.task_id)?.status ?? "missing"}`)), remainingTestTime())
       })
       // Keep both 50 ms close graces frozen until the real host confirms the close, so a slow
       // socket reply cannot turn the acknowledged case into an unconfirmed close (#9489).

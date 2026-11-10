@@ -7,6 +7,7 @@ import { cleanupProjects, fakeHandle, FakeRegistry, seedRecord, settings, tempSt
 import { NO_HOST_ENDPOINT } from "./host-session"
 import type { ResidentHandle } from "./port"
 import type { TeardownStep } from "./teardown-budget"
+import { testBudgetSignal } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -41,7 +42,7 @@ function manualDeadlines() {
       waiting.push({ step, expire: resolve })
       arrived.emit("armed")
     }),
-    armed: () => once(arrived, "armed", { signal: AbortSignal.timeout(3_000) }),
+    armed: () => once(arrived, "armed", { signal: testBudgetSignal("arrived to emit 'armed'") }),
     expireAll: () => { for (const entry of waiting.splice(0)) entry.expire() },
     pendingSteps: () => waiting.map((entry) => entry.step),
   }
@@ -64,7 +65,7 @@ function watchEvents(store: TaskRecordStore) {
       return path
     },
   }
-  const next = (type: string, taskId: string) => once(events, `${type}:${taskId}`, { signal: AbortSignal.timeout(3_000) })
+  const next = (type: string, taskId: string) => once(events, `${type}:${taskId}`, { signal: testBudgetSignal(`the ${type}:${taskId} event`) })
   return { watched, next }
 }
 

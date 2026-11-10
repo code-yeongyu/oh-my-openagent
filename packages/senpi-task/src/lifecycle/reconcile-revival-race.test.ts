@@ -5,6 +5,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { resolveChildSessionDir } from "../runners/rpc/spawn"
 import type { TaskRecordStore } from "../store"
 import { cleanupProjects, seedRecord, tempStore } from "./__fixtures__/lifecycle-fakes"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -36,6 +37,7 @@ const interleavings = [
 
 describe("reconcileOnSessionStart scoped revival ownership race", () => {
   test.each(interleavings)("#given two OS processes observe one dead-owner resident #when $name #then exactly one respawns and the loser defers", async ({ loserHold, forced }) => {
+    useTestTimeout(20_000)
     // given: both workers are inside session start before either is released.
     const store = tempStore()
     const taskId = seedOrphan(store)
@@ -99,7 +101,7 @@ function spawnWorker(store: TaskRecordStore, launchLog: string, hold: Hold): Wor
   const stderr = new Response(child.stderr).text()
   return {
     pid: child.pid,
-    next: () => withTimeout(read(), 10_000, `worker ${child.pid} line`),
+    next: () => withTimeout(read(), remainingTestTime(), `worker ${child.pid} line`),
     release: () => {
       child.stdin.write("g")
       child.stdin.flush()

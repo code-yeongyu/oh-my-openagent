@@ -3,6 +3,7 @@ import { afterEach, expect, test } from "bun:test"
 import { cleanupProjects, fakeHandle, FakeRegistry, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
 import { createTaskLifecycle } from "./create"
 import { NO_HOST_ENDPOINT } from "./host-session"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
@@ -39,7 +40,7 @@ test("#given live children whose uncertain inputs hang on retry #when the parent
   // then
   const outcome = await Promise.race([
     started.then(() => "settled" as const),
-    new Promise<"hung">(resolve => setTimeout(() => resolve("hung"), 5_000)),
+    new Promise<"hung">(resolve => setTimeout(() => resolve("hung"), remainingTestTime())),
   ])
   hung.resolve()
   expect(outcome).toBe("settled")

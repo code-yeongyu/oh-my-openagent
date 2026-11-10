@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { createConnection } from "node:net"
 import { resolveRpcSocketTransport, withRpcSocket, type RpcRequest } from "../socket-client"
-import { withContractHost, type ContractHost, type ContractHostOptions } from "./contract-host"
+import { type ContractHost, type ContractHostOptions } from "./contract-host"
+import { withBudgetedContractHost } from "./contract-host-budget"
 
 /**
  * The contract fake must answer the way a real `senpi --mode rpc --multi-session` host does, or a client
@@ -18,7 +19,7 @@ const hosts: readonly [string, ContractHostOptions][] = [["an attach-capable hos
 
 describe("contract fake parity with the real multi-session host", () => {
   test.each(hosts)("#given %s #when a wake names no session #then it is refused missing_session_id and nothing is mutated", async (_name, options) => {
-    await withContractHost(options, async (host) => {
+    await withBudgetedContractHost(options, async (host) => {
       const reply = await onConnection(host, (request) => request({ type: "wake", delivery_ids: [] }))
       expect(reply).toMatchObject({ success: false, error: "missing_session_id" })
       expect(host.mutations).toEqual([])
@@ -26,7 +27,7 @@ describe("contract fake parity with the real multi-session host", () => {
   })
 
   test("#given a multi-session host #when a session read names no session #then it is refused missing_session_id too", async () => {
-    await withContractHost({}, async (host) => {
+    await withBudgetedContractHost({}, async (host) => {
       expect(await onConnection(host, (request) => request({ type: "get_messages" }))).toMatchObject({ success: false, error: "missing_session_id" })
     })
   })
@@ -37,7 +38,7 @@ describe("contract fake parity with the real multi-session host", () => {
     ["session_identity_mismatch", {}, { type: "reclaim_session", sessionPath: "/session.jsonl", durableSessionId: "dur-recycled" }],
   ]
   test.each(refusals)("#given a refused attach #when the host answers %s #then the refusal carries errorData {} as the real host's does", async (code, options, command) => {
-    await withContractHost(options, async (host) => {
+    await withBudgetedContractHost(options, async (host) => {
       const reply = await onConnection(host, (request) => request(command))
       expect(reply).toMatchObject({ success: false, error: code })
       expect(reply.errorData).toEqual({})
@@ -45,7 +46,7 @@ describe("contract fake parity with the real multi-session host", () => {
   })
 
   test("#given an unattached connection #when it reads get_available_thinking_levels #then the host's exempt read answers instead of session_not_attached", async () => {
-    await withContractHost({}, async (host) => {
+    await withBudgetedContractHost({}, async (host) => {
       const reply = await onConnection(host, (request) => request({ type: "get_available_thinking_levels", sessionId: "rpc-1" }))
       expect(reply).toMatchObject({ success: true, data: { levels: expect.any(Array) } })
       expect(host.frames.some(({ frame }) => frame.type === "attach_session")).toBe(false)
@@ -53,14 +54,14 @@ describe("contract fake parity with the real multi-session host", () => {
   })
 
   test("#given an unattached connection #when it sends a session mutation #then the gate still refuses it session_not_attached", async () => {
-    await withContractHost({}, async (host) => {
+    await withBudgetedContractHost({}, async (host) => {
       expect(await onConnection(host, (request) => request({ type: "set_session_name", sessionId: "rpc-1", name: "x" }))).toMatchObject({ success: false, error: "session_not_attached" })
       expect(host.mutations).toEqual([])
     })
   })
 
   test("#given a host that starts draining #when a new client connects #then it is disconnected, while an admitted connection sees the host_draining attach refusal", async () => {
-    await withContractHost({}, async (host) => {
+    await withBudgetedContractHost({}, async (host) => {
       const admitted = await onConnection(host, async (request) => {
         expect(await request({ type: "get_protocol_info", observe: true })).toMatchObject({ success: true })
         host.drain()

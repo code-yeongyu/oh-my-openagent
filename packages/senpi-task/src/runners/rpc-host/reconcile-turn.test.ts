@@ -11,6 +11,7 @@ import { isHostSessionHandle } from "../rpc-host"
 import { childSpec, hostRunnerHarness } from "../rpc-host.test-support"
 import { HOST_RESPAWN_CONTINUATION, reconcileHostTurn, type InputEffectStatus, type ReconciledTurnNotice } from "./reconcile-turn"
 import { reattachContinuationPrompt } from "./reattach"
+import { useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const harness = hostRunnerHarness()
 afterEach(async () => { await harness.release(); cleanupProjects() })
@@ -57,6 +58,7 @@ describe("host turn reconciliation authority", () => {
   }
 
   test("host dies after a delivered continuation before child output and leaves an actionable interrupted task", async () => {
+    useTestTimeout(5_000)
     const recovering = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
     const reopen = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
     let recovery = 0

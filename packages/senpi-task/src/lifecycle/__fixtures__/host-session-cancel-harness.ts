@@ -8,6 +8,7 @@ import type { LifecycleDeps } from "../port"
 import type { TaskLifecycle } from "../types"
 import { hostLifecycleDeps, hostSession, hostSessionRecordInput, type HostLifecycleFixture, type HostLifecycleInput } from "./host-session-fakes"
 import { seedRecord, tempStore } from "./lifecycle-fakes"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 export type RecordedEvent = { readonly taskId: string; readonly type: string; readonly payload: unknown }
 
@@ -99,7 +100,7 @@ export function cancelHarness(input: CancelHarnessInput): CancelHarness {
   }
 }
 
-export function within<T>(promise: Promise<T>, what: string, ms = 5_000): Promise<T> {
+export function within<T>(promise: Promise<T>, what: string, ms = remainingTestTime()): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => reject(new Error(`waited ${ms}ms for ${what}, it never came`)), ms)

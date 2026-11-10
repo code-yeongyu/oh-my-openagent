@@ -8,6 +8,7 @@ import { adaptRpcHandle } from "../manager/child-handle"
 import { childSpec, hostRunnerHarness } from "./rpc-host.test-support"
 import { HostSessionClient } from "./rpc-host/session-client"
 import { RpcRequestTimeout } from "./rpc/errors"
+import { remainingTestTime } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupSteering)
 
@@ -51,7 +52,7 @@ for (const launch of ["admitted", "held"] as const) {
       expect(parent.store.load(taskId)?.host_session?.effect_seq).toBe(minted)
     } finally {
       release()
-      if (launched !== undefined) await bounded(parent.manager.whenLaunched?.(launched) ?? Promise.resolve())
+      if (launched !== undefined) await bounded(parent.manager.whenLaunched?.(launched) ?? Promise.resolve(), LAUNCH_SETTLE_TEARDOWN_MS)
       await world.cleanup()
     }
   })
@@ -115,10 +116,13 @@ for (const conflict of [false, true]) {
   })
 }
 
-async function bounded<T>(promise: Promise<T>): Promise<T> {
+/** Fixed bound for the launch settle in finally: the test budget may already be spent there. */
+const LAUNCH_SETTLE_TEARDOWN_MS = 5_000
+
+async function bounded<T>(promise: Promise<T>, fixedMs?: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try { return await Promise.race([promise, new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("host input did not arrive")), 5_000)
+    timer = setTimeout(() => reject(new Error(fixedMs === undefined ? "host input did not arrive" : `the launch did not settle within ${fixedMs} ms during teardown`)), fixedMs ?? remainingTestTime())
   })]) } finally { clearTimeout(timer) }
 }
 

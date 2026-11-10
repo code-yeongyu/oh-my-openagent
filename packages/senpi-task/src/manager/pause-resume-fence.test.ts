@@ -4,16 +4,18 @@ import { createTaskRecordStore } from "../store"
 import { createTaskManager } from "./manager"
 import { baseSpec, categoryPlanner, cleanupProjects, FakeRunner, launchSettled, settings, tempProject } from "./__fixtures__/manager-fakes"
 import type { RunnerOutcome } from "./child-handle"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 afterEach(cleanupProjects)
 
 function bounded<T>(promise: Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
-  const deadline = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error("Resume signal did not arrive")), 5000) })
+  const deadline = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error("Resume signal did not arrive")), remainingTestTime()) })
   return Promise.race([promise, deadline]).finally(() => { if (timer !== undefined) clearTimeout(timer) })
 }
 
 test.each([false, true])("design 40: stale Resume cannot modify newer ownership (Resume 2 started: %s)", async newerResume => {
+  useTestTimeout(15000)
   const cwd = tempProject()
   const store = createTaskRecordStore({ project_dir: cwd })
   const runner = new FakeRunner()
