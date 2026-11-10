@@ -29,6 +29,8 @@ import { NO_HOST_ENDPOINT } from "../host-session"
 // cold launches), which is what stalled the first member launch (#9029). With the cache off it imports the
 // same graph in 1.2-1.7 s and never blocks (27 of 27 launches).
 const NO_TRANSPILER_CACHE = { BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" } as const
+// Print-only: senpi times its startup phases to stderr, so a traced child's next block names its phase (#10993).
+const SENPI_PHASE_TIMINGS = { SENPI_TIMING: "1" } as const
 
 // The daemon-hosted variant of this fixture: same real manager/lifecycle/steering, child on a
 // session of a (fake) daemon instead of its own process. It lives in its own module for the file
@@ -238,6 +240,7 @@ export async function realColdRevive(
         PATH: process.env.PATH,
         HOME: root,
         ...NO_TRANSPILER_CACHE,
+        ...(trace === undefined ? {} : SENPI_PHASE_TIMINGS),
         SENPI_CODING_AGENT_DIR: agentDir,
         SENPI_CODING_AGENT_SESSION_DIR: sessionDir,
         OMO_SENPI_TASK_RPC_CHILD: "1",

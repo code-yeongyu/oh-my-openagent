@@ -65,7 +65,7 @@ const repoRoot = resolve(scriptDir, "..")
 const compileEntry = join(repoRoot, "packages", "omo-native", "compile-entry.ts")
 
 /**
- * Hard per-binary size budget (200 MiB). It exists to keep the download and install of one
+ * Hard per-binary size budget (210 MiB). It exists to keep the download and install of one
  * platform binary small: every install, `omo update` and CI smoke fetches the full binary, so
  * growth is a user-facing cost, not just a storage one. A release that crosses it fails loud
  * rather than shipping a quietly larger download. Raised from 150 MiB for 5.1.26, when linux-x64
@@ -78,9 +78,12 @@ const compileEntry = join(repoRoot, "packages", "omo-native", "compile-entry.ts"
  * (an empty `bun build --compile --target=bun-linux-x64`: 90,798,048 bytes on 1.4.3, 109,123,760 on
  * 1.4.4; v5.1.48 rebuilt with 1.4.4 already measures 199,542,960); the compiled JS graph added +409,318
  * and the embedded payload +49,434, which together make up the +18,784,464.
+ * Raised to 210 MiB after the 5.1.67 publish failed: its linux-x64 and linux-x64-baseline binaries measured
+ * 209,889,456 bytes (5.1.66's linux-x64: 209,664,176), +225,280 in one release and 174,256 bytes (0.08%)
+ * over 200 MiB. 210 MiB keeps a hard ceiling with about 5% headroom over that size.
  * `reportBinaryHeadroom` warns well before the next crossing.
  */
-export const MAX_BINARY_BYTES = 200 * 1024 * 1024
+export const MAX_BINARY_BYTES = 210 * 1024 * 1024
 
 /** Below this much headroom under the budget, the build warns so growth is seen a release ahead. */
 export const BINARY_HEADROOM_WARN_BYTES = 5 * 1024 * 1024

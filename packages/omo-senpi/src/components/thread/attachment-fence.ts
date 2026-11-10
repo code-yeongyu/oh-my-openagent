@@ -143,9 +143,12 @@ export async function fencedCommand(
   capabilities: ReadonlySet<unknown>,
   durableSessionId: string | undefined,
   send: () => Promise<RpcObject>,
+  options: { readonly attached?: boolean } = {},
 ): Promise<RpcObject> {
+  // `attached`: an exempt read sent attached anyway, because its attach IS the question (the close ladder's
+  // "still held" probe: a session the engine no longer holds refuses the attach, whatever the read would answer).
   const attach =
-    !UNFENCED.has(String(command.type)) &&
+    (options.attached === true || !UNFENCED.has(String(command.type))) &&
     command.sessionId !== undefined &&
     capabilities.has("attach_session") &&
     (command.type !== "release_session" || capabilities.has("release_caller_aware"))

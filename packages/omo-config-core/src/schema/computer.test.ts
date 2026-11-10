@@ -28,6 +28,10 @@ describe("computer settings schema", () => {
       screenshot_gc: { enabled: true, stale_ms: 0, scan_interval_ms: 60_000 },
       engine_path: "/opt/engine",
       cua_adapter: true,
+      run_sandbox: "quickjs",
+      intervention: "continue",
+      macos_key_priming: "on",
+      trace: true,
     } as const
 
     // when
@@ -35,6 +39,17 @@ describe("computer settings schema", () => {
 
     // then
     expect(parsed).toEqual(block)
+  })
+
+  test("#given a value outside a reserved key's set #when parsed #then the block rejects it", () => {
+    // given: the four keys reserved for computer use v2 accept only their own values.
+    const outside = [{ run_sandbox: "wasm" }, { intervention: "stop" }, { macos_key_priming: true }, { trace: "yes" }]
+
+    // when
+    const accepted = outside.map((block) => OmoComputerSettingsSchema.safeParse(block).success)
+
+    // then
+    expect(accepted).toEqual([false, false, false, false])
   })
 
   test("#given an unknown or camelCase key #when parsed #then the strict block rejects it", () => {

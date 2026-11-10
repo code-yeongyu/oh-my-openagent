@@ -227,6 +227,8 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
       return await relay.toolReceiptBegin(ctx, args as Parameters<typeof relay.toolReceiptBegin>[1])
     case "tool_receipt_settle":
       return await relay.toolReceiptSettle(ctx, args as Parameters<typeof relay.toolReceiptSettle>[1])
+    case "tool_receipt_revise":
+      return await relay.toolReceiptRevise(ctx, args as Parameters<typeof relay.toolReceiptRevise>[1])
     case "bind":
       return await relay.bindThread(ctx, args as Parameters<typeof relay.bindThread>[1])
     case "unbind":

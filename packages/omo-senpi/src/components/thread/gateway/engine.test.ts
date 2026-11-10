@@ -70,7 +70,7 @@ describe("all_fifteen_delivery_state_cases", () => {
       "idle/auto": ["started", "applied"],
       "idle/steer": ["error:not_steerable", "refused"],
       "idle/follow_up": ["started", "applied"],
-      "mid_turn/auto": ["queued", "admitted"],
+      "mid_turn/auto": ["steered", "admitted"],
       "mid_turn/steer": ["steered", "admitted"],
       "mid_turn/follow_up": ["queued", "admitted"],
       "waiting_question/auto": ["queued", "admitted"],
@@ -186,7 +186,7 @@ describe("repeated_wake_during_streaming", () => {
     h.session("A")
     const b = h.session("B")
     b.runtime.beginUserTurn()
-    const result = await send(h, "A", "B", "M1", { mode: "auto" })
+    const result = await send(h, "A", "B", "M1", { mode: "follow_up" })
     expect(summary(result)).toBe("queued")
     const m1 = okId(result)
     for (let wake = 0; wake < 3; wake++) await b.drain.drain({ reason: "command" })
@@ -266,7 +266,7 @@ describe("lost_ack_and_durable_recovery", () => {
     await h.quiesce()
     const replayed = await retrying.deliver(request("admitted"))
     expect(replayed.kind === "ok" && { delivery: replayed.delivery.kind, deduplicated: replayed.deduplicated }).toEqual(
-      { delivery: "queued", deduplicated: true },
+      { delivery: "steered", deduplicated: true },
     )
 
     const stillUncertain = await retrying.deliver(request("unadmitted"))

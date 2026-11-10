@@ -34,6 +34,7 @@ const CATALOG = [
   { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", api: "anthropic-messages", contextWindow: 1000000 },
   { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", api: "anthropic-messages", contextWindow: 1000000 },
   { id: "claude-opus-5", name: "Claude Opus 5", api: "anthropic-messages", contextWindow: 1000000 },
+  { id: "claude-fable-5-2", name: "Claude Fable 5.2", api: "anthropic-messages", contextWindow: 1000000 },
   { id: "claude-fable-5-1", name: "Claude Fable 5.1", api: "anthropic-messages", contextWindow: 1000000 },
   { id: "deepseek/deepseek-v4-pro", name: "DeepSeek V4 Pro (latest)", contextWindow: 1000000 },
   { id: "deepseek/deepseek-v4-flash", name: "DeepSeek V4 Flash (latest)", contextWindow: 1000000 },

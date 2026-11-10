@@ -101,6 +101,10 @@ export type GatewayStore = ExtensionFacade & {
   readonly toolReceiptSettle: (
     request: ReceiptScope & { readonly now: number } & ({ readonly result: unknown } | { readonly error_note: string }),
   ) => Promise<boolean>
+  /** Replaces a completed receipt's answer with the call's later final one (a held relayed steer refused `turn_conflict`); false when this instance settled no such receipt. */
+  readonly toolReceiptRevise: (
+    request: ReceiptScope & { readonly now: number; readonly result: unknown },
+  ) => Promise<boolean>
   readonly bind: (request: BindOpRequest) => Promise<RelayOutcome<{ readonly binding: BindingRecord } & Deduplicated>>
   readonly unbind: (request: CasRequest) => Promise<
     RelayOutcome<

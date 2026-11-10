@@ -37,6 +37,7 @@ export {
   type RequestId,
   STANDARD_RPC_ERRORS,
 } from "./json-rpc"
+export type { RpcCallOptions, RpcNotificationListener, RpcNotifications, RpcPort, RpcPortFailure } from "./port"
 export type {
   ComputerDisplay,
   ComputerImageDisplay,

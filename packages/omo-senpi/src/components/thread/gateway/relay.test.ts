@@ -649,9 +649,10 @@ describe("relay_direction_question_authority_and_completion", () => {
     })
     b.runtime.submitDraft()
     await drain.drain({ reason: "submission" })
+    // The submitted draft started a turn, and the default lane steers into it (gateway/decision.ts).
     expect({ notices: notices.length, lanes: b.runtime.enqueueCalls.map((call) => call.lane) }).toEqual({
       notices: 1,
-      lanes: ["followUp"],
+      lanes: ["steer"],
     })
   })
 

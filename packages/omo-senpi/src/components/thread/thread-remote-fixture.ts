@@ -42,6 +42,8 @@ type Engine = {
   readonly pending: number
   readonly currentTurnId?: string
   readonly turnEpoch?: string
+  readonly pendingQuestions?: readonly JsonObject[]
+  readonly pendingDialogs?: readonly JsonObject[]
 }
 
 export const ENGINE: Engine = {
@@ -53,6 +55,9 @@ export const ENGINE: Engine = {
   streaming: false,
   pending: 0,
 }
+
+/** The levels both legs' engines run in these tests; `xhigh` is refused on both. */
+const THINKING_LEVELS: readonly string[] = ["off", "low", "high"]
 
 export const comparable = (result: ThreadToolResult): unknown => {
   const { thread_id: _id, link: _link, device: _device, ...rest } = result as Record<string, unknown>
@@ -86,6 +91,8 @@ export function createRemoteThreadFixture() {
       failClaim?: boolean
       otherHolders?: number
       unwritten?: boolean
+      unloadReason?: string
+      terminal?: boolean
       rowState?: string
       live?: readonly string[]
       records?: readonly JsonObject[]
@@ -122,12 +129,18 @@ export function createRemoteThreadFixture() {
       })
       if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
       if (attachedTo !== undefined && !live.has(attachedTo)) return { kind: "refused", reason: "unknown_session" }
+      // A terminal's engine takes no session lifecycle record (live-surface.ts `unsupported:` on this device): it answers the
+      // failed envelope the device service reports as this refusal.
+      if (options.terminal === true && (rpc["type"] === "close_session" || rpc["type"] === "unload_session"))
+        return { kind: "refused", reason: "unsupported" }
       if (rpc["type"] === "close_session") {
         if (attachedTo === undefined) return { kind: "refused", reason: "unknown_session" }
         if ((options.otherHolders ?? 0) === 0) live.delete(attachedTo)
         return ok({})
       }
       if (rpc["type"] === "unload_session" && attachedTo !== undefined) {
+        if (options.unloadReason !== undefined)
+          return ok({ outcome: "refused", reason: options.unloadReason, detail: `refused: ${options.unloadReason}` })
         if (options.unwritten === true)
           return ok({ outcome: "refused", reason: "unsupported", detail: "the session has no file to reopen it by" })
         if ((options.otherHolders ?? 0) > 0 && rpc["force"] !== true)
@@ -145,6 +158,8 @@ export function createRemoteThreadFixture() {
           isStreaming: engine.streaming,
           pendingMessageCount: engine.pending,
           ...(engine.currentTurnId === undefined ? {} : { currentTurnId: engine.currentTurnId }),
+          ...(engine.pendingQuestions === undefined ? {} : { pendingQuestions: [...engine.pendingQuestions] }),
+          ...(engine.pendingDialogs === undefined ? {} : { pendingDialogs: [...engine.pendingDialogs] }),
         })
       if (rpc["type"] === "get_messages") return ok({ messages: [...engine.messages] })
       if (rpc["type"] === "interrupt") return ok(engine.interrupt)
@@ -191,6 +206,12 @@ export function createRemoteThreadFixture() {
           ],
         })
       if (rpc["type"] === "set_model") return ok({ provider: rpc["provider"] ?? null, id: rpc["modelId"] ?? null })
+      if (rpc["type"] === "get_available_thinking_levels") return ok({ levels: [...THINKING_LEVELS] })
+      // The engine refuses a level the active model cannot run with its text as the error (device-service.ts: errorCode, else error).
+      if (rpc["type"] === "set_thinking_level")
+        return THINKING_LEVELS.includes(String(rpc["level"]))
+          ? ok({})
+          : { kind: "refused", reason: `Thinking level ${String(rpc["level"])} is not supported by the active model.` }
       return ok({})
     }
     const devices: RemoteDevice[] = [
@@ -371,8 +392,11 @@ export function createRemoteThreadFixture() {
       setSessionName: async () => {},
       setModel: async (_s, provider, id) => ({ provider, id }),
       getAvailableModels: async () => [],
-      setThinkingLevel: async () => {},
-      getAvailableThinkingLevels: async () => [],
+      setThinkingLevel: async (_s, level) => {
+        if (!THINKING_LEVELS.includes(level))
+          throw new Error(`thinking_level_unsupported:Thinking level ${level} is not supported by the active model.`)
+      },
+      getAvailableThinkingLevels: async () => [...THINKING_LEVELS],
       closeSession: async (sessionId, durableId) => {
         closed.push([sessionId, durableId])
         return extra.closeOutcome ?? "closed"

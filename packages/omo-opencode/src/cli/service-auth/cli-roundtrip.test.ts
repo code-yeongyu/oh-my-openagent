@@ -50,6 +50,8 @@ test("real omo launcher signs in, reports status, and logs out without disk or o
       OMO_RUNTIME: "bun",
       OMO_SERVICE_API_URL: api,
       OMO_TEST_KEYSTORE_URL: `${api}/fake-keystore`,
+      // The child's own lock home: the test preload's account seam does not reach a child process (#12978).
+      OMO_TEST_CREDENTIAL_LOCK_HOME: home,
     }
     const child = Bun.spawn(command, { cwd: home, env, stdout: "pipe", stderr: "pipe" })
     children.push(child)

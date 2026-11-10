@@ -1,5 +1,4 @@
 import process from "node:process"
-import { FABLE_55_LAUNCH } from "./fable-55-launch"
 
 const DEFAULT_ANTHROPIC_ACTUAL_LIMIT = 200_000
 const ANTHROPIC_GA_1M_LIMIT = 1_000_000
@@ -33,6 +32,9 @@ function hasGA1MContext(modelID: string): boolean {
     /^claude-(?:fable|mythos|sonnet)-5$/.test(modelID) ||
     /^(?:anthropic\/|(?:(?:us|eu|global|jp|au)\.)?anthropic\.)?claude-opus-5(?:-fast|(?:-|\.)5)?(?:-\d{8})?(?:@default)?$/.test(
       modelID,
+    ) ||
+    /^(?:anthropic\/|(?:(?:us|eu|global|jp|au)\.)?anthropic\.)?claude-(?:fable|mythos)-5(?:-|\.)2(?:-\d{8})?(?:@default)?$/.test(
+      modelID,
     )
   )
 }
@@ -42,13 +44,6 @@ export function resolveActualContextLimit(
   modelID: string,
   modelCacheState?: ContextLimitModelCacheState,
 ): number | null {
-  if (modelID === FABLE_55_LAUNCH.id) {
-    return (
-      modelCacheState?.modelContextLimitsCache?.get(`${providerID}/${modelID}`) ??
-      FABLE_55_LAUNCH.limit?.context ??
-      null
-    )
-  }
   if (isAnthropicProvider(providerID, modelID)) {
     const explicit1M = getAnthropicActualLimit(modelCacheState)
     if (explicit1M === ANTHROPIC_GA_1M_LIMIT) return explicit1M

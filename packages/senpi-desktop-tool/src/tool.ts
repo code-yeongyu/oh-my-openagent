@@ -6,6 +6,7 @@ import {
   isReadOnlyComputerCall,
 } from "@oh-my-opencode/senpi-desktop-protocol"
 import {
+  type ComputerRunSandbox,
   DesktopEngineRpcError,
   DesktopLaunchContextError,
   type ExecuteTool,
@@ -42,6 +43,8 @@ export interface ComputerToolDetails {
   readonly readOnly?: boolean
   readonly screenshots?: readonly ComputerScreenshot[]
   readonly audit?: readonly AuditRecord[]
+  /** Where the run executed: `quickjs` only for model-written `run` code under `computer.run_sandbox: "quickjs"`. */
+  readonly sandbox?: ComputerRunSandbox
   /** Mirrors the top-level `isError` so a code-mode marshal (which reads `details`) reports the failure. */
   readonly isError?: boolean
 }
@@ -98,16 +101,30 @@ function assertNever(value: never): never {
 export async function runComputer(
   deps: ComputerToolDeps,
   context: ComputerHostContext,
-  request: { readonly code: string; readonly readOnly: boolean; readonly timeoutSeconds: number },
+  request: {
+    readonly code: string
+    readonly readOnly: boolean
+    readonly timeoutSeconds: number
+    /** `host` for code the host built (call chains, the CUA batch), which stays on vm whatever the setting. */
+    readonly origin: "host" | "model"
+  },
   signal: AbortSignal | undefined,
 ): Promise<ComputerToolResult> {
   const { handle, executeTool } = deps
   await handle.activate(context)
-  const snapshot = runSnapshot(handle.settings(), context, request.readOnly)
+  const settings = handle.settings()
+  const snapshot = runSnapshot(settings, context, request.readOnly)
   const timeoutMs = request.timeoutSeconds * 1000
   const confirmControl = deps.confirmControl
   const outcome = await runComputerCode(
-    { code: request.code, snapshot, timeoutMs, ...(signal === undefined ? {} : { signal }) },
+    {
+      code: request.code,
+      snapshot,
+      timeoutMs,
+      sandbox: settings.runSandbox,
+      origin: request.origin,
+      ...(signal === undefined ? {} : { signal }),
+    },
     {
       service: handle.service,
       executeTool,
@@ -131,6 +148,7 @@ export async function runComputer(
       readOnly: request.readOnly,
       screenshots: outcome.screenshots,
       audit: outcome.audit,
+      sandbox: outcome.sandbox,
     },
   }
 }
@@ -164,14 +182,18 @@ export function createComputerTool(deps: ComputerToolDeps) {
           const readOnly = isReadOnlyComputerCall(params.chain)
           const code = renderCallChain(params.chain)
           return permissionResult(
-            run(context, { code, readOnly, timeoutSeconds: DEFAULT_TIMEOUT_SECONDS }, signal),
+            run(context, { code, readOnly, timeoutSeconds: DEFAULT_TIMEOUT_SECONDS, origin: "host" }, signal),
             handle,
           )
         }
         case "run": {
           const timeoutSeconds = params.timeout ?? DEFAULT_TIMEOUT_SECONDS
           return permissionResult(
-            run(context, { code: params.code, readOnly: params.read_only === true, timeoutSeconds }, signal),
+            run(
+              context,
+              { code: params.code, readOnly: params.read_only === true, timeoutSeconds, origin: "model" },
+              signal,
+            ),
             handle,
           )
         }
@@ -194,6 +216,16 @@ export function createComputerTool(deps: ComputerToolDeps) {
   }
 }
 
+// Engine failures returned as structured results, so the eval-kernel facade reads the code from `details.value`.
+// StaleRef lets `computer.verify` tell a gone element from a failed read; its message names no code.
+const STRUCTURED_ENGINE_CODES: ReadonlySet<string> = new Set([
+  "PermissionDenied",
+  "ControlRequired",
+  "InputBusy",
+  "Suspended",
+  "StaleRef",
+])
+
 async function permissionResult(
   result: Promise<ComputerToolResult>,
   handle: ComputerHandle,
@@ -213,13 +245,16 @@ async function permissionResult(
       !(error instanceof DesktopEngineRpcError) ||
       error.data === null ||
       !("code" in error.data) ||
-      (error.data.code !== "PermissionDenied" &&
-        error.data.code !== "ControlRequired" &&
-        error.data.code !== "InputBusy" &&
-        error.data.code !== "Suspended")
+      !STRUCTURED_ENGINE_CODES.has(error.data.code)
     )
       throw error
-    const failure = computerFailure(error.data.code, error.message, handle.settings().stopHotkey, error.data.permission)
+    const failure = computerFailure(
+      error.data.code,
+      error.message,
+      handle.settings().stopHotkey,
+      error.data.permission,
+      error.data.reason,
+    )
     return {
       content: [{ type: "text", text: JSON.stringify(failure, null, 2) }],
       details: { value: failure, isError: true },

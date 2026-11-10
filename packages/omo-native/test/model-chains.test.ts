@@ -55,6 +55,12 @@ describe("omo doctor --models", () => {
     expect(artistry.primary).toBe("anthropic/claude-opus-5-5")
     expect(artistry.rungs[0]).toEqual({ model: "anthropic/claude-opus-5-5", source: "omo.json", state: "primary" })
     expect(artistry.rungs[1]).toMatchObject({
+      model: "anthropic/claude-fable-5-2",
+      source: "built-in",
+      state: "excluded",
+      excludedBy: "claude-fable-*",
+    })
+    expect(artistry.rungs[2]).toMatchObject({
       model: "anthropic/claude-fable-5-1",
       state: "excluded",
       excludedBy: "claude-fable-*",

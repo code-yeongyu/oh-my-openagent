@@ -6,7 +6,8 @@ import type { AutoAnswerableUiRequest } from "./rpc/ui-auto-answer"
 
 /**
  * The parent session's approval mode as its children follow it (#6189 F2c/F2e): `current` is the preset the parent's
- * next gated decision uses (`pi.getPermissionPreset()`), `onChange` fires when a client moves the parent to another one.
+ * next gated decision uses (`pi.getPermissionPreset()`), `onChange` fires wherever that mode may have moved: a client
+ * named a new one, or the parent session restarted or began a turn (#12853). It may fire with an unchanged mode.
  */
 export interface ParentPermissionMode {
   current(): string | undefined

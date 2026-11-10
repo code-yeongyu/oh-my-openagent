@@ -38,7 +38,8 @@ function recordingUi(via: string, raised: Raised[], answer = "Allow once"): Dial
 
 function harness() {
   const raised: Raised[] = []
-  const changes: Array<() => void> = []
+  const changes = new Set<() => void>()
+  const lifecycle = new Map<string, () => void>()
   let preset = "full-access"
   const origins = createForegroundDialogOrigins()
   const wiring = createChildParentWiring({
@@ -46,9 +47,16 @@ function harness() {
       events: {
         emit: () => {},
         on: (name, handler) => {
-          if (name === "permission_preset_changed") changes.push(() => handler({ permissionPreset: "x" }))
-          return () => {}
+          if (name !== "permission_preset_changed") return () => {}
+          const run = () => handler({ permissionPreset: "x" })
+          changes.add(run)
+          return () => {
+            changes.delete(run)
+          }
         },
+      },
+      on: (event, handler) => {
+        lifecycle.set(event, () => void handler({ type: event }))
       },
       getPermissionPreset: () => preset,
       sessionDialog: recordingUi("session", raised),
@@ -67,6 +75,12 @@ function harness() {
       preset = next
       changes.forEach((run) => run())
     },
+    // The engine moves the enforced mode without announcing it (a restore, a host default re-read).
+    moveSilently: (next: string) => {
+      preset = next
+    },
+    emit: (event: string) => lifecycle.get(event)?.(),
+    busListeners: () => changes.size,
   }
 }
 
@@ -136,5 +150,39 @@ describe("createChildParentWiring", () => {
     // then
     expect(wiring.parentPermission.current()).toBe("ask")
     expect(handed).toEqual(["ask"])
+  })
+
+  // #12853 M1: an out-of-process child follows every move of the parent's enforced mode, not only a client-named one.
+  for (const event of ["session_start", "turn_start"]) {
+    test(`#given the parent's mode moved with no announcement #when the parent's ${event} fires #then children are handed the mode read then`, () => {
+      // given
+      const { wiring, moveSilently, emit } = harness()
+      const handed: string[] = []
+      wiring.parentPermission.onChange((preset) => handed.push(preset))
+      moveSilently("ask")
+
+      // when
+      emit(event)
+
+      // then
+      expect(handed).toEqual(["ask"])
+    })
+  }
+
+  test("#given the last following child leaves #when the parent's mode moves #then nothing is handed and the bus listener is released", () => {
+    // given
+    const { wiring, change, emit, busListeners } = harness()
+    const handed: string[] = []
+    const stop = wiring.parentPermission.onChange((preset) => handed.push(preset))
+    expect(busListeners()).toBe(1)
+
+    // when
+    stop()
+    change("ask")
+    emit("turn_start")
+
+    // then
+    expect(handed).toEqual([])
+    expect(busListeners()).toBe(0)
   })
 })

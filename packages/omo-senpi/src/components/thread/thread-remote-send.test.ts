@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { GATEWAY_PROVENANCE_SENTENCE } from "./gateway/constants"
+import { GATEWAY_PEER_REPLY_SENTENCE, GATEWAY_PROVENANCE_SENTENCE } from "./gateway/constants"
 import { deliveryProvenanceLine, renderDeliveryText } from "./gateway/provenance"
 import { UNKNOWN_CALLER } from "./tools"
 import { ENGINE, comparable, createRemoteThreadFixture } from "./thread-remote-fixture"
@@ -30,7 +30,8 @@ describe("#12882: a send to another device is one admit_external_message, admitt
       delivery: { kind: "started", turn_id: "turn-b" },
       deduplicated: false,
     })
-    expect(commands(a.sent)).toEqual([ADMIT])
+    // The default mode reads b's state once before the record (gateway/decision.ts: it steers a running turn), then one admit.
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT])
     const [record = {}] = admits(a.sent)
     expect(record["deliveryId"]).toMatch(UUID)
     expect(record).toMatchObject({
@@ -65,7 +66,7 @@ describe("#12882: a send to another device is one admit_external_message, admitt
     expect(remote).toContain(" requested=auto effective=follow_up ")
     expect(remote).not.toContain("device")
     expect(remote.split("\n")).toHaveLength(3)
-    expect(remote.split("\n")[1]).toBe(GATEWAY_PROVENANCE_SENTENCE)
+    expect(remote.split("\n")[1]).toBe(`${GATEWAY_PROVENANCE_SENTENCE} ${GATEWAY_PEER_REPLY_SENTENCE}`)
     expect(record["deliveryId"]).toBe(remote.match(/delivery=(\S+)/)?.[1])
   })
 
@@ -117,7 +118,7 @@ describe("remote == local: the same call answers the same on b as on this device
     const sent = await run("thread_send", { thread: "dur-on-b", message: "later" })
     expect(sent).toMatchObject({ kind: "ok", delivery: { kind: "queued", queue_position: 3 } })
     expect("message_seq" in sent).toBe(false)
-    expect(commands(a.sent)).toEqual([ADMIT, "get_state"])
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT, "get_state"])
   })
 
   test("#given the record's reply is lost on the way back #when a message is sent #then the send is idempotency_uncertain naming the reason, and nothing else is sent", async () => {
@@ -127,7 +128,7 @@ describe("remote == local: the same call answers the same on b as on this device
       kind: "error",
       error: { code: "idempotency_uncertain", details: { device: "b", reason: "reply_lost" } },
     })
-    expect(commands(a.sent)).toEqual([ADMIT])
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT])
   })
 
   test.each([
@@ -160,7 +161,7 @@ describe("remote == local: the same call answers the same on b as on this device
         error: { code: "unsupported", details: { device: "b" } },
       })
       expect(prompts(a.sent)).toEqual([])
-      expect(commands(a.sent)).toEqual([ADMIT])
+      expect(commands(a.sent)).toEqual(["get_state", ADMIT])
     },
   )
 
@@ -171,7 +172,7 @@ describe("remote == local: the same call answers the same on b as on this device
       kind: "error",
       error: { details: { device: "b", reason: "chain_count_limit" } },
     })
-    expect(commands(a.sent)).toEqual([ADMIT])
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT])
   })
 })
 
@@ -228,6 +229,47 @@ describe("remote == local, round 2: send modes, handoff and the unknown caller",
       await run("thread_send", { thread: "dur-on-b", message: "x", delivery: "steer", expected_turn_id: "3" }),
     ).toMatchObject({ kind: "error", error: { code: "turn_conflict", details: { device: "b", current_turn_id: "4" } } })
     expect(admits(a.sent)).toEqual([])
+  })
+
+  test("#given b is mid-turn #when a message is sent with no mode #then the default steers b's running turn by the epoch one get_state read, as it does here", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, pending: 2, currentTurnId: "3" } })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({
+      kind: "ok",
+      device: "b",
+      delivery: { kind: "steered", turn_id: "3" },
+    })
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT])
+    expect(admits(a.sent).map((record) => [record["deliverAs"], record["expectedTurnId"]])).toEqual([["steer", "3"]])
+    const [record = {}] = admits(a.sent)
+    expect(String(record["text"])).toContain(" requested=auto effective=steer ")
+  })
+
+  test("#given b's turn ends between the probe and the record #when the default mode steers #then the send falls back to the lane b has now instead of failing on the race", async () => {
+    // b answers the probe mid-turn on turn 3 and is idle by the time the record arrives (a getter, so the fixture reads it live).
+    let reads = 0
+    const engine = {
+      ...ENGINE,
+      pending: 0,
+      currentTurnId: "3",
+      get streaming() {
+        return reads++ === 0
+      },
+    }
+    const a = account({ engine })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({
+      kind: "ok",
+      device: "b",
+      delivery: { kind: "started" },
+    })
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT, ADMIT])
+    expect(admits(a.sent).map((record) => [record["deliverAs"], record["expectedTurnId"] ?? null])).toEqual([
+      ["steer", "3"],
+      ["followUp", null],
+    ])
+    const [, second = {}] = admits(a.sent)
+    expect(String(second["text"])).toContain(" requested=auto effective=follow_up ")
   })
 
   test("#given a follow_up to b while it runs #when it is sent #then it is queued behind b's own pending count", async () => {

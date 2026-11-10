@@ -1,10 +1,8 @@
 import { describe, expect, test } from "bun:test"
 
 import { CATEGORY_FALLBACK_CHAINS } from "./fallback-chains"
-import { FABLE_55_RELEASED } from "@oh-my-opencode/model-core"
 
-// Coupling guard: this test file must NEVER import chain data from @oh-my-opencode/model-core. The one
-// allowed import is the FABLE_55_RELEASED launch switch, which gates the literal provisional 5.5 rows.
+// Coupling guard: this test file must NEVER import chain data from @oh-my-opencode/model-core.
 // packages/model-core/src/category-model-requirements.ts is the source of truth; this file is the
 // independent transcription that catches drift between the two mirrors (senpi adds the kimi-coding
 // provider id to kimi rungs, heads every claude-* rung with the anthropic-subscription subscription lane,
@@ -33,15 +31,11 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
     expect(CATEGORY_FALLBACK_CHAINS).toEqual({
       "visual-engineering": [
         { providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "low" },
-        ...(FABLE_55_RELEASED
-          ? [
-              {
-                providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-                model: "claude-fable-5-5",
-                variant: "max",
-              },
-            ]
-          : []),
+        {
+          providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
+          model: "claude-fable-5-2",
+          variant: "max",
+        },
         {
           providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
           model: "claude-fable-5-1",
@@ -59,15 +53,11 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
         },
       ],
       architect: [
-        ...(FABLE_55_RELEASED
-          ? [
-              {
-                providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-                model: "claude-fable-5-5",
-                variant: "max",
-              },
-            ]
-          : []),
+        {
+          providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
+          model: "claude-fable-5-2",
+          variant: "max",
+        },
         {
           providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
           model: "claude-fable-5-1",
@@ -100,15 +90,11 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
         },
       ],
       artistry: [
-        ...(FABLE_55_RELEASED
-          ? [
-              {
-                providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-                model: "claude-fable-5-5",
-                variant: "max",
-              },
-            ]
-          : []),
+        {
+          providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
+          model: "claude-fable-5-2",
+          variant: "max",
+        },
         {
           providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
           model: "claude-fable-5-1",

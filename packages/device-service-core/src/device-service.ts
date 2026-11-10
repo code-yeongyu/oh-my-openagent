@@ -15,6 +15,7 @@ import type {
 import { type CommandResult, openAttach, PROGRESS_STATES, type RemoteAttach } from "./remote-attach.ts"
 import { followDelegatedChannel } from "./delegated-channel.ts"
 import { LocalApiError } from "./local-api/errors.ts"
+import { newestRowsListing } from "./listing-rows.ts"
 import type { CommandRpc } from "./local-api/protocol.ts"
 import type { SessionCandidate } from "./local-api/protocol-delegated.ts"
 import { randomBytes } from "node:crypto"
@@ -264,7 +265,7 @@ export async function connectDeviceService(options: ConnectDeviceServiceOptions)
     },
     thisDevice: async () => (await client.request("device.info", {})).device,
     devices: async () => (await client.request("devices.list", {})).devices,
-    sessions: (filter, onRevision) => client.list(filter, onRevision),
+    sessions: newestRowsListing(client),
     attach: (device, sessionId) => openAttach(client, device, sessionId),
     endpointCommand: async (device, rpc, options) => {
       // The endpoint lookup runs before any session.command is written, so whatever fails it (a timeout, a closed

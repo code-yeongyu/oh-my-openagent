@@ -610,8 +610,6 @@
         "**/*.test-d.ts",
       ],
       "ignoreIssues": {
-        // pre-existing at origin dev 4686e425b5: unused export(s) FABLE_55_PREDECESSOR
-        "src/fable-55-launch.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) isModelAvailable
         "src/index.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) isModelAvailable

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process"
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { builtinModules, createRequire } from "node:module"
 import { basename, dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -106,6 +106,26 @@ const computerUseOutputPath = join(
   "extensions",
   "omo-computer-use.js",
 )
+// The computer.run QuickJS cell runs in a worker thread, which a bundler cannot inline: its entry ships
+// as its own bundle (quickjs-wasi inlined) beside omo-computer-use.js, with the engine's wasm next to it.
+// `senpi-desktop-service/src/run/sandbox/quickjs.ts` resolves both names from its own module location.
+const computerRunWorkerEntryPath = join(
+  repoRoot,
+  "packages",
+  "senpi-desktop-service",
+  "src",
+  "run",
+  "sandbox",
+  "worker.ts",
+)
+export const COMPUTER_RUN_WORKER_NAME = "omo-computer-run-worker.mjs"
+export const COMPUTER_RUN_WASM_NAME = "quickjs.wasm"
+// The wasm the INSTALLED quickjs-wasi ships: the freshness check pins the staged copy to it.
+export function computerRunWasmSourcePath() {
+  return createRequire(join(repoRoot, "packages", "senpi-desktop-service", "package.json")).resolve(
+    `quickjs-wasi/${COMPUTER_RUN_WASM_NAME}`,
+  )
+}
 const memoryDoctorEntryPath = join(packageRoot, "src", "components", "memory", "commands", "doctor-runtime.ts")
 const memoryMemfsEntryPath = join(packageRoot, "src", "components", "memory", "commands", "memfs-runtime.ts")
 const memoryPalaceEntryPath = join(packageRoot, "src", "components", "memory", "palace", "runtime.ts")
@@ -450,6 +470,13 @@ export async function buildExtension(options = {}) {
   const desktopToolkitInputs = await buildEntry(desktopToolkitEntryPath, desktopToolkitOutput, buildDefines)
   const claimReceiptInputs = await buildEntry(claimReceiptEntryPath, claimReceiptOutput, buildDefines)
   const computerUseInputs = await buildEntry(computerUseEntryPath, computerUseOutput, buildDefines)
+  const computerRunWorkerInputs = await buildEntry(
+    computerRunWorkerEntryPath,
+    join(dirname(computerUseOutput), COMPUTER_RUN_WORKER_NAME),
+    buildDefines,
+    sdkExternalSpecifiers,
+  )
+  await copyFile(computerRunWasmSourcePath(), join(dirname(computerUseOutput), COMPUTER_RUN_WASM_NAME))
   const gatewayStoreWorkerInputs = await buildEntry(
     gatewayStoreWorkerEntryPath,
     gatewayStoreWorkerOutput,
@@ -475,6 +502,7 @@ export async function buildExtension(options = {}) {
     bunshinTsInputs,
     rollbackRuntimeInputs,
     computerUseInputs,
+    computerRunWorkerInputs,
     memoryDoctorInputs,
     memoryMemfsInputs,
     memoryPalaceInputs,

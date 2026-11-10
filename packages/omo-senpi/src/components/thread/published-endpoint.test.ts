@@ -188,9 +188,9 @@ test("a row only a delivery created keeps legacy discovery for the next send", a
   db.close()
   expect(await w.send()).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
   expect(await w.store.sessionOwner("target")).toBeNull()
-  // The target is still busy with the first message: the live endpoint takes the second as a follow-up behind it.
+  // The target is still busy with the first message: the live endpoint takes the second into that turn (the default steers).
   const second = await w.send()
-  expect(second).toMatchObject({ kind: "ok", delivery: { kind: "queued" }, endpoint: { kind: "rpc_host" } })
+  expect(second).toMatchObject({ kind: "ok", delivery: { kind: "steered" }, endpoint: { kind: "rpc_host" } })
   expect(target.runtime.enqueueCalls).toHaveLength(2)
 }, 15000)
 
@@ -211,7 +211,7 @@ async function listSendSteer(
 ) {
   const [list, send, steer] = await Promise.all([
     w.sdk.list({}),
-    w.sdk.send({ thread: "target", text: "busy followup" }),
+    w.sdk.send({ thread: "target", text: "busy followup", mode: "follow_up" }),
     w.sdk.send({ thread: "target", text: "busy steer", mode: "steer", expected_turn_id: target.runtime.epoch }),
   ])
   const listed =
@@ -318,7 +318,7 @@ test("a terminal the engine still reports dead is offline to thread_list, send a
   }
   const before = await listed()
   const [send, steer] = await Promise.all([
-    w.sdk.send({ thread: "target", text: "busy followup" }),
+    w.sdk.send({ thread: "target", text: "busy followup", mode: "follow_up" }),
     w.sdk.send({ thread: "target", text: "busy steer", mode: "steer", expected_turn_id: target.runtime.epoch }),
   ])
   const after = await listed()

@@ -198,7 +198,7 @@ describe("claim_reconciliation", () => {
     const next = freshProcess(h, b.runtime.sessionPath)
     next.runtime.beginUserTurn()
     const result = await next.drain.drain({ reason: "start" })
-    expect(result.admitted).toEqual([{ delivery_id: id, kind: "queued" }])
+    expect(result.admitted).toEqual([{ delivery_id: id, kind: "steered" }])
     expect(next.runtime.enqueueCount(id)).toBe(1)
   })
 
@@ -214,10 +214,10 @@ describe("claim_reconciliation", () => {
     })
     b.runtime.beginUserTurn()
     const id = await sendToB(h, "dropped by the runtime")
-    expect((await drain.drain({ reason: "start" })).admitted).toEqual([{ delivery_id: id, kind: "queued" }])
+    expect((await drain.drain({ reason: "start" })).admitted).toEqual([{ delivery_id: id, kind: "steered" }])
     expect(b.runtime.dropQueues()).toEqual([id])
     expect(b.runtime.listAdmittedDeliveries()).toEqual({ pending: [], emitted: [] })
-    expect((await drain.drain({ reason: "command" })).admitted).toEqual([{ delivery_id: id, kind: "queued" }])
+    expect((await drain.drain({ reason: "command" })).admitted).toEqual([{ delivery_id: id, kind: "steered" }])
     expect({
       state: (await b.view(id))?.state,
       attempt: (await b.view(id))?.attempt,
@@ -243,7 +243,7 @@ describe("claim_reconciliation", () => {
     const firstEmitted = new Promise<string>((resolve) => b.runtime.onEmitted(resolve))
     expect((await host.drain({ reason: "start" })).admitted).toEqual([
       { delivery_id: written, kind: "started" },
-      { delivery_id: unwritten, kind: "queued" },
+      { delivery_id: unwritten, kind: "steered" },
     ])
     expect(await firstEmitted).toBe(written)
     expect({ written: (await b.view(written))?.state, unwritten: (await b.view(unwritten))?.state }).toEqual({

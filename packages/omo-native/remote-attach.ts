@@ -11,6 +11,7 @@ import type {
   RemoteAttachEvent,
   SnapshotBody,
 } from "../device-service-core/src/index.ts"
+import { outcomeFailure, outcomeOf } from "../omo-senpi/src/components/thread/remote/outcome"
 
 // `omo remote attach` serves one remote session to the engine's unchanged attach TUI (`--attach <socket> --session
 // <ref>`): a private endpoint that speaks the RPC subset the TUI uses, answered from the device service's attach.
@@ -48,8 +49,11 @@ const isRecord = (value: unknown): value is Json => typeof value === "object" &&
 const isParsedRecord = (value: unknown): value is JsonObject => isRecord(value)
 
 /** A non-applied outcome as the host or engine stated it: the state, then its reason when it has one. */
-const outcomeText = (outcome: CommandStateEvent): string =>
-  "reason" in outcome ? `${outcome.state}: ${outcome.reason}` : outcome.state
+const outcomeText = (outcome: CommandStateEvent, device: string): string => {
+  // The same mapping every relay request is explained by (#12885); a state that mapping calls applied keeps its own name.
+  const mapped = outcomeOf({ outcome })
+  return mapped.kind === "ok" ? outcome.state : outcomeFailure(mapped, device).error.message
+}
 
 function stateOf(snapshot: SnapshotBody): Json {
   const state = isRecord(snapshot.state) ? snapshot.state : {}
@@ -192,7 +196,13 @@ class Presentation {
       this.send({ type: "response", id: request.id, command: type, success: true })
       return
     }
-    this.send({ type: "response", id: request.id, command: type, success: false, error: outcomeText(outcome) })
+    this.send({
+      type: "response",
+      id: request.id,
+      command: type,
+      success: false,
+      error: outcomeText(outcome, this.attach.device),
+    })
   }
 
   private async entries(request: Json): Promise<Json> {

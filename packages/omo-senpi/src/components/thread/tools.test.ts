@@ -127,7 +127,7 @@ describe("thread tool registration", () => {
     expect(f.setModel.mock.calls[0]).toEqual(["route-peer", "openai", "gpt-x", "dur-peer"])
   })
 
-  test("registers exactly the eighteen contract tools with search metadata", () => {
+  test("registers exactly the eighteen contract tools with eval exposure", () => {
     const tools: Record<string, unknown>[] = []
     const f = fixture()
     registerThreadTools(
@@ -154,7 +154,13 @@ describe("thread tool registration", () => {
       "thread_outbox_ack",
       "thread_answer",
     ])
-    expect(tools.every((tool) => tool.exposure === "search" && tool.searchGroup === "threads")).toBe(true)
+    for (const tool of tools) {
+      expect(tool.exposure, String(tool.name)).toBe("eval")
+      expect(
+        ["searchGroup", "searchText", "searchKeywords"].filter((key) => key in tool),
+        String(tool.name),
+      ).toEqual([])
+    }
   })
 
   test("#given live threads in two workspaces #when thread_list runs in the default scope #then only the caller's workspace is listed and all_scope widens it", async () => {

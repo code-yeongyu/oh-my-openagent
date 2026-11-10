@@ -15,6 +15,7 @@ import {
   resolveBunExecutable,
   toPortableBuildPath,
 } from "./build-extension.mjs"
+import { COMPUTER_RUN_WASM_NAME } from "./build-extension-core.mjs"
 import { npmPackStage, runBoundedStage, systemTar } from "./bounded-stage.test-support.mjs"
 import { createBuildFixture, outputPathsIn } from "./build-extension.test-support.mjs"
 import {
@@ -628,14 +629,16 @@ describe("checkExtensionCurrent", () => {
   })
 
   test("#given the sync sidecar build #when its output dir is listed #then every emitted asset is a declared sidecar asset", async () => {
-    const { memorySyncOutputPath } = await sharedOutputs()
+    const { memorySyncOutputPath, computerUseOutputPath } = await sharedOutputs()
+    // The computer.run QuickJS wasm is the computer-use sidecar's asset, emitted into the same dir.
+    expect(await readFile(computerUseOutputPath, "utf8")).toContain(COMPUTER_RUN_WASM_NAME)
     const syncText = await readFile(memorySyncOutputPath, "utf8")
     const referenced = MEMORY_SYNC_ASSET_NAMES.filter((name) => syncText.includes(name))
     expect(referenced).toEqual([...MEMORY_SYNC_ASSET_NAMES])
     const emitted = (await readdir(dirname(memorySyncOutputPath), { withFileTypes: true }))
       .filter((entry) => entry.isFile() && !/\.(?:m?js|json|md)$/.test(entry.name))
       .map((entry) => entry.name)
-    expect(emitted.sort()).toEqual([...MEMORY_SYNC_ASSET_NAMES].sort())
+    expect(emitted.sort()).toEqual([...MEMORY_SYNC_ASSET_NAMES, COMPUTER_RUN_WASM_NAME].sort())
   })
 
   test(

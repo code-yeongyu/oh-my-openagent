@@ -482,8 +482,11 @@ describe("K8: a run woken from another device continues that chain's hop on its 
       }
       expect(next.details.result).toMatchObject({ kind: "ok", device: "b" })
       expect(account.hops).toEqual([3, 1])
+      // Each default-mode send reads b's state once before its record (gateway/decision.ts); the records carry the hops.
       expect(account.sent.map((entry) => [entry.rpc?.["type"], entry.rpc?.["chainCount"]])).toEqual([
+        ["get_state", undefined],
         ["admit_external_message", 3],
+        ["get_state", undefined],
         ["admit_external_message", 1],
       ])
     } finally {

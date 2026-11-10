@@ -29,6 +29,7 @@ import type { ThreadHostView, ThreadHostViewRequest, ThreadSessionPort } from ".
 import { acceptedControls, LEGACY_TUI_COMMANDS, tuiCommandsFrom } from "./endpoint-controls"
 import { answerUiRequest } from "./ui-answer"
 import { fencedCommand } from "./attachment-fence"
+import { closeLadder, SESSION_GONE } from "./control/close-ladder"
 import { createServiceAliasRegistry, type ServiceAccess } from "./remote/alias-registry"
 import { createDeviceServiceSessions } from "./remote/device-service"
 import { createLazyRemoteSurface } from "./remote/lazy-remote"
@@ -95,6 +96,8 @@ type RequestOptions = {
   readonly durableSessionId?: string
   readonly openedName?: string
   readonly rpcHost?: boolean
+  /** An exempt read sent attached anyway (`attachment-fence.ts`): the close ladder's "still held" probe. */
+  readonly attached?: boolean
 }
 
 /**
@@ -127,17 +130,25 @@ async function requestFrame(
       // An older host that refuses get_protocol_info advertises nothing: it gets today's unfenced request, as askHost does.
       const protocol = info.success === true && record(info.data) ? info.data : {}
       const capabilities = new Set(Array.isArray(protocol.capabilities) ? protocol.capabilities : [])
-      return await fencedCommand(request, socketPath, command, capabilities, options.durableSessionId, async () => {
-        const result = await request(command)
-        if (command.type === "open_session" && result.success === true && options.openedName?.trim()) {
-          const opened = dataRecord(result, "open_session")
-          dataRecord(
-            await request({ type: "set_session_name", sessionId: opened.sessionId, name: options.openedName }),
-            "set_session_name",
-          )
-        }
-        return result
-      })
+      return await fencedCommand(
+        request,
+        socketPath,
+        command,
+        capabilities,
+        options.durableSessionId,
+        async () => {
+          const result = await request(command)
+          if (command.type === "open_session" && result.success === true && options.openedName?.trim()) {
+            const opened = dataRecord(result, "open_session")
+            dataRecord(
+              await request({ type: "set_session_name", sessionId: opened.sessionId, name: options.openedName }),
+              "set_session_name",
+            )
+          }
+          return result
+        },
+        { attached: options.attached === true },
+      )
     },
   )
 }
@@ -306,7 +317,8 @@ export function createLiveThreadSurface(
   const registry = options.registry ?? (() => listRegistryEndpoints(resolveAgentHome({ env })))
   const readSecret = options.readSecret ?? ((socket: string) => readFileSync(controlSocketSecretPath(socket)))
   const legacy = options.socket ?? resolveThreadSocket(options.env)
-  let enumeration: { readonly expiresAt: number; readonly endpoints: Promise<readonly KnownEndpoint[]> } | undefined
+  type Enumeration = { expiresAt: number | undefined; readonly endpoints: Promise<readonly KnownEndpoint[]> }
+  let enumeration: Enumeration | undefined
   // Session files each endpoint listed on its last answer: a host that stopped cleanly released its
   // claims, and this is then the only record of which threads it held.
   const lastListed = new Map<string, readonly string[]>()
@@ -334,6 +346,7 @@ export function createLiveThreadSurface(
     timeoutMs?: number,
     durableSessionId?: string,
     openedName?: string,
+    attached?: boolean,
   ): Promise<RpcFrame> => {
     const tui = kindOf(socket) === "tui"
     if (tui && !LEGACY_TUI_COMMANDS.has(type) && !(await learnTuiCommands(socket)).has(type))
@@ -359,6 +372,7 @@ export function createLiveThreadSurface(
       secret,
       durableSessionId,
       openedName,
+      ...(attached === true ? { attached } : {}),
       rpcHost: !tui,
       keyRoot: () => options.keyRoot ?? (env.SENPI_RPC_KEY_ROOT?.trim() || resolveAgentHome({ env })),
     })
@@ -371,7 +385,9 @@ export function createLiveThreadSurface(
     data: Record<string, unknown> = {},
     timeoutMs?: number,
     durableSessionId?: string,
-  ): Promise<T> => dataRecord(await callFrame(socket, type, data, timeoutMs, durableSessionId), type) as T
+    attached?: boolean,
+  ): Promise<T> =>
+    dataRecord(await callFrame(socket, type, data, timeoutMs, durableSessionId, undefined, attached), type) as T
   const call = <T>(type: string, data: Record<string, unknown> = {}, durableSessionId?: string): Promise<T> =>
     callOn<T>(legacy, type, data, undefined, durableSessionId)
 
@@ -413,8 +429,19 @@ export function createLiveThreadSurface(
   }
 
   const endpoints = async (): Promise<readonly KnownEndpoint[]> => {
-    if (enumeration === undefined || enumeration.expiresAt <= now()) {
-      enumeration = { expiresAt: now() + HOST_ENDPOINTS_CACHE_TTL_MS, endpoints: enumerate() }
+    // One enumeration at a time, and its window starts when it answers: a host whose `status --all` takes longer
+    // than the window shares the running one and reuses its answer, instead of enumerating once per view (#12989).
+    if (enumeration === undefined || (enumeration.expiresAt !== undefined && enumeration.expiresAt <= now())) {
+      const started: Enumeration = { expiresAt: undefined, endpoints: enumerate() }
+      enumeration = started
+      started.endpoints.then(
+        () => {
+          started.expiresAt = now() + HOST_ENDPOINTS_CACHE_TTL_MS
+        },
+        () => {
+          if (enumeration === started) enumeration = undefined
+        },
+      )
     }
     const known = await enumeration.endpoints
     for (const endpoint of known) kinds.set(resolve(endpoint.socket), endpoint.kind)
@@ -550,38 +577,24 @@ export function createLiveThreadSurface(
       releaseReply(
         await callFrame(socket ?? legacy, "release_session", { sessionId, ...release }, undefined, durableId),
       ),
-    closeSession: async (sessionId, durableId) => {
-      // unload_session with force ends the session for every client that holds it (senpi session-unload.ts, drained
-      // through tearDownUnloaded); close_session releases only this connection's own hold. Both are sent attached.
-      const left = (error: unknown) =>
-        error instanceof Error && /^(unknown_session|session_identity_mismatch):/.test(error.message)
-      let answer: Record<string, unknown>
-      try {
-        answer = await send<Record<string, unknown>>(
-          "unload_session",
-          { sessionId, force: true, interrupt: true, children: "detach" },
-          durableId,
-        )
-      } catch (error) {
-        if (left(error)) return "not_live"
-        throw error
-      }
-      if (answer.outcome === "unloaded") return "closed"
-      if (answer.reason === "session_closing") return "not_live"
-      if (answer.reason === "host_draining") throw new Error(`host_unavailable:${socket ?? legacy}`)
-      if (answer.reason !== "unsupported") throw new Error(`thread RPC request failed: ${JSON.stringify(answer)}`)
-      // A session with no file yet cannot be unloaded: close it attached, then read whether another client still holds it.
-      try {
-        await send("close_session", { sessionId }, durableId)
-      } catch (error) {
-        if (left(error)) return "not_live"
-        throw error
-      }
-      const { sessions } = await callOn<{ sessions: ThreadHostSession[] }>(socket ?? legacy, "list_sessions", OBSERVE)
-      return sessions.some((session) => session.sessionId === sessionId && session.status !== "closed")
-        ? "held_elsewhere"
-        : "closed"
-    },
+    // Every rung of the ladder is sent attached (`durableId`), the `get_state` probe included although the host exempts
+    // that read from its gate: the probe's attach itself answers whether the engine still holds the session.
+    closeSession: (sessionId, durableId) =>
+      closeLadder(sessionId, async ({ type, ...data }) => {
+        try {
+          return {
+            kind: "ok",
+            data:
+              type === "get_state"
+                ? await callOn<Record<string, unknown>>(socket ?? legacy, "get_state", data, undefined, durableId, true)
+                : await send<Record<string, unknown>>(String(type), data, durableId),
+          }
+        } catch (error) {
+          const reason = error instanceof Error ? error.message.slice(0, Math.max(0, error.message.indexOf(":"))) : ""
+          if (SESSION_GONE.has(reason)) return { kind: "gone", reason }
+          throw error
+        }
+      }),
   })
 
   const liveness = async (endpoint: GatewayEndpointRef): Promise<EndpointLiveness> => {
@@ -681,7 +694,7 @@ export function createLiveThreadSurface(
       // never starts an enumeration itself - a published durable id needs none - so with no fresh
       // listing the direct probe decides, exactly as a fresh listing would.
       const fresh =
-        endpoint.kind === "tui" && enumeration !== undefined && enumeration.expiresAt > now()
+        endpoint.kind === "tui" && enumeration?.expiresAt !== undefined && enumeration.expiresAt > now()
           ? await enumeration.endpoints
           : undefined
       const cached = fresh?.find((candidate) => resolve(candidate.socket) === resolve(endpoint.socket))?.verdict
@@ -719,7 +732,8 @@ export function createLiveThreadSurface(
       // host DETACH instead of closing when a connection drops. This client is one-shot - the
       // connection that opens the session ends immediately - so without the flag the new session
       // goes straight to `closing` and every later call answers `session_closing`.
-      // `initialSkills` rides on the open_session context (`initial-skills.ts`), never as a wire field.
+      // `initialSkills` rides on the open_session context (`initial-skills.ts`), never as a wire field; `cwd`,
+      // `sessionPath`, `forkFrom` and `permissionPreset` (the mode the session starts in, #12884) are wire fields.
       const { initialSkills, name, ...openParams } = params
       const result = dataRecord(
         await callFrame(
@@ -766,13 +780,7 @@ export function createCliRemoteSurface(options: {
   })
 }
 export { crossTarget, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
-export {
-  closeRemote,
-  deviceOnline,
-  interruptRemote,
-  outcomeFailure,
-  promptRemote,
-  readRemote,
-} from "./remote/remote-ops"
-export { setModelRemote } from "./remote/remote-controls"
+export { deviceOnline, promptRemote } from "./remote/remote-ops"
+export { outcomeFailure } from "./remote/outcome"
 export { createRelayTransport } from "./remote/relay-transport"
+export { createRelayControl } from "./control/relay-control"

@@ -254,7 +254,7 @@ describe("setup-stream commandcode", () => {
       id: "commandcode",
       kind: "provider",
       state: "import",
-      detail: "12 model(s)",
+      detail: "13 model(s)",
     })
     // Items travel over RPC: a key never rides in one.
     expect(JSON.stringify(results.map((result) => result.items))).not.toContain(SENTINEL)

@@ -78,6 +78,7 @@ describe("binary/npm parity comparison", () => {
         "PASS computer use engine: native/senpi-desktop-engine",
         "INFO Claude Code 2.1.284: not downloaded yet",
         "INFO engine trust: generation 0123456789ab, default-file: kept",
+        "INFO computer use stop persistence: a stop survives an engine restart only on the macOS XPC agent",
       ],
     })
     expect(compareRuns(binary, npm)).toEqual([])

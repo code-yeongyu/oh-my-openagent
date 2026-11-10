@@ -1,5 +1,6 @@
 import { homedir } from "node:os"
 import { join } from "node:path"
+import { accountHome, lockDirectoryIn } from "../account-home"
 import { type HelperAccess, resolveHelperAccess } from "./access"
 import { type ApprovalCache, processApprovalCache } from "./approval-cache"
 import { HelperReadError, readThroughHelper, type Row8bChoice } from "./darwin-read"
@@ -114,7 +115,7 @@ export function createDarwinBackend(options: {
     cache: options.cache ?? processApprovalCache(),
     background: options.background,
     takePromptLock: promptLockAt(
-      join(options.home ?? homedir(), ".omo", "session-locks", `${options.account}.keychain-prompt`),
+      join(lockDirectoryIn(options.home ?? accountHome()), `${options.account}.keychain-prompt`),
     ),
     ownSilentGet: () => silently(() => options.secrets.get(key)),
     ownOverwrite: (value: string) => silently(() => options.secrets.set({ ...key, value })),

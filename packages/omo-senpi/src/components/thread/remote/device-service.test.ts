@@ -8,18 +8,35 @@ import {
 } from "@oh-my-opencode/device-service-core"
 import { withContractHost } from "../../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
 import type { ThreadReadInput } from "../contracts"
+import { answered, closeThread, interruptThread, setModelOn } from "../control/operations"
+import { createRelayControl } from "../control/relay-control"
 import { createLiveThreadSurface } from "../live-surface"
+import { liveReadResult } from "../tools/read-ops"
 import { createDeviceServiceSessions } from "./device-service"
 import { createLazyRemoteSurface } from "./lazy-remote"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
-import { setModelRemote } from "./remote-controls"
-import { closeRemote, interruptRemote, openRemote, promptRemote, readRemote } from "./remote-ops"
+import { createRelaySessionHost } from "../control/relay-session-host"
+import { promptRemote } from "./remote-ops"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createGatewayStore } from "../gateway/store"
 import type { OutboundDelivery } from "../gateway/transport"
 import { createRelayTransport } from "./relay-transport"
+
+// The thread tools' bodies over the relay control of `row`: what thread_set_model, thread_interrupt, thread_close
+// and thread_read send once the device is found online.
+const setModelRemote = (surface: RemoteThreadSurface, row: RemoteSessionRow, request: { readonly model: string }) =>
+  answered(() => setModelOn(createRelayControl(surface, row), request.model, undefined))
+const interruptRemote = (surface: RemoteThreadSurface, row: RemoteSessionRow, turnId: string | undefined) =>
+  answered(() => interruptThread(createRelayControl(surface, row), turnId))
+const closeRemote = (surface: RemoteThreadSurface, row: RemoteSessionRow) =>
+  answered(() => closeThread(createRelayControl(surface, row)))
+const readRemote = (surface: RemoteThreadSurface, row: RemoteSessionRow, view: ThreadReadInput) =>
+  answered(async () => {
+    const control = createRelayControl(surface, row)
+    return liveReadResult(control.thread_id, control.title, await control.getMessages(), view)
+  })
 
 // An attach whose session stream stays silent: no record, frame or channel loss ever arrives.
 const quietStream = { onEvent: () => () => {}, onFrame: () => () => {}, onChannelLoss: () => () => {} }
@@ -275,10 +292,10 @@ describe("device-service adapter: a session created on another device is address
       connect: async () => service,
       retryDelay: async () => {},
     })
-    const created = await openRemote(
-      { sessions: port, chain: { stamp: (record) => record } },
-      { kind: "create", device: "b" },
-    )
+    const created = await createRelaySessionHost(
+      { sessions: port, chain: { stamp: (record: JsonObject) => record } },
+      "b",
+    ).open({})
     if (created.kind !== "ok" || !("thread" in created)) throw new Error(`create failed: ${JSON.stringify(created)}`)
     expect(created.thread.thread_id).toBe(KEY)
     const status = await port.sessionCommand("b", created.thread.thread_id, {
@@ -310,10 +327,10 @@ describe("device-service adapter: a session created on another device is address
       connect: async () => service,
       retryDelay: async () => {},
     })
-    const created = await openRemote(
-      { sessions: port, chain: { stamp: (record) => record } },
-      { kind: "create", device: "b" },
-    )
+    const created = await createRelaySessionHost(
+      { sessions: port, chain: { stamp: (record: JsonObject) => record } },
+      "b",
+    ).open({})
     if (created.kind !== "ok" || !("thread" in created)) throw new Error(`create failed: ${JSON.stringify(created)}`)
     expect(created.thread.thread_id).toBe(KEY)
     expect(located).toEqual([])
@@ -702,7 +719,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
     "#given %s #when a thread is created on b #then the open asks for its located session and session.locate runs only when the reply lacks it",
     async (_label, relayd, frames, asked) => {
       const w = relayWorld(relayd)
-      const created = await openRemote(w.surface, { kind: "create", device: "b" })
+      const created = await createRelaySessionHost(w.surface, "b").open({})
       if (created.kind !== "ok" || !("thread" in created)) throw new Error(`create failed: ${JSON.stringify(created)}`)
       expect(created.thread.thread_id).toBe(CREATED_KEY)
       expect(w.take()).toEqual([...frames])
@@ -712,7 +729,7 @@ describe("device-service adapter: relay round trips per thread op", () => {
 
   test("#given an existing row of b #when it is opened #then the open does not ask for a located session and nothing is located", async () => {
     const w = relayWorld()
-    const opened = await openRemote(w.surface, { kind: "open", row })
+    const opened = await createRelaySessionHost(w.surface, "b", row).open({ sessionPath: row.path })
     expect(opened.kind).toBe("ok")
     expect(w.take()).toEqual(["session.endpoints", "session.command"])
     expect(w.locateAsked).toEqual([false])

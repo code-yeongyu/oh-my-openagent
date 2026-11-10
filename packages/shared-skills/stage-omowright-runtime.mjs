@@ -17,7 +17,8 @@ const defaultSourceRoot = process.env.OMO_OMOWRIGHT_SOURCE ?? join(repoRoot, "no
 const defaultTargetDir =
   process.env.OMO_OMOWRIGHT_TARGET ?? join(scriptDir, "skills", "browser", "runtime", "omowright")
 
-export const STAGED_FILES = Object.freeze(["index.js", "page-bundle.js"])
+// LICENSE is omowright's own MIT text, copied verbatim so the notice ships beside the bundle (omowright#290).
+export const STAGED_FILES = Object.freeze(["index.js", "page-bundle.js", "LICENSE"])
 
 async function sha256(path) {
   return createHash("sha256")
@@ -58,7 +59,7 @@ function resolveLayout(sourceRoot) {
 }
 
 async function sourceDigest(sourceRoot, layout) {
-  const entries = ["package.json", layout.entry, layout.pageBundle, ...layout.sources]
+  const entries = ["package.json", "LICENSE", layout.entry, layout.pageBundle, ...layout.sources]
   const hash = createHash("sha256")
   for (const entry of entries)
     hash
@@ -92,6 +93,9 @@ export async function stageOmowrightRuntime(options = {}) {
   const bunExecutable = options.bunExecutable ?? process.env.BUN ?? "bun"
   const version = await readSourceVersion(sourceRoot)
   const layout = resolveLayout(sourceRoot)
+  if (!existsSync(join(sourceRoot, "LICENSE"))) {
+    throw new Error(`omowright has no LICENSE to ship beside the bundle: ${join(sourceRoot, "LICENSE")}`)
+  }
   const digest = await sourceDigest(sourceRoot, layout)
 
   await mkdir(dirname(targetDir), { recursive: true })
@@ -104,6 +108,7 @@ export async function stageOmowrightRuntime(options = {}) {
     await mkdir(tempDir, { recursive: true })
     bundle({ sourceRoot, layout, outFile: join(tempDir, "index.js"), bunExecutable })
     await copyFile(join(sourceRoot, layout.pageBundle), join(tempDir, "page-bundle.js"))
+    await copyFile(join(sourceRoot, "LICENSE"), join(tempDir, "LICENSE"))
     const files = {}
     for (const name of STAGED_FILES) files[name] = await sha256(join(tempDir, name))
     await writeFile(
