@@ -172,7 +172,10 @@ export async function realColdRevive(mode: "in-process" | "process", misleading 
     assert(!request.includes("DO_NOT_REPLAY_SENTINEL"))
     const messageCount = request.split("CONTINUE_SENTINEL").length - 1
     assert.equal(messageCount, 1)
-    const memberExtensionRestored = options.team === true && request.includes('"name":"task_send"')
+    // task_send is eval-only (TASK_FAMILY_EXPOSURE): on an engine with an eval tool the restored member extension
+    // reaches the model as the `tool.task_send(` eval form in the system prompt, not as a direct tool definition.
+    const memberExtensionRestored =
+      options.team === true && (request.includes('"name":"task_send"') || request.includes("tool.task_send("))
     if (options.team) assert(memberExtensionRestored)
     releaseResponse.resolve()
     const completed = await terminal
