@@ -142,13 +142,13 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
 describe("#12833: a name reaches a thread on another device by its title", () => {
   const titled = (device: string, session_id: string, title: string, state = "idle") => ({ ...B_ROW, device, session_id, durable_id: session_id, title, state })
 
-  test("#given b lists a live session titled with the name #when thread_send names it from this device #then it reaches b's session; this device's own row and an ended session are never matched by title", async () => {
+  test("#given b lists live and ended sessions #when their names are addressed #then the live session receives the send and the ended session resolves without a live owner", async () => {
     const a = account({ rows: [titled("b", "dur-on-b", "Release Train"), titled("here", "dur-local", "local peer"), titled("b", "dur-old-on-b", "stale", "ended")] })
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "release  train", message: "go" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
     expect(a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message").map((entry) => [entry.device, entry.session])).toEqual([["b", "dur-on-b"]])
     expect(await run("thread_send", { thread: "local peer", message: "here" })).toMatchObject({ kind: "ok", thread_id: "dur-local" })
-    expect(await run("thread_send", { thread: "stale", message: "x" })).toMatchObject({ kind: "error", error: { code: "not_found" } })
+    expect(await run("thread_close", { thread: "stale" })).toMatchObject({ kind: "ok", thread_id: "dur-old-on-b", closed: false })
   })
 
   test("#given two devices each hold a session with the name #when a tool names it #then it is ambiguous_target listing both with their devices, and nothing is sent", async () => {
@@ -236,11 +236,11 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
 })
 
 describe("the device service is not connected, or the alias registry is not there yet", () => {
-  test("#given remote sessions turned off on this device #when a tool names this device's thread by name and another device's by id #then both answer exactly as without a remote surface: the local one works and the other is not_found", async () => {
+  test("#given remote sessions turned off on this device #when a tool names this device's thread by name and another device's by id #then the local one works and the other reports typed unavailability", async () => {
     const a = account({ plan: "disabled" })
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "local peer", message: "local" })).toMatchObject({ kind: "ok", thread_id: "dur-local" })
-    expect(await run("thread_send", { thread: "dur-on-b", message: "remote" })).toMatchObject({ kind: "error", error: { code: "not_found" } })
+    expect(await run("thread_send", { thread: "dur-on-b", message: "remote" })).toMatchObject({ kind: "error", error: { code: "host_unavailable", details: { state: "disabled" } } })
     expect(await run("thread_create", { device: "b" })).toMatchObject({ kind: "error", error: { code: "host_unavailable", details: { state: "disabled" } } })
     expect(a.sent).toEqual([])
   })
@@ -279,7 +279,7 @@ describe("remote == local: the same call answers the same on b as on this device
     ["thread_set_reasoning to a level the model cannot run (the supported list comes from the target's engine)", "thread_set_reasoning", { level: "xhigh" }],
     ["thread_interrupt on an idle thread", "thread_interrupt", {}],
   ] as const)("#given %s #when it runs on this device and on b #then both answers are the same", async (_label, tool, args) => {
-    const a = account()
+    const a = account({ rows: [B_ROW, { ...B_ROW, session_id: "rk-other", durable_id: "dur-other-on-b", title: "other peer" }] })
     const other: ThreadHostSession = { sessionId: "route-other", durableSessionId: "dur-other", cwd: process.cwd(), name: "other peer", status: "open" }
     const local: ThreadHostSession = { sessionId: "route-local", durableSessionId: "dur-local", cwd: process.cwd(), name: "local peer", status: "open" }
     const { run } = surface(a.remote, { sessions: [local, other] })

@@ -1,4 +1,5 @@
 import type { ThreadToolResult } from "../contracts"
+import { workspaceEntries } from "../addressing"
 import { rowThreadId } from "../remote/ports"
 import { createRelayControl, deviceOnline } from "../remote/lazy-ops"
 import { resolution, resolveEntries, targetSession, resolveAcross } from "../tools/internals"
@@ -20,7 +21,8 @@ export type LocatedControl =
  */
 export async function locateControl(options: ThreadToolSurfaceOptions, current: ThreadHostView, address: string, allScope: boolean | undefined, callerId: string): Promise<LocatedControl> {
   // Decision 0027: one resolver over this device's entries and the relay transport's address book.
-  const resolved = await resolveAcross(options, resolveEntries(options, current), address, callerId, allScope)
+  const entries = resolveEntries(options, current)
+  const resolved = await resolveAcross(options, entries, address, callerId, allScope)
   if (resolved.kind === "ok" && resolved.entry.transport?.kind === "relay" && options.remote !== undefined) {
     const row = resolved.entry.transport.row
     const offline = await deviceOnline(options.remote, row.device)
@@ -31,5 +33,5 @@ export async function locateControl(options: ThreadToolSurfaceOptions, current: 
   if (resolved.kind === "error") return { kind: "error", result: { kind: "error", error: resolved } }
   const session = targetSession(current, resolved.entry.thread_id)
   if (session === undefined) return { kind: "not_live", thread_id: resolved.entry.thread_id, title: resolved.entry.name }
-  return { kind: "control", control: createLocalControl(options, session, resolved.entry.thread_id, resolved.entry.name) }
+  return { kind: "control", control: createLocalControl(options, session, resolved.entry.thread_id, resolved.entry.name, () => allScope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot())) }
 }

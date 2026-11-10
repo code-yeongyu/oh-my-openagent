@@ -2,7 +2,7 @@ import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import type { ThreadResolveResult } from "../addressing"
 import { relayAddressBook, type RelayAddressBook } from "../remote/address-book"
 import { assembleAddressBook, findDiskSessions, toThreadAddressEntries, type AddressEndpoint, type AddressEntry, type DiskSession, type ThreadSurface } from "../address-book"
-import { resolveTarget, workspaceDirectories, type ThreadAddressEntry } from "../addressing"
+import { fuzzyMatch, resolveTarget, workspaceDirectories, workspaceEntries, type ThreadAddressEntry } from "../addressing"
 import type { ThreadToolName, ThreadToolResult, ThreadTranscriptItem } from "../contracts"
 import { threadToolFailure, type ThreadErrorCode } from "../errors"
 import { THREAD_TOOL_EXPOSURE, THREAD_TOOL_METADATA } from "../metadata"
@@ -182,16 +182,24 @@ export function targetSession(view: ThreadHostView, durableId: string): ThreadHo
  * the relay; a local miss answers the relay's typed unavailability (plan, sign-in) or the alias holder's typed failure
  * before any not_found. An alias or an entry on another device is account-wide: the local scope no longer applies to it.
  */
-export async function resolveAcross(options: ThreadToolSurfaceOptions, local: readonly ThreadAddressEntry[], address: string, callerId: string, allScope: boolean | undefined): Promise<ThreadResolveResult & { readonly all_scope?: boolean | undefined }> {
-  const here = resolution(options, local, address, callerId, allScope)
+export async function resolveAcross(options: ThreadToolSurfaceOptions, local: readonly ThreadAddressEntry[], address: string, callerId: string, allScope: boolean | undefined, match: "exact" | "fuzzy" = "exact"): Promise<ThreadResolveResult & { readonly all_scope?: boolean | undefined }> {
+  if (match === "fuzzy" && allScope !== true && options.callerWorkspaceRoot().trim() === "") return { kind: "error", ...threadToolFailure("caller_context_missing", "Scoping a fuzzy handoff needs the caller's workspace root, which this call did not provide.", "Set all_scope to search every workspace, or hand off from a session that knows its workspace.") }
+  const resolve = (entries: readonly ThreadAddressEntry[]): ThreadResolveResult => {
+    if (match === "exact") return resolution(options, entries, address, callerId, allScope)
+    const visible = allScope === true ? entries : [...workspaceEntries(entries.filter((entry) => entry.transport === undefined), options.callerWorkspaceRoot()), ...entries.filter((entry) => entry.transport !== undefined)]
+    const found = fuzzyMatch(visible.filter((entry) => entry.thread_id !== callerId), address)
+    return found.kind === "ok" ? { ...found, resolution: "name" } : found
+  }
+  const here = resolve(local)
   if (options.remote === undefined || (here.kind === "ok" && here.resolution === "id")) return here
-  const book = await relayAddressBook(options.remote, address).catch((): RelayAddressBook => ({ entries: [] }))
+  const book = await relayAddressBook(options.remote, address).catch((error: unknown): RelayAddressBook => ({
+    entries: [],
+    unavailable: threadToolFailure("host_unavailable", "The account's session listing could not be reached.", "Retry when the device service is reachable.", { reason: error instanceof Error ? error.message : String(error) }),
+  }))
   if (book.entries.length === 0 && here.kind === "ok") return here
-  const across = resolution(options, [...local, ...book.entries], address, callerId, allScope)
+  const across = resolve([...local, ...book.entries])
   if (across.kind === "ok") return { ...across, all_scope: across.resolution === "alias" || across.entry.transport !== undefined ? true : allScope }
   if (book.aliasFailure !== undefined) return { kind: "error", ...book.aliasFailure } as ThreadResolveResult
-  // A5: the paid-plan refusal is the answer when other devices would have been needed; any other unavailability leaves
-  // the local answer as it is (not_found), exactly as without a device service.
-  if (book.unavailable?.code === "relay_requires_paid_plan" && here.kind === "error" && here.code === "not_found") return { kind: "error", ...book.unavailable } as ThreadResolveResult
+  if (book.unavailable !== undefined && here.kind === "error" && here.code === "not_found") return { kind: "error", ...book.unavailable } as ThreadResolveResult
   return across
 }

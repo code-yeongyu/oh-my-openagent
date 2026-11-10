@@ -4,7 +4,7 @@ import { threadToolFailure } from "./errors"
 import type { ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
-import { checkNameConflict, fuzzyMatch, normalizeThreadName, workspaceEntries, type ThreadAddressEntry } from "./addressing"
+import { checkNameConflict, normalizeThreadName, type ThreadAddressEntry } from "./addressing"
 import { createLocalSessionHost } from "./control/local-session-host"
 import { checkInitialSkills } from "./initial-skills"
 import {
@@ -192,8 +192,6 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     return output(result)
   }
 
-  // Fuzzy candidates follow the exact ladder's scope: the caller's workspace unless all_scope.
-  const fuzzyCandidates = (entries: ThreadAddressEntry[], allScope: boolean | undefined) => allScope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot())
   /**
    * One body for a new, an existing or a forked thread, here or on another device (#12884): the shape checks, then
    * placement (the only step that reads the device), then the name checked against the threads the target device
@@ -254,7 +252,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       return await closeThread(located.control)
     }),
   }
-  const handoff: AnyTool = { ...metadata("thread_handoff"), parameters: threadToolParamSchemas.thread_handoff, execute: (id: string, args: ThreadHandoffInput, _signal, _onUpdate, ectx) => execute("thread_handoff", id, args, ectx, async (current, value, operationId, callerId) => { if (value.match === "fuzzy" && value.all_scope !== true && options.callerWorkspaceRoot().trim() === "") return failure("caller_context_missing", "Scoping a fuzzy handoff needs the caller's workspace root, which this call did not provide.", "Set all_scope to search every workspace, or hand off from a session that knows its workspace."); if (value.match !== "fuzzy") return await deliver(current, value.thread, value, operationId, callerId, "exact_name"); const entries = value.match === "fuzzy" ? fuzzyCandidates(resolveEntries(options, current), value.all_scope) : toThreadAddressEntries(sendAddressBook(options, current, value.thread, value.all_scope)); const resolved = value.match === "fuzzy" ? fuzzyMatch(entries.filter((entry) => entry.thread_id !== callerId), value.thread) : resolution(options, entries, value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; return deliver(current, resolved.entry.thread_id, value, operationId, callerId, value.match === "fuzzy" ? "fuzzy" : "exact_name") }) }
+  const handoff: AnyTool = { ...metadata("thread_handoff"), parameters: threadToolParamSchemas.thread_handoff, execute: (id: string, args: ThreadHandoffInput, _signal, _onUpdate, ectx) => execute("thread_handoff", id, args, ectx, async (current, value, operationId, callerId) => deliver(current, value.thread, value, operationId, callerId, value.match === "fuzzy" ? "fuzzy" : "exact_name")) }
   const rename: AnyTool = {
     ...metadata("thread_rename"),
     parameters: threadToolParamSchemas.thread_rename,
@@ -267,10 +265,9 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       const name = value.name?.trim()
       if (name !== undefined && located.kind === "not_live") return NOT_LIVE
       const thread = located.kind === "control" ? located.control : located
-      if (name !== undefined) {
+      if (name !== undefined && located.kind === "control") {
         if (name.length === 0) return failure("invalid_arguments", "The new thread name is empty.", "Pass a non-empty name.")
-        const entries = resolveEntries(options, current)
-        const visible = value.all_scope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot())
+        const visible = await located.control.visible()
         const existing = visible.find((entry) => entry.thread_id !== thread.thread_id && normalizeThreadName(entry.name) === normalizeThreadName(name))
         if (existing !== undefined) return failure("name_conflict", `A thread named "${existing.name}" already exists.`, "Call thread_list and choose another name.")
       }
@@ -323,7 +320,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
    * holds, resolved through the send address book under the scope the address resolved with. A registered exact id
    * (`PUBLISHED_SEND_VIEW`) skips the address book; the engine validates its one endpoint.
    */
-  async function locate(current: ThreadHostView, address: string, allScope: boolean | undefined, callerId: string): Promise<DeliveryTarget | { readonly kind: "error"; readonly result: ThreadToolResult }> {
+  async function locate(current: ThreadHostView, address: string, allScope: boolean | undefined, callerId: string, match: "exact" | "fuzzy" = "exact"): Promise<DeliveryTarget | { readonly kind: "error"; readonly result: ThreadToolResult }> {
     const scope = allScope
     if (current === PUBLISHED_SEND_VIEW) {
       // A reply approved by the sender's stated name must still land on that sender, not on a published thread that happens to carry the same spelling as its id.
@@ -333,7 +330,8 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     }
     // Decision 0027: ONE resolver over this device's book and the relay transport's book (the account's other devices);
     // the entry it returns says which transport carries the send. An unreachable relay leaves the local book alone.
-    const resolved = await resolveAcross(options, toThreadAddressEntries(sendAddressBook(options, current, address, true)), address, callerId, scope)
+    const entries = match === "fuzzy" ? resolveEntries(options, current) : toThreadAddressEntries(sendAddressBook(options, current, address, true))
+    const resolved = await resolveAcross(options, entries, address, callerId, scope, match)
     if (resolved.kind === "error") return { kind: "error", result: { kind: "error", error: resolved } as ThreadToolResult }
     // The allowance approved this send as a reply to a consumed delivery's sender (by id or stated name): deliver only when
     // the address resolves to that sender, else refuse by name without sending (decision 0027 section 6).
@@ -344,7 +342,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   }
 
   async function deliver(current: ThreadHostView, address: string, value: ThreadSendInput | ThreadHandoffInput, idempotencyKey: string, callerId: string, resolvedBy?: "exact_name" | "fuzzy"): Promise<ThreadToolResult> {
-    const target = await locate(current, address, value.all_scope, callerId)
+    const target = await locate(current, address, value.all_scope, callerId, resolvedBy === "fuzzy" ? "fuzzy" : "exact")
     if (target.kind === "error") return target.result
     return await deliverThrough(options, pipeline, current, target, value, idempotencyKey, callerId, resolvedBy)
   }

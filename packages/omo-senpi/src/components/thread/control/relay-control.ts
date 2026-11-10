@@ -1,4 +1,5 @@
 import type { ThreadTranscriptEntry } from "../reader"
+import { relayAddressEntry } from "../remote/address-book"
 import { rowThreadId } from "../remote/ports"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
 import { outcomeFailure } from "../remote/outcome"
@@ -43,6 +44,7 @@ export function createRelayControl(remote: RemoteThreadSurface, row: RemoteSessi
     thread_id: rowThreadId(row),
     device,
     title: row.title,
+    visible: async () => (await remote.sessions.sessions()).filter((entry) => entry.device === device).map((entry) => relayAddressEntry(entry)),
     interrupt: async (turnId) => {
       const reply = await command({ type: "interrupt", ...(turnId === undefined ? {} : { turnId }) })
       const reported = reply["turnId"]
