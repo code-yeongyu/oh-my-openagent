@@ -115,7 +115,9 @@ describe("the account source built from the engine's one selection", () => {
 
     // when: a late resolve blocks on the held check, a third resolve reopens, then the held check answers false
     const late = source()
-    while (checks < 1) await Promise.resolve()
+    // Bounded, so a regression that never reaches the held check fails at the assertion instead of hanging.
+    for (let spins = 0; checks < 1 && spins < 50; spins++) await Promise.resolve()
+    expect(checks).toBe(1)
     const reopened = await source()
     held.resolve(false)
 
