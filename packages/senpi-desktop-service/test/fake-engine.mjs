@@ -4,6 +4,12 @@
 // FAKE_ENGINE_ABI overrides the advertised ABI.
 // FAKE_ENGINE_DESKTOP=1 answers desktop methods without `params.fake` from test/fake-desktop.mjs;
 // FAKE_ENGINE_STALL=<method> then treats that method as "cancellable".
+// FAKE_ENGINE_FEATURES is the JSON `features` value of the hello reply (unset omits the key, like a
+// pre-features engine); a session opened with `reportMode: "object"` then answers a `null` desktop exec reply
+// with an ActionReport, and FAKE_ENGINE_EXEC_REPLY (JSON) replaces every such reply.
+// FAKE_ENGINE_TCC_FILE names a file holding "granted" or "denied"; it is read once at startup and that
+// answer is kept for the process's life, the way macOS caches a TCC answer per process.
+// FAKE_ENGINE_SPAWN_LOG names a file each fake engine appends its pid to at startup.
 // Every received line is echoed first as an `engine.log` notification ("recv <line>") so tests observe the wire.
 // Any other method is steered by `params.fake`:
 //   "hold"        - reply only after a "release" request arrives (after the release reply)
@@ -15,6 +21,7 @@
 //   "notify"      - emit one audit and one stopPath.changed notification, then reply
 //   "exit"        - exit with code 7 without replying
 //   otherwise     - reply { method, params, pid }
+import { appendFileSync, readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { createDesktop } from "./fake-desktop.mjs";
 
@@ -23,25 +30,45 @@ const abi = process.env.FAKE_ENGINE_ABI ?? "senpi-desktop/1";
 const resumeToken = `token-${process.pid}`;
 const desktop = process.env.FAKE_ENGINE_DESKTOP === "1" ? createDesktop() : undefined;
 const stalled = process.env.FAKE_ENGINE_STALL;
+const helloFeatures =
+	process.env.FAKE_ENGINE_FEATURES === undefined ? {} : { features: JSON.parse(process.env.FAKE_ENGINE_FEATURES) };
+const execReply = process.env.FAKE_ENGINE_EXEC_REPLY === undefined ? undefined : JSON.parse(process.env.FAKE_ENGINE_EXEC_REPLY);
+let reportMode = "null";
+// The exec methods whose reply is `null | ActionReport` (core `Response::Action`).
+const EXEC_METHODS = new Set([
+	"click", "moveMouse", "drag", "scroll", "typeText", "keyChord", "holdKeys", "holdMouse", "raiseWindow",
+	"menus.select", "clipboard.write", "ax.perform", "ax.setValue", "ax.focus", "ax.click",
+]);
+const actionReport = (method) => ({
+	disposition: { delivery: "delivered_unverified", retry: "unsafe" },
+	effect: "unverifiable",
+	focusRestoration: "not_needed",
+	auditIds: [`audit-${method}`],
+});
 
 if (!process.argv.includes("--stdio")) {
 	process.stderr.write("fake-engine: expected --stdio\n");
 	process.exit(2);
 }
 
+if (process.env.FAKE_ENGINE_SPAWN_LOG !== undefined) appendFileSync(process.env.FAKE_ENGINE_SPAWN_LOG, `${process.pid}\n`);
+const tccFile = process.env.FAKE_ENGINE_TCC_FILE;
+const tcc = tccFile === undefined ? "granted" : readFileSync(tccFile, "utf8").trim();
+const trusted = tcc === "granted";
+
 const capabilities = {
 	backend: "fake",
 	displayServer: null,
-	capture: true,
-	input: true,
-	ax: true,
-	backgroundWindowInput: true,
+	capture: trusted,
+	input: trusted,
+	ax: trusted,
+	backgroundWindowInput: trusted,
 	...(process.env.FAKE_ENGINE_CURSOR_OMITTED === "1" ? {} : { cursorOverlay: false }),
 	deliveryModes: ["background", "foreground"],
-	capturePermission: "granted",
-	inputPermission: "granted",
-	axPermission: "granted",
-	displayCount: 1,
+	capturePermission: tcc,
+	inputPermission: tcc,
+	axPermission: tcc,
+	displayCount: trusted ? 1 : 0,
 	focusGuard: true,
 	stopPath: "global",
 	stopReason: null,
@@ -81,8 +108,9 @@ function handle(request) {
 	const { id, method, params } = request;
 	switch (method) {
 		case "engine.hello":
-			return reply(id, { protocolVersion: "1", engineVersion: "0.0.0-fake", buildSha: "fake", abi });
+			return reply(id, { protocolVersion: "1", engineVersion: "0.0.0-fake", buildSha: "fake", abi, ...helloFeatures });
 		case "session.open":
+			reportMode = params?.reportMode ?? "null";
 			return reply(id, { capabilities, resumeToken });
 		case "session.close":
 		case "stopPath.heartbeat":
@@ -145,6 +173,9 @@ function handle(request) {
 		if (outcome !== undefined) {
 			const { notifications = [], ...reply } = outcome;
 			for (const notification of notifications) send(notification);
+			const exec = reply.result === null && EXEC_METHODS.has(method);
+			if (exec && execReply !== undefined) return send({ id, result: execReply });
+			if (exec && reportMode === "object") return send({ id, result: actionReport(method) });
 			return send({ id, ...reply });
 		}
 	}
