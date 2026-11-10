@@ -81,7 +81,9 @@ export async function runSession(service: DeviceService, args: SessionArgs, json
   const label = `${args.target.device}/${args.target.session}`
   // Addressed directly, as the SDK does: its device refuses a session it does not hold (unknown_session). The
   // account listing settles only with the slowest device (seconds) and lags a session just opened.
-  const row: RemoteSessionRow = { device: args.target.device, session_id: args.target.session, title: "", project: "", path: "", state: "idle", updated_ms: 0 }
+  // The id a caller types is the id above the port (decision 0027 D2): it is the row's durable id, and the transport
+  // key it dispatches by until the device service resolves it.
+  const row: RemoteSessionRow = { device: args.target.device, session_id: args.target.session, durable_id: args.target.session, title: "", project: "", path: "", state: "idle", updated_ms: 0 }
   if (args.verb === "send") return sendTo(remote, row, args, { label, json, show }, dependencies)
   // The device is found online once, before its control is used, as the thread tools' locate does (A3).
   const offline = await deviceOnline(remote, row.device)
@@ -116,7 +118,7 @@ async function openOn(
   const wanted = args.model
   if (opened.kind !== "ok" || !("thread" in opened) || wanted === undefined) return show(opened, "")
   const label = `${args.device}/${opened.thread.thread_id}`
-  const created: RemoteSessionRow = { device: args.device, session_id: opened.thread.thread_id, title: opened.thread.name, project: opened.thread.cwd, path: "", state: "idle", updated_ms: 0 }
+  const created: RemoteSessionRow = { device: args.device, session_id: opened.thread.thread_id, durable_id: opened.thread.thread_id, title: opened.thread.name, project: opened.thread.cwd, path: "", state: "idle", updated_ms: 0 }
   const model = await answered(() => setModelOn(createRelayControl(remote, created), wanted, undefined))
   if (model.kind === "error") {
     // The session exists on its device (opened to be kept), so the failure names it: a retry must not leave another one

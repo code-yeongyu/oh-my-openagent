@@ -233,7 +233,8 @@ describe("thread component control endpoint registration", () => {
 describe("K8: a run woken from another device continues that chain's hop on its next send", () => {
   const remoteFixture = createRemoteThreadFixture()
 
-  test("#given the run consumed a delivery the engine stamped as arriving from another device at chain_count 2 #when it sends to b, and again after the run settles #then the first record is hop 3 and the next run starts a chain at hop 1", async () => {
+  // Decision 0027 section 6 (#13042): the consumed delivery's hop carries into a turn the engine starts on its own; a person's message starts a new chain.
+  test("#given the run consumed a delivery the engine stamped as arriving from another device at chain_count 2 #when it sends to b, again in a turn the engine starts after the settle, and again after a person's message #then the records are hop 3, hop 3, hop 1", async () => {
     const agentDir = mkdtempSync(join(tmpdir(), "thr-component-chain-"))
     const store = createGatewayStore({ agentDir })
     const account = remoteFixture.account()
@@ -247,11 +248,17 @@ describe("K8: a run woken from another device continues that chain's hop on its 
       expect(first.details.result).toMatchObject({ kind: "ok", device: "b" })
       await settleRun(f, "dur-1")
       await f.dispatch("agent_start", ctx)
-      const next = (await f.tool("thread_send").execute("call-2", { thread: "dur-on-b", message: "fresh" }, undefined, undefined, ctx)) as { details: { result: unknown } }
+      await f.dispatch("message_start", ctx, { message: { role: "custom", customType: "senpi.todo-owed", content: "open todos remain" } })
+      const next = (await f.tool("thread_send").execute("call-2", { thread: "dur-on-b", message: "still on it" }, undefined, undefined, ctx)) as { details: { result: unknown } }
       expect(next.details.result).toMatchObject({ kind: "ok", device: "b" })
-      expect(account.hops).toEqual([3, 1])
+      await settleRun(f, "dur-1")
+      await f.dispatch("agent_start", ctx)
+      await f.dispatch("message_start", ctx, { message: { role: "user", content: "a person typed" } })
+      const fresh = (await f.tool("thread_send").execute("call-3", { thread: "dur-on-b", message: "fresh" }, undefined, undefined, ctx)) as { details: { result: unknown } }
+      expect(fresh.details.result).toMatchObject({ kind: "ok", device: "b" })
+      expect(account.hops).toEqual([3, 3, 1])
       // Each default-mode send reads b's state once before its record (gateway/decision.ts); the records carry the hops.
-      expect(account.sent.map((entry) => [entry.rpc?.["type"], entry.rpc?.["chainCount"]])).toEqual([["get_state", undefined], ["admit_external_message", 3], ["get_state", undefined], ["admit_external_message", 1]])
+      expect(account.sent.map((entry) => [entry.rpc?.["type"], entry.rpc?.["chainCount"]])).toEqual([["get_state", undefined], ["admit_external_message", 3], ["get_state", undefined], ["admit_external_message", 3], ["get_state", undefined], ["admit_external_message", 1]])
     } finally {
       await store.dispose()
       await remoteFixture.cleanup()

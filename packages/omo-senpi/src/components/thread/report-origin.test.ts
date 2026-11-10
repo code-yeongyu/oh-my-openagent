@@ -223,6 +223,14 @@ async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all";
    * schedules the continuation instead of settling: a new run takes the next follow-up (or all of
    * them), and `agent_settled` does not fire. `local` is a prompt the user queued in the terminal.
    */
+  /** The run answers, then the engine starts its own turn (an open-todo reminder) before the session settles (#13042). */
+  const answerAndEngineTurn = async () => {
+    await message(finalAnswer)
+    await dispatch("agent_end", { messages: [finalAnswer] })
+    await dispatch("agent_start")
+    await dispatch("turn_start")
+    await message({ role: "custom", customType: "senpi.todo-owed", content: [{ type: "text", text: "open todos remain" }], timestamp: 0 })
+  }
   const answerAndContinue = async (local?: string) => {
     await message(finalAnswer)
     await dispatch("agent_end", { messages: [finalAnswer] })
@@ -242,7 +250,7 @@ async function setup(options: { readonly followUpMode?: "one-at-a-time" | "all";
     const page = await connectorStore.readOutbox({ now: Date.now(), binding_id: bindingId })
     return page.kind === "ok" ? page.rows.map((row) => `${row.event}:${row.text}`) : []
   }
-  return { bindThread, send, sendFromRun, rootOf, callReport, runStartedDelivery, steerLocal, steerAskUserAnswer, runLocalPrompt, answerAndContinue, answerAndSettle, texts, written: () => completionsWritten(runtimeStore) }
+  return { bindThread, send, sendFromRun, rootOf, callReport, runStartedDelivery, steerLocal, steerAskUserAnswer, runLocalPrompt, answerAndContinue, answerAndEngineTurn, answerAndSettle, texts, written: () => completionsWritten(runtimeStore) }
 }
 
 describe("a send from a run continues the causal chain of the message that run consumed", () => {
@@ -290,6 +298,19 @@ describe("a report or completion without binding_id goes to the thread whose mes
     await within(written, "the armed completion to be written at the settle")
     expect({ a: await s.texts(a), b: await s.texts(b) }).toEqual({ a: ["report:halfway there", "completion:job done"], b: [] })
     expect(await s.callReport("report", "no run now")).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+  })
+
+  // #13042: the run's deliveries end with its final answer in every order - an engine-started message (a reminder) that
+  // arrives after the answer and before the settle starts a new group for reports, exactly as the settle does.
+  test("#given A's run answered #when the engine starts its own follow-up turn before the session settles #then a report without binding_id must name its thread", async () => {
+    const s = await setup()
+    const a = await s.bindThread("chat-a")
+    await s.bindThread("chat-b")
+    expect(await s.send(a, "please do the job")).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
+    await s.runStartedDelivery()
+    expect(await s.callReport("report", "halfway there")).toMatchObject({ kind: "ok", binding_id: a })
+    await s.answerAndEngineTurn()
+    expect(await s.callReport("report", "no binding named")).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
   })
 
   test("#given A's run with B's message queued behind it #when the engine drains B's follow-up before the session settles #then the report and completion answering B land in B, not A", async () => {
