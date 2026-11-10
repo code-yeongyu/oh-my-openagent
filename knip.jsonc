@@ -335,8 +335,6 @@
       "packages/memory-core/src/sync/space/read-back.ts": ["toLf", "linesOf"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MemoryApplyPatchError
       "packages/memory-core/src/tools/memory-apply-patch.ts": ["MemoryApplyPatchError"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) FABLE_55_PREDECESSOR
-      "packages/model-core/src/fable-55-launch.ts": ["FABLE_55_PREDECESSOR"],
       // pre-existing at origin dev 4686e425b5: unused export(s) isModelAvailable
       "packages/model-core/src/index.ts": ["isModelAvailable"],
       // pre-existing at origin dev 4686e425b5: unused export(s) isModelAvailable
@@ -1354,8 +1352,6 @@
       "packages/omo-senpi/src/components/thread/gateway/store-relay-ops.ts": ["toolReceiptBegin", "toolReceiptSettle", "registerIncarnation", "pendingCompletionArms", "latestCompletionArm", "closeQuestion"],
       // pre-existing at origin dev 4686e425b5: unused export(s) sweepRetention
       "packages/omo-senpi/src/components/thread/gateway/store-retention.ts": ["sweepRetention"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_STORE_WORKER_BUNDLE_NAME
-      "packages/omo-senpi/src/components/thread/gateway/store.ts": ["GATEWAY_STORE_WORKER_BUNDLE_NAME"],
       // pre-existing at origin dev 4686e425b5: unused export(s) matcherAwaits
       "packages/omo-senpi/src/components/thread/gateway/worker-reply-matchers.test.ts": ["matcherAwaits"],
       // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_TOOL_SEARCH_GROUP
@@ -3668,6 +3664,8 @@
         "src/cli/install-codex/toml-section-editor.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/install-codex/types.ts",
+        // a child-process fixture: refresh-process.test.ts runs it under a scratch HOME, nothing imports it (#12978)
+        "src/cli/service-auth/account-home.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/service-auth/accounts-closed.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs

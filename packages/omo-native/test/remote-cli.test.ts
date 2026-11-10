@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmodSync, existsSync, mkdtempSync, rmSync } from "node:fs"
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { connectDeviceService, DEVICE_SERVICE_VERSION } from "../../device-service-core/src/index.ts"
 import { deviceServiceAssetName } from "../../device-service-core/src/release/acquire.ts"
@@ -14,6 +15,7 @@ import { createRemoteThreadFixture, ENGINE } from "../../omo-senpi/src/component
 import { runAccountVerb } from "../account-cli"
 import { type BootstrapSetup, deviceServiceBootstrapSetup } from "../remote-bootstrap"
 import { prepareRemoteAttach, REMOTE_EXIT, runRemoteVerb } from "../remote-cli"
+import { gatewayWorkerAnchor } from "../remote-session-verbs"
 import { ago } from "../remote-render"
 
 const NOW = 1_790_000_400_000
@@ -46,7 +48,7 @@ const testBootstrap = (overrides: Partial<BootstrapSetup> = {}): BootstrapSetup 
   ...overrides,
 })
 
-async function run(args: readonly string[], stateDir?: string, account = SIGNED_IN, bootstrap = testBootstrap(), remote?: RemoteThreadSurface) {
+async function run(args: readonly string[], stateDir?: string, account = SIGNED_IN, bootstrap = testBootstrap(), remote?: RemoteThreadSurface, extra: { readonly packageRoot?: string } = {}) {
   let dir = stateDir
   if (dir === undefined) {
     const owner = await startFakeOwner({ stateDir: privateDir(), world: defaultWorld() })
@@ -68,6 +70,7 @@ async function run(args: readonly string[], stateDir?: string, account = SIGNED_
       error: line => err.push(line),
       bootstrap,
       ...(remote === undefined ? {} : { remote: () => remote }),
+      ...extra,
     },
     args,
   )
@@ -402,6 +405,76 @@ describe("omo remote attach", () => {
 })
 
 // The session verbs are the thread tools' remote ops (omo-senpi thread/remote), driven here over that suite's fake account.
+// The shipped omo carries the gateway store's worker only beside the plugin's extension bundle; a send that resolved it
+// beside bin/lib (the store's default) failed on every remote send from the published package (#12911 review HIGH).
+describe("omo remote send: the gateway store's worker in the shipped layout", () => {
+  test("#given a package root whose plugin/extensions holds the worker sidecar #when the anchor is resolved #then it is the extension bundle beside that sidecar", () => {
+    const root = mkdtempSync(join(tmpdir(), "omo-remote-worker-"))
+    try {
+      const extensions = join(root, "plugin", "extensions")
+      mkdirSync(extensions, { recursive: true })
+      writeFileSync(join(extensions, "gateway-store-worker.mjs"), "")
+      const anchor = gatewayWorkerAnchor(root)
+      expect(anchor && fileURLToPath(anchor)).toBe(join(extensions, "omo.js"))
+      expect(anchor && fileURLToPath(new URL("./gateway-store-worker.mjs", anchor))).toBe(join(extensions, "gateway-store-worker.mjs"))
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given the staged plugin's real worker sidecar under a package root the launcher names #when omo remote send runs #then the send goes through a store on that worker and b's engine takes the prompt", async () => {
+    // The sidecar the build ships (packages/omo-senpi/plugin/extensions/gateway-store-worker.mjs) under <root>/plugin/extensions/,
+    // as the npm package and the compiled runtime directory lay it out; the launcher passes that root as packageRoot.
+    const root = mkdtempSync(join(tmpdir(), "omo-remote-staged-"))
+    const extensions = join(root, "plugin", "extensions")
+    mkdirSync(extensions, { recursive: true })
+    const sidecar = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "omo-senpi", "plugin", "extensions", "gateway-store-worker.mjs")
+    copyFileSync(sidecar, join(extensions, "gateway-store-worker.mjs"))
+    try {
+      const fixture = createRemoteThreadFixture()
+      const a = fixture.account()
+      try {
+        const { code, out } = await run(["send", "b/dur-on-b", "hi", "--no-wait"], undefined, SIGNED_IN, testBootstrap(), a.remote, { packageRoot: root })
+        expect([code, out]).toEqual([REMOTE_EXIT.ok, ["Sent to b/dur-on-b: turn turn-b started."]])
+        expect(a.sent.filter(entry => entry.rpc?.["type"] === "prompt")).toHaveLength(1)
+      } finally {
+        await fixture.cleanup()
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a package root whose staged sidecar cannot start (an empty worker module) #when omo remote send runs with that root #then the send fails before b is asked, which proves the store ran on the named root and not on the source fallback", async () => {
+    const root = mkdtempSync(join(tmpdir(), "omo-remote-broken-"))
+    const extensions = join(root, "plugin", "extensions")
+    mkdirSync(extensions, { recursive: true })
+    writeFileSync(join(extensions, "gateway-store-worker.mjs"), "")
+    try {
+      const fixture = createRemoteThreadFixture()
+      const a = fixture.account()
+      try {
+        const { code } = await run(["send", "b/dur-on-b", "hi", "--no-wait"], undefined, SIGNED_IN, testBootstrap(), a.remote, { packageRoot: root })
+        expect(code).not.toBe(REMOTE_EXIT.ok)
+        expect(a.sent.filter(entry => entry.rpc?.["type"] === "prompt")).toHaveLength(0)
+      } finally {
+        await fixture.cleanup()
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a package root with no staged plugin (the source tree) #when the anchor is resolved #then there is none and the store resolves its own worker", () => {
+    const root = mkdtempSync(join(tmpdir(), "omo-remote-noworker-"))
+    try {
+      expect(gatewayWorkerAnchor(root)).toBeUndefined()
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe("omo remote session verbs", () => {
   const fixture = createRemoteThreadFixture()
   afterEach(fixture.cleanup)
@@ -520,7 +593,7 @@ describe("omo remote session verbs", () => {
   test("--json prints the remote op's typed result as is", async () => {
     const a = fixture.account({ engine: { ...ENGINE, interrupt: { turnId: "turn-b", interrupted: true } } })
     const { out } = await run(["interrupt", "b/dur-on-b", "--json"], undefined, SIGNED_IN, testBootstrap(), a.remote)
-    expect(JSON.parse(out.join(""))).toEqual({ kind: "ok", thread_id: "dur-on-b", turn_id: "turn-b", interrupted: true })
+    expect(JSON.parse(out.join(""))).toEqual({ kind: "ok", thread_id: "dur-on-b", turn_id: "turn-b", interrupted: true, device: "b" })
   })
 
   test.each([
