@@ -148,7 +148,7 @@ async function sendTo(
   const store = createGatewayStore({ agentDir: canonicalAgentDir(), ...(anchor === undefined ? {} : { workerModuleUrl: anchor }) })
   const senderProvenance = () => resolveProvenance({ cwd: process.cwd(), env: process.env })
   // This command holds no session of its own, so the local transport's engine has an empty address book.
-  const engine = createGatewayEngine({ store, endpoints: { wake: async () => undefined }, resolve: resolveFromEntries(() => [], () => process.cwd()), senderProvenance })
+  const engine = createGatewayEngine({ store, endpoints: { wake: async (endpoint) => { throw new Error(`host_unavailable:${endpoint.socket}`) } }, resolve: resolveFromEntries(() => [], () => process.cwd()), senderProvenance })
   const pipeline = createDeliveryPipeline({ local: createLocalTransport(engine), relay: createRelayTransport({ remote, store, senderProvenance }) })
   const person = { kind: "person" as const, uid: process.getuid?.() ?? 0, user: userInfo().username }
   const deliver = async (): Promise<ThreadToolResult> => {
