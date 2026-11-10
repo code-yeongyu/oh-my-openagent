@@ -10,6 +10,7 @@ use objc2_application_services::{AXError, AXIsProcessTrusted, AXUIElement, AXVal
 use objc2_core_foundation::{CFArray, CFBoolean, CFDate, CFRange, CFRetained, CFString, CFType, CGPoint, CGSize};
 use senpi_desktop_core::ax::{AxBounds, AxHandle};
 use senpi_desktop_core::error::{CoreResult, DesktopError, TccPermission};
+use senpi_desktop_core::frame::PointHit;
 
 const AX_TIMEOUT_SECONDS: f32 = 2.0;
 
@@ -48,12 +49,17 @@ pub(super) fn ensure_trusted() -> CoreResult<()> {
     }
 }
 
+/// A retained, generation-bound handle for `element` (see `retained`).
 pub(super) fn handle(element: CFRetained<AXUIElement>) -> AxHandle {
-    AxHandle::native(element)
+    super::retained::wrap(element)
 }
 
-/// The AXUIElement behind a handle this backend produced.
+/// The AXUIElement behind a handle this backend produced: `StaleRef` once the
+/// ref generations that held it expired or its app was replaced.
 pub(crate) fn element(handle: &AxHandle) -> CoreResult<&AXUIElement> {
+    if let Some(found) = super::retained::resolve(handle) {
+        return found;
+    }
     handle
         .downcast_native::<CFRetained<AXUIElement>>()
         .map(|element| &**element)
@@ -253,4 +259,19 @@ pub(super) fn ax_result(error: AXError, context: impl Into<String>) -> CoreResul
     } else {
         Err(DesktopError::ax_failed(format!("{} ({error:?})", context.into())))
     }
+}
+
+/// The element at a global logical point, as the object-mode `hit` reports
+/// it: its role, and its title (else description) unless it is a secure text
+/// field.
+pub(crate) fn hit_at(x: f64, y: f64) -> CoreResult<Option<PointHit>> {
+    Ok(super::tree::element_at(x, y)?.map(|hit| {
+        let role = copy_string(&hit, "AXRole").unwrap_or_default();
+        let secure = role == "AXSecureTextField"
+            || copy_string(&hit, "AXSubrole").as_deref() == Some("AXSecureTextField");
+        let label = copy_string(&hit, "AXTitle")
+            .filter(|title| !title.is_empty())
+            .or_else(|| copy_string(&hit, "AXDescription"));
+        PointHit { role, label, secure }
+    }))
 }
