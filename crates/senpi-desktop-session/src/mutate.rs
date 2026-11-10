@@ -145,10 +145,14 @@ impl FrameContext for GateView {
     }
 }
 
-/// A foreground transaction holds the machine-wide lock from its capture
-/// through its restore; background exec only around its dispatch.
+/// A foreground transaction, and any transaction whose guard captures focus
+/// to hand back (background keys: `Guard::KeyFocus`), holds the machine-wide
+/// lock from its capture through its restore; other background exec holds it
+/// only around its dispatch.
 fn locks_whole_transaction(mutation: &Mutation<'_>) -> bool {
-    mutation.delivery == DeliveryMode::Foreground || matches!(route(mutation), Some(ActionRoute::ForegroundHid))
+    mutation.delivery == DeliveryMode::Foreground
+        || matches!(route(mutation), Some(ActionRoute::ForegroundHid))
+        || Guard::captures(mutation.action, mutation.delivery)
 }
 
 /// The channel a mutating request's input takes; `None` for a request that
@@ -294,6 +298,8 @@ impl Worker {
             Ok(guard) => guard,
             Err(error) => return (Err(TransactionError::Primary(error)), None),
         };
+        // A failed dispatch keeps its lock until the release below has run.
+        let mut failed_dispatch = None;
         let mut result = match self.stop_observed(cancelled) {
             Some(stopped) => Err(stopped),
             None => match (!whole).then(|| self.take_interaction(mutation, cancelled)).transpose() {
@@ -301,7 +307,9 @@ impl Worker {
                 Ok(dispatch) => {
                     mutation.stage.set(Stage::Acting);
                     let acted = mutation.timings.time(TimedStage::Dispatch, || guarded(|| act(self)));
-                    drop(dispatch);
+                    if acted.is_err() {
+                        failed_dispatch = dispatch;
+                    }
                     acted
                 }
             },
@@ -318,6 +326,7 @@ impl Worker {
                 primary.message = format!("{}; releasing held input also failed: {release}", primary.message);
             }
         }
+        drop(failed_dispatch);
         mutation.timings.time(TimedStage::Restore, || guard.restore(self, result))
     }
 
