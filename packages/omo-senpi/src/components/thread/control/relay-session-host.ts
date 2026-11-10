@@ -1,4 +1,5 @@
 import type { ThreadSummary } from "../contracts"
+import { rowThreadId } from "../remote/ports"
 import { threadToolFailure } from "../errors"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
@@ -15,7 +16,9 @@ const recordOf = (value: unknown): JsonObject => (typeof value === "object" && v
 /** A listing row as the tools report a thread on another device (thread_list with all_scope shows the same). */
 export function listedThread(row: RemoteSessionRow): HostedThread {
   const seen = new Date(row.updated_ms).toISOString()
-  return { sessionId: row.session_id, thread_id: row.session_id, name: row.title, status: "live", cwd: row.project, created_at: seen, updated_at: seen, device: row.device, link: threadLink(row.session_id, row.title) }
+  // D2 (decision 0027): the id a caller sees and may pass back is the durable id; the listing key stays inside sessionId
+  // for the relay transport. A device that publishes no durable id lists an empty id: address its threads by name.
+  return { sessionId: row.session_id, thread_id: rowThreadId(row), name: row.title, status: "live", cwd: row.project, created_at: seen, updated_at: seen, device: row.device, link: threadLink(rowThreadId(row), row.title) }
 }
 
 // The engine session id the open_session reply names: its durable session id, else the relay session id. It is in no
@@ -68,9 +71,13 @@ export function createRelaySessionHost(remote: RemoteThreadSurface, device: stri
       // The reply's state keyed by the id the device lists the session under; the far engine's own routing id and
       // endpoint facts name nothing on this device.
       const { sessionId: _engineId, durableSessionId: _durable, socket: _socket, endpoint_kind: _endpointKind, controls: _controls, ...facts } = state
+      // D2: the id the caller gets back is the durable id (the engine names it on open; a listed row carries it), never
+      // the listing key, which stays in sessionId for the relay transport.
+      const durable = nonEmpty(state["durableSessionId"]) ?? nonEmpty(data["durableSessionId"]) ?? listed?.durable_id
       const session: ThreadHostSession = {
         ...facts,
         sessionId: threadId,
+        ...(durable === undefined ? {} : { durableSessionId: durable }),
         cwd: nonEmpty(state["cwd"]) ?? request.cwd ?? listed?.project ?? "",
         name: name ?? nonEmpty(state["sessionName"]) ?? listed?.title ?? null,
       }
