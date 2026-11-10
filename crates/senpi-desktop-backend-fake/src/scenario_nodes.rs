@@ -16,6 +16,9 @@ pub struct FakeAxNode {
     pub value: Option<String>,
     #[serde(default)]
     pub description: Option<String>,
+    /// Developer identifier (`AXIdentifier`).
+    #[serde(default)]
+    pub identifier: Option<String>,
     #[serde(default = "enabled_by_default")]
     pub enabled: bool,
     #[serde(default)]

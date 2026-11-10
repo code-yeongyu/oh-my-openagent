@@ -1,0 +1,365 @@
+{
+  "description": "computer-use v2 P6, reportMode object: engine.hello lists frame-identity and frame-consume; a capture of window 101 names its owner (identity); a click sent with consume:true and the bound frameId is delivered_unverified with route background_window and the element hit before it; the next click on that frame is refused InvalidCoordinateFrame reason consumed, not_delivered/safe (nothing sent); consume without frameId is -32602.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/v2-frame-identity.json",
+  "env": {
+    "SENPI_DESKTOP_FAKE_CLOCK": "1"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "engine.hello",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "protocolVersion": "1",
+              "engineVersion": "0.0.0",
+              "buildSha": "unknown",
+              "abi": "senpi-desktop/1",
+              "features": [
+                "action-report",
+                "frame-identity",
+                "frame-consume",
+                "ax-partial",
+                "trace",
+                "key-priming",
+                "epoch",
+                "interaction-lock"
+              ]
+            }
+          },
+          "variable": [
+            "/result/engineVersion",
+            "/result/buildSha"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session.open",
+        "params": {
+          "allowHostRelayOnlyStop": true,
+          "showCursor": false,
+          "reportMode": "object"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 1,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": "no-global-listener",
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "stopPath.start",
+        "params": {
+          "chord": "ctrl+alt+shift+escape"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/heartbeatFresh",
+            "/result/reason"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "stopPath.heartbeat",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "stopPath.changed",
+            "params": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/params/heartbeatFresh",
+            "/params/reason"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": null
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "capture",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": {
+              "mode": "inline-png",
+              "data": "iVBORw0KGgoAAAANSUhEUgAAAyAAAAJYCAYAAACadoJwAAAqu0lEQVR4Ae3AA6AkWZbG8f937o3IzKdyS2Oubdu2bdu2bdu2bWmMnpZKr54yMyLu+Xa3anqmhztr1a8++L2/21x11VVXXXXVVVddddVVV/3nI7jqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5r8I+vhwbSKOXQ+wAAAABJRU5ErkJggg==",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 800,
+              "height": 600,
+              "sourceWidth": 800,
+              "sourceHeight": 600,
+              "coordinateWidth": 800,
+              "coordinateHeight": 600,
+              "region": null,
+              "scale": 1.0,
+              "target": "101",
+              "frameId": "frame-01m6n3ma82cxjzyp08ry4c6ppp-1",
+              "note": null,
+              "identity": {
+                "windowNumber": "101",
+                "pid": 4242,
+                "processStart": 1700000000
+              }
+            }
+          },
+          "variable": [
+            "/result/data",
+            "/result/frameId"
+          ],
+          "bind": {
+            "frame": "/result/frameId"
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 20.0,
+          "y": 20.0,
+          "frameId": "{{frame}}",
+          "opts": {
+            "consume": true
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "result": {
+              "disposition": {
+                "delivery": "delivered_unverified",
+                "retry": "unsafe"
+              },
+              "effect": "unverifiable",
+              "route": "background_window",
+              "hit": {
+                "role": "button",
+                "label": "Delete"
+              },
+              "focusRestoration": "not_needed",
+              "auditIds": [
+                "01M6N3MBJ6DJJCZZ2Q522F4GMD"
+              ]
+            }
+          },
+          "variable": [
+            "/result/auditIds/0"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "click",
+              "target": "101",
+              "delivery": "background",
+              "frameId": "frame-01m6n3ma82cxjzyp08ry4c6ppp-1",
+              "code": null,
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null,
+              "id": "01M6N3MBJ6DJJCZZ2Q522F4GMD"
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored",
+            "/params/id",
+            "/params/frameId"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 20.0,
+          "y": 20.0,
+          "frameId": "{{frame}}"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "error": {
+              "code": -32007,
+              "message": "the frame was consumed by an earlier action; capture the target again before coordinate input",
+              "data": {
+                "code": "InvalidCoordinateFrame",
+                "hint": null,
+                "reason": "consumed",
+                "disposition": {
+                  "delivery": "not_delivered",
+                  "retry": "safe"
+                },
+                "focusRestoration": "not_needed"
+              }
+            }
+          },
+          "variable": []
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "click",
+              "target": "101",
+              "delivery": "background",
+              "frameId": "frame-01m6n3ma82cxjzyp08ry4c6ppp-1",
+              "code": "InvalidCoordinateFrame",
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null,
+              "id": "01M6N3MD1MJPAW9SQB2CAN28CT"
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored",
+            "/params/id",
+            "/params/frameId"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 20.0,
+          "y": 20.0,
+          "opts": {
+            "consume": true
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "error": {
+              "code": -32602,
+              "message": "invalid params: consume needs the frameId of the frame it consumes"
+            }
+          },
+          "variable": []
+        }
+      ]
+    }
+  ]
+}

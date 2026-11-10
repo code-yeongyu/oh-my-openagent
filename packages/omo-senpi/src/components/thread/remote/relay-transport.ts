@@ -15,7 +15,7 @@ import { outcomeFailure } from "./outcome"
 
 export type RelayTransportOptions = {
   readonly remote: RemoteThreadSurface
-  readonly store: Pick<GatewayStore, "now" | "toolReceiptBegin" | "toolReceiptSettle" | "deliveryView">
+  readonly store: Pick<GatewayStore, "now" | "toolReceiptBegin" | "toolReceiptSettle" | "toolReceiptRevise" | "deliveryView">
   readonly now?: () => number
   readonly senderProvenance: () => Promise<Provenance>
   readonly callerCause?: () => string | undefined
@@ -29,6 +29,10 @@ export type RelayTransportOptions = {
 
 type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
 type SendOutcome = Failure | RelayDeliverySuccess
+/** Replaces the answer the send's receipt replays with what later became of the delivery. */
+type Revise = (result: SendOutcome) => Promise<void>
+/** Work a send leaves for after its receipt is settled, so a revision always lands on the settled receipt. */
+type Later = (task: (revise: Revise) => Promise<void>) => void
 const fail = (code: ThreadToolFailure["code"], message: string, next: string, details?: Readonly<Record<string, unknown>>): Failure => ({ kind: "error", error: threadToolFailure(code, message, next, details) })
 
 // The refusals that mean the other side has no `admit_external_message` record (senpi#6240): the device service refuses a
@@ -82,24 +86,30 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
   const retryDelay = options.retryDelay ?? abortableDelay
   // Background re-sends of held deliveries; dispose aborts them (a receiver that already took one answers already_admitted).
   const disposed = new AbortController()
-  const retryHeld = async (row: RemoteSessionRow, record: JsonObject, deliveryId: string): Promise<void> => {
+  const retryHeld = async (row: RemoteSessionRow, record: JsonObject, deliveryId: string, revise: Revise): Promise<void> => {
     for (const [attempt, wait] of retryDelays.entries()) {
       log(`relay_delivery_held: delivery ${deliveryId} to ${row.session_id} on device ${row.device} waits behind an open draft; re-send ${attempt + 1} of ${retryDelays.length} in ${Math.round(wait / 1000)} s.`)
       await retryDelay(wait, disposed.signal)
       if (disposed.signal.aborted) return
       const sent = await remote.sessions.sessionCommand(row.device, row.session_id, record).catch((error: unknown) => ({ kind: "uncertain" as const, reason: error instanceof Error ? error.message : String(error) }))
       if (sent.kind !== "ok") { log(`relay_delivery_failed: delivery ${deliveryId} to ${row.session_id} on device ${row.device}: re-send ${attempt + 1} ended ${sent.kind} (${sent.reason}).`); return }
-      const kind = replyData(sent.response)["kind"]
-      // A steer the receiver held past the end of its turn is refused here; the sender was told queued, so say so in the log.
-      if (kind === "turn_conflict") { log(`relay_delivery_failed: delivery ${deliveryId} to ${row.session_id} on device ${row.device}: re-send ${attempt + 1} ended turn_conflict (the turn it steered ended while the draft held it).`); return }
-      if (kind !== "held_draft") return
+      const reply = replyData(sent.response)
+      if (reply["kind"] === "turn_conflict") {
+        // An explicit steer the draft held until its turn ended. The sender was answered queued; its receipt now answers
+        // the refusal, so a retry under the same idempotency key reads what became of it (the local row's `refused`).
+        const turnId = typeof reply["turnId"] === "string" ? reply["turnId"] : ""
+        await revise(fail(REFUSAL_CODES.turn_conflict.code, `Turn ${String(record["expectedTurnId"] ?? "?")} of ${row.session_id} on device ${row.device} ended while that session's open draft held the steer; it was not delivered.`, REFUSAL_CODES.turn_conflict.next, { device: row.device, delivery_id: deliveryId, ...(turnId === "" ? {} : { current_turn_id: turnId }) }))
+        log(`relay_delivery_failed: delivery ${deliveryId} to ${row.session_id} on device ${row.device}: re-send ${attempt + 1} ended turn_conflict (the steered turn ended while the draft held it); the send's receipt now answers that refusal.`)
+        return
+      }
+      if (reply["kind"] !== "held_draft") return
     }
     log(`relay_delivery_failed: delivery ${deliveryId} to ${row.session_id} on device ${row.device} was held behind that session's open draft through ${retryDelays.length} re-sends.`)
   }
   const unsettled = new Map<string, string>()
   const receiptKey = (scope: { readonly principal: string; readonly operation: string; readonly idempotency_key: string }) => `${scope.principal}\u0000${scope.operation}\u0000${scope.idempotency_key}`
 
-  async function once(callerId: string, idempotencyKey: string, args: unknown, run: () => Promise<SendOutcome>): Promise<SendOutcome> {
+  async function once(callerId: string, idempotencyKey: string, args: unknown, run: (later: Later) => Promise<SendOutcome>): Promise<SendOutcome> {
     const scope = { principal: `session:${callerId}`, operation: "thread_send:remote", idempotency_key: idempotencyKey }
     const admission = await store.toolReceiptBegin({ ...scope, now: now(), args_hash: hashArgs(args) })
     if (admission.kind === "replay") { const first = admission.result as SendOutcome; return first.kind === "ok" ? { ...first, deduplicated: true } : first }
@@ -110,14 +120,20 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
     if (admission.kind === "uncertain") return fail("idempotency_uncertain", "The earlier operation may have been delivered.", "Read the target transcript before deciding whether to retry.")
     const unrecorded = (what: string) => (settleError: unknown) => { unsettled.set(receiptKey(scope), `${what}, and its receipt could not be recorded: ${settleError instanceof Error ? settleError.message : String(settleError)}`) }
     let result: SendOutcome
+    const tasks: Array<(revise: Revise) => Promise<void>> = []
     try {
-      result = await run()
+      result = await run((task) => { tasks.push(task) })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       await store.toolReceiptSettle({ ...scope, now: now(), error_note: message }).catch(unrecorded(`the send failed (${message})`))
       throw error
     }
     await store.toolReceiptSettle({ ...scope, now: now(), result }).catch(unrecorded("the send ran"))
+    const revise: Revise = async (later) => {
+      const revised = await store.toolReceiptRevise({ ...scope, now: now(), result: later }).catch((error: unknown) => { log(`relay_receipt_unrevised: ${idempotencyKey}: ${error instanceof Error ? error.message : String(error)}`); return true })
+      if (!revised) log(`relay_receipt_unrevised: ${idempotencyKey}: no settled receipt of this process to revise.`)
+    }
+    for (const task of tasks) void task(revise)
     return result
   }
 
@@ -127,7 +143,7 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
     return { delivery_id: randomUUID(), root_id: prior?.root_id ?? `root-${randomUUID()}`, hop: Math.max(prior?.hop ?? 0, options.callerChainHop?.() ?? 0) + 1 }
   }
 
-  async function send(delivery: OutboundDelivery, row: RemoteSessionRow): Promise<SendOutcome> {
+  async function send(delivery: OutboundDelivery, row: RemoteSessionRow, later: Later): Promise<SendOutcome> {
     const offline = await deviceOnline(remote, row.device)
     if (offline !== undefined) return offline
     const expected = delivery.expected_turn_id === undefined ? null : Number(delivery.expected_turn_id)
@@ -207,7 +223,7 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
         lane = "follow_up"
         record = recordFor(lane)
       }
-      void retryHeld(row, record, delivery_id)
+      later((revise) => retryHeld(row, record, delivery_id, revise))
     }
     // An idle receiver reports pendingMessageCount 0 while it holds (held_draft) or already took (already_admitted) the
     // delivery: the message is still first in line there, so those two kinds answer position 1, never uncertain.
@@ -262,7 +278,7 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
       if (delivery.expected_turn_id !== undefined && !/^\d+$/.test(delivery.expected_turn_id)) return fail("turn_conflict", `Turn ${delivery.expected_turn_id} is not a turn of the target session.`, "Read the target again and steer with the turn_id a started or steered result returned.")
       if (delivery.sender.kind === "person") return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, () => prompt(delivery, row))
       if (delivery.caller_id === UNKNOWN_CALLER) return fail("caller_context_missing", "A gateway send needs the calling session's durable id.", "Retry from a session that passes its execution context.")
-      return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, () => send(delivery, row))
+      return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, (later) => send(delivery, row, later))
     },
     dispose: () => disposed.abort(),
   }

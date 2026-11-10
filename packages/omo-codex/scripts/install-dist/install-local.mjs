@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:5679bd6890ad8fc90467dd6f235b837d2aae56765141cf938d8a3970e0578f5b:41974f72a1fd515cd3c8fa53311e0b9e6469f8d1239f3ddc129f9ad36eb10925
+// omo-codex-install:21d72a25a6fa11b93b369fc3615c75579165cbd3d22268f8d43090865c848cbf:63cdee403758ddb2d117cb925aab54dc5885e090ea7bbb0af7dff20cb9eef1e0
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19716,7 +19716,11 @@ var OmoComputerSettingsLayerSchema = object({
   audit_log: object({ enabled: boolean2() }).partial().strict(),
   screenshot_gc: object({ enabled: boolean2(), stale_ms: nonNegativeInteger, scan_interval_ms: nonNegativeInteger }).partial().strict(),
   engine_path: string2().min(1),
-  cua_adapter: boolean2()
+  cua_adapter: boolean2(),
+  run_sandbox: _enum(["vm", "quickjs"]).describe("Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"),
+  intervention: _enum(["continue", "pause"]).describe("What a background action does while the user uses the target app (default: pause)"),
+  macos_key_priming: _enum(["on", "off"]).describe("macOS background keys first make the target window key (default: off)"),
+  trace: boolean2().describe("Per-request timing traces (default: false)")
 }).partial().strict().describe("Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host.");
 var OmoComputerSettingsSchema = OmoComputerSettingsLayerSchema;
 
@@ -21877,13 +21881,6 @@ function resolveOmoConfigView(options) {
 }
 
 // packages/omo-config-core/src/loader/loader.ts
-function positionAt(content, offset) {
-  const before = content.slice(0, offset);
-  const lineStart = before.lastIndexOf(`
-`) + 1;
-  return { line: before.split(`
-`).length, column: offset - lineStart + 1 };
-}
 function parseJsoncSafe(content) {
   const errors = [];
   const data = parse4(content.charCodeAt(0) === 65279 ? content.slice(1) : content, errors, {
@@ -21930,14 +21927,12 @@ function readConfigSource(path, scope, fileSystem) {
     };
   }
   const parsed = parseJsoncSafe(content);
-  const firstError = parsed.errors[0];
-  if (firstError !== undefined) {
+  if (parsed.errors.length > 0) {
     return {
       diagnostics: [{
         kind: "parse",
         message: `JSONC parse error in ${path}: ${parsed.errors.map((error) => error.message).join(", ")}`,
-        path,
-        position: positionAt(content.charCodeAt(0) === 65279 ? content.slice(1) : content, firstError.offset)
+        path
       }],
       source: { exists: true, loaded: false, path, scope }
     };

@@ -32,6 +32,8 @@ export interface EngineErrorData {
 	/** Recovery hint for the model, e.g. `capture it again`. */
 	readonly hint?: string | null;
 	readonly permission?: PermissionDeniedData | null;
+	/** Machine-readable cause, an open token set per code (e.g. `consumed` for `InvalidCoordinateFrame`). */
+	readonly reason?: string | null;
 }
 
 /** Error data carried by every `-32601` rejection. */
