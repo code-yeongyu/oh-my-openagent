@@ -364,7 +364,8 @@ describe("relay_direction_question_authority_and_completion", () => {
     expect({ notices, enqueued: b.runtime.enqueueCalls.length }).toEqual({ notices: [`remote message from qa queued (${deliveryId})`], enqueued: 0 })
     b.runtime.submitDraft()
     await drain.drain({ reason: "submission" })
-    expect({ notices: notices.length, lanes: b.runtime.enqueueCalls.map((call) => call.lane) }).toEqual({ notices: 1, lanes: ["followUp"] })
+    // The submitted draft started a turn, and the default lane steers into it (gateway/decision.ts).
+    expect({ notices: notices.length, lanes: b.runtime.enqueueCalls.map((call) => call.lane) }).toEqual({ notices: 1, lanes: ["steer"] })
   })
 
   test("#given three outbox rows #when the connector acks and re-reads #then a read after the ack returns nothing new, an older ack is a no-op, and an older cursor re-reads from there", async () => {
