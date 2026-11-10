@@ -1,4 +1,3 @@
-import { FABLE_55_LAUNCH, launchRungs } from "./fable-55-launch"
 import type { ModelRequirement } from "./model-requirement-types"
 import { LATEST_MODEL_BY_FAMILY } from "./latest-models"
 
@@ -95,15 +94,15 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     ],
   },
   prometheus: {
-    fallbackChain: launchRungs([
+    fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: FABLE_55_LAUNCH.id,
+        model: LATEST_MODEL_BY_FAMILY.claudeFable,
         variant: "xhigh",
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: LATEST_MODEL_BY_FAMILY.claudeFable,
+        model: "claude-fable-5-1",
         variant: "xhigh",
       },
       {
@@ -117,18 +116,18 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
-    ]),
+    ],
   },
   metis: {
-    fallbackChain: launchRungs([
+    fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: FABLE_55_LAUNCH.id,
+        model: LATEST_MODEL_BY_FAMILY.claudeFable,
         variant: "max",
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: LATEST_MODEL_BY_FAMILY.claudeFable,
+        model: "claude-fable-5-1",
         variant: "max",
       },
       {
@@ -142,7 +141,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
-    ]),
+    ],
   },
   momus: {
     fallbackChain: [
