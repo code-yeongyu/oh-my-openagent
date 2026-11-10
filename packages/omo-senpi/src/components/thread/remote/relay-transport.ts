@@ -52,15 +52,17 @@ function abortableDelay(ms: number, signal: AbortSignal): Promise<void> {
 
 const ADMIT_RECORD = "admit_external_message"
 
-type EngineState = { readonly phase: "idle" | "mid_turn"; readonly turnEpoch: number | null; readonly pending: number | null }
+type EngineState = { readonly phase: "idle" | "mid_turn"; readonly turnEpoch: number | null; readonly pending: number | null; readonly parkedOnApproval: boolean }
 
 function engineStateOf(reply: JsonObject): EngineState {
   const pendingQuestions = reply["pendingQuestions"]
-  const midTurn = reply["isStreaming"] === true && reply["isCompacting"] !== true && !(Array.isArray(pendingQuestions) && pendingQuestions.length > 0)
+  // An open question is an approval (a tool permission or an ask) a human must answer on that device: the turn is parked.
+  const parkedOnApproval = Array.isArray(pendingQuestions) && pendingQuestions.length > 0
+  const midTurn = reply["isStreaming"] === true && reply["isCompacting"] !== true && !parkedOnApproval
   const current = reply["currentTurnId"]
   const turnEpoch = typeof current === "string" && /^\d+$/.test(current) ? Number(current) : null
   const pending = reply["pendingMessageCount"]
-  return { phase: midTurn ? "mid_turn" : "idle", turnEpoch, pending: typeof pending === "number" && Number.isInteger(pending) && pending >= 1 ? pending : null }
+  return { phase: midTurn ? "mid_turn" : "idle", turnEpoch, pending: typeof pending === "number" && Number.isInteger(pending) && pending >= 1 ? pending : null, parkedOnApproval }
 }
 
 /**
@@ -191,7 +193,8 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
     // same-device delivery waits in its inbox (gateway/drain.ts answers held_draft as queued and re-admits it on the next
     // edge). Its place is the engine's own pending count. A held one is re-sent in the background under the same id.
     const after = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
-    const pending = after.kind === "ok" ? engineStateOf(replyData(after.response)).pending : null
+    const afterState = after.kind === "ok" ? engineStateOf(replyData(after.response)) : undefined
+    const pending = afterState?.pending ?? null
     if (kind === "held_draft") {
       // The receiver's draft gate answers before its turn check. A default-mode steer it holds would be re-sent against a
       // turn that may have ended by the time the draft goes (turn_conflict, silently lost); the re-sends take the lane
@@ -204,6 +207,9 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
     }
     // An idle receiver reports pendingMessageCount 0 while it holds (held_draft) or already took (already_admitted) the
     // delivery: the message is still first in line there, so those two kinds answer position 1, never uncertain.
+    // A receiver parked on an approval (an open question its human must answer on that device) reports no queue
+    // position while it holds the message: the delivery is not uncertain, it waits behind that approval (#12886).
+    if (kind === "queued" && afterState?.parkedOnApproval === true) return ok({ kind: "queued", queue_position: pending ?? 1, waiting_on: { kind: "approval", device: row.device } })
     if (kind === "queued" && pending === null) return fail("idempotency_uncertain", `Device ${row.device} accepted the message but did not report where it waits.`, "Read the thread before deciding whether to send again.", { device: row.device, delivery_id })
     return ok({ kind: "queued", queue_position: pending ?? 1 }, kind === "already_admitted")
   }

@@ -129,6 +129,14 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
     relay.dispose()
   })
 
+  test("#12886: #given b is parked on an approval (get_state has an open question, pendingMessageCount 0) #when a message is sent #then the send is queued with waiting_on approval on b, not idempotency_uncertain", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, pending: 0, currentTurnId: "7", pendingQuestions: [{ id: "q-1", kind: "permission" }] } })
+    const { relay } = transport(a.remote)
+    expect(await relay.deliver(delivery("while b waits on a human", "k6"))).toMatchObject({ kind: "ok", device: "b", delivery: { kind: "queued", queue_position: 1, waiting_on: { kind: "approval", device: "b" } } })
+    expect(admits(a.sent)).toHaveLength(1)
+    relay.dispose()
+  })
+
   test("#given b already holds the delivery (a lost reply retried) #when the retry reaches b #then the send is deduplicated at b's real pending count, not an invented 1", async () => {
     const a = account({ admitOutcome: { kind: "ok", response: { type: "response", command: "admit_external_message", success: true, data: { kind: "already_admitted", turnId: "9" } } }, engine: { ...ENGINE, streaming: true, pending: 3 } })
     const { relay } = transport(a.remote)
