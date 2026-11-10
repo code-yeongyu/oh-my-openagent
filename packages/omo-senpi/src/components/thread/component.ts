@@ -10,6 +10,7 @@ import { loadProvenanceWorkspaces } from "./gateway/provenance-config"
 import { resolveProvenance } from "./gateway/provenance-resolver"
 import { registerInitialSkills } from "./initial-skills"
 import { controlSessionOf, createControlEndpointRegistrant, hostInstanceOf, sessionControlOf, type ControlEndpointRegistrantOptions, type SessionControlActionsPort } from "./gateway/registration"
+import { createExtensionResolver } from "./gateway/extension-resolver"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
 import { createLazyLiveThreadSurface } from "./lazy-live-surface"
@@ -67,7 +68,7 @@ export type ThreadComponentOptions = Partial<Omit<ThreadToolSurfaceOptions, "cal
  * only one it goes there. Never a misroute: an input the session cannot attribute makes an implicit
  * report refuse when several bindings exist.
  */
-type RunContext = { turn: number; cause: string | undefined; consumed: string[]; local: boolean; answered: boolean }
+type RunContext = { turn: number; cause: string | undefined; chainHop: number; consumed: string[]; local: boolean; answered: boolean }
 
 type EngineMessage = { readonly role?: unknown; readonly customType?: unknown; readonly details?: unknown; readonly content?: unknown }
 
@@ -76,11 +77,21 @@ function messageOf(event: unknown): EngineMessage | undefined {
   return typeof message === "object" && message !== null ? (message as EngineMessage) : undefined
 }
 
+type DeliveryDetails = { readonly delivery_id?: unknown; readonly remote_origin?: unknown; readonly chain_count?: unknown }
+
 /** senpi `external-admission.js` `deliveryIdOf`: the delivery a `session_control_delivery` message carries. */
-function deliveryIdOf(message: EngineMessage): string | undefined {
+function deliveryOf(message: EngineMessage): { readonly id: string; readonly fromOtherDevice: boolean; readonly chainCount: number } | undefined {
   if (message.role !== "custom" || message.customType !== SESSION_CONTROL_DELIVERY_TYPE) return undefined
-  const id = (message.details as { readonly delivery_id?: unknown } | null | undefined)?.delivery_id
-  return typeof id === "string" ? id : undefined
+  const details = (message.details ?? undefined) as DeliveryDetails | undefined
+  const id = details?.delivery_id
+  if (typeof id !== "string") return undefined
+  const count = details?.chain_count
+  return {
+    id,
+    // Engine-stamped (senpi#6233): the delivery crossed from another device, so no row of this store holds it.
+    fromOtherDevice: typeof details?.remote_origin === "object" && details.remote_origin !== null,
+    chainCount: typeof count === "number" && Number.isSafeInteger(count) && count >= 1 ? count : 0,
+  }
 }
 
 function callsTools(message: EngineMessage): boolean {
@@ -91,14 +102,17 @@ function noteInput(run: RunContext, message: EngineMessage): void {
   if (message.role !== "user" && message.role !== "custom") return
   if (run.answered) {
     run.consumed = []
+    run.chainHop = 0
     run.local = false
     run.answered = false
   }
   if (message.role === "user") run.local = true
-  const deliveryId = deliveryIdOf(message)
-  if (deliveryId === undefined) return
-  run.cause = deliveryId
-  if (!run.consumed.includes(deliveryId)) run.consumed.push(deliveryId)
+  const delivery = deliveryOf(message)
+  if (delivery === undefined) return
+  // A delivery from another device has no row here to be the cause of the next send; its hop count continues the chain (K8).
+  if (!delivery.fromOtherDevice) run.cause = delivery.id
+  run.chainHop = Math.max(run.chainHop, delivery.chainCount)
+  if (!run.consumed.includes(delivery.id)) run.consumed.push(delivery.id)
 }
 
 /** senpi's ask_user tool per model family (`ask-user/family.js` `TOOL_NAMES`) and the flag that makes it wait for the answer. */
@@ -200,7 +214,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       const legacyMailbox = join(stateDirectory, "mailbox")
       const callerWorkspaceRoot = options.callerWorkspaceRoot ?? (() => pi.cwd ?? process.cwd())
       const onProvenanceWarning = (message: string) => ctx.logger.warn(`thread gateway: ${message}`)
-      const store = options.store ?? createGatewayStore({ agentDir: agentDir(), senderProvenance: () => resolveProvenance({ cwd: callerWorkspaceRoot(), env: options.env, loadWorkspaces: loadProvenanceWorkspaces, onWarning: onProvenanceWarning }), legacyMailboxDirectories: [legacyMailbox], ...(runtimeInstance === undefined ? {} : { runtimeInstance }) })
+      const store = options.store ?? createGatewayStore({ agentDir: agentDir(), resolveTarget: createExtensionResolver(agentDir()), senderProvenance: () => resolveProvenance({ cwd: callerWorkspaceRoot(), env: options.env, loadWorkspaces: loadProvenanceWorkspaces, onWarning: onProvenanceWarning }), legacyMailboxDirectories: [legacyMailbox], ...(runtimeInstance === undefined ? {} : { runtimeInstance }) })
       // Every store open retries an unreadable legacy mailbox, and an idle store reopens its worker on
       // the next call, so the same failure would repeat each time: it is reported once per session.
       const reportedInvalidMailboxes = new Set<string>()
@@ -211,7 +225,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         }
         if (event.kind === "legacy_mailbox_skipped") ctx.logger.warn(`thread gateway: ${event.items.length} legacy thread mailbox item(s) in ${event.directory} name no session id and were not imported: ${event.items.map((item) => `#${item.message_seq} -> ${JSON.stringify(item.target)}`).join(", ")}`)
       })
-      const run: RunContext = { turn: 0, cause: undefined, consumed: [], local: false, answered: true }
+      const run: RunContext = { turn: 0, cause: undefined, chainHop: 0, consumed: [], local: false, answered: true }
       const completions = createCompletionTracker((durableId, outcome, throughArmSeq) => store.emitCompletions({ now: store.now(), session_durable_id: durableId, outcome, through_arm_seq: throughArmSeq }), {
         retryAfterMs: () => store.busyTimeoutMs,
         onWriteFailed: (error, retrying) =>
@@ -234,6 +248,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerTurnId: () => (run.turn === 0 ? undefined : `turn-${run.turn}`),
         callerName: () => pi.getSessionName?.(),
         callerCause: () => run.cause,
+        callerChainHop: () => run.chainHop,
         callerRunDeliveries: () => [...run.consumed],
         callerRunHasLocalInput: () => run.local,
         onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
@@ -336,6 +351,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       pi.on("agent_settled", async (_event, eventCtx) => {
         const durableId = durableIdOf(eventCtx)
         run.cause = undefined
+        run.chainHop = 0
         run.consumed = []
         run.local = false
         run.answered = true
