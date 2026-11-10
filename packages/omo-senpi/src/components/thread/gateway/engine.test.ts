@@ -97,7 +97,7 @@ describe("#13014: a local send to a session parked on a question names the wait,
     const result = await send(h, "A", "B", "after your question", { mode: "follow_up", idempotency_key: "k-wait" })
     if (result.kind !== "ok" || result.delivery.kind !== "queued") throw new Error(`expected queued, got ${JSON.stringify(result)}`)
     expect(result.delivery).toEqual({ kind: "queued", queue_position: 1, waiting_on: waiting })
-    // The lost-ACK replay rebuilds the answer from the row and names the same wait.
+    // A retry under the same idempotency key replays the completed receipt's stored answer, which names the same wait.
     const replay = await send(h, "A", "B", "after your question", { mode: "follow_up", idempotency_key: "k-wait" })
     expect(replay).toMatchObject({ kind: "ok", deduplicated: true, delivery: { waiting_on: waiting } })
   })
