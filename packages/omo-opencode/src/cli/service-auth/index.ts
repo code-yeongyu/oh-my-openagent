@@ -1,4 +1,4 @@
-export { credentialLockPaths, withCredentialLock } from "./credential-lock"
+export { accountHome, credentialLockPaths, withCredentialLock } from "./credential-lock"
 export { currentServiceDevice } from "./protocol"
 export { CredentialIdentityChanged, type CredentialStore, createCredentialStore, KeychainApprovalPendingError, quietNotice } from "./keystore"
 export { type Credentials, SignInError, serviceOrigin } from "./protocol"
