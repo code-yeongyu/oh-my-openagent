@@ -23,13 +23,30 @@ export function branchEntryCount(eventCtx: unknown): number {
   return Array.isArray(entries) ? entries.length : 0
 }
 
+/**
+ * Last status text published per host ui and key (#13046). Footer refreshes land in whatever order their
+ * async work settles, so several can compute the same line; re-publishing an unchanged line changes nothing
+ * on screen but makes the number of status updates depend on timing. Keyed by the host ui object, so every
+ * handle `readUi` returns for one session shares it.
+ */
+const publishedStatus = new WeakMap<object, Map<string, string | undefined>>()
+
 export function readUi(eventCtx: unknown): StatusUi | undefined {
   if (!isRecord(eventCtx)) return undefined
   const ui = eventCtx.ui
   if (!isRecord(ui)) return undefined
   if (typeof ui.setStatus !== "function" || typeof ui.notify !== "function") return undefined
   return {
-    setStatus: (key, text) => Reflect.apply(ui.setStatus as (...args: unknown[]) => unknown, ui, [key, text]),
+    setStatus: (key, text) => {
+      let published = publishedStatus.get(ui)
+      if (published === undefined) {
+        published = new Map()
+        publishedStatus.set(ui, published)
+      }
+      if (text !== undefined && published.get(key) === text) return
+      published.set(key, text)
+      Reflect.apply(ui.setStatus as (...args: unknown[]) => unknown, ui, [key, text])
+    },
     notify: (message, level) => Reflect.apply(ui.notify as (...args: unknown[]) => unknown, ui, [message, level]),
   }
 }
