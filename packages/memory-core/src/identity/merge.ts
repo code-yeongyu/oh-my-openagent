@@ -7,10 +7,11 @@
 import { dirname, join } from "node:path"
 
 import { GitMemoryRepo, NoEffectiveChangesError, type GitCommitAuthor, type GitTreeBlobEntry } from "../git"
-import { mkdir, readdir, writeFile } from "../fs/resilient"
+import { mkdir, readdir, readFile, writeFile } from "../fs/resilient"
 import type { MemoryWriteLock } from "../tools/commit-write"
 import { AGENTS_DIRNAME, buildIdentityPaths, type MemoryIdentityPaths } from "./layout"
 import { markIdentityMerged, readIdentityRecord } from "./record"
+import { resolveAutoIdentity } from "./resolve"
 
 const MERGED_FROM_TRAILER = "Omo-Merged-From"
 const MERGED_HEAD_TRAILER = "Omo-Merged-Head"
@@ -46,10 +47,15 @@ export type MergeResult =
   | { readonly status: "merged"; readonly sha: string; readonly plan: MergePlan }
   | { readonly status: "already-merged" | "nothing-to-merge"; readonly plan: MergePlan }
 
+/**
+ * `candidateDirs` covers stores written before `identity.json` existed: each directory (typically a live
+ * linked worktree of the repository) is probed for a store under its path-derived id.
+ */
 export async function findMergePredecessors(
   memoryRoot: string,
   targetId: string,
   resolve: (spelling: string) => string,
+  candidateDirs: readonly string[] = [],
 ): Promise<MergePredecessors> {
   const agentsDir = join(memoryRoot, AGENTS_DIRNAME)
   const ids = (await readdir(agentsDir).catch(() => [] as string[])).filter((id) => id !== targetId).sort()
@@ -65,7 +71,39 @@ export async function findMergePredecessors(
       unmapped.push(id)
     }
   }
+  const known = new Set([targetId, ...predecessors.map((entry) => entry.id), ...unmapped])
+  for (const dir of candidateDirs) {
+    const id = resolveAutoIdentity(dir, { OMO_MEMORY_HOME: memoryRoot }, "path").id
+    if (known.has(id)) continue
+    const paths = buildIdentityPaths(memoryRoot, id)
+    if ((await readdir(paths.repo).catch(() => [] as string[])).length === 0) continue
+    known.add(id)
+    predecessors.push({ id, paths, spellings: [dir] })
+  }
   return { predecessors, unmapped }
+}
+
+/** The live linked worktrees of each directory's repository (read from `.git/worktrees/*\/gitdir`, no `git` spawn). */
+export async function repositoryWorktreeDirs(dirs: readonly string[]): Promise<string[]> {
+  const found = new Set<string>()
+  for (const dir of dirs) {
+    let current = dir
+    for (;;) {
+      const adminRoot = join(current, ".git", "worktrees")
+      const names = await readdir(adminRoot).catch(() => undefined)
+      if (names !== undefined) {
+        for (const name of names) {
+          const pointer = await readFile(join(adminRoot, name, "gitdir"), "utf8").catch(() => undefined)
+          const gitFile = pointer?.split(/\r?\n/, 1)[0]?.trim()
+          if (gitFile !== undefined && gitFile !== "") found.add(dirname(gitFile))
+        }
+        break
+      }
+      if (dirname(current) === current) break
+      current = dirname(current)
+    }
+  }
+  return [...found].sort()
 }
 
 /**
@@ -87,6 +125,8 @@ export async function planIdentityMerge(
   const targetBlobs = new Map<string, GitTreeBlobEntry>(
     targetHead === null ? [] : (await targetRepo.lsTreeBlobs(targetHead)).map((entry) => [entry.path, entry]),
   )
+  // On a case-insensitive disk (default macOS) a path that differs only in letter case is the same file.
+  const targetFolded = new Set([...targetBlobs.keys()].map((path) => path.toLowerCase()))
   const mergedBefore = since === undefined
     ? undefined
     : new Map((await sourceRepo.lsTreeBlobs(since).catch(() => [] as readonly GitTreeBlobEntry[])).map((entry) => [entry.path, entry.oid]))
@@ -97,7 +137,8 @@ export async function planIdentityMerge(
     .map((entry): MergeAction => {
       const existing = targetBlobs.get(entry.path)
       if (existing?.oid === entry.oid) return { path: entry.path, action: "skip" }
-      if (existing === undefined && !entry.path.startsWith("system/")) {
+      const foldedCollision = existing === undefined && targetFolded.has(entry.path.toLowerCase())
+      if (existing === undefined && !foldedCollision && !entry.path.startsWith("system/")) {
         return { path: entry.path, action: "add", destination: entry.path }
       }
       return { path: entry.path, action: "keep-aside", destination: `${MERGED_ASIDE_ROOT}/${sourceId}/${entry.path}` }

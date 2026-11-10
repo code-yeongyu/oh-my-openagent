@@ -8,7 +8,8 @@ import { dirname, join } from "node:path"
 import { GitMemoryRepo, type GitCommitAuthor } from "../git"
 import { removeTree } from "../../../../test-support/remove-tree"
 import { buildIdentityPaths } from "./layout"
-import { applyIdentityMerge, findMergePredecessors, planIdentityMerge } from "./merge"
+import { applyIdentityMerge, findMergePredecessors, planIdentityMerge, repositoryWorktreeDirs } from "./merge"
+import { resolveAutoIdentity } from "./resolve"
 import { readIdentityRecord, recordIdentityBind } from "./record"
 
 const AUTHOR: GitCommitAuthor = { agentId: "merge-test", authorName: "Merge Test", authorEmail: "merge@example.com" }
@@ -102,6 +103,36 @@ describe("identity merge (#10070)", () => {
     expect(await readFile(join(target.paths.repo, "reference/merged/project-feature-bbbb2222/notes/diff.md"), "utf8")).toBe(note("source"))
     expect(await readIdentityRecord(source.paths.root)).toMatchObject({ mergedInto: "project-aaaa1111", mergedHead: sourceHead })
     expect(await source.repo.head()).toBe(sourceHead)
+  }, 30_000)
+
+  it("#given a source file whose path differs from a target file only in letter case #when the merge is planned #then it goes aside instead of overwriting the target on a case-insensitive disk (#12974 review)", async () => {
+    const root = await memoryRoot()
+    const target = await identity(root, "project-aaaa1111", { "notes/Habit.md": note("target") }, ["/work/project"])
+    const source = await identity(root, "project-feature-bbbb2222", { "notes/habit.md": note("source") }, ["/work/project-feature"])
+
+    const plan = await planIdentityMerge(source.paths, target.paths)
+
+    expect(plan.actions).toEqual([{ path: "notes/habit.md", action: "keep-aside", destination: "reference/merged/project-feature-bbbb2222/notes/habit.md" }])
+  }, 30_000)
+
+  it("#given a worktree store written before identity.json existed #when predecessors are found with the repository's live worktrees as candidates #then the store is found by its path-derived id (#12974 review)", async () => {
+    const root = await memoryRoot()
+    const main = join(root, "checkout", "project")
+    const thread = join(root, "checkout", "project-thread")
+    await mkdir(main, { recursive: true })
+    const git = (cwd: string, args: readonly string[]) => execFileSync("git", ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", ...args], { cwd, stdio: "ignore" })
+    git(main, ["init", "--quiet", "--initial-branch=main"])
+    git(main, ["commit", "--quiet", "--allow-empty", "-m", "init"])
+    git(main, ["worktree", "add", "--quiet", "-b", "thread", thread])
+    const env = { OMO_MEMORY_HOME: root }
+    const targetId = resolveAutoIdentity(main, env, "git").id
+    const legacyId = resolveAutoIdentity(thread, env, "path").id
+    await identity(root, targetId, {}, [main])
+    await identity(root, legacyId, { "notes/old.md": note("old") }, [])
+
+    const found = await findMergePredecessors(root, targetId, (spelling) => resolveAutoIdentity(spelling, env, "git").id, await repositoryWorktreeDirs([main]))
+
+    expect(found.predecessors.map((entry) => entry.id)).toEqual([legacyId])
   }, 30_000)
 
   it("#given another writer creates the same path between the plan and the lock #when the merge applies #then the target's file is kept and the source copy goes aside (#12974 review)", async () => {
