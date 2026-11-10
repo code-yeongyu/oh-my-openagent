@@ -118,22 +118,16 @@ function failure(check: ProbeCheck): string {
   }
 }
 
-// A parent killed mid-probe leaves sentinels behind; a probe file whose pid is dead is removed.
+// A parent killed mid-probe leaves sentinels behind. A probe finishes within PROBE_TIMEOUT_MS, so a
+// probe file older than a minute belongs to no live preflight.
+const STALE_PROBE_MS = 60_000
+
 function sweepStaleProbes(dir: string): void {
   if (!isDir(dir)) return
   for (const name of readdirSync(dir)) {
     if (!name.startsWith(PROBE_PREFIX)) continue
-    const pid = Number.parseInt(name.slice(PROBE_PREFIX.length), 10)
-    if (Number.isInteger(pid) && !alive(pid)) rmSync(join(dir, name), { force: true })
-  }
-}
-
-function alive(pid: number): boolean {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === "EPERM"
+    const path = join(dir, name)
+    if (Date.now() - lstatSync(path).mtimeMs > STALE_PROBE_MS) rmSync(path, { force: true })
   }
 }
 
