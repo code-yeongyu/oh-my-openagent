@@ -5,6 +5,7 @@ import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
 import { describeModelChains, type ModelChainEntry } from "./index"
 
 const SELECTORS = [
+  "anthropic/claude-fable-5-2",
   "anthropic/claude-fable-5-1",
   "anthropic/claude-opus-5-5",
   "kimi-for-coding/k3.1-pro",
@@ -32,10 +33,11 @@ describe("describeModelChains", () => {
       kind: "category",
       name: "artistry",
       status: "resolved",
-      primary: "anthropic/claude-fable-5-1",
-      runtime: ["anthropic/claude-fable-5-1", "anthropic/claude-opus-5-5", "kimi-for-coding/k3.1-pro"],
+      primary: "anthropic/claude-fable-5-2",
+      runtime: ["anthropic/claude-fable-5-2", "anthropic/claude-fable-5-1", "anthropic/claude-opus-5-5", "kimi-for-coding/k3.1-pro"],
       rungs: [
-        { model: "anthropic/claude-fable-5-1", source: "built-in", state: "primary" },
+        { model: "anthropic/claude-fable-5-2", source: "built-in", state: "primary" },
+        { model: "anthropic/claude-fable-5-1", source: "built-in", state: "fallback" },
         { model: "anthropic/claude-opus-5-5", source: "built-in", state: "fallback" },
         { model: "kimi-for-coding/k3.1-pro", source: "built-in", state: "fallback" },
       ],
@@ -53,6 +55,7 @@ describe("describeModelChains", () => {
     expect(artistry.runtime).toEqual(["anthropic/claude-opus-5-5", "kimi-for-coding/k3.1-pro"])
     expect(artistry.rungs).toEqual([
       { model: "anthropic/claude-opus-5-5", source: "omo.json", state: "primary" },
+      { model: "anthropic/claude-fable-5-2", source: "built-in", state: "not-reached" },
       { model: "anthropic/claude-fable-5-1", source: "built-in", state: "not-reached" },
       { model: "kimi-for-coding/k3.1-pro", source: "built-in", state: "fallback" },
     ])
@@ -69,7 +72,8 @@ describe("describeModelChains", () => {
     // then
     expect(report.excludeModels).toEqual(["claude-fable-*"])
     expect(artistry.primary).toBe("anthropic/claude-opus-5-5")
-    expect(artistry.rungs[0]).toEqual({ model: "anthropic/claude-fable-5-1", source: "built-in", state: "excluded", excludedBy: "claude-fable-*" })
+    expect(artistry.rungs[0]).toEqual({ model: "anthropic/claude-fable-5-2", source: "built-in", state: "excluded", excludedBy: "claude-fable-*" })
+    expect(artistry.rungs[1]).toEqual({ model: "anthropic/claude-fable-5-1", source: "built-in", state: "excluded", excludedBy: "claude-fable-*" })
   })
 
   test("#given a builtin agent with rungs nobody is logged in for #when described #then those rungs are marked no-login with their providers", () => {

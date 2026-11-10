@@ -8,6 +8,7 @@ import { createInboxDrain } from "./drain"
 import { createGatewayRelay, type GatewayRelay } from "./relay"
 import type { GatewayStore } from "./store"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 /** The arm a completion report made: its sequence number is the watermark the tracker's settle passes. */
 function armSeqOf(reported: { readonly arm_seq: number | null }): number {
@@ -17,7 +18,7 @@ function armSeqOf(reported: { readonly arm_seq: number | null }): number {
 
 let harness: GatewayHarness | undefined
 
-function within<T>(promise: Promise<T>, label: string, ms = 10_000): Promise<T> {
+function within<T>(promise: Promise<T>, label: string, ms = remainingTestTime()): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   return Promise.race([promise, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`waited ${ms} ms for ${label}`)), ms) })]).finally(() => clearTimeout(timer))
 }
@@ -363,7 +364,8 @@ describe("relay_direction_question_authority_and_completion", () => {
     expect({ notices, enqueued: b.runtime.enqueueCalls.length }).toEqual({ notices: [`remote message from qa queued (${deliveryId})`], enqueued: 0 })
     b.runtime.submitDraft()
     await drain.drain({ reason: "submission" })
-    expect({ notices: notices.length, lanes: b.runtime.enqueueCalls.map((call) => call.lane) }).toEqual({ notices: 1, lanes: ["followUp"] })
+    // The submitted draft started a turn, and the default lane steers into it (gateway/decision.ts).
+    expect({ notices: notices.length, lanes: b.runtime.enqueueCalls.map((call) => call.lane) }).toEqual({ notices: 1, lanes: ["steer"] })
   })
 
   test("#given three outbox rows #when the connector acks and re-reads #then a read after the ack returns nothing new, an older ack is a no-op, and an older cursor re-reads from there", async () => {

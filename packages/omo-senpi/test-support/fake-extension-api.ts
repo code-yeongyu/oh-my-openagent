@@ -1,3 +1,4 @@
+import { absentSenpiSeams, SENPI_SEAMS } from "../src/extension/senpi-seams"
 import type { SenpiExtensionAPI } from "../src/extension/types"
 
 export type FakeEventHandler = (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>
@@ -183,4 +184,22 @@ export class FakeExtensionAPI implements SenpiExtensionAPI {
     }
     return results
   }
+}
+
+// Gives a fake every listed senpi seam it lacks as an inert stand-in, so a composed fake reports no absent seam and a test
+// that watches the logger sees only the warnings it is about.
+export function withInertSenpiSeams<T extends object>(pi: T): T {
+  for (const path of absentSenpiSeams(pi)) {
+    const keys = path.split(".")
+    const last = keys.pop() ?? path
+    let holder: object = pi
+    for (const key of keys) {
+      const next: unknown = Reflect.get(holder, key)
+      if (typeof next === "object" && next !== null) holder = next
+      else { const created = {}; Reflect.set(holder, key, created); holder = created }
+    }
+    const kind = SENPI_SEAMS[path as keyof typeof SENPI_SEAMS]
+    Reflect.set(holder, last, kind === "function" ? () => undefined : kind === "object" ? {} : kind === "string" ? "/" : undefined)
+  }
+  return pi
 }

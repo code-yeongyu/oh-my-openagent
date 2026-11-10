@@ -8,6 +8,8 @@
 //! live for both the HID tap and the stamped SkyLight post), so the OK button
 //! is dismissed through AX after the keystroke receipt proves delivery.
 
+mod verdict;
+
 use std::os::unix::process::CommandExt;
 use std::process::{Command, Stdio};
 use std::thread;
@@ -108,20 +110,11 @@ pub(super) fn run(input: &mut MacInput) -> CoreResult<CanaryResult> {
         .map_err(|error| DesktopError::input_failed(format!("spawning the canary dialog failed: {error}")))?;
     let delivered = deliver_and_confirm(input, child);
     let focus_restored = restore(input, front.as_ref());
-    let passed = delivered.is_ok() && focus_restored;
-    input.settle_canary(passed);
-    if passed {
-        Ok(CanaryResult { focus_restored: true })
-    } else {
-        let detail = match delivered {
-            Err(error) => format!(" {error}"),
-            Ok(()) => String::new(),
-        };
-        Err(DesktopError::background_unavailable(format!(
-            "{CANARY_STOP_REASON}: the background SPI path did not produce a dialog receipt or \
-             could not restore focus;{detail} retry with delivery:\"foreground\" or use ax actions",
-        )))
+    let (settle, reply) = verdict::verdict(delivered, focus_restored);
+    if let Some(passed) = settle {
+        input.settle_canary(passed);
     }
+    reply
 }
 
 /// Runs `script` in `osascript` contained to this engine's lifetime, in a

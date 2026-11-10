@@ -4,6 +4,7 @@ import { type DelegatedChannel, followDelegatedChannel } from "./delegated-chann
 import type { LocalApiClient } from "./local-api/client.ts"
 import type { ReadPage } from "./local-api/client-assembly.ts"
 import { LocalApiError } from "./local-api/errors.ts"
+import type { CommandLocated } from "./local-api/protocol-delegated.ts"
 import type {
   AttachPendingReason,
   CommandRpc,
@@ -23,8 +24,16 @@ export type RemoteAttachEvent =
   | { readonly kind: "records"; readonly attach_id: number; readonly records: readonly JsonObject[] }
   | { readonly kind: "detached"; readonly reason: DetachReason }
 
-/** A forwarded record's outcome: its final command state, and the engine's own reply when the host sent one. */
-export type CommandResult = { readonly outcome: CommandStateEvent; readonly response?: JsonObject }
+/**
+ * A forwarded record's outcome: its final command state, and the engine's own reply when the host sent one. `located`
+ * is the session an endpoint open made, when the open asked for it and the host named it (decision 0018 amendment
+ * 2026-11-06); it is attachable at once, as a session.locate answer is.
+ */
+export type CommandResult = {
+  readonly outcome: CommandStateEvent
+  readonly response?: JsonObject
+  readonly located?: CommandLocated
+}
 
 export type RemoteAttach = {
   readonly device: string
