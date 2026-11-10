@@ -56,14 +56,23 @@ const approved = (address: string) => [{ permission: "thread_send", patterns: [a
  */
 type Leg = "local" | "remote"
 const LEGS: readonly Leg[] = ["local", "remote"]
-const delivery = (sender: Record<string, unknown>, leg: Leg = "remote") => ({
+const delivery = (sender: Record<string, unknown>, leg: Leg = "remote", id = "d-1") => ({
   message: {
     role: "custom", customType: "session_control_delivery",
-    details: { delivery_id: leg === "remote" ? "device:b/d-1" : "d-1", ...(leg === "remote" ? { remote_origin: { deviceId: "b" } } : {}), sender },
+    details: { delivery_id: leg === "remote" ? `device:b/${id}` : id, ...(leg === "remote" ? { remote_origin: { deviceId: "b" } } : {}), sender },
   },
 })
 
-/** Every address's decision after one consumed delivery from SENDER named "Planner Bot", then after the run settles. */
+/** A message the engine starts on its own after the run settled: senpi's open-todo reminder, a goal continuation, a monitor wake (role custom, not a delivery). */
+const engineStarted = { message: { role: "custom", customType: "senpi.todo-owed", content: "open todos remain" } }
+/** The run's own final answer: an assistant message that calls no tool. */
+const finalAnswer = { message: { role: "assistant", content: [{ type: "text", text: "done" }] } }
+
+/**
+ * Every address's decision after one consumed delivery from SENDER named "Planner Bot", then after the run settles, then
+ * in a turn the engine starts on its own (decision 0027 section 6, #13042: the allowance lasts for the work the delivery
+ * started), then after a message from someone else starts new work.
+ */
 async function replyDecisions(leg: Leg): Promise<Record<string, unknown>> {
   const agentDir = mkdtempSync(join(tmpdir(), `thr-peer-reply-${leg}-`))
   const { store, dispatch, requests } = component(agentDir)
@@ -72,8 +81,17 @@ async function replyDecisions(leg: Leg): Promise<Record<string, unknown>> {
     await dispatch("agent_start")
     await dispatch("message_start", delivery({ kind: "agent", session_id: SENDER, name: "Planner Bot" }, leg))
     const decided = { before_any_delivery: before, sender_id: requests(SENDER), sender_name: requests("Planner Bot"), sender_name_respelled: requests("  planner bot "), other_id: requests(OTHER), other_name: requests("reviewer") }
+    await dispatch("message_end", finalAnswer)
     await dispatch("agent_settled")
-    return { ...decided, after_settle: requests(SENDER) }
+    const after_settle = requests(SENDER)
+    await dispatch("agent_start")
+    await dispatch("message_start", engineStarted)
+    const engine_turn = { engine_turn_sender_id: requests(SENDER), engine_turn_sender_name: requests("Planner Bot"), engine_turn_other_id: requests(OTHER) }
+    await dispatch("message_end", finalAnswer)
+    await dispatch("agent_settled")
+    await dispatch("agent_start")
+    await dispatch("message_start", { message: { role: "user", content: "a person typed" } })
+    return { ...decided, after_settle, ...engine_turn, after_user_message: requests(SENDER) }
   } finally {
     await store.dispose()
     rmSync(agentDir, { recursive: true, force: true })
@@ -108,8 +126,41 @@ describe("#12886 a peer-delivered run replies to its sender", () => {
       sender_name_respelled: approved("  planner bot "),
       other_id: ASK,
       other_name: ASK,
-      after_settle: ASK,
+      // decision 0027 section 6 (#13042): a settle alone keeps the allowance; a turn the engine starts on its own is still the
+      // delivery's work; a person's message starts new work and ends it.
+      after_settle: approved(SENDER),
+      engine_turn_sender_id: approved(SENDER),
+      engine_turn_sender_name: approved("Planner Bot"),
+      engine_turn_other_id: ASK,
+      after_user_message: ASK,
     })
+  })
+
+  test.each(LEGS)("#13042: #given a run that answered a %s delivery from SENDER #when a delivery from OTHER starts new work after the settle #then OTHER is the reply target and SENDER asks again; a delivery that joins running work adds its sender instead", async (leg) => {
+    const agentDir = mkdtempSync(join(tmpdir(), `thr-peer-reply-group-${leg}-`))
+    const { store, dispatch, requests } = component(agentDir)
+    try {
+      await dispatch("agent_start")
+      await dispatch("message_start", delivery({ kind: "agent", session_id: SENDER, name: "Planner Bot" }, leg))
+      await dispatch("message_end", finalAnswer)
+      await dispatch("agent_settled")
+      await dispatch("agent_start")
+      await dispatch("message_start", delivery({ kind: "agent", session_id: OTHER, name: "Reviewer" }, leg, "d-2"))
+      expect({ sender: requests(SENDER), other: requests(OTHER) }).toEqual({ sender: ASK, other: approved(OTHER) })
+      // Running work (no final answer yet): a third agent's delivery joins it, so both are reply targets.
+      await dispatch("message_start", delivery({ kind: "agent", session_id: "planner", name: "planner" }, leg, "d-3"))
+      expect({ other: requests(OTHER), third: requests("planner") }).toEqual({ other: approved(OTHER), third: approved("planner") })
+      // After this group's final answer, a delivery from OTHER again starts a NEW group: only OTHER is approved, the third
+      // agent of the earlier work is not (the allowance never outlives the work a delivery started).
+      await dispatch("message_end", finalAnswer)
+      await dispatch("agent_settled")
+      await dispatch("agent_start")
+      await dispatch("message_start", delivery({ kind: "agent", session_id: OTHER, name: "Reviewer" }, leg, "d-4"))
+      expect({ other: requests(OTHER), third: requests("planner"), sender: requests(SENDER) }).toEqual({ other: approved(OTHER), third: ASK, sender: ASK })
+    } finally {
+      await store.dispose()
+      rmSync(agentDir, { recursive: true, force: true })
+    }
   })
 
   test("#13006: #given the same delivery once from this device and once from device b #when every decision is compared #then the two legs are equal, key by key", async () => {
@@ -140,7 +191,9 @@ describe("#12886 a peer-delivered run replies to its sender", () => {
     } satisfies DeliveryRow
     const [, sentence = ""] = renderDeliveryText(row).split("\n")
     expect(sentence).toContain(GATEWAY_PEER_REPLY_SENTENCE)
-    expect(GATEWAY_PEER_REPLY_SENTENCE).toContain("thread_send")
+    // The thread family is eval-only, like bash (#12903): the sentence names the call the receiver can make.
+    expect(GATEWAY_PEER_REPLY_SENTENCE).toContain("tool.thread_send(")
+    expect(GATEWAY_PEER_REPLY_SENTENCE).toContain("eval")
     expect(GATEWAY_PEER_REPLY_SENTENCE).toContain("sender_session")
   })
 })

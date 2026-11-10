@@ -51,7 +51,7 @@ export const GATEWAY_PROVENANCE_SENTENCE =
 
 /** A peer agent's delivery also tells the receiver how an answer reaches that agent (#12886). */
 export const GATEWAY_PEER_REPLY_SENTENCE =
-  "To answer this agent, call thread_send with thread set to the sender_session above; text you write here does not reach it."
+  "To answer this agent, run tool.thread_send({ thread: <sender_session above>, message }) inside an eval cell (the thread tools are eval-only, like bash); text you write here does not reach it."
 
 export const SESSION_CONTROL_DELIVERY_TYPE = "session_control_delivery"
 

@@ -100,9 +100,25 @@ function callsTools(message: EngineMessage): boolean {
   return Array.isArray(message.content) && message.content.some((part) => (part as { readonly type?: unknown } | null)?.type === "toolCall")
 }
 
+/**
+ * Decision 0027 section 6 (#13042): the reply allowance belongs to the consumed delivery and lasts for the work that
+ * delivery started - the consuming turn and every later turn the engine starts on its own (a reminder, a goal
+ * continuation, a monitor wake: a custom message that is no delivery). It ends when a new message starts work after
+ * a final answer: a person's message (role user, which is also how a loop tick or a schedule arrives, so those end
+ * it too) or any delivery, whose own sender the new group then holds. A delivery that joins running work adds its
+ * sender. The run's deliveries (`consumed`, the implicit target of a report) end with the final answer in every
+ * order: an engine-started message that arrives after the answer and before the settle keeps the allowance, not them.
+ */
 function noteInput(run: RunContext, message: EngineMessage): void {
   if (message.role !== "user" && message.role !== "custom") return
+  const delivery = deliveryOf(message)
+  if (message.role === "custom" && delivery === undefined) {
+    if (run.answered) run.consumed = []
+    run.answered = false
+    return
+  }
   if (run.answered) {
+    run.cause = undefined
     run.consumed = []
     run.replyTo = []
     run.replySenders = []
@@ -111,7 +127,6 @@ function noteInput(run: RunContext, message: EngineMessage): void {
     run.answered = false
   }
   if (message.role === "user") run.local = true
-  const delivery = deliveryOf(message)
   if (delivery === undefined) return
   // A delivery from another device has no row here to be the cause of the next send; its hop count continues the chain (K8).
   if (!delivery.fromOtherDevice) run.cause = delivery.id
@@ -358,11 +373,10 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       })
       pi.on("agent_settled", async (_event, eventCtx) => {
         const durableId = durableIdOf(eventCtx)
-        run.cause = undefined
-        run.chainHop = 0
+        // A settle alone keeps the consumed delivery's senders, hop and cause (#13042): the next input decides whether
+        // the work continues (noteInput). The run's deliveries end with the run: a report without binding_id after it
+        // must name its thread.
         run.consumed = []
-        run.replyTo = []
-        run.replySenders = []
         run.local = false
         run.answered = true
         if (durableId === undefined) return
