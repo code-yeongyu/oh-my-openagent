@@ -48,6 +48,22 @@ export const exactly = (
     if (!required.includes(key) && !optional.includes(key)) fail(`${what} has an unknown field`);
   return v;
 };
+export type FieldCheck = typeof exactly;
+
+// What this client READS from the service (welcome, refused, response, event, blob payload): a required field must be
+// present, and a field this version does not define is dropped, so a newer service that adds one keeps an installed
+// client working (omo-relay-daemon#914). The result holds only the named fields, so `exactly` on it still refuses a
+// field another variant of the same message defines. What a peer SENDS to be acted on (hello, request) stays `exactly`.
+export const known: FieldCheck = (v, required, optional = [], what = "message") => {
+  if (!isRecord(v)) return fail(`${what} must be an object`);
+  const out: { [key: string]: unknown } = {};
+  for (const name of required) {
+    if (!Object.hasOwn(v, name)) fail(`${what} misses ${name}`);
+    out[name] = v[name];
+  }
+  for (const name of optional) if (Object.hasOwn(v, name)) out[name] = v[name];
+  return out;
+};
 
 export const oneOf = <T extends string>(list: readonly T[], v: unknown, what: string): T =>
   list.find((item) => item === v) ?? fail(what);

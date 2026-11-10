@@ -105,7 +105,9 @@ A request is `{"id": "<1-64 printable ASCII>", "type": "<request type>", ...fiel
 request gets exactly one `{"id", "type": "response", "ok": true, "data": {...}}` or
 `{"id", "type": "response", "ok": false, "error": {"code", "reason", "action"}}`. A request type this version does
 not define is answered `unknown_type`; a malformed request `invalid_request` (its `reason` names the field, never its
-value). Requests are answered in any order; clients correlate by `id`.
+value). Requests are answered in any order; clients correlate by `id`. A client ignores a field it does not define in
+anything it reads (`welcome`, `refused`, a response, an event, a blob payload), so a newer service may add one; a
+missing required field, or a field one variant of a message defines carried by another, is still a protocol violation.
 
 | Request                      | Fields                                                                   | Response `data`                                                      | Notes                                                                 |
 | ---------------------------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------- | --------------------------------------------------------------------- |
