@@ -12,8 +12,8 @@ import type { MemoryWriteLock } from "../tools/commit-write"
 import { AGENTS_DIRNAME, buildIdentityPaths, type MemoryIdentityPaths } from "./layout"
 import { markIdentityMerged, readIdentityRecord } from "./record"
 
-export const MERGED_FROM_TRAILER = "Omo-Merged-From"
-export const MERGED_HEAD_TRAILER = "Omo-Merged-Head"
+const MERGED_FROM_TRAILER = "Omo-Merged-From"
+const MERGED_HEAD_TRAILER = "Omo-Merged-Head"
 const MERGED_ASIDE_ROOT = "reference/merged"
 
 export interface MergePredecessor {

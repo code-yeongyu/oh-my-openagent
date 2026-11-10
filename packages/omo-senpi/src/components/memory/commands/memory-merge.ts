@@ -19,7 +19,7 @@ import {
 import { LAZY_MEMORY_COMMANDS, type MemoryCommandPort } from "./metadata"
 import { requireIdentity, respond, type MemoryCommandContext, type MemoryCommandDeps, type MemoryCommandIdentity } from "./types"
 
-export const MEMORY_MERGE_USAGE = "usage: /memory-merge [--apply]"
+const MEMORY_MERGE_USAGE = "usage: /memory-merge [--apply]"
 
 export function registerMemoryMergeCommand(pi: MemoryCommandPort, deps: MemoryCommandDeps): void {
   pi.registerCommand("memory-merge", {
