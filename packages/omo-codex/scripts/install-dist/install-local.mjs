@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:adc0c9ae0db7b2199d87a87956f2a065f91ef403e2c0816a4fe17111125c47b1:6fec9dd74fa6bb69f9064c703c94e024377de335a2c86ac93c5bd141b1290e69
+// omo-codex-install:77fd722f7e8ba601bd1c396beaa5c85e31ddb76733fe7c00dd4710e610cccf7c:2def71c203875179308a35a94fa35051a027396c923804493e853b70c6230182
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19720,6 +19720,21 @@ var OmoComputerSettingsLayerSchema = object({
 }).partial().strict().describe("Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host.");
 var OmoComputerSettingsSchema = OmoComputerSettingsLayerSchema;
 
+// packages/omo-config-core/src/schema/context-handoff.ts
+var OmoContextHandoffSettingsShape = {
+  enabled: boolean2(),
+  threshold_percent: number2().int().min(1).max(99),
+  compaction_repeat_limit: number2().int().min(2).max(20),
+  compaction_repeat_window_minutes: number2().int().min(1).max(120)
+};
+var OmoContextHandoffSettingsLayerSchema = object(OmoContextHandoffSettingsShape).partial().strict();
+var OmoContextHandoffSettingsSchema = OmoContextHandoffSettingsLayerSchema.extend({
+  enabled: boolean2().default(false),
+  threshold_percent: number2().int().min(1).max(99).default(85),
+  compaction_repeat_limit: number2().int().min(2).max(20).default(3),
+  compaction_repeat_window_minutes: number2().int().min(1).max(120).default(10)
+}).strict();
+
 // packages/omo-config-core/src/schema/git-master.ts
 var GIT_ENV_ASSIGNMENT_PATTERN = /^(?:[A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_-]*)(?: [A-Za-z_][A-Za-z0-9_]*=[A-Za-z0-9_-]*)*$/;
 var GitEnvPrefixSchema = string2().refine((value) => value === "" || GIT_ENV_ASSIGNMENT_PATTERN.test(value), {
@@ -20332,6 +20347,7 @@ var OmoTypedHarnessConfigSchema = object({
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
+  context_handoff: OmoContextHandoffSettingsLayerSchema.optional(),
   task: OmoTaskSettingsLayerSchema.optional(),
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),
@@ -20352,6 +20368,7 @@ var OmoConfigProfileSchema = object({
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
+  context_handoff: OmoContextHandoffSettingsLayerSchema.optional(),
   task: OmoTaskSettingsLayerSchema.optional(),
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),
@@ -20377,6 +20394,7 @@ var OmoConfigSchema = object({
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsSchema.optional(),
+  context_handoff: OmoContextHandoffSettingsSchema.optional(),
   task: OmoTaskSettingsSchema.optional(),
   teams: OmoTeamsConfigSchema.optional(),
   models: OmoModelCatalogSchema.optional(),
@@ -20405,6 +20423,7 @@ var OmoConfigLayerSchema = object({
   categories: OmoCategoriesConfigSchema.optional(),
   agents: OmoAgentsConfigSchema.optional(),
   git_master: OmoGitMasterSettingsLayerSchema.optional(),
+  context_handoff: OmoContextHandoffSettingsLayerSchema.optional(),
   task: OmoTaskSettingsLayerSchema.optional(),
   teams: OmoTeamsConfigLayerSchema.optional(),
   models: OmoModelCatalogLayerSchema.optional(),
