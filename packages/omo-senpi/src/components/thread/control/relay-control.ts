@@ -1,6 +1,7 @@
 import type { ThreadTranscriptEntry } from "../reader"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
-import { outcomeFailure, replyData } from "../remote/remote-ops"
+import { outcomeFailure } from "../remote/outcome"
+import { replyData } from "../remote/remote-ops"
 import type { ModelChoice } from "../tools/model-match"
 import { closeLadder, SESSION_GONE, type RecordAnswer } from "./close-ladder"
 import { ControlRefusal, refuse, type SessionControl } from "./port"
