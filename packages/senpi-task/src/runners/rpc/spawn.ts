@@ -7,6 +7,7 @@ import type { RpcRunnerSpec } from "../types"
 import { rpcChildAncestry } from "../child-ancestry"
 import { engineAcceptsSpawnedBy } from "../engine-spawned-by"
 import { asSenpiThinkingLevel } from "../../senpi/thinking-level"
+import { personaArgs } from "./persona-args"
 import { MEMBER_EXTENSION_BUNDLE_NAME, MEMBER_PROCESS_ENV_NAMES, WORKPOOL_PROCESS_ENV_NAMES } from "../../team/member-extension/identity"
 import {
   detectBunBinary,
@@ -105,6 +106,7 @@ export function buildChildArgs(spec: RpcRunnerSpec): readonly string[] {
     args.push("--thinking", thinkingLevel)
   }
   if (spec.permissionPreset !== undefined) args.push("--permission-preset", spec.permissionPreset)
+  args.push(...personaArgs(spec))
   return args
 }
 
