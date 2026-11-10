@@ -31,6 +31,7 @@ import type { DeliveryTarget } from "./gateway/transport"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
+import { withThreadRenderers } from "./tools/render"
 import { localScope } from "./remote/local-scope"
 import { crossTarget, listAcross, planCreate, renameAlias, withAlias } from "./remote/lazy-ops"
 import { locateControl } from "./control/locate"
@@ -306,7 +307,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     unanswered.clear()
     relay.dispose()
   }
-  return { tools: [create, list, read, send, interrupt, close, handoff, rename, setModel, setReasoning, ...relayTools], dispose }
+  return { tools: [create, list, read, send, interrupt, close, handoff, rename, setModel, setReasoning, ...relayTools].map(withThreadRenderers), dispose }
 
   /**
    * Where a send's address points: a session on another device (its account listing row), or a session this device
