@@ -17,6 +17,7 @@ import { createLazyLiveThreadSurface } from "./lazy-live-surface"
 import { createDefaultRemoteSurface } from "./remote/default-remote"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import { defaultThreadStateDirectory } from "./live-surface-paths"
+import { stampThisDevice } from "./remote/this-device"
 
 /**
  * The longest the `agent_settled` handler waits for an armed completion's store write. senpi waits
@@ -77,10 +78,10 @@ function messageOf(event: unknown): EngineMessage | undefined {
   return typeof message === "object" && message !== null ? (message as EngineMessage) : undefined
 }
 
-type DeliveryDetails = { readonly delivery_id?: unknown; readonly remote_origin?: unknown; readonly chain_count?: unknown; readonly sender?: { readonly kind?: unknown; readonly session_id?: unknown; readonly name?: unknown } }
+type DeliveryDetails = { readonly delivery_id?: unknown; readonly chain_count?: unknown; readonly sender?: { readonly kind?: unknown; readonly session_id?: unknown; readonly name?: unknown } }
 
 /** senpi `external-admission.js` `deliveryIdOf`: the delivery a `session_control_delivery` message carries. */
-function deliveryOf(message: EngineMessage): { readonly id: string; readonly fromOtherDevice: boolean; readonly chainCount: number; readonly agentSender: string | undefined; readonly senderName: string | undefined } | undefined {
+function deliveryOf(message: EngineMessage): { readonly id: string; readonly chainCount: number; readonly agentSender: string | undefined; readonly senderName: string | undefined } | undefined {
   if (message.role !== "custom" || message.customType !== SESSION_CONTROL_DELIVERY_TYPE) return undefined
   const details = (message.details ?? undefined) as DeliveryDetails | undefined
   const id = details?.delivery_id
@@ -88,8 +89,6 @@ function deliveryOf(message: EngineMessage): { readonly id: string; readonly fro
   const count = details?.chain_count
   return {
     id,
-    // Engine-stamped (senpi#6233): the delivery crossed from another device, so no row of this store holds it.
-    fromOtherDevice: typeof details?.remote_origin === "object" && details.remote_origin !== null,
     chainCount: typeof count === "number" && Number.isSafeInteger(count) && count >= 1 ? count : 0,
     agentSender: details?.sender?.kind === "agent" && typeof details.sender.session_id === "string" ? details.sender.session_id : undefined,
     senderName: typeof details?.sender?.name === "string" && details.sender.name.trim() !== "" ? details.sender.name.trim() : undefined,
@@ -113,8 +112,9 @@ function noteInput(run: RunContext, message: EngineMessage): void {
   if (message.role === "user") run.local = true
   const delivery = deliveryOf(message)
   if (delivery === undefined) return
-  // A delivery from another device has no row here to be the cause of the next send; its hop count continues the chain (K8).
-  if (!delivery.fromOtherDevice) run.cause = delivery.id
+  // Every consumed delivery is the cause of the run's next send, on either transport (decision 0027 section 3); one no row
+  // here holds starts a new root there and its hop count continues the chain (K8).
+  run.cause = delivery.id
   run.chainHop = Math.max(run.chainHop, delivery.chainCount)
   if (!run.consumed.includes(delivery.id)) run.consumed.push(delivery.id)
   if (delivery.agentSender !== undefined && !run.replyTo.includes(delivery.agentSender)) run.replyTo.push(delivery.agentSender)
@@ -220,7 +220,8 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       const legacyMailbox = join(stateDirectory, "mailbox")
       const callerWorkspaceRoot = options.callerWorkspaceRoot ?? (() => pi.cwd ?? process.cwd())
       const onProvenanceWarning = (message: string) => ctx.logger.warn(`thread gateway: ${message}`)
-      const store = options.store ?? createGatewayStore({ agentDir: agentDir(), resolveTarget: createExtensionResolver(agentDir()), senderProvenance: () => resolveProvenance({ cwd: callerWorkspaceRoot(), env: options.env, loadWorkspaces: loadProvenanceWorkspaces, onWarning: onProvenanceWarning }), legacyMailboxDirectories: [legacyMailbox], ...(runtimeInstance === undefined ? {} : { runtimeInstance }) })
+      const remote = options.remote ?? createDefaultRemoteSurface({ version: createOmoNativeProductConfig().packageVersion, log: (line) => ctx.logger.warn(line), permissionPreset: () => pi.getPermissionPreset?.() })
+      const store = options.store ?? createGatewayStore({ agentDir: agentDir(), resolveTarget: createExtensionResolver(agentDir()), senderProvenance: () => stampThisDevice(resolveProvenance({ cwd: callerWorkspaceRoot(), env: options.env, loadWorkspaces: loadProvenanceWorkspaces, onWarning: onProvenanceWarning }), remote), legacyMailboxDirectories: [legacyMailbox], ...(runtimeInstance === undefined ? {} : { runtimeInstance }) })
       // Every store open retries an unreadable legacy mailbox, and an idle store reopens its worker on
       // the next call, so the same failure would repeat each time: it is reported once per session.
       const reportedInvalidMailboxes = new Set<string>()
@@ -260,7 +261,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         callerReplySenders: () => [...run.replySenders],
         callerRunHasLocalInput: () => run.local,
         onCompletionArmed: (durableId, armSeq) => completions.arm(durableId, armSeq),
-        remote: options.remote ?? createDefaultRemoteSurface({ version: createOmoNativeProductConfig().packageVersion, log: (line) => ctx.logger.warn(line), permissionPreset: () => pi.getPermissionPreset?.() }),
+        remote,
       }, (line) => ctx.logger.warn(line))
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
       // crash before its write), or made by another process (`omo thread report ... completion`) - is
