@@ -2,12 +2,12 @@ import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { validateResponse, validateWelcome } from "./fixtures/omo-5.1.66-decoder/validate.ts";
+import { validateResponse, validateWelcome } from "../../vendor/omo-5.1.66-decoder/validate.ts";
 
 // #12981 review: the pin is 0.1.27, so an omo through 5.1.66 (pin 0.1.3; it keeps any running service at or above its
 // pin, bootstrap.ts) talks to a 0.1.27 service that a newer omo installed. Its local API decoders refuse every field
 // they do not know. This tree's decoders ignore unknown reply fields since #914, so the old ones are vendored byte for
-// byte from v5.1.66 (fixtures/omo-5.1.66-decoder, pinned below; v5.1.65 has the same blobs, and no release tag carries
+// byte from v5.1.66 (vendor/omo-5.1.66-decoder, pinned below; v5.1.65 has the same blobs, and no release tag carries
 // the lenient ones). Two recordings:
 // - device-service-0.1.27-omo-5.1.66-session-endpoints.json: the 0.1.27 local API server, recorded exactly as the 0.1.25
 //   fixture was, for a 5.1.66 hello whose session.endpoints request did not ask for environments, and for a 5.1.67 hello.
@@ -72,7 +72,7 @@ describe("an omo through 5.1.66 (pin 0.1.3) talking to a running 0.1.27 service"
 describe("the vendored omo 5.1.66 decoder", () => {
   test("is byte for byte the v5.1.66 tree", () => {
     // given the git blob ids of packages/device-service-core/src/local-api at v5.1.66
-    const dir = join(import.meta.dir, "fixtures", "omo-5.1.66-decoder");
+    const dir = join(import.meta.dir, "..", "..", "vendor", "omo-5.1.66-decoder");
     const pin: { readonly blobs: Readonly<Record<string, string>> } = JSON.parse(
       readFileSync(join(dir, "PIN.json"), "utf8"),
     );
