@@ -73,6 +73,22 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
     expect(admits(a.sent)).toHaveLength(3)
   })
 
+  test("#given b is mid-turn and its user's draft holds the default-mode steer #when the draft goes after the turn ended #then the re-send is a follow-up under the same delivery id and the message is taken, never a turn_conflict the sender does not see", async () => {
+    // b answers the probe mid-turn on turn 3 and holds the first admit behind its draft; by the re-send its turn is over.
+    let reads = 0
+    const engine = { ...ENGINE, pending: 1, currentTurnId: "3", get streaming() { return reads++ < 2 } }
+    const a = account({ heldDraft: 1, engine })
+    const { relay, log } = transport(a.remote)
+    const first = await relay.deliver(delivery("steer me", "k6"))
+    expect(first).toMatchObject({ kind: "ok", device: "b", delivery: { kind: "queued", queue_position: 1 }, effective_mode: "follow_up" })
+    await admitted(a.sent, 2)
+    const records = admits(a.sent)
+    expect(records.map((record) => [record["deliverAs"], record["expectedTurnId"] ?? null])).toEqual([["steer", "3"], ["followUp", null]])
+    expect(new Set(records.map((record) => record["deliveryId"])).size).toBe(1)
+    expect(String(records[1]?.["text"])).toContain(" requested=auto effective=follow_up ")
+    expect(log.filter((line) => line.startsWith("relay_delivery_failed:"))).toEqual([])
+  })
+
   test("#given a draft that outlasts every re-send #when the schedule is exhausted #then the send already answered queued, the re-sends stop, and one failure line names the delivery", async () => {
     const a = account({ heldDraft: 10, engine: { ...ENGINE, pending: 1 } })
     const { relay, log } = transport(a.remote)

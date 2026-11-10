@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 
-import type { AddressEntry } from "./address-book"
+import { toThreadAddressEntries, type AddressEntry } from "./address-book"
 import type { ThreadToolResult } from "./contracts"
 import { threadToolFailure, type ThreadToolFailure } from "./errors"
 import type { ReleaseSessionReply, ReleaseSessionRequest } from "./gateway/adapter"
@@ -17,13 +17,12 @@ import type { DeliveryTarget } from "./gateway/transport"
 import type { ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult } from "./gateway/types"
 import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
 import { createGatewayResolver, createGatewayServices } from "./tools/gateway-services"
-import { addressBook, hostView, resolution, resolveEntries, resolveStoredSession } from "./tools/internals"
+import { addressBook, hostView, resolution, resolveEntries, resolveStoredSession, sendAddressBook } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread } from "./tools/read-ops"
 import { crossTarget } from "./remote/cross-device"
 import type { RemoteThreadSurface } from "./remote/ports"
 import { localScope } from "./remote/local-scope"
-import { readRemote } from "./remote/remote-ops"
 
 export type ThreadSdkOptions = {
   readonly agentDir: string
@@ -192,26 +191,20 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     extensionCall: store.extensionCall,
     principal,
     list: (request) => guarded(async () => listThreads(surface, await view(), request.all_scope)),
-    read: (request) => guarded(async () => {
-      const current = await view()
-      const value = { thread: request.thread, max_bytes: request.max_bytes, cursor: request.cursor, all_scope: request.all_scope }
-      const remote = options.remote
-      if (remote === undefined) return readThread(surface, current, value, UNKNOWN_CALLER)
-      const target = await crossTarget(remote, value.thread, resolution(surface, resolveEntries(surface, current), value.thread, UNKNOWN_CALLER, true))
-      if (target.kind === "error") return target.result
-      if (target.kind === "remote") return await readRemote(remote, target.row, value)
-      return readThread(surface, current, { ...value, thread: target.address, all_scope: localScope(target, value.all_scope) }, UNKNOWN_CALLER)
-    }),
+    read: (request) => guarded(async () => readThread({ ...surface, ...(options.remote === undefined ? {} : { remote: options.remote }) }, await view(), { thread: request.thread, max_bytes: request.max_bytes, cursor: request.cursor, all_scope: request.all_scope }, UNKNOWN_CALLER)),
     send: (request) => guarded(async () => {
       if (request.binding_id !== undefined) return await inbound({ ...request, binding_id: request.binding_id })
       if (request.thread === undefined) return fail("invalid_arguments", "A send without a binding needs a target session.", "Pass the target session, or --binding to deliver through a binding.")
       if (request.author !== undefined) return fail("invalid_arguments", "An author names a human in a bound external thread; a send without a binding has none.", "Pass binding_id with the author, or drop the author.")
       // The same road as an agent's send: the address resolves across the account, and the target's kind picks the transport.
+      // Like the agent's thread_send, a published id needs no lookup (no host listing, no account call), and any other address
+      // resolves over the offline view and the send address book, so an own alias is account-wide and a thread that is not
+      // running with nothing live answering still queues offline.
       let target: DeliveryTarget = { kind: "local", thread_id: request.thread, ...(request.all_scope === undefined ? {} : { all_scope: request.all_scope }) }
       const remote = options.remote
-      if (remote !== undefined) {
-        const current = await view()
-        const across = await crossTarget(remote, request.thread, resolution(surface, resolveEntries(surface, current), request.thread, UNKNOWN_CALLER, true))
+      if (remote !== undefined && await store.sessionOwner(request.thread) === null) {
+        const offline = await hostView(surface, { offline: true })
+        const across = await crossTarget(remote, request.thread, resolution(surface, toThreadAddressEntries(sendAddressBook(surface, offline, request.thread, true)), request.thread, UNKNOWN_CALLER, true))
         if (across.kind === "error") return across.result.kind === "error" ? across.result : fail("internal_error", "The target could not be resolved.", "Run omo thread list and retry.")
         const scope = across.kind === "local" ? localScope(across, request.all_scope) : undefined
         target = across.kind === "remote" ? { kind: "remote", row: across.row } : { kind: "local", thread_id: across.address, ...(scope === undefined ? {} : { all_scope: scope }) }

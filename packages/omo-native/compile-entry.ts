@@ -171,7 +171,8 @@ export async function runCompiledLauncher(args: string[], execDir: string, engin
     return false
   }
   if (args[0] === "remote") {
-    await runRemoteCommand(args)
+    // The staged plugin (and the gateway store's worker sidecar a remote send needs) lives in the provisioned runtime dir.
+    await runRemoteCommand(args, compiledPackageRoot ?? execDir)
     return true
   }
   const packageJson = readJson(join(execDir, "package.json")) as { version: string; omoBuild?: unknown }
