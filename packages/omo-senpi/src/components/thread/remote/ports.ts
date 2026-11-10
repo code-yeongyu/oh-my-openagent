@@ -4,6 +4,8 @@ export type JsonObject = { readonly [key: string]: unknown }
 export type RemoteSessionRow = {
   readonly device: string
   readonly session_id: string
+  /** The session's omo durable id when its device publishes it (#12996); a delivery header names its sender by this id. */
+  readonly durable_id?: string
   readonly title: string
   readonly project: string
   /** The session file on its own device; `open_session` on that device takes it. */

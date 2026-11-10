@@ -45,7 +45,9 @@ export type RemoteTarget =
 export async function locateAcross(remote: RemoteThreadSurface, address: string): Promise<RemoteTarget | Failure> {
   const here = await remote.sessions.thisDevice()
   const rows = await remote.sessions.sessions()
-  const byId = rows.find((row) => row.session_id === address)
+  // Step 1b: an exact session id, then the durable id a device published for its session (#12996: a delivery header
+  // names its sender by the durable id, the listing by the engine session id). Both are exact, so both beat step 3.
+  const byId = rows.find((row) => row.session_id === address) ?? rows.find((row) => row.durable_id === address)
   if (byId !== undefined) return byId.device === here ? { where: "here", session_id: byId.session_id } : { where: "remote", row: byId }
   if (remote.aliases === undefined) return { where: "none", rows, here }
   // The address was not asked for as an alias, so a registry that cannot answer only means no alias match: a name keeps
