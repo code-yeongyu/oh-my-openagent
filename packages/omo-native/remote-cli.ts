@@ -57,6 +57,12 @@ export interface RemoteCommandDependencies {
   readonly remote?: (service: DeviceService) => RemoteThreadSurface
   /** The mode `open` names when no --permission-preset is given; this device's engine settings by default. Test seam. */
   readonly localPermissionPreset?: () => string
+  /**
+   * Where this omo's staged plugin payload lives (`<root>/plugin/extensions/` holds the gateway store's worker sidecar):
+   * the npm package root by default; the compiled binary passes its provisioned runtime directory, because its own
+   * module paths sit inside the executable and resolve to nothing on disk.
+   */
+  readonly packageRoot?: string
 }
 
 /** `omo remote` verbs; `bootstrap` also needs the pinned install, the stored keys and this omo binary. */

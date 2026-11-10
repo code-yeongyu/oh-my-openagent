@@ -1604,6 +1604,7 @@
     "packages/omo-senpi/src/components/thread/remote/lazy-ops.ts",
     "packages/omo-senpi/src/components/thread/remote/lazy-remote.ts",
     "packages/omo-senpi/src/components/thread/remote/local-scope.ts",
+    "packages/omo-senpi/src/components/thread/remote/outcome.ts",
     "packages/omo-senpi/src/components/thread/remote/relay-transport.ts",
     "packages/omo-senpi/src/components/thread/remote/remote-ops.ts",
     "packages/omo-senpi/src/components/thread/sdk.ts",
