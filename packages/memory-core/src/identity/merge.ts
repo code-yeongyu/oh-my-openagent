@@ -4,7 +4,7 @@
 // repository as it was; the source's `identity.json` records `mergedInto` and the head that was merged,
 // so a repeated run is a no-op and later source commits merge incrementally.
 
-import { dirname, join } from "node:path"
+import { basename, dirname, isAbsolute, join } from "node:path"
 
 import { GitMemoryRepo, NoEffectiveChangesError, type GitCommitAuthor, type GitTreeBlobEntry } from "../git"
 import { mkdir, readdir, readFile, writeFile } from "../fs/resilient"
@@ -141,23 +141,33 @@ export async function repositoryCandidateDirs(spellings: readonly string[]): Pro
 export async function repositoryWorktreeDirs(dirs: readonly string[]): Promise<string[]> {
   const found = new Set<string>()
   for (const dir of dirs) {
-    let current = dir
-    for (;;) {
-      const adminRoot = join(current, ".git", "worktrees")
-      const names = await readdir(adminRoot).catch(() => undefined)
-      if (names !== undefined) {
-        for (const name of names) {
-          const pointer = await readFile(join(adminRoot, name, "gitdir"), "utf8").catch(() => undefined)
-          const gitFile = pointer?.split(/\r?\n/, 1)[0]?.trim()
-          if (gitFile !== undefined && gitFile !== "") found.add(dirname(gitFile))
-        }
-        break
-      }
-      if (dirname(current) === current) break
-      current = dirname(current)
+    const common = await commonGitDir(dir)
+    if (common === undefined) continue
+    // The main working tree owns the common `.git`; a linked worktree outside the repository (Desktop keeps
+    // thread worktrees under its own folder) reaches it only through its `.git` file.
+    if (basename(common) === ".git") found.add(dirname(common))
+    for (const name of await readdir(join(common, "worktrees")).catch(() => [] as string[])) {
+      const pointer = await readFile(join(common, "worktrees", name, "gitdir"), "utf8").catch(() => undefined)
+      const gitFile = pointer?.split(/\r?\n/, 1)[0]?.trim()
+      if (gitFile !== undefined && gitFile !== "") found.add(dirname(gitFile))
     }
   }
   return [...found].sort()
+}
+
+/** The repository's common git directory for `dir` or its nearest ancestor checkout; no `git` spawn. */
+async function commonGitDir(dir: string): Promise<string | undefined> {
+  for (let current = dir; ; current = dirname(current)) {
+    const dotGit = join(current, ".git")
+    if ((await readdir(dotGit).catch(() => undefined)) !== undefined) return dotGit
+    const pointer = (await readFile(dotGit, "utf8").catch(() => undefined))?.match(/^gitdir:\s*(.+)$/m)?.[1]?.trim()
+    if (pointer !== undefined) {
+      const gitDir = isAbsolute(pointer) ? pointer : join(current, pointer)
+      const commonPointer = (await readFile(join(gitDir, "commondir"), "utf8").catch(() => undefined))?.trim()
+      return commonPointer === undefined || commonPointer === "" ? gitDir : (isAbsolute(commonPointer) ? commonPointer : join(gitDir, commonPointer))
+    }
+    if (dirname(current) === current) return undefined
+  }
 }
 
 /**
@@ -220,8 +230,17 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
   // The plan that is written is made inside the lock: another writer may have created a path in the
   // target after the preview, and an `add` must never replace it.
   const outcome = await lock("memory-write", async (): Promise<{ readonly plan: MergePlan; readonly sha?: string }> => {
+    // A repository-root identity that is new under the `git` default has no repository yet: the merge is
+    // its first write, so it creates it here instead of failing every source.
+    if ((await targetRepo.head().catch(() => null)) === null && (await readdir(target.repo).catch(() => undefined)) === undefined) {
+      await targetRepo.init({ authorName: author.authorName })
+    }
     await targetRepo.cleanCheck()
-    const plan = await planIdentityMerge(source, target, since)
+    // Read the merge record again under the lock: a concurrent apply may have merged this source meanwhile.
+    const current = await readIdentityRecord(source.root).catch(() => undefined)
+    const lockedSince = current?.mergedInto === targetId ? current.mergedHead : undefined
+    if (lockedSince !== undefined && lockedSince === preview.sourceHead) return { plan: { ...preview, actions: [] } }
+    const plan = await planIdentityMerge(source, target, lockedSince)
     const writes = plan.actions.filter((action): action is Exclude<MergeAction, { action: "skip" }> => action.action !== "skip")
     if (writes.length === 0 || plan.sourceHead === null) return { plan }
     const oids = new Map((await sourceRepo.lsTreeBlobs(plan.sourceHead)).map((entry) => [entry.path, entry.oid]))
