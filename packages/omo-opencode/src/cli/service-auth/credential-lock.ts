@@ -10,6 +10,12 @@ export { accountHome }
 
 const held = new AsyncLocalStorage<ReadonlyMap<string, LockLease>>()
 
+// Age decides only for a record whose owner cannot be checked: one torn by a crash between the exclusive create and the
+// record write (no fsync, so a reboot leaves it empty), or a legacy record of a dead pid. A live owner is never stale
+// whatever its age. Unbounded, a torn record held the lock for good and every credential read waited out the lock-wait
+// bound and failed (#12989).
+const CREDENTIAL_LOCK_STALE_AFTER_MS = 60_000
+
 /**
  * The one per-origin lock and desktop generation record (account-transport-api v7 section 4.1). The CLI, desktop main
  * and the engine pin boundary all derive these paths here or with the same inputs; never pass a path around instead.
@@ -36,6 +42,6 @@ export async function withCredentialLock<T>(api: string, action: (lease: LockLea
   if (outer !== undefined) return action(outer)
   await mkdir(directory, { recursive: true, mode: 0o700 })
   return withLock(lock, lease => held.run(new Map([...owned ?? [], [lock, lease]]), () => action(lease)), {
-    ownerTag, staleAfterMs: Number.POSITIVE_INFINITY,
+    ownerTag, staleAfterMs: CREDENTIAL_LOCK_STALE_AFTER_MS,
   })
 }
