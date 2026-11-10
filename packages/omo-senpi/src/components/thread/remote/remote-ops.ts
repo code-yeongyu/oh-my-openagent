@@ -42,18 +42,12 @@ export type RemoteTarget =
  * Resolution steps 1b and 2 of the frozen order: an exact session id in the account list, then an alias.
  * Step 1a (this device's exact id) and step 3 (the local name ladder) stay with the local resolver.
  */
-/** The device a reply's delivery came from (the header's remote_origin): a durable-id hit must sit on that device. */
-export type ReplyOrigin = { readonly device: string }
-
-export async function locateAcross(remote: RemoteThreadSurface, address: string, origin?: ReplyOrigin): Promise<RemoteTarget | Failure> {
+export async function locateAcross(remote: RemoteThreadSurface, address: string): Promise<RemoteTarget | Failure> {
   const here = await remote.sessions.thisDevice()
   const rows = await remote.sessions.sessions()
   // Step 1b: an exact session id, then the durable id a device published for its session (#12996: a delivery header
   // names its sender by the durable id, the listing by the engine session id). Both are exact, so both beat step 3.
   const byId = rows.find((row) => row.session_id === address) ?? rows.find((row) => row.durable_id === address)
-  // Defence in depth (#12996): a reply addressed by the sender's durable id goes only to the device the delivery came
-  // from; a colliding or forged listing row on another device is refused by name, never routed to.
-  if (byId !== undefined && origin !== undefined && byId.device !== origin.device) return fail("reply_device_mismatch", `The listing places ${address} on device ${byId.device}, but the delivery it answers came from device ${origin.device}.`, "Call thread_list with all_scope and address the sender by the row that matches its device.", { device: byId.device, expected_device: origin.device })
   if (byId !== undefined) return byId.device === here ? { where: "here", session_id: byId.session_id } : { where: "remote", row: byId }
   if (remote.aliases === undefined) return { where: "none", rows, here }
   // The address was not asked for as an alias, so a registry that cannot answer only means no alias match: a name keeps
@@ -70,7 +64,7 @@ export async function locateAcross(remote: RemoteThreadSurface, address: string,
  * lookup a create on another device uses). An offline holder device is device_offline; one that is online but cannot map
  * the holder to a session it lists is not_found.
  */
-async function holderTarget(remote: RemoteThreadSurface, holder: AliasHolder, here: string | null, rows: readonly RemoteSessionRow[]): Promise<RemoteTarget | Failure> {
+export async function holderTarget(remote: RemoteThreadSurface, holder: AliasHolder, here: string | null, rows: readonly RemoteSessionRow[]): Promise<RemoteTarget | Failure> {
   if (holder.device === here) return { where: "here", session_id: holder.session_id }
   const listed = rows.find((row) => row.device === holder.device && row.session_id === holder.session_id)
   if (listed !== undefined) return { where: "remote", row: listed }

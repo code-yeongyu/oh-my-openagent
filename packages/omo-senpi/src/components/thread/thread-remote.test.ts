@@ -140,7 +140,7 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
 })
 
 describe("#12833: a name reaches a thread on another device by its title", () => {
-  const titled = (device: string, session_id: string, title: string, state = "idle") => ({ ...B_ROW, device, session_id, title, state })
+  const titled = (device: string, session_id: string, title: string, state = "idle") => ({ ...B_ROW, device, session_id, durable_id: session_id, title, state })
 
   test("#given b lists a live session titled with the name #when thread_send names it from this device #then it reaches b's session; this device's own row and an ended session are never matched by title", async () => {
     const a = account({ rows: [titled("b", "dur-on-b", "Release Train"), titled("here", "dur-local", "local peer"), titled("b", "dur-old-on-b", "stale", "ended")] })

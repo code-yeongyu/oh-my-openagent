@@ -1,4 +1,6 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
+import { threadToolFailure } from "./errors"
+import type { ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
 import { checkNameConflict, fuzzyMatch, normalizeThreadName, workspaceEntries, type ThreadAddressEntry } from "./addressing"
@@ -31,9 +33,9 @@ import type { DeliveryTarget } from "./gateway/transport"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
-import { threadSendPermission } from "./tools/reply-permission"
+import { isReplyToConsumedSender, threadSendPermission } from "./tools/reply-permission"
 import { localScope } from "./remote/local-scope"
-import { crossTarget, listAcross, planCreate, renameAlias, withAlias } from "./remote/lazy-ops"
+import { listAcross, planCreate, renameAlias, withAlias } from "./remote/lazy-ops"
 import { locateControl } from "./control/locate"
 import { closeThread, interruptThread, setModelOn, setThinkingLevelOn } from "./control/operations"
 import { controlIdentity, controlRefusalOf } from "./control/port"
@@ -56,8 +58,7 @@ import {
   summary,
   targetSession,
   type AnyTool,
-  type ToolOutput,
-} from "./tools/internals"
+  type ToolOutput, resolveAcross } from "./tools/internals"
 
 /** How many keys a tool surface keeps for recovering receipts whose admission reply was lost. */
 export const RECEIPT_RECOVERY_MAX_KEYS = 4_096
@@ -245,7 +246,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
       return await closeThread(located.control)
     }),
   }
-  const handoff: AnyTool = { ...metadata("thread_handoff"), parameters: threadToolParamSchemas.thread_handoff, execute: (id: string, args: ThreadHandoffInput, _signal, _onUpdate, ectx) => execute("thread_handoff", id, args, ectx, async (current, value, operationId, callerId) => { if (value.match === "fuzzy" && value.all_scope !== true && options.callerWorkspaceRoot().trim() === "") return failure("caller_context_missing", "Scoping a fuzzy handoff needs the caller's workspace root, which this call did not provide.", "Set all_scope to search every workspace, or hand off from a session that knows its workspace."); if (value.match !== "fuzzy" && options.remote !== undefined && current !== PUBLISHED_SEND_VIEW) { const across = await crossTarget(options.remote, value.thread, resolution(options, toThreadAddressEntries(sendAddressBook(options, current, value.thread, true)), value.thread, callerId, true)); if (across.kind === "error") return across.result; if (across.kind === "remote") return await deliver(current, value.thread, value, operationId, callerId, "exact_name") }; const entries = value.match === "fuzzy" ? fuzzyCandidates(resolveEntries(options, current), value.all_scope) : toThreadAddressEntries(sendAddressBook(options, current, value.thread, value.all_scope)); const resolved = value.match === "fuzzy" ? fuzzyMatch(entries.filter((entry) => entry.thread_id !== callerId), value.thread) : resolution(options, entries, value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; return deliver(current, resolved.entry.thread_id, value, operationId, callerId, value.match === "fuzzy" ? "fuzzy" : "exact_name") }) }
+  const handoff: AnyTool = { ...metadata("thread_handoff"), parameters: threadToolParamSchemas.thread_handoff, execute: (id: string, args: ThreadHandoffInput, _signal, _onUpdate, ectx) => execute("thread_handoff", id, args, ectx, async (current, value, operationId, callerId) => { if (value.match === "fuzzy" && value.all_scope !== true && options.callerWorkspaceRoot().trim() === "") return failure("caller_context_missing", "Scoping a fuzzy handoff needs the caller's workspace root, which this call did not provide.", "Set all_scope to search every workspace, or hand off from a session that knows its workspace."); if (value.match !== "fuzzy") return await deliver(current, value.thread, value, operationId, callerId, "exact_name"); const entries = value.match === "fuzzy" ? fuzzyCandidates(resolveEntries(options, current), value.all_scope) : toThreadAddressEntries(sendAddressBook(options, current, value.thread, value.all_scope)); const resolved = value.match === "fuzzy" ? fuzzyMatch(entries.filter((entry) => entry.thread_id !== callerId), value.thread) : resolution(options, entries, value.thread, callerId, value.all_scope); if (resolved.kind === "error") return { kind: "error", error: resolved } as ThreadToolResult; return deliver(current, resolved.entry.thread_id, value, operationId, callerId, value.match === "fuzzy" ? "fuzzy" : "exact_name") }) }
   const rename: AnyTool = {
     ...metadata("thread_rename"),
     parameters: threadToolParamSchemas.thread_rename,
@@ -315,19 +316,18 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
    * (`PUBLISHED_SEND_VIEW`) skips the address book; the engine validates its one endpoint.
    */
   async function locate(current: ThreadHostView, address: string, allScope: boolean | undefined, callerId: string): Promise<DeliveryTarget | { readonly kind: "error"; readonly result: ThreadToolResult }> {
-    let scope = allScope
-    if (options.remote !== undefined && current !== PUBLISHED_SEND_VIEW) {
-      const origin = options.callerReplyOrigins?.().find((o) => o.session_id === address)
-      const target = await crossTarget(options.remote, address, resolution(options, toThreadAddressEntries(sendAddressBook(options, current, address, true)), address, callerId, true), origin === undefined ? undefined : { device: origin.device })
-      if (target.kind === "error") return target
-      if (target.kind === "remote") return target
-      address = target.address
-      scope = localScope(target, allScope)
-    }
+    const scope = allScope
     if (current === PUBLISHED_SEND_VIEW) return { kind: "local", thread_id: address, all_scope: scope }
-    const resolved = resolution(options, toThreadAddressEntries(sendAddressBook(options, current, address, scope)), address, callerId, scope)
+    // Decision 0027: ONE resolver over this device's book and the relay transport's book (the account's other devices);
+    // the entry it returns says which transport carries the send. An unreachable relay leaves the local book alone.
+    const resolved = await resolveAcross(options, toThreadAddressEntries(sendAddressBook(options, current, address, true)), address, callerId, scope)
     if (resolved.kind === "error") return { kind: "error", result: { kind: "error", error: resolved } as ThreadToolResult }
-    return { kind: "local", thread_id: resolved.entry.thread_id, all_scope: scope }
+    // The allowance approved this send as a reply to a consumed delivery's sender (by id or stated name): deliver only when
+    // the address resolves to that sender, else refuse by name without sending (decision 0027 section 6).
+    const mismatch = replyTargetMismatch(options, address, resolved.entry)
+    if (mismatch !== undefined) return { kind: "error", result: { kind: "error", error: mismatch } as ThreadToolResult }
+    if (resolved.entry.transport?.kind === "relay") return { kind: "remote", row: resolved.entry.transport.row }
+    return { kind: "local", thread_id: resolved.entry.thread_id, all_scope: resolved.all_scope ?? scope }
   }
 
   async function deliver(current: ThreadHostView, address: string, value: ThreadSendInput | ThreadHandoffInput, idempotencyKey: string, callerId: string, resolvedBy?: "exact_name" | "fuzzy"): Promise<ThreadToolResult> {
@@ -404,3 +404,10 @@ export function registerThreadTools(pi: ExtensionToolHost, options: ThreadToolSu
   return { dispose: built.dispose }
 }
 
+
+function replyTargetMismatch(options: ThreadToolSurfaceOptions, address: string, entry: ThreadAddressEntry): ThreadToolFailure | undefined {
+  if (!isReplyToConsumedSender(options, address)) return undefined
+  const senders = options.callerReplySenders?.() ?? []
+  if (senders.some((sender) => sender.session_id === entry.thread_id) || (options.callerReplyTargets?.() ?? []).includes(entry.thread_id)) return undefined
+  return threadToolFailure("reply_target_mismatch", `"${address}" was approved as a reply to a sender of this run's deliveries, but it resolves to ${entry.name} (${entry.thread_id}${entry.device === undefined ? "" : " on " + entry.device}), which is not that sender.`, "Reply with the sender's durable id from the delivery header, or send to the other thread by its id as a normal send.", { resolved_thread_id: entry.thread_id, ...(entry.device === undefined ? {} : { device: entry.device }) })
+}

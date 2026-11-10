@@ -22,11 +22,4 @@ describe("locateAcross resolves a durable id the listing carries (#12996)", () =
   test("#given an engine session id #when located #then the exact session_id match still wins", async () => {
     expect(await locateAcross(surface([ROW_HERE, ROW_B]), "eng-on-b")).toEqual({ where: "remote", row: ROW_B })
   })
-  test("#given the durable id matches a row on a device other than the delivery's remote_origin #when located with that origin #then it is refused reply_device_mismatch, never routed", async () => {
-    const result = await locateAcross(surface([ROW_HERE, ROW_B]), ROW_B.durable_id ?? "", { device: "c" })
-    expect(result).toMatchObject({ kind: "error", error: { code: "reply_device_mismatch", details: { device: "b", expected_device: "c" } } })
-  })
-  test("#given the durable id matches the row on the delivery's remote_origin #when located with that origin #then it resolves to that row", async () => {
-    expect(await locateAcross(surface([ROW_HERE, ROW_B]), ROW_B.durable_id ?? "", { device: "b" })).toEqual({ where: "remote", row: ROW_B })
-  })
 })

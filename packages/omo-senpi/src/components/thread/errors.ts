@@ -6,7 +6,7 @@ export const THREAD_ERROR_CODES = [
   "invalid_arguments",
   "caller_context_missing",
   "not_found",
-  "reply_device_mismatch",
+  "reply_target_mismatch",
   "ambiguous_target",
   "scope_denied",
   "name_conflict",

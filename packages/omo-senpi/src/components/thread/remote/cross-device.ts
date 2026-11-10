@@ -4,7 +4,7 @@ import { createRelaySessionHost, listedThread } from "../control/relay-session-h
 import type { HostedThread, SessionHost, SessionOpenRequest } from "../control/session-host"
 import { threadToolFailure } from "../errors"
 import type { AliasRegistry, RemoteSessionRow, RemoteThreadSurface } from "./ports"
-import { aliasFailure, deviceOnline, locateAcross, remoteAvailable , type ReplyOrigin } from "./remote-ops"
+import { aliasFailure, deviceOnline, locateAcross, remoteAvailable  } from "./remote-ops"
 
 type LocalEntry = { readonly thread_id: string; readonly name?: string; readonly cwd?: string; readonly preview?: string; readonly updated_at?: string | null; readonly status?: ThreadStatus }
 type LocalResolution =
@@ -23,14 +23,14 @@ export type CrossTarget =
  * (#12833), so one match anywhere resolves and two or more are ambiguous_target naming each device. Without a remote
  * surface the tools resolve exactly as before.
  */
-export async function crossTarget(remote: RemoteThreadSurface | undefined, address: string, local: LocalResolution, origin?: ReplyOrigin): Promise<CrossTarget> {
+export async function crossTarget(remote: RemoteThreadSurface | undefined, address: string, local: LocalResolution): Promise<CrossTarget> {
   if (remote === undefined || address === "self") return { kind: "local", address }
   if (local.kind === "ok" && local.entry.thread_id === address) return { kind: "local", address }
   const unavailable = await remoteAvailable(remote)
   if (unavailable !== undefined) return local.kind === "ok" || unavailable.error.code !== "relay_requires_paid_plan" ? { kind: "local", address } : { kind: "error", result: unavailable }
   let across: Awaited<ReturnType<typeof locateAcross>>
   try {
-    across = await locateAcross(remote, address, origin)
+    across = await locateAcross(remote, address)
   } catch {
     return { kind: "local", address }
   }
