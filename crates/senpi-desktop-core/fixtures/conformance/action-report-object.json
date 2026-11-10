@@ -1,5 +1,5 @@
 {
-  "description": "reportMode object (computer-use v2 P1a): engine.hello lists the action-report feature; a completed background click answers an ActionReport delivered_unverified/unsafe with effect unverifiable and auditIds naming its audit notification, which carries that id; a click refused for a stale frame carries data.disposition not_delivered/safe and focusRestoration.",
+  "description": "reportMode object (computer-use v2 P1a): engine.hello lists the action-report feature; a completed background click answers an ActionReport delivered_unverified/unsafe with effect unverifiable and auditIds naming its audit notification, which carries that id; a click refused for a stale frame carries data.reason superseded and data.disposition not_delivered/safe and focusRestoration.",
   "scenario": "crates/senpi-desktop-backend-fake/fixtures/two-displays-one-window.json",
   "env": {
     "SENPI_DESKTOP_FAKE_CLOCK": "1"
@@ -23,7 +23,14 @@
               "buildSha": "unknown",
               "abi": "senpi-desktop/1",
               "features": [
-                "action-report"
+                "action-report",
+                "frame-identity",
+                "frame-consume",
+                "ax-partial",
+                "trace",
+                "key-priming",
+                "epoch",
+                "interaction-lock"
               ]
             }
           },
@@ -213,6 +220,7 @@
                 "retry": "unsafe"
               },
               "effect": "unverifiable",
+              "route": "background_window",
               "focusRestoration": "not_needed",
               "auditIds": [
                 "01M6FPGT7M2120RGBWA9PKTN56"
@@ -272,6 +280,7 @@
               "data": {
                 "code": "InvalidCoordinateFrame",
                 "hint": null,
+                "reason": "superseded",
                 "disposition": {
                   "delivery": "not_delivered",
                   "retry": "safe"
