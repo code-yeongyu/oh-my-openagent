@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:9e6e5afdaf6afb9e6be0c25465673f510ba9f892368975f502a16c31495c3a61:d7047ce43c01ed4d33f093f758b4a4942b873c6fed0a1b17cc0e678963b23da5
+// omo-codex-install:66b62f72f20dcda85428e1d3d1483ee0791dbf707cca6f54aba347f40c333439:39e67341cc95036f8c9c428ebfd2fcf7360e66fd570b2131a164820a29397af8
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19940,7 +19940,7 @@ var OmoMemoryAutoIdentitySchema = _enum(["path", "git"]);
 var OmoMemorySettingsSchema = object({
   enabled: boolean2().default(true),
   agent: string2().min(1).default("auto"),
-  auto_identity: OmoMemoryAutoIdentitySchema.default("git"),
+  auto_identity: OmoMemoryAutoIdentitySchema.default("path"),
   reflection: OmoMemoryReflectionSchema.default({
     enabled: true,
     trigger: { step_count: 25, on_compaction: true },
@@ -19980,6 +19980,7 @@ var OmoMemorySettingsSchema = object({
   projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 0, max_bytes: 40960 }),
   runtime: OmoMemoryRuntimeSchema.default({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30, pass_budget_ms: 60000, discard_unreflected_journals: false, max_bytes: 2 * 1024 * 1024 * 1024 }),
   compile_warn_tokens: number2().int().positive().default(30000),
+  facts_note_max_bytes: number2().int().nonnegative().default(48 * 1024),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).default({})
 }).strict();
 var OmoMemorySettingsLayerSchema = object({
@@ -20001,6 +20002,7 @@ var OmoMemorySettingsLayerSchema = object({
   projection: OmoMemoryProjectionLayerSchema.optional(),
   runtime: OmoMemoryRuntimeLayerSchema.optional(),
   compile_warn_tokens: number2().int().positive().optional(),
+  facts_note_max_bytes: number2().int().nonnegative().optional(),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).optional()
 }).strict();
 

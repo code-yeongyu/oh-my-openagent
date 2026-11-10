@@ -1,5 +1,13 @@
 export { loadFactsPersona } from "./assets/assets"
 export {
+  DEFAULT_FACTS_NOTE_MAX_BYTES,
+  factsNotesOverBudget,
+  isFactsNotePath,
+  measureFactsNote,
+  measureFactsNotesInDir,
+  type FactsNoteSize,
+} from "./note-budget"
+export {
   FactsQueue,
   type FactsEnqueueRequest,
   type FactsEnqueueResult,

@@ -19,6 +19,7 @@ import {
   checkReflectionHealth,
   checkRuntimeSize,
   checkSoulSeed,
+  checkFactsNotes,
   checkMemoryFragmentation,
   checkTokens,
   checkWorktrees,
@@ -141,6 +142,7 @@ export async function runDoctor(deps: MemoryCommandDeps, ctx: MemoryCommandConte
       await checkGhostReservation(identity.identityPaths, deps),
       await checkReflectionHealth(identity.identityPaths.reflection, { now: deps.now?.() ?? Date.now() }),
       await checkTokens(repoDir, warnTokens, systemTokens),
+      await checkFactsNotes(repoDir, settings.facts_note_max_bytes),
       await checkMemoryFragmentation(identity.identityPaths, (spelling) => resolveAutoIdentity(spelling, { ...(deps.env ?? process.env), OMO_MEMORY_HOME: dirname(dirname(identity.identityPaths.root)) }, settings.auto_identity).id),
       runtime.check,
     )
