@@ -65,8 +65,24 @@ describe("#12886 a peer-delivered run replies to its sender", () => {
       await dispatch("message_start", delivery({ kind: "agent", session_id: SENDER, name: "A" }))
       expect(requests(SENDER)).toEqual(REPLY)
       expect(requests(OTHER)).toEqual(ASK)
+      // Decision 0027 section 6: the stated sender of a consumed delivery is a reply target by id or name, whatever its spelling class.
       await dispatch("message_start", delivery({ kind: "agent", session_id: "planner", name: "planner" }))
-      expect(requests("planner")).toEqual(ASK)
+      expect(requests("planner")).toEqual([{ permission: "thread_send", patterns: ["planner"], always: ["planner"], autoApproveAsk: true }])
+    } finally {
+      await store.dispose()
+      rmSync(agentDir, { recursive: true, force: true })
+    }
+  })
+
+  test("decision 0027: #given a run woken by an agent's delivery that states the sender's name #when it sends back by that NAME (any spelling the resolver accepts) #then the ask is auto-approved from the delivery alone; an unrelated name still asks", async () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "thr-peer-reply-name-"))
+    const { store, dispatch, requests } = component(agentDir)
+    try {
+      await dispatch("agent_start")
+      await dispatch("message_start", delivery({ kind: "agent", session_id: SENDER, name: "Planner Bot" }))
+      expect(requests("Planner Bot")).toEqual([{ permission: "thread_send", patterns: ["Planner Bot"], always: ["Planner Bot"], autoApproveAsk: true }])
+      expect(requests("  planner bot ")).toEqual([{ permission: "thread_send", patterns: ["  planner bot "], always: ["  planner bot "], autoApproveAsk: true }])
+      expect(requests("reviewer")).toEqual(ASK)
     } finally {
       await store.dispose()
       rmSync(agentDir, { recursive: true, force: true })

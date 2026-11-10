@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { rowThreadId } from "./ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { hashArgs } from "../gateway/bindings"
 import { decideDelivery } from "../gateway/decision"
@@ -191,7 +192,7 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
       chainCount: hop,
     }, hop)
     let record = recordFor(lane)
-    const ok = (kind: GatewayDeliveryDelivery, deduplicated = false): RelayDeliverySuccess => ({ kind: "ok", thread_id: row.session_id, delivery: kind, deduplicated, device: row.device, delivery_id, effective_mode: lane })
+    const ok = (kind: GatewayDeliveryDelivery, deduplicated = false): RelayDeliverySuccess => ({ kind: "ok", thread_id: rowThreadId(row), delivery: kind, deduplicated, device: row.device, delivery_id, effective_mode: lane })
     let sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
     if (delivery.mode === "auto" && lane === "steer" && sent.kind === "ok" && replyData(sent.response)["kind"] === "turn_conflict") {
       // The turn the probe saw ended before the record arrived. The default never fails on that race: it takes the lane the
@@ -240,7 +241,7 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
   const prompt = async (delivery: OutboundDelivery, row: RemoteSessionRow): Promise<SendOutcome> => {
     const offline = await deviceOnline(remote, row.device)
     if (offline !== undefined) return offline
-    const ok = (kind: GatewayDeliveryDelivery): RelayDeliverySuccess => ({ kind: "ok", thread_id: row.session_id, delivery: kind, deduplicated: false, device: row.device, effective_mode: delivery.mode === "steer" ? "steer" : "follow_up" })
+    const ok = (kind: GatewayDeliveryDelivery): RelayDeliverySuccess => ({ kind: "ok", thread_id: rowThreadId(row), delivery: kind, deduplicated: false, device: row.device, effective_mode: delivery.mode === "steer" ? "steer" : "follow_up" })
     if (delivery.mode === "steer") {
       const state = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
       if (state.kind !== "ok") return outcomeFailure(state, row.device)

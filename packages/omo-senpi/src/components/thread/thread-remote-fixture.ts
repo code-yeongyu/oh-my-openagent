@@ -9,7 +9,9 @@ import type { ThreadTranscriptEntry } from "./reader"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import type { ThreadCloseOutcome } from "./tools/ports"
 
-export const B_ROW: RemoteSessionRow = { device: "b", session_id: "dur-on-b", title: "on b", project: "/work/b", path: "/home/b/.omo/agent/sessions/dur-on-b.jsonl", state: "idle", updated_ms: 1_700_000_000_000 }
+// The listing key (what b's connector assigned) deliberately differs from the durable id (audit class C8, #13017): a test
+// that passes with either id proves nothing about which one a tool path matched.
+export const B_ROW: RemoteSessionRow = { device: "b", session_id: "rk-on-b", durable_id: "dur-on-b", title: "on b", project: "/work/b", path: "/home/b/.omo/agent/sessions/dur-on-b.jsonl", state: "idle", updated_ms: 1_700_000_000_000 }
 
 type Sent = { readonly via: "endpoint" | "session" | "read" | "watch"; readonly device: string; readonly session?: string; readonly rpc?: JsonObject }
 
@@ -48,7 +50,8 @@ export function createRemoteThreadFixture() {
     // The sessions b's engine holds. Its close rules are senpi's (2026.11.5-1): close_session from a connection that never
     // attached is refused unknown_session (senpi#1782); an attached close releases only that hold, so the session ends
     // only with no other holder; unload_session with force drains every hold, and refuses a session with no file yet.
-    const live = new Set(options.live ?? [B_ROW.session_id])
+    // b's engine knows its sessions by the listing key; rows a test builds with the durable id as key (titled(), the remote verbs' typed id) are live too.
+    const live = new Set(options.live ?? [B_ROW.session_id, ...(B_ROW.durable_id === undefined ? [] : [B_ROW.durable_id])])
     const answer = (rpc: JsonObject, attachedTo?: string): RemoteCommandOutcome => {
       // The engine's real reply envelope, as the device service hands it back (device-service-core's CommandResult.response):
       // every field the tools read lives under `data`.
@@ -175,7 +178,7 @@ export function createRemoteThreadFixture() {
     return { remote, sent, hops, aliases, live, registryCalls }
   }
 
-  function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?: () => string | undefined; callerChainHop?: () => number; callerName?: () => string | undefined; env?: Readonly<Record<string, string | undefined>>; sessions?: ThreadHostSession[]; engine?: Engine; caller?: string; diskSessions?: readonly string[]; closeOutcome?: ThreadCloseOutcome } = {}) {
+  function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?: () => string | undefined; callerChainHop?: () => number; callerName?: () => string | undefined; callerReplyTargets?: () => readonly string[]; callerReplySenders?: () => readonly { readonly session_id: string; readonly name?: string }[]; env?: Readonly<Record<string, string | undefined>>; sessions?: ThreadHostSession[]; engine?: Engine; caller?: string; diskSessions?: readonly string[]; closeOutcome?: ThreadCloseOutcome } = {}) {
     const engine = extra.engine ?? ENGINE
     const local: ThreadHostSession = { sessionId: "route-local", durableSessionId: "dur-local", cwd: process.cwd(), name: "local peer", status: "open" }
     const sessions = extra.sessions ?? [local]
@@ -207,7 +210,7 @@ export function createRemoteThreadFixture() {
     // Session files with no live owner: the address book lists them from disk, and no host holds them.
     const disk = (extra.diskSessions ?? []).map((id) => ({ durable_id: id, name: null, cwd: process.cwd(), created_at: "2026-11-01T00:00:00Z", updated_at: null, session_path: join(agentDir, `${id}.jsonl`), source_host: null }))
     const caller = extra.caller ?? "dur-caller"
-    const tools = createThreadTools({ host, store, stateDirectory: join(agentDir, "state"), diskSessions: () => disk, callerSessionId: () => caller, callerWorkspaceRoot: () => process.cwd(), remote, ...(extra.callerCause === undefined ? {} : { callerCause: extra.callerCause }), ...(extra.callerChainHop === undefined ? {} : { callerChainHop: extra.callerChainHop }), ...(extra.callerName === undefined ? {} : { callerName: extra.callerName }), ...(extra.env === undefined ? {} : { env: extra.env }) })
+    const tools = createThreadTools({ host, store, stateDirectory: join(agentDir, "state"), diskSessions: () => disk, callerSessionId: () => caller, callerWorkspaceRoot: () => process.cwd(), remote, ...(extra.callerReplyTargets === undefined ? {} : { callerReplyTargets: extra.callerReplyTargets }), ...(extra.callerReplySenders === undefined ? {} : { callerReplySenders: extra.callerReplySenders }), ...(extra.callerCause === undefined ? {} : { callerCause: extra.callerCause }), ...(extra.callerChainHop === undefined ? {} : { callerChainHop: extra.callerChainHop }), ...(extra.callerName === undefined ? {} : { callerName: extra.callerName }), ...(extra.env === undefined ? {} : { env: extra.env }) })
     const run = async (name: ThreadToolName, args: unknown): Promise<ThreadToolResult> => {
       const tool = tools.find((candidate) => candidate.name === name)
       if (tool === undefined) throw new Error(`${name} is not registered`)
