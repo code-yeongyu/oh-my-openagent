@@ -104,6 +104,7 @@ describe("computer use doctor rendering", () => {
       "PASS computer use permissions: capture=granted input=granted accessibility=granted",
       "PASS computer use display: count=2 screenLocked=false displayAsleep=false",
       "PASS computer use stop path: global",
+      "INFO computer use stop persistence: a stop survives an engine restart only on the macOS XPC agent; a --serve daemon (--oneshot, --mcp) starts unstopped",
     ])
   })
 
@@ -117,7 +118,7 @@ describe("computer use doctor rendering", () => {
     const lines = formatComputerUseDoctorLines(report)
 
     // then
-    expect(lines.at(-1)).toStartWith("INFO computer use stop path:")
+    expect(lines.at(-2)).toStartWith("INFO computer use stop path:")
     expect(lines.filter((line) => line.startsWith("WARN"))).toEqual([])
   })
 

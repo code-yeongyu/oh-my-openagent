@@ -35,6 +35,9 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("extensions", "memory-run-supervisor.mjs"),
   // The thread gateway store worker: the inbox drain cannot open its store without it.
   join("extensions", "gateway-store-worker.mjs"),
+  // The computer.run QuickJS cell worker and the wasm it loads, beside omo-computer-use.js.
+  join("extensions", "omo-computer-run-worker.mjs"),
+  join("extensions", "quickjs.wasm"),
   ...PERSONA_ASSET_FILES.map((filename) => join("extensions", filename)),
   join("skills", "ast-grep", "SKILL.md"),
   join("skills", "browser", "SKILL.md"),
