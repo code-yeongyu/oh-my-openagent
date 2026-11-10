@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:2586b58e48abce60b054ef9c15ea089fb631736ec64ba417530fb9a345008f2f:fb5b3a9ed7f6f90c242e5247ea95bce2025f7218e79f0485f2ecb358938d9948
+// omo-codex-install:9e6e5afdaf6afb9e6be0c25465673f510ba9f892368975f502a16c31495c3a61:d7047ce43c01ed4d33f093f758b4a4942b873c6fed0a1b17cc0e678963b23da5
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19940,7 +19940,7 @@ var OmoMemoryAutoIdentitySchema = _enum(["path", "git"]);
 var OmoMemorySettingsSchema = object({
   enabled: boolean2().default(true),
   agent: string2().min(1).default("auto"),
-  auto_identity: OmoMemoryAutoIdentitySchema.default("path"),
+  auto_identity: OmoMemoryAutoIdentitySchema.default("git"),
   reflection: OmoMemoryReflectionSchema.default({
     enabled: true,
     trigger: { step_count: 25, on_compaction: true },
