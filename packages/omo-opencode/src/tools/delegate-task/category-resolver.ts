@@ -11,7 +11,7 @@ import { parseModelString } from "../../shared/model-string-parser"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
 import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../../shared/fallback-chain-from-models"
-import { getAvailableModelsForDelegateTask } from "./available-models"
+import { confirmRequestedModels, getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
 import type { DelegatedModelConfig } from "./types"
 import { applyCategoryParams } from "./delegated-model-config"
@@ -188,7 +188,8 @@ Available categories: ${allCategoryNames}`)
         ? configuredPrimaryModel !== undefined
         : resolved.isUserConfiguredModel,
       fallbackChain: requirement.fallbackChain,
-      availableModels,
+      // A partial cached catalog must not demote the user's explicit model: confirm a miss against the live list.
+      availableModels: await confirmRequestedModels(client, availableModels, [explicitCategoryModel ?? overrideModel]),
       systemDefaultModel,
     })
 

@@ -6,7 +6,7 @@ import { normalizeModelFormat } from "../../shared/model-format-normalizer"
 import { flattenToFallbackModelStrings, normalizeFallbackModels } from "../../shared/model-resolver"
 import { AGENT_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { log } from "../../shared/logger"
-import { getAvailableModelsForDelegateTask } from "./available-models"
+import { confirmRequestedModels, getAvailableModelsForDelegateTask } from "./available-models"
 import { applyCategoryParams } from "./delegated-model-config"
 import type { ExecutorContext } from "./executor-types"
 import { applyFallbackEntrySettings } from "./fallback-entry-settings"
@@ -55,7 +55,11 @@ export async function resolveSubagentModel(
     ?? agentCategoryConfig?.fallback_models
   )
 
-  const availableModels = await getAvailableModelsForDelegateTask(executorCtx.client)
+  const availableModels = await confirmRequestedModels(
+    executorCtx.client,
+    await getAvailableModelsForDelegateTask(executorCtx.client),
+    [explicitModel],
+  )
   const normalizedMatchedModel = matchedAgent.model
     ? normalizeModelFormat(matchedAgent.model)
     : undefined

@@ -33,6 +33,39 @@ function addFromProviderModels(
   }
 }
 
+/**
+ * A cached catalog can be partial: it was written before a model was registered. Before an explicitly requested
+ * model on a provider the catalog already serves is treated as unreachable (and silently replaced by a
+ * fallback), confirm it once against Core's live model list. A model the live list lacks stays missing.
+ */
+export async function confirmRequestedModels(
+  client: OpencodeClient,
+  available: Set<string>,
+  requested: ReadonlyArray<string | undefined>,
+): Promise<Set<string>> {
+  const providers = new Set([...available].map((model) => model.split("/")[0]))
+  const known = new Set([...available].map((model) => model.toLowerCase()))
+  const missing = requested.filter((model): model is string => {
+    if (!model || !model.includes("/")) return false
+    return providers.has(model.split("/")[0]!) && !known.has(model.toLowerCase())
+  })
+  if (missing.length === 0 || !hasModelList(client)) return available
+  try {
+    const rows = extractModelRows(await client.model.list())
+    const out = new Set(available)
+    for (const row of rows) if (providers.has(row.provider)) out.add(`${row.provider}/${row.id}`)
+    const live = new Set([...out].map((model) => model.toLowerCase()))
+    log("[delegate-task] requested model missing from the cached catalog; checked the live catalog", {
+      missing,
+      confirmed: missing.filter((model) => live.has(model.toLowerCase())),
+    })
+    return out
+  } catch (err) {
+    log("[delegate-task] live catalog check failed; keeping the cached catalog", { missing, error: err instanceof Error ? err.message : String(err) })
+    return available
+  }
+}
+
 export async function getAvailableModelsForDelegateTask(client: OpencodeClient): Promise<Set<string>> {
   const providerModelsCache = connectedProvidersCache.readProviderModelsCache()
 
