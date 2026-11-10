@@ -266,7 +266,8 @@ describe("session inbox drain through the control endpoint registrant", () => {
 
     // then
     expect(b.runtime.enqueueCalls.map((call) => call.delivery_id)).toEqual(ids)
-    expect(b.runtime.enqueueCalls.map((call) => call.lane)).toEqual(["start", "followUp", "followUp"])
+    // The first delivery starts the turn; the default lane steers the next two into it (gateway/decision.ts).
+    expect(b.runtime.enqueueCalls.map((call) => call.lane)).toEqual(["start", "steer", "steer"])
     expect(tokensOnDisk(w.sessionPath)).toEqual(ids)
     expect(await Promise.all(ids.map((id) => stateOf(w.senderStore, id)))).toEqual(["applied", "applied", "applied"])
     expect(b.control.persisted).toBe(1)

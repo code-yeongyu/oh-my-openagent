@@ -79,6 +79,14 @@ describe("thread_close: close a thread on this device or on another one", () => 
     expect(closed).toEqual([])
   })
 
+  test("#given b's engine refuses the unload with a reason the ladder does not know #when thread_close names b's thread #then it is typed unsupported naming the reason and b, and nothing else is sent", async () => {
+    const a = account({ unloadReason: "attached" })
+    const { run } = surface(a.remote)
+    expect(await run("thread_close", { thread: "dur-on-b" })).toMatchObject({ kind: "error", error: { code: "unsupported", details: { device: "b", command: "unload_session", reason: "attached" } } })
+    expect(a.sent.map((entry) => entry.rpc?.["type"])).toEqual(["unload_session"])
+    expect(a.live.has("dur-on-b")).toBe(true)
+  })
+
   test("#given device b refuses the command #when thread_close names a thread on b #then the refusal is data naming b", async () => {
     const a = account({ refuse: "host_detached" })
     const { run } = surface(a.remote)

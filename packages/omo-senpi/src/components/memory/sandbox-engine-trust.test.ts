@@ -9,6 +9,8 @@ import { buildSandboxTransform } from "./sandbox"
 import { probeBwrapUsability } from "./sandbox-bwrap-probe"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 import type { ReflectionSpawnArgs } from "./worker/spawn"
+import { useTestTimeout } from "../../../../../test-support/test-deadline"
+import { spawnTimeout } from "../../../test-support/spawn-timeout"
 
 const bwrap = process.platform === "linux" ? Bun.which("bwrap") : null
 const bwrapUsable = bwrap !== null && (await probeBwrapUsability(bwrap)).usable
@@ -93,13 +95,14 @@ async function runInSandbox(mode: "prepare" | "adopt" | "unattested", options: {
   const separator = sandboxed.args.indexOf("--")
   const args = [...sandboxed.args.slice(0, separator), ...(options.extraMounts?.(setup.root) ?? []), ...sandboxed.args.slice(separator)]
   const child = Bun.spawn([sandboxed.command, ...args], {
-    cwd: setup.worktree, env: sandboxed.env, stdout: "pipe", stderr: "pipe", timeout: 20_000,
+    cwd: setup.worktree, env: sandboxed.env, stdout: "pipe", stderr: "pipe", timeout: spawnTimeout(),
   })
   const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
   return { code, stderr, outcome: JSON.parse(stdout) as Outcome }
 }
 
 test.skipIf(!bwrapUsable)("#given the real Linux reflection sandbox #when the child prepares its engine trust directory #then it gets a private directory instead of an unsafe-ancestor crash", async () => {
+  useTestTimeout(60_000)
   // given / when
   const home = process.env.HOME ?? "/"
   const { code, stderr, outcome } = await runInSandbox("prepare")
@@ -114,6 +117,7 @@ test.skipIf(!bwrapUsable)("#given the real Linux reflection sandbox #when the ch
 }, 60_000)
 
 test.skipIf(!bwrapUsable)("#given a parent trust generation outside the child's trust directory #when the sandboxed child adopts it #then the inherited marker's ancestors are attested and the generation verifies", async () => {
+  useTestTimeout(60_000)
   // given
   const marker = async (worktree: string) => {
     const { directory } = await prepareTrustDirectory(join(worktree, "parent-trust"), "linux")
@@ -131,6 +135,7 @@ test.skipIf(!bwrapUsable)("#given a parent trust generation outside the child's 
 }, 60_000)
 
 test.skipIf(!bwrapUsable)("#given a user namespace without the launcher's attestation #when the child prepares its trust directory #then it gets the named unattested refusal, not a crash", async () => {
+  useTestTimeout(60_000)
   // given / when
   const { code, stderr, outcome } = await runInSandbox("unattested")
 
@@ -140,6 +145,7 @@ test.skipIf(!bwrapUsable)("#given a user namespace without the launcher's attest
 }, 60_000)
 
 test.skipIf(!bwrapUsable)("#given a user namespace whose overflow uid cannot be read #when the child prepares its trust directory #then it gets the named unattested refusal, not a crash", async () => {
+  useTestTimeout(60_000)
   // given / when
   const { code, stderr, outcome } = await runInSandbox("prepare", {
     extraMounts: () => ["--ro-bind", "/dev/null", "/proc/sys/kernel/overflowuid"],
@@ -151,6 +157,7 @@ test.skipIf(!bwrapUsable)("#given a user namespace whose overflow uid cannot be 
 }, 60_000)
 
 test.skipIf(!bwrapUsable)("#given an existing private trust directory on a read-only mount #when the sandboxed child prepares it #then it falls back to a private temp directory with trust-dir-readonly", async () => {
+  useTestTimeout(60_000)
   // given
   const readOnlyHome = (root: string) => {
     const home = join(root, "ro-home")
