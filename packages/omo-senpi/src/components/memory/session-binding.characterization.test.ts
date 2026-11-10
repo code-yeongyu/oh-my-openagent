@@ -7,7 +7,7 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { readIdentityRecord, resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
+import { readIdentityRecord, recordIdentityBind, resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
 import { createMemoryBinding } from "./binding"
 import { MEMORY_BINDING_CUSTOM_TYPE, createMemoryComponent, memoryModuleSupervisor } from "./index"
 import {
@@ -180,6 +180,39 @@ describe("X8c memory binding at session_start (characterization)", () => {
     }])
     expect(h.syncCalls).toEqual([{ kind: "acquire", identity: hostIdentity.id, repo: hostIdentity.paths.repo, profile: "auto", projectDir: h.hostCwd }])
     expect(supervisorDelta(before)).toBe(1)
+  })
+
+  test("#given a session bound under the host's auto config whose own folder now names an explicit agent #when it is resumed #then it rebinds its recorded identity instead of failing closed, and the rebind leaves that identity's record alone (#12962 review)", async () => {
+    // given
+    const hostCwd = join(tempDir("omo-x8c-host-"), "host")
+    const sessionCwd = join(tempDir("omo-x8c-ws-"), "project")
+    const env = { OMO_MEMORY_HOME: join(tempDir("omo-x8c-home-"), "memory") }
+    const recorded = resolveMemoryIdentity("auto", sessionCwd, env)
+    await recordIdentityBind(recorded.paths.root, { id: recorded.id, kind: "explicit", mode: "path", source: "/original", spelling: "/original" }, 10)
+    const pi = new MemoryFakeExtensionAPI()
+    const ctx = componentContext()
+    createMemoryComponent({
+      env,
+      loadConfig: (options) => loadedMemoryConfig(memorySettings({ agent: options?.cwd === sessionCwd ? "session-agent" : "auto" })),
+      now: () => 1237,
+      resolveCwd: () => hostCwd,
+      syncRunner: recordingSyncRunner([]),
+      createRuntime: () => {
+        throw new Error("bind-only characterization does not create an identity runtime")
+      },
+    }).register(pi, ctx)
+    started.push({ pi, ctx })
+    const notifications: Array<{ message: string; level: string }> = []
+
+    // when
+    await pi.dispatch("session_start", {}, sessionContext({ entries: [boundEntry(recorded.id, recorded.paths.repo)], notifications, cwd: sessionCwd }))
+
+    // then
+    expect(pi.entries.map((entry) => entry.data)).toEqual([createMemoryBinding({ identity: recorded.id, repoPath: recorded.paths.repo, boundAt: 1237 })])
+    expect(notifications).toEqual([])
+    await pi.dispatch("session_shutdown", {}, sessionContext())
+    started.splice(started.findIndex((entry) => entry.pi === pi), 1)
+    expect(await readIdentityRecord(recorded.paths.root)).toMatchObject({ kind: "explicit", source: "/original", spellings: ["/original"], lastBoundAt: 10 })
   })
 
   test("#given a session whose transcript recorded another auto identity #when session_start fires #then the recorded identity is re-bound, logged at info, and a new entry with the recorded hash and the new time is appended", async () => {
