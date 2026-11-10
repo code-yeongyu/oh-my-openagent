@@ -20,8 +20,6 @@ export interface IdentityRecord {
   readonly mode: AutoIdentityMode
   readonly source: string
   readonly spellings: readonly string[]
-  readonly firstBoundAt: number
-  readonly lastBoundAt: number
 }
 
 export interface IdentityBind {
@@ -47,7 +45,7 @@ export async function readIdentityRecord(identityRoot: string): Promise<Identity
   }
 }
 
-export async function recordIdentityBind(identityRoot: string, bind: IdentityBind, now: number): Promise<IdentityRecord> {
+export async function recordIdentityBind(identityRoot: string, bind: IdentityBind): Promise<IdentityRecord> {
   const previous = await readIdentityRecord(identityRoot).catch(() => undefined)
   const kept = previous?.id === bind.id ? previous : undefined
   const record: IdentityRecord = {
@@ -57,8 +55,6 @@ export async function recordIdentityBind(identityRoot: string, bind: IdentityBin
     mode: bind.mode,
     source: bind.source,
     spellings: kept === undefined || kept.spellings.includes(bind.spelling) ? [...(kept?.spellings ?? [bind.spelling])] : [...kept.spellings, bind.spelling],
-    firstBoundAt: kept?.firstBoundAt ?? now,
-    lastBoundAt: now,
   }
   await writeJsonAtomic(join(identityRoot, IDENTITY_RECORD_FILENAME), record)
   return record
@@ -72,7 +68,6 @@ function parseIdentityRecord(value: unknown): IdentityRecord | undefined {
   if (record.kind !== "auto" && record.kind !== "explicit") return undefined
   if (record.mode !== "path" && record.mode !== "git") return undefined
   if (!Array.isArray(spellings) || !spellings.every((spelling) => typeof spelling === "string")) return undefined
-  if (typeof record.firstBoundAt !== "number" || typeof record.lastBoundAt !== "number") return undefined
   return {
     version: 1,
     id: record.id,
@@ -80,7 +75,5 @@ function parseIdentityRecord(value: unknown): IdentityRecord | undefined {
     mode: record.mode,
     source: record.source,
     spellings,
-    firstBoundAt: record.firstBoundAt,
-    lastBoundAt: record.lastBoundAt,
   }
 }

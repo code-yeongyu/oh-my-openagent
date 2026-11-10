@@ -21,7 +21,7 @@ describe("identity record (#10070)", () => {
   test("#given a first bind #when it is recorded #then identity.json holds the id, kind, mode, source, one spelling and both timestamps, mode 0600", async () => {
     const root = await identityRoot()
 
-    await recordIdentityBind(root, { id: "project-1234abcd", kind: "auto", mode: "path", source: "/work/project", spelling: "/work/project" }, 1000)
+    await recordIdentityBind(root, { id: "project-1234abcd", kind: "auto", mode: "path", source: "/work/project", spelling: "/work/project" })
 
     expect(await readIdentityRecord(root)).toEqual({
       version: 1,
@@ -30,36 +30,45 @@ describe("identity record (#10070)", () => {
       mode: "path",
       source: "/work/project",
       spellings: ["/work/project"],
-      firstBoundAt: 1000,
-      lastBoundAt: 1000,
     })
     expect((await stat(join(root, IDENTITY_RECORD_FILENAME))).mode & 0o777).toBe(0o600)
   })
 
-  test("#given an existing record #when a later bind arrives from another spelling and mode #then spellings accumulate once each, firstBoundAt stays and the latest mode and source win", async () => {
+  test("#given an existing record #when a later bind arrives from another spelling and mode #then spellings accumulate once each and the latest mode and source win", async () => {
     const root = await identityRoot()
-    await recordIdentityBind(root, { id: "project-1234abcd", kind: "auto", mode: "path", source: "/work/project", spelling: "/work/project" }, 1000)
+    await recordIdentityBind(root, { id: "project-1234abcd", kind: "auto", mode: "path", source: "/work/project", spelling: "/work/project" })
 
-    await recordIdentityBind(root, { id: "project-1234abcd", kind: "auto", mode: "git", source: "/work/project", spelling: "/work/project-wt" }, 2000)
-    await recordIdentityBind(root, { id: "project-1234abcd", kind: "auto", mode: "git", source: "/work/project", spelling: "/work/project" }, 3000)
+    await recordIdentityBind(root, { id: "project-1234abcd", kind: "auto", mode: "git", source: "/work/project", spelling: "/work/project-wt" })
+    await recordIdentityBind(root, { id: "project-1234abcd", kind: "auto", mode: "git", source: "/work/project", spelling: "/work/project" })
 
     expect(await readIdentityRecord(root)).toMatchObject({
       mode: "git",
       spellings: ["/work/project", "/work/project-wt"],
-      firstBoundAt: 1000,
-      lastBoundAt: 3000,
     })
   })
 
   test("#given an unreadable or malformed record #when a bind is recorded #then it is replaced by a fresh record instead of failing the bind", async () => {
     const root = await identityRoot()
-    await recordIdentityBind(root, { id: "project-1234abcd", kind: "explicit", mode: "path", source: "/w", spelling: "/w" }, 1000)
+    await recordIdentityBind(root, { id: "project-1234abcd", kind: "explicit", mode: "path", source: "/w", spelling: "/w" })
     await writeFile(join(root, IDENTITY_RECORD_FILENAME), "{not json")
 
-    await recordIdentityBind(root, { id: "project-1234abcd", kind: "explicit", mode: "path", source: "/w", spelling: "/w" }, 5000)
+    await recordIdentityBind(root, { id: "project-1234abcd", kind: "explicit", mode: "path", source: "/w", spelling: "/w" })
 
-    expect(await readIdentityRecord(root)).toMatchObject({ kind: "explicit", firstBoundAt: 5000, lastBoundAt: 5000 })
+    expect(await readIdentityRecord(root)).toMatchObject({ kind: "explicit" })
     expect(JSON.parse(await readFile(join(root, IDENTITY_RECORD_FILENAME), "utf8")).version).toBe(1)
+  })
+
+  test("#given the same bind recorded at two different times #when identity.json is read back #then the bytes are identical (no wall-clock fields; EQ determinism)", async () => {
+    const root = await identityRoot()
+    const bind = { id: "project-1234abcd", kind: "auto" as const, mode: "git" as const, source: "/w/p", spelling: "/w/p" }
+
+    await recordIdentityBind(root, bind)
+    const first = await readFile(join(root, IDENTITY_RECORD_FILENAME), "utf8")
+    await recordIdentityBind(root, bind)
+    const second = await readFile(join(root, IDENTITY_RECORD_FILENAME), "utf8")
+
+    expect(second).toBe(first)
+    expect(Object.keys(JSON.parse(first)).sort()).toEqual(["id", "kind", "mode", "source", "spellings", "version"])
   })
 
   test("#given no record #when it is read #then the answer is undefined", async () => {

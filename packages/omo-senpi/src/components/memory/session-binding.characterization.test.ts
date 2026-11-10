@@ -155,8 +155,6 @@ describe("X8c memory binding at session_start (characterization)", () => {
       mode: "path",
       source: sessionCwd,
       spellings: [sessionCwd],
-      firstBoundAt: 1236,
-      lastBoundAt: 1236,
     })
     expect(pi.entries.map((entry) => entry.data)).toEqual([
       createMemoryBinding({ identity: sessionIdentity.id, repoPath: sessionIdentity.paths.repo, boundAt: 1236 }),
@@ -188,7 +186,7 @@ describe("X8c memory binding at session_start (characterization)", () => {
     const sessionCwd = join(tempDir("omo-x8c-ws-"), "project")
     const env = { OMO_MEMORY_HOME: join(tempDir("omo-x8c-home-"), "memory") }
     const recorded = resolveMemoryIdentity("auto", sessionCwd, env)
-    await recordIdentityBind(recorded.paths.root, { id: recorded.id, kind: "explicit", mode: "path", source: "/original", spelling: "/original" }, 10)
+    await recordIdentityBind(recorded.paths.root, { id: recorded.id, kind: "explicit", mode: "path", source: "/original", spelling: "/original" })
     const pi = new MemoryFakeExtensionAPI()
     const ctx = componentContext()
     createMemoryComponent({
@@ -212,7 +210,7 @@ describe("X8c memory binding at session_start (characterization)", () => {
     expect(notifications).toEqual([])
     await pi.dispatch("session_shutdown", {}, sessionContext())
     started.splice(started.findIndex((entry) => entry.pi === pi), 1)
-    expect(await readIdentityRecord(recorded.paths.root)).toMatchObject({ kind: "auto", firstBoundAt: 10, lastBoundAt: 1237 })
+    expect(await readIdentityRecord(recorded.paths.root)).toMatchObject({ kind: "auto" })
   })
 
   test("#given a session bound under its own folder's agent while the host folder names another explicit agent #when it is resumed #then it binds its own agent again (#12962 review r3)", async () => {

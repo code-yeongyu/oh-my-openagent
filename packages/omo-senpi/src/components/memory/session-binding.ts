@@ -169,7 +169,7 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
       mode: bindConfig.auto_identity,
       source: sessionCwd,
       spelling: sessionCwd,
-    }, binding.boundAt)).catch((error: unknown) => {
+    })).catch((error: unknown) => {
       ctx.logger.warn("omo-senpi memory identity record write failed", { sessionId: surface.id, error: error instanceof Error ? error.message : String(error) })
     })
     // Disposable bookkeeping: a session closed without a conversation leaves no file (senpi#3263).
