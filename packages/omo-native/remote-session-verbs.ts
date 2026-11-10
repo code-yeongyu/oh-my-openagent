@@ -131,9 +131,10 @@ async function sendTo(
     if (sent.kind === "error") return show(sent, label)
     const end = await follow.settled
     if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")
-    // --json: the send's typed result, with the answer it streamed. The send itself succeeded even when its turn did not
-    // settle, so that result is still printed, naming how the follow ended.
-    if (json) dependencies.output(JSON.stringify(end === "settled" ? { ...sent, reply } : { ...sent, reply, ended: end }))
+    // --json: the send's typed result, with the answer it streamed. When the turn did not settle the send's fields are
+    // still printed, but under `kind: "unsettled"` with how the follow ended, so a consumer that reads only `kind`
+    // never takes the failed exit for success.
+    if (json) dependencies.output(JSON.stringify(end === "settled" ? { ...sent, reply } : { ...sent, kind: "unsettled", reply, ended: end }))
     if (end !== "settled") {
       dependencies.error(`omo remote: the session on ${row.device} ended before its turn settled (${end}).`)
       return REMOTE_EXIT.failed

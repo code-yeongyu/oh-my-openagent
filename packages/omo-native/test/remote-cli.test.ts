@@ -511,7 +511,7 @@ describe("omo remote session verbs", () => {
     const a = fixture.account({ records: [{ type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "O" } }, { type: "agent_settled", reason: "session_closed" }] })
     const { code, out, err } = await run(["send", "b/dur-on-b", "hi", "--json"], undefined, SIGNED_IN, testBootstrap(), a.remote)
     expect([code, err]).toEqual([REMOTE_EXIT.failed, ["omo remote: the session on b ended before its turn settled (session_closed)."]])
-    expect(JSON.parse(out.join(""))).toMatchObject({ kind: "ok", reply: "O", ended: "session_closed" })
+    expect(JSON.parse(out.join(""))).toMatchObject({ kind: "unsettled", reply: "O", ended: "session_closed" })
   })
 
   test("send whose attach ends before the turn settles fails with the attach's end reason, in human output and --json", async () => {
@@ -520,7 +520,7 @@ describe("omo remote session verbs", () => {
     expect([human.code, human.written.join(""), human.err]).toEqual([REMOTE_EXIT.failed, "partial\n", ["omo remote: the session on b ended before its turn settled (detached)."]])
     const json = await run(["send", "b/dur-on-b", "hi", "--json"], undefined, SIGNED_IN, testBootstrap(), fixture.account({ records, watchEnds: "detached" }).remote)
     expect(json.code).toBe(REMOTE_EXIT.failed)
-    expect(JSON.parse(json.out.join(""))).toMatchObject({ kind: "ok", reply: "partial", ended: "detached" })
+    expect(JSON.parse(json.out.join(""))).toMatchObject({ kind: "unsettled", reply: "partial", ended: "detached" })
   })
 
   test("send --steer that waits prints the steered turn's reply and returns once it settles", async () => {
