@@ -193,7 +193,10 @@ export type RecordOutcomeRequest = {
 
 export type GatewayDeliveryDelivery =
   | { readonly kind: "started" | "steered"; readonly turn_id: string }
-  | { readonly kind: "queued" | "queued_offline"; readonly queue_position: number }
+  | { readonly kind: "queued" | "queued_offline"; readonly queue_position: number; readonly waiting_on?: DeliveryWait }
+
+/** What the receiver is parked on while the delivery waits: an approval (a tool permission or question) a human must answer on that device. */
+export type DeliveryWait = { readonly kind: "approval"; readonly device: string }
 
 export type GatewayDeliverySuccess = {
   readonly kind: "ok"
