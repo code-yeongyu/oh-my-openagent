@@ -130,6 +130,8 @@ export type ThreadToolSurfaceOptions = {
   readonly callerRunDeliveries?: () => readonly string[]
   /** The agent sessions whose deliveries the caller's current run took in: a `thread_send` back to one asks for no permission (#12886). */
   readonly callerReplyTargets?: () => readonly string[]
+  /** For each reply target the current run took in from another device: the device the delivery came from (#12996 guard). */
+  readonly callerReplyOrigins?: () => readonly { readonly session_id: string; readonly device: string }[]
   /** A `user` message (typed in the caller's terminal, or an extension's) is part of that same answer (`RunContext.local`); with a bound delivery there and another outbound binding, a report without `binding_id` is refused. */
   readonly callerRunHasLocalInput?: () => boolean
   /** `thread_report {kind: "completion"}` armed a completion (`arm_seq`) for this session; the component writes it at the next settle. */

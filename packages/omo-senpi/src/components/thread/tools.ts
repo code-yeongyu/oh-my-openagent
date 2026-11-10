@@ -317,7 +317,8 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
   async function locate(current: ThreadHostView, address: string, allScope: boolean | undefined, callerId: string): Promise<DeliveryTarget | { readonly kind: "error"; readonly result: ThreadToolResult }> {
     let scope = allScope
     if (options.remote !== undefined && current !== PUBLISHED_SEND_VIEW) {
-      const target = await crossTarget(options.remote, address, resolution(options, toThreadAddressEntries(sendAddressBook(options, current, address, true)), address, callerId, true))
+      const origin = options.callerReplyOrigins?.().find((o) => o.session_id === address)
+      const target = await crossTarget(options.remote, address, resolution(options, toThreadAddressEntries(sendAddressBook(options, current, address, true)), address, callerId, true), origin === undefined ? undefined : { device: origin.device })
       if (target.kind === "error") return target
       if (target.kind === "remote") return target
       address = target.address
