@@ -205,11 +205,10 @@ export interface ApplyIdentityMergeOptions {
   readonly target: MemoryIdentityPaths
   readonly lock: MemoryWriteLock
   readonly author: GitCommitAuthor
-  readonly now: number
 }
 
 export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Promise<MergeResult> {
-  const { source, target, lock, author, now } = options
+  const { source, target, lock, author } = options
   const record = await readIdentityRecord(source.root).catch(() => undefined)
   const targetId = identityIdOf(target)
   const since = record?.mergedInto === targetId ? record.mergedHead : undefined
@@ -259,7 +258,7 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
       const sha = (await targetRepo.commitWrite(destinations, message, author)).sha
       // Marked before the lock is released: a crash between the commit and the mark would make a rerun plan
       // from scratch and write a second set of aside copies.
-      await markIdentityMerged(source.root, plan.sourceId, targetId, plan.sourceHead, now)
+      await markIdentityMerged(source.root, plan.sourceId, targetId, plan.sourceHead)
       return { plan, sha }
     } catch (error) {
       if (error instanceof NoEffectiveChangesError) {
@@ -270,7 +269,7 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
       throw error
     }
   })
-  if (outcome.sha === undefined && outcome.plan.sourceHead !== null) await markIdentityMerged(source.root, outcome.plan.sourceId, targetId, outcome.plan.sourceHead, now)
+  if (outcome.sha === undefined && outcome.plan.sourceHead !== null) await markIdentityMerged(source.root, outcome.plan.sourceId, targetId, outcome.plan.sourceHead)
   return outcome.sha === undefined
     ? { status: "nothing-to-merge", plan: outcome.plan }
     : { status: "merged", sha: outcome.sha, plan: outcome.plan }
