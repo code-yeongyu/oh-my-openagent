@@ -103,13 +103,16 @@ export function parseWriteScope(line: string): readonly string[] {
 // ---------------------------------------------------------------------------------------------------------
 // git: every guard reads the live repository; nothing is cached between runs
 
-type Git = (args: readonly string[], allowedExitCodes?: readonly number[]) => string[]
+/** The output lines of one git call; empty lines are dropped unless `keepEmpty` (physical lines of a file). */
+type Git = (args: readonly string[], allowedExitCodes?: readonly number[], keepEmpty?: boolean) => string[]
 
 function gitIn(cwd: string, env: Readonly<Record<string, string | undefined>>): Git {
-  return (args, allowedExitCodes = [0]) => {
+  return (args, allowedExitCodes = [0], keepEmpty = false) => {
     const result = Bun.spawnSync(["git", "-c", "core.quotePath=false", ...args], { cwd, env: { ...env }, stdout: "pipe", stderr: "pipe" })
     if (!allowedExitCodes.includes(result.exitCode)) throw new GuardInputError(`git ${args.join(" ")} failed (${result.exitCode}): ${result.stderr.toString().trim()}`)
-    return result.stdout.toString().split("\n").filter((line) => line.length > 0)
+    const lines = result.stdout.toString().split("\n")
+    if (lines.at(-1) === "") lines.pop()
+    return keepEmpty ? lines : lines.filter((line) => line.length > 0)
   }
 }
 
@@ -141,10 +144,16 @@ const readText = (cwd: string, path: string): string | undefined => readInput(jo
 // ---------------------------------------------------------------------------------------------------------
 // --residue, --no-legacy-edge, --copy, --old-frozen, --stubs
 
-function residue(git: Git): string[] {
+function residue(git: Git, cwd: string): string[] {
   const findings = grepOldName(git, ["."]).map((line) => `residue: ${line}`)
-  for (const path of [...nameMap.removal.classA, ...nameMap.removal.classB.map((entry) => entry.path)]) {
-    if (listFiles(git, [path]).length > 0) findings.push(`residue: ${path} still exists`)
+  // Absent means absent on disk: an empty directory or one holding only ignored files is still there.
+  const remaining = [...nameMap.removal.classA, ...nameMap.removal.classB.map((entry) => entry.path)].filter((path) => existsSync(join(cwd, path)))
+  findings.push(...remaining.map((path) => `residue: ${path} still exists`))
+  // Path names: every tracked file and every untracked one on disk, ignored included; a remaining removal path is reported once above.
+  const oldName = new RegExp(nameMap.oldNamePattern, "i")
+  const isRemaining = (path: string): boolean => remaining.some((root) => path === root || path.startsWith(`${root}/`))
+  for (const path of new Set(git(["ls-files", "--cached", "--others"]))) {
+    if (oldName.test(path) && !isLegacyNameExcluded(path) && !isRemaining(path)) findings.push(`residue: path ${path} names the old family`)
   }
   return findings
 }
@@ -175,7 +184,7 @@ function copy(git: Git, ref: string): string[] {
     const [status, source, destination] = line.split("\t")
     if (!isUnderOldDirectory(source) || !isUnderNewDirectory(destination)) continue
     if (!sourceExtensions.includes(posix.extname(destination)) || skipSuffixes.some((suffix) => destination.endsWith(suffix)) || isData(destination)) continue
-    if (git(["show", `HEAD:${destination}`]).length < minLines) continue
+    if (git(["show", `HEAD:${destination}`], [0], true).length < minLines) continue
     findings.push(`copy: ${destination} is a ${status.startsWith("R") ? "rename" : "copy"} (${status.slice(1)}%) of ${source}`)
   }
   return findings
@@ -186,7 +195,8 @@ const oldFrozen = (git: Git, ref: string): string[] => changedPaths(git, ref).fi
 function stubs(git: Git, cwd: string): string[] {
   const patterns = nameMap.stubs.patterns.map(({ name, regexp }) => ({ name, regexp: new RegExp(regexp) }))
   const findings: string[] = []
-  for (const file of listFiles(git, newDirectoryPathspecs).filter((path) => nameMap.copy.sourceExtensions.includes(posix.extname(path)))) {
+  // Every file under the new directories, whatever its extension.
+  for (const file of listFiles(git, newDirectoryPathspecs)) {
     ;(readText(cwd, file) ?? "").split("\n").forEach((line, index) => {
       for (const { name, regexp } of patterns) if (regexp.test(line)) findings.push(`stubs: ${file}:${index + 1}: ${name}`)
     })
@@ -275,7 +285,8 @@ function scope(git: Git, row: string, ref: string, planFile: string): string[] {
   return changedPaths(git, ref)
     .filter(({ status, path }) => {
       if (isOwn(path) || (status === "A" && isNewFileRule(path))) return false
-      return !(listed.has(path) && isBlockerOwned(path) && !isDriverEntry(path))
+      // A listed blocker path never admits a QA driver entry file or an existing scenario or v3- case (they are only ever added).
+      return !(listed.has(path) && isBlockerOwned(path) && !isDriverEntry(path) && !isNewFileRule(path))
     })
     .map(({ path }) => `scope: ${path} is outside row ${row}'s write scope`)
 }
@@ -447,7 +458,7 @@ const USAGE = [
 function dispatch(args: readonly string[], cwd: string, git: Git): (() => string[]) | undefined {
   const [command, ...rest] = args
   const one = rest.length === 1 ? rest[0] : undefined
-  if (command === "--residue" && rest.length === 0) return () => residue(git)
+  if (command === "--residue" && rest.length === 0) return () => residue(git, cwd)
   if (command === "--no-legacy-edge" && rest.length === 0) return () => noLegacyEdge(git, cwd)
   if (command === "--copy" && one) return () => copy(git, one)
   if (command === "--old-frozen" && one) return () => oldFrozen(git, one)

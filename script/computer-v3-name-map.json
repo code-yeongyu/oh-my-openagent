@@ -284,8 +284,20 @@
         "regexp": "\\b(it|test|describe)\\.(skip|only)\\("
       },
       {
+        "name": "skipped or exclusive test through a modifier",
+        "regexp": "\\b(?:it|test|describe)(?:(?:\\.[A-Za-z_$][\\w$]*)+\\.(?:skip|only)|\\.(?:skip|only)(?:\\.[A-Za-z_$][\\w$]*)+)\\s*\\("
+      },
+      {
+        "name": "todo test",
+        "regexp": "\\b(?:it|test|describe)(?:\\.[A-Za-z_$][\\w$]*)*\\.todo\\s*\\("
+      },
+      {
         "name": "#[ignore] without a live: reason",
         "regexp": "#\\[ignore(\\]|\\s*=\\s*\"(?!live: ))"
+      },
+      {
+        "name": "ignore through cfg_attr",
+        "regexp": "\\bcfg_attr\\s*\\([^)]*\\bignore\\b"
       }
     ]
   },
