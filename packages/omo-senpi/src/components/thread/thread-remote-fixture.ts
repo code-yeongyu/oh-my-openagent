@@ -216,7 +216,13 @@ export function createRemoteThreadFixture() {
       if (tool === undefined) throw new Error(`${name} is not registered`)
       return (await tool.execute(`call-${Math.random()}`, args, undefined, undefined, { sessionManager: { getSessionId: () => caller } } as never)).details.result as ThreadToolResult
     }
-    return { run, openSession, store, closed, agentDir }
+    // What thread_send asks the engine's permission system for, before it runs (tools/reply-permission.ts).
+    const permission = (args: Record<string, unknown>): unknown => {
+      const parse = tools.find((candidate) => candidate.name === "thread_send")?.permissionParser
+      if (parse === undefined) throw new Error("thread_send declares no permission parser")
+      return parse(args, process.cwd())
+    }
+    return { run, permission, openSession, store, closed, agentDir }
   }
 
   return { account, surface, cleanup }

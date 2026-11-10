@@ -16,6 +16,8 @@ import { createGatewayEngine, resolveFromEntries } from "../omo-senpi/src/compon
 import { createLocalTransport } from "../omo-senpi/src/components/thread/gateway/local-transport"
 import { createDeliveryPipeline } from "../omo-senpi/src/components/thread/gateway/pipeline"
 import { namedDeviceRow } from "../omo-senpi/src/components/thread/remote/address-book"
+import { stampThisDevice } from "../omo-senpi/src/components/thread/remote/this-device"
+import type { Provenance } from "../omo-senpi/src/components/thread/gateway/types"
 import { threadLink } from "../omo-senpi/src/components/thread/thread-link"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { packageRoot } from "./bin/lib/package-paths.js"
@@ -133,6 +135,11 @@ async function openOn(
   return show({ ...opened, model: model.model } as ThreadToolResult, "")
 }
 
+/** The provenance a person's `omo remote send` carries: this device stamped as on every delivery path (#13004). */
+export function personSenderProvenance(remote: RemoteThreadSurface, cwd = process.cwd(), env: NodeJS.ProcessEnv = process.env): () => Promise<Provenance> {
+  return () => stampThisDevice(resolveProvenance({ cwd, env }), remote)
+}
+
 async function sendTo(
   remote: RemoteThreadSurface,
   row: RemoteSessionRow,
@@ -146,7 +153,8 @@ async function sendTo(
   // send, so nothing dedupes it). A steer names no turn: the transport reads the running one once and steers it.
   const anchor = gatewayWorkerAnchor(dependencies.packageRoot ?? packageRoot)
   const store = createGatewayStore({ agentDir: canonicalAgentDir(), ...(anchor === undefined ? {} : { workerModuleUrl: anchor }) })
-  const senderProvenance = () => resolveProvenance({ cwd: process.cwd(), env: process.env })
+  // This device stamped as on every delivery path (#13004), through the one pipeline (#13016).
+  const senderProvenance = personSenderProvenance(remote)
   // This command holds no session of its own, so the local transport's engine has an empty address book.
   const engine = createGatewayEngine({ store, endpoints: { wake: async (endpoint) => { throw new Error(`host_unavailable:${endpoint.socket}`) } }, resolve: resolveFromEntries(() => [], () => process.cwd()), senderProvenance })
   const pipeline = createDeliveryPipeline({ local: createLocalTransport(engine), relay: createRelayTransport({ remote, store, senderProvenance }) })

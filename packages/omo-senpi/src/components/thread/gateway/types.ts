@@ -44,9 +44,14 @@ export type Provenance = {
   readonly project: string
   readonly lane?: string
   readonly session?: string
-  /** The account device a send to another device left from (remote/remote-ops.ts); absent on a send within one device. */
+  /** The account device the delivery left from, on both transports (remote/this-device.ts). */
   readonly device?: string
+  /** Why `device` is absent: a delivery never omits its sender device silently (#13004). */
+  readonly device_absent?: DeviceAbsentReason
 }
+
+/** No device service is set up here, it did not answer, or it answered without a device id. */
+export type DeviceAbsentReason = "no_device_service" | "device_service_unavailable" | "no_device_id"
 
 export type DeliveryEnvelope = {
   readonly provenance: Provenance
