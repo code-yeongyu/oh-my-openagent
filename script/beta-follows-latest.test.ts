@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
-import { betaMustFollowLatest, compareVersions } from "./beta-follows-latest.mjs"
+import { betaMustFollowLatest, betaMustFollowLatestFromDistTags, compareVersions } from "./beta-follows-latest.mjs"
 
 const cli = fileURLToPath(new URL("./beta-follows-latest.mjs", import.meta.url))
 
@@ -28,6 +28,32 @@ describe("betaMustFollowLatest", () => {
   })
 })
 
+describe("betaMustFollowLatestFromDistTags", () => {
+  test.each([
+    { name: "a lookup with no beta tag moves", tags: '{"latest":"5.1.66"}', move: true },
+    { name: "a lookup with an older beta moves", tags: '{"latest":"5.1.66","beta":"5.1.0"}', move: true },
+    { name: "a lookup with a newer beta prerelease is kept", tags: '{"latest":"5.1.66","beta":"5.2.0-0.beta.1"}', move: false },
+    { name: "a lookup with beta on the stable version is a no-op", tags: '{"latest":"5.1.66","beta":"5.1.66"}', move: false },
+  ])("$name", ({ tags, move }) => {
+    expect(betaMustFollowLatestFromDistTags("5.1.66", tags)).toBe(move)
+  })
+
+  test.each([
+    { name: "empty output from a failed npm view", tags: "" },
+    { name: "no output at all", tags: undefined },
+    { name: "output that is not JSON", tags: "npm ERR! network timeout" },
+    { name: "an npm error object", tags: '{"error":{"code":"ETIMEDOUT","summary":"network"}}' },
+    { name: "an object without latest", tags: '{"beta":"5.1.0"}' },
+    { name: "a JSON array", tags: '["5.1.0"]' },
+  ])("a failed lookup is not a missing beta: $name", ({ tags }) => {
+    expect(betaMustFollowLatestFromDistTags("5.1.66", tags)).toBeNull()
+  })
+
+  test("refuses a prerelease stable version even when the lookup failed", () => {
+    expect(() => betaMustFollowLatestFromDistTags("5.2.0-0.beta.1", "")).toThrow("Not a stable version")
+  })
+})
+
 describe("compareVersions", () => {
   test.each([
     ["5.1.0-0.beta.1", "5.1.0", -1],
@@ -49,6 +75,9 @@ describe("beta-follows-latest CLI", () => {
     { args: ["5.1.66", "5.1.0"], stdout: "move=true\n" },
     { args: ["5.1.66", ""], stdout: "move=true\n" },
     { args: ["5.1.66", "5.2.0-0.beta.1"], stdout: "move=false\n" },
+    { args: ["--dist-tags", "5.1.66", '{"latest":"5.1.66"}'], stdout: "move=true\n" },
+    { args: ["--dist-tags", "5.1.66", '{"latest":"5.1.66","beta":"5.2.0-0.beta.1"}'], stdout: "move=false\n" },
+    { args: ["--dist-tags", "5.1.66", ""], stdout: "lookup=failed\n" },
   ])("prints $stdout for $args", ({ args, stdout }) => {
     const result = spawnSync("node", [cli, ...args], { encoding: "utf8", timeout: 10_000 })
     expect(result.status).toBe(0)

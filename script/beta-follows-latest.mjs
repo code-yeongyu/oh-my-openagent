@@ -50,9 +50,37 @@ export function betaMustFollowLatest(stableVersion, currentBeta) {
   return compareVersions(beta, stableVersion) < 0
 }
 
+/**
+ * The beta decision from the raw `npm view --json omo-ai dist-tags` output. Returns null when that output is not a
+ * successful lookup (empty, not JSON, an npm error object, or no `latest` tag), so a failed lookup is never read as
+ * "beta is absent" and can never move beta down over a newer prerelease. An object without `beta` means beta is absent.
+ */
+export function betaMustFollowLatestFromDistTags(stableVersion, distTagsJson) {
+  let distTags
+  try {
+    distTags = JSON.parse(distTagsJson ?? "")
+  } catch {
+    distTags = null
+  }
+  const lookupSucceeded =
+    distTags !== null && typeof distTags === "object" && !Array.isArray(distTags) && typeof distTags.latest === "string"
+  const beta = lookupSucceeded && typeof distTags.beta === "string" ? distTags.beta : ""
+  // Validate the stable version first, so a bad caller argument fails loudly even when the lookup also failed.
+  const move = betaMustFollowLatest(stableVersion, beta)
+  return lookupSucceeded ? move : null
+}
+
+function cliDecision(args) {
+  if (args[0] === "--dist-tags") {
+    const move = betaMustFollowLatestFromDistTags(args[1] ?? "", args[2] ?? "")
+    return move === null ? "lookup=failed" : `move=${move}`
+  }
+  return `move=${betaMustFollowLatest(args[0] ?? "", args[1] ?? "")}`
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    console.log(`move=${betaMustFollowLatest(process.argv[2] ?? "", process.argv[3] ?? "")}`)
+    console.log(cliDecision(process.argv.slice(2)))
   } catch (error) {
     console.error(`::error::${error.message}`)
     process.exitCode = 1

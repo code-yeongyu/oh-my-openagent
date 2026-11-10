@@ -97,11 +97,25 @@ describe("omo-ai publish workflow shape", () => {
 const repoRoot = fileURLToPath(new URL("../", import.meta.url))
 const actionsExpression = (inner: string): string => `\${{ ${inner} }}`
 
-// Runs a workflow step's real script with `npm` stubbed: `npm view` answers from LATEST/BETA, every call is recorded.
+// Runs a workflow step's real script with `npm` stubbed: `npm view` answers from LATEST/BETA (VIEW_FAIL=1 fails the
+// dist-tags lookup, ADD_FAIL=1 fails `npm dist-tag add`), `sleep` returns at once, and every npm call is recorded.
 function runStep(run: string, env: Record<string, string>): { status: number | null; stderr: string; stdout: string; calls: string[] } {
   const dir = mkdtempSync(join(tmpdir(), "omo-ai-beta-"))
   const calls = join(dir, "calls")
-  const stub = `npm() {\n  printf '%s\\n' "$*" >> "$CALLS"\n  case "$*" in\n    *dist-tags.latest*) printf '%s\\n' "$LATEST" ;;\n    *dist-tags.beta*) printf '%s\\n' "$BETA" ;;\n  esac\n}\n`
+  const stub = [
+    "npm() {",
+    `  printf '%s\\n' "$*" >> "$CALLS"`,
+    `  case "$*" in`,
+    `    "dist-tag add "*) [ "\${ADD_FAIL:-}" != 1 ] ;;`,
+    `    *"--json omo-ai dist-tags") [ "\${VIEW_FAIL:-}" != 1 ] || return 1`,
+    `      if [ -n "$BETA" ]; then printf '{"latest":"%s","beta":"%s"}\\n' "$LATEST" "$BETA"; else printf '{"latest":"%s"}\\n' "$LATEST"; fi ;;`,
+    `    *dist-tags.latest*) printf '%s\\n' "$LATEST" ;;`,
+    `    *dist-tags.beta*) printf '%s\\n' "$BETA" ;;`,
+    "  esac",
+    "}",
+    "sleep() { :; }",
+    "",
+  ].join("\n")
   try {
     const result = spawnSync("bash", ["-c", `${stub}${run}`], {
       cwd: repoRoot, encoding: "utf8", timeout: 20_000,
@@ -115,11 +129,15 @@ function runStep(run: string, env: Record<string, string>): { status: number | n
 }
 
 describe("beta follows latest on a stable release (#12987)", () => {
-  const betaMove = namedStep("publish-main", "Move omo-ai beta up to the stable release")
+  const betaMove = namedStep("post-publish-verify", "Move omo-ai beta up to the stable release")
 
-  test("the beta move runs right after the omo-ai publish, for a fresh stable release only", () => {
-    const names = steps("publish-main").map((step) => step.name)
-    expect(names.indexOf("Move omo-ai beta up to the stable release")).toBe(names.indexOf("Publish omo-ai") + 1)
+  test("the beta move runs in post-publish-verify between the readiness wait and the guard, for a fresh stable release only", () => {
+    // publish-main gates the GitHub release, so a beta-tag hiccup there would strand an already-published version.
+    expect(steps("publish-main").map((step) => step.name)).not.toContain("Move omo-ai beta up to the stable release")
+    const names = steps("post-publish-verify").map((step) => step.name)
+    const moveIndex = names.indexOf("Move omo-ai beta up to the stable release")
+    expect(moveIndex).toBe(names.indexOf("Wait for omo-ai registry readiness") + 1)
+    expect(names.indexOf("Guard omo-ai dist-tags")).toBe(moveIndex + 1)
     const condition = betaMove.if ?? ""
     expect(condition).toContain("needs.release-metadata.outputs.omo_ai_dist_tag == 'latest'")
     expect(condition).toContain("needs.release-metadata.outputs.already_published != 'true'")
@@ -133,7 +151,7 @@ describe("beta follows latest on a stable release (#12987)", () => {
     { beta: "5.1.66", moved: false },
     { beta: "5.2.0-0.beta.1", moved: false },
   ])("publishing 5.1.66 with beta at '$beta' sets beta >= latest (moved: $moved)", ({ beta, moved }) => {
-    const result = runStep(betaMove.run ?? "", { OMO_AI_VERSION: "5.1.66", BETA: beta, NODE_AUTH_TOKEN: "dummy" })
+    const result = runStep(betaMove.run ?? "", { OMO_AI_VERSION: "5.1.66", LATEST: "5.1.66", BETA: beta, NODE_AUTH_TOKEN: "dummy" })
     expect(result.status).toBe(0)
     const tagWrites = result.calls.filter((call) => call.startsWith("dist-tag"))
     if (moved) {
@@ -142,6 +160,23 @@ describe("beta follows latest on a stable release (#12987)", () => {
     } else {
       expect(tagWrites).toEqual([])
     }
+  })
+
+  test("a failed dist-tags lookup is retried, never read as a missing beta, and leaves beta untouched with a warning", () => {
+    const result = runStep(betaMove.run ?? "", { OMO_AI_VERSION: "5.1.66", LATEST: "5.1.66", BETA: "", VIEW_FAIL: "1", NODE_AUTH_TOKEN: "dummy" })
+    expect(result.status).toBe(0)
+    expect(result.calls.filter((call) => call.includes("dist-tags"))).toHaveLength(3)
+    expect(result.calls.filter((call) => call.startsWith("dist-tag"))).toEqual([])
+    expect(result.stdout).toContain("::warning::")
+    expect(result.stdout).not.toContain("::error::")
+  })
+
+  test("a failed beta move warns instead of failing, leaving the dist-tag guard as the hard check", () => {
+    const result = runStep(betaMove.run ?? "", { OMO_AI_VERSION: "5.1.66", LATEST: "5.1.66", BETA: "5.1.0", ADD_FAIL: "1", NODE_AUTH_TOKEN: "dummy" })
+    expect(result.status).toBe(0)
+    expect(result.calls.filter((call) => call.startsWith("dist-tag add"))).toHaveLength(5)
+    expect(result.stdout).toContain("::warning::")
+    expect(result.stdout).not.toContain("::error::")
   })
 
   test.each([

@@ -1092,44 +1092,6 @@ jobs:
           OMO_AI_DIST_TAG: ${{ needs.release-metadata.outputs.omo_ai_dist_tag }}
         run: npm publish --ignore-scripts --access public --provenance --tag "$OMO_AI_DIST_TAG"
 
-      - name: Move omo-ai beta up to the stable release
-        # beta is the newer of the latest stable release and the newest prerelease (#12987), so a stable release also
-        # moves beta unless beta already holds a newer prerelease. Trusted publishing covers `npm publish` only, so the
-        # dist-tag write authenticates with the registry token, as npm-dist-tag-rollback.yml does.
-        if: >-
-          needs.release-metadata.outputs.already_published != 'true' &&
-          inputs.lazycodex_only != true &&
-          needs.release-metadata.outputs.omo_ai_dist_tag == 'latest'
-        env:
-          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          BETA_VERSION=$(npm view --prefer-online omo-ai dist-tags.beta 2>/dev/null || true)
-          DECISION=$(node script/beta-follows-latest.mjs "$OMO_AI_VERSION" "$BETA_VERSION")
-          if [ "$DECISION" != "move=true" ]; then
-            echo "omo-ai beta stays at $BETA_VERSION: it is not older than $OMO_AI_VERSION"
-            exit 0
-          fi
-
-          echo "omo-ai beta ${BETA_VERSION:-missing} is older than $OMO_AI_VERSION; moving beta to $OMO_AI_VERSION"
-          # npm expands the variable reference itself, so the token never lands on disk.
-          NPMRC="$RUNNER_TEMP/omo-ai-dist-tag.npmrc"
-          # shellcheck disable=SC2016
-          printf '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}\n' > "$NPMRC"
-          for attempt in 1 2 3 4 5; do
-            if npm dist-tag add --userconfig "$NPMRC" "omo-ai@$OMO_AI_VERSION" beta; then
-              rm -f "$NPMRC"
-              echo "omo-ai beta -> $OMO_AI_VERSION"
-              exit 0
-            fi
-            [ "$attempt" = "5" ] || { echo "Retrying omo-ai beta dist-tag (attempt ${attempt}/5)"; sleep 15; }
-          done
-          rm -f "$NPMRC"
-          echo "::error::Could not move omo-ai beta to $OMO_AI_VERSION; run 'npm dist-tag add omo-ai@$OMO_AI_VERSION beta' with a publish token"
-          exit 1
-
       - name: Restore package.json after lazycodex-ai publish attempt
         if: always() && inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
         run: |
@@ -1728,6 +1690,56 @@ jobs:
             sleep "$READINESS_INTERVAL_SECONDS"
           done
 
+      - name: Move omo-ai beta up to the stable release
+        # beta is the newer of the latest stable release and the newest prerelease (#12987), so a stable release also
+        # moves beta unless beta already holds a newer prerelease. It runs here, after the registry serves the release
+        # and before the guard below, so a beta-tag hiccup can never fail publish-main and block the GitHub release of an
+        # already-published version: this step only warns, and the guard stays the hard beta >= latest check.
+        # Trusted publishing covers `npm publish` only, so the dist-tag write authenticates with the registry token, as
+        # npm-dist-tag-rollback.yml does.
+        if: >-
+          needs.release-metadata.outputs.already_published != 'true' &&
+          inputs.lazycodex_only != true &&
+          needs.release-metadata.outputs.omo_ai_dist_tag == 'latest'
+        env:
+          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Read the whole dist-tags object, not dist-tags.beta: a failed lookup must never read as "no beta tag",
+          # or a registry hiccup would move beta DOWN over a newer prerelease. lookup=failed means: do not move.
+          for attempt in 1 2 3; do
+            DIST_TAGS=$(npm view --prefer-online --json omo-ai dist-tags 2>/dev/null) || DIST_TAGS=""
+            DECISION=$(node script/beta-follows-latest.mjs --dist-tags "$OMO_AI_VERSION" "$DIST_TAGS")
+            [ "$DECISION" = "lookup=failed" ] || break
+            [ "$attempt" = "3" ] || { echo "Retrying the omo-ai dist-tags lookup (attempt ${attempt}/3)"; sleep 15; }
+          done
+          if [ "$DECISION" = "lookup=failed" ]; then
+            echo "::warning::Could not read the omo-ai dist-tags, so beta was not moved; the dist-tag guard checks beta >= latest"
+            exit 0
+          fi
+          if [ "$DECISION" != "move=true" ]; then
+            echo "omo-ai beta stays: it is not older than $OMO_AI_VERSION"
+            exit 0
+          fi
+
+          echo "omo-ai beta is missing or older than $OMO_AI_VERSION; moving beta to $OMO_AI_VERSION"
+          # npm expands the variable reference itself, so the token never lands on disk.
+          NPMRC="$RUNNER_TEMP/omo-ai-dist-tag.npmrc"
+          # shellcheck disable=SC2016
+          printf '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}\n' > "$NPMRC"
+          for attempt in 1 2 3 4 5; do
+            if npm dist-tag add --userconfig "$NPMRC" "omo-ai@$OMO_AI_VERSION" beta; then
+              rm -f "$NPMRC"
+              echo "omo-ai beta -> $OMO_AI_VERSION"
+              exit 0
+            fi
+            [ "$attempt" = "5" ] || { echo "Retrying omo-ai beta dist-tag (attempt ${attempt}/5)"; sleep 15; }
+          done
+          rm -f "$NPMRC"
+          echo "::warning::Could not move omo-ai beta to $OMO_AI_VERSION; the dist-tag guard reports it. Fix: run 'npm dist-tag add omo-ai@$OMO_AI_VERSION beta' with a publish token"
+
       - name: Guard omo-ai dist-tags
         if: inputs.lazycodex_only != true
         env:
@@ -1752,7 +1764,7 @@ jobs:
             fi
           fi
 
-          # beta is never older than latest (#12987): publish-main moved it with this stable release.
+          # beta is never older than latest (#12987): the step above moved it with this stable release.
           if [ "$OMO_AI_DIST_TAG" = "latest" ] && [ "$ALREADY_PUBLISHED" != "true" ]; then
             BETA_VERSION=$(npm view --prefer-online omo-ai dist-tags.beta 2>/dev/null || true)
             if [ "$(node script/beta-follows-latest.mjs "$LATEST_VERSION" "$BETA_VERSION")" != "move=false" ]; then
@@ -1975,7 +1987,7 @@ jobs:
           JOB_SUMMARY_TITLE: Post-publish verification
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
-            - Waits for omo-ai registry readiness and guards its dist-tags.
+            - Waits for omo-ai registry readiness, moves beta up to a stable release, and guards its dist-tags.
             - Verifies the omo-ai live install and smoke-tests the published LazyCodex package.
             - Runs after the GitHub release so propagation delays cannot strand a published release.
           JOB_SUMMARY_NEXT: Investigate the failing registry probe; the release itself already exists.
