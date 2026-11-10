@@ -34,6 +34,10 @@ export const LAZY_MEMORY_COMMANDS = {
     description: "Show the resolved sleeptime memory settings for this identity.",
     argumentHint: "",
   },
+  "memory-merge": {
+    description: "Merge memory stores of old worktrees or spellings into this repository's store; a dry run unless --apply.",
+    argumentHint: "[--apply]",
+  },
   reflect: {
     description: "Request a memory reflection run now, optionally scoped and focused.",
     argumentHint: "[--recent N | --conversation <ids>] [focus]",

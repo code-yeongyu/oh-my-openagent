@@ -23,6 +23,7 @@ export const MEMORY_COMMAND_NAMES = [
   "doctor",
   "recompile",
   "memory-repository",
+  "memory-merge",
   "sleeptime",
   "reflect",
   "dream",
@@ -47,6 +48,7 @@ export function registerMemoryCommands(
   registerDoctorCommand(pi, deps)
   lazy("recompile")
   lazy("memory-repository")
+  lazy("memory-merge")
   lazy("sleeptime")
   lazy("reflect")
   lazy("dream")
