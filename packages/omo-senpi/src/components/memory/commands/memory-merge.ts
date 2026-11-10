@@ -11,7 +11,7 @@ import {
   memoryWriterLockPath,
   planIdentityMerge,
   readIdentityRecord,
-  repositoryWorktreeDirs,
+  repositoryCandidateDirs,
   resolveAutoIdentity,
   withLock,
   type MemoryWriteLock,
@@ -41,7 +41,7 @@ async function runMemoryMerge(deps: MemoryCommandDeps, args: string, ctx: Memory
   const env = { ...(deps.env ?? process.env), OMO_MEMORY_HOME: memoryRoot }
   const resolve = (spelling: string): string => resolveAutoIdentity(spelling, env, "git").id
   const spellings = (await readIdentityRecord(identity.identityPaths.root).catch(() => undefined))?.spellings ?? []
-  const found = await findMergePredecessors(memoryRoot, identity.identity, resolve, await repositoryWorktreeDirs(spellings))
+  const found = await findMergePredecessors(memoryRoot, identity.identity, resolve, await repositoryCandidateDirs(spellings))
   const unmapped = found.unmapped.length === 0 ? [] : [`left alone (no recorded directory maps here): ${found.unmapped.join(", ")}`]
   if (found.predecessors.length === 0) {
     return respond(ctx, [`no other memory store maps to ${identity.identity}`, ...unmapped].join("\n"))

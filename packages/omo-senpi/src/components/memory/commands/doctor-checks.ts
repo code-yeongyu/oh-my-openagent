@@ -14,7 +14,7 @@ import {
   describeRuntimeCapExcess,
   findMergePredecessors,
   readIdentityRecord,
-  repositoryWorktreeDirs,
+  repositoryCandidateDirs,
   GitMemoryRepo,
   formatRuntimeBytes,
   isMemoryContentPath,
@@ -305,7 +305,7 @@ export async function checkMemoryFragmentation(
   const identity = identityPaths.root.split(/[\\/]/).filter((part) => part !== "").at(-1) ?? ""
   const memoryRoot = join(identityPaths.root, "..", "..")
   const spellings = (await readIdentityRecord(identityPaths.root).catch(() => undefined))?.spellings ?? []
-  const { predecessors } = await findMergePredecessors(memoryRoot, identity, resolve, await repositoryWorktreeDirs(spellings))
+  const { predecessors } = await findMergePredecessors(memoryRoot, identity, resolve, await repositoryCandidateDirs(spellings))
   const pending: string[] = []
   for (const predecessor of predecessors) {
     if (predecessor.mergedInto !== identity) {

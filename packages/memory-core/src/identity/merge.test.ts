@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { execFileSync } from "node:child_process"
-import { realpathSync } from "node:fs"
+import { realpathSync, symlinkSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
@@ -8,7 +8,7 @@ import { dirname, join } from "node:path"
 import { GitMemoryRepo, type GitCommitAuthor } from "../git"
 import { removeTree } from "../../../../test-support/remove-tree"
 import { buildIdentityPaths } from "./layout"
-import { applyIdentityMerge, findMergePredecessors, planIdentityMerge, repositoryWorktreeDirs } from "./merge"
+import { applyIdentityMerge, findMergePredecessors, planIdentityMerge, repositoryCandidateDirs, repositoryWorktreeDirs } from "./merge"
 import { resolveAutoIdentity } from "./resolve"
 import { readIdentityRecord, recordIdentityBind } from "./record"
 
@@ -133,6 +133,26 @@ describe("identity merge (#10070)", () => {
     const found = await findMergePredecessors(root, targetId, (spelling) => resolveAutoIdentity(spelling, env, "git").id, await repositoryWorktreeDirs([main]))
 
     expect(found.predecessors.map((entry) => entry.id)).toEqual([legacyId])
+  }, 30_000)
+
+  it("#given pre-record stores for a repository subdirectory and for a symlinked spelling of the checkout #when candidates are collected from the target's recorded spellings #then both stores are found (#12974 review r3)", async () => {
+    const root = await memoryRoot()
+    const main = join(root, "checkout", "proj")
+    const alias = join(root, "checkout", "proj-link")
+    await mkdir(join(main, "packages", "sub"), { recursive: true })
+    execFileSync("git", ["init", "--quiet", "--initial-branch=main"], { cwd: main, stdio: "ignore" })
+    symlinkSync(main, alias)
+    const env = { OMO_MEMORY_HOME: root }
+    const targetId = resolveAutoIdentity(main, env, "git").id
+    const subId = resolveAutoIdentity(join(main, "packages", "sub"), env, "path").id
+    const aliasId = resolveAutoIdentity(alias, env, "path").id
+    await identity(root, targetId, {}, [main, alias])
+    await identity(root, subId, { "notes/sub.md": note("sub") }, [])
+    await identity(root, aliasId, { "notes/alias.md": note("alias") }, [])
+
+    const found = await findMergePredecessors(root, targetId, (spelling) => resolveAutoIdentity(spelling, env, "git").id, await repositoryCandidateDirs([main, alias]))
+
+    expect(found.predecessors.map((entry) => entry.id).sort()).toEqual([aliasId, subId].sort())
   }, 30_000)
 
   it("#given another writer creates the same path between the plan and the lock #when the merge applies #then the target's file is kept and the source copy goes aside (#12974 review)", async () => {

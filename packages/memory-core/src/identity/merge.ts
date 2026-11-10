@@ -83,6 +83,49 @@ export async function findMergePredecessors(
   return { predecessors, unmapped }
 }
 
+const CANDIDATE_WALK_SKIP = new Set([".git", "node_modules", ".omo", "dist", "build", "target", ".next", ".turbo", ".cache", "vendor"])
+const CANDIDATE_WALK_MAX_DEPTH = 6
+const CANDIDATE_WALK_MAX_DIRS = 5000
+
+/**
+ * Every directory a pre-`identity.json` store may have been keyed to: the recorded spellings themselves
+ * (a symlinked spelling included), the repository's live linked worktrees, and the directories inside
+ * each repository root (bounded walk, build and dependency trees skipped).
+ */
+export async function repositoryCandidateDirs(spellings: readonly string[]): Promise<string[]> {
+  const found = new Set<string>(spellings)
+  const worktrees = await repositoryWorktreeDirs(spellings)
+  for (const dir of worktrees) found.add(dir)
+  const roots = new Set<string>()
+  for (const dir of [...spellings, ...worktrees]) {
+    for (let current = dir; ; current = dirname(current)) {
+      if ((await readdir(join(current, ".git")).catch(() => undefined)) !== undefined || (await readFile(join(current, ".git"), "utf8").catch(() => undefined)) !== undefined) {
+        roots.add(current)
+        break
+      }
+      if (dirname(current) === current) break
+    }
+  }
+  let budget = CANDIDATE_WALK_MAX_DIRS
+  const walk = async (dir: string, depth: number): Promise<void> => {
+    if (budget <= 0 || depth > CANDIDATE_WALK_MAX_DEPTH) return
+    const entries = await readdir(dir, { withFileTypes: true }).catch(() => [])
+    for (const entry of entries) {
+      if (!entry.isDirectory() || CANDIDATE_WALK_SKIP.has(entry.name)) continue
+      if (budget <= 0) return
+      budget -= 1
+      const child = join(dir, entry.name)
+      found.add(child)
+      await walk(child, depth + 1)
+    }
+  }
+  for (const root of roots) {
+    found.add(root)
+    await walk(root, 1)
+  }
+  return [...found].sort()
+}
+
 /** The live linked worktrees of each directory's repository (read from `.git/worktrees/*\/gitdir`, no `git` spawn). */
 export async function repositoryWorktreeDirs(dirs: readonly string[]): Promise<string[]> {
   const found = new Set<string>()
