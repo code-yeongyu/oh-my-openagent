@@ -84,8 +84,9 @@ export interface RetentionHostSweepStepOptions {
 
 /**
  * The dry-run preview for one identity: read-only counts of what is past its window in every store the
- * pass prunes, by the pass's own rules, and over the cap what the cap could evict. Locks, reservations and
- * live sessions are decided only by the real pass, which can keep some of what the preview counts.
+ * pass prunes, by the pass's own rules and in its order (a completion whose run the pass removes is counted),
+ * and over the cap what the cap could evict. Locks, reservations, live sessions and live recall ledgers are
+ * decided only by the real pass, which can keep some of what the preview counts.
  */
 async function previewRetention(identity: string, root: string, policy: RuntimeRetentionPolicy, maxBytes: number, now: () => number, signal: AbortSignal): Promise<string[]> {
   const paths = buildIdentityPaths(dirname(dirname(root)), identity)
