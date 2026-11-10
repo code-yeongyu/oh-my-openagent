@@ -1607,6 +1607,7 @@
     "packages/omo-senpi/src/components/thread/remote/ports.ts",
     "packages/omo-senpi/src/components/thread/remote/relay-transport.ts",
     "packages/omo-senpi/src/components/thread/remote/remote-ops.ts",
+    "packages/omo-senpi/src/components/thread/remote/this-device.ts",
     "packages/omo-senpi/src/components/thread/sdk.ts",
     "packages/omo-senpi/src/components/thread/session-facts.ts",
     "packages/omo-senpi/src/components/thread/thread-link.ts",
