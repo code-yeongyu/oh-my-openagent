@@ -1,0 +1,13 @@
+{
+  "$comment": "Data of the computer-use v3 clean reimplementation guards (plan row 2); filled by the implementation commit.",
+  "oldNamePattern": "",
+  "nameMap": {},
+  "oldDirectories": [],
+  "newDirectories": [],
+  "legacyNameExclusions": [],
+  "scope": {},
+  "parity": {},
+  "oracle": {},
+  "stubs": {},
+  "removal": {}
+}
