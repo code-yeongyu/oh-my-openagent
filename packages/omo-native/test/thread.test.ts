@@ -238,9 +238,12 @@ describe("omo thread: SDK loading", () => {
       agentDir: "/agent",
       env: { KEEP: "1" },
       cwd: "/work",
+      stderr: { write: () => {} },
+      reinstall: "Reinstall omo, then retry.",
       engine: { run: (args: string[], options: { env: Record<string, string> }) => { engineCalls.push({ args, env: options.env }); return { exitCode: 0, stdout: "{\"endpoints\":[]}", stderr: "" } } },
       loadSqlite: async () => ({}),
       importSdk: async () => ({ createThreadSdk: (options: Record<string, unknown>) => { received = options; return {} } }),
+      importThreadClient: async () => ({}),
       identity: { uid: 501, user: "qa" },
     })
     expect(loaded.error).toBeUndefined()
@@ -260,6 +263,8 @@ describe("omo thread: SDK loading", () => {
       agentDir: "/agent",
       env: {},
       cwd: "/work",
+      stderr: { write: () => {} },
+      reinstall: "Reinstall omo, then retry.",
       engine: { run: () => ({ exitCode: 0, stdout: "", stderr: "" }) },
       loadSqlite: async () => ({}),
       importSdk: async () => ({ createThreadSdk: (options: Record<string, unknown>) => { received = options; return {} } }),

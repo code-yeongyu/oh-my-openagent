@@ -1,3 +1,4 @@
+import { outcomeOf } from "./outcome"
 import { connectDeviceService, LocalApiError, type CommandResult, type DeviceService, type RemoteAttach } from "@oh-my-opencode/device-service-core"
 import type { JsonObject, RemoteCommandOutcome, RemoteSessionsPort } from "./ports"
 
@@ -81,21 +82,6 @@ type Session = { readonly attached: RemoteAttach; readonly catalog: ReturnType<t
 
 const recordKey = (record: WireRpc): string => JSON.stringify(Object.entries(record).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
 
-function outcomeOf(result: CommandResult): RemoteCommandOutcome {
-  const { outcome } = result
-  if (outcome.state === "engine_refused") return { kind: "refused", reason: outcome.reason }
-  if (outcome.state === "uncertain") return { kind: "uncertain", reason: outcome.reason }
-  if (outcome.state === "engine_stale") return { kind: "uncertain", reason: "engine_stale" }
-  const response = result.response ?? {}
-  // The engine ran the command and answered it failed (senpi's `{success: false, error, errorCode}` envelope): a typed
-  // refusal, so no caller reads `data` from a failed reply.
-  if (response["success"] === false) {
-    const code = response["errorCode"]
-    const error = response["error"]
-    return { kind: "refused", reason: typeof code === "string" && code.length > 0 ? code : typeof error === "string" && error.length > 0 ? error : "engine_failed" }
-  }
-  return result.located === undefined ? { kind: "ok", response } : { kind: "ok", response, located: result.located.key }
-}
 
 /**
  * The account half of the thread tools over this device's device service: one proven connection, rebuilt after it

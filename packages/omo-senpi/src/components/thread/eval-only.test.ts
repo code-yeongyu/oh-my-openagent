@@ -131,12 +131,12 @@ describe("thread tools are eval-only, like bash", () => {
     // given
     const { session, f, root } = await openSession({ withEval: true })
     const direct = createThreadTools(f).find((tool) => tool.name === "thread_read")
-    expect(direct).toBeDefined()
+    if (!direct) throw new Error("thread_read is missing from the thread tool family")
 
     // when
     const listed = threadResult(await session.executeTool("thread_list", { all_scope: true }, { activateInactiveTool: true }))
     const viaEval = threadResult(await session.executeTool("thread_read", { thread: "missing" }, { activateInactiveTool: true }))
-    const viaDirect = (await direct!.execute("call-direct", { thread: "missing" }, undefined, undefined, {} as never)).details.result as ThreadToolResult
+    const viaDirect = (await direct.execute("call-direct", { thread: "missing" }, undefined, undefined, {} as never)).details.result as ThreadToolResult
 
     // then: the call reached the tool and listed the fixture peer
     expect(listed).toMatchObject({ kind: "ok", scope: "all" })

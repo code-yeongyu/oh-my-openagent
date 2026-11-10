@@ -238,8 +238,10 @@ describe("omo-senpi task component wiring", () => {
     // host pre-warm's session_start (revival) plus its default `first-turn` edges (input, before_agent_start);
     // the pre-warm registers nothing on win32, where task children never use a host
     const prewarmEvents = process.platform === "win32" ? [] : ["session_start", "input", "before_agent_start"]
+    // child-parent wiring's wakes for the parent's approval mode (#12853)
+    const parentModeWakeEvents = ["session_start", "turn_start"]
     expect(pi.handlers.map((handler) => handler.event).sort()).toEqual(
-      [...TASK_EVENTS, ...SKILL_INVOCATION_TRACKER_EVENTS, ...DAG_LIFECYCLE_EVENTS, "session_start", "session_shutdown", "session_start", ...prewarmEvents].sort(),
+      [...TASK_EVENTS, ...SKILL_INVOCATION_TRACKER_EVENTS, ...DAG_LIFECYCLE_EVENTS, "session_start", "session_shutdown", "session_start", ...prewarmEvents, ...parentModeWakeEvents].sort(),
     )
   })
 
