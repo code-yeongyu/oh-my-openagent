@@ -14,21 +14,18 @@ describe("Claude Fable 5.2 recognition", () => {
     expect(LATEST_MODEL_BY_FAMILY.claudeFable).toBe(MODEL)
   })
 
-  test("recognizes every Fable and Mythos 5.2 spelling as the adaptive-only Fable family", () => {
+  test("recognizes every Fable and Mythos 5.2 spelling as the adaptive-only family", () => {
     // given
-    const selectors = [
+    const fableSelectors = [
       MODEL,
       `anthropic/${MODEL}`,
       "github-copilot/claude-fable-5.2",
       "anthropic.claude-fable-5-2",
       "us.anthropic.claude-fable-5-2",
-      "claude-mythos-5-2",
     ]
     // when / then
-    for (const selector of selectors) {
-      expect(isClaudeFableOrMythosModel(selector)).toBe(true)
-      expect(isClaudeOpus47OrLaterModel(selector)).toBe(true)
-    }
+    for (const selector of [...fableSelectors, "claude-mythos-5-2"]) expect(isClaudeFableOrMythosModel(selector)).toBe(true)
+    for (const selector of fableSelectors) expect(isClaudeOpus47OrLaterModel(selector)).toBe(true)
     expect(isClaudeFable5Model(`anthropic/${MODEL}`)).toBe(true)
   })
 
