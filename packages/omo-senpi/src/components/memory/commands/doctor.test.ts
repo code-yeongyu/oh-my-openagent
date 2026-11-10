@@ -731,6 +731,34 @@ describe("doctor runtime size: measurement over budget (B16, r4 R5)", () => {
   })
 })
 
+describe("doctor runtime size: last cleanup (#12932)", () => {
+  test("#given a runtime with a logged cleanup and one without #when the runtime-size check runs #then the report and the detail say when it last cleaned, or that none is recorded", async () => {
+    const input = {
+      maxBytes: 0,
+      policy: { retentionDays: 7, abandonedJournalDays: 14, completionsDays: 30, discardUnreflectedJournals: false, passBudgetMs: 60_000 },
+      now: Date.parse("2026-11-05T07:00:00.000Z"),
+      reflectionEnabled: true,
+      discardUnreflectedJournals: false,
+    }
+    const cleaned = await tempIdentity()
+    const never = await tempIdentity()
+    tempDirs.push(cleaned.root, never.root)
+    for (const { identity } of [cleaned, never]) {
+      await mkdir(join(identity.identityPaths.transcripts, "s1"), { recursive: true })
+      await writeFile(join(identity.identityPaths.transcripts, "s1", "transcript.jsonl"), "{}\n")
+    }
+    await writeFile(join(cleaned.identity.identityPaths.runtime, "retention-log.jsonl"), `${JSON.stringify({ v: 1, at: "2026-11-05T00:00:00.000Z", total: 2, removed: { journals: ["a", "b"] } })}\n`)
+
+    const withLog = await checkRuntimeSize(cleaned.identity.identityPaths, input)
+    const withoutLog = await checkRuntimeSize(never.identity.identityPaths, input)
+
+    expect(withLog.report.lastCleanup).toEqual({ at: "2026-11-05T00:00:00.000Z", total: 2 })
+    expect(withLog.check.detail).toContain("last cleanup 2026-11-05T00:00:00.000Z removed 2")
+    expect(withoutLog.report.lastCleanup).toBeUndefined()
+    expect(withoutLog.check.detail).toContain("no cleanup recorded")
+  })
+})
+
 describe("doctor runtime size (B10)", () => {
   async function sizedIdentity(maxBytesFor: (bytes: number) => number, runtime: Partial<ReturnType<typeof memorySettings>["runtime"]> = {}) {
     const { root, identity } = await tempIdentity()
