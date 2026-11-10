@@ -16,6 +16,17 @@ export type HostRunHoldClient = {
 
 const WIDTH = 80
 
+// One wire per engine connection: a reattach's new connection declares task_parent again.
+const wiresByClient = new WeakMap<HostRunHoldClient, TaskParentWire>()
+
+export function hostTaskParentWireOf(client: HostRunHoldClient): TaskParentWire {
+  const known = wiresByClient.get(client)
+  if (known !== undefined) return known
+  const wire = createHostTaskParentWire(client)
+  wiresByClient.set(client, wire)
+  return wire
+}
+
 export function createHostTaskParentWire(client: HostRunHoldClient): TaskParentWire {
   const answer = async (run: () => Promise<unknown>) => {
     try {

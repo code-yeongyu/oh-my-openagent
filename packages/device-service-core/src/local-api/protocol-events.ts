@@ -33,6 +33,11 @@ export type ListingRow = {
   readonly kind?: string;
   readonly parent?: string;
   readonly parent_listed?: boolean;
+  /**
+   * Only on rows of a `sessions.list` with `rows: 3` (#12996): the durable engine session id of the listed session
+   * (1-128 characters, as `session.locate`'s `engine_id`). Absent when the host does not report it.
+   */
+  readonly durable_id?: string;
 };
 export type StatusChanged = EventOf<"status.changed", { readonly status: Status }>;
 export type SessionsRound = EventOf<

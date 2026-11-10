@@ -7,6 +7,7 @@ import { gatewayDatabasePath } from "./paths"
 import { createGatewayRelay } from "./relay"
 import { ANSWER_IN_FLIGHT_MAX_MS } from "./store-relay-ops"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 let harness: GatewayHarness | undefined
 
@@ -55,7 +56,7 @@ async function abandonedQuestion(refusal: string) {
   void dead.answer({ binding_id: bindingId, reply_token: token, answer: "from the dead claimant" })
   let watchdog: ReturnType<typeof setTimeout> | undefined
   try {
-    await Promise.race([handOffStarted, new Promise((_, reject) => { watchdog = setTimeout(() => reject(new Error("waited 10s for the dead claimant's hand-off")), 10_000) })])
+    await Promise.race([handOffStarted, new Promise((_, reject) => { watchdog = setTimeout(() => reject(new Error("waited out the test budget for the dead claimant's hand-off")), remainingTestTime()) })])
   } finally {
     clearTimeout(watchdog)
   }

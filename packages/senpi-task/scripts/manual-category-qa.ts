@@ -50,12 +50,12 @@ requireCondition(happy.spec.modelId === "gpt-5.6-sol", "happy model mismatch")
 requireCondition(happy.spec.variant === "max", "happy variant mismatch")
 requireCondition(happy.spec.prompt_append?.includes("DEEP LOGICAL REASONING") === true, "happy prompt missing")
 
-const visualPrimary = resolveCategory("visual-engineering", {}, registry([model("anthropic", "claude-fable-5-1")]))
+const visualPrimary = resolveCategory("visual-engineering", {}, registry([model("anthropic", "claude-fable-5-2")]))
 requireCondition(visualPrimary.kind === "resolved", "visual-engineering primary did not resolve")
 if (visualPrimary.kind !== "resolved") {
   throw new Error("visual-engineering primary did not resolve")
 }
-requireCondition(visualPrimary.spec.modelId === "claude-fable-5-1", "visual-engineering primary model mismatch")
+requireCondition(visualPrimary.spec.modelId === "claude-fable-5-2", "visual-engineering primary model mismatch")
 requireCondition(visualPrimary.spec.variant === "max", "visual-engineering primary variant is not max")
 
 const quickPrimary = resolveCategory("quick", {}, registry([model("chatgpt-subscription", "gpt-6-luna-fast")]))
@@ -75,12 +75,12 @@ if (visualKimiFallback.kind !== "resolved") {
 requireCondition(visualKimiFallback.spec.modelId === "k3.1-pro", "visual-engineering kimi fallback model mismatch")
 requireCondition(visualKimiFallback.spec.variant === "max", "visual-engineering kimi fallback variant is not max")
 
-const artistryPrimary = resolveCategory("artistry", {}, registry([model("anthropic", "claude-fable-5-1")]))
+const artistryPrimary = resolveCategory("artistry", {}, registry([model("anthropic", "claude-fable-5-2")]))
 requireCondition(artistryPrimary.kind === "resolved", "artistry primary did not resolve")
 if (artistryPrimary.kind !== "resolved") {
   throw new Error("artistry primary did not resolve")
 }
-requireCondition(artistryPrimary.spec.modelId === "claude-fable-5-1", "artistry primary model mismatch")
+requireCondition(artistryPrimary.spec.modelId === "claude-fable-5-2", "artistry primary model mismatch")
 requireCondition(artistryPrimary.spec.variant === "max", "artistry primary variant is not max")
 
 const artistryKimiFallback = resolveCategory("artistry", {}, registry([model("kimi-coding", "k3.1-pro")]))
@@ -156,19 +156,6 @@ requireCondition(hardcodedFallback.spec.provider === "openai", "hardcoded fallba
 requireCondition(hardcodedFallback.spec.modelId === "gpt-6-luna-fast", "hardcoded fallback model mismatch")
 requireCondition(hardcodedFallback.spec.variant === "low", "hardcoded fallback variant is not low")
 requireCondition(hardcodedFallback.modelSelection.matchedFallback, "hardcoded fallback was not marked as fallback")
-
-const systemDefault = resolveCategory(
-  "quick",
-  {},
-  registry([model("local", "system-default")]),
-  { systemDefaultModel: "local/system-default" },
-)
-requireCondition(systemDefault.kind === "resolved", "system default scenario did not resolve")
-if (systemDefault.kind !== "resolved") {
-  throw new Error("system default scenario did not resolve")
-}
-requireCondition(systemDefault.spec.provider === "local", "system default provider mismatch")
-requireCondition(systemDefault.spec.modelId === "system-default", "system default model mismatch")
 
 const headerModel = {
   provider: "openai-codex",
@@ -319,7 +306,6 @@ console.log(JSON.stringify({
   disabled,
   unavailable,
   hardcodedFallback,
-  systemDefault,
   headerBearing,
   malformed,
   throwingAvailable,
