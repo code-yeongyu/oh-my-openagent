@@ -54,7 +54,7 @@ describe("all_fifteen_delivery_state_cases", () => {
     h.session("A")
     const expected: Record<string, readonly [string, string | null]> = {
       "idle/auto": ["started", "applied"], "idle/steer": ["error:not_steerable", "refused"], "idle/follow_up": ["started", "applied"],
-      "mid_turn/auto": ["queued", "admitted"], "mid_turn/steer": ["steered", "admitted"], "mid_turn/follow_up": ["queued", "admitted"],
+      "mid_turn/auto": ["steered", "admitted"], "mid_turn/steer": ["steered", "admitted"], "mid_turn/follow_up": ["queued", "admitted"],
       "waiting_question/auto": ["queued", "admitted"], "waiting_question/steer": ["error:not_steerable", "refused"], "waiting_question/follow_up": ["queued", "admitted"],
       "compacting/auto": ["queued", "admitted"], "compacting/steer": ["error:not_steerable", "refused"], "compacting/follow_up": ["queued", "admitted"],
       "offline/auto": ["queued_offline", "queued"], "offline/steer": ["error:turn_conflict", null], "offline/follow_up": ["queued_offline", "queued"],
@@ -155,7 +155,7 @@ describe("repeated_wake_during_streaming", () => {
     h.session("A")
     const b = h.session("B")
     b.runtime.beginUserTurn()
-    const result = await send(h, "A", "B", "M1", { mode: "auto" })
+    const result = await send(h, "A", "B", "M1", { mode: "follow_up" })
     expect(summary(result)).toBe("queued")
     const m1 = okId(result)
     for (let wake = 0; wake < 3; wake++) await b.drain.drain({ reason: "command" })
@@ -215,7 +215,7 @@ describe("lost_ack_and_durable_recovery", () => {
     await b.drain.drain({ reason: "start" })
     await h.quiesce()
     const replayed = await retrying.deliver(request("admitted"))
-    expect(replayed.kind === "ok" && { delivery: replayed.delivery.kind, deduplicated: replayed.deduplicated }).toEqual({ delivery: "queued", deduplicated: true })
+    expect(replayed.kind === "ok" && { delivery: replayed.delivery.kind, deduplicated: replayed.deduplicated }).toEqual({ delivery: "steered", deduplicated: true })
 
     const stillUncertain = await retrying.deliver(request("unadmitted"))
     expect(summary(stillUncertain)).toBe("error:idempotency_uncertain")

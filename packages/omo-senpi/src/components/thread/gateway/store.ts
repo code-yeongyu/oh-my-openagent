@@ -21,7 +21,11 @@ export type GatewayStoreOptions = {
   readonly now?: () => number
   /** The module location the worker sidecar is resolved from when the facade does not run inside `omo.js` (the thread SDK runtime). */
   readonly workerModuleUrl?: string | URL
-  /** Resolves extension enqueue targets through the caller's live-and-disk address book. */
+  /**
+   * Resolves extension enqueue targets through the caller's live-and-disk address book (`createExtensionResolver`).
+   * The creator passes it: a store module that loaded the resolver itself would carry the engine's live surface into
+   * every bundle that opens a store, the shipped `omo` CLI included, which only writes receipts and never resolves.
+   */
   readonly resolveTarget?: GatewayResolve
   /** Sender-owned resolution for deliveries created by extension transactions. */
   readonly senderProvenance?: () => Promise<Provenance>
@@ -98,15 +102,12 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
   /** The close-and-terminate of a retired worker, until it settles: `dispose` waits for it. */
   let retiring: Promise<void> | undefined
   const idleRetireMs = options._test?.idleRetireMs ?? GATEWAY_STORE_IDLE_RETIRE_MS
-  let resolveTarget = options.resolveTarget
+  const resolveTarget = options.resolveTarget
   /** The registrations the current worker holds, restored on the next worker after one exits. */
   const registrations = new Map<string, RetainedRegistration>()
 
   const resolveExtensionTarget: GatewayResolve = async (address, request) => {
-    if (resolveTarget === undefined) {
-      const { createExtensionResolver } = await import("./extension-resolver")
-      resolveTarget = createExtensionResolver(options.agentDir)
-    }
+    if (resolveTarget === undefined) throw new Error("this gateway store was created without an extension resolver (resolveTarget); it cannot resolve an extension target")
     return await resolveTarget(address, request)
   }
 

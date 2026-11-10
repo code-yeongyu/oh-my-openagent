@@ -62,7 +62,8 @@ export type ThreadHostViewRequest = {
 export type ThreadHost = {
   readonly socket: string
   readonly listSessions: () => Promise<readonly ThreadHostSession[]>
-  readonly openSession: (params: { readonly cwd?: string; readonly sessionPath?: string; readonly name?: string; readonly forkFrom?: string; readonly initialSkills?: readonly string[] }) => Promise<ThreadHostSession>
+  /** `permissionPreset` is the approval mode the new session starts in (its creator's, #12884); absent, the host's default applies. */
+  readonly openSession: (params: { readonly cwd?: string; readonly sessionPath?: string; readonly name?: string; readonly forkFrom?: string; readonly initialSkills?: readonly string[]; readonly permissionPreset?: string }) => Promise<ThreadHostSession>
   readonly getMessages: (sessionId: string) => Promise<readonly ThreadTranscriptEntry[]>
   readonly getState: (sessionId: string) => Promise<{ readonly isStreaming?: boolean; readonly activeTurnId?: string }>
   readonly prompt: (sessionId: string, message: string, options?: { readonly streamingBehavior?: "steer" | "followUp" }, durable_session_id?: string) => Promise<{ readonly turnId?: string }>
@@ -127,6 +128,8 @@ export type ThreadToolSurfaceOptions = {
   readonly callerChainHop?: () => number
   /** The deliveries the caller's current answer is for (`component.ts` `RunContext.consumed`); a report without `binding_id` goes to their binding. */
   readonly callerRunDeliveries?: () => readonly string[]
+  /** The agent sessions whose deliveries the caller's current run took in: a `thread_send` back to one asks for no permission (#12886). */
+  readonly callerReplyTargets?: () => readonly string[]
   /** A `user` message (typed in the caller's terminal, or an extension's) is part of that same answer (`RunContext.local`); with a bound delivery there and another outbound binding, a report without `binding_id` is refused. */
   readonly callerRunHasLocalInput?: () => boolean
   /** `thread_report {kind: "completion"}` armed a completion (`arm_seq`) for this session; the component writes it at the next settle. */
