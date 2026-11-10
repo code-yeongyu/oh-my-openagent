@@ -2347,6 +2347,20 @@
         "@oh-my-opencode/team-core",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
         "@oh-my-opencode/tmux-core",
+        // computer-use v3 (row 5, #13051): a workspace devDependency the registration audit requires before anything at the root imports it
+        "@oh-my-opencode/omo-computer-protocol",
+        // computer-use v3 (row 5, #13051): a workspace devDependency the registration audit requires before anything at the root imports it
+        "@oh-my-opencode/omo-computer-sdk",
+        // computer-use v3 (row 5, #13051): a workspace devDependency the registration audit requires before anything at the root imports it
+        "@oh-my-opencode/omo-computer-engine",
+        // computer-use v3 (row 5, #13051): a workspace devDependency the registration audit requires before anything at the root imports it
+        "@oh-my-opencode/omo-computer-hand",
+        // computer-use v3 (row 5, #13051): a workspace devDependency the registration audit requires before anything at the root imports it
+        "@oh-my-opencode/omo-computer-carriers",
+        // computer-use v3 (row 5, #13051): a workspace devDependency the registration audit requires before anything at the root imports it
+        "@oh-my-opencode/omo-computer-tool",
+        // computer-use v3 (row 5, #13051): a workspace devDependency the registration audit requires before anything at the root imports it
+        "@oh-my-opencode/omo-computer-prelude",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
         "@opencode-ai/plugin",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
