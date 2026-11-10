@@ -65,6 +65,10 @@ describe("resolveComputerSettings", () => {
 			screenshotGc: { enabled: true, staleMs: 43_200_000, scanIntervalMs: 1_800_000 },
 			enginePath: undefined,
 			cuaAdapter: false,
+			runSandbox: "vm",
+			intervention: "pause",
+			macosKeyPriming: "off",
+			trace: false,
 		});
 	});
 
@@ -100,6 +104,17 @@ describe("resolveComputerSettings", () => {
 			stopHotkey: "ctrl+alt+shift+f12",
 			gc: { enabled: true, staleMs: 60_000, scanIntervalMs: 1_800_000 },
 		});
+	});
+
+	it("keeps the four reserved v2 keys when set", () => {
+		// Given
+		const raw = { runSandbox: "quickjs", intervention: "continue", macosKeyPriming: "on", trace: true };
+
+		// When
+		const { runSandbox, intervention, macosKeyPriming, trace } = resolveComputerSettings(raw, "darwin");
+
+		// Then
+		expect({ runSandbox, intervention, macosKeyPriming, trace }).toEqual(raw);
 	});
 
 	it("rejects an unknown key and a wrongly typed value", () => {

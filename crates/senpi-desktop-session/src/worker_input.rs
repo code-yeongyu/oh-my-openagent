@@ -1,19 +1,22 @@
 //! Pointer and keyboard requests. Coordinates are pixels of the target's
 //! latest capture and map through its frame to global logical points.
 
+use senpi_desktop_core::ax::AxOwner;
 use senpi_desktop_core::backend::{DeliveryMode, PointerEvent};
-use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
-use senpi_desktop_core::frame::FrameGeometry;
+use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode, ErrorReport};
+use senpi_desktop_core::frame::{FrameGeometry, PointHit};
 use senpi_desktop_core::keys::parse_keys;
 use senpi_desktop_core::protocol_params::{
     DragParams, KeyChordParams, PointParams, ScrollParams, TypeTextParams,
 };
+use senpi_desktop_core::report::{ActionEffect, ActionHit, Disposition, ReportMode};
 use senpi_desktop_core::types::{DesktopWindow, PointerOptions, Target};
 
-use senpi_desktop_safety::{MutatingAction, StopPolicy, Supervisor};
+use senpi_desktop_safety::{GateError, MutatingAction, StopPolicy, Supervisor};
 
 use crate::mutate::Mutation;
 use crate::pointer::ParsedPointerOptions;
+use crate::report::ReportExtras;
 use crate::request::Response;
 use crate::worker::{Audited, Worker};
 
@@ -40,6 +43,9 @@ impl Worker {
         frame: &FrameGeometry,
         mode: DeliveryMode,
     ) -> CoreResult<Response> {
+        if self.epochs.probe().moved() {
+            return Err(crate::epoch::superseded_before_input());
+        }
         self.backend()?.pointer(target, event, frame, mode)?;
         Ok(Response::Unit)
     }
@@ -52,6 +58,7 @@ impl Worker {
         let target = Target::parse(&params.target);
         let mutation = Mutation {
             frame_id: params.frame_id.as_deref(),
+            consume: consumes(params.opts.as_ref()),
             ..Mutation::new(
                 MutatingAction::Click,
                 target.key().to_owned(),
@@ -62,6 +69,7 @@ impl Worker {
             let options = ParsedPointerOptions::parse(params.opts.as_ref())?;
             let (frame, current) = worker.frame_for(&target, params.frame_id.as_deref())?;
             let (x, y) = frame.map_point(params.x, params.y, current.as_ref())?;
+            worker.read_hit(x, y);
             let event = PointerEvent::Click {
                 x,
                 y,
@@ -69,7 +77,9 @@ impl Worker {
                 count: options.count,
                 modifiers: options.modifiers,
             };
-            worker.pointer(&target, event, &frame, options.mode)
+            let response = worker.pointer(&target, event, &frame, options.mode)?;
+            worker.judge(&target, &frame, options.count > 1)?;
+            Ok(response)
         })
     }
 
@@ -81,6 +91,7 @@ impl Worker {
         let target = Target::parse(&params.target);
         let mutation = Mutation {
             frame_id: params.frame_id.as_deref(),
+            consume: consumes(params.opts.as_ref()),
             ..Mutation::new(
                 MutatingAction::MoveMouse,
                 target.key().to_owned(),
@@ -91,7 +102,10 @@ impl Worker {
             let mode = delivery(params.opts.as_ref())?;
             let (frame, current) = worker.frame_for(&target, params.frame_id.as_deref())?;
             let (x, y) = frame.map_point(params.x, params.y, current.as_ref())?;
-            worker.pointer(&target, PointerEvent::Move { x, y }, &frame, mode)
+            worker.read_hit(x, y);
+            let response = worker.pointer(&target, PointerEvent::Move { x, y }, &frame, mode)?;
+            worker.judge(&target, &frame, false)?;
+            Ok(response)
         })
     }
 
@@ -99,6 +113,7 @@ impl Worker {
         let target = Target::parse(&params.target);
         let mutation = Mutation {
             frame_id: params.frame_id.as_deref(),
+            consume: consumes(params.opts.as_ref()),
             ..Mutation::new(
                 MutatingAction::Drag,
                 target.key().to_owned(),
@@ -113,12 +128,17 @@ impl Worker {
                 .iter()
                 .map(|point| frame.map_point(point.x, point.y, current.as_ref()))
                 .collect::<CoreResult<Vec<_>>>()?;
+            if let Some(&(x, y)) = path.first() {
+                worker.read_hit(x, y);
+            }
             let event = PointerEvent::Drag {
                 path,
                 button: options.button,
                 modifiers: options.modifiers,
             };
-            worker.pointer(&target, event, &frame, options.mode)
+            let response = worker.pointer(&target, event, &frame, options.mode)?;
+            worker.judge(&target, &frame, true)?;
+            Ok(response)
         })
     }
 
@@ -130,6 +150,7 @@ impl Worker {
         let target = Target::parse(&params.target);
         let mutation = Mutation {
             frame_id: params.frame_id.as_deref(),
+            consume: consumes(params.opts.as_ref()),
             ..Mutation::new(
                 MutatingAction::Scroll,
                 target.key().to_owned(),
@@ -140,13 +161,16 @@ impl Worker {
             let mode = delivery(params.opts.as_ref())?;
             let (frame, current) = worker.frame_for(&target, params.frame_id.as_deref())?;
             let (x, y) = frame.map_point(params.x, params.y, current.as_ref())?;
+            worker.read_hit(x, y);
             let event = PointerEvent::Scroll {
                 x,
                 y,
                 dx: params.dx,
                 dy: params.dy,
             };
-            worker.pointer(&target, event, &frame, mode)
+            let response = worker.pointer(&target, event, &frame, mode)?;
+            worker.judge(&target, &frame, false)?;
+            Ok(response)
         })
     }
 
@@ -166,9 +190,16 @@ impl Worker {
         };
         let supervisor = self.safety.supervisor.clone();
         let policy = self.stop_policy();
-        self.mutate(&mutation, cancelled, |worker| {
+        let secure = std::cell::Cell::new(false);
+        let (response, event) = self.mutate(&mutation, cancelled, |worker| {
             let mode = delivery(params.opts.as_ref())?;
-            let check_stop = || interrupted(&supervisor, &policy, cancelled, "typing");
+            worker.takeover_gate(&target, mode)?;
+            secure.set(worker.typing_into_secure_field(&target));
+            let epoch = worker.epochs.probe();
+            let check_stop = || {
+                interrupted(&supervisor, &policy, cancelled, "typing")?;
+                epoch_unmoved(&epoch, mutation.text_delivered.get() > 0)
+            };
             worker.backend()?.type_text_interruptible(
                 &target,
                 &params.text,
@@ -177,7 +208,74 @@ impl Worker {
                 &mut || mutation.text_delivered.set(mutation.text_delivered.get().saturating_add(1)),
             )?;
             Ok(Response::Unit)
-        })
+        })?;
+        if !secure.get() {
+            return Ok((response, event));
+        }
+        // A secure field's value is never read back: the write stays
+        // unverifiable, and the report says why.
+        let extras = self.report_extras.take().unwrap_or_default();
+        let mut report = crate::report::success_report(&event, extras);
+        report.effect = ActionEffect::Unverifiable;
+        report.warning = Some("secure_field".to_owned());
+        Ok((Response::Action(Box::new(report)), event))
+    }
+
+    /// DESIGN 7 step 0, for background keys in an object-mode session: when
+    /// the target window's app is frontmost and the user pressed a key or
+    /// clicked in it within [`crate::intervention::TAKEOVER_MS`], nothing is
+    /// sent. Without a front-window read or a watch there is no evidence, and
+    /// the input proceeds as before.
+    fn takeover_gate(&mut self, target: &Target, mode: DeliveryMode) -> CoreResult<()> {
+        if self.registry.report_mode() != ReportMode::Object
+            || mode != DeliveryMode::Background
+            || !matches!(target, Target::Window(_))
+        {
+            return Ok(());
+        }
+        let Some(window) = self.window(target).ok().filter(|window| window.pid.is_some()) else {
+            return Ok(());
+        };
+        let front = self.backend()?.front_window().ok().flatten();
+        if front.is_none_or(|front| Some(front.pid) != window.pid) {
+            return Ok(());
+        }
+        let Some(idle) = window.pid.and_then(|pid| self.user_active_in(pid)) else {
+            return Ok(());
+        };
+        Err(DesktopError::background_unavailable(format!(
+            "the user is using {} (last input {:.1} s ago) and it is the frontmost app; nothing was sent; \
+             retry once they pause",
+            window.app,
+            idle as f64 / 1000.0,
+        ))
+        .with_report(ErrorReport {
+            reason: Some("user_active_in_target".to_owned()),
+            disposition: Some(Disposition::NOT_DELIVERED_AFTER_USER),
+            ..ErrorReport::default()
+        }))
+    }
+
+    /// Object mode: whether the element that takes the keys is a secure text
+    /// field, read as the target window's focused element and the hit at its
+    /// center. A read that fails says no.
+    fn typing_into_secure_field(&mut self, target: &Target) -> bool {
+        let Target::Window(id) = target else { return false };
+        if self.registry.report_mode() != ReportMode::Object {
+            return false;
+        }
+        let Ok(backend) = self.backend() else { return false };
+        let Ok(windows) = backend.windows() else { return false };
+        let center = {
+            let Some(ax) = backend.ax() else { return false };
+            let Ok(Some(element)) = ax.focused_element() else { return false };
+            if !matches!(ax.owner(&element, &windows), Ok(AxOwner::Window(owner)) if owner == *id) {
+                return false;
+            }
+            let Some(bounds) = ax.props(&element).ok().and_then(|props| props.bounds) else { return false };
+            (bounds.x + bounds.width / 2.0, bounds.y + bounds.height / 2.0)
+        };
+        backend.hit_at(center.0, center.1).ok().flatten().is_some_and(|hit| hit.secure)
     }
 
     pub(crate) fn key_chord(
@@ -199,10 +297,49 @@ impl Worker {
         self.mutate(&mutation, cancelled, |worker| {
             let keys = parse_keys(&params.keys)?;
             let mode = delivery(params.opts.as_ref())?;
-            let check_stop = || interrupted(&supervisor, &policy, cancelled, "pressing keys");
+            worker.takeover_gate(&target, mode)?;
+            let epoch = worker.epochs.probe();
+            let pressed = std::cell::Cell::new(false);
+            let check_stop = || {
+                interrupted(&supervisor, &policy, cancelled, "pressing keys")?;
+                epoch_unmoved(&epoch, pressed.replace(true))
+            };
             worker.backend()?.key_chord_interruptible(&target, &keys, mode, &check_stop)?;
             Ok(Response::Unit)
         })
+    }
+
+    /// Object mode: the element under the mapped point, read before input
+    /// is sent, for the report's `hit`. A read that fails reports no hit and
+    /// never blocks the input.
+    pub(crate) fn read_hit(&mut self, x: f64, y: f64) {
+        if self.registry.report_mode() != ReportMode::Object {
+            return;
+        }
+        let hit = self.backend().and_then(|backend| backend.hit_at(x, y)).ok().flatten().map(action_hit);
+        self.report_extras.set(Some(ReportExtras { route: None, hit, timings: None }));
+    }
+
+    /// Object mode, window targets: once input was sent, judges it against
+    /// the window as it is now. A window whose owner changed, or (for input
+    /// of several events, `multi_event`) whose size changed since capture,
+    /// may have taken part of the input elsewhere: `delivery_uncertain`.
+    pub(crate) fn judge(&mut self, target: &Target, frame: &FrameGeometry, multi_event: bool) -> CoreResult<()> {
+        if self.registry.report_mode() != ReportMode::Object || !matches!(target, Target::Window(_)) {
+            return Ok(());
+        }
+        let captured = frame.identity().cloned();
+        if captured.is_none() && !multi_event {
+            return Ok(());
+        }
+        let current = self.window(target).map_err(uncertain)?;
+        if captured.is_some_and(|captured| current.identity.as_ref() != Some(&captured)) {
+            return Err(uncertain(DesktopError::from(GateError::IdentityChanged)));
+        }
+        if multi_event {
+            frame.check_size(&current).map_err(uncertain)?;
+        }
+        Ok(())
     }
 
     /// Raising a window is itself the focus change asked for: audited as
@@ -245,8 +382,57 @@ pub(crate) fn interrupted(
     }
 }
 
+/// The epoch probe of an interruptible input call, run after
+/// [`interrupted`] before each event: a move before the first event refuses
+/// it (nothing sent); a move after `sent` input ends it with the delivery
+/// unknown.
+fn epoch_unmoved(epoch: &crate::epoch::EpochProbe, sent: bool) -> CoreResult<()> {
+    match (epoch.moved(), sent) {
+        (false, _) => Ok(()),
+        (true, false) => Err(crate::epoch::superseded_before_input()),
+        (true, true) => Err(crate::epoch::superseded_mid_input()),
+    }
+}
+
+/// Whether the request's options ask to consume its frame.
+pub(crate) fn consumes(options: Option<&PointerOptions>) -> bool {
+    options.is_some_and(|options| options.consume)
+}
+
+/// Longest label a report carries before it is cut.
+const MAX_LABEL_CHARS: usize = 256;
+
+/// The report's `hit`: a secure field's label is never reported, and a long
+/// label is cut to 256 characters plus `[truncated]`.
+fn action_hit(hit: PointHit) -> ActionHit {
+    let label = hit.label.filter(|_| !hit.secure).map(|label| {
+        if label.chars().count() > MAX_LABEL_CHARS {
+            format!("{}[truncated]", label.chars().take(MAX_LABEL_CHARS).collect::<String>())
+        } else {
+            label
+        }
+    });
+    ActionHit { role: hit.role, label }
+}
+
+/// An error judged after input was sent: whatever reason it carries, the
+/// input may have landed, and sending it again may duplicate it.
+fn uncertain(mut error: DesktopError) -> DesktopError {
+    let mut report = error.report.take().map(|report| *report).unwrap_or_default();
+    report.disposition = Some(Disposition::UNCERTAIN_UNSAFE);
+    error.with_report(report)
+}
+
 /// Only the delivery mode matters for these requests, but malformed options
 /// still fail like they do for a click.
 pub(crate) fn delivery(options: Option<&PointerOptions>) -> CoreResult<DeliveryMode> {
     ParsedPointerOptions::parse(options).map(|options| options.mode)
 }
+
+#[cfg(test)]
+#[path = "worker_input/frame_tests.rs"]
+mod frame_tests;
+
+#[cfg(test)]
+#[path = "worker_input/takeover_tests.rs"]
+mod takeover_tests;

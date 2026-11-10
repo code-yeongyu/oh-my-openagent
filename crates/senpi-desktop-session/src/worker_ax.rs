@@ -5,7 +5,7 @@ use senpi_desktop_core::ax::{self, register_node};
 use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::CoreResult;
 use senpi_desktop_core::protocol_params::{AxElementAtParams, AxQueryParams, AxSnapshotParams};
-use senpi_desktop_core::types::{AxNode, Target};
+use senpi_desktop_core::types::Target;
 
 use senpi_desktop_safety::MutatingAction;
 
@@ -46,36 +46,14 @@ impl Worker {
         Ok(Response::MaybeNode(node))
     }
 
+    /// In object mode the node carries evidence, `secure`, and whether the
+    /// snapshot that registered it cut its children.
     pub(crate) fn ax_node(&mut self, reference: &str) -> CoreResult<Response> {
         let handle = self.registry.resolve(reference)?;
-        let props = self.ax_parts()?.0.props(&handle)?;
-        let (x, y, width, height) = props.bounds.map_or((None, None, None, None), |bounds| {
-            (
-                Some(bounds.x),
-                Some(bounds.y),
-                Some(bounds.width),
-                Some(bounds.height),
-            )
-        });
-        Ok(Response::Node(AxNode {
-            evidence: None,
-            subtree_truncated: false,
-            secure: false,
-            ref_: reference.to_owned(),
-            role: props.role,
-            native_role: props.native_role,
-            title: props.title,
-            value: props.value,
-            description: props.description,
-            enabled: props.enabled,
-            focused: props.focused,
-            x,
-            y,
-            width,
-            height,
-            actions: (!props.actions.is_empty()).then_some(props.actions),
-            child_count: props.child_count,
-        }))
+        let subtree_truncated = self.registry.subtree_truncated(reference);
+        let (backend, registry) = self.ax_parts()?;
+        let observed = ax::observe(backend, registry, &handle)?;
+        Ok(Response::Node(ax::node_to_wire(reference.to_owned(), observed, subtree_truncated)))
     }
 
     pub(crate) fn ax_attributes(&mut self, reference: &str) -> CoreResult<Response> {
