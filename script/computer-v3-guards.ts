@@ -126,7 +126,17 @@ const changedPaths = (git: Git, ref: string): { readonly status: string; readonl
     return { status, path }
   })
 
-const readText = (cwd: string, path: string): string | undefined => (existsSync(join(cwd, path)) ? readFileSync(join(cwd, path), "utf8") : undefined)
+/** The text of an input file: undefined when it is absent, a finding when it exists but cannot be read (a directory, no permission). */
+function readInput(absolute: string, label: string): string | undefined {
+  if (!existsSync(absolute)) return undefined
+  try {
+    return readFileSync(absolute, "utf8")
+  } catch (error) {
+    throw new GuardInputError(`${label} cannot be read (${error instanceof Error ? error.message.split("\n")[0] : String(error)})`)
+  }
+}
+
+const readText = (cwd: string, path: string): string | undefined => readInput(join(cwd, path), path)
 
 // ---------------------------------------------------------------------------------------------------------
 // --residue, --no-legacy-edge, --copy, --old-frozen, --stubs
@@ -238,9 +248,10 @@ function unitFiles(scope: readonly string[]): string[] {
 
 function blockerEdits(planFile: string, row: string): Set<string> {
   const file = join(dirname(planFile), nameMap.scope.blockerEdits.replace("<row>", row))
-  if (!existsSync(file)) return new Set()
+  const content = readInput(file, `blocker-edits file ${file}`)
+  if (content === undefined) return new Set()
   const listed = new Set<string>()
-  readFileSync(file, "utf8").split("\n").forEach((line, index) => {
+  content.split("\n").forEach((line, index) => {
     if (line.trim().length === 0) return
     const [path, reason] = line.split("\t")
     if (!path || /\s/.test(path) || !reason?.trim()) throw new GuardInputError(`${posix.basename(file)} line ${index + 1} is malformed (expected <path><TAB><sentence>)`)
@@ -250,8 +261,9 @@ function blockerEdits(planFile: string, row: string): Set<string> {
 }
 
 function scope(git: Git, row: string, ref: string, planFile: string): string[] {
-  if (!existsSync(planFile)) throw new GuardInputError(`plan file ${planFile} does not exist`)
-  const lines = readFileSync(planFile, "utf8").split("\n")
+  const text = readInput(planFile, `plan file ${planFile}`)
+  if (text === undefined) throw new GuardInputError(`plan file ${planFile} does not exist`)
+  const lines = text.split("\n")
   const own = planRow(lines, row)
   const blockers = transitiveBlockers(lines, row)
   const listed = blockerEdits(planFile, row)
@@ -271,34 +283,45 @@ function scope(git: Git, row: string, ref: string, planFile: string): string[] {
 // ---------------------------------------------------------------------------------------------------------
 // --parity
 
-function tsvRows(cwd: string, path: string, columns: number, label: string): { readonly line: number; readonly cells: string[] }[] | string {
+type TsvRead = {
+  readonly missing: boolean
+  readonly problems: readonly string[]
+  /** Data rows from line 2 on; a row with the wrong column count has no cells. */
+  readonly rows: readonly { readonly line: number; readonly cells: string[] }[]
+}
+
+/** Reads a ledger whose line 1 must be exactly the header the name map lists; an empty file or another line 1 is a finding. */
+function tsvRows(cwd: string, path: string, columns: readonly string[], label: string): TsvRead {
   const content = readText(cwd, path)
-  if (content === undefined) return `${label}: ${path} is missing`
-  return content
-    .split("\n")
+  const header = `"${columns.join(", ")}" (tab-separated)`
+  if (content === undefined) return { missing: true, problems: [`${label}: ${path} is missing`], rows: [] }
+  if (content.trim().length === 0) return { missing: false, problems: [`${label}: ${path} is empty (expected the header ${header})`], rows: [] }
+  const lines = content.split("\n")
+  const problems = lines[0] === columns.join("\t") ? [] : [`${label}: ${path} line 1 is not the header ${header}`]
+  const rows = lines
     .map((text, index) => ({ line: index + 1, cells: text.split("\t") }))
     .slice(1)
     .filter(({ cells }) => cells.join("").trim().length > 0)
-    .map((row) => (row.cells.length === columns ? row : { line: row.line, cells: [] }))
+    .map((row) => (row.cells.length === columns.length ? row : { line: row.line, cells: [] }))
+  return { missing: false, problems, rows }
 }
 
 const PARITY_STATUS = /^(?:pending|ported:\S.*|superseded:AC-\d+|dropped:\S.*)$/
 
 function parity(cwd: string, final: boolean): string[] {
   const { manifest, manifestColumns, deferredLegs, deferredLegsColumns, finalGateRow } = nameMap.parity
-  const rows = tsvRows(cwd, manifest, manifestColumns.length, "parity")
-  if (typeof rows === "string") return [rows]
-  const findings: string[] = []
-  for (const { line, cells } of rows) {
+  const read = tsvRows(cwd, manifest, manifestColumns, "parity")
+  const findings: string[] = [...read.problems]
+  for (const { line, cells } of read.rows) {
     const [, , testId, status] = cells
     if (cells.length === 0) findings.push(`parity: ${manifest} line ${line} is malformed (expected ${manifestColumns.length} tab-separated columns)`)
     else if (!PARITY_STATUS.test(status)) findings.push(`parity: ${testId} has status "${status}" (line ${line})`)
     else if (final && status === "pending") findings.push(`parity: ${testId} is still pending (line ${line})`)
   }
   if (!final) return findings
-  const legs = tsvRows(cwd, deferredLegs, deferredLegsColumns.length, "parity")
-  if (typeof legs === "string") return [...findings, legs]
-  for (const { line, cells } of legs) {
+  const legs = tsvRows(cwd, deferredLegs, deferredLegsColumns, "parity")
+  findings.push(...legs.problems)
+  for (const { line, cells } of legs.rows) {
     const [designRow, , recordedBy, owedTo, status] = cells
     if (cells.length === 0 || !/^\d+$/.test(recordedBy) || !/^\d+$/.test(owedTo) || !/^(?:owed|passed:\S+)$/.test(status)) {
       findings.push(`parity: DEFERRED-LEGS line ${line} is malformed`)
@@ -382,11 +405,11 @@ function checkDelta(cells: readonly string[], imported: ReadonlyMap<string, Json
 
 function oracle(git: Git, cwd: string): string[] {
   const { provenance, provenanceColumns, deltas, deltasColumns, directories, newCasePrefix } = nameMap.oracle
-  const rows = tsvRows(cwd, provenance, provenanceColumns.length, "oracle")
-  if (typeof rows === "string") return [rows]
-  const findings: string[] = []
+  const read = tsvRows(cwd, provenance, provenanceColumns, "oracle")
+  if (read.missing) return [...read.problems]
+  const findings: string[] = [...read.problems]
   const imported = new Map<string, Json>()
-  for (const { line, cells } of rows) {
+  for (const { line, cells } of read.rows) {
     const [path, , , , expectedSha] = cells
     if (cells.length === 0 || !/^[0-9a-f]{64}$/.test(expectedSha)) {
       findings.push(`oracle: ${provenance} line ${line} is malformed`)
@@ -404,9 +427,9 @@ function oracle(git: Git, cwd: string): string[] {
   for (const file of listFiles(git, [...new Set([...directories, ...[...imported.keys()].map((path) => `${posix.dirname(path)}/`)])])) {
     if (!imported.has(file) && !posix.basename(file).startsWith(newCasePrefix)) findings.push(`oracle: ${file} is not in the provenance manifest and its name does not start with ${newCasePrefix}`)
   }
-  const deltaRows = tsvRows(cwd, deltas, deltasColumns.length, "oracle")
-  if (typeof deltaRows === "string") return [...findings, deltaRows]
-  for (const { line, cells } of deltaRows) {
+  const deltaRead = tsvRows(cwd, deltas, deltasColumns, "oracle")
+  findings.push(...deltaRead.problems)
+  for (const { line, cells } of deltaRead.rows) {
     const problem = cells.length === 0 ? `expected ${deltasColumns.length} tab-separated columns` : checkDelta(cells, imported)
     if (problem) findings.push(`oracle: ORACLE-DELTAS line ${line}: ${problem}`)
   }
