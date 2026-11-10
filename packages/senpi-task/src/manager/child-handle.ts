@@ -135,7 +135,7 @@ export function adaptRpcHandle(handle: RpcChildHandle): ManagedChildHandle {
     get pid() {
       return handle.pid
     },
-    ...(handle.reportedModel === undefined ? {} : { effectiveModel: () => handle.reportedModel }),
+    effectiveModel: () => handle.reportedModel,
     ...(handle.spawnSpec === undefined ? {} : { spawnSpec: handle.spawnSpec }),
     ...(isHostSessionHandle(handle)
       ? {

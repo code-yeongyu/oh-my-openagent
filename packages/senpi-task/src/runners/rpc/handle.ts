@@ -26,6 +26,7 @@ import { createInputDelivery } from "../input-delivery"
 import { createRpcRunPause } from "./native-run-pause"
 import { createTurnClaim } from "./turn-claim"
 import { createTaskParentControl } from "../task-parent-control"
+import { reportedEffectiveModel, type ModelIdentity } from "../pinned-model-equivalence"
 
 export type CreateRpcChildHandleOptions = {
   readonly inputStore?: import("../../store").TaskRecordStore
@@ -59,6 +60,8 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
   const exitWaiters: Array<(outcome: ChildExitOutcome) => void> = []
   let reachedIdle = false
   let sessionId: string | undefined
+  let model: ModelIdentity | undefined
+  let serviceTier: string | undefined
   let finalText: string | undefined
   let turnBaseline: string | undefined
   let turnOutcome: RunnerOutcome | undefined
@@ -106,6 +109,11 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
   let heartbeatActivity = (): void => {}
   client.onEvent((event) => {
     heartbeatActivity()
+    if (event.type === "model_changed") model = event.model
+    if (event.type === "service_tier_changed") serviceTier = event.tier
+    if ((event.type === "message_start" || event.type === "message_end") && event.message.role === "assistant") {
+      model = { provider: event.message.provider, id: event.message.model }
+    }
     // A run the child starts on its own after its turn settled (a monitor or background job woke it)
     // is a new turn: the next outcome is that run's, never the settled one again (omo#9069).
     if (event.type === "agent_start" && turnOutcome !== undefined && outcome === undefined) {
@@ -143,6 +151,10 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     onState: (response) => {
       lastSeenAt = now()
       sessionId = readSessionId(response) ?? sessionId
+      if (response.command === "get_state" && response.success) {
+        model = response.data.model
+        serviceTier = response.data.serviceTier
+      }
     },
     onFailure: (error) => {
       if (!isHarmlessRpcShutdownError(error)) log("senpi-task heartbeat get_state failed", { taskId, error: String(error) })
@@ -227,6 +239,9 @@ export function createRpcChildHandle(options: CreateRpcChildHandleOptions): Trac
     runPause,
     get sessionId() {
       return sessionId
+    },
+    get reportedModel() {
+      return reportedEffectiveModel(model, serviceTier)
     },
     get pid() {
       return child.pid ?? undefined
