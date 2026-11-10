@@ -47,7 +47,7 @@ function component(agentDir: string) {
 const ASK = [{ permission: "thread_send", patterns: ["*"], always: ["*"] }]
 const SENDER = "0195f0c2-1a2b-7c3d-8e4f-a1b2c3d4e5f6"
 const OTHER = "0195f0c2-1a2b-7c3d-8e4f-0f0e0d0c0b0a"
-const REPLY = [{ permission: "thread_send", patterns: [SENDER], always: [SENDER], autoApproveAsk: true }]
+const REPLY = [{ permission: "thread_send", patterns: [SENDER], always: [SENDER], autoApproveAsk: true as const }]
 const delivery = (sender: Record<string, unknown>) => ({
   message: {
     role: "custom", customType: "session_control_delivery",
