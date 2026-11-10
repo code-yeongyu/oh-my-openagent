@@ -58,7 +58,9 @@ import {
   summary,
   targetSession,
   type AnyTool,
-  type ToolOutput, resolveAcross } from "./tools/internals"
+  type ToolOutput,
+  resolveAcross,
+} from "./tools/internals"
 
 /** How many keys a tool surface keeps for recovering receipts whose admission reply was lost. */
 export const RECEIPT_RECOVERY_MAX_KEYS = 4_096

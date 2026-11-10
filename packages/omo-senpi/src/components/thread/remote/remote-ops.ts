@@ -49,7 +49,8 @@ export type RemoteTarget =
  */
 export async function holderTarget(remote: RemoteThreadSurface, holder: AliasHolder, here: string | null, rows: readonly RemoteSessionRow[]): Promise<RemoteTarget | Failure> {
   if (holder.device === here) return { where: "here", session_id: holder.session_id }
-  const listed = rows.find((row) => row.device === holder.device && row.session_id === holder.session_id)
+  // A holder is recorded by its durable id (claimed on its own device) or by its listing key: match either.
+  const listed = rows.find((row) => row.device === holder.device && (row.durable_id === holder.session_id || row.session_id === holder.session_id))
   if (listed !== undefined) return { where: "remote", row: listed }
   const device = (await remote.sessions.devices()).find((candidate) => candidate.device === holder.device)
   if (device !== undefined && !device.online) return fail("device_offline", `Device ${holder.device} holding this thread is offline.`, "Retry when that device is online; nothing was queued.", { device: holder.device, thread_id: holder.session_id })
