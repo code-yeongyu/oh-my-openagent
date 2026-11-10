@@ -125,8 +125,10 @@ export type ThreadHandoffResult =
       readonly thread: ThreadResultSummary
       readonly resolved_by: ThreadAddressResolution
       readonly delivery: ThreadDelivery
-      readonly message_seq: number
+      /** The gateway row's sequence; absent for a session on another device, which has no row here. */
+      readonly message_seq?: number
       readonly deduplicated: boolean
+      readonly device?: string
     } & ThreadGatewayDeliveryFacts)
   | ThreadDataError
 

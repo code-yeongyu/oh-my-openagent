@@ -48,12 +48,37 @@ const ASK = [{ permission: "thread_send", patterns: ["*"], always: ["*"] }]
 const SENDER = "0195f0c2-1a2b-7c3d-8e4f-a1b2c3d4e5f6"
 const OTHER = "0195f0c2-1a2b-7c3d-8e4f-0f0e0d0c0b0a"
 const REPLY = [{ permission: "thread_send", patterns: [SENDER], always: [SENDER], autoApproveAsk: true as const }]
-const delivery = (sender: Record<string, unknown>) => ({
+const approved = (address: string) => [{ permission: "thread_send", patterns: [address], always: [address], autoApproveAsk: true as const }]
+/**
+ * The two legs a consumed delivery can arrive on (#13006): from a session on this device (the drain admits it in-process,
+ * no origin stamp) or from another device (the engine stamps `remote_origin` on the entry, senpi#6233). The sender it
+ * names is the same shape on both (`gateway/provenance.ts` `deliverySender` here, `relay-transport.ts` there).
+ */
+type Leg = "local" | "remote"
+const LEGS: readonly Leg[] = ["local", "remote"]
+const delivery = (sender: Record<string, unknown>, leg: Leg = "remote") => ({
   message: {
     role: "custom", customType: "session_control_delivery",
-    details: { delivery_id: "device:b/d-1", remote_origin: { deviceId: "b" }, sender },
+    details: { delivery_id: leg === "remote" ? "device:b/d-1" : "d-1", ...(leg === "remote" ? { remote_origin: { deviceId: "b" } } : {}), sender },
   },
 })
+
+/** Every address's decision after one consumed delivery from SENDER named "Planner Bot", then after the run settles. */
+async function replyDecisions(leg: Leg): Promise<Record<string, unknown>> {
+  const agentDir = mkdtempSync(join(tmpdir(), `thr-peer-reply-${leg}-`))
+  const { store, dispatch, requests } = component(agentDir)
+  try {
+    const before = requests(SENDER)
+    await dispatch("agent_start")
+    await dispatch("message_start", delivery({ kind: "agent", session_id: SENDER, name: "Planner Bot" }, leg))
+    const decided = { before_any_delivery: before, sender_id: requests(SENDER), sender_name: requests("Planner Bot"), sender_name_respelled: requests("  planner bot "), other_id: requests(OTHER), other_name: requests("reviewer") }
+    await dispatch("agent_settled")
+    return { ...decided, after_settle: requests(SENDER) }
+  } finally {
+    await store.dispose()
+    rmSync(agentDir, { recursive: true, force: true })
+  }
+}
 
 describe("#12886 a peer-delivered run replies to its sender", () => {
   test("#given a run woken by an agent's delivery #when it sends back to that agent's session id #then the request is scoped to it with the ask auto-approved, and any other target or spelling still asks", async () => {
@@ -67,26 +92,28 @@ describe("#12886 a peer-delivered run replies to its sender", () => {
       expect(requests(OTHER)).toEqual(ASK)
       // Decision 0027 section 6: the stated sender of a consumed delivery is a reply target by id or name, whatever its spelling class.
       await dispatch("message_start", delivery({ kind: "agent", session_id: "planner", name: "planner" }))
-      expect(requests("planner")).toEqual([{ permission: "thread_send", patterns: ["planner"], always: ["planner"], autoApproveAsk: true }])
+      expect(requests("planner")).toEqual(approved("planner"))
     } finally {
       await store.dispose()
       rmSync(agentDir, { recursive: true, force: true })
     }
   })
 
-  test("decision 0027: #given a run woken by an agent's delivery that states the sender's name #when it sends back by that NAME (any spelling the resolver accepts) #then the ask is auto-approved from the delivery alone; an unrelated name still asks", async () => {
-    const agentDir = mkdtempSync(join(tmpdir(), "thr-peer-reply-name-"))
-    const { store, dispatch, requests } = component(agentDir)
-    try {
-      await dispatch("agent_start")
-      await dispatch("message_start", delivery({ kind: "agent", session_id: SENDER, name: "Planner Bot" }))
-      expect(requests("Planner Bot")).toEqual([{ permission: "thread_send", patterns: ["Planner Bot"], always: ["Planner Bot"], autoApproveAsk: true }])
-      expect(requests("  planner bot ")).toEqual([{ permission: "thread_send", patterns: ["  planner bot "], always: ["  planner bot "], autoApproveAsk: true }])
-      expect(requests("reviewer")).toEqual(ASK)
-    } finally {
-      await store.dispose()
-      rmSync(agentDir, { recursive: true, force: true })
-    }
+  // #13006 acceptance 3: the decision is computed from the sender's identity; the leg the delivery took is not an input.
+  test.each(LEGS)("decision 0027: #given a run woken by a %s delivery that states the sender's name #when it sends back by that id or NAME (any spelling the resolver accepts) #then the ask is auto-approved from the delivery alone, an unrelated target still asks, and the allowance ends with the run", async (leg) => {
+    expect(await replyDecisions(leg)).toEqual({
+      before_any_delivery: ASK,
+      sender_id: approved(SENDER),
+      sender_name: approved("Planner Bot"),
+      sender_name_respelled: approved("  planner bot "),
+      other_id: ASK,
+      other_name: ASK,
+      after_settle: ASK,
+    })
+  })
+
+  test("#13006: #given the same delivery once from this device and once from device b #when every decision is compared #then the two legs are equal, key by key", async () => {
+    expect(await replyDecisions("remote")).toEqual(await replyDecisions("local"))
   })
 
   test("#given a delivery whose sender is not an agent #when the run sends anywhere #then it still asks", async () => {
@@ -95,21 +122,6 @@ describe("#12886 a peer-delivered run replies to its sender", () => {
     try {
       await dispatch("agent_start")
       await dispatch("message_start", delivery({ kind: "external", platform: "slack" }))
-      expect(requests(SENDER)).toEqual(ASK)
-    } finally {
-      await store.dispose()
-      rmSync(agentDir, { recursive: true, force: true })
-    }
-  })
-
-  test("#given a run that replied to its sender #when the run settles #then a later send to that sender asks again", async () => {
-    const agentDir = mkdtempSync(join(tmpdir(), "thr-peer-reply-"))
-    const { store, dispatch, requests } = component(agentDir)
-    try {
-      await dispatch("agent_start")
-      await dispatch("message_start", delivery({ kind: "agent", session_id: SENDER, name: "A" }))
-      expect(requests(SENDER)).toEqual(REPLY)
-      await dispatch("agent_settled")
       expect(requests(SENDER)).toEqual(ASK)
     } finally {
       await store.dispose()
