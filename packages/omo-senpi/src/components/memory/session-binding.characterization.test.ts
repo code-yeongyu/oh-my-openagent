@@ -3,7 +3,7 @@
 // the session's own cwd and a repeated session_start shape that bind. They pin the behaviour as it
 // is; they do not propose changes.
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync } from "node:fs"
+import { mkdirSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -141,6 +141,8 @@ describe("X8c memory binding at session_start (characterization)", () => {
     }).register(pi, ctx)
     started.push({ pi, ctx })
     const sessionIdentity = resolveMemoryIdentity("session-agent", sessionCwd, env)
+    // The store exists (a bind records identity.json only for a store already on disk; binding itself stays write-free).
+    mkdirSync(sessionIdentity.paths.root, { recursive: true })
 
     // when
     await pi.dispatch("session_start", {}, sessionContext({ cwd: sessionCwd }))
@@ -188,6 +190,7 @@ describe("X8c memory binding at session_start (characterization)", () => {
     const sessionCwd = join(tempDir("omo-x8c-ws-"), "project")
     const env = { OMO_MEMORY_HOME: join(tempDir("omo-x8c-home-"), "memory") }
     const recorded = resolveMemoryIdentity("auto", sessionCwd, env)
+    mkdirSync(recorded.paths.root, { recursive: true })
     await recordIdentityBind(recorded.paths.root, { id: recorded.id, kind: "explicit", mode: "path", source: "/original", spelling: "/original" }, 10)
     const pi = new MemoryFakeExtensionAPI()
     const ctx = componentContext()

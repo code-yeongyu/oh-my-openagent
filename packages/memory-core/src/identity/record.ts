@@ -5,7 +5,7 @@
 
 import { join } from "node:path"
 
-import { mkdir, readFile } from "../fs/resilient"
+import { mkdir, readFile, stat } from "../fs/resilient"
 import { createLockRecord, withLock } from "../locks"
 import { writeJsonAtomic } from "../reflection/reservation-files"
 import type { AutoIdentityMode } from "./resolve"
@@ -63,8 +63,18 @@ async function withRecordLock<T>(identityRoot: string, operation: () => Promise<
   return withLock(join(identityRoot, RECORD_LOCK_FILENAME), await createLockRecord("identity record"), operation, { waitTimeoutMs: RECORD_LOCK_WAIT_MS })
 }
 
-export function recordIdentityBind(identityRoot: string, bind: IdentityBind, now: number): Promise<IdentityRecord> {
+/**
+ * A bind is recorded only for an identity whose directory already exists: binding stays write-free, so a
+ * session that never writes memory never creates the memory home. The store's first bind after it exists
+ * records the spellings `/memory-merge` needs.
+ */
+export async function recordIdentityBind(identityRoot: string, bind: IdentityBind, now: number): Promise<IdentityRecord | undefined> {
+  if (!(await isDirectory(identityRoot))) return undefined
   return withRecordLock(identityRoot, () => writeIdentityBind(identityRoot, bind, now))
+}
+
+async function isDirectory(path: string): Promise<boolean> {
+  return (await stat(path).catch(() => undefined))?.isDirectory() === true
 }
 
 async function writeIdentityBind(identityRoot: string, bind: IdentityBind, now: number): Promise<IdentityRecord> {

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
+import { existsSync } from "node:fs"
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -14,7 +15,9 @@ afterEach(async () => {
 async function identityRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "omo-identity-record-"))
   roots.push(root)
-  return join(root, "agents", "project-1234abcd")
+  const identity = join(root, "agents", "project-1234abcd")
+  await mkdir(identity, { recursive: true })
+  return identity
 }
 
 describe("identity record (#10070)", () => {
@@ -74,6 +77,18 @@ describe("identity record (#10070)", () => {
     const record = await readIdentityRecord(root)
     expect([...(record?.spellings ?? [])].sort()).toEqual([...spellings].sort())
     expect(record).toMatchObject({ mergedInto: "project-target", mergedHead: "abc123" })
+  })
+
+  test("#given an identity whose store does not exist yet #when a bind is recorded #then nothing is written and no directory is created (bind stays write-free, #12974 train-3)", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "omo-identity-record-"))
+    roots.push(parent)
+    const memoryHome = join(parent, "memory")
+    const root = join(memoryHome, "agents", "project-1234abcd")
+
+    const record = await recordIdentityBind(root, { id: "project-1234abcd", kind: "auto", mode: "git", source: "/w/p", spelling: "/w/p" }, 1)
+
+    expect(record).toBeUndefined()
+    expect(existsSync(memoryHome)).toBe(false)
   })
 
   test("#given no record #when it is read #then the answer is undefined", async () => {

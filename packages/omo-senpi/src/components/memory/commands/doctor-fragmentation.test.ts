@@ -17,6 +17,8 @@ describe("doctor memory fragmentation (#10070)", () => {
     const root = await mkdtemp(join(tmpdir(), "omo-doctor-frag-"))
     roots.push(root)
     const target = buildIdentityPaths(root, "project-aaaa1111")
+    await mkdir(buildIdentityPaths(root, "thread-1-bbbb2222").root, { recursive: true })
+    await mkdir(buildIdentityPaths(root, "thread-2-cccc3333").root, { recursive: true })
     await recordIdentityBind(buildIdentityPaths(root, "thread-1-bbbb2222").root, { id: "thread-1-bbbb2222", kind: "auto", mode: "path", source: "/w/thread-1", spelling: "/w/thread-1" }, 1)
     await recordIdentityBind(buildIdentityPaths(root, "thread-2-cccc3333").root, { id: "thread-2-cccc3333", kind: "auto", mode: "path", source: "/w/thread-2", spelling: "/w/thread-2" }, 1)
     await markIdentityMerged(buildIdentityPaths(root, "thread-2-cccc3333").root, "thread-2-cccc3333", "project-aaaa1111", "abc", 2)
