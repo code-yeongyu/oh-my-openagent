@@ -79,7 +79,9 @@ export async function runPreemptiveCompactionIfNeeded(args: {
     return
   }
 
-  const totalInputTokens = (cached.tokens.input ?? 0) + (cached.tokens.cache?.read ?? 0)
+  // A cold-cache turn reports most of its prompt as cache.write; it occupies the window like any input.
+  const totalInputTokens =
+    (cached.tokens.input ?? 0) + (cached.tokens.cache?.read ?? 0) + (cached.tokens.cache?.write ?? 0)
   const usageRatio = totalInputTokens / actualLimit
   if (usageRatio < PREEMPTIVE_COMPACTION_THRESHOLD || !cached.modelID) return
 
