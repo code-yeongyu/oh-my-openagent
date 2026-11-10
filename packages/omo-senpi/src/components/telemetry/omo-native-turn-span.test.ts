@@ -245,12 +245,12 @@ describe("omo.turn span per assistant turn", () => {
 
   test("#given a turn on a model the collector pin does not list #then the span's model attributes leave as custom", async () => {
     await withTempAgentDir(async (agentDir) => {
-      // given: claude-fable-5-5 is in the client vocabulary but not in the pinned enum (required on the span)
+      // given: claude-fable-5-2 is in the client vocabulary but not in the pinned enum (required on the span)
       const collector = await otlpCollector()
       const { pi, ctx } = await openSession(agentDir, collector.factory, "main-unpinned")
-      const unpinnedCtx = { ...ctx, model: { provider: "anthropic", id: "claude-fable-5-5" } }
+      const unpinnedCtx = { ...ctx, model: { provider: "anthropic", id: "claude-fable-5-2" } }
       const end = turnEnd(0)
-      const message = { ...(end.message as Record<string, unknown>), provider: "anthropic", model: "claude-fable-5-5" }
+      const message = { ...(end.message as Record<string, unknown>), provider: "anthropic", model: "claude-fable-5-2" }
 
       // when
       await pi.dispatch("turn_start", turnStart(0), unpinnedCtx)

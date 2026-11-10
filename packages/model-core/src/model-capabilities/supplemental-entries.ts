@@ -1,8 +1,6 @@
 import type { ModelCapabilitiesSnapshotEntry } from "./types"
-import { FABLE_55_LAUNCH } from "../fable-55-launch"
 
 export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSnapshotEntry> = {
-	[FABLE_55_LAUNCH.id]: FABLE_55_LAUNCH,
 	"kimi-k3": {
 		id: "kimi-k3",
 		family: "kimi",
@@ -67,6 +65,24 @@ export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSn
 	},
 	"claude-fable-5-1": {
 		id: "claude-fable-5-1",
+		family: "claude-fable",
+		reasoning: true,
+		temperature: false,
+		toolCall: true,
+		modalities: {
+			input: ["text", "image", "pdf"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1000000,
+			output: 128000,
+		},
+	},
+	// Claude Fable 5.2 (Anthropic launch listing, 2026-11-09): 1M context (default and max), 128k
+	// output, adaptive thinking always on, text/image/pdf input like 5.1. Prices come from the
+	// adopted senpi catalog, not from this row.
+	"claude-fable-5-2": {
+		id: "claude-fable-5-2",
 		family: "claude-fable",
 		reasoning: true,
 		temperature: false,

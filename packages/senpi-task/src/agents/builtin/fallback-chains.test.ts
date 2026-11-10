@@ -1,10 +1,8 @@
 import { describe, expect, test } from "bun:test"
 
 import { AGENT_FALLBACK_CHAINS } from "./fallback-chains"
-import { FABLE_55_RELEASED } from "@oh-my-opencode/model-core"
 
-// Coupling guard: this test file must NEVER import chain data from @oh-my-opencode/model-core. The one
-// allowed import is the FABLE_55_RELEASED launch switch, which gates the literal provisional 5.5 rows.
+// Coupling guard: this test file must NEVER import chain data from @oh-my-opencode/model-core.
 // The chains are a hand transcription; the pins below catch transcription drift.
 
 describe("AGENT_FALLBACK_CHAINS", () => {
@@ -27,7 +25,7 @@ describe("AGENT_FALLBACK_CHAINS", () => {
         { providers: ["opencode-go"], model: "minimax-m2.7" }
       ],
       "plan-consultant": [
-        ...(FABLE_55_RELEASED ? [{ providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"], model: "claude-fable-5-5", variant: "max" }] : []),
+        { providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"], model: "claude-fable-5-2", variant: "max" },
         { providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"], model: "claude-fable-5-1", variant: "max" },
         { providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"], model: "claude-opus-5-5", variant: "max" },
         { providers: ["opencode-go", "kimi-for-coding", "moonshotai"], model: "kimi-k3.1-pro", variant: "max" },
