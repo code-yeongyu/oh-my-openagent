@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { GATEWAY_PROVENANCE_SENTENCE } from "./gateway/constants"
+import { GATEWAY_PEER_REPLY_SENTENCE, GATEWAY_PROVENANCE_SENTENCE } from "./gateway/constants"
 import { deliveryProvenanceLine, renderDeliveryText } from "./gateway/provenance"
 import { UNKNOWN_CALLER } from "./tools"
 import { ENGINE, comparable, createRemoteThreadFixture } from "./thread-remote-fixture"
@@ -50,7 +50,8 @@ describe("#12882: a send to another device is one admit_external_message, admitt
     expect(remote).toContain(" requested=auto effective=follow_up ")
     expect(remote).not.toContain("device")
     expect(remote.split("\n")).toHaveLength(3)
-    expect(remote.split("\n")[1]).toBe(GATEWAY_PROVENANCE_SENTENCE)
+    // A peer delivery's sentence line is the provenance sentence followed by how to answer (a thread_send to the sender).
+    expect(remote.split("\n")[1]).toBe(`${GATEWAY_PROVENANCE_SENTENCE} ${GATEWAY_PEER_REPLY_SENTENCE}`)
     expect(record["deliveryId"]).toBe(remote.match(/delivery=(\S+)/)?.[1])
   })
 

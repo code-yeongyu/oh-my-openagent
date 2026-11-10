@@ -1,4 +1,4 @@
-import { GATEWAY_PROVENANCE_SENTENCE } from "./constants"
+import { GATEWAY_PEER_REPLY_SENTENCE, GATEWAY_PROVENANCE_SENTENCE } from "./constants"
 import type { DeliverySender } from "./adapter"
 import type { DeliveryRow, Provenance } from "./types"
 
@@ -70,5 +70,8 @@ export function renderDeliveryText(row: RenderedDelivery): string {
   ].join(" ")
   // One header line, workspace and project first: readers split the text as header, sentence, body. Every label is
   // quoted with its brackets escaped, so the line still ends at the header's own `]`.
-  return `${deliveryProvenanceLine(envelope.provenance)} [${header}]\n${GATEWAY_PROVENANCE_SENTENCE}\n${JSON.stringify(row.body)}`
+  // A peer delivery's sentence also says how to answer (the receiver's own turn never reaches the sender, only a
+  // thread_send does); it stays ONE line, so readers still split the text as header, sentence, body.
+  const sentences = source === "peer_agent" ? `${GATEWAY_PROVENANCE_SENTENCE} ${GATEWAY_PEER_REPLY_SENTENCE}` : GATEWAY_PROVENANCE_SENTENCE
+  return `${deliveryProvenanceLine(envelope.provenance)} [${header}]\n${sentences}\n${JSON.stringify(row.body)}`
 }

@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
 
 import { renderDeliveryText } from "./provenance"
 import type { DeliveryRow, EnvelopeOrigin } from "./types"
@@ -77,4 +77,30 @@ test("#given only required provenance labels #when rendering #then optional segm
   const row = delivery()
   expect(renderDeliveryText({ ...row, envelope: { ...row.envelope, provenance: { workspace: "Example", project: "project" } } }).split("\n")[0])
     .toStartWith("From Example / project [OMO_GATEWAY v=1 ")
+})
+
+describe("the delivery text tells a peer's receiver how to answer", () => {
+  const envelope = (origin: Parameters<typeof renderDeliveryText>[0]["envelope"]["origin"]) => ({
+    provenance: { workspace: "w", project: "p" }, origin, actor: "actor", via: ["node"], root_id: "root-1", hop: 1, delivery_id: "d-1",
+  })
+  const row = (origin: Parameters<typeof renderDeliveryText>[0]["envelope"]["origin"]) => ({
+    delivery_id: "d-1", envelope: envelope(origin), body: "hi", mode_requested: "auto" as const, mode_effective: "follow_up" as const, binding_id: null, binding_revision: null,
+  })
+  test("#given a delivery from another session #when rendered #then it names thread_send to the sender_session as the only way back", () => {
+    const text = renderDeliveryText(row({ session: "dur-sender", name: "planner" } as never))
+    const lines = text.split("\n")
+    expect(lines).toHaveLength(3)
+    expect(lines[0]).toContain(" sender_session=dur-sender ")
+    expect(lines[1]).toMatch(/thread_send/)
+    expect(lines[1]).toMatch(/sender_session/)
+    expect(lines[2]).toBe(JSON.stringify("hi"))
+  })
+  test("#given a delivery from an external connector #when rendered #then no peer reply route is claimed (the connector answers through the binding)", () => {
+    const text = renderDeliveryText(row({ platform: "custom", account_id: "a", chat_id: "c", thread_id: "@c", message_id: "m" } as never))
+    const lines = text.split("\n")
+    expect(lines).toHaveLength(3)
+    expect(lines[0]).toContain(" sender_session=- ")
+    expect(lines[1]).not.toMatch(/thread_send/)
+    expect(lines[2]).toBe(JSON.stringify("hi"))
+  })
 })
