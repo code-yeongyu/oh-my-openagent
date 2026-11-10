@@ -1,3 +1,4 @@
+import { outcomeOf } from "./outcome"
 import { connectDeviceService, LocalApiError, type CommandResult, type DeviceService, type RemoteAttach } from "@oh-my-opencode/device-service-core"
 import type { JsonObject, RemoteCommandOutcome, RemoteSessionsPort } from "./ports"
 
@@ -81,27 +82,18 @@ type Session = { readonly attached: RemoteAttach; readonly catalog: ReturnType<t
 
 const recordKey = (record: WireRpc): string => JSON.stringify(Object.entries(record).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
 
-function outcomeOf(result: CommandResult): RemoteCommandOutcome {
-  const { outcome } = result
-  if (outcome.state === "engine_refused") return { kind: "refused", reason: outcome.reason }
-  if (outcome.state === "uncertain") return { kind: "uncertain", reason: outcome.reason }
-  if (outcome.state === "engine_stale") return { kind: "uncertain", reason: "engine_stale" }
-  const response = result.response ?? {}
-  // The engine ran the command and answered it failed (senpi's `{success: false, error, errorCode}` envelope): a typed
-  // refusal, so no caller reads `data` from a failed reply.
-  if (response["success"] === false) {
-    const code = response["errorCode"]
-    const error = response["error"]
-    return { kind: "refused", reason: typeof code === "string" && code.length > 0 ? code : typeof error === "string" && error.length > 0 ? error : "engine_failed" }
-  }
-  return result.located === undefined ? { kind: "ok", response } : { kind: "ok", response, located: result.located.key }
-}
 
 /**
  * The account half of the thread tools over this device's device service: one proven connection, rebuilt after it
  * closes or fails, and one attach per remote session, kept across ops and dropped when it ends (the next op attaches
  * again), with the session's model catalog held on it: a command costs one round trip, and a held catalog none.
  */
+// The listing's optional durable_id (device-service-core #12996); a daemon or core that predates it lists none.
+function durableIdOf(row: object): { readonly durable_id?: string } {
+  const value = Reflect.get(row, "durable_id")
+  return typeof value === "string" && value !== "" ? { durable_id: value } : {}
+}
+
 export function createDeviceServiceSessions(options: DeviceServiceSessionsOptions): RemoteSessionsPort {
   let service: Promise<DeviceService> | undefined
   const attaches = new Map<string, Promise<Session>>()
@@ -132,7 +124,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     status: async () => ({ state: (await (await svc()).status()).state }),
     thisDevice: async () => (await (await svc()).thisDevice())?.id ?? null,
     devices: async () => (await (await svc()).devices()).map((row) => ({ device: row.device, label: row.label, online: row.online })),
-    sessions: async () => (await (await svc()).sessions()).rows.map((row) => ({ device: row.device, session_id: row.session_id, title: row.title, project: row.project, path: row.path, state: row.state, updated_ms: row.updated_ms })),
+    sessions: async () => (await (await svc()).sessions()).rows.map((row) => ({ device: row.device, session_id: row.session_id, ...durableIdOf(row), title: row.title, project: row.project, path: row.path, state: row.state, updated_ms: row.updated_ms })),
     // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
     // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
     endpointCommand: async (device, rpc, endpointOptions) => {

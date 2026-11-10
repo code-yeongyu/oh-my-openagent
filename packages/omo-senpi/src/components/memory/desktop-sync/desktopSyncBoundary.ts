@@ -1,7 +1,6 @@
 import { readFile } from "@oh-my-opencode/memory-core/fs"
-import { homedir } from "node:os"
 import { z } from "zod"
-import { credentialLockPaths, withCredentialLock } from "@oh-my-opencode/omo-opencode/service-auth"
+import { accountHome, credentialLockPaths, withCredentialLock } from "@oh-my-opencode/omo-opencode/service-auth"
 import type { DesktopSyncDescriptor } from "@oh-my-opencode/memory-core/sync-engine"
 import { DesktopSyncRefused } from "./desktopSyncProtocol"
 
@@ -17,7 +16,7 @@ const DesktopGenerationRecord = z.strictObject({
 })
 
 /** Re-read main's durable record; only an active record naming the captured identity, generation and incarnation passes. */
-async function desktopRecordIsCurrent(descriptor: DesktopSyncDescriptor, home = homedir()): Promise<boolean> {
+async function desktopRecordIsCurrent(descriptor: DesktopSyncDescriptor, home = accountHome()): Promise<boolean> {
   let raw: string
   try {
     raw = await readFile(credentialLockPaths(descriptor.serviceOrigin, home).desktopRecord, "utf8")
@@ -42,7 +41,7 @@ async function desktopRecordIsCurrent(descriptor: DesktopSyncDescriptor, home = 
  * The desktop account's pin boundary (account-transport-api v7 section 1): main's credential writers hold the same
  * per-origin lock, so the record cannot change between this read and the synchronous dispatch.
  */
-export function desktopSyncBoundary(descriptor: DesktopSyncDescriptor, lifetime: AbortSignal, home = homedir()) {
+export function desktopSyncBoundary(descriptor: DesktopSyncDescriptor, lifetime: AbortSignal, home = accountHome()) {
   return <T>(dispatch: () => T): Promise<T> => withCredentialLock(descriptor.serviceOrigin, async () => {
     if (lifetime.aborted || !await desktopRecordIsCurrent(descriptor, home) || lifetime.aborted) throw new DesktopSyncRefused()
     return { value: dispatch() }

@@ -25,6 +25,7 @@ import {
   ONBOARDING_UNDERSTAND_STOP_RPC_METHOD,
   type OnboardingUnderstandEvent,
 } from "./understand-contract"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const EVENT_TIMEOUT_MS = 20_000
 const cleanups: Array<() => Promise<void>> = []
@@ -37,7 +38,7 @@ type Handler = (data: unknown) => unknown
 async function within<T>(label: string, pending: Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const expired = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`waited ${EVENT_TIMEOUT_MS}ms for ${label}, never happened`)), EVENT_TIMEOUT_MS)
+    timer = setTimeout(() => reject(new Error(`waited out the test budget for ${label}, never happened`)), remainingTestTime())
   })
   try {
     return await Promise.race([pending, expired])
@@ -112,12 +113,12 @@ function host(input: {
   if (input.withRegistry !== false) for (const handler of sessionHandlers) handler({}, { modelRegistry: registrySnapshot() })
 
   const until = async (label: string, ready: () => boolean): Promise<void> => {
-    const deadline = Date.now() + EVENT_TIMEOUT_MS
+    const deadline = Date.now() + remainingTestTime()
     while (!ready()) {
-      if (Date.now() > deadline) throw new Error(`waited ${EVENT_TIMEOUT_MS}ms for ${label}, never fired`)
+      if (Date.now() > deadline) throw new Error(`waited out the test budget for ${label}, never fired`)
       await new Promise<void>((resolve) => {
         waiters.push(resolve)
-        setTimeout(resolve, EVENT_TIMEOUT_MS).unref?.()
+        setTimeout(resolve, Math.min(EVENT_TIMEOUT_MS, Math.max(0, deadline - Date.now()))).unref?.()
       })
     }
   }

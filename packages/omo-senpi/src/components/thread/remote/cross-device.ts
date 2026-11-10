@@ -1,9 +1,10 @@
 import { AMBIGUOUS_CANDIDATE_LIMIT, normalizeThreadName, type ThreadCandidate } from "../addressing"
 import type { ThreadStatus, ThreadToolResult } from "../contracts"
+import { createRelaySessionHost, listedThread } from "../control/relay-session-host"
+import type { HostedThread, SessionHost, SessionOpenRequest } from "../control/session-host"
 import { threadToolFailure } from "../errors"
-import { threadLink } from "../thread-link"
-import type { AliasRegistry, RemoteSessionRow, RemoteThreadSurface } from "./ports"
-import { aliasFailure, deviceOnline, locateAcross, openRemote, remoteAvailable } from "./remote-ops"
+import { rowThreadId, type AliasRegistry, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import { aliasFailure, deviceOnline, remoteAvailable } from "./remote-ops"
 
 type LocalEntry = { readonly thread_id: string; readonly name?: string; readonly cwd?: string; readonly preview?: string; readonly updated_at?: string | null; readonly status?: ThreadStatus }
 type LocalResolution =
@@ -15,56 +16,6 @@ export type CrossTarget =
   | { readonly kind: "local"; readonly address: string; readonly accountWide?: true }
   | { readonly kind: "remote"; readonly row: RemoteSessionRow }
   | { readonly kind: "error"; readonly result: ThreadToolResult }
-
-/**
- * Frozen order (alias port v1): 1 an exact session id (this device, then the account list), 2 an alias,
- * 3 the name ladder: this device's names and the titles of the account's other devices' live sessions, judged together
- * (#12833), so one match anywhere resolves and two or more are ambiguous_target naming each device. Without a remote
- * surface the tools resolve exactly as before.
- */
-export async function crossTarget(remote: RemoteThreadSurface | undefined, address: string, local: LocalResolution): Promise<CrossTarget> {
-  if (remote === undefined || address === "self") return { kind: "local", address }
-  if (local.kind === "ok" && local.entry.thread_id === address) return { kind: "local", address }
-  const unavailable = await remoteAvailable(remote)
-  if (unavailable !== undefined) return local.kind === "ok" || unavailable.error.code !== "relay_requires_paid_plan" ? { kind: "local", address } : { kind: "error", result: unavailable }
-  let across: Awaited<ReturnType<typeof locateAcross>>
-  try {
-    across = await locateAcross(remote, address)
-  } catch {
-    return { kind: "local", address }
-  }
-  if ("error" in across) return local.kind === "ok" ? { kind: "local", address } : { kind: "error", result: across }
-  if (across.where === "remote") return { kind: "remote", row: across.row }
-  if (across.where === "here") return { kind: "local", address: across.session_id, accountWide: true }
-  return byTitle(across.rows, across.here, address, local)
-}
-
-// The local ladder's answers that leave room for a title on another device: nothing here by that name, several here,
-// or no workspace to scope it by. Any other answer (an id hit out of scope, an invalid address) stays local.
-const NAME_OPEN: ReadonlySet<string> = new Set(["not_found", "ambiguous_target", "caller_context_missing"])
-
-function byTitle(rows: readonly RemoteSessionRow[], here: string | null, address: string, local: LocalResolution): CrossTarget {
-  if (local.kind === "error" && !NAME_OPEN.has(local.code)) return { kind: "local", address }
-  const wanted = normalizeThreadName(address)
-  // A device's ended sessions are reached by id only: a name addresses a live agent, and old runs reuse names.
-  const remote = rows.filter((row) => row.device !== here && row.state !== "ended" && normalizeThreadName(row.title) === wanted)
-  if (remote.length === 0) return { kind: "local", address }
-  const localMatches: readonly ThreadCandidate[] = local.kind === "ok"
-    ? [{ id: local.entry.thread_id, name: local.entry.name ?? address, cwd: local.entry.cwd ?? "", preview: local.entry.preview ?? "", updatedAt: local.entry.updated_at ?? null, state: local.entry.status ?? "live" }]
-    : local.code === "ambiguous_target" ? (local.candidates ?? []) : []
-  if (remote.length === 1 && localMatches.length === 0 && !(local.kind === "error" && local.code === "ambiguous_target")) return { kind: "remote", row: remote[0] }
-  // One bounded list that always shows both sides: this device keeps at least half the slots it can fill, the other
-  // devices take the rest (the local list already arrives capped at the same limit).
-  const localShown = localMatches.slice(0, Math.max(AMBIGUOUS_CANDIDATE_LIMIT - remote.length, Math.min(localMatches.length, AMBIGUOUS_CANDIDATE_LIMIT / 2)))
-  const candidates: readonly ThreadCandidate[] = [
-    ...localShown.map((candidate) => (here === null ? candidate : { ...candidate, device: here })),
-    ...remote.slice(0, AMBIGUOUS_CANDIDATE_LIMIT - localShown.length).map((row) => ({ id: row.session_id, name: row.title, cwd: row.project, preview: "", updatedAt: new Date(row.updated_ms).toISOString(), state: "live" as const, device: row.device })),
-  ]
-  return {
-    kind: "error",
-    result: { kind: "error", error: threadToolFailure("ambiguous_target", `Threads on more than one of this account's devices share the name "${address}" (${candidates.length} listed).`, "Call thread_list with all_scope and pass the exact thread_id of the intended thread.", { candidates }) },
-  }
-}
 
 const ALIASES_UNAVAILABLE: ThreadToolResult = { kind: "error", error: threadToolFailure("host_unavailable", "Thread aliases need the account's alias registry, which this device cannot reach.", "Create or address the thread by its id; retry the alias later.") }
 
@@ -81,25 +32,57 @@ async function targetDevice(remote: RemoteThreadSurface, device: string): Promis
   return { id: row.device }
 }
 
-export type CreatePlan =
-  | { readonly kind: "local"; readonly forkFrom?: string }
-  | { readonly kind: "open-local"; readonly address: string }
-  | { readonly kind: "done"; readonly result: ThreadToolResult }
+/** What this device answers for an existing thread named to thread_create: it is live here, or its session file is here, or neither. */
+export type LocalExisting =
+  | { readonly kind: "live"; readonly thread: HostedThread }
+  | { readonly kind: "file"; readonly sessionPath: string }
+  | { readonly kind: "error"; readonly result: ThreadToolResult }
+
+/** This device's side of placement: its name ladder, what it knows of an existing thread, and its SessionHost. */
+export type LocalPlacement = {
+  readonly host: SessionHost
+  readonly resolve: (address: string) => LocalResolution
+  /** Decision 0027: the ONE resolver (local + relay address books) for an existing thread or a fork source; omitted = local only. */
+  readonly locate: (address: string) => Promise<CrossTarget>
+  readonly existing: (address: string) => LocalExisting
+}
 
 /**
- * thread_create under A3: an id or alias OPENS that session wherever it is (never with a device); no id and a
- * device creates on that device; no id and no device creates on this device, as before.
+ * Where a thread_create lands: `open` names the SessionHost that opens it and the open's own fields (`creates` is false
+ * for an existing thread's file); `done` is a refusal, or an existing thread that is live already and needs no open
+ * (`deduplicated`), with the device that holds it.
+ */
+type OpenFields = Pick<SessionOpenRequest, "cwd" | "sessionPath" | "forkFrom">
+
+export type CreatePlan =
+  | { readonly kind: "open"; readonly host: SessionHost; readonly request: OpenFields; readonly creates: boolean }
+  | { readonly kind: "done"; readonly result: ThreadToolResult; readonly device?: string }
+
+const alreadyLive = (thread: HostedThread, device?: string): CreatePlan => ({ kind: "done", result: { kind: "ok", thread, deduplicated: true }, ...(device === undefined ? {} : { device }) })
+
+/**
+ * thread_create under A3: an id or alias OPENS that session wherever it is (never with a device) - answered without an
+ * open when it is live there already; no id and a device creates on that device; no id and no device creates on this
+ * device, as before; a fork is created on its source's device. Placement is the only step that reads the device.
  */
 export async function planCreate(
   remote: RemoteThreadSurface | undefined,
-  value: { readonly thread?: string; readonly device?: string; readonly fork_from?: string; readonly cwd?: string; readonly name?: string; readonly alias?: string; readonly skills?: readonly string[] },
-  local: (address: string) => LocalResolution,
+  value: { readonly thread?: string; readonly device?: string; readonly fork_from?: string; readonly cwd?: string; readonly alias?: string },
+  local: LocalPlacement,
 ): Promise<CreatePlan> {
+  const here = (request: OpenFields, creates: boolean): CreatePlan => ({ kind: "open", host: local.host, request, creates })
+  const create = (host: SessionHost): CreatePlan => ({ kind: "open", host, request: value.cwd === undefined ? {} : { cwd: value.cwd }, creates: true })
+  const openHere = (address: string): CreatePlan => {
+    const existing = local.existing(address)
+    if (existing.kind === "error") return { kind: "done", result: existing.result }
+    return existing.kind === "live" ? alreadyLive(existing.thread) : here({ sessionPath: existing.sessionPath }, false)
+  }
   if (value.thread !== undefined && value.device !== undefined) return { kind: "done", result: invalid("An existing thread is named by its id or alias only, never with a device.", "Drop device; the thread's device is found from the account's session list.") }
   if (value.thread !== undefined && value.fork_from !== undefined) return { kind: "done", result: invalid("thread opens an existing thread; fork_from creates a new one. Pass one of them.", "Pass thread to open it, or fork_from to fork it.") }
   if (remote === undefined) {
-    if (value.alias !== undefined || (value.device !== undefined)) return { kind: "done", result: { kind: "error", error: threadToolFailure("host_unavailable", "Aliases and other devices need this device signed in to the account's device service.", "Sign in, or create the thread on this device without an alias.") } }
-    return value.thread === undefined ? { kind: "local" } : { kind: "open-local", address: value.thread }
+    if (value.alias !== undefined || value.device !== undefined) return { kind: "done", result: { kind: "error", error: threadToolFailure("host_unavailable", "Aliases and other devices need this device signed in to the account's device service.", "Sign in, or create the thread on this device without an alias.") } }
+    if (value.thread !== undefined) return openHere(value.thread)
+    return value.fork_from === undefined ? create(local.host) : here({ ...(value.cwd === undefined ? {} : { cwd: value.cwd }), forkFrom: value.fork_from }, true)
   }
   if (value.alias !== undefined) {
     if (remote.aliases === undefined) return { kind: "done", result: ALIASES_UNAVAILABLE }
@@ -108,36 +91,31 @@ export async function planCreate(
     if (held.error.code !== "alias_not_found") return { kind: "done", result: aliasFailure(held.error) }
   }
   if (value.thread !== undefined) {
-    const target = await crossTarget(remote, value.thread, local(value.thread))
+    const target = await local.locate(value.thread)
     if (target.kind === "error") return { kind: "done", result: target.result }
-    if (target.kind === "remote") return { kind: "done", result: await withAlias(remote, value.alias, await openRemote(remote, { kind: "open", row: target.row }), target.row.device) }
-    return { kind: "open-local", address: target.address }
+    if (target.kind === "local") return openHere(target.address)
+    // A device's listing names its ended sessions too; only those are opened again, from their file (B's engine holds a live one).
+    if (target.row.state !== "ended") return alreadyLive(listedThread(target.row), target.row.device)
+    return { kind: "open", host: createRelaySessionHost(remote, target.row.device, target.row), request: { sessionPath: target.row.path }, creates: false }
   }
   if (value.fork_from !== undefined) {
-    const source = await crossTarget(remote, value.fork_from, local(value.fork_from))
+    const source = await local.locate(value.fork_from)
     if (source.kind === "error") return { kind: "done", result: source.result }
-    if (source.kind === "remote") {
-      if (value.device !== undefined) {
-        const wanted = await targetDevice(remote, value.device)
-        if ("result" in wanted) return { kind: "done", result: wanted.result }
-        if (wanted.id !== source.row.device) return { kind: "done", result: invalid("A fork is created on the device that holds its source thread.", "Drop device, or fork a thread on the device you name.") }
-      }
-      return { kind: "done", result: await withAlias(remote, value.alias, await openRemote(remote, { kind: "fork", row: source.row, cwd: value.cwd, name: value.name, skills: value.skills }), source.row.device) }
-    }
     if (value.device !== undefined) {
       const wanted = await targetDevice(remote, value.device)
       if ("result" in wanted) return { kind: "done", result: wanted.result }
-      if (wanted.id !== undefined) return { kind: "done", result: invalid("A fork is created on the device that holds its source thread.", "Drop device, or fork a thread on the device you name.") }
+      if (wanted.id !== (source.kind === "remote" ? source.row.device : undefined)) return { kind: "done", result: invalid("A fork is created on the device that holds its source thread.", "Drop device, or fork a thread on the device you name.") }
     }
-    return { kind: "local", forkFrom: source.address }
+    // The far engine opens a fork by the id IT knows the source under: its durable id (the listing key is the relay's).
+    const fork = { ...(value.cwd === undefined ? {} : { cwd: value.cwd }), forkFrom: source.kind === "remote" ? source.row.durable_id ?? source.row.session_id : source.address }
+    return source.kind === "remote" ? { kind: "open", host: createRelaySessionHost(remote, source.row.device), request: fork, creates: true } : here(fork, true)
   }
-  if (value.device === undefined) return { kind: "local" }
+  if (value.device === undefined) return create(local.host)
   const unavailable = await remoteAvailable(remote)
   if (unavailable !== undefined) return { kind: "done", result: unavailable }
   const target = await targetDevice(remote, value.device)
   if ("result" in target) return { kind: "done", result: target.result }
-  if (target.id === undefined) return { kind: "local" }
-  return { kind: "done", result: await withAlias(remote, value.alias, await openRemote(remote, { kind: "create", device: target.id, cwd: value.cwd, name: value.name, skills: value.skills }), target.id) }
+  return create(target.id === undefined ? local.host : createRelaySessionHost(remote, target.id))
 }
 
 /**
@@ -188,15 +166,12 @@ export async function listAcross(remote: RemoteThreadSurface | undefined, local:
   } catch {
     return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
   }
-  const others = listed.filter((row) => row.device !== here && !known.has(row.session_id))
+  const others = listed.filter((row) => row.device !== here && !known.has(rowThreadId(row)))
   const merged: ThreadToolResult = {
     ...local,
-    threads: [
-      ...local.threads,
-      ...others.map((row) => ({ thread_id: row.session_id, name: row.title, status: "live" as const, cwd: row.project, created_at: new Date(row.updated_ms).toISOString(), updated_at: new Date(row.updated_ms).toISOString(), device: row.device, link: threadLink(row.session_id, row.title) })),
-    ],
+    threads: [...local.threads, ...others.map((row) => { const { sessionId: _routing, ...thread } = listedThread(row); return thread })],
   }
-  return withAliases(remote, merged, [...ids, ...others.map((row) => row.session_id)])
+  return withAliases(remote, merged, [...ids, ...others.map(rowThreadId).filter((id) => id !== "")])
 }
 
 async function withAliases(remote: RemoteThreadSurface, listed: ThreadToolResult, ids: readonly string[]): Promise<ThreadToolResult> {

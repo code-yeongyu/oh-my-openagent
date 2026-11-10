@@ -33,7 +33,9 @@ const REMOTE_USAGE = `usage: omo remote <command> [--json]
                                            device's sessions (on unless you turn it off)
   bootstrap                                set up this device's service for your sign-in (every omo start runs it)
   attach <device>/<session>                open a session on another device in the terminal UI, to watch and type
-  open <device> [--project P] [--model M]  start a session on another device; prints <device>/<session>
+  open <device> [--project P] [--model M] [--permission-preset MODE]
+                                           start a session on another device; prints <device>/<session>; it runs
+                                           in MODE (default: this device's own setting, else full-access)
   send <device>/<session> <text> [--steer|--follow-up] [--no-wait]
                                            send a message and print the answer as it arrives (--steer: into the
                                            running turn; --no-wait: return once the session took it)
@@ -53,6 +55,14 @@ export interface RemoteCommandDependencies {
   readonly error: (line: string) => void
   /** The thread tools' remote surface over a connected service; the device service's own by default. Test seam. */
   readonly remote?: (service: DeviceService) => RemoteThreadSurface
+  /** The mode `open` names when no --permission-preset is given; this device's engine settings by default. Test seam. */
+  readonly localPermissionPreset?: () => string
+  /**
+   * Where this omo's staged plugin payload lives (`<root>/plugin/extensions/` holds the gateway store's worker sidecar):
+   * the npm package root by default; the compiled binary passes its provisioned runtime directory, because its own
+   * module paths sit inside the executable and resolve to nothing on disk.
+   */
+  readonly packageRoot?: string
 }
 
 /** `omo remote` verbs; `bootstrap` also needs the pinned install, the stored keys and this omo binary. */

@@ -339,8 +339,6 @@
       "packages/memory-core/src/sync/space/read-back.ts": ["toLf", "linesOf"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MemoryApplyPatchError
       "packages/memory-core/src/tools/memory-apply-patch.ts": ["MemoryApplyPatchError"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) FABLE_55_PREDECESSOR
-      "packages/model-core/src/fable-55-launch.ts": ["FABLE_55_PREDECESSOR"],
       // pre-existing at origin dev 4686e425b5: unused export(s) isModelAvailable
       "packages/model-core/src/index.ts": ["isModelAvailable"],
       // pre-existing at origin dev 4686e425b5: unused export(s) isModelAvailable
@@ -1355,15 +1353,11 @@
       // pre-existing at origin dev 4686e425b5: unused export(s) registerIncarnation, clearEndpoint, sessionOwner
       "packages/omo-senpi/src/components/thread/gateway/store-ownership.ts": ["registerIncarnation", "clearEndpoint", "sessionOwner"],
       // pre-existing at origin dev 4686e425b5: unused export(s) toolReceiptBegin, toolReceiptSettle, registerIncarnation, pendingCompletionArms, latestCompletionArm, closeQuestion
-      "packages/omo-senpi/src/components/thread/gateway/store-relay-ops.ts": ["toolReceiptBegin", "toolReceiptSettle", "registerIncarnation", "pendingCompletionArms", "latestCompletionArm", "closeQuestion"],
+      "packages/omo-senpi/src/components/thread/gateway/store-relay-ops.ts": ["toolReceiptBegin", "toolReceiptSettle", "toolReceiptRevise", "registerIncarnation", "pendingCompletionArms", "latestCompletionArm", "closeQuestion"],
       // pre-existing at origin dev 4686e425b5: unused export(s) sweepRetention
       "packages/omo-senpi/src/components/thread/gateway/store-retention.ts": ["sweepRetention"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_STORE_WORKER_BUNDLE_NAME
-      "packages/omo-senpi/src/components/thread/gateway/store.ts": ["GATEWAY_STORE_WORKER_BUNDLE_NAME"],
       // pre-existing at origin dev 4686e425b5: unused export(s) matcherAwaits
       "packages/omo-senpi/src/components/thread/gateway/worker-reply-matchers.test.ts": ["matcherAwaits"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_TOOL_SEARCH_GROUP
-      "packages/omo-senpi/src/components/thread/metadata.ts": ["THREAD_TOOL_SEARCH_GROUP"],
       // pre-existing at origin dev 4686e425b5: unused export(s) messageText, parseSessionLines, summarizeSessionEntries
       "packages/omo-senpi/src/components/thread/session-facts.ts": ["messageText", "parseSessionLines", "summarizeSessionEntries"],
       // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_LINK_SCHEME
@@ -2108,6 +2102,8 @@
         "script/senpi-worker-compile.ts",
         "test-support/remove-tree.ts",
         "test-support/test-deadline.ts",
+        // preloaded by path from the package bunfig.toml files (the bun plugin adds it with exports unchecked)
+        "test-support/test-deadline.preload.ts",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "script/build-binaries.ts",
@@ -2624,6 +2620,7 @@
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
+        "test/local-api/event-examples.ts",
         "test/local-api/support.ts",
         "test/local-api/support-windows.ts",
         "test/local-api/conformance/*.ts",
@@ -3704,6 +3701,8 @@
         "src/cli/install-codex/toml-section-editor.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/install-codex/types.ts",
+        // a child-process fixture: refresh-process.test.ts runs it under a scratch HOME, nothing imports it (#12978)
+        "src/cli/service-auth/account-home.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/service-auth/accounts-closed.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs

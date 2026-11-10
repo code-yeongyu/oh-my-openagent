@@ -225,6 +225,8 @@ test.skipIf(process.platform === "win32")("never imports R beyond real Bun's acc
     });
   `
   const outcomes = new Map<string, readonly string[]>()
+  const acceptedByBun = new Set<string>()
+  const importedByOmo = new Set<string>()
   const narrowings: string[] = []
   try {
     // When: each fixture gets its own Bun process and all five requests share its lazy set.
@@ -251,12 +253,12 @@ test.skipIf(process.platform === "win32")("never imports R beyond real Bun's acc
       expect(requests).toHaveLength(5)
       expect(requests.every((value) => value === "0" || value === "1")).toBe(true)
       outcomes.set(fixture.id, requests)
+      if (requests.every((value) => value === "1")) acceptedByBun.add(fixture.id)
       console.log(`oracle ${fixture.id}: ${requests.join("")}`)
-      // Then: every importer candidate must be accepted by every lookup in the real oracle.
       const imported = read(fixture.text, () => false)
       switch (imported.kind) {
         case "kept":
-          if (imported.certificates.length > 0) expect(requests).toEqual(["1", "1", "1", "1", "1"])
+          if (imported.certificates.length > 0) importedByOmo.add(fixture.id)
           break
         case "dropped":
           if (requests.every((value) => value === "1")) narrowings.push(fixture.id)
@@ -264,15 +266,13 @@ test.skipIf(process.platform === "win32")("never imports R beyond real Bun's acc
         default: { const unreachable: never = imported; throw unreachable }
       }
     }
+    // Then: omo's imported set must be a subset of what this Bun accepts on every lookup.
+    // PEM parsing and lazy-set ordering differ across builds; narrowings are observations, not a fixed list.
+    expect([...importedByOmo].filter((id) => !acceptedByBun.has(id))).toEqual([])
     expect(outcomes.get("empty")).toEqual(["0", "0", "0", "0", "0"])
     expect(outcomes.get("c0")).toEqual(["1", "1", "1", "1", "1"])
     expect(outcomes.get("c1")).toEqual(["0", "0", "0", "0", "0"])
-    // Equal canonical subjects have no sort tie-breaker: exactly one permutation exposes R, never assumed which.
-    const exposed = ["c4s", "c4t"].filter((id) => outcomes.get(id)?.every((value) => value === "1"))
-    expect(exposed).toHaveLength(1)
     console.log(`oracle narrowings: ${narrowings.join(", ")}`)
-    expect([...narrowings].sort()).toEqual(["c4", ...exposed, "long-label", "mid-cr", "form-feed", "non-ascii-in-block",
-      "lowercase-label", "blank-body", "space-only-header-line"].sort())
   } finally {
     const closed = once(server, "close", { signal: AbortSignal.timeout(10_000) })
     server.closeAllConnections()

@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test"
-import { FakeExtensionAPI } from "../../test-support/fake-extension-api"
+import { FakeExtensionAPI, withInertSenpiSeams } from "../../test-support/fake-extension-api"
 import { composeOmoSenpiExtension } from "./compose"
 import type { BeforeAgentStartHandlerOptions, ComponentLogger } from "./types"
 
 async function fixture(options?: BeforeAgentStartHandlerOptions) {
-  const pi = new FakeExtensionAPI()
+  const pi = withInertSenpiSeams(new FakeExtensionAPI())
   const warnings: { readonly message: string; readonly details: unknown }[] = []
   const logger: ComponentLogger = {
     info() {}, error() {},
