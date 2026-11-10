@@ -23,6 +23,7 @@
  */
 
 import { execFileSync } from "node:child_process"
+import type { RemoteSessionRow } from "./remote/ports"
 import { realpathSync } from "node:fs"
 import { basename } from "node:path"
 
@@ -31,7 +32,15 @@ import { threadToolFailure, type ThreadErrorCode } from "./errors"
 
 // A thread as the addressing layer sees it: the shared summary plus the
 // optional last-message preview the discovery layer may already have loaded.
-export type ThreadAddressEntry = ThreadSummary & { readonly preview?: string }
+export type ThreadAddressEntry = ThreadSummary & {
+  readonly preview?: string
+  /** The account device holding the thread when it is not this one (decision 0027: one address book across transports). */
+  readonly device?: string
+  /** Account aliases this thread holds (the registry answered them for the address being resolved). */
+  readonly aliases?: readonly string[]
+  /** How a send reaches the thread when it is not local: the relay transport and the listing row it dispatches to. */
+  readonly transport?: { readonly kind: "relay"; readonly row: RemoteSessionRow }
+}
 
 /** The candidate payload every ambiguity error carries (up to ten). */
 export type ThreadCandidate = {
@@ -46,7 +55,7 @@ export type ThreadCandidate = {
 }
 
 /** How a resolveTarget hit was found. */
-export type ThreadTargetResolution = "id" | "name"
+export type ThreadTargetResolution = "id" | "alias" | "name"
 
 /** Which fuzzy signal produced the accepted score. */
 export type ThreadFuzzyBasis = "name" | "preview" | "cwd"
@@ -140,15 +149,19 @@ function toCandidate(entry: ThreadAddressEntry): ThreadCandidate {
     preview: entry.preview ?? "",
     updatedAt: entry.updated_at,
     state: entry.status,
+    ...(entry.device === undefined ? {} : { device: entry.device }),
   }
 }
 
 // Most recently updated first, thread_id ascending as the deterministic
 // tiebreak, capped at the candidate limit.
 function toCandidates(matches: readonly ThreadAddressEntry[]): readonly ThreadCandidate[] {
-  return [...matches]
+  // When the candidates span devices, this device's threads say so too, so the caller can tell them apart.
+  const spans = matches.some((entry) => entry.device !== undefined)
+  return [...matches].map((entry) => (spans && entry.device === undefined && entry.transport === undefined ? { ...entry, device: "here" } : entry))
     .sort((a, b) =>
-      a.updated_at === b.updated_at ? (a.thread_id < b.thread_id ? -1 : 1) : a.updated_at === null ? 1 : b.updated_at === null ? -1 : a.updated_at < b.updated_at ? 1 : -1,
+      (a.transport === undefined) !== (b.transport === undefined) ? (a.transport === undefined ? -1 : 1)
+        : a.updated_at === b.updated_at ? (a.thread_id < b.thread_id ? -1 : 1) : a.updated_at === null ? 1 : b.updated_at === null ? -1 : a.updated_at < b.updated_at ? 1 : -1,
     )
     .slice(0, AMBIGUOUS_CANDIDATE_LIMIT)
     .map(toCandidate)
@@ -248,7 +261,8 @@ export function resolveTarget(
   // Ladder step 1: the exact durable id wins immediately, across every entry.
   const idHit = entries.find((entry) => entry.thread_id === target)
   if (idHit !== undefined) {
-    if (opts.all_scope === true) return { kind: "ok", entry: idHit, resolution: "id" }
+    // A thread on another device belongs to the account, not to a workspace of this device (decision 0027).
+    if (opts.all_scope === true || idHit.transport !== undefined) return { kind: "ok", entry: idHit, resolution: "id" }
     if (!hasCallerRoot) {
       return addressError(
         "caller_context_missing",
@@ -266,6 +280,11 @@ export function resolveTarget(
     )
   }
 
+  // Ladder step 1c (decision 0027): an account alias names one thread account-wide, on any device, never workspace-scoped.
+  const wantedAlias = normalizeThreadName(target)
+  const aliasHit = wantedAlias === "" ? undefined : entries.find((entry) => entry.aliases?.some((alias) => normalizeThreadName(alias) === wantedAlias))
+  if (aliasHit !== undefined) return { kind: "ok", entry: aliasHit, resolution: "alias" }
+
   // Ladder step 2: normalized name match over the visible entries only.
   let visible: readonly ThreadAddressEntry[]
   if (opts.all_scope === true) {
@@ -278,10 +297,13 @@ export function resolveTarget(
         "Set all_scope to address every workspace, or call thread_list from a session that knows its workspace.",
       )
     }
-    visible = entries.filter((entry) => sameWorkspace(entry.cwd, callerRoot, rootResolver))
+    // A thread on another device belongs to the account, not to a workspace of this device: it stays visible (decision 0027).
+    visible = entries.filter((entry) => entry.transport !== undefined || sameWorkspace(entry.cwd, callerRoot, rootResolver))
   }
 
-  const matches = visible.filter((entry) => normalizeThreadName(entry.name) === guard.normalized)
+  // An ended session on another device is reachable by id only, never by its title (it is not a live peer to talk to).
+  // A local resumable thread stays name-addressable (its contract today); making that one rule is #13012.
+  const matches = visible.filter((entry) => normalizeThreadName(entry.name) === guard.normalized && !(entry.transport !== undefined && entry.status === "resumable"))
   if (matches.length === 1) return { kind: "ok", entry: matches[0], resolution: "name" }
   if (matches.length >= 2) {
     return addressError(
