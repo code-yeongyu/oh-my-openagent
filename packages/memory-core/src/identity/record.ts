@@ -22,6 +22,9 @@ export interface IdentityRecord {
   readonly spellings: readonly string[]
   readonly firstBoundAt: number
   readonly lastBoundAt: number
+  /** Set by `/memory-merge --apply`: the identity this one was merged into, and its head at that merge. */
+  readonly mergedInto?: string
+  readonly mergedHead?: string
 }
 
 export interface IdentityBind {
@@ -59,7 +62,19 @@ export async function recordIdentityBind(identityRoot: string, bind: IdentityBin
     spellings: kept === undefined || kept.spellings.includes(bind.spelling) ? [...(kept?.spellings ?? [bind.spelling])] : [...kept.spellings, bind.spelling],
     firstBoundAt: kept?.firstBoundAt ?? now,
     lastBoundAt: now,
+    ...(kept?.mergedInto === undefined ? {} : { mergedInto: kept.mergedInto }),
+    ...(kept?.mergedHead === undefined ? {} : { mergedHead: kept.mergedHead }),
   }
+  await writeJsonAtomic(join(identityRoot, IDENTITY_RECORD_FILENAME), record)
+  return record
+}
+
+export async function markIdentityMerged(identityRoot: string, id: string, mergedInto: string, mergedHead: string, now: number): Promise<IdentityRecord> {
+  const previous = await readIdentityRecord(identityRoot).catch(() => undefined)
+  const base: IdentityRecord = previous?.id === id
+    ? previous
+    : { version: 1, id, kind: "auto", mode: "path", source: "", spellings: [], firstBoundAt: now, lastBoundAt: now }
+  const record: IdentityRecord = { ...base, mergedInto, mergedHead }
   await writeJsonAtomic(join(identityRoot, IDENTITY_RECORD_FILENAME), record)
   return record
 }
@@ -82,5 +97,7 @@ function parseIdentityRecord(value: unknown): IdentityRecord | undefined {
     spellings,
     firstBoundAt: record.firstBoundAt,
     lastBoundAt: record.lastBoundAt,
+    ...(typeof record.mergedInto === "string" ? { mergedInto: record.mergedInto } : {}),
+    ...(typeof record.mergedHead === "string" ? { mergedHead: record.mergedHead } : {}),
   }
 }
