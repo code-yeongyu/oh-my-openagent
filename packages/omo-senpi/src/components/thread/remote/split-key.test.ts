@@ -24,8 +24,7 @@ describe("a listing key that differs from the durable id (decision 0027 D2)", ()
     const a = fixture.account({ rows: [SPLIT], live: ["rk-b-7"] })
     const { run } = fixture.surface(a.remote)
     const result = await run("thread_create", { thread: SPLIT.durable_id ?? "" })
-    // The row is live on b: opening it again is answered as that thread (already live there), never not_found.
-    expect(JSON.stringify(result)).toContain(SPLIT.durable_id ?? "")
-    expect(result.kind === "error" ? result.error.code : "ok").not.toBe("not_found")
+    // The row is live on b: opening it again answers THAT thread as already live there (deduplicated), under its durable id.
+    expect(result).toMatchObject({ kind: "ok", deduplicated: true, thread: { thread_id: SPLIT.durable_id, device: "b" } })
   })
 })

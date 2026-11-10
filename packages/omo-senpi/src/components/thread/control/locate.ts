@@ -1,7 +1,6 @@
 import type { ThreadToolResult } from "../contracts"
 import { rowThreadId } from "../remote/ports"
 import { createRelayControl, deviceOnline } from "../remote/lazy-ops"
-import { localScope } from "../remote/local-scope"
 import { resolution, resolveEntries, targetSession, resolveAcross } from "../tools/internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "../tools/ports"
 import { createLocalControl } from "./local-control"
@@ -15,7 +14,7 @@ export type LocatedControl =
 
 /**
  * The only place a control tool reads the device: an address resolved through this device's address book and the
- * account's session list (`crossTarget`) becomes the control of the thread it names, over this device's endpoint or
+ * account's session list (the one resolver, `resolveAcross`) becomes the control of the thread it names, over this device's endpoint or
  * over the other device's relay. A device found offline refuses here (A3: nothing is queued), before any check that
  * would change something.
  */

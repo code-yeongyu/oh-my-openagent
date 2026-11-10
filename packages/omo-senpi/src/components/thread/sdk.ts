@@ -21,7 +21,6 @@ import { addressBook, hostView, resolution, resolveEntries, resolveStoredSession
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread } from "./tools/read-ops"
 import type { RemoteThreadSurface } from "./remote/ports"
-import { localScope } from "./remote/local-scope"
 
 export type ThreadSdkOptions = {
   readonly agentDir: string
