@@ -155,6 +155,46 @@ describe("identity merge (#10070)", () => {
     expect(found.predecessors.map((entry) => entry.id).sort()).toEqual([aliasId, subId].sort())
   }, 30_000)
 
+  it("#given an aside copy the user edited and committed in the target #when the source changes that file and the merge reruns #then the edit is kept and the new copy goes to a fresh aside path (#12974 review r4)", async () => {
+    const root = await memoryRoot()
+    const target = await identity(root, "project-aaaa1111", { "notes/diff.md": note("target") }, ["/work/project"])
+    const source = await identity(root, "project-feature-bbbb2222", { "notes/diff.md": note("source v1") }, ["/work/project-feature"])
+    await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 5000 })
+    const aside = "reference/merged/project-feature-bbbb2222/notes/diff.md"
+    await writeFile(join(target.paths.repo, aside), note("user edit"))
+    await target.repo.commitWrite([aside], "edit aside", AUTHOR)
+    await writeFile(join(source.paths.repo, "notes/diff.md"), note("source v2"))
+    await source.repo.commitWrite(["notes/diff.md"], "v2", AUTHOR)
+
+    const rerun = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 6000 })
+
+    expect(rerun.status).toBe("merged")
+    expect(await readFile(join(target.paths.repo, aside), "utf8")).toBe(note("user edit"))
+    const fresh = rerun.plan.actions.find((action) => action.path === "notes/diff.md")
+    expect(fresh?.action).toBe("keep-aside")
+    expect(fresh !== undefined && fresh.action !== "skip" ? fresh.destination : "").not.toBe(aside)
+    expect(await readFile(join(target.paths.repo, fresh !== undefined && fresh.action !== "skip" ? fresh.destination : ""), "utf8")).toBe(note("source v2"))
+  }, 30_000)
+
+  it("#given a nested repository inside the checkout with a pre-record store #when candidates are collected #then the nested repository's own store is not offered to the parent (#12974 review r4)", async () => {
+    const root = await memoryRoot()
+    const main = join(root, "checkout", "proj")
+    const nested = join(main, "libs", "lib")
+    await mkdir(nested, { recursive: true })
+    execFileSync("git", ["init", "--quiet", "--initial-branch=main"], { cwd: main, stdio: "ignore" })
+    execFileSync("git", ["init", "--quiet", "--initial-branch=main"], { cwd: nested, stdio: "ignore" })
+    const env = { OMO_MEMORY_HOME: root }
+    const resolveGit = (spelling: string) => resolveAutoIdentity(spelling, env, "git").id
+    const targetId = resolveGit(main)
+    const nestedId = resolveAutoIdentity(nested, env, "path").id
+    await identity(root, targetId, {}, [main])
+    await identity(root, nestedId, { "notes/lib.md": note("lib") }, [])
+
+    const found = await findMergePredecessors(root, targetId, resolveGit, await repositoryCandidateDirs([main]))
+
+    expect(found.predecessors.map((entry) => entry.id)).not.toContain(nestedId)
+  }, 30_000)
+
   it("#given another writer creates the same path between the plan and the lock #when the merge applies #then the target's file is kept and the source copy goes aside (#12974 review)", async () => {
     const root = await memoryRoot()
     const target = await identity(root, "project-aaaa1111", { "notes/base.md": note("base") }, ["/work/project"])
