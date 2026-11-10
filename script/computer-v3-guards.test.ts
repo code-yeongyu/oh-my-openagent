@@ -193,6 +193,12 @@ const plan = [
   "- [ ] 5. Session settle",
   "  Parallelization: Wave 4 (session) | Blocked by: 3 | Blocks: -",
   "  Write scope: `crates/omo-computer-session/src/settle/**`; `crates/omo-computer-backend-x11/src/input/**`",
+  "- [ ] 47. X11 capture and the Linux live driver",
+  "  Parallelization: Wave 11 (os) | Blocked by: 2 | Blocks: 48",
+  "  Write scope: `crates/omo-computer-backend-x11/src/capture/**`; `script/qa/computer/linux.ts`; `script/qa/computer/linux/**`",
+  "- [ ] 48. AT-SPI accessibility",
+  "  Parallelization: Wave 12 (os) | Blocked by: 47 | Blocks: -",
+  "  Write scope: `crates/omo-computer-backend-atspi/src/**`",
   "- [ ] 80. Remove the old implementation",
   "  Parallelization: Wave 28 (removal) | Blocked by: 5 | Blocks: -",
   "  Write scope: `every path of the Removal inventory (classes A-D)`; `changes/unreleased/<pr>.md`",
@@ -207,6 +213,31 @@ function scopeRepo(repo: Repo, planText: string = plan): (row: string) => Return
   repo.git("branch", "base")
   return (row) => repo.guard("--scope", row, "base", "--plan", join(repo.run, "plan.md"))
 }
+
+describe("computer-v3-guards --copy physical lines", () => {
+  test("copy_counts_physical_lines_including_blank_ones", () => {
+    withRepo((repo) => {
+      // given an old 19-line file and an old 24-line file whose every other line is blank
+      const short = Array.from({ length: 19 }, (_, index) => `export const short_${index} = ${index};\n`).join("")
+      const spaced = Array.from({ length: 12 }, (_, index) => `export const copied_${index} = ${index};\n\n`).join("")
+      repo.write({ "packages/senpi-desktop-tool/src/short.ts": short, "packages/senpi-desktop-tool/src/gate-copy-source.ts": spaced })
+      repo.commit("base")
+      repo.git("branch", "base")
+
+      // when the 19-line file is copied, it is short and passes
+      repo.write({ "packages/omo-computer-tool/src/short.ts": short })
+      repo.commit("short copy")
+      expectPass(repo.guard("--copy", "base"))
+
+      // when the 24-line file (12 of them blank) is copied byte for byte
+      repo.write({ "packages/omo-computer-tool/src/gate-copy.ts": spaced })
+      repo.commit("spaced copy")
+
+      // then it is a finding: 24 physical lines are not shorter than 20
+      expectFindings(repo.guard("--copy", "base"), "packages/omo-computer-tool/src/gate-copy.ts")
+    })
+  })
+})
 
 describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
   test("scope_refuses_a_path_outside_the_row_write_scope", () => {
@@ -309,6 +340,28 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
 
       // then those three are findings
       expectFindings(scope("5"), "script/computer-v3-guards.ts", "docs/sibling.md", "script/qa/computer/replay.ts")
+    })
+  })
+
+  test("scope_refuses_a_listed_edit_of_an_existing_scenario_file_even_when_a_blocker_owns_it", () => {
+    withRepo((repo) => {
+      const scope = scopeRepo(repo)
+      const blockerEdits = join(repo.run, "evidence", "task-48.blocker-edits.txt")
+      const listedCapture = "crates/omo-computer-backend-x11/src/capture/frame.rs\tthe frame hook row 48 reads\n"
+
+      // given row 48 adding a new scenario file and making a listed edit to a non-scenario path of row 47 (its blocker)
+      writeFileSync(blockerEdits, listedCapture)
+      repo.write({ "crates/omo-computer-backend-x11/src/capture/frame.rs": "// hook\n", "script/qa/computer/linux/atspi-walk.ts": "export {}\n" })
+      repo.commit("new scenario and listed blocker edit")
+      expectPass(scope("48"))
+
+      // when it edits row 47's existing scenario file and lists that edit
+      writeFileSync(blockerEdits, `${listedCapture}script/qa/computer/linux/existing.ts\tWalk AT-SPI for row 48.\n`)
+      repo.write({ "script/qa/computer/linux/existing.ts": 'export const scenario = "changed by row 48"\n' })
+      repo.commit("edit another row's scenario")
+
+      // then the scenario edit is a finding: no row edits another row's scenario file
+      expectFindings(scope("48"), "script/qa/computer/linux/existing.ts")
     })
   })
 
@@ -458,6 +511,13 @@ describe("computer-v3-guards --parity", () => {
 
       // then the missing header is a finding for each file, never a skipped row
       expectFindings(repo.guard("--parity", "--final"), "test-parity-manifest.tsv line 1", "DEFERRED-LEGS.tsv line 1")
+
+      // when the manifest is valid and the legs file holds only one malformed record
+      repo.write({ [manifestPath]: manifestHeader + "core\trust\tx\tported:case-x\t\n", [legsPath]: "C17\tbroken\n" })
+      repo.commit("malformed only")
+
+      // then that record is not taken for a header
+      expectFindings(repo.guard("--parity", "--final"), "DEFERRED-LEGS.tsv line 1")
     })
   })
 })
@@ -614,6 +674,113 @@ describe("computer-v3-guards --stubs", () => {
         "packages/omo-computer-tool/test/a.test.ts:1:",
         "packages/omo-computer-tool/test/a.test.ts:2:",
       )
+    })
+  })
+})
+
+describe("computer-v3-guards --stubs domain and --residue on disk", () => {
+  test("stubs_scans_every_file_under_the_new_directories", () => {
+    withRepo((repo) => {
+      // given a .test.tsx file under a new package with no stub
+      repo.write({ "packages/omo-computer-sdk/test/ok.test.tsx": 'it("runs", () => {})\n' })
+      repo.commit("clean")
+      expectPass(repo.guard("--stubs"))
+
+      // when a .test.tsx file skips a test
+      repo.write({ "packages/omo-computer-sdk/test/missed.test.tsx": 'test.skip("must run", () => {})\n' })
+      repo.commit("skipped")
+
+      // then it is a finding, whatever the extension
+      expectFindings(repo.guard("--stubs"), "packages/omo-computer-sdk/test/missed.test.tsx:1:")
+    })
+  })
+
+  test("residue_refuses_a_tracked_or_on_disk_file_path_that_names_the_old_family", () => {
+    withRepo((repo) => {
+      // given old names only in the paths of the legacy-name exclusions
+      repo.write({
+        "README.md": "the computer module\n",
+        "changes/unreleased/senpi-desktop-removal.md": "removed\n",
+        "crates/omo-computer-core/parity/senpi_desktop-ids.tsv": "ids\n",
+      })
+      repo.commit("clean")
+      expectPass(repo.guard("--residue"))
+
+      // when a tracked doc and an ignored on-disk file carry the old name in their path, with neutral content
+      repo.write({ "docs/senpi-desktop-notes.md": "notes\n", ".gitignore": "*.log\n", "logs/SENPI_Desktop.log": "neutral\n" })
+      repo.commit("named paths")
+
+      // then each path is a finding
+      expectFindings(repo.guard("--residue"), "docs/senpi-desktop-notes.md", "logs/SENPI_Desktop.log")
+    })
+  })
+
+  test("stubs_refuses_a_skip_or_only_reached_through_a_modifier", () => {
+    withRepo((repo) => {
+      // given modifier chains that neither skip nor focus
+      repo.write({ "packages/omo-computer-sdk/test/a.test.ts": 'it.concurrent("runs", () => {})\ntest.each([1])("case %d", () => {})\ndescribe.each([1])("group", () => {})\n' })
+      repo.commit("clean")
+      expectPass(repo.guard("--stubs"))
+
+      // when a chain skips or focuses through a modifier
+      repo.write({ "packages/omo-computer-sdk/test/b.test.ts": 'it.concurrent.skip("a", () => {})\ntest.skip.each([1])("b", () => {})\ndescribe.only.each([1])("c", () => {})\n' })
+      repo.commit("chains")
+
+      // then each line is a finding
+      expectFindings(repo.guard("--stubs"), "b.test.ts:1:", "b.test.ts:2:", "b.test.ts:3:")
+    })
+  })
+
+  test("stubs_refuses_a_todo_test", () => {
+    withRepo((repo) => {
+      // given tests whose titles or variables merely say todo
+      repo.write({ "packages/omo-computer-tool/test/a.test.ts": 'const todo = 1\nit("keeps the todo list", () => {})\n' })
+      repo.commit("clean")
+      expectPass(repo.guard("--stubs"))
+
+      // when test.todo and it.todo declare placeholder tests
+      repo.write({ "packages/omo-computer-tool/test/b.test.ts": 'test.todo("later")\nit.todo("later too")\n' })
+      repo.commit("todos")
+
+      // then each line is a finding
+      expectFindings(repo.guard("--stubs"), "b.test.ts:1:", "b.test.ts:2:")
+    })
+  })
+
+  test("stubs_refuses_an_ignore_through_cfg_attr_and_keeps_the_live_reason_form", () => {
+    withRepo((repo) => {
+      // given a live-ignored test and a cfg_attr that does not ignore
+      repo.write({ "crates/omo-computer-core/src/lib.rs": '#[cfg_attr(test, derive(Debug))]\nstruct A;\n#[test]\n#[ignore = "live: needs a display"]\nfn capture() {}\n' })
+      repo.commit("clean")
+      expectPass(repo.guard("--stubs"))
+
+      // when cfg_attr ignores a test, with or without a reason
+      repo.write({ "crates/omo-computer-safety/src/lib.rs": '#[test]\n#[cfg_attr(test, ignore)]\nfn a() {}\n#[cfg_attr(target_os = "linux", ignore = "flaky")]\nfn b() {}\n' })
+      repo.commit("cfg_attr")
+
+      // then each is a finding
+      expectFindings(repo.guard("--stubs"), "crates/omo-computer-safety/src/lib.rs:2:", "crates/omo-computer-safety/src/lib.rs:4:")
+    })
+  })
+
+  test("residue_refuses_a_class_a_path_that_exists_on_disk_as_an_empty_or_ignored_directory", () => {
+    withRepo((repo) => {
+      repo.write({ "README.md": "the computer module\n" })
+      repo.commit("clean")
+      expectPass(repo.guard("--residue"))
+
+      // when the old crate's directory remains on disk, empty
+      mkdirSync(join(repo.root, "crates/senpi-desktop-core"), { recursive: true })
+
+      // then it is a finding
+      expectFindings(repo.guard("--residue"), "crates/senpi-desktop-core still exists")
+
+      // when it holds only a file that git ignores
+      repo.write({ ".gitignore": "crates/\n", "crates/senpi-desktop-core/retained.txt": "kept\n" })
+      repo.commit("ignore crates")
+
+      // then it is still a finding
+      expectFindings(repo.guard("--residue"), "crates/senpi-desktop-core still exists")
     })
   })
 })
