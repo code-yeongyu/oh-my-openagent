@@ -78,7 +78,9 @@ impl Worker {
                 modifiers: options.modifiers,
             };
             let response = worker.pointer(&target, event, &frame, options.mode)?;
-            worker.judge(&target, &frame, options.count > 1)?;
+            if options.count > 1 {
+                worker.judge(&target, &frame)?;
+            }
             Ok(response)
         })
     }
@@ -103,9 +105,7 @@ impl Worker {
             let (frame, current) = worker.frame_for(&target, params.frame_id.as_deref())?;
             let (x, y) = frame.map_point(params.x, params.y, current.as_ref())?;
             worker.read_hit(x, y);
-            let response = worker.pointer(&target, PointerEvent::Move { x, y }, &frame, mode)?;
-            worker.judge(&target, &frame, false)?;
-            Ok(response)
+            worker.pointer(&target, PointerEvent::Move { x, y }, &frame, mode)
         })
     }
 
@@ -137,7 +137,7 @@ impl Worker {
                 modifiers: options.modifiers,
             };
             let response = worker.pointer(&target, event, &frame, options.mode)?;
-            worker.judge(&target, &frame, true)?;
+            worker.judge(&target, &frame)?;
             Ok(response)
         })
     }
@@ -168,9 +168,7 @@ impl Worker {
                 dx: params.dx,
                 dy: params.dy,
             };
-            let response = worker.pointer(&target, event, &frame, mode)?;
-            worker.judge(&target, &frame, false)?;
-            Ok(response)
+            worker.pointer(&target, event, &frame, mode)
         })
     }
 
@@ -320,26 +318,21 @@ impl Worker {
         self.report_extras.set(Some(ReportExtras { route: None, hit, timings: None }));
     }
 
-    /// Object mode, window targets: once input was sent, judges it against
-    /// the window as it is now. A window whose owner changed, or (for input
-    /// of several events, `multi_event`) whose size changed since capture,
-    /// may have taken part of the input elsewhere: `delivery_uncertain`.
-    pub(crate) fn judge(&mut self, target: &Target, frame: &FrameGeometry, multi_event: bool) -> CoreResult<()> {
+    /// Object mode, window targets, input of several events (a drag, a
+    /// multi-click): once it was sent, judges it against the window as it is
+    /// now. A window that closed, changed owner or changed size since capture
+    /// may have taken part of the input elsewhere: `delivery_uncertain`. A
+    /// single event is never judged: a click that closes its dialog or hands
+    /// its window to another process has already landed where it was aimed.
+    pub(crate) fn judge(&mut self, target: &Target, frame: &FrameGeometry) -> CoreResult<()> {
         if self.registry.report_mode() != ReportMode::Object || !matches!(target, Target::Window(_)) {
             return Ok(());
         }
-        let captured = frame.identity().cloned();
-        if captured.is_none() && !multi_event {
-            return Ok(());
-        }
         let current = self.window(target).map_err(uncertain)?;
-        if captured.is_some_and(|captured| current.identity.as_ref() != Some(&captured)) {
+        if frame.identity().is_some_and(|captured| current.identity.as_ref() != Some(captured)) {
             return Err(uncertain(DesktopError::from(GateError::IdentityChanged)));
         }
-        if multi_event {
-            frame.check_size(&current).map_err(uncertain)?;
-        }
-        Ok(())
+        frame.check_size(&current).map_err(uncertain)
     }
 
     /// Raising a window is itself the focus change asked for: audited as
