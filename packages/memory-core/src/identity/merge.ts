@@ -80,7 +80,14 @@ export async function findMergePredecessors(
     const paths = buildIdentityPaths(memoryRoot, id)
     if ((await readdir(paths.repo).catch(() => [] as string[])).length === 0) continue
     known.add(id)
-    predecessors.push({ id, paths, spellings: [dir] })
+    const record = await readIdentityRecord(paths.root).catch(() => undefined)
+    predecessors.push({
+      id,
+      paths,
+      spellings: [dir],
+      ...(record?.mergedInto === undefined ? {} : { mergedInto: record.mergedInto }),
+      ...(record?.mergedHead === undefined ? {} : { mergedHead: record.mergedHead }),
+    })
   }
   return { predecessors, unmapped }
 }
@@ -217,7 +224,21 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
     const writes = plan.actions.filter((action): action is Exclude<MergeAction, { action: "skip" }> => action.action !== "skip")
     if (writes.length === 0 || plan.sourceHead === null) return { plan }
     const oids = new Map((await sourceRepo.lsTreeBlobs(plan.sourceHead)).map((entry) => [entry.path, entry.oid]))
-    const contents = await sourceRepo.readBlobs(writes.map((action) => requiredOid(oids, action.path)))
+    const raw = await sourceRepo.readBlobBytes(writes.map((action) => requiredOid(oids, action.path)))
+    // Memory files are UTF-8 by contract; a file that is not (an image under skills/, say) is refused before
+    // anything is written instead of being decoded into replacement characters in the target.
+    const strict = new TextDecoder("utf-8", { fatal: true })
+    const contents = new Map<string, string>()
+    for (const action of writes) {
+      const oid = requiredOid(oids, action.path)
+      const bytes = raw.get(oid)
+      if (bytes === undefined) continue
+      try {
+        contents.set(oid, strict.decode(bytes))
+      } catch {
+        throw new Error(`memory merge: ${action.path} in ${plan.sourceId} is not UTF-8 text; nothing was merged`)
+      }
+    }
     const destinations = writes.map((action) => action.destination)
     try {
       for (const action of writes) {

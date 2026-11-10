@@ -195,6 +195,46 @@ describe("identity merge (#10070)", () => {
     expect(found.predecessors.map((entry) => entry.id)).not.toContain(nestedId)
   }, 30_000)
 
+  it("#given a pre-record worktree store that was merged #when predecessors are collected again #then it carries its merge record so it is no longer pending (#12974 review r5)", async () => {
+    const root = await memoryRoot()
+    const main = join(root, "checkout", "project")
+    const thread = join(root, "checkout", "project-thread")
+    await mkdir(main, { recursive: true })
+    const git = (cwd: string, args: readonly string[]) => execFileSync("git", ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", ...args], { cwd, stdio: "ignore" })
+    git(main, ["init", "--quiet", "--initial-branch=main"])
+    git(main, ["commit", "--quiet", "--allow-empty", "-m", "init"])
+    git(main, ["worktree", "add", "--quiet", "-b", "thread", thread])
+    const env = { OMO_MEMORY_HOME: root }
+    const resolveGit = (spelling: string) => resolveAutoIdentity(spelling, env, "git").id
+    const targetId = resolveGit(main)
+    const legacyId = resolveAutoIdentity(thread, env, "path").id
+    const target = await identity(root, targetId, {}, [main])
+    const legacy = await identity(root, legacyId, { "notes/old.md": note("old") }, [])
+    await applyIdentityMerge({ source: legacy.paths, target: target.paths, lock, author: AUTHOR, now: 5000 })
+
+    const found = await findMergePredecessors(root, targetId, resolveGit, await repositoryCandidateDirs([main]))
+
+    expect(found.predecessors.find((entry) => entry.id === legacyId)).toMatchObject({ mergedInto: targetId, mergedHead: await legacy.repo.head() })
+  }, 30_000)
+
+  it("#given a source file that is not UTF-8 #when the merge applies #then it is refused before anything is written (#12974 review r5)", async () => {
+    const root = await memoryRoot()
+    const target = await identity(root, "project-aaaa1111", { "notes/base.md": note("base") }, ["/work/project"])
+    const source = await identity(root, "project-feature-bbbb2222", { "notes/ok.md": note("ok") }, ["/work/project-feature"])
+    await mkdir(join(source.paths.repo, "skills"), { recursive: true })
+    await writeFile(join(source.paths.repo, "skills/icon.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0xfe, 0x00, 0x01]))
+    execFileSync("git", ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", "add", "skills/icon.png"], { cwd: source.paths.repo, stdio: "ignore" })
+    execFileSync("git", ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", "commit", "-q", "--no-verify", "-m", "icon"], { cwd: source.paths.repo, stdio: "ignore" })
+    const before = await target.repo.head()
+
+    const outcome = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 5000 }).catch((error: unknown) => error)
+
+    expect(outcome).toBeInstanceOf(Error)
+    expect(String(outcome)).toContain("skills/icon.png")
+    expect(await target.repo.head()).toBe(before)
+    expect((await target.repo.status()).trim()).toBe("")
+  }, 30_000)
+
   it("#given another writer creates the same path between the plan and the lock #when the merge applies #then the target's file is kept and the source copy goes aside (#12974 review)", async () => {
     const root = await memoryRoot()
     const target = await identity(root, "project-aaaa1111", { "notes/base.md": note("base") }, ["/work/project"])

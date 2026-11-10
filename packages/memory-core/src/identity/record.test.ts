@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { IDENTITY_RECORD_FILENAME, readIdentityRecord, recordIdentityBind } from "./record"
+import { IDENTITY_RECORD_FILENAME, markIdentityMerged, readIdentityRecord, recordIdentityBind } from "./record"
 
 const roots: string[] = []
 
@@ -60,6 +60,20 @@ describe("identity record (#10070)", () => {
 
     expect(await readIdentityRecord(root)).toMatchObject({ kind: "explicit", firstBoundAt: 5000, lastBoundAt: 5000 })
     expect(JSON.parse(await readFile(join(root, IDENTITY_RECORD_FILENAME), "utf8")).version).toBe(1)
+  })
+
+  test("#given binds from many folders and a merge mark landing together #when they finish #then no spelling and no merge marker is lost (#12974 review r5)", async () => {
+    const root = await identityRoot()
+    const spellings = Array.from({ length: 12 }, (_, index) => `/work/thread-${index}`)
+
+    await Promise.all([
+      ...spellings.map((spelling, index) => recordIdentityBind(root, { id: "project-aaaa1111", kind: "auto", mode: "git", source: "/work/project", spelling }, 100 + index)),
+      markIdentityMerged(root, "project-aaaa1111", "project-target", "abc123", 99),
+    ])
+
+    const record = await readIdentityRecord(root)
+    expect([...(record?.spellings ?? [])].sort()).toEqual([...spellings].sort())
+    expect(record).toMatchObject({ mergedInto: "project-target", mergedHead: "abc123" })
   })
 
   test("#given no record #when it is read #then the answer is undefined", async () => {

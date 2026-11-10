@@ -4,7 +4,7 @@ import type { GitExecResult } from "./exec"
 import { commandError } from "./repo-arguments"
 import { readHeadFromFiles } from "./repo-head"
 import { parseLogOutput, parseLogOutputWithPaths } from "./repo-log"
-import { parseCatFileBatch, parseLsTreeBlobs, parseLsTreeSized } from "./repo-tree"
+import { parseCatFileBatch, parseCatFileBatchBytes, parseLsTreeBlobs, parseLsTreeSized } from "./repo-tree"
 import type { GitLogOptions, GitTreeBlobEntry, GitTreeSizedEntry, MemoryCommit } from "./repo-types"
 import { STABLE_LOG_OUTPUT } from "./stable-log-output"
 
@@ -64,6 +64,16 @@ export class GitRevisionReads {
     const result = await this.git.result(argv, `${unique.join("\n")}\n`)
     if (result.code !== 0) throw commandError(argv, result)
     return parseCatFileBatch(result.stdoutBytes ?? Buffer.from(result.stdout, "utf8"))
+  }
+
+  /** `readBlobs` without decoding: the bytes git stored, so a caller can refuse or copy a non-UTF-8 file intact. */
+  async readBlobBytes(oids: readonly string[]): Promise<ReadonlyMap<string, Buffer>> {
+    const unique = [...new Set(oids)]
+    if (unique.length === 0) return new Map()
+    const argv = ["cat-file", "--batch"]
+    const result = await this.git.result(argv, `${unique.join("\n")}\n`)
+    if (result.code !== 0) throw commandError(argv, result)
+    return parseCatFileBatchBytes(result.stdoutBytes ?? Buffer.from(result.stdout, "utf8"))
   }
 
   async log(options: GitLogOptions = {}): Promise<readonly MemoryCommit[]> {
