@@ -352,6 +352,11 @@ describe("memory.auto_identity", () => {
     // then
     expect(parsed).toEqual({ auto_identity: "git" })
   })
+
+  test("#given no auto_identity #when the block is parsed #then the default is git, one memory per repository (#10070)", () => {
+    expect(OmoMemorySettingsSchema.parse({}).auto_identity).toBe("git")
+    expect(OmoMemorySettingsSchema.parse({ auto_identity: "path" }).auto_identity).toBe("path")
+  })
 })
 
 describe("memory.recall.query_expansion", () => {

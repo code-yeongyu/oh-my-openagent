@@ -1,4 +1,5 @@
 export * from "./layout"
+export * from "./merge"
 export * from "./project-scope"
 export * from "./record"
 export * from "./resolve"

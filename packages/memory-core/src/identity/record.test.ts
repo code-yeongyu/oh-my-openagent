@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
+import { existsSync } from "node:fs"
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { IDENTITY_RECORD_FILENAME, readIdentityRecord, recordIdentityBind } from "./record"
+import { IDENTITY_RECORD_FILENAME, markIdentityMerged, readIdentityRecord, recordIdentityBind } from "./record"
 
 const roots: string[] = []
 
@@ -14,7 +15,9 @@ afterEach(async () => {
 async function identityRoot(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "omo-identity-record-"))
   roots.push(root)
-  return join(root, "agents", "project-1234abcd")
+  const identity = join(root, "agents", "project-1234abcd")
+  await mkdir(identity, { recursive: true })
+  return identity
 }
 
 describe("identity record (#10070)", () => {
@@ -56,6 +59,32 @@ describe("identity record (#10070)", () => {
 
     expect(await readIdentityRecord(root)).toMatchObject({ kind: "explicit" })
     expect(JSON.parse(await readFile(join(root, IDENTITY_RECORD_FILENAME), "utf8")).version).toBe(1)
+  })
+
+  test("#given binds from many folders and a merge mark landing together #when they finish #then no spelling and no merge marker is lost (#12974 review r5)", async () => {
+    const root = await identityRoot()
+    const spellings = Array.from({ length: 12 }, (_, index) => `/work/thread-${index}`)
+
+    await Promise.all([
+      ...spellings.map((spelling, index) => recordIdentityBind(root, { id: "project-aaaa1111", kind: "auto", mode: "git", source: "/work/project", spelling })),
+      markIdentityMerged(root, "project-aaaa1111", "project-target", "abc123"),
+    ])
+
+    const record = await readIdentityRecord(root)
+    expect([...(record?.spellings ?? [])].sort()).toEqual([...spellings].sort())
+    expect(record).toMatchObject({ mergedInto: "project-target", mergedHead: "abc123" })
+  })
+
+  test("#given an identity whose store does not exist yet #when a bind is recorded #then nothing is written and no directory is created (bind stays write-free, #12974 train-3)", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "omo-identity-record-"))
+    roots.push(parent)
+    const memoryHome = join(parent, "memory")
+    const root = join(memoryHome, "agents", "project-1234abcd")
+
+    const record = await recordIdentityBind(root, { id: "project-1234abcd", kind: "auto", mode: "git", source: "/w/p", spelling: "/w/p" })
+
+    expect(record).toBeUndefined()
+    expect(existsSync(memoryHome)).toBe(false)
   })
 
   test("#given the same bind recorded at two different times #when identity.json is read back #then the bytes are identical (no wall-clock fields; EQ determinism)", async () => {
