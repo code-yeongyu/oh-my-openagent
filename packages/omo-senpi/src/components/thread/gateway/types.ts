@@ -79,6 +79,8 @@ export type DeliveryRow = {
   readonly claimed_at: number | null
   readonly attempt: number
   readonly admission_kind: string | null
+  /** What the receiver was parked on when it queued the delivery (#13014); null when it was not. */
+  readonly wait_kind: "approval" | null
   readonly turn_epoch: number | null
   readonly root_id: string
   readonly hop: number
@@ -179,8 +181,8 @@ export type ClaimRequest = {
 export type ClaimOutcome = { readonly kind: "claimed"; readonly row: DeliveryRow } | { readonly kind: "lost"; readonly state: DeliveryState | null }
 
 export type OutcomeRecord =
-  | { readonly kind: "admitted"; readonly admission_kind: string; readonly turn_epoch: number }
-  | { readonly kind: "applied"; readonly admission_kind: string; readonly turn_epoch: number }
+  | { readonly kind: "admitted"; readonly admission_kind: string; readonly turn_epoch: number; readonly wait_kind?: "approval" }
+  | { readonly kind: "applied"; readonly admission_kind: string; readonly turn_epoch: number; readonly wait_kind?: "approval" }
   | { readonly kind: "requeue" }
   | { readonly kind: "refused"; readonly reason: RefusalReason }
 
@@ -195,8 +197,11 @@ export type GatewayDeliveryDelivery =
   | { readonly kind: "started" | "steered"; readonly turn_id: string }
   | { readonly kind: "queued" | "queued_offline"; readonly queue_position: number; readonly waiting_on?: DeliveryWait }
 
-/** What the receiver is parked on while the delivery waits: an approval (a tool permission or question) a human must answer on that device. */
-export type DeliveryWait = { readonly kind: "approval"; readonly device: string }
+/**
+ * What the receiver is parked on while the delivery waits: an approval (a tool permission or question) a human must answer on
+ * that device. `device` is the account device it waits on; absent when this install has no device identity (#13014).
+ */
+export type DeliveryWait = { readonly kind: "approval"; readonly device?: string }
 
 export type GatewayDeliverySuccess = {
   readonly kind: "ok"

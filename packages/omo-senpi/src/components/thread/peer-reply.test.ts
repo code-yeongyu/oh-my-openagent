@@ -122,7 +122,7 @@ describe("#12886 a peer-delivered run replies to its sender", () => {
     const row = {
       delivery_id: "d-1", target_durable_id: "receiver", seq: 1, sender: "session:sess-a", sender_turn: null, envelope,
       body: "What is your hostname?", bytes: 22, mode_requested: "auto", mode_effective: null, expected_turn_id: null,
-      state: "queued", reason: null, admitted_by: null, claimed_at: null, attempt: 0, admission_kind: null, turn_epoch: null,
+      state: "queued", reason: null, admitted_by: null, claimed_at: null, attempt: 0, admission_kind: null, wait_kind: null, turn_epoch: null,
       root_id: "root-1", hop: 1, created_at: 1, updated_at: 1, expires_at: 2, binding_id: null, binding_revision: null,
       actor_user_id: null,
     } satisfies DeliveryRow

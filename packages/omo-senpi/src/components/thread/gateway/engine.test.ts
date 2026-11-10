@@ -78,6 +78,33 @@ describe("all_fifteen_delivery_state_cases", () => {
   }, 30_000)
 })
 
+describe("#13014: a local send to a session parked on a question names the wait, as a send to another device does", () => {
+  test.each([
+    ["with a device identity", "dev-here", { kind: "approval", device: "dev-here" }],
+    ["without a device identity", undefined, { kind: "approval" }],
+  ] as const)("#given B waits on a question and this install runs %s #when A sends a follow_up #then it is queued with waiting_on approval, naming this device only when it has one", async (_label, device, waiting) => {
+    harness = createGatewayHarness(device === undefined ? {} : { device })
+    const h = harness
+    h.session("A")
+    const b = h.session("B")
+    b.runtime.beginUserTurn()
+    b.runtime.phaseValue = "waiting_question"
+    const result = await send(h, "A", "B", "after your question", { mode: "follow_up" })
+    expect(result).toMatchObject({ kind: "ok", delivery: { kind: "queued", queue_position: 1, waiting_on: waiting } })
+    if (result.kind !== "ok" || result.delivery.kind !== "queued") throw new Error(`expected queued, got ${JSON.stringify(result)}`)
+    expect(result.delivery.waiting_on).toEqual(waiting)
+  })
+
+  test("#given B is busy in a turn, not on a question #when A sends a follow_up #then it is queued with no waiting_on", async () => {
+    const h = open()
+    h.session("A")
+    h.session("B").runtime.beginUserTurn()
+    const result = await send(h, "A", "B", "later", { mode: "follow_up" })
+    expect(result).toMatchObject({ kind: "ok", delivery: { kind: "queued" } })
+    expect(result.kind === "ok" && "waiting_on" in result.delivery).toBe(false)
+  })
+})
+
 describe("turn_epoch_cas_and_fifo", () => {
   test("#given a mid-turn target #when a steer names the previous epoch #then it is refused turn_conflict and nothing is enqueued", async () => {
     const h = open()

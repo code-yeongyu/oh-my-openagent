@@ -47,7 +47,8 @@ export type GatewayHarness = {
   readonly dispose: () => Promise<void>
 }
 
-export function createGatewayHarness(options: { readonly startAt?: number } = {}): GatewayHarness {
+/** `device`: the account device id this install stamps on its sends' provenance (absent: no device identity). */
+export function createGatewayHarness(options: { readonly startAt?: number; readonly device?: string } = {}): GatewayHarness {
   const agentDir = realpathSync(mkdtempSync(join(tmpdir(), "omo-gateway-")))
   mkdirSync(join(agentDir, "sessions"), { recursive: true })
   const clock = { now: options.startAt ?? Date.UTC(2026, 8, 29, 0, 0, 0) }
@@ -95,7 +96,7 @@ export function createGatewayHarness(options: { readonly startAt?: number } = {}
   }
 
   function engineFor(target: GatewayStore, cwd: string = agentDir): GatewayEngine {
-    return createGatewayEngine({ store: target, endpoints, resolve: resolveFromEntries(entries, () => cwd), now, senderProvenance: async () => ({ workspace: "unclassified", project: "fixture" }) })
+    return createGatewayEngine({ store: target, endpoints, resolve: resolveFromEntries(entries, () => cwd), now, senderProvenance: async () => ({ workspace: "unclassified", project: "fixture", ...(options.device === undefined ? {} : { device: options.device }) }) })
   }
 
   const endpoints: GatewayEndpointPort = {
