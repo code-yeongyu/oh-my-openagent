@@ -563,33 +563,34 @@ Configured under `memory` in `omo.json`, with per-agent overrides under `memory.
 | -------------------- | ---------- | ------------------------------------------------------------------------------- |
 | `enabled`            | `true`     | Master switch for the whole memory component                                     |
 | `agent`              | `"auto"`   | Which agent identity owns the memory repository                                  |
-| `auto_identity`      | `"path"`   | How `agent: "auto"` picks the identity: `"path"` or `"git"` (see below); root only, not per agent |
+| `auto_identity`      | `"git"`    | How `agent: "auto"` picks the identity: `"git"` (one per repository) or `"path"` (see below); root only, not per agent |
 | `compile_warn_tokens`| `30000`    | Warn when the compiled memory block exceeds this many tokens                     |
 | `facts_note_max_bytes`| `49152`   | A committed `notes/facts/<YYYY-MM>.md` over this many bytes starts a memory pressure dream that consolidates it (retires superseded and day-only facts into `ARCHIVE.md`); `/doctor` lists notes over it; `0` turns the budget off |
 | `agents`             | `{}`       | Per-agent overrides; any block below may be overridden field by field            |
 
-#### Sharing memory across git worktrees
+#### One memory per repository
 
-With `agent: "auto"`, the memory identity comes from the session's directory, so by default every
-git worktree of a repository gets its own, empty memory. Set `auto_identity: "git"` to resolve a
-linked worktree onto its main checkout instead: every worktree of one clone then reads and writes
-the main checkout's memory, and a subdirectory maps onto the same subdirectory of the main checkout.
-The main checkout keeps the identity it has today, so turning this on loses nothing. Worktrees of a
-bare repository share one memory named after the repository. Directories outside git, submodules
-(also inside a worktree), and repositories whose main working tree git does not record (a clone made
-with `--separate-git-dir` and no `core.worktree`) keep the path-derived identity, and an explicit
-`agent` name always wins. `auto_identity` is set on the `memory` block itself; the per-agent
-`agents` overrides do not accept it.
+With `agent: "auto"` and the default `auto_identity: "git"`, every directory inside a git repository
+uses that repository's memory: the main checkout, any subdirectory, every linked worktree (including
+the per-thread worktrees OmO Desktop creates), and any spelling of the path through a symlink. A
+bare repository's worktrees share one memory named after the repository. A submodule, a nested
+repository and a clone made with `--separate-git-dir` without `core.worktree` keep their own root's
+memory. A repository rooted at or above your home directory counts as no repository, and a directory
+outside any repository keeps a memory of its own. An explicit `agent` name always wins.
+`auto_identity: "path"` restores the older behaviour, where each directory has its own memory.
 
-Put the setting in the user config (`~/.omo/omo.jsonc`). Tools such as Orca create worktrees outside
-the main checkout, where its project `.omo/omo.jsonc` is not found. Sessions that are already bound
-keep their current memory; new sessions pick up the shared one. Changing `auto_identity` (on or
-off) rebinds the identity for new worktree sessions, and with it which memory sync stream they join:
-a worktree session with `"git"` reads and writes the main checkout's memory, and also syncs it
-when `memory.sync.enabled` is on and the device is signed in. A worktree opened through a symlinked
-path still maps to its main checkout. Git records the real path of the main checkout, though, so a
-main checkout opened through a symlinked path resolves differently from its worktrees; use an
-explicit `agent` name in that case.
+Put the setting in the user config (`~/.omo/omo.jsonc`); `memory.agent` and `auto_identity` are read
+from the config layers of the directory the session runs in. Sessions that are already bound keep
+their current memory; new sessions pick up the repository's.
+
+Memory written before this default (or with `"path"`) may sit in one store per worktree or
+subdirectory. `/doctor` lists such stores as `memory-fragmentation` until they are merged.
+`/memory-merge` shows, without changing anything, which stores map to the current repository and
+what each would bring in; `/memory-merge --apply` merges each one as a single commit: files the
+repository memory lacks are added, identical files are skipped, and differing files (and anything
+under the old store's `system/`) are kept under `reference/merged/<old-id>/`. The repository's own
+`system/` is never written, the old store is left as it is, and a second run merges only commits made
+after the first. Undo a merge by reverting its commit.
 
 #### Memory from projects the session touches
 

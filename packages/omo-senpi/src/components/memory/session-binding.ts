@@ -3,7 +3,7 @@
 // memory module supervisor and the end-to-end encrypted sync runner for durable sessions.
 
 import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
-import { isAutoAgentValue, resolveAutoIdentity, resolveMemoryIdentity, resolveMemoryRoot, type InFlightReads } from "@oh-my-opencode/memory-core"
+import { isAutoAgentValue, recordIdentityBind, resolveAutoIdentity, resolveMemoryIdentity, resolveMemoryRoot, type InFlightReads } from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
@@ -75,7 +75,11 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
     eventCtx: unknown,
     options: { readonly existing: SessionState | undefined; readonly verifyRepository: boolean },
   ): void => {
-    const sessionConfig = deps.resolveConfig(loadConfig({ cwd }))
+    // The identity belongs to the SESSION's workspace, not to whatever directory the host
+    // process happens to sit in: one shared host serves sessions from many workspaces (#8556),
+    // and so does the memory config that names it (#10070).
+    const sessionCwd = surface.cwd ?? cwd
+    const sessionConfig = deps.resolveConfig(loadConfig({ cwd: sessionCwd }))
     const state: SessionState = options.existing ?? {
       enabled: deps.isEnabled(sessionConfig),
       memoryStatusAttempted: false,
@@ -86,21 +90,31 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
     sessions.set(surface.id, state)
     if (!state.enabled) return
 
-    // The identity belongs to the SESSION's workspace, not to whatever directory the host
-    // process happens to sit in: one shared host serves sessions from many workspaces (#8556).
-    const sessionCwd = surface.cwd ?? cwd
     const memoryRoot = resolveMemoryRoot(env, sessionCwd)
-    const resolved = isAutoAgentValue(sessionConfig.agent)
-      ? resolveAutoIdentity(sessionCwd, env, sessionConfig.auto_identity)
-      : resolveMemoryIdentity(sessionConfig.agent, sessionCwd, env)
     const previous = findLatestMemoryBinding(surface.readEntries())
-    const adoption = adoptSessionIdentity({
-      recorded: previous,
-      resolved,
-      memoryRoot,
-      configAgentValue: sessionConfig.agent,
-      verifyRepository: options.verifyRepository,
-    })
+    // A resumed session is judged under its own folder's config first. Its record may instead come from a
+    // bind made before #10070, when the config was read from the host folder, so a conflict there is
+    // retried under that host config before the bind fails closed.
+    const adoptUnder = (config: OmoMemorySettings) => {
+      const resolvedId = isAutoAgentValue(config.agent)
+        ? resolveAutoIdentity(sessionCwd, env, config.auto_identity)
+        : resolveMemoryIdentity(config.agent, sessionCwd, env)
+      const result = adoptSessionIdentity({
+        recorded: previous,
+        resolved: resolvedId,
+        memoryRoot,
+        configAgentValue: config.agent,
+        verifyRepository: options.verifyRepository,
+      })
+      return { config, resolved: resolvedId, adoption: result }
+    }
+    let attempt = adoptUnder(sessionConfig)
+    if (attempt.adoption.kind === "conflict" && previous !== undefined && surface.cwd !== undefined && surface.cwd !== cwd) {
+      const hostAttempt = adoptUnder(deps.resolveConfig(loadConfig({ cwd })))
+      if (hostAttempt.adoption.kind !== "conflict") attempt = hostAttempt
+    }
+    const { config: bindConfig, resolved, adoption } = attempt
+    const autoAgent = isAutoAgentValue(bindConfig.agent)
     if (adoption.kind === "conflict") {
       if (!state.conflictNotified) {
         state.conflictNotified = true
@@ -146,6 +160,18 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
       state.syncRepo = identity.paths.repo
       void syncRunner.acquire(identity.id, identity.paths, sessionConfig.sync, { profile: sessionConfig.agent, projectDir: sessionCwd })
     }
+    // `identity.json` is what `/memory-merge` maps old identities from (#10070), so it records only binds
+    // whose identity this config actually derived; a rebind to a recorded identity says nothing new about
+    // how that identity came to be. A failed write is logged, never a failed bind.
+    if (adoption.kind === "resolved") void deps.work.track(() => recordIdentityBind(run.paths.root, {
+      id: identity.id,
+      kind: autoAgent ? "auto" : "explicit",
+      mode: bindConfig.auto_identity,
+      source: sessionCwd,
+      spelling: sessionCwd,
+    }, binding.boundAt)).catch((error: unknown) => {
+      ctx.logger.warn("omo-senpi memory identity record write failed", { sessionId: surface.id, error: error instanceof Error ? error.message : String(error) })
+    })
     // Disposable bookkeeping: a session closed without a conversation leaves no file (senpi#3263).
     pi.appendEntry(MEMORY_BINDING_CUSTOM_TYPE, binding, { startupBookkeeping: true })
     // Bind-time reconcile floats past the bind by design, but its rejection must not

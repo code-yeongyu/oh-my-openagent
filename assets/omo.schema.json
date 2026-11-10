@@ -1672,7 +1672,7 @@
           "minLength": 1
         },
         "auto_identity": {
-          "default": "path",
+          "default": "git",
           "type": "string",
           "enum": [
             "path",

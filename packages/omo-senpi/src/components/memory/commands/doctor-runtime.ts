@@ -4,7 +4,9 @@
 // stale locks, orphaned reflection worktrees, and the compile-warn token
 // advisory. Output is read-only and never enters model context.
 
-import { auditMemoryRepo, redactSecretLikeMaterial, type MemoryAuditReport } from "@oh-my-opencode/memory-core"
+import { dirname } from "node:path"
+
+import { auditMemoryRepo, redactSecretLikeMaterial, resolveAutoIdentity, type MemoryAuditReport } from "@oh-my-opencode/memory-core"
 import { parseCommandArgs } from "./args"
 import { projectionLimits } from "../projection-limits"
 import { checkProjection } from "./doctor-projection"
@@ -18,6 +20,7 @@ import {
   checkRuntimeSize,
   checkSoulSeed,
   checkFactsNotes,
+  checkMemoryFragmentation,
   checkTokens,
   checkWorktrees,
   type CheckLevel,
@@ -140,6 +143,7 @@ export async function runDoctor(deps: MemoryCommandDeps, ctx: MemoryCommandConte
       await checkReflectionHealth(identity.identityPaths.reflection, { now: deps.now?.() ?? Date.now() }),
       await checkTokens(repoDir, warnTokens, systemTokens),
       await checkFactsNotes(repoDir, settings.facts_note_max_bytes),
+      await checkMemoryFragmentation(identity.identityPaths, (spelling) => resolveAutoIdentity(spelling, { ...(deps.env ?? process.env), OMO_MEMORY_HOME: dirname(dirname(identity.identityPaths.root)) }, settings.auto_identity).id),
       runtime.check,
     )
     const projection = await checkProjection(repoDir, identity.identity, projectionLimits(settings, identity.identity))
