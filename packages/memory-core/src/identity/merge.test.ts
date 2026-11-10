@@ -235,6 +235,43 @@ describe("identity merge (#10070)", () => {
     expect((await target.repo.status()).trim()).toBe("")
   }, 30_000)
 
+  it("#given an explicit profile store bound from a folder of this repository #when predecessors are found #then the profile is not offered (#12974 review r6)", async () => {
+    const root = await memoryRoot()
+    await identity(root, "project-aaaa1111", {}, ["/work/project"])
+    const profile = await identity(root, "work-00e13ed7", { "notes/p.md": note("profile") }, [])
+    await recordIdentityBind(profile.paths.root, { id: "work-00e13ed7", kind: "explicit", mode: "git", source: "work", spelling: "/work/project" }, 1)
+
+    const found = await findMergePredecessors(root, "project-aaaa1111", (spelling) => (spelling === "/work/project" ? "project-aaaa1111" : spelling))
+
+    expect(found.predecessors.map((entry) => entry.id)).not.toContain("work-00e13ed7")
+  }, 30_000)
+
+  it("#given a source path whose first segment is System/ #when the merge is planned #then it goes aside like system/ (#12974 review r6)", async () => {
+    const root = await memoryRoot()
+    const target = await identity(root, "project-aaaa1111", { "system/persona.md": note("persona") }, ["/work/project"])
+    const source = await identity(root, "project-feature-bbbb2222", { "System/x.md": note("x") }, ["/work/project-feature"])
+
+    const plan = await planIdentityMerge(source.paths, target.paths)
+
+    expect(plan.actions).toEqual([{ path: "System/x.md", action: "keep-aside", destination: "reference/merged/project-feature-bbbb2222/System/x.md" }])
+  }, 30_000)
+
+  it("#given a merge that commits #when the write lock is released #then the source is already marked merged (#12974 review r6)", async () => {
+    const root = await memoryRoot()
+    const target = await identity(root, "project-aaaa1111", { "notes/base.md": note("base") }, ["/work/project"])
+    const source = await identity(root, "project-feature-bbbb2222", { "notes/new.md": note("new") }, ["/work/project-feature"])
+    let markedAtRelease: unknown
+    const observingLock = async <T>(_domain: unknown, operation: () => Promise<T>): Promise<T> => {
+      const result = await operation()
+      markedAtRelease = (await readIdentityRecord(source.paths.root))?.mergedInto
+      return result
+    }
+
+    await applyIdentityMerge({ source: source.paths, target: target.paths, lock: observingLock, author: AUTHOR, now: 5000 })
+
+    expect(markedAtRelease).toBe("project-aaaa1111")
+  }, 30_000)
+
   it("#given another writer creates the same path between the plan and the lock #when the merge applies #then the target's file is kept and the source copy goes aside (#12974 review)", async () => {
     const root = await memoryRoot()
     const target = await identity(root, "project-aaaa1111", { "notes/base.md": note("base") }, ["/work/project"])

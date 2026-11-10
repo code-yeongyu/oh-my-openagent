@@ -6,7 +6,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { GitMemoryRepo, recordIdentityBind, resolveAutoIdentity, type MemoryIdentity } from "@oh-my-opencode/memory-core"
-import { MemoryFakeExtensionAPI } from "../memory.test-support"
+import { MemoryFakeExtensionAPI, memorySettings } from "../memory.test-support"
 import { fakeCommandContext, fakeDeps, invoke } from "./commands.test-support"
 import { registerMemoryMergeCommand } from "./memory-merge"
 import { removeTree } from "../../../../../../test-support/remove-tree"
@@ -87,5 +87,26 @@ describe("/memory-merge (#10070)", () => {
     const { pi } = await desktopLayout()
 
     expect(await invoke(pi, "memory-merge", "--force", fakeCommandContext())).toContain("usage: /memory-merge [--apply]")
+  }, 60_000)
+  test("#given a user who pinned auto_identity to path #when /memory-merge runs at the repository root #then a subfolder store kept on purpose is not offered (#12974 review r6)", async () => {
+    const parent = realpathSync.native(mkdtempSync(join(tmpdir(), "omo-memory-merge-path-")))
+    roots.push(parent)
+    const main = join(parent, "project")
+    const sub = join(main, "packages", "sub")
+    mkdirSync(sub, { recursive: true })
+    git(main, ["init", "--quiet", "--initial-branch=main"])
+    const env = { OMO_MEMORY_HOME: join(parent, "memory") }
+    const target = resolveAutoIdentity(main, env, "path")
+    const subStore = resolveAutoIdentity(sub, env, "path")
+    await seed(target, { "notes/root.md": note("root") })
+    await seed(subStore, { "notes/sub.md": note("sub") })
+    await recordIdentityBind(target.paths.root, { id: target.id, kind: "auto", mode: "path", source: main, spelling: main }, 1)
+    await recordIdentityBind(subStore.paths.root, { id: subStore.id, kind: "auto", mode: "path", source: sub, spelling: sub }, 2)
+    const pi = new MemoryFakeExtensionAPI()
+    registerMemoryMergeCommand(pi, fakeDeps({ identity: target.id, identityPaths: target.paths }, { env, loadSettings: () => ({ settings: memorySettings({ auto_identity: "path" }) }) }))
+
+    const text = await invoke(pi, "memory-merge", "", fakeCommandContext())
+
+    expect(text).toContain(`no other memory store maps to ${target.id}`)
   }, 60_000)
 })

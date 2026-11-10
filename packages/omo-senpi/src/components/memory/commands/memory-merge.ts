@@ -39,7 +39,9 @@ async function runMemoryMerge(deps: MemoryCommandDeps, args: string, ctx: Memory
 
   const memoryRoot = dirname(dirname(identity.identityPaths.root))
   const env = { ...(deps.env ?? process.env), OMO_MEMORY_HOME: memoryRoot }
-  const resolve = (spelling: string): string => resolveAutoIdentity(spelling, env, "git").id
+  // The mode the user configured: with `auto_identity: "path"` pinned, subfolder stores are kept on purpose.
+  const mode = deps.loadSettings().settings.auto_identity
+  const resolve = (spelling: string): string => resolveAutoIdentity(spelling, env, mode).id
   const spellings = (await readIdentityRecord(identity.identityPaths.root).catch(() => undefined))?.spellings ?? []
   const found = await findMergePredecessors(memoryRoot, identity.identity, resolve, await repositoryCandidateDirs(spellings))
   const unmapped = found.unmapped.length === 0 ? [] : [`left alone (no recorded directory maps here): ${found.unmapped.join(", ")}`]

@@ -64,7 +64,9 @@ export async function findMergePredecessors(
   for (const id of ids) {
     const paths = buildIdentityPaths(memoryRoot, id)
     const record = await readIdentityRecord(paths.root).catch(() => undefined)
-    if (record === undefined || record.spellings.length === 0) continue
+    // An explicit `memory.agent` profile is a cross-project store the user named on purpose; it is never a
+    // fragment of the repository it happened to be used from.
+    if (record === undefined || record.spellings.length === 0 || record.kind !== "auto") continue
     if (record.spellings.some((spelling) => resolve(spelling) === targetId)) {
       predecessors.push({ id, paths, spellings: record.spellings, ...(record.mergedInto === undefined ? {} : { mergedInto: record.mergedInto }), ...(record.mergedHead === undefined ? {} : { mergedHead: record.mergedHead }) })
     } else {
@@ -190,7 +192,7 @@ export async function planIdentityMerge(
       const existing = targetBlobs.get(entry.path)
       if (existing?.oid === entry.oid) return { path: entry.path, action: "skip" }
       const foldedCollision = existing === undefined && targetFolded.has(entry.path.toLowerCase())
-      if (existing === undefined && !foldedCollision && !entry.path.startsWith("system/")) {
+      if (existing === undefined && !foldedCollision && !entry.path.toLowerCase().startsWith("system/")) {
         return { path: entry.path, action: "add", destination: entry.path }
       }
       return { path: entry.path, action: "keep-aside", destination: freeAsidePath(sourceId, sourceHead, entry.path, targetBlobs, targetFolded) }
@@ -254,7 +256,11 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
         `${MERGED_FROM_TRAILER}: ${plan.sourceId}`,
         `${MERGED_HEAD_TRAILER}: ${plan.sourceHead}`,
       ].join("\n")
-      return { plan, sha: (await targetRepo.commitWrite(destinations, message, author)).sha }
+      const sha = (await targetRepo.commitWrite(destinations, message, author)).sha
+      // Marked before the lock is released: a crash between the commit and the mark would make a rerun plan
+      // from scratch and write a second set of aside copies.
+      await markIdentityMerged(source.root, plan.sourceId, targetId, plan.sourceHead, now)
+      return { plan, sha }
     } catch (error) {
       if (error instanceof NoEffectiveChangesError) {
         await targetRepo.restorePaths(destinations)
@@ -264,7 +270,7 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
       throw error
     }
   })
-  if (outcome.plan.sourceHead !== null) await markIdentityMerged(source.root, outcome.plan.sourceId, targetId, outcome.plan.sourceHead, now)
+  if (outcome.sha === undefined && outcome.plan.sourceHead !== null) await markIdentityMerged(source.root, outcome.plan.sourceId, targetId, outcome.plan.sourceHead, now)
   return outcome.sha === undefined
     ? { status: "nothing-to-merge", plan: outcome.plan }
     : { status: "merged", sha: outcome.sha, plan: outcome.plan }
