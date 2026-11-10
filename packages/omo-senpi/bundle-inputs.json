@@ -2068,6 +2068,7 @@
     "packages/senpi-task/src/runners/rpc/model-catalog-probe.ts",
     "packages/senpi-task/src/runners/rpc/native-run-pause.ts",
     "packages/senpi-task/src/runners/rpc/parent-extensions.ts",
+    "packages/senpi-task/src/runners/rpc/persona-args.ts",
     "packages/senpi-task/src/runners/rpc/protocol-client.ts",
     "packages/senpi-task/src/runners/rpc/protocol-errors.ts",
     "packages/senpi-task/src/runners/rpc/senpi-launcher.ts",
