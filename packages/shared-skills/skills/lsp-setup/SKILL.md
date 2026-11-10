@@ -87,8 +87,10 @@ first project file that exists, plus one user file:
 | OpenCode | `.opencode/lsp.json`, then `.omo/lsp.json`, then `.omo/lsp-client.json` | `lsp.json` in the OpenCode config dir (default `~/.config/opencode/lsp.json`) |
 | OmO native | `.omo/lsp-client.json`, then `.pi/lsp-client.json` | `~/.omo/lsp-client.json` (`~/.pi/lsp-client.json` when only that one exists) |
 
-On Codex, the two files in its row are read by the post-edit LSP hook (the diagnostics run after
-an edit); the `lsp_*` tools do not read them.
+On Codex, both the `lsp_*` tools and the post-edit LSP hook (the diagnostics run after an edit) read
+`.codex/lsp-client.json`. They differ only on the user file: the hook follows `$CODEX_HOME`, while the
+`lsp_*` tools always read `~/.codex/lsp-client.json`. With a custom `$CODEX_HOME`, keep a user file in
+both places or put the setting in the project file.
 
 A standalone `lsp-tools-mcp` launch reads the paths in
 `LSP_TOOLS_MCP_PROJECT_CONFIG` / `LSP_TOOLS_MCP_USER_CONFIG` instead.

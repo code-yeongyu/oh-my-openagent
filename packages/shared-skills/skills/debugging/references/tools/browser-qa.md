@@ -33,7 +33,8 @@ try {
   await trace.step("submit", async () => {
     const { tree } = await page.snapshot({ interactive: true })       // read, then act on a fresh ref
     await page.locator("e5").fill(value)
-    await readConsoleErrors()                                           // the form page's errors, before the submit navigates
+    await readConsoleErrors()                                           // the form page's errors so far; anything the click or
+                                                                        // submit handler logs before navigating is not captured
     await page.locator("e7").click()
     await page.waitForURL(/\/done/, { timeout: 10_000 })
   })
