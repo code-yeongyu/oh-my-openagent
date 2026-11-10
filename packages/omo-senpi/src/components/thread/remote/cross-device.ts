@@ -106,7 +106,8 @@ export async function planCreate(
       if ("result" in wanted) return { kind: "done", result: wanted.result }
       if (wanted.id !== (source.kind === "remote" ? source.row.device : undefined)) return { kind: "done", result: invalid("A fork is created on the device that holds its source thread.", "Drop device, or fork a thread on the device you name.") }
     }
-    const fork = { ...(value.cwd === undefined ? {} : { cwd: value.cwd }), forkFrom: source.kind === "remote" ? source.row.session_id : source.address }
+    // The far engine opens a fork by the id IT knows the source under: its durable id (the listing key is the relay's).
+    const fork = { ...(value.cwd === undefined ? {} : { cwd: value.cwd }), forkFrom: source.kind === "remote" ? source.row.durable_id ?? source.row.session_id : source.address }
     return source.kind === "remote" ? { kind: "open", host: createRelaySessionHost(remote, source.row.device), request: fork, creates: true } : here(fork, true)
   }
   if (value.device === undefined) return create(local.host)

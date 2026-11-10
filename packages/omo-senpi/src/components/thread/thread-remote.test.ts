@@ -16,8 +16,8 @@ describe("thread_set_model on another device", () => {
     const result = await run("thread_set_model", { thread: "dur-on-b", model: "opus" })
     expect(result).toEqual({ kind: "ok", thread_id: "dur-on-b", model: { provider: "anthropic", id: "claude-opus" }, device: "b" })
     expect(a.sent.map((entry) => [entry.via, entry.device, entry.session, entry.rpc])).toEqual([
-      ["session", "b", "dur-on-b", { type: "get_available_models", sessionId: "dur-on-b" }],
-      ["session", "b", "dur-on-b", { type: "set_model", sessionId: "dur-on-b", provider: "anthropic", modelId: "claude-opus" }],
+      ["session", "b", "rk-on-b", { type: "get_available_models", sessionId: "rk-on-b" }],
+      ["session", "b", "rk-on-b", { type: "set_model", sessionId: "rk-on-b", provider: "anthropic", modelId: "claude-opus" }],
     ])
   })
 

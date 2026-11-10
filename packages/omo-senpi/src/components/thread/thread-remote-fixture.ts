@@ -9,9 +9,9 @@ import type { ThreadTranscriptEntry } from "./reader"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import type { ThreadCloseOutcome } from "./tools/ports"
 
-// TODO(#13017, this PR before merge): the shared row's listing key must differ from its durable id (audit class C8); the
-// dedicated split-key.test.ts proves the distinction for list -> send and create until the fixture's locate/alias holders are migrated.
-export const B_ROW: RemoteSessionRow = { device: "b", session_id: "dur-on-b", durable_id: "dur-on-b", title: "on b", project: "/work/b", path: "/home/b/.omo/agent/sessions/dur-on-b.jsonl", state: "idle", updated_ms: 1_700_000_000_000 }
+// The listing key (what b's connector assigned) deliberately differs from the durable id (audit class C8, #13017): a test
+// that passes with either id proves nothing about which one a tool path matched.
+export const B_ROW: RemoteSessionRow = { device: "b", session_id: "rk-on-b", durable_id: "dur-on-b", title: "on b", project: "/work/b", path: "/home/b/.omo/agent/sessions/dur-on-b.jsonl", state: "idle", updated_ms: 1_700_000_000_000 }
 
 type Sent = { readonly via: "endpoint" | "session" | "read" | "watch"; readonly device: string; readonly session?: string; readonly rpc?: JsonObject }
 
@@ -50,7 +50,8 @@ export function createRemoteThreadFixture() {
     // The sessions b's engine holds. Its close rules are senpi's (2026.11.5-1): close_session from a connection that never
     // attached is refused unknown_session (senpi#1782); an attached close releases only that hold, so the session ends
     // only with no other holder; unload_session with force drains every hold, and refuses a session with no file yet.
-    const live = new Set(options.live ?? [B_ROW.session_id])
+    // b's engine knows its sessions by the listing key; rows a test builds with the durable id as key (titled(), the remote verbs' typed id) are live too.
+    const live = new Set(options.live ?? [B_ROW.session_id, ...(B_ROW.durable_id === undefined ? [] : [B_ROW.durable_id])])
     const answer = (rpc: JsonObject, attachedTo?: string): RemoteCommandOutcome => {
       // The engine's real reply envelope, as the device service hands it back (device-service-core's CommandResult.response):
       // every field the tools read lives under `data`.
