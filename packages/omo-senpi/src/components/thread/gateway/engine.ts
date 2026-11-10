@@ -5,10 +5,11 @@ import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from 
 import type { EndpointLiveness, GatewayEndpointPort, GatewayEndpointRef } from "./adapter"
 import { TARGET_MAX_BYTES } from "./constants"
 import { decideDelivery } from "./decision"
+import { senderFacts } from "./envelope"
 import { resultFromRow } from "./result"
 import { resolveProvenance } from "./provenance-resolver"
 import type { GatewayStore } from "./store"
-import type { EnvelopeOrigin, ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult, GatewaySender, Provenance } from "./types"
+import type { ExternalAuthor, GatewayDeliveryMode, GatewayDeliveryResult, GatewaySender, Provenance } from "./types"
 
 export type GatewayTarget = {
   readonly durable_id: string
@@ -34,6 +35,8 @@ export type GatewayDeliverRequest = {
   readonly all_scope?: boolean
   readonly idempotency_key?: string
   readonly root_id?: string
+  /** The highest chain hop an input of the caller's current run arrived with from another device (K8): the row continues it. */
+  readonly inbound_hop?: number
 }
 
 export type GatewayEngine = {
@@ -74,64 +77,6 @@ const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
 
 function fail(code: ThreadErrorCode, message: string, details?: Readonly<Record<string, unknown>>): GatewayDeliveryResult {
   return { kind: "error", error: threadToolFailure(code, message, NEXT_ACTION[code] ?? "Call thread_list and retry after checking the target.", details) }
-}
-
-type SenderFacts = {
-  readonly provenance: Provenance
-  readonly principal: string
-  readonly rate_principal: string
-  readonly node: string
-  readonly turn: string | null
-  readonly cause: string | null
-  readonly actor: string
-  readonly origin: (deliveryId: string) => EnvelopeOrigin
-  readonly binding: { readonly binding_id: string; readonly revision: number } | null
-}
-
-function senderFacts(sender: GatewaySender, resolved: Provenance): SenderFacts {
-  const sessionLabel = sender.kind === "session" ? sender.name?.trim() : undefined
-  const provenance = { ...resolved, ...(sessionLabel ? { session: sessionLabel } : {}) }
-  if (sender.kind === "session") {
-    return {
-      provenance,
-      principal: `session:${sender.durable_id}`,
-      rate_principal: `session:${sender.durable_id}`,
-      node: sender.durable_id,
-      turn: sender.turn_id ?? null,
-      cause: sender.cause_delivery_id ?? null,
-      actor: sender.name ?? sender.durable_id,
-      origin: () => ({ session: sender.durable_id }),
-      binding: null,
-    }
-  }
-  if (sender.kind === "cli") {
-    const principal = `cli:${sender.uid}`
-    return {
-      provenance,
-      principal,
-      rate_principal: principal,
-      node: principal,
-      turn: null,
-      cause: null,
-      actor: sender.user,
-      origin: (deliveryId) => ({ external: { platform: "cli", account_id: sender.user, chat_id: "@cli", thread_id: "@chat", message_id: deliveryId } }),
-      binding: null,
-    }
-  }
-  const principal = `binding:${sender.binding_id}`
-  const author = sender.origin.author
-  return {
-    provenance,
-    principal,
-    // Each human in a bound thread gets their own pair bucket; a sender with no author shares the binding's.
-    rate_principal: author === undefined ? principal : `${principal}#author:${author.platform_user_id}`,
-    node: principal,
-    turn: null,
-    cause: null,
-    actor: sender.origin.account_id,
-    origin: () => ({ external: sender.origin }),
-    binding: { binding_id: sender.binding_id, revision: sender.binding_revision },
-  }
 }
 
 function argsHash(value: unknown): string {
@@ -185,6 +130,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       sender_node: facts.node,
       sender_turn: facts.turn,
       cause_delivery_id: facts.cause,
+      ...(request.inbound_hop === undefined ? {} : { inbound_hop: request.inbound_hop }),
       claimed_root_id: request.root_id ?? null,
       origin: facts.origin(deliveryId),
       actor: facts.actor,
