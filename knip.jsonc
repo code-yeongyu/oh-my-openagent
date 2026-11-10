@@ -3702,6 +3702,8 @@
         "src/cli/install-codex/toml-section-editor.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/install-codex/types.ts",
+        // a child-process fixture: refresh-process.test.ts runs it under a scratch HOME, nothing imports it (#12978)
+        "src/cli/service-auth/account-home.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/service-auth/accounts-closed.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
