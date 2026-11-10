@@ -1,11 +1,9 @@
-import { FABLE_55_LAUNCH, launchRungs } from "@oh-my-opencode/model-core"
 import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
 
 // Source of truth mirrored from packages/model-core/src/agent-model-requirements.ts.
 // Key rename: the two curated agents carry their canonical ids here (plan-consultant, plan-reviewer);
 // the mirrored rungs (models, providers, variants, order) are unchanged from the mirror source.
-// Model IDs share the launch block; chain rows remain independently mirrored for parity checks.
 // senpi-only difference: every claude-* rung is headed by "anthropic-subscription", senpi's Claude subscription
 // lane, so a Claude Pro/Max login outranks the metered `opencode` lane (#8051; see the category chains
 // for the full rationale). model-core stays without it - no other edition has that provider.
@@ -32,15 +30,15 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
     { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
     { providers: ["opencode-go"], model: "minimax-m2.7" }
   ],
-  "plan-consultant": launchRungs([
+  "plan-consultant": [
     {
       providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"],
-      model: FABLE_55_LAUNCH.id,
+      model: LATEST_MODEL_BY_FAMILY.claudeFable,
       variant: "max",
     },
     {
       providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"],
-      model: LATEST_MODEL_BY_FAMILY.claudeFable,
+      model: "claude-fable-5-1",
       variant: "max",
     },
     {
@@ -54,7 +52,7 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
       variant: "max",
     },
     { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
-  ]),
+  ],
   "plan-reviewer": [
     { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "xhigh" },
     { providers: ["github-copilot"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
