@@ -27,7 +27,7 @@ const REMOTE_USAGE = `usage: omo remote <command> [--json]
   enable | disable                         turn remote sessions on or off for this device
   control [on|off]                         whether your other signed-in devices can view and command this
                                            device's sessions (on unless you turn it off)
-  bootstrap                                set up this device's service for your sign-in (every omo start runs it)
+  bootstrap                                set up this device's service for your sign-in (every interactive omo start runs it)
   attach <device>/<session>                watch a session on another device (input is not enabled yet)`
 
 export interface RemoteCommandDependencies {

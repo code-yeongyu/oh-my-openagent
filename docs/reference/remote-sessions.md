@@ -15,7 +15,7 @@ omo remote devices [--json]      # the devices on this account
 omo remote sessions [--device D] [--project P] [--state running|idle|ended] [--json]
 omo remote enable | disable [--json]   # turn remote sessions on or off for this device
 omo remote control [on|off]      # whether your other devices may view and command this device's sessions
-omo remote bootstrap [--json]    # set up the device service for your sign-in (every omo start runs it)
+omo remote bootstrap [--json]    # set up the device service for your sign-in (every interactive omo start runs it)
 omo remote attach <device>/<session>   # watch a session on another device
 ```
 
