@@ -339,6 +339,7 @@
     "packages/memory-core/src/retention/index.ts",
     "packages/memory-core/src/retention/journals.ts",
     "packages/memory-core/src/retention/legacy.ts",
+    "packages/memory-core/src/retention/log.ts",
     "packages/memory-core/src/retention/pass.ts",
     "packages/memory-core/src/retention/past-retention.ts",
     "packages/memory-core/src/retention/policy.ts",
