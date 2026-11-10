@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { withContractHost, type ContractHost } from "../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
+import { controlRefusalOf } from "./control/port"
 import { createLiveThreadSurface, type LiveThreadSurface } from "./live-surface"
 
 // The contract host enforces the engine's own close rules (senpi 2026.11.5-1): a close from a connection that holds no
@@ -38,10 +39,22 @@ describe("thread_close on this device's host: the session ends for every client 
     })
   })
 
-  test("#given a session with no file yet that another client holds #when it is closed #then the answer says another client still holds it", async () => {
+  test("#given a session with no file yet that another client holds #when it is closed #then the answer says another client still holds it, decided by one get_state probe", async () => {
     await withContractHost({ auth: true, unwritten: true, otherAttachments: 1 }, async (host) => {
       expect(await close(host)).toBe("held_elsewhere")
       expect(host.live()).toBe(true)
+      expect(sentTypes(host).filter((type) => type === "get_state" || type === "list_sessions")).toEqual(["get_state"])
+    })
+  })
+
+  test.each([
+    ["a reason the ladder does not know", "attached", "unsupported"],
+    ["a draining host", "host_draining", "host_unavailable"],
+  ] as const)("#given unload_session refused with %s #when it is closed #then the refusal is typed %s naming the reason, as on another device", async (_label, reason, code) => {
+    await withContractHost({ auth: true, unloadRefusal: reason }, async (host) => {
+      const refused = await close(host).then(() => undefined, (error: unknown) => controlRefusalOf(error))
+      expect(refused).toMatchObject({ code, details: { command: "unload_session", reason } })
+      expect(host.mutations).toEqual([])
     })
   })
 
