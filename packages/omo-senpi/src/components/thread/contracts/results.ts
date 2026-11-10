@@ -110,7 +110,7 @@ export type ThreadSendResult =
   | ThreadDataError
 
 export type ThreadInterruptResult =
-  | { readonly kind: "ok"; readonly thread_id: string; readonly turn_id?: string; readonly interrupted: boolean }
+  | { readonly kind: "ok"; readonly thread_id: string; readonly turn_id?: string; readonly interrupted: boolean; readonly device?: string }
   | ThreadDataError
 
 /** `closed` is false when no live owner held the thread, so there was nothing to close. */
@@ -142,7 +142,7 @@ export type ThreadSetModelResult =
   | ThreadDataError
 
 export type ThreadSetReasoningResult =
-  | { readonly kind: "ok"; readonly thread_id: string; readonly level: ThreadThinkingLevel; readonly scope: ThreadReasoningScope }
+  | { readonly kind: "ok"; readonly thread_id: string; readonly level: ThreadThinkingLevel; readonly scope: ThreadReasoningScope; readonly device?: string }
   | ThreadDataError
 
 export type ThreadBinding = BindingRecord
