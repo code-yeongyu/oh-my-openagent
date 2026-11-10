@@ -136,7 +136,7 @@ const VALIDATORS: RequestValidators<RequestType> = {
   },
   "sessions.list": (v, id) => {
     const { filter, rows } = requestFields(v, [], ["filter", "rows"]);
-    if (rows !== undefined && rows !== 2) return fail("rows");
+    if (rows !== undefined && rows !== 2 && rows !== 3) return fail("rows");
     return {
       id,
       type: "sessions.list",

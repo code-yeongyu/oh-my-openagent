@@ -203,6 +203,59 @@ export interface AxInputResult {
 export const isAxInputResult: Guard<AxInputResult> = (value): value is AxInputResult =>
 	typeof value === "object" && value !== null && ((value as { method?: unknown }).method === "inserted" || (value as { method?: unknown }).method === "keys");
 
+/** Whether input reached the target, and whether sending the same request again could duplicate it. */
+export type Disposition =
+	| { readonly delivery: "not_delivered"; readonly retry: "safe" | "after_user" }
+	| { readonly delivery: "delivery_uncertain"; readonly retry: "unsafe" | "unknown" }
+	| { readonly delivery: "delivered_unverified" | "delivered_verified"; readonly retry: "unsafe" }
+	| { readonly delivery: "unknown"; readonly retry: "unknown" };
+
+/**
+ * The exec reply of a session opened with `reportMode: "object"` (core `ActionReport`). Members other
+ * than the four required ones are open: a newer engine may fill more of them.
+ */
+export interface ActionReport {
+	readonly disposition: Disposition;
+	readonly delivered?: { readonly count: number; readonly of: number } | null;
+	readonly effect: string;
+	readonly route?: string | null;
+	readonly hit?: { readonly role: string; readonly label?: string | null } | null;
+	readonly focusRestoration: string;
+	readonly openedSurfaces?: readonly Readonly<Record<string, unknown>>[];
+	readonly nextCall?: { readonly method: string; readonly args: Readonly<Record<string, unknown>> } | null;
+	readonly note?: string | null;
+	readonly warning?: string | null;
+	readonly auditIds: readonly string[];
+}
+
+/** The seven valid (delivery, retry) pairs; anything else is a malformed reply, never a guess. */
+const DISPOSITIONS: ReadonlySet<string> = new Set([
+	"not_delivered/safe",
+	"not_delivered/after_user",
+	"delivery_uncertain/unsafe",
+	"delivery_uncertain/unknown",
+	"delivered_unverified/unsafe",
+	"delivered_verified/unsafe",
+	"unknown/unknown",
+]);
+
+function isDisposition(value: unknown): value is Disposition {
+	return matches(value, { delivery: "string", retry: "string" }) && DISPOSITIONS.has(`${value.delivery}/${value.retry}`);
+}
+
+const isActionReport: Guard<ActionReport> = (value): value is ActionReport =>
+	matches(value, { effect: "string", focusRestoration: "string", route: "string?", note: "string?", warning: "string?" }) &&
+	isDisposition(value.disposition) &&
+	isStringArray(value.auditIds) &&
+	(value.delivered == null || matches(value.delivered, { count: "number", of: "number" })) &&
+	(value.hit == null || matches(value.hit, { role: "string", label: "string?" })) &&
+	(value.openedSurfaces === undefined || (Array.isArray(value.openedSurfaces) && value.openedSurfaces.every(isRecord))) &&
+	(value.nextCall == null || (matches(value.nextCall, { method: "string" }) && isRecord(value.nextCall.args)));
+
+/** An exec reply: `null` from a `reportMode: "null"` session or an older engine, else an `ActionReport`. */
+export const isExecResult: Guard<ActionReport | null> = (value): value is ActionReport | null =>
+	value === null || isActionReport(value);
+
 export const isText: Guard<{ readonly text: string }> = (value): value is { readonly text: string } =>
 	isRecord(value) && typeof value.text === "string";
 

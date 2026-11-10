@@ -38,6 +38,7 @@
         "@oh-my-opencode/senpi-desktop-engine": "workspace:*",
         "@oh-my-opencode/senpi-desktop-prelude": "workspace:*",
         "@oh-my-opencode/senpi-desktop-protocol": "workspace:*",
+        "@oh-my-opencode/senpi-desktop-sdk": "workspace:*",
         "@oh-my-opencode/senpi-desktop-service": "workspace:*",
         "@oh-my-opencode/senpi-desktop-tool": "workspace:*",
         "@oh-my-opencode/senpi-task": "workspace:*",
@@ -372,12 +373,25 @@
         "vitest": "5.0.1",
       },
     },
+    "packages/senpi-desktop-sdk": {
+      "name": "@oh-my-opencode/senpi-desktop-sdk",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/senpi-desktop-protocol": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "26.6.2",
+        "vitest": "5.0.1",
+      },
+    },
     "packages/senpi-desktop-service": {
       "name": "@oh-my-opencode/senpi-desktop-service",
       "version": "0.1.0",
       "dependencies": {
         "@oh-my-opencode/senpi-desktop-engine": "workspace:*",
         "@oh-my-opencode/senpi-desktop-protocol": "workspace:*",
+        "@oh-my-opencode/senpi-desktop-sdk": "workspace:*",
+        "quickjs-wasi": "3.6.2",
       },
       "devDependencies": {
         "@types/node": "26.6.2",
@@ -856,6 +870,8 @@
     "@oh-my-opencode/senpi-desktop-prelude": ["@oh-my-opencode/senpi-desktop-prelude@workspace:packages/senpi-desktop-prelude"],
 
     "@oh-my-opencode/senpi-desktop-protocol": ["@oh-my-opencode/senpi-desktop-protocol@workspace:packages/senpi-desktop-protocol"],
+
+    "@oh-my-opencode/senpi-desktop-sdk": ["@oh-my-opencode/senpi-desktop-sdk@workspace:packages/senpi-desktop-sdk"],
 
     "@oh-my-opencode/senpi-desktop-service": ["@oh-my-opencode/senpi-desktop-service@workspace:packages/senpi-desktop-service"],
 
