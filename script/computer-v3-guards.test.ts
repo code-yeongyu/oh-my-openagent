@@ -10,10 +10,13 @@ import { parseWriteScope, runGuard } from "./computer-v3-guards.ts"
 
 const guardScript = join(import.meta.dir, "computer-v3-guards.ts")
 
-// The guard and the fixture git calls see no inherited GIT_* variable and no user or system git config.
+// The guard and the fixture git calls see no inherited GIT_* variable and no system git config. Their global config
+// is the repository's hermetic test git config (test-hermetic-home.ts: HOME and GIT_CONFIG_GLOBAL name it), never the
+// user's: it turns off the detached `git maintenance run --auto` that could outlive a fixture's removal.
 const isolatedEnv: Record<string, string> = {
-  ...Object.fromEntries(Object.entries(process.env).filter((entry): entry is [string, string] => !entry[0].startsWith("GIT_") && entry[1] !== undefined)),
-  GIT_CONFIG_GLOBAL: "/dev/null",
+  ...Object.fromEntries(
+    Object.entries(process.env).filter((entry): entry is [string, string] => (!entry[0].startsWith("GIT_") || entry[0] === "GIT_CONFIG_GLOBAL") && entry[1] !== undefined),
+  ),
   GIT_CONFIG_NOSYSTEM: "1",
 }
 
