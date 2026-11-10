@@ -134,6 +134,23 @@ describe("retention as a host-sweep step (6b driver 2 / --fix; A34, A38 driver h
     expect(fixed.lines[0]).toStartWith("FIXED id-mix retention removed 5 ")
   })
 
+  test("#given a folded run past retention whose consumed completion is outside the newest 50 #when --dry-run then --fix run #then the preview also counts the completion the pass removes once the run is gone (#12949 review r2 M)", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "memory-host-dry-runpresent-"))
+    roots.push(memoryRoot)
+    const paths = buildIdentityPaths(memoryRoot, "id-rp")
+    await mkdir(paths.repo, { recursive: true })
+    await reflectionRun(paths, "reflection-run-1", { finishedAt: daysAgo(40) })
+    await reflectionRun(paths, "reflection-run-60", { finishedAt: daysAgo(1) })
+    for (let index = 1; index <= 51; index += 1) await completion(paths, `reflection-run-${index}`, { finishedAt: daysAgo(90 - index) })
+
+    const dry = await sweepHostIdentities({ memoryRoot, steps: [createRetentionHostSweepStep({ now, dryRun: true })], dryRun: true, now })
+    const fixed = await sweepHostIdentities({ memoryRoot, steps: [createRetentionHostSweepStep({ now })], now })
+
+    if (dry.status !== "swept" || fixed.status !== "swept") throw new Error("expected sweeps")
+    expect(dry.lines).toEqual(["WOULD FIX id-rp retention would remove 2 (runs 1, completions 1, journals 0, sidecars 0, ledgers 0, legacy 0)"])
+    expect(fixed.lines[0]).toStartWith("FIXED id-rp retention removed 2 ")
+  })
+
   test("#given --dry-run and an identity over its size cap #when the step runs #then it also says what the cap would evict (#12932)", async () => {
     const memoryRoot = await mkdtemp(join(tmpdir(), "memory-host-dry-cap-"))
     roots.push(memoryRoot)
