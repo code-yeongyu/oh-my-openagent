@@ -7,11 +7,13 @@ use std::thread;
 
 use parking_lot::Mutex;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
+use senpi_desktop_core::protocol_results::EpochChanged;
 use senpi_desktop_core::report::ReportMode;
 use senpi_desktop_core::types::{DesktopCapabilities, DesktopSessionOptions};
 use tokio::time::Instant;
 
 use crate::display_awake::DisplayAwake;
+use crate::epoch::{EpochLog, Epochs};
 use crate::mutate::SessionSafety;
 pub use crate::pending::Pending;
 use crate::pending::PendingKind;
@@ -60,6 +62,7 @@ pub struct Session {
     report_mode: Arc<Mutex<ReportMode>>,
     awake: Arc<DisplayAwake>,
     notes: ScreenNotes,
+    epochs: EpochLog,
     _stop_observer: Arc<dyn Fn() + Send + Sync>,
 }
 
@@ -98,10 +101,13 @@ impl Session {
         let stop_observer = awake.observe_stops(&supervisor);
         let notes = ScreenNotes::default();
         let screen = (Arc::clone(&awake), notes.clone());
+        let epochs = EpochLog::default();
+        let worker_epochs = epochs.clone();
         thread::Builder::new()
             .name(THREAD_NAME.to_owned())
             .spawn(move || {
-                let worker = Worker::new(Box::new(factory), shared, applied_mode, safety, screen);
+                let mut worker = Worker::new(Box::new(factory), shared, applied_mode, safety, screen);
+                worker.epochs = Epochs::new(worker_epochs);
                 // `start` is blocked on this receiver until it arrives.
                 ready_tx.send(()).unwrap_or(());
                 serve(worker, &requests);
@@ -119,8 +125,16 @@ impl Session {
             report_mode,
             awake,
             notes,
+            epochs,
             _stop_observer: stop_observer,
         })
+    }
+
+    /// The `epoch.changed` notifications of an object-mode session that were
+    /// not announced yet; a request's own arrive before its reply is sent.
+    #[must_use]
+    pub fn epoch_changes(&self) -> Vec<EpochChanged> {
+        self.epochs.take_announcements()
     }
 
     /// The latest capabilities the session thread observed, with the display

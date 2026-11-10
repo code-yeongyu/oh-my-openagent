@@ -11,7 +11,10 @@
 mod record;
 
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::sync::Arc;
+
+use parking_lot::Mutex;
 use std::time::{Duration, Instant};
 
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
@@ -31,9 +34,31 @@ pub(crate) use self::record::QUIET_MS;
 /// How often a waiting admission re-checks the cancel token and the stop.
 const WAIT_SLICE: Duration = Duration::from_millis(50);
 
+/// How recently the user must have pressed a key or clicked in the frontmost
+/// app for background keys into it to be refused (DESIGN 7 step 0).
+pub(crate) const TAKEOVER_MS: u64 = 1_500;
+
+/// The user's last press per process, kept for every app, touched or not:
+/// the takeover gate asks about an app the session may never have read.
+#[derive(Default)]
+struct LastPresses(Mutex<HashMap<u32, u64>>);
+
+impl LastPresses {
+    fn record(&self, pid: u32, at_ms: u64) {
+        let mut last = self.0.lock();
+        let at = last.entry(pid).or_insert(at_ms);
+        *at = (*at).max(at_ms);
+    }
+
+    fn get(&self, pid: u32) -> Option<u64> {
+        self.0.lock().get(&pid).copied()
+    }
+}
+
 /// The session's record and its feed, per backend.
 pub(crate) struct Intervention {
     inputs: Arc<UserInputs>,
+    last: Arc<LastPresses>,
     feed: Option<Arc<dyn UserInputFeed>>,
 }
 
@@ -46,6 +71,7 @@ impl Intervention {
         let started = feed.clone();
         Self {
             inputs: Arc::new(UserInputs::new(Box::new(move |pid| started.as_ref().and_then(|feed| feed.process_started(pid))))),
+            last: Arc::default(),
             feed,
         }
     }
@@ -54,6 +80,7 @@ impl Intervention {
 /// What this thread's admitted input call compares before each press.
 struct Watch {
     inputs: Arc<UserInputs>,
+    last: Arc<LastPresses>,
     feed: Option<Arc<dyn UserInputFeed>>,
     supervisor: Arc<Supervisor>,
     pid: u32,
@@ -79,7 +106,7 @@ impl Drop for AdmitWatch {
 
 /// Drains `feed` into `inputs`, stamping each press on the supervisor's clock
 /// by how long ago the watch saw it.
-fn drain(inputs: &UserInputs, feed: Option<&Arc<dyn UserInputFeed>>, supervisor: &Supervisor) {
+fn drain_presses(inputs: &UserInputs, last: &LastPresses, feed: Option<&Arc<dyn UserInputFeed>>, supervisor: &Supervisor) {
     let Some(feed) = feed else { return };
     let presses = feed.take();
     let now_ms = supervisor.now_ms();
@@ -100,7 +127,14 @@ fn drain(inputs: &UserInputs, feed: Option<&Arc<dyn UserInputFeed>>, supervisor:
     }
     for (pid, at_ms) in stamped {
         inputs.record(pid, at_ms);
+        last.record(pid, at_ms);
     }
+}
+
+/// [`drain_presses`] for the record alone.
+#[cfg(test)]
+fn drain(inputs: &UserInputs, feed: Option<&Arc<dyn UserInputFeed>>, supervisor: &Supervisor) {
+    drain_presses(inputs, &LastPresses::default(), feed, supervisor);
 }
 
 /// The press check the backend runs: refuses once the user pressed a key or
@@ -108,7 +142,7 @@ fn drain(inputs: &UserInputs, feed: Option<&Arc<dyn UserInputFeed>>, supervisor:
 pub(crate) fn check_press() -> CoreResult<()> {
     WATCH.with_borrow(|watch| {
         let Some(watch) = watch else { return Ok(()) };
-        drain(&watch.inputs, watch.feed.as_ref(), &watch.supervisor);
+        drain_presses(&watch.inputs, &watch.last, watch.feed.as_ref(), &watch.supervisor);
         watch.inputs.check(watch.pid, watch.baseline)
     })
 }
@@ -144,7 +178,15 @@ impl Worker {
     }
 
     pub(crate) fn drain_user_input(&self) {
-        drain(&self.intervention.inputs, self.intervention.feed.as_ref(), &self.safety.supervisor);
+        drain_presses(&self.intervention.inputs, &self.intervention.last, self.intervention.feed.as_ref(), &self.safety.supervisor);
+    }
+
+    /// How long ago the user last pressed a key or clicked in `pid`, when that
+    /// was within [`TAKEOVER_MS`]; `None` without a watch or after a pause.
+    pub(crate) fn user_active_in(&self, pid: u32) -> Option<u64> {
+        self.drain_user_input();
+        let idle = self.safety.supervisor.now_ms().saturating_sub(self.intervention.last.get(pid)?);
+        (idle < TAKEOVER_MS).then_some(idle)
     }
 
     fn touch_app(&self, window: &DesktopWindow) -> Option<u32> {
@@ -204,6 +246,7 @@ impl Worker {
         let supervisor = Arc::clone(&self.safety.supervisor);
         let policy = self.stop_policy();
         let inputs = Arc::clone(&self.intervention.inputs);
+        let last = Arc::clone(&self.intervention.last);
         let feed = self.intervention.feed.clone();
         let wait = |ms: u64| -> CoreResult<()> {
             let until = Instant::now() + Duration::from_millis(ms);
@@ -223,12 +266,12 @@ impl Worker {
                     return Ok(());
                 }
                 std::thread::sleep(left.min(WAIT_SLICE));
-                drain(&inputs, feed.as_ref(), &supervisor);
+                drain_presses(&inputs, &last, feed.as_ref(), &supervisor);
             }
         };
         let baseline = inputs.admit(pid, None, || supervisor.now_ms(), wait)?;
         let previous = WATCH.with_borrow_mut(|current| {
-            current.replace(Watch { inputs: Arc::clone(&inputs), feed, supervisor: Arc::clone(&supervisor), pid, baseline })
+            current.replace(Watch { inputs: Arc::clone(&inputs), last, feed, supervisor: Arc::clone(&supervisor), pid, baseline })
         });
         Ok(AdmitWatch { previous, _press: watch(check_press) })
     }

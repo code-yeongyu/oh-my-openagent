@@ -9,6 +9,8 @@ export interface EngineHello {
 	readonly engineVersion: string;
 	readonly buildSha: string;
 	readonly abi: typeof ENGINE_ABI;
+	/** Opt-in behaviours the engine advertises, e.g. `action-report`; `[]` from engines that predate the list. */
+	readonly features: readonly string[];
 }
 
 export interface EngineContract {
@@ -66,7 +68,7 @@ const defaultSpawner: DesktopEngineSpawner = (enginePath, args) =>
 /** Spawns the engine with `--stdio`, sends `engine.hello`, and accepts only the host's ABI and protocol. */
 export async function helloDesktopEngine(enginePath: string, options: HelloOptions = {}): Promise<EngineHello> {
 	const result = await requestHello(enginePath, options);
-	if (!isRecord(result) || !isHelloShape(result)) {
+	if (!isRecord(result) || !isHelloShape(result) || !isFeatureList(result.features)) {
 		throw new DesktopEngineHandshakeError(enginePath, `malformed engine.hello result ${JSON.stringify(result)}`);
 	}
 	if (result.abi !== ENGINE_ABI || result.protocolVersion !== PROTOCOL_VERSION) {
@@ -77,6 +79,7 @@ export async function helloDesktopEngine(enginePath: string, options: HelloOptio
 		engineVersion: result.engineVersion,
 		buildSha: result.buildSha,
 		abi: ENGINE_ABI,
+		features: result.features ?? [],
 	};
 }
 
@@ -164,7 +167,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null;
 }
 
-function isHelloShape(value: Record<string, unknown>): value is Record<keyof EngineHello, string> {
+/** An absent or `null` list is an engine from before `features`; any other value must be a list of names. */
+function isFeatureList(value: unknown): value is readonly string[] | null | undefined {
+	return value === undefined || value === null || (Array.isArray(value) && value.every((item) => typeof item === "string"));
+}
+
+function isHelloShape(
+	value: Record<string, unknown>,
+): value is Record<Exclude<keyof EngineHello, "features">, string> & { readonly features?: unknown } {
 	return (
 		typeof value.protocolVersion === "string" &&
 		typeof value.engineVersion === "string" &&
