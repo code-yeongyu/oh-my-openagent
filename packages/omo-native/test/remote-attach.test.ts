@@ -10,6 +10,7 @@ import { connectDeviceService, type DeviceService } from "../../device-service-c
 import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld, PEER, SESSION_ID, type World } from "../../device-service-core/test/local-api/conformance/world.ts"
 import { LOCAL_SESSION_ID, pipeAddress, type RemoteAttachEndpoint, serveRemoteAttach } from "../remote-attach"
+import { outcomeFailure } from "../../omo-senpi/src/components/thread/remote/outcome"
 
 // Every inbound record type the pinned engine knows, from its own method table (senpi#4319), never a list kept here.
 const engineDist = dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi")))
@@ -216,7 +217,9 @@ describe.skipIf(process.platform === "win32")("omo remote attach endpoint", () =
     expect(await tui.record(line => line.id === "dialog-1", "the relayed dialog frame")).toEqual({ ...dialog, sessionId: LOCAL_SESSION_ID })
   })
 
-  test("shows the host's refusal verbatim", async () => {
+  // The attach TUI reads a refused command through the one outcome mapping (#12885): the same sentence omo remote and the
+  // thread tools print for that device, never the device service's raw state and reason.
+  test("explains the host's refusal with the one outcome mapping", async () => {
     const base = defaultWorld()
     const [session] = base.sessions
     if (session === undefined) throw new Error("the default world has a session")
@@ -227,7 +230,7 @@ describe.skipIf(process.platform === "win32")("omo remote attach endpoint", () =
     const endpoint = await endpointFor(world)
     const tui = await TuiPeer.connect(endpoint.socketPath)
     const answer = await tui.request({ type: "bash", sessionId: LOCAL_SESSION_ID, command: "ls" })
-    expect([answer.command, answer.success, answer.error]).toEqual(["bash", false, "engine_refused: capability_missing"])
+    expect([answer.command, answer.success, answer.error]).toEqual(["bash", false, outcomeFailure({ kind: "refused", reason: "capability_missing" }, PEER).error.message])
   })
 
   test("closes a connection that does not prove the secret before answering anything", async () => {

@@ -190,7 +190,7 @@ describe("omo setup migration summary", () => {
 
       // then
       expect(output).toContain("Found your Command Code setup")
-      expect(output).toContain("commandcode -> https://api.commandcode.ai/provider/v1, 12 models")
+      expect(output).toContain("commandcode -> https://api.commandcode.ai/provider/v1, 13 models")
       expect(output).toContain("key from environment variable CMD_API_KEY - will be imported")
       // The key env var's value never appears anywhere; the engine interpolates the reference.
       expect(output).not.toContain("SK-CMD-SENTINEL-SUMMARY")

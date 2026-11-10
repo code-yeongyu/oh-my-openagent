@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { AGENT_MODEL_REQUIREMENTS } from "./agent-model-requirements";
 import { CATEGORY_MODEL_REQUIREMENTS } from "./category-model-requirements";
-import { FABLE_55_LAUNCH, FABLE_55_RELEASED } from "./fable-55-launch";
 import { resolveModelPipeline } from "./model-resolution-pipeline";
 
 describe("resolveModelPipeline", () => {
@@ -123,13 +122,13 @@ test("inherits the fallback variant for an explicit transformed gateway model", 
 	expect(variant).toBe("high")
 })
 
-// The provisional Fable 5.5 id must never reach live routing before release: a cold provider-models
-// cache with only anthropic connected gives no proof the model exists.
-describe("launch-gated Fable 5.5 on a cold provider-models cache", () => {
-	const expected = FABLE_55_RELEASED ? `anthropic/${FABLE_55_LAUNCH.id}` : "anthropic/claude-fable-5-1";
+// Fable 5.2 is a released model: on a cold provider-models cache with only anthropic connected,
+// the chain head and the artistry default both resolve to it on the connected provider.
+describe("Fable 5.2 on a cold provider-models cache", () => {
+	const expected = "anthropic/claude-fable-5-2";
 	const coldAnthropic = { availableModels: new Set<string>(), connectedProviders: ["anthropic"] };
 
-	test.each(["metis", "prometheus"])("%s resolves past the launch rung", (agent) => {
+	test.each(["metis", "prometheus"])("%s resolves to its Fable 5.2 head rung", (agent) => {
 		const result = resolveModelPipeline({
 			constraints: coldAnthropic,
 			policy: { fallbackChain: AGENT_MODEL_REQUIREMENTS[agent]?.fallbackChain },
@@ -137,9 +136,9 @@ describe("launch-gated Fable 5.5 on a cold provider-models cache", () => {
 		expect(result?.model).toBe(expected);
 	});
 
-	test("artistry's launch-gated category default falls through to its chain", () => {
+	test("artistry's Fable 5.2 category default resolves on the connected provider", () => {
 		const result = resolveModelPipeline({
-			intent: { categoryDefaultModel: `anthropic/${FABLE_55_LAUNCH.id}` },
+			intent: { categoryDefaultModel: expected },
 			constraints: coldAnthropic,
 			policy: { fallbackChain: CATEGORY_MODEL_REQUIREMENTS.artistry?.fallbackChain },
 		});

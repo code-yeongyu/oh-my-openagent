@@ -3,7 +3,6 @@
 import { describe, expect, it } from "bun:test"
 
 import { resolveModelProfile } from "./resolve"
-import { FABLE_55_RELEASED } from "@oh-my-opencode/model-core"
 
 const OPUS = "anthropic/claude-opus-5-5"
 const OPUS_SUBSCRIPTION = "anthropic-subscription/claude-opus-5-5"
@@ -165,19 +164,18 @@ describe("resolveModelProfile", () => {
 })
 
 describe("builtin chain routing", () => {
-  it("prefers Fable 5.5 at the existing effort without changing listed providers", () => {
+  it("prefers Fable 5.2 at the existing effort without changing listed providers", () => {
     // given
     const availableModels = [
-      "opencode/claude-fable-5-5",
-      "anthropic-subscription/claude-fable-5-5",
+      "opencode/claude-fable-5-2",
+      "anthropic-subscription/claude-fable-5-2",
       FABLE,
     ]
     // when
     const result = resolveModelProfile({ active: "daily-heavy", availableModels })
     // then
     expect(result).toMatchObject({
-      // While FABLE_55_RELEASED is false the 5.5 rung is absent, so listed 5.5 copies are never picked.
-      kind: "resolved", provider: "anthropic-subscription", modelId: FABLE_55_RELEASED ? "claude-fable-5-5" : "claude-fable-5-1", reasoning: "xhigh",
+      kind: "resolved", provider: "anthropic-subscription", modelId: "claude-fable-5-2", reasoning: "xhigh",
     })
   })
 
@@ -359,7 +357,7 @@ describe("builtin chain routing", () => {
         availableModels: [
           "openrouter/anthropic/claude-opus-5.5",
           "opengateway/anthropic/claude-fable-5-1",
-          "opengateway/anthropic/claude-fable-5-5",
+          "opengateway/anthropic/claude-fable-5-2",
           "openrouter/moonshotai/kimi-k3",
           "openrouter/openai/gpt-6-astra",
           "openrouter/openai/gpt-5.6-sol",
