@@ -78,6 +78,22 @@ describe("remote == local: the same call answers the same on b as on this device
     expect(again).toMatchObject({ kind: "ok", deduplicated: true, delivery: (first as { delivery: unknown }).delivery })
   })
 
+  test.each(["thread_send", "thread_handoff"] as const)("#13014: #given one %s here and one to b #when each answers #then both name the delivery_id, effective_mode and endpoint, and b's delivery_id is the one its record carried", async (tool) => {
+    const a = account()
+    const { run } = surface(a.remote)
+    const here = await run(tool, { thread: "dur-local", message: "x" })
+    const there = await run(tool, { thread: "dur-on-b", message: "x" })
+    const [record = {}] = admits(a.sent)
+    for (const result of [here, there]) {
+      expect(result).toMatchObject({ kind: "ok" })
+      expect(result).toHaveProperty("delivery_id", expect.stringMatching(UUID))
+      expect(result).toHaveProperty("effective_mode")
+      expect(result).toHaveProperty("endpoint")
+    }
+    // b was idle, so the default mode took the follow_up lane its record carried.
+    expect(there).toMatchObject({ delivery_id: record["deliveryId"], effective_mode: "follow_up" })
+  })
+
   test("#given b already holds the delivery (the first reply was lost and the id was retried) #when the retry reaches b #then it answers already_admitted and the send reads as deduplicated", async () => {
     const a = account({ admitOutcome: { kind: "ok", response: { type: "response", command: ADMIT, success: true, data: { kind: "already_admitted", turnId: "9" } } } })
     const { run } = surface(a.remote)
