@@ -13,6 +13,7 @@ import { registerJournalSettleDelivery } from "./journal-settle-delivery"
 import * as journalState from "./memory-rpc-journal-state"
 import { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
 import { createMemoryWiring, type MemoryWiring } from "./wiring"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 afterEach(() => jest.useRealTimers())
 
@@ -81,7 +82,7 @@ test.each(["initial", "cached", "aborted"] as const)("#given an %s full sync hel
       sequence.push("agent_settled", "agent_idle")
     })
     // Failure deadline only: passing requires the exact settle event while the git latch stays held.
-    timer = setTimeout(() => deadline.reject(new Error("settle delivery waited for the held full build")), 4_000)
+    timer = setTimeout(() => deadline.reject(new Error("settle delivery waited for the held full build")), remainingTestTime())
     await Promise.race([settling, deadline.promise])
     expect(sequence).toEqual(["memory", "agent_settled", "agent_idle"])
     expect(reads).toBe(readsBefore)
