@@ -3,7 +3,7 @@ import type { OmoMemorySettings } from "./memory"
 export const FULL_DEFAULTS: OmoMemorySettings = {
   enabled: true,
   agent: "auto",
-  auto_identity: "path",
+  auto_identity: "git",
   reflection: {
     enabled: true,
     trigger: { step_count: 25, on_compaction: true },

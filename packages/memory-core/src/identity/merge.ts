@@ -20,6 +20,8 @@ export interface MergePredecessor {
   readonly id: string
   readonly paths: MemoryIdentityPaths
   readonly spellings: readonly string[]
+  /** Set once `/memory-merge --apply` merged this store; a later run merges only newer commits. */
+  readonly mergedInto?: string
 }
 
 export interface MergePredecessors {
@@ -57,7 +59,7 @@ export async function findMergePredecessors(
     const record = await readIdentityRecord(paths.root).catch(() => undefined)
     if (record === undefined || record.spellings.length === 0) continue
     if (record.spellings.some((spelling) => resolve(spelling) === targetId)) {
-      predecessors.push({ id, paths, spellings: record.spellings })
+      predecessors.push({ id, paths, spellings: record.spellings, ...(record.mergedInto === undefined ? {} : { mergedInto: record.mergedInto }) })
     } else {
       unmapped.push(id)
     }
