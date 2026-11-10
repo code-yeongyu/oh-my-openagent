@@ -73,6 +73,22 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
     expect(admits(a.sent)).toHaveLength(3)
   })
 
+  test("#given b is mid-turn and its user's draft holds the default-mode steer #when the draft goes after the turn ended #then the re-send is a follow-up under the same delivery id and the message is taken, never a turn_conflict the sender does not see", async () => {
+    // b answers the probe mid-turn on turn 3 and holds the first admit behind its draft; by the re-send its turn is over.
+    let reads = 0
+    const engine = { ...ENGINE, pending: 1, currentTurnId: "3", get streaming() { return reads++ < 2 } }
+    const a = account({ heldDraft: 1, engine })
+    const { relay, log } = transport(a.remote)
+    const first = await relay.deliver(delivery("steer me", "k6"))
+    expect(first).toMatchObject({ kind: "ok", device: "b", delivery: { kind: "queued", queue_position: 1 }, effective_mode: "follow_up" })
+    await admitted(a.sent, 2)
+    const records = admits(a.sent)
+    expect(records.map((record) => [record["deliverAs"], record["expectedTurnId"] ?? null])).toEqual([["steer", "3"], ["followUp", null]])
+    expect(new Set(records.map((record) => record["deliveryId"])).size).toBe(1)
+    expect(String(records[1]?.["text"])).toContain(" requested=auto effective=follow_up ")
+    expect(log.filter((line) => line.startsWith("relay_delivery_failed:"))).toEqual([])
+  })
+
   test("#given a draft that outlasts every re-send #when the schedule is exhausted #then the send already answered queued, the re-sends stop, and one failure line names the delivery", async () => {
     const a = account({ heldDraft: 10, engine: { ...ENGINE, pending: 1 } })
     const { relay, log } = transport(a.remote)
@@ -109,6 +125,22 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
     const { relay, released } = transport(a.remote)
     released.value = false
     expect(await relay.deliver(delivery("to an idle b", "k5"))).toMatchObject({ kind: "ok", device: "b", deduplicated, delivery: { kind: "queued", queue_position: 1 } })
+    expect(admits(a.sent)).toHaveLength(1)
+    relay.dispose()
+  })
+
+  test("#12886: #given b is parked on a tool PERMISSION prompt (get_state has an open dialog, streaming, pendingMessageCount 0) #when a default-mode message is sent #then it is queued behind the approval with waiting_on, not steered into the parked turn", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, pending: 0, currentTurnId: "7", pendingDialogs: [{ id: "perm-1", kind: "permission" }] } })
+    const { relay } = transport(a.remote)
+    expect(await relay.deliver(delivery("while b waits on a permission", "k7"))).toMatchObject({ kind: "ok", device: "b", effective_mode: "follow_up", delivery: { kind: "queued", queue_position: 1, waiting_on: { kind: "approval", device: "b" } } })
+    expect(admits(a.sent)).toHaveLength(1)
+    relay.dispose()
+  })
+
+  test("#12886: #given b is parked on an approval (get_state has an open question, pendingMessageCount 0) #when a message is sent #then the send is queued with waiting_on approval on b, not idempotency_uncertain", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, pending: 0, currentTurnId: "7", pendingQuestions: [{ id: "q-1", kind: "permission" }] } })
+    const { relay } = transport(a.remote)
+    expect(await relay.deliver(delivery("while b waits on a human", "k6"))).toMatchObject({ kind: "ok", device: "b", delivery: { kind: "queued", queue_position: 1, waiting_on: { kind: "approval", device: "b" } } })
     expect(admits(a.sent)).toHaveLength(1)
     relay.dispose()
   })
