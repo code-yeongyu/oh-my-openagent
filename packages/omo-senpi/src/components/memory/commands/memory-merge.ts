@@ -45,7 +45,7 @@ async function runMemoryMerge(deps: MemoryCommandDeps, args: string, ctx: Memory
   }
 
   if (!apply) {
-    const lines = await Promise.all(found.predecessors.map(async (predecessor) => describePlan(await planIdentityMerge(predecessor.paths, identity.identityPaths))))
+    const lines = await Promise.all(found.predecessors.map(async (predecessor) => describePlan(await planIdentityMerge(predecessor.paths, identity.identityPaths, predecessor.mergedInto === identity.identity ? predecessor.mergedHead : undefined))))
     return respond(ctx, [
       `${found.predecessors.length} memory store(s) map to ${identity.identity} (dry run, nothing changed):`,
       ...lines,

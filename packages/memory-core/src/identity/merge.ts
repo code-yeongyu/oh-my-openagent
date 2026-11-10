@@ -6,7 +6,7 @@
 
 import { dirname, join } from "node:path"
 
-import { GitMemoryRepo, type GitCommitAuthor, type GitTreeBlobEntry } from "../git"
+import { GitMemoryRepo, NoEffectiveChangesError, type GitCommitAuthor, type GitTreeBlobEntry } from "../git"
 import { mkdir, readdir, writeFile } from "../fs/resilient"
 import type { MemoryWriteLock } from "../tools/commit-write"
 import { AGENTS_DIRNAME, buildIdentityPaths, type MemoryIdentityPaths } from "./layout"
@@ -22,6 +22,7 @@ export interface MergePredecessor {
   readonly spellings: readonly string[]
   /** Set once `/memory-merge --apply` merged this store; a later run merges only newer commits. */
   readonly mergedInto?: string
+  readonly mergedHead?: string
 }
 
 export interface MergePredecessors {
@@ -59,7 +60,7 @@ export async function findMergePredecessors(
     const record = await readIdentityRecord(paths.root).catch(() => undefined)
     if (record === undefined || record.spellings.length === 0) continue
     if (record.spellings.some((spelling) => resolve(spelling) === targetId)) {
-      predecessors.push({ id, paths, spellings: record.spellings, ...(record.mergedInto === undefined ? {} : { mergedInto: record.mergedInto }) })
+      predecessors.push({ id, paths, spellings: record.spellings, ...(record.mergedInto === undefined ? {} : { mergedInto: record.mergedInto }), ...(record.mergedHead === undefined ? {} : { mergedHead: record.mergedHead }) })
     } else {
       unmapped.push(id)
     }
@@ -67,7 +68,15 @@ export async function findMergePredecessors(
   return { predecessors, unmapped }
 }
 
-export async function planIdentityMerge(source: MemoryIdentityPaths, target: MemoryIdentityPaths): Promise<MergePlan> {
+/**
+ * `since` is the source head of an earlier merge into this target: only files that changed after it are
+ * considered, so a rerun brings in new work without re-adding files the target deleted meanwhile.
+ */
+export async function planIdentityMerge(
+  source: MemoryIdentityPaths,
+  target: MemoryIdentityPaths,
+  since?: string,
+): Promise<MergePlan> {
   const sourceId = identityIdOf(source)
   const sourceRepo = new GitMemoryRepo({ dir: source.repo, agentId: sourceId })
   const targetRepo = new GitMemoryRepo({ dir: target.repo, agentId: identityIdOf(target) })
@@ -78,8 +87,12 @@ export async function planIdentityMerge(source: MemoryIdentityPaths, target: Mem
   const targetBlobs = new Map<string, GitTreeBlobEntry>(
     targetHead === null ? [] : (await targetRepo.lsTreeBlobs(targetHead)).map((entry) => [entry.path, entry]),
   )
+  const mergedBefore = since === undefined
+    ? undefined
+    : new Map((await sourceRepo.lsTreeBlobs(since).catch(() => [] as readonly GitTreeBlobEntry[])).map((entry) => [entry.path, entry.oid]))
   const actions = [...sourceBlobs]
     .filter((entry) => !entry.path.startsWith(".") && !entry.path.startsWith(`${MERGED_ASIDE_ROOT}/`))
+    .filter((entry) => mergedBefore?.get(entry.path) !== entry.oid)
     .sort((left, right) => left.path.localeCompare(right.path))
     .map((entry): MergeAction => {
       const existing = targetBlobs.get(entry.path)
@@ -103,25 +116,30 @@ export interface ApplyIdentityMergeOptions {
 export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Promise<MergeResult> {
   const { source, target, lock, author, now } = options
   const record = await readIdentityRecord(source.root).catch(() => undefined)
-  const plan = await planIdentityMerge(source, target)
   const targetId = identityIdOf(target)
-  if (plan.sourceHead !== null && record?.mergedInto === targetId && record.mergedHead === plan.sourceHead) {
-    return { status: "already-merged", plan }
-  }
-  const writes = plan.actions.filter((action): action is Exclude<MergeAction, { action: "skip" }> => action.action !== "skip")
-  if (plan.sourceHead === null) return { status: "nothing-to-merge", plan }
-  const sourceRepo = new GitMemoryRepo({ dir: source.repo, agentId: plan.sourceId })
+  const since = record?.mergedInto === targetId ? record.mergedHead : undefined
+  const preview = await planIdentityMerge(source, target, since)
+  if (preview.sourceHead === null) return { status: "nothing-to-merge", plan: preview }
+  if (since === preview.sourceHead) return { status: "already-merged", plan: preview }
+  const sourceRepo = new GitMemoryRepo({ dir: source.repo, agentId: preview.sourceId })
   const targetRepo = new GitMemoryRepo({ dir: target.repo, agentId: targetId })
-  let sha: string | undefined
-  if (writes.length > 0) {
+  // The plan that is written is made inside the lock: another writer may have created a path in the
+  // target after the preview, and an `add` must never replace it.
+  const outcome = await lock("memory-write", async (): Promise<{ readonly plan: MergePlan; readonly sha?: string }> => {
+    await targetRepo.cleanCheck()
+    const plan = await planIdentityMerge(source, target, since)
+    const writes = plan.actions.filter((action): action is Exclude<MergeAction, { action: "skip" }> => action.action !== "skip")
+    if (writes.length === 0 || plan.sourceHead === null) return { plan }
     const oids = new Map((await sourceRepo.lsTreeBlobs(plan.sourceHead)).map((entry) => [entry.path, entry.oid]))
-    const contents = await sourceRepo.readBlobs(writes.map((action) => oids.get(action.path) ?? ""))
-    sha = await lock("memory-write", async () => {
-      await targetRepo.cleanCheck()
+    const contents = await sourceRepo.readBlobs(writes.map((action) => requiredOid(oids, action.path)))
+    const destinations = writes.map((action) => action.destination)
+    try {
       for (const action of writes) {
+        const content = contents.get(requiredOid(oids, action.path))
+        if (content === undefined) throw new Error(`memory merge: blob for ${action.path} could not be read from ${plan.sourceId}`)
         const destination = join(target.repo, action.destination)
         await mkdir(dirname(destination), { recursive: true })
-        await writeFile(destination, contents.get(oids.get(action.path) ?? "") ?? "", "utf8")
+        await writeFile(destination, content, "utf8")
       }
       const message = [
         `chore(memory): merge memories from ${plan.sourceId}`,
@@ -129,11 +147,26 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
         `${MERGED_FROM_TRAILER}: ${plan.sourceId}`,
         `${MERGED_HEAD_TRAILER}: ${plan.sourceHead}`,
       ].join("\n")
-      return (await targetRepo.commitWrite(writes.map((action) => action.destination), message, author)).sha
-    })
-  }
-  await markIdentityMerged(source.root, plan.sourceId, targetId, plan.sourceHead, now)
-  return sha === undefined ? { status: "nothing-to-merge", plan } : { status: "merged", sha, plan }
+      return { plan, sha: (await targetRepo.commitWrite(destinations, message, author)).sha }
+    } catch (error) {
+      if (error instanceof NoEffectiveChangesError) {
+        await targetRepo.restorePaths(destinations)
+        return { plan }
+      }
+      await targetRepo.restorePaths(destinations)
+      throw error
+    }
+  })
+  if (outcome.plan.sourceHead !== null) await markIdentityMerged(source.root, outcome.plan.sourceId, targetId, outcome.plan.sourceHead, now)
+  return outcome.sha === undefined
+    ? { status: "nothing-to-merge", plan: outcome.plan }
+    : { status: "merged", sha: outcome.sha, plan: outcome.plan }
+}
+
+function requiredOid(oids: ReadonlyMap<string, string>, path: string): string {
+  const oid = oids.get(path)
+  if (oid === undefined) throw new Error(`memory merge: ${path} is not in the source tree`)
+  return oid
 }
 
 function identityIdOf(paths: MemoryIdentityPaths): string {

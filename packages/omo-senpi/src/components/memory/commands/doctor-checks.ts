@@ -13,6 +13,7 @@ import {
   countRuntimePastRetention,
   describeRuntimeCapExcess,
   findMergePredecessors,
+  GitMemoryRepo,
   formatRuntimeBytes,
   isMemoryContentPath,
   measureRuntimeCapEvictableBytes,
@@ -302,7 +303,15 @@ export async function checkMemoryFragmentation(
   const identity = identityPaths.root.split(/[\\/]/).filter((part) => part !== "").at(-1) ?? ""
   const memoryRoot = join(identityPaths.root, "..", "..")
   const { predecessors } = await findMergePredecessors(memoryRoot, identity, resolve)
-  const pending = predecessors.filter((predecessor) => predecessor.mergedInto !== identity).map((predecessor) => predecessor.id)
+  const pending: string[] = []
+  for (const predecessor of predecessors) {
+    if (predecessor.mergedInto !== identity) {
+      pending.push(predecessor.id)
+      continue
+    }
+    const head = await new GitMemoryRepo({ dir: predecessor.paths.repo, agentId: predecessor.id }).head().catch(() => null)
+    if (head !== null && head !== predecessor.mergedHead) pending.push(predecessor.id)
+  }
   if (pending.length === 0) return { name: "memory-fragmentation", level: "ok", detail: "no older memory store maps to this repository" }
   const noun = pending.length === 1 ? "older memory store maps" : "older memory stores map"
   return {

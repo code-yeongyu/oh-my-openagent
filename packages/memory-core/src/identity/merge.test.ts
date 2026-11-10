@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test"
+import { execFileSync } from "node:child_process"
 import { realpathSync } from "node:fs"
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -101,5 +102,74 @@ describe("identity merge (#10070)", () => {
     expect(await readFile(join(target.paths.repo, "reference/merged/project-feature-bbbb2222/notes/diff.md"), "utf8")).toBe(note("source"))
     expect(await readIdentityRecord(source.paths.root)).toMatchObject({ mergedInto: "project-aaaa1111", mergedHead: sourceHead })
     expect(await source.repo.head()).toBe(sourceHead)
+  }, 30_000)
+
+  it("#given another writer creates the same path between the plan and the lock #when the merge applies #then the target's file is kept and the source copy goes aside (#12974 review)", async () => {
+    const root = await memoryRoot()
+    const target = await identity(root, "project-aaaa1111", { "notes/base.md": note("base") }, ["/work/project"])
+    const source = await identity(root, "project-feature-bbbb2222", { "notes/new.md": note("from source") }, ["/work/project-feature"])
+    const racingLock = async <T>(_domain: unknown, operation: () => Promise<T>): Promise<T> => {
+      await writeFile(join(target.paths.repo, "notes/new.md"), note("written meanwhile"))
+      await target.repo.commitWrite(["notes/new.md"], "concurrent write", AUTHOR)
+      return operation()
+    }
+
+    const result = await applyIdentityMerge({ source: source.paths, target: target.paths, lock: racingLock, author: AUTHOR, now: 5000 })
+
+    expect(result.status).toBe("merged")
+    expect(await readFile(join(target.paths.repo, "notes/new.md"), "utf8")).toBe(note("written meanwhile"))
+    expect(await readFile(join(target.paths.repo, "reference/merged/project-feature-bbbb2222/notes/new.md"), "utf8")).toBe(note("from source"))
+  }, 30_000)
+
+  it("#given a carried file the commit refuses #when the merge applies #then it fails and the target is left clean (#12974 review)", async () => {
+    const root = await memoryRoot()
+    const target = await identity(root, "project-aaaa1111", { "notes/base.md": note("base") }, ["/work/project"])
+    const source = await identity(root, "project-feature-bbbb2222", { "notes/ok.md": note("ok") }, ["/work/project-feature"])
+    await writeFile(join(source.paths.repo, "notes/key.md"), note("aws AKIAABCDEFGHIJKLMNOP"))
+    execFileSync("git", ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", "add", "notes/key.md"], { cwd: source.paths.repo, stdio: "ignore" })
+    execFileSync("git", ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", "commit", "-q", "--no-verify", "-m", "seed key"], { cwd: source.paths.repo, stdio: "ignore" })
+    expect((await source.repo.lsTree("HEAD")).includes("notes/key.md")).toBe(true)
+
+    const outcome = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 5000 }).catch((error: unknown) => error)
+
+    expect((await target.repo.status()).trim()).toBe("")
+    expect(outcome).toBeInstanceOf(Error)
+  }, 30_000)
+
+  it("#given a store merged once whose target later deleted a file #when the source gains a new note and the merge reruns #then only the new note arrives and the deleted file stays deleted (#12974 review)", async () => {
+    const root = await memoryRoot()
+    const target = await identity(root, "project-aaaa1111", { "notes/base.md": note("base") }, ["/work/project"])
+    const source = await identity(root, "project-feature-bbbb2222", { "notes/old.md": note("old"), "notes/aside.md": note("source aside") }, ["/work/project-feature"])
+    await writeFile(join(target.paths.repo, "notes/aside.md"), note("target aside"))
+    await target.repo.commitWrite(["notes/aside.md"], "target aside", AUTHOR)
+    await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 5000 })
+    await rm(join(target.paths.repo, "notes/old.md"))
+    await target.repo.commitWrite(["notes/old.md"], "drop old", AUTHOR)
+    await writeFile(join(source.paths.repo, "notes/later.md"), note("later"))
+    await source.repo.commitWrite(["notes/later.md"], "later", AUTHOR)
+    const newHead = await source.repo.head()
+
+    const rerun = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 6000 })
+
+    expect(rerun.status).toBe("merged")
+    expect(rerun.plan.actions.map((action) => action.path)).toEqual(["notes/later.md"])
+    expect(await readFile(join(target.paths.repo, "notes/later.md"), "utf8")).toBe(note("later"))
+    expect((await target.repo.lsTree("HEAD")).includes("notes/old.md")).toBe(false)
+    expect(await readIdentityRecord(source.paths.root)).toMatchObject({ mergedHead: newHead })
+  }, 30_000)
+
+  it("#given a merged store whose new commit only repeats content the target already has #when the merge reruns #then it reports nothing to merge and records the new head (#12974 review)", async () => {
+    const root = await memoryRoot()
+    const target = await identity(root, "project-aaaa1111", { "notes/shared.md": note("shared"), "notes/diff.md": note("target diff") }, ["/work/project"])
+    const source = await identity(root, "project-feature-bbbb2222", { "notes/one.md": note("one"), "notes/diff.md": note("source diff") }, ["/work/project-feature"])
+    await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 5000 })
+    await writeFile(join(source.paths.repo, "notes/shared.md"), note("shared"))
+    await source.repo.commitWrite(["notes/shared.md"], "same as target", AUTHOR)
+    const newHead = await source.repo.head()
+
+    const rerun = await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR, now: 6000 })
+
+    expect(rerun.status).toBe("nothing-to-merge")
+    expect(await readIdentityRecord(source.paths.root)).toMatchObject({ mergedHead: newHead })
   }, 30_000)
 })
