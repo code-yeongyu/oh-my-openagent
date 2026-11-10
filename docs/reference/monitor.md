@@ -69,7 +69,7 @@ Arguments:
 
 | Argument | Required | Type | Meaning |
 |----------|----------|------|---------|
-| `command` | yes | string | Shell command to run. The command is tokenized and spawned without stdin or a PTY. |
+| `command` | yes | string | Shell command to run, through the same shell OpenCode's `bash` tool uses (the configured `shell`, else `$SHELL`, else the platform default), so pipes, loops and `&&` work. It runs without stdin or a PTY. |
 | `label` | no | string | Safe label shown in transcripts instead of the raw command. |
 | `mode` | no | `"idle"` or `"live_safe"` | Output injection mode. Defaults to `"idle"`. |
 | `match_pattern` | no | string | Optional JavaScript regex, capped by `pattern_max_length`. When set, only matching lines are auto-injected; unmatched lines stay in the ring and are readable via `monitor_output` (`stream: "unmatched"` or `"all"`). Omit it to inject every line. |

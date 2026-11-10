@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import path from "node:path"
 import {
   createOpenCodeShellTypeResolver,
+  openCodeShellArgv,
   resolveOpenCodeShell,
   shellTypeForOpenCodeShell,
   type OpenCodeShellHost,
@@ -199,5 +200,14 @@ describe("createOpenCodeShellTypeResolver", () => {
     expect(resolver.resolveShellType()).toBe("cmd")
     resolver.setConfiguredShell("   ")
     expect(resolver.resolveShellType()).toBe("cmd")
+  })
+})
+
+describe("openCodeShellArgv", () => {
+  test("#given each shell kind #when a command is wrapped #then it is passed the way that shell takes a command", () => {
+    const win = windowsHost(cmdOnly)
+    expect(openCodeShellArgv("/bin/bash", "a | b", posixHost("linux", {}, []))).toEqual(["/bin/bash", "-c", "a | b"])
+    expect(openCodeShellArgv("C:\\pwsh.exe", "a | b", win)).toEqual(["C:\\pwsh.exe", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "a | b"])
+    expect(openCodeShellArgv("C:\\Windows\\System32\\cmd.exe", "a | b", win)).toEqual(["C:\\Windows\\System32\\cmd.exe", "/c", "a | b"])
   })
 })

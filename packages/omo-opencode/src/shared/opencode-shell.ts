@@ -132,9 +132,22 @@ export function shellTypeForOpenCodeShell(shellPath: string, host: OpenCodeShell
   return "unix"
 }
 
+/**
+ * The argv that runs `command` in `shell`, the way OpenCode's bash tool runs it, so shell syntax (pipes, loops,
+ * `&&`) works: PowerShell takes `-Command`, cmd takes `/c`, every other shell `-c`.
+ */
+export function openCodeShellArgv(shell: string, command: string, host: OpenCodeShellHost = defaultHost()): string[] {
+  const type = shellTypeForOpenCodeShell(shell, host)
+  if (type === "powershell") return [shell, "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command]
+  if (type === "cmd") return [shell, "/c", command]
+  return [shell, "-c", command]
+}
+
 export interface OpenCodeShellTypeResolver {
   setConfiguredShell(shell: unknown): void
   resolveShellType(): ShellType
+  /** The shell OpenCode's bash tool runs, honoring the configured `shell`. */
+  resolveShellPath(): string
 }
 
 export function createOpenCodeShellTypeResolver(host: () => OpenCodeShellHost = defaultHost): OpenCodeShellTypeResolver {
@@ -151,6 +164,9 @@ export function createOpenCodeShellTypeResolver(host: () => OpenCodeShellHost = 
       const current = host()
       cached = shellTypeForOpenCodeShell(resolveOpenCodeShell(configuredShell, current), current)
       return cached
+    },
+    resolveShellPath() {
+      return resolveOpenCodeShell(configuredShell, host())
     },
   }
 }
