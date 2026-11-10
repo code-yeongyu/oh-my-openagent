@@ -10,7 +10,7 @@ import { buildIdentityPaths } from "../identity/layout"
 import type { HostSweepIdentity, HostSweepStep } from "../reflection/host-sweep"
 import { describeRuntimeCapExcess, measureRuntimeCapEvictableBytes } from "./cap"
 import { runRuntimeRetention, summarizeRuntimeRetention } from "./pass"
-import { countRuntimePastRetention, measureUnreflectedJournalBytes } from "./past-retention"
+import { countRuntimePastRetention, countRuntimePastRetentionOtherStores, measureUnreflectedJournalBytes } from "./past-retention"
 import { DAY_MS, DEFAULT_RUNTIME_RETENTION, type RuntimeRetentionPolicy } from "./policy"
 import { DEFAULT_RUNTIME_MAX_BYTES, measureRuntimeSizeWithinBudget } from "./size"
 
@@ -83,15 +83,17 @@ export interface RetentionHostSweepStepOptions {
 }
 
 /**
- * The dry-run preview for one identity: the read-only counts `/doctor` shows for what is past its
- * window, and over the cap what the cap could evict. Locks, reservations and live sessions are decided
- * only by the real pass, so the preview is an upper bound of what it removes.
+ * The dry-run preview for one identity: read-only counts of what is past its window in every store the
+ * pass prunes, by the pass's own rules, and over the cap what the cap could evict. Locks, reservations and
+ * live sessions are decided only by the real pass, which can keep some of what the preview counts.
  */
 async function previewRetention(identity: string, root: string, policy: RuntimeRetentionPolicy, maxBytes: number, now: () => number, signal: AbortSignal): Promise<string[]> {
   const paths = buildIdentityPaths(dirname(dirname(root)), identity)
   const past = await countRuntimePastRetention({ paths, policy, now, reflectionEnabled: true, signal })
-  const total = past.runs + past.journals + past.sidecars
-  const lines = total === 0 ? [] : [`WOULD FIX ${identity} retention would remove ${total} (runs ${past.runs}, journals ${past.journals}, sidecars ${past.sidecars})`]
+  const other = await countRuntimePastRetentionOtherStores({ paths, policy, now, signal })
+  const total = past.runs + past.journals + past.sidecars + other.completions + other.ledgers + other.legacy
+  const counts = `runs ${past.runs}, completions ${other.completions}, journals ${past.journals}, sidecars ${past.sidecars}, ledgers ${other.ledgers}, legacy ${other.legacy}`
+  const lines = total === 0 ? [] : [`WOULD FIX ${identity} retention would remove ${total} (${counts})`]
   if (maxBytes <= 0) return lines
   const measured = await measureRuntimeSizeWithinBudget(paths.runtime, { budgetMs: policy.passBudgetMs, now: now(), signal })
   if ("sizeUnknown" in measured || measured.size.bytes <= maxBytes) return lines
