@@ -22,7 +22,8 @@ async function harness() {
     if (path === "/v1/sync/keys") return Response.json({ entries: [] })
     return new Response("unexpected", { status: 500 })
   })
-  const store = memorySecrets().store(api)
+  const secrets = memorySecrets()
+  const store = secrets.store(api)
   await store.write(identityA)
   // The lock would otherwise live under the real home directory; running the action keeps the locked path observable.
   // The action takes the lock lease: the keystore keys its per-section view by it.
@@ -32,7 +33,7 @@ async function harness() {
   const context = await signedInSyncContext({ env: { OMO_SERVICE_API_URL: api }, cwd: await temporaryHome(), store })
   // Building the context records the account under the lock (#12280); only the token path after it must stay lock-free.
   lock.mockClear()
-  return { context, store, requests, lock }
+  return { context, store, secrets, requests, lock }
 }
 
 describe("signed-in sync context token identity", () => {
@@ -43,6 +44,30 @@ describe("signed-in sync context token identity", () => {
     expect(h.requests.map(request => request.path)).toEqual(["/v1/me"])
     expect(h.requests.some(request => request.authorization === `Bearer ${identityB.accessToken}`)).toBe(false)
   })
+
+  // Each clause of `sameIdentity` must reject on its own: exactly one field differs from the captured identity.
+  // The store re-mints the generation whenever device or keys change, so a one-field difference is planted in the raw secret instead.
+  type Harness = Awaited<ReturnType<typeof harness>>
+  const plant = (h: Harness, change: (stored: Record<string, unknown>) => Record<string, unknown>) => {
+    const [name, raw] = [...h.secrets.values.entries()][0] ?? []
+    if (name === undefined || raw === undefined) throw new Error("the harness stored no credential")
+    h.secrets.values.set(name, JSON.stringify({ ...change(JSON.parse(raw) as Record<string, unknown>), accessToken: "changed-access" }))
+  }
+  const singleFieldChanges: readonly (readonly [string, (stored: Record<string, unknown>) => Record<string, unknown>])[] = [
+    ["device id", stored => ({ ...stored, device: { ...identityA.device, id: "device-2" } })],
+    ["signing private key", stored => ({ ...stored, signingPrivateKey: keys().signingPrivateKey })],
+    ["sealing private key", stored => ({ ...stored, sealingPrivateKey: keys().sealingPrivateKey })],
+    ["credentialGeneration", stored => ({ ...stored, credentialGeneration: "generation-b" })],
+  ]
+  for (const [field, change] of singleFieldChanges) {
+    test(`a store whose only difference is the ${field} rejects the next token and sends nothing`, async () => {
+      const h = await harness()
+      plant(h, change)
+      await expect(h.context.chain.listKeys()).rejects.toBeInstanceOf(CredentialIdentityChanged)
+      expect(h.requests.map(request => request.path)).toEqual(["/v1/me"])
+      expect(h.requests.some(request => request.authorization === "Bearer changed-access")).toBe(false)
+    })
+  }
 
   test("the captured identity keeps a valid token lock-free and unrefreshed", async () => {
     const h = await harness()
