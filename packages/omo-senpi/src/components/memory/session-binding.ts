@@ -92,23 +92,29 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
 
     const memoryRoot = resolveMemoryRoot(env, sessionCwd)
     const previous = findLatestMemoryBinding(surface.readEntries())
-    // A recorded binding was made under the config read from the host folder before #10070, so a resumed
-    // session resolves and is judged exactly as it was then; only a new session (no record) takes its
-    // own folder's `memory.agent` / `auto_identity`.
-    const bindConfig = previous === undefined || surface.cwd === undefined || surface.cwd === cwd
-      ? sessionConfig
-      : deps.resolveConfig(loadConfig({ cwd }))
+    // A resumed session is judged under its own folder's config first. Its record may instead come from a
+    // bind made before #10070, when the config was read from the host folder, so a conflict there is
+    // retried under that host config before the bind fails closed.
+    const adoptUnder = (config: OmoMemorySettings) => {
+      const resolvedId = isAutoAgentValue(config.agent)
+        ? resolveAutoIdentity(sessionCwd, env, config.auto_identity)
+        : resolveMemoryIdentity(config.agent, sessionCwd, env)
+      const result = adoptSessionIdentity({
+        recorded: previous,
+        resolved: resolvedId,
+        memoryRoot,
+        configAgentValue: config.agent,
+        verifyRepository: options.verifyRepository,
+      })
+      return { config, resolved: resolvedId, adoption: result }
+    }
+    let attempt = adoptUnder(sessionConfig)
+    if (attempt.adoption.kind === "conflict" && previous !== undefined && surface.cwd !== undefined && surface.cwd !== cwd) {
+      const hostAttempt = adoptUnder(deps.resolveConfig(loadConfig({ cwd })))
+      if (hostAttempt.adoption.kind !== "conflict") attempt = hostAttempt
+    }
+    const { config: bindConfig, resolved, adoption } = attempt
     const autoAgent = isAutoAgentValue(bindConfig.agent)
-    const resolved = autoAgent
-      ? resolveAutoIdentity(sessionCwd, env, bindConfig.auto_identity)
-      : resolveMemoryIdentity(bindConfig.agent, sessionCwd, env)
-    const adoption = adoptSessionIdentity({
-      recorded: previous,
-      resolved,
-      memoryRoot,
-      configAgentValue: bindConfig.agent,
-      verifyRepository: options.verifyRepository,
-    })
     if (adoption.kind === "conflict") {
       if (!state.conflictNotified) {
         state.conflictNotified = true
