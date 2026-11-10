@@ -8,7 +8,7 @@ import { buildIdentityPaths } from "../identity/layout"
 import { acquireLock, createLockRecord, releaseLock } from "../locks"
 import { HOST_SWEEP_LOCK_FILE, HOST_SWEEP_STATE_FILE, sweepHostIdentities } from "../reflection/host-sweep"
 import { createRetentionHostSweepStep, resolveForeignIdentityDiscardUnreflected } from "./host-step"
-import { completion, daysAgo, journal, now, reflectionRun } from "./retention.test-support"
+import { ageTree, completion, daysAgo, journal, now, reflectionRun, writeJson } from "./retention.test-support"
 
 const roots: string[] = []
 afterEach(async () => {
@@ -95,10 +95,10 @@ describe("retention as a host-sweep step (6b driver 2 / --fix; A34, A38 driver h
     if (result.status !== "swept") throw new Error("expected a sweep")
     expect(result.visited).toHaveLength(30)
     expect(result.lines).toEqual([
-      "WOULD FIX id-05 retention would remove 1 (runs 1, journals 0, sidecars 0)",
-      "WOULD FIX id-07 retention would remove 1 (runs 1, journals 0, sidecars 0)",
-      "WOULD FIX id-15 retention would remove 1 (runs 0, journals 1, sidecars 0)",
-      "WOULD FIX id-20 retention would remove 1 (runs 1, journals 0, sidecars 0)",
+      "WOULD FIX id-05 retention would remove 1 (runs 1, completions 0, journals 0, sidecars 0, ledgers 0, legacy 0)",
+      "WOULD FIX id-07 retention would remove 1 (runs 1, completions 0, journals 0, sidecars 0, ledgers 0, legacy 0)",
+      "WOULD FIX id-15 retention would remove 1 (runs 0, completions 0, journals 1, sidecars 0, ledgers 0, legacy 0)",
+      "WOULD FIX id-20 retention would remove 1 (runs 1, completions 0, journals 0, sidecars 0, ledgers 0, legacy 0)",
     ])
     for (const name of ["id-05", "id-07", "id-20"]) {
       expect(existsSync(join(memoryRoot, "agents", name, "runtime", "reflection", "runs", "reflection-run-1"))).toBe(true)
@@ -106,6 +106,32 @@ describe("retention as a host-sweep step (6b driver 2 / --fix; A34, A38 driver h
       expect(existsSync(join(memoryRoot, "agents", name, "runtime", "reflection", "run-id.json"))).toBe(false)
     }
     expect(existsSync(join(memoryRoot, "agents", "id-15", "runtime", "transcripts", "s-never"))).toBe(true)
+  })
+
+  test("#given an identity with something past retention in every store #when --dry-run then --fix run #then the preview names as many items as the pass removes (#12949 review M1)", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "memory-host-dry-mix-"))
+    roots.push(memoryRoot)
+    const paths = buildIdentityPaths(memoryRoot, "id-mix")
+    await mkdir(paths.repo, { recursive: true })
+    await reflectionRun(paths, "reflection-run-60", { finishedAt: daysAgo(8) })
+    await reflectionRun(paths, "reflection-run-61", { finishedAt: daysAgo(1) })
+    for (let index = 1; index <= 51; index += 1) await completion(paths, `reflection-run-${index}`, { finishedAt: daysAgo(90 - index) })
+    const ledger = join(paths.recallLedger, "s-old.json")
+    await writeJson(ledger, { surfaced: [] })
+    await ageTree(ledger, daysAgo(60))
+    const session = join(paths.reflectionSessions, "reflection-run-0")
+    await mkdir(session, { recursive: true })
+    await ageTree(session, daysAgo(20))
+    const recallRuns = join(paths.recall, "runs", "r-1")
+    await mkdir(recallRuns, { recursive: true })
+    await ageTree(join(paths.recall, "runs"), daysAgo(20))
+
+    const dry = await sweepHostIdentities({ memoryRoot, steps: [createRetentionHostSweepStep({ now, dryRun: true })], dryRun: true, now })
+    const fixed = await sweepHostIdentities({ memoryRoot, steps: [createRetentionHostSweepStep({ now })], now })
+
+    if (dry.status !== "swept" || fixed.status !== "swept") throw new Error("expected sweeps")
+    expect(dry.lines).toEqual(["WOULD FIX id-mix retention would remove 5 (runs 1, completions 1, journals 0, sidecars 0, ledgers 1, legacy 2)"])
+    expect(fixed.lines[0]).toStartWith("FIXED id-mix retention removed 5 ")
   })
 
   test("#given --dry-run and an identity over its size cap #when the step runs #then it also says what the cap would evict (#12932)", async () => {
@@ -119,7 +145,7 @@ describe("retention as a host-sweep step (6b driver 2 / --fix; A34, A38 driver h
     const result = await sweepHostIdentities({ memoryRoot, steps: [createRetentionHostSweepStep({ settings: { runtime: { max_bytes: 1 } }, now, dryRun: true })], dryRun: true, now })
 
     if (result.status !== "swept") throw new Error("expected a sweep")
-    expect(result.lines[0]).toBe("WOULD FIX id-big retention would remove 1 (runs 1, journals 0, sidecars 0)")
+    expect(result.lines[0]).toBe("WOULD FIX id-big retention would remove 1 (runs 1, completions 0, journals 0, sidecars 0, ledgers 0, legacy 0)")
     expect(result.lines[1]).toStartWith("WOULD FIX id-big size cap: cap exceeded by ")
     expect(result.lines).toHaveLength(2)
     expect(existsSync(join(paths.reflection, "runs", "reflection-run-1"))).toBe(true)

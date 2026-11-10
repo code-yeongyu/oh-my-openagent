@@ -65,6 +65,20 @@ describe("retention removal log (#12932)", () => {
     expect(await logLines(paths.runtime)).toEqual([{ v: 1, at: iso(NOW), total: 7, removed: { runs: runs.slice(0, 5) }, more: { runs: 2 } }])
   })
 
+  test("#given a small entry then a cleanup naming 200 long names in each of 6 stores #when the last entry is read #then it is the newest one and its line fits the reader's tail (#12949 review M2)", async () => {
+    const paths = await identity()
+    await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
+    await appendRetentionLog(paths.runtime, { at: daysAgo(1), removed: { runs: ["reflection-run-1"] } })
+    const names = (store: string) => Array.from({ length: 200 }, (_, index) => `${store}-${"x".repeat(56)}-${String(index).padStart(3, "0")}`)
+    const removed = Object.fromEntries(["runs", "journals", "sidecars", "cap:runs", "cap:journals", "cap:sidecars"].map((store) => [store, names(store)]))
+
+    await appendRetentionLog(paths.runtime, { at: NOW, removed })
+
+    expect(await readLastRetentionLogEntry(paths.runtime)).toEqual({ at: iso(NOW), total: 1200 })
+    const last = (await readFile(join(paths.runtime, RETENTION_LOG_FILE), "utf8")).trimEnd().split("\n").at(-1) ?? ""
+    expect(Buffer.byteLength(last)).toBeLessThanOrEqual(32 * 1024)
+  })
+
   test("#given a current log, a rotated log, a torn last line or no log #when the last entry is read #then it is the newest whole entry, else undefined", async () => {
     const paths = await identity()
     await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
