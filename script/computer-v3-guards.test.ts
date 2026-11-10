@@ -763,6 +763,56 @@ describe("computer-v3-guards --stubs domain and --residue on disk", () => {
     })
   })
 
+  test("stubs_refuses_a_cfg_attr_ignore_with_nested_arguments_or_across_lines", () => {
+    withRepo((repo) => {
+      // given cfg_attr attributes whose attribute list has no ignore: flat, nested, and across lines with "ignore" only in the condition
+      repo.write({
+        "crates/omo-computer-core/src/lib.rs": [
+          "#[cfg_attr(test, derive(Debug))]",
+          "struct A;",
+          "#[cfg_attr(all(test, unix), derive(Debug, Clone))]",
+          "struct B;",
+          "#[cfg_attr(",
+          '    feature = "ignore",',
+          "    derive(Debug)",
+          ")]",
+          "struct C;",
+          "#[test]",
+          '#[ignore = "live: needs a display"]',
+          "fn capture() {}",
+          "",
+        ].join("\n"),
+      })
+      repo.commit("clean")
+      expectPass(repo.guard("--stubs"))
+
+      // when cfg_attr ignores under a nested condition, across lines, and after another attribute in its list
+      repo.write({
+        "crates/omo-computer-session/src/lib.rs": [
+          "#[cfg_attr(all(test, unix), ignore)]",
+          "fn a() {}",
+          "#[cfg_attr(",
+          "    test,",
+          "    ignore",
+          ")]",
+          "fn b() {}",
+          '#[cfg_attr(any(windows, target_os = "macos"), derive(Debug), ignore = "flaky")]',
+          "fn c() {}",
+          "",
+        ].join("\n"),
+      })
+      repo.commit("nested and multi-line cfg_attr")
+
+      // then each attribute is one finding at the line where it opens
+      expectFindings(
+        repo.guard("--stubs"),
+        "crates/omo-computer-session/src/lib.rs:1:",
+        "crates/omo-computer-session/src/lib.rs:3:",
+        "crates/omo-computer-session/src/lib.rs:8:",
+      )
+    })
+  })
+
   test("residue_refuses_a_class_a_path_that_exists_on_disk_as_an_empty_or_ignored_directory", () => {
     withRepo((repo) => {
       repo.write({ "README.md": "the computer module\n" })
