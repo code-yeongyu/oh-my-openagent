@@ -179,8 +179,9 @@ export function targetSession(view: ThreadHostView, durableId: string): ThreadHo
 
 /**
  * Decision 0027: ONE resolver over this device's entries and the relay transport's address book. A local hit never needs
- * the relay; a local miss answers the relay's typed unavailability (plan, sign-in) or the alias holder's typed failure
- * before any not_found. An alias or an entry on another device is account-wide: the local scope no longer applies to it.
+ * the relay. Absent remote setup leaves a local miss unchanged; a configured relay's failed lookup, disconnected
+ * transport, plan refusal or alias holder's typed failure answers before not_found. An alias or entry on another
+ * device is account-wide: the local scope no longer applies to it.
  */
 export async function resolveAcross(options: ThreadToolSurfaceOptions, local: readonly ThreadAddressEntry[], address: string, callerId: string, allScope: boolean | undefined, match: "exact" | "fuzzy" = "exact"): Promise<ThreadResolveResult & { readonly all_scope?: boolean | undefined }> {
   if (match === "fuzzy" && allScope !== true && options.callerWorkspaceRoot().trim() === "") return { kind: "error", ...threadToolFailure("caller_context_missing", "Scoping a fuzzy handoff needs the caller's workspace root, which this call did not provide.", "Set all_scope to search every workspace, or hand off from a session that knows its workspace.") }

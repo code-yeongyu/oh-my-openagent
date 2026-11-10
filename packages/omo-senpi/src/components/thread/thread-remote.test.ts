@@ -236,11 +236,11 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
 })
 
 describe("the device service is not connected, or the alias registry is not there yet", () => {
-  test("#given remote sessions turned off on this device #when a tool names this device's thread by name and another device's by id #then the local one works and the other reports typed unavailability", async () => {
+  test("#given remote sessions turned off on this device #when a tool addresses a thread #then local names work and misses stay not_found while an explicit device operation reports unavailability", async () => {
     const a = account({ plan: "disabled" })
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "local peer", message: "local" })).toMatchObject({ kind: "ok", thread_id: "dur-local" })
-    expect(await run("thread_send", { thread: "dur-on-b", message: "remote" })).toMatchObject({ kind: "error", error: { code: "host_unavailable", details: { state: "disabled" } } })
+    expect(await run("thread_send", { thread: "dur-on-b", message: "remote" })).toMatchObject({ kind: "error", error: { code: "not_found" } })
     expect(await run("thread_create", { device: "b" })).toMatchObject({ kind: "error", error: { code: "host_unavailable", details: { state: "disabled" } } })
     expect(a.sent).toEqual([])
   })

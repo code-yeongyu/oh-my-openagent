@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { B_ROW, createRemoteThreadFixture } from "../thread-remote-fixture"
+import { createDeviceServiceSessions } from "./device-service"
+import { createLazyRemoteSurface } from "./lazy-remote"
 
 const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
@@ -33,12 +35,65 @@ describe("#13012 route parity", () => {
     expect(a.sent).toEqual([])
   })
 
-  test("#given remote sessions are disconnected #when a remote name is resolved #then it reports typed unavailability", async () => {
-    const a = account({ plan: "disconnected" })
-    const { run } = surface(a.remote)
+  test("#given a connected relay's device lookup fails #when a remote name is resolved #then it reports typed unavailability", async () => {
+    const a = account()
+    const { run } = surface({ ...a.remote, sessions: { ...a.remote.sessions, thisDevice: async () => { throw new Error("device lookup failed") } } })
     expect(await run("thread_read", { thread: B_ROW.title })).toMatchObject({
+      kind: "error", error: { code: "host_unavailable", details: { reason: "device lookup failed" } },
+    })
+    expect(a.sent).toEqual([])
+  })
+
+  test.each(["thread_read", "thread_send"] as const)("#given no device service with the production lazy remote wired #when %s misses a local name #then it stays not_found", async (tool) => {
+    let connects = 0
+    const remote = createLazyRemoteSurface({
+      version: "0.0.0",
+      loadRuntime: async () => ({
+        createDeviceServiceSessions: () => createDeviceServiceSessions({
+          version: "0.0.0",
+          connect: async () => { connects += 1; throw Object.assign(new Error("device service endpoint is absent"), { code: "ENOENT" }) },
+        }),
+      }),
+    })
+    expect(await surface(remote).run(tool, { thread: "local peeer", message: "continue" })).toMatchObject({
+      kind: "error", error: { code: "not_found" },
+    })
+    expect(connects).toBe(1)
+  })
+
+  test.each(["signed_out", "disabled"])("#given remote sessions are %s #when a local name misses #then lookup stays local instead of requiring remote setup", async (plan) => {
+    const a = account({ plan })
+    let listings = 0
+    const { run } = surface({ ...a.remote, sessions: { ...a.remote.sessions, sessions: async () => { listings += 1; return [B_ROW] } } })
+    for (const tool of ["thread_read", "thread_send"] as const) {
+      expect(await run(tool, { thread: "local peeer", message: "continue" })).toMatchObject({
+        kind: "error", error: { code: "not_found" },
+      })
+    }
+    expect(listings).toBe(0)
+    expect(a.sent).toEqual([])
+  })
+
+  test("#given a configured relay is disconnected #when a remote name is resolved #then the connection failure stays typed", async () => {
+    const a = account({ plan: "disconnected" })
+    expect(await surface(a.remote).run("thread_read", { thread: B_ROW.title })).toMatchObject({
       kind: "error", error: { code: "host_unavailable", details: { state: "disconnected" } },
     })
+    expect(a.sent).toEqual([])
+  })
+
+  test("#given the target device's rename listing fails after resolution #when an alias and name are requested #then it returns typed host_unavailable before either mutation", async () => {
+    const a = account()
+    let listings = 0
+    const { run } = surface({ ...a.remote, sessions: { ...a.remote.sessions, sessions: async () => {
+      if (++listings === 2) throw new Error("rename listing failed")
+      return [B_ROW]
+    } } })
+    expect(await run("thread_rename", { thread: B_ROW.durable_id, name: "release planner", alias: "kept-free" })).toMatchObject({
+      kind: "error", error: { code: "host_unavailable", details: { device: B_ROW.device, reason: "rename listing failed" } },
+    })
+    expect(listings).toBe(2)
+    expect(a.aliases.has("kept-free")).toBe(false)
     expect(a.sent).toEqual([])
   })
 

@@ -17,7 +17,7 @@ export function relayAddressEntry(row: RemoteSessionRow, aliases?: readonly stri
 
 export type RelayAddressBook = {
   readonly entries: readonly ThreadAddressEntry[]
-  /** The typed reason other devices are out of reach (plan, sign-in, service down): answered when the local book misses. */
+  /** A configured relay's connection failure or plan refusal; absent remote setup contributes no entries. */
   readonly unavailable?: ThreadToolFailure
   /** The alias named a holder the account cannot reach right now (device_offline / not_found): answered as is. */
   readonly aliasFailure?: ThreadToolFailure
@@ -30,7 +30,10 @@ export type RelayAddressBook = {
  */
 export async function relayAddressBook(remote: RemoteThreadSurface, address: string): Promise<RelayAddressBook> {
   const unavailable = await remoteAvailable(remote)
-  if (unavailable !== undefined) return { entries: [], unavailable: unavailable.error }
+  if (unavailable !== undefined) {
+    if (unavailable.error.code === "host_unavailable" && unavailable.error.details?.["state"] !== "disconnected") return { entries: [] }
+    return { entries: [], unavailable: unavailable.error }
+  }
   const here = await remote.sessions.thisDevice()
   const rows = await remote.sessions.sessions()
   const entries = rows.filter((row) => row.device !== here).map((row) => relayAddressEntry(row))
