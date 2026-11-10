@@ -142,6 +142,17 @@ describe("omo-senpi lsp component", () => {
     ])
   })
 
+  it("#given a deny-live sandboxed review child #when the component registers #then no LSP tools register, since the daemon socket is unreachable", () => {
+    // given
+    const test = setup()
+
+    // when
+    createLspComponent({ env: { OMO_SANDBOX: "deny-live" } }).register(test.pi, test.ctx)
+
+    // then
+    expect(toolNames(test.pi)).toEqual([])
+  })
+
   it("#given no language server is resolvable for any file type #when the lsp component registers #then the six tools remain exposed", () => {
     // given
     const test = setup()

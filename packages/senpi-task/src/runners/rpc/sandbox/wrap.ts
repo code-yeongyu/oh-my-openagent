@@ -1,41 +1,64 @@
-import { existsSync, mkdirSync } from "node:fs"
+import { existsSync } from "node:fs"
 
 import type { DenyLivePlan } from "./plan"
 
-export type WrappedCommand = { readonly command: string; readonly args: readonly string[] }
+// fd the seccomp program is handed on; the spawner opens `seccompFile` there.
+export const SECCOMP_FD = 3
 
-export function wrapDenyLive(plan: DenyLivePlan, command: string, args: readonly string[]): WrappedCommand {
-  mkdirSync(plan.tmpDir, { recursive: true, mode: 0o700 })
+export type WrappedCommand = {
+  readonly command: string
+  readonly args: readonly string[]
+  readonly seccompFile?: string
+}
+
+export function wrapDenyLive(plan: DenyLivePlan, command: string, args: readonly string[], seccompFile?: string): WrappedCommand {
   if (plan.platform === "darwin") {
     return { command: plan.backend, args: ["-p", seatbeltProfile(plan), "--", command, ...args] }
   }
-  return { command: plan.backend, args: [...bwrapArgs(plan), "--", command, ...args] }
+  if (seccompFile === undefined) throw new Error("the Linux deny-live wrapper needs its seccomp program")
+  return { command: plan.backend, args: [...bwrapArgs(plan), "--seccomp", String(SECCOMP_FD), "--", command, ...args], seccompFile }
 }
 
-// bwrap cannot bind a path that does not exist; an absent protected path has nothing a child could
-// overwrite, and Seatbelt (which can rule absent paths) keeps every rule.
+/**
+ * Mount order is rule order (the later mount wins): everything read-only, private /tmp and
+ * /run/user/<uid>, the live roots re-exposed read-only over those, the cwd writable, its control entries
+ * read-only again, then the report dir and the child's state dir writable.
+ */
 export function bwrapArgs(plan: DenyLivePlan): readonly string[] {
-  const present = (paths: readonly string[]) => paths.filter((path) => existsSync(path))
+  const roBind = (path: string) => ["--ro-bind", path, path]
+  const bind = (path: string) => ["--bind", path, path]
   return [
-    "--bind", "/", "/",
-    "--dev-bind", "/dev", "/dev",
+    "--ro-bind", "/", "/",
+    "--dev", "/dev",
     "--proc", "/proc",
-    ...present(plan.deny).flatMap((path) => ["--ro-bind", path, path]),
-    ...present(plan.allow).flatMap((path) => ["--bind", path, path]),
-    ...present(plan.reDeny).flatMap((path) => ["--ro-bind", path, path]),
+    "--unshare-pid",
+    "--unshare-ipc",
+    "--die-with-parent",
+    ...plan.privateDirs.flatMap((dir) => ["--tmpfs", dir]),
+    ...[plan.home, plan.liveRoot, plan.agentDir, ...plan.codeRoots].filter(existsSync).flatMap(roBind),
+    ...bind(plan.cwd),
+    ...plan.projectControl.filter(existsSync).flatMap(roBind),
+    ...bind(plan.artifactDir),
+    ...bind(plan.stateDir),
     "--chdir", plan.cwd,
   ]
 }
 
 export function seatbeltProfile(plan: DenyLivePlan): string {
-  const rule = (verb: "allow" | "deny", path: string) =>
-    `(${verb} file-write* (literal ${quote(path)}) (subpath ${quote(path)}))`
+  const subpath = (path: string) => `(subpath ${quote(path)})`
+  const literal = (path: string) => `(literal ${quote(path)})`
   return [
     "(version 1)",
     "(allow default)",
-    ...plan.deny.map((path) => rule("deny", path)),
-    ...plan.allow.map((path) => rule("allow", path)),
-    ...plan.reDeny.map((path) => rule("deny", path)),
+    "(deny file-write*)",
+    `(allow file-write* ${subpath(plan.cwd)} ${literal("/dev/null")} ${literal("/dev/tty")} ${literal("/dev/dtracehelper")} ${literal("/dev/ptmx")} (regex #"^/dev/ttys[0-9]+$") (regex #"^/dev/fd/"))`,
+    `(deny file-write* ${plan.projectControl.map((path) => `${literal(path)} ${subpath(path)}`).join(" ")})`,
+    `(allow file-write* ${subpath(plan.artifactDir)} ${subpath(plan.stateDir)})`,
+    "(deny network-outbound (remote unix-socket))",
+    `(allow network-outbound (remote unix-socket (path-literal "/private/var/run/mDNSResponder")))`,
+    "(deny appleevent-send)",
+    "(deny mach-priv-task-port)",
+    `(deny process-exec ${literal("/bin/launchctl")} ${literal("/usr/bin/osascript")})`,
   ].join("\n")
 }
 

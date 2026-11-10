@@ -5,6 +5,9 @@ import { buildRespawnManagedSpec } from "../../../manager/manager-helpers"
 import { classifyResumeFailure } from "../../../manager/respawn-failure"
 import { createInProcessManagedRunner, type InProcessRunnerLike } from "../../../manager/runner"
 import { RunnerError } from "../../in-process/runner-error"
+import { RpcHostRunner } from "../../rpc-host"
+import { fakeFallbackRunner } from "../../rpc-host/__fixtures__/host-world-ports"
+import type { RpcRunnerSpec } from "../../types"
 
 const neverStarts: InProcessRunnerLike = {
   start: () => Promise.reject(new Error("an in-process child must never start for a sandboxed spec")),
@@ -47,5 +50,40 @@ describe("deny-live policy at the launch boundary", () => {
 
     expect(RunnerError.is(resumed) && resumed.failure.kind).toBe("sandbox_required")
     expect(classifyResumeFailure(resumed)).toMatchObject({ ok: false, disposition: "unrecoverable", code: "sandbox_required" })
+  })
+})
+
+describe("deny-live policy on the task-daemon runner", () => {
+  function hostRunner() {
+    const fallback = fakeFallbackRunner()
+    const daemonAsks: string[] = []
+    const runner = new RpcHostRunner({
+      policy: "upgrade", agentDir: "/tmp/agent", storeDir: "/tmp/store",
+      shardResolver: () => ({ socket: "/tmp/host.sock", shard: { kind: "p", key: "0000000000000000", ownerSessionId: "parent", inherited: false }, root: "primary" }),
+      ownHostSocket: () => undefined, insideHost: () => false, onNotice: () => undefined, shardEvents: {}, env: {},
+      ensureDaemon: () => {
+        daemonAsks.push("ensure")
+        return Promise.reject(new Error("the daemon must never be asked to host a sandboxed child"))
+      },
+      modelAdmission: () => Promise.resolve(),
+      fallback,
+    })
+    return { runner, fallback, daemonAsks }
+  }
+  const spec: RpcRunnerSpec = { task_id: "st_r", cwd: "/tmp/project", state_dir: "/tmp/store/children/st_r", prompt: "review", sandbox: "deny-live" }
+
+  test("#given a fresh sandboxed spec #when the daemon runner starts it #then it runs on the per-child runner and the daemon is never asked", async () => {
+    const { runner, fallback, daemonAsks } = hostRunner()
+    await runner.start(spec)
+    expect(fallback.starts).toHaveLength(1)
+    expect(daemonAsks).toEqual([])
+  })
+
+  test("#given a review child recorded on a daemon session #when it is resumed #then the resume is refused so no second writer opens its transcript", async () => {
+    const { runner, fallback, daemonAsks } = hostRunner()
+    const resumed = await runner.start({ ...spec, hostSocket: "/tmp/host.sock", resumeSessionPath: "/tmp/s.jsonl" }).then(() => undefined, (error: unknown) => error)
+    expect(RunnerError.is(resumed) && resumed.failure.kind).toBe("sandbox_required")
+    expect(fallback.starts).toEqual([])
+    expect(daemonAsks).toEqual([])
   })
 })
