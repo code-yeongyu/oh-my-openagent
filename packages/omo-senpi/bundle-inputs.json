@@ -1618,6 +1618,7 @@
     "packages/omo-senpi/src/components/thread/tools/ports.ts",
     "packages/omo-senpi/src/components/thread/tools/read-ops.ts",
     "packages/omo-senpi/src/components/thread/tools/relay-tools.ts",
+    "packages/omo-senpi/src/components/thread/tools/reply-permission.ts",
     "packages/omo-senpi/src/components/thread/tools/send-view.ts",
     "packages/omo-senpi/src/components/thread/ui-answer.ts",
     "packages/omo-senpi/src/components/todo-fanout-reminder/index.ts",
