@@ -192,14 +192,52 @@ function copy(git: Git, ref: string): string[] {
 
 const oldFrozen = (git: Git, ref: string): string[] => changedPaths(git, ref).filter(({ path }) => isUnderOldDirectory(path)).map(({ path }) => `old-frozen: ${path}`)
 
+/**
+ * The top-level comma-separated items inside the parentheses that open at `open`, read across lines with balanced
+ * parentheses and string literals skipped; undefined when the parentheses never close.
+ */
+function parenthesizedItems(text: string, open: number): string[] | undefined {
+  const items: string[] = []
+  let depth = 0
+  let start = open + 1
+  for (let index = open; index < text.length; index += 1) {
+    const char = text[index]
+    if (char === '"') {
+      for (index += 1; index < text.length && text[index] !== '"'; index += 1) if (text[index] === "\\") index += 1
+    } else if (char === "(") {
+      depth += 1
+    } else if (char === ")" && --depth === 0) {
+      return [...items, text.slice(start, index)]
+    } else if (char === "," && depth === 1) {
+      items.push(text.slice(start, index))
+      start = index + 1
+    }
+  }
+  return undefined
+}
+
+/** Every `cfg_attr(<condition>, <attributes>)` whose attribute list holds `ignore` in any form, at the line where it opens. */
+function cfgAttrIgnores(text: string): { readonly line: number; readonly problem: string }[] {
+  const found: { readonly line: number; readonly problem: string }[] = []
+  for (const match of text.matchAll(/\bcfg_attr\s*\(/g)) {
+    const line = text.slice(0, match.index).split("\n").length
+    const items = parenthesizedItems(text, match.index + match[0].length - 1)
+    if (items === undefined) found.push({ line, problem: "unterminated cfg_attr" })
+    else if (items.slice(1).some((item) => /^ignore\b/.test(item.trim()))) found.push({ line, problem: nameMap.stubs.cfgAttrIgnore })
+  }
+  return found
+}
+
 function stubs(git: Git, cwd: string): string[] {
   const patterns = nameMap.stubs.patterns.map(({ name, regexp }) => ({ name, regexp: new RegExp(regexp) }))
   const findings: string[] = []
   // Every file under the new directories, whatever its extension.
   for (const file of listFiles(git, newDirectoryPathspecs)) {
-    ;(readText(cwd, file) ?? "").split("\n").forEach((line, index) => {
+    const text = readText(cwd, file) ?? ""
+    text.split("\n").forEach((line, index) => {
       for (const { name, regexp } of patterns) if (regexp.test(line)) findings.push(`stubs: ${file}:${index + 1}: ${name}`)
     })
+    findings.push(...cfgAttrIgnores(text).map(({ line, problem }) => `stubs: ${file}:${line}: ${problem}`))
   }
   return findings
 }

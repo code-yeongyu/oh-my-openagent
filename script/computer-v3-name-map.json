@@ -294,12 +294,9 @@
       {
         "name": "#[ignore] without a live: reason",
         "regexp": "#\\[ignore(\\]|\\s*=\\s*\"(?!live: ))"
-      },
-      {
-        "name": "ignore through cfg_attr",
-        "regexp": "\\bcfg_attr\\s*\\([^)]*\\bignore\\b"
       }
-    ]
+    ],
+    "cfgAttrIgnore": "ignore through cfg_attr"
   },
   "removal": {
     "oracleCommit": "d79bc6cc9abdeab4a93979089dbbdede0268078c",
