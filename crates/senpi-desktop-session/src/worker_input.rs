@@ -255,8 +255,11 @@ impl Worker {
     }
 
     /// Object mode: whether the element that takes the keys is a secure text
-    /// field, read as the target window's focused element and the hit at its
-    /// center. A read that fails says no.
+    /// field. The element is the target app's own focused element, read from
+    /// that app (background keys land there even while another app is
+    /// frontmost), and it must sit in the target window; it is secure when its
+    /// own role says so or the hit at its center does. A read that fails says
+    /// no.
     fn typing_into_secure_field(&mut self, target: &Target) -> bool {
         let Target::Window(id) = target else { return false };
         if self.registry.report_mode() != ReportMode::Object {
@@ -264,11 +267,19 @@ impl Worker {
         }
         let Ok(backend) = self.backend() else { return false };
         let Ok(windows) = backend.windows() else { return false };
+        let pid = windows.iter().find(|window| window.id == *id).and_then(|window| window.pid);
         let center = {
             let Some(ax) = backend.ax() else { return false };
-            let Ok(Some(element)) = ax.focused_element() else { return false };
+            let focused = match pid {
+                Some(pid) => ax.app_focused_element(pid),
+                None => ax.focused_element(),
+            };
+            let Ok(Some(element)) = focused else { return false };
             if !matches!(ax.owner(&element, &windows), Ok(AxOwner::Window(owner)) if owner == *id) {
                 return false;
+            }
+            if ax.is_secure_text_field(&element).unwrap_or(false) {
+                return true;
             }
             let Some(bounds) = ax.props(&element).ok().and_then(|props| props.bounds) else { return false };
             (bounds.x + bounds.width / 2.0, bounds.y + bounds.height / 2.0)

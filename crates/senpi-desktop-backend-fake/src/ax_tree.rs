@@ -10,6 +10,7 @@ use crate::scenario::FakeAxNode;
 struct AxEntry {
     props: AxProps,
     identifier: Option<String>,
+    secure: bool,
     parent: Option<u64>,
     children: Vec<u64>,
 }
@@ -64,6 +65,7 @@ impl AxTree {
             AxEntry {
                 props,
                 identifier: node.identifier.clone(),
+                secure: node.secure,
                 parent,
                 children,
             },
@@ -91,6 +93,7 @@ impl AxTree {
                 identifier: None,
                 enabled: true,
                 focused: false,
+                secure: false,
                 bounds: None,
                 actions: Vec::new(),
                 children: Vec::new(),
@@ -176,6 +179,25 @@ impl AxTree {
             .iter()
             .find(|(_, entry)| entry.props.focused)
             .map(|(id, _)| *id)
+    }
+
+    /// The first focused node inside the trees of `windows`: one app's own
+    /// focus, which stays put while another app is frontmost.
+    pub(crate) fn focused_in(&self, windows: &[&str]) -> Option<u64> {
+        self.nodes
+            .iter()
+            .filter(|(_, entry)| entry.props.focused)
+            .map(|(id, _)| *id)
+            .find(|id| {
+                self.window_of(*id)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|window| windows.contains(&window.as_str()))
+            })
+    }
+
+    pub(crate) fn secure(&self, id: u64) -> CoreResult<bool> {
+        self.entry(id).map(|entry| entry.secure)
     }
 
     /// Deepest node whose bounds contain the global logical point.
