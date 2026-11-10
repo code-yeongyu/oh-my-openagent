@@ -55,9 +55,10 @@ const ADMIT_RECORD = "admit_external_message"
 type EngineState = { readonly phase: "idle" | "mid_turn"; readonly turnEpoch: number | null; readonly pending: number | null; readonly parkedOnApproval: boolean }
 
 function engineStateOf(reply: JsonObject): EngineState {
-  const pendingQuestions = reply["pendingQuestions"]
-  // An open question is an approval (a tool permission or an ask) a human must answer on that device: the turn is parked.
-  const parkedOnApproval = Array.isArray(pendingQuestions) && pendingQuestions.length > 0
+  // The engine parks a turn on two kinds of approval a human must answer on that device: an open question (an ask, in
+  // pendingQuestions) and a permission prompt (a dialog, in pendingDialogs). Either means the turn is not running.
+  const open = (value: unknown): boolean => Array.isArray(value) && value.length > 0
+  const parkedOnApproval = open(reply["pendingQuestions"]) || open(reply["pendingDialogs"])
   const midTurn = reply["isStreaming"] === true && reply["isCompacting"] !== true && !parkedOnApproval
   const current = reply["currentTurnId"]
   const turnEpoch = typeof current === "string" && /^\d+$/.test(current) ? Number(current) : null
@@ -132,12 +133,14 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
     const expected = delivery.expected_turn_id === undefined ? null : Number(delivery.expected_turn_id)
     let lane: EffectiveLane = "follow_up"
     let steerTurn: number | null = null
+    let probedState: EngineState | undefined
     // One get_state decides the lane the way the local drain does (gateway/decision.ts): a steer must name the running
     // turn, and the default (auto) steers whatever turn is running and starts one when the target is idle.
     if (delivery.mode === "steer" || delivery.mode === "auto") {
       const probed = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
       if (probed.kind !== "ok") return outcomeFailure(probed, row.device)
       const state: EngineState = engineStateOf(replyData(probed.response))
+      probedState = state
       const decision = decideDelivery(state.phase, delivery.mode, expected, state.turnEpoch)
       if (decision.kind !== "admit") {
         const reason = decision.kind === "refuse" ? decision.reason : "turn_conflict"
@@ -193,8 +196,9 @@ export function createRelayTransport(options: RelayTransportOptions): DeliveryTr
     // same-device delivery waits in its inbox (gateway/drain.ts answers held_draft as queued and re-admits it on the next
     // edge). Its place is the engine's own pending count. A held one is re-sent in the background under the same id.
     const after = await remote.sessions.sessionCommand(row.device, row.session_id, { type: "get_state", sessionId: row.session_id })
-    const afterState = after.kind === "ok" ? engineStateOf(replyData(after.response)) : undefined
-    const pending = afterState?.pending ?? null
+    // When that read fails, the probe's state (auto and steer modes) still says whether the receiver was parked.
+    const afterState = after.kind === "ok" ? engineStateOf(replyData(after.response)) : probedState
+    const pending = after.kind === "ok" ? (afterState?.pending ?? null) : null
     if (kind === "held_draft") {
       // The receiver's draft gate answers before its turn check. A default-mode steer it holds would be re-sent against a
       // turn that may have ended by the time the draft goes (turn_conflict, silently lost); the re-sends take the lane
