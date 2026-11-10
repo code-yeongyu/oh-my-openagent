@@ -64,7 +64,7 @@ const delivery = (sender: Record<string, unknown>, leg: Leg = "remote", id = "d-
 })
 
 /** A message the engine starts on its own after the run settled: senpi's open-todo reminder, a goal continuation, a monitor wake (role custom, not a delivery). */
-const engineStarted = { message: { role: "custom", customType: "senpi:todo-owed-reminder", content: "open todos remain" } }
+const engineStarted = { message: { role: "custom", customType: "senpi.todo-owed", content: "open todos remain" } }
 /** The run's own final answer: an assistant message that calls no tool. */
 const finalAnswer = { message: { role: "assistant", content: [{ type: "text", text: "done" }] } }
 
@@ -150,6 +150,13 @@ describe("#12886 a peer-delivered run replies to its sender", () => {
       // Running work (no final answer yet): a third agent's delivery joins it, so both are reply targets.
       await dispatch("message_start", delivery({ kind: "agent", session_id: "planner", name: "planner" }, leg, "d-3"))
       expect({ other: requests(OTHER), third: requests("planner") }).toEqual({ other: approved(OTHER), third: approved("planner") })
+      // After this group's final answer, a delivery from OTHER again starts a NEW group: only OTHER is approved, the third
+      // agent of the earlier work is not (the allowance never outlives the work a delivery started).
+      await dispatch("message_end", finalAnswer)
+      await dispatch("agent_settled")
+      await dispatch("agent_start")
+      await dispatch("message_start", delivery({ kind: "agent", session_id: OTHER, name: "Reviewer" }, leg, "d-4"))
+      expect({ other: requests(OTHER), third: requests("planner"), sender: requests(SENDER) }).toEqual({ other: approved(OTHER), third: ASK, sender: ASK })
     } finally {
       await store.dispose()
       rmSync(agentDir, { recursive: true, force: true })
@@ -184,7 +191,9 @@ describe("#12886 a peer-delivered run replies to its sender", () => {
     } satisfies DeliveryRow
     const [, sentence = ""] = renderDeliveryText(row).split("\n")
     expect(sentence).toContain(GATEWAY_PEER_REPLY_SENTENCE)
-    expect(GATEWAY_PEER_REPLY_SENTENCE).toContain("thread_send")
+    // The thread family is eval-only, like bash (#12903): the sentence names the call the receiver can make.
+    expect(GATEWAY_PEER_REPLY_SENTENCE).toContain("tool.thread_send(")
+    expect(GATEWAY_PEER_REPLY_SENTENCE).toContain("eval")
     expect(GATEWAY_PEER_REPLY_SENTENCE).toContain("sender_session")
   })
 })

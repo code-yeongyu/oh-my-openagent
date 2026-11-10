@@ -103,27 +103,27 @@ function callsTools(message: EngineMessage): boolean {
 /**
  * Decision 0027 section 6 (#13042): the reply allowance belongs to the consumed delivery and lasts for the work that
  * delivery started - the consuming turn and every later turn the engine starts on its own (a reminder, a goal
- * continuation, a monitor wake: a custom message that is no delivery). It ends when a new message from someone else
- * starts work: a person's message (role user, which is also how a loop tick or a schedule arrives, so those end it too),
- * or a delivery from a sender the run has not answered. A delivery that joins running work adds its sender.
+ * continuation, a monitor wake: a custom message that is no delivery). It ends when a new message starts work after
+ * a final answer: a person's message (role user, which is also how a loop tick or a schedule arrives, so those end
+ * it too) or any delivery, whose own sender the new group then holds. A delivery that joins running work adds its
+ * sender. The run's deliveries (`consumed`, the implicit target of a report) end with the final answer in every
+ * order: an engine-started message that arrives after the answer and before the settle keeps the allowance, not them.
  */
 function noteInput(run: RunContext, message: EngineMessage): void {
   if (message.role !== "user" && message.role !== "custom") return
   const delivery = deliveryOf(message)
   if (message.role === "custom" && delivery === undefined) {
+    if (run.answered) run.consumed = []
     run.answered = false
     return
   }
   if (run.answered) {
-    const continues = delivery?.agentSender !== undefined && run.replySenders.some((s) => s.session_id === delivery.agentSender)
-    if (!continues) {
-      run.cause = undefined
-      run.consumed = []
-      run.replyTo = []
-      run.replySenders = []
-      run.chainHop = 0
-      run.local = false
-    }
+    run.cause = undefined
+    run.consumed = []
+    run.replyTo = []
+    run.replySenders = []
+    run.chainHop = 0
+    run.local = false
     run.answered = false
   }
   if (message.role === "user") run.local = true

@@ -248,7 +248,7 @@ describe("K8: a run woken from another device continues that chain's hop on its 
       expect(first.details.result).toMatchObject({ kind: "ok", device: "b" })
       await settleRun(f, "dur-1")
       await f.dispatch("agent_start", ctx)
-      await f.dispatch("message_start", ctx, { message: { role: "custom", customType: "senpi:todo-owed-reminder", content: "open todos remain" } })
+      await f.dispatch("message_start", ctx, { message: { role: "custom", customType: "senpi.todo-owed", content: "open todos remain" } })
       const next = (await f.tool("thread_send").execute("call-2", { thread: "dur-on-b", message: "still on it" }, undefined, undefined, ctx)) as { details: { result: unknown } }
       expect(next.details.result).toMatchObject({ kind: "ok", device: "b" })
       await settleRun(f, "dur-1")
