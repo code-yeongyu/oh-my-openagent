@@ -220,7 +220,8 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
   const registry = options.registry ?? (() => listRegistryEndpoints(resolveAgentHome({ env })))
   const readSecret = options.readSecret ?? ((socket: string) => readFileSync(controlSocketSecretPath(socket)))
   const legacy = options.socket ?? resolveThreadSocket(options.env)
-  let enumeration: { readonly expiresAt: number; readonly endpoints: Promise<readonly KnownEndpoint[]> } | undefined
+  type Enumeration = { expiresAt: number | undefined; readonly endpoints: Promise<readonly KnownEndpoint[]> }
+  let enumeration: Enumeration | undefined
   // Session files each endpoint listed on its last answer: a host that stopped cleanly released its
   // claims, and this is then the only record of which threads it held.
   const lastListed = new Map<string, readonly string[]>()
@@ -286,8 +287,15 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
   }
 
   const endpoints = async (): Promise<readonly KnownEndpoint[]> => {
-    if (enumeration === undefined || enumeration.expiresAt <= now()) {
-      enumeration = { expiresAt: now() + HOST_ENDPOINTS_CACHE_TTL_MS, endpoints: enumerate() }
+    // One enumeration at a time, and its window starts when it answers: a host whose `status --all` takes longer
+    // than the window shares the running one and reuses its answer, instead of enumerating once per view (#12989).
+    if (enumeration === undefined || (enumeration.expiresAt !== undefined && enumeration.expiresAt <= now())) {
+      const started: Enumeration = { expiresAt: undefined, endpoints: enumerate() }
+      enumeration = started
+      started.endpoints.then(
+        () => { started.expiresAt = now() + HOST_ENDPOINTS_CACHE_TTL_MS },
+        () => { if (enumeration === started) enumeration = undefined },
+      )
     }
     const known = await enumeration.endpoints
     for (const endpoint of known) kinds.set(resolve(endpoint.socket), endpoint.kind)
@@ -438,7 +446,7 @@ export function createLiveThreadSurface(_pi: SenpiExtensionAPI | undefined, opti
       // the one a listing could have shown, so the send and the steer read the same liveness. A send
       // never starts an enumeration itself - a published durable id needs none - so with no fresh
       // listing the direct probe decides, exactly as a fresh listing would.
-      const fresh = endpoint.kind === "tui" && enumeration !== undefined && enumeration.expiresAt > now() ? await enumeration.endpoints : undefined
+      const fresh = endpoint.kind === "tui" && enumeration?.expiresAt !== undefined && enumeration.expiresAt > now() ? await enumeration.endpoints : undefined
       const cached = fresh?.find((candidate) => resolve(candidate.socket) === resolve(endpoint.socket))?.verdict
       const listed = await listEndpoint({ socket: endpoint.socket, paths: [], kind: endpoint.kind, verdict: cached ?? {} })
       const target = listed.sessions.filter((session) => (session.durableSessionId ?? session.sessionId) === durableId && session.status !== "closed")

@@ -6,6 +6,9 @@ use senpi_desktop_core::backend::PointerEvent;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::keys::KeyName;
 
+use crate::capture::layout::EisRegion;
+use crate::compositor::hyprland::WindowRect;
+
 use super::burst::Burst;
 use super::keymap;
 use super::preflight;
@@ -42,7 +45,111 @@ pub(super) fn finish(
     result.and(flushed)
 }
 
+fn region_contains(region: &EisRegion, (x, y): (f64, f64)) -> bool {
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "region edges are u32 sums, far below f64's exact-integer range"
+    )]
+    let (right, bottom) = (region.right() as f64, region.bottom() as f64);
+    x >= f64::from(region.x) && y >= f64::from(region.y) && x < right && y < bottom
+}
+
+/// Moves `event`, whose points are relative to a window whose frame origin was
+/// `frame_origin`, onto the compositor's own `rect` for that window, in the
+/// logical layout the libei `regions` share. Every point must land inside the
+/// window, outside every `covering` window, and inside one libei region.
+///
+/// # Errors
+/// `BackgroundUnavailable` when a point misses the window or lands on a window
+/// that may sit above it; `InvalidCoordinateFrame` when it misses every region.
+fn window_event(
+    event: PointerEvent,
+    frame_origin: (f64, f64),
+    rect: &WindowRect,
+    covering: &[WindowRect],
+    regions: &[EisRegion],
+) -> CoreResult<PointerEvent> {
+    let place = |(x, y): (f64, f64)| -> CoreResult<(f64, f64)> {
+        let point = (
+            f64::from(rect.x) + x - frame_origin.0,
+            f64::from(rect.y) + y - frame_origin.1,
+        );
+        if !rect.contains(point.0, point.1) {
+            return Err(DesktopError::background_unavailable(format!(
+                "point ({}, {}) is outside the target window's compositor geometry; no input was sent",
+                point.0, point.1
+            )));
+        }
+        if covering.iter().any(|other| other.contains(point.0, point.1)) {
+            return Err(DesktopError::background_unavailable(format!(
+                "point ({}, {}) of the target window may be covered by another window; no input was sent",
+                point.0, point.1
+            )));
+        }
+        if !regions.iter().any(|region| region_contains(region, point)) {
+            return Err(DesktopError::invalid_coordinate_frame(format!(
+                "point ({}, {}) falls outside every libei output region; no input was sent",
+                point.0, point.1
+            )));
+        }
+        Ok(point)
+    };
+    Ok(match event {
+        PointerEvent::Click {
+            x,
+            y,
+            button,
+            count,
+            modifiers,
+        } => {
+            let (x, y) = place((x, y))?;
+            PointerEvent::Click {
+                x,
+                y,
+                button,
+                count,
+                modifiers,
+            }
+        }
+        PointerEvent::Move { x, y } => {
+            let (x, y) = place((x, y))?;
+            PointerEvent::Move { x, y }
+        }
+        PointerEvent::Drag {
+            path,
+            button,
+            modifiers,
+        } => PointerEvent::Drag {
+            path: path.into_iter().map(place).collect::<CoreResult<_>>()?,
+            button,
+            modifiers,
+        },
+        PointerEvent::Scroll { x, y, dx, dy } => {
+            let (x, y) = place((x, y))?;
+            PointerEvent::Scroll { x, y, dx, dy }
+        }
+    })
+}
+
 impl Libei {
+    /// Sends `event`, given relative to a window whose frame origin was
+    /// `frame_origin`, at that window's compositor `rect` (see
+    /// [`window_event`]); nothing is sent when any point is refused.
+    ///
+    /// # Errors
+    /// The refusals of [`window_event`] and of [`Libei::pointer`].
+    pub fn window_pointer(
+        &mut self,
+        event: PointerEvent,
+        frame_origin: (f64, f64),
+        rect: &WindowRect,
+        covering: &[WindowRect],
+    ) -> CoreResult<()> {
+        let regions = self.regions()?;
+        let event = window_event(event, frame_origin, rect, covering, &regions)?;
+        self.pointer(event)
+    }
+
     pub fn pointer(&mut self, event: PointerEvent) -> CoreResult<()> {
         self.refresh_devices()?;
         let admission = preflight::pointer(&self.devices, &event)?;
@@ -170,5 +277,94 @@ impl Libei {
                 })
             });
         finish(&self.context, &devices, result)
+    }
+}
+
+#[cfg(test)]
+mod window_event_tests {
+    use senpi_desktop_core::backend::{Modifiers, MouseButton};
+    use senpi_desktop_core::error::ErrorCode;
+
+    use super::*;
+
+    const DP1: EisRegion = EisRegion {
+        x: 0,
+        y: 0,
+        width: 2560,
+        height: 1440,
+        scale: 1.0,
+    };
+    const HDMI: EisRegion = EisRegion {
+        x: 2560,
+        y: 0,
+        width: 1920,
+        height: 1080,
+        scale: 1.0,
+    };
+    const EDITOR: WindowRect = WindowRect {
+        x: 1290,
+        y: 48,
+        width: 1260,
+        height: 1012,
+    };
+
+    fn click(x: f64, y: f64) -> PointerEvent {
+        PointerEvent::Click {
+            x,
+            y,
+            button: MouseButton::Left,
+            count: 1,
+            modifiers: Modifiers::default(),
+        }
+    }
+
+    #[test]
+    fn a_window_point_lands_on_the_compositor_rect_inside_its_output_region() {
+        // Given: AT-SPI reports the window at (0, 0); Hyprland places it at (1290, 48)
+        let event = window_event(click(100.0, 20.0), (0.0, 0.0), &EDITOR, &[], &[DP1, HDMI]);
+
+        // Then: the click lands at the compositor position, inside DP-1
+        assert!(
+            matches!(event, Ok(PointerEvent::Click { x, y, .. }) if (x, y) == (1390.0, 68.0)),
+            "{event:?}"
+        );
+    }
+
+    #[test]
+    fn every_drag_point_is_moved_and_checked() {
+        let drag = PointerEvent::Drag {
+            path: vec![(10.0, 10.0), (1200.0, 900.0)],
+            button: MouseButton::Left,
+            modifiers: Modifiers::default(),
+        };
+        let moved = window_event(drag, (0.0, 0.0), &EDITOR, &[], &[DP1]).expect("inside");
+        assert!(matches!(moved, PointerEvent::Drag { ref path, .. } if path == &[(1300.0, 58.0), (2490.0, 948.0)]));
+
+        let escaping = PointerEvent::Drag {
+            path: vec![(10.0, 10.0), (1300.0, 10.0)],
+            button: MouseButton::Left,
+            modifiers: Modifiers::default(),
+        };
+        let error = window_event(escaping, (0.0, 0.0), &EDITOR, &[], &[DP1]).expect_err("leaves the window");
+        assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
+    }
+
+    #[test]
+    fn a_covered_point_is_refused() {
+        let dialog = WindowRect {
+            x: 1500,
+            y: 300,
+            width: 600,
+            height: 400,
+        };
+        let error = window_event(click(300.0, 300.0), (0.0, 0.0), &EDITOR, &[dialog], &[DP1]).expect_err("covered");
+        assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
+        assert!(error.message.contains("covered"), "{}", error.message);
+    }
+
+    #[test]
+    fn a_point_outside_every_libei_region_is_refused() {
+        let error = window_event(click(100.0, 20.0), (0.0, 0.0), &EDITOR, &[], &[HDMI]).expect_err("no region");
+        assert_eq!(error.code, ErrorCode::InvalidCoordinateFrame);
     }
 }

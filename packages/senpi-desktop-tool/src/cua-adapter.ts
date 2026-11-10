@@ -22,6 +22,7 @@ interface StepOutcome {
 	readonly code?: string;
 	readonly message?: string;
 	readonly permission?: PermissionDeniedData;
+	readonly reason?: string | null;
 }
 
 interface ActionsOutcome {
@@ -63,7 +64,7 @@ export function createComputerActionsTool(deps: ComputerToolDeps) {
 			const code = actionsScript(actionsOf(params), bounds);
 			let result: ComputerToolResult;
 			try {
-				result = await runComputer(deps, context, { code, readOnly, timeoutSeconds }, signal);
+				result = await runComputer(deps, context, { code, readOnly, timeoutSeconds, origin: "host" }, signal);
 			} catch (error) {
 				if (!(error instanceof Error)) throw error;
 				if (error instanceof DesktopLaunchContextError) {
@@ -73,7 +74,7 @@ export function createComputerActionsTool(deps: ComputerToolDeps) {
 				const data = error instanceof DesktopEngineRpcError && error.data !== null && "code" in error.data
 					? error.data : undefined;
 				const reason = data?.code ?? Reflect.get(error, "reason") ?? Reflect.get(error, "code") ?? error.name;
-				const failure = computerFailure(String(reason), error.message, stopHotkey, data?.permission);
+				const failure = computerFailure(String(reason), error.message, stopHotkey, data?.permission, data?.reason);
 				return { content: [{ type: "text", text: failure.message }], details: { value: failure, isError: true }, isError: true };
 			}
 			const outcome = result.details.value;
@@ -85,7 +86,13 @@ export function createComputerActionsTool(deps: ComputerToolDeps) {
 				const text = `${outcome.steps.length} action(s) done: ${outcome.steps.map((step) => step.action).join(", ")}.`;
 				return { ...result, content: [...images, { type: "text", text }] };
 			}
-			const failure = computerFailure(failed.code ?? "Error", failed.message ?? "action failed", stopHotkey, failed.permission);
+			const failure = computerFailure(
+				failed.code ?? "Error",
+				failed.message ?? "action failed",
+				stopHotkey,
+				failed.permission,
+				failed.reason,
+			);
 			const text = `Action ${failed.index + 1} (${failed.action}) failed. ${
 				failure.permission === undefined ? failure.message : JSON.stringify(failure)
 			}`;

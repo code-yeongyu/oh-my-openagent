@@ -18,11 +18,35 @@ const ENGINE_TO_COMPUTER: Readonly<Record<string, string>> = {
 	AxUnconfirmed: "COMPUTER_AX_UNCONFIRMED",
 	SpaceUnsupported: "COMPUTER_SPACE_UNSUPPORTED",
 	SpaceMoveDenied: "COMPUTER_SPACE_MOVE_DENIED",
+	AmbiguousTarget: "COMPUTER_AMBIGUOUS_TARGET",
+	CaptureConsentRequired: "COMPUTER_CAPTURE_CONSENT_REQUIRED",
+	ProtectedProcess: "COMPUTER_PROTECTED_PROCESS",
+	StaleRef: "COMPUTER_STALE_REF",
 	Cancelled: "COMPUTER_CANCELLED",
 	Timeout: "COMPUTER_CANCELLED",
 	timeout: "COMPUTER_CANCELLED",
 	aborted: "COMPUTER_CANCELLED",
 };
+
+/** A recovery hint for one engine `data.reason`, which says more than the code alone; `undefined` falls back. */
+function reasonHint(code: string, reason: string | null | undefined): string | undefined {
+	switch (`${code}/${reason ?? ""}`) {
+		case "COMPUTER_DISPLAY_STALE/consumed":
+			return "That frame was already used for input; capture a fresh screenshot before acting again.";
+		case "COMPUTER_DISPLAY_STALE/wrong_target":
+			return "The coordinates belong to another target's screenshot; capture the target you act on.";
+		case "COMPUTER_DISPLAY_STALE/out_of_bounds":
+			return "The point lies outside the screenshot; use coordinates within its frame.";
+		case "COMPUTER_BACKGROUND_UNAVAILABLE/user_active_in_target":
+			return "The user is typing in this app; wait until they pause, read the window again, then decide.";
+		case "COMPUTER_CONTROL_REQUIRED/headless_host":
+			return "This host cannot ask the human to confirm; target a window for background delivery instead.";
+		case "COMPUTER_SUSPENDED/stop_marker":
+			return "The user stopped computer use from outside this session; only the user resumes, with /computer resume.";
+		default:
+			return undefined;
+	}
+}
 
 function hint(code: string, stopHotkey: string): string | undefined {
 	const waitForUser = `Stop and wait for the user (stop chord: ${stopHotkey}); only the user resumes, with /computer resume.`;
@@ -56,6 +80,12 @@ function hint(code: string, stopHotkey: string): string | undefined {
 			return "Moving windows between Spaces is not available here; ask the user to bring the window to the current Space.";
 		case "COMPUTER_SPACE_MOVE_DENIED":
 			return "The window could not be moved to the current Space; ask the user to bring it over, then read the window again.";
+		case "COMPUTER_AMBIGUOUS_TARGET":
+			return "Several windows or elements match; list them again and target one by its id or ref.";
+		case "COMPUTER_CAPTURE_CONSENT_REQUIRED":
+			return "The system needs the user to approve screen capture; ask the user to approve it, then capture again.";
+		case "COMPUTER_PROTECTED_PROCESS":
+			return "This app is protected from automation; do not retry it, and ask the user to act in it.";
 		default:
 			return undefined;
 	}
@@ -80,9 +110,10 @@ export function computerFailure(
 	reason: string,
 	stopHotkey: string,
 	permission?: PermissionDeniedData | null,
+	engineReason?: string | null,
 ): ComputerFailure {
 	const mapped = code.startsWith("COMPUTER_") ? code : (ENGINE_TO_COMPUTER[code] ?? "COMPUTER_ERROR");
-	const recovery = hint(mapped, stopHotkey);
+	const recovery = reasonHint(mapped, engineReason) ?? hint(mapped, stopHotkey);
 	return {
 		code: mapped,
 		message: `${mapped}: ${reason}${recovery === undefined ? "" : ` ${recovery}`}`,
