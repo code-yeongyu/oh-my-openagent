@@ -132,8 +132,11 @@ export type SessionsList = {
   readonly id: string;
   readonly type: "sessions.list";
   readonly filter?: SessionFilter;
-  /** 2: this query's rows may carry `kind`, `parent` and `parent_listed` (#316); absent, they never do. */
-  readonly rows?: 2;
+  /**
+   * 2: this query's rows may carry `kind`, `parent` and `parent_listed` (#316); 3: those and `durable_id` (#12996);
+   * absent, they never do.
+   */
+  readonly rows?: 2 | 3;
 };
 export type SessionAttach = {
   readonly id: string;

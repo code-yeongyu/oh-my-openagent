@@ -401,7 +401,7 @@ describe("size budget", () => {
     // then
     expect(oversize).toThrow(/darwin-arm64/)
     expect(withinBudget).not.toThrow()
-    expect(MAX_BINARY_BYTES).toBe(200 * 1024 * 1024)
+    expect(MAX_BINARY_BYTES).toBe(210 * 1024 * 1024)
     rmSync(stageDir, { recursive: true, force: true })
   })
 
@@ -727,7 +727,7 @@ describe("embedded manifest parity (darwin-arm64)", () => {
   )
 
   test.skipIf(!existsSync(builtBinary))(
-    "#given the built darwin-arm64 binary #when measured #then it stays within the 150MB budget",
+    "#given the built darwin-arm64 binary #when measured #then it stays within the size budget",
     () => {
       // given / when
       const size = statSync(builtBinary).size

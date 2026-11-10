@@ -1,8 +1,10 @@
 import { workspaceEntries } from "../addressing"
 import type { ThreadReadInput, ThreadToolResult } from "../contracts"
+import { locateControl } from "../control/locate"
+import { controlIdentity } from "../control/port"
 import { readTranscript, type ThreadTranscriptEntry } from "../reader"
 import { threadLink } from "../thread-link"
-import { addressBook, degradedSummary, failure, resolution, resolveEntries, routingId, sessionPort, summary, targetSession, transcriptRole } from "./internals"
+import { addressBook, degradedSummary, failure, resolveEntries, summary, transcriptRole } from "./internals"
 import type { ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
 
 /**
@@ -24,7 +26,6 @@ export function listThreads(options: ThreadToolSurfaceOptions, current: ThreadHo
   return { kind: "ok", threads, scope: allScope === true ? "all" : "workspace" }
 }
 
-/** `thread_read` over one host view: the live transcript from the session's endpoint, else its JSONL when that endpoint is dead. */
 /**
  * A first read takes the trailing window; a read that carries a cursor continues forward from it.
  * Tail mode ignores the cursor, so following next_cursor in tail mode returned the same slice again.
@@ -33,13 +34,14 @@ function readWindow(value: ThreadReadInput): { mode: "tail" | "page"; max_bytes?
   return { mode: value.cursor === undefined ? "tail" : "page", max_bytes: value.max_bytes, cursor: value.cursor }
 }
 
+/** `thread_read`: the live transcript through the thread's control, wherever it is held; else its JSONL when its endpoint here is dead. */
 export async function readThread(options: ThreadToolSurfaceOptions, current: ThreadHostView, value: ThreadReadInput, callerId: string): Promise<ThreadToolResult> {
-  const resolved = resolution(options, resolveEntries(options, current), value.thread, callerId, value.all_scope)
-  if (resolved.kind === "error") return { kind: "error", error: resolved }
-  const session = targetSession(current, resolved.entry.thread_id)
-  if (session === undefined) return readDegraded(options, current, resolved.entry.thread_id, value)
-  const messages = await sessionPort(options, session).getMessages(routingId(session))
-  return liveReadResult(resolved.entry.thread_id, resolved.entry.name, messages, value)
+  const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
+  if (located.kind === "error") return located.result
+  if (located.kind === "not_live") return readDegraded(options, current, located.thread_id, value)
+  const { control } = located
+  const result = liveReadResult(control.thread_id, control.title, await control.getMessages(), value)
+  return result.kind === "ok" ? { ...result, ...controlIdentity(control) } : result
 }
 
 /** A live session's transcript through the bounded reader; the same window rules on this device and on another one. */
