@@ -1,7 +1,11 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
+import { spawnSync } from "node:child_process"
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 import { resolveReleaseVersion } from "./release-version.mjs"
 
 const workflowPath = new URL("../.github/workflows/publish.yml", import.meta.url)
@@ -21,6 +25,10 @@ interface Step {
 }
 
 interface Job {
+  needs?: string[]
+  if?: string
+  uses?: string
+  with?: Record<string, unknown>
   outputs?: Record<string, unknown>
   steps?: Step[]
 }
@@ -83,5 +91,83 @@ describe("omo-ai publish workflow shape", () => {
     expect(versionRun).toContain("DIST_TAG=$(printf '%s\\n' \"$METADATA\" | awk -F= '$1 == \"dist_tag\" { print $2 }')")
     expect(resolveReleaseVersion("5.0.0", false).distTag).toBe("")
     expect(resolveReleaseVersion("5.0.0-rc.1", false).distTag).toBe("rc")
+  })
+})
+
+const repoRoot = fileURLToPath(new URL("../", import.meta.url))
+const actionsExpression = (inner: string): string => `\${{ ${inner} }}`
+
+// Runs a workflow step's real script with `npm` stubbed: `npm view` answers from LATEST/BETA, every call is recorded.
+function runStep(run: string, env: Record<string, string>): { status: number | null; stderr: string; stdout: string; calls: string[] } {
+  const dir = mkdtempSync(join(tmpdir(), "omo-ai-beta-"))
+  const calls = join(dir, "calls")
+  const stub = `npm() {\n  printf '%s\\n' "$*" >> "$CALLS"\n  case "$*" in\n    *dist-tags.latest*) printf '%s\\n' "$LATEST" ;;\n    *dist-tags.beta*) printf '%s\\n' "$BETA" ;;\n  esac\n}\n`
+  try {
+    const result = spawnSync("bash", ["-c", `${stub}${run}`], {
+      cwd: repoRoot, encoding: "utf8", timeout: 20_000,
+      env: { ...process.env, CALLS: calls, RUNNER_TEMP: dir, ...env },
+    })
+    const recorded = existsSync(calls) ? readFileSync(calls, "utf8").trim().split("\n").filter(Boolean) : []
+    return { status: result.status, stderr: result.stderr, stdout: result.stdout, calls: recorded }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+}
+
+describe("beta follows latest on a stable release (#12987)", () => {
+  const betaMove = namedStep("publish-main", "Move omo-ai beta up to the stable release")
+
+  test("the beta move runs right after the omo-ai publish, for a fresh stable release only", () => {
+    const names = steps("publish-main").map((step) => step.name)
+    expect(names.indexOf("Move omo-ai beta up to the stable release")).toBe(names.indexOf("Publish omo-ai") + 1)
+    const condition = betaMove.if ?? ""
+    expect(condition).toContain("needs.release-metadata.outputs.omo_ai_dist_tag == 'latest'")
+    expect(condition).toContain("needs.release-metadata.outputs.already_published != 'true'")
+    expect(condition).toContain("inputs.lazycodex_only != true")
+    expect(betaMove.env?.NODE_AUTH_TOKEN).toBe(actionsExpression("secrets.NODE_AUTH_TOKEN"))
+  })
+
+  test.each([
+    { beta: "5.1.0", moved: true },
+    { beta: "", moved: true },
+    { beta: "5.1.66", moved: false },
+    { beta: "5.2.0-0.beta.1", moved: false },
+  ])("publishing 5.1.66 with beta at '$beta' sets beta >= latest (moved: $moved)", ({ beta, moved }) => {
+    const result = runStep(betaMove.run ?? "", { OMO_AI_VERSION: "5.1.66", BETA: beta, NODE_AUTH_TOKEN: "dummy" })
+    expect(result.status).toBe(0)
+    const tagWrites = result.calls.filter((call) => call.startsWith("dist-tag"))
+    if (moved) {
+      expect(tagWrites).toHaveLength(1)
+      expect(tagWrites[0]).toMatch(/^dist-tag add --userconfig \S+ omo-ai@5\.1\.66 beta$/)
+    } else {
+      expect(tagWrites).toEqual([])
+    }
+  })
+
+  test.each([
+    { distTag: "latest", beta: "5.1.0", passes: false },
+    { distTag: "latest", beta: "", passes: false },
+    { distTag: "latest", beta: "5.1.66", passes: true },
+    { distTag: "latest", beta: "5.2.0-0.beta.1", passes: true },
+  ])("the dist-tag guard with latest 5.1.66 and beta '$beta' passes: $passes", ({ distTag, beta, passes }) => {
+    const guard = namedStep("post-publish-verify", "Guard omo-ai dist-tags").run ?? ""
+    const result = runStep(guard, { OMO_AI_VERSION: "5.1.66", OMO_AI_DIST_TAG: distTag, ALREADY_PUBLISHED: "false", LATEST: "5.1.66", BETA: beta })
+    expect(result.status).toBe(passes ? 0 : 1)
+    if (!passes) expect(result.stdout).toContain("older than latest 5.1.66")
+  })
+
+  test("the dist-tag guard leaves a prerelease's older beta alone", () => {
+    const guard = namedStep("post-publish-verify", "Guard omo-ai dist-tags").run ?? ""
+    const result = runStep(guard, { OMO_AI_VERSION: "5.2.0-0.beta.2", OMO_AI_DIST_TAG: "beta", ALREADY_PUBLISHED: "false", LATEST: "5.1.66", BETA: "5.2.0-0.beta.2" })
+    expect(result.status).toBe(0)
+  })
+
+  test("a second installer mirror moves get.omo.dev channels/beta after a stable mirror", () => {
+    const mirrorBeta = job("installer-mirror-beta")
+    expect(mirrorBeta.uses).toBe("./.github/workflows/installer-mirror.yml")
+    expect(mirrorBeta.with).toEqual({ tag: `v${actionsExpression("needs.release-metadata.outputs.version")}`, channel: "beta", dry_run: false })
+    expect(mirrorBeta.needs).toContain("installer-mirror")
+    expect(mirrorBeta.if).toContain("needs.installer-mirror.result == 'success'")
+    expect(mirrorBeta.if).toContain("needs.release-metadata.outputs.omo_ai_dist_tag == 'latest'")
   })
 })

@@ -2092,6 +2092,7 @@
         "script/release-announce.ts",
         "script/preflight-trust.mjs",
         "script/release-version.mjs",
+        "script/beta-follows-latest.mjs",
         "script/verify-npm-payload.mjs",
         "script/wait-registry-versions.mjs",
         "script/senpi-worker-compile.ts",
@@ -2170,6 +2171,8 @@
         "script/changelog-backfill-verify.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "script/changelog-fragments-cli.ts",
+        // type declarations for script/beta-follows-latest.mjs, which publish.yml runs by path and only a test imports
+        "script/beta-follows-latest.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "script/changelog-shipping-policy.d.mts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs

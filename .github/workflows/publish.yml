@@ -1092,6 +1092,44 @@ jobs:
           OMO_AI_DIST_TAG: ${{ needs.release-metadata.outputs.omo_ai_dist_tag }}
         run: npm publish --ignore-scripts --access public --provenance --tag "$OMO_AI_DIST_TAG"
 
+      - name: Move omo-ai beta up to the stable release
+        # beta is the newer of the latest stable release and the newest prerelease (#12987), so a stable release also
+        # moves beta unless beta already holds a newer prerelease. Trusted publishing covers `npm publish` only, so the
+        # dist-tag write authenticates with the registry token, as npm-dist-tag-rollback.yml does.
+        if: >-
+          needs.release-metadata.outputs.already_published != 'true' &&
+          inputs.lazycodex_only != true &&
+          needs.release-metadata.outputs.omo_ai_dist_tag == 'latest'
+        env:
+          OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          BETA_VERSION=$(npm view --prefer-online omo-ai dist-tags.beta 2>/dev/null || true)
+          DECISION=$(node script/beta-follows-latest.mjs "$OMO_AI_VERSION" "$BETA_VERSION")
+          if [ "$DECISION" != "move=true" ]; then
+            echo "omo-ai beta stays at $BETA_VERSION: it is not older than $OMO_AI_VERSION"
+            exit 0
+          fi
+
+          echo "omo-ai beta ${BETA_VERSION:-missing} is older than $OMO_AI_VERSION; moving beta to $OMO_AI_VERSION"
+          # npm expands the variable reference itself, so the token never lands on disk.
+          NPMRC="$RUNNER_TEMP/omo-ai-dist-tag.npmrc"
+          # shellcheck disable=SC2016
+          printf '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}\n' > "$NPMRC"
+          for attempt in 1 2 3 4 5; do
+            if npm dist-tag add --userconfig "$NPMRC" "omo-ai@$OMO_AI_VERSION" beta; then
+              rm -f "$NPMRC"
+              echo "omo-ai beta -> $OMO_AI_VERSION"
+              exit 0
+            fi
+            [ "$attempt" = "5" ] || { echo "Retrying omo-ai beta dist-tag (attempt ${attempt}/5)"; sleep 15; }
+          done
+          rm -f "$NPMRC"
+          echo "::error::Could not move omo-ai beta to $OMO_AI_VERSION; run 'npm dist-tag add omo-ai@$OMO_AI_VERSION beta' with a publish token"
+          exit 1
+
       - name: Restore package.json after lazycodex-ai publish attempt
         if: always() && inputs.publish_lazycodex == true && steps.check-lazycodex.outputs.skip != 'true'
         run: |
@@ -1571,6 +1609,22 @@ jobs:
       dry_run: false
     secrets: inherit
 
+  installer-mirror-beta:
+    needs: [release-metadata, installer-mirror]
+    # beta is the newer of the latest stable release and the newest prerelease (#12987): after a stable release moves
+    # channels/latest, this moves channels/beta to the same version. The mirror never moves a channel backwards, so a
+    # newer beta prerelease is kept. The assets are already mirrored; this run re-verifies them and moves the pointer.
+    if: >-
+      always() &&
+      needs.installer-mirror.result == 'success' &&
+      needs.release-metadata.outputs.omo_ai_dist_tag == 'latest'
+    uses: ./.github/workflows/installer-mirror.yml
+    with:
+      tag: v${{ needs.release-metadata.outputs.version }}
+      channel: beta
+      dry_run: false
+    secrets: inherit
+
   post-publish-verify:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9940.
     runs-on: ubuntu-24.04
@@ -1694,6 +1748,15 @@ jobs:
             TAGGED_VERSION=$(npm view omo-ai "dist-tags.$OMO_AI_DIST_TAG" 2>/dev/null || true)
             if [ "$TAGGED_VERSION" != "$OMO_AI_VERSION" ]; then
               echo "::error::omo-ai $OMO_AI_DIST_TAG points to ${TAGGED_VERSION:-missing}, expected $OMO_AI_VERSION"
+              exit 1
+            fi
+          fi
+
+          # beta is never older than latest (#12987): publish-main moved it with this stable release.
+          if [ "$OMO_AI_DIST_TAG" = "latest" ] && [ "$ALREADY_PUBLISHED" != "true" ]; then
+            BETA_VERSION=$(npm view --prefer-online omo-ai dist-tags.beta 2>/dev/null || true)
+            if [ "$(node script/beta-follows-latest.mjs "$LATEST_VERSION" "$BETA_VERSION")" != "move=false" ]; then
+              echo "::error::omo-ai beta points to ${BETA_VERSION:-missing}, older than latest ${LATEST_VERSION:-missing}; move beta to $LATEST_VERSION"
               exit 1
             fi
           fi
