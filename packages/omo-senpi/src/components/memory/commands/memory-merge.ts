@@ -6,8 +6,10 @@ import { dirname } from "node:path"
 
 import {
   applyIdentityMerge,
+  buildDefaultSeedFiles,
   createLockRecord,
   findMergePredecessors,
+  installHooks,
   memoryWriterLockPath,
   planIdentityMerge,
   readIdentityRecord,
@@ -18,6 +20,7 @@ import {
   type MergePlan,
 } from "@oh-my-opencode/memory-core"
 
+import { memoryHookChecker } from "../worker/spawn-supervisor-support"
 import { LAZY_MEMORY_COMMANDS, type MemoryCommandPort } from "./metadata"
 import { requireIdentity, respond, type MemoryCommandContext, type MemoryCommandDeps, type MemoryCommandIdentity } from "./types"
 
@@ -69,6 +72,8 @@ async function runMemoryMerge(deps: MemoryCommandDeps, args: string, ctx: Memory
         target: identity.identityPaths,
         lock,
         author: { agentId: identity.identity, authorName: "Human" },
+        // Same bootstrap as a first memory write (engine-session.ts), so a store the merge creates has its seeds and hooks.
+        initTarget: (repo) => repo.init({ seedFiles: buildDefaultSeedFiles(), installHooks: (dir) => { installHooks(dir, { checker: memoryHookChecker() }) } }),
       })
       if (result.status === "merged") {
         merged = true

@@ -215,6 +215,12 @@ export interface ApplyIdentityMergeOptions {
   readonly target: MemoryIdentityPaths
   readonly lock: MemoryWriteLock
   readonly author: GitCommitAuthor
+  /**
+   * Creates the target repository when it does not exist yet, called inside the write lock. The harness
+   * supplies its full bootstrap (seed files, hooks), the same one a first memory write runs, so a store
+   * created by a merge is never a bare repository. Without it a missing target is refused.
+   */
+  readonly initTarget?: (repo: GitMemoryRepo) => Promise<unknown>
 }
 
 export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Promise<MergeResult> {
@@ -233,7 +239,8 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
     // A repository-root identity that is new under the `git` default has no repository yet: the merge is
     // its first write, so it creates it here instead of failing every source.
     if ((await targetRepo.head().catch(() => null)) === null && (await readdir(target.repo).catch(() => undefined)) === undefined) {
-      await targetRepo.init({ authorName: author.authorName })
+      if (options.initTarget === undefined) throw new Error(`memory merge: ${targetId} has no memory repository yet`)
+      await options.initTarget(targetRepo)
     }
     await targetRepo.cleanCheck()
     // Read the merge record again under the lock: a concurrent apply may have merged this source meanwhile.
