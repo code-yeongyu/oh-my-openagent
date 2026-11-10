@@ -4,18 +4,26 @@ import { getSessionAgent, handedBackSyncSessions } from "../../features/claude-c
 import { normalizeSDKResponse } from "../../shared"
 import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { log } from "../../shared/logger"
-import { latestAssistantTurnBlocksInternalPrompt } from "@oh-my-opencode/utils/prompt-async-gate/pending-tool-turn"
+import {
+  getAbortWindowElapsedMs,
+  getTranscriptContinuationSkipReason,
+  type TranscriptContinuationSkipReason,
+} from "../shared/idle-continuation-guards"
 
-import { isLastAssistantMessageAborted } from "./abort-detection"
 import { acknowledgeCompactionGuard, isCompactionGuardActive } from "./compaction-guard"
-import { ABORT_WINDOW_MS, CONTINUATION_COOLDOWN_MS, DEFAULT_SKIP_AGENTS, FAILURE_RESET_WINDOW_MS, HOOK_NAME, MAX_CONSECUTIVE_FAILURES } from "./constants"
+import { CONTINUATION_COOLDOWN_MS, DEFAULT_SKIP_AGENTS, FAILURE_RESET_WINDOW_MS, HOOK_NAME, MAX_CONSECUTIVE_FAILURES } from "./constants"
 import { startCountdown } from "./countdown"
-import { hasUnansweredQuestion } from "./pending-question-detection"
 import { resolveLatestMessageInfo } from "./resolve-message-info"
 import type { SessionStateStore } from "./session-state"
 import { shouldStopForStagnation } from "./stagnation-detection"
 import { getIncompleteCount } from "./todo"
 import type { MessageWithInfo, ResolvedMessageInfo, Todo } from "./types"
+
+const TRANSCRIPT_SKIP_LOG_MESSAGES: Record<TranscriptContinuationSkipReason, string> = {
+  "last-assistant-aborted": "last assistant message was aborted (API fallback)",
+  "pending-question": "pending question awaiting user response",
+  "pending-internal-response": "pending internal continuation response",
+}
 
 export async function handleSessionIdle(args: {
   ctx: PluginInput
@@ -70,13 +78,12 @@ export async function handleSessionIdle(args: {
   }
 
   if (state.abortDetectedAt) {
-    const timeSinceAbort = Date.now() - state.abortDetectedAt
-    if (timeSinceAbort < ABORT_WINDOW_MS) {
+    const timeSinceAbort = getAbortWindowElapsedMs(state.abortDetectedAt, Date.now())
+    state.abortDetectedAt = undefined
+    if (timeSinceAbort !== undefined) {
       log(`[${HOOK_NAME}] Skipped: abort detected via event ${timeSinceAbort}ms ago`, { sessionID })
-      state.abortDetectedAt = undefined
       return
     }
-    state.abortDetectedAt = undefined
   }
 
   const hasRunningBgTasks = backgroundManager
@@ -96,16 +103,9 @@ export async function handleSessionIdle(args: {
       query: { directory: ctx.directory },
     })
     prefetchedMessages = normalizeSDKResponse(messagesResp, [] as MessageWithInfo[])
-    if (isLastAssistantMessageAborted(prefetchedMessages)) {
-      log(`[${HOOK_NAME}] Skipped: last assistant message was aborted (API fallback)`, { sessionID })
-      return
-    }
-    if (hasUnansweredQuestion(prefetchedMessages)) {
-      log(`[${HOOK_NAME}] Skipped: pending question awaiting user response`, { sessionID })
-      return
-    }
-    if (latestAssistantTurnBlocksInternalPrompt(prefetchedMessages)) {
-      log(`[${HOOK_NAME}] Skipped: pending internal continuation response`, { sessionID })
+    const transcriptSkipReason = getTranscriptContinuationSkipReason(prefetchedMessages)
+    if (transcriptSkipReason !== undefined) {
+      log(`[${HOOK_NAME}] Skipped: ${TRANSCRIPT_SKIP_LOG_MESSAGES[transcriptSkipReason]}`, { sessionID })
       return
     }
   } catch (error) {
