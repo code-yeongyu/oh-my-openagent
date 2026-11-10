@@ -207,6 +207,12 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     const plan = await planCreate(options.remote, value, {
       host: createLocalSessionHost(options.host, entries),
       resolve: (address) => resolution(options, entries, address, callerId, true),
+      // Decision 0027: an existing thread or a fork source is found by the same resolver every send uses, not by a second ladder.
+      locate: async (address) => {
+        const found = await resolveAcross(options, entries, address, callerId, true)
+        if (found.kind === "error") return { kind: "error", result: { kind: "error", error: found } as ThreadToolResult }
+        return found.entry.transport?.kind === "relay" ? { kind: "remote", row: found.entry.transport.row } : { kind: "local", address: found.entry.thread_id, accountWide: true }
+      },
       existing: (address) => existingHere(current, address, callerId),
     })
     if (plan.kind === "done") return await withAlias(options.remote, value.alias, plan.result, plan.device)

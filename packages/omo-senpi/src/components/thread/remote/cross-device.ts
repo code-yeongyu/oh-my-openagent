@@ -92,6 +92,8 @@ export type LocalExisting =
 export type LocalPlacement = {
   readonly host: SessionHost
   readonly resolve: (address: string) => LocalResolution
+  /** Decision 0027: the ONE resolver (local + relay address books) for an existing thread or a fork source; omitted = local only. */
+  readonly locate?: (address: string) => Promise<CrossTarget>
   readonly existing: (address: string) => LocalExisting
 }
 
@@ -139,7 +141,7 @@ export async function planCreate(
     if (held.error.code !== "alias_not_found") return { kind: "done", result: aliasFailure(held.error) }
   }
   if (value.thread !== undefined) {
-    const target = await crossTarget(remote, value.thread, local.resolve(value.thread))
+    const target = local.locate === undefined ? await crossTarget(remote, value.thread, local.resolve(value.thread)) : await local.locate(value.thread)
     if (target.kind === "error") return { kind: "done", result: target.result }
     if (target.kind === "local") return openHere(target.address)
     // A device's listing names its ended sessions too; only those are opened again, from their file (B's engine holds a live one).
@@ -147,7 +149,7 @@ export async function planCreate(
     return { kind: "open", host: createRelaySessionHost(remote, target.row.device, target.row), request: { sessionPath: target.row.path }, creates: false }
   }
   if (value.fork_from !== undefined) {
-    const source = await crossTarget(remote, value.fork_from, local.resolve(value.fork_from))
+    const source = local.locate === undefined ? await crossTarget(remote, value.fork_from, local.resolve(value.fork_from)) : await local.locate(value.fork_from)
     if (source.kind === "error") return { kind: "done", result: source.result }
     if (value.device !== undefined) {
       const wanted = await targetDevice(remote, value.device)
