@@ -14,6 +14,7 @@ import {
 } from "./adapter"
 import { createInboxDrain, type InboxDrain, type InboxDrainOptions } from "./drain"
 import { gatewayInboxDirectory } from "./paths"
+import { createExtensionResolver } from "./extension-resolver"
 import { createGatewayStore, type GatewayStore } from "./store"
 
 /**
@@ -190,7 +191,7 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
     }
     const agentDir = options.agentDir()
     // Creating the store opens nothing; its file is opened by its first operation, below.
-    store ??= createGatewayStore({ agentDir, ...(options.runtimeInstance === undefined ? {} : { runtimeInstance: options.runtimeInstance }) })
+    store ??= createGatewayStore({ agentDir, resolveTarget: createExtensionResolver(agentDir), ...(options.runtimeInstance === undefined ? {} : { runtimeInstance: options.runtimeInstance }) })
     const runtime: SessionRuntimePort = {
       phase: (): RuntimePhase => (compacting ? "compacting" : session.isIdle() ? "idle" : openQuestions.size > 0 ? "waiting_question" : "mid_turn"),
       admissionGate: () => control.admissionGate(),
