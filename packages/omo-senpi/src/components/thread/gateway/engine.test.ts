@@ -7,6 +7,8 @@ import { join } from "node:path"
 import { ROOT_LIFETIME_MS } from "./constants"
 import type { GatewayDeliverRequest } from "./engine"
 import { gatewayInboxDirectory } from "./paths"
+import { createRemoteThreadFixture } from "../thread-remote-fixture"
+import type { RemoteThreadSurface } from "../remote/ports"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 import { settled } from "./testing/settled"
 import type { GatewayDeliveryResult } from "./types"
@@ -79,20 +81,25 @@ describe("all_fifteen_delivery_state_cases", () => {
 })
 
 describe("#13014: a local send to a session parked on a question names the wait, as a send to another device does", () => {
+  const remote = createRemoteThreadFixture().account().remote
+  const down: RemoteThreadSurface = { ...remote, sessions: { ...remote.sessions, thisDevice: async () => { throw new Error("device service down") } } }
   test.each([
-    ["with a device identity", "dev-here", { kind: "approval", device: "dev-here" }],
-    ["without a device identity", undefined, { kind: "approval" }],
-  ] as const)("#given B waits on a question and this install runs %s #when A sends a follow_up #then it is queued with waiting_on approval, naming this device only when it has one", async (_label, device, waiting) => {
-    harness = createGatewayHarness(device === undefined ? {} : { device })
+    ["whose device service names this device", remote, { kind: "approval", device: "here" }],
+    ["whose device service is down", down, { kind: "approval" }],
+    ["with no device service", undefined, { kind: "approval" }],
+  ] as const)("#given B waits on a question and A runs on an install %s #when A sends a follow_up #then it is queued with waiting_on approval, naming this device only when the stamp has one", async (_label, surface, waiting) => {
+    harness = createGatewayHarness(surface === undefined ? {} : { remote: surface })
     const h = harness
     h.session("A")
     const b = h.session("B")
     b.runtime.beginUserTurn()
     b.runtime.phaseValue = "waiting_question"
-    const result = await send(h, "A", "B", "after your question", { mode: "follow_up" })
-    expect(result).toMatchObject({ kind: "ok", delivery: { kind: "queued", queue_position: 1, waiting_on: waiting } })
+    const result = await send(h, "A", "B", "after your question", { mode: "follow_up", idempotency_key: "k-wait" })
     if (result.kind !== "ok" || result.delivery.kind !== "queued") throw new Error(`expected queued, got ${JSON.stringify(result)}`)
-    expect(result.delivery.waiting_on).toEqual(waiting)
+    expect(result.delivery).toEqual({ kind: "queued", queue_position: 1, waiting_on: waiting })
+    // The lost-ACK replay rebuilds the answer from the row and names the same wait.
+    const replay = await send(h, "A", "B", "after your question", { mode: "follow_up", idempotency_key: "k-wait" })
+    expect(replay).toMatchObject({ kind: "ok", deduplicated: true, delivery: { waiting_on: waiting } })
   })
 
   test("#given B is busy in a turn, not on a question #when A sends a follow_up #then it is queued with no waiting_on", async () => {

@@ -44,7 +44,10 @@ export type Provenance = {
   readonly project: string
   readonly lane?: string
   readonly session?: string
-  /** The account device the delivery left from, on both transports (remote/this-device.ts). */
+  /**
+   * The account device the delivery left from, stamped on every send on both transports by the one device reader
+   * (`stampThisDevice`, remote/this-device.ts). A local wait names it as the device the receiver waits on (#13014).
+   */
   readonly device?: string
   /** Why `device` is absent: a delivery never omits its sender device silently (#13004). */
   readonly device_absent?: DeviceAbsentReason

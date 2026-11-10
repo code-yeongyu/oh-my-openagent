@@ -168,7 +168,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       // reply naming nothing while this row is still queued means no drain ran: the session has no
       // registered control endpoint, and nothing starts it before the session's next run (#12486).
       const drained = reply !== undefined && reply.unroutable === undefined && (view.row.state !== "queued" || (reply.admitted ?? []).length > 0)
-      return await settle(resultFromRow(view.row, view.queue_position, endpoint.kind, false, !drained, facts.provenance.device))
+      return await settle(resultFromRow(view.row, view.queue_position, endpoint.kind, false, !drained))
     } catch (error) {
       await store.abandonReceipt({ now: now(), principal: facts.principal, idempotency_key: idempotencyKey, error_note: error instanceof Error ? error.message : String(error) }).catch(() => false)
       throw error

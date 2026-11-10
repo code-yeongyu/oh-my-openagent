@@ -15,8 +15,6 @@ export function resultFromRow(
   endpointKind: GatewayEndpointKind | null,
   deduplicated: boolean,
   offline: boolean,
-  /** This install's account device, named by a wait the row records (#13014); absent without a device identity. */
-  device?: string,
 ): GatewayDeliveryResult {
   const base = {
     kind: "ok" as const,
@@ -31,6 +29,9 @@ export function resultFromRow(
     if (row.admission_kind === "started" || row.admission_kind === "steered") {
       return { ...base, delivery: { kind: row.admission_kind, turn_id: String(row.turn_epoch ?? 0) } }
     }
+    // A row here was sent and is received on this install, so the device its sender stamped (#13004) is the one the
+    // receiver waits on (#13014); a row with no stamped device names none, so a replayed answer reads the same.
+    const device = row.envelope.provenance?.device
     const waiting = row.wait_kind === null ? {} : { waiting_on: { kind: row.wait_kind, ...(device === undefined ? {} : { device }) } }
     return { ...base, delivery: { kind: "queued", queue_position: Math.max(queuePosition, 1), ...waiting } }
   }
