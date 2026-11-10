@@ -31,6 +31,7 @@ import type { DeliveryTarget } from "./gateway/transport"
 import { createGatewayServices } from "./tools/gateway-services"
 import { listThreads, readThread } from "./tools/read-ops"
 import { createRelayTools } from "./tools/relay-tools"
+import { threadSendPermission } from "./tools/reply-permission"
 import { localScope } from "./remote/local-scope"
 import { crossTarget, listAcross, planCreate, renameAlias, withAlias } from "./remote/lazy-ops"
 import { locateControl } from "./control/locate"
@@ -226,7 +227,7 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     execute: (id: string, args: ThreadListInput, _signal, _onUpdate, ectx) => execute("thread_list", id, args, ectx, async (current, value) => await listAcross(options.remote, listThreads(options, current, value.all_scope), value.all_scope === true)),
   }
   const read: AnyTool = { ...metadata("thread_read"), parameters: threadToolParamSchemas.thread_read, execute: (id: string, args: ThreadReadInput, _signal, _onUpdate, ectx) => execute("thread_read", id, args, ectx, async (current, value, _operationId, callerId) => readThread(options, current, value, callerId)) }
-  const send: AnyTool = { ...metadata("thread_send"), parameters: threadToolParamSchemas.thread_send, execute: (id: string, args: ThreadSendInput, _signal, _onUpdate, ectx) => execute("thread_send", id, args, ectx, async (current, value, operationId, callerId) => deliver(current, value.thread, value, operationId, callerId)) }
+  const send: AnyTool = { ...metadata("thread_send"), permissionParser: threadSendPermission(options), parameters: threadToolParamSchemas.thread_send, execute: (id: string, args: ThreadSendInput, _signal, _onUpdate, ectx) => execute("thread_send", id, args, ectx, async (current, value, operationId, callerId) => deliver(current, value.thread, value, operationId, callerId)) }
   const interrupt: AnyTool = { ...metadata("thread_interrupt"), parameters: threadToolParamSchemas.thread_interrupt, execute: (id: string, args: ThreadInterruptInput, _signal, _onUpdate, ectx) => execute("thread_interrupt", id, args, ectx, async (current, value, _operationId, callerId) => {
     const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
     if (located.kind === "error") return located.result
