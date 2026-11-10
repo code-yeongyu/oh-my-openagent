@@ -91,22 +91,22 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
     if (!state.enabled) return
 
     const memoryRoot = resolveMemoryRoot(env, sessionCwd)
-    const autoAgent = isAutoAgentValue(sessionConfig.agent)
-    const resolved = autoAgent
-      ? resolveAutoIdentity(sessionCwd, env, sessionConfig.auto_identity)
-      : resolveMemoryIdentity(sessionConfig.agent, sessionCwd, env)
     const previous = findLatestMemoryBinding(surface.readEntries())
-    // A recorded binding was made under the config read from the host folder before #10070; judging a
-    // resumed session by its own folder's config would turn an explicit agent nobody applied to it
-    // into a fail-closed conflict. A new session (no record) is judged by its own folder's config.
-    const adoptionAgentValue = previous === undefined || surface.cwd === undefined || surface.cwd === cwd
-      ? sessionConfig.agent
-      : deps.resolveConfig(loadConfig({ cwd })).agent
+    // A recorded binding was made under the config read from the host folder before #10070, so a resumed
+    // session resolves and is judged exactly as it was then; only a new session (no record) takes its
+    // own folder's `memory.agent` / `auto_identity`.
+    const bindConfig = previous === undefined || surface.cwd === undefined || surface.cwd === cwd
+      ? sessionConfig
+      : deps.resolveConfig(loadConfig({ cwd }))
+    const autoAgent = isAutoAgentValue(bindConfig.agent)
+    const resolved = autoAgent
+      ? resolveAutoIdentity(sessionCwd, env, bindConfig.auto_identity)
+      : resolveMemoryIdentity(bindConfig.agent, sessionCwd, env)
     const adoption = adoptSessionIdentity({
       recorded: previous,
       resolved,
       memoryRoot,
-      configAgentValue: adoptionAgentValue,
+      configAgentValue: bindConfig.agent,
       verifyRepository: options.verifyRepository,
     })
     if (adoption.kind === "conflict") {
@@ -160,7 +160,7 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
     if (adoption.kind === "resolved") void deps.work.track(() => recordIdentityBind(run.paths.root, {
       id: identity.id,
       kind: autoAgent ? "auto" : "explicit",
-      mode: sessionConfig.auto_identity,
+      mode: bindConfig.auto_identity,
       source: sessionCwd,
       spelling: sessionCwd,
     }, binding.boundAt)).catch((error: unknown) => {
