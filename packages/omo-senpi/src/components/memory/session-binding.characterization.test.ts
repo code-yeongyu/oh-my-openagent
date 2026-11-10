@@ -118,6 +118,40 @@ describe("X8c memory binding at session_start (characterization)", () => {
     expect(notifications).toEqual([])
   })
 
+  test("#given the host cwd and the session cwd configure different memory agents #when session_start fires #then the session cwd's config names the identity (#10070)", async () => {
+    // given
+    const hostCwd = join(tempDir("omo-x8c-host-"), "host")
+    const sessionCwd = join(tempDir("omo-x8c-ws-"), "project")
+    const env = { OMO_MEMORY_HOME: join(tempDir("omo-x8c-home-"), "memory") }
+    const pi = new MemoryFakeExtensionAPI()
+    const ctx = componentContext()
+    const configCwds: Array<string | undefined> = []
+    createMemoryComponent({
+      env,
+      loadConfig: (options) => {
+        configCwds.push(options?.cwd)
+        return loadedMemoryConfig(memorySettings({ agent: options?.cwd === sessionCwd ? "session-agent" : "host-agent" }))
+      },
+      now: () => 1236,
+      resolveCwd: () => hostCwd,
+      syncRunner: recordingSyncRunner([]),
+      createRuntime: () => {
+        throw new Error("bind-only characterization does not create an identity runtime")
+      },
+    }).register(pi, ctx)
+    started.push({ pi, ctx })
+    const sessionIdentity = resolveMemoryIdentity("session-agent", sessionCwd, env)
+
+    // when
+    await pi.dispatch("session_start", {}, sessionContext({ cwd: sessionCwd }))
+
+    // then
+    expect(configCwds).toContain(sessionCwd)
+    expect(pi.entries.map((entry) => entry.data)).toEqual([
+      createMemoryBinding({ identity: sessionIdentity.id, repoPath: sessionIdentity.paths.repo, boundAt: 1236 }),
+    ])
+  })
+
   test("#given a host that reports no session cwd #when session_start fires #then the binding falls back to the host process cwd's identity", async () => {
     // given
     const h = harness({ now: 1235 })

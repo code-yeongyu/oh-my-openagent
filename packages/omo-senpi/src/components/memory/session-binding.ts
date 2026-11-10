@@ -75,7 +75,11 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
     eventCtx: unknown,
     options: { readonly existing: SessionState | undefined; readonly verifyRepository: boolean },
   ): void => {
-    const sessionConfig = deps.resolveConfig(loadConfig({ cwd }))
+    // The identity belongs to the SESSION's workspace, not to whatever directory the host
+    // process happens to sit in: one shared host serves sessions from many workspaces (#8556),
+    // and so does the memory config that names it (#10070).
+    const sessionCwd = surface.cwd ?? cwd
+    const sessionConfig = deps.resolveConfig(loadConfig({ cwd: sessionCwd }))
     const state: SessionState = options.existing ?? {
       enabled: deps.isEnabled(sessionConfig),
       memoryStatusAttempted: false,
@@ -86,9 +90,6 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
     sessions.set(surface.id, state)
     if (!state.enabled) return
 
-    // The identity belongs to the SESSION's workspace, not to whatever directory the host
-    // process happens to sit in: one shared host serves sessions from many workspaces (#8556).
-    const sessionCwd = surface.cwd ?? cwd
     const memoryRoot = resolveMemoryRoot(env, sessionCwd)
     const resolved = isAutoAgentValue(sessionConfig.agent)
       ? resolveAutoIdentity(sessionCwd, env, sessionConfig.auto_identity)
