@@ -96,6 +96,15 @@ pub(crate) fn harness(overlay: &Value) -> Harness {
 /// A harness whose session shares `slot` with other harnesses, as the
 /// engine's sessions share the process-wide slot.
 pub(crate) fn harness_with_slot(overlay: &Value, slot: Arc<crate::grant::ControlSlot>) -> Harness {
+    harness_opened(overlay, slot, DesktopSessionOptions::default())
+}
+
+/// A harness whose session was opened with `options`.
+pub(crate) fn harness_opened(
+    overlay: &Value,
+    slot: Arc<crate::grant::ControlSlot>,
+    options: DesktopSessionOptions,
+) -> Harness {
     let scenario = scenario(overlay);
     let built = Built::default();
     let clock = Arc::new(FakeClock::new(0));
@@ -123,7 +132,7 @@ pub(crate) fn harness_with_slot(overlay: &Value, slot: Arc<crate::grant::Control
     let report_mode = Arc::new(Mutex::new(senpi_desktop_core::report::ReportMode::Null));
     let display = (Arc::default(), crate::screen_notes::ScreenNotes::default());
     let mut worker = Worker::new(Box::new(factory), capabilities, report_mode, safety, display);
-    worker.open(DesktopSessionOptions::default());
+    worker.open(options);
     let (sink, faults, user_input) = built.lock().clone().expect("open built a backend");
     Harness {
         worker,

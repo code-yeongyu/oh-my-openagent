@@ -9,87 +9,89 @@ export type ComputerCallPolicy = "read" | "exec";
 
 type MethodPolicies = Readonly<Record<string, ComputerCallPolicy>>;
 
+// <generated:facade> from facade-manifest.json by scripts/generate-assets.ts; edit CHAIN_BINDINGS there, then `bun run generate`
 /** Helpers callable on the `desktop` root; `window` and `ref` also anchor one-hop handle chains. */
 export const DESKTOP_METHODS: MethodPolicies = {
-	capabilities: "read",
-	displays: "read",
-	display: "read",
-	windows: "read",
-	window: "read",
-	focusedWindow: "read",
-	screenshot: "read",
-	zoom: "read",
-	click: "exec",
-	doubleClick: "exec",
-	move: "exec",
-	drag: "exec",
-	scroll: "exec",
-	type: "exec",
-	press: "exec",
-	holdKeys: "exec",
-	holdMouse: "exec",
-	elementAt: "read",
-	focusedElement: "read",
-	ref: "read",
-	"clipboard.read": "read",
-	"clipboard.write": "exec",
-	"control.acquire": "exec",
-	"control.release": "exec",
-	"control.state": "read",
+	capabilities: "read", // Computer.capabilities
+	displays: "read", // Computer.displays
+	display: "read", // kernel-only: no SDK facade method yet
+	windows: "read", // Computer.windows
+	window: "read", // Computer.window
+	focusedWindow: "read", // kernel-only: no SDK facade method yet
+	screenshot: "read", // Target.screenshot
+	zoom: "read", // Frame.zoom
+	click: "exec", // Pointer.click
+	doubleClick: "exec", // Pointer.click
+	move: "exec", // Pointer.move
+	drag: "exec", // Pointer.drag
+	scroll: "exec", // Pointer.scroll
+	type: "exec", // Keyboard.type
+	press: "exec", // Keyboard.chord
+	holdKeys: "exec", // Keyboard.hold
+	holdMouse: "exec", // Pointer.hold
+	elementAt: "read", // kernel-only: no SDK facade method yet
+	focusedElement: "read", // kernel-only: no SDK facade method yet
+	ref: "read", // Window.element
+	"clipboard.read": "read", // kernel-only: no SDK facade method yet
+	"clipboard.write": "exec", // kernel-only: no SDK facade method yet
+	"control.acquire": "exec", // Control.acquire
+	"control.release": "exec", // Control.release
+	"control.state": "read", // Control.state
 };
 
 /** Helpers callable on a display handle resolved through `desktop.display(selector)`. */
 export const DISPLAY_METHODS: MethodPolicies = {
-	screenshot: "read",
-	zoom: "read",
-	click: "exec",
-	doubleClick: "exec",
-	move: "exec",
-	drag: "exec",
-	scroll: "exec",
-	type: "exec",
-	press: "exec",
-	holdKeys: "exec",
-	holdMouse: "exec",
+	screenshot: "read", // Target.screenshot
+	zoom: "read", // Frame.zoom
+	click: "exec", // Pointer.click
+	doubleClick: "exec", // Pointer.click
+	move: "exec", // Pointer.move
+	drag: "exec", // Pointer.drag
+	scroll: "exec", // Pointer.scroll
+	type: "exec", // Keyboard.type
+	press: "exec", // Keyboard.chord
+	holdKeys: "exec", // Keyboard.hold
+	holdMouse: "exec", // Pointer.hold
 };
 
 /** Helpers callable on a window handle resolved through `desktop.window(id)`. */
 export const WINDOW_METHODS: MethodPolicies = {
-	screenshot: "read",
-	observe: "read",
-	zoom: "read",
-	click: "exec",
-	doubleClick: "exec",
-	move: "exec",
-	drag: "exec",
-	scroll: "exec",
-	type: "exec",
-	press: "exec",
-	holdKeys: "exec",
-	holdMouse: "exec",
-	raise: "exec",
-	ax: "read",
-	find: "read",
-	ref: "read",
-	"menu.items": "read",
-	"menu.select": "exec",
+	screenshot: "read", // Target.screenshot
+	observe: "read", // Target.observe
+	zoom: "read", // Frame.zoom
+	click: "exec", // Pointer.click
+	doubleClick: "exec", // Pointer.click
+	move: "exec", // Pointer.move
+	drag: "exec", // Pointer.drag
+	scroll: "exec", // Pointer.scroll
+	type: "exec", // Keyboard.type
+	press: "exec", // Keyboard.chord
+	holdKeys: "exec", // Keyboard.hold
+	holdMouse: "exec", // Pointer.hold
+	raise: "exec", // Window.raise
+	ax: "read", // Target.ax
+	find: "read", // Window.find
+	ref: "read", // Window.element
+	"menu.items": "read", // Menus.items
+	"menu.select": "exec", // Menus.select
 };
 
 /** Helpers callable on an AX element handle resolved through `desktop.ref(ref)`. */
 export const ELEMENT_METHODS: MethodPolicies = {
-	value: "read",
-	setValue: "exec",
-	bounds: "read",
-	attributes: "read",
-	actions: "read",
-	perform: "exec",
-	press: "exec",
-	click: "exec",
-	type: "exec",
-	focus: "exec",
-	parent: "read",
-	children: "read",
+	value: "read", // Element.read
+	setValue: "exec", // Element.setValue
+	bounds: "read", // Element.read
+	attributes: "read", // Element.attributes
+	actions: "read", // Element.read
+	perform: "exec", // Element.perform
+	press: "exec", // Element.press
+	click: "exec", // Element.click
+	type: "exec", // Element.type
+	focus: "exec", // Element.focus
+	parent: "read", // Element.read
+	children: "read", // Element.read
 };
+// </generated:facade>
 
 /** Root methods whose result accepts one chained handle call, mapped to the handle's method table. */
 const HANDLE_ROOTS: Readonly<Record<string, { readonly label: string; readonly methods: MethodPolicies }>> = {

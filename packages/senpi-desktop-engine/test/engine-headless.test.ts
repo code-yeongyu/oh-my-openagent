@@ -82,12 +82,13 @@ describe("senpi-desktop-engine over stdio with the fake backend", { timeout: TES
 		expect(at(refused, "error", "message")).toContain("capture it again");
 	});
 
-	it("answers StaleRef for an AX ref older than the previous snapshot", async () => {
+	it("answers StaleRef for an AX ref older than the eight newest snapshots", async () => {
 		const engine = twoDisplays();
 		await makeStopPathLive(engine);
 		const save = await snapshotRef(engine, WINDOW, '"Save"');
-		await engine.call("ax.snapshot", { target: WINDOW });
-		await engine.call("ax.snapshot", { target: WINDOW });
+		for (let snapshot = 0; snapshot < 8; snapshot++) {
+			await engine.call("ax.snapshot", { target: WINDOW });
+		}
 
 		const performed = await engine.call("ax.perform", { ref: save, action: "press" });
 
