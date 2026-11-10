@@ -187,7 +187,7 @@ export function threadExitCode(result) {
  * The answer is `{ sdk }` or `{ error, code }`: `unsupported` for the runtime, `internal_error` for a
  * plugin SDK that cannot be imported (a broken or partial install).
  */
-export async function loadThreadSdk({ pluginRoot, agentDir, env, cwd, engine, loadSqlite, importSdk, importThreadClient = () => import(pathToFileURL(join(pluginRoot, "extensions", "omo-thread-client.js")).href), identity }) {
+export async function loadThreadSdk({ pluginRoot, agentDir, env, cwd, engine, stderr, reinstall, loadSqlite, importSdk, importThreadClient = () => import(pathToFileURL(threadClientPath(pluginRoot)).href), identity }) {
   try {
     await (loadSqlite ?? (() => import("node:sqlite")))()
   } catch {
@@ -201,20 +201,23 @@ export async function loadThreadSdk({ pluginRoot, agentDir, env, cwd, engine, lo
   }
   const who = identity ?? { uid: process.getuid?.() ?? 0, user: userInfo().username }
   const engineStatusAll = async () => engine.run(["host", "status", "--json", "--all", "--include-workers"], { env: { ...env, OMO_AGENT_DIR: agentDir } }).stdout
-  const remote = await cliRemoteSurface({ pluginRoot, env, cwd, importThreadClient })
+  const remote = await cliRemoteSurface({ pluginRoot, env, cwd, stderr, reinstall, importThreadClient })
   return { sdk: module.createThreadSdk({ agentDir, cwd, uid: who.uid, user: who.user, env, engineStatusAll, ...(remote === undefined ? {} : { remote }) }) }
 }
 
 /**
  * The account's other devices and its alias registry for `omo thread` (#12833), from the plugin's own thread client and
  * device-account sidecars: `read` then resolves an alias or another device's thread as the agent tools do. A plugin
- * whose thread client does not offer it keeps the local-only behavior. The SDK closes it on dispose.
+ * whose thread client does not offer it keeps the local-only behavior. A thread client that cannot be imported is a
+ * broken install: the local-only behavior stays, and stderr says aliases and other devices are unreachable (#12848).
+ * The SDK closes it on dispose.
  */
-async function cliRemoteSurface({ pluginRoot, env, cwd, importThreadClient }) {
+async function cliRemoteSurface({ pluginRoot, env, cwd, stderr, reinstall, importThreadClient }) {
   let client
   try {
     client = await importThreadClient()
-  } catch {
+  } catch (error) {
+    stderr.write(`omo: the plugin's thread client could not be loaded from ${threadClientPath(pluginRoot)} (${error instanceof Error ? error.message : String(error)}); aliases and other devices' threads are unreachable, only this device's threads are.\n  next: ${reinstall ?? "Reinstall omo, then retry."}\n`)
     return undefined
   }
   if (typeof client.createCliRemoteSurface !== "function") return undefined
@@ -225,8 +228,12 @@ async function cliRemoteSurface({ pluginRoot, env, cwd, importThreadClient }) {
   } catch {
     // A plugin manifest that cannot be read only loses the version the device service is told; reads still work.
   }
-  const loadAccess = async () => (await import(pathToFileURL(join(pluginRoot, "extensions", "omo-device-account.js")).href)).cliServiceAccess({ env, cwd })
+  const loadAccess = async () => (await import(pathToFileURL(join(pluginRoot, "extensions", "omo-device-account.js")).href)).cliServiceAccess({ env, cwd, log: (line) => stderr.write(`omo: ${line}\n`) })
   return client.createCliRemoteSurface({ version, loadAccess })
+}
+
+function threadClientPath(pluginRoot) {
+  return join(pluginRoot, "extensions", "omo-thread-client.js")
 }
 
 export async function runThreadCommand(args, options) {

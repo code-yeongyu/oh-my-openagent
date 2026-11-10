@@ -104,6 +104,8 @@ export type GatewaySender =
       readonly cause_delivery_id?: string
     }
   | { readonly kind: "cli"; readonly uid: number; readonly user: string }
+  /** The person at a terminal sending their own input to a session on another device (`omo remote send`): a prompt, never a delivery with an envelope. */
+  | { readonly kind: "person"; readonly uid: number; readonly user: string }
   | {
       readonly kind: "external"
       readonly origin: ExternalOrigin
