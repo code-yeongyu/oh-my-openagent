@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:dafb8f02d02d61aac6a966cadc2cad2464ba5fc2ad8ab44d6cd37f4f91a8065f:fc15bc8193136b9b66c7c1302079dc621449139529fc9497bce91c8f2153214b
+// omo-codex-install:2586b58e48abce60b054ef9c15ea089fb631736ec64ba417530fb9a345008f2f:fb5b3a9ed7f6f90c242e5247ea95bce2025f7218e79f0485f2ecb358938d9948
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10205,7 +10205,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.65",
+    version: "5.1.66",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -13154,7 +13154,7 @@ var LATEST_MODEL_BY_FAMILY = {
   claudeOpus: "claude-opus-5-5",
   claudeSonnet: "claude-sonnet-5-5",
   claudeHaiku: "claude-haiku-5-5",
-  claudeFable: "claude-fable-5-1",
+  claudeFable: "claude-fable-5-2",
   gptAstra: "gpt-6-astra",
   gptSol: "gpt-6.1-sol",
   gptSolFast: "gpt-6.1-sol-fast",
@@ -19716,11 +19716,7 @@ var OmoComputerSettingsLayerSchema = object({
   audit_log: object({ enabled: boolean2() }).partial().strict(),
   screenshot_gc: object({ enabled: boolean2(), stale_ms: nonNegativeInteger, scan_interval_ms: nonNegativeInteger }).partial().strict(),
   engine_path: string2().min(1),
-  cua_adapter: boolean2(),
-  run_sandbox: _enum(["vm", "quickjs"]).describe("Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"),
-  intervention: _enum(["continue", "pause"]).describe("What a background action does while the user uses the target app (default: pause)"),
-  macos_key_priming: _enum(["on", "off"]).describe("macOS background keys first make the target window key (default: off)"),
-  trace: boolean2().describe("Per-request timing traces (default: false)")
+  cua_adapter: boolean2()
 }).partial().strict().describe("Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host.");
 var OmoComputerSettingsSchema = OmoComputerSettingsLayerSchema;
 

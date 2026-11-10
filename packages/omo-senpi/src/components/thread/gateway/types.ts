@@ -104,6 +104,8 @@ export type GatewaySender =
       readonly cause_delivery_id?: string
     }
   | { readonly kind: "cli"; readonly uid: number; readonly user: string }
+  /** The person at a terminal sending their own input to a session on another device (`omo remote send`): a prompt, never a delivery with an envelope. */
+  | { readonly kind: "person"; readonly uid: number; readonly user: string }
   | {
       readonly kind: "external"
       readonly origin: ExternalOrigin
@@ -191,7 +193,10 @@ export type RecordOutcomeRequest = {
 
 export type GatewayDeliveryDelivery =
   | { readonly kind: "started" | "steered"; readonly turn_id: string }
-  | { readonly kind: "queued" | "queued_offline"; readonly queue_position: number }
+  | { readonly kind: "queued" | "queued_offline"; readonly queue_position: number; readonly waiting_on?: DeliveryWait }
+
+/** What the receiver is parked on while the delivery waits: an approval (a tool permission or question) a human must answer on that device. */
+export type DeliveryWait = { readonly kind: "approval"; readonly device: string }
 
 export type GatewayDeliverySuccess = {
   readonly kind: "ok"
