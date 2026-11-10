@@ -15,8 +15,6 @@ use senpi_desktop_safety::MutatingAction;
 
 use crate::mutate::Mutation;
 use crate::request::Response;
-use crate::timings::TimedStage;
-use crate::worker_input::interrupted;
 use crate::worker::{Audited, Worker};
 
 /// Attribute values longer than this are cut with an ellipsis.
@@ -109,18 +107,15 @@ impl Worker {
         action: &str,
         cancelled: &dyn Fn() -> bool,
     ) -> CoreResult<Audited> {
-        let mutation = Mutation::new(
+        let mut mutation = Mutation::new(
             MutatingAction::AxPerform,
             self.ref_target(reference),
             DeliveryMode::Background,
         );
-        let interrupted = self.battery_interruption(cancelled);
+        mutation.ax_actionability = Some((reference, Some(action)));
         let baseline = Cell::new(None);
         let audited = self.mutate(&mutation, cancelled, |worker| {
             let handle = worker.registry.resolve(reference)?;
-            mutation.timings.time(TimedStage::AxResolve, || {
-                worker.actionable(reference, &handle, Some(action), &interrupted)
-            })?;
             baseline.set(worker.element_surface_baseline(&handle));
             let backend = worker.ax_parts()?.0;
             if action.eq_ignore_ascii_case("press") {
@@ -134,17 +129,6 @@ impl Worker {
         Ok(audited)
     }
 
-    /// The stop and cancellation check the actionability battery runs
-    /// before each read of the element it waits on.
-    pub(crate) fn battery_interruption<'a>(
-        &self,
-        cancelled: &'a dyn Fn() -> bool,
-    ) -> impl Fn() -> CoreResult<()> + 'a {
-        let supervisor = self.safety.supervisor.clone();
-        let policy = self.stop_policy();
-        move || interrupted(&supervisor, &policy, cancelled, "waiting for the element to become actionable")
-    }
-
     pub(crate) fn ax_set_value(
         &mut self,
         reference: &str,
@@ -153,35 +137,29 @@ impl Worker {
     ) -> CoreResult<Audited> {
         let mutation = Mutation {
             text: Some(value),
+            ax_actionability: Some((reference, None)),
             ..Mutation::new(
                 MutatingAction::AxSetValue,
                 self.ref_target(reference),
                 DeliveryMode::Background,
             )
         };
-        let interrupted = self.battery_interruption(cancelled);
         self.mutate(&mutation, cancelled, |worker| {
             let handle = worker.registry.resolve(reference)?;
-            mutation.timings.time(TimedStage::AxResolve, || {
-                worker.actionable(reference, &handle, None, &interrupted)
-            })?;
             worker.ax_parts()?.0.set_value(&handle, value)?;
             Ok(Response::Unit)
         })
     }
 
     pub(crate) fn ax_focus(&mut self, reference: &str, cancelled: &dyn Fn() -> bool) -> CoreResult<Audited> {
-        let mutation = Mutation::new(
+        let mut mutation = Mutation::new(
             MutatingAction::AxFocus,
             self.ref_target(reference),
             DeliveryMode::Background,
         );
-        let interrupted = self.battery_interruption(cancelled);
+        mutation.ax_actionability = Some((reference, None));
         self.mutate(&mutation, cancelled, |worker| {
             let handle = worker.registry.resolve(reference)?;
-            mutation.timings.time(TimedStage::AxResolve, || {
-                worker.actionable(reference, &handle, None, &interrupted)
-            })?;
             worker.ax_parts()?.0.focus(&handle)?;
             Ok(Response::Unit)
         })

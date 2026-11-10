@@ -5,6 +5,9 @@
 //! (no element, no owner) passes. Transient states (hidden, moving, covered)
 //! are waited on for up to [`AUTO_WAIT`]; terminal ones (disabled while
 //! visible and still, an action the element does not offer) refuse at once.
+//! The wait sends nothing, so it runs before the machine-wide interaction
+//! lock is taken; under the lock the element is observed once more, without
+//! waiting, and a target that regressed meanwhile is refused the same way.
 //! Every refusal is `AxUnsupported` with nothing sent. A session without
 //! `reportMode: "object"` acts at once, as protocol 1 did.
 
@@ -14,7 +17,10 @@ use senpi_desktop_core::ax::{AxBounds, AxHandle, AxOwner};
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode, ErrorReport};
 use senpi_desktop_core::report::{Disposition, ReportMode};
 
+use crate::mutate::Mutation;
+use crate::timings::TimedStage;
 use crate::worker::Worker;
+use crate::worker_input::interrupted;
 
 /// How long the battery waits for a hidden, moving or covered element.
 pub(crate) const AUTO_WAIT: Duration = Duration::from_secs(5);
@@ -48,22 +54,59 @@ impl Pending {
 }
 
 impl Worker {
+    /// Waits up to [`AUTO_WAIT`] for the mutation's element to become
+    /// actionable, before the capture and the machine-wide lock; the bounds
+    /// it settled on are what [`Self::assert_actionable_now`] expects.
+    pub(crate) fn wait_until_actionable(
+        &mut self,
+        mutation: &Mutation<'_>,
+        cancelled: &dyn Fn() -> bool,
+    ) -> CoreResult<Option<AxBounds>> {
+        let Some((reference, action)) = self.battery_target(mutation) else { return Ok(None) };
+        let interrupted = self.battery_interruption(cancelled);
+        mutation.timings.time(TimedStage::AxResolve, || {
+            let handle = self.registry.resolve(reference).map_err(nothing_sent)?;
+            self.actionability(reference, &handle, action, &interrupted, None, true)
+        })
+    }
+
+    /// One observation under the lock, no wait: the element must still be
+    /// actionable at the bounds the wait settled on (`previous`).
+    pub(crate) fn assert_actionable_now(
+        &mut self,
+        mutation: &Mutation<'_>,
+        cancelled: &dyn Fn() -> bool,
+        previous: Option<AxBounds>,
+    ) -> CoreResult<()> {
+        let Some((reference, action)) = self.battery_target(mutation) else { return Ok(()) };
+        let interrupted = self.battery_interruption(cancelled);
+        mutation.timings.time(TimedStage::AxResolve, || {
+            let handle = self.registry.resolve(reference).map_err(nothing_sent)?;
+            self.actionability(reference, &handle, action, &interrupted, previous, false).map(|_| ())
+        })
+    }
+
+    /// The element and offered action the battery checks: only in an
+    /// object-mode session, which a protocol-1 session is not.
+    fn battery_target<'a>(&self, mutation: &Mutation<'a>) -> Option<(&'a str, Option<&'a str>)> {
+        mutation.ax_actionability.filter(|_| self.registry.report_mode() == ReportMode::Object)
+    }
+
     /// Runs the battery on `handle` (named `reference` in errors) before
     /// `action` (`None` for a value write, a focus or a coordinate click).
     /// `interrupted` is checked before every read, so a stop or a
-    /// cancellation ends the wait with nothing sent.
-    pub(crate) fn actionable(
+    /// cancellation ends the wait with nothing sent. With `wait` false it
+    /// reads once and refuses any state it would have waited out.
+    fn actionability(
         &mut self,
         reference: &str,
         handle: &AxHandle,
         action: Option<&str>,
         interrupted: &dyn Fn() -> CoreResult<()>,
-    ) -> CoreResult<()> {
-        if self.registry.report_mode() != ReportMode::Object {
-            return Ok(());
-        }
+        mut previous: Option<AxBounds>,
+        wait: bool,
+    ) -> CoreResult<Option<AxBounds>> {
         let deadline = Instant::now() + AUTO_WAIT;
-        let mut previous: Option<AxBounds> = None;
         loop {
             interrupted().map_err(nothing_sent)?;
             let props = self.ax_parts().and_then(|(ax, _)| ax.props(handle)).map_err(nothing_sent)?;
@@ -84,7 +127,7 @@ impl Worker {
                 Some(bounds) if previous != Some(bounds) => {
                     let first = previous.is_none();
                     previous = Some(bounds);
-                    if first {
+                    if first && wait {
                         // Stability is judged across two reads: read again at once.
                         continue;
                     }
@@ -97,10 +140,10 @@ impl Worker {
                     ));
                 }
                 Some(bounds) if self.occluded(handle, &bounds) => Pending::Occluded,
-                Some(_) => return Ok(()),
+                Some(bounds) => return Ok(Some(bounds)),
             };
             let now = Instant::now();
-            if now >= deadline {
+            if !wait || now >= deadline {
                 return Err(refusal(
                     pending.reason(),
                     format!(
@@ -112,6 +155,17 @@ impl Worker {
             }
             std::thread::sleep(POLL.min(deadline - now));
         }
+    }
+
+    /// The stop and cancellation check the battery runs before each read of
+    /// the element it waits on.
+    fn battery_interruption<'a>(
+        &self,
+        cancelled: &'a dyn Fn() -> bool,
+    ) -> impl Fn() -> CoreResult<()> + 'a {
+        let supervisor = self.safety.supervisor.clone();
+        let policy = self.stop_policy();
+        move || interrupted(&supervisor, &policy, cancelled, "waiting for the element to become actionable")
     }
 
     /// Whether the element under the centre of `bounds` is another element

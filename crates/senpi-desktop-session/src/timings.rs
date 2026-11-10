@@ -2,8 +2,8 @@
 //! transaction times each stage it runs; the report carries them as
 //! [`StageTimings`] in microseconds. Stages the request never reached, and
 //! stages no code path runs yet (`prime`), stay absent. `axResolve` is the
-//! object-mode actionability battery, auto-wait included, and is part of
-//! the `dispatch` stage it runs in.
+//! object-mode actionability battery: the wait before capture plus the
+//! immediate check inside `dispatch`.
 
 use std::cell::Cell;
 use std::time::Instant;

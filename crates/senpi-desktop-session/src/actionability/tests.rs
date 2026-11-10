@@ -1,6 +1,9 @@
 //! The actionability battery, opened surfaces, refusal hints and dangerous
 //! chords over scripted fake windows.
 
+#[path = "lock_tests.rs"]
+mod lock_tests;
+
 use std::time::{Duration, Instant};
 
 use senpi_desktop_backend_fake::SinkOp;

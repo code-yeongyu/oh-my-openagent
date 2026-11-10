@@ -19,7 +19,6 @@ use serde_json::{Map, Value};
 use crate::mutate::Mutation;
 use crate::pointer::ParsedPointerOptions;
 use crate::request::Response;
-use crate::timings::TimedStage;
 use crate::worker::{Audited, Worker};
 use crate::worker_input::with_next_call;
 
@@ -31,14 +30,11 @@ impl Worker {
         cancelled: &dyn Fn() -> bool,
     ) -> CoreResult<Audited> {
         let mode = ParsedPointerOptions::requested_mode(params.opts.as_ref());
-        let mutation = Mutation::new(MutatingAction::AxClick, self.ref_target(&params.ref_), mode);
-        let interrupted = self.battery_interruption(cancelled);
+        let mut mutation = Mutation::new(MutatingAction::AxClick, self.ref_target(&params.ref_), mode);
+        mutation.ax_actionability = Some((&params.ref_, None));
         let baseline = Cell::new(None);
         let audited = self.mutate(&mutation, cancelled, |worker| {
             let handle: AxHandle = worker.registry.resolve(&params.ref_)?;
-            mutation.timings.time(TimedStage::AxResolve, || {
-                worker.actionable(&params.ref_, &handle, None, &interrupted)
-            })?;
             baseline.set(worker.element_surface_baseline(&handle));
             worker
                 .ax_click_now(params, &handle)
