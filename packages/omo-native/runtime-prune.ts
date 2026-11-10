@@ -1,4 +1,4 @@
-import { readdirSync, renameSync, rmSync } from "node:fs"
+import { readdirSync, renameSync, rmSync, statSync } from "node:fs"
 import { join, sep } from "node:path"
 import { listProcesses } from "./bin/lib/doctor.js"
 import { RELEASE_VERSION } from "./compiled-update"
@@ -27,6 +27,8 @@ export function pruneProvisionedRuntimes(options: {
   readonly current: string
   readonly platform?: NodeJS.Platform
   readonly listRunning?: ListRunningCommands
+  /** The current time in ms; leftover `.prune-*` trees are aged against it. */
+  readonly now?: number
 }): RuntimePruneResult {
   const platform = options.platform ?? process.platform
   const result = { removed: [] as string[], kept: [] as string[], failed: [] as { version: string; reason: string }[] }
@@ -39,7 +41,7 @@ export function pruneProvisionedRuntimes(options: {
   // A prune interrupted between its rename and its delete leaves a renamed tree that nothing runs from.
   // A live pruner's tree is skipped: it may still rename that tree back to a runtime in use.
   for (const entry of entries.filter((name) => name.startsWith(PRUNE_PREFIX))) {
-    if (pruneOwnerAlive(entry)) continue
+    if (pruneOwnerAlive(options.root, entry, options.now ?? Date.now())) continue
     try {
       rmSync(join(options.root, entry), { recursive: true, force: true })
     } catch {
@@ -69,7 +71,7 @@ export function pruneProvisionedRuntimes(options: {
     }
     // Rename first so a launch of this version that races the delete re-provisions a whole runtime
     // instead of running from a half-deleted one.
-    const pruning = join(options.root, `${PRUNE_PREFIX}${version}-${process.pid}-${Date.now()}`)
+    const pruning = join(options.root, `${PRUNE_PREFIX}${version}-${Date.now()}-${process.pid}`)
     try {
       renameSync(directory, pruning)
       renamed.push({ version, directory, pruning })
@@ -129,22 +131,34 @@ function listRunningCommands(): readonly string[] | undefined {
   return commands.length === 0 ? undefined : commands
 }
 
-// `.prune-<version>-<pid>-<ms>`: signal 0 probes the pid without touching it; EPERM means it exists.
+// `.prune-<version>-<ms>-<pid>`: signal 0 probes the pid without touching it; EPERM means it exists.
 // A live pruner holds its tree for a moment, so a tree older than the ceiling belongs to a crashed
 // pruner whose pid was reused (after a reboot, say) and is swept anyway.
+// The pid stays last so #12770's pruner, which reads the trailing number as the pid, still sees the
+// real owner of a tree this version renamed; the time takes 13 digits, which no pid reaches.
 const PRUNE_TREE_MAX_AGE_MS = 60 * 60 * 1000
 
-function pruneOwnerAlive(entry: string, now = Date.now()): boolean {
-  const match = /-(\d+)(?:-(\d+))?$/.exec(entry)
-  const pid = Number(match?.[1])
+function pruneOwnerAlive(root: string, entry: string, now: number): boolean {
+  const stamped = /-(\d{13,})-(\d+)$/.exec(entry)
+  const pid = Number(stamped?.[2] ?? /-(\d+)$/.exec(entry)?.[1])
   if (!Number.isSafeInteger(pid) || pid <= 0 || pid === process.pid) return false
-  const renamedAt = Number(match?.[2])
-  if (Number.isSafeInteger(renamedAt) && now - renamedAt > PRUNE_TREE_MAX_AGE_MS) return false
+  const renamedAt = stamped === null ? renameTime(join(root, entry)) : Number(stamped[1])
+  if (renamedAt !== undefined && now - renamedAt > PRUNE_TREE_MAX_AGE_MS) return false
   try {
     process.kill(pid, 0)
     return true
   } catch (error) {
     return errorCode(error) === "EPERM"
+  }
+}
+
+// A name from #12770 (no rename time) is aged by the tree's change time: a rename updates ctime,
+// while mtime keeps the time the runtime was provisioned and would read a fresh rename as old.
+function renameTime(path: string): number | undefined {
+  try {
+    return statSync(path).ctimeMs
+  } catch {
+    return undefined
   }
 }
 

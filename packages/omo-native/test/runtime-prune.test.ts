@@ -142,14 +142,45 @@ describe("pruneProvisionedRuntimes", () => {
 
   test("#given a live pruner's tree renamed longer ago than the age ceiling #when a fresh runtime prunes #then it is swept as a crashed pruner's leftover", () => {
     // given: the pid is alive (reused after a crash), but the tree was renamed two hours ago
-    const stale = `.prune-5.1.39-${process.ppid}-${Date.now() - 2 * 60 * 60 * 1000}`
-    const fresh = `.prune-5.1.38-${process.ppid}-${Date.now()}`
+    const stale = `.prune-5.1.39-${Date.now() - 2 * 60 * 60 * 1000}-${process.ppid}`
+    const fresh = `.prune-5.1.38-${Date.now()}-${process.ppid}`
     provision(stale, fresh, "5.1.62")
     // when
     pruneProvisionedRuntimes({ root, current: "5.1.62", platform: "linux", listRunning: () => [] })
     // then
     expect(present(stale)).toBe(false)
     expect(present(fresh)).toBe(true)
+  })
+
+  test("#given a runtime this launch prunes #when its tree is renamed #then the pid is the last segment, which the previous release reads as the owner", () => {
+    // given: #12770's pruner resolves the owner with a trailing-number match, so a tree renamed by this
+    // version has to end in the pid or that pruner sweeps a tree this one may still rename back.
+    provision("5.1.40", "5.1.61", "5.1.62")
+    let renamed: string[] = []
+    let calls = 0
+    const listRunning = () => {
+      if (calls++ === 1) renamed = readdirSync(root).filter((name) => name.startsWith(".prune-"))
+      return []
+    }
+    // when
+    pruneProvisionedRuntimes({ root, current: "5.1.62", platform: "linux", listRunning })
+    // then
+    expect(renamed).toHaveLength(1)
+    expect(/-(\d+)$/.exec(renamed[0] ?? "")?.[1]).toBe(String(process.pid))
+  })
+
+  test("#given a tree named by the previous release whose pid is alive #when a fresh runtime prunes more than an hour after its rename #then it is swept, and kept before that", () => {
+    // given: `.prune-<version>-<pid>` without the rename time, owned by a live (reused) pid; renamed just now
+    const legacy = `.prune-5.1.36-${process.ppid}`
+    provision(legacy, "5.1.62")
+    // when: pruned right away
+    pruneProvisionedRuntimes({ root, current: "5.1.62", platform: "linux", listRunning: () => [] })
+    // then
+    expect(present(legacy)).toBe(true)
+    // when: pruned two hours after the rename
+    pruneProvisionedRuntimes({ root, current: "5.1.62", platform: "linux", listRunning: () => [], now: Date.now() + 2 * 60 * 60 * 1000 })
+    // then
+    expect(present(legacy)).toBe(false)
   })
 
   test("#given a concurrent pruner that renames a runtime before this one does #when a fresh runtime prunes #then it is neither failed nor claimed as removed", () => {
