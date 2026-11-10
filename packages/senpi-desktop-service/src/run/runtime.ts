@@ -18,6 +18,7 @@ import {
 	RunOutput,
 } from "./context";
 import { createDesktopFacade } from "./facade";
+import { runQuickJsCode } from "./sandbox/quickjs";
 import { createWait, type WaitOptions } from "./wait";
 
 /** The host's tool pipeline (senpi `executeTool`): validation, permission, and lazy activation stay host-side. */
@@ -27,9 +28,16 @@ export type ExecuteTool = (
 	options: { readonly signal: AbortSignal },
 ) => Promise<unknown>;
 
+/** Where a run executes (`computer.run_sandbox`). */
+export type ComputerRunSandbox = "vm" | "quickjs";
+
 export interface ComputerRunRequest {
 	/** An async function body; `return` sets the run's value. */
 	readonly code: string;
+	/** The `computer.run_sandbox` setting; default `vm`. It governs model-written code only. */
+	readonly sandbox?: ComputerRunSandbox;
+	/** Who wrote `code` (default `model`): host-built bodies (call chains, the CUA batch) always run on vm. */
+	readonly origin?: "host" | "model";
 	readonly snapshot: ComputerSessionSnapshot;
 	readonly timeoutMs: number;
 	readonly signal?: AbortSignal;
@@ -88,7 +96,8 @@ function auditRecord(event: AuditEvent, sessionId: string, runId: string): Audit
 }
 
 /**
- * Runs `code` in a fresh `node:vm` context of this process, with `desktop`, `wait`, `assert`, `tool`,
+ * Runs model-written `code` in the QuickJS cell (`run/sandbox`) when `sandbox` is `quickjs`; otherwise
+ * (the default, and always for host-built code) in a fresh `node:vm` context of this process, with `desktop`, `wait`, `assert`, `tool`,
  * and `console` as its globals. The vm is not a security boundary; it scopes the run's globals and
  * bounds its synchronous work.
  *
@@ -99,7 +108,17 @@ function auditRecord(event: AuditEvent, sessionId: string, runId: string): Audit
  * code resumes the vm from a macrotask once it settles. After the run ends nothing resumes it, and
  * work it leaked stays frozen.
  */
-export async function runComputerCode(request: ComputerRunRequest, host: ComputerRunHost): Promise<ComputerRunOk> {
+export async function runComputerCode(
+	request: ComputerRunRequest,
+	host: ComputerRunHost,
+): Promise<ComputerRunOk & { readonly sandbox: ComputerRunSandbox }> {
+	if (request.sandbox === "quickjs" && request.origin !== "host") {
+		return { ...(await runQuickJsCode(request, host)), sandbox: "quickjs" };
+	}
+	return { ...(await runInVm(request, host)), sandbox: "vm" };
+}
+
+async function runInVm(request: ComputerRunRequest, host: ComputerRunHost): Promise<ComputerRunOk> {
 	const { code, snapshot, timeoutMs } = request;
 	const runId = randomUUID();
 	const controller = new AbortController();
