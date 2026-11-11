@@ -15,16 +15,17 @@
 //   --verify <ledger>            measure every row of this host again; exit 0 only if every verdict is identical
 //   --cleanup                    remove probe-only state (work tree, LaunchServices entries, prompt-probe rows)
 //   --leg <spec.json>            internal: one launch, run inside the GUI session or an ssh child
+//   --self-test                  the pure classification logic and the row table against fixed inputs (any host)
 //
 // No agent clicks a TCC grant or answers a permission prompt. Rows that need the H3 grant or a Deny answer read
 // WAITING-PERSON and launch nothing unless SPT_PERSON_PRESENT=1 (a person at the QA session for that slot), and
 // --request-grant refuses without it.
 //
 // Sections, in file order: types and constants | process helpers | preconditions | work tree | legs |
-// classification | measurements | the row table | ledger | cleanup | main
+// classification | measurements | the row table | ledger | cleanup | self-test | main
 import {
-  chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -80,6 +81,7 @@ interface RowDef {
   os: Os
   needs?: "h2" | "h4"
   person?: PersonNeed
+  route?: "hypervisor-vkbd" | "vhid"
   measure: (env: HostEnv, log: EvidenceLog) => Promise<Measured>
 }
 
@@ -176,6 +178,54 @@ function asQa(env: HostEnv, argv: string[], extraEnv: Record<string, string> = {
   }).map(([k, v]) => `${k}=${v}`)
   if (env.sameUser) return ["env", ...vars, ...argv]
   return ["sudo", "-n", "-H", "-u", env.qaUser, "env", `HOME=${env.qaHome}`, ...vars, ...argv]
+}
+
+// The results directory belongs to the QA account (0700): the spec files in it decide what a QA-account leg runs, so
+// no other account may write there. When the probe runs as another account every read and write goes through it.
+async function qaWrite(env: HostEnv, path: string, text: string): Promise<void> {
+  if (env.sameUser) {
+    writeFileSync(path, text, { mode: 0o600 })
+    return
+  }
+  const out = await run(asQa(env, ["/bin/sh", "-c", 'umask 077; cat > "$1"', "sh", path]), { stdin: text })
+  if (out.code !== 0) throw new Error(`write as the QA account failed for ${basename(path)}: ${out.stderr}`)
+}
+
+async function qaRead(env: HostEnv, path: string): Promise<string | null> {
+  if (env.sameUser) return existsSync(path) ? readFileSync(path, "utf8") : null
+  const out = await run(asQa(env, ["cat", path]))
+  return out.code === 0 ? out.stdout : null
+}
+
+async function ensureResultsDir(env: HostEnv, dir: string): Promise<void> {
+  if (!existsSync(dir) && !isSymlink(dir)) {
+    const made = env.sameUser
+      ? (mkdirSync(dir, { mode: 0o700 }), { code: 0, stderr: "" })
+      : await run(["sudo", "-n", "install", "-d", "-o", env.qaUser, "-m", "0700", dir])
+    if (made.code !== 0) throw new Precondition(`the results directory created by the QA account (${made.stderr})`)
+  }
+  const problem = resultsDirProblem(lstatSync(dir), env.qaUid)
+  if (problem) throw new Precondition(`a results directory owned by the QA account with mode 0700 (${problem})`)
+}
+
+function isSymlink(path: string): boolean {
+  try {
+    return lstatSync(path).isSymbolicLink()
+  } catch {
+    return false
+  }
+}
+
+// pure: what is wrong with the results directory's lstat, or "" when it is a real 0700 directory of the QA account
+function resultsDirProblem(
+  st: { isSymbolicLink(): boolean; isDirectory(): boolean; uid: number; mode: number },
+  qaUid: number,
+): string {
+  if (st.isSymbolicLink()) return "it is a symlink; refused"
+  if (!st.isDirectory()) return "it is not a directory"
+  if (st.uid !== qaUid) return `owner uid ${st.uid}, not the QA account`
+  if ((st.mode & 0o7777) !== 0o700) return `mode ${(st.mode & 0o7777).toString(8)}, not 700`
+  return ""
 }
 
 function sleep(ms: number): Promise<void> {
@@ -300,8 +350,7 @@ async function setup(env: HostEnv) {
   process.umask(0o022)
   const p = paths(env)
   mkdirSync(p.bin, { recursive: true })
-  mkdirSync(p.results, { recursive: true })
-  chmodSync(p.results, 0o1777)
+  await ensureResultsDir(env, p.results)
   if (!existsSync(p.spawner)) {
     const out = await run(["bash", join(PROBE_DIR, "sp-t-bundle.sh"), "spawner", p.spawner])
     if (out.code !== 0) throw new Error(`spawner build failed: ${out.stderr}`)
@@ -387,7 +436,7 @@ async function runLeg(
     ...(tapSeconds === undefined ? {} : { tapSeconds }),
   }
   const specPath = join(p.results, `${tag}.spec.json`)
-  writeFileSync(specPath, JSON.stringify(spec))
+  await qaWrite(env, specPath, JSON.stringify(spec))
   const legArgv = [env.bun, join(PROBE_DIR, "probe-sp-t.ts"), "--leg", specPath]
   let driver
   if (context === "gui") {
@@ -423,9 +472,10 @@ async function runLeg(
     throw new Precondition(
       `a bootstrap into gui/${env.qaUid} (refused: ${driver.stdout.split("\n").slice(-2).join(" ")})`,
     )
-  if (!existsSync(spec.done))
+  const done = await qaRead(env, spec.done)
+  if (done === null)
     throw new Error(`leg ${tag} produced no result (driver exit ${driver.code}): ${driver.stderr || driver.stdout}`)
-  const result = JSON.parse(readFileSync(spec.done, "utf8")) as LegResult
+  const result = JSON.parse(done) as LegResult
   log.add(`leg ${tag} result`, result)
   return result
 }
@@ -582,8 +632,13 @@ function swapSurvives(path: "open" | "disclaim") {
     const swapped = result.report.exe.startsWith(realpathSync(gen.app))
     return {
       verdict: swapped ? `SURVIVES=${result.report.preflight.accessibility === 1 ? "yes" : "no"}` : "NOT_SWAPPED",
-      measured: { ...base(result.report, result), ranNewGeneration: swapped, requirement: gen.requirement },
-      note: "grant given to the bundle before the swap; current re-pointed to a new generations/<cdhash>/ directory; the new copy's AXIsProcessTrusted",
+      measured: {
+        ...base(result.report, result),
+        ranNewGeneration: swapped,
+        currentResolvesTo: basename(join(currentApp(env), "..")),
+        requirement: gen.requirement,
+      },
+      note: "grant given to the bundle before the swap; current re-pointed to a new generations/<cdhash>/ directory; the launch passes the RESOLVED current-generation bundle path (what `open <current-generation bundle path>` names), not the current link itself; the new copy's AXIsProcessTrusted",
     }
   }
 }
@@ -664,31 +719,73 @@ function promptRow(context: Context, path: "open" | "disclaim") {
     const p = paths(env)
     const reset = await run(asQa(env, ["tccutil", "reset", "Accessibility", PROMPT_BUNDLE_ID]))
     log.add("reset prompt-probe rows before the prompt", reset)
+    // a stale Deny left by a failed reset would read as PROMPT=none, so the row is not measured at all
+    if (reset.code !== 0) return resetFailed("before", reset)
     console.log(
       `OPERATOR: a TCC dialog naming "${DISPLAY_NAME} SP-T prompt probe" may appear on the QA session; answer Deny.`,
     )
+    let outcome: Measured
+    let after: Awaited<ReturnType<typeof run>>
     try {
       const result = await runLeg(env, log, context, actionFor(path), p.prompt, "ax")
-      if (!result.report) return noReport(result, "prompt")
-      await sleep(3000)
-      const warn = await run(["pgrep", "-x", "universalAccessAuthWarn"])
-      const lines = await tccLog(env, log, result.startedAt, [
-        PROMPT_BUNDLE_ID,
-        "universalAccessAuthWarn",
-        `pid=${result.report.pid}`,
-      ])
-      const prompting = lines.some((l) => /AUTHREQ_PROMPTING|prompting|universalAccessAuthWarn/i.test(l))
-      return {
-        verdict: `PROMPT=${prompting || warn.code === 0 ? "shown" : "none"}`,
-        measured: { ...base(result.report, result), promptLines: lines.length, authWarnProcess: warn.code === 0 },
-        note: "a separate never-granted identifier (the prompt probe) asks AXIsProcessTrustedWithOptions(prompt); read from the tccd prompting lines and the universalAccessAuthWarn process",
+      if (!result.report) outcome = noReport(result, "prompt")
+      else {
+        const seenAfterMs = await pollForProcess("universalAccessAuthWarn", PROMPT_POLL_MS)
+        const lines = await tccLog(env, log, result.startedAt, [
+          PROMPT_BUNDLE_ID,
+          "universalAccessAuthWarn",
+          `pid=${result.report.pid}`,
+        ])
+        outcome = {
+          verdict: `PROMPT=${promptVerdict(lines, seenAfterMs !== null)}`,
+          measured: {
+            ...base(result.report, result),
+            promptLines: lines.length,
+            authWarnProcess: seenAfterMs !== null,
+            authWarnSeenAfterMs: seenAfterMs ?? `not within ${PROMPT_POLL_MS}`,
+          },
+          note: "a separate never-granted identifier (the prompt probe) asks AXIsProcessTrustedWithOptions(prompt); read from the tccd prompting lines and a bounded poll for the universalAccessAuthWarn process",
+        }
       }
     } finally {
       // every exit path, including a leg with no report or a thrown error, leaves no Deny row for the prompt probe
-      const after = await run(asQa(env, ["tccutil", "reset", "Accessibility", PROMPT_BUNDLE_ID]))
+      after = await run(asQa(env, ["tccutil", "reset", "Accessibility", PROMPT_BUNDLE_ID]))
       log.add("reset prompt-probe rows after the prompt", after)
     }
+    if (after.code !== 0)
+      return {
+        ...outcome,
+        note: `${outcome.note}; ${resetFailed("after", after).note} (the Deny row may remain until --cleanup)`,
+      }
+    return outcome
   }
+}
+
+const PROMPT_POLL_MS = 10_000
+
+function resetFailed(when: "before" | "after", out: { code: number; stderr: string }): Measured {
+  return {
+    verdict: "UNMEASURED",
+    measured: { resetExit: out.code },
+    note: `tccutil reset Accessibility of the prompt-probe identifier ${when} the prompt failed (exit ${out.code}: ${out.stderr.split("\n")[0] ?? ""})`,
+  }
+}
+
+// bounded wait for a process to appear: returns the ms it took, or null when it never appeared within the bound
+async function pollForProcess(name: string, boundMs: number): Promise<number | null> {
+  const start = Date.now()
+  while (Date.now() - start < boundMs) {
+    if ((await run(["pgrep", "-x", name])).code === 0) return Date.now() - start
+    await sleep(250)
+  }
+  return null
+}
+
+// pure: the prompt verdict from the tccd log lines and whether the prompt process was seen
+function promptVerdict(lines: string[], authWarnSeen: boolean): "shown" | "none" {
+  return authWarnSeen || lines.some((l) => /AUTHREQ_PROMPTING|prompting|universalAccessAuthWarn/i.test(l))
+    ? "shown"
+    : "none"
 }
 
 async function bunshinDomain(env: HostEnv, log: EvidenceLog): Promise<Measured> {
@@ -735,26 +832,18 @@ async function bunshinDomain(env: HostEnv, log: EvidenceLog): Promise<Measured> 
 
 function untagged(route: "hypervisor-vkbd" | "vhid") {
   return async (env: HostEnv, log: EvidenceLog): Promise<Measured> => {
-    const awaiting = route === "vhid" ? "awaiting H4" : "awaiting H2"
-    if (process.env.SPT_HW_ROUTE !== route)
-      return {
-        verdict: "UNMEASURED",
-        measured: {},
-        note: `${awaiting}: set SPT_HW_ROUTE=${route} on a host where that route exists`,
-      }
+    // the route itself is checked by measureRow BEFORE the person gate (routeGate), so a host without the route reads
+    // UNMEASURED 'awaiting H2/H4' whether or not a person is present
     const seconds = Number(process.env.SPT_TAP_SECONDS ?? "20")
     console.log(`OPERATOR: press the "a" key through the ${route} route within ${seconds}s.`)
     // the tap runs inside the helper bundle launched BY PATH through LaunchServices, like the other legs, so the
     // bundle is its own responsible process and TCC checks Input Monitoring for the helper bundle's identity
     const leg = await runLeg(env, log, "gui", "open-path", currentApp(env), "", seconds)
-    const tapFile = leg.tapFile
-    const events =
-      tapFile && existsSync(tapFile)
-        ? readFileSync(tapFile, "utf8")
-            .split("\n")
-            .filter(Boolean)
-            .map((l) => JSON.parse(l) as { type?: number; sourcePid?: number; sourceStateId?: number; error?: string })
-        : []
+    const tapText = leg.tapFile ? await qaRead(env, leg.tapFile) : null
+    const events = (tapText ?? "")
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as TapEvent)
     log.add("tap events", events)
     const keys = events.filter((e) => e.type === 10)
     if (events.some((e) => e.error))
@@ -765,13 +854,8 @@ function untagged(route: "hypervisor-vkbd" | "vhid") {
       }
     if (keys.length === 0)
       return { verdict: "NO_EVENT", measured: { events: events.length }, note: "no keyDown reached the session tap" }
-    const tag = keys.every((e) => e.sourcePid === 0)
-      ? "untagged"
-      : keys.some((e) => e.sourcePid === 0)
-        ? "mixed"
-        : "tagged"
     return {
-      verdict: `ROUTE=${tag}`,
+      verdict: `ROUTE=${classifyTap(keys)}`,
       measured: {
         keyDowns: keys.length,
         sourcePids: [...new Set(keys.map((e) => e.sourcePid))].join(","),
@@ -780,6 +864,19 @@ function untagged(route: "hypervisor-vkbd" | "vhid") {
       note: "listen-only kCGSessionEventTap inside the helper bundle launched by path (open <bundle> --args tap; the bundle is its own responsible process); untagged = kCGEventSourceUnixProcessID 0 on every keyDown",
     }
   }
+}
+
+interface TapEvent {
+  type?: number
+  sourcePid?: number
+  sourceStateId?: number
+  error?: string
+}
+
+// pure: untagged = every keyDown carries kCGEventSourceUnixProcessID 0
+function classifyTap(keys: TapEvent[]): "untagged" | "mixed" | "tagged" {
+  if (keys.every((e) => e.sourcePid === 0)) return "untagged"
+  return keys.some((e) => e.sourcePid === 0) ? "mixed" : "tagged"
 }
 
 // ---------------------------------------------------------------------------------------------- the row table
@@ -803,6 +900,10 @@ const C = {
   guiPlain: "GUI-resident Bun host -> plain posix_spawn (control, no disclaim)",
   sshOpen: "ssh child -> open <current bundle path> --args --host-pid <pid>",
   sshDisclaim: "ssh child -> posix_spawn with responsibility_spawnattrs_setdisclaim",
+  sshPromptOpen:
+    "ssh child -> open <prompt-probe bundle path> --args --prompt ax (never-granted prompt-probe identifier)",
+  sshPromptDisclaim:
+    "ssh child -> posix_spawn of the prompt-probe bundle with responsibility_spawnattrs_setdisclaim (never-granted prompt-probe identifier)",
   guiOpenPromptControl: "GUI-resident Bun host -> open <prompt-probe bundle path> (positive control)",
   byName: "GUI-resident Bun host -> open -a <bundle name> with current and previous registered",
   rebuild: "GUI-resident Bun host -> open <rebuilt bundle path>, same T3 identity",
@@ -835,8 +936,8 @@ function osRows(os: Os): RowDef[] {
     row("charged.ssh-open", Q.charged, C.sshOpen, charged("ssh", "open")),
     row("charged.ssh-disclaim", Q.charged, C.sshDisclaim, charged("ssh", "disclaim")),
     row("prompt.gui-open-control", Q.prompt, C.guiOpenPromptControl, promptRow("gui", "open"), "deny"),
-    row("prompt.ssh-open", Q.prompt, C.sshOpen, promptRow("ssh", "open"), "deny"),
-    row("prompt.ssh-disclaim", Q.prompt, C.sshDisclaim, promptRow("ssh", "disclaim"), "deny"),
+    row("prompt.ssh-open", Q.prompt, C.sshPromptOpen, promptRow("ssh", "open"), "deny"),
+    row("prompt.ssh-disclaim", Q.prompt, C.sshPromptDisclaim, promptRow("ssh", "disclaim"), "deny"),
     row("charged.gui-open", Q.charged, C.guiOpen, charged("gui", "open")),
     row("charged.gui-disclaim", Q.charged, C.guiDisclaim, charged("gui", "disclaim")),
     row("charged.gui-plain-control", Q.charged, C.guiPlain, charged("gui", "plain")),
@@ -864,6 +965,7 @@ const ROWS: RowDef[] = [
     os: 26,
     needs: "h2",
     person: "tap",
+    route: "hypervisor-vkbd",
     measure: untagged("hypervisor-vkbd"),
   },
   {
@@ -874,6 +976,7 @@ const ROWS: RowDef[] = [
     os: 26,
     needs: "h4",
     person: "tap",
+    route: "vhid",
     measure: untagged("vhid"),
   },
 ]
@@ -932,17 +1035,40 @@ function appliesHere(def: RowDef, env: HostEnv): boolean {
   return def.os === env.major && (def.host === "h2" ? "h2" : "h1") === role
 }
 
-async function measureRow(def: RowDef, env: HostEnv): Promise<{ line: string[]; exit: number }> {
+// pure: a row bound to a key route reads UNMEASURED 'awaiting H2/H4' until that route exists, checked before the person
+function routeGate(def: RowDef, hwRoute: string | undefined): Measured | null {
+  if (!def.route || hwRoute === def.route) return null
+  const awaiting = def.route === "vhid" ? "awaiting H4" : "awaiting H2"
+  return {
+    verdict: "UNMEASURED",
+    measured: {},
+    note: `${awaiting}: set SPT_HW_ROUTE=${def.route} on a host where that route exists`,
+  }
+}
+
+// --measure and --row write the row's evidence file (the ledger's evidence column); --verify writes <id>.verify.txt
+// beside it, so a DIFF never replaces the evidence behind the recorded verdict
+function evidenceFile(id: string, mode: "measure" | "verify"): string {
+  return mode === "verify" ? `${id}.verify.txt` : `${id}.txt`
+}
+
+async function measureRow(
+  def: RowDef,
+  env: HostEnv,
+  mode: "measure" | "verify" = "measure",
+): Promise<{ line: string[]; exit: number }> {
   const log = new EvidenceLog()
   let measured: Measured
   let exit = 0
   try {
+    const gate = routeGate(def, process.env.SPT_HW_ROUTE)
     if (!appliesHere(def, env))
       measured = {
         verdict: "UNMEASURED",
         measured: {},
         note: `awaiting ${def.host.toUpperCase()}: this host is not the row's host (${env.build})`,
       }
+    else if (gate) measured = gate
     else if (def.person && !personPresent())
       measured = { verdict: "WAITING-PERSON", measured: {}, note: `${PERSON_REASON[def.person]}; no leg was launched` }
     else measured = await def.measure(env, log)
@@ -973,7 +1099,7 @@ async function measureRow(def: RowDef, env: HostEnv): Promise<{ line: string[]; 
   const dir = join(env.ev, "task-9.sp-t")
   mkdirSync(dir, { recursive: true })
   const body = [
-    `command: ${[env.bun, ...process.argv.slice(1)].join(" ")} (row ${def.id})`,
+    `command: ${[env.bun, ...process.argv.slice(1)].join(" ")} (row ${def.id}, ${mode})`,
     `commit: ${env.commit}`,
     `host_build: ${env.build}`,
     ...log.lines,
@@ -981,7 +1107,7 @@ async function measureRow(def: RowDef, env: HostEnv): Promise<{ line: string[]; 
     line.join("\t"),
     `EXIT ${exit}`,
   ]
-  writeFileSync(join(dir, `${def.id}.txt`), `${body.join("\n")}\n`)
+  writeFileSync(join(dir, evidenceFile(def.id, mode)), `${body.join("\n")}\n`)
   return { line, exit }
 }
 
@@ -1005,12 +1131,140 @@ async function cleanup(env: HostEnv) {
   receipts.push(`leftover sp-t launchd jobs: ${left.length}`)
   const procs = await run(["pgrep", "-f", "omo-computer-helper.app/Contents/MacOS/omo-computer-engine"])
   receipts.push(`procs ${procs.stdout ? procs.stdout.split("\n").length : 0}`)
+  // the results directory belongs to the QA account (0700), so it is removed as that account first
+  const results = env.sameUser ? { code: 0 } : await run(asQa(env, ["rm", "-rf", p.results]))
+  receipts.push(`results dir removed as the QA account: exit ${results.code}`)
   rmSync(env.work, { recursive: true, force: true })
   receipts.push(existsSync(env.work) ? `dir STILL PRESENT ${env.work}` : `dir REMOVED ${env.work}`)
   receipts.push(
     "kept: the T3 identity and the H3 grants to the helper bundle (later rows need them; the final teardown removes them)",
   )
   return receipts
+}
+
+// ---------------------------------------------------------------------------------------------- self-test
+
+// --self-test: the pure classification logic and the row table against fixed inputs; runs on any host, exits 1 on a
+// mismatch. It is the probe's unit coverage (the row's write scope allows no separate test file).
+function selfTest(): number {
+  const report = (over: Partial<ProbeReport>): ProbeReport => ({
+    marker: "m",
+    pid: 500,
+    ppid: 1,
+    exe: `/w/generations/abc/${APP_NAME}/${EXE_REL}`,
+    responsibleSymbol: true,
+    responsiblePid: 500,
+    responsibleExe: `/w/generations/abc/${APP_NAME}/${EXE_REL}`,
+    managerName: "Aqua",
+    securitySession: { status: 0, hasGraphicAccess: true, isRemote: false },
+    preflight: { accessibility: 0, screenRecording: 0, inputMonitoring: 0 },
+    ancestry: [],
+    ...over,
+  })
+  const leg: LegResult = {
+    hostPid: 400,
+    hostExe: "/opt/bun",
+    hostManager: "Aqua",
+    launch: { argv: [], code: 0, stdout: "", stderr: "" },
+    report: null,
+    waitedMs: 0,
+    startedAt: 0,
+  }
+  const st = (kind: "dir" | "link" | "file", uid: number, mode: number) => ({
+    isSymbolicLink: () => kind === "link",
+    isDirectory: () => kind === "dir",
+    uid,
+    mode,
+  })
+  const rowOf = (id: string) => ROWS.find((r) => r.id === id)
+  const cases: Array<[string, unknown, unknown]> = [
+    ["charged: responsible is the bundle", classifyCharged(report({}), leg), "bundle"],
+    [
+      "charged: responsible is the host",
+      classifyCharged(report({ responsiblePid: 400, responsibleExe: "/opt/bun" }), leg),
+      "host",
+    ],
+    [
+      "charged: responsible is another app",
+      classifyCharged(report({ responsiblePid: 9, responsibleExe: "/usr/sbin/sshd" }), leg),
+      "other:sshd",
+    ],
+    ["charged: symbol missing", classifyCharged(report({ responsibleSymbol: false }), leg), "UNMEASURED"],
+    ["identity.path: open re-exec", identityPath(report({ ppid: 1 })), "open_a"],
+    ["identity.path: disclaimed child", identityPath(report({ ppid: 77 })), "disclaim"],
+    [
+      "identity.path: inherited",
+      identityPath(report({ responsiblePid: 9, responsibleExe: "/x/Terminal" })),
+      "inherited:Terminal",
+    ],
+    ["domain: Aqua with graphics", domainOf(report({})), "Aqua/graphic=1"],
+    [
+      "domain: Background",
+      domainOf(
+        report({ managerName: "Background", securitySession: { status: 0, hasGraphicAccess: false, isRemote: true } }),
+      ),
+      "Background/graphic=0",
+    ],
+    [
+      "tap: all untagged",
+      classifyTap([
+        { type: 10, sourcePid: 0 },
+        { type: 10, sourcePid: 0 },
+      ]),
+      "untagged",
+    ],
+    [
+      "tap: mixed",
+      classifyTap([
+        { type: 10, sourcePid: 0 },
+        { type: 10, sourcePid: 42 },
+      ]),
+      "mixed",
+    ],
+    ["tap: tagged", classifyTap([{ type: 10, sourcePid: 42 }]), "tagged"],
+    ["prompt: process seen", promptVerdict([], true), "shown"],
+    ["prompt: tccd prompting line", promptVerdict(["tccd AUTHREQ_PROMPTING msgID=1"], false), "shown"],
+    ["prompt: nothing", promptVerdict(["tccd AUTHREQ_ATTRIBUTION msgID=1"], false), "none"],
+    ["results dir: QA-owned 0700", resultsDirProblem(st("dir", 502, 0o40700), 502), ""],
+    ["results dir: symlink refused", resultsDirProblem(st("link", 502, 0o120700), 502), "it is a symlink; refused"],
+    ["results dir: 1777 refused", resultsDirProblem(st("dir", 502, 0o41777), 502), "mode 1777, not 700"],
+    [
+      "results dir: other owner refused",
+      resultsDirProblem(st("dir", 501, 0o40700), 502),
+      "owner uid 501, not the QA account",
+    ],
+    ["evidence: measure file", evidenceFile("a.m26", "measure"), "a.m26.txt"],
+    ["evidence: verify file", evidenceFile("a.m26", "verify"), "a.m26.verify.txt"],
+    ["compact: separators stripped", compact({ a: "x;y\tz", b: 1 }), "a=x y z;b=1"],
+  ]
+  const vhid = rowOf("untagged.vhid")
+  const vkbd = rowOf("untagged.hypervisor-vkbd")
+  cases.push(
+    [
+      "route gate: vhid without route",
+      vhid ? routeGate(vhid, undefined)?.note : "missing row",
+      "awaiting H4: set SPT_HW_ROUTE=vhid on a host where that route exists",
+    ],
+    ["route gate: vkbd without route", vkbd ? routeGate(vkbd, "vhid")?.verdict : "missing row", "UNMEASURED"],
+    ["route gate: route present", vhid ? routeGate(vhid, "vhid") : "missing row", null],
+    ["rows: untagged rows are person-gated", [vhid?.person, vkbd?.person].join(","), "tap,tap"],
+    ["rows: ids are unique", new Set(ROWS.map((r) => r.id)).size, ROWS.length],
+    [
+      "rows: every prompt row names the prompt-probe bundle",
+      ROWS.filter((r) => r.id.startsWith("prompt.")).every((r) => r.condition.includes("prompt-probe")),
+      true,
+    ],
+  )
+  let failed = 0
+  for (const [name, got, want] of cases) {
+    const ok = JSON.stringify(got) === JSON.stringify(want)
+    if (!ok) failed++
+    console.log(
+      `${ok ? "PASS" : "FAIL"} ${name}${ok ? "" : `: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`}`,
+    )
+  }
+  console.log(failed === 0 ? `SELF_TEST_OK ${cases.length}` : `SELF_TEST_FAILED ${failed}/${cases.length}`)
+  return failed === 0 ? 0 : 1
 }
 
 // ---------------------------------------------------------------------------------------------- main
@@ -1023,6 +1277,7 @@ async function main(argv: string[]): Promise<number> {
   }
 
   if (flag("--leg")) return leg(value("--leg") ?? "")
+  if (flag("--self-test")) return selfTest()
   if (flag("--print-skeleton")) {
     process.stdout.write(ledgerText(ROWS.map(skeletonLine)))
     return 0
@@ -1107,7 +1362,7 @@ async function main(argv: string[]): Promise<number> {
         console.log(`SKIP ${def.id} (${recorded[3]}; this host is ${env.build})`)
         continue
       }
-      const { line } = await measureRow(def, env)
+      const { line } = await measureRow(def, env, "verify")
       const same = line[4] === recorded[4]
       if (!same) mismatches++
       console.log(`${same ? "SAME" : "DIFF"} ${def.id} recorded=${recorded[4]} measured=${line[4]}`)
@@ -1116,7 +1371,7 @@ async function main(argv: string[]): Promise<number> {
     return mismatches === 0 ? 0 : 1
   }
   console.error(
-    "usage: probe-sp-t.ts --print-skeleton | --setup | --request-grant | --check-grant | --row <id> | --measure --out <ledger> | --verify <ledger> | --cleanup",
+    "usage: probe-sp-t.ts --self-test | --print-skeleton | --setup | --request-grant | --check-grant | --row <id> | --measure --out <ledger> | --verify <ledger> | --cleanup",
   )
   return 2
 }

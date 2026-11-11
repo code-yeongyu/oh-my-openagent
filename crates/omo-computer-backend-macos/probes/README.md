@@ -72,7 +72,18 @@ No agent clicks a TCC grant or answers a permission prompt. The rows that need t
 the QA session; `--request-grant` refuses without it. In such a slot the `prompt.*` rows print an `OPERATOR:` line: a
 dialog naming "OmO Computer Use SP-T prompt probe" appears in the QA session and the person answers Deny.
 
-`--verify` re-measures every row of this host and compares only the verdict column:
+The `prompt.*` rows reset the prompt-probe identifier with `tccutil reset Accessibility` before and after the prompt
+(as the QA account, not root). A failed reset before the prompt makes the row `UNMEASURED` with the reason and raises
+no dialog; a failed reset after it is named in the note. Still unverified: whether a non-root `tccutil reset` clears
+an Accessibility row held in the system `TCC.db`; the first person slot reads it back with `sp-t-tccdb.sh`.
+
+The leg results directory (`$CU_RUN/sp-t-work/results`) belongs to the QA account with mode 0700, because its spec
+files decide what a QA-account leg runs; the probe refuses it when it is a symlink, has another owner or another
+mode, and reads and writes it as the QA account. `--self-test` checks the pure classification logic and the row table
+against fixed inputs on any host.
+
+`--verify` re-measures every row of this host and compares only the verdict column. It writes its evidence to
+`$EV/task-9.sp-t/<id>.verify.txt`, so the `<id>.txt` file behind the recorded verdict is never replaced:
 
 - Without `SPT_PERSON_PRESENT=1` the person rows re-measure as `WAITING-PERSON`. That matches a ledger written
   without a person (exit 0, `VERIFY_OK`), but against a ledger that holds their measured verdicts it prints `DIFF` for
