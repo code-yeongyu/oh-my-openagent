@@ -250,3 +250,40 @@ fn public_exec_params_carry_the_exec_members() {
     }
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
+
+/// The paired params decode through a private wire struct (`#[serde(try_from)]`), but the
+/// schema schemars generates is still the params' own: named after them, equal to the
+/// committed copy, and no wire struct leaks into `$defs`. `schema_is_fresh` checks the whole
+/// file; this names the two types it depends on.
+#[test]
+fn paired_params_publish_their_own_schema() {
+    let generated = engine_schema();
+    let committed: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(crate_path(SCHEMA_PATH)).expect("committed schema"),
+    )
+    .expect("committed schema is JSON");
+    for (method, name) in [("click", "ClickParams"), ("mouse.down", "MouseDownParams")] {
+        assert_eq!(
+            generated["methods"][method]["params"]["$ref"],
+            format!("#/$defs/{name}"),
+            "{method} params are not published as {name}"
+        );
+        assert_eq!(
+            generated["$defs"][name], committed["$defs"][name],
+            "{name} differs from the committed schema"
+        );
+        for member in ["x", "y", "callId", "runGeneration", "observeAfter"] {
+            assert!(
+                generated["$defs"][name]["properties"].get(member).is_some(),
+                "{name} has no {member}"
+            );
+        }
+    }
+    let leaked: Vec<&String> = generated["$defs"]
+        .as_object()
+        .expect("$defs")
+        .keys()
+        .filter(|name| name.ends_with("Wire"))
+        .collect();
+    assert!(leaked.is_empty(), "wire structs in $defs: {leaked:?}");
+}
