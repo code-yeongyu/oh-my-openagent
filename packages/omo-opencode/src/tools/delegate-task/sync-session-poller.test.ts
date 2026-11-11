@@ -64,6 +64,47 @@ describe("pollSyncSession", () => {
       expect(result).toBe("Forbidden: Selected provider is forbidden")
     })
 
+    test("#given a running assistant turn reported with error: null #when polling #then it keeps waiting and completes normally", async () => {
+      // given: the messages API reports the in-flight turn with error: null, then finishes it
+      const { pollSyncSession } = require("./sync-session-poller")
+      let messageCallCount = 0
+      let abortCount = 0
+      const mockClient = {
+        session: {
+          abort: async () => {
+            abortCount++
+          },
+          messages: async () => {
+            messageCallCount++
+            const finished = messageCallCount > 2
+            return {
+              data: [
+                { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
+                {
+                  info: { id: "msg_002", role: "assistant", time: { created: 2000 }, error: null, ...(finished ? { finish: "stop" } : {}) },
+                  parts: finished ? [{ type: "text", text: "done" }] : [],
+                },
+              ],
+            }
+          },
+          status: async () => ({ data: messageCallCount > 2 ? {} : { ses_null: { type: "busy", revision: messageCallCount } } }),
+        },
+      }
+
+      // when
+      const result = await pollSyncSession(createMockCtx(), mockClient, {
+        sessionID: "ses_null",
+        agentToUse: "test-agent",
+        toastManager: null,
+        taskId: undefined,
+      })
+
+      // then
+      expect(result).toBeNull()
+      expect(abortCount).toBe(0)
+      expect(messageCallCount).toBeGreaterThan(2)
+    })
+
     test("surfaces terminal errors even when status remains busy", async () => {
       const { pollSyncSession } = require("./sync-session-poller")
       const controller = new AbortController()
