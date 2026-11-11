@@ -134,7 +134,9 @@ export function modelChoiceQuestion(plan) {
 }
 
 function writeText(target, text) {
-  mkdirSync(dirname(target.path), { recursive: true })
+  // Owner-only like the other setup writers: `omo setup` can be the first command to create the
+  // agent dir, and the RPC socket host refuses a group-writable one (#12546).
+  mkdirSync(dirname(target.path), { recursive: true, mode: 0o700 })
   if (target.text !== undefined) copyFileSync(target.path, `${target.path}.bak-${timestamp()}`)
   // A config symlinked from a dotfiles checkout is written through the link, not replaced by a copy.
   const destination = target.text !== undefined ? realpathSync(target.path) : target.path

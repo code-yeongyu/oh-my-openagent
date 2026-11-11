@@ -3,6 +3,7 @@ import "./lib/private-fds.js"
 import { fileURLToPath } from "node:url"
 import { ensureBunBinShim } from "./lib/bun-bin-shim.js"
 import { maybeReexecUnderBun } from "./lib/bun-runtime.js"
+import { prepareAgentDirForLaunch } from "./lib/agent-dir.js"
 import { runAttachTui, runLauncher } from "./lib/launcher.js"
 import { removeLegacyServiceCredentials } from "./lib/legacy-service-credentials.js"
 import { runRemoteAttachLaunch } from "./lib/remote-attach-launch.js"
@@ -24,6 +25,10 @@ try {
   if (!reexeced) {
     // The #10697 plaintext file goes before ANY command runs: several verbs return before runLauncher.
     removeLegacyServiceCredentials()
+    // #12546: `setup` and the service verbs below return before runLauncher, so an existing
+    // group-writable agent dir is tightened here; a missing one is created by the launch or by the
+    // writer that needs it (owner-only), never by a command that writes nothing.
+    prepareAgentDirForLaunch({ create: false })
     if (["login", "logout", "whoami"].includes(process.argv[2])) {
       const { runServiceAuthCommand } = await import("./lib/service-auth.generated.js")
       await runServiceAuthCommand(process.argv.slice(2))

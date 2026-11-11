@@ -19,7 +19,7 @@ import { memoryRuntimeDiscardResolver, memoryRuntimeMaxBytesResolver, memoryRunt
 import { ensureEnginePrepared, preparePluginLaunchSpec } from "./engine-prepare.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { removeLegacyServiceCredentials } from "./legacy-service-credentials.js"
-import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
+import { adoptLegacyFlatState, canonicalAgentDir, prepareAgentDirForLaunch } from "./agent-dir.js"
 import { senpiEnvironment } from "./engine-environment.js"
 import { withHerdrAgentHint } from "./herdr-agent-hint.js"
 import { packageManifest, packageRoot, readJson, releaseBanner, resolveSenpi, updateTarget } from "./package-paths.js"
@@ -167,6 +167,8 @@ export function rollbackMigrateCall(request) {
 export async function runLauncher(args = process.argv.slice(2)) {
   migrateLegacyBunGlobalManifest()
   removeLegacyServiceCredentials()
+  // Before the engine can create the agent dir with the umask, which the RPC socket host refuses (#12546).
+  prepareAgentDirForLaunch()
   reportLegacyFlatAdoption()
   const command = args[0]
   // The toolkit CLI is no longer part of the Native payload; the loop is driven in-process by the
