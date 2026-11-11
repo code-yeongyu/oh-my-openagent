@@ -190,7 +190,9 @@ fn reply_problem(
 }
 
 /// The smallest value the schema node admits: the first `const` / `enum` value or branch,
-/// the minimum of a number, an empty string or array, and an object of its required members.
+/// the minimum of a number, a string of `minLength` characters, an array of its tuple
+/// members (`prefixItems`) padded to `minItems` with `items`, and an object of its required
+/// members.
 fn example(schema: &Value, node: &Value) -> Value {
     if let Some(name) = definition_name(&node["$ref"]) {
         return example(schema, &schema["$defs"][name]);
@@ -221,10 +223,21 @@ fn example(schema: &Value, node: &Value) -> Value {
         kind => kind.as_str().unwrap_or("object"),
     };
     match kind {
-        "string" => Value::String(String::new()),
+        "string" => Value::String("a".repeat(bound(node, "minLength"))),
         "integer" | "number" => node.get("minimum").cloned().unwrap_or_else(|| 0.into()),
         "boolean" => Value::Bool(false),
-        "array" => Value::Array(Vec::new()),
+        "array" => {
+            let mut items: Vec<Value> = node["prefixItems"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|item| example(schema, item))
+                .collect();
+            while items.len() < bound(node, "minItems") {
+                items.push(example(schema, &node["items"]));
+            }
+            Value::Array(items)
+        }
         "null" => Value::Null,
         _ => Value::Object(
             node["required"]
@@ -329,6 +342,14 @@ fn corpus_requests_name_table_methods_and_fit_their_types() {
         problems.len(),
         problems.join("\n")
     );
+}
+
+/// A `minLength` / `minItems` bound of a schema node; 0 when it has none.
+fn bound(node: &Value, key: &str) -> usize {
+    node[key]
+        .as_u64()
+        .and_then(|value| usize::try_from(value).ok())
+        .unwrap_or(0)
 }
 
 /// A reply that lacks a ledgered member is still type-checked on every other member.
