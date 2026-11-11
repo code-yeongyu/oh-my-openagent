@@ -39,7 +39,7 @@ InvalidTarget	expected	design/d-remote.md:177	5161e10367ee69a6a52844bd5705f2cd21
 InvalidTarget	observed	design/d-remote.md:177	5161e10367ee69a6a52844bd5705f2cd21cd3ce060c25c9f00f78d743d6eb06e	data member carried beside the reason, not a data.reason
 HandOffline	reason	design/d-remote.md:456	f7e8b72d99fa4136b4a442b1b369a9f01dfa2af77dd6fb40429d4c0a11061b29	placeholder word for the reasons listed or named elsewhere; each has its row
 Suspended	path	design/d-safety.md:33	881d8f1e883130e02f7944ab42ca3d8ec0d744cc4250d5f383dd1d939c95acf9	data member carried beside the reason, not a data.reason
-StopPathUnavailable	portal-global-shortcuts-unavailable	design/d-safety.md:88	120ca498928675153aaafb3333d1a955efd5b4b9b0058e1e5913ed9e9a9c9fb2	superseded: the round-18 deaf reason covers a missing GlobalShortcuts portal with no raw fallback (d-sdk-skill.md:471); row StopPathUnavailable{deaf}
+StopPathUnavailable	portal-global-shortcuts-unavailable	design/d-safety.md:88	120ca498928675153aaafb3333d1a955efd5b4b9b0058e1e5913ed9e9a9c9fb2	superseded, replaced by StopPathUnavailable{deaf}: the round-18 deaf reason covers a missing GlobalShortcuts portal with no raw fallback (d-sdk-skill.md:471); row StopPathUnavailable{deaf}
 ScreenLocked	session	design/d-safety.md:122	6ff8739cd5e4d60fec0b105e64763f7261fdea90e21dc1c4c3ea3a7f554e79f8	data member carried beside the reason, not a data.reason
 PermissionDenied	input_monitoring	design/d-safety.md:178	efcf13a7c719532cece1a6080451984aaa47d5d10ac5e72107951534d5053a1d	permission kind (data.permission), not a data.reason
 InvalidTarget	point	design/d-safety.md:242	4fa3af31c5833eedc191fa03240c856f1c6964e7042cdddbaf89e27c0169dfe5	data member carried beside the reason, not a data.reason
@@ -70,6 +70,6 @@ BackgroundUnavailable	class	design/d-windows.md:146	d6aee5a0758d0217d3119679debc
 BackgroundUnavailable	kind	design/d-windows.md:146	d6aee5a0758d0217d3119679debc6e958b0b22b38f058122c0cd1e9a07de98cc	data member carried beside the reason, not a data.reason
 HandCrashed	delivery_uncertain	waves/analysis/ideal-state.md:238	6838817c7c5d4c9a76acdb4019cf9ffa4bdeeabcaad5869c3130683450995416	disposition written beside the name, not a data.reason
 HandCrashed	unsafe	waves/analysis/ideal-state.md:238	6838817c7c5d4c9a76acdb4019cf9ffa4bdeeabcaad5869c3130683450995416	disposition written beside the name, not a data.reason
-ScreenLocked	display_asleep	waves/analysis/ideal-state.md:388	e910d6fb50270f74a4acdc54c1bb267ecbb8fa9318d1980c8556e8b745c89c23	withdrawn in contract round 11: ControlRequired{display_asleep} replaces it
+ScreenLocked	display_asleep	waves/analysis/ideal-state.md:388	e910d6fb50270f74a4acdc54c1bb267ecbb8fa9318d1980c8556e8b745c89c23	withdrawn in contract round 11: replaced by ControlRequired{display_asleep}
 ScreenLocked	reason	waves/analysis/ideal-state.md:742	0ce4fbc574bb037b492b6b1fc8c88658a21aee60aa56d9991dff48d79238f6ed	placeholder word for the reasons listed or named elsewhere; each has its row
-ScreenLocked	session_inactive	waves/analysis/ideal-state.md:788	e54c724e148b7349aa7eb344dbbf98b5c4a618f6eea6e24989ae3180154c85c5	rejected in contract round 12: SessionInactive is its own code
+ScreenLocked	session_inactive	waves/analysis/ideal-state.md:788	e54c724e148b7349aa7eb344dbbf98b5c4a618f6eea6e24989ae3180154c85c5	rejected in contract round 12: replaced by SessionInactive (its own code)
