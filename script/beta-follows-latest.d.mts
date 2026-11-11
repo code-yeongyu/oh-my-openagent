@@ -4,3 +4,13 @@ export function betaMustFollowLatestFromDistTags(
   stableVersion: string,
   distTagsJson: string | null | undefined,
 ): boolean | null
+
+export type VerifyBetaAfterMoveResult =
+  | { status: "lookup-failed" }
+  | { status: "ok" | "ahead"; beta: string }
+  | { status: "behind"; beta: string; floor: string; command: string }
+export function verifyBetaAfterMove(
+  writtenVersion: string,
+  beforeDistTagsJson: string | null | undefined,
+  afterDistTagsJson: string | null | undefined,
+): VerifyBetaAfterMoveResult

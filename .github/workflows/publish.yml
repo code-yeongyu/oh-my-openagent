@@ -1744,18 +1744,34 @@ jobs:
           fi
           echo "omo-ai beta -> $OMO_AI_VERSION"
 
-          # The registry serves a dist-tag write with lag, like the readiness wait above: wait until beta reads back the
-          # moved version so the guard below does not fail on a stale read. A read-back that never converges only warns;
-          # the guard re-reads it and stays the hard check.
+          # Re-read the whole dist-tags object after the write (#13149). The registry serves a dist-tag write with lag, so
+          # a stale read is retried (bounded). Beta newer than what we wrote means someone moved it forward: leave it.
+          # Beta older than the newest of latest and every prerelease seen in either read fails with the repair command.
+          # A read-back that cannot be read at all only warns; the dist-tag guard below re-reads it.
+          VERDICT="lookup=failed"
           for attempt in 1 2 3 4 5; do
-            BETA_VERSION=$(npm view --prefer-online omo-ai dist-tags.beta 2>/dev/null || true)
-            if [ "$BETA_VERSION" = "$OMO_AI_VERSION" ]; then
-              echo "omo-ai beta reads $OMO_AI_VERSION (attempt ${attempt}/5)"
-              exit 0
-            fi
-            [ "$attempt" = "5" ] || { echo "Waiting for omo-ai beta to read $OMO_AI_VERSION (attempt ${attempt}/5, 15s)"; sleep 15; }
+            AFTER_TAGS=$(npm view --prefer-online --json omo-ai dist-tags 2>/dev/null) || AFTER_TAGS=""
+            VERDICT=$(node script/beta-follows-latest.mjs --verify "$OMO_AI_VERSION" "$DIST_TAGS" "$AFTER_TAGS")
+            case "$VERDICT" in
+              beta=ok:*)
+                echo "omo-ai beta reads ${VERDICT#beta=ok:} (attempt ${attempt}/5)"
+                exit 0
+                ;;
+              beta=ahead:*)
+                echo "omo-ai beta was moved forward to ${VERDICT#beta=ahead:}, newer than $OMO_AI_VERSION; leaving it"
+                exit 0
+                ;;
+            esac
+            [ "$attempt" = "5" ] || { echo "Waiting for omo-ai beta to settle after the move to $OMO_AI_VERSION (attempt ${attempt}/5, 15s)"; sleep 15; }
           done
-          echo "::warning::omo-ai beta still reads ${BETA_VERSION:-missing} after the move to $OMO_AI_VERSION; the dist-tag guard re-reads it"
+          case "$VERDICT" in
+            beta=behind:*)
+              REPAIR_VERSION="${VERDICT#beta=behind:}"
+              echo "::error::omo-ai beta is still older than $REPAIR_VERSION after the move; run: npm dist-tag add omo-ai@$REPAIR_VERSION beta"
+              exit 1
+              ;;
+          esac
+          echo "::warning::Could not re-read the omo-ai dist-tags after the move to $OMO_AI_VERSION; the dist-tag guard re-reads it"
 
       - name: Guard omo-ai dist-tags
         if: inputs.lazycodex_only != true

@@ -71,7 +71,52 @@ export function betaMustFollowLatestFromDistTags(stableVersion, distTagsJson) {
   return lookupSucceeded ? move : null
 }
 
+function parseDistTags(distTagsJson) {
+  try {
+    const distTags = JSON.parse(distTagsJson ?? "")
+    const usable =
+      distTags !== null &&
+      typeof distTags === "object" &&
+      !Array.isArray(distTags) &&
+      typeof distTags.latest === "string"
+    return usable ? distTags : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Re-checks beta after our own "npm dist-tag add omo-ai@<written> beta" (#13149), from the raw dist-tags JSON of the
+ * read before the write and the read after it. status is "lookup-failed" when the second read is unusable, "ahead" when
+ * beta is newer than what we wrote (someone moved it forward: leave it), "ok" when beta is at least the floor, and
+ * "behind" otherwise, with the floor (the newest of latest and every prerelease tag seen in either read) and the exact
+ * command that repairs it.
+ */
+export function verifyBetaAfterMove(writtenVersion, beforeDistTagsJson, afterDistTagsJson) {
+  const after = parseDistTags(afterDistTagsJson)
+  if (!after) return { status: "lookup-failed" }
+  const before = parseDistTags(beforeDistTagsJson)
+  const seen = [before, after].flatMap((tags) => (tags ? Object.entries(tags) : []))
+  let floor = null
+  for (const [tag, value] of seen) {
+    const parsed = typeof value === "string" ? parseVersion(value) : null
+    if (!parsed || (tag !== "latest" && parsed.pre.length === 0)) continue
+    if (floor === null || compareVersions(value, floor) > 0) floor = value
+  }
+  const beta = typeof after.beta === "string" && parseVersion(after.beta) ? after.beta : ""
+  if (beta && compareVersions(beta, writtenVersion) > 0) return { status: "ahead", beta }
+  if (beta && (floor === null || compareVersions(beta, floor) >= 0)) return { status: "ok", beta }
+  const target = floor ?? writtenVersion
+  return { status: "behind", beta, floor: target, command: "npm dist-tag add omo-ai@" + target + " beta" }
+}
+
 function cliDecision(args) {
+  if (args[0] === "--verify") {
+    const result = verifyBetaAfterMove(args[1] ?? "", args[2] ?? "", args[3] ?? "")
+    if (result.status === "lookup-failed") return "lookup=failed"
+    return "beta=" + result.status + ":" + (result.status === "behind" ? result.floor : result.beta)
+  }
+
   if (args[0] === "--dist-tags") {
     const move = betaMustFollowLatestFromDistTags(args[1] ?? "", args[2] ?? "")
     return move === null ? "lookup=failed" : `move=${move}`

@@ -126,7 +126,9 @@ function runStep(
     `    "dist-tag add "*) [ "\${ADD_FAIL:-}" != 1 ] || return 1`,
     `      spec="\${*: -2:1}"; printf '%s\\n' "\${spec#omo-ai@}" > "$CALLS.moved" ;;`,
     `    *"--json omo-ai dist-tags") [ "\${VIEW_FAIL:-}" != 1 ] || return 1`,
-    `      if [ -n "$BETA" ]; then printf '{"latest":"%s","beta":"%s"}\\n' "$LATEST" "$BETA"; else printf '{"latest":"%s"}\\n' "$LATEST"; fi ;;`,
+    `      b="$BETA"; if [ -f "$CALLS.moved" ]; then reads=$(( $(cat "$CALLS.json-reads" 2>/dev/null || echo 0) + 1 )); echo "$reads" > "$CALLS.json-reads"`,
+    `        if [ -n "\${AFTER_BETA:-}" ]; then b="$AFTER_BETA"; elif [ "$reads" -gt "\${BETA_LAG:-0}" ]; then b=$(cat "$CALLS.moved"); fi; fi`,
+    `      if [ -n "$b" ]; then printf '{"latest":"%s","beta":"%s"}\\n' "$LATEST" "$b"; else printf '{"latest":"%s"}\\n' "$LATEST"; fi ;;`,
     `    *dist-tags.latest*) printf '%s\\n' "$LATEST" ;;`,
     `    *dist-tags.beta*) reads=$(( $(cat "$CALLS.beta-reads" 2>/dev/null || echo 0) + 1 )); echo "$reads" > "$CALLS.beta-reads"`,
     `      if [ "$reads" -le "\${BETA_LAG:-0}" ]; then printf '%s\\n' "$BETA"`,
@@ -225,12 +227,13 @@ describe("beta follows latest on a stable release (#12987)", () => {
       NODE_AUTH_TOKEN: "dummy",
     })
     expect(result.status).toBe(0)
-    expect(result.calls.filter((call) => call.includes("dist-tags.beta"))).toHaveLength(3)
+    // one dist-tags read before the write, then re-reads until the moved beta is visible
+    expect(result.calls.filter((call) => call.includes("--prefer-online --json omo-ai dist-tags"))).toHaveLength(4)
     expect(result.stdout).toContain("omo-ai beta reads 5.1.66 (attempt 3/5)")
     expect(result.stdout).not.toContain("::warning::")
   })
 
-  test("a beta read-back that never converges is bounded and only warns", () => {
+  test("a beta read-back that never converges is bounded and fails with the exact repair command (#13149)", () => {
     const result = runStep(betaMove.run ?? "", {
       OMO_AI_VERSION: "5.1.66",
       LATEST: "5.1.66",
@@ -238,9 +241,22 @@ describe("beta follows latest on a stable release (#12987)", () => {
       BETA_LAG: "99",
       NODE_AUTH_TOKEN: "dummy",
     })
+    expect(result.status).toBe(1)
+    expect(result.calls.filter((call) => call.includes("--prefer-online --json omo-ai dist-tags"))).toHaveLength(6)
+    expect(result.stdout).toContain("::error::")
+    expect(result.stdout).toContain("npm dist-tag add omo-ai@5.1.66 beta")
+  })
+
+  test("a beta moved further forward by someone else after our write is logged and left alone (#13149)", () => {
+    const result = runStep(betaMove.run ?? "", {
+      OMO_AI_VERSION: "5.1.66",
+      LATEST: "5.1.66",
+      BETA: "5.1.0",
+      AFTER_BETA: "5.2.0-0.beta.1",
+      NODE_AUTH_TOKEN: "dummy",
+    })
     expect(result.status).toBe(0)
-    expect(result.calls.filter((call) => call.includes("dist-tags.beta"))).toHaveLength(5)
-    expect(result.stdout).toContain("::warning::omo-ai beta still reads 5.1.0 after the move to 5.1.66")
+    expect(result.stdout).toContain("moved forward")
     expect(result.stdout).not.toContain("::error::")
   })
 
