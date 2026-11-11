@@ -3,7 +3,7 @@
 
 import { join } from "node:path"
 
-import { lstat, mkdir, open, type FileHandle } from "../fs/resilient"
+import { lstat, mkdir, open, rmdir, type FileHandle } from "../fs/resilient"
 import { fsErrorCode } from "../fs/retry"
 
 // Code points HFS+ ignores in names (git's `is_hfs_dotgit`), so `.g\u200cit` is `.git` on such a disk.
@@ -27,7 +27,7 @@ export function isPlainTreePath(path: string): boolean {
  * nothing may be on disk at the leaf: a link there (tracked or git-ignored) would carry the write outside
  * the repository, and an ignored file or the other Unicode spelling of a tracked one is the user's data.
  */
-export async function createInTarget(repo: string, destination: string): Promise<FileHandle> {
+export async function createInTarget(repo: string, destination: string, created: string[] = []): Promise<FileHandle> {
   let dir = repo
   for (const name of destination.split("/").slice(0, -1)) {
     dir = join(dir, name)
@@ -36,8 +36,10 @@ export async function createInTarget(repo: string, destination: string): Promise
       throw error
     })
     // `lstat` reports a link as a link, so a linked directory is refused here and never entered.
-    if (found === undefined) await mkdir(dir)
-    else if (!found.isDirectory())
+    if (found === undefined) {
+      await mkdir(dir)
+      created.push(dir)
+    } else if (!found.isDirectory())
       throw new Error(
         `memory merge: ${destination} would be written through a link or file in the target; nothing was merged`,
       )
@@ -48,5 +50,15 @@ export async function createInTarget(repo: string, destination: string): Promise
   } catch (error) {
     if (fsErrorCode(error) !== "EEXIST") throw error
     throw new Error(`memory merge: ${destination} is already on the target disk outside git; nothing was merged`)
+  }
+}
+
+/** Removes, deepest first, the directories createInTarget made, only while they are empty, so a refused merge leaves no trace. */
+export async function removeCreatedDirs(created: readonly string[]): Promise<void> {
+  for (const dir of [...created].reverse()) {
+    await rmdir(dir).catch((error: unknown) => {
+      const code = fsErrorCode(error)
+      if (code !== "ENOENT" && code !== "ENOTEMPTY" && code !== "EEXIST") throw error
+    })
   }
 }

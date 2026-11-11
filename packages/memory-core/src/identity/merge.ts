@@ -10,7 +10,7 @@ import { GitMemoryRepo, NoEffectiveChangesError, type GitCommitAuthor, type GitT
 import { readdir, readFile, writeFile } from "../fs/resilient"
 import type { MemoryWriteLock } from "../tools/commit-write"
 import { AGENTS_DIRNAME, buildIdentityPaths, type MemoryIdentityPaths } from "./layout"
-import { createInTarget, isPlainTreePath } from "./merge-paths"
+import { createInTarget, isPlainTreePath, removeCreatedDirs } from "./merge-paths"
 import { markIdentityMerged, readIdentityRecord } from "./record"
 import { resolveAutoIdentity } from "./resolve"
 
@@ -319,13 +319,14 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
     const destinations = writes.map((action) => action.destination)
     // Only files this merge created are rolled back; a path it refused may hold the user's own bytes.
     const written: string[] = []
+    const createdDirs: string[] = []
     try {
       for (const action of writes) {
         const content = contents.get(requiredOid(oids, action.path))
         if (content === undefined)
           throw new Error(`memory merge: blob for ${action.path} could not be read from ${plan.sourceId}`)
         assertMergePathConfined(action.destination)
-        const handle = await createInTarget(target.repo, action.destination)
+        const handle = await createInTarget(target.repo, action.destination, createdDirs)
         written.push(action.destination)
         try {
           await writeFile(handle, content, "utf8")
@@ -347,9 +348,11 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
     } catch (error) {
       if (error instanceof NoEffectiveChangesError) {
         await targetRepo.restorePaths(written)
+        await removeCreatedDirs(createdDirs)
         return { plan }
       }
       await targetRepo.restorePaths(written)
+      await removeCreatedDirs(createdDirs)
       throw error
     }
   })

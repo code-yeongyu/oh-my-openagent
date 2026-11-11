@@ -814,6 +814,36 @@ describe("identity merge (#10070)", () => {
     30_000,
   )
 
+  it("#given a merge that creates a new directory and is then refused at a later path #when it rolls back #then the directories it created are gone too (#12974 security review)", async () => {
+    const root = await memoryRoot()
+    const target = await identity(
+      root,
+      "project-aaaa1111",
+      { ".gitignore": "local/\n", "notes/base.md": note("base") },
+      ["/work/project"],
+    )
+    await mkdir(join(target.paths.repo, "local"))
+    await writeFile(join(target.paths.repo, "local/mine.md"), "kept out of memory on purpose\n")
+    const source = await identity(
+      root,
+      "project-feature-bbbb2222",
+      { "fresh/deep/new.md": note("new"), "local/mine.md": note("from source") },
+      ["/work/project-feature"],
+    )
+
+    const outcome = await applyIdentityMerge({
+      source: source.paths,
+      target: target.paths,
+      lock,
+      author: AUTHOR,
+    }).catch((error: unknown) => error)
+
+    expect(outcome).toBeInstanceOf(Error)
+    expect(existsSync(join(target.paths.repo, "fresh"))).toBe(false)
+    expect(await readFile(join(target.paths.repo, "local/mine.md"), "utf8")).toBe("kept out of memory on purpose\n")
+    expect((await target.repo.status()).trim()).toBe("")
+  }, 30_000)
+
   it.each([
     [
       "a git-ignored file",
