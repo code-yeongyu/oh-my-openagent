@@ -8,4 +8,3 @@ C4	`computer-error-table.test.ts`: every `(code, reason)` pair has a row, enumer
 C4	0 `COMPUTER_ERROR` fallthrough on tool	13	34	owed
 C4	0 `COMPUTER_ERROR` fallthrough on adapter	13	35	owed
 T1	`conformance_replay` byte-equal modulo variable pointers on the three CI legs (AC-1 replay leg)	14	28	owed
-C2	`hello_generation_quarantines_stale_reply` (restart-mid-call: 1 quarantined reply, `delivery_uncertain/unsafe`): the interrupted call's `delivery_uncertain/unsafe` answer needs the pre-input marker and mutate funnel	15	17	owed
