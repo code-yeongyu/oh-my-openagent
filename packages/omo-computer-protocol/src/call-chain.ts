@@ -5,11 +5,6 @@ type MethodRow = (typeof METHODS)[number]
 const byName: ReadonlyMap<string, MethodRow> = new Map(METHODS.map((row) => [row.name, row]))
 const aliases: ReadonlyMap<string, string> = new Map(Object.entries(ONESHOT.aliases))
 
-/** The table row a wire name selects, or `undefined` for an unknown method. */
-export function methodRow(name: string): MethodRow | undefined {
-	return byName.get(name)
-}
-
 /** The method a one-shot call names: the exact name, an alias, or the name after the prefix. */
 export function resolveOneshot(name: string): MethodName | undefined {
 	const exact = byName.get(name)

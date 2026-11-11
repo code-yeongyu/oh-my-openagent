@@ -126,11 +126,14 @@ fn unread_members(schema: &Value) -> (usize, Vec<String>) {
         for member in wire_members {
             checked += 1;
             let at = read_sites.get(member).cloned().unwrap_or_default();
-            if !at.iter().any(|site| site.read) {
+            // Every site that destructures the type must read the member: a second reader of the
+            // same type that drops it (`force: _`) fails even when another reader reads it.
+            let dropped: Vec<Site> = at.iter().filter(|site| !site.read).cloned().collect();
+            if at.is_empty() || !dropped.is_empty() {
                 let reason = if at.is_empty() {
                     "no reader names it".to_owned()
                 } else {
-                    describe(&at)
+                    describe(&dropped)
                 };
                 problems.push(format!("unread: {definition}.{member} - {reason}"));
             }

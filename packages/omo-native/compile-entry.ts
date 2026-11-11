@@ -15,6 +15,7 @@ import { handOffToProvisionedRuntime, planProvisionedLaunch, type ProvisionedLau
 import { pruneProvisionedRuntimes, removeReplacedLauncher, type RuntimePruneResult } from "./runtime-prune"
 import { parseBuildInfo, parseEngineBuildStamp, versionLines } from "./build-info"
 import { compiledUpdate, fetchGitHubReleases, probePackageOwner, releaseAssetName, RELEASES_URL } from "./compiled-update"
+import { startCompiledAutoUpdate } from "./compiled-auto-update"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
 import { removeLegacyServiceCredentials } from "./bin/lib/legacy-service-credentials.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./bin/lib/agent-dir.js"
@@ -456,6 +457,13 @@ async function main(): Promise<void> {
   // Inspector and custom execArgv isolation is unsupported in compiled binaries; the provisioned
   // executable delegates to the engine in-process as required by the native startup contract.
   if (await runCompiledLauncher(process.argv.slice(2), execDir, manifest.enginePin, execDir)) return
+  void startCompiledAutoUpdate({
+    args: process.argv.slice(2),
+    interactive: process.stderr.isTTY === true,
+    release: parseBuildInfo(manifest.buildInfo) === undefined,
+    launcher: launch.launcher,
+    env: process.env,
+  })
   if (shouldPrintCompiledBanner(process.argv.slice(2), process.stderr.isTTY === true)) {
     // Not console.error: Bun renders that red, and the banner is not an error (#8442).
     for (const line of compiledBannerLines(manifest)) process.stderr.write(`${line}\n`)
