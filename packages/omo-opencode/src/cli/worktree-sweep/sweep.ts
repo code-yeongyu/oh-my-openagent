@@ -64,9 +64,7 @@ async function classifyRecord(
   }
 
   const merged = await isMerged(repo, worktreeRef(record), defaultBranch)
-  const agedOut = merged
-    ? false
-    : await isOlderThan(record.path, options.olderThanDays, options.now)
+  const agedOut = merged ? false : await isOlderThan(record.path, options.olderThanDays, options.now)
   const dirty = merged || agedOut ? await isDirty(record.path) : false
 
   return classifyWorktree({ record, pathExists, merged, agedOut, dirty, external })

@@ -21,12 +21,15 @@ try {
   const path = join(canonicalAgentDir(env, home), CACHE_FILENAME)
   const temporary = `${path}.tmp-${process.pid}`
   mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(temporary, `${JSON.stringify({
-    version: CACHE_VERSION,
-    writtenAt: Date.now(),
-    inputs: setupDetectInputStats(env, home),
-    suggestion: needsSetupSuggestion(inventory),
-  })}\n`)
+  writeFileSync(
+    temporary,
+    `${JSON.stringify({
+      version: CACHE_VERSION,
+      writtenAt: Date.now(),
+      inputs: setupDetectInputStats(env, home),
+      suggestion: needsSetupSuggestion(inventory),
+    })}\n`,
+  )
   renameSync(temporary, path)
 } catch {
   // Fail-open by contract: see the module comment.

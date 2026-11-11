@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync } from "node:fs"
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+} from "node:fs"
 import { sign } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -12,7 +22,14 @@ import {
   verifyReleaseSignature,
 } from "../src/release/acquire.ts"
 import { parseReleaseKeySet } from "../src/release/release-signature.ts"
-import { buildRelease, ENGINE_VERSION, PIN_VERSION, RELEASE_ORIGIN, releaseKey, serveRelease } from "./release-fixture.ts"
+import {
+  buildRelease,
+  ENGINE_VERSION,
+  PIN_VERSION,
+  RELEASE_ORIGIN,
+  releaseKey,
+  serveRelease,
+} from "./release-fixture.ts"
 import { nativeEd25519Verify } from "./strict-ed25519/native-control.ts"
 
 const dirs: string[] = []
@@ -33,7 +50,12 @@ const scalar = (le: Uint8Array): bigint => BigInt(`0x${Buffer.from(le).reverse()
 const scalarBytes = (value: bigint): Uint8Array => Buffer.from(value.toString(16).padStart(64, "0"), "hex").reverse()
 
 const HOST = "linux-x64"
-const options = (state: string, served: ReturnType<typeof serveRelease>, publicHex: string, extra: Partial<AcquireOptions> = {}): AcquireOptions => ({
+const options = (
+  state: string,
+  served: ReturnType<typeof serveRelease>,
+  publicHex: string,
+  extra: Partial<AcquireOptions> = {},
+): AcquireOptions => ({
   version: PIN_VERSION,
   host: HOST,
   stateDir: state,
@@ -54,8 +76,15 @@ describe("verified acquisition of the device service", () => {
     const result = await acquireDeviceService(options(state, served, key.publicHex))
 
     const releaseDir = join(state, "bin", PIN_VERSION)
-    expect(result).toEqual({ ok: true, version: PIN_VERSION, releaseDir, binary: join(releaseDir, deviceServiceAssetName(HOST)) })
-    expect(readdirSync(releaseDir).toSorted()).toEqual(["checksums.txt", "checksums.txt.sig", "latest.json", deviceServiceAssetName(HOST)].toSorted())
+    expect(result).toEqual({
+      ok: true,
+      version: PIN_VERSION,
+      releaseDir,
+      binary: join(releaseDir, deviceServiceAssetName(HOST)),
+    })
+    expect(readdirSync(releaseDir).toSorted()).toEqual(
+      ["checksums.txt", "checksums.txt.sig", "latest.json", deviceServiceAssetName(HOST)].toSorted(),
+    )
     for (const [name, content] of release) expect(Buffer.compare(readFileSync(join(releaseDir, name)), content)).toBe(0)
     expect(readdirSync(join(state, "bin"))).toEqual([PIN_VERSION])
     if (process.platform !== "win32") {
@@ -69,13 +98,19 @@ describe("verified acquisition of the device service", () => {
     const release = buildRelease({ key, host: HOST, signedBytes: () => new TextEncoder().encode("other bytes") })
     const checksums = release.get("checksums.txt") ?? new Uint8Array()
     const signature = release.get("checksums.txt.sig") ?? new Uint8Array()
-    expect(await verifyReleaseSignature([bytes(key.publicHex)], signature, checksums)).toEqual({ ok: false, refusal: "signature" })
+    expect(await verifyReleaseSignature([bytes(key.publicHex)], signature, checksums)).toEqual({
+      ok: false,
+      refusal: "signature",
+    })
 
     const state = stateDir()
     const served = serveRelease(release)
-    expect(await acquireDeviceService(options(state, served, key.publicHex))).toMatchObject({ ok: false, refusal: "signature" })
+    expect(await acquireDeviceService(options(state, served, key.publicHex))).toMatchObject({
+      ok: false,
+      refusal: "signature",
+    })
     expect(existsSync(state)).toBe(false)
-    expect(served.requested.some(url => url.endsWith(deviceServiceAssetName(HOST)))).toBe(false)
+    expect(served.requested.some((url) => url.endsWith(deviceServiceAssetName(HOST)))).toBe(false)
   })
 
   test("a release signed by a key outside the two-key set is refused as signature and nothing is written", async () => {
@@ -84,10 +119,13 @@ describe("verified acquisition of the device service", () => {
     const outsider = releaseKey()
     const state = stateDir()
     const served = serveRelease(buildRelease({ key: outsider, host: HOST }))
-    const result = await acquireDeviceService({ ...options(state, served, ""), releaseKeys: [operational.publicHex, recovery.publicHex] })
+    const result = await acquireDeviceService({
+      ...options(state, served, ""),
+      releaseKeys: [operational.publicHex, recovery.publicHex],
+    })
     expect(result).toMatchObject({ ok: false, refusal: "signature" })
     expect(existsSync(state)).toBe(false)
-    expect(served.requested.some(url => url.endsWith(deviceServiceAssetName(HOST)))).toBe(false)
+    expect(served.requested.some((url) => url.endsWith(deviceServiceAssetName(HOST)))).toBe(false)
   })
 
   test("identity-point release key and identity signature are refused", async () => {
@@ -102,7 +140,10 @@ describe("verified acquisition of the device service", () => {
 
     const state = stateDir()
     const served = serveRelease(new Map())
-    expect(await acquireDeviceService(options(state, served, identity?.key ?? ""))).toMatchObject({ ok: false, refusal: "release_key_invalid" })
+    expect(await acquireDeviceService(options(state, served, identity?.key ?? ""))).toMatchObject({
+      ok: false,
+      refusal: "release_key_invalid",
+    })
     expect(served.requested).toEqual([])
     expect(existsSync(state)).toBe(false)
   })
@@ -115,10 +156,16 @@ describe("verified acquisition of the device service", () => {
     expect(await verifyReleaseSignature([bytes(key.publicHex)], signature, checksums)).toEqual({ ok: true })
 
     const malleated = new Uint8Array([...signature.slice(0, 32), ...scalarBytes(scalar(signature.slice(32)) + L)])
-    expect(await verifyReleaseSignature([bytes(key.publicHex)], malleated, checksums)).toEqual({ ok: false, refusal: "malformed" })
+    expect(await verifyReleaseSignature([bytes(key.publicHex)], malleated, checksums)).toEqual({
+      ok: false,
+      refusal: "malformed",
+    })
     const state = stateDir()
     const served = serveRelease(new Map([...release, ["checksums.txt.sig", malleated]]))
-    expect(await acquireDeviceService(options(state, served, key.publicHex))).toMatchObject({ ok: false, refusal: "malformed" })
+    expect(await acquireDeviceService(options(state, served, key.publicHex))).toMatchObject({
+      ok: false,
+      refusal: "malformed",
+    })
     expect(existsSync(state)).toBe(false)
   })
 
@@ -142,7 +189,10 @@ describe("verified acquisition of the device service", () => {
     const recovery = releaseKey()
     const state = stateDir()
     const served = serveRelease(buildRelease({ key: recovery, host: HOST }))
-    const result = await acquireDeviceService({ ...options(state, served, ""), releaseKeys: [operational.publicHex, recovery.publicHex] })
+    const result = await acquireDeviceService({
+      ...options(state, served, ""),
+      releaseKeys: [operational.publicHex, recovery.publicHex],
+    })
     expect(result).toMatchObject({ ok: true, version: PIN_VERSION })
   })
 
@@ -181,16 +231,23 @@ describe("verified acquisition of the device service", () => {
     const result = await acquireDeviceService(options(state, served, releaseKey().publicHex))
     expect(result).toMatchObject({ ok: false, refusal: "not_published" })
     expect(result.ok ? "" : result.action).not.toContain("connection")
-    expect(served.requested.some(url => url.endsWith(deviceServiceAssetName(HOST)))).toBe(false)
+    expect(served.requested.some((url) => url.endsWith(deviceServiceAssetName(HOST)))).toBe(false)
     expect(existsSync(state)).toBe(false)
   })
 
   test.each([
-    ["a fetch that throws", async (): Promise<Response> => { throw new TypeError("fetch failed") }],
+    [
+      "a fetch that throws",
+      async (): Promise<Response> => {
+        throw new TypeError("fetch failed")
+      },
+    ],
     ["a 503", async (): Promise<Response> => new Response("unavailable", { status: 503 })],
   ])("%s is still download_failed with the connection action", async (_name, fetch) => {
     const state = stateDir()
-    const result = await acquireDeviceService(options(state, serveRelease(new Map()), releaseKey().publicHex, { fetch }))
+    const result = await acquireDeviceService(
+      options(state, serveRelease(new Map()), releaseKey().publicHex, { fetch }),
+    )
     expect(result).toEqual({
       ok: false,
       refusal: "download_failed",
@@ -209,15 +266,23 @@ describe("verified acquisition of the device service", () => {
     const files = buildRelease({ key, host: HOST })
     files.delete(missing)
     const state = stateDir()
-    expect(await acquireDeviceService(options(state, serveRelease(files), key.publicHex))).toMatchObject({ ok: false, refusal: "download_failed" })
+    expect(await acquireDeviceService(options(state, serveRelease(files), key.publicHex))).toMatchObject({
+      ok: false,
+      refusal: "download_failed",
+    })
     expect(existsSync(state)).toBe(false)
   })
 
   test("checksum mismatch aborts before any write", async () => {
     const key = releaseKey()
     const state = stateDir()
-    const served = serveRelease(buildRelease({ key, host: HOST, tamperedBinary: new TextEncoder().encode("not the release") }))
-    expect(await acquireDeviceService(options(state, served, key.publicHex))).toMatchObject({ ok: false, refusal: "checksum" })
+    const served = serveRelease(
+      buildRelease({ key, host: HOST, tamperedBinary: new TextEncoder().encode("not the release") }),
+    )
+    expect(await acquireDeviceService(options(state, served, key.publicHex))).toMatchObject({
+      ok: false,
+      refusal: "checksum",
+    })
     expect(existsSync(state)).toBe(false)
   })
 
@@ -225,19 +290,31 @@ describe("verified acquisition of the device service", () => {
     const key = releaseKey()
     const state = stateDir()
     const files = buildRelease({ key, host: HOST })
-    files.set("latest.json", new TextEncoder().encode(JSON.stringify({ version: PIN_VERSION, min_engine_version: "0.1.0" })))
-    expect(await acquireDeviceService(options(state, serveRelease(files), key.publicHex))).toMatchObject({ ok: false, refusal: "checksum" })
+    files.set(
+      "latest.json",
+      new TextEncoder().encode(JSON.stringify({ version: PIN_VERSION, min_engine_version: "0.1.0" })),
+    )
+    expect(await acquireDeviceService(options(state, serveRelease(files), key.publicHex))).toMatchObject({
+      ok: false,
+      refusal: "checksum",
+    })
     expect(existsSync(state)).toBe(false)
   })
 
   test("a signed checksums.txt that names a file outside the release is malformed", async () => {
     const key = releaseKey()
     const files = buildRelease({ key, host: HOST })
-    const checksums = new Uint8Array([...(files.get("checksums.txt") ?? []), ...new TextEncoder().encode(`${"0".repeat(64)}  install.sh\n`)])
+    const checksums = new Uint8Array([
+      ...(files.get("checksums.txt") ?? []),
+      ...new TextEncoder().encode(`${"0".repeat(64)}  install.sh\n`),
+    ])
     files.set("checksums.txt", checksums)
     files.set("checksums.txt.sig", new Uint8Array(sign(null, checksums, key.privateKey)))
     const state = stateDir()
-    expect(await acquireDeviceService(options(state, serveRelease(files), key.publicHex))).toMatchObject({ ok: false, refusal: "malformed" })
+    expect(await acquireDeviceService(options(state, serveRelease(files), key.publicHex))).toMatchObject({
+      ok: false,
+      refusal: "malformed",
+    })
     expect(existsSync(state)).toBe(false)
   })
 
@@ -254,48 +331,77 @@ describe("verified acquisition of the device service", () => {
   test("a signed latest.json for another version than the pin is refused", async () => {
     const key = releaseKey()
     const state = stateDir()
-    const served = serveRelease(buildRelease({ key, host: HOST, latest: JSON.stringify({ version: "1.3.9", min_engine_version: "0.70.0" }) }))
-    expect(await acquireDeviceService(options(state, served, key.publicHex))).toMatchObject({ ok: false, refusal: "version_mismatch" })
+    const served = serveRelease(
+      buildRelease({ key, host: HOST, latest: JSON.stringify({ version: "1.3.9", min_engine_version: "0.70.0" }) }),
+    )
+    expect(await acquireDeviceService(options(state, served, key.publicHex))).toMatchObject({
+      ok: false,
+      refusal: "version_mismatch",
+    })
     expect(existsSync(state)).toBe(false)
   })
 
   test.each([
-    ["a signature that is not 64 bytes", (files: Map<string, Uint8Array>) => files.set("checksums.txt.sig", new Uint8Array(63))],
-    ["a latest.json with an extra field", (files: Map<string, Uint8Array>, key: ReturnType<typeof releaseKey>) => {
-      for (const [name, content] of buildRelease({ key, host: HOST, latest: JSON.stringify({ version: PIN_VERSION, min_engine_version: "0.70.0", url: "x" }) })) files.set(name, content)
-    }],
+    [
+      "a signature that is not 64 bytes",
+      (files: Map<string, Uint8Array>) => files.set("checksums.txt.sig", new Uint8Array(63)),
+    ],
+    [
+      "a latest.json with an extra field",
+      (files: Map<string, Uint8Array>, key: ReturnType<typeof releaseKey>) => {
+        for (const [name, content] of buildRelease({
+          key,
+          host: HOST,
+          latest: JSON.stringify({ version: PIN_VERSION, min_engine_version: "0.70.0", url: "x" }),
+        }))
+          files.set(name, content)
+      },
+    ],
   ])("%s is malformed", async (_name, tamper) => {
     const key = releaseKey()
     const files = buildRelease({ key, host: HOST })
     tamper(files, key)
     const state = stateDir()
-    expect(await acquireDeviceService(options(state, serveRelease(files), key.publicHex))).toMatchObject({ ok: false, refusal: "malformed" })
+    expect(await acquireDeviceService(options(state, serveRelease(files), key.publicHex))).toMatchObject({
+      ok: false,
+      refusal: "malformed",
+    })
     expect(existsSync(state)).toBe(false)
   })
 
-  test.skipIf(process.platform === "win32")("an existing state dir open to others is made private before the release is written", async () => {
-    const key = releaseKey()
-    const state = stateDir()
-    mkdirSync(state, { mode: 0o755 })
-    chmodSync(state, 0o755)
-    expect(await acquireDeviceService(options(state, serveRelease(buildRelease({ key, host: HOST })), key.publicHex))).toMatchObject({ ok: true })
-    expect(statSync(state).mode & 0o777).toBe(0o700)
-    expect(statSync(join(state, "bin")).mode & 0o777).toBe(0o700)
-  })
+  test.skipIf(process.platform === "win32")(
+    "an existing state dir open to others is made private before the release is written",
+    async () => {
+      const key = releaseKey()
+      const state = stateDir()
+      mkdirSync(state, { mode: 0o755 })
+      chmodSync(state, 0o755)
+      expect(
+        await acquireDeviceService(options(state, serveRelease(buildRelease({ key, host: HOST })), key.publicHex)),
+      ).toMatchObject({ ok: true })
+      expect(statSync(state).mode & 0o777).toBe(0o700)
+      expect(statSync(join(state, "bin")).mode & 0o777).toBe(0o700)
+    },
+  )
 
-  test.skipIf(process.platform === "win32")("a state dir that is a symlink is refused and nothing lands behind it", async () => {
-    const key = releaseKey()
-    const state = stateDir()
-    const target = `${state}-target`
-    mkdirSync(target, { mode: 0o700 })
-    symlinkSync(target, state)
-    const failure = await acquireDeviceService(options(state, serveRelease(buildRelease({ key, host: HOST })), key.publicHex)).then(
-      () => undefined,
-      (error: unknown) => error,
-    )
-    expect(failure).toMatchObject({ code: "insecure_state_dir" })
-    expect(readdirSync(target)).toEqual([])
-  })
+  test.skipIf(process.platform === "win32")(
+    "a state dir that is a symlink is refused and nothing lands behind it",
+    async () => {
+      const key = releaseKey()
+      const state = stateDir()
+      const target = `${state}-target`
+      mkdirSync(target, { mode: 0o700 })
+      symlinkSync(target, state)
+      const failure = await acquireDeviceService(
+        options(state, serveRelease(buildRelease({ key, host: HOST })), key.publicHex),
+      ).then(
+        () => undefined,
+        (error: unknown) => error,
+      )
+      expect(failure).toMatchObject({ code: "insecure_state_dir" })
+      expect(readdirSync(target)).toEqual([])
+    },
+  )
 
   test("a macOS binary is installed only when its code signature passes, checked before it is renamed into place", async () => {
     const key = releaseKey()
@@ -303,7 +409,10 @@ describe("verified acquisition of the device service", () => {
     const checked: string[] = []
     const refusedState = stateDir()
     const refused = await acquireDeviceService(
-      options(refusedState, serveRelease(buildRelease({ key, host })), key.publicHex, { host, verifyCodeSignature: path => (checked.push(path), false) }),
+      options(refusedState, serveRelease(buildRelease({ key, host })), key.publicHex, {
+        host,
+        verifyCodeSignature: (path) => (checked.push(path), false),
+      }),
     )
     expect(refused).toMatchObject({ ok: false, refusal: "code_signature" })
     expect(checked).toHaveLength(1)
@@ -313,8 +422,14 @@ describe("verified acquisition of the device service", () => {
 
     const passedState = stateDir()
     const passed = await acquireDeviceService(
-      options(passedState, serveRelease(buildRelease({ key, host })), key.publicHex, { host, verifyCodeSignature: () => true }),
+      options(passedState, serveRelease(buildRelease({ key, host })), key.publicHex, {
+        host,
+        verifyCodeSignature: () => true,
+      }),
     )
-    expect(passed).toMatchObject({ ok: true, binary: join(passedState, "bin", PIN_VERSION, deviceServiceAssetName(host)) })
+    expect(passed).toMatchObject({
+      ok: true,
+      binary: join(passedState, "bin", PIN_VERSION, deviceServiceAssetName(host)),
+    })
   })
 })

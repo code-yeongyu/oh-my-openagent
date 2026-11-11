@@ -74,10 +74,15 @@ describe("dispatchFallbackRetry", () => {
     deps.sessionRetryInFlight.add(sessionID)
     let cleared = false
     const helpers = createRejectedDispatchHelpers([])
-    helpers.clearSessionFallbackTimeout = () => { cleared = true }
+    helpers.clearSessionFallbackTimeout = () => {
+      cleared = true
+    }
 
     await dispatchFallbackRetry(deps, helpers, {
-      sessionID, state, fallbackModels: ["openai/gpt-5.5"], source: "session.error",
+      sessionID,
+      state,
+      fallbackModels: ["openai/gpt-5.5"],
+      source: "session.error",
     })
 
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
@@ -98,16 +103,27 @@ describe("dispatchFallbackRetry", () => {
     deps.sessionRetryInFlight.add(sessionID)
     deps.sessionAwaitingFallbackResult.add(sessionID)
     const clearedTimeouts: string[] = []
-    const autoRetryWithFallback = createAutoRetryDispatcher(deps, () => {}, (id) => { clearedTimeouts.push(id) })
+    const autoRetryWithFallback = createAutoRetryDispatcher(
+      deps,
+      () => {},
+      (id) => {
+        clearedTimeouts.push(id)
+      },
+    )
     const helpers: AutoRetryHelpers = {
       ...createRejectedDispatchHelpers([]),
-      clearSessionFallbackTimeout: (id) => { clearedTimeouts.push(id) },
+      clearSessionFallbackTimeout: (id) => {
+        clearedTimeouts.push(id)
+      },
       autoRetryWithFallback,
     }
 
     // when
     await dispatchFallbackRetry(deps, helpers, {
-      sessionID, state, fallbackModels: ["openai/gpt-5.5", "anthropic/claude-opus-5-5"], source: "message.updated",
+      sessionID,
+      state,
+      fallbackModels: ["openai/gpt-5.5", "anthropic/claude-opus-5-5"],
+      source: "message.updated",
     })
 
     // then
@@ -134,14 +150,22 @@ describe("dispatchFallbackRetry", () => {
         agents: { oracle: { fallback_models: refusal ? ["openai/gpt-5.5"] : [] } },
       }
       let fireTimeout: (() => Promise<void>) | undefined
-      const timer = spyOn(globalThis, "setTimeout").mockImplementation(((callback: Parameters<typeof setTimeout>[0]) => {
+      const timer = spyOn(globalThis, "setTimeout").mockImplementation(((
+        callback: Parameters<typeof setTimeout>[0],
+      ) => {
         fireTimeout = callback as () => Promise<void>
         return 1 as unknown as ReturnType<typeof setTimeout>
       }) as typeof setTimeout)
       try {
-        const helpers = createFallbackTimeoutHelpers(deps, async () => {}, async () => ({
-          accepted: false, status: "blocked", reason: "test refusal",
-        }))
+        const helpers = createFallbackTimeoutHelpers(
+          deps,
+          async () => {},
+          async () => ({
+            accepted: false,
+            status: "blocked",
+            reason: "test refusal",
+          }),
+        )
         helpers.scheduleSessionFallbackTimeout(sessionID, "oracle")
         await fireTimeout?.()
         expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(refusal)

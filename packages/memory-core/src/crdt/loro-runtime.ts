@@ -133,9 +133,7 @@ function installToJsonWithReplacer(LoroDocClass: typeof LoroDoc, isContainerId: 
     const doc = this
     const run = (layer: unknown): Value => {
       if (Array.isArray(layer)) {
-        return layer
-          .map((item, index) => m(index, item))
-          .filter((item) => item !== undefined) as Value
+        return layer.map((item, index) => m(index, item)).filter((item) => item !== undefined) as Value
       }
       const result: Record<string, unknown> = {}
       for (const [key, value] of Object.entries(layer as Record<string, unknown>)) {

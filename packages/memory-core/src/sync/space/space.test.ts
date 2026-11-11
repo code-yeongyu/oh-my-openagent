@@ -219,7 +219,11 @@ describe("resolveSpaceInRepo / git-backed config", () => {
     // The pair must be in the environment the process started with: that is what a host exports, and
     // what a git child inherits when no env is passed.
     const child = Bun.spawnSync(
-      [process.execPath, "-e", `const { resolveSpaceInRepo } = await import(${JSON.stringify(join(import.meta.dir, "space.ts"))}); console.log(JSON.stringify(resolveSpaceInRepo(${JSON.stringify(dir)}, {})))`],
+      [
+        process.execPath,
+        "-e",
+        `const { resolveSpaceInRepo } = await import(${JSON.stringify(join(import.meta.dir, "space.ts"))}); console.log(JSON.stringify(resolveSpaceInRepo(${JSON.stringify(dir)}, {})))`,
+      ],
       { env: { ...process.env, GIT_DIR: join(foreign, ".git"), GIT_WORK_TREE: foreign } },
     )
     expect(child.stderr.toString()).toBe("")

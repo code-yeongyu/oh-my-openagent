@@ -47,7 +47,11 @@ export type FakeHandle = {
   selfResume(): void
 }
 
-export function makeHandle(taskId: string, pid?: number, effectiveModel?: { readonly provider: string; readonly id: string }): FakeHandle {
+export function makeHandle(
+  taskId: string,
+  pid?: number,
+  effectiveModel?: { readonly provider: string; readonly id: string },
+): FakeHandle {
   let resolveOutcome: (outcome: RunnerOutcome) => void = () => {}
   // Re-armable: each settle resolves the current cycle's promise and arms a fresh one for the next
   // tracking cycle, so a revived task (re-tracked under a new epoch) awaits its OWN completion.
@@ -118,12 +122,10 @@ export function makeHandle(taskId: string, pid?: number, effectiveModel?: { read
     park: (reason) => {
       for (const listener of [...parkWatches]) listener({ reason })
     },
-    waitForSubscription: () => subscribeCalls > 0
-      ? Promise.resolve()
-      : new Promise((resolve) => subscriptionWaiters.push(resolve)),
-    waitForUnsubscription: () => unsubscribeCalls > 0
-      ? Promise.resolve()
-      : new Promise((resolve) => unsubscriptionWaiters.push(resolve)),
+    waitForSubscription: () =>
+      subscribeCalls > 0 ? Promise.resolve() : new Promise((resolve) => subscriptionWaiters.push(resolve)),
+    waitForUnsubscription: () =>
+      unsubscribeCalls > 0 ? Promise.resolve() : new Promise((resolve) => unsubscriptionWaiters.push(resolve)),
     selfResume: () => {
       for (const listener of [...resumedListeners]) listener()
     },
@@ -171,17 +173,19 @@ export function flush(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0))
 }
 
-export function makeManager(options: {
-  project?: string
-  // A caller-owned store (e.g. a wrapper that injects persistence faults) over the same project dir.
-  store?: TaskRecordStore
-  config?: OmoTaskSettings
-  planner?: ChildPlanner
-  inProcess?: FakeRunner
-  process?: ManagedRunner
-  admit?: AdmitResident
-  executionModeGate?: ExecutionModeGate
-} = {}) {
+export function makeManager(
+  options: {
+    project?: string
+    // A caller-owned store (e.g. a wrapper that injects persistence faults) over the same project dir.
+    store?: TaskRecordStore
+    config?: OmoTaskSettings
+    planner?: ChildPlanner
+    inProcess?: FakeRunner
+    process?: ManagedRunner
+    admit?: AdmitResident
+    executionModeGate?: ExecutionModeGate
+  } = {},
+) {
   const project = options.project ?? tempProject()
   const store = options.store ?? createTaskRecordStore({ project_dir: project })
   const inProcess = options.inProcess ?? new FakeRunner()
@@ -225,9 +229,15 @@ export async function launchSettled(
     await Promise.race([
       launched,
       new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(
-          `awaited whenLaunched(${taskId}); exhausted launch settlement share of ${testTimeoutMs} ms test budget`,
-        )), remainingMs)
+        timer = setTimeout(
+          () =>
+            reject(
+              new Error(
+                `awaited whenLaunched(${taskId}); exhausted launch settlement share of ${testTimeoutMs} ms test budget`,
+              ),
+            ),
+          remainingMs,
+        )
       }),
     ])
   } finally {

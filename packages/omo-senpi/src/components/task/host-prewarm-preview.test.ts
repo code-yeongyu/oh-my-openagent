@@ -18,27 +18,36 @@ function files(dir: string): unknown {
   })
 }
 
-posixPreviewTest("#given a first-turn task host #when its prompt is previewed #then no launcher, warm, registry, socket, lock or pid state changes", async () => {
-  // given: the world's injected ensureDaemon is the process-launch boundary.
-  const w = world({ prewarm: "first-turn", ensure: "reject", platform: "darwin" })
-  await w.sessionStart("preview")
-  const before = files(w.root)
-  const registry = readTaskStoreIndex(w.indexPath)
-  const mode = w.host.executionModeGate.current()
-  const socket = w.host.shardSocket()
-  // when
-  const result = await w.pi.dispatch("before_agent_start", {
-    type: "before_agent_start", systemPrompt: "BASE", preview: true,
-  }, sessionCtx("preview"))
-  await w.settled("preview")
-  // then
-  expect(result).toEqual([undefined])
-  expect(w.ensures).toEqual([])
-  expect(w.probes).toEqual([])
-  expect(w.hostStarted(socket)).toBe(false)
-  expect(await w.commandsAt(socket, "warm")).toEqual([])
-  expect(existsSync(socket)).toBe(false)
-  expect(readTaskStoreIndex(w.indexPath)).toEqual(registry)
-  expect(w.host.executionModeGate.current()).toBe(mode)
-  expect(files(w.root)).toEqual(before)
-})
+posixPreviewTest(
+  "#given a first-turn task host #when its prompt is previewed #then no launcher, warm, registry, socket, lock or pid state changes",
+  async () => {
+    // given: the world's injected ensureDaemon is the process-launch boundary.
+    const w = world({ prewarm: "first-turn", ensure: "reject", platform: "darwin" })
+    await w.sessionStart("preview")
+    const before = files(w.root)
+    const registry = readTaskStoreIndex(w.indexPath)
+    const mode = w.host.executionModeGate.current()
+    const socket = w.host.shardSocket()
+    // when
+    const result = await w.pi.dispatch(
+      "before_agent_start",
+      {
+        type: "before_agent_start",
+        systemPrompt: "BASE",
+        preview: true,
+      },
+      sessionCtx("preview"),
+    )
+    await w.settled("preview")
+    // then
+    expect(result).toEqual([undefined])
+    expect(w.ensures).toEqual([])
+    expect(w.probes).toEqual([])
+    expect(w.hostStarted(socket)).toBe(false)
+    expect(await w.commandsAt(socket, "warm")).toEqual([])
+    expect(existsSync(socket)).toBe(false)
+    expect(readTaskStoreIndex(w.indexPath)).toEqual(registry)
+    expect(w.host.executionModeGate.current()).toBe(mode)
+    expect(files(w.root)).toEqual(before)
+  },
+)

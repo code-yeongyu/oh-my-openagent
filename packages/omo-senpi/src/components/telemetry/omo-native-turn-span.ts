@@ -42,7 +42,11 @@ export type OmoNativeTurnSpans = {
     readonly rawSessionId: string | undefined
     readonly model: TurnModel | undefined
   }) => void
-  readonly end: (input: { readonly response: TurnModel | undefined; readonly responseModelId: string | undefined; readonly failed: boolean }) => void
+  readonly end: (input: {
+    readonly response: TurnModel | undefined
+    readonly responseModelId: string | undefined
+    readonly failed: boolean
+  }) => void
   /** Ends an open span that will see no `turn_end` (the run ended). */
   readonly abandon: () => void
   readonly run: <T>(fn: () => T) => T
@@ -67,7 +71,8 @@ function modelAttributes(model: TurnModel): TurnSpanAttributes {
  * extension instance serves every session of a shared host, and two sessions' turns may overlap.
  */
 export function createOmoNativeTurnSpans(options: OmoNativeTurnSpansOptions): OmoNativeTurnSpans {
-  let open: { readonly handle: TurnSpanHandle; readonly rawSessionId: string | undefined; requestModelSet: boolean } | undefined
+  let open:
+    { readonly handle: TurnSpanHandle; readonly rawSessionId: string | undefined; requestModelSet: boolean } | undefined
   let lastPublished: { readonly rawSessionId: string; readonly traceparent: string } | undefined
   const parent = isTraceparent(options.inheritedTraceparent) ? options.inheritedTraceparent : undefined
 
@@ -96,10 +101,14 @@ export function createOmoNativeTurnSpans(options: OmoNativeTurnSpansOptions): Om
           "session.id": input.sessionHash,
           "omo.session.role": options.sessionRole,
           "omo.turn.index": input.turnIndex,
-          ...(input.model === undefined ? {} : {
-            ...modelAttributes(input.model),
-            "gen_ai.request.model": pinnedModelId(maskProviderAndModel(input.model.provider, input.model.modelId).model_id),
-          }),
+          ...(input.model === undefined
+            ? {}
+            : {
+                ...modelAttributes(input.model),
+                "gen_ai.request.model": pinnedModelId(
+                  maskProviderAndModel(input.model.provider, input.model.modelId).model_id,
+                ),
+              }),
         },
         ...(parent === undefined ? {} : { parentTraceparent: parent }),
       })
@@ -116,8 +125,16 @@ export function createOmoNativeTurnSpans(options: OmoNativeTurnSpansOptions): Om
       if (input.response !== undefined) {
         open.handle.setAttributes({
           ...modelAttributes(input.response),
-          ...(open.requestModelSet ? {} : { "gen_ai.request.model": pinnedModelId(maskProviderAndModel(input.response.provider, input.response.modelId).model_id) }),
-          "gen_ai.response.model": pinnedModelId(maskProviderAndModel(input.response.provider, input.responseModelId ?? input.response.modelId).model_id),
+          ...(open.requestModelSet
+            ? {}
+            : {
+                "gen_ai.request.model": pinnedModelId(
+                  maskProviderAndModel(input.response.provider, input.response.modelId).model_id,
+                ),
+              }),
+          "gen_ai.response.model": pinnedModelId(
+            maskProviderAndModel(input.response.provider, input.responseModelId ?? input.response.modelId).model_id,
+          ),
         })
       }
       close(input.failed ? "error" : "ok")

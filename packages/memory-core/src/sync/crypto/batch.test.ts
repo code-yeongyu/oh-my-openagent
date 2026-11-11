@@ -3,15 +3,30 @@ import { createInMemoryDeviceKeyring } from "../keyring-port.ts"
 import { BatchInputError, buildBatch } from "./build.ts"
 import { type BatchBinding, openBatch } from "./open.ts"
 import { createRejectionCounter } from "./rejection.ts"
-import { b64, deviceId, epochKey, keyringFor, type ManifestObject, objects, readBytes } from "./testing/sync-v1.test-support.ts"
+import {
+  b64,
+  deviceId,
+  epochKey,
+  keyringFor,
+  type ManifestObject,
+  objects,
+  readBytes,
+} from "./testing/sync-v1.test-support.ts"
 import { b64urlDecode } from "./vendor/sync-format/jcs.ts"
 
 type CorruptedCase = { readonly file: string; readonly base: string; readonly expect: string }
 
-const corrupted: { readonly cases: ReadonlyArray<CorruptedCase> } = JSON.parse(new TextDecoder().decode(readBytes("corrupted/corrupted.json")))
+const corrupted: { readonly cases: ReadonlyArray<CorruptedCase> } = JSON.parse(
+  new TextDecoder().decode(readBytes("corrupted/corrupted.json")),
+)
 
 const recordsOf = (entry: ManifestObject) =>
-  entry.payload.map((row) => ({ type: row.type, spaceId: b64urlDecode(row.space_id), itemKey: row.item_key, body: b64urlDecode(row.body_base64url) }))
+  entry.payload.map((row) => ({
+    type: row.type,
+    spaceId: b64urlDecode(row.space_id),
+    itemKey: row.item_key,
+    body: b64urlDecode(row.body_base64url),
+  }))
 
 const objectNamed = (file: string): ManifestObject => {
   const entry = objects.objects.find((candidate) => candidate.file === file)
@@ -19,7 +34,11 @@ const objectNamed = (file: string): ManifestObject => {
   return entry
 }
 
-const bindingFor = async (entry: ManifestObject, bytes: Uint8Array<ArrayBuffer>, digest = entry.sha256): Promise<BatchBinding> => ({
+const bindingFor = async (
+  entry: ManifestObject,
+  bytes: Uint8Array<ArrayBuffer>,
+  digest = entry.sha256,
+): Promise<BatchBinding> => ({
   account: objects.account,
   epoch: entry.epoch,
   authorId: deviceId(entry.author),
@@ -49,14 +68,31 @@ describe("buildBatch: the client encoder", () => {
   // byte-identically on any runtime), while the client compresses with the runtime's deflate-raw,
   // so whole-object bytes are not a format property. What is: the canonical header, a valid
   // object signature by the author's DeviceKeyring, and a payload that opens to the same records.
-  test.each(objects.objects.map((entry) => [entry.file, entry] as const))("rebuilds %s: same header, signed by its author, opens to its records", async (file, entry) => {
-    const built = await rebuild(entry)
-    const golden = readBytes(`objects/${file}`)
-    const headerOf = (bytes: Uint8Array<ArrayBuffer>) => b64(bytes.subarray(10, 10 + new DataView(bytes.buffer, bytes.byteOffset).getUint32(6, false)))
-    expect(headerOf(built)).toBe(headerOf(golden))
-    const opened = await openBatch(built, await bindingFor(entry, built, b64(new Uint8Array(await crypto.subtle.digest("SHA-256", built)))), epochKey(entry.epoch) ?? new Uint8Array(32), createRejectionCounter())
-    expect(opened.ok && opened.records.map((r) => ({ type: r.type, space_id: b64(r.spaceId), item_key: r.itemKey, body_base64url: b64(r.body) }))).toEqual([...entry.payload])
-  })
+  test.each(objects.objects.map((entry) => [entry.file, entry] as const))(
+    "rebuilds %s: same header, signed by its author, opens to its records",
+    async (file, entry) => {
+      const built = await rebuild(entry)
+      const golden = readBytes(`objects/${file}`)
+      const headerOf = (bytes: Uint8Array<ArrayBuffer>) =>
+        b64(bytes.subarray(10, 10 + new DataView(bytes.buffer, bytes.byteOffset).getUint32(6, false)))
+      expect(headerOf(built)).toBe(headerOf(golden))
+      const opened = await openBatch(
+        built,
+        await bindingFor(entry, built, b64(new Uint8Array(await crypto.subtle.digest("SHA-256", built)))),
+        epochKey(entry.epoch) ?? new Uint8Array(32),
+        createRejectionCounter(),
+      )
+      expect(
+        opened.ok &&
+          opened.records.map((r) => ({
+            type: r.type,
+            space_id: b64(r.spaceId),
+            item_key: r.itemKey,
+            body_base64url: b64(r.body),
+          })),
+      ).toEqual([...entry.payload])
+    },
+  )
 
   test("a batch from a fresh in-memory keyring opens with its records intact", async () => {
     const keyring = createInMemoryDeviceKeyring("device-under-test")
@@ -91,7 +127,13 @@ describe("buildBatch: the client encoder", () => {
   test("input the payload framing cannot carry is rejected, never padded or wrapped and then signed", async () => {
     const keyring = createInMemoryDeviceKeyring("device-under-test")
     const signed: unknown[] = []
-    const watched = { ...keyring, sign: (request: Parameters<typeof keyring.sign>[0]) => { signed.push(request); return keyring.sign(request) } }
+    const watched = {
+      ...keyring,
+      sign: (request: Parameters<typeof keyring.sign>[0]) => {
+        signed.push(request)
+        return keyring.sign(request)
+      },
+    }
     const input = (record: { readonly spaceId: Uint8Array; readonly itemKey: string }) => ({
       account: "framing-account",
       kind: "ops" as const,
@@ -112,20 +154,30 @@ describe("buildBatch: the client encoder", () => {
       await expect(buildBatch(input(record))).rejects.toBeInstanceOf(BatchInputError)
     }
     expect(signed).toEqual([])
-    expect(await buildBatch(input({ spaceId: new Uint8Array(16), itemKey: "k".repeat(65535) }))).toBeInstanceOf(Uint8Array)
+    expect(await buildBatch(input({ spaceId: new Uint8Array(16), itemKey: "k".repeat(65535) }))).toBeInstanceOf(
+      Uint8Array,
+    )
   })
 })
 
 describe("openBatch: object receiver checks", () => {
-  test.each(objects.objects.map((entry) => [entry.file, entry] as const))("opens %s and returns exactly the manifest records", async (file, entry) => {
-    const bytes = readBytes(`objects/${file}`)
-    const rejections = createRejectionCounter()
-    const opened = await openBatch(bytes, await bindingFor(entry, bytes), epochKey(entry.epoch) ?? new Uint8Array(32), rejections)
-    expect(opened.ok).toBe(true)
-    if (!opened.ok) return
-    expect(opened.records.map((record) => b64(record.body))).toEqual(entry.payload.map((row) => row.body_base64url))
-    expect(rejections.count()).toBe(0)
-  })
+  test.each(objects.objects.map((entry) => [entry.file, entry] as const))(
+    "opens %s and returns exactly the manifest records",
+    async (file, entry) => {
+      const bytes = readBytes(`objects/${file}`)
+      const rejections = createRejectionCounter()
+      const opened = await openBatch(
+        bytes,
+        await bindingFor(entry, bytes),
+        epochKey(entry.epoch) ?? new Uint8Array(32),
+        rejections,
+      )
+      expect(opened.ok).toBe(true)
+      if (!opened.ok) return
+      expect(opened.records.map((record) => b64(record.body))).toEqual(entry.payload.map((row) => row.body_base64url))
+      expect(rejections.count()).toBe(0)
+    },
+  )
 
   test.each(corrupted.cases.filter((row) => row.file.endsWith(".omob")).map((row) => [row.file, row] as const))(
     "%s is refused with its typed reason, no records, one content-free rejection",
@@ -148,7 +200,11 @@ describe("openBatch: object receiver checks", () => {
     const entry = objectNamed("batch-a-epoch1.omob")
     const foreign = await rebuild(entry, "another-account")
     const rejections = createRejectionCounter()
-    const binding = await bindingFor(entry, foreign, b64(new Uint8Array(await crypto.subtle.digest("SHA-256", foreign))))
+    const binding = await bindingFor(
+      entry,
+      foreign,
+      b64(new Uint8Array(await crypto.subtle.digest("SHA-256", foreign))),
+    )
     const opened = await openBatch(foreign, binding, epochKey(1) ?? new Uint8Array(32), rejections)
     expect(opened).toEqual({ ok: false, reason: "account_mismatch" })
     expect(rejections.count()).toBe(1)
@@ -159,6 +215,9 @@ describe("openBatch: object receiver checks", () => {
     const bytes = readBytes("objects/batch-a-epoch1.omob")
     const rejections = createRejectionCounter()
     const binding = await bindingFor(entry, bytes, objectNamed("batch-b-epoch1.omob").sha256)
-    expect(await openBatch(bytes, binding, epochKey(1) ?? new Uint8Array(32), rejections)).toEqual({ ok: false, reason: "digest_mismatch" })
+    expect(await openBatch(bytes, binding, epochKey(1) ?? new Uint8Array(32), rejections)).toEqual({
+      ok: false,
+      reason: "digest_mismatch",
+    })
   })
 })

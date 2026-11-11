@@ -39,7 +39,9 @@ export const TEAM_E2E_OMO_CONFIG = {
     fixture: { model: "omo-mock/mock-1" },
     dura: { model: "omo-mock/mock-1" },
   },
-  agents: { fixture: { model: "omo-mock/mock-1", description: "team fixture agent", prompt: "You are the fixture agent." } },
+  agents: {
+    fixture: { model: "omo-mock/mock-1", description: "team fixture agent", prompt: "You are the fixture agent." },
+  },
 }
 
 const spawnedGroups = createOwnedProcessRegistry()
@@ -52,9 +54,10 @@ export function resolveSenpi(operations = {}) {
   if (requested !== undefined && requested !== "" && isExecutablePath(requested)) {
     return fileExists(requested) ? requested : null
   }
-  const names = platform === "win32" && (requested === undefined || requested === "" || requested.toLowerCase() === "senpi")
-    ? ["senpi.exe", "senpi.cmd", "senpi"]
-    : [requested || "senpi"]
+  const names =
+    platform === "win32" && (requested === undefined || requested === "" || requested.toLowerCase() === "senpi")
+      ? ["senpi.exe", "senpi.cmd", "senpi"]
+      : [requested || "senpi"]
   const pathDelimiter = operations.delimiter ?? (platform === "win32" ? ";" : delimiter)
   const joinPath = operations.joinPath ?? (platform === "win32" ? win32.join : join)
   for (const dir of (env.PATH ?? "").split(pathDelimiter)) {
@@ -100,12 +103,22 @@ async function runMain(senpiBin, outDir) {
   try {
     const obsDir = resolve(outDir, "main-obs")
     seedProject(sandbox)
-    const active = startRun({ senpiBin, sandbox, prompt: "drive injection-only team delivery", script: LEAD_SCRIPT, obsDir })
+    const active = startRun({
+      senpiBin,
+      sandbox,
+      prompt: "drive injection-only team delivery",
+      script: LEAD_SCRIPT,
+      obsDir,
+    })
     let observation
     try {
       observation = await pollUntil(
         () => Promise.resolve(mainInjectionObserved(sandbox, obsDir)),
-        (value) => value.memberEnvelopeEchoed && value.memberToLeadInjected && value.leadInbox.unread === 0 && value.leadInbox.reserved === 0,
+        (value) =>
+          value.memberEnvelopeEchoed &&
+          value.memberToLeadInjected &&
+          value.leadInbox.unread === 0 &&
+          value.leadInbox.reserved === 0,
         MAIN_INJECTION_TIMEOUT_MS,
       )
     } finally {
@@ -132,14 +145,19 @@ async function runDuraRevive(senpiBin, outDir) {
   try {
     const obsDir = resolve(outDir, "dura-obs")
     seedProject(sandbox)
-    const active = startRun({ senpiBin, sandbox, prompt: "durability revive drain drive", script: DURA_REVIVE_SCRIPT, obsDir })
+    const active = startRun({
+      senpiBin,
+      sandbox,
+      prompt: "durability revive drain drive",
+      script: DURA_REVIVE_SCRIPT,
+      obsDir,
+    })
     let state
     try {
       state = await pollUntil(
         () => Promise.resolve(readDuraInboxState(sandbox)),
-        (value) => value.counts.unread === 0
-          && value.counts.reserved === 0
-          && value.counts.processed >= DURA_EXPECTED_PROCESSED,
+        (value) =>
+          value.counts.unread === 0 && value.counts.reserved === 0 && value.counts.processed >= DURA_EXPECTED_PROCESSED,
         DURA_DRAIN_TIMEOUT_MS,
       )
     } finally {
@@ -154,9 +172,7 @@ async function runDuraRevive(senpiBin, outDir) {
       duraBacklogSeeded: readText(join(obsDir, "dura-seeded.txt")) !== undefined,
       duraMessagesEnqueued: teamMessageEnqueues(send).length >= 2,
       duraUnreadDrainedToZero:
-        state.counts.unread === 0
-        && state.counts.reserved === 0
-        && state.counts.processed >= DURA_EXPECTED_PROCESSED,
+        state.counts.unread === 0 && state.counts.reserved === 0 && state.counts.processed >= DURA_EXPECTED_PROCESSED,
     }
   } finally {
     rmSync(sandbox.root, { recursive: true, force: true })
@@ -165,9 +181,10 @@ async function runDuraRevive(senpiBin, outDir) {
 
 function readDuraInboxState(sandbox) {
   const runId = discoverRunIds(sandbox)[0]
-  const counts = runId === undefined
-    ? { unread: -1, reserved: -1, processed: -1 }
-    : inboxCounts(memberInboxDir(sandbox, runId, "dura"))
+  const counts =
+    runId === undefined
+      ? { unread: -1, reserved: -1, processed: -1 }
+      : inboxCounts(memberInboxDir(sandbox, runId, "dura"))
   return { runId, counts }
 }
 
@@ -175,17 +192,30 @@ async function runReclaim(senpiBin, outDir) {
   const sandbox = createSandbox()
   try {
     seedProject(sandbox)
-    const seed = await runSenpi({ senpiBin, sandbox, prompt: "seed an active team for reclaim", script: DURA_SEED_SCRIPT })
+    const seed = await runSenpi({
+      senpiBin,
+      sandbox,
+      prompt: "seed an active team for reclaim",
+      script: DURA_SEED_SCRIPT,
+    })
     writeFileSync(join(outDir, "reclaim-seed-stdout.json.log"), seed.stdout)
     const runId = discoverRunIds(sandbox)[0]
     if (runId === undefined) return { reclaimReservationRestored: false, reclaimNoLeak: false }
     const inbox = memberInboxDir(sandbox, runId, "rcl")
     const reservation = seedCrashReservation(inbox, STALE_TTL_MS * 2, "rcl")
     const before = inboxCounts(inbox)
-    const reclaim = await runSenpi({ senpiBin, sandbox, prompt: "boot a fresh session so session_start reclaims", script: NOOP_SCRIPT })
+    const reclaim = await runSenpi({
+      senpiBin,
+      sandbox,
+      prompt: "boot a fresh session so session_start reclaims",
+      script: NOOP_SCRIPT,
+    })
     writeFileSync(join(outDir, "reclaim-boot-stdout.json.log"), reclaim.stdout)
     const after = inboxCounts(inbox)
-    writeFileSync(join(outDir, "reclaim-inbox.json"), `${JSON.stringify({ runId, reservation: reservation.messageId, before, after, restored: existsSync(reservation.restoredPath) }, null, 2)}\n`)
+    writeFileSync(
+      join(outDir, "reclaim-inbox.json"),
+      `${JSON.stringify({ runId, reservation: reservation.messageId, before, after, restored: existsSync(reservation.restoredPath) }, null, 2)}\n`,
+    )
     return {
       reclaimReservationRestored: before.reserved === 1 && after.unread === 1 && existsSync(reservation.restoredPath),
       reclaimNoLeak: after.reserved === 0,
@@ -209,14 +239,28 @@ async function main() {
     const beforeCredential = credentialDigest(realSenpiAgentDir)
     const beforeWholeDir = digestDirectory(realSenpiAgentDir)
     if (senpiBin === null) {
-      console.log(JSON.stringify({ result: "SKIP", reason: "senpi-binary-unavailable", credentialIsolationClean: true, leakedPids: 0 }))
+      console.log(
+        JSON.stringify({
+          result: "SKIP",
+          reason: "senpi-binary-unavailable",
+          credentialIsolationClean: true,
+          leakedPids: 0,
+        }),
+      )
       return
     }
     let checks = {}
     let leakedPids = 0
     try {
       const main = await runMain(senpiBin, outDir)
-      const crash = await runCrashRestartScenario({ senpiBin, outDir, createSandbox, seedProject, startRun, memberExtensionEntry })
+      const crash = await runCrashRestartScenario({
+        senpiBin,
+        outDir,
+        createSandbox,
+        seedProject,
+        startRun,
+        memberExtensionEntry,
+      })
       // Plan todo 22: member quit->resume revival + shutdown-approved non-revival (own module).
       const resume = await runTeamResumeScenarios({ senpiBin, outDir, startRun })
       checks = { ...main.checks, ...crash, ...resume }
@@ -260,8 +304,31 @@ function selfTest() {
   }
   const events = parseEvents(
     [
-      JSON.stringify({ type: "tool_execution_end", toolName: "team_create", result: { content: [{ type: "text", text: "Created team 'e2eteam' (run-1) with 2 members." }], details: { kind: "created", team_run_id: "run-1", members: [{ name: "quick", status: "running" }, { name: "fixture", status: "running" }] } }, isError: false }),
-      JSON.stringify({ type: "tool_execution_end", toolName: "task_send", result: { content: [], details: { kind: "team_message", team: { kind: "to_members", message_id: "msg-1", recipients: ["quick"] } } }, isError: false }),
+      JSON.stringify({
+        type: "tool_execution_end",
+        toolName: "team_create",
+        result: {
+          content: [{ type: "text", text: "Created team 'e2eteam' (run-1) with 2 members." }],
+          details: {
+            kind: "created",
+            team_run_id: "run-1",
+            members: [
+              { name: "quick", status: "running" },
+              { name: "fixture", status: "running" },
+            ],
+          },
+        },
+        isError: false,
+      }),
+      JSON.stringify({
+        type: "tool_execution_end",
+        toolName: "task_send",
+        result: {
+          content: [],
+          details: { kind: "team_message", team: { kind: "to_members", message_id: "msg-1", recipients: ["quick"] } },
+        },
+        isError: false,
+      }),
     ].join("\n"),
   )
   const create = findResults(events, "team_create")[0]

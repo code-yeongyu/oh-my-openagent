@@ -15,7 +15,11 @@ export type RunStatsTracker = {
 // An assistant message_end whose stopReason is "error" or "aborted" is a FAILED turn: it contributes
 // no tokens, cost, usage coverage or generation time - only the failed_turns count - but it still
 // re-anchors the window, so a failure's wall time never inflates a later window.
-export function createRunStatsTracker(startedAt: number, now: () => number = Date.now, runStartEpoch?: number): RunStatsTracker {
+export function createRunStatsTracker(
+  startedAt: number,
+  now: () => number = Date.now,
+  runStartEpoch?: number,
+): RunStatsTracker {
   let turns = 0
   let failedTurns = 0
   let toolCalls = 0
@@ -67,10 +71,7 @@ export function createRunStatsTracker(startedAt: number, now: () => number = Dat
         const nestedEvalTools = Array.isArray(details?.toolCalls)
           ? details.toolCalls.filter(
               (call) =>
-                isRecord(call) &&
-                typeof call.name === "string" &&
-                call.name.length > 0 &&
-                typeof call.ok === "boolean",
+                isRecord(call) && typeof call.name === "string" && call.name.length > 0 && typeof call.ok === "boolean",
             ).length
           : 0
         toolCalls += nestedEvalTools
@@ -130,8 +131,7 @@ export function createRunStatsTracker(startedAt: number, now: () => number = Dat
       // token-bearing collapsed window exists (i.e. outputTokens is zero or every window was
       // zero-token): there the runtime is the sole available timing signal and no collapsed
       // token timing has been lost.
-      const throughputWindowMs =
-        collapsedWindows > 0 ? undefined : generationMs > 0 ? generationMs : runtimeMs
+      const throughputWindowMs = collapsedWindows > 0 ? undefined : generationMs > 0 ? generationMs : runtimeMs
       const tps = throughputWindowMs === undefined ? undefined : tokensPerSecond(outputTokens, throughputWindowMs)
       const runCacheHitRate = boundedCacheHitRate(cacheReadTokens, cacheableTokens)
       const costReported = sawCost && Number.isFinite(costUsd)
@@ -224,10 +224,7 @@ function readUsage(message: Record<string, unknown>): UsageFacts {
     ...optionalNumber("cost", usage.costUnknown === true ? undefined : readCost(usage.cost)),
     ...optionalNumber("input", firstFiniteNonNegativeNumber(usage.input, usage.input_tokens)),
     ...optionalNumber("cacheRead", firstFiniteNonNegativeNumber(usage.cacheRead, usage.cache_read_input_tokens)),
-    ...optionalNumber(
-      "cacheWrite",
-      firstFiniteNonNegativeNumber(usage.cacheWrite, usage.cache_creation_input_tokens),
-    ),
+    ...optionalNumber("cacheWrite", firstFiniteNonNegativeNumber(usage.cacheWrite, usage.cache_creation_input_tokens)),
   }
 }
 
@@ -248,9 +245,7 @@ function optionalNumber<K extends string>(key: K, value: number | undefined): Pa
 }
 
 function firstFiniteNonNegativeNumber(...values: readonly unknown[]): number | undefined {
-  return values.find(
-    (value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0,
-  )
+  return values.find((value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

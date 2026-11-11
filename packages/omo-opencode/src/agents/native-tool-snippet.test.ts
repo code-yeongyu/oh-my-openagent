@@ -7,18 +7,23 @@ describe("toolPromptSnippet", () => {
   })
 
   test("stops after the first sentence once it says enough", () => {
-    expect(toolPromptSnippet("Fast content search tool with safety limits (60s timeout). Searches file contents. Supports regex."))
-      .toBe("Fast content search tool with safety limits (60s timeout).")
+    expect(
+      toolPromptSnippet(
+        "Fast content search tool with safety limits (60s timeout). Searches file contents. Supports regex.",
+      ),
+    ).toBe("Fast content search tool with safety limits (60s timeout).")
   })
 
   test("adds the next sentence when the first is too short to describe the tool", () => {
-    expect(toolPromptSnippet("WARNING: This is TMUX ONLY. Pass tmux subcommands directly. Examples follow."))
-      .toBe("WARNING: This is TMUX ONLY. Pass tmux subcommands directly.")
+    expect(toolPromptSnippet("WARNING: This is TMUX ONLY. Pass tmux subcommands directly. Examples follow.")).toBe(
+      "WARNING: This is TMUX ONLY. Pass tmux subcommands directly.",
+    )
   })
 
   test("uses only the first paragraph", () => {
-    expect(toolPromptSnippet("Runs a shell command in a persistent session.\n\nUsage notes:\n- quote paths"))
-      .toBe("Runs a shell command in a persistent session.")
+    expect(toolPromptSnippet("Runs a shell command in a persistent session.\n\nUsage notes:\n- quote paths")).toBe(
+      "Runs a shell command in a persistent session.",
+    )
   })
 
   test("caps a long sentence at a word boundary", () => {

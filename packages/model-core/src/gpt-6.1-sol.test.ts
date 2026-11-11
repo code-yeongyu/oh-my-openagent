@@ -24,19 +24,23 @@ describe("GPT-6.1 Sol capabilities", () => {
   })
 
   test.each(["none", "minimal"])("downgrades %s reasoning effort to low", (effort) => {
-    expect(resolveCompatibleModelSettings({
-      providerID: "chatgpt-subscription",
-      modelID: "gpt-6.1-sol",
-      desired: { reasoningEffort: effort },
-    }).reasoningEffort).toBe("low")
+    expect(
+      resolveCompatibleModelSettings({
+        providerID: "chatgpt-subscription",
+        modelID: "gpt-6.1-sol",
+        desired: { reasoningEffort: effort },
+      }).reasoningEffort,
+    ).toBe("low")
   })
 
   test("keeps plain GPT-6 Sol on its own ladder, which still accepts none", () => {
-    expect(resolveCompatibleModelSettings({
-      providerID: "openai",
-      modelID: "gpt-6-sol",
-      desired: { reasoningEffort: "none" },
-    }).reasoningEffort).toBe("none")
+    expect(
+      resolveCompatibleModelSettings({
+        providerID: "openai",
+        modelID: "gpt-6-sol",
+        desired: { reasoningEffort: "none" },
+      }).reasoningEffort,
+    ).toBe("none")
   })
 })
 
@@ -56,6 +60,9 @@ describe("deep-low on GPT-6.1 Sol", () => {
   })
 
   test("still resolves gpt-5.6-sol at medium on a registry without 6.1 Sol", () => {
-    expect(deepLow(["github-copilot/gpt-5.6-sol"])).toMatchObject({ model: "github-copilot/gpt-5.6-sol", variant: "medium" })
+    expect(deepLow(["github-copilot/gpt-5.6-sol"])).toMatchObject({
+      model: "github-copilot/gpt-5.6-sol",
+      variant: "medium",
+    })
   })
 })
