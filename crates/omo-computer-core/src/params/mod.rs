@@ -62,4 +62,7 @@ pub use verbs::{
     PressParams, ScrollDirection, ScrollParams, SelectTextParams, TextRange, TypeParams,
     WindowFrameParams, WindowParams,
 };
-pub use wait::{WaitForParams, WaitPredicate};
+pub use wait::{
+    ElementState, EventKind, EventPredicate, NotificationPredicate, SessionPredicate,
+    SurfacePredicate, SurfaceState, WaitForParams, WaitPredicate, WindowPredicate, WindowState,
+};

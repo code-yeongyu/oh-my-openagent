@@ -10,7 +10,7 @@ pub mod methods;
 mod nullable;
 pub mod observation;
 pub mod params;
-pub mod readers;
+pub mod requests;
 pub mod results;
 pub mod schema;
 pub mod session_state;
