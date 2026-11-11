@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { spawnSync } from "node:child_process"
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import {
+  checkRuntimeDistFresh,
   stageLspDaemonRuntime,
   verifyRuntimeDist,
 } from "../plugin/scripts/stage-lsp-daemon-runtime.mjs"
@@ -66,6 +68,72 @@ afterEach(async () => {
 })
 
 describe("Senpi LSP daemon runtime staging", () => {
+  test("#given no local source dist #when the CLI checks freshness #then it skips the freshness check", async () => {
+    const fixture = await makeRuntimeFixture()
+    await rm(fixture.sourceDist, { recursive: true })
+    const result = checkCli(fixture)
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain("runtime dist not built locally; skipping freshness check:")
+  })
+
+  test("#given built source without a target #when the CLI checks freshness #then it fails with staging guidance instead of ENOENT", async () => {
+    const fixture = await makeRuntimeFixture()
+    const result = checkCli(fixture)
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain("Senpi LSP runtime stale: staged manifest is missing:")
+    expect(result.stderr).toContain("run node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs")
+    expect(result.stderr).not.toContain("ENOENT")
+  })
+
+  test("#given built source without a staged runtime #when freshness is checked #then it names the missing manifest and stage command", async () => {
+    const fixture = await makeRuntimeFixture()
+    await expect(checkRuntimeDistFresh(fixture)).rejects.toThrow(
+      `Senpi LSP runtime stale: staged manifest is missing: ${join(fixture.targetDist, ".omo-runtime-manifest.json")}; run node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs`,
+    )
+  })
+
+  test("#given a staged runtime without its manifest #when freshness is checked #then it reports stale", async () => {
+    const fixture = await makeRuntimeFixture()
+    await stageLspDaemonRuntime(fixture)
+    await rm(join(fixture.targetDist, ".omo-runtime-manifest.json"))
+    await expect(checkRuntimeDistFresh(fixture)).rejects.toThrow("runtime stale: staged manifest is missing:")
+  })
+
+  test("#given a staged runtime missing a required output #when freshness is checked #then it names the output and stage command", async () => {
+    const fixture = await makeRuntimeFixture()
+    await stageLspDaemonRuntime(fixture)
+    await rm(join(fixture.targetDist, "client.js"))
+    await expect(checkRuntimeDistFresh(fixture)).rejects.toThrow(
+      `Senpi LSP runtime stale: staged output is missing: ${join(fixture.targetDist, "client.js")}; run node packages/omo-senpi/plugin/scripts/stage-lsp-daemon-runtime.mjs`,
+    )
+  })
+
+  test("#given an intact staged runtime #when freshness is checked #then it passes", async () => {
+    const fixture = await makeRuntimeFixture()
+    await stageLspDaemonRuntime(fixture)
+    expect((await checkRuntimeDistFresh(fixture)).ok).toBe(true)
+  })
+
+  test("#given changed source inputs #when freshness is checked #then stale inputs remain rejected", async () => {
+    const fixture = await makeRuntimeFixture()
+    await stageLspDaemonRuntime(fixture)
+    await writeText(join(fixture.repoRoot, "packages", "lsp-daemon", "src", "index.ts"), "export const changed = true\n")
+    await expect(checkRuntimeDistFresh(fixture)).rejects.toThrow("manifest is stale")
+  })
+
+  test("#given a malformed staged manifest #when freshness is checked #then the parsing error remains visible", async () => {
+    const fixture = await makeRuntimeFixture()
+    await stageLspDaemonRuntime(fixture)
+    await writeText(join(fixture.targetDist, ".omo-runtime-manifest.json"), "{")
+    await expect(checkRuntimeDistFresh(fixture)).rejects.toBeInstanceOf(SyntaxError)
+  })
+
+  test("#given a manifest path that is a directory #when freshness is checked #then the filesystem error remains visible", async () => {
+    const fixture = await makeRuntimeFixture()
+    await mkdir(join(fixture.targetDist, ".omo-runtime-manifest.json"), { recursive: true })
+    await expect(checkRuntimeDistFresh(fixture)).rejects.toMatchObject({ code: "EISDIR" })
+  })
+
   test("#given daemon build outputs #when staged #then manifest pins sorted outputs and verifies", async () => {
     // given
     const fixture = await makeRuntimeFixture()
@@ -101,7 +169,7 @@ describe("Senpi LSP daemon runtime staging", () => {
     await writeFile(join(fixture.targetDist, "cli.js"), "console.log('tampered')\n", "utf8")
 
     // when
-    const failure = verifyRuntimeDist(fixture.targetDist)
+    const failure = checkRuntimeDistFresh(fixture)
 
     // then
     await expect(failure).rejects.toThrow("manifest output hash mismatch")
@@ -122,6 +190,14 @@ describe("Senpi LSP daemon runtime staging", () => {
     expect(await readFile(join(fixture.targetDist, "cli.js"), "utf8")).toBe("old cli\n")
   })
 })
+
+function checkCli(fixture: { sourceDist: string; targetDist: string }) {
+  return spawnSync("node", [join(import.meta.dir, "../plugin/scripts/stage-lsp-daemon-runtime.mjs"), "--check"], {
+    env: { ...process.env, OMO_LSP_DAEMON_DIST: fixture.sourceDist, OMO_LSP_DAEMON_TARGET: fixture.targetDist },
+    encoding: "utf8",
+    windowsHide: true,
+  })
+}
 
 function isRecord(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null && !Array.isArray(value)
