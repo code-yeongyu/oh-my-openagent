@@ -28,7 +28,7 @@ export const cleanupAttachFixtures = async (): Promise<void> => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 }
 
-export const privateDir = (prefix: string): string => {
+const privateDir = (prefix: string): string => {
   const dir = mkdtempSync(join(tmpdir(), prefix))
   chmodSync(dir, 0o700)
   dirs.push(dir)
