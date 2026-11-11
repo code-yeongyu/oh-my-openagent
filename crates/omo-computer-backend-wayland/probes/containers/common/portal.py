@@ -65,6 +65,7 @@ def gate(rec, name, res):
         return False
     if res.get("absent"):
         rec["result"], rec["interfaces_enumerated"] = "interface_absent", len(res["interfaces"])
+        rec["interfaces"] = res["interfaces"]
         return False
     rec["iface_version"] = res["version"]
     return True

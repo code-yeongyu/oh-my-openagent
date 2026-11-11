@@ -71,6 +71,11 @@ function backendComplaint(): string {
 
 // The interface presence check (iface_probe.py): absent ONLY when the frontend's interface list came back without
 // the name; a failed call is UNMEASURED with its error text, never CONTRADICTS.
+const listed = (rec: Record<string, unknown>) =>
+  Array.isArray(rec.interfaces)
+    ? ` [${rec.interfaces.map((i) => String(i).replace("org.freedesktop.", "")).join(" ")}]`
+    : ""
+
 function presence(rec: Record<string, unknown>, nameKey = "iface_name"): Answer | null {
   const name = String(rec[nameKey] ?? rec.iface ?? "?")
   const err = rec.iface_error ?? rec.error
@@ -83,7 +88,7 @@ function presence(rec: Record<string, unknown>, nameKey = "iface_name"): Answer 
   if (rec.result === "interface_absent" || rec.absent === true)
     return {
       answer: false,
-      observed: `enumerated ${String(rec.interfaces_enumerated)} interfaces, ${name} not among them`,
+      observed: `enumerated ${String(rec.interfaces_enumerated)} interfaces${listed(rec)}, ${name} not among them`,
     }
   return null
 }
@@ -156,7 +161,7 @@ export async function globalShortcuts(c: Compositor): Promise<Answer> {
   return (
     presence(r.rec, "iface") ?? {
       answer: true,
-      observed: `enumerated ${String(r.rec.interfaces_enumerated)} interfaces, org.freedesktop.portal.GlobalShortcuts version ${String(r.rec.version)}`,
+      observed: `enumerated ${String(r.rec.interfaces_enumerated)} interfaces${listed(r.rec)}, org.freedesktop.portal.GlobalShortcuts version ${String(r.rec.version)}`,
     }
   )
 }
