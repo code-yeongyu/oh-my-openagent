@@ -3,7 +3,8 @@
  * the VM holds stubs generated from the four facade method tables, and every stub call is one bridged call that
  * runs the same run facade the vm mode uses (`facadeMethod` -> `guardRun` -> the engine), one at a time.
  *
- * Arguments arrive as JSON and are passed to the facade method as they are, never merged into a host object.
+ * Arguments arrive as JSON and are passed to the facade method as they are, never merged into a host object; a
+ * trailing `undefined` argument is dropped in the VM, so it stays absent, and a non-trailing one arrives as `null`.
  * A result crosses back as JSON through an explicit replacer: a window, element or display handle becomes a
  * descriptor (a handle number plus its snapshot fields) that the VM turns into a stub, and a value JSON cannot
  * carry faithfully (non-finite number, bigint, function, symbol) is refused. A result that is `undefined` crosses
@@ -67,7 +68,11 @@ const SETUP_SOURCE = `(callHost, data) => {
 			const leaf = path.pop();
 			let node = root;
 			for (const part of path) node = Object.hasOwn(node, part) ? node[part] : (node[part] = {});
-			node[leaf] = (...args) => callHost(${JSON.stringify(BRIDGE_NAME)}, [target, name, args]).then(revive);
+			node[leaf] = (...args) => {
+				// The method's own arguments are nested, so callHost cannot drop their trailing undefined; drop it here.
+				while (args.length > 0 && args[args.length - 1] === undefined) args.pop();
+				return callHost(${JSON.stringify(BRIDGE_NAME)}, [target, name, args]).then(revive);
+			};
 		}
 		return root;
 	};

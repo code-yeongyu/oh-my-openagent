@@ -44,7 +44,10 @@ const PRELUDE = `(bridge, names) => {
 		return value;
 	};
 	const callHost = (name, args) => new Promise((resolve, reject) => {
-		const json = JSON.stringify(args, boundary);
+		// A trailing undefined argument stays absent, as in a JavaScript call; a non-trailing one becomes null (JSON).
+		const list = [...args];
+		while (list.length > 0 && list[list.length - 1] === undefined) list.pop();
+		const json = JSON.stringify(list, boundary);
 		const id = nextId++;
 		const refusal = bridge("call", id, name, json);
 		if (refusal !== undefined) {

@@ -10,7 +10,7 @@ import { ComputerRunError, RunOutput } from "../src/run/context";
 import { type ComputerRunSandbox, type ExecuteTool, runComputerCode } from "../src/run/runtime";
 import { createComputerBridge } from "../src/run/sandbox/bridge";
 import { SANDBOX_MAX_CALLS, SANDBOX_RESULT_BYTES } from "../src/run/sandbox/limits";
-import { BridgedJson } from "../src/run/sandbox/quickjs";
+import { BridgedJson, runQuickJsCode, type SandboxBridgedCall } from "../src/run/sandbox/quickjs";
 import { DesktopEngineRpcError } from "../src/service/rpc-client";
 import { DesktopService } from "../src/service/service";
 import { fakeEngineFactory, rejectionOf, type SpawnLog } from "./harness";
@@ -86,7 +86,7 @@ function methods(log: SpawnLog): readonly string[] {
 	return log.requests.map((request) => request.method);
 }
 
-describe.each(SANDBOXES)("runComputerCode under %s", (sandbox) => {
+describe.each(SANDBOXES)("runComputerCode under %s", HANG_GUARD, (sandbox) => {
 	const run = (service: DesktopService, code: string, options: RunOptions = {}) =>
 		runCode(service, code, { ...options, sandbox });
 
@@ -191,6 +191,32 @@ describe.each(SANDBOXES)("runComputerCode under %s", (sandbox) => {
 
 		// Then
 		expect(result.returnValue).toEqual([true, true]);
+	});
+
+	it("treats an undefined screenshot argument as an absent one", async () => {
+		// Given
+		const { service } = await openDesktop();
+		const shape = (shot: string) => `const shot = await ${shot}; return [Object.keys(shot).sort(), shot.width];`;
+
+		// When
+		const bare = await run(service, shape("desktop.screenshot()"));
+		const explicit = await run(service, shape("desktop.screenshot(undefined)"));
+
+		// Then
+		expect(bare.returnValue).toEqual([expect.arrayContaining(["frameId", "width"]), 1280]);
+		expect(explicit.returnValue).toEqual(bare.returnValue);
+	});
+
+	it("sends no opts for w.ax(undefined)", async () => {
+		// Given
+		const { service, log } = await openDesktop();
+
+		// When
+		await run(service, `const w = await desktop.window({ app: "Code" }); return await w.ax(undefined);`);
+
+		// Then
+		const params = log.requests.find((request) => request.method === "ax.snapshot")?.params;
+		expect(params).toEqual({ target: "101" });
 	});
 
 	it("rejects click in a read-only run before it reaches the engine", async () => {
@@ -685,6 +711,49 @@ describe("the computer bridge in the QuickJS run cell", HANG_GUARD, () => {
 		expect(error).toBeInstanceOf(ComputerRunError);
 		expect(error).toHaveProperty("reason", "calls");
 		expect((await log.nthRequest("$/cancel", 1)).params).toEqual({ id: sent.id });
+	});
+
+	it("drops trailing undefined arguments before they cross, for a bridged global and a facade method", async () => {
+		// Given: a recorder in front of a probe global and of the computer bridge itself
+		const { service } = await openDesktop();
+		const output = new RunOutput();
+		const { bridge, setup } = createComputerBridge({
+			snapshot: snapshot(false),
+			deadline: Date.now() + RUN_TIMEOUT_MS,
+			output,
+			screenshots: [],
+			call: (method, params, signal) => service.call(method, params, { signal }),
+		});
+		const forward = bridge.computer;
+		if (forward === undefined) throw new Error("no computer bridge");
+		const received: unknown[] = [];
+		const recorded: Record<string, SandboxBridgedCall> = {
+			probe: async (args) => {
+				received.push(args);
+				return args.length;
+			},
+			computer: (args, signal) => {
+				received.push(args);
+				return forward(args, signal);
+			},
+		};
+		const code = `
+			const lengths = [await probe(1, undefined), await probe(undefined, 2)];
+			await desktop.windows(undefined);
+			await desktop.screenshot({ silent: true }, undefined);
+			return lengths;
+		`;
+
+		// When
+		const result = await runQuickJsCode(
+			{ code, snapshot: snapshot(false), timeoutMs: RUN_TIMEOUT_MS },
+			{ service },
+			{ bridge: recorded, setup, output },
+		);
+
+		// Then: a non-trailing undefined still crosses as null (JSON)
+		expect(result.returnValue).toEqual([1, 2]);
+		expect(received).toEqual([[1], [null, 2], [0, "windows", []], [0, "screenshot", [{ silent: true }]]]);
 	});
 
 	it("keeps handles per run: a handle index from one run is an unknown handle in the next", async () => {

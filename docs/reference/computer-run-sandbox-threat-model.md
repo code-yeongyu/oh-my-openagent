@@ -157,8 +157,9 @@ Serialization rules, both directions (the builder of row 32 implements exactly t
 
 - Host-ward arguments go through `JSON.stringify` with an explicit replacer that throws a VM `TypeError` on a
   function, `RegExp`, symbol, `bigint`, `NaN` or `Infinity` (plain `JSON.stringify` would silently drop the first
-  two, turn the next into `{}` and the last two into `null`). `undefined` in an argument list is kept as an absent
-  trailing argument or an absent property, as JavaScript calls already treat it.
+  two, turn the next into `{}` and the last two into `null`). Trailing `undefined` arguments are dropped, so they
+  stay absent as JavaScript calls already treat them, and an `undefined` property is absent; a non-trailing
+  `undefined` argument becomes `null` (JSON).
 - VM-ward results travel in an envelope `{ "ok": true, "value": <json> }`; an `undefined` result (for example
   `el.value()`, `run/handles.ts:146-148`) is the envelope without `value`, and `pid` and other optional snapshot
   fields are simply absent, so the VM sees `undefined`, not `null`.
