@@ -120,11 +120,14 @@ function deliveryOf(message: EngineMessage):
       readonly agentSender: string | undefined
       readonly senderName: string | undefined
     }
+  | "malformed"
   | undefined {
   if (message.role !== "custom" || message.customType !== SESSION_CONTROL_DELIVERY_TYPE) return undefined
   const details = (message.details ?? undefined) as DeliveryDetails | undefined
   const id = details?.delivery_id
-  if (typeof id !== "string") return undefined
+  // A delivery message without a string id is malformed: it starts work like any delivery (nobody approved) and
+  // never passes as a turn the engine started, which would keep the earlier group's allowance (#13056).
+  if (typeof id !== "string") return "malformed"
   const count = details?.chain_count
   return {
     id,
@@ -155,10 +158,22 @@ function callsTools(message: EngineMessage): boolean {
  * it too) or any delivery, whose own sender the new group then holds. A delivery that joins running work adds its
  * sender. The run's deliveries (`consumed`, the implicit target of a report) end with the final answer in every
  * order: an engine-started message that arrives after the answer and before the settle keeps the allowance, not them.
+ * The same-account bound is not enforced here: a delivery reaches this component only after the engine's admission
+ * accepted it for this account, so the allowance a consumed delivery grants rests on that admission (#13044, #13056).
  */
 function noteInput(run: RunContext, message: EngineMessage): void {
   if (message.role !== "user" && message.role !== "custom") return
   const delivery = deliveryOf(message)
+  if (delivery === "malformed") {
+    run.cause = undefined
+    run.consumed = []
+    run.replyTo = []
+    run.replySenders = []
+    run.chainHop = 0
+    run.local = false
+    run.answered = false
+    return
+  }
   if (message.role === "custom" && delivery === undefined) {
     if (run.answered) run.consumed = []
     run.answered = false
