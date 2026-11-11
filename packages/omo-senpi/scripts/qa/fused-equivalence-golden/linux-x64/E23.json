@@ -3704,9 +3704,6 @@
      {
       "identity": "<memory-identity:1>",
       "files": {
-       "identity.json": {
-        "text": "{\n  \"version\": 1,\n  \"id\": \"<memory-identity:1>\",\n  \"kind\": \"auto\",\n  \"mode\": \"path\",\n  \"source\": \"<sandbox>/work\",\n  \"spellings\": [\n    \"<sandbox>/work\"\n  ]\n}\n"
-       },
        "repo/reference/self/observations.md": {
         "text": "---\ndescription: Self-observations journal - external reactions to my behavior (corrections, gate verdicts, test contradictions), one line each, appended as they happen; reflection promotes to system/self-aware.md\n---\nOne line per external reaction to your behavior, appended when it happens:\n\n- [YYYY-MM-DD] cond: <when> | reaction: \"<their words>\" (<src>) | obs: <what you did, counted> | next: <what you will check> <!-- status: hypothesis|observed|disconfirmed; expires: YYYY-MM-DD -->\n\nAdd a line when your person corrects or characterizes you, a reviewer or gate rejects your work, or a test contradicts what you claimed. Quote them; count what you did; name the next check. A line becomes observed when a later outcome agrees with it; until then, praise and unbacked pushback stay hypothesis.\n\nExample:\n- [<ts:repo/reference/self/observations.md.text:1>] cond: a remote machine is named in the ask | reaction: \"why are you searching here\" (msg 01a0…) | obs: searched local fs before the host check, 2 of 9 | next: run the host check first <!-- status: observed; expires: <ts:repo/reference/self/observations.md.text:2> -->"
        },
