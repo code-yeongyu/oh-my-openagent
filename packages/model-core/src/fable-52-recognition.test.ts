@@ -42,6 +42,22 @@ describe("Claude Fable 5.2 recognition", () => {
     expect(result.modalities).toEqual({ input: ["text", "image", "pdf"], output: ["text"] })
   })
 
+  test("keeps ids just outside the 5.2 boundary at the default window without the opt-in (#12985)", () => {
+    // given: neighbours a loosened 5.2 pattern would start to match
+    const outside: [string, string][] = [
+      ["anthropic", "claude-fable-5-20"],
+      ["anthropic", "claude-fable-5-2-2026110"],
+      ["anthropic", "claude-fable-5-21"],
+      ["anthropic", "claude-opus-5-2"],
+      ["anthropic", "claude-fable-5-1-20260601"],
+      ["aws-bedrock-anthropic", "anthropic.claude-fable-5-20"],
+    ]
+    // when
+    const limits = outside.map(([provider, model]) => resolveActualContextLimit(provider, model, noOptIn))
+    // then
+    expect(limits).toEqual(outside.map(() => 200_000))
+  })
+
   test("uses the 1M context window on every Anthropic-family spelling without the opt-in", () => {
     // given
     const spellings: [string, string][] = [
