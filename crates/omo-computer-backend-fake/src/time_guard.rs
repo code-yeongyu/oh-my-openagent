@@ -1,5 +1,7 @@
-//! The source guard behind `fake_clock_is_the_only_time_source`: no file of this crate reads
-//! the host's clock or waits. Each needle is split so this file does not match itself.
+//! The source guard behind `fake_clock_is_the_only_time_source` and
+//! `the_fake_reads_no_environment`: no file of this crate reads the host's clock, waits, or
+//! reads the environment (seams arrive as values). Each needle is split so this file does not
+//! match itself.
 
 use std::path::{Path, PathBuf};
 
@@ -10,6 +12,8 @@ pub const FORBIDDEN: &[&str] = &[
     concat!("sle", "ep("),
     concat!("tokio", "::time"),
     concat!("chr", "ono::"),
+    concat!("std", "::env"),
+    concat!("env", "::var"),
 ];
 
 #[derive(Debug, Default)]

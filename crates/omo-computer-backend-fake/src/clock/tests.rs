@@ -30,9 +30,10 @@ fn fake_clock_is_the_only_time_source() {
 #[test]
 fn the_fake_reads_no_environment() {
     for probe in [
-        r#"let home = std::env::var("HOME");"#,
-        "use std::env;",
-        r#"let seam = env::var_os("OMO_COMPUTER_FAKE_CLOCK");"#,
+        // Split like the needles, so the crate scan above stays clean.
+        concat!("let home = std", "::en", "v::var(\"HOME\");"),
+        concat!("use std", "::env;"),
+        concat!("let seam = env", "::var_os(\"OMO_COMPUTER_FAKE_CLOCK\");"),
     ] {
         assert!(
             !scan_text("probe.rs", probe).is_empty(),
