@@ -206,10 +206,25 @@ const RTLD_DEFAULT = 0xfffffffffffffffen
 
 // Where a symbol was found: in the image the design names (`yes`), only in another loaded image (`elsewhere`),
 // or nowhere (`no`). `elsewhere` counts as resolved: the ledger reads it differently from absent.
-type SymbolLocation = "yes" | "elsewhere" | "no"
-function symbolLocation(inImage: boolean, anywhere: boolean): SymbolLocation {
+type SymbolLocation = "yes" | "elsewhere" | "no" | "load-error"
+function symbolLocation(inImage: boolean, anywhere: boolean, loadError?: string): SymbolLocation {
+  void loadError
   if (inImage) return "yes"
   return anywhere ? "elsewhere" : "no"
+}
+
+// One symbol lookup as the ledger sees it; `loadError` carries dlerror() text when the named image did not load.
+interface Lookup {
+  name: string
+  where: SymbolLocation
+  loadError?: string
+}
+
+// The negative verdict of a symbol row. A symbol is proven absent only when its image loaded and dlsym answered
+// null; a framework that failed to load proves nothing, so that row is UNMEASURED with the loader's text.
+function absenceOutcome(lookups: ReadonlyArray<Lookup>, measured: string, consequence: string): Outcome | undefined {
+  if (lookups.every((l) => l.where === "yes" || l.where === "elsewhere")) return undefined
+  return { verdict: "CONTRADICTS", resolves: "no", behaves: "-", measured, reason: consequence }
 }
 
 const kCFStringEncodingUTF8 = 0x08000100
@@ -317,6 +332,29 @@ interface WindowInfo {
 const kCGWindowListOptionOnScreenOnly = 1
 const kCGWindowListExcludeDesktopElements = 16
 const kCGWindowListOptionAll = 0
+
+interface WindowFields {
+  id: number | undefined
+  pid: number | undefined
+  layer: number | undefined
+  owner: string
+  x: number | undefined
+  y: number | undefined
+  w: number | undefined
+  h: number | undefined
+}
+
+// A window-list entry whose id, owner pid, layer or bounds could not be read is dropped, never defaulted to 0: a
+// made-up window id 0 would turn an unreadable entry into a capture or Space verdict.
+function windowFromFields(f: WindowFields): WindowInfo | undefined {
+  return {
+    id: f.id ?? 0,
+    pid: f.pid ?? 0,
+    owner: f.owner,
+    layer: f.layer ?? 0,
+    bounds: { x: f.x || 0, y: f.y || 0, w: f.w || 0, h: f.h || 0 },
+  }
+}
 
 function windowList(option: number): WindowInfo[] {
   const n = native()
@@ -584,6 +622,12 @@ function qRemoteToken(host: Host): Outcome {
 // contain that id. A zero id (no current Space read) never matches.
 function onCurrentSpace(spaces: ReadonlyArray<number | undefined>, currentSpace: number): boolean {
   return currentSpace !== 0 && spaces.includes(currentSpace)
+}
+
+// The copy-spaces decision: `unread` when the display's current Space could not be read (id 0), which is never a
+// negative verdict.
+function spaceDecision(spaces: ReadonlyArray<number | undefined>, currentSpace: number): "on" | "off" | "unread" {
+  return onCurrentSpace(spaces, currentSpace) ? "on" : "off"
 }
 
 function qCopySpaces(): Outcome {
@@ -1333,6 +1377,61 @@ function selfTest(): number {
   expect("onCurrentSpace: on its display's current Space", () => onCurrentSpace([3, 7], 7))
   expect("onCurrentSpace: not on it", () => !onCurrentSpace([3], 7))
   expect("onCurrentSpace: an unread current Space (0) never matches", () => !onCurrentSpace([0], 0))
+  // swallowed errors: a failure to read or load is never a negative verdict
+  expect("spaceDecision: an unread current Space (0) is 'unread', not 'off'", () => spaceDecision([3], 0) === "unread")
+  expect(
+    "spaceDecision: on and off still decide",
+    () => spaceDecision([7], 7) === "on" && spaceDecision([3], 7) === "off",
+  )
+  expect(
+    "symbolLocation: an image that failed to load and no symbol anywhere is 'load-error'",
+    () => symbolLocation(false, false, "image not found") === "load-error",
+  )
+  expect(
+    "symbolLocation: found elsewhere despite a load error is 'elsewhere'",
+    () => symbolLocation(false, true, "image not found") === "elsewhere",
+  )
+  expect("symbolLocation: loaded image, no symbol is 'no'", () => symbolLocation(false, false) === "no")
+  const loadErr: Lookup = { name: "SLEventPostToPid", where: "load-error", loadError: "image not found" }
+  const absent: Lookup = { name: "SLSEventPostToPid", where: "no" }
+  expect("absenceOutcome: a load error is UNMEASURED with the loader text, never CONTRADICTS", () => {
+    const o = absenceOutcome([loadErr], "m", "c")
+    return o?.verdict === "UNMEASURED" && o.reason.includes("image not found")
+  })
+  expect(
+    "absenceOutcome: absent + load error is still UNMEASURED",
+    () => absenceOutcome([absent, loadErr], "m", "c")?.verdict === "UNMEASURED",
+  )
+  expect(
+    "absenceOutcome: a proven absence is CONTRADICTS",
+    () => absenceOutcome([absent], "m", "c")?.verdict === "CONTRADICTS",
+  )
+  expect(
+    "absenceOutcome: all resolved gives no negative",
+    () =>
+      absenceOutcome(
+        [
+          { name: "a", where: "yes" },
+          { name: "b", where: "elsewhere" },
+        ],
+        "m",
+        "c",
+      ) === undefined,
+  )
+  const fields: WindowFields = { id: 9, pid: 42, layer: 0, owner: "o", x: 0, y: 0, w: 640, h: 480 }
+  expect("windowFromFields: a complete entry is kept", () => windowFromFields(fields)?.id === 9)
+  expect(
+    "windowFromFields: an unreadable id drops the entry",
+    () => windowFromFields({ ...fields, id: undefined }) === undefined,
+  )
+  expect(
+    "windowFromFields: an unreadable layer drops the entry",
+    () => windowFromFields({ ...fields, layer: undefined }) === undefined,
+  )
+  expect(
+    "windowFromFields: unreadable bounds drop the entry",
+    () => windowFromFields({ ...fields, w: undefined }) === undefined,
+  )
   // a file that is not an SP-M ledger: one-line refusal, exit 2
   const bad = `${process.env.TMPDIR ?? "/tmp"}/sp-m-self-test-${process.pid}.tsv`
   writeFileSync(bad, "not\ta\tledger\n")
