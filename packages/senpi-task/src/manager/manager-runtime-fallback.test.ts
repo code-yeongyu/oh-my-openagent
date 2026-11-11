@@ -134,4 +134,89 @@ describe("TaskManager runtime fallback visibility", () => {
     fake.settle({ status: "completed", finalResponse: "done" })
     await manager.waitFor(started.task_id)
   })
+
+  test("#given a category chain that runs one model at two thinking levels #when Senpi falls back to the second level #then the rest of the chain and both attempts survive", async () => {
+    // given
+    const models = [
+      { provider: "vendor-a", id: "primary-model" },
+      { provider: "vendor-b", id: "fallback-model" },
+    ] as const
+    const registry = {
+      getAvailable: () => models,
+      find: (provider: string, modelId: string) =>
+        models.find((candidate) => candidate.provider === provider && candidate.id === modelId),
+    }
+    const { manager, store, inProcess } = makeManager({
+      planner: () => {
+        const resolution = resolveCategory(
+          "quick",
+          {
+            categories: {
+              quick: {
+                models: [
+                  { model: "vendor-a/primary-model", reasoning: "high" },
+                  { model: "vendor-a/primary-model", reasoning: "off" },
+                  { model: "vendor-b/fallback-model", reasoning: "off" },
+                ],
+              },
+            },
+          },
+          registry,
+        )
+        if (resolution.kind !== "resolved") throw new Error(`Expected resolved category, got ${resolution.kind}`)
+        const spec = resolution.spec
+        return {
+          kind: "resolved",
+          plan: {
+            model: `${spec.provider}/${spec.modelId}`,
+            category: "quick",
+            resolved_model: {
+              source: "category",
+              provider: spec.provider,
+              model_id: spec.modelId,
+              display: `${spec.provider}/${spec.modelId}`,
+              ...(spec.reasoningEffort !== undefined ? { reasoning: spec.reasoningEffort } : {}),
+            },
+            ...(spec.requested_model !== undefined ? { requested_model: spec.requested_model } : {}),
+            ...(spec.fallback_models !== undefined ? { fallback_models: spec.fallback_models } : {}),
+          },
+        } as const
+      },
+    })
+    const started = await manager.start(baseSpec())
+    if (started.kind !== "started") throw new Error(`Unexpected start result: ${started.kind}`)
+    const fake = inProcess.handles.get(started.task_id)
+    if (fake === undefined) throw new Error("Fake child handle missing")
+
+    // then the same-model retry rung is on the record before any retry happens
+    expect(
+      store.load(started.task_id)?.fallback_models?.map((rung) => `${rung.display}:${rung.reasoning_effort}`),
+    ).toEqual(["vendor-a/primary-model:off", "vendor-b/fallback-model:off"])
+
+    // when Senpi moves to the same model's second thinking level
+    const fallbackEvent = {
+      type: "retry_fallback_applied",
+      from: "vendor-a/primary-model:high",
+      to: "vendor-a/primary-model:off",
+      chainKey: "vendor-a/primary-model:high",
+      reason: "hard-error",
+    }
+    fake.emit(fallbackEvent)
+
+    // then only the rungs AFTER the level actually in use remain, and both attempts are recorded
+    const record = store.load(started.task_id)
+    expect(record?.resolved_model).toMatchObject({
+      provider: "vendor-a",
+      model_id: "primary-model",
+      reasoning: "off",
+    })
+    expect(record?.fallback_models?.map((rung) => `${rung.display}:${rung.reasoning_effort}`)).toEqual([
+      "vendor-b/fallback-model:off",
+    ])
+    expect(
+      record?.fallback_attempts?.map((attempt) => `${attempt.display}:${attempt.reasoning ?? attempt.reasoning_effort}`),
+    ).toEqual(["vendor-a/primary-model:high", "vendor-a/primary-model:off"])
+    fake.settle({ status: "completed", finalResponse: "done" })
+    await manager.waitFor(started.task_id)
+  })
 })

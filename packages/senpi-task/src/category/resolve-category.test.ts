@@ -209,6 +209,40 @@ describe("resolveCategory", () => {
     expect(resolved.spec.fallback_models?.[0]?.model_id).toBe("fallback-model")
   })
 
+  test("#given a canonical chain that runs one model at two thinking levels #when resolved #then the second level stays a rung and the selection keeps its own level", () => {
+    // given
+    const models = registry([
+      model("vendor-a", "primary-model"),
+      model("vendor-b", "fallback-model"),
+    ])
+
+    // when
+    const result = resolveCategory(
+      "quick",
+      {
+        categories: {
+          quick: {
+            models: [
+              { model: "vendor-a/primary-model", reasoning: "high" },
+              { model: "vendor-a/primary-model", reasoning: "off" },
+              { model: "vendor-b/fallback-model", reasoning: "off" },
+            ],
+          },
+        },
+      },
+      models,
+    )
+
+    // then the same-model retry is a rung of its own, and the row is labelled with the level of
+    // the entry the selection actually landed on (the first one), not the last entry for the model
+    const resolved = expectResolved(result)
+    expect(resolved.spec.modelId).toBe("primary-model")
+    expect(resolved.spec.reasoningEffort).toBe("high")
+    expect(
+      resolved.spec.fallback_models?.map((rung) => `${rung.display}:${rung.reasoning_effort}`),
+    ).toEqual(["vendor-a/primary-model:off", "vendor-b/fallback-model:off"])
+  })
+
   test("#given a canonical models chain plus a conflicting legacy fallback_models #when resolved #then canonical models wins", () => {
     // given
     const models = registry([model("vendor-a", "primary-model")])
