@@ -1,5 +1,11 @@
 import { existsSync } from "node:fs"
-import { type DeviceCredential, type DeviceService, deviceServiceEndpointPath, LocalApiError, type Status } from "./device-service.ts"
+import {
+  type DeviceCredential,
+  type DeviceService,
+  deviceServiceEndpointPath,
+  LocalApiError,
+  type Status,
+} from "./device-service.ts"
 
 /** Why a connection to the device service's endpoint failed; the first word of the log line. */
 type ConnectFailure = "dead_endpoint" | "refused" | "unreadable" | "timed_out" | "failed"

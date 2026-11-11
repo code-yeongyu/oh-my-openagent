@@ -12,25 +12,13 @@ import {
 describe("deduplicatePathAliasedSkills", () => {
   it("keeps all skills when there are no duplicate names", () => {
     const skills = [makeSkill("debugging"), makeSkill("review-work"), makeSkill("git-master")]
-    expect(deduplicatePathAliasedSkills(skills).map((s) => s.name)).toEqual([
-      "debugging",
-      "review-work",
-      "git-master",
-    ])
+    expect(deduplicatePathAliasedSkills(skills).map((s) => s.name)).toEqual(["debugging", "review-work", "git-master"])
   })
 
   it("is a no-op after the shared/ prefix cutover", () => {
-    const skills = [
-      sharedSkill("debugging"),
-      builtinSharedSkill("debugging"),
-      makeSkill("review-work"),
-    ]
+    const skills = [sharedSkill("debugging"), builtinSharedSkill("debugging"), makeSkill("review-work")]
     const result = deduplicatePathAliasedSkills(skills)
-    expect(result.map((s) => s.name)).toEqual([
-      "shared/debugging",
-      "debugging",
-      "review-work",
-    ])
+    expect(result.map((s) => s.name)).toEqual(["shared/debugging", "debugging", "review-work"])
   })
 
   it("handles multiple skills in one pass", () => {

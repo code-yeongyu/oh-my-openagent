@@ -20,20 +20,20 @@ test.each(["child", "dag_child", "member", "dream_child"])(
   },
 )
 
-test.each([
-  { OMO_SENPI_TASK_RPC_CHILD: "1" },
-  { SENPI_TASK_MEMBER: "run::worker" },
-])("#given a per-child process environment %j #when its input is accepted #then automatic memory activity stays disabled", async (env) => {
-  const pi = new MemoryFakeExtensionAPI()
-  const activity = createMemoryUserActivity(env)
-  activity.register(pi)
+test.each([{ OMO_SENPI_TASK_RPC_CHILD: "1" }, { SENPI_TASK_MEMBER: "run::worker" }])(
+  "#given a per-child process environment %j #when its input is accepted #then automatic memory activity stays disabled",
+  async (env) => {
+    const pi = new MemoryFakeExtensionAPI()
+    const activity = createMemoryUserActivity(env)
+    activity.register(pi)
 
-  await pi.dispatch("input", { source: "interactive", inputId: "task-input", text: "Perform the task." }, eventCtx)
-  await pi.dispatch("input_disposition", { inputId: "task-input", disposition: "queued" }, eventCtx)
+    await pi.dispatch("input", { source: "interactive", inputId: "task-input", text: "Perform the task." }, eventCtx)
+    await pi.dispatch("input_disposition", { inputId: "task-input", disposition: "queued" }, eventCtx)
 
-  expect(activity.has(SESSION)).toBe(false)
-  expect(activity.hasInput(SESSION)).toBe(false)
-})
+    expect(activity.has(SESSION)).toBe(false)
+    expect(activity.hasInput(SESSION)).toBe(false)
+  },
+)
 
 test("#given an ordinary top-level RPC input #when the engine reaches before_agent_start #then prompt-time memory can observe it before disposition", async () => {
   const pi = new MemoryFakeExtensionAPI()
@@ -79,7 +79,11 @@ test("#given concurrent settles #when rebind retires their reconciliation #then 
   const gate = Promise.withResolvers<void>()
   const entered = Promise.withResolvers<void>()
   let calls = 0
-  const reconcile = () => { calls += 1; entered.resolve(); return gate.promise }
+  const reconcile = () => {
+    calls += 1
+    entered.resolve()
+    return gate.promise
+  }
   const first = activity.reconcileOnce(SESSION, reconcile)
   const second = activity.reconcileOnce(SESSION, reconcile)
   await entered.promise
@@ -97,7 +101,9 @@ test("#given a scheduled reconciliation #when rebind resets before it starts #th
   await pi.dispatch("input", { source: "rpc", inputId: "user-input", text: "Remember." }, eventCtx)
   await pi.dispatch("input_disposition", { inputId: "user-input", disposition: "started" }, eventCtx)
   let calls = 0
-  const pending = activity.reconcileOnce(SESSION, async () => { calls += 1 })
+  const pending = activity.reconcileOnce(SESSION, async () => {
+    calls += 1
+  })
   activity.reset(SESSION)
   await pending
   expect(calls).toBe(0)

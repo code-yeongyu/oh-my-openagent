@@ -67,7 +67,8 @@ test("#given a stalled runner #when a workpool event arrives after the stall #th
 
   // when
   now += STALL_MS
-  if (armedMs !== undefined && armedMs <= STALL_MS) deadline.abort(new DOMException("The operation timed out.", "TimeoutError"))
+  if (armedMs !== undefined && armedMs <= STALL_MS)
+    deadline.abort(new DOMException("The operation timed out.", "TimeoutError"))
   event.resolve("arrived")
 
   // then

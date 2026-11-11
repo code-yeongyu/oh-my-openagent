@@ -191,9 +191,7 @@ describe("createChatMessageHandler runtime fallback model override", () => {
       parts?: Array<{ type: string; text?: string }>
     } = {
       message: {},
-      parts: [
-        { type: "text", text: "continue\n<!-- OMO_RUNTIME_FALLBACK_RETRY -->" },
-      ],
+      parts: [{ type: "text", text: "continue\n<!-- OMO_RUNTIME_FALLBACK_RETRY -->" }],
     }
 
     // when - requestedModel (go/fallback-a) matches currentModel here only by
@@ -237,9 +235,7 @@ describe("createChatMessageHandler runtime fallback model override", () => {
       parts?: Array<{ type: string; text?: string }>
     } = {
       message: {},
-      parts: [
-        { type: "text", text: "retry payload\n<!-- OMO_RUNTIME_FALLBACK_RETRY -->" },
-      ],
+      parts: [{ type: "text", text: "retry payload\n<!-- OMO_RUNTIME_FALLBACK_RETRY -->" }],
     }
 
     // when
@@ -279,9 +275,7 @@ describe("createChatMessageHandler runtime fallback model override", () => {
       parts?: Array<{ type: string; text?: string }>
     } = {
       message: {},
-      parts: [
-        { type: "text", text: "continue\n<!-- OMO_RUNTIME_FALLBACK_RETRY -->" },
-      ],
+      parts: [{ type: "text", text: "continue\n<!-- OMO_RUNTIME_FALLBACK_RETRY -->" }],
     }
 
     // when
@@ -399,10 +393,13 @@ describe("createChatMessageHandler runtime fallback model override", () => {
     deps.sessionStates.set(sessionID, state)
     const handler = createChatMessageHandler(deps)
 
-    await handler({ sessionID, model: { providerID: "google", modelID: "gemini-2.5-pro" } }, {
-      message: {},
-      parts: [{ type: "text", text: "Please continue with the task" }],
-    })
+    await handler(
+      { sessionID, model: { providerID: "google", modelID: "gemini-2.5-pro" } },
+      {
+        message: {},
+        parts: [{ type: "text", text: "Please continue with the task" }],
+      },
+    )
 
     expect(state.attemptCount).toBe(0)
     expect(state.fallbackIndex).toBe(-1)
@@ -418,10 +415,13 @@ describe("createChatMessageHandler runtime fallback model override", () => {
     state.fallbackIndex = 1
     deps.sessionStates.set(sessionID, state)
 
-    await createChatMessageHandler(deps)({ sessionID }, {
-      message: {},
-      parts: [{ type: "text", text: `wake${OMO_INTERNAL_INITIATOR_MARKER}` }],
-    })
+    await createChatMessageHandler(deps)(
+      { sessionID },
+      {
+        message: {},
+        parts: [{ type: "text", text: `wake${OMO_INTERNAL_INITIATOR_MARKER}` }],
+      },
+    )
 
     expect(state.attemptCount).toBe(deps.config.max_fallback_attempts)
     expect(state.fallbackIndex).toBe(1)
@@ -435,10 +435,13 @@ describe("createChatMessageHandler runtime fallback model override", () => {
     state.fallbackIndex = 1
     deps.sessionStates.set(sessionID, state)
 
-    await createChatMessageHandler(deps)({ sessionID }, {
-      message: {},
-      parts: [{ type: "text", text: `retry this${OMO_RUNTIME_FALLBACK_RETRY_MARKER}` }],
-    })
+    await createChatMessageHandler(deps)(
+      { sessionID },
+      {
+        message: {},
+        parts: [{ type: "text", text: `retry this${OMO_RUNTIME_FALLBACK_RETRY_MARKER}` }],
+      },
+    )
 
     expect(state.attemptCount).toBe(deps.config.max_fallback_attempts)
     expect(state.fallbackIndex).toBe(1)

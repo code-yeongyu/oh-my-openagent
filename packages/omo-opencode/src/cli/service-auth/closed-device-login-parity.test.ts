@@ -10,7 +10,8 @@ const STOP = new Error("stop before the login action runs")
 function rootProgramRunsDeviceLogin(argv: readonly string[]): boolean {
   const program = serviceAuthProgram(false)
   // Subcommands copy these settings when they are created, so each one needs them too.
-  for (const command of [program, ...program.commands]) command.exitOverride().configureOutput({ writeOut: () => {}, writeErr: () => {} })
+  for (const command of [program, ...program.commands])
+    command.exitOverride().configureOutput({ writeOut: () => {}, writeErr: () => {} })
   let decided = false
   program.hook("preAction", (_root: Command, action: Command) => {
     decided = action.name() === "login" && isClosedDeviceLogin(action.opts(), action.args)

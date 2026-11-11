@@ -4,9 +4,7 @@ import type { Static, TObject } from "typebox"
 import { threadToolFailure } from "../errors"
 import type { ThreadDataError } from "./results"
 
-export type ThreadParamParse<S extends TObject> =
-  | { readonly kind: "ok"; readonly value: Static<S> }
-  | ThreadDataError
+export type ThreadParamParse<S extends TObject> = { readonly kind: "ok"; readonly value: Static<S> } | ThreadDataError
 
 // Validation seam: parse a thread tool payload against its schema and return the outcome as
 // data. Invalid input yields the invalid_arguments failure object here instead of throwing,
@@ -25,4 +23,3 @@ export function parseThreadParams<S extends TObject>(schema: S, input: unknown):
     ),
   }
 }
-

@@ -30,7 +30,9 @@ function isRecord(value: unknown): value is JsonRecord {
 export function messageText(content: unknown): string {
   if (typeof content === "string") return content
   if (!Array.isArray(content)) return ""
-  return content.flatMap((part) => (isRecord(part) && part.type === "text" && typeof part.text === "string" ? [part.text] : [])).join(" ")
+  return content
+    .flatMap((part) => (isRecord(part) && part.type === "text" && typeof part.text === "string" ? [part.text] : []))
+    .join(" ")
 }
 
 /** The display title of a thread: its name, else the first user message's opening; never its id. */
@@ -76,8 +78,14 @@ export function summarizeSessionEntries(entries: readonly JsonRecord[]): Session
   let newest = ""
   for (const entry of entries) {
     if (header === null && entry.type === "session" && typeof entry.id === "string") header = entry
-    if (entry.type === "session_info") name = typeof entry.name === "string" && entry.name.trim().length > 0 ? entry.name.trim() : null
-    if (firstUserText === null && entry.type === "message" && isRecord(entry.message) && entry.message.role === "user") {
+    if (entry.type === "session_info")
+      name = typeof entry.name === "string" && entry.name.trim().length > 0 ? entry.name.trim() : null
+    if (
+      firstUserText === null &&
+      entry.type === "message" &&
+      isRecord(entry.message) &&
+      entry.message.role === "user"
+    ) {
       const text = messageText(entry.message.content).trim()
       if (text.length > 0) firstUserText = text
     }
@@ -141,7 +149,14 @@ export function readSessionFacts(path: string, read: SessionRead = readSync): Se
     const whole = size <= SESSION_FACTS_WINDOW_BYTES
     const headEntries = parseSessionLines(head.toString("utf8"), false, !whole)
     const first = headEntries[0]
-    if (first === undefined || first.type !== "session" || typeof first.id !== "string" || typeof first.cwd !== "string" || typeof first.timestamp !== "string") return null
+    if (
+      first === undefined ||
+      first.type !== "session" ||
+      typeof first.id !== "string" ||
+      typeof first.cwd !== "string" ||
+      typeof first.timestamp !== "string"
+    )
+      return null
     let tailEntries: JsonRecord[] = []
     if (!whole) {
       const tailStart = Math.max(headLength, size - SESSION_FACTS_WINDOW_BYTES)
@@ -154,9 +169,8 @@ export function readSessionFacts(path: string, read: SessionRead = readSync): Se
     const summary = summarizeSessionEntries([...headEntries, ...tailEntries])
     const finalLine = finalCompleteLine(fd, size, read)
     const after = fstatSync(fd)
-    const updatedAt = after.size === before.size && after.mtimeMs === before.mtimeMs
-      ? finalEntryTimestamp(finalLine)
-      : null
+    const updatedAt =
+      after.size === before.size && after.mtimeMs === before.mtimeMs ? finalEntryTimestamp(finalLine) : null
     return {
       durable_id: first.id,
       cwd: first.cwd,

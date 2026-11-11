@@ -35,7 +35,10 @@ describe("runMemoryModelAttempts", () => {
     // when
     const error = await runMemoryModelAttempts(loaded, async (candidate) =>
       child({ stderr: `Error: Model "${candidate.model}" not found. Use --list-models to see available models.` }),
-    ).then(() => undefined, (reason: unknown) => reason)
+    ).then(
+      () => undefined,
+      (reason: unknown) => reason,
+    )
 
     // then
     expect(error).toBeInstanceOf(MemoryModelExhaustedError)
@@ -52,7 +55,10 @@ describe("runMemoryModelAttempts", () => {
     // when
     const error = await runMemoryModelAttempts(mixed, async (candidate) =>
       child({ stderr: `Error: Model "${candidate.model}" not found. Use --list-models to see available models.` }),
-    ).then(() => undefined, (reason: unknown) => reason)
+    ).then(
+      () => undefined,
+      (reason: unknown) => reason,
+    )
 
     // then
     expect(error).toBeInstanceOf(MemoryModelExhaustedError)
@@ -67,7 +73,9 @@ describe("runMemoryModelAttempts", () => {
     const result = await runMemoryModelAttempts(candidates, async (candidate) => {
       attempted.push(candidate.model)
       return candidate.model === "extension-only/primary"
-        ? child({ stderr: 'Error: Model "extension-only/primary" not found. Use --list-models to see available models.' })
+        ? child({
+            stderr: 'Error: Model "extension-only/primary" not found. Use --list-models to see available models.',
+          })
         : child({ code: 0 })
     })
 
@@ -143,39 +151,38 @@ describe("runMemoryModelAttempts", () => {
   })
 
   test("#given every candidate overflows #when the chain is exhausted #then context_overflow is carried by a typed signal and message", async () => {
-    const allOverflow: MemoryModelChain = [
-      { model: "openai/primary" },
-      { model: "anthropic/fallback" },
-    ]
-    const attempt = runMemoryModelAttempts(allOverflow, async () => child({
-      stderr: "prompt is too long: 213462 tokens > 200000 maximum",
-    }))
+    const allOverflow: MemoryModelChain = [{ model: "openai/primary" }, { model: "anthropic/fallback" }]
+    const attempt = runMemoryModelAttempts(allOverflow, async () =>
+      child({
+        stderr: "prompt is too long: 213462 tokens > 200000 maximum",
+      }),
+    )
     await expect(attempt).rejects.toMatchObject({
       message: expect.stringContaining("context_overflow:"),
-      attempts: [
-        { miss: { kind: "context_overflow" } },
-        { miss: { kind: "context_overflow" } },
-      ],
+      attempts: [{ miss: { kind: "context_overflow" } }, { miss: { kind: "context_overflow" } }],
     })
   })
 
   test("#given every candidate has a retryable model or auth miss #when the chain is exhausted #then every candidate and cause are carried by a typed signal", async () => {
     // given
-    const allMissing: MemoryModelChain = [
-      { model: "extension-only/primary" },
-      { model: "anthropic/fallback" },
-    ]
+    const allMissing: MemoryModelChain = [{ model: "extension-only/primary" }, { model: "anthropic/fallback" }]
 
     // when
-    const attempt = runMemoryModelAttempts(allMissing, async (candidate) => candidate.model.startsWith("extension-only/")
-      ? child({ stderr: 'Error: Model "extension-only/primary" not found. Use --list-models to see available models.' })
-      : child({ stderr: "No API key found for anthropic" }))
+    const attempt = runMemoryModelAttempts(allMissing, async (candidate) =>
+      candidate.model.startsWith("extension-only/")
+        ? child({
+            stderr: 'Error: Model "extension-only/primary" not found. Use --list-models to see available models.',
+          })
+        : child({ stderr: "No API key found for anthropic" }),
+    )
 
     // then
-    await expect(attempt).rejects.toEqual(new MemoryModelExhaustedError([
-      { candidate: allMissing[0], miss: { kind: "model_not_visible", id: "extension-only/primary" } },
-      { candidate: allMissing[1], miss: { kind: "auth_missing", provider: "anthropic" } },
-    ]))
+    await expect(attempt).rejects.toEqual(
+      new MemoryModelExhaustedError([
+        { candidate: allMissing[0], miss: { kind: "model_not_visible", id: "extension-only/primary" } },
+        { candidate: allMissing[1], miss: { kind: "auth_missing", provider: "anthropic" } },
+      ]),
+    )
   })
 
   test("#given a generic child failure #when a fallback exists #then it does not retry", async () => {

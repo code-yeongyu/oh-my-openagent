@@ -25,8 +25,14 @@ test.each(["nonce length", "non-NFC RP", "invalid credential", "empty credential
       () => null,
       (error: unknown) => error,
     )
-    expect({ failure, sealCalls: seal.mock.calls.length, countersignCalls: countersign.mock.calls.length }).toMatchObject({
-      failure: { reason: "bad_bootstrap" }, sealCalls: 0, countersignCalls: 0,
+    expect({
+      failure,
+      sealCalls: seal.mock.calls.length,
+      countersignCalls: countersign.mock.calls.length,
+    }).toMatchObject({
+      failure: { reason: "bad_bootstrap" },
+      sealCalls: 0,
+      countersignCalls: 0,
     })
   },
 )

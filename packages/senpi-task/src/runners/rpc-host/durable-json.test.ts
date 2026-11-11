@@ -45,7 +45,8 @@ describe("writeTextDurably", () => {
 
     // then
     expect(fs.readFileSync(path, "utf8")).toBe("{}\n")
-    const expected = process.platform === "win32" ? ["fsync-file", "rename"] : ["fsync-file", "rename", "fsync-directory"]
+    const expected =
+      process.platform === "win32" ? ["fsync-file", "rename"] : ["fsync-file", "rename", "fsync-directory"]
     expect(events).toEqual(expected)
   })
 })

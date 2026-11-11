@@ -31,7 +31,7 @@ pub use faults::Faults;
 pub use method::{AxWrite, FakeMethod};
 pub use remote_impl::FakeRemoteScreen;
 pub use scenario::{
-    fake_capabilities, DelayMs, FakeAxNode, FakeBounds, FakeMenuNode, FakeScenario, ResizeWindow,
+    fake_capabilities, DelayMs, FakeAxNode, FakeBounds, FakeMenuNode, FakeOpening, FakeScenario, ResizeWindow,
     ScenarioError, ScriptedFailure,
 };
 pub use scripting::{

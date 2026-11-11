@@ -153,7 +153,7 @@ describe("runBunInstallWithDetails", () => {
               stdout: "resolved 10 packages",
               stderr: "network error",
             },
-          })
+          }),
         )
 
         // when
@@ -190,7 +190,7 @@ describe("runBunInstallWithDetails", () => {
             },
             {
               __promisify__: originalSetTimeout.__promisify__,
-            }
+            },
           ),
         })
         Object.defineProperty(globalThis, "clearTimeout", {
@@ -205,7 +205,7 @@ describe("runBunInstallWithDetails", () => {
             kill: () => {
               killCallCount += 1
             },
-          })
+          }),
         )
         const timeoutAwareModule = await import(`./bun-install?timeout-test=${Date.now()}-${Math.random()}`)
 
