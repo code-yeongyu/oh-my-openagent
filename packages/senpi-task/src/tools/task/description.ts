@@ -1,48 +1,58 @@
-import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
+import type { OmoConfig } from "@oh-my-opencode/omo-config-core";
 
-import { PLAN_GATED_AGENT_NAMES, type AgentDefinition } from "../../agents"
-import { CATEGORY_CALLER_GUIDANCE } from "../../category"
-import { listTaskAgents, listTaskCategories } from "./categories"
-import type { TaskCategoryInfo } from "./types"
+import { PLAN_GATED_AGENT_NAMES, type AgentDefinition } from "../../agents";
+import { CATEGORY_CALLER_GUIDANCE } from "../../category";
+import { listTaskAgents, listTaskCategories } from "./categories";
+import type { TaskCategoryInfo } from "./types";
 
-export const TASK_PROMPT_SNIPPET = "Spawn one child or fan out a batch; use task_send to continue an existing child."
+export const TASK_PROMPT_SNIPPET =
+  "Spawn one child or fan out a batch; use task_send to continue an existing child.";
 
 export const TASK_PROMPT_GUIDELINES: readonly string[] = [
   "Spawn children with run_in_background=true.",
   "NEVER pass model together with category: category-routed tasks take their model from omo.json (categories.<name>.models).",
-  "Continue an existing child with task_send(to=\"st_...\", message=\"...\"); task always spawns.",
+  'Continue an existing child with task_send(to="st_...", message="..."); task always spawns.',
   "Use task_output for one midpoint status or transcript peek; use task_cancel to end a child.",
   "Pass task_summary (one line, <=80 chars) on every spawn: the user's footer/widget UI shows it instead of the raw prompt, so it should say WHAT was delegated.",
-]
+];
 
 type DescriptionInput = {
-  readonly omoConfig: OmoConfig
-  readonly agents: Readonly<Record<string, AgentDefinition>>
-}
+  readonly omoConfig: OmoConfig;
+  readonly agents: Readonly<Record<string, AgentDefinition>>;
+};
 
 function renderCategoryList(entries: readonly TaskCategoryInfo[]): string {
-  if (entries.length === 0) return "  (none configured)"
-  return entries.map((entry) => {
-    const categoryLine = entry.description ? `  - ${entry.name}: ${entry.description}` : `  - ${entry.name}`
-    const callerGuidance = CATEGORY_CALLER_GUIDANCE[entry.name]?.replaceAll("\n", "\n    ")
-    return callerGuidance ? `${categoryLine}\n    ${callerGuidance}` : categoryLine
-  }).join("\n")
+  if (entries.length === 0) return "  (none configured)";
+  return entries
+    .map((entry) => {
+      const categoryLine = entry.description
+        ? `  - ${entry.name}: ${entry.description}`
+        : `  - ${entry.name}`;
+      const callerGuidance = CATEGORY_CALLER_GUIDANCE[entry.name]?.replaceAll("\n", "\n    ");
+      return callerGuidance ? `${categoryLine}\n    ${callerGuidance}` : categoryLine;
+    })
+    .join("\n");
 }
 
 export function buildTaskToolDescription(input: DescriptionInput): string {
-  const categories = listTaskCategories(input.omoConfig)
-  const agents = listTaskAgents(input.agents)
-  const plainAgents = agents.filter((agent) => !PLAN_GATED_AGENT_NAMES.has(agent.name))
-  const gatedAgents = agents.filter((agent) => PLAN_GATED_AGENT_NAMES.has(agent.name))
-  const agentNames = plainAgents.map((agent) => agent.name).join(", ") || "none loaded"
+  const categories = listTaskCategories(input.omoConfig);
+  const agents = listTaskAgents(input.agents);
+  const plainAgents = agents.filter((agent) => !PLAN_GATED_AGENT_NAMES.has(agent.name));
+  const gatedAgents = agents.filter((agent) => PLAN_GATED_AGENT_NAMES.has(agent.name));
+  const agentNames = plainAgents.map((agent) => agent.name).join(", ") || "none loaded";
   const gatedLine =
     gatedAgents.length === 0
       ? ""
-      : `\n  Plan-gated agents (spawnable only after the user explicitly requests the ulw-plan workflow, a .omo/plans/*.md plan artifact was touched in this session, and ulw-execute was never invoked): ${gatedAgents.map((agent) => agent.name).join(", ")}`
+      : `\n  Plan-gated agents (spawnable only after the user explicitly requests the ulw-plan workflow, a .omo/plans/*.md plan artifact was touched in this session, and ulw-execute was never invoked): ${gatedAgents.map((agent) => agent.name).join(", ")}`;
   const planReviewerNotice =
     gatedAgents.length === 0
       ? ""
-      : "\n  plan-reviewer is one-shot: spawn it, read task_output, optionally task_cancel; task_send is always refused. The harness replaces the plan-reviewer spawn prompt with the canonical plan-review contract (one .omo/plans/*.md path only) - any other prompt content is discarded, so pass the plan path and nothing else."
+      : "\n  plan-reviewer is one-shot: spawn it, read task_output, optionally task_cancel; task_send is always refused. The harness replaces the plan-reviewer spawn prompt with the canonical plan-review contract (one .omo/plans/*.md path only) - any other prompt content is discarded, so pass the plan path and nothing else.";
+  const maxDepth = input.omoConfig.task?.max_depth ?? 1;
+  const depthLine =
+    maxDepth <= 1
+      ? "Nesting limit: max_depth is 1, so a child cannot spawn children of its own; delegate from this session instead."
+      : `Nesting limit: max_depth is ${maxDepth}; a spawn that would run deeper than that is refused (Subagent nesting limit reached).`;
   return `Spawn one child task or fan out a batch.
 
 Choose exactly one input form:
@@ -63,5 +73,6 @@ name is an optional stable handle. model is an explicit override for subagent_ty
 isolated runs a child in a checkout clone; it defaults to task.isolation.enabled. apply controls merge-back; false retains artifacts only. merge selects patch or branch. Batch items inherit these three options unless overridden. apply and merge require isolation to be enabled.
 NEVER combine model with category: a category-routed task always takes its model from omo.json (categories.<name>.models), so passing both fails with invalid_arguments.
 task_send continues an existing child; task always spawns.
-Prompts MUST be in English.`
+${depthLine}
+Prompts MUST be in English.`;
 }
