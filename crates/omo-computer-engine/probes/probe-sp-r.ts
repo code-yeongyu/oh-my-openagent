@@ -14,7 +14,8 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 const HEADER = ["id", "pipe", "question", "measured", "verdict", "rerun", "host_build", "note"]
-const LAN_REASON = "awaiting a named same-network pair"
+const LAN_REASON =
+  "the same-network direct path is off in shipped builds by the relay daemon owner ruling of 2026-11-11 (see L-STATE-A/B): every envelope rides the relay; measuring it would mean switching on a dormant path on the pair, outside a read-only run"
 type Verdict = "CONFIRMS" | "CONTRADICTS" | "NEW-EDGE" | "UNMEASURED"
 type Row = Readonly<{
   id: string
@@ -448,6 +449,60 @@ const mRefresh = () =>
     }
   })
 
+// ---- a same-network pair (two hosts on one network), reached through SP_R_PAIR_A / SP_R_PAIR_B ----------------------
+// Each is a command prefix that runs one shell command string on that host. probe-sp-r-pair.sh is sent along with it.
+const pairExec = (side: "A" | "B"): string => process.env[`SP_R_PAIR_${side}`] ?? ""
+const pairHelper = Buffer.from(readFileSync(join(import.meta.dir, "probe-sp-r-pair.sh"))).toString("base64")
+type PairOut = Readonly<{ ok: true; fields: Record<string, string> }> | Readonly<{ ok: false; why: string }>
+const onPair = async (side: "A" | "B", args: string, timeoutS: number): Promise<PairOut> => {
+  const proc = Bun.spawn(["sh", "-c", `${pairExec(side)} sh -c "echo ${pairHelper} | base64 -d | sh -s -- ${args}"`], {
+    stdout: "pipe",
+    stderr: "ignore",
+  })
+  const timer = setTimeout(() => proc.kill(), timeoutS * 1000)
+  const out = await new Response(proc.stdout).text()
+  const code = await proc.exited
+  clearTimeout(timer)
+  if (code === 75 || out.startsWith("busy"))
+    return { ok: false, why: `host ${side} load at or above its core count, stopped` }
+  if (code === 2)
+    return { ok: false, why: `precondition missing on host ${side}: ${out.trim().split("\n").pop() ?? ""}` }
+  if (code !== 0) return { ok: false, why: `host ${side} unreachable or dropped mid-run (exit ${code})` }
+  const fields: Record<string, string> = {}
+  for (const m of out.matchAll(/([a-z_]+)=([^\s]*)/g)) if (m[1] !== undefined) fields[m[1]] = m[2] ?? ""
+  return { ok: true, fields }
+}
+const hostedSocket = (): string => {
+  const base = process.env["SP_R_HOSTED_RELAY"] ?? ""
+  return `${base}${socketTpl.replace("${this.account}", "sp-r-probe").replace("${this.device}", "silent")}`
+}
+const mPairState = (side: "A" | "B") => once(`state-${side}`, () => onPair(side, "state", 60))
+const mPairSilent = (side: "A" | "B") => once(`silent-${side}`, () => onPair(side, `silent ${hostedSocket()}`, 120))
+/** The same silent unadmitted socket against the local relay, for the hosted comparison. */
+const mLocalSilent = () =>
+  once("silent-local", async () => {
+    const base = (await relayPrivate()).base
+    const t0 = Date.now()
+    const ws = new WebSocket(socketUrl(base, uid("sp-r-silent"), "silent"))
+    const opened = await new Promise<number>((ok) => {
+      ws.onopen = () => ok(Date.now() - t0)
+    })
+    const end = await within(90_000, closedAt(ws))
+    if (end === "timeout") ws.close()
+    return end === "timeout"
+      ? { afterOpenMs: -1, code: "open_at_90s" }
+      : { afterOpenMs: end.at - t0 - opened, code: String(end.code) }
+  })
+// The relay's own hello deadline, read from the checkout (the silent unadmitted socket is closed by it).
+const helloDeadlineMs = Number(
+  (
+    /HELLO_DEADLINE_MS = ([\d_]+)/.exec(readFileSync(join(checkout, "packages/core/src/hello.ts"), "utf8"))?.[1] ??
+    "NaN"
+  ).replaceAll("_", ""),
+)
+const silentOk = (ms: number, code: string, ref: { code: string }): boolean =>
+  ms >= helloDeadlineMs - 500 && ms <= helloDeadlineMs + 2_000 && code === ref.code
+
 // ---- the rows ------------------------------------------------------------------------------------------------------
 type Spec = Readonly<{
   id: string
@@ -546,7 +601,7 @@ const relay: Spec[] = [
       Promise.resolve({
         measured: "-",
         verdict: "UNMEASURED",
-        note: "issued lifetime is set by the account service: no test account on it in this run (local issuer only); the cap needs a real-time run past one hour, and the relay's clock seam also moves its liveness deadline, so it cannot isolate the cap",
+        note: "needs a test account on the account service",
       }),
   },
   {
@@ -744,7 +799,7 @@ const relay: Spec[] = [
       return {
         measured: m.openAt150 ? "open at 150 s" : `closed after ${m.closedAfterS} s`,
         verdict: short ? "CONTRADICTS" : "CONFIRMS",
-        note: `${relayNote}; a silent relay channel ends before 120 s: the close deadline drops to the measured value unless the hand keeps the transport keepalive`,
+        note: `${relayNote}; design question for the lead, see the row's finding R-LIVE-120-2 in the task evidence; R4's 120 s deadline is unchanged until the lead rules`,
       }
     },
   },
@@ -760,6 +815,52 @@ const lanQuestions: readonly (readonly [string, string])[] = [
   ["L-KEY-1", "what binds the per-device pairing key"],
   ["L-ENROLL-1", "re-enrollment yields a new hand id"],
   ["L-MITM-1", "pairing handshake posture against a machine in the middle"],
+]
+const pairNote = "a same-network pair of machines, read-only"
+const stateSpec = (side: "A" | "B"): Spec => ({
+  id: `L-STATE-${side}`,
+  pipe: "lan",
+  question: `same-network direct path on a shipped build, pair host ${side}: does the device service listen off loopback or open discovery sockets`,
+  run: async () => {
+    const m = await mPairState(side)
+    if (!m.ok) return { measured: "-", verdict: "UNMEASURED", note: m.why }
+    const f = m.fields
+    const off = f["listeners_off_loopback"] === "0" && f["udp_discovery_sockets"] === "0"
+    return {
+      measured: `device service ${f["device_service"] ?? "?"} ${f["version"] ?? ""}; listeners ${f["listeners_total"] ?? "?"} (off loopback ${f["listeners_off_loopback"] ?? "?"}); discovery sockets ${f["udp_discovery_sockets"] ?? "?"}; load ${f["load"] ?? "?"}/${f["cores"] ?? "?"}`,
+      verdict: f["device_service"] === "running" && off ? "CONTRADICTS" : "NEW-EDGE",
+      note: `${pairNote}; CONTRADICTS = the free same-network pipe the design assumes is absent on the shipped build (owner ruling 2026-11-11)`,
+    }
+  },
+})
+const silentSpec = (side: "A" | "B"): Spec => ({
+  id: `R-HOSTED-1-${side}`,
+  pipe: "relay",
+  question: `hosted relay, from pair host ${side}: a silent unadmitted socket closes at the relay's hello deadline (within +2 s), with the local relay's close code`,
+  run: async () => {
+    const [m, ref] = await Promise.all([mPairSilent(side), mLocalSilent()])
+    if (!m.ok) return { measured: "-", verdict: "UNMEASURED", note: m.why }
+    const ms = Number(m.fields["closed_after_open_ms"] ?? "-1")
+    const code = m.fields["code"] ?? "?"
+    return {
+      measured: `hosted closed ${ms} ms after open, code ${code}; hello deadline ${helloDeadlineMs} ms; local relay (this run, loaded build host) closed ${ref.afterOpenMs} ms after open, code ${ref.code}`,
+      verdict: silentOk(ms, code, ref) ? "CONFIRMS" : "CONTRADICTS",
+      note: `${pairNote}; one unauthenticated socket, no account, no frame sent; the deadline is the hello deadline, not the admitted channel's dead window`,
+    }
+  },
+})
+const pairSpecs: Spec[] = [
+  stateSpec("A"),
+  stateSpec("B"),
+  silentSpec("A"),
+  silentSpec("B"),
+  {
+    id: "R-HOSTED-2",
+    pipe: "relay",
+    question: "hosted relay: when a silent ADMITTED channel closes (the hosted counterpart of R-LIVE-120-2)",
+    run: () =>
+      Promise.resolve({ measured: "-", verdict: "UNMEASURED", note: "needs a test account on the account service" }),
+  },
 ]
 const lan: Spec[] = lanQuestions.map(([id, question]) => ({
   id,
@@ -793,11 +894,19 @@ const relayBuild = (): string => {
   const kernel = Bun.spawnSync(["uname", "-r"]).stdout.toString().trim()
   return `linux-${process.arch} ${kernel}; bun ${Bun.version}; wrangler ${wrangler}; relay ${sha}`
 }
-const lanBuild = "none (no same-network pair measured)"
+const pairBuild = (build: string): string =>
+  `${build}; pair: two macOS hosts on one network, read through SP_R_PAIR_A/B`
 const rerunFor = (id: string): string =>
-  `CI=true SP_R_RELAY_CHECKOUT=<relay checkout> bun crates/omo-computer-engine/probes/probe-sp-r.ts --verify crates/omo-computer-engine/probes/relay-limits.tsv --only ${id}`
+  `CI=true SP_R_RELAY_CHECKOUT=<relay checkout> SP_R_PAIR_A=<exec on pair host A> SP_R_PAIR_B=<exec on pair host B> SP_R_HOSTED_RELAY=<wss://hosted relay> bun crates/omo-computer-engine/probes/probe-sp-r.ts --verify crates/omo-computer-engine/probes/relay-limits.tsv --only ${id}`
 
-const specs = [...relay, ...lan].filter((s) => only === null || only.has(s.id))
+const specs = [...relay, ...pairSpecs, ...lan].filter((s) => only === null || only.has(s.id))
+const needsPair = specs.some((s) => s.id.startsWith("L-STATE") || s.id.startsWith("R-HOSTED-1"))
+if (needsPair && (pairExec("A") === "" || pairExec("B") === ""))
+  die(
+    "precondition missing: no same-network pair configured (SP_R_PAIR_A and SP_R_PAIR_B must each run a command on one host of the pair)",
+  )
+if (specs.some((s) => s.id.startsWith("R-HOSTED-1")) && !/^wss:\/\/[^/]+$/.test(process.env["SP_R_HOSTED_RELAY"] ?? ""))
+  die("precondition missing: no hosted relay configured (SP_R_HOSTED_RELAY must be wss://<host>)")
 let status = 0
 try {
   const results = await Promise.all(
@@ -819,13 +928,26 @@ try {
   const build = relayBuild()
   for (const r of results) console.log(`${r.id}\t${r.verdict}\t${r.measured}`)
   if (mode === "--write") {
-    const lines = [HEADER.join("\t")]
-    for (const r of results)
-      lines.push(
-        [r.id, r.pipe, r.question, r.measured, r.verdict, rerunFor(r.id), r.pipe === "lan" ? lanBuild : build, r.note]
-          .map(tsv)
-          .join("\t"),
-      )
+    const line = (r: Row): string =>
+      [
+        r.id,
+        r.pipe,
+        r.question,
+        r.measured,
+        r.verdict,
+        rerunFor(r.id),
+        r.id.startsWith("L-") || r.id.startsWith("R-HOSTED") ? pairBuild(build) : build,
+        r.note,
+      ]
+        .map(tsv)
+        .join("\t")
+    // With --only, the other rows of an existing ledger are kept as they are; rows follow the probe's own order.
+    const kept = new Map<string, string>()
+    if (only !== null && existsSync(ledgerPath))
+      for (const l of readFileSync(ledgerPath, "utf8").trim().split("\n").slice(1)) kept.set(l.split("\t")[0] ?? "", l)
+    for (const r of results) kept.set(r.id, line(r))
+    const order = [...relay, ...pairSpecs, ...lan].map((s) => s.id)
+    const lines = [HEADER.join("\t"), ...order.flatMap((id) => kept.get(id) ?? [])]
     writeFileSync(ledgerPath, `${lines.join("\n")}\n`)
     console.log(`wrote ${results.length} rows`)
   } else {

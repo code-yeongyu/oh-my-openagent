@@ -40,6 +40,10 @@ Run it on a Linux host, inside a container or with `CI=true`; this is the harnes
 
 These rows measure a local relay, and the hibernation onset is the local runtime's. The hosted runtime's numbers are not part of this ledger.
 
-### Same-network pipe
+### Same-network pair and the hosted relay
 
-The L-* rows stay `UNMEASURED` until a same-network pair of machines is measured.
+`probe-sp-r-pair.sh` is a helper that the probe sends to each host of a same-network pair. `SP_R_PAIR_A` and `SP_R_PAIR_B` are each a command prefix that runs one shell command on one host. The helper is read-only: it reports the host's load, the device service's version, and whether that service listens off loopback or holds discovery sockets. It can also open one unauthenticated socket to the hosted relay named by `SP_R_HOSTED_RELAY` (`wss://<host>`). It sends nothing on that socket and records when and how the relay closes it. The helper refuses to run when the host's 1-minute load is at or above its core count. It removes its temp file on every exit path, and nothing stays resident.
+
+- `L-STATE-A` and `L-STATE-B` record that the shipped device service has no same-network direct path.
+- `R-HOSTED-1-A` and `R-HOSTED-1-B` compare the hosted relay's deadline with the local one.
+- `R-HOSTED-2` (a silent admitted channel on the hosted relay) and the other L-* rows stay `UNMEASURED`, each with its reason.
