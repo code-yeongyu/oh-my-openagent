@@ -42,9 +42,33 @@ impl Watches {
     }
 }
 
+/// One edit to every `windows()` reply once a pointer call has run: a
+/// window that closes or resizes after input was sent. Clones share the slot.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct AfterPointer(Arc<Mutex<(Option<WindowsEdit>, bool)>>);
+
+type WindowsEdit = fn(&mut Vec<DesktopWindow>);
+
+impl AfterPointer {
+    pub(crate) fn edit_windows(&self, edit: WindowsEdit) {
+        *self.0.lock() = (Some(edit), false);
+    }
+
+    fn pointed(&self) {
+        self.0.lock().1 = true;
+    }
+
+    fn apply(&self, windows: &mut Vec<DesktopWindow>) {
+        if let (Some(edit), true) = *self.0.lock() {
+            edit(windows);
+        }
+    }
+}
+
 pub(crate) struct PanickyFake {
     pub(crate) inner: FakeBackend,
     pub(crate) panics: Panics,
+    pub(crate) after_pointer: AfterPointer,
     pub(crate) awake: super::AwakeHolds,
     pub(crate) screen: super::FakeScreen,
     pub(crate) watches: Watches,
@@ -70,7 +94,9 @@ impl Backend for PanickyFake {
         self.inner.displays()
     }
     fn windows(&mut self) -> CoreResult<Vec<DesktopWindow>> {
-        self.inner.windows()
+        let mut windows = self.inner.windows()?;
+        self.after_pointer.apply(&mut windows);
+        Ok(windows)
     }
     fn capture(&mut self, target: &Target, caps: &CaptureCaps, exclude_window_titles: &[String]) -> CoreResult<(RgbaImage, FrameGeometry)> {
         self.inner.capture(target, caps, exclude_window_titles)
@@ -82,7 +108,9 @@ impl Backend for PanickyFake {
         frame: &FrameGeometry,
         mode: DeliveryMode,
     ) -> CoreResult<()> {
-        self.inner.pointer(target, ev, frame, mode)
+        self.inner.pointer(target, ev, frame, mode)?;
+        self.after_pointer.pointed();
+        Ok(())
     }
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
         self.inner.type_text(target, text, mode)

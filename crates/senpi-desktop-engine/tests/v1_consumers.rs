@@ -586,7 +586,10 @@ fn two_null_mode_engines_serialize_their_clicks_and_both_succeed() {
             .collect();
         clicks.into_iter().map(|click| click.join().expect("click thread")).collect()
     });
-    // Then: both succeed with v1's null result, one full click after the other
+    // Then: both succeed with v1's null result, and the replies land at least
+    // half a click apart. This bounds, but does not prove, non-overlap across
+    // processes; the sink ordering inside the lock is pinned in-process by
+    // `senpi-desktop-session` `mutate::lock_tests`.
     for (reply, _) in &replied {
         assert_eq!(reply["result"], Value::Null, "{reply}");
         assert!(reply.get("error").is_none(), "{reply}");

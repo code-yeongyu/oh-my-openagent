@@ -244,6 +244,23 @@ describe("computer tool execute", HANG_GUARD, () => {
 		expect(open?.params).toMatchObject({ macosCanary });
 	});
 
+	// Contract: omo's resolved default `computer.intervention` (DESIGN 7, Q decision 1) reaches an engine that
+	// advertises `intervention-policy`; fails if the default reverts to pause or the open stops carrying it.
+	it.each([
+		["advertising intervention-policy", { FAKE_ENGINE_FEATURES: '["intervention-policy"]' }, "continue"],
+		["without the feature", {}, undefined],
+	] as const)("opens an engine %s with the resolved intervention default", async (_engine, env, intervention) => {
+		// Given
+		const { handle, log } = desktopFixture({}, env);
+
+		// When
+		await toolFor(handle).execute("call-1", { action: "capabilities" }, undefined, undefined, hostContext());
+
+		// Then
+		const open = log.requests.find((request) => request.method === "session.open");
+		expect((open?.params as { intervention?: string } | undefined)?.intervention).toBe(intervention);
+	});
+
 	it("arms the configured stop chord once across repeated calls", async () => {
 		// Given
 		const { handle, log } = desktopFixture({ stopHotkey: "ctrl+alt+shift+f12" });
