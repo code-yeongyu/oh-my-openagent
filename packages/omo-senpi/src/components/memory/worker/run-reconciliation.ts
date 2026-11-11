@@ -21,7 +21,7 @@ import {
   type ReservationRunResult,
   type ReservationStatePort,
 } from "./run-finalization"
-import { backfillRunReceipt } from "./run-receipt-backfill"
+import { backfillRunReceipt, runReceiptStamp } from "./run-receipt-backfill"
 import { classifyRunProcess, signalRecordedProcessGroup, waitUntil as waitForTime } from "./run-liveness"
 import { quarantineRun, reconcilePrelaunch } from "./run-reconciliation-prelaunch"
 import { RunTerminalClaimUnrecoverableError } from "./run-terminal-claim"
@@ -65,7 +65,8 @@ export interface ReflectionRunReconciliationOptions {
  * Marks a terminal run directory whose receipt is backfilled and which holds no temporary, so later
  * passes skip it. A terminal run never changes again; re-reading every one of them on every pass made
  * a pass grow with every run the identity ever kept (#12355). The marker is honoured only while it is
- * at least as new as the run's ledger and terminal sentinels, so a rewritten generation is reconsidered.
+ * newer than the run's ledger and terminal sentinels. A rewrite that lands on the marker's own
+ * timestamp is caught by the receipt identity stored in the marker.
  */
 const RUN_RECONCILED_MARKER = "reconciled.json"
 const RUN_STATE_FILES = ["ledger.json", "final.json", "abandoned.json", "quarantined.json"] as const
@@ -120,9 +121,14 @@ export async function reconcileReflectionRuns(
           options.receipts,
           options.warn,
         )
-        if (backfilled && keptTemporaries === 0)
-          await writeRunJsonAtomic(join(runDir, RUN_RECONCILED_MARKER), { version: 1, runId: name })
-        else unsettledRuns += 1
+        if (backfilled && keptTemporaries === 0) {
+          const receipt = await runReceiptStamp(runDir)
+          await writeRunJsonAtomic(join(runDir, RUN_RECONCILED_MARKER), {
+            version: 1,
+            runId: name,
+            ...(receipt === undefined ? {} : { receipt }),
+          })
+        } else unsettledRuns += 1
         continue
       }
       unsettledRuns += 1
@@ -309,13 +315,24 @@ function deadProcesses(ledger: ReservationRunLedger): string {
 }
 
 async function isReconciledRun(runDir: string): Promise<boolean> {
-  const marked = await modifiedAt(join(runDir, RUN_RECONCILED_MARKER))
+  const markerPath = join(runDir, RUN_RECONCILED_MARKER)
+  const marked = await modifiedAt(markerPath)
   if (marked === undefined) return false
+  let tied = false
   for (const file of RUN_STATE_FILES) {
     const changed = await modifiedAt(join(runDir, file))
-    if (changed !== undefined && changed > marked) return false
+    if (changed === undefined) continue
+    if (changed > marked) return false
+    if (changed === marked) tied = true
   }
-  return true
+  if (!tied) return true
+  let recorded: { readonly receipt?: unknown }
+  try {
+    recorded = await readRunJson(markerPath)
+  } catch {
+    return false
+  }
+  return recorded.receipt === (await runReceiptStamp(runDir))
 }
 
 async function modifiedAt(path: string): Promise<number | undefined> {

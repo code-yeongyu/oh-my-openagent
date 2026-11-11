@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test"
-import { cp, readFile, writeFile } from "node:fs/promises"
+import { cp, readFile, stat, utimes, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import type { MemoryReceiptInput } from "@oh-my-opencode/memory-core"
@@ -76,6 +76,29 @@ test("#given a reconciled run whose ledger is rewritten by a new generation #whe
   const ledgerPath = join(runs.runsDir, rewritten, "ledger.json")
   const ledger: unknown = JSON.parse(await readFile(ledgerPath, "utf8"))
   await writeRunJsonAtomic(ledgerPath, { ...(ledger as object), startedAt: "2026-08-11T00:00:00.000Z" })
+
+  // when
+  await runs.pass()
+
+  // then
+  expect(runs.appended).toEqual([rewritten])
+})
+
+test("#given a reconciled run whose ledger is rewritten at the marker's own mtime #when the next pass runs #then that run is backfilled again", async () => {
+  // given
+  const runs = await finalizedRuns(1)
+  await runs.pass()
+  runs.appended.length = 0
+  const [rewritten] = runs.runIds
+  if (rewritten === undefined) throw new Error("fixture has no run")
+  const ledgerPath = join(runs.runsDir, rewritten, "ledger.json")
+  const ledger: unknown = JSON.parse(await readFile(ledgerPath, "utf8"))
+  await writeRunJsonAtomic(ledgerPath, { ...(ledger as object), startedAt: "2026-08-12T00:00:00.000Z" })
+  const markerPath = join(runs.runsDir, rewritten, "reconciled.json")
+  const markedAt = new Date(Math.floor((await stat(markerPath)).mtimeMs))
+  await utimes(ledgerPath, markedAt, markedAt)
+  await utimes(markerPath, markedAt, markedAt)
+  expect((await stat(ledgerPath)).mtimeMs).toBe((await stat(markerPath)).mtimeMs)
 
   // when
   await runs.pass()

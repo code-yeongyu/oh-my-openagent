@@ -50,6 +50,13 @@ export async function backfillRunReceipt(
   return receipt === undefined || (await emitMemoryReceipt(runtimeDir, receipt, port, warn))
 }
 
+/** Identity a later pass compares when a rewrite lands in the same timestamp as the reconciled marker. */
+export async function runReceiptStamp(runDir: string): Promise<string | undefined> {
+  const receipt = await terminalReceipt(runDir)
+  if (receipt === undefined || receipt.kind === "facts") return undefined
+  return `${receipt.event}\n${receipt.generation}`
+}
+
 async function terminalReceipt(runDir: string): Promise<MemoryReceiptInput | undefined> {
   const ledger = await readLedger(runDir)
   if (existsSync(join(runDir, "final.json"))) {
