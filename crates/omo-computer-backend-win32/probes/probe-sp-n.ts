@@ -383,9 +383,15 @@ const all = (ids: readonly string[], r: Result) => Object.fromEntries(ids.map((i
 
 // ------------------------------------------------------------------ legs grouped by what they set up
 
-type Group = { readonly ids: readonly string[]; run(ctx: Ctx): Promise<Record<string, Result>> }
+type Group = {
+  readonly ids: readonly string[]
+  // The most this group may run before its rows are written UNMEASURED "timeout after Ns".
+  readonly budgetS: number
+  run(ctx: Ctx): Promise<Record<string, Result>>
+}
 
 const hostFacts: Group = {
+  budgetS: 30,
   ids: ["n-host-admin", "n-host-second-monitor", "n-affinity-wgc-monitor-secondary"],
   async run(ctx) {
     const f = ctx.facts
@@ -411,6 +417,7 @@ const hostFacts: Group = {
 }
 
 const isSupported: Group = {
+  budgetS: 120,
   ids: ["n-wgc-issupported-session0", "n-wgc-issupported-interactive"],
   async run(ctx) {
     const here = await leg(ctx, "issupported")
@@ -437,6 +444,7 @@ const isSupported: Group = {
 }
 
 const timers: Group = {
+  budgetS: 60,
   ids: ["n-dwmflush-ms", "n-poll-sleep1-ms", "n-poll-hrtimer1-ms"],
   async run(ctx) {
     const d = obj((await leg(ctx, "dwmflush", { warm: WARM, n: RUNS })).stats)
@@ -458,6 +466,7 @@ const timers: Group = {
 }
 
 const barriers: Group = {
+  budgetS: 480,
   ids: FAMILIES.flatMap(([k]) => [
     `n-barrier-fg-proves-${k}`,
     `n-barrier-fg-ms-${k}`,
@@ -516,6 +525,7 @@ const barriers: Group = {
 }
 
 const chords: Group = {
+  budgetS: 120,
   ids: [
     "n-fg-chord-ctrl-a-notepad-control",
     "n-posted-chord-ctrl-a-notepad",
@@ -564,6 +574,7 @@ const chords: Group = {
 }
 
 const wheel: Group = {
+  budgetS: 120,
   ids: ["n-wheel-after-raise-dwmflush", "n-wheel-after-raise-5ms"],
   async run(ctx) {
     const t = ctx.targets.get("SPN-EDIT")
@@ -585,6 +596,7 @@ const wheel: Group = {
 }
 
 const affinity: Group = {
+  budgetS: 120,
   ids: [
     "n-affinity-control-wgc-monitor",
     "n-affinity-wgc-monitor",
@@ -628,6 +640,7 @@ const affinity: Group = {
 }
 
 const elevated: Group = {
+  budgetS: 120,
   ids: [
     "n-uipi-sendinput",
     "n-uipi-postmessage",
@@ -753,6 +766,7 @@ async function sessionLeg(ctx: Ctx, t: Target, state: "disconnected" | "locked")
 }
 
 const capture: Group = {
+  budgetS: 240,
   ids: (Object.keys(CAPTURE_STATES) as CaptureState[]).flatMap(captureIds),
   async run(ctx) {
     const t = ctx.targets.get("Notepad")
@@ -776,6 +790,18 @@ const capture: Group = {
 }
 
 const GROUPS: readonly Group[] = [hostFacts, isSupported, timers, barriers, chords, wheel, affinity, elevated, capture]
+
+// Budget of one --measure run: starting the target windows plus every group's own budget. The hosted job
+// times out at 40 minutes; the probe must end well inside it.
+export const SETUP_BUDGET_S = 300
+export const TOTAL_BUDGET_S = SETUP_BUDGET_S + GROUPS.reduce((s, g) => s + g.budgetS, 0)
+export const JOB_TIMEOUT_S = 40 * 60
+export const MAX_TOTAL_BUDGET_S = 30 * 60
+
+// Runs one group within its budget.
+export async function runGroup(g: Group, ctx: Ctx): Promise<Record<string, Result>> {
+  return g.run(ctx).catch((e: Error) => all(g.ids, UN(`leg failed: ${clean(e.message)}`)))
+}
 
 // ------------------------------------------------------------------ ledger io
 
@@ -831,7 +857,47 @@ async function setup(ctx: Ctx, ids: readonly string[]) {
   if (needs(/uipi|elevated/)) await startTarget(ctx, "edit", "SPN-ELEV", 360, 260)
 }
 
+// Linux-runnable checks of the probe's own bookkeeping (no Windows call): a leg past its budget becomes
+// exactly one UNMEASURED "timeout after Ns" row per id, and the total budget stays under the job timeout.
+async function selfTest(): Promise<never> {
+  const failures: string[] = []
+  const ctx: Ctx = { tmp: tmpdir(), shared: tmpdir(), facts: {}, targets: new Map(), spawned: [] }
+  const slow: Group = {
+    ids: ["t-slow-a", "t-slow-b"],
+    budgetS: 1,
+    async run() {
+      await Bun.sleep(3000)
+      return all(this.ids, { measured: "ran to the end", verdict: "CONFIRMS" })
+    },
+  }
+  const t0 = Date.now()
+  const got = await runGroup(slow, ctx)
+  const tookS = (Date.now() - t0) / 1000
+  for (const id of slow.ids) {
+    const r = got[id]
+    if (r?.verdict !== "UNMEASURED" || r.measured !== "UNMEASURED: timeout after 1s")
+      failures.push(`${id}: want UNMEASURED "UNMEASURED: timeout after 1s", got ${JSON.stringify(r)}`)
+  }
+  if (Object.keys(got).length !== slow.ids.length)
+    failures.push(`rows: want ${slow.ids.length}, got ${Object.keys(got).length}`)
+  if (tookS > 2) failures.push(`runGroup returned after ${tookS.toFixed(1)} s, budget 1 s`)
+  const sum = SETUP_BUDGET_S + GROUPS.reduce((s, g) => s + g.budgetS, 0)
+  if (TOTAL_BUDGET_S !== sum) failures.push(`TOTAL_BUDGET_S ${TOTAL_BUDGET_S} != setup + group budgets ${sum}`)
+  if (!(TOTAL_BUDGET_S <= MAX_TOTAL_BUDGET_S && MAX_TOTAL_BUDGET_S < JOB_TIMEOUT_S))
+    failures.push(
+      `TOTAL_BUDGET_S ${TOTAL_BUDGET_S} s must be <= ${MAX_TOTAL_BUDGET_S} s, under the ${JOB_TIMEOUT_S} s job timeout`,
+    )
+  for (const f of failures) console.log(`SELF-TEST FAIL ${f}`)
+  console.log(
+    failures.length
+      ? `SELF-TEST FAIL ${failures.length}`
+      : `SELF-TEST PASS total budget ${TOTAL_BUDGET_S} s of ${JOB_TIMEOUT_S} s`,
+  )
+  process.exit(failures.length ? 1 : 0)
+}
+
 async function main() {
+  if (process.argv[2] === "--self-test") await selfTest()
   const opt = args()
   if (process.platform !== "win32")
     fail(
@@ -877,8 +943,7 @@ async function main() {
       ctx,
       groups.flatMap((g) => g.ids),
     )
-    for (const g of groups)
-      Object.assign(results, await g.run(ctx).catch((e: Error) => all(g.ids, UN(`leg failed: ${clean(e.message)}`))))
+    for (const g of groups) Object.assign(results, await runGroup(g, ctx))
   } finally {
     const notepad = ctx.targets.get("Notepad")
     if (notepad) await leg(ctx, "close", { top: notepad.top }).catch(() => undefined)
