@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { childSpec, hostRunnerHarness } from "./rpc-host.test-support"
+import { childSpec, fakeFallbackRunner, hostRunnerHarness } from "./rpc-host.test-support"
 import type { FakeHostCommand } from "./rpc-host/__fixtures__/fake-host"
 import { FAKE_HOST_CAPABILITIES } from "./rpc-host/__fixtures__/fake-host-probe"
+import { RunnerError } from "../runners/in-process"
+import type { RpcRunnerSpec } from "./types"
 
 const harness = hostRunnerHarness()
 const { fakeHost, runnerOver } = harness
@@ -67,6 +69,13 @@ describe("a daemon-hosted child's own fallback chain (#9512)", () => {
     // then
     await expect(started).rejects.toThrow("task daemon unavailable (capability): missing retry_fallback_profile")
     await expect(started).rejects.toThrow("designated models (anthropic/claude-sonnet-4-5 -> openai/gpt-5.6-sol)")
+    await expect(started).rejects.toMatchObject({
+      failure: {
+        kind: "host_unavailable",
+        reason: "capability",
+        cause: { designatedChain: "anthropic/claude-sonnet-4-5 -> openai/gpt-5.6-sol" },
+      },
+    })
     const types = host.commands.map((command) => command.type)
     expect(types).not.toContain("open_session")
     expect(types).not.toContain("prompt")
@@ -93,5 +102,60 @@ describe("a daemon-hosted child's own fallback chain (#9512)", () => {
     }
     expect(opens.map((payload) => payload["retryFallback"])).toEqual([profile, profile])
     await resumed.terminate()
+  })
+})
+
+describe("a host refusal hands the child to the process runner (#12778 item 1)", () => {
+  // The composed path: the host refuses the child for the missing retry_fallback capability,
+  // the per-child process runner takes it, and it runs (or fails) under its designated chain.
+  // The process runner's own chain enforcement stays owned by rpc-process-fallback-chain.test.ts;
+  // these tests pin the handoff.
+  test("#given an older host without retry_fallback_profile #when a child with a designated chain starts #then it starts on the per-child runner and the host never opens or prompts it", async () => {
+    // given
+    const host = await fakeHost({ capabilities: BEFORE_PROFILE })
+    const fallback = fakeFallbackRunner()
+    const runner = runnerOver(host, { fallback })
+
+    // when
+    const handle = await runner.start(childSpec({ task_id: "st_31", fallbackModels: ["openai/gpt-5.6-sol"] }))
+
+    // then
+    expect(handle.sessionId).toBe("fallback-session")
+    expect(fallback.starts).toHaveLength(1)
+    expect(fallback.starts[0]?.model).toBe("anthropic/claude-sonnet-4-5")
+    expect(fallback.starts[0]?.fallbackModels).toEqual(["openai/gpt-5.6-sol"])
+    const types = host.commands.map((command) => command.type)
+    expect(types).not.toContain("open_session")
+    expect(types).not.toContain("prompt")
+    await handle.terminate()
+  })
+
+  test("#given an older host without retry_fallback_profile #when the per-child runner refuses the designated chain #then the refusal surfaces unchanged and the host never opens or prompts it", async () => {
+    // given
+    const host = await fakeHost({ capabilities: BEFORE_PROFILE })
+    const refusingFallback = {
+      start: (spec: RpcRunnerSpec) => {
+        expect(spec.model).toBe("anthropic/claude-sonnet-4-5")
+        expect(spec.fallbackModels).toEqual(["openai/gpt-5.6-sol"])
+        return Promise.reject(
+          new RunnerError({
+            kind: "child-prompt-failed",
+            message:
+              "the child could not serve its designated models (anthropic/claude-sonnet-4-5 -> openai/gpt-5.6-sol)",
+          }),
+        )
+      },
+    }
+    const runner = runnerOver(host, { fallback: refusingFallback })
+
+    // when
+    const started = runner.start(childSpec({ task_id: "st_32", fallbackModels: ["openai/gpt-5.6-sol"] }))
+
+    // then
+    await expect(started).rejects.toThrow("designated models (anthropic/claude-sonnet-4-5 -> openai/gpt-5.6-sol)")
+    await expect(started).rejects.toMatchObject({ failure: { kind: "child-prompt-failed" } })
+    const types = host.commands.map((command) => command.type)
+    expect(types).not.toContain("open_session")
+    expect(types).not.toContain("prompt")
   })
 })

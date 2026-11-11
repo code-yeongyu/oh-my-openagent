@@ -2,6 +2,7 @@ import { homedir } from "node:os"
 
 import { RunnerError } from "../runners/in-process/runner-error"
 import { RpcRequestTimeout } from "../runners/rpc/errors"
+import { HostUnavailableError } from "../runners/rpc-host/daemon-contract"
 import {
   HOST_START_FAILURE_REASONS,
   SESSION_START_FAILURE_REASONS,
@@ -64,8 +65,16 @@ export function describeStartFailure(error: unknown): StartFailureDescription {
           : exited !== undefined && failureKind === "child-prompt-failed"
             ? `Child prompt failed to start: ${describeChildExit(exited)}.`
             : publicMessage(failureKind, reason)
+  // A host that refuses a designated child for a missing capability names the chain only in the
+  // engine error; the public message above is a fixed string, so the chain never reaches the
+  // record (#12778). Append it when the refusal carries one: the chain is omo-computed model
+  // names, never child output, and the reason must be a valid closed-enum member, so an
+  // off-enum reason still leaks nothing.
+  const designation = designatedModelsSuffix(failureKind, reason, error)
+  const message =
+    designation === "" || errorMessage.includes(designation.trim()) ? errorMessage : `${errorMessage}${designation}`
   return {
-    errorMessage,
+    errorMessage: message,
     failureKind,
     ...(reason === undefined ? {} : { failureReason: reason }),
     eventFacts: {
@@ -81,6 +90,20 @@ export function describeStartFailure(error: unknown): StartFailureDescription {
 
 function causeOf(kind: TaskStartFailureKind, cause: unknown): StartCause | undefined {
   return kind === "child-prompt-failed" || kind === "session_unavailable" ? classifyStartCause(cause) : undefined
+}
+
+function designatedModelsSuffix(
+  kind: TaskStartFailureKind,
+  reason: TaskStartFailureReason | undefined,
+  error: RunnerError,
+): string {
+  if (kind !== "host_unavailable" && kind !== "session_unavailable") return ""
+  if (reason === undefined) return ""
+  const cause = error.failure.cause
+  if (!(cause instanceof HostUnavailableError)) return ""
+  const chain = cause.designatedChain
+  if (chain === undefined || chain === "") return ""
+  return ` Designated models: ${chain}.`
 }
 
 function causedMessage(kind: TaskStartFailureKind, cause: StartCause): string {

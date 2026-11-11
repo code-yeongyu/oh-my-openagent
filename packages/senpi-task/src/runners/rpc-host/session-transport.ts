@@ -162,13 +162,20 @@ export function assertHostUsable(
   }
   const missing = TASK_DAEMON_REQUIRED_CAPABILITIES.filter((capability) => !info.capabilities.includes(capability))
   if (missing.length > 0) {
-    const chain =
+    // The chain travels on the error so the public start failure can name it (#12778); the detail
+    // string below is unchanged, so existing message assertions keep passing.
+    const designatedChain =
       retryFallback === undefined || !missing.includes("retry_fallback_profile")
+        ? undefined
+        : designatedChainOf(retryFallback)
+    const chain =
+      designatedChain === undefined
         ? ""
-        : `; the child's designated models (${designatedChainOf(retryFallback)}) cannot be held to on this host`
+        : `; the child's designated models (${designatedChain}) cannot be held to on this host`
     throw new HostUnavailableError("capability", {
       fallbackAllowed: true,
       detail: `missing ${missing.join(", ")}${chain}`,
+      ...(designatedChain === undefined ? {} : { designatedChain }),
     })
   }
   return info
