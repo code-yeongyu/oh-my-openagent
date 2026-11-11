@@ -26,6 +26,7 @@ import { isAttachableSessionStatus } from "./attachable-session-status"
 import { parseSessionStatusResponse } from "./session-status-parser"
 import { FailedReadinessCache, type FailedReadinessSessionSeed } from "./failed-readiness-cache"
 import { resolveServerUrl } from "./resolve-server-url"
+import { getServerBaseUrl } from "../../shared/opencode-http-api"
 import { sweepStaleTmuxResources } from "./stale-tmux-resource-sweeper"
 type OpencodeClient = PluginInput["client"]
 
@@ -151,7 +152,7 @@ export class TmuxSessionManager {
     })
     const rawServerUrl = ctx.serverUrl?.toString()
     this.ctxServerUrl = rawServerUrl
-    this.serverUrl = resolveServerUrl(rawServerUrl, process.env, this.deps.log)
+    this.serverUrl = resolveServerUrl(rawServerUrl, process.env, this.deps.log, getServerBaseUrl(this.client) ?? undefined)
     this.sourcePaneId = this.deps.getCurrentPaneId()
     this.pollingManager = new TmuxPollingManager(
       this.client,
