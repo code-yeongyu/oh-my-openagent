@@ -2174,6 +2174,7 @@
         "test-temp-leak-match.ts",
         "test-temp-root.ts",
         "crates/omo-computer-core/src/error/tests/check-design-citations.mjs",
+        "crates/omo-computer-backend-wayland/probes/probe-sp-w.ts",
       ],
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
