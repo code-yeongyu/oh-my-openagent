@@ -3,7 +3,8 @@ import { pathToFileURL } from "node:url"
 // beta is the newer of the latest stable release and the newest prerelease (#12987). A stable publish therefore also
 // moves omo-ai@beta and get.omo.dev/channels/beta, unless beta already holds a newer prerelease.
 
-const VERSION_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/
+const VERSION_PATTERN =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/
 
 function parseVersion(version) {
   const match = VERSION_PATTERN.exec(version)

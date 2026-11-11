@@ -104,7 +104,16 @@ const actionsExpression = (inner: string): string => `\${{ ${inner} }}`
 // A successful `npm dist-tag add` records the moved beta; `dist-tags.beta` reads keep answering the old BETA for the
 // first BETA_LAG reads (registry lag), then the moved version, else BETA_SETTLED, else BETA.
 // RUNNER_TEMP is its own directory, so `runnerTemp` lists exactly what the step left behind there.
-function runStep(run: string, env: Record<string, string>): { status: number | null; stderr: string; stdout: string; calls: string[]; runnerTemp: { name: string; content: string }[] } {
+function runStep(
+  run: string,
+  env: Record<string, string>,
+): {
+  status: number | null
+  stderr: string
+  stdout: string
+  calls: string[]
+  runnerTemp: { name: string; content: string }[]
+} {
   const dir = mkdtempSync(join(tmpdir(), "omo-ai-beta-"))
   const calls = join(dir, "calls")
   const runnerTempDir = join(dir, "runner-temp")
@@ -129,7 +138,9 @@ function runStep(run: string, env: Record<string, string>): { status: number | n
   ].join("\n")
   try {
     const result = spawnSync("bash", ["-c", `${stub}${run}`], {
-      cwd: repoRoot, encoding: "utf8", timeout: 20_000,
+      cwd: repoRoot,
+      encoding: "utf8",
+      timeout: 20_000,
       env: { ...process.env, CALLS: calls, RUNNER_TEMP: runnerTempDir, ...env },
     })
     const recorded = existsSync(calls) ? readFileSync(calls, "utf8").trim().split("\n").filter(Boolean) : []
@@ -165,7 +176,12 @@ describe("beta follows latest on a stable release (#12987)", () => {
     { beta: "5.1.66", moved: false },
     { beta: "5.2.0-0.beta.1", moved: false },
   ])("publishing 5.1.66 with beta at '$beta' sets beta >= latest (moved: $moved)", ({ beta, moved }) => {
-    const result = runStep(betaMove.run ?? "", { OMO_AI_VERSION: "5.1.66", LATEST: "5.1.66", BETA: beta, NODE_AUTH_TOKEN: "dummy" })
+    const result = runStep(betaMove.run ?? "", {
+      OMO_AI_VERSION: "5.1.66",
+      LATEST: "5.1.66",
+      BETA: beta,
+      NODE_AUTH_TOKEN: "dummy",
+    })
     expect(result.status).toBe(0)
     const tagWrites = result.calls.filter((call) => call.startsWith("dist-tag"))
     if (moved) {
@@ -177,7 +193,13 @@ describe("beta follows latest on a stable release (#12987)", () => {
   })
 
   test("after a successful move the step waits until beta reads back the moved version", () => {
-    const result = runStep(betaMove.run ?? "", { OMO_AI_VERSION: "5.1.66", LATEST: "5.1.66", BETA: "5.1.0", BETA_LAG: "2", NODE_AUTH_TOKEN: "dummy" })
+    const result = runStep(betaMove.run ?? "", {
+      OMO_AI_VERSION: "5.1.66",
+      LATEST: "5.1.66",
+      BETA: "5.1.0",
+      BETA_LAG: "2",
+      NODE_AUTH_TOKEN: "dummy",
+    })
     expect(result.status).toBe(0)
     expect(result.calls.filter((call) => call.includes("dist-tags.beta"))).toHaveLength(3)
     expect(result.stdout).toContain("omo-ai beta reads 5.1.66 (attempt 3/5)")
@@ -185,7 +207,13 @@ describe("beta follows latest on a stable release (#12987)", () => {
   })
 
   test("a beta read-back that never converges is bounded and only warns", () => {
-    const result = runStep(betaMove.run ?? "", { OMO_AI_VERSION: "5.1.66", LATEST: "5.1.66", BETA: "5.1.0", BETA_LAG: "99", NODE_AUTH_TOKEN: "dummy" })
+    const result = runStep(betaMove.run ?? "", {
+      OMO_AI_VERSION: "5.1.66",
+      LATEST: "5.1.66",
+      BETA: "5.1.0",
+      BETA_LAG: "99",
+      NODE_AUTH_TOKEN: "dummy",
+    })
     expect(result.status).toBe(0)
     expect(result.calls.filter((call) => call.includes("dist-tags.beta"))).toHaveLength(5)
     expect(result.stdout).toContain("::warning::omo-ai beta still reads 5.1.0 after the move to 5.1.66")
@@ -198,7 +226,12 @@ describe("beta follows latest on a stable release (#12987)", () => {
     { name: "lookup failure", env: { BETA: "", VIEW_FAIL: "1" } },
   ])("after a $name the runner temp dir holds no npmrc and no raw token", ({ env }) => {
     const token = "npm_test-token-value-12987"
-    const result = runStep(betaMove.run ?? "", { OMO_AI_VERSION: "5.1.66", LATEST: "5.1.66", NODE_AUTH_TOKEN: token, ...env })
+    const result = runStep(betaMove.run ?? "", {
+      OMO_AI_VERSION: "5.1.66",
+      LATEST: "5.1.66",
+      NODE_AUTH_TOKEN: token,
+      ...env,
+    })
     expect(result.status).toBe(0)
     expect(result.runnerTemp.map((file) => file.name).filter((name) => name.includes("npmrc"))).toEqual([])
     expect(result.runnerTemp.filter((file) => file.content.includes(token))).toEqual([])
@@ -207,7 +240,13 @@ describe("beta follows latest on a stable release (#12987)", () => {
   })
 
   test("a failed dist-tags lookup is retried, never read as a missing beta, and leaves beta untouched with a warning", () => {
-    const result = runStep(betaMove.run ?? "", { OMO_AI_VERSION: "5.1.66", LATEST: "5.1.66", BETA: "", VIEW_FAIL: "1", NODE_AUTH_TOKEN: "dummy" })
+    const result = runStep(betaMove.run ?? "", {
+      OMO_AI_VERSION: "5.1.66",
+      LATEST: "5.1.66",
+      BETA: "",
+      VIEW_FAIL: "1",
+      NODE_AUTH_TOKEN: "dummy",
+    })
     expect(result.status).toBe(0)
     expect(result.calls.filter((call) => call.includes("dist-tags"))).toHaveLength(3)
     expect(result.calls.filter((call) => call.startsWith("dist-tag"))).toEqual([])
@@ -216,7 +255,13 @@ describe("beta follows latest on a stable release (#12987)", () => {
   })
 
   test("a failed beta move warns instead of failing, leaving the dist-tag guard as the hard check", () => {
-    const result = runStep(betaMove.run ?? "", { OMO_AI_VERSION: "5.1.66", LATEST: "5.1.66", BETA: "5.1.0", ADD_FAIL: "1", NODE_AUTH_TOKEN: "dummy" })
+    const result = runStep(betaMove.run ?? "", {
+      OMO_AI_VERSION: "5.1.66",
+      LATEST: "5.1.66",
+      BETA: "5.1.0",
+      ADD_FAIL: "1",
+      NODE_AUTH_TOKEN: "dummy",
+    })
     expect(result.status).toBe(0)
     expect(result.calls.filter((call) => call.startsWith("dist-tag add"))).toHaveLength(5)
     expect(result.stdout).toContain("::warning::")
@@ -230,14 +275,28 @@ describe("beta follows latest on a stable release (#12987)", () => {
     { distTag: "latest", beta: "5.2.0-0.beta.1", passes: true },
   ])("the dist-tag guard with latest 5.1.66 and beta '$beta' passes: $passes", ({ distTag, beta, passes }) => {
     const guard = namedStep("post-publish-verify", "Guard omo-ai dist-tags").run ?? ""
-    const result = runStep(guard, { OMO_AI_VERSION: "5.1.66", OMO_AI_DIST_TAG: distTag, ALREADY_PUBLISHED: "false", LATEST: "5.1.66", BETA: beta })
+    const result = runStep(guard, {
+      OMO_AI_VERSION: "5.1.66",
+      OMO_AI_DIST_TAG: distTag,
+      ALREADY_PUBLISHED: "false",
+      LATEST: "5.1.66",
+      BETA: beta,
+    })
     expect(result.status).toBe(passes ? 0 : 1)
     if (!passes) expect(result.stdout).toContain("older than latest 5.1.66")
   })
 
   test("the dist-tag guard re-reads a lagging beta until it reaches latest", () => {
     const guard = namedStep("post-publish-verify", "Guard omo-ai dist-tags").run ?? ""
-    const result = runStep(guard, { OMO_AI_VERSION: "5.1.66", OMO_AI_DIST_TAG: "latest", ALREADY_PUBLISHED: "false", LATEST: "5.1.66", BETA: "5.1.0", BETA_LAG: "3", BETA_SETTLED: "5.1.66" })
+    const result = runStep(guard, {
+      OMO_AI_VERSION: "5.1.66",
+      OMO_AI_DIST_TAG: "latest",
+      ALREADY_PUBLISHED: "false",
+      LATEST: "5.1.66",
+      BETA: "5.1.0",
+      BETA_LAG: "3",
+      BETA_SETTLED: "5.1.66",
+    })
     expect(result.status).toBe(0)
     expect(result.calls.filter((call) => call.includes("dist-tags.beta"))).toHaveLength(4)
     expect(result.stdout).not.toContain("::error::")
@@ -245,7 +304,15 @@ describe("beta follows latest on a stable release (#12987)", () => {
 
   test("the dist-tag guard fails after a bounded number of reads when beta never reaches latest", () => {
     const guard = namedStep("post-publish-verify", "Guard omo-ai dist-tags").run ?? ""
-    const result = runStep(guard, { OMO_AI_VERSION: "5.1.66", OMO_AI_DIST_TAG: "latest", ALREADY_PUBLISHED: "false", LATEST: "5.1.66", BETA: "5.1.0", BETA_LAG: "99", BETA_SETTLED: "5.1.66" })
+    const result = runStep(guard, {
+      OMO_AI_VERSION: "5.1.66",
+      OMO_AI_DIST_TAG: "latest",
+      ALREADY_PUBLISHED: "false",
+      LATEST: "5.1.66",
+      BETA: "5.1.0",
+      BETA_LAG: "99",
+      BETA_SETTLED: "5.1.66",
+    })
     expect(result.status).toBe(1)
     expect(result.calls.filter((call) => call.includes("dist-tags.beta"))).toHaveLength(5)
     expect(result.stdout).toContain("::error::omo-ai beta points to 5.1.0, older than latest 5.1.66")
@@ -253,14 +320,24 @@ describe("beta follows latest on a stable release (#12987)", () => {
 
   test("the dist-tag guard leaves a prerelease's older beta alone", () => {
     const guard = namedStep("post-publish-verify", "Guard omo-ai dist-tags").run ?? ""
-    const result = runStep(guard, { OMO_AI_VERSION: "5.2.0-0.beta.2", OMO_AI_DIST_TAG: "beta", ALREADY_PUBLISHED: "false", LATEST: "5.1.66", BETA: "5.2.0-0.beta.2" })
+    const result = runStep(guard, {
+      OMO_AI_VERSION: "5.2.0-0.beta.2",
+      OMO_AI_DIST_TAG: "beta",
+      ALREADY_PUBLISHED: "false",
+      LATEST: "5.1.66",
+      BETA: "5.2.0-0.beta.2",
+    })
     expect(result.status).toBe(0)
   })
 
   test("a second installer mirror moves get.omo.dev channels/beta after a stable mirror", () => {
     const mirrorBeta = job("installer-mirror-beta")
     expect(mirrorBeta.uses).toBe("./.github/workflows/installer-mirror.yml")
-    expect(mirrorBeta.with).toEqual({ tag: `v${actionsExpression("needs.release-metadata.outputs.version")}`, channel: "beta", dry_run: false })
+    expect(mirrorBeta.with).toEqual({
+      tag: `v${actionsExpression("needs.release-metadata.outputs.version")}`,
+      channel: "beta",
+      dry_run: false,
+    })
     expect(mirrorBeta.needs).toContain("installer-mirror")
     expect(mirrorBeta.if).toContain("needs.installer-mirror.result == 'success'")
     expect(mirrorBeta.if).toContain("needs.release-metadata.outputs.omo_ai_dist_tag == 'latest'")

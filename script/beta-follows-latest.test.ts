@@ -9,9 +9,19 @@ const cli = fileURLToPath(new URL("./beta-follows-latest.mjs", import.meta.url))
 
 describe("betaMustFollowLatest", () => {
   test.each([
-    { name: "a stable release newer than the beta prerelease moves beta", stable: "5.2.0", beta: "5.2.0-0.beta.9", move: true },
+    {
+      name: "a stable release newer than the beta prerelease moves beta",
+      stable: "5.2.0",
+      beta: "5.2.0-0.beta.9",
+      move: true,
+    },
     { name: "the real case: 5.1.66 moves a beta stuck on 5.1.0", stable: "5.1.66", beta: "5.1.0", move: true },
-    { name: "a stable release newer than an older stable beta moves beta", stable: "5.1.66", beta: "5.1.65", move: true },
+    {
+      name: "a stable release newer than an older stable beta moves beta",
+      stable: "5.1.66",
+      beta: "5.1.65",
+      move: true,
+    },
     { name: "a beta prerelease of a higher version is kept", stable: "5.1.66", beta: "5.2.0-0.beta.1", move: false },
     { name: "a beta already on the stable version is a no-op", stable: "5.1.66", beta: "5.1.66", move: false },
     { name: "a beta on a newer stable version is kept", stable: "5.1.60", beta: "5.1.66", move: false },
@@ -32,8 +42,16 @@ describe("betaMustFollowLatestFromDistTags", () => {
   test.each([
     { name: "a lookup with no beta tag moves", tags: '{"latest":"5.1.66"}', move: true },
     { name: "a lookup with an older beta moves", tags: '{"latest":"5.1.66","beta":"5.1.0"}', move: true },
-    { name: "a lookup with a newer beta prerelease is kept", tags: '{"latest":"5.1.66","beta":"5.2.0-0.beta.1"}', move: false },
-    { name: "a lookup with beta on the stable version is a no-op", tags: '{"latest":"5.1.66","beta":"5.1.66"}', move: false },
+    {
+      name: "a lookup with a newer beta prerelease is kept",
+      tags: '{"latest":"5.1.66","beta":"5.2.0-0.beta.1"}',
+      move: false,
+    },
+    {
+      name: "a lookup with beta on the stable version is a no-op",
+      tags: '{"latest":"5.1.66","beta":"5.1.66"}',
+      move: false,
+    },
   ])("$name", ({ tags, move }) => {
     expect(betaMustFollowLatestFromDistTags("5.1.66", tags)).toBe(move)
   })

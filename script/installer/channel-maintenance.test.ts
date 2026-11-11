@@ -151,7 +151,9 @@ describe("recreateChannel", () => {
   test("refuses a prerelease for channels/latest before any request", async () => {
     const fetch = recordFetch([])
     try {
-      await expect(recreateChannel(credentials, "latest", "5.2.0-beta.1", () => {})).rejects.toThrow("not channels/latest")
+      await expect(recreateChannel(credentials, "latest", "5.2.0-beta.1", () => {})).rejects.toThrow(
+        "not channels/latest",
+      )
       expect(fetch.mock.calls).toHaveLength(0)
     } finally {
       fetch.mockRestore()
@@ -160,7 +162,13 @@ describe("recreateChannel", () => {
 
   // beta is never older than latest (#12987), so a stable version is a valid beta pointer.
   test("writes a stable version to channels/beta", async () => {
-    const fetch = recordFetch([{ status: 200 }, { status: 200, body: "5.1.0\n" }, { status: 204 }, { status: 200 }, { status: 200, body: "5.1.66\n" }])
+    const fetch = recordFetch([
+      { status: 200 },
+      { status: 200, body: "5.1.0\n" },
+      { status: 204 },
+      { status: 200 },
+      { status: 200, body: "5.1.66\n" },
+    ])
     try {
       await recreateChannel(credentials, "beta", "5.1.66", () => {})
       const sent = requests(fetch)
