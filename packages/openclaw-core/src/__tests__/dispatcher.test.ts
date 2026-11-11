@@ -24,9 +24,7 @@ describe("OpenClaw Dispatcher", () => {
   test("interpolateInstruction replaces variables", () => {
     const template = "Hello {{name}}, welcome to {{place}}!"
     const variables = { name: "World", place: "Bun" }
-    expect(interpolateInstruction(template, variables)).toBe(
-      "Hello World, welcome to Bun!",
-    )
+    expect(interpolateInstruction(template, variables)).toBe("Hello World, welcome to Bun!")
   })
 
   test("interpolateInstruction handles missing variables", () => {
@@ -53,7 +51,7 @@ describe("OpenClaw Dispatcher", () => {
 
       expect(result.success).toBe(true)
       expect(fetchSpy).toHaveBeenCalled()
-      const call = fetchSpy.mock.calls.find(c => c[0] === "https://example.com")
+      const call = fetchSpy.mock.calls.find((c) => c[0] === "https://example.com")
       expect(call).toBeDefined()
       if (!call) {
         throw new Error("Expected fetch call for https://example.com")
@@ -165,7 +163,11 @@ describe("OpenClaw Dispatcher", () => {
   })
 
   test("wakeGateway fails on invalid URL", async () => {
-    const result = await wakeGateway("test", { url: "http://example.com", method: "POST", timeout: 1000, type: "http" }, {})
+    const result = await wakeGateway(
+      "test",
+      { url: "http://example.com", method: "POST", timeout: 1000, type: "http" },
+      {},
+    )
     expect(result.success).toBe(false)
     expect(result.error).toContain("Invalid URL")
   })
@@ -245,7 +247,7 @@ describe("OpenClaw Dispatcher", () => {
       {
         type: "command",
         method: "POST",
-        command: "printf '%s' '{\"messageId\":\"55\",\"platform\":\"telegram\",\"threadId\":\"thr\"}'",
+        command: 'printf \'%s\' \'{"messageId":"55","platform":"telegram","threadId":"thr"}\'',
         timeout: commandGatewayTestTimeoutMs,
       },
       {},

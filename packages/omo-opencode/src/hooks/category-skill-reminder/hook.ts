@@ -7,25 +7,11 @@ import { getAgentConfigKey } from "../../shared/agent-display-names"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { buildReminderMessage } from "./formatter"
 
-const TARGET_AGENTS = new Set([
-  "sisyphus",
-  "sisyphus-junior",
-  "atlas",
-])
+const TARGET_AGENTS = new Set(["sisyphus", "sisyphus-junior", "atlas"])
 
-const DELEGATABLE_WORK_TOOLS = new Set([
-  "edit",
-  "write",
-  "bash",
-  "read",
-  "grep",
-  "glob",
-])
+const DELEGATABLE_WORK_TOOLS = new Set(["edit", "write", "bash", "read", "grep", "glob"])
 
-const DELEGATION_TOOLS = new Set([
-  "task",
-  "call_omo_agent",
-])
+const DELEGATION_TOOLS = new Set(["task", "call_omo_agent"])
 
 interface ToolExecuteInput {
   tool: string
@@ -82,10 +68,7 @@ function findLatestReminderTarget(
   return undefined
 }
 
-export function createCategorySkillReminderHook(
-  _ctx: PluginInput,
-  availableSkills: AvailableSkill[] = [],
-) {
+export function createCategorySkillReminderHook(_ctx: PluginInput, availableSkills: AvailableSkill[] = []) {
   const sessionStates = new Map<string, SessionState>()
   const reminderMessage = buildReminderMessage(availableSkills)
 
@@ -105,11 +88,7 @@ export function createCategorySkillReminderHook(
     const agent = getSessionAgent(sessionID) ?? inputAgent
     if (!agent) return false
     const agentKey = getAgentConfigKey(agent)
-    return (
-      TARGET_AGENTS.has(agentKey) ||
-      agentKey.includes("sisyphus") ||
-      agentKey.includes("atlas")
-    )
+    return TARGET_AGENTS.has(agentKey) || agentKey.includes("sisyphus") || agentKey.includes("atlas")
   }
 
   const toolExecuteAfter = async (input: ToolExecuteInput, _output: ToolExecuteOutput) => {
@@ -135,12 +114,7 @@ export function createCategorySkillReminderHook(
 
     state.toolCallCount++
 
-    if (
-      state.toolCallCount >= 3
-      && !state.delegationUsed
-      && !state.reminderPending
-      && !state.reminderShown
-    ) {
+    if (state.toolCallCount >= 3 && !state.delegationUsed && !state.reminderPending && !state.reminderShown) {
       state.reminderPending = true
       log("[category-skill-reminder] Reminder queued", {
         sessionID,

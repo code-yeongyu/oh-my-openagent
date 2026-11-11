@@ -1,13 +1,13 @@
-import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { computerPreludeAssets } from "@oh-my-opencode/senpi-desktop-prelude";
+import { createHash } from "node:crypto"
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { computerPreludeAssets } from "@oh-my-opencode/senpi-desktop-prelude"
 
-export const COMPUTER_SKILL_NAME = "computer-use";
+export const COMPUTER_SKILL_NAME = "computer-use"
 
 const COMPUTER_SKILL_DESCRIPTION =
-	"Experimental computer use. MUST read before driving the desktop with the computer tool: every helper, coordinate frames, accessibility refs, background vs foreground delivery, the stop and resume rules, and the safety rules for consequential actions.";
+  "Experimental computer use. MUST read before driving the desktop with the computer tool: every helper, coordinate frames, accessibility refs, background vs foreground delivery, the stop and resume rules, and the safety rules for consequential actions."
 
 /**
  * The skill is composed of the hand-written rules (prelude docs/computer-guide.md), the method table generated
@@ -15,33 +15,33 @@ const COMPUTER_SKILL_DESCRIPTION =
  * prelude block (docs/computer.md), which the model already sees while the tool is active.
  */
 export function computerSkillMarkdown(): string {
-	return [
-		"---",
-		`name: ${COMPUTER_SKILL_NAME}`,
-		`description: ${JSON.stringify(COMPUTER_SKILL_DESCRIPTION)}`,
-		"---",
-		"",
-		"# Computer use",
-		"",
-		"Computer use is experimental: its behavior, platform coverage and settings may change between releases.",
-		"",
-		"Find the `computer` tool with `tool_search` (query `computer`). Once it is active, eval cells get the `computer` global in the next cell.",
-		"",
-		"Availability is unknown until `computer.capabilities()` has returned in this session: say nothing about it before that, and on `native-unavailable` repeat the host and reason given. A needed `capturePermission`, `inputPermission` or `axPermission` that is not `granted` only the user can fix: name it (macOS: Screen Recording or Accessibility for the app that launched OmO, in System Settings > Privacy & Security, then fully quit and relaunch that app) and stop. When the target is ambiguous, or an action still fails after a fresh observation, ask the user instead of guessing.",
-		"",
-		computerPreludeAssets.guide.trim(),
-		"",
-		"## Methods",
-		"",
-		"Each kernel helper's signature is in the eval prompt's `computer` prelude block.",
-		"",
-		computerPreludeAssets.methodTable.trim(),
-		"",
-		"## Safety",
-		"",
-		computerPreludeAssets.safety.trim(),
-		"",
-	].join("\n");
+  return [
+    "---",
+    `name: ${COMPUTER_SKILL_NAME}`,
+    `description: ${JSON.stringify(COMPUTER_SKILL_DESCRIPTION)}`,
+    "---",
+    "",
+    "# Computer use",
+    "",
+    "Computer use is experimental: its behavior, platform coverage and settings may change between releases.",
+    "",
+    "Find the `computer` tool with `tool_search` (query `computer`). Once it is active, eval cells get the `computer` global in the next cell.",
+    "",
+    "Availability is unknown until `computer.capabilities()` has returned in this session: say nothing about it before that, and on `native-unavailable` repeat the host and reason given. A needed `capturePermission`, `inputPermission` or `axPermission` that is not `granted` only the user can fix: name it (macOS: Screen Recording or Accessibility for the app that launched OmO, in System Settings > Privacy & Security, then fully quit and relaunch that app) and stop. When the target is ambiguous, or an action still fails after a fresh observation, ask the user instead of guessing.",
+    "",
+    computerPreludeAssets.guide.trim(),
+    "",
+    "## Methods",
+    "",
+    "Each kernel helper's signature is in the eval prompt's `computer` prelude block.",
+    "",
+    computerPreludeAssets.methodTable.trim(),
+    "",
+    "## Safety",
+    "",
+    computerPreludeAssets.safety.trim(),
+    "",
+  ].join("\n")
 }
 
 /**
@@ -50,19 +50,19 @@ export function computerSkillMarkdown(): string {
  * `build-extension.mjs`), so materialization needs no compiled-in strings (#9113).
  */
 export function materializeComputerSkill(root: string = tmpdir()): string {
-	const markdown = computerSkillMarkdown();
-	const digest = createHash("sha256").update(markdown).digest("hex").slice(0, 16);
-	const dir = join(root, `senpi-computer-skill-${digest}`, COMPUTER_SKILL_NAME);
-	const path = join(dir, "SKILL.md");
-	let current: string | undefined;
-	try {
-		current = readFileSync(path, "utf8");
-	} catch (error) {
-		if (!(error instanceof Error && Reflect.get(error, "code") === "ENOENT")) throw error;
-	}
-	if (current !== markdown) {
-		mkdirSync(dir, { recursive: true });
-		writeFileSync(path, markdown);
-	}
-	return path;
+  const markdown = computerSkillMarkdown()
+  const digest = createHash("sha256").update(markdown).digest("hex").slice(0, 16)
+  const dir = join(root, `senpi-computer-skill-${digest}`, COMPUTER_SKILL_NAME)
+  const path = join(dir, "SKILL.md")
+  let current: string | undefined
+  try {
+    current = readFileSync(path, "utf8")
+  } catch (error) {
+    if (!(error instanceof Error && Reflect.get(error, "code") === "ENOENT")) throw error
+  }
+  if (current !== markdown) {
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(path, markdown)
+  }
+  return path
 }

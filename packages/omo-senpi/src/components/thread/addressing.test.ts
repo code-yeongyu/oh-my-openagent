@@ -81,10 +81,7 @@ describe("resolveTarget exact ladder", () => {
   })
 
   test("#given an id that also equals another thread's name #when resolved #then the id hit wins, never the name", () => {
-    const entries = [
-      thread({ thread_id: "t-1", name: "build" }),
-      thread({ thread_id: "build", name: "unrelated" }),
-    ]
+    const entries = [thread({ thread_id: "t-1", name: "build" }), thread({ thread_id: "build", name: "unrelated" })]
     const result = resolveTarget(entries, "build", { callerWorkspaceRoot: CALLER })
 
     expect(result.kind).toBe("ok")
@@ -306,10 +303,7 @@ describe("NFKC name normalization", () => {
   })
 
   test("#given a composed name and a decomposed duplicate #when resolved #then NFKC also unifies the ambiguity path", () => {
-    const entries = [
-      thread({ thread_id: "t-1", name: "caf\u00e9" }),
-      thread({ thread_id: "t-2", name: "cafe\u0301" }),
-    ]
+    const entries = [thread({ thread_id: "t-1", name: "caf\u00e9" }), thread({ thread_id: "t-2", name: "cafe\u0301" })]
     const result = resolveTarget(entries, "cafe\u0301", { callerWorkspaceRoot: CALLER })
 
     const error = expectError(result, "ambiguous_target")
@@ -488,10 +482,7 @@ describe("checkNameConflict", () => {
 
 describe("error recovery wording (R7)", () => {
   test("#given every error this module can return #when inspected #then each next_action names thread_list", () => {
-    const dupes = [
-      thread({ thread_id: "t-1", name: "fix build" }),
-      thread({ thread_id: "t-2", name: "fix  build" }),
-    ]
+    const dupes = [thread({ thread_id: "t-1", name: "fix build" }), thread({ thread_id: "t-2", name: "fix  build" })]
     const errors: AnyAddressingResult[] = [
       resolveTarget([thread({ thread_id: "t-1", name: "payments" })], "missing", { callerWorkspaceRoot: CALLER }),
       resolveTarget(dupes, "fix build", { callerWorkspaceRoot: CALLER }),
@@ -500,7 +491,10 @@ describe("error recovery wording (R7)", () => {
       resolveTarget([thread({ thread_id: "t-1", name: "payments" })], "payments", {}),
       fuzzyMatch([thread({ thread_id: "t-1", name: "payments" })], "ab"),
       fuzzyMatch([thread({ thread_id: "t-1", name: "payments" })], "zzzzz"),
-      fuzzyMatch(Array.from({ length: 501 }, (_, i) => thread({ thread_id: `t-${i}`, name: `noise-${i}` })), "payments"),
+      fuzzyMatch(
+        Array.from({ length: 501 }, (_, i) => thread({ thread_id: `t-${i}`, name: `noise-${i}` })),
+        "payments",
+      ),
       checkNameConflict([thread({ thread_id: "t-1", name: "payments" })], "payments"),
     ]
 

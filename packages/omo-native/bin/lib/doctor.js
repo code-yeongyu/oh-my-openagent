@@ -4,7 +4,15 @@ import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
 import { fetchNpmDistTagsSync } from "./npm-dist-tags.js"
-import { channelDistTagVersion, packageManifest, packageRoot, readJson, releaseChannel, resolveSenpi, updateTarget } from "./package-paths.js"
+import {
+  channelDistTagVersion,
+  packageManifest,
+  packageRoot,
+  readJson,
+  releaseChannel,
+  resolveSenpi,
+  updateTarget,
+} from "./package-paths.js"
 import { daemonReportLines } from "./daemon.js"
 import { migrationReport } from "./doctor-migration.js"
 import { launchSpecDoctorLines } from "./launch-spec-mode.js"
@@ -62,7 +70,9 @@ export function warningsForSettings() {
     return entry !== null && typeof entry === "object" && entry.source === "@code-yeongyu/omo-senpi"
   })
   return duplicate
-    ? ["WARN duplicate @code-yeongyu/omo-senpi package entry; remove it from the packages array because omo loads the packaged extension"]
+    ? [
+        "WARN duplicate @code-yeongyu/omo-senpi package entry; remove it from the packages array because omo loads the packaged extension",
+      ]
     : []
 }
 
@@ -116,7 +126,22 @@ export function listProcesses() {
 // or engine flags count; those other roles are never engines.
 const BINARY_RUNTIME_EXECUTABLE = String.raw`[\\/]binary-runtime[\\/][^\\/\s]+[\\/]omo(?:\.exe)?`
 const BINARY_ENGINE = new RegExp(String.raw`${BINARY_RUNTIME_EXECUTABLE}(?=\s|$)\s*(\S*)`)
-const BINARY_NON_ENGINE_COMMANDS = new Set(["doctor", "setup", "daemon", "update", "upgrade", "host", "install", "remove", "list", "config", "auth", "ulw-loop", "--version", "-v"])
+const BINARY_NON_ENGINE_COMMANDS = new Set([
+  "doctor",
+  "setup",
+  "daemon",
+  "update",
+  "upgrade",
+  "host",
+  "install",
+  "remove",
+  "list",
+  "config",
+  "auth",
+  "ulw-loop",
+  "--version",
+  "-v",
+])
 
 function isBinaryEngine(command) {
   const match = BINARY_ENGINE.exec(command)
@@ -169,7 +194,7 @@ export function formatStaleEngineLines(stale) {
   const lines = stale.map((entry) =>
     entry.retiredAppServer
       ? `WARN stale engine pid ${entry.pid} (age ${entry.elapsed}, tty ${entry.tty}) is an app-server daemon started by an older version; that command was removed, so stop it`
-      : `WARN stale engine pid ${entry.pid} (age ${entry.elapsed}, tty ${entry.tty}) has no launcher; it was orphaned by a signaled launcher`
+      : `WARN stale engine pid ${entry.pid} (age ${entry.elapsed}, tty ${entry.tty}) has no launcher; it was orphaned by a signaled launcher`,
   )
   lines.push(`INFO reap them explicitly by pid: omo doctor --reap ${stale.map((entry) => entry.pid).join(" ")}`)
   return lines
@@ -213,10 +238,13 @@ export function classifyRetiredPayloadEngines(entries, input) {
 
 export function formatRetiredPayloadLines(retired) {
   if (retired.length === 0) return []
-  const lines = retired.map((entry) =>
-    `WARN engine pid ${entry.pid} (age ${entry.elapsed}, tty ${entry.tty}) started before this payload was installed; it still runs the previous plugin copy`
+  const lines = retired.map(
+    (entry) =>
+      `WARN engine pid ${entry.pid} (age ${entry.elapsed}, tty ${entry.tty}) started before this payload was installed; it still runs the previous plugin copy`,
   )
-  lines.push("INFO restart those sessions to pick up the installed payload; a running engine is never rewritten in place")
+  lines.push(
+    "INFO restart those sessions to pick up the installed payload; a running engine is never rewritten in place",
+  )
   return lines
 }
 
@@ -261,7 +289,9 @@ export function reapStaleEngines(args, options = {}) {
       continue
     }
     if (!isInteractive(entry)) {
-      lines.push(`FAIL refusing pid ${pid}: it is a managed engine (${MANAGED_MODE_FLAG}), owned by whatever started it`)
+      lines.push(
+        `FAIL refusing pid ${pid}: it is a managed engine (${MANAGED_MODE_FLAG}), owned by whatever started it`,
+      )
       failed = true
       continue
     }
@@ -339,24 +369,28 @@ export function formatTransientMemoryLines(counts) {
 
 export function transientMemoryReport(options) {
   const root = memoryRoot(options.env ?? process.env)
-  return formatTransientMemoryLines(countTransientMemoryIdentities({
-    agentsRoot: join(root, MEMORY_AGENTS_DIRNAME),
-    transientRoot: join(root, MEMORY_TRANSIENT_DIRNAME),
-    listDirs: options.listDirs ?? listSubdirectories,
-    hasRepo: options.hasRepo ?? ((identityRoot) => existsSync(join(identityRoot, MEMORY_REPO_DIRNAME))),
-  }))
+  return formatTransientMemoryLines(
+    countTransientMemoryIdentities({
+      agentsRoot: join(root, MEMORY_AGENTS_DIRNAME),
+      transientRoot: join(root, MEMORY_TRANSIENT_DIRNAME),
+      listDirs: options.listDirs ?? listSubdirectories,
+      hasRepo: options.hasRepo ?? ((identityRoot) => existsSync(join(identityRoot, MEMORY_REPO_DIRNAME))),
+    }),
+  )
 }
 
 function retiredPayloadReport(options) {
   const list = options.list ?? listProcesses
   const now = options.now ?? Date.now
-  const payloadMtimeMs = options.payloadMtimeMs ?? ((payloadDir) => {
-    try {
-      return statSync(join(payloadDir, "extensions", "omo.js")).mtimeMs
-    } catch {
-      return undefined
-    }
-  })
+  const payloadMtimeMs =
+    options.payloadMtimeMs ??
+    ((payloadDir) => {
+      try {
+        return statSync(join(payloadDir, "extensions", "omo.js")).mtimeMs
+      } catch {
+        return undefined
+      }
+    })
   return formatRetiredPayloadLines(classifyRetiredPayloadEngines(list(), { payloadMtimeMs, nowMs: now() }))
 }
 
@@ -366,7 +400,11 @@ function daemonReport(options) {
   const engine = options.daemonEngine
   if (engine === undefined) return []
   return daemonReportLines({
-    engine, pluginRoot: join(packageRoot, "plugin"), agentDir: canonicalAgentDir(), env: process.env, platform: process.platform,
+    engine,
+    pluginRoot: join(packageRoot, "plugin"),
+    agentDir: canonicalAgentDir(),
+    env: process.env,
+    platform: process.platform,
   })
 }
 
@@ -417,7 +455,9 @@ export function runDoctor(inventory, args = [], options = {}) {
 
   const version = packageManifest().version
   const latest = latestFromDistTags(readDistTags(options), version)
-  lines.push(`INFO omo · Edition: Native · Installed: ${version} (engine: senpi ${engineVersionOrUnresolved(senpi)}) · Latest: ${latest}`)
+  lines.push(
+    `INFO omo · Edition: Native · Installed: ${version} (engine: senpi ${engineVersionOrUnresolved(senpi)}) · Latest: ${latest}`,
+  )
   lines.push(`INFO Update: ${updateTarget().command}`)
   lines.push(...migrationReport(options, updateTarget().command))
   lines.push(...warningsForSettings())

@@ -304,7 +304,9 @@ describe("fetchSyncResult", () => {
             { info: { id: "msg_001", role: "user", time: { created: 1000 } } },
             {
               info: { id: "msg_002", role: "assistant", time: { created: 2000 } },
-              parts: [{ type: "tool", toolCallId: "t1", toolName: "x", state: "output-available", input: {}, output: {} }],
+              parts: [
+                { type: "tool", toolCallId: "t1", toolName: "x", state: "output-available", input: {}, output: {} },
+              ],
             },
           ],
         }),

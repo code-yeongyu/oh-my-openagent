@@ -1,22 +1,22 @@
-import { writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs"
 
-import { afterEach, describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test"
 
-import { ControlledClock } from "./controlled-clock-test-support.js";
+import { ControlledClock } from "./controlled-clock-test-support.js"
 
 import {
-	createWorkspaceEditTestHarness,
-	diagnostic,
-	readEvents,
-	waitForEventCount,
-	waitForEventCountBySubscription,
-} from "./workspace-apply-edit-test-support.js";
+  createWorkspaceEditTestHarness,
+  diagnostic,
+  readEvents,
+  waitForEventCount,
+  waitForEventCountBySubscription,
+} from "./workspace-apply-edit-test-support.js"
 
-const harness = createWorkspaceEditTestHarness();
+const harness = createWorkspaceEditTestHarness()
 
 afterEach(async () => {
-	await harness.cleanup();
-});
+  await harness.cleanup()
+})
 
 /**
  * Drives one `diagnostics()` call whose ONLY exit is the freshness window closing: an advertised
@@ -30,442 +30,441 @@ afterEach(async () => {
  * happened to reach first (#8323).
  */
 async function resolveThroughFreshnessWindow<T>(clock: ControlledClock, start: () => Promise<T>): Promise<T> {
-	const scheduledBefore = clock.scheduledDelays.length;
-	const pending = start();
-	await clock.waitForScheduled(scheduledBefore + 2);
-	clock.advanceBy(FRESHNESS_WINDOW_MS);
-	return pending;
+  const scheduledBefore = clock.scheduledDelays.length
+  const pending = start()
+  await clock.waitForScheduled(scheduledBefore + 2)
+  clock.advanceBy(FRESHNESS_WINDOW_MS)
+  return pending
 }
 
-const FRESHNESS_WINDOW_MS = 500;
+const FRESHNESS_WINDOW_MS = 500
 
 describe("LspClient diagnostics freshness", () => {
-	it("#given a versionless publish that arrives after the current change #when no newer eligible publish arrives before quiescence #then diagnostics wait for that quiescence window and return the versionless payload", async () => {
-		const clock = new ControlledClock();
-		const context = await harness.makeClient(
-			{
-				publishDiagnostics: [
-					{
-						trigger: "didChange",
-						diagnostics: [diagnostic("post-generation-versionless")],
-						awaitClientDelivery: true,
-					},
-				],
-			},
-			{ diagnosticsFreshnessTimeoutMs: 80, versionlessPublishQuiescenceMs: 20, timerProvider: clock },
-		);
-		await context.client.openFile(context.source);
-		const versionlessDelivery = waitForEventCount(
-			context.events,
-			(event) => event.type === "clientResponse" && event.method === "workspace/configuration",
-			1,
-		);
-		writeFileSync(context.source, "const after = 1;\n", "utf-8");
-		await context.client.openFile(context.source);
-		expect(await versionlessDelivery).toHaveLength(1);
+  it("#given a versionless publish that arrives after the current change #when no newer eligible publish arrives before quiescence #then diagnostics wait for that quiescence window and return the versionless payload", async () => {
+    const clock = new ControlledClock()
+    const context = await harness.makeClient(
+      {
+        publishDiagnostics: [
+          {
+            trigger: "didChange",
+            diagnostics: [diagnostic("post-generation-versionless")],
+            awaitClientDelivery: true,
+          },
+        ],
+      },
+      { diagnosticsFreshnessTimeoutMs: 80, versionlessPublishQuiescenceMs: 20, timerProvider: clock },
+    )
+    await context.client.openFile(context.source)
+    const versionlessDelivery = waitForEventCount(
+      context.events,
+      (event) => event.type === "clientResponse" && event.method === "workspace/configuration",
+      1,
+    )
+    writeFileSync(context.source, "const after = 1;\n", "utf-8")
+    await context.client.openFile(context.source)
+    expect(await versionlessDelivery).toHaveLength(1)
 
-		const pending = context.client.diagnostics(context.source);
-		await clock.waitForTimer(20);
-		expect(clock.scheduledDelays.at(-1)).toBe(20);
-		clock.advanceBy(20);
-		const result = await pending;
+    const pending = context.client.diagnostics(context.source)
+    await clock.waitForTimer(20)
+    expect(clock.scheduledDelays.at(-1)).toBe(20)
+    clock.advanceBy(20)
+    const result = await pending
 
-		expect(result.items).toEqual([diagnostic("post-generation-versionless")]);
-	});
+    expect(result.items).toEqual([diagnostic("post-generation-versionless")])
+  })
 
-	it("#given only a pre-generation versionless publish #when a newer local version asks for diagnostics #then the stale versionless publish is ignored and the request does not resolve clean", async () => {
-		const clock = new ControlledClock();
-		const context = await harness.makeClient(
-			{
-				publishDiagnostics: [
-					{
-						trigger: "didOpen",
-						diagnostics: [diagnostic("pre-generation-versionless")],
-						awaitClientDelivery: true,
-					},
-				],
-			},
-			{ diagnosticsFreshnessTimeoutMs: 300, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
-		);
-		await context.client.openFile(context.source);
-		await waitForEventCount(
-			context.events,
-			(event) => event.type === "clientResponse" && event.method === "workspace/configuration",
-			1,
-		);
-		const initial = context.client.diagnostics(context.source);
-		await clock.waitForTimer(5);
-		expect(clock.scheduledDelays.at(-1)).toBe(5);
-		clock.advanceBy(5);
-		expect((await initial).items).toEqual([diagnostic("pre-generation-versionless")]);
-		writeFileSync(context.source, "const after = 1;\n", "utf-8");
-		await context.client.openFile(context.source);
+  it("#given only a pre-generation versionless publish #when a newer local version asks for diagnostics #then the stale versionless publish is ignored and the request does not resolve clean", async () => {
+    const clock = new ControlledClock()
+    const context = await harness.makeClient(
+      {
+        publishDiagnostics: [
+          {
+            trigger: "didOpen",
+            diagnostics: [diagnostic("pre-generation-versionless")],
+            awaitClientDelivery: true,
+          },
+        ],
+      },
+      { diagnosticsFreshnessTimeoutMs: 300, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
+    )
+    await context.client.openFile(context.source)
+    await waitForEventCount(
+      context.events,
+      (event) => event.type === "clientResponse" && event.method === "workspace/configuration",
+      1,
+    )
+    const initial = context.client.diagnostics(context.source)
+    await clock.waitForTimer(5)
+    expect(clock.scheduledDelays.at(-1)).toBe(5)
+    clock.advanceBy(5)
+    expect((await initial).items).toEqual([diagnostic("pre-generation-versionless")])
+    writeFileSync(context.source, "const after = 1;\n", "utf-8")
+    await context.client.openFile(context.source)
 
-		const pending = context.client.diagnostics(context.source);
-		await clock.waitForTimer(300);
-		expect(clock.scheduledDelays.at(-1)).toBe(300);
-		clock.advanceBy(300);
-		const result = await pending;
+    const pending = context.client.diagnostics(context.source)
+    await clock.waitForTimer(300)
+    expect(clock.scheduledDelays.at(-1)).toBe(300)
+    clock.advanceBy(300)
+    const result = await pending
 
-		expect(result.items).toEqual([]);
-		expect(result.transientError?.kind).toBe("freshness_timeout");
-	});
+    expect(result.items).toEqual([])
+    expect(result.transientError?.kind).toBe("freshness_timeout")
+  })
 
-	it("#given stale and future publish versions #when diagnostics target the current version #then neither stale nor future diagnostics satisfy the request", async () => {
-		const staleClock = new ControlledClock();
-		const stale = await harness.makeClient(
-			{
-				publishDiagnostics: [
-					{
-						trigger: "didChange",
-						version: 1,
-						diagnostics: [diagnostic("stale")],
-						awaitClientDelivery: true,
-					},
-				],
-			},
-			{ diagnosticsFreshnessTimeoutMs: 100, versionlessPublishQuiescenceMs: 5, timerProvider: staleClock },
-		);
-		await stale.client.openFile(stale.source);
-		const staleDelivery = waitForEventCount(
-			stale.events,
-			(event) => event.type === "clientResponse" && event.method === "workspace/configuration",
-			1,
-		);
-		writeFileSync(stale.source, "const stale = 1;\n", "utf-8");
-		await stale.client.openFile(stale.source);
-		expect(await staleDelivery).toHaveLength(1);
+  it("#given stale and future publish versions #when diagnostics target the current version #then neither stale nor future diagnostics satisfy the request", async () => {
+    const staleClock = new ControlledClock()
+    const stale = await harness.makeClient(
+      {
+        publishDiagnostics: [
+          {
+            trigger: "didChange",
+            version: 1,
+            diagnostics: [diagnostic("stale")],
+            awaitClientDelivery: true,
+          },
+        ],
+      },
+      { diagnosticsFreshnessTimeoutMs: 100, versionlessPublishQuiescenceMs: 5, timerProvider: staleClock },
+    )
+    await stale.client.openFile(stale.source)
+    const staleDelivery = waitForEventCount(
+      stale.events,
+      (event) => event.type === "clientResponse" && event.method === "workspace/configuration",
+      1,
+    )
+    writeFileSync(stale.source, "const stale = 1;\n", "utf-8")
+    await stale.client.openFile(stale.source)
+    expect(await staleDelivery).toHaveLength(1)
 
-		const stalePending = stale.client.diagnostics(stale.source);
-		await staleClock.waitForTimer(100);
-		staleClock.advanceBy(100);
-		const staleResult = await stalePending;
+    const stalePending = stale.client.diagnostics(stale.source)
+    await staleClock.waitForTimer(100)
+    staleClock.advanceBy(100)
+    const staleResult = await stalePending
 
-		expect(staleResult.items).toEqual([]);
-		expect(staleResult.transientError?.kind).toBe("freshness_timeout");
+    expect(staleResult.items).toEqual([])
+    expect(staleResult.transientError?.kind).toBe("freshness_timeout")
 
-		await harness.cleanup();
+    await harness.cleanup()
 
-		const futureClock = new ControlledClock();
-		const future = await harness.makeClient(
-			{
-				publishDiagnostics: [
-					{
-						trigger: "didChange",
-						version: 3,
-						diagnostics: [diagnostic("future")],
-						awaitClientDelivery: true,
-					},
-				],
-			},
-			{ diagnosticsFreshnessTimeoutMs: 100, versionlessPublishQuiescenceMs: 5, timerProvider: futureClock },
-		);
-		await future.client.openFile(future.source);
-		const futureDelivery = waitForEventCount(
-			future.events,
-			(event) => event.type === "clientResponse" && event.method === "workspace/configuration",
-			1,
-		);
-		writeFileSync(future.source, "const future = 1;\n", "utf-8");
-		await future.client.openFile(future.source);
-		expect(await futureDelivery).toHaveLength(1);
+    const futureClock = new ControlledClock()
+    const future = await harness.makeClient(
+      {
+        publishDiagnostics: [
+          {
+            trigger: "didChange",
+            version: 3,
+            diagnostics: [diagnostic("future")],
+            awaitClientDelivery: true,
+          },
+        ],
+      },
+      { diagnosticsFreshnessTimeoutMs: 100, versionlessPublishQuiescenceMs: 5, timerProvider: futureClock },
+    )
+    await future.client.openFile(future.source)
+    const futureDelivery = waitForEventCount(
+      future.events,
+      (event) => event.type === "clientResponse" && event.method === "workspace/configuration",
+      1,
+    )
+    writeFileSync(future.source, "const future = 1;\n", "utf-8")
+    await future.client.openFile(future.source)
+    expect(await futureDelivery).toHaveLength(1)
 
-		const futurePending = future.client.diagnostics(future.source);
-		await futureClock.waitForTimer(100);
-		futureClock.advanceBy(100);
-		const futureResult = await futurePending;
+    const futurePending = future.client.diagnostics(future.source)
+    await futureClock.waitForTimer(100)
+    futureClock.advanceBy(100)
+    const futureResult = await futurePending
 
-		expect(futureResult.items).toEqual([]);
-		expect(futureResult.transientError?.kind).toBe("freshness_timeout");
-	});
+    expect(futureResult.items).toEqual([])
+    expect(futureResult.transientError?.kind).toBe("freshness_timeout")
+  })
 
-	it("#given a pull response overtaken by a later local change #when the stale full report returns first #then diagnostics restart within the same request and resolve from the current version", async () => {
-		// Both pull reports answer this request, so no freshness deadline may fire: a controlled clock
-		// removes the 800ms wall-clock race that a starved shard otherwise wins (#8323).
-		const clock = new ControlledClock();
-		const context = await harness.makeClient(
-			{
-				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
-				diagnosticResponses: [
-					{
-						releaseOnDidChange: true,
-						report: { kind: "full", resultId: "v1", items: [diagnostic("pull-stale")] },
-					},
-					{
-						report: { kind: "full", resultId: "v2", items: [diagnostic("pull-fresh")] },
-					},
-				],
-			},
-			{ diagnosticsFreshnessTimeoutMs: 800, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
-		);
-		await context.client.openFile(context.source);
+  it("#given a pull response overtaken by a later local change #when the stale full report returns first #then diagnostics restart within the same request and resolve from the current version", async () => {
+    // Both pull reports answer this request, so no freshness deadline may fire: a controlled clock
+    // removes the 800ms wall-clock race that a starved shard otherwise wins (#8323).
+    const clock = new ControlledClock()
+    const context = await harness.makeClient(
+      {
+        capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
+        diagnosticResponses: [
+          {
+            releaseOnDidChange: true,
+            report: { kind: "full", resultId: "v1", items: [diagnostic("pull-stale")] },
+          },
+          {
+            report: { kind: "full", resultId: "v2", items: [diagnostic("pull-fresh")] },
+          },
+        ],
+      },
+      { diagnosticsFreshnessTimeoutMs: 800, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
+    )
+    await context.client.openFile(context.source)
 
-		const pending = context.client.diagnostics(context.source);
-		await waitForEventCountBySubscription(
-			context.events,
-			(event) => event.type === "clientRequest" && event.method === "textDocument/diagnostic",
-			1,
-		);
-		writeFileSync(context.source, "const pull_fresh = 1;\n", "utf-8");
-		await context.client.openFile(context.source);
+    const pending = context.client.diagnostics(context.source)
+    await waitForEventCountBySubscription(
+      context.events,
+      (event) => event.type === "clientRequest" && event.method === "textDocument/diagnostic",
+      1,
+    )
+    writeFileSync(context.source, "const pull_fresh = 1;\n", "utf-8")
+    await context.client.openFile(context.source)
 
-		const result = await pending;
+    const result = await pending
 
-		expect(result.items).toEqual([diagnostic("pull-fresh")]);
-		expect(
-			readEvents(context.events).filter(
-				(event) => event.type === "clientRequest" && event.method === "textDocument/diagnostic",
-			),
-		).toHaveLength(2);
-	});
+    expect(result.items).toEqual([diagnostic("pull-fresh")])
+    expect(
+      readEvents(context.events).filter(
+        (event) => event.type === "clientRequest" && event.method === "textDocument/diagnostic",
+      ),
+    ).toHaveLength(2)
+  })
 
-	it("#given a full pull report followed by an unchanged report for the same version and resultId #when diagnostics repeat without a local change #then the cached full items are reused", async () => {
-		// Both requests are answered by the server, so a controlled clock keeps the freshness window
-		// from becoming a second deadline the shard can starve (#8323).
-		const clock = new ControlledClock();
-		const context = await harness.makeClient(
-			{
-				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
-				diagnosticResponses: [
-					{
-						report: { kind: "full", resultId: "same-version", items: [diagnostic("cached-full")] },
-					},
-					{
-						report: { kind: "unchanged", resultId: "same-version" },
-					},
-				],
-			},
-			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
-		);
-		await context.client.openFile(context.source);
+  it("#given a full pull report followed by an unchanged report for the same version and resultId #when diagnostics repeat without a local change #then the cached full items are reused", async () => {
+    // Both requests are answered by the server, so a controlled clock keeps the freshness window
+    // from becoming a second deadline the shard can starve (#8323).
+    const clock = new ControlledClock()
+    const context = await harness.makeClient(
+      {
+        capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
+        diagnosticResponses: [
+          {
+            report: { kind: "full", resultId: "same-version", items: [diagnostic("cached-full")] },
+          },
+          {
+            report: { kind: "unchanged", resultId: "same-version" },
+          },
+        ],
+      },
+      { diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
+    )
+    await context.client.openFile(context.source)
 
-		const first = await context.client.diagnostics(context.source);
-		const second = await context.client.diagnostics(context.source);
+    const first = await context.client.diagnostics(context.source)
+    const second = await context.client.diagnostics(context.source)
 
-		expect(first.items).toEqual([diagnostic("cached-full")]);
-		expect(second.items).toEqual([diagnostic("cached-full")]);
-	});
+    expect(first.items).toEqual([diagnostic("cached-full")])
+    expect(second.items).toEqual([diagnostic("cached-full")])
+  })
 
-	it("#given a server that claims pull support but closes instead of answering #when diagnostics run #then the transport failure is not labeled clean", async () => {
-		// Deliberately left on the real clock: the client only notices the dead server when the
-		// in-flight pull request's own timeout aborts it, so a timer must actually fire here. Making
-		// the transport reject pending requests from the child's exit event is a separate change.
-		const context = await harness.makeClient(
-			{
-				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
-				diagnosticResponses: [{ action: "close" }],
-			},
-			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5 },
-		);
-		await context.client.openFile(context.source);
+  it("#given a server that claims pull support but closes instead of answering #when diagnostics run #then the transport failure is not labeled clean", async () => {
+    // Deliberately left on the real clock: the client only notices the dead server when the
+    // in-flight pull request's own timeout aborts it, so a timer must actually fire here. Making
+    // the transport reject pending requests from the child's exit event is a separate change.
+    const context = await harness.makeClient(
+      {
+        capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
+        diagnosticResponses: [{ action: "close" }],
+      },
+      { diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5 },
+    )
+    await context.client.openFile(context.source)
 
-		await expect(context.client.diagnostics(context.source)).rejects.toThrow(/exited|closed/i);
-	});
+    await expect(context.client.diagnostics(context.source)).rejects.toThrow(/exited|closed/i)
+  })
 
-	it("#given an advertised pull method that is explicitly unsupported and a matching push publish #when diagnostics run #then the client falls back to push diagnostics", async () => {
-		// The exact-version publish wakes the push-fallback wait, so no deadline may fire; a controlled
-		// clock keeps the 500ms window from winning that race on a starved shard (#8323).
-		const clock = new ControlledClock();
-		const context = await harness.makeClient(
-			{
-				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
-				publishDiagnostics: [
-					{
-						trigger: "didOpen",
-						version: 1,
-						diagnostics: [diagnostic("push-fallback")],
-						awaitClientDelivery: true,
-					},
-				],
-				diagnosticResponses: [{ error: { code: -32601, message: "Method not found" } }],
-			},
-			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
-		);
+  it("#given an advertised pull method that is explicitly unsupported and a matching push publish #when diagnostics run #then the client falls back to push diagnostics", async () => {
+    // The exact-version publish wakes the push-fallback wait, so no deadline may fire; a controlled
+    // clock keeps the 500ms window from winning that race on a starved shard (#8323).
+    const clock = new ControlledClock()
+    const context = await harness.makeClient(
+      {
+        capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
+        publishDiagnostics: [
+          {
+            trigger: "didOpen",
+            version: 1,
+            diagnostics: [diagnostic("push-fallback")],
+            awaitClientDelivery: true,
+          },
+        ],
+        diagnosticResponses: [{ error: { code: -32601, message: "Method not found" } }],
+      },
+      { diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
+    )
 
-		const pending = context.client.diagnostics(context.source);
-		const [delivery] = await waitForEventCountBySubscription(
-			context.events,
-			(event) => event.type === "clientResponse" && event.method === "workspace/configuration",
-			1,
-		);
-		expect(delivery).toBeDefined();
-		const result = await pending;
+    const pending = context.client.diagnostics(context.source)
+    const [delivery] = await waitForEventCountBySubscription(
+      context.events,
+      (event) => event.type === "clientResponse" && event.method === "workspace/configuration",
+      1,
+    )
+    expect(delivery).toBeDefined()
+    const result = await pending
 
-		expect(result.items).toEqual([diagnostic("push-fallback")]);
-	});
+    expect(result.items).toEqual([diagnostic("push-fallback")])
+  })
 
-	it("#given a diagnostic pull request times out #when the fake server keeps it pending #then the client sends cancel for the LSP request id", async () => {
-		const context = await harness.makeClient(
-			{
-				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
-				diagnosticResponses: [{ action: "hang" }],
-			},
-			{ requestTimeoutMs: 30, diagnosticsFreshnessTimeoutMs: 50, versionlessPublishQuiescenceMs: 5 },
-		);
+  it("#given a diagnostic pull request times out #when the fake server keeps it pending #then the client sends cancel for the LSP request id", async () => {
+    const context = await harness.makeClient(
+      {
+        capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
+        diagnosticResponses: [{ action: "hang" }],
+      },
+      { requestTimeoutMs: 30, diagnosticsFreshnessTimeoutMs: 50, versionlessPublishQuiescenceMs: 5 },
+    )
 
-		const result = await context.client.diagnostics(context.source);
-		const [cancel] = await waitForEventCount(
-			context.events,
-			(event) => event.type === "clientNotification" && event.method === "$/cancelRequest",
-			1,
-		);
-		const events = readEvents(context.events);
-		const request = events.find((event) => event.type === "clientRequest" && event.method === "textDocument/diagnostic");
+    const result = await context.client.diagnostics(context.source)
+    const [cancel] = await waitForEventCount(
+      context.events,
+      (event) => event.type === "clientNotification" && event.method === "$/cancelRequest",
+      1,
+    )
+    const events = readEvents(context.events)
+    const request = events.find((event) => event.type === "clientRequest" && event.method === "textDocument/diagnostic")
 
-		expect(result.transientError?.kind).toBe("freshness_timeout");
-		expect(cancel?.params).toEqual({ id: request?.id });
-	});
+    expect(result.transientError?.kind).toBe("freshness_timeout")
+    expect(cancel?.params).toEqual({ id: request?.id })
+  })
 
-	it("#given a server without pull support that never publishes diagnostics #when diagnostics run on a clean file #then the request resolves clean after the freshness window instead of reporting a timeout", async () => {
-		const clock = new ControlledClock();
-		const context = await harness.makeClient(
-			{},
-			{ diagnosticsFreshnessTimeoutMs: 60, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
-		);
+  it("#given a server without pull support that never publishes diagnostics #when diagnostics run on a clean file #then the request resolves clean after the freshness window instead of reporting a timeout", async () => {
+    const clock = new ControlledClock()
+    const context = await harness.makeClient(
+      {},
+      { diagnosticsFreshnessTimeoutMs: 60, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
+    )
 
-		const pending = context.client.diagnostics(context.source);
-		await clock.waitForTimer(60);
-		expect(clock.scheduledDelays.at(-1)).toBe(60);
-		clock.advanceBy(60);
-		const result = await pending;
+    const pending = context.client.diagnostics(context.source)
+    await clock.waitForTimer(60)
+    expect(clock.scheduledDelays.at(-1)).toBe(60)
+    clock.advanceBy(60)
+    const result = await pending
 
-		expect(result.transientError).toBeUndefined();
-		expect(result.items).toEqual([]);
-	});
+    expect(result.transientError).toBeUndefined()
+    expect(result.items).toEqual([])
+  })
 
-	it("#given a pull-supported server that cached diagnostics for an older document version #when the file changes and a later pull is rejected as unsupported without any publish #then the fallback resolves empty instead of returning the stale cached diagnostics", async () => {
-		const clock = new ControlledClock();
-		const context = await harness.makeClient(
-			{
-				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
-				diagnosticResponses: [
-					{ report: { kind: "full", resultId: "v1", items: [diagnostic("stale-pull")] } },
-					{ error: { code: -32601, message: "Method not found" } },
-				],
-			},
-			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
-		);
+  it("#given a pull-supported server that cached diagnostics for an older document version #when the file changes and a later pull is rejected as unsupported without any publish #then the fallback resolves empty instead of returning the stale cached diagnostics", async () => {
+    const clock = new ControlledClock()
+    const context = await harness.makeClient(
+      {
+        capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
+        diagnosticResponses: [
+          { report: { kind: "full", resultId: "v1", items: [diagnostic("stale-pull")] } },
+          { error: { code: -32601, message: "Method not found" } },
+        ],
+      },
+      { diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
+    )
 
-		const first = await context.client.diagnostics(context.source);
-		expect(first.items).toEqual([diagnostic("stale-pull")]);
+    const first = await context.client.diagnostics(context.source)
+    expect(first.items).toEqual([diagnostic("stale-pull")])
 
-		writeFileSync(context.source, "const changed = 1;\n");
-		await context.client.openFile(context.source);
+    writeFileSync(context.source, "const changed = 1;\n")
+    await context.client.openFile(context.source)
 
-		const second = await resolveThroughFreshnessWindow(clock, () => context.client.diagnostics(context.source));
-		expect(second.transientError).toBeUndefined();
-		expect(second.items).toEqual([]);
-	});
+    const second = await resolveThroughFreshnessWindow(clock, () => context.client.diagnostics(context.source))
+    expect(second.transientError).toBeUndefined()
+    expect(second.items).toEqual([])
+  })
 
-	it("#given a pull-supported server with a current cached pull report #when a later pull is rejected as unsupported without any publish and the document is unchanged #then the fallback resolves with the current cached diagnostics", async () => {
-		const clock = new ControlledClock();
-		const context = await harness.makeClient(
-			{
-				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
-				diagnosticResponses: [
-					{ report: { kind: "full", resultId: "v1", items: [diagnostic("cached-full")] } },
-					{ error: { code: -32601, message: "Method not found" } },
-				],
-			},
-			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
-		);
+  it("#given a pull-supported server with a current cached pull report #when a later pull is rejected as unsupported without any publish and the document is unchanged #then the fallback resolves with the current cached diagnostics", async () => {
+    const clock = new ControlledClock()
+    const context = await harness.makeClient(
+      {
+        capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
+        diagnosticResponses: [
+          { report: { kind: "full", resultId: "v1", items: [diagnostic("cached-full")] } },
+          { error: { code: -32601, message: "Method not found" } },
+        ],
+      },
+      { diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
+    )
 
-		const first = await context.client.diagnostics(context.source);
-		expect(first.items).toEqual([diagnostic("cached-full")]);
+    const first = await context.client.diagnostics(context.source)
+    expect(first.items).toEqual([diagnostic("cached-full")])
 
-		const second = await resolveThroughFreshnessWindow(clock, () => context.client.diagnostics(context.source));
-		expect(second.transientError).toBeUndefined();
-		expect(second.items).toEqual([diagnostic("cached-full")]);
-	});
+    const second = await resolveThroughFreshnessWindow(clock, () => context.client.diagnostics(context.source))
+    expect(second.transientError).toBeUndefined()
+    expect(second.items).toEqual([diagnostic("cached-full")])
+  })
 
-	// #9476: the server delays whichever message must come second, so the arrival order at the client
-	// is fixed by the fake server instead of scheduler luck. The controlled clock keeps the freshness
-	// window from firing: only the matching push publish may resolve the call.
-	it("#given the unsupported-pull error response arrives before the matching push publish #when diagnostics run #then the client resolves to that publish", async () => {
-		const clock = new ControlledClock();
-		const context = await harness.makeClient(
-			{
-				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
-				publishDiagnostics: [
-					{
-						trigger: "diagnosticRequest",
-						version: 1,
-						delayMs: 150,
-						diagnostics: [diagnostic("error-first")],
-						awaitClientDelivery: true,
-					},
-				],
-				diagnosticResponses: [{ error: { code: -32601, message: "Method not found" } }],
-			},
-			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
-		);
+  // #9476: the server delays whichever message must come second, so the arrival order at the client
+  // is fixed by the fake server instead of scheduler luck. The controlled clock keeps the freshness
+  // window from firing: only the matching push publish may resolve the call.
+  it("#given the unsupported-pull error response arrives before the matching push publish #when diagnostics run #then the client resolves to that publish", async () => {
+    const clock = new ControlledClock()
+    const context = await harness.makeClient(
+      {
+        capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
+        publishDiagnostics: [
+          {
+            trigger: "diagnosticRequest",
+            version: 1,
+            delayMs: 150,
+            diagnostics: [diagnostic("error-first")],
+            awaitClientDelivery: true,
+          },
+        ],
+        diagnosticResponses: [{ error: { code: -32601, message: "Method not found" } }],
+      },
+      { diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
+    )
 
-		const result = await context.client.diagnostics(context.source);
+    const result = await context.client.diagnostics(context.source)
 
-		expect(result.items).toEqual([diagnostic("error-first")]);
-		expect(result.transientError).toBeUndefined();
-	});
+    expect(result.items).toEqual([diagnostic("error-first")])
+    expect(result.transientError).toBeUndefined()
+  })
 
-	it("#given the matching push publish arrives before the unsupported-pull error response #when diagnostics run #then the client resolves to that publish", async () => {
-		const clock = new ControlledClock();
-		const context = await harness.makeClient(
-			{
-				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
-				publishDiagnostics: [
-					{
-						trigger: "diagnosticRequest",
-						version: 1,
-						diagnostics: [diagnostic("publish-first")],
-						awaitClientDelivery: true,
-					},
-				],
-				diagnosticResponses: [{ delayMs: 150, error: { code: -32601, message: "Method not found" } }],
-			},
-			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
-		);
+  it("#given the matching push publish arrives before the unsupported-pull error response #when diagnostics run #then the client resolves to that publish", async () => {
+    const clock = new ControlledClock()
+    const context = await harness.makeClient(
+      {
+        capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
+        publishDiagnostics: [
+          {
+            trigger: "diagnosticRequest",
+            version: 1,
+            diagnostics: [diagnostic("publish-first")],
+            awaitClientDelivery: true,
+          },
+        ],
+        diagnosticResponses: [{ delayMs: 150, error: { code: -32601, message: "Method not found" } }],
+      },
+      { diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: clock },
+    )
 
-		const result = await context.client.diagnostics(context.source);
+    const result = await context.client.diagnostics(context.source)
 
-		expect(result.items).toEqual([diagnostic("publish-first")]);
-		expect(result.transientError).toBeUndefined();
-	});
+    expect(result.items).toEqual([diagnostic("publish-first")])
+    expect(result.transientError).toBeUndefined()
+  })
 
-	it("#given the matching push publish arrived while the pull was in flight and the freshness window elapsed before the unsupported-pull error response #when diagnostics run #then the client resolves to that publish instead of clean", async () => {
-		const clock = new ControlledClock();
-		let skewMs = 0;
-		const skewedClock = {
-			now: () => clock.now() + skewMs,
-			setTimeout: clock.setTimeout,
-			clearTimeout: clock.clearTimeout,
-		};
-		const context = await harness.makeClient(
-			{
-				capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
-				publishDiagnostics: [
-					{
-						trigger: "diagnosticRequest",
-						version: 1,
-						diagnostics: [diagnostic("publish-before-deadline")],
-						awaitClientDelivery: true,
-					},
-				],
-				diagnosticResponses: [{ delayMs: 150, error: { code: -32601, message: "Method not found" } }],
-			},
-			{ diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: skewedClock },
-		);
+  it("#given the matching push publish arrived while the pull was in flight and the freshness window elapsed before the unsupported-pull error response #when diagnostics run #then the client resolves to that publish instead of clean", async () => {
+    const clock = new ControlledClock()
+    let skewMs = 0
+    const skewedClock = {
+      now: () => clock.now() + skewMs,
+      setTimeout: clock.setTimeout,
+      clearTimeout: clock.clearTimeout,
+    }
+    const context = await harness.makeClient(
+      {
+        capabilities: { diagnosticProvider: { interFileDependencies: false, workspaceDiagnostics: false } },
+        publishDiagnostics: [
+          {
+            trigger: "diagnosticRequest",
+            version: 1,
+            diagnostics: [diagnostic("publish-before-deadline")],
+            awaitClientDelivery: true,
+          },
+        ],
+        diagnosticResponses: [{ delayMs: 150, error: { code: -32601, message: "Method not found" } }],
+      },
+      { diagnosticsFreshnessTimeoutMs: 500, versionlessPublishQuiescenceMs: 5, timerProvider: skewedClock },
+    )
 
-		const pending = context.client.diagnostics(context.source);
-		await waitForEventCountBySubscription(
-			context.events,
-			(event) => event.type === "clientResponse" && event.method === "workspace/configuration",
-			1,
-		);
-		// The publish is recorded; the freshness window now elapses before the error response lands.
-		skewMs = 500;
-		const result = await pending;
+    const pending = context.client.diagnostics(context.source)
+    await waitForEventCountBySubscription(
+      context.events,
+      (event) => event.type === "clientResponse" && event.method === "workspace/configuration",
+      1,
+    )
+    // The publish is recorded; the freshness window now elapses before the error response lands.
+    skewMs = 500
+    const result = await pending
 
-		expect(result.items).toEqual([diagnostic("publish-before-deadline")]);
-		expect(result.transientError).toBeUndefined();
-	});
-
-});
+    expect(result.items).toEqual([diagnostic("publish-before-deadline")])
+    expect(result.transientError).toBeUndefined()
+  })
+})

@@ -29,10 +29,7 @@ declare module "bun:test" {
   export function afterAll(fn: () => void | Promise<void>): void
   export function mock<TFunction extends AnyFunction>(fn: TFunction): MockFunction<TFunction>
 
-  export function spyOn<TObject extends object>(
-    object: TObject,
-    key: keyof TObject,
-  ): MockFunction<AnyFunction>
+  export function spyOn<TObject extends object>(object: TObject, key: keyof TObject): MockFunction<AnyFunction>
 
   export namespace mock {
     function module(modulePath: string, factory: () => Record<string, unknown>): void

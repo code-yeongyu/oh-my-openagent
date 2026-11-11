@@ -16,9 +16,16 @@ describe.skipIf(process.platform === "win32")("provisioned runtime handoff with 
     try {
       // given: a provisioned runtime stand-in that records the table and answers on fd 5
       const runtime = join(root, "omo")
-      writeFileSync(runtime, `#!/bin/sh\nprintf '%s' "$SENPI_PRIVATE_FDS" > "$CAPTURE_FILE"\nprintf 'engine:ok' >&5\n`, { mode: 0o755 })
+      writeFileSync(
+        runtime,
+        `#!/bin/sh\nprintf '%s' "$SENPI_PRIVATE_FDS" > "$CAPTURE_FILE"\nprintf 'engine:ok' >&5\n`,
+        { mode: 0o755 },
+      )
       const probe = join(root, "probe.ts")
-      writeFileSync(probe, `import { reexecProvisionedRuntime } from ${JSON.stringify(HANDOFF)}\nawait reexecProvisionedRuntime(${JSON.stringify(runtime)}, { argv: [] })\n`)
+      writeFileSync(
+        probe,
+        `import { reexecProvisionedRuntime } from ${JSON.stringify(HANDOFF)}\nawait reexecProvisionedRuntime(${JSON.stringify(runtime)}, { argv: [] })\n`,
+      )
       const child = spawn(process.execPath, [probe], {
         env: { ...process.env, CAPTURE_FILE: join(root, "capture"), SENPI_PRIVATE_FDS: '{"memory-sync":5}' },
         stdio: ["ignore", "ignore", "pipe", "ignore", "ignore", "pipe"],
@@ -28,8 +35,12 @@ describe.skipIf(process.platform === "win32")("provisioned runtime handoff with 
       if (!(channel instanceof Socket)) throw new Error("no private channel")
       let stderr = ""
       let received = ""
-      child.stderr?.on("data", (chunk: Buffer) => { stderr += chunk.toString() })
-      channel.on("data", (chunk: Buffer) => { received += chunk.toString() })
+      child.stderr?.on("data", (chunk: Buffer) => {
+        stderr += chunk.toString()
+      })
+      channel.on("data", (chunk: Buffer) => {
+        received += chunk.toString()
+      })
       const ended = once(channel, "end", { signal: AbortSignal.timeout(20_000) })
       // when: the launch hands off to the provisioned runtime
       const [code] = await once(child, "exit", { signal: AbortSignal.timeout(20_000) })
@@ -50,7 +61,10 @@ describe.skipIf(process.platform === "win32")("provisioned runtime handoff with 
       const runtime = join(root, "omo")
       writeFileSync(runtime, `#!/bin/sh\ncat <&5 >/dev/null\n`, { mode: 0o755 })
       const probe = join(root, "probe.ts")
-      writeFileSync(probe, `import { reexecProvisionedRuntime } from ${JSON.stringify(HANDOFF)}\nawait reexecProvisionedRuntime(${JSON.stringify(runtime)}, { argv: [] })\n`)
+      writeFileSync(
+        probe,
+        `import { reexecProvisionedRuntime } from ${JSON.stringify(HANDOFF)}\nawait reexecProvisionedRuntime(${JSON.stringify(runtime)}, { argv: [] })\n`,
+      )
       const stdio: ("ignore" | "pipe")[] = ["ignore", "ignore", "pipe"]
       for (let fd = 3; fd <= 24; fd++) stdio.push(fd === 5 || fd === 24 ? "pipe" : "ignore")
       const child = spawn(process.execPath, [probe], {

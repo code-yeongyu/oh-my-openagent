@@ -7,10 +7,7 @@ const DEFAULT_COMMAND_TIMEOUT_MS = 5_000
 const MIN_COMMAND_TIMEOUT_MS = 100
 const MAX_COMMAND_TIMEOUT_MS = 300_000
 
-export function interpolateInstruction(
-  template: string,
-  variables: Record<string, string | undefined>,
-): string {
+export function interpolateInstruction(template: string, variables: Record<string, string | undefined>): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_match, key) => {
     return variables[key] ?? ""
   })
@@ -34,15 +31,9 @@ export function resolveCommandTimeoutMs(
     return Number.isFinite(parsed) ? parsed : undefined
   }
 
-  const rawTimeout =
-    parseFinite(gatewayTimeout) ??
-    parseEnv(envTimeoutRaw) ??
-    DEFAULT_COMMAND_TIMEOUT_MS
+  const rawTimeout = parseFinite(gatewayTimeout) ?? parseEnv(envTimeoutRaw) ?? DEFAULT_COMMAND_TIMEOUT_MS
 
-  return Math.min(
-    MAX_COMMAND_TIMEOUT_MS,
-    Math.max(MIN_COMMAND_TIMEOUT_MS, Math.trunc(rawTimeout)),
-  )
+  return Math.min(MAX_COMMAND_TIMEOUT_MS, Math.max(MIN_COMMAND_TIMEOUT_MS, Math.trunc(rawTimeout)))
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -62,8 +53,9 @@ function extractWakeMetadata(payload: unknown): Pick<WakeResult, "messageId" | "
   const record = asRecord(payload)
   if (!record) return {}
 
-  const nestedCandidates = [record, asRecord(record.data), asRecord(record.result), asRecord(record.message)]
-    .filter((candidate): candidate is Record<string, unknown> => candidate !== null)
+  const nestedCandidates = [record, asRecord(record.data), asRecord(record.result), asRecord(record.message)].filter(
+    (candidate): candidate is Record<string, unknown> => candidate !== null,
+  )
 
   let bestMatch: Pick<WakeResult, "messageId" | "platform" | "channelId" | "threadId"> = {}
   let bestScore = -1
@@ -74,11 +66,7 @@ function extractWakeMetadata(payload: unknown): Pick<WakeResult, "messageId" | "
     const channelId = firstStringValue(candidate, ["channelId", "channel_id", "channel"])
     const threadId = firstStringValue(candidate, ["threadId", "thread_id", "thread"])
 
-    const score =
-      (messageId ? 4 : 0)
-      + (platform ? 3 : 0)
-      + (channelId ? 2 : 0)
-      + (threadId ? 1 : 0)
+    const score = (messageId ? 4 : 0) + (platform ? 3 : 0) + (channelId ? 2 : 0) + (threadId ? 1 : 0)
 
     if (score > bestScore) {
       bestMatch = { messageId, platform, channelId, threadId }
