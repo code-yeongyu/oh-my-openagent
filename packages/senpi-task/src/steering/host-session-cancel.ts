@@ -22,19 +22,31 @@ export function createUnhandledHostSessionCancel(deps: UnhandledHostSessionCance
   const { port } = deps
   const nowIso = (): string => new Date(port.now()).toISOString()
 
-  return async function cancelUnhandledHostSession(record: TaskRecord, reason: string | undefined, expected?: number): Promise<CancelOutcome> {
+  return async function cancelUnhandledHostSession(
+    record: TaskRecord,
+    reason: string | undefined,
+    expected?: number,
+  ): Promise<CancelOutcome> {
     if (record.cancel_requested !== undefined) return deps.cancelPending(record)
     const errorMessage = withDroppedSteeringNotice(reason, record.pending_steering?.length ?? 0)
     let moved: CancelOutcome | undefined
     port.store.mutate(record.task_id, (fresh) => {
       moved = runMoved(fresh, expected) ? staleCancel(fresh) : undefined
-      return moved !== undefined ? fresh : {
-        ...fresh,
-        cancel_requested: { requested_at: nowIso(), ...(errorMessage !== undefined ? { reason: errorMessage } : {}) },
-      }
+      return moved !== undefined
+        ? fresh
+        : {
+            ...fresh,
+            cancel_requested: {
+              requested_at: nowIso(),
+              ...(errorMessage !== undefined ? { reason: errorMessage } : {}),
+            },
+          }
     })
     if (moved !== undefined) return moved
-    port.store.appendEvent(record.task_id, { type: "cancel_requested", payload: { unreachable: true, ...(reason !== undefined ? { reason } : {}) } })
+    port.store.appendEvent(record.task_id, {
+      type: "cancel_requested",
+      payload: { unreachable: true, ...(reason !== undefined ? { reason } : {}) },
+    })
     const cancel = port.destruction.hostSessionCancel
     if (cancel === undefined) return deps.cancelPending(record)
     port.stopRequested?.(record.task_id)
@@ -48,7 +60,10 @@ export function createUnhandledHostSessionCancel(deps: UnhandledHostSessionCance
       })
       if (!result.applied) return false
       deps.clearPersistedQueue(record.task_id)
-      port.store.appendEvent(record.task_id, { type: "cancelled", payload: { previous_status: record.status, ...(reason !== undefined ? { reason } : {}) } })
+      port.store.appendEvent(record.task_id, {
+        type: "cancelled",
+        payload: { previous_status: record.status, ...(reason !== undefined ? { reason } : {}) },
+      })
       await port.destruction.destroyResidentTask(record.task_id, "cancel")
       return true
     }
@@ -64,12 +79,28 @@ export function createUnhandledHostSessionCancel(deps: UnhandledHostSessionCance
       // Another writer ended the record first: this cancel changed nothing, as the with-handle path reports it.
       if (!applied) {
         const status = port.store.load(record.task_id)?.status ?? record.status
-        return { kind: "noop", task_id: record.task_id, status, reason: `Task ${record.task_id} is ${status}, not running.` }
+        return {
+          kind: "noop",
+          task_id: record.task_id,
+          status,
+          reason: `Task ${record.task_id} is ${status}, not running.`,
+        }
       }
-      return { kind: "cancelled", task_id: record.task_id, previous_status: record.status,
-        ...((record.pending_steering?.length ?? 0) > 0 ? { undelivered_messages: record.pending_steering?.length } : {}) }
+      return {
+        kind: "cancelled",
+        task_id: record.task_id,
+        previous_status: record.status,
+        ...((record.pending_steering?.length ?? 0) > 0
+          ? { undelivered_messages: record.pending_steering?.length }
+          : {}),
+      }
     }
-    cancel.drive(record, { ended: async () => { await finish() }, settle })
+    cancel.drive(record, {
+      ended: async () => {
+        await finish()
+      },
+      settle,
+    })
     return deps.cancelPending(record, end.kind === "pending" ? "close_pending" : end.reason)
   }
 }

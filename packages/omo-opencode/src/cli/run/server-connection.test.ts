@@ -2,17 +2,21 @@ import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
 import { existsSync, statSync } from "node:fs"
 import { dirname } from "node:path"
 import { buildPaneAuthEnvironmentArgs } from "../../../../tmux-core/src/tmux-utils/pane-command"
-import { createServerConnectionWithDeps, type ServerConnectionDeps, type ServerConnectionOptions } from "./server-connection"
+import {
+  createServerConnectionWithDeps,
+  type ServerConnectionDeps,
+  type ServerConnectionOptions,
+} from "./server-connection"
 
 const originalConsole = globalThis.console
-type TestClient = { session: Record<string, unknown>, baseUrl?: string }
+type TestClient = { session: Record<string, unknown>; baseUrl?: string }
 
 const mockServerClose = mock(() => {})
 const mockCreateOpencode = mock(() =>
   Promise.resolve({
     client: { session: {} },
     server: { url: "http://127.0.0.1:4096", close: mockServerClose },
-  })
+  }),
 )
 const mockCreateOpencodeClient = mock((options?: { baseUrl?: string }) => ({
   session: {},
@@ -73,7 +77,10 @@ describe("createServerConnection", () => {
       let passwordAtSpawn: string | undefined
       mockCreateOpencode.mockImplementationOnce(() => {
         passwordAtSpawn = process.env.OPENCODE_SERVER_PASSWORD
-        return Promise.resolve({ client: { session: {} }, server: { url: "http://127.0.0.1:4096", close: mockServerClose } })
+        return Promise.resolve({
+          client: { session: {} },
+          server: { url: "http://127.0.0.1:4096", close: mockServerClose },
+        })
       })
       let passwordAtInject: string | undefined
       mockInjectServerAuthIntoClient.mockImplementationOnce(() => {
@@ -87,7 +94,8 @@ describe("createServerConnection", () => {
       expect(passwordAtSpawn?.length ?? 0).toBeGreaterThanOrEqual(32)
       expect(passwordAtInject === passwordAtSpawn).toBe(true)
       const passwordFile = buildPaneAuthEnvironmentArgs()
-        .find((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))?.slice("OPENCODE_SERVER_PASSWORD_FILE=".length)
+        .find((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))
+        ?.slice("OPENCODE_SERVER_PASSWORD_FILE=".length)
       expect(passwordFile !== undefined).toBe(true)
       if (!passwordFile) throw new Error("missing private password file")
       if (process.platform !== "win32") {
@@ -105,10 +113,13 @@ describe("createServerConnection", () => {
       let passwordFile: string | undefined
       mockInjectServerAuthIntoClient.mockImplementationOnce(() => {
         passwordFile = buildPaneAuthEnvironmentArgs()
-          .find((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))?.slice("OPENCODE_SERVER_PASSWORD_FILE=".length)
+          .find((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))
+          ?.slice("OPENCODE_SERVER_PASSWORD_FILE=".length)
         throw new Error("incompatible client")
       })
-      mockServerClose.mockImplementationOnce(() => { throw new Error("close also failed") })
+      mockServerClose.mockImplementationOnce(() => {
+        throw new Error("close also failed")
+      })
 
       // when
       const attempt = createServerConnection({ signal: new AbortController().signal })
@@ -126,7 +137,8 @@ describe("createServerConnection", () => {
       // given
       const result = await createServerConnection({ signal: new AbortController().signal })
       const passwordFile = buildPaneAuthEnvironmentArgs()
-        .find((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))?.slice("OPENCODE_SERVER_PASSWORD_FILE=".length)
+        .find((arg) => arg.startsWith("OPENCODE_SERVER_PASSWORD_FILE="))
+        ?.slice("OPENCODE_SERVER_PASSWORD_FILE=".length)
       expect(process.env.OPENCODE_SERVER_PASSWORD).toBeDefined()
       mockServerClose.mockImplementationOnce(() => {
         throw new Error("close failed")
@@ -145,7 +157,9 @@ describe("createServerConnection", () => {
 
     it("#when the own server fails to start and omo attaches instead #then no generated password is left behind", async () => {
       // given
-      mockIsPortAvailable.mockImplementationOnce(() => Promise.resolve(true)).mockImplementationOnce(() => Promise.resolve(false))
+      mockIsPortAvailable
+        .mockImplementationOnce(() => Promise.resolve(true))
+        .mockImplementationOnce(() => Promise.resolve(false))
       mockCreateOpencode.mockImplementationOnce(() => Promise.reject(new Error("Failed to start server on port 4100")))
 
       // when
@@ -165,7 +179,10 @@ describe("createServerConnection", () => {
     let passwordAtSpawn: string | undefined
     mockCreateOpencode.mockImplementationOnce(() => {
       passwordAtSpawn = process.env.OPENCODE_SERVER_PASSWORD
-      return Promise.resolve({ client: { session: {} }, server: { url: "http://127.0.0.1:4096", close: mockServerClose } })
+      return Promise.resolve({
+        client: { session: {} },
+        server: { url: "http://127.0.0.1:4096", close: mockServerClose },
+      })
     })
 
     try {
@@ -322,12 +339,10 @@ describe("createServerConnection", () => {
       .mockResolvedValueOnce({ port: 4096, wasAutoSelected: false })
       .mockResolvedValueOnce({ port: 4097, wasAutoSelected: true })
 
-    mockCreateOpencode
-      .mockRejectedValueOnce(new Error("Failed to start server on port 4096"))
-      .mockResolvedValueOnce({
-        client: { session: {} },
-        server: { url: "http://127.0.0.1:4097", close: mockServerClose },
-      })
+    mockCreateOpencode.mockRejectedValueOnce(new Error("Failed to start server on port 4096")).mockResolvedValueOnce({
+      client: { session: {} },
+      server: { url: "http://127.0.0.1:4097", close: mockServerClose },
+    })
 
     // when
     const result = await createServerConnection({ signal })
@@ -344,9 +359,7 @@ describe("createServerConnection", () => {
   it("auto mode attaches to default server when port range is exhausted", async () => {
     // given
     const signal = new AbortController().signal
-    mockGetAvailableServerPort.mockRejectedValueOnce(
-      new Error("No available port found in range 4097-4116"),
-    )
+    mockGetAvailableServerPort.mockRejectedValueOnce(new Error("No available port found in range 4097-4116"))
     mockIsPortAvailable.mockResolvedValueOnce(false)
 
     // when

@@ -158,6 +158,17 @@ pub(super) fn focused_element() -> CoreResult<Option<Element>> {
     Ok(element::copy_element(&system, "AXFocusedUIElement"))
 }
 
+/// The app `pid`'s own `AXFocusedUIElement`, read from its application
+/// element: where keys posted to that app land, frontmost or not.
+pub(super) fn app_focused_element(pid: u32) -> CoreResult<Option<Element>> {
+    element::ensure_trusted()?;
+    let pid = libc::pid_t::try_from(pid)
+        .map_err(|_| DesktopError::ax_failed(format!("process id {pid} is out of range")))?;
+    let app = element::create_application(pid)?;
+    set_timeout(&app)?;
+    Ok(element::copy_element(&app, "AXFocusedUIElement"))
+}
+
 /// Every attribute name with its value rendered and truncated to 200 chars.
 pub(super) fn attributes(element: &AXUIElement) -> CoreResult<Vec<(String, String)>> {
     // SAFETY: The slot is writable and receives a create-rule CFArray.

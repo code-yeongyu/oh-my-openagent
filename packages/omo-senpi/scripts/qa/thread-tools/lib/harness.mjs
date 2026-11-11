@@ -27,7 +27,8 @@ const here = dirname(fileURLToPath(import.meta.url))
 
 export const OMO_ROOT = resolve(here, "..", "..", "..", "..", "..", "..")
 export const SENPI_ROOT = process.env.THREAD_QA_SENPI_ROOT ?? "/Users/yeongyu/local-workspaces/senpi-thread-tools"
-export const DESKTOP_ROOT = process.env.THREAD_QA_DESKTOP_ROOT ?? "/Users/yeongyu/local-workspaces/omo-desktop-thread-tools"
+export const DESKTOP_ROOT =
+  process.env.THREAD_QA_DESKTOP_ROOT ?? "/Users/yeongyu/local-workspaces/omo-desktop-thread-tools"
 
 const SENPI_QA_LIB = join(SENPI_ROOT, "packages", "coding-agent", "scripts", "qa-shared", "lib")
 const SENPI_CLI = join(SENPI_ROOT, "packages", "coding-agent", "src", "cli.ts")
@@ -386,11 +387,7 @@ export class HostClient {
   async promptAndSettle(routingId, message, options = {}) {
     const from = this.mark()
     await this.request({ type: "prompt", sessionId: routingId, message, ...options })
-    await this.waitFor(
-      (record) => record.type === "agent_settled" && record.sessionId === routingId,
-      from,
-      120_000,
-    )
+    await this.waitFor((record) => record.type === "agent_settled" && record.sessionId === routingId, from, 120_000)
   }
 }
 
@@ -443,7 +440,8 @@ export async function deliverAuto(port, message, attempts = 40) {
       const started = await port.start(message)
       return { kind: "ok", delivery: "started", turn_id: started.turn_id }
     } catch (error) {
-      if (attempt >= attempts || !/already processing/i.test(error instanceof Error ? error.message : String(error))) throw error
+      if (attempt >= attempts || !/already processing/i.test(error instanceof Error ? error.message : String(error)))
+        throw error
       await new Promise((resolve) => setTimeout(resolve, 50))
     }
   }
@@ -549,7 +547,11 @@ export function stopOwnedShardHosts(scratchDir) {
         continue
       }
       // Separator-bounded: `/tmp/run` must not own a session file under a sibling `/tmp/run-other`.
-      if (typeof meta.owner_session_file !== "string" || !meta.owner_session_file.startsWith(scratchDir.endsWith(sep) ? scratchDir : `${scratchDir}${sep}`)) continue
+      if (
+        typeof meta.owner_session_file !== "string" ||
+        !meta.owner_session_file.startsWith(scratchDir.endsWith(sep) ? scratchDir : `${scratchDir}${sep}`)
+      )
+        continue
       owned = true
       if (typeof meta.socket !== "string") continue
       sockets.push(meta.socket)

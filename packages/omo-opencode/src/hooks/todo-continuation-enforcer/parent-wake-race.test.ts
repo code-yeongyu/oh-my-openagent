@@ -24,7 +24,10 @@ function createFakeTimers(): FakeTimers {
   let clockNow = originalNow
   let timerNow = 0
   let nextId = 1
-  const timers = new Map<number, { readonly time: number; readonly callback: TimerCallback; readonly args: readonly unknown[] }>()
+  const timers = new Map<
+    number,
+    { readonly time: number; readonly callback: TimerCallback; readonly args: readonly unknown[] }
+  >()
 
   const flushMicrotasks = async (): Promise<void> => {
     for (let index = 0; index < 25; index++) {
@@ -32,12 +35,14 @@ function createFakeTimers(): FakeTimers {
     }
   }
 
-  globalThis.setTimeout = unsafeTestValue<typeof setTimeout>((callback: TimerCallback, delay?: number, ...args: readonly unknown[]) => {
-    const id = nextId++
-    const normalizedDelay = typeof delay === "number" && Number.isFinite(delay) ? Math.max(delay, 0) : 0
-    timers.set(id, { time: timerNow + normalizedDelay, callback, args })
-    return unsafeTestValue<FakeTimerID>(id)
-  })
+  globalThis.setTimeout = unsafeTestValue<typeof setTimeout>(
+    (callback: TimerCallback, delay?: number, ...args: readonly unknown[]) => {
+      const id = nextId++
+      const normalizedDelay = typeof delay === "number" && Number.isFinite(delay) ? Math.max(delay, 0) : 0
+      timers.set(id, { time: timerNow + normalizedDelay, callback, args })
+      return unsafeTestValue<FakeTimerID>(id)
+    },
+  )
 
   globalThis.clearTimeout = unsafeTestValue<typeof clearTimeout>((id?: number) => {
     if (typeof id === "number") {
@@ -58,7 +63,8 @@ function createFakeTimers(): FakeTimers {
         if (!next) {
           break
         }
-        if (++fired > 10_000) throw new Error("fake clock fired more than 10000 timers in one advance: a timer keeps rescheduling itself")
+        if (++fired > 10_000)
+          throw new Error("fake clock fired more than 10000 timers in one advance: a timer keeps rescheduling itself")
         const [id, timer] = next
         timers.delete(id)
         timerNow = timer.time
@@ -92,9 +98,7 @@ describe("todo-continuation-enforcer parent wake race", () => {
           todo: async () => {
             onTodoRead?.()
             return {
-              data: [
-                { id: "todo-1", content: "wait for child result", status: "pending", priority: "high" },
-              ],
+              data: [{ id: "todo-1", content: "wait for child result", status: "pending", priority: "high" }],
             }
           },
           promptAsync: async () => {
@@ -151,7 +155,9 @@ describe("todo-continuation-enforcer parent wake race", () => {
     setMainSession(sessionID)
     let pendingParentWake = false
     const hook = createTodoContinuationEnforcer(createMockPluginInput(), {
-      backgroundManager: createBackgroundManager((candidateSessionID) => pendingParentWake && candidateSessionID === sessionID),
+      backgroundManager: createBackgroundManager(
+        (candidateSessionID) => pendingParentWake && candidateSessionID === sessionID,
+      ),
     })
 
     await hook.handler({
@@ -168,14 +174,19 @@ describe("todo-continuation-enforcer parent wake race", () => {
     setMainSession(sessionID)
     let pendingParentWake = false
     let todoReads = 0
-    const hook = createTodoContinuationEnforcer(createMockPluginInput(() => {
-      todoReads += 1
-      if (todoReads === 2) {
-        pendingParentWake = true
-      }
-    }), {
-      backgroundManager: createBackgroundManager((candidateSessionID) => pendingParentWake && candidateSessionID === sessionID),
-    })
+    const hook = createTodoContinuationEnforcer(
+      createMockPluginInput(() => {
+        todoReads += 1
+        if (todoReads === 2) {
+          pendingParentWake = true
+        }
+      }),
+      {
+        backgroundManager: createBackgroundManager(
+          (candidateSessionID) => pendingParentWake && candidateSessionID === sessionID,
+        ),
+      },
+    )
 
     await hook.handler({
       event: { type: "session.idle", properties: { sessionID } },

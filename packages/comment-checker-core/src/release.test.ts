@@ -50,19 +50,40 @@ describe("comment-checker release descriptor", () => {
   })
 
   it("#given XDG_CACHE_HOME on posix #when locating the cache #then it is <xdg>/<name>/bin", () => {
-    const dir = commentCheckerCacheDir({ platform: "linux", env: { XDG_CACHE_HOME: "/xdg" }, homedir: "/home/u", cacheDirName: "oh-my-opencode" })
+    const dir = commentCheckerCacheDir({
+      platform: "linux",
+      env: { XDG_CACHE_HOME: "/xdg" },
+      homedir: "/home/u",
+      cacheDirName: "oh-my-opencode",
+    })
     expect(dir).toBe(join("/xdg", "oh-my-opencode", "bin"))
   })
 
   it("#given no XDG_CACHE_HOME on posix #when locating the cache #then it falls back to ~/.cache", () => {
-    const dir = commentCheckerCacheDir({ platform: "darwin", env: {}, homedir: "/Users/u", cacheDirName: "oh-my-opencode" })
+    const dir = commentCheckerCacheDir({
+      platform: "darwin",
+      env: {},
+      homedir: "/Users/u",
+      cacheDirName: "oh-my-opencode",
+    })
     expect(dir).toBe(join("/Users/u", ".cache", "oh-my-opencode", "bin"))
   })
 
   it("#given win32 #when locating the cache #then LOCALAPPDATA wins, then APPDATA, then AppData\\Local", () => {
     const name = "oh-my-opencode"
-    expect(commentCheckerCacheDir({ platform: "win32", env: { LOCALAPPDATA: "L", APPDATA: "A" }, homedir: "H", cacheDirName: name })).toBe(join("L", name, "bin"))
-    expect(commentCheckerCacheDir({ platform: "win32", env: { APPDATA: "A" }, homedir: "H", cacheDirName: name })).toBe(join("A", name, "bin"))
-    expect(commentCheckerCacheDir({ platform: "win32", env: {}, homedir: "H", cacheDirName: name })).toBe(join("H", "AppData", "Local", name, "bin"))
+    expect(
+      commentCheckerCacheDir({
+        platform: "win32",
+        env: { LOCALAPPDATA: "L", APPDATA: "A" },
+        homedir: "H",
+        cacheDirName: name,
+      }),
+    ).toBe(join("L", name, "bin"))
+    expect(commentCheckerCacheDir({ platform: "win32", env: { APPDATA: "A" }, homedir: "H", cacheDirName: name })).toBe(
+      join("A", name, "bin"),
+    )
+    expect(commentCheckerCacheDir({ platform: "win32", env: {}, homedir: "H", cacheDirName: name })).toBe(
+      join("H", "AppData", "Local", name, "bin"),
+    )
   })
 })

@@ -11,7 +11,23 @@ import { captureCurrent, captureInto, newDoc } from "./test-support"
 // the frontmatter invalid, so the whole file stays body.
 
 const LONG = "This is a fairly long description line that runs well past the default eighty column fold width of yaml"
-const HOSTILE = [LONG, "한국어 설명 문장이 길게 이어집니다. ".repeat(20).trim(), "a\nb", "a\r\nb", "\tlead tab", " lead", "trail ", "x # y", "k: v", "|-", ">", "a\n", "#start", "- dash", "a\n---\nb"]
+const HOSTILE = [
+  LONG,
+  "한국어 설명 문장이 길게 이어집니다. ".repeat(20).trim(),
+  "a\nb",
+  "a\r\nb",
+  "\tlead tab",
+  " lead",
+  "trail ",
+  "x # y",
+  "k: v",
+  "|-",
+  ">",
+  "a\n",
+  "#start",
+  "- dash",
+  "a\n---\nb",
+]
 
 function headerOf(rendered: string): Record<string, unknown> {
   const parsed: unknown = parseYaml(rendered.slice(4, rendered.indexOf("\n---\n", 3)))
@@ -42,7 +58,7 @@ describe("register render (spec #454)", () => {
   })
 
   test("a string and a number with the same text stay two values, sorted by UTF-8 bytes", async () => {
-    const rendered = await concurrent("---\nn: 1\n---\n", "---\nn: 3\n---\n", "---\nn: \"3\"\n---\n")
+    const rendered = await concurrent("---\nn: 1\n---\n", "---\nn: 3\n---\n", '---\nn: "3"\n---\n')
     expect(parseYaml(rendered.slice(4, rendered.indexOf("\n---", 4)))).toEqual({ n: '"3" / 3' })
   })
 
@@ -55,7 +71,10 @@ describe("register render (spec #454)", () => {
         const rendered = renderItem(doc) ?? ""
         expect(rendered, `${JSON.stringify(value)} cycle ${cycle} changed bytes`).toBe(first)
         expect(headerOf(rendered), `${JSON.stringify(value)} cycle ${cycle}`).toEqual({ k: value })
-        expect(captureCurrent(doc, rendered), `${JSON.stringify(value)} cycle ${cycle} re-capture minted ops`).toBeNull()
+        expect(
+          captureCurrent(doc, rendered),
+          `${JSON.stringify(value)} cycle ${cycle} re-capture minted ops`,
+        ).toBeNull()
       }
       doc.free()
     }
@@ -65,7 +84,9 @@ describe("register render (spec #454)", () => {
     const rendered = await concurrent("---\nk: s\n---\n", '---\nk: "a\\nb"\n---\n', '---\nk: "|-"\n---\n')
     const joined = headerOf(rendered).k
     expect(typeof joined).toBe("string")
-    const parts = String(joined).split(" / ").map((part) => parseYaml(part))
+    const parts = String(joined)
+      .split(" / ")
+      .map((part) => parseYaml(part))
     expect(parts.sort()).toEqual(["a\nb", "|-"])
   })
 
@@ -83,7 +104,7 @@ describe("source forms round-trip through the whole-frontmatter emitter (review 
     "---\nk: |\n  line one\n  line two\n---\n",
     "---\nk: >\n  folded line\n  continues here\n---\n",
     "---\nk: |-\n  kept\n\n  blank above\n---\n",
-    "---\nk: \"x: y # not a comment\"\n---\n",
+    '---\nk: "x: y # not a comment"\n---\n',
     "---\nk: 'it''s: #x'\n---\n",
   ]
 
@@ -131,9 +152,17 @@ describe("CRLF frontmatter capture (delta review ea00e988be)", () => {
 
 describe("register values keep their YAML type (review r6 M1, M2)", () => {
   test("a register value joined into a set-kind key keeps its type as an element", async () => {
-    for (const [source, expected] of [["3", 3], ["true", true], ["{ a: 1 }", { a: 1 }]] as const) {
+    for (const [source, expected] of [
+      ["3", 3],
+      ["true", true],
+      ["{ a: 1 }", { a: 1 }],
+    ] as const) {
       // Concurrent first writes tie on Lamport; the lower peer (the list writer) fixes the kind as set.
-      const rendered = await concurrent("---\nother: 1\n---\n", "---\nother: 1\nk:\n  - x\n---\n", `---\nother: 1\nk: ${source}\n---\n`)
+      const rendered = await concurrent(
+        "---\nother: 1\n---\n",
+        "---\nother: 1\nk:\n  - x\n---\n",
+        `---\nother: 1\nk: ${source}\n---\n`,
+      )
       expect(headerOf(rendered).k, `register ${source} inside a set`).toEqual(["x", expected])
     }
   })

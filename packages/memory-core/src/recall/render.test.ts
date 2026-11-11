@@ -20,14 +20,20 @@ describe("renderNudgeBlock", () => {
   })
 
   it("#given a Korean hint #when the block is rendered #then the Korean header is used", () => {
-    const block = renderNudgeBlock({ path: "reference/a.md", hint: "맹모타맥에서는 bun test를 로컬에서 실행하지 않는다." })
+    const block = renderNudgeBlock({
+      path: "reference/a.md",
+      hint: "맹모타맥에서는 bun test를 로컬에서 실행하지 않는다.",
+    })
 
     expect(block).toContain(RECALL_HINT_HEADER_KO)
     expect(block).not.toContain(RECALL_HINT_HEADER)
   })
 
   it("#given an English hint #when the block is rendered #then the English header is kept", () => {
-    const block = renderNudgeBlock({ path: "reference/a.md", hint: "The runbook records that the smoke checks stay local." })
+    const block = renderNudgeBlock({
+      path: "reference/a.md",
+      hint: "The runbook records that the smoke checks stay local.",
+    })
 
     expect(block).toContain(RECALL_HINT_HEADER)
     expect(block).not.toContain(RECALL_HINT_HEADER_KO)
@@ -37,7 +43,7 @@ describe("renderNudgeBlock", () => {
     const rendered = renderNudgeBlock({ path: 'reference/a"><injected>.md', hint: "plain hint" })
     expect(rendered.match(/<recalled-memory/g)).toHaveLength(1)
     expect(rendered.match(/<\/recalled-memory>/g)).toHaveLength(1)
-    expect(rendered).toContain('reference/a&quot;&gt;&lt;injected&gt;.md')
+    expect(rendered).toContain("reference/a&quot;&gt;&lt;injected&gt;.md")
   })
 
   it("#given a hint containing recalled-memory delimiters #when rendered #then it cannot escape the sourced block", () => {

@@ -42,19 +42,30 @@ afterEach(async () => {
 })
 
 describe("member injection residency", () => {
-  test("#given configured TTL and a real process member #when parked then messaged by task id #then detach_rpc resumes one acknowledged turn", async () => {
-    const trace = createColdReviveTrace()
-    activeTrace = trace
-    const progress = trace.watchProgress(CHILD_LIVENESS_WINDOW_MS)
-    const result = await Promise.race([
-      realColdRevive("process", false, { idleTimeoutMs: 37, team: true, trace }),
-      progress.stalled,
-    ]).finally(() => {
-      progress.dispose()
-      if (activeTrace === trace) activeTrace = undefined
-    })
-    expect(result).toMatchObject({ cadenceMs: 37, parked: "rpc_detached", memberExtensionRestored: true, messageCount: 1, status: "completed", leaseReleased: true })
-  }, COLD_REVIVE_CEILING_MS)
+  test(
+    "#given configured TTL and a real process member #when parked then messaged by task id #then detach_rpc resumes one acknowledged turn",
+    async () => {
+      const trace = createColdReviveTrace()
+      activeTrace = trace
+      const progress = trace.watchProgress(CHILD_LIVENESS_WINDOW_MS)
+      const result = await Promise.race([
+        realColdRevive("process", false, { idleTimeoutMs: 37, team: true, trace }),
+        progress.stalled,
+      ]).finally(() => {
+        progress.dispose()
+        if (activeTrace === trace) activeTrace = undefined
+      })
+      expect(result).toMatchObject({
+        cadenceMs: 37,
+        parked: "rpc_detached",
+        memberExtensionRestored: true,
+        messageCount: 1,
+        status: "completed",
+        leaseReleased: true,
+      })
+    },
+    COLD_REVIVE_CEILING_MS,
+  )
 
   test("#given a member whose initial turn ended without a wait #when lead mail is injected #then its resident RPC session revives into a working turn", async () => {
     // given an ended but resident member session
@@ -79,24 +90,33 @@ describe("member injection residency", () => {
       memberName: "alice",
       config,
       sessionDir,
-      inject: (content) => { injected = handle.followUp(content) },
+      inject: (content) => {
+        injected = handle.followUp(content)
+      },
     })
-    await sendMessage({
-      version: 1,
-      messageId: MESSAGE_ID,
-      from: "lead",
-      to: "alice",
-      kind: "message",
-      body: "continue with injected work",
-      timestamp: 1,
-    }, TEAM_RUN_ID, config, { isLead: true, activeMembers: ["alice"] })
+    await sendMessage(
+      {
+        version: 1,
+        messageId: MESSAGE_ID,
+        from: "lead",
+        to: "alice",
+        kind: "message",
+        body: "continue with injected work",
+        timestamp: 1,
+      },
+      TEAM_RUN_ID,
+      config,
+      { isLead: true, activeMembers: ["alice"] },
+    )
 
     // when the member inbox poller injects the lead mail
     await poller.pollOnce()
     await injected
     const workingTurn = handle.waitForIdle()
     let completed = false
-    void workingTurn.then(() => { completed = true })
+    void workingTurn.then(() => {
+      completed = true
+    })
     await Promise.resolve()
 
     // then the prior completed turn did not satisfy the new turn, and work can proceed

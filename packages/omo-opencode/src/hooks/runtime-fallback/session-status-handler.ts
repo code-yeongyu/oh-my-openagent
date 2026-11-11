@@ -17,24 +17,21 @@ export function createSessionStatusHandler(
   helpers: AutoRetryHelpers,
   sessionStatusRetryKeys: Map<string, Set<string>>,
 ) {
-  const {
-    pluginConfig,
-    sessionStates,
-    sessionLastAccess,
-    sessionRetryInFlight,
-  } = deps
+  const { pluginConfig, sessionStates, sessionLastAccess, sessionRetryInFlight } = deps
   const exhaustionToastStates = deps.fallbackExhaustionToastStates ?? new Map<string, FallbackState>()
 
   const showExhaustedToast = async (sessionID: string, state?: FallbackState) => {
     if (state ? exhaustionToastStates.get(sessionID) === state : exhaustionToastStates.has(sessionID)) return
     exhaustionToastStates.set(sessionID, state ?? createFallbackState("unknown"))
     try {
-      await deps.ctx.client.tui.showToast({ body: {
-        title: "Runtime fallback",
-        message: "Fallback attempts exhausted; native retry continues",
-        variant: "warning",
-        duration: 3000,
-      } })
+      await deps.ctx.client.tui.showToast({
+        body: {
+          title: "Runtime fallback",
+          message: "Fallback attempts exhausted; native retry continues",
+          variant: "warning",
+          duration: 3000,
+        },
+      })
     } catch (error) {
       log(`[${HOOK_NAME}] fallback exhaustion toast failed`, { sessionID, error: String(error) })
     }
@@ -72,7 +69,10 @@ export function createSessionStatusHandler(
     }
 
     if (isCompactionInFlight(sessionID)) {
-      log(`[${HOOK_NAME}] retry signal belongs to compaction lane; primary chain untouched (compaction-lane-retry-ignored)`, { sessionID })
+      log(
+        `[${HOOK_NAME}] retry signal belongs to compaction lane; primary chain untouched (compaction-lane-retry-ignored)`,
+        { sessionID },
+      )
       return
     }
 
@@ -97,7 +97,9 @@ export function createSessionStatusHandler(
         const resolvedAgentForAbort = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
         const availableModels = getFallbackModelsForSession(sessionID, resolvedAgentForAbort, pluginConfig)
         if (!canPrepareFallback(state, availableModels, deps.config, model)) {
-          log(`[${HOOK_NAME}] fallback exhausted; leaving native retry running (fallback-exhausted-no-abort)`, { sessionID })
+          log(`[${HOOK_NAME}] fallback exhausted; leaving native retry running (fallback-exhausted-no-abort)`, {
+            sessionID,
+          })
           await showExhaustedToast(sessionID, state)
           return
         }
@@ -123,7 +125,9 @@ export function createSessionStatusHandler(
 
     const stateBeforeMutation = sessionStates.get(sessionID)
     if (!canPrepareFallback(stateBeforeMutation, fallbackModels, deps.config, model)) {
-      log(`[${HOOK_NAME}] fallback exhausted; leaving native retry running (fallback-exhausted-no-abort)`, { sessionID })
+      log(`[${HOOK_NAME}] fallback exhausted; leaving native retry running (fallback-exhausted-no-abort)`, {
+        sessionID,
+      })
       await showExhaustedToast(sessionID, stateBeforeMutation)
       return
     }
@@ -178,7 +182,9 @@ export function createSessionStatusHandler(
     })
 
     if (!canPrepareFallback(state, fallbackModels, deps.config)) {
-      log(`[${HOOK_NAME}] fallback exhausted; leaving native retry running (fallback-exhausted-no-abort)`, { sessionID })
+      log(`[${HOOK_NAME}] fallback exhausted; leaving native retry running (fallback-exhausted-no-abort)`, {
+        sessionID,
+      })
       await showExhaustedToast(sessionID, state)
       return
     }

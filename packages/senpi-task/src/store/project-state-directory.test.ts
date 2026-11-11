@@ -12,7 +12,10 @@ const nothingExists = () => false
 describe("resolveProjectStateDirectory", () => {
   describe("#given a project with no omo state inside it", () => {
     test("#then task state lands in the default agent dir, outside the project", () => {
-      const directory = resolveProjectStateDirectory("/work/app", "senpi-task", { env: { HOME }, exists: nothingExists })
+      const directory = resolveProjectStateDirectory("/work/app", "senpi-task", {
+        env: { HOME },
+        exists: nothingExists,
+      })
 
       expect(directory).toBe(join(HOME, ".omo", "agent", "projects", projectStateKey("/work/app"), "senpi-task"))
       expect(relative(resolve("/work/app"), directory).startsWith("..")).toBe(true)
@@ -28,7 +31,10 @@ describe("resolveProjectStateDirectory", () => {
 
     test("#then the thread tools' mailbox shares the same per-project folder", () => {
       const tasks = resolveProjectStateDirectory("/work/app", "senpi-task", { env: { HOME }, exists: nothingExists })
-      const threads = resolveProjectStateDirectory("/work/app", "thread-tools", { env: { HOME }, exists: nothingExists })
+      const threads = resolveProjectStateDirectory("/work/app", "thread-tools", {
+        env: { HOME },
+        exists: nothingExists,
+      })
 
       expect(join(threads, "..")).toBe(join(tasks, ".."))
       expect(threads.endsWith("thread-tools")).toBe(true)
@@ -42,7 +48,9 @@ describe("resolveProjectStateDirectory", () => {
         mkdirSync(join(project, ".omo", "senpi-task", "tasks"), { recursive: true })
         writeFileSync(join(project, ".omo", "senpi-task", "tasks", "st_x.json"), "{}")
 
-        expect(resolveProjectStateDirectory(project, "senpi-task", { env: { HOME } })).toBe(join(project, ".omo", "senpi-task"))
+        expect(resolveProjectStateDirectory(project, "senpi-task", { env: { HOME } })).toBe(
+          join(project, ".omo", "senpi-task"),
+        )
         expect(resolveProjectStateDirectory(project, "thread-tools", { env: { HOME } })).toBe(
           join(HOME, ".omo", "agent", "projects", projectStateKey(project), "thread-tools"),
         )
@@ -98,7 +106,9 @@ describe("resolveProjectStateDirectory", () => {
         mkdirSync(join(project, ".omo"))
         symlinkSync(join(project, "shared-state"), join(project, ".omo", "senpi-task"))
 
-        expect(resolveProjectStateDirectory(project, "senpi-task", { env: { HOME } })).toBe(join(project, ".omo", "senpi-task"))
+        expect(resolveProjectStateDirectory(project, "senpi-task", { env: { HOME } })).toBe(
+          join(project, ".omo", "senpi-task"),
+        )
       } finally {
         rmSync(project, { recursive: true, force: true })
       }
@@ -110,7 +120,9 @@ describe("resolveProjectStateDirectory", () => {
         mkdirSync(join(project, ".omo"))
         writeFileSync(join(project, ".omo", "senpi-task"), "")
 
-        expect(resolveProjectStateDirectory(project, "senpi-task", { env: { HOME } })).toBe(join(project, ".omo", "senpi-task"))
+        expect(resolveProjectStateDirectory(project, "senpi-task", { env: { HOME } })).toBe(
+          join(project, ".omo", "senpi-task"),
+        )
       } finally {
         rmSync(project, { recursive: true, force: true })
       }

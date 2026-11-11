@@ -3,16 +3,7 @@
 
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { createHash } from "node:crypto"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
@@ -92,18 +83,28 @@ function nativeFixture() {
         packageName: "@code-yeongyu/senpi-pty",
         pinSource: "ptyPin",
         pin: "2026.8.24",
-        targets: Object.fromEntries(Object.keys(GREP_HOSTS).map((target) => [target, {
-          available: target === "darwin-arm64",
-          prebuildHost: target === "darwin-arm64" ? target : null,
-        }])),
+        targets: Object.fromEntries(
+          Object.keys(GREP_HOSTS).map((target) => [
+            target,
+            {
+              available: target === "darwin-arm64",
+              prebuildHost: target === "darwin-arm64" ? target : null,
+            },
+          ]),
+        ),
       },
       senpi_grep: {
         packageName: "@code-yeongyu/senpi",
         pinSource: "enginePin",
-        targets: Object.fromEntries(Object.entries(GREP_HOSTS).map(([target, prebuildHost]) => [target, {
-          available: false,
-          prebuildHost,
-        }])),
+        targets: Object.fromEntries(
+          Object.entries(GREP_HOSTS).map(([target, prebuildHost]) => [
+            target,
+            {
+              available: false,
+              prebuildHost,
+            },
+          ]),
+        ),
       },
     },
   }
@@ -133,7 +134,9 @@ function packedPrebuildDependencies(packageDir: string, archiveRoot: string, pac
   }
 }
 
-const unexpectedPack = (): never => { throw new Error("local prebuild must not invoke npm pack") }
+const unexpectedPack = (): never => {
+  throw new Error("local prebuild must not invoke npm pack")
+}
 
 describe("RELEASE_BINARY_TARGETS", () => {
   test("#given the release target map #when inspected #then it lists the twelve published targets", () => {
@@ -204,7 +207,9 @@ describe("RELEASE_BINARY_TARGETS", () => {
     expect(fixture.prebuilds).toEqual(nativeFixture().prebuilds)
     const nativePackage = JSON.parse(readFileSync(join(repoRoot, "packages/omo-native/package.json"), "utf8"))
     expect(binaryBuilder.loadReleaseBinaryTargets(fixture)).toEqual(RELEASE_BINARY_TARGETS)
-    expect(RELEASE_BINARY_TARGETS.every((target) => target.enginePin === nativePackage.dependencies["@code-yeongyu/senpi"])).toBe(true)
+    expect(
+      RELEASE_BINARY_TARGETS.every((target) => target.enginePin === nativePackage.dependencies["@code-yeongyu/senpi"]),
+    ).toBe(true)
     for (const prebuild of Object.values(fixture.prebuilds)) {
       expect(Object.keys(prebuild.targets).sort()).toEqual(RELEASE_BINARY_TARGETS.map((entry) => entry.target).sort())
     }
@@ -252,8 +257,9 @@ describe("RELEASE_BINARY_TARGETS", () => {
     const fixture = JSON.parse(
       readFileSync(join(scriptDir, "release-binary-native-fixture.json"), "utf8"),
     ) as ReturnType<typeof nativeFixture>
-    const grepHosts = Object.fromEntries(Object.entries(fixture.prebuilds.senpi_grep.targets)
-      .map(([target, entry]) => [target, entry.prebuildHost]))
+    const grepHosts = Object.fromEntries(
+      Object.entries(fixture.prebuilds.senpi_grep.targets).map(([target, entry]) => [target, entry.prebuildHost]),
+    )
     expect(grepHosts).toEqual(GREP_HOSTS)
     for (const prebuild of Object.values(fixture.prebuilds)) {
       for (const [target, entry] of Object.entries(prebuild.targets)) {
@@ -282,9 +288,7 @@ describe("embedded asset naming", () => {
     ]
 
     // when
-    const roundTripped = relPaths.map((relPath) =>
-      relPathForEmbeddedName(embeddedNameForRelPath(relPath)),
-    )
+    const roundTripped = relPaths.map((relPath) => relPathForEmbeddedName(embeddedNameForRelPath(relPath)))
 
     // then
     expect(roundTripped).toEqual(relPaths)
@@ -335,10 +339,7 @@ describe("runtime manifest", () => {
     expect(manifest.omoAiVersion).toBe("1.2.3")
     expect(manifest.enginePin).toBe("2026.8.24")
     expect(manifest.manifestSha).toMatch(/^[0-9a-f]{64}$/)
-    expect(manifest.entries.map((entry) => entry.relPath).sort()).toEqual([
-      "package.json",
-      "theme/dark.json",
-    ])
+    expect(manifest.entries.map((entry) => entry.relPath).sort()).toEqual(["package.json", "theme/dark.json"])
     for (const entry of manifest.entries) {
       expect(entry.sha256).toMatch(/^[0-9a-f]{64}$/)
       expect(entry.size).toBeGreaterThan(0)
@@ -401,7 +402,7 @@ describe("size budget", () => {
     // then
     expect(oversize).toThrow(/darwin-arm64/)
     expect(withinBudget).not.toThrow()
-    expect(MAX_BINARY_BYTES).toBe(200 * 1024 * 1024)
+    expect(MAX_BINARY_BYTES).toBe(210 * 1024 * 1024)
     rmSync(stageDir, { recursive: true, force: true })
   })
 
@@ -439,7 +440,10 @@ describe("native prebuild staging", () => {
         const stageDir = join(root, "stage")
         stageParityFixture(packageDir, [relPath, "native/prebuilds/darwin-arm64/unrelated.node"])
         const staged = new Set<string>()
-        binaryBuilder.stageNativePrebuild(entry, stageDir, staged, { resolvePackageDir: () => packageDir, runCommand: unexpectedPack })
+        binaryBuilder.stageNativePrebuild(entry, stageDir, staged, {
+          resolvePackageDir: () => packageDir,
+          runCommand: unexpectedPack,
+        })
         expect([...staged]).toEqual([relPath])
         expect(collectStagedFiles(stageDir)).toEqual([relPath])
         expect(readFileSync(join(stageDir, relPath))).toEqual(readFileSync(join(packageDir, relPath)))
@@ -454,7 +458,11 @@ describe("native prebuild staging", () => {
       try {
         const archiveRoot = join(root, "archive")
         stageParityFixture(join(archiveRoot, "package"), [relPath, "native/prebuilds/darwin-arm64/unrelated.node"])
-        const dependencies = packedPrebuildDependencies(join(root, "missing"), archiveRoot, `${entry.packageName}@${entry.pin}`)
+        const dependencies = packedPrebuildDependencies(
+          join(root, "missing"),
+          archiveRoot,
+          `${entry.packageName}@${entry.pin}`,
+        )
         const staged = new Set<string>()
         binaryBuilder.stageNativePrebuild(entry, join(root, "stage"), staged, dependencies)
         expect(dependencies.commands).toEqual(["npm", "tar"])
@@ -477,7 +485,9 @@ describe("native prebuild staging", () => {
         stageParityFixture(join(archiveRoot, "package"), [otherFile])
         const dependencies = packedPrebuildDependencies(localDir, archiveRoot, `${entry.packageName}@${entry.pin}`)
         const staged = new Set<string>()
-        expect(() => binaryBuilder.stageNativePrebuild(entry, join(root, "stage"), staged, dependencies)).toThrow(`missing required sidecar source: ${relPath}`)
+        expect(() => binaryBuilder.stageNativePrebuild(entry, join(root, "stage"), staged, dependencies)).toThrow(
+          `missing required sidecar source: ${relPath}`,
+        )
         expect(dependencies.commands).toEqual(["npm", "tar"])
         expect([...staged]).toEqual([])
         expect(existsSync(join(root, "stage", relPath))).toBe(false)
@@ -578,7 +588,9 @@ describe("engine trust helper payload", () => {
   test("#given every release target #when expected paths are resolved #then only Darwin and Windows promise the helper", () => {
     expect(RELEASE_BINARY_TARGETS.map((target) => target.target)).toEqual(Object.keys(helperHosts))
     for (const target of RELEASE_BINARY_TARGETS) {
-      const promised = resolveExpectedSidecarRelPaths(target).filter((relPath) => relPath.includes("omo-engine-trust-helper"))
+      const promised = resolveExpectedSidecarRelPaths(target).filter((relPath) =>
+        relPath.includes("omo-engine-trust-helper"),
+      )
       const expected = helperHosts[target.target]
       expect(promised, target.target).toEqual(expected === null || expected === undefined ? [] : [expected])
     }
@@ -589,7 +601,8 @@ describe("engine trust helper payload", () => {
     try {
       const helper = engineTrustHelperTarget("windows-arm64")
       const engine = desktopEngineTarget("windows-arm64")
-      if (helper.source === null || helper.payload === null || engine.source === null) throw new Error("available target expected")
+      if (helper.source === null || helper.payload === null || engine.source === null)
+        throw new Error("available target expected")
       stageParityFixture(root, [helper.source, engine.source])
       const bytes = readFileSync(join(root, helper.source))
       const stageDir = join(root, "stage")
@@ -621,7 +634,9 @@ describe("engine trust helper payload", () => {
         const keychain = keychainHelperPayload(name) === null ? [] : [KEYCHAIN_HELPER_SOURCE]
         stageParityFixture(root, [engine.source, ...keychain])
 
-        const stage = (): void => { stageSidecarPayload(target, join(root, "stage"), "1.0.0", undefined, root) }
+        const stage = (): void => {
+          stageSidecarPayload(target, join(root, "stage"), "1.0.0", undefined, root)
+        }
 
         expect(stage).toThrow(new RegExp(`missing required engine trust helper for ${name}:.*omo-engine-trust-helper`))
         expect(existsSync(join(root, "stage", "plugin"))).toBe(false)
@@ -637,7 +652,9 @@ describe("engine trust helper payload", () => {
 describe("git job helper payload", () => {
   test("#given every release target #when expected paths are resolved #then only Windows promises the helper", () => {
     for (const target of RELEASE_BINARY_TARGETS) {
-      const promised = resolveExpectedSidecarRelPaths(target).filter((relPath) => relPath.includes("omo-git-job-helper"))
+      const promised = resolveExpectedSidecarRelPaths(target).filter((relPath) =>
+        relPath.includes("omo-git-job-helper"),
+      )
       const host = target.target === "windows-arm64" ? "win32-arm64" : "win32-x64"
       const expected = target.target.startsWith("windows-") ? [`native/prebuilds/${host}/omo-git-job-helper.exe`] : []
       expect(promised, target.target).toEqual(expected)
@@ -674,11 +691,14 @@ describe("git job helper payload", () => {
       const target = RELEASE_BINARY_TARGETS.find((entry) => entry.target === "windows-arm64")
       const engine = desktopEngineTarget("windows-arm64")
       const trust = engineTrustHelperTarget("windows-arm64")
-      if (target === undefined || engine.source === null || trust.source === null) throw new Error("windows-arm64 target expected")
+      if (target === undefined || engine.source === null || trust.source === null)
+        throw new Error("windows-arm64 target expected")
       // Every other promised sidecar is present, so the git job helper is the only missing one.
       stageParityFixture(root, [engine.source, trust.source])
 
-      const stage = (): void => { stageSidecarPayload(target, join(root, "stage"), "1.0.0", undefined, root) }
+      const stage = (): void => {
+        stageSidecarPayload(target, join(root, "stage"), "1.0.0", undefined, root)
+      }
 
       expect(stage).toThrow(/missing required git job helper for windows-arm64:.*omo-git-job-helper\.exe/)
       expect(existsSync(join(root, "stage", "plugin"))).toBe(false)
@@ -691,43 +711,35 @@ describe("git job helper payload", () => {
 describe("embedded manifest parity (darwin-arm64)", () => {
   const builtBinary = join(repoRoot, ".omo", "release-binaries", "omo-darwin-arm64")
 
-  test(
-    "#given the darwin-arm64 sidecar payload #when embedded and probed #then the embedded set equals the expected parity set",
-    async () => {
-      // given
-      const target = RELEASE_BINARY_TARGETS.find((entry) => entry.target === "darwin-arm64")!
-      const stageRoot = makeTempDir("omo-parity-")
-      const stageDir = join(stageRoot, "omo-runtime")
-      const expectedRelPaths = resolveExpectedSidecarRelPaths(target)
-      stageParityFixture(stageDir, expectedRelPaths)
-      const manifest = await buildRuntimeManifest(stageDir, {
-        omoAiVersion: "0.0.0-0.test",
-        enginePin: target.enginePin,
-      })
-      writeFileSync(
-        join(stageDir, RUNTIME_MANIFEST_REL_PATH),
-        `${JSON.stringify(manifest)}\n`,
-        "utf8",
-      )
+  test("#given the darwin-arm64 sidecar payload #when embedded and probed #then the embedded set equals the expected parity set", async () => {
+    // given
+    const target = RELEASE_BINARY_TARGETS.find((entry) => entry.target === "darwin-arm64")!
+    const stageRoot = makeTempDir("omo-parity-")
+    const stageDir = join(stageRoot, "omo-runtime")
+    const expectedRelPaths = resolveExpectedSidecarRelPaths(target)
+    stageParityFixture(stageDir, expectedRelPaths)
+    const manifest = await buildRuntimeManifest(stageDir, {
+      omoAiVersion: "0.0.0-0.test",
+      enginePin: target.enginePin,
+    })
+    writeFileSync(join(stageDir, RUNTIME_MANIFEST_REL_PATH), `${JSON.stringify(manifest)}\n`, "utf8")
 
-      // when
-      const embedded = reportEmbeddedPayload(stageDir)
+    // when
+    const embedded = reportEmbeddedPayload(stageDir)
 
-      // then
-      const embeddedRelPaths = embedded.relPaths
-        .filter((relPath) => relPath !== RUNTIME_MANIFEST_REL_PATH)
-        .slice()
-        .sort()
-      expect(embeddedRelPaths).toEqual(expectedRelPaths.slice().sort())
-      expect(embedded.manifest.enginePin).toBe(target.enginePin)
-      expect(embedded.manifest.omoAiVersion).toBe("0.0.0-0.test")
-      rmSync(stageRoot, { recursive: true, force: true })
-    },
-    900_000,
-  )
+    // then
+    const embeddedRelPaths = embedded.relPaths
+      .filter((relPath) => relPath !== RUNTIME_MANIFEST_REL_PATH)
+      .slice()
+      .sort()
+    expect(embeddedRelPaths).toEqual(expectedRelPaths.slice().sort())
+    expect(embedded.manifest.enginePin).toBe(target.enginePin)
+    expect(embedded.manifest.omoAiVersion).toBe("0.0.0-0.test")
+    rmSync(stageRoot, { recursive: true, force: true })
+  }, 900_000)
 
   test.skipIf(!existsSync(builtBinary))(
-    "#given the built darwin-arm64 binary #when measured #then it stays within the 150MB budget",
+    "#given the built darwin-arm64 binary #when measured #then it stays within the size budget",
     () => {
       // given / when
       const size = statSync(builtBinary).size
@@ -748,11 +760,10 @@ describe("plugin staging isolation guard", () => {
     }).stdout
 
     // when
-    const built = spawnSync(
-      "bun",
-      ["run", "script/build-omo-native.ts", "--output", join(stageDir, "plugin")],
-      { cwd: repoRoot, encoding: "utf8" },
-    )
+    const built = spawnSync("bun", ["run", "script/build-omo-native.ts", "--output", join(stageDir, "plugin")], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    })
 
     // then
     expect(built.status).toBe(0)
@@ -771,10 +782,7 @@ describe("plugin staging isolation guard", () => {
 describe("engine graph bundling", () => {
   test("#given the compiled OMO entry #when its engine imports are inspected #then both retain the standard patched engine literal", () => {
     // given
-    const compileEntrySource = readFileSync(
-      join(repoRoot, "packages", "omo-native", "compile-entry.ts"),
-      "utf8",
-    )
+    const compileEntrySource = readFileSync(join(repoRoot, "packages", "omo-native", "compile-entry.ts"), "utf8")
 
     // when
     const engineImports = compileEntrySource.match(
@@ -809,9 +817,7 @@ describe("engine graph bundling", () => {
     const output = "\n   [4ms]  bundle  7 modules\n"
 
     // when / then
-    expect(() => assertEngineGraphBundled(output)).toThrow(
-      /engine graph is missing.*inline string literal/s,
-    )
+    expect(() => assertEngineGraphBundled(output)).toThrow(/engine graph is missing.*inline string literal/s)
   })
 
   test("#given the engine floor #when compared to both observed shapes #then it separates them", () => {
@@ -853,22 +859,43 @@ describe("staged file collection", () => {
 describe("omob build info stamping", () => {
   const buildInfo = {
     command: "omob",
-    omo: { commit: "c6e7dd7fb0f993336ed61c62acc5d55c6ada8bfc", committedAt: "2026-09-04T10:17:49+09:00", branch: "dev" },
-    engine: { commit: "7fd18dfeec7a7db89a983b2c3cb90835b8c3c5f7", committedAt: "2026-09-04T10:49:12+09:00", branch: "main" },
+    omo: {
+      commit: "c6e7dd7fb0f993336ed61c62acc5d55c6ada8bfc",
+      committedAt: "2026-09-04T10:17:49+09:00",
+      branch: "dev",
+    },
+    engine: {
+      commit: "7fd18dfeec7a7db89a983b2c3cb90835b8c3c5f7",
+      committedAt: "2026-09-04T10:49:12+09:00",
+      branch: "main",
+    },
   }
 
   test("#given build info #when the sidecar package.json is stamped #then it carries omoBuild", () => {
-    const stamped = JSON.parse(createStampedPackageJson("0.0.0-omob.c6e7dd7.7fd18df", buildInfo)) as Record<string, unknown>
+    const stamped = JSON.parse(createStampedPackageJson("0.0.0-omob.c6e7dd7.7fd18df", buildInfo)) as Record<
+      string,
+      unknown
+    >
     expect(stamped.omoBuild).toEqual(buildInfo)
   })
 
   test("#given no build info #when stamped #then the release shape stays byte-identical", () => {
-    expect(createStampedPackageJson("9.9.9-0.test")).toBe(`${JSON.stringify({ name: "omo", version: "9.9.9-0.test" }, null, 2)}\n`)
+    expect(createStampedPackageJson("9.9.9-0.test")).toBe(
+      `${JSON.stringify({ name: "omo", version: "9.9.9-0.test" }, null, 2)}\n`,
+    )
   })
 
   test("#given a senpi-package engineBuild #when stamped #then package.json carries engineBuild", () => {
-    const engineBuild = { scheme: "epoch" as const, epoch: 1788486552, sha7: "7fd18df", source: "senpi-package" as const }
-    const stamped = JSON.parse(createStampedPackageJson("9.9.9-0.test", undefined, engineBuild)) as Record<string, unknown>
+    const engineBuild = {
+      scheme: "epoch" as const,
+      epoch: 1788486552,
+      sha7: "7fd18df",
+      source: "senpi-package" as const,
+    }
+    const stamped = JSON.parse(createStampedPackageJson("9.9.9-0.test", undefined, engineBuild)) as Record<
+      string,
+      unknown
+    >
     expect(stamped.engineBuild).toEqual(engineBuild)
     expect(stamped).not.toHaveProperty("omoBuild")
   })
@@ -899,18 +926,21 @@ describe("omob build info stamping", () => {
 describe("engine build identity compile defines", () => {
   const buildInfo = {
     command: "omob",
-    omo: { commit: "c6e7dd7fb0f993336ed61c62acc5d55c6ada8bfc", committedAt: "2026-09-04T10:17:49+09:00", branch: "dev" },
-    engine: { commit: "7fd18dfeec7a7db89a983b2c3cb90835b8c3c5f7", committedAt: "2026-09-04T10:49:12+09:00", branch: "main" },
+    omo: {
+      commit: "c6e7dd7fb0f993336ed61c62acc5d55c6ada8bfc",
+      committedAt: "2026-09-04T10:17:49+09:00",
+      branch: "dev",
+    },
+    engine: {
+      commit: "7fd18dfeec7a7db89a983b2c3cb90835b8c3c5f7",
+      committedAt: "2026-09-04T10:49:12+09:00",
+      branch: "main",
+    },
   }
 
   test("#given buildInfo #when compile defines are resolved #then SENPI_BUILD_EPOCH and SENPI_BUILD_SHA7 are present", () => {
     const args = binaryBuilder.compileDefinesForOmoBinary({ buildInfo })
-    expect(args).toEqual([
-      "--define",
-      "SENPI_BUILD_EPOCH=1788486552",
-      "--define",
-      "SENPI_BUILD_SHA7=\"7fd18df\"",
-    ])
+    expect(args).toEqual(["--define", "SENPI_BUILD_EPOCH=1788486552", "--define", 'SENPI_BUILD_SHA7="7fd18df"'])
   })
 
   test("#given no buildInfo and no senpi git metadata #when compile defines are resolved #then they are omitted", () => {
@@ -929,12 +959,7 @@ describe("engine build identity compile defines", () => {
         committedAt: "2026-09-04T10:49:12+09:00",
       },
     })
-    expect(args).toEqual([
-      "--define",
-      "SENPI_BUILD_EPOCH=1788486552",
-      "--define",
-      "SENPI_BUILD_SHA7=\"7fd18df\"",
-    ])
+    expect(args).toEqual(["--define", "SENPI_BUILD_EPOCH=1788486552", "--define", 'SENPI_BUILD_SHA7="7fd18df"'])
   })
 
   test("#given gitHead without a committedAt #when compile defines are resolved #then they are omitted rather than inventing an epoch", () => {
@@ -949,9 +974,9 @@ describe("engine build identity compile defines", () => {
   })
 
   test("#given the currently pinned senpi package #when compile defines are resolved #then they are omitted (no gitHead)", () => {
-    const pkg = JSON.parse(
-      readFileSync(join(repoRoot, "node_modules/@code-yeongyu/senpi/package.json"), "utf8"),
-    ) as { gitHead?: unknown }
+    const pkg = JSON.parse(readFileSync(join(repoRoot, "node_modules/@code-yeongyu/senpi/package.json"), "utf8")) as {
+      gitHead?: unknown
+    }
     expect(pkg.gitHead).toBeUndefined()
     expect(binaryBuilder.compileDefinesForOmoBinary({ senpiPackage: pkg })).toEqual([])
   })
@@ -960,15 +985,19 @@ describe("engine build identity compile defines", () => {
     const root = makeTempDir("omo-define-probe-")
     const entry = join(root, "probe.ts")
     const outfile = join(root, "probe")
-    writeFileSync(entry, [
-      "declare const SENPI_BUILD_EPOCH: number | undefined",
-      "declare const SENPI_BUILD_SHA7: string | undefined",
-      "const epoch = typeof SENPI_BUILD_EPOCH === \"number\" ? SENPI_BUILD_EPOCH : 0",
-      "const sha7 = typeof SENPI_BUILD_SHA7 === \"string\" ? SENPI_BUILD_SHA7 : \"\"",
-      "const scheme = epoch > 0 ? \"epoch\" : \"nodef\"",
-      "console.log(JSON.stringify({ epoch, sha7, scheme }))",
-      "",
-    ].join("\n"), "utf8")
+    writeFileSync(
+      entry,
+      [
+        "declare const SENPI_BUILD_EPOCH: number | undefined",
+        "declare const SENPI_BUILD_SHA7: string | undefined",
+        'const epoch = typeof SENPI_BUILD_EPOCH === "number" ? SENPI_BUILD_EPOCH : 0',
+        'const sha7 = typeof SENPI_BUILD_SHA7 === "string" ? SENPI_BUILD_SHA7 : ""',
+        'const scheme = epoch > 0 ? "epoch" : "nodef"',
+        "console.log(JSON.stringify({ epoch, sha7, scheme }))",
+        "",
+      ].join("\n"),
+      "utf8",
+    )
     const args = binaryBuilder.compileDefinesForOmoBinary({ buildInfo })
     const built = spawnSync("bun", ["build", "--compile", ...args, entry, "--outfile", outfile], { encoding: "utf8" })
     expect(built.status).toBe(0)
@@ -981,15 +1010,19 @@ describe("engine build identity compile defines", () => {
     const root = makeTempDir("omo-nodef-probe-")
     const entry = join(root, "probe.ts")
     const outfile = join(root, "probe")
-    writeFileSync(entry, [
-      "declare const SENPI_BUILD_EPOCH: number | undefined",
-      "declare const SENPI_BUILD_SHA7: string | undefined",
-      "const epoch = typeof SENPI_BUILD_EPOCH === \"number\" ? SENPI_BUILD_EPOCH : 0",
-      "const sha7 = typeof SENPI_BUILD_SHA7 === \"string\" ? SENPI_BUILD_SHA7 : \"\"",
-      "const scheme = epoch > 0 ? \"epoch\" : \"nodef\"",
-      "console.log(JSON.stringify({ epoch, sha7, scheme }))",
-      "",
-    ].join("\n"), "utf8")
+    writeFileSync(
+      entry,
+      [
+        "declare const SENPI_BUILD_EPOCH: number | undefined",
+        "declare const SENPI_BUILD_SHA7: string | undefined",
+        'const epoch = typeof SENPI_BUILD_EPOCH === "number" ? SENPI_BUILD_EPOCH : 0',
+        'const sha7 = typeof SENPI_BUILD_SHA7 === "string" ? SENPI_BUILD_SHA7 : ""',
+        'const scheme = epoch > 0 ? "epoch" : "nodef"',
+        "console.log(JSON.stringify({ epoch, sha7, scheme }))",
+        "",
+      ].join("\n"),
+      "utf8",
+    )
     const args = binaryBuilder.compileDefinesForOmoBinary({
       senpiPackage: { name: "@code-yeongyu/senpi", version: "2026.9.17" },
     })

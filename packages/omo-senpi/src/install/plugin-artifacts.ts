@@ -35,6 +35,9 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("extensions", "memory-run-supervisor.mjs"),
   // The thread gateway store worker: the inbox drain cannot open its store without it.
   join("extensions", "gateway-store-worker.mjs"),
+  // The computer.run QuickJS cell worker and the wasm it loads, beside omo-computer-use.js.
+  join("extensions", "omo-computer-run-worker.mjs"),
+  join("extensions", "quickjs.wasm"),
   ...PERSONA_ASSET_FILES.map((filename) => join("extensions", filename)),
   join("skills", "ast-grep", "SKILL.md"),
   join("skills", "browser", "SKILL.md"),
@@ -87,13 +90,29 @@ export async function ensurePluginArtifacts(context: {
   readonly platform: NodeJS.Platform
 }): Promise<void> {
   if (context.allowBuild) {
-    await context.runCommand("node", [join(context.pluginPath, "scripts", "build-extension.mjs")], { cwd: context.repoRoot })
-    await context.runCommand("node", [join("packages", "omo-codex", "plugin", "scripts", "materialize-shared-upstreams.mjs")], { cwd: context.repoRoot })
-    await context.runCommand("node", [join(context.pluginPath, "scripts", "sync-skills.mjs")], { cwd: context.repoRoot })
-    await context.runCommand("node", [join(context.pluginPath, "scripts", "build-install.mjs")], { cwd: context.repoRoot })
-    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], { cwd: context.repoRoot })
-    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], { cwd: context.repoRoot })
-    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-x-search-skill.mjs")], { cwd: context.repoRoot })
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "build-extension.mjs")], {
+      cwd: context.repoRoot,
+    })
+    await context.runCommand(
+      "node",
+      [join("packages", "omo-codex", "plugin", "scripts", "materialize-shared-upstreams.mjs")],
+      { cwd: context.repoRoot },
+    )
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "sync-skills.mjs")], {
+      cwd: context.repoRoot,
+    })
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "build-install.mjs")], {
+      cwd: context.repoRoot,
+    })
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-lsp-daemon-runtime.mjs")], {
+      cwd: context.repoRoot,
+    })
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-ast-grep-mcp-runtime.mjs")], {
+      cwd: context.repoRoot,
+    })
+    await context.runCommand("node", [join(context.pluginPath, "scripts", "stage-x-search-skill.mjs")], {
+      cwd: context.repoRoot,
+    })
   }
 
   if (await hasMissingPluginArtifact(context.pluginPath)) {
@@ -138,7 +157,9 @@ async function verifyAstGrepRuntimeIntegrity(pluginPath: string, platform: NodeJ
 
   let actualSha256: string
   try {
-    actualSha256 = createHash("sha256").update(await readFile(runtimeEntry)).digest("hex")
+    actualSha256 = createHash("sha256")
+      .update(await readFile(runtimeEntry))
+      .digest("hex")
   } catch (error) {
     throw astGrepIntegrityError(runtimeEntry, `runtime hash could not be computed: ${messageOf(error)}`)
   }
@@ -152,14 +173,18 @@ async function verifyAstGrepRuntimeIntegrity(pluginPath: string, platform: NodeJ
   }
 }
 
-function isAstGrepRuntimeManifest(value: unknown): value is { readonly sha256: string; readonly mode: number; readonly stagedAtUtc: string } {
+function isAstGrepRuntimeManifest(
+  value: unknown,
+): value is { readonly sha256: string; readonly mode: number; readonly stagedAtUtc: string } {
   if (!isRecord(value)) return false
-  return typeof value.sha256 === "string"
-    && /^[a-f0-9]{64}$/.test(value.sha256)
-    && typeof value.mode === "number"
-    && Number.isInteger(value.mode)
-    && typeof value.stagedAtUtc === "string"
-    && !Number.isNaN(Date.parse(value.stagedAtUtc))
+  return (
+    typeof value.sha256 === "string" &&
+    /^[a-f0-9]{64}$/.test(value.sha256) &&
+    typeof value.mode === "number" &&
+    Number.isInteger(value.mode) &&
+    typeof value.stagedAtUtc === "string" &&
+    !Number.isNaN(Date.parse(value.stagedAtUtc))
+  )
 }
 
 function astGrepIntegrityError(runtimeEntry: string, reason: string): Error {

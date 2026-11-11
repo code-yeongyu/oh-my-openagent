@@ -74,53 +74,24 @@ export function truncateToolResult(text: string, limit = TOOL_RESULT_TRUNCATE_LI
   return `${text.slice(0, headLength)}\n…[truncated ${dropped} chars]…\n${tail}`
 }
 
-export function projectTranscriptEntries(
-  message: TranscriptProjection,
-  capturedAt: string,
-): TranscriptEntry[] {
+export function projectTranscriptEntries(message: TranscriptProjection, capturedAt: string): TranscriptEntry[] {
   if (message.kind === "user" || message.kind === "error") {
     // An image-only user message is still a user turn: it is kept as an empty, non-canonical row so consent binding
     // (#10488) sees that it broke the adjacency between a proposal and the next reply. An empty error is dropped.
     if (message.kind === "error" && message.text.trim().length === 0) return []
-    return [
-      textRow(
-        message.kind,
-        message.text,
-        capturedAt,
-        `${message.messageId}:${message.kind}`,
-        message.messageId,
-      ),
-    ]
+    return [textRow(message.kind, message.text, capturedAt, `${message.messageId}:${message.kind}`, message.messageId)]
   }
 
   const entries: TranscriptEntry[] = []
-  const assistantText = (message.textBlocks ?? [])
-    .filter((text) => text.trim().length > 0)
-    .join("\n")
+  const assistantText = (message.textBlocks ?? []).filter((text) => text.trim().length > 0).join("\n")
   if (assistantText.length > 0) {
-    entries.push(
-      textRow(
-        "assistant",
-        assistantText,
-        capturedAt,
-        `${message.messageId}:assistant`,
-        message.messageId,
-      ),
-    )
+    entries.push(textRow("assistant", assistantText, capturedAt, `${message.messageId}:assistant`, message.messageId))
   }
 
   for (const [index, reasoning] of (message.reasoningBlocks ?? []).entries()) {
     const text = typeof reasoning === "string" ? reasoning : REDACTED_REASONING_TEXT
     if (text.trim().length === 0) continue
-    entries.push(
-      textRow(
-        "reasoning",
-        text,
-        capturedAt,
-        `${message.messageId}:reasoning:${index}`,
-        message.messageId,
-      ),
-    )
+    entries.push(textRow("reasoning", text, capturedAt, `${message.messageId}:reasoning:${index}`, message.messageId))
   }
 
   for (const toolCall of message.toolCalls ?? []) {

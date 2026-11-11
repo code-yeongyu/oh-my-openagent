@@ -76,7 +76,10 @@ export async function recordReflectionRunIdMark(reflectionDir: string, highWater
   const target = reflectionRunIdMarkPath(reflectionDir)
   const temporary = `${target}.tmp-${randomUUID()}`
   try {
-    await writeFile(temporary, `${JSON.stringify({ version: 1, highWater: next })}\n`, { encoding: "utf8", mode: 0o600 })
+    await writeFile(temporary, `${JSON.stringify({ version: 1, highWater: next })}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    })
     await rename(temporary, target)
   } catch (error) {
     await rm(temporary, { force: true })

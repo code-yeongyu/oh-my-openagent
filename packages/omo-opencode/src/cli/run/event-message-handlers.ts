@@ -1,16 +1,17 @@
 import pc from "picocolors"
 import type { EventState } from "./event-state"
 import { displayChars } from "./display-chars"
-import {
-  getDeltaMessageId,
-  getInfoSessionId,
-  getPartMessageId,
-  getPartSessionId,
-} from "./event-session-ids"
+import { getDeltaMessageId, getInfoSessionId, getPartMessageId, getPartSessionId } from "./event-session-ids"
 import { closeThinkBlockIfNeeded, ensureThinkBlockOpen } from "./event-think-block"
 import { writeToolHeader, writeToolOutput } from "./event-tool-output"
 import { renderAgentHeader, writePaddedText } from "./output-renderer"
-import type { EventPayload, MessagePartDeltaProps, MessagePartUpdatedProps, MessageUpdatedProps, RunContext } from "./types"
+import type {
+  EventPayload,
+  MessagePartDeltaProps,
+  MessagePartUpdatedProps,
+  MessageUpdatedProps,
+  RunContext,
+} from "./types"
 
 function renderCompletionMetaLine(state: EventState, messageID: string): void {
   if (state.completionMetaPrintedByMessageId[messageID]) return
@@ -34,9 +35,7 @@ export function handleMessagePartUpdated(ctx: RunContext, payload: EventPayload,
   if ((partSid ?? infoSid) !== ctx.sessionID) return
 
   const role = props?.info?.role
-  const mappedRole = getPartMessageId(props)
-    ? state.messageRoleById[getPartMessageId(props) ?? ""]
-    : undefined
+  const mappedRole = getPartMessageId(props) ? state.messageRoleById[getPartMessageId(props) ?? ""] : undefined
   if ((role ?? mappedRole) === "user") return
 
   const part = props?.part
@@ -95,9 +94,7 @@ export function handleMessagePartDelta(ctx: RunContext, payload: EventPayload, s
   const sessionID = props?.sessionID ?? props?.sessionId
   if (sessionID !== ctx.sessionID) return
 
-  const role = getDeltaMessageId(props)
-    ? state.messageRoleById[getDeltaMessageId(props) ?? ""]
-    : undefined
+  const role = getDeltaMessageId(props) ? state.messageRoleById[getDeltaMessageId(props) ?? ""] : undefined
   if (role === "user") return
 
   if (props?.field !== "text") return

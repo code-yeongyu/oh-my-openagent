@@ -102,7 +102,11 @@ describe("omo-senpi ulw-loop footer real filesystem plan lookup", () => {
     try {
       writeFileSync(scenario.scopedGoalsPath, "{}\n")
 
-      await scenario.pi.dispatch("session_start", { type: "session_start" }, eventContext(scenario.cwd, sessionId, scenario.ui))
+      await scenario.pi.dispatch(
+        "session_start",
+        { type: "session_start" },
+        eventContext(scenario.cwd, sessionId, scenario.ui),
+      )
       scenario.timers.fire()
       scenario.timers.fire()
       scenario.timers.fire()
@@ -120,7 +124,11 @@ describe("omo-senpi ulw-loop footer real filesystem plan lookup", () => {
       mkdirSync(join(scenario.cwd, ".omo", "ulw-loop"), { recursive: true })
       writeFileSync(join(scenario.cwd, ".omo", "ulw-loop", "goals.json"), "{}\n")
 
-      await scenario.pi.dispatch("session_start", { type: "session_start" }, eventContext(scenario.cwd, sessionId, scenario.ui))
+      await scenario.pi.dispatch(
+        "session_start",
+        { type: "session_start" },
+        eventContext(scenario.cwd, sessionId, scenario.ui),
+      )
       scenario.timers.fire()
 
       expect(footerFrames(scenario.ui)).toEqual([])
@@ -136,7 +144,11 @@ describe("omo-senpi ulw-loop footer real filesystem plan lookup", () => {
       mkdirSync(join(scenario.cwd, ".omo", "ulw-loop", "other-name"), { recursive: true })
       writeFileSync(join(scenario.cwd, ".omo", "ulw-loop", "other-name", "goals.json"), "{}\n")
 
-      await scenario.pi.dispatch("session_start", { type: "session_start" }, eventContext(scenario.cwd, sessionId, scenario.ui))
+      await scenario.pi.dispatch(
+        "session_start",
+        { type: "session_start" },
+        eventContext(scenario.cwd, sessionId, scenario.ui),
+      )
       scenario.timers.fire()
 
       expect(footerFrames(scenario.ui)).toEqual([])
