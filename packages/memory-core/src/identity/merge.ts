@@ -89,6 +89,9 @@ export async function findMergePredecessors(
     if ((await readdir(paths.repo).catch(() => [] as string[])).length === 0) continue
     known.add(id)
     const record = await readIdentityRecord(paths.root).catch(() => undefined)
+    // The first loop already drops an explicit profile. A path-derived directory can carry one too
+    // (the profile name hashed like that directory); candidate discovery must not offer it either.
+    if (record?.kind === "explicit") continue
     predecessors.push({
       id,
       paths,

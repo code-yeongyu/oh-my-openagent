@@ -86,6 +86,25 @@ describe("resolveAutoIdentity with real git layouts", () => {
     expect(viaAlias.id).toBe(resolveAutoIdentity(main, env).id)
   })
 
+  it("#given git mode #when the only repository marker is the filesystem root #then it counts as no repository and the path id is kept (#10070)", () => {
+    // given
+    const cwd = join(parent, "under-filesystem-root")
+    mkdirSync(cwd)
+    const filesystemRootGit = join("/", ".git")
+    const probe = {
+      exists: () => false,
+      gitLayout: {
+        entryKind: (marker: string) => (marker === filesystemRootGit ? ("directory" as const) : undefined),
+        readText: () => undefined,
+        realPath: (path: string) => path,
+      },
+    }
+    // when
+    const gitMode = resolveAutoIdentity(cwd, env, "git", probe)
+    // then
+    expect(gitMode.id).toBe(resolveAutoIdentity(cwd, env, "path").id)
+  })
+
   it("#given git mode #when the nearest repository is rooted at the home directory #then it is treated as no repository and the path id is kept (#10070)", () => {
     // given
     const home = join(parent, "home-repo")

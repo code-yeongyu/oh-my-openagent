@@ -327,6 +327,25 @@ describe("identity merge (#10070)", () => {
     expect((await target.repo.status()).trim()).toBe("")
   }, 30_000)
 
+  it("#given an explicit record on the path-derived store of a candidate directory #when predecessors are found #then the profile is not offered (#10070)", async () => {
+    const root = await memoryRoot()
+    const dir = "/work/project"
+    const id = resolveAutoIdentity(dir, { OMO_MEMORY_HOME: root }, "path").id
+    await identity(root, "project-aaaa1111", {}, ["/work/main"])
+    const profile = await identity(root, id, { "notes/p.md": note("profile") }, [])
+    await recordIdentityBind(profile.paths.root, { id, kind: "explicit", mode: "path", source: dir, spelling: dir })
+
+    const found = await findMergePredecessors(
+      root,
+      "project-aaaa1111",
+      (spelling) => (spelling === dir ? "project-aaaa1111" : "other"),
+      [dir],
+    )
+
+    expect(found.predecessors.map((entry) => entry.id)).not.toContain(id)
+    expect(found.unmapped).not.toContain(id)
+  }, 30_000)
+
   it("#given an explicit profile store bound from a folder of this repository #when predecessors are found #then the profile is not offered (#12974 review r6)", async () => {
     const root = await memoryRoot()
     await identity(root, "project-aaaa1111", {}, ["/work/project"])
