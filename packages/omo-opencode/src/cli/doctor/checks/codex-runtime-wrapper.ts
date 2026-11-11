@@ -66,8 +66,10 @@ async function readRuntimeWrapper(path: string): Promise<string | null> {
 }
 
 function parseRuntimeTargetPath(wrapper: string): string | null {
-  const posixMatch = wrapper.match(/exec "\$BUN_BINARY" "([^"]+)" "\$@"/)
-  if (posixMatch?.[1] !== undefined) return posixMatch[1]
+  // The POSIX generator escapes \, ", $ and ` inside the double-quoted target (escapePosixDoubleQuoted in
+  // codex-cache-runtime-wrapper.ts), so escaped characters are matched and unescaped back to the path (#12560).
+  const posixMatch = wrapper.match(/exec "\$BUN_BINARY" "((?:[^"\\]|\\.)+)" "\$@"/)
+  if (posixMatch?.[1] !== undefined) return posixMatch[1].replace(/\\([\\"$`])/g, "$1")
   const windowsMatch = wrapper.match(/"%+BUN_BINARY%+"\s+"([^"]+)"\s+%+\*/)
   return windowsMatch?.[1] ?? null
 }
