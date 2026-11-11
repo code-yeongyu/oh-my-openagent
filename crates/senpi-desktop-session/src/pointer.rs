@@ -1,6 +1,6 @@
 //! Parsed pointer options and the per-target capture frame cache.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
 
@@ -69,6 +69,9 @@ fn next_frame_id() -> (String, u64) {
     (format!("frame-{}-{capture}", engine_instance()), capture)
 }
 
+/// How many superseded frame ids the cache remembers the target of.
+const RETIRED_FRAMES: usize = 256;
+
 /// The latest capture of every target; coordinate input maps through it.
 #[derive(Clone, Default)]
 pub(crate) struct FrameCache {
@@ -80,6 +83,9 @@ pub(crate) struct FrameCache {
     latest: HashMap<String, CapturedFrame>,
     /// Captures numbered up to this one were taken before the last epoch move.
     superseded_through: u64,
+    /// `(frame id, target key)` of the most recent superseded captures, so an
+    /// older frame of another target still reads `wrong_target`.
+    retired: VecDeque<(String, String)>,
 }
 
 impl FrameCache {
@@ -125,7 +131,12 @@ impl FrameCache {
             geometry,
             consumed: false,
         };
-        self.latest.insert(target.key().to_owned(), frame);
+        if let Some(previous) = self.latest.insert(target.key().to_owned(), frame) {
+            if self.retired.len() == RETIRED_FRAMES {
+                self.retired.pop_front();
+            }
+            self.retired.push_back((previous.id, target.key().to_owned()));
+        }
         id
     }
 
@@ -154,7 +165,9 @@ impl FrameCache {
         let elsewhere = self
             .latest
             .iter()
-            .any(|(key, frame)| key != target_key && frame.id == requested);
+            .map(|(key, frame)| (frame.id.as_str(), key.as_str()))
+            .chain(self.retired.iter().map(|(id, key)| (id.as_str(), key.as_str())))
+            .any(|(id, key)| key != target_key && id == requested);
         match latest {
             _ if elsewhere => Some(FrameRefusal::WrongTarget),
             None => Some(FrameRefusal::NoCapture),

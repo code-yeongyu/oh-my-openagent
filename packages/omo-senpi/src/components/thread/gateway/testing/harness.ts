@@ -7,6 +7,8 @@ import { createInboxDrain, type InboxDrain } from "../drain"
 import { createGatewayEngine, resolveFromEntries, type GatewayAddressEntry, type GatewayEngine } from "../engine"
 import { createGatewayStore, type GatewayStore, type GatewayStoreOptions } from "../store"
 import { FakeSessionRuntime } from "./fake-runtime"
+import type { RemoteThreadSurface } from "../../remote/ports"
+import { stampThisDevice } from "../../remote/this-device"
 
 // Cross-version conformance runs select a real older facade, which starts its own older worker.
 const storeFactory: typeof createGatewayStore = process.env.OMO_GATEWAY_TEST_STORE_MODULE === undefined
@@ -47,7 +49,8 @@ export type GatewayHarness = {
   readonly dispose: () => Promise<void>
 }
 
-export function createGatewayHarness(options: { readonly startAt?: number } = {}): GatewayHarness {
+/** `remote`: the account surface whose device the senders stamp, through the same `stampThisDevice` every production sender uses (#13004). */
+export function createGatewayHarness(options: { readonly startAt?: number; readonly remote?: RemoteThreadSurface } = {}): GatewayHarness {
   const agentDir = realpathSync(mkdtempSync(join(tmpdir(), "omo-gateway-")))
   mkdirSync(join(agentDir, "sessions"), { recursive: true })
   const clock = { now: options.startAt ?? Date.UTC(2026, 8, 29, 0, 0, 0) }
@@ -95,7 +98,7 @@ export function createGatewayHarness(options: { readonly startAt?: number } = {}
   }
 
   function engineFor(target: GatewayStore, cwd: string = agentDir): GatewayEngine {
-    return createGatewayEngine({ store: target, endpoints, resolve: resolveFromEntries(entries, () => cwd), now, senderProvenance: async () => ({ workspace: "unclassified", project: "fixture" }) })
+    return createGatewayEngine({ store: target, endpoints, resolve: resolveFromEntries(entries, () => cwd), now, senderProvenance: () => stampThisDevice(Promise.resolve({ workspace: "unclassified", project: "fixture" }), options.remote) })
   }
 
   const endpoints: GatewayEndpointPort = {

@@ -29,7 +29,11 @@ export function resultFromRow(
     if (row.admission_kind === "started" || row.admission_kind === "steered") {
       return { ...base, delivery: { kind: row.admission_kind, turn_id: String(row.turn_epoch ?? 0) } }
     }
-    return { ...base, delivery: { kind: "queued", queue_position: Math.max(queuePosition, 1) } }
+    // A row here was sent and is received on this install, so the device its sender stamped (#13004) is the one the
+    // receiver waits on (#13014); a row with no stamped device names none, so a replayed answer reads the same.
+    const device = row.envelope.provenance?.device
+    const waiting = row.wait_kind === null ? {} : { waiting_on: { kind: row.wait_kind, ...(device === undefined ? {} : { device }) } }
+    return { ...base, delivery: { kind: "queued", queue_position: Math.max(queuePosition, 1), ...waiting } }
   }
   if (row.state === "refused") {
     const mapped = REFUSAL_CODES[row.reason ?? ""] ?? { code: "internal_error" as const, next: "Call thread_list and check the target." }

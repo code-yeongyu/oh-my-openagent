@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::report::{Delivered, Disposition, FocusRestoration};
+use crate::report::{Delivered, Disposition, FocusRestoration, NextCall};
 
 /// Desktop error vocabulary shared by the engine, the wire, and the host.
 ///
@@ -148,6 +148,8 @@ pub struct ErrorReport {
     pub delivered: Option<Delivered>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub focus_restoration: Option<FocusRestoration>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_call: Option<NextCall>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize, JsonSchema)]
