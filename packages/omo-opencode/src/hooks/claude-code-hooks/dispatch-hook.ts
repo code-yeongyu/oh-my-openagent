@@ -9,11 +9,7 @@ export function getHookIdentifier(hook: HookAction): string {
   return hook.command.split("/").pop() || hook.command
 }
 
-export async function dispatchHook(
-  hook: HookAction,
-  stdinJson: string,
-  cwd: string
-): Promise<CommandResult> {
+export async function dispatchHook(hook: HookAction, stdinJson: string, cwd: string): Promise<CommandResult> {
   if (hook.type === "http") {
     return executeHttpHook(hook, stdinJson)
   }
@@ -30,10 +26,5 @@ export async function dispatchHook(
     options.pluginRoot = cmdHook.pluginRoot
   }
 
-  return executeHookCommand(
-    hook.command,
-    stdinJson,
-    cwd,
-    options
-  )
+  return executeHookCommand(hook.command, stdinJson, cwd, options)
 }

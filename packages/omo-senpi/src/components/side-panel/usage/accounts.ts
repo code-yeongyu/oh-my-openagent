@@ -99,9 +99,12 @@ function resolveOne(
   if (accounts.length > 0) {
     const pinnedName = nonEmptyString(node["pinned"])
     const pinnedStored = accounts.find((account) => nonEmptyString(account["name"]) === pinnedName)
-    // A pin that names no stored account is an env token slot (it never appears in accounts[]); the
-    // engine serves that slot, so no stored account is named and its own record is drawn instead.
-    if (pinnedName !== undefined && pinnedStored === undefined) return undefined
+    // A pin that names no stored account is an env token slot. Name that pin so the record lookup
+    // stays on it and then the env record; an empty credential would draw the newest record, which
+    // can be a stored account the engine is not serving.
+    if (pinnedName !== undefined && pinnedStored === undefined) {
+      return { state: health({ name: pinnedName }), account: pinnedName }
+    }
     const pinned = pinnedStored ?? accounts[0]
     const healthy = accounts.find((account) => health(account) === "ok" && canServe(account))
     // A stale OAuth token still serves: the endpoint's 401 is what lets the column say
@@ -170,7 +173,3 @@ function canServe(account: Record<string, unknown>): boolean {
 function usableToken(value: unknown): boolean {
   return typeof value === "string" && value.length >= MIN_ACCESS_TOKEN_LENGTH
 }
-
-
-
-

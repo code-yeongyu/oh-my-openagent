@@ -19,7 +19,13 @@ const pool = (slots: Record<string, unknown>): Record<string, unknown> => ({
 describe("resolveUsageCredential", () => {
   test("#given a healthy pinned account #when resolved #then its own token and name come back", () => {
     // given
-    const file = auth([{ name: "work", access: token("work") }, { name: "personal", access: token("personal") }], "work")
+    const file = auth(
+      [
+        { name: "work", access: token("work") },
+        { name: "personal", access: token("personal") },
+      ],
+      "work",
+    )
 
     // when
     const credential = resolveUsageCredential(file, undefined, PROVIDER, NOW)
@@ -30,7 +36,13 @@ describe("resolveUsageCredential", () => {
 
   test("#given the pinned account is on cooldown #when resolved #then the healthy one serves and is marked", () => {
     // given the pool put the pinned slot on cooldown, so it is not the slot doing the work
-    const file = auth([{ name: "work", access: token("work") }, { name: "personal", access: token("personal") }], "work")
+    const file = auth(
+      [
+        { name: "work", access: token("work") },
+        { name: "personal", access: token("personal") },
+      ],
+      "work",
+    )
     const slots = pool({ work: { blockedUntil: NOW + 60_000 } })
 
     // when
@@ -262,14 +274,30 @@ describe("claude CLI accounts (senpi#4436)", () => {
     // then
     expect(credential).toEqual({ state: "ok", account: "my", pinnedAccount: "old" })
   })
-  test("#given a pinned env token account next to claude CLI accounts #when resolved #then no stored account is named for it", () => {
+  test("#given a pinned env token account next to claude CLI accounts #when resolved #then the pin is named and no stored account is", () => {
     // given the engine pins the env slot, which never appears in auth.json accounts[]
     const file = cliAuth("env", [cli("my"), cli("work")])
 
     // when
     const credential = resolveUsageCredentialFrom(file, undefined, ["anthropic-subscription"], NOW)
 
-    // then the engine-source falls back to the env record or the latest one
-    expect(credential).toBeUndefined()
+    // then the record lookup stays on the pin, then the env record
+    expect(credential).toEqual({ state: "ok", account: "env" })
+  })
+
+  test("#given a pinned env slot the pool has cooled down #when resolved #then that slot stays named and marked cooldown", () => {
+    // given
+    const file = cliAuth("env", [cli("my"), cli("work")])
+    const slots = {
+      providers: {
+        "anthropic-subscription": { lanes: { stored: { slots: { env: { cooldownUntil: NOW + 60_000 } } } } },
+      },
+    }
+
+    // when
+    const credential = resolveUsageCredentialFrom(file, slots, ["anthropic-subscription"], NOW)
+
+    // then a cooled env slot is not handed to a stored CLI account
+    expect(credential).toEqual({ state: "cooldown", account: "env" })
   })
 })

@@ -1,4 +1,10 @@
-import type { NewSessionOptions, RpcClient, RpcExtensionUIResponse, RpcSessionState, RpcTransportGoneError } from "@code-yeongyu/senpi"
+import type {
+  NewSessionOptions,
+  RpcClient,
+  RpcExtensionUIResponse,
+  RpcSessionState,
+  RpcTransportGoneError,
+} from "@code-yeongyu/senpi"
 
 import { loadSenpiBarrel, senpiProbeHost, senpiRpcClient, type SenpiHostProtocolInfo } from "../../lazy/senpi-barrel"
 import type { SenpiThinkingLevel } from "../../senpi/thinking-level"
@@ -28,9 +34,20 @@ export interface HostRpcClient extends HostRunHoldClient {
   closeSession(sessionId?: string): Promise<void>
   listSessions?(options: { include_workers: boolean }): Promise<readonly { sessionId: string }[]>
   sendExtensionUIResponse(response: RpcExtensionUIResponse): Promise<void>
-  prompt(message: string, options?: { streamingBehavior?: "steer" | "followUp"; clientMessageId?: string }): Promise<HostPromptDisposition>
-  steer(message: string, images?: undefined, recovery?: { clientMessageId?: string }): Promise<HostQueuedInputDisposition>
-  followUp(message: string, images?: undefined, recovery?: { clientMessageId?: string }): Promise<HostQueuedInputDisposition>
+  prompt(
+    message: string,
+    options?: { streamingBehavior?: "steer" | "followUp"; clientMessageId?: string },
+  ): Promise<HostPromptDisposition>
+  steer(
+    message: string,
+    images?: undefined,
+    recovery?: { clientMessageId?: string },
+  ): Promise<HostQueuedInputDisposition>
+  followUp(
+    message: string,
+    images?: undefined,
+    recovery?: { clientMessageId?: string },
+  ): Promise<HostQueuedInputDisposition>
   /** Absent on an engine before senpi#3549. */
   getPendingInputs?(knownClientMessageIds?: readonly string[]): Promise<HostPendingInputs>
   abort(): Promise<void>
@@ -38,7 +55,10 @@ export interface HostRpcClient extends HostRunHoldClient {
   getAvailableModels(): ReturnType<RpcClient["getAvailableModels"]>
   getEntries(since?: string): Promise<RpcEntriesResult>
   switchSession(sessionPath: string): Promise<RpcSwitchSessionResult>
-  setSessionContext(patch: Readonly<Record<string, string | number | boolean | null>>, sessionId?: string): Promise<void>
+  setSessionContext(
+    patch: Readonly<Record<string, string | number | boolean | null>>,
+    sessionId?: string,
+  ): Promise<void>
 }
 
 /** A session's own fallback policy, held in memory by the host (senpi `retry_fallback_profile`). */
@@ -142,10 +162,14 @@ export function assertHostUsable(
   }
   const missing = TASK_DAEMON_REQUIRED_CAPABILITIES.filter((capability) => !info.capabilities.includes(capability))
   if (missing.length > 0) {
-    const chain = retryFallback === undefined || !missing.includes("retry_fallback_profile")
-      ? ""
-      : `; the child's designated models (${designatedChainOf(retryFallback)}) cannot be held to on this host`
-    throw new HostUnavailableError("capability", { fallbackAllowed: true, detail: `missing ${missing.join(", ")}${chain}` })
+    const chain =
+      retryFallback === undefined || !missing.includes("retry_fallback_profile")
+        ? ""
+        : `; the child's designated models (${designatedChainOf(retryFallback)}) cannot be held to on this host`
+    throw new HostUnavailableError("capability", {
+      fallbackAllowed: true,
+      detail: `missing ${missing.join(", ")}${chain}`,
+    })
   }
   return info
 }

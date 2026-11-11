@@ -31,7 +31,12 @@ export interface KibitzerDelivery {
   drainForPrompt(sessionId: string, context: MemoryIdentityContext): RecallNudge[]
   onCompactionAccepted(sessionId: string, context: MemoryIdentityContext): Promise<void>
   onSessionShutdown(sessionId: string): void
-  markDelivered(sessionId: string, context: MemoryIdentityContext, paths: readonly string[], via: "steer" | "wake" | "prompt"): Promise<void>
+  markDelivered(
+    sessionId: string,
+    context: MemoryIdentityContext,
+    paths: readonly string[],
+    via: "steer" | "wake" | "prompt",
+  ): Promise<void>
 }
 
 interface DeliveryState {
@@ -61,9 +66,16 @@ export function createKibitzerDelivery(options: KibitzerDeliveryOptions): Kibitz
     state.coordinatorKeys.clear()
   }
 
-  async function accept(sessionId: string, context: MemoryIdentityContext, nudges: readonly RecallNudge[]): Promise<void> {
+  async function accept(
+    sessionId: string,
+    context: MemoryIdentityContext,
+    nudges: readonly RecallNudge[],
+  ): Promise<void> {
     try {
-      await options.ledgerFor(context).markSurfaced(sessionId, nudges.map((nudge) => ({ path: nudge.path, hash: GATE_SURFACE_HASH })))
+      await options.ledgerFor(context).markSurfaced(
+        sessionId,
+        nudges.map((nudge) => ({ path: nudge.path, hash: GATE_SURFACE_HASH })),
+      )
     } catch (error) {
       warn("omo-senpi kibitzer delivery ledger mark skipped", { sessionId, error })
     }
@@ -83,7 +95,9 @@ export function createKibitzerDelivery(options: KibitzerDeliveryOptions): Kibitz
           customType: NUDGED_ENTRY_TYPE,
           content: renderNudgeBlock(nudge),
           details: { path: nudge.path },
-          onFlushed: () => { void markDelivered(sessionId, context, [nudge.path], "wake") },
+          onFlushed: () => {
+            void markDelivered(sessionId, context, [nudge.path], "wake")
+          },
         })
         state.coordinatorKeys.add(key)
       } catch (error) {
@@ -96,7 +110,12 @@ export function createKibitzerDelivery(options: KibitzerDeliveryOptions): Kibitz
     } catch (error) {
       warn("omo-senpi kibitzer pending write skipped", { sessionId, error })
     }
-    if (runningSessions.has(sessionId) && (toolsInFlight.get(sessionId)?.size ?? 0) > 0 && !state.steering && state.nudges.size > 0) {
+    if (
+      runningSessions.has(sessionId) &&
+      (toolsInFlight.get(sessionId)?.size ?? 0) > 0 &&
+      !state.steering &&
+      state.nudges.size > 0
+    ) {
       await steer(sessionId, context, state)
     }
   }
@@ -114,10 +133,23 @@ export function createKibitzerDelivery(options: KibitzerDeliveryOptions): Kibitz
     state.steering = true
     try {
       const nudges = [...state.nudges.values()]
-      await Promise.resolve(options.sendMessage({ customType: RECALL_CUSTOM_TYPE, content: nudges.map(renderNudgeBlock).join("\n"), display: false }, { deliverAs: "steer" }))
-      await markDelivered(sessionId, context, nudges.map((nudge) => nudge.path), "steer")
+      await Promise.resolve(
+        options.sendMessage(
+          { customType: RECALL_CUSTOM_TYPE, content: nudges.map(renderNudgeBlock).join("\n"), display: false },
+          { deliverAs: "steer" },
+        ),
+      )
+      await markDelivered(
+        sessionId,
+        context,
+        nudges.map((nudge) => nudge.path),
+        "steer",
+      )
     } catch (error: unknown) {
-      warn("omo-senpi kibitzer steer delivery failed", { sessionId, error: error instanceof Error ? error.message : String(error) })
+      warn("omo-senpi kibitzer steer delivery failed", {
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      })
     } finally {
       state.steering = false
     }
@@ -159,7 +191,12 @@ export function createKibitzerDelivery(options: KibitzerDeliveryOptions): Kibitz
     sessions.delete(sessionId)
   }
 
-  async function markDelivered(sessionId: string, context: MemoryIdentityContext, paths: readonly string[], via: "steer" | "wake" | "prompt"): Promise<void> {
+  async function markDelivered(
+    sessionId: string,
+    context: MemoryIdentityContext,
+    paths: readonly string[],
+    via: "steer" | "wake" | "prompt",
+  ): Promise<void> {
     const state = sessions.get(sessionId)
     if (state === undefined) return
     const delivered: RecallNudge[] = []
@@ -199,7 +236,12 @@ export function createKibitzerDelivery(options: KibitzerDeliveryOptions): Kibitz
   }
 
   return {
-    accept, onToolResult, drainForPrompt, onCompactionAccepted, onSessionShutdown, markDelivered,
+    accept,
+    onToolResult,
+    drainForPrompt,
+    onCompactionAccepted,
+    onSessionShutdown,
+    markDelivered,
     markRunning(sessionId): void {
       runningSessions.add(sessionId)
       toolsInFlight.delete(sessionId)
@@ -220,7 +262,9 @@ export function createKibitzerDelivery(options: KibitzerDeliveryOptions): Kibitz
       if (calls.size === 0) toolsInFlight.delete(sessionId)
     },
     // A tool call that never reports a result (blocked or aborted before execution) must not outlive its turn.
-    markTurnEnded(sessionId): void { toolsInFlight.delete(sessionId) },
+    markTurnEnded(sessionId): void {
+      toolsInFlight.delete(sessionId)
+    },
   }
 }
 

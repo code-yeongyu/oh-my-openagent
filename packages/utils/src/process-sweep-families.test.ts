@@ -353,9 +353,7 @@ describe("lsp-daemon cli attestation", () => {
     const cmdline = Buffer.from("node\u0000/usr/lib/omo/lsp-daemon/dist/cli.js\u0000daemon\u0000")
 
     // when / then
-    expect(
-      await attestLspDaemonCliProcess(801, "linux", { readProcFile: () => Promise.resolve(cmdline) }),
-    ).toBe(true)
+    expect(await attestLspDaemonCliProcess(801, "linux", { readProcFile: () => Promise.resolve(cmdline) })).toBe(true)
   })
 
   it("#given a linux /proc cmdline for the mcp proxy shape #when attesting #then it fails", async () => {
@@ -363,9 +361,7 @@ describe("lsp-daemon cli attestation", () => {
     const cmdline = Buffer.from("node\u0000/usr/lib/omo/lsp-daemon/dist/cli.js\u0000mcp\u0000")
 
     // when / then
-    expect(
-      await attestLspDaemonCliProcess(802, "linux", { readProcFile: () => Promise.resolve(cmdline) }),
-    ).toBe(false)
+    expect(await attestLspDaemonCliProcess(802, "linux", { readProcFile: () => Promise.resolve(cmdline) })).toBe(false)
   })
 
   it("#given an unreadable /proc cmdline #when attesting #then it fails closed", async () => {
@@ -389,7 +385,9 @@ describe("lsp-daemon cli attestation", () => {
         executeForStdout: () => Promise.resolve("node /usr/lib/omo/lsp-daemon/dist/cli.js mcp\n"),
       }),
     ).toBe(false)
-    expect(await attestLspDaemonCliProcess(806, "darwin", { executeForStdout: () => Promise.resolve(null) })).toBe(false)
+    expect(await attestLspDaemonCliProcess(806, "darwin", { executeForStdout: () => Promise.resolve(null) })).toBe(
+      false,
+    )
   })
 
   it("#given Windows #when attesting #then it always fails closed", async () => {
@@ -433,5 +431,4 @@ describe("stale lsp-daemon version sweep pid reuse", () => {
     expect(result.killed).toEqual([])
     rmSync(homeDir, { recursive: true, force: true })
   })
-
 })

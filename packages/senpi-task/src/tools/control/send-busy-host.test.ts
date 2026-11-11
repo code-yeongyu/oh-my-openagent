@@ -24,7 +24,10 @@ function busyManager(): { manager: SendManager; settle: (outcome: SendOutcome) =
 
 type Late = { readonly result: SendToolResult; readonly delivery: LateSendDelivery }
 
-function lateOutcomes(): { deliver: (result: SendToolResult, delivery: LateSendDelivery) => void; next: Promise<Late> } {
+function lateOutcomes(): {
+  deliver: (result: SendToolResult, delivery: LateSendDelivery) => void
+  next: Promise<Late>
+} {
   const arrived = Promise.withResolvers<Late>()
   return { deliver: (result, delivery) => arrived.resolve({ result, delivery }), next: arrived.promise }
 }
@@ -36,9 +39,11 @@ describe("task_send against a busy task host (#10042)", () => {
     const late = lateOutcomes()
 
     // when
-    const result = await bounded(runTaskSend(busy.manager, { to: "st_00000001", message: "hi" }, "parent-1", undefined, {
-      deliverLateOutcome: late.deliver,
-    }))
+    const result = await bounded(
+      runTaskSend(busy.manager, { to: "st_00000001", message: "hi" }, "parent-1", undefined, {
+        deliverLateOutcome: late.deliver,
+      }),
+    )
     busy.settle({ kind: "revived", task_id: "st_00000001", run_epoch: 2 })
 
     // then
@@ -61,7 +66,12 @@ describe("task_send against a busy task host (#10042)", () => {
     // when
     controller.abort(new Error("parent aborted"))
     const result = await bounded(running)
-    busy.settle({ kind: "not_continuable", task_id: "st_00000001", reason: "session_unavailable", suggestion: "read it" })
+    busy.settle({
+      kind: "not_continuable",
+      task_id: "st_00000001",
+      reason: "session_unavailable",
+      suggestion: "read it",
+    })
 
     // then
     expect(result.details).toMatchObject({ kind: "delivering", reason: "aborted" })
@@ -75,9 +85,11 @@ describe("task_send against a busy task host (#10042)", () => {
     const controller = new AbortController()
     controller.abort(new Error("parent aborted"))
 
-    const result = await bounded(runTaskSend(busy.manager, { to: "st_00000001", message: "hi" }, "parent-1", undefined, {
-      signal: controller.signal,
-    }))
+    const result = await bounded(
+      runTaskSend(busy.manager, { to: "st_00000001", message: "hi" }, "parent-1", undefined, {
+        signal: controller.signal,
+      }),
+    )
 
     expect(busy.calls()).toBe(0)
     expect(result.details).toMatchObject({ kind: "aborted" })
@@ -86,7 +98,9 @@ describe("task_send against a busy task host (#10042)", () => {
   test("#given a caller with no channel for a late outcome (Desktop RPC, team member) #when its turn aborts mid-send #then task_send still returns at once", async () => {
     const busy = busyManager()
     const controller = new AbortController()
-    const running = runTaskSend(busy.manager, { to: "st_00000001", message: "hi" }, "parent-1", undefined, { signal: controller.signal })
+    const running = runTaskSend(busy.manager, { to: "st_00000001", message: "hi" }, "parent-1", undefined, {
+      signal: controller.signal,
+    })
 
     controller.abort(new Error("parent aborted"))
     const result = await bounded(running)

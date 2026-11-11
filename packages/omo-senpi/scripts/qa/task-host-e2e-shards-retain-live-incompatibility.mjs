@@ -3,11 +3,7 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 
 import { observeState, stopParent } from "./task-host-e2e-events.mjs"
-import {
-  endpointSockets,
-  stopEndpoint,
-  taskRecords,
-} from "./task-host-e2e-shard-cost-support.mjs"
+import { endpointSockets, stopEndpoint, taskRecords } from "./task-host-e2e-shard-cost-support.mjs"
 import { HostClient } from "./task-host-e2e-shards-rpc.mjs"
 import { childSessionFiles, jsonlLines } from "./task-host-e2e-support.mjs"
 import {
@@ -52,13 +48,15 @@ function startIncompatibleFixture(socketPath) {
           capabilities: ["multi_session"],
           launch_profile: { profile_id: "todo14-incompatible" },
         }
-        socket.write(`${JSON.stringify({
-          type: "response",
-          id: request.id,
-          command: request.type,
-          success: true,
-          data,
-        })}\n`)
+        socket.write(
+          `${JSON.stringify({
+            type: "response",
+            id: request.id,
+            command: request.type,
+            success: true,
+            data,
+          })}\n`,
+        )
       }
     })
   })
@@ -80,14 +78,12 @@ async function retainedChildren(current, name, count) {
     ...prompts.map((prompt, index) => taskStep(`${name}-${index}`, prompt)),
     textStep(`${name} initial parent done`),
   ]
-  const childSteps = prompts.map((_, index) =>
-    heldText(`${name} child ${index} complete`, release))
+  const childSteps = prompts.map((_, index) => heldText(`${name} child ${index} complete`, release))
   const scenario = await createRetainScenario(current, name, { parentSteps, childSteps })
   let parent = startParent(scenario, `start ${name}`)
   const records = await observeState(scenario.sandbox.root, () => {
     const rows = taskRecords(scenario.project)
-    return rows.length === count &&
-      rows.every((record) => record.status === "running" && record.host_session?.socket)
+    return rows.length === count && rows.every((record) => record.status === "running" && record.host_session?.socket)
       ? rows
       : undefined
   })
@@ -98,7 +94,8 @@ async function retainedChildren(current, name, count) {
   writeFileSync(release, "go\n")
   const turnDone = new RegExp(`${name} child \\d+ complete`)
   const settled = await observeState(scenario.sandbox.root, () =>
-    records.every((record) => transcriptSettled(scenario.sandbox, record.task_id, turnDone)) ? true : undefined)
+    records.every((record) => transcriptSettled(scenario.sandbox, record.task_id, turnDone)) ? true : undefined,
+  )
   if (settled !== true) throw new Error(`${name}: children did not finish their turns inside the host`)
   const retainedRecords = taskRecords(scenario.project)
   if (retainedRecords.some(terminal)) throw new Error(`${name}: fixture is vacuous: a record settled without a parent`)
@@ -132,24 +129,28 @@ async function incompatibilityFacts(current, artifacts) {
       const row = taskRecords(scenario.project).find((entry) => entry.task_id === record.task_id)
       return row?.suspension_reason === "host_incompatible" ? row : undefined
     })
-    const notices = await observeState(dirname(parentSession), () => {
-      const count = noticeCount(parentSession, "host_unavailable:host_incompatible")
-      return count > 0 ? count : undefined
-    }, { trigger: () => writeFileSync(noticeRelease, "go\n"), timeoutMs: 120_000 })
+    const notices = await observeState(
+      dirname(parentSession),
+      () => {
+        const count = noticeCount(parentSession, "host_unavailable:host_incompatible")
+        return count > 0 ? count : undefined
+      },
+      { trigger: () => writeFileSync(noticeRelease, "go\n"), timeoutMs: 120_000 },
+    )
     const facts = {
       socket,
       parked_status: parked?.status ?? null,
       parked_residency: parked?.residency_state ?? null,
       parked_reason: parked?.suspension_reason ?? null,
       commands: fixture.commands.map((command) => command.type),
-      open_session_count: fixture.commands
-        .filter((command) => command.type === "open_session").length,
+      open_session_count: fixture.commands.filter((command) => command.type === "open_session").length,
       notice_count: notices ?? 0,
       other_endpoints: endpointSockets(scenario.sandbox),
     }
     return {
       facts,
-      ok: facts.parked_reason === "host_incompatible" &&
+      ok:
+        facts.parked_reason === "host_incompatible" &&
         facts.open_session_count === 0 &&
         facts.notice_count === 1 &&
         facts.other_endpoints.length === 0,
@@ -160,11 +161,7 @@ async function incompatibilityFacts(current, artifacts) {
     await stopParent(resumed)
     await fixture?.close()
     writeFileSync(release, "go\n")
-    await cleanupScenario(
-      scenario,
-      [resumed],
-      join(artifacts, "incompatibility-cleanup.json"),
-    )
+    await cleanupScenario(scenario, [resumed], join(artifacts, "incompatibility-cleanup.json"))
   }
 }
 
@@ -194,11 +191,10 @@ async function isolationFacts(current, artifacts) {
       const rows = taskRecords(scenario.project)
       const bad = rows.find((entry) => entry.task_id === deleted.task_id)
       const kept = rows.find((entry) => entry.task_id === good.task_id)
-      const isolated = ["lost", "error"].includes(bad?.status) ||
+      const isolated =
+        ["lost", "error"].includes(bad?.status) ||
         bad?.residency_state === "rpc_detached" ||
-        /missing|ENOENT|transcript|session/i.test(
-          `${bad?.error_message ?? ""} ${bad?.suspension_reason ?? ""}`,
-        )
+        /missing|ENOENT|transcript|session/i.test(`${bad?.error_message ?? ""} ${bad?.suspension_reason ?? ""}`)
       return isolated && kept?.status === "completed" && kept.host_session?.socket === socket
         ? { bad, kept }
         : undefined
@@ -223,19 +219,22 @@ async function isolationFacts(current, artifacts) {
       // Observed, not gated: the engine recreates the deleted directory for its holder record and runs
       // one turn in the fresh empty session before the client disposes it (a senpi engine defect
       // reported separately); the child's RECORD is what this row judges.
-      deleted_message_rows: jsonlLines(deleted.host_session.session_path)
-        .filter((line) => line.includes('"type":"message"')).length,
+      deleted_message_rows: jsonlLines(deleted.host_session.session_path).filter((line) =>
+        line.includes('"type":"message"'),
+      ).length,
       child_http_requests: requestCount(scenario.childLog),
       deleted_path_messages: jsonlLines(deleted.host_session.session_path)
         .filter((line) => line.includes('"type":"message"'))
         .map((line) => JSON.stringify(JSON.parse(line).message).slice(0, 400)),
-      good_transcript_present: childSessionFiles(scenario.sandbox, good.task_id)
-        .includes(good.host_session.session_path),
+      good_transcript_present: childSessionFiles(scenario.sandbox, good.task_id).includes(
+        good.host_session.session_path,
+      ),
       ...turns,
     }
     return {
       facts,
-      ok: facts.list_sessions_answered &&
+      ok:
+        facts.list_sessions_answered &&
         facts.good_session_listed &&
         facts.stopped_endpoint_before_resume.stillAlive.length === 0 &&
         facts.original_same_host &&
@@ -252,11 +251,7 @@ async function isolationFacts(current, artifacts) {
     writeFileSync(resumeRelease, "go\n")
     await stopParent(resumed)
     writeFileSync(release, "go\n")
-    await cleanupScenario(
-      scenario,
-      [resumed],
-      join(artifacts, "entry-isolation-cleanup.json"),
-    )
+    await cleanupScenario(scenario, [resumed], join(artifacts, "entry-isolation-cleanup.json"))
   }
 }
 
@@ -272,9 +267,6 @@ export async function runIncompatibilityAndEntryIsolation(current, artifacts) {
     join(artifacts, "incompatibility-entry-isolation.json"),
     facts,
     "incompatibility or per-entry isolation invariants failed",
-    [
-      join(artifacts, "incompatibility-cleanup.json"),
-      join(artifacts, "entry-isolation-cleanup.json"),
-    ],
+    [join(artifacts, "incompatibility-cleanup.json"), join(artifacts, "entry-isolation-cleanup.json")],
   )
 }

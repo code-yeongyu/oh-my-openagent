@@ -89,7 +89,9 @@ export function createCategoryUnavailableWarningPlanner(deps: CategoryUnavailabl
           reason: "no_chain_rung_available",
           attempted_chain: error.attempted_chain,
           missing_providers: error.missing_providers ?? [],
-          ...(error.unlisted_provider_model !== undefined && { unlisted_provider_model: error.unlisted_provider_model }),
+          ...(error.unlisted_provider_model !== undefined && {
+            unlisted_provider_model: error.unlisted_provider_model,
+          }),
           available_categories: error.availableCategories ?? [],
         },
       },

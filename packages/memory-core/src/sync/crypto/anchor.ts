@@ -66,7 +66,8 @@ const anchors = new WeakSet<object>()
 const candidates = new WeakSet<object>()
 const bootstraps = new WeakSet<object>()
 
-export const isBootstrapAnchor = (value: unknown): value is BootstrapAnchor => typeof value === "object" && value !== null && bootstraps.has(value)
+export const isBootstrapAnchor = (value: unknown): value is BootstrapAnchor =>
+  typeof value === "object" && value !== null && bootstraps.has(value)
 
 const isBootstrap = (value: object): value is BootstrapAnchor => bootstraps.has(value)
 
@@ -96,17 +97,36 @@ export const pairingAnchor = (input: {
   readonly joiningNonce: string
   readonly approverNonce: string
 }): BootstrapAnchor => {
-  const approver = Object.freeze({ sealing_public_key: input.approver.sealing_public_key, signing_public_key: input.approver.signing_public_key })
+  const approver = Object.freeze({
+    sealing_public_key: input.approver.sealing_public_key,
+    signing_public_key: input.approver.signing_public_key,
+  })
   const transcript = Object.freeze({ joining_nonce: input.joiningNonce, approver_nonce: input.approverNonce })
-  return mintBootstrap({ kind: "pairing", account: input.account, self: Object.freeze(principalOf(input.keyring)), approver, transcript })
+  return mintBootstrap({
+    kind: "pairing",
+    account: input.account,
+    self: Object.freeze(principalOf(input.keyring)),
+    approver,
+    transcript,
+  })
 }
 
 /** The anchor of a recovering device: the public keys it derived from the passkey it is using. */
-export const recoveryAnchor = (input: { readonly account: string; readonly credentialId: string } & PublicKeys): BootstrapAnchor =>
-  mintBootstrap({ kind: "recovery", account: input.account, credentialId: input.credentialId, sealing_public_key: input.sealing_public_key, signing_public_key: input.signing_public_key })
+export const recoveryAnchor = (
+  input: { readonly account: string; readonly credentialId: string } & PublicKeys,
+): BootstrapAnchor =>
+  mintBootstrap({
+    kind: "recovery",
+    account: input.account,
+    credentialId: input.credentialId,
+    sealing_public_key: input.sealing_public_key,
+    signing_public_key: input.signing_public_key,
+  })
 
-export const isTrustAnchor = (value: unknown): value is TrustAnchor => typeof value === "object" && value !== null && anchors.has(value)
-export const isPinCandidate = (value: unknown): value is PinCandidate => typeof value === "object" && value !== null && candidates.has(value)
+export const isTrustAnchor = (value: unknown): value is TrustAnchor =>
+  typeof value === "object" && value !== null && anchors.has(value)
+export const isPinCandidate = (value: unknown): value is PinCandidate =>
+  typeof value === "object" && value !== null && candidates.has(value)
 
 const isAnchor = (value: object): value is TrustAnchor => anchors.has(value)
 const isCandidate = (value: object): value is PinCandidate => candidates.has(value)
@@ -119,8 +139,18 @@ export const mintTrustAnchor = (account: string, genesisDigest: string): TrustAn
   return anchor
 }
 
-const mintCandidate = (account: string, genesisDigest: string, pinnedBy: PinSource, entry: KeyringEntry): PinCandidate => {
-  const candidate = Object.freeze({ account, genesisDigest, pinnedBy, at: Object.freeze({ seq: entry.seq, keyring_link: entry.keyring_link }) })
+const mintCandidate = (
+  account: string,
+  genesisDigest: string,
+  pinnedBy: PinSource,
+  entry: KeyringEntry,
+): PinCandidate => {
+  const candidate = Object.freeze({
+    account,
+    genesisDigest,
+    pinnedBy,
+    at: Object.freeze({ seq: entry.seq, keyring_link: entry.keyring_link }),
+  })
   candidates.add(candidate)
   if (!isCandidate(candidate)) throw new Error("unreachable: a fresh pin candidate is always registered")
   return candidate
@@ -166,10 +196,13 @@ export const anchorStep = (
   if (anchor.kind === "creator") {
     if (body.kind !== "genesis") return { ok: true, anchored: false, candidate: null }
     const own = body.firstDevice.id === anchor.selfId
-    return own ? { ok: true, anchored: true, candidate: mintCandidate(anchor.account, entry.digest, "creator", entry) } : { ok: false, reason: "anchor_mismatch" }
+    return own
+      ? { ok: true, anchored: true, candidate: mintCandidate(anchor.account, entry.digest, "creator", entry) }
+      : { ok: false, reason: "anchor_mismatch" }
   }
   if (anchor.kind === "pairing") {
-    if (body.kind !== "approval" || body.principal.id !== anchor.self.id) return { ok: true, anchored: false, candidate: null }
+    if (body.kind !== "approval" || body.principal.id !== anchor.self.id)
+      return { ok: true, anchored: false, candidate: null }
     const pairing = entry.body["pairing"]
     const transcript = isObject(pairing) ? pairing : {}
     const signer = entry.author.kind === "device" ? before?.members.get(entry.author.id) : undefined
@@ -178,10 +211,13 @@ export const anchorStep = (
       sameKeys(signer, anchor.approver) &&
       transcript["joining_nonce"] === anchor.transcript.joining_nonce &&
       transcript["approver_nonce"] === anchor.transcript.approver_nonce
-    return matches ? { ok: true, anchored: true, candidate: mintCandidate(anchor.account, genesisDigest, "pairing", entry) } : { ok: false, reason: "anchor_mismatch" }
+    return matches
+      ? { ok: true, anchored: true, candidate: mintCandidate(anchor.account, genesisDigest, "pairing", entry) }
+      : { ok: false, reason: "anchor_mismatch" }
   }
   const enrolled = body.kind === "genesis" ? body.recoveryKey : body.kind === "recovery-key" ? body.key : null
-  if (enrolled === null || enrolled.credential_id !== anchor.credentialId) return { ok: true, anchored: false, candidate: null }
+  if (enrolled === null || enrolled.credential_id !== anchor.credentialId)
+    return { ok: true, anchored: false, candidate: null }
   return sameKeys(enrolled, anchor)
     ? { ok: true, anchored: true, candidate: mintCandidate(anchor.account, genesisDigest, "recovery", entry) }
     : { ok: false, reason: "anchor_mismatch" }

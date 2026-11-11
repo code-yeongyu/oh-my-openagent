@@ -14,11 +14,7 @@ import {
   handleTuiToast,
 } from "./event-handlers"
 
-export async function processEvents(
-  ctx: RunContext,
-  stream: AsyncIterable<unknown>,
-  state: EventState
-): Promise<void> {
+export async function processEvents(ctx: RunContext, stream: AsyncIterable<unknown>, state: EventState): Promise<void> {
   for await (const event of stream) {
     if (ctx.abortController.signal.aborted) break
 

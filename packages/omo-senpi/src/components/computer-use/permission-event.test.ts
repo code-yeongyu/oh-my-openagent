@@ -8,28 +8,34 @@ describe("computer permission events through the real session", () => {
       const fixture = await permissionSession()
       try {
         // when
-        const result = path === "direct" || path === "cua"
-          ? await fixture.execute(path === "direct" ? "computer" : "computer_actions",
-              path === "direct" ? capture : { action: "screenshot" })
-          : await fixture.execute("eval", {
-              language: path,
-              code: path === "js"
-                ? `await tool.computer(${JSON.stringify(capture)}); print("arbitrary output")`
-                : `await tool.computer(${JSON.stringify(capture)})\nprint("arbitrary output")`,
-              summary: "Exercise computer permission denial",
-            })
+        const result =
+          path === "direct" || path === "cua"
+            ? await fixture.execute(
+                path === "direct" ? "computer" : "computer_actions",
+                path === "direct" ? capture : { action: "screenshot" },
+              )
+            : await fixture.execute("eval", {
+                language: path,
+                code:
+                  path === "js"
+                    ? `await tool.computer(${JSON.stringify(capture)}); print("arbitrary output")`
+                    : `await tool.computer(${JSON.stringify(capture)})\nprint("arbitrary output")`,
+                summary: "Exercise computer permission denial",
+              })
         // then
         expect(result).toBeDefined()
         // A cell that never reached the engine shows why (its error, or that it timed out) instead of only a missing call (#9495).
         expect(fixture.methods, JSON.stringify(result)).toContain("capture")
-        expect(fixture.events).toEqual([{
-          name: "omo.computer.permission_required",
-          data: {
-            session_id: fixture.session.sessionManager.getSessionId(),
-            permission: "screen_recording",
-            app: "Test App",
+        expect(fixture.events).toEqual([
+          {
+            name: "omo.computer.permission_required",
+            data: {
+              session_id: fixture.session.sessionManager.getSessionId(),
+              permission: "screen_recording",
+              app: "Test App",
+            },
           },
-        }])
+        ])
       } finally {
         await fixture.close()
       }
@@ -49,10 +55,12 @@ describe("computer permission events through the real session", () => {
       })
       await fixture.execute("computer", input)
       // then
-      expect(fixture.events).toEqual(["screen_recording", "accessibility"].map((permission) => ({
-        name: "omo.computer.permission_required",
-        data: { session_id: fixture.session.sessionManager.getSessionId(), permission, app: "Test App" },
-      })))
+      expect(fixture.events).toEqual(
+        ["screen_recording", "accessibility"].map((permission) => ({
+          name: "omo.computer.permission_required",
+          data: { session_id: fixture.session.sessionManager.getSessionId(), permission, app: "Test App" },
+        })),
+      )
     } finally {
       await fixture.close()
     }
@@ -131,10 +139,12 @@ describe("computer permission events through the real session", () => {
       await fixture.execute("computer", capture)
       // then
       expect(first).toMatchObject({ details: { value: { code: "COMPUTER_PERMISSION_REQUIRED" } } })
-      expect(fixture.events).toEqual([{
-        name: "omo.computer.permission_required",
-        data: { session_id: fixture.session.sessionId, permission: "screen_recording", app: "Test App" },
-      }])
+      expect(fixture.events).toEqual([
+        {
+          name: "omo.computer.permission_required",
+          data: { session_id: fixture.session.sessionId, permission: "screen_recording", app: "Test App" },
+        },
+      ])
     } finally {
       marker.mockRestore()
       await fixture.close()
@@ -157,14 +167,16 @@ describe("computer permission events through the real session", () => {
       // then
       expect(fixture.session.sessionId).toBe(root)
       expect(fixture.extensionErrors).toEqual([])
-      expect(fixture.methods.filter(method => method === "capture")).toHaveLength(2)
+      expect(fixture.methods.filter((method) => method === "capture")).toHaveLength(2)
       for (const result of [first, second]) {
         expect(result).toMatchObject({ details: { value: { code: "COMPUTER_PERMISSION_REQUIRED" } } })
       }
-      expect(fixture.events).toEqual([{
-        name: "omo.computer.permission_required",
-        data: { session_id: root, permission: "screen_recording", app: "Test App" },
-      }])
+      expect(fixture.events).toEqual([
+        {
+          name: "omo.computer.permission_required",
+          data: { session_id: root, permission: "screen_recording", app: "Test App" },
+        },
+      ])
     } finally {
       marker.mockRestore()
       await fixture.close()

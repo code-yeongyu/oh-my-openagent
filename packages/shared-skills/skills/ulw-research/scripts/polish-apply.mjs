@@ -33,46 +33,55 @@ export const POLISH_EDIT_FIELDS = Object.freeze({ before: "required", after: "re
 
 /** Throws a TypeError naming the first edit that breaks POLISH_EDIT_FIELDS; returns the edits. */
 export function validatePolishEdits(edits) {
-	if (!Array.isArray(edits)) throw new TypeError("edits must be an array")
-	edits.forEach((edit, index) => {
-		if (edit === null || typeof edit !== "object" || Array.isArray(edit)) throw new TypeError(`edit ${index} must be an object`)
-		for (const [field, need] of Object.entries(POLISH_EDIT_FIELDS)) {
-			if (need === "optional" && edit[field] === undefined) continue
-			if (typeof edit[field] !== "string") throw new TypeError(`edit ${index} needs ${need === "optional" ? "a string" : "string"} ${field}`)
-		}
-	})
-	return edits
+  if (!Array.isArray(edits)) throw new TypeError("edits must be an array")
+  edits.forEach((edit, index) => {
+    if (edit === null || typeof edit !== "object" || Array.isArray(edit))
+      throw new TypeError(`edit ${index} must be an object`)
+    for (const [field, need] of Object.entries(POLISH_EDIT_FIELDS)) {
+      if (need === "optional" && edit[field] === undefined) continue
+      if (typeof edit[field] !== "string")
+        throw new TypeError(`edit ${index} needs ${need === "optional" ? "a string" : "string"} ${field}`)
+    }
+  })
+  return edits
 }
 
 /** Characters an edit's before and after may never contain. */
 export const POLISH_MARKUP_CHARACTERS = /[<>&]/
 /** The actionable rejection reason for an edit holding a markup character. */
-export const POLISH_MARKUP_REASON = "edit contains markup characters (<, >, &): route this section through the full fidelity gates"
+export const POLISH_MARKUP_REASON =
+  "edit contains markup characters (<, >, &): route this section through the full fidelity gates"
 /** The actionable rejection reason for a located region touching a character reference. */
-export const POLISH_REFERENCE_REASON = "edit touches a character reference: route this section through the full fidelity gates"
+export const POLISH_REFERENCE_REASON =
+  "edit touches a character reference: route this section through the full fidelity gates"
 
 /** True when [start, end) overlaps a character reference of html or starts inside one. */
 export function touchesReference(html, start, end) {
-	for (const match of String(html).matchAll(CHARACTER_REFERENCE)) {
-		const stop = match.index + match[0].length
-		if (match.index < end && (stop > start || (stop === start && !match[0].endsWith(";")))) return true
-	}
-	return false
+  for (const match of String(html).matchAll(CHARACTER_REFERENCE)) {
+    const stop = match.index + match[0].length
+    if (match.index < end && (stop > start || (stop === start && !match[0].endsWith(";")))) return true
+  }
+  return false
 }
 
 const escape = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
 /** The single whitespace-normalized match of `before` in html as {start, end}, or {count} otherwise. */
 function locate(html, before) {
-	if (before.trim() === "") return { count: 0 }
-	const pattern = new RegExp(before.split(/\s+/).map(escape).join("\\s+"), "g")
-	const hits = [...html.matchAll(pattern)]
-	return hits.length === 1 ? { count: 1, start: hits[0].index, end: hits[0].index + hits[0][0].length } : { count: hits.length }
+  if (before.trim() === "") return { count: 0 }
+  const pattern = new RegExp(before.split(/\s+/).map(escape).join("\\s+"), "g")
+  const hits = [...html.matchAll(pattern)]
+  return hits.length === 1
+    ? { count: 1, start: hits[0].index, end: hits[0].index + hits[0][0].length }
+    : { count: hits.length }
 }
 
 /** The id of a fact span the region [start, end) cuts through (overlaps without containing), or null. */
 export function cutSpan(html, start, end) {
-	return factSpans(html).find((span) => span.start < end && span.end > start && !(start <= span.start && span.end <= end))?.id ?? null
+  return (
+    factSpans(html).find((span) => span.start < end && span.end > start && !(start <= span.start && span.end <= end))
+      ?.id ?? null
+  )
 }
 
 /**
@@ -83,34 +92,41 @@ export function cutSpan(html, start, end) {
  *   unlocated: { index: number, code: string, reason: string }[] }}
  */
 export function applyEdits(html, edits, ledger) {
-	validatePolishEdits(edits)
-	const original = String(html)
-	const result = { out: original, applied: [], rejected: [], unlocated: [] }
-	const defects = (candidate) => {
-		const messages = [result.out, original].flatMap((base) => polishDefects(base, candidate, ledger, { ordered: true }).map((d) => d.message))
-		return [...new Set(messages)]
-	}
-	edits.forEach((edit, index) => {
-		const touches = POLISH_MARKUP_CHARACTERS.test(edit.before) || POLISH_MARKUP_CHARACTERS.test(edit.after)
-		const where = locate(result.out, edit.before)
-		if (where.count !== 1 && !touches) {
-			result.unlocated.push({ index, code: "polish_edit_unlocated", reason: `before matches ${where.count} times; it must match exactly once` })
-			return
-		}
-		const reasons = touches ? [POLISH_MARKUP_REASON] : []
-		const candidate = where.count === 1 ? result.out.slice(0, where.start) + edit.after + result.out.slice(where.end) : result.out
-		if (where.count === 1) {
-			const cut = cutSpan(result.out, where.start, where.end)
-			if (touchesReference(result.out, where.start, where.end)) reasons.push(POLISH_REFERENCE_REASON)
-			reasons.push(...defects(candidate))
-			if (cut !== null) reasons.push(`the edit cuts through fact span ${cut}`)
-		}
-		if (reasons.length > 0) {
-			result.rejected.push({ index, code: "polish_edit_rejected", reason: reasons.join("; ") })
-			return
-		}
-		result.out = candidate
-		result.applied.push(index)
-	})
-	return result
+  validatePolishEdits(edits)
+  const original = String(html)
+  const result = { out: original, applied: [], rejected: [], unlocated: [] }
+  const defects = (candidate) => {
+    const messages = [result.out, original].flatMap((base) =>
+      polishDefects(base, candidate, ledger, { ordered: true }).map((d) => d.message),
+    )
+    return [...new Set(messages)]
+  }
+  edits.forEach((edit, index) => {
+    const touches = POLISH_MARKUP_CHARACTERS.test(edit.before) || POLISH_MARKUP_CHARACTERS.test(edit.after)
+    const where = locate(result.out, edit.before)
+    if (where.count !== 1 && !touches) {
+      result.unlocated.push({
+        index,
+        code: "polish_edit_unlocated",
+        reason: `before matches ${where.count} times; it must match exactly once`,
+      })
+      return
+    }
+    const reasons = touches ? [POLISH_MARKUP_REASON] : []
+    const candidate =
+      where.count === 1 ? result.out.slice(0, where.start) + edit.after + result.out.slice(where.end) : result.out
+    if (where.count === 1) {
+      const cut = cutSpan(result.out, where.start, where.end)
+      if (touchesReference(result.out, where.start, where.end)) reasons.push(POLISH_REFERENCE_REASON)
+      reasons.push(...defects(candidate))
+      if (cut !== null) reasons.push(`the edit cuts through fact span ${cut}`)
+    }
+    if (reasons.length > 0) {
+      result.rejected.push({ index, code: "polish_edit_rejected", reason: reasons.join("; ") })
+      return
+    }
+    result.out = candidate
+    result.applied.push(index)
+  })
+  return result
 }
