@@ -96,7 +96,7 @@ describe("directory diagnostics", () => {
 		}
 	});
 
-	it("#given cold client acquisition is pending #when directory diagnostics are aborted #then acquisition settles and cleans up before startup releases", async () => {
+	it("#given cold client acquisition is pending #when directory diagnostics are aborted #then acquisition settles before startup releases and the cold start stays with the manager", async () => {
 		const workspace = mkdtempSync(join(tmpdir(), "lsp-directory-diag-cold-cancel-"));
 		const controller = new AbortController();
 		const startupStarted = deferred();
@@ -133,8 +133,8 @@ describe("directory diagnostics", () => {
 
 			expect(settledBeforeStartupRelease).toBe(true);
 			await expect(aggregation).rejects.toHaveProperty("name", "AbortError");
-			expect(manager.clientCount()).toBe(0);
-			expect(client.stopCallCount).toBe(1);
+			expect(manager.clientCount()).toBe(1);
+			expect(client.stopCallCount).toBe(0);
 		} finally {
 			startupRelease.resolve();
 			await aggregation.catch(() => undefined);

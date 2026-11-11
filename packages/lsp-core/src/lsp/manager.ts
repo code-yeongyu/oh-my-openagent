@@ -235,6 +235,34 @@ export class LspManager {
 		}
 	}
 
+	/**
+	 * Starts and initializes a new client independently of the caller that triggered it (senpi#4208): an aborted or
+	 * timed-out caller no longer stops a server that is still starting, so a slow cold start keeps its own initialize
+	 * budget and the next caller attaches to it. A failed start is removed and stopped here, exactly once.
+	 */
+	private runColdStart(key: string, managed: ManagedClient): Promise<void> {
+		const { client } = managed;
+		const start = (async () => {
+			await client.start();
+			await client.initialize();
+		})().then(
+			() => {
+				managed.isInitializing = false;
+				managed.initializingSince = null;
+				managed.initPromise = null;
+			},
+			async (err: unknown) => {
+				if (this.clients.get(key) === managed) {
+					this.clients.delete(key);
+					await this.tombstoneStop(key, client);
+				}
+				throw err;
+			},
+		);
+		start.catch(() => undefined);
+		return start;
+	}
+
 	async getClient(root: string, server: ResolvedServer, signal?: AbortSignal): Promise<LspClient> {
 		if (this.disposed) {
 			throw new Error("LspManager has been disposed");
@@ -305,37 +333,27 @@ export class LspManager {
 
 		const client = this.clientFactory(root, server);
 		const initStartedAt = this.now();
-		const initPromise = (async () => {
-			await client.start();
-			await client.initialize();
-		})();
-
 		const newManaged: ManagedClient = {
 			client,
 			refCount: 0,
 			pendingWaiters: 1,
 			lastUsedAt: initStartedAt,
-			initPromise,
+			initPromise: null,
 			isInitializing: true,
 			initializingSince: initStartedAt,
 		};
+		const initPromise = this.runColdStart(key, newManaged);
+		newManaged.initPromise = initPromise;
 		this.clients.set(key, newManaged);
 
 		try {
 			await awaitWithSignal(initPromise, signal);
 		} catch (err) {
 			newManaged.pendingWaiters--;
-			if (this.clients.get(key) === newManaged) {
-				this.clients.delete(key);
-			}
-			await this.tombstoneStop(key, client);
 			throw err;
 		}
 
 		newManaged.pendingWaiters--;
-		newManaged.isInitializing = false;
-		newManaged.initializingSince = null;
-		newManaged.initPromise = null;
 
 		if (signal?.aborted) {
 			await this.tryDeleteIfOrphaned(key, newManaged);
