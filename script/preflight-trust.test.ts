@@ -2,6 +2,7 @@ import { expect, test } from "bun:test"
 import { verifyPublisher, requestWithRetry } from "./preflight-trust.mjs"
 import { createServer } from "node:http"
 import { once } from "node:events"
+import { testBudgetSignal } from "../test-support/test-deadline"
 
 test("the real HTTP adapter retries the same POST with its authorization and body intact", async () => {
   const requests: Array<{ method?: string; authorization?: string; body: string }> = []
@@ -12,7 +13,7 @@ test("the real HTTP adapter retries the same POST with its authorization and bod
     response.writeHead(requests.length === 1 ? 503 : 201, { "Content-Type": "application/json" })
     response.end(requests.length === 1 ? '{"error":"propagating"}' : '{"token":"issued-secret"}')
   })
-  const listening = once(server, "listening", { signal: AbortSignal.timeout(5000) })
+  const listening = once(server, "listening", { signal: testBudgetSignal("the trust server to listen") })
   server.listen(0, "127.0.0.1")
   await listening
   try {
@@ -27,7 +28,7 @@ test("the real HTTP adapter retries the same POST with its authorization and bod
     expect(requests).toEqual(Array.from({ length: 2 }, () => ({ method: "POST", authorization: "Bearer fixture-token", body: "{}" })))
     expect(waits).toEqual([1000])
   } finally {
-    const closed = once(server, "close", { signal: AbortSignal.timeout(5000) })
+    const closed = once(server, "close", { signal: testBudgetSignal("the trust server to close") })
     server.close()
     server.closeAllConnections()
     await closed

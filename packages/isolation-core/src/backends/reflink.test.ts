@@ -8,6 +8,7 @@ import { fixture } from "../test-fixture"
 import { IsolationUnavailableError } from "../backend"
 import { ReflinkBackend } from "./reflink"
 import { runtime } from "./runtime"
+import { testBudgetSignal } from "../../../../test-support/test-deadline"
 
 test("FICLONE walks fd pairs, preserves metadata/symlinks and isolates writes", async () => {
   const f = await fixture(), merged = join(f.root, "merged")
@@ -87,7 +88,7 @@ test.skipIf(process.platform === "win32")("reflink walk skips sockets and FIFOs 
   expect(fifo.code).toBe(0)
   await writeFile(join(f.repoRoot, "data"), "source")
   const server = createServer()
-  const listening = once(server, "listening", { signal: AbortSignal.timeout(5000) })
+  const listening = once(server, "listening", { signal: testBudgetSignal("the socket fixture to listen") })
   server.listen(join(f.repoRoot, "sock"))
   await listening
   try {
@@ -99,7 +100,7 @@ test.skipIf(process.platform === "win32")("reflink walk skips sockets and FIFOs 
     expect((await readdir(merged)).sort()).toEqual(["data"])
     expect(clones).toBe(2)
   } finally {
-    const closed = once(server, "close", { signal: AbortSignal.timeout(5000) })
+    const closed = once(server, "close", { signal: testBudgetSignal("the socket fixture to close") })
     server.close()
     await closed
   }

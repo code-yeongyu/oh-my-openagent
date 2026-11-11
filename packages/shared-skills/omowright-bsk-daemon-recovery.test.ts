@@ -11,6 +11,7 @@ import { createServer, type Server, type Socket } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { BskIpcClient } from "omowright"
+import { remainingTestTime } from "../../test-support/test-deadline"
 
 type Frame = { readonly id: string; readonly method: string; readonly params?: Record<string, unknown> }
 type Reply = Record<string, unknown> | undefined
@@ -86,7 +87,7 @@ test("a call the client gives up on is cancelled at the daemon, so the session s
   await expect(handle.promise).rejects.toMatchObject({ code: "timeout" })
   let timer: ReturnType<typeof setTimeout> | undefined
   const timedOut = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error("waited 2 s for the cancel frame, never sent")), 2_000)
+    timer = setTimeout(() => reject(new Error("waited out the test budget for the cancel frame, never sent")), remainingTestTime())
   })
   const cancel = await Promise.race([daemon.cancelled, timedOut]).finally(() => clearTimeout(timer))
 

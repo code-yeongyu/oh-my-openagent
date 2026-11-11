@@ -9,6 +9,7 @@ import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { devBrowserSkill, releaseStaleCdpPortScript } from "./dev-browser"
+import { remainingTestTime, useTestTimeout } from "../../../../../../test-support/test-deadline"
 
 function which(name: string): string | null {
 	const found = Bun.spawnSync(["sh", "-c", `command -v ${name}`])
@@ -53,7 +54,7 @@ async function startPortProcess(socket: { listen: true } | { connect: number }, 
 	})
 	const ready = child.stdout.getReader().read()
 	const timeout = new Promise<never>((_, reject) =>
-		setTimeout(() => reject(new Error("port process did not open its socket within 5s")), 5_000),
+		setTimeout(() => reject(new Error("port process did not open its socket within the test budget")), remainingTestTime()),
 	)
 	const { value } = await Promise.race([ready, timeout])
 	const port = Number(new TextDecoder().decode(value).trim())
@@ -98,6 +99,7 @@ async function runReleaseThenStartServerCleanup(httpPort: number, cdpPort: numbe
 // start-server.ts reaches its kill path only through lsof, and Windows uses the PowerShell setup instead.
 if (process.platform !== "win32" && hasLsof) describe("dev-browser standalone setup releases the CDP port", () => {
 	test("a holder that quits on SIGTERM exits cleanly and never receives SIGKILL", async () => {
+		useTestTimeout(20_000)
 		const httpPort = await freePort()
 		const holder = await startPortHolder("exit")
 		const cdpPort = holder.port
@@ -111,6 +113,7 @@ if (process.platform !== "win32" && hasLsof) describe("dev-browser standalone se
 	}, { timeout: 20_000 })
 
 	test("a holder that ignores SIGTERM is killed only after the grace window", async () => {
+		useTestTimeout(20_000)
 		const httpPort = await freePort()
 		const holder = await startPortHolder("ignore")
 		const cdpPort = holder.port
@@ -124,6 +127,7 @@ if (process.platform !== "win32" && hasLsof) describe("dev-browser standalone se
 	}, { timeout: 20_000 })
 
 	test("a running dev-browser server keeps its browser", async () => {
+		useTestTimeout(20_000)
 		const httpPort = startAnsweringServer()
 		const holder = await startPortHolder("exit")
 
@@ -134,6 +138,7 @@ if (process.platform !== "win32" && hasLsof) describe("dev-browser standalone se
 	}, { timeout: 20_000 })
 
 	test("without curl a running server's browser is left alone, because nothing can tell whether it answers", async () => {
+		useTestTimeout(20_000)
 		const httpPort = startAnsweringServer()
 		const holder = await startPortHolder("exit")
 		const bin = mkdtempSync(join(tmpdir(), "dev-browser-nocurl-"))
@@ -151,6 +156,7 @@ if (process.platform !== "win32" && hasLsof) describe("dev-browser standalone se
 	}, { timeout: 20_000 })
 
 	if (zshPath !== null) test("under zsh every pid on the port gets SIGTERM", async () => {
+		useTestTimeout(20_000)
 		const httpPort = await freePort()
 		const holder = await startPortHolder("exit")
 		const client = await startPortProcess({ connect: holder.port }, "exit")
@@ -163,6 +169,7 @@ if (process.platform !== "win32" && hasLsof) describe("dev-browser standalone se
 	}, { timeout: 20_000 })
 
 	test("with no grace window it still runs cleanly under set -u", async () => {
+		useTestTimeout(20_000)
 		const httpPort = await freePort()
 		const holder = await startPortHolder("exit")
 

@@ -7,10 +7,11 @@ import { createFileGrantStore } from "./env-grant-store"
 import { declarationDigest } from "./project-env-policy"
 import { resolveGrantsStorePath } from "./env-grants-store"
 import { setStdioClientDependenciesForTesting } from "./stdio-client"
+import { remainingTestTime, useTestTimeout } from "../../../../test-support/test-deadline"
 
 async function bounded<T>(promise: Promise<T>): Promise<T> {
   const timeout = Promise.withResolvers<T>()
-  const timer = setTimeout(() => timeout.reject(new Error("Expected cross-process event did not arrive")), 10_000)
+  const timer = setTimeout(() => timeout.reject(new Error("Expected cross-process event did not arrive within the test budget")), remainingTestTime())
   try { return await Promise.race([promise, timeout.promise]) }
   finally { clearTimeout(timer) }
 }
@@ -37,6 +38,7 @@ async function runWriter(root: string, operation: string): Promise<void> {
 }
 
 test("separate atomic writers converge and revoke closes a live legacy transport and pending materialization", async () => {
+  useTestTimeout(30_000)
   const root = mkdtempSync(join(tmpdir(), "omo-cross-grants-"))
   const source = join(root, "project", "SKILL.md")
   mkdirSync(join(root, "project"))

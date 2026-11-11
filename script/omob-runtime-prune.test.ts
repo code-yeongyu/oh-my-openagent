@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync }
 import { tmpdir } from "node:os"
 import { join, sep } from "node:path"
 import { listProcessCommands, planRuntimePrune, pruneOmobRuntimes, runtimesInUse, selectPruneEntries } from "./omob-runtime-prune"
+import { testBudgetSignal } from "../test-support/test-deadline"
 
 describe("selectPruneEntries", () => {
 	const entries = [
@@ -88,13 +89,13 @@ describe("listProcessCommands", () => {
 	test("includes a live child spawned by absolute executable path", async () => {
 		const child = spawn(process.execPath, ["-e", "process.stdin.once('data', () => console.log('ready')); process.stdin.resume()"], { stdio: ["pipe", "pipe", "ignore"] })
 		try {
-			const ready = once(child.stdout, "data", { signal: AbortSignal.timeout(5_000) })
+			const ready = once(child.stdout, "data", { signal: testBudgetSignal("the child to print ready") })
 			child.stdin.write("start\n")
 			await ready
 			const commands = listProcessCommands()
 			expect(commands.some((command) => command.startsWith(process.execPath))).toBe(true)
 		} finally {
-			const exited = once(child, "exit", { signal: AbortSignal.timeout(5_000) })
+			const exited = once(child, "exit", { signal: testBudgetSignal("the child to exit") })
 			child.kill()
 			await exited
 		}

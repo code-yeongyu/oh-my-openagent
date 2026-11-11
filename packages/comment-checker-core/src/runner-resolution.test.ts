@@ -1,4 +1,5 @@
 import { expect, it } from "bun:test"
+import { testBudgetSignal } from "../../../test-support/test-deadline"
 
 for (const name of ["ResolveMessage", "UnrelatedFailure"] as const) {
   it(`handles ${name} when legacy npm resolution throws a non-Error value`, async () => {
@@ -29,7 +30,7 @@ for (const name of ["ResolveMessage", "UnrelatedFailure"] as const) {
     const child = Bun.spawn([process.execPath, "-e", program], {
       stdout: "pipe",
       stderr: "pipe",
-      signal: AbortSignal.timeout(10_000),
+      signal: testBudgetSignal("the legacy package probe to exit"),
     })
     const [exitCode, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()])
 
