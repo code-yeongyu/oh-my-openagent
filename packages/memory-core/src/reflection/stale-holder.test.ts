@@ -16,28 +16,35 @@ function sameHost(
 describe("reflection lock holder decision (#10377)", () => {
   // Each fail-closed rule has its own scenario that changes exactly one fact of a provably dead
   // holder, so removing that rule changes this scenario's verdict.
-  test.each(SCENARIOS.map((scenario) => [scenario.rule === undefined ? scenario.name : `${scenario.name} [rule:${scenario.rule}]`, scenario] as const))(
-    "#given %s #when the holder is classified #then the verdict is exact",
-    async (_name, scenario) => {
-      expect(await classifyReflectionLockHolder(REFLECTION_DIR, probeFor(scenario.facts))).toEqual(scenario.expected)
-    },
-  )
+  test.each(
+    SCENARIOS.map(
+      (scenario) =>
+        [scenario.rule === undefined ? scenario.name : `${scenario.name} [rule:${scenario.rule}]`, scenario] as const,
+    ),
+  )("#given %s #when the holder is classified #then the verdict is exact", async (_name, scenario) => {
+    expect(await classifyReflectionLockHolder(REFLECTION_DIR, probeFor(scenario.facts))).toEqual(scenario.expected)
+  })
 
   test("#given a start-identity reader that throws #when the launcher is alive #then it stays live instead of failing", async () => {
     const scenario = SCENARIOS.find((entry) => entry.rule === "pid-reused")
     if (scenario === undefined) throw new Error("missing scenario")
-    const probe = { ...probeFor(scenario.facts), getProcessStartIdentity: async () => { throw new Error("ps failed") } }
-    expect(await classifyReflectionLockHolder(REFLECTION_DIR, probe)).toEqual({ state: "live", runId: "reflection-run-64" })
+    const probe = {
+      ...probeFor(scenario.facts),
+      getProcessStartIdentity: async () => {
+        throw new Error("ps failed")
+      },
+    }
+    expect(await classifyReflectionLockHolder(REFLECTION_DIR, probe)).toEqual({
+      state: "live",
+      runId: "reflection-run-64",
+    })
   })
 
   describe("stable host identity across roaming and multi-device sync (#11818)", () => {
     test("#given matching hostnames with different machine ids #when checked #then they stay foreign", async () => {
-      expect(
-        await sameHost(
-          { hostname: "Mac-765", hostId: "mac-a" },
-          { hostname: "Mac-765", hostId: "mac-b" },
-        ),
-      ).toBe(false)
+      expect(await sameHost({ hostname: "Mac-765", hostId: "mac-a" }, { hostname: "Mac-765", hostId: "mac-b" })).toBe(
+        false,
+      )
     })
 
     test("#given another machine's record whose pid is alive there #when classified #then it stays stuck and is never cleared", async () => {
@@ -71,18 +78,10 @@ describe("reflection lock holder decision (#10377)", () => {
     })
 
     test("#given a legacy record with only the old hostname field #when checked #then it matches only the same hostname", async () => {
-      expect(
-        await sameHost(
-          { hostname: "my-workstation" },
-          { hostname: "my-workstation", hostId: "host-123" },
-        ),
-      ).toBe(true)
-      expect(
-        await sameHost(
-          { hostname: "old-hostname" },
-          { hostname: "new-hostname", hostId: "host-123" },
-        ),
-      ).toBe(false)
+      expect(await sameHost({ hostname: "my-workstation" }, { hostname: "my-workstation", hostId: "host-123" })).toBe(
+        true,
+      )
+      expect(await sameHost({ hostname: "old-hostname" }, { hostname: "new-hostname", hostId: "host-123" })).toBe(false)
     })
 
     test("#given the DHCP-rename case from #11818 with same hostId and different hostname #when classified #then it is reclaimed as dead", async () => {
@@ -151,19 +150,13 @@ describe("reflection lock holder decision (#10377)", () => {
     // leave the machine unable to reclaim its own lock, so the hostname rule has to decide.
     test("#given a recorded id and an unknown current id #when the hostnames match #then it is still this host", async () => {
       expect(
-        await sameHost(
-          { hostname: "MacBook-Pro", hostId: "our-machine" },
-          { hostname: "MacBook-Pro", hostId: null },
-        ),
+        await sameHost({ hostname: "MacBook-Pro", hostId: "our-machine" }, { hostname: "MacBook-Pro", hostId: null }),
       ).toBe(true)
     })
 
     test("#given a recorded id and an unknown current id #when the hostnames differ #then it stays foreign", async () => {
       expect(
-        await sameHost(
-          { hostname: "Mac-765", hostId: "our-machine" },
-          { hostname: "Mac-424", hostId: null },
-        ),
+        await sameHost({ hostname: "Mac-765", hostId: "our-machine" }, { hostname: "Mac-424", hostId: null }),
       ).toBe(false)
     })
 

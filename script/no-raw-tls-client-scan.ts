@@ -104,7 +104,8 @@ export function isScannedSourceFile(relativePath: string): boolean {
 // probe is how the guard reaches them: scanned and pinned when present,
 // entries skipped when no build ran (nothing exists to guard). The list
 // is also the complete manifest of what stage-omowright-runtime.mjs
-// stages per plugin tree (STAGED_FILES: index.js + page-bundle.js):
+// stages per plugin tree (the JavaScript in STAGED_FILES: index.js +
+// page-bundle.js; the extensionless LICENSE is not a source file):
 // evaluateBuiltRuntimeProbe fails CI on a missing entry and on any
 // staged runtime file the list does not name, so a staging-path change
 // cannot silently shrink the guard's scope.
@@ -156,7 +157,9 @@ export function evaluateBuiltRuntimeProbe(input: {
   if (input.ci !== undefined) {
     for (const found of input.discovered) {
       if (!input.known.includes(found)) {
-        failures.push("CI: built omowright runtime missing from KNOWN_BUILT_RUNTIMES: " + found + ". Add it so the guard scans it.")
+        failures.push(
+          "CI: built omowright runtime missing from KNOWN_BUILT_RUNTIMES: " + found + ". Add it so the guard scans it.",
+        )
       }
     }
   }
@@ -199,7 +202,11 @@ export function discoverPluginBuiltRuntimes(): string[] {
   for (const pkg of readdirSync(path.join(WORKSPACE_ROOT, "packages"), { withFileTypes: true })) {
     if (pkg.name === "node_modules") continue
     if (!isDirectory(path.join(WORKSPACE_ROOT, "packages"), pkg)) continue
-    walk(path.join(WORKSPACE_ROOT, "packages", pkg.name, "plugin", "skills"), "packages/" + pkg.name + "/plugin/skills", false)
+    walk(
+      path.join(WORKSPACE_ROOT, "packages", pkg.name, "plugin", "skills"),
+      "packages/" + pkg.name + "/plugin/skills",
+      false,
+    )
   }
   return [...new Set(found)].sort()
 }

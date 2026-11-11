@@ -1,12 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { MemoryFakeExtensionAPI } from "../memory.test-support"
-import {
-  fakeCommandContext,
-  fakeDeps,
-  invoke,
-  tempIdentity,
-  trackSendOrder,
-} from "./commands.test-support"
+import { fakeCommandContext, fakeDeps, invoke, tempIdentity, trackSendOrder } from "./commands.test-support"
 import { registerRememberCommand } from "./remember"
 import { removeTree } from "../../../../../../test-support/remove-tree"
 

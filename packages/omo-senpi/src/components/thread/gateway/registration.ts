@@ -14,6 +14,7 @@ import {
 } from "./adapter"
 import { createInboxDrain, type InboxDrain, type InboxDrainOptions } from "./drain"
 import { gatewayInboxDirectory } from "./paths"
+import { createExtensionResolver } from "./extension-resolver"
 import { createGatewayStore, type GatewayStore } from "./store"
 
 /**
@@ -27,12 +28,21 @@ export type SenpiWakeEvent = Parameters<RegisterControlEndpointOptions["drain"]>
 export type SessionControlActionsPort = {
   readonly registerControlEndpoint: SessionControlRegistrar
   readonly admissionGate: () => SessionAdmissionGate
-  readonly admitExternalMessage: (input: AdmitExternalMessageInput) => { readonly kind: ExternalAdmissionKind; readonly turn_epoch: number }
+  readonly admitExternalMessage: (input: AdmitExternalMessageInput) => {
+    readonly kind: ExternalAdmissionKind
+    readonly turn_epoch: number
+  }
   readonly listAdmittedDeliveries: () => { readonly pending: readonly string[]; readonly emitted: readonly string[] }
   readonly persistHeaderNow: () => Promise<void>
 }
 
-const CONTROL_METHODS = ["registerControlEndpoint", "admissionGate", "admitExternalMessage", "listAdmittedDeliveries", "persistHeaderNow"] as const
+const CONTROL_METHODS = [
+  "registerControlEndpoint",
+  "admissionGate",
+  "admitExternalMessage",
+  "listAdmittedDeliveries",
+  "persistHeaderNow",
+] as const
 
 /** `pi.session` when the host exposes the whole control surface; `undefined` on every engine that predates it. */
 export function sessionControlOf(pi: unknown): SessionControlActionsPort | undefined {
@@ -42,10 +52,13 @@ export function sessionControlOf(pi: unknown): SessionControlActionsPort | undef
   const surface = session as Record<string, unknown>
   if (!CONTROL_METHODS.every((method) => typeof surface[method] === "function")) return undefined
   return {
-    registerControlEndpoint: (options) => (surface.registerControlEndpoint as SessionControlActionsPort["registerControlEndpoint"]).call(session, options),
+    registerControlEndpoint: (options) =>
+      (surface.registerControlEndpoint as SessionControlActionsPort["registerControlEndpoint"]).call(session, options),
     admissionGate: () => (surface.admissionGate as SessionControlActionsPort["admissionGate"]).call(session),
-    admitExternalMessage: (input) => (surface.admitExternalMessage as SessionControlActionsPort["admitExternalMessage"]).call(session, input),
-    listAdmittedDeliveries: () => (surface.listAdmittedDeliveries as SessionControlActionsPort["listAdmittedDeliveries"]).call(session),
+    admitExternalMessage: (input) =>
+      (surface.admitExternalMessage as SessionControlActionsPort["admitExternalMessage"]).call(session, input),
+    listAdmittedDeliveries: () =>
+      (surface.listAdmittedDeliveries as SessionControlActionsPort["listAdmittedDeliveries"]).call(session),
     persistHeaderNow: () => (surface.persistHeaderNow as SessionControlActionsPort["persistHeaderNow"]).call(session),
   }
 }
@@ -61,7 +74,8 @@ export type ControlSession = {
 export function controlSessionOf(eventCtx: unknown): ControlSession | undefined {
   if (typeof eventCtx !== "object" || eventCtx === null) return undefined
   const context = eventCtx as { readonly sessionManager?: unknown; readonly isIdle?: unknown; readonly ui?: unknown }
-  const manager = context.sessionManager as { readonly getSessionId?: unknown; readonly getSessionFile?: unknown } | undefined
+  const manager = context.sessionManager as
+    { readonly getSessionId?: unknown; readonly getSessionFile?: unknown } | undefined
   if (typeof manager?.getSessionId !== "function") return undefined
   const durableId: unknown = manager.getSessionId.call(manager)
   if (typeof durableId !== "string" || durableId.length === 0) return undefined
@@ -127,7 +141,15 @@ export type ControlEndpointRegistrant = {
   readonly currentDrain: () => InboxDrain | undefined
 }
 
-const SENPI_REASONS: ReadonlySet<string> = new Set<WakeReason>(["idle", "submission", "draft_cleared", "command", "inbox", "emitted", "continue"])
+const SENPI_REASONS: ReadonlySet<string> = new Set<WakeReason>([
+  "idle",
+  "submission",
+  "draft_cleared",
+  "command",
+  "inbox",
+  "emitted",
+  "continue",
+])
 
 function drainEvent(event: SenpiWakeEvent): DrainWakeEvent {
   const reason = SENPI_REASONS.has(event.reason) ? (event.reason as WakeReason) : "inbox"
@@ -190,9 +212,20 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
     }
     const agentDir = options.agentDir()
     // Creating the store opens nothing; its file is opened by its first operation, below.
-    store ??= createGatewayStore({ agentDir, ...(options.runtimeInstance === undefined ? {} : { runtimeInstance: options.runtimeInstance }) })
+    store ??= createGatewayStore({
+      agentDir,
+      resolveTarget: createExtensionResolver(agentDir),
+      ...(options.runtimeInstance === undefined ? {} : { runtimeInstance: options.runtimeInstance }),
+    })
     const runtime: SessionRuntimePort = {
-      phase: (): RuntimePhase => (compacting ? "compacting" : session.isIdle() ? "idle" : openQuestions.size > 0 ? "waiting_question" : "mid_turn"),
+      phase: (): RuntimePhase =>
+        compacting
+          ? "compacting"
+          : session.isIdle()
+            ? "idle"
+            : openQuestions.size > 0
+              ? "waiting_question"
+              : "mid_turn",
       admissionGate: () => control.admissionGate(),
       admitExternalMessage: (input) => control.admitExternalMessage(input),
       listAdmittedDeliveries: () => control.listAdmittedDeliveries(),
@@ -225,7 +258,8 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
       inboxDir: gatewayInboxDirectory(agentDir, session.durableId),
       drain: async (event) => {
         if (retired || !(await holder) || retired) return { admitted: [] }
-        if (event.reason === "command" || event.reasons.includes("command")) await options.onCommandWake?.(session.durableId)
+        if (event.reason === "command" || event.reasons.includes("command"))
+          await options.onCommandWake?.(session.durableId)
         return await drainOnce(event)
       },
       isSessionReferenced: () => drain.isSessionReferenced(),
@@ -233,21 +267,31 @@ export function createControlEndpointRegistrant(options: ControlEndpointRegistra
     if (reply.status !== "registered") {
       retire()
       recorded(false)
-      if (reply.status === "failed") log(`thread gateway: the control endpoint for ${session.durableId} failed to register: ${reply.reason}`)
+      if (reply.status === "failed")
+        log(`thread gateway: the control endpoint for ${session.durableId} failed to register: ${reply.reason}`)
       return reply
     }
     const incarnation = randomUUID()
     try {
       await store.registerIncarnation({
-        durable_id: session.durableId, incarnation,
+        durable_id: session.durableId,
+        incarnation,
         endpoint: { socket: reply.socket, kind: endpointKindOf(reply.socket, []) },
       })
     } catch (error) {
       retire()
       recorded(false)
       const reason = error instanceof Error ? error.message : String(error)
-      log(`thread gateway: the session incarnation for ${session.durableId} could not be recorded, so the session is not registered: ${reason}`)
-      await reply.dispose().catch((disposal: unknown) => log(`thread gateway: the control endpoint for ${session.durableId} was not disposed: ${disposal instanceof Error ? disposal.message : String(disposal)}`))
+      log(
+        `thread gateway: the session incarnation for ${session.durableId} could not be recorded, so the session is not registered: ${reason}`,
+      )
+      await reply
+        .dispose()
+        .catch((disposal: unknown) =>
+          log(
+            `thread gateway: the control endpoint for ${session.durableId} was not disposed: ${disposal instanceof Error ? disposal.message : String(disposal)}`,
+          ),
+        )
       return { status: "failed", reason }
     }
     recorded(true)

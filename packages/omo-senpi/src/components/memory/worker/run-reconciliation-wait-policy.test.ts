@@ -4,7 +4,11 @@ import { join } from "node:path"
 
 import { writeRunJsonAtomic } from "./run-artifacts"
 import { reconcileReflectionRuns } from "./run-reconciliation"
-import { cleanupReconciliationFixtures, FIXTURE_HOST, reconciliationFixture as fixture } from "./run-reconciliation.test-support"
+import {
+  cleanupReconciliationFixtures,
+  FIXTURE_HOST,
+  reconciliationFixture as fixture,
+} from "./run-reconciliation.test-support"
 
 afterEach(cleanupReconciliationFixtures)
 
@@ -18,7 +22,13 @@ describe("per-turn reconcile never waits on a run's deadline (#11976, DESIGN.r3 
     const sibling = join(item.identity.paths.reflection, "runs", "run-a-waiting")
     await mkdir(sibling, { recursive: true })
     const { processStart: _start, ...ledger } = item.ledger as unknown as Record<string, unknown>
-    await writeRunJsonAtomic(join(sibling, "ledger.json"), { ...ledger, runId: "run-a-waiting", pid: WAITING_SUPERVISOR, deadlineAt: NOW + 60 * 60_000, hardDeadlineAt: NOW + 60 * 60_000 - 100 })
+    await writeRunJsonAtomic(join(sibling, "ledger.json"), {
+      ...ledger,
+      runId: "run-a-waiting",
+      pid: WAITING_SUPERVISOR,
+      deadlineAt: NOW + 60 * 60_000,
+      hardDeadlineAt: NOW + 60 * 60_000 - 100,
+    })
     const waits: string[] = []
 
     // when
@@ -27,9 +37,14 @@ describe("per-turn reconcile never waits on a run's deadline (#11976, DESIGN.r3 
       reservation: item.store,
       hostname: () => FIXTURE_HOST,
       now: () => NOW,
-      getPidLiveness: (pid) => pid === WAITING_SUPERVISOR ? "alive" : "dead",
-      waitForOutcome: async () => { waits.push("outcome"); return "timeout" },
-      waitUntil: async () => { waits.push("until") },
+      getPidLiveness: (pid) => (pid === WAITING_SUPERVISOR ? "alive" : "dead"),
+      waitForOutcome: async () => {
+        waits.push("outcome")
+        return "timeout"
+      },
+      waitUntil: async () => {
+        waits.push("until")
+      },
       waitPolicy: "none",
     })
 

@@ -23,11 +23,13 @@ describe("resolveCompatibleModelSettings", () => {
   })
 
   test("maps GPT-6 Astra minimal reasoning effort to low", () => {
-    expect(resolveCompatibleModelSettings({
-      providerID: "chatgpt-subscription",
-      modelID: "gpt-6-astra",
-      desired: { reasoningEffort: "minimal" },
-    }).reasoningEffort).toBe("low")
+    expect(
+      resolveCompatibleModelSettings({
+        providerID: "chatgpt-subscription",
+        modelID: "gpt-6-astra",
+        desired: { reasoningEffort: "minimal" },
+      }).reasoningEffort,
+    ).toBe("low")
   })
   test("keeps supported Claude Opus variant unchanged", () => {
     const result = resolveCompatibleModelSettings({
@@ -236,7 +238,15 @@ describe("resolveCompatibleModelSettings", () => {
 
   // Provider-agnostic detection: model ID is the source of truth, not provider ID
   test("detects Claude via any provider (provider-agnostic)", () => {
-    for (const providerID of ["anthropic", "aws-bedrock", "bedrock", "amazon-bedrock", "opencode", "my-custom-proxy", "google-vertex-anthropic"]) {
+    for (const providerID of [
+      "anthropic",
+      "aws-bedrock",
+      "bedrock",
+      "amazon-bedrock",
+      "opencode",
+      "my-custom-proxy",
+      "google-vertex-anthropic",
+    ]) {
       const result = resolveCompatibleModelSettings({
         providerID,
         modelID: "claude-sonnet-4-6",
@@ -277,16 +287,51 @@ describe("resolveCompatibleModelSettings", () => {
       expectedVariants: string[]
       hasReasoningEffort: boolean
     }> = [
-      { name: "Gemini", modelID: "gemini-3.1-pro", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
+      {
+        name: "Gemini",
+        modelID: "gemini-3.1-pro",
+        expectedVariants: ["low", "medium", "high"],
+        hasReasoningEffort: false,
+      },
       { name: "Grok", modelID: "grok-4.3", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: true },
-      { name: "Kimi (kimi)", modelID: "kimi-k2.5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
+      {
+        name: "Kimi (kimi)",
+        modelID: "kimi-k2.5",
+        expectedVariants: ["low", "medium", "high"],
+        hasReasoningEffort: false,
+      },
       { name: "Kimi (k2)", modelID: "k2-v2", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
       { name: "GLM", modelID: "glm-5.2", expectedVariants: ["low", "medium", "high", "max"], hasReasoningEffort: true },
-      { name: "Minimax", modelID: "minimax-m2.5", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
-      { name: "DeepSeek", modelID: "deepseek-r2", expectedVariants: ["low", "medium", "high", "max"], hasReasoningEffort: true },
-      { name: "Mistral", modelID: "mistral-large-next", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
-      { name: "Codestral → Mistral", modelID: "codestral-2506", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
-      { name: "Llama", modelID: "llama-4-maverick", expectedVariants: ["low", "medium", "high"], hasReasoningEffort: false },
+      {
+        name: "Minimax",
+        modelID: "minimax-m2.5",
+        expectedVariants: ["low", "medium", "high"],
+        hasReasoningEffort: false,
+      },
+      {
+        name: "DeepSeek",
+        modelID: "deepseek-r2",
+        expectedVariants: ["low", "medium", "high", "max"],
+        hasReasoningEffort: true,
+      },
+      {
+        name: "Mistral",
+        modelID: "mistral-large-next",
+        expectedVariants: ["low", "medium", "high"],
+        hasReasoningEffort: false,
+      },
+      {
+        name: "Codestral → Mistral",
+        modelID: "codestral-2506",
+        expectedVariants: ["low", "medium", "high"],
+        hasReasoningEffort: false,
+      },
+      {
+        name: "Llama",
+        modelID: "llama-4-maverick",
+        expectedVariants: ["low", "medium", "high"],
+        hasReasoningEffort: false,
+      },
     ]
 
     for (const { name, modelID, expectedVariants, hasReasoningEffort } of familyCases) {
@@ -305,9 +350,7 @@ describe("resolveCompatibleModelSettings", () => {
       test(`${name} (${modelID}): downgrades unsupported variant`, () => {
         const supportsMax = expectedVariants.includes("max")
         const desiredVariant = supportsMax ? "xhigh" : "max"
-        const expectedDowngrade = supportsMax
-          ? "high"
-          : expectedVariants[expectedVariants.length - 1]
+        const expectedDowngrade = supportsMax ? "high" : expectedVariants[expectedVariants.length - 1]
 
         const result = resolveCompatibleModelSettings({
           providerID: "any-provider",
@@ -407,12 +450,14 @@ describe("resolveCompatibleModelSettings", () => {
       expect(result.changes).toEqual(
         requested === expected
           ? []
-          : [{
-              field: "reasoningEffort",
-              from: requested,
-              to: expected,
-              reason: "unsupported-by-model-family",
-            }],
+          : [
+              {
+                field: "reasoningEffort",
+                from: requested,
+                to: expected,
+                reason: "unsupported-by-model-family",
+              },
+            ],
       )
     }
   })
@@ -580,9 +625,7 @@ describe("resolveCompatibleModelSettings", () => {
     expect(result).toEqual({
       variant: undefined,
       reasoningEffort: "low",
-      changes: [
-        { field: "reasoningEffort", from: "none", to: "low", reason: "unsupported-by-model-family" },
-      ],
+      changes: [{ field: "reasoningEffort", from: "none", to: "low", reason: "unsupported-by-model-family" }],
     })
   })
 
@@ -734,41 +777,40 @@ describe("resolveCompatibleModelSettings", () => {
     expect(result.changes).toEqual([])
   })
 
-  test.each([
-    "openai/o3:high",
-    "openai/o3(high)",
-    "openai/o3 high",
-  ])("drops temperature for reasoning-suffixed o-series model %s", (modelID) => {
-    const result = resolveCompatibleModelSettings({
-      providerID: "openai",
-      modelID,
-      desired: { temperature: 0.1 },
-    })
+  test.each(["openai/o3:high", "openai/o3(high)", "openai/o3 high"])(
+    "drops temperature for reasoning-suffixed o-series model %s",
+    (modelID) => {
+      const result = resolveCompatibleModelSettings({
+        providerID: "openai",
+        modelID,
+        desired: { temperature: 0.1 },
+      })
 
-    expect(result.temperature).toBeUndefined()
-    expect(result.changes).toEqual([
-      {
-        field: "temperature",
-        from: "0.1",
-        to: undefined,
-        reason: "unsupported-by-model-family",
-      },
-    ])
-  })
+      expect(result.temperature).toBeUndefined()
+      expect(result.changes).toEqual([
+        {
+          field: "temperature",
+          from: "0.1",
+          to: undefined,
+          reason: "unsupported-by-model-family",
+        },
+      ])
+    },
+  )
 
-  test.each([
-    "openai/o3-deep-research",
-    "openai/o4-mini-deep-research",
-  ])("keeps temperature for the deep-research exception %s", (modelID) => {
-    const result = resolveCompatibleModelSettings({
-      providerID: "openai",
-      modelID,
-      desired: { temperature: 0.1 },
-    })
+  test.each(["openai/o3-deep-research", "openai/o4-mini-deep-research"])(
+    "keeps temperature for the deep-research exception %s",
+    (modelID) => {
+      const result = resolveCompatibleModelSettings({
+        providerID: "openai",
+        modelID,
+        desired: { temperature: 0.1 },
+      })
 
-    expect(result.temperature).toBe(0.1)
-    expect(result.changes).toEqual([])
-  })
+      expect(result.temperature).toBe(0.1)
+      expect(result.changes).toEqual([])
+    },
+  )
 
   test("drops thinking when model capabilities say it is unsupported", () => {
     const result = resolveCompatibleModelSettings({
@@ -782,7 +824,7 @@ describe("resolveCompatibleModelSettings", () => {
     expect(result.changes).toEqual([
       {
         field: "thinking",
-        from: "{\"type\":\"enabled\",\"budgetTokens\":4096}",
+        from: '{"type":"enabled","budgetTokens":4096}',
         to: undefined,
         reason: "unsupported-by-model-metadata",
       },

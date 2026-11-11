@@ -8,8 +8,16 @@ afterEach(cleanupPalaceFixtures)
 describe("palace reflection collector", () => {
   test("#given journal state and completion records #when reflection data is collected #then cursor state and recent outcomes are returned newest first", async () => {
     const fixture = await createPalaceFixture()
-    await fixture.writeCompletion("run-old", { runId: "run-old", outcome: "merged", finishedAt: "2026-01-01T00:00:00.000Z" })
-    await fixture.writeCompletion("run-new", { runId: "run-new", outcome: "failed", finishedAt: "2026-02-01T00:00:00.000Z" })
+    await fixture.writeCompletion("run-old", {
+      runId: "run-old",
+      outcome: "merged",
+      finishedAt: "2026-01-01T00:00:00.000Z",
+    })
+    await fixture.writeCompletion("run-new", {
+      runId: "run-new",
+      outcome: "failed",
+      finishedAt: "2026-02-01T00:00:00.000Z",
+    })
 
     const reflection = await collectReflection(fixture.paths, { limit: 5 })
 

@@ -7,7 +7,11 @@ function errorCode(error: unknown): string | undefined {
   return typeof error.code === "string" ? error.code : undefined
 }
 
-export async function execFileText(command: string, args: readonly string[], timeoutMs = 2_000): Promise<string | null> {
+export async function execFileText(
+  command: string,
+  args: readonly string[],
+  timeoutMs = 2_000,
+): Promise<string | null> {
   return await new Promise((resolve) => {
     // PowerShell is a console-subsystem binary; keep its probes from stealing focus (#8501).
     execFile(command, args, { encoding: "utf8", timeout: timeoutMs, windowsHide: true }, (error, stdout) => {
@@ -26,7 +30,10 @@ async function readLinuxStartIdentity(pid: number): Promise<string | null> {
     const stat = await readFile(`/proc/${pid}/stat`, "utf8")
     const commandEnd = stat.lastIndexOf(")")
     if (commandEnd < 0) return null
-    const fieldsAfterCommand = stat.slice(commandEnd + 2).trim().split(/\s+/)
+    const fieldsAfterCommand = stat
+      .slice(commandEnd + 2)
+      .trim()
+      .split(/\s+/)
     const startTicks = fieldsAfterCommand[19]
     return startTicks === undefined ? null : `linux-proc-start-ticks:${startTicks}`
   } catch {
@@ -59,13 +66,16 @@ export function createProcessStartIdentityReader(
   let ownIdentity: Promise<string | null> | undefined
   return (pid) => {
     if (pid !== ownPid) return read(pid)
-    ownIdentity ??= read(pid).then((identity) => {
-      if (identity === null) ownIdentity = undefined
-      return identity
-    }, (error: unknown) => {
-      ownIdentity = undefined
-      throw error
-    })
+    ownIdentity ??= read(pid).then(
+      (identity) => {
+        if (identity === null) ownIdentity = undefined
+        return identity
+      },
+      (error: unknown) => {
+        ownIdentity = undefined
+        throw error
+      },
+    )
     return ownIdentity
   }
 }

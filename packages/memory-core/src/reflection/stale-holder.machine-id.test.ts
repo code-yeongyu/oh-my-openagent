@@ -33,6 +33,18 @@ describe("machine id resolver", () => {
     expect(await resolve()).toBe("darwin-uuid:stable")
     expect(probes).toBe(1)
   })
+
+  test("#given a probe that throws #when it is called again #then the failure is not cached", async () => {
+    let probes = 0
+    const resolve = createMachineIdResolver(async () => {
+      probes += 1
+      throw new Error("ioreg failed")
+    })
+
+    await expect(resolve()).rejects.toThrow("ioreg failed")
+    await expect(resolve()).rejects.toThrow("ioreg failed")
+    expect(probes).toBe(2)
+  })
 })
 
 describe("platform uuid parse", () => {
@@ -55,14 +67,21 @@ describe("platform uuid parse", () => {
 })
 
 describe("platform uuid reader", () => {
-  test.if(process.platform === "darwin")("#given an empty PATH #when the production probe runs #then it returns the machine id", () => {
-    const source = new URL("./stale-holder.ts", import.meta.url).href
-    const result = spawnSync(process.execPath, [
-      "-e",
-      `import { getStableLocalHostId } from ${JSON.stringify(source)}; console.log(await getStableLocalHostId())`,
-    ], { encoding: "utf8", env: { ...process.env, PATH: "" }, timeout: 10_000 })
+  test.if(process.platform === "darwin")(
+    "#given an empty PATH #when the production probe runs #then it returns the machine id",
+    () => {
+      const source = new URL("./stale-holder.ts", import.meta.url).href
+      const result = spawnSync(
+        process.execPath,
+        [
+          "-e",
+          `import { getStableLocalHostId } from ${JSON.stringify(source)}; console.log(await getStableLocalHostId())`,
+        ],
+        { encoding: "utf8", env: { ...process.env, PATH: "" }, timeout: 10_000 },
+      )
 
-    expect(result.status, result.stderr).toBe(0)
-    expect(result.stdout.trim()).toMatch(/^darwin-uuid:[0-9A-Fa-f-]{36}$/)
-  })
+      expect(result.status, result.stderr).toBe(0)
+      expect(result.stdout.trim()).toMatch(/^darwin-uuid:[0-9A-Fa-f-]{36}$/)
+    },
+  )
 })

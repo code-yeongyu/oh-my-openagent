@@ -48,15 +48,21 @@ function memoryStore(initial: Credentials | null): CredentialStore & { clear(): 
 }
 
 const meReply = (accountId: string): typeof fetch =>
-  Object.assign(async (input: Parameters<typeof fetch>[0]) => {
-    if (String(input).endsWith("/v1/devices")) return Response.json({ devices: [{ id: "dev_service_row", current: true, revokedAt: null }] })
-    if (!String(input).endsWith("/v1/me")) return new Response("{}", { status: 404 })
-    return Response.json({ user: { id: "u" }, account: { id: accountId }, deviceId: "dev_service_row" })
-  }, { preconnect: fetch.preconnect })
+  Object.assign(
+    async (input: Parameters<typeof fetch>[0]) => {
+      if (String(input).endsWith("/v1/devices"))
+        return Response.json({ devices: [{ id: "dev_service_row", current: true, revokedAt: null }] })
+      if (!String(input).endsWith("/v1/me")) return new Response("{}", { status: 404 })
+      return Response.json({ user: { id: "u" }, account: { id: accountId }, deviceId: "dev_service_row" })
+    },
+    { preconnect: fetch.preconnect },
+  )
 
 describe("the CLI device account source", () => {
   test("a signed-out device answers null", async () => {
-    expect(await createCliAccountSource({ api: "http://127.0.0.1:9", store: memoryStore(null), fetch: meReply("acct") })()).toBeNull()
+    expect(
+      await createCliAccountSource({ api: "http://127.0.0.1:9", store: memoryStore(null), fetch: meReply("acct") })(),
+    ).toBeNull()
   })
 
   test("a host whose OS credential store cannot be used reads as signed out, not as a failure", async () => {
@@ -70,7 +76,9 @@ describe("the CLI device account source", () => {
       write: async () => undefined,
       clear: async () => undefined,
     }
-    expect(await createCliAccountSource({ api: "http://127.0.0.1:9", store: locked, fetch: meReply("acct") })()).toBeNull()
+    expect(
+      await createCliAccountSource({ api: "http://127.0.0.1:9", store: locked, fetch: meReply("acct") })(),
+    ).toBeNull()
   })
 
   test("a signed-in device names its account and builds its keyring from the keys it registered at sign-in", async () => {
@@ -81,7 +89,9 @@ describe("the CLI device account source", () => {
     expect(account.accountId).toBe("acct_42")
     expect(await account.accessToken()).toBe("access-1")
     const keyring = await account.keyring(deviceKeyringFromMaterial)
-    const registered = createPublicKey(createPrivateKey({ key: Buffer.from(stored.signingPrivateKey, "base64"), format: "der", type: "pkcs8" })).export({ format: "jwk" }).x
+    const registered = createPublicKey(
+      createPrivateKey({ key: Buffer.from(stored.signingPrivateKey, "base64"), format: "der", type: "pkcs8" }),
+    ).export({ format: "jwk" }).x
     if (registered === undefined) throw new Error("the registered key has no public half")
     expect(keyring.publicKeys().signing).toBe(registered)
     expect(keyring.principal().id).not.toBe(stored.device.id)
@@ -91,13 +101,18 @@ describe("the CLI device account source", () => {
   })
 })
 
-async function repoWithRemote(): Promise<{ readonly paths: ReturnType<typeof buildIdentityPaths>; readonly project: string }> {
+async function repoWithRemote(): Promise<{
+  readonly paths: ReturnType<typeof buildIdentityPaths>
+  readonly project: string
+}> {
   const root = await mkdtemp(join(tmpdir(), "omo-device-session-"))
   dirs.push(root)
   const paths = buildIdentityPaths(join(root, "memory"), "agent")
   const project = join(root, "project")
   for (const dir of [paths.repo, project]) execFileSync("git", ["init", "-q", dir], { windowsHide: true })
-  execFileSync("git", ["-C", project, "remote", "add", "origin", "git@github.com:acme/widgets.git"], { windowsHide: true })
+  execFileSync("git", ["-C", project, "remote", "add", "origin", "git@github.com:acme/widgets.git"], {
+    windowsHide: true,
+  })
   return { paths, project }
 }
 
@@ -105,15 +120,32 @@ function fakeAccount(overrides: Partial<CliDeviceAccount> = {}): CliDeviceAccoun
   const material = credentials()
   return {
     kind: "cli",
-    descriptor: { genesis: "unsupported", rpId: null, userName: null, serviceOrigin: "http://127.0.0.1:9", accountId: "acct_7", serviceDeviceId: "service-device", syncPrincipalId: "principal", publicKeys: { signing: "signing", sealing: "sealing" }, generation: "fixture", incarnation: "cli" },
+    descriptor: {
+      genesis: "unsupported",
+      rpId: null,
+      userName: null,
+      serviceOrigin: "http://127.0.0.1:9",
+      accountId: "acct_7",
+      serviceDeviceId: "service-device",
+      syncPrincipalId: "principal",
+      publicKeys: { signing: "signing", sealing: "sealing" },
+      generation: "fixture",
+      incarnation: "cli",
+    },
     signal: new AbortController().signal,
-    boundary: async dispatch => dispatch(),
-    forOperation: async () => { throw new Error("unused") },
+    boundary: async (dispatch) => dispatch(),
+    forOperation: async () => {
+      throw new Error("unused")
+    },
     serviceDeviceId: "service-device",
     isCurrent: async () => true,
     api: "http://127.0.0.1:9",
     accountId: "acct_7",
-    keyring: async () => createDeviceKeyring("principal", { signingPrivatePkcs8: Buffer.from(material.signingPrivateKey, "base64").toString("base64url"), sealingPrivatePkcs8: Buffer.from(material.sealingPrivateKey, "base64").toString("base64url") }),
+    keyring: async () =>
+      createDeviceKeyring("principal", {
+        signingPrivatePkcs8: Buffer.from(material.signingPrivateKey, "base64").toString("base64url"),
+        sealingPrivatePkcs8: Buffer.from(material.sealingPrivateKey, "base64").toString("base64url"),
+      }),
     accessToken: async () => "token",
     signedOut: async () => false,
     ...overrides,
@@ -121,7 +153,10 @@ function fakeAccount(overrides: Partial<CliDeviceAccount> = {}): CliDeviceAccoun
 }
 
 describe("the device session resolver", () => {
-  const resolverWith = (account: CliDeviceAccount | null, opened: { ok: true; session: SyncSession } | { ok: false; reason: "no_pin" | "not_member" | "corrupt_pin" }) => {
+  const resolverWith = (
+    account: CliDeviceAccount | null,
+    opened: { ok: true; session: SyncSession } | { ok: false; reason: "no_pin" | "not_member" | "corrupt_pin" },
+  ) => {
     const calls: AccountSessionOptions[] = []
     const resolve = createDeviceSessionResolver({
       source: async () => account,
@@ -140,8 +175,13 @@ describe("the device session resolver", () => {
   test("a project memory resolves to the same space on every device: the one its git remote names", async () => {
     const { paths, project } = await repoWithRemote()
     const { resolve, calls } = resolverWith(fakeAccount(), { ok: false, reason: "no_pin" })
-    expect(await resolve({ identity: "agent", paths, space: { profile: "auto", projectDir: project } })).toEqual({ idle: "no_pin" })
-    const expected = syncRuntime.resolveSpace({ get: () => null, set: () => undefined }, { remotes: [{ name: "origin", url: "https://github.com/acme/widgets" }] }).spaceId
+    expect(await resolve({ identity: "agent", paths, space: { profile: "auto", projectDir: project } })).toEqual({
+      idle: "no_pin",
+    })
+    const expected = syncRuntime.resolveSpace(
+      { get: () => null, set: () => undefined },
+      { remotes: [{ name: "origin", url: "https://github.com/acme/widgets" }] },
+    ).spaceId
     expect(Buffer.from(calls[0]?.spaceId ?? []).toString("hex")).toBe(expected)
     expect(calls[0]).toMatchObject({ account: "acct_7", pinDir: "/pins" })
   })

@@ -37,10 +37,9 @@ export type LeadPollerLifecycleDeps = {
 export type LeadPollerLifecycle = {
   tick(): Promise<void>
   resolveLeadPoller(teamRunId: string): LeadPollerPort | undefined
-  resolveTeamRunId(explicit?: string): Promise<
-    | { readonly ok: true; readonly teamRunId: string }
-    | { readonly ok: false; readonly reason: string }
-  >
+  resolveTeamRunId(
+    explicit?: string,
+  ): Promise<{ readonly ok: true; readonly teamRunId: string } | { readonly ok: false; readonly reason: string }>
   resolveDefaultTeamRunId(): Promise<DefaultTeamRunIdResolution>
   kick(): void
   shutdown(): void
@@ -75,9 +74,7 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
     if (stopped) return []
     const sessionId = deps.runtime.sessionId()
     const teams = await deps.listTeams()
-    const owned = sessionId === undefined
-      ? []
-      : teams.filter((team) => team.leadSessionId === sessionId)
+    const owned = sessionId === undefined ? [] : teams.filter((team) => team.leadSessionId === sessionId)
     const ownedIds = new Set(owned.map((team) => team.teamRunId))
 
     for (const [teamRunId, entry] of pollers) {
@@ -151,16 +148,16 @@ export function createLeadPollerLifecycle(deps: LeadPollerLifecycleDeps): LeadPo
   }
 
   const resolveLeadPoller = (teamRunId: string): LeadPollerPort | undefined => {
-    if (stopped || deps.runtime.sessionFile() === undefined || isTransition(deps.runtime.parentState())) return undefined
+    if (stopped || deps.runtime.sessionFile() === undefined || isTransition(deps.runtime.parentState()))
+      return undefined
     const entry = pollers.get(teamRunId)
     if (entry === undefined || entry.ownerSessionId !== deps.runtime.sessionId()) return undefined
     return entry.poller
   }
 
-  const resolveTeamRunId = async (explicit?: string): Promise<
-    | { readonly ok: true; readonly teamRunId: string }
-    | { readonly ok: false; readonly reason: string }
-  > => {
+  const resolveTeamRunId = async (
+    explicit?: string,
+  ): Promise<{ readonly ok: true; readonly teamRunId: string } | { readonly ok: false; readonly reason: string }> => {
     const owned = await synchronize()
     if (explicit !== undefined) {
       return owned.some((team) => team.teamRunId === explicit)
@@ -296,9 +293,7 @@ function scheduleInterval(tick: () => void, intervalMs: number): () => void {
 }
 
 function isRuntimeAccessError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error
-    && "code" in error
-    && (error.code === "EACCES" || error.code === "EPERM")
+  return error instanceof Error && "code" in error && (error.code === "EACCES" || error.code === "EPERM")
 }
 
 function assertNever(value: never): never {
