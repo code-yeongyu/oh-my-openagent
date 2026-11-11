@@ -19,7 +19,7 @@ pub fn read_click(params: ClickParams) -> ExecRequest {
         modifiers,
         delivery,
         consume,
-        force: _,
+        force,
         call_id,
         run_generation,
         observe_after,
@@ -33,7 +33,7 @@ pub fn read_click(params: ClickParams) -> ExecRequest {
     };
     let policy = SendPolicy {
         delivery,
-        force: false,
+        force: force.unwrap_or(false),
     };
     request(
         verb,

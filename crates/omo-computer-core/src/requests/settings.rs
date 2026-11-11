@@ -159,8 +159,8 @@ pub fn read_settings(settings: Settings) -> SessionConfig {
         default_hand,
         mcp,
         intervention,
-        macos_key_priming: _,
-        trace: _,
+        macos_key_priming,
+        trace,
         remote_commands,
         foreground_input_lock,
         x11_mpx,
@@ -221,7 +221,7 @@ pub fn read_settings(settings: Settings) -> SessionConfig {
             preview,
         },
         input: InputConfig {
-            macos_key_priming: None,
+            macos_key_priming,
             x11_keymap_remap,
             x11_mpx,
         },
@@ -238,7 +238,7 @@ pub fn read_settings(settings: Settings) -> SessionConfig {
             artifact_max_bytes,
             artifact_max_files,
             artifact_release_after_fetch,
-            trace: None,
+            trace: trace.map(read_trace),
         },
         fleet: read_fleet(ssh_hosts, fleet),
     }

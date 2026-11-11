@@ -46,8 +46,8 @@ pub fn read_session_open(params: SessionOpenParams) -> SessionOpenRequest {
     let SessionOpenParams {
         report_mode,
         intervention,
-        macos_key_priming: _,
-        trace: _,
+        macos_key_priming,
+        trace,
         show_cursor,
         allow_host_relay_only_stop,
         settings,
@@ -55,8 +55,8 @@ pub fn read_session_open(params: SessionOpenParams) -> SessionOpenRequest {
     SessionOpenRequest {
         report_mode: report_mode.unwrap_or(ReportMode::Null),
         intervention,
-        key_priming: None,
-        trace: None,
+        key_priming: macos_key_priming.map(read_key_priming),
+        trace: trace.map(read_trace),
         show_cursor,
         allow_host_relay_only_stop,
         config: settings.map(read_settings),
