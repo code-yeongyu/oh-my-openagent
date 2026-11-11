@@ -2174,6 +2174,8 @@
         "test-temp-leak-match.ts",
         "test-temp-root.ts",
         "crates/omo-computer-core/src/error/tests/check-design-citations.mjs",
+        // SP-B spike probe, run by path (plan row 11)
+        "crates/omo-computer-engine/probes/probe-sp-b.ts",
       ],
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
