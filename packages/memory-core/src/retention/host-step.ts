@@ -117,8 +117,15 @@ async function previewRetention(
   signal: AbortSignal,
 ): Promise<string[]> {
   const paths = buildIdentityPaths(dirname(dirname(root)), identity)
-  const past = await countRuntimePastRetention({ paths, policy, now, reflectionEnabled: true, signal })
-  const other = await countRuntimePastRetentionOtherStores({ paths, policy, now, signal })
+  const past = await countRuntimePastRetention({
+    paths,
+    policy,
+    now,
+    reflectionEnabled: true,
+    signal,
+    measureBytes: maxBytes > 0,
+  })
+  const other = await countRuntimePastRetentionOtherStores({ paths, policy, now, signal, measureBytes: maxBytes > 0 })
   const total = past.runs + past.journals + past.sidecars + other.completions + other.ledgers + other.legacy
   const counts = `runs ${past.runs}, completions ${other.completions}, journals ${past.journals}, sidecars ${past.sidecars}, ledgers ${other.ledgers}, legacy ${other.legacy}`
   const lines = total === 0 ? [] : [`WOULD FIX ${identity} retention would remove ${total} (${counts})`]
@@ -128,9 +135,13 @@ async function previewRetention(
     now: now(),
     signal,
   })
-  if ("sizeUnknown" in measured || measured.size.bytes <= maxBytes) return lines
+  if ("sizeUnknown" in measured) return lines
+  // The pass runs the cap only after retention has removed what is past its window (pass.ts), so the preview
+  // compares the size retention would leave with the cap (#12959).
+  const afterRetention = Math.max(0, measured.size.bytes - (past.bytes ?? 0) - (other.bytes ?? 0))
+  if (afterRetention <= maxBytes) return lines
   const excess = describeRuntimeCapExcess({
-    overCapBytes: measured.size.bytes - maxBytes,
+    overCapBytes: afterRetention - maxBytes,
     evictableBytes: await measureRuntimeCapEvictableBytes({
       paths,
       policy,
