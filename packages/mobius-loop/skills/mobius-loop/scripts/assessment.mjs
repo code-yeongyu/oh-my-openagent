@@ -88,8 +88,11 @@ export function validateClosure(snapshot, records, closure) {
       `Outcome ${outcome.id} has no current supported resolution`,
       "INVALID_TRANSITION",
     )
+    const cited = records.evidence.filter(
+      (item) => closure.evidenceIds.includes(item.id) && resolution.evidenceIds.includes(item.id),
+    )
     requireValue(
-      resolution.evidenceIds.some((id) => closure.evidenceIds.includes(id)),
+      cited.some(supportsImpact),
       `Closure must cite supporting evidence for ${outcome.id}`,
       "INVALID_TRANSITION",
     )
