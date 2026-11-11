@@ -22,7 +22,13 @@ import {
 
 import { memoryHookChecker } from "../worker/spawn-supervisor-support"
 import { LAZY_MEMORY_COMMANDS, type MemoryCommandPort } from "./metadata"
-import { requireIdentity, respond, type MemoryCommandContext, type MemoryCommandDeps, type MemoryCommandIdentity } from "./types"
+import {
+  requireIdentity,
+  respond,
+  type MemoryCommandContext,
+  type MemoryCommandDeps,
+  type MemoryCommandIdentity,
+} from "./types"
 
 const MEMORY_MERGE_USAGE = "usage: /memory-merge [--apply]"
 
@@ -34,7 +40,10 @@ export function registerMemoryMergeCommand(pi: MemoryCommandPort, deps: MemoryCo
 }
 
 async function runMemoryMerge(deps: MemoryCommandDeps, args: string, ctx: MemoryCommandContext): Promise<string> {
-  const tokens = args.trim().split(/\s+/).filter((token) => token !== "")
+  const tokens = args
+    .trim()
+    .split(/\s+/)
+    .filter((token) => token !== "")
   if (tokens.some((token) => token !== "--apply")) return respond(ctx, MEMORY_MERGE_USAGE, "error")
   const apply = tokens.includes("--apply")
   const identity = requireIdentity(deps, ctx)
@@ -46,20 +55,39 @@ async function runMemoryMerge(deps: MemoryCommandDeps, args: string, ctx: Memory
   const mode = deps.loadSettings().settings.auto_identity
   const resolve = (spelling: string): string => resolveAutoIdentity(spelling, env, mode).id
   const spellings = (await readIdentityRecord(identity.identityPaths.root).catch(() => undefined))?.spellings ?? []
-  const found = await findMergePredecessors(memoryRoot, identity.identity, resolve, await repositoryCandidateDirs(spellings))
-  const unmapped = found.unmapped.length === 0 ? [] : [`left alone (no recorded directory maps here): ${found.unmapped.join(", ")}`]
+  const found = await findMergePredecessors(
+    memoryRoot,
+    identity.identity,
+    resolve,
+    await repositoryCandidateDirs(spellings),
+  )
+  const unmapped =
+    found.unmapped.length === 0 ? [] : [`left alone (no recorded directory maps here): ${found.unmapped.join(", ")}`]
   if (found.predecessors.length === 0) {
     return respond(ctx, [`no other memory store maps to ${identity.identity}`, ...unmapped].join("\n"))
   }
 
   if (!apply) {
-    const lines = await Promise.all(found.predecessors.map(async (predecessor) => describePlan(await planIdentityMerge(predecessor.paths, identity.identityPaths, predecessor.mergedInto === identity.identity ? predecessor.mergedHead : undefined))))
-    return respond(ctx, [
-      `${found.predecessors.length} memory store(s) map to ${identity.identity} (dry run, nothing changed):`,
-      ...lines,
-      ...unmapped,
-      "run /memory-merge --apply to merge them; each merge is one commit you can revert",
-    ].join("\n"))
+    const lines = await Promise.all(
+      found.predecessors.map(async (predecessor) =>
+        describePlan(
+          await planIdentityMerge(
+            predecessor.paths,
+            identity.identityPaths,
+            predecessor.mergedInto === identity.identity ? predecessor.mergedHead : undefined,
+          ),
+        ),
+      ),
+    )
+    return respond(
+      ctx,
+      [
+        `${found.predecessors.length} memory store(s) map to ${identity.identity} (dry run, nothing changed):`,
+        ...lines,
+        ...unmapped,
+        "run /memory-merge --apply to merge them; each merge is one commit you can revert",
+      ].join("\n"),
+    )
   }
 
   const lock = writerLock(identity)
@@ -73,7 +101,13 @@ async function runMemoryMerge(deps: MemoryCommandDeps, args: string, ctx: Memory
         lock,
         author: { agentId: identity.identity, authorName: "Human" },
         // Same bootstrap as a first memory write (engine-session.ts), so a store the merge creates has its seeds and hooks.
-        initTarget: (repo) => repo.init({ seedFiles: buildDefaultSeedFiles(), installHooks: (dir) => { installHooks(dir, { checker: memoryHookChecker() }) } }),
+        initTarget: (repo) =>
+          repo.init({
+            seedFiles: buildDefaultSeedFiles(),
+            installHooks: (dir) => {
+              installHooks(dir, { checker: memoryHookChecker() })
+            },
+          }),
       })
       if (result.status === "merged") {
         merged = true

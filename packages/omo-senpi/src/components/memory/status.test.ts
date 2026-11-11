@@ -634,7 +634,7 @@ describe("refreshMemoryStatus", () => {
       head: async () => "abcdef1234567890",
       headCommitTimestamp: async () => null,
       lsTree: async () => ["system/persona.md", "notes/facts/2026-10.md", "notes/facts/2026-11.md"],
-      show: async (_revision, path) => path === "notes/facts/2026-11.md" ? "F".repeat(201) : "x".repeat(10),
+      show: async (_revision, path) => (path === "notes/facts/2026-11.md" ? "F".repeat(201) : "x".repeat(10)),
       status: async () => "",
     }
     const context = createMemoryIdentityContext({
@@ -651,7 +651,9 @@ describe("refreshMemoryStatus", () => {
       factsNoteMaxBytes: 200,
       alreadyNotified: false,
       gitRepo: fakeRepo,
-      requestPressureDream: async () => { pressureRequests.push(1) },
+      requestPressureDream: async () => {
+        pressureRequests.push(1)
+      },
     })
 
     expect(pressureRequests).toHaveLength(1)
@@ -664,7 +666,7 @@ describe("refreshMemoryStatus", () => {
       head: async () => "abcdef1234567890",
       headCommitTimestamp: async () => null,
       lsTree: async () => ["system/persona.md", "notes/facts/2026-11.md"],
-      show: async (_revision, path) => path === "notes/facts/2026-11.md" ? "F".repeat(200) : "x".repeat(10),
+      show: async (_revision, path) => (path === "notes/facts/2026-11.md" ? "F".repeat(200) : "x".repeat(10)),
       status: async () => "",
     }
     const context = createMemoryIdentityContext({
@@ -675,9 +677,12 @@ describe("refreshMemoryStatus", () => {
 
     const oversizedFacts: GitRepoForStatus = {
       ...fakeRepo,
-      show: async (_revision, path) => path === "notes/facts/2026-11.md" ? "F".repeat(10_000) : "x".repeat(10),
+      show: async (_revision, path) => (path === "notes/facts/2026-11.md" ? "F".repeat(10_000) : "x".repeat(10)),
     }
-    for (const [factsNoteMaxBytes, gitRepo] of [[200, fakeRepo], [0, oversizedFacts]] as const) {
+    for (const [factsNoteMaxBytes, gitRepo] of [
+      [200, fakeRepo],
+      [0, oversizedFacts],
+    ] as const) {
       await refreshMemoryStatus({
         context,
         ui: recordingUi().ui,
@@ -685,7 +690,9 @@ describe("refreshMemoryStatus", () => {
         factsNoteMaxBytes,
         alreadyNotified: false,
         gitRepo,
-        requestPressureDream: async () => { pressureRequests.push(1) },
+        requestPressureDream: async () => {
+          pressureRequests.push(1)
+        },
       })
     }
 

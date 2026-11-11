@@ -16,13 +16,19 @@ async function repoWithFacts(notes: Record<string, string>): Promise<string> {
   const repo = await mkdtemp(join(tmpdir(), "omo-doctor-facts-"))
   roots.push(repo)
   await mkdir(join(repo, "notes", "facts", "archive"), { recursive: true })
-  await Promise.all(Object.entries(notes).map(([name, content]) => writeFile(join(repo, "notes", "facts", name), content)))
+  await Promise.all(
+    Object.entries(notes).map(([name, content]) => writeFile(join(repo, "notes", "facts", name), content)),
+  )
   return repo
 }
 
 describe("doctor facts notes (#10884)", () => {
   test("#given one facts note over budget #when checked #then it warns naming that note with its size and lines", async () => {
-    const repo = await repoWithFacts({ "2026-10.md": "a\n", "2026-11.md": "F\n".repeat(1_500), "archive/2026-01.md": "x".repeat(9_000) })
+    const repo = await repoWithFacts({
+      "2026-10.md": "a\n",
+      "2026-11.md": "F\n".repeat(1_500),
+      "archive/2026-01.md": "x".repeat(9_000),
+    })
 
     const check = await checkFactsNotes(repo, 2_048)
 
@@ -39,6 +45,10 @@ describe("doctor facts notes (#10884)", () => {
 
     expect((await checkFactsNotes(repo, 2_048)).level).toBe("ok")
     expect((await checkFactsNotes(repo, 0)).level).toBe("ok")
-    expect(await checkFactsNotes(empty, 2_048)).toEqual({ name: "facts-notes", level: "ok", detail: "0 facts notes, all within 2.0 KiB" })
+    expect(await checkFactsNotes(empty, 2_048)).toEqual({
+      name: "facts-notes",
+      level: "ok",
+      detail: "0 facts notes, all within 2.0 KiB",
+    })
   })
 })

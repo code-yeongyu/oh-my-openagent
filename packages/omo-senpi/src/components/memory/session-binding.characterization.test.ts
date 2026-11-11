@@ -151,7 +151,9 @@ describe("X8c memory binding at session_start (characterization)", () => {
       env,
       loadConfig: (options) => {
         configCwds.push(options?.cwd)
-        return loadedMemoryConfig(memorySettings({ agent: options?.cwd === sessionCwd ? "session-agent" : "host-agent" }))
+        return loadedMemoryConfig(
+          memorySettings({ agent: options?.cwd === sessionCwd ? "session-agent" : "host-agent" }),
+        )
       },
       now: () => 1236,
       resolveCwd: () => hostCwd,
@@ -171,7 +173,10 @@ describe("X8c memory binding at session_start (characterization)", () => {
     // then
     expect(configCwds).toContain(sessionCwd)
     await pi.dispatch("session_shutdown", {}, sessionContext())
-    started.splice(started.findIndex((entry) => entry.pi === pi), 1)
+    started.splice(
+      started.findIndex((entry) => entry.pi === pi),
+      1,
+    )
     expect(await readIdentityRecord(sessionIdentity.paths.root)).toMatchObject({
       id: sessionIdentity.id,
       kind: "explicit",
@@ -220,12 +225,19 @@ describe("X8c memory binding at session_start (characterization)", () => {
     const env = { OMO_MEMORY_HOME: join(tempDir("omo-x8c-home-"), "memory") }
     const recorded = resolveMemoryIdentity("auto", sessionCwd, env)
     mkdirSync(recorded.paths.root, { recursive: true })
-    await recordIdentityBind(recorded.paths.root, { id: recorded.id, kind: "explicit", mode: "path", source: "/original", spelling: "/original" })
+    await recordIdentityBind(recorded.paths.root, {
+      id: recorded.id,
+      kind: "explicit",
+      mode: "path",
+      source: "/original",
+      spelling: "/original",
+    })
     const pi = new MemoryFakeExtensionAPI()
     const ctx = componentContext()
     createMemoryComponent({
       env,
-      loadConfig: (options) => loadedMemoryConfig(memorySettings({ agent: options?.cwd === sessionCwd ? "session-agent" : "auto" })),
+      loadConfig: (options) =>
+        loadedMemoryConfig(memorySettings({ agent: options?.cwd === sessionCwd ? "session-agent" : "auto" })),
       now: () => 1237,
       resolveCwd: () => hostCwd,
       syncRunner: recordingSyncRunner([]),
@@ -237,13 +249,22 @@ describe("X8c memory binding at session_start (characterization)", () => {
     const notifications: Array<{ message: string; level: string }> = []
 
     // when
-    await pi.dispatch("session_start", {}, sessionContext({ entries: [boundEntry(recorded.id, recorded.paths.repo)], notifications, cwd: sessionCwd }))
+    await pi.dispatch(
+      "session_start",
+      {},
+      sessionContext({ entries: [boundEntry(recorded.id, recorded.paths.repo)], notifications, cwd: sessionCwd }),
+    )
 
     // then
-    expect(pi.entries.map((entry) => entry.data)).toEqual([createMemoryBinding({ identity: recorded.id, repoPath: recorded.paths.repo, boundAt: 1237 })])
+    expect(pi.entries.map((entry) => entry.data)).toEqual([
+      createMemoryBinding({ identity: recorded.id, repoPath: recorded.paths.repo, boundAt: 1237 }),
+    ])
     expect(notifications).toEqual([])
     await pi.dispatch("session_shutdown", {}, sessionContext())
-    started.splice(started.findIndex((entry) => entry.pi === pi), 1)
+    started.splice(
+      started.findIndex((entry) => entry.pi === pi),
+      1,
+    )
     expect(await readIdentityRecord(recorded.paths.root)).toMatchObject({ kind: "auto" })
   })
 
@@ -257,7 +278,10 @@ describe("X8c memory binding at session_start (characterization)", () => {
     const ctx = componentContext()
     createMemoryComponent({
       env,
-      loadConfig: (options) => loadedMemoryConfig(memorySettings({ agent: options?.cwd === sessionCwd ? "auto" : "host-agent", auto_identity: "path" })),
+      loadConfig: (options) =>
+        loadedMemoryConfig(
+          memorySettings({ agent: options?.cwd === sessionCwd ? "auto" : "host-agent", auto_identity: "path" }),
+        ),
       now: () => 1239,
       resolveCwd: () => hostCwd,
       syncRunner: recordingSyncRunner([]),
@@ -269,10 +293,16 @@ describe("X8c memory binding at session_start (characterization)", () => {
     const notifications: Array<{ message: string; level: string }> = []
 
     // when
-    await pi.dispatch("session_start", {}, sessionContext({ entries: [boundEntry(recorded.id, recorded.paths.repo)], notifications, cwd: sessionCwd }))
+    await pi.dispatch(
+      "session_start",
+      {},
+      sessionContext({ entries: [boundEntry(recorded.id, recorded.paths.repo)], notifications, cwd: sessionCwd }),
+    )
 
     // then
-    expect(pi.entries.map((entry) => entry.data)).toEqual([createMemoryBinding({ identity: recorded.id, repoPath: recorded.paths.repo, boundAt: 1239 })])
+    expect(pi.entries.map((entry) => entry.data)).toEqual([
+      createMemoryBinding({ identity: recorded.id, repoPath: recorded.paths.repo, boundAt: 1239 }),
+    ])
     expect(notifications).toEqual([])
   })
 
@@ -286,7 +316,8 @@ describe("X8c memory binding at session_start (characterization)", () => {
     const ctx = componentContext()
     createMemoryComponent({
       env,
-      loadConfig: (options) => loadedMemoryConfig(memorySettings({ agent: options?.cwd === sessionCwd ? "auto" : "host-agent" })),
+      loadConfig: (options) =>
+        loadedMemoryConfig(memorySettings({ agent: options?.cwd === sessionCwd ? "auto" : "host-agent" })),
       now: () => 1238,
       resolveCwd: () => hostCwd,
       syncRunner: recordingSyncRunner([]),
@@ -298,10 +329,16 @@ describe("X8c memory binding at session_start (characterization)", () => {
     const notifications: Array<{ message: string; level: string }> = []
 
     // when
-    await pi.dispatch("session_start", {}, sessionContext({ entries: [boundEntry(recorded.id, recorded.paths.repo)], notifications, cwd: sessionCwd }))
+    await pi.dispatch(
+      "session_start",
+      {},
+      sessionContext({ entries: [boundEntry(recorded.id, recorded.paths.repo)], notifications, cwd: sessionCwd }),
+    )
 
     // then
-    expect(pi.entries.map((entry) => entry.data)).toEqual([createMemoryBinding({ identity: recorded.id, repoPath: recorded.paths.repo, boundAt: 1238 })])
+    expect(pi.entries.map((entry) => entry.data)).toEqual([
+      createMemoryBinding({ identity: recorded.id, repoPath: recorded.paths.repo, boundAt: 1238 }),
+    ])
     expect(notifications).toEqual([])
   })
 

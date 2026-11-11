@@ -99,8 +99,11 @@ export async function refreshMemoryStatus(input: RefreshMemoryStatusInput): Prom
 
   const estimate = await estimateSystemTokens(repo, head)
   const systemPressure = estimate >= Math.floor(MEMORY_PRESSURE_SOFT_RATIO * input.compileWarnTokens)
-  const factsPressure = !systemPressure && input.factsNoteMaxBytes !== undefined && input.factsNoteMaxBytes > 0
-    && factsNotesOverBudget(await measureFactsNotes(repo, head), input.factsNoteMaxBytes).length > 0
+  const factsPressure =
+    !systemPressure &&
+    input.factsNoteMaxBytes !== undefined &&
+    input.factsNoteMaxBytes > 0 &&
+    factsNotesOverBudget(await measureFactsNotes(repo, head), input.factsNoteMaxBytes).length > 0
   if (systemPressure || factsPressure) {
     try {
       input.requestPressureDream?.()

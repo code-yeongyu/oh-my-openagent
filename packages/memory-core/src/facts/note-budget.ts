@@ -37,8 +37,13 @@ export async function measureFactsNotesInDir(repoDir: string): Promise<FactsNote
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return []
     throw error
   }
-  const paths = names.map((name) => `notes/facts/${name}`).filter(isFactsNotePath).sort()
-  const files = await Promise.all(paths.map(async (path) => (await lstat(join(repoDir, path))).isFile() ? path : undefined))
+  const paths = names
+    .map((name) => `notes/facts/${name}`)
+    .filter(isFactsNotePath)
+    .sort()
+  const files = await Promise.all(
+    paths.map(async (path) => ((await lstat(join(repoDir, path))).isFile() ? path : undefined)),
+  )
   const notes = files.filter((path): path is string => path !== undefined)
   return Promise.all(notes.map(async (path) => measureFactsNote(path, await readFile(join(repoDir, path), "utf8"))))
 }
@@ -46,5 +51,7 @@ export async function measureFactsNotesInDir(repoDir: string): Promise<FactsNote
 /** Notes strictly over `maxBytes`, largest first; a budget of `0` or less disables the check. */
 export function factsNotesOverBudget(notes: readonly FactsNoteSize[], maxBytes: number): FactsNoteSize[] {
   if (maxBytes <= 0) return []
-  return notes.filter((note) => note.bytes > maxBytes).sort((left, right) => right.bytes - left.bytes || left.path.localeCompare(right.path))
+  return notes
+    .filter((note) => note.bytes > maxBytes)
+    .sort((left, right) => right.bytes - left.bytes || left.path.localeCompare(right.path))
 }

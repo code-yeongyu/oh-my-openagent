@@ -24,7 +24,13 @@ describe("identity record (#10070)", () => {
   test("#given a first bind #when it is recorded #then identity.json holds the id, kind, mode, source, one spelling and both timestamps, mode 0600", async () => {
     const root = await identityRoot()
 
-    await recordIdentityBind(root, { id: "project-1234abcd", kind: "auto", mode: "path", source: "/work/project", spelling: "/work/project" })
+    await recordIdentityBind(root, {
+      id: "project-1234abcd",
+      kind: "auto",
+      mode: "path",
+      source: "/work/project",
+      spelling: "/work/project",
+    })
 
     expect(await readIdentityRecord(root)).toEqual({
       version: 1,
@@ -35,15 +41,34 @@ describe("identity record (#10070)", () => {
       spellings: ["/work/project"],
     })
     // Windows has no POSIX permission bits; stat reports 0o666 whatever the write asked for.
-    if (process.platform !== "win32") expect((await stat(join(root, IDENTITY_RECORD_FILENAME))).mode & 0o777).toBe(0o600)
+    if (process.platform !== "win32")
+      expect((await stat(join(root, IDENTITY_RECORD_FILENAME))).mode & 0o777).toBe(0o600)
   })
 
   test("#given an existing record #when a later bind arrives from another spelling and mode #then spellings accumulate once each and the latest mode and source win", async () => {
     const root = await identityRoot()
-    await recordIdentityBind(root, { id: "project-1234abcd", kind: "auto", mode: "path", source: "/work/project", spelling: "/work/project" })
+    await recordIdentityBind(root, {
+      id: "project-1234abcd",
+      kind: "auto",
+      mode: "path",
+      source: "/work/project",
+      spelling: "/work/project",
+    })
 
-    await recordIdentityBind(root, { id: "project-1234abcd", kind: "auto", mode: "git", source: "/work/project", spelling: "/work/project-wt" })
-    await recordIdentityBind(root, { id: "project-1234abcd", kind: "auto", mode: "git", source: "/work/project", spelling: "/work/project" })
+    await recordIdentityBind(root, {
+      id: "project-1234abcd",
+      kind: "auto",
+      mode: "git",
+      source: "/work/project",
+      spelling: "/work/project-wt",
+    })
+    await recordIdentityBind(root, {
+      id: "project-1234abcd",
+      kind: "auto",
+      mode: "git",
+      source: "/work/project",
+      spelling: "/work/project",
+    })
 
     expect(await readIdentityRecord(root)).toMatchObject({
       mode: "git",
@@ -53,10 +78,22 @@ describe("identity record (#10070)", () => {
 
   test("#given an unreadable or malformed record #when a bind is recorded #then it is replaced by a fresh record instead of failing the bind", async () => {
     const root = await identityRoot()
-    await recordIdentityBind(root, { id: "project-1234abcd", kind: "explicit", mode: "path", source: "/w", spelling: "/w" })
+    await recordIdentityBind(root, {
+      id: "project-1234abcd",
+      kind: "explicit",
+      mode: "path",
+      source: "/w",
+      spelling: "/w",
+    })
     await writeFile(join(root, IDENTITY_RECORD_FILENAME), "{not json")
 
-    await recordIdentityBind(root, { id: "project-1234abcd", kind: "explicit", mode: "path", source: "/w", spelling: "/w" })
+    await recordIdentityBind(root, {
+      id: "project-1234abcd",
+      kind: "explicit",
+      mode: "path",
+      source: "/w",
+      spelling: "/w",
+    })
 
     expect(await readIdentityRecord(root)).toMatchObject({ kind: "explicit" })
     expect(JSON.parse(await readFile(join(root, IDENTITY_RECORD_FILENAME), "utf8")).version).toBe(1)
@@ -67,7 +104,15 @@ describe("identity record (#10070)", () => {
     const spellings = Array.from({ length: 12 }, (_, index) => `/work/thread-${index}`)
 
     await Promise.all([
-      ...spellings.map((spelling, index) => recordIdentityBind(root, { id: "project-aaaa1111", kind: "auto", mode: "git", source: "/work/project", spelling })),
+      ...spellings.map((spelling, index) =>
+        recordIdentityBind(root, {
+          id: "project-aaaa1111",
+          kind: "auto",
+          mode: "git",
+          source: "/work/project",
+          spelling,
+        }),
+      ),
       markIdentityMerged(root, "project-aaaa1111", "project-target", "abc123"),
     ])
 
@@ -82,7 +127,13 @@ describe("identity record (#10070)", () => {
     const memoryHome = join(parent, "memory")
     const root = join(memoryHome, "agents", "project-1234abcd")
 
-    const record = await recordIdentityBind(root, { id: "project-1234abcd", kind: "auto", mode: "git", source: "/w/p", spelling: "/w/p" })
+    const record = await recordIdentityBind(root, {
+      id: "project-1234abcd",
+      kind: "auto",
+      mode: "git",
+      source: "/w/p",
+      spelling: "/w/p",
+    })
 
     expect(record).toBeUndefined()
     expect(existsSync(memoryHome)).toBe(false)
@@ -90,7 +141,13 @@ describe("identity record (#10070)", () => {
 
   test("#given the same bind recorded at two different times #when identity.json is read back #then the bytes are identical (no wall-clock fields; EQ determinism)", async () => {
     const root = await identityRoot()
-    const bind = { id: "project-1234abcd", kind: "auto" as const, mode: "git" as const, source: "/w/p", spelling: "/w/p" }
+    const bind = {
+      id: "project-1234abcd",
+      kind: "auto" as const,
+      mode: "git" as const,
+      source: "/w/p",
+      spelling: "/w/p",
+    }
 
     await recordIdentityBind(root, bind)
     const first = await readFile(join(root, IDENTITY_RECORD_FILENAME), "utf8")

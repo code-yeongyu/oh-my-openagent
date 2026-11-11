@@ -134,7 +134,10 @@ describe("dream token budget launch contract", () => {
 
     const dream = await prepareReflectionSpawn({
       ...input,
-      run: { runId: "dream-facts-1", request: { trigger: "dream", origin: "pressure", conversationIds: [], snapshots: [] } },
+      run: {
+        runId: "dream-facts-1",
+        request: { trigger: "dream", origin: "pressure", conversationIds: [], snapshots: [] },
+      },
     })
     const reflection = await prepareReflectionSpawn({ ...input, run })
 

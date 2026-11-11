@@ -18,8 +18,16 @@ describe("facts note budget (#10884)", () => {
   })
 
   test("#given note content #when measured #then bytes are UTF-8 and lines count every line including an unterminated last one", () => {
-    expect(measureFactsNote("notes/facts/2026-10.md", "- a\n- 한\n- c")).toEqual({ path: "notes/facts/2026-10.md", bytes: 13, lines: 3 })
-    expect(measureFactsNote("notes/facts/2026-10.md", "")).toEqual({ path: "notes/facts/2026-10.md", bytes: 0, lines: 0 })
+    expect(measureFactsNote("notes/facts/2026-10.md", "- a\n- 한\n- c")).toEqual({
+      path: "notes/facts/2026-10.md",
+      bytes: 13,
+      lines: 3,
+    })
+    expect(measureFactsNote("notes/facts/2026-10.md", "")).toEqual({
+      path: "notes/facts/2026-10.md",
+      bytes: 0,
+      lines: 0,
+    })
   })
 
   test("#given notes around the budget #when filtered #then only notes strictly over it are returned, largest first", () => {
@@ -29,7 +37,10 @@ describe("facts note budget (#10884)", () => {
       measureFactsNote("notes/facts/2026-11.md", "x".repeat(300)),
     ]
 
-    expect(factsNotesOverBudget(notes, 100).map((note) => note.path)).toEqual(["notes/facts/2026-11.md", "notes/facts/2026-10.md"])
+    expect(factsNotesOverBudget(notes, 100).map((note) => note.path)).toEqual([
+      "notes/facts/2026-11.md",
+      "notes/facts/2026-10.md",
+    ])
   })
 
   test("#given a directory named like a month note #when the folder is measured #then it is skipped and the real notes are still measured", async () => {

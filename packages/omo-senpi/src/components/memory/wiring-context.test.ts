@@ -43,31 +43,47 @@ describe("readUi status publishing (#13046)", () => {
     first?.setStatus("memory", undefined)
     second?.setStatus("memory", "mem:project just now")
 
-    expect(published).toEqual([undefined, "mem:project just now", "mem:project just now (+1)", undefined, "mem:project just now"])
+    expect(published).toEqual([
+      undefined,
+      "mem:project just now",
+      "mem:project just now (+1)",
+      undefined,
+      "mem:project just now",
+    ])
   })
 
   it("#given two status keys on one host #when each publishes the same text #then the keys are deduplicated independently", () => {
     const published: Array<[string, string | undefined]> = []
-    const host = { ui: { setStatus: (key: string, text?: string) => published.push([key, text]), notify: () => undefined } }
+    const host = {
+      ui: { setStatus: (key: string, text?: string) => published.push([key, text]), notify: () => undefined },
+    }
 
     const ui = readUi(host)
     ui?.setStatus("memory", "a")
     ui?.setStatus("loop", "a")
     ui?.setStatus("memory", "a")
 
-    expect(published).toEqual([["memory", "a"], ["loop", "a"]])
+    expect(published).toEqual([
+      ["memory", "a"],
+      ["loop", "a"],
+    ])
   })
 
   it("#given a host setStatus that throws once #when the same text is published again #then it is retried, because a line the host never showed is not remembered", () => {
     const published: Array<string | undefined> = []
     let failNext = true
-    const host = { ui: { setStatus: (_key: string, text?: string) => {
-      if (failNext) {
-        failNext = false
-        throw new Error("host unavailable")
-      }
-      published.push(text)
-    }, notify: () => undefined } }
+    const host = {
+      ui: {
+        setStatus: (_key: string, text?: string) => {
+          if (failNext) {
+            failNext = false
+            throw new Error("host unavailable")
+          }
+          published.push(text)
+        },
+        notify: () => undefined,
+      },
+    }
 
     const ui = readUi(host)
     expect(() => ui?.setStatus("memory", "mem:project just now")).toThrow("host unavailable")

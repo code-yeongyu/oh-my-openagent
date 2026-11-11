@@ -36,7 +36,8 @@ export const LAZY_MEMORY_COMMANDS = {
     argumentHint: "",
   },
   "memory-merge": {
-    description: "Merge memory stores of old worktrees or spellings into this repository's store; a dry run unless --apply.",
+    description:
+      "Merge memory stores of old worktrees or spellings into this repository's store; a dry run unless --apply.",
     argumentHint: "[--apply]",
   },
   reflect: {
