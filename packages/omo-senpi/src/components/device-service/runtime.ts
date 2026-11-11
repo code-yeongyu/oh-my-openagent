@@ -59,12 +59,24 @@ function notifierOf(eventCtx: unknown): Notify | undefined {
  * under CI or in a task child (team members included; they inherit OMO_BIN from the parent that already ran it), and
  * not with `device_service.enabled: false`; once per process. Speaks only for a stop the user can act on.
  */
-export async function bootstrapAtStart(eventCtx: unknown, logger: ComponentLogger, options: DeviceServiceRuntimeOptions = {}): Promise<void> {
+export async function bootstrapAtStart(
+  eventCtx: unknown,
+  logger: ComponentLogger,
+  options: DeviceServiceRuntimeOptions = {},
+): Promise<void> {
   const env = options.env ?? process.env
   const omoBin = env.OMO_BIN
   const notify = notifierOf(eventCtx)
   const latch = options.latch ?? processLatch()
-  if (latch.claimed || omoBin === undefined || !isAbsolute(omoBin) || isCi(env) || env[OMO_SENPI_TASK_RPC_CHILD] === "1" || notify === undefined) return
+  if (
+    latch.claimed ||
+    omoBin === undefined ||
+    !isAbsolute(omoBin) ||
+    isCi(env) ||
+    env[OMO_SENPI_TASK_RPC_CHILD] === "1" ||
+    notify === undefined
+  )
+    return
   latch.claimed = true
   const cwd = isRecord(eventCtx) && typeof eventCtx.cwd === "string" ? eventCtx.cwd : process.cwd()
   if (!isOmoDeviceServiceEnabled((options.loadConfig ?? loadSenpiOmoConfig)({ cwd }).config)) return
@@ -72,10 +84,15 @@ export async function bootstrapAtStart(eventCtx: unknown, logger: ComponentLogge
   try {
     report = await (options.run ?? runBootstrapWorker)(omoBin)
   } catch (error) {
-    logger.warn("device service bootstrap could not finish", { error: error instanceof Error ? error.message : String(error) })
+    logger.warn("device service bootstrap could not finish", {
+      error: error instanceof Error ? error.message : String(error),
+    })
     return
   }
   if (report === undefined) logger.warn("device service bootstrap answered no report")
+  // A release this build pins but nobody has published yet (#12656): `omo remote` says so when used, the start stays quiet.
+  else if ("notice" in report && report.state === "not_published")
+    logger.debug?.("device service release is not published", { notice: report.notice })
   else if ("notice" in report && !QUIET_STOPS.has(report.state)) notify(report.notice, "warning")
 }
 
@@ -84,7 +101,11 @@ export async function bootstrapAtStart(eventCtx: unknown, logger: ComponentLogge
  * engine's long-lived agent dir registrant for a tui or rpc engine (#12379). The registrant starts first and never
  * waits on the bootstrap worker.
  */
-export async function startAtSession(eventCtx: unknown, logger: ComponentLogger, options: DeviceServiceRuntimeOptions = {}): Promise<void> {
+export async function startAtSession(
+  eventCtx: unknown,
+  logger: ComponentLogger,
+  options: DeviceServiceRuntimeOptions = {},
+): Promise<void> {
   startRegistrantAtStart(eventCtx, logger, {
     ...options,
     env: options.env ?? process.env,

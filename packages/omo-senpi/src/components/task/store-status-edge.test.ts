@@ -3,7 +3,12 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { createTaskRecord, createTaskRecordStore, type TaskRecord, type TaskRecordStore } from "@oh-my-opencode/senpi-task"
+import {
+  createTaskRecord,
+  createTaskRecordStore,
+  type TaskRecord,
+  type TaskRecordStore,
+} from "@oh-my-opencode/senpi-task"
 
 import { createMutationNotifyingStore } from "./store-mutation-observer"
 import { createTaskTerminalObservers, type TaskTerminalEdge } from "./terminal-observers"
@@ -147,9 +152,13 @@ describe("store status-edge observation", () => {
       throw new Error("observer exploded")
     })
     let mutations = 0
-    const store = createMutationNotifyingStore(backing, () => {
-      mutations += 1
-    }, observers)
+    const store = createMutationNotifyingStore(
+      backing,
+      () => {
+        mutations += 1
+      },
+      observers,
+    )
     const draft = createTaskRecord({
       parent_session_id: "parent-1",
       root_session_id: "parent-1",

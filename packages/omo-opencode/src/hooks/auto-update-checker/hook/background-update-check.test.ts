@@ -30,7 +30,10 @@ describe("createBackgroundUpdateCheckRunner — OpenCode-managed sandbox (#4318)
     const getCachedVersion = mock(() => "4.1.2")
     const getLatestVersion = mock(async () => "4.3.1")
     const extractChannel = mock(() => "stable")
-    const syncCachePackageJsonToIntent = mock(() => ({ synced: true, error: null as null | "parse_error" | "write_error" }))
+    const syncCachePackageJsonToIntent = mock(() => ({
+      synced: true,
+      error: null as null | "parse_error" | "write_error",
+    }))
     const invalidatePackage = mock(() => true)
     const runBunInstallWithDetails = mock(async () => ({ success: true }))
     const getOpenCodeCacheDir = mock(() => "/cache")
@@ -39,7 +42,9 @@ describe("createBackgroundUpdateCheckRunner — OpenCode-managed sandbox (#4318)
     const showUpdateAvailableToast = mock(async () => {})
     const showAutoUpdatedToast = mock(async () => {})
     const logCalls: unknown[][] = []
-    const log = mock((...args: unknown[]) => { logCalls.push(args) })
+    const log = mock((...args: unknown[]) => {
+      logCalls.push(args)
+    })
 
     // KEY: import.meta.url resolves to a workspace that is neither the flat
     // cacheDir nor configDir — i.e. an OpenCode-managed sandbox. The current
@@ -53,7 +58,8 @@ describe("createBackgroundUpdateCheckRunner — OpenCode-managed sandbox (#4318)
       // The deps shape uses node's `join`; positional posix is enough for the
       // mocks below and lets us avoid pulling in node:path in this test.
       join: joinPosix as unknown as typeof import("node:path").join,
-      runBunInstallWithDetails: runBunInstallWithDetails as unknown as typeof import("../../../cli/config-manager").runBunInstallWithDetails,
+      runBunInstallWithDetails:
+        runBunInstallWithDetails as unknown as typeof import("../../../cli/config-manager").runBunInstallWithDetails,
       log: log as unknown as typeof import("../../../shared/logger").log,
       getOpenCodeCacheDir,
       getOpenCodeConfigPaths,
@@ -62,7 +68,8 @@ describe("createBackgroundUpdateCheckRunner — OpenCode-managed sandbox (#4318)
       findPluginEntry,
       getCachedVersion,
       getLatestVersion,
-      syncCachePackageJsonToIntent: syncCachePackageJsonToIntent as unknown as typeof import("../checker").syncCachePackageJsonToIntent,
+      syncCachePackageJsonToIntent:
+        syncCachePackageJsonToIntent as unknown as typeof import("../checker").syncCachePackageJsonToIntent,
       showUpdateAvailableToast,
       showAutoUpdatedToast,
       getModuleHostingWorkspace,
@@ -95,7 +102,10 @@ describe("createBackgroundUpdateCheckRunner — OpenCode-managed sandbox (#4318)
     const getCachedVersion = mock(() => "4.1.2")
     const getLatestVersion = mock(async () => "4.3.1")
     const extractChannel = mock(() => "stable")
-    const syncCachePackageJsonToIntent = mock(() => ({ synced: true, error: null as null | "parse_error" | "write_error" }))
+    const syncCachePackageJsonToIntent = mock(() => ({
+      synced: true,
+      error: null as null | "parse_error" | "write_error",
+    }))
     const invalidatePackage = mock(() => true)
     const runBunInstallWithDetails = mock(async () => ({ success: true }))
     const getOpenCodeCacheDir = mock(() => "/cache")
@@ -110,7 +120,8 @@ describe("createBackgroundUpdateCheckRunner — OpenCode-managed sandbox (#4318)
     const runner = createBackgroundUpdateCheckRunner({
       existsSync,
       join: joinPosix as unknown as typeof import("node:path").join,
-      runBunInstallWithDetails: runBunInstallWithDetails as unknown as typeof import("../../../cli/config-manager").runBunInstallWithDetails,
+      runBunInstallWithDetails:
+        runBunInstallWithDetails as unknown as typeof import("../../../cli/config-manager").runBunInstallWithDetails,
       log: log as unknown as typeof import("../../../shared/logger").log,
       getOpenCodeCacheDir,
       getOpenCodeConfigPaths,
@@ -119,7 +130,8 @@ describe("createBackgroundUpdateCheckRunner — OpenCode-managed sandbox (#4318)
       findPluginEntry,
       getCachedVersion,
       getLatestVersion,
-      syncCachePackageJsonToIntent: syncCachePackageJsonToIntent as unknown as typeof import("../checker").syncCachePackageJsonToIntent,
+      syncCachePackageJsonToIntent:
+        syncCachePackageJsonToIntent as unknown as typeof import("../checker").syncCachePackageJsonToIntent,
       showUpdateAvailableToast,
       showAutoUpdatedToast,
       getModuleHostingWorkspace,
@@ -150,7 +162,10 @@ describe("createBackgroundUpdateCheckRunner — OpenCode-managed sandbox (#4318)
     const getCachedVersion = mock(() => "4.1.2")
     const getLatestVersion = mock(async () => "4.3.1")
     const extractChannel = mock(() => "stable")
-    const syncCachePackageJsonToIntent = mock(() => ({ synced: true, error: null as null | "parse_error" | "write_error" }))
+    const syncCachePackageJsonToIntent = mock(() => ({
+      synced: true,
+      error: null as null | "parse_error" | "write_error",
+    }))
     const invalidatePackage = mock(() => true)
     const runBunInstallWithDetails = mock(async () => {
       throw nonError
@@ -166,7 +181,8 @@ describe("createBackgroundUpdateCheckRunner — OpenCode-managed sandbox (#4318)
     const runner = createBackgroundUpdateCheckRunner({
       existsSync,
       join: joinPosix as unknown as typeof import("node:path").join,
-      runBunInstallWithDetails: runBunInstallWithDetails as unknown as typeof import("../../../cli/config-manager").runBunInstallWithDetails,
+      runBunInstallWithDetails:
+        runBunInstallWithDetails as unknown as typeof import("../../../cli/config-manager").runBunInstallWithDetails,
       log: log as unknown as typeof import("../../../shared/logger").log,
       getOpenCodeCacheDir,
       getOpenCodeConfigPaths,
@@ -175,7 +191,8 @@ describe("createBackgroundUpdateCheckRunner — OpenCode-managed sandbox (#4318)
       findPluginEntry,
       getCachedVersion,
       getLatestVersion,
-      syncCachePackageJsonToIntent: syncCachePackageJsonToIntent as unknown as typeof import("../checker").syncCachePackageJsonToIntent,
+      syncCachePackageJsonToIntent:
+        syncCachePackageJsonToIntent as unknown as typeof import("../checker").syncCachePackageJsonToIntent,
       showUpdateAvailableToast,
       showAutoUpdatedToast,
       getModuleHostingWorkspace,
@@ -213,7 +230,9 @@ describe("createBackgroundUpdateCheckRunner — sandbox refresh + strictly-newer
     const deps = {
       existsSync: mock(() => false),
       join: joinPosix as unknown as typeof import("node:path").join,
-      runBunInstallWithDetails: mock(async () => ({ success: true })) as unknown as typeof import("../../../cli/config-manager").runBunInstallWithDetails,
+      runBunInstallWithDetails: mock(async () => ({
+        success: true,
+      })) as unknown as typeof import("../../../cli/config-manager").runBunInstallWithDetails,
       log: mock(() => {}) as unknown as typeof import("../../../shared/logger").log,
       getOpenCodeCacheDir: mock(() => "/cache"),
       getOpenCodeConfigPaths: mock(() => ({ configDir })),
@@ -222,7 +241,10 @@ describe("createBackgroundUpdateCheckRunner — sandbox refresh + strictly-newer
       findPluginEntry,
       getCachedVersion: mock(() => overrides.cachedVersion),
       getLatestVersion: mock(async () => overrides.latestVersion),
-      syncCachePackageJsonToIntent: mock(() => ({ synced: true, error: null as null | "parse_error" | "write_error" })) as unknown as typeof import("../checker").syncCachePackageJsonToIntent,
+      syncCachePackageJsonToIntent: mock(() => ({
+        synced: true,
+        error: null as null | "parse_error" | "write_error",
+      })) as unknown as typeof import("../checker").syncCachePackageJsonToIntent,
       showUpdateAvailableToast: mock(async () => {}),
       showAutoUpdatedToast: mock(async () => {}),
       getModuleHostingWorkspace: mock(() => sandboxDir),
@@ -308,7 +330,11 @@ describe("createBackgroundUpdateCheckRunner — sandbox refresh + strictly-newer
     await runner(createCtx(), /* autoUpdate */ true, restartToApply)
 
     // then - the message points at the directory to remove
-    const [, , message] = deps.showUpdateAvailableToast.mock.calls[0] as unknown as [unknown, string, (isUpdate: boolean, latest?: string) => string]
+    const [, , message] = deps.showUpdateAvailableToast.mock.calls[0] as unknown as [
+      unknown,
+      string,
+      (isUpdate: boolean, latest?: string) => string,
+    ]
     expect(message).not.toBe(restartToApply)
     expect(message(true, "5.0.0-beta.89")).toContain(sandboxDir)
   })

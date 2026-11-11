@@ -1,3 +1,148 @@
+## 2026-11-10 - The reply allowance lasts for the work a delivery started (#13042, part of #12996)
+
+`component.ts` `noteInput`: a custom message that is no delivery (an engine-started turn) keeps `replyTo`, `replySenders`, `chainHop` and `cause`; after a final answer, a user-role message or any delivery clears them (the new delivery re-adds its own sender; nothing of the earlier group survives), and an engine-started message after the answer clears `consumed` whether or not the settle ran first; `agent_settled` no longer clears them; it still clears `consumed` (a report without `binding_id` after the run must name its thread, as before) and sets `local = false`, `answered = true`. The same-account bound is not enforceable here: a delivery's details carry sender, remote_origin and chain_count, no account fact; it rests on the engine's admission letting no cross-account agent delivery through (not verified in this change). Tests: `peer-reply.test.ts` decision table gains after_settle (kept), the engine-started turn (kept) and the person's message (ends), per leg; a new case per leg for another sender's delivery starting new work (after the answer, only that sender is approved; the earlier group's other agent is not) versus joining running work; `report-origin.test.ts` proves a report without `binding_id` must name its thread in an engine-started turn before the settle too; `component.test.ts` K8 hop case now reads hop 3, 3, 1 across settle, engine turn, person's message.
+
+The delivery text a receiver gets (`gateway/constants.ts` `GATEWAY_PEER_REPLY_SENTENCE`) now names the call it can make - `tool.thread_send({ thread: <sender_session>, message })` inside an eval cell - since the thread family is eval-only, like bash (#12903); the render test pins the eval form.
+
+## 2026-11-10 - omo remote send on the one delivery pipeline (#13038, part of #13016)
+
+## 2026-11-10 - A local send names the approval its receiver waits on (#13035, part of #13008)
+- A delivery queued while the receiving session waits on a question records the wait (gateway schema v11, `deliveries.wait_kind`), and `thread_send` reports it as `waiting_on` on both transports. `DeliveryWait.device` is optional.
+
+## 2026-11-10 - thread: every delivery names its sender device (#13004)
+
+- **One reader for this device.** `remote/this-device.ts`:
+  - `thisDeviceId(remote)` reads `remote.sessions.thisDevice()` once and keeps it per remote surface.
+  - `stampThisDevice(provenance, remote)` adds `device`, or `device_absent` (`no_device_service` | `device_service_unavailable` | `no_device_id`) when the id cannot be read.
+  - Every path that creates a delivery uses it: `tools/gateway-services.ts` `senderProvenance` (local and relay transports), the component's store, the SDK's store and `omo remote send` (`omo-native/remote-session-verbs.ts` `personSenderProvenance`). Decision 0027 section 3 requires every delivery to name its sender device, with the local transport stamping this device.
+- **No origin test.** `component.ts` drops `fromOtherDevice`, which read `details.remote_origin`. Every consumed delivery is `run.cause`.
+- **Unknown cause.** `gateway/store-ops.ts` `placeCausally` treats a cause no row here holds as a new root with the hop kept, instead of refusing it as `unknown_cause`. A cause row naming another target is still refused.
+- **#12860 pin relaxed.** A send to a published id now makes exactly one `thisDevice` read, and still no alias or listing call.
+- **Must not break:**
+  - Do not add a second reader of this device.
+  - Do not let a failed device read fail a send.
+  - Do not reintroduce a rule that asks whether a delivery came from another device.
+- **Follow-up:** carrying the causal root across devices as data is #13032.
+
+## 2026-11-10 - A send to another device answers with its delivery facts (#13033, part of #13008)
+- `thread_send` and `thread_handoff` to a session on another device return `delivery_id` and `effective_mode` from the relay result, and `endpoint: null`. The hand-off receipt names the thread by the relay result's `thread_id`.
+
+## 2026-11-10 - One resolver across devices, reply by stated name, and one send result on both legs (#13000 with #13006, part of #12996)
+
+
+
+### One send result on both legs, and a route-parity table (#13006)
+
+`tools.ts` `deliverThrough` builds one result for both transports: `delivery`, `deduplicated`, `delivery_id` and `effective_mode` on each; `message_seq` and `endpoint` only for a gateway row on this device, `device` only for another device (the remote handoff receipt carries the same facts; `contracts/results.ts` makes the handoff's `message_seq` optional, which the remote branch never had). Tests: `peer-reply.test.ts` runs the reply-allowance table once per leg (a consumed delivery with and without `remote_origin`) and asserts the two legs equal; `route-parity.test.ts` runs the send-path table (id and name, reply by id and by stated name, `reply_target_mismatch`, `ambiguous_target`, idempotent replay, result keys) against a thread on this device and one on device b; `thread-remote-fixture.ts` `surface()` exposes `permission(args)`, what `thread_send` asks the engine before it runs.
+
+## 2026-11-09 - Thread tools are eval-only (#12907, closes #12903)
+
+`thread/metadata.ts` declares `THREAD_TOOL_EXPOSURE = "eval"` for all eighteen `thread_*` tools (`THREAD_TOOL_METADATA`, formerly `THREAD_TOOL_SEARCH_METADATA`), and `tools/internals.ts` `metadata(name)` returns only name, label, description and exposure. Senpi treats an `"eval"` definition like `bash`: it is withheld from the active tool list while an eval tool is registered, reachable from a cell through the registry with a redirect hint on a direct call, and a direct tool when no eval tool exists. Senpi's tool_search catalog indexes only `"search"` exposure, so the search-only fields (`searchText`, `searchKeywords`, `group`, `allowLazyActivation`) and the BM25 discovery tests are gone; `discovery.test.ts` became `metadata.test.ts` with an eval-exposure check. The family guideline is unchanged. `scripts/qa/thread-tools/plugin-surface.mjs` proves the exposure on a real rpc host with the built extension (direct `thread_list` and `generate_image` refused with the eval hint, js and py cells list threads, `generate_image` reached from a cell); the `lib/gateway.mjs` scenarios disable codemode in their scratch settings because they drive the gateway through the fake model's direct `QA:CALL thread_*` calls. The `plugin/extensions` and `plugin/runtime` bundles are regenerated.
+
+## 2026-11-09 - The once-per-process transient memory sweep re-arms after 24 h (#12899)
+
+`memory/transient-sweep-once.ts` keeps a claim map (memory root -> claim time) under `Symbol.for("omo.memory.transient-sweep.claims")` instead of a set. A claim older than `TRANSIENT_RUN_MAX_AGE_MS` (24 h) re-arms, so the first open after it schedules one more deferred `sweepTransientMemoryRuns`; opens before it start nothing. `cancel()` releases a claim only if it is still its own. `index.ts` passes the component's `now` seam through. `transient-sweep-once.test.ts` checks that a claim re-arms at the 24 h bound and not before it.
+
+## 2026-11-09 - The transient memory sweep runs once per process, off the open path (#12896)
+
+`memory/transient-sweep-once.ts` `scheduleTransientSweepOnce` claims each memory root once per process (a `globalThis` latch under `Symbol.for("omo.memory.transient-sweep.claims")`) and starts `sweepTransientMemoryRuns` on an unref'd 1 s timer, so it no longer runs inside `register()` on every session open. Once started, the sweep is still tracked by the session's in-flight work, so the shutdown drain waits on it. `session_shutdown` releases a claim whose sweep has not started yet. `transient-run-lifecycle.test.ts` counts sweeps across five opens (exactly one, none during an open) and checks that a released claim is swept by the next open.
+
+## 2026-11-10 - Queued behind an approval on another device (#12975, part of #12886)
+
+`remote/relay-transport.ts` reads open `pendingQuestions` from the receiver's `get_state` as parked-on-approval and answers a queued admission with `waiting_on` instead of `idempotency_uncertain`; `gateway/types.ts` / `contracts/results.ts` add the optional `waiting_on` to the queued delivery shape. Test: `remote/relay-transport.test.ts`.
+
+## 2026-11-09 - The default delivery mode steers the running turn (#12921, part of #12879)
+
+`thread/gateway/decision.ts`: the `auto` row of the 15-cell table admits a `mid_turn` target as `steer` with `expected_turn_id` = the target's own `turnEpoch` (`expect: steered`); a `mid_turn` target whose engine reports no epoch still queues (`followUp`), and idle, waiting-question, compacting and offline cells are unchanged. The local drain reads the phase and epoch from its own runtime, as before. `remote/relay-transport.ts` `send` probes `get_state` once for `auto` as it already did for `steer` and decides through the same table; the record then carries `deliverAs: "steer"` and `expectedTurnId` for a running turn. When the engine answers `turn_conflict` to an `auto` steer (the probed turn ended before the record arrived) the same `deliveryId` is re-sent as `followUp` and the reply is read as usual (started when idle, queued behind a turn that began since). A default-mode steer the receiver holds behind its user's open draft (`held_draft`) is re-sent as `followUp` too, and the sender's answer names that lane, so the draft's release can never turn it into a `turn_conflict` the sender does not see; a held re-send that still ends `turn_conflict` is logged as `relay_delivery_failed`. `contracts/params.ts` describes a binding's `inbound_mode: auto` accordingly. Tests: `gateway/decision.test.ts` (table + the two new mid-turn auto cells), `gateway/engine.test.ts` (the local 15 cells), `thread-remote-send.test.ts` (auto steers b's running turn through one `get_state`; the probe-to-record race falls back), and the drain/reconciliation suites updated for the lane the default now takes.
+
+## 2026-11-09 - omo remote send over the transport port, one outcome mapping (#12911, part of #12879)
+
+`thread/remote/outcome.ts` holds the one mapping from a device service `CommandResult` to a `RemoteCommandOutcome` (`outcomeOf`, moved from `device-service.ts`) and from a non-ok outcome to a `ThreadToolFailure` (`outcomeFailure` and `READ_UNCERTAIN`, moved from `remote-ops.ts`); `relay-transport.ts`, `remote-controls.ts`, `remote-ops.ts`, `live-surface.ts`, `lazy-ops.ts` and omo-native's `remote-attach.ts` (the attach TUI's `command` passthrough) read it from there. `GatewaySender` gains `{ kind: "person", uid, user }` (`gateway/types.ts`; `envelope.ts` `senderFacts` keys its receipt as `person:<uid>`). `relay-transport.ts` delivers a person sender as the engine's own `prompt` record (`followUp`, or `steer` after one `get_state` against `expected_turn_id`) behind the same `deviceOnline` preflight, recorded through the same `once` receipt as a peer delivery under a key minted per invocation (a person's retry is a new send, nothing dedupes it); a person steer confirms the running turn by its numeric `currentTurnId`, as the peer path does (an engine reporting a non-numeric turn id is told the turn cannot be confirmed); `local-transport.ts` refuses a person sender (`unsupported`: a person reaches a session on this device through its TUI). `omo-native/remote-session-verbs.ts` `send` builds `createRelayTransport` over this device's gateway store and delivers through it instead of `promptRemote`.
+
+## 2026-11-09 - One create/open/fork body over a SessionHost port; the creator's approval mode on both devices (#12891, part of #12879)
+
+`thread/control/session-host.ts` is the port `thread_create` opens sessions through: `open({ cwd?, sessionPath?, forkFrom?, name?, initialSkills?, permissionPreset? })` and `visible()`, the target device's threads a new name must not collide with. `control/local-session-host.ts` is this device's operator endpoint (`ThreadHost.openSession`, which now takes `permissionPreset` and puts it on the `open_session` frame); `control/relay-session-host.ts` is another device's engine endpoint through the device service (the former `openRemote` body: `endpointCommand open_session`, `locate` for a create or fork, `set_session_name`), answering `summary()` of the engine's reply state keyed by the listing id plus `device`. `remote/cross-device.ts` `planCreate` is placement only: it keeps every device / alias / fork refusal, names the host that opens, and answers an already-live thread as `deduplicated` on both legs (a live session in the view here; a listing row that is not `ended` there). `tools.ts` `thread_create` is one body: the skills shape check, placement, the name conflict over `host.visible()`, one `host.open` with the creator's `permissionPreset` on a create or fork (never on an open of an existing session), then `recordThreadCreator` and `withAlias`, on both legs. Deleted: `openRemote` and `RemoteOpen` (`remote/remote-ops.ts`), `openLocal` (`tools.ts`), `remote/remote-open-mode.test.ts` (its cases run on both legs in `control/session-host.test.ts`); `omo remote open` opens through the relay host.
+
+## 2026-11-09 - One tool body per control tool over a SessionControl port (#12890, part of #12879)
+
+`thread/control/port.ts` defines the `SessionControl` port (interrupt, close, setName, getAvailableModels, setModel, getAvailableThinkingLevels, setThinkingLevel, getMessages); `control/local-control.ts` implements it over the endpoint that listed the session and `control/relay-control.ts` over the other device's `sessionCommand` records. `control/locate.ts` `locateControl` is the only place a control tool reads the device. `control/close-ladder.ts` is the one close ladder on both legs (unload with force, then an attached close and one `get_state` probe for a session with no file yet; a draining host is `host_unavailable`, any other unload refusal is typed `unsupported` naming the reason, on this device as on another). `control/operations.ts` holds the one body per tool, run by `tools.ts` and by `omo remote model|interrupt|close`. `thread_set_reasoning` gains its cross-device leg. Deleted: `remote/remote-controls.ts`, `interruptRemote`/`closeRemote`/`readRemote` from `remote/remote-ops.ts`, their `lazy-ops.ts` wrappers and the per-tool `if remote` branches in `tools.ts`. `thread_interrupt` and `thread_set_reasoning` results name `device` for a thread on another device, as the other control results already did.
+
+## 2026-11-09 - A send to another device is the same delivery as a send on this device (#12889, part of #12879)
+
+`thread/remote/relay-transport.ts` is now a real transport: one `admit_external_message` on the target device's session (senpi#6240), carrying `gateway/provenance.ts` `renderDeliveryText` over the same envelope a same-device delivery gets (`gateway/envelope.ts` `senderFacts`, moved out of `engine.ts`; `decideDelivery` for a steer after one `get_state`), `displayText` = the provenance line + body, `sender: { kind: "agent", session_id, name? }`, `deliverAs`, `expectedTurnId`, `chainCount`. The engine's reply maps to the send contract (`started` / `steered` / `queued` with the engine's own pending count / `already_admitted` = deduplicated / `turn_conflict`); `held_draft` is retried under the same delivery id for about half an hour; an engine without the record answers typed `unsupported` naming the device, never a downgrade to a `prompt`. The `thread_send:remote` tool receipt keeps the retry promise. `remote/peer-text.ts`, `RemoteSender` and the peer half of `promptRemote` are deleted (`omo remote send` keeps a person's `prompt`). Chain continuity on both legs (K8, #12865): `component.ts` reads the engine-stamped `chain_count` of a consumed `session_control_delivery` that carries `remote_origin` (no local row, so no `cause`), `tools/ports.ts` `callerChainHop`, `OutboundDelivery.inbound_hop`, `store-ops.ts` `placeCausally` `hop = max(cause.hop, inbound_hop) + 1`. `sdk.ts` `send` resolves across the account through the same pipeline; a `cli` sender to another device is refused `unsupported` (`sender_not_allowed`) before any record (#12857).
+
+## 2026-11-09 - One delivery pipeline with a transport port (#12887, part of #12879)
+
+`thread/gateway/transport.ts` defines the port: a resolved `DeliveryTarget` (`local` = a session this device holds, `remote` = an account listing row) and one `OutboundDelivery` shape every send becomes, carried by a `DeliveryTransport`. `gateway/local-transport.ts` wraps the gateway engine (row + receipt + inbox marker + wake); `remote/relay-transport.ts` wraps the existing remote prompt send (its `thread_send:remote` tool receipt and the caller's chain facts moved there from `tools.ts`); `gateway/pipeline.ts` routes by the target's kind and is composed once in `tools/gateway-services.ts`. `tools.ts` `deliver` resolves the address (`locate`) and hands one `OutboundDelivery` to the pipeline; `deliverThrough` shapes the result exactly as before, and `remoteOnce` / `remotePeer` are gone. Pure refactor: no result field, refusal code, receipt key or wire record changes. The remote leg becoming a real delivery (`admit_external_message`) is #12882.
+
+## 2026-11-09 - A cross-device peer send names no device in the receiver's text (#12878, fixes #12877)
+
+`thread/remote/peer-text.ts` `peerText` renders exactly the local delivery text (`gateway/provenance.ts` `renderDeliveryText`) with the sender's own provenance and no `device` field; `remote-ops.ts` `promptRemote` no longer asks the device service for this device only to stamp it. Replies resolve the `sender_session` id through the account session list (`cross-device.ts` `crossTarget`, exact id first). `thread-remote-send.test.ts` asserts the remote From line equals the local one and the header carries no `device`.
+
+## 2026-11-08 - A send to another device carries the sender's gateway provenance (#12858, part of #12852)
+
+`thread/remote/remote-ops.ts` `promptRemote` takes a `RemoteSender`: `{ kind: "peer" } & RemotePeer` from the thread tools (`tools.ts` `remotePeer`: caller durable id, caller name, `resolveProvenance` through `tools/gateway-services.ts` `senderProvenance`, the engine's own closure, a fresh delivery id, the cause's `root_id` and hop + 1), or `{ kind: "person", hop: 1 }` from `omo remote send` (`omo-native/remote-session-verbs.ts`), whose text is sent as before. A peer prompt's `message` is `gateway/provenance.ts` `renderDeliveryText` over the delivery the send makes, with the sender's device (`device.info`) as the new optional `Provenance.device` (`From ... / device "<id>"`, header `device=`), and the record sets `expandPromptTemplates: false`. `renderDeliveryText` takes `RenderedDelivery` (the fields it reads, plus any of a stored row). Still open in #12852: the receiver writes the text as `role: "user"` and fires `input` hooks on it until senpi#6233 gives RPC an `admit_external_message` record.
+
+## 2026-11-07 - A remote command on a closed session answers unknown_session (#12755, part of #12320)
+
+`thread/remote/device-service.ts` `sessionReason` maps the device service's `session_not_found` to the engine's `unknown_session` for every session-scoped refusal of the port: a failed attach for `sessionCommand` or `read`, and a command or read-only record refused before sending. Every other code is unchanged, and the attach retry inside `locate` still keys on the raw `session_not_found`. `device-service.test.ts` runs one prompt for a closed session through the local surface (contract host) and through the remote port and asserts both answer the same code; the remote fixture refuses a no-longer-live session with `unknown_session`, as the port does.
+
+## 2026-11-05 - Ancestor enumeration is denied only when a foreign identity exists (#12301)
+
+`guard.ts` used to deny every recursive tool rooted at an ancestor of a memory area. It now lists every area in the call's denied set (lexical and canonical forms, including a transient run's own `transient-runs/<token>/agents`) through `guard-foreign-roots.ts`. Each physical area is listed once by its canonical form, so the verdict does not depend on whether a symlinked home or a case-variant path reached it. Regular files (`.DS_Store`, `desktop.ini`) are skipped because an identity root is a directory; any other entry counts as the caller's own only if it is, or contains, one of the own roots, compared lexically and never resolved, so a dangling link or a link aliasing the own root counts as foreign. A missing area is empty, and any other listing error denies. Because the host checks only the walk's root, an allowed ancestor walk is recorded by `toolCallId`; its `tool_result` re-lists the areas and replaces the whole result with the deny when a foreign root appeared or an area can no longer be listed. The hard filesystem policy still has no ancestor rule, so this soft guard alone covers ancestor enumeration until the host prunes per directory.
+
+## 2026-11-04 - Config-watch creation targets stop at the project root (#12397)
+
+`resolveOmoConfigWatchTargetResolution` bounds the ancestor list used for creation targets with `creationAncestors()`: it stops after the first ancestor holding `.git`, and before any ancestor that contains the user config directory's parent or is the filesystem root. The walk for existing `.omo` config targets is unchanged. Measured on macOS: a session's CPU during 12 s of HOME writes went from 1.69-1.78 s to 0.03-0.04 s.
+
+## 2026-11-02 - Import guard for the shared launch classification module (#11997)
+
+`desktop-sync/launchClassification.test.ts` bundles `launchClassification.ts` on its own and requires the module to be
+its only input, with no imports. The rule that the module stays free of sidecar and private-fds imports used to be a
+comment only; omo.js's registration half imports the module before any sidecar loads, so a later import would have
+pulled that code into omo.js. Test only.
+
+## 2026-11-01 - Shared launch classification for the compiled desktop-sync test (#11997)
+
+`launchCarriedPrivateTable` moved from `device-session/account-runtime-loader.ts` (module-private) to the sidecar-free
+`desktop-sync/launchClassification.ts`; the loader and `desktop-sync/channel-compiled.fixture.ts` both import it, so the
+compiled test can no longer pass on a stale copy of the classification. The fixture header now describes the loader
+wiring it uses. Must not break: the module stays free of sidecar and private-fds imports, because omo.js's
+registration half imports it.
+
+## 2026-10-31 - Desktop memory sync attaches on Windows over senpi's pipe pair (#11997)
+
+`components/memory/desktop-sync/channel.ts` no longer refuses win32. It attaches to the stream senpi's
+`takeInheritedPrivateChannel("memory-sync")` hands over on every platform; on win32 senpi builds that stream
+from two one-way pipes (engine fd 5 read, fd 6 write) and clears their inherit flag before adoption, so the
+receiver opens no descriptor, clears no flag and spawns nothing itself. A declared channel that senpi did not
+adopt (no stream) is `unavailable: private_channel_unavailable` on every platform, never the CLI source.
+Must not break: the receiver stays platform-neutral; Windows handle work belongs to senpi. `channel-compiled.test.ts`
+runs in the Windows Senpi compatibility job and skips the win32 pair case only while the bundled senpi predates
+the pair gate (senpi#5125).
+
+## 2026-11-05 - An applied onboarding scan stays retained for understanding (#12509)
+
+`omo.onboarding.apply` used to delete the scan from the process-wide store before applying it, so `omo.onboarding.understand` on the same `scanId`, which the desktop sends right after About you's apply, answered `unavailable`. Apply now marks the held scan `applied` (checked and set before its first `await`, so racing applies still produce one success) and leaves it retained with its in-memory digests until the ten-minute TTL or the eight-scan eviction removes it; a failed or expired scan is still dropped at apply. A second apply answers `unavailable` as before. The understand refusal no longer lists "was applied" among its causes.
+
+## 2026-11-04 - A timed-out bwrap probe is not cached (#12378)
+
+`probeBwrapUsability` used to memoize every verdict for the process lifetime, including a smoke test that hit its 3000 ms timeout. Under `auto` every later reflection child then ran unsandboxed, and under `required` every later reflection was refused. Only definitive verdicts are memoized now (exited 0, exited nonzero such as the user-namespace denial, or spawn failure). A timeout is returned to its caller and the next spawn's probe runs the smoke again. Concurrent callers still share one in-flight smoke.
+
+Because a timed-out spawn now runs unsandboxed under `auto` while the next one re-probes, the deferred (async) probe path reports per spawn: the transform's `wasSandboxed` and `warning` describe the latest spawn instead of the build-time guess, and `identity-runtime` logs `memory reflection sandbox degraded` when the state changes to a new degradation reason (and `memory reflection sandbox restored` when it recovers), never once per spawn. `required` still fails closed. A test also pins that a spawn-error verdict stays cached (the smoke never runs again).
+
+## 2026-11-04 - The next turn releases a run Stop whose Resume was missed (#12343)
+
+When the run-pause bridge misses the Resume of a user Stop, the pause ledger stays `applied` with admission closed while the engine holds no Stop, and no later hold-change event can arrive. `EngineRunPauseBridge.releaseStale()` resumes the recorded Stop through the normal Resume path when the engine's live ledger is at or past it and holds no user Stop, and every real `before_agent_start` starts it in the background. It acts only on a Stop left `applied` with no Resume already in flight, so the ordinary Stop-then-message path keeps its own Resume, and the turn never waits on child resume turns; a failure is logged.
+
+## 2026-11-03 - Run-paused task children resume and never stay paused forever (#12268)
+
+A user Stop pauses the background children of that run. The run's Resume now reaches them: the bridge resumes the recorded Stop whenever the resumed event's seq is at or above it, because the Stop's own `run_fence` holds raise the engine seq. A participant the released Resume could not restore is retried on a bounded schedule; one still lost after that has its paused run ended as `error` with `failure_kind: session_unavailable`, its lane slot freed and its parent notified. A paused child a live foreign host owns is never ended. The widget renders a paused child as paused with no clock, and `/task-kill` lists paused children.
+
+## 2026-10-28 - Memory shutdown waits for in-flight memory work (#11671)
+
+`MemoryBlockCache.settled()` and `RecallCorpusCache.settled()` now cover every call from its first repository read (HEAD, the persisted-store load, the compile or corpus load) through a shared `InFlightReads` tracker, and the prompt prebuild runs its HEAD read through `MemoryBlockCache.track()`. The memory component registers its hooks through `trackMemoryHooks()`, which tracks every hook's promise (`session_shutdown` itself excepted) and every memory tool execute in one component-wide tracker (on quit the host runs the drain before it aborts a running tool); the bind-time reconcile, the registration-time transient sweep, the sync-status refresh, pressure dream requests and idle dream fires run through it too, and the shutdown drain awaits it in a `memory-work-settle` step that runs last, after the drain's own steps (`wiring-shutdown.ts`), so work that stalls cannot starve the facts enqueue, the skills-usage flush or the shutdown evaluators. To keep `omo.js` inside its byte budget, the dream conversation selection (`dream-selector.ts`) moves out of the entry bundle into the memory commands sidecar (`extensions/omo-memory-commands.js`), which a dream fire loads through the shared commands loader only when it selects conversations.
+
 ## 2026-11-02 - Finished team members leave the task widget (#12160)
 
 The below-editor task widget now shows only running or parked work. A team member that completes its turn leaves the widget even while its handle stays resident, instead of lingering as a `process completed` row until the team shuts down. `/tasks` still lists it, `task_send` still revives it, and its row returns while it runs again. Task lifecycle, residency and messaging are unchanged.

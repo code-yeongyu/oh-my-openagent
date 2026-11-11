@@ -162,9 +162,7 @@ describe("config handler OpenGateway provider injection", () => {
     const providers = config.provider as Record<string, unknown> | undefined
     expect(providers?.[OPENGATEWAY_PROVIDER_ID]).toBeUndefined()
     expect(
-      [...modelCacheState.modelContextLimitsCache.keys()].some((key) =>
-        key.startsWith(`${OPENGATEWAY_PROVIDER_ID}/`),
-      ),
+      [...modelCacheState.modelContextLimitsCache.keys()].some((key) => key.startsWith(`${OPENGATEWAY_PROVIDER_ID}/`)),
     ).toBe(false)
   })
 })

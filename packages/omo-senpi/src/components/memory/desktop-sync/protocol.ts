@@ -12,7 +12,9 @@ export type DesktopSyncRequest = z.infer<typeof desktopSyncRequest>
 
 export const desktopSyncEvent = z.union([
   z.object({ event: z.literal("retired"), child: token }).strict(),
-  z.object({ event: z.literal("advanced"), child: token, handle: token, head: z.number().int().nonnegative() }).strict(),
+  z
+    .object({ event: z.literal("advanced"), child: token, handle: token, head: z.number().int().nonnegative() })
+    .strict(),
   z.object({ event: z.literal("connected"), child: token, handle: token, connected: z.boolean() }).strict(),
 ])
 export type DesktopSyncEvent = z.infer<typeof desktopSyncEvent>
@@ -25,5 +27,7 @@ export const desktopSyncChild = z.object({ child: token }).strict()
 
 export class DesktopSyncUnavailable extends Error {
   override readonly name = "DesktopSyncUnavailable"
-  constructor() { super("The private desktop sync channel is unavailable or retired.") }
+  constructor() {
+    super("The private desktop sync channel is unavailable or retired.")
+  }
 }

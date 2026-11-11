@@ -13,10 +13,22 @@ const release = (content: string, pr = 50) => assembleRelease("", [{ pr, content
 
 describe("which links count as the entry's own", () => {
   test.each([
-    ["an upstream PR link keeps our credit", "- Work around a crash ([bun#123](https://github.com/oven-sh/bun/pull/123)).", `### Fixed\n\n- Work around a crash ([bun#123](https://github.com/oven-sh/bun/pull/123)). ${link(50)}`],
-    ["a senpi PR link keeps our credit", "**Engine.** Adopts [senpi#123](https://github.com/code-yeongyu/senpi/pull/123).", `**Engine.** Adopts [senpi#123](https://github.com/code-yeongyu/senpi/pull/123). ${link(50)}`],
+    [
+      "an upstream PR link keeps our credit",
+      "- Work around a crash ([bun#123](https://github.com/oven-sh/bun/pull/123)).",
+      `### Fixed\n\n- Work around a crash ([bun#123](https://github.com/oven-sh/bun/pull/123)). ${link(50)}`,
+    ],
+    [
+      "a senpi PR link keeps our credit",
+      "**Engine.** Adopts [senpi#123](https://github.com/code-yeongyu/senpi/pull/123).",
+      `**Engine.** Adopts [senpi#123](https://github.com/code-yeongyu/senpi/pull/123). ${link(50)}`,
+    ],
     ["the entry's own link is not repeated", `**Own.** Done ${link(50)}`, `**Own.** Done ${link(50)}`],
-    ["a folded car names both the car and the batch", `- Car fix. ${link(21)}`, `### Fixed\n\n- Car fix. ${link(21)} ${link(50)}`],
+    [
+      "a folded car names both the car and the batch",
+      `- Car fix. ${link(21)}`,
+      `### Fixed\n\n- Car fix. ${link(21)} ${link(50)}`,
+    ],
   ])("%s", (_name, entry, expected) => {
     const content = entry.startsWith("- ") ? `### Fixed\n\n${entry}\n` : `${entry}\n`
     expect(release(content)).toBe(expected)
@@ -25,11 +37,31 @@ describe("which links count as the entry's own", () => {
 
 describe("code fences", () => {
   test.each([
-    ["a paragraph then a fenced block with a blank line inside", `**Thing.** Use it:\n\n${FENCE3}sh\nfoo\n\nbar\n${FENCE3}`, `**Thing.** Use it: ${link(50)}\n\n${FENCE3}sh\nfoo\n\nbar\n${FENCE3}`],
-    ["prose directly followed by a fence gets the link on its prose line", `**Thing.** Use it:\n${FENCE3}sh\nfoo\n${FENCE3}`, `**Thing.** Use it: ${link(50)}\n${FENCE3}sh\nfoo\n${FENCE3}`],
-    ["a backtick fence inside a tilde fence does not close it", `~~~md\n${FENCE3}js\nx\n\n**Next.** inside\n~~~\n\n**After.** prose`, `~~~md\n${FENCE3}js\nx\n\n**Next.** inside\n~~~\n\n**After.** prose ${link(50)}`],
-    ["a shorter fence does not close a longer one", "````\n```\n\nstill code\n````\n\n**After.** prose", `\`\`\`\`\n\`\`\`\n\nstill code\n\`\`\`\`\n\n**After.** prose ${link(50)}`],
-    ["a ### line inside a fence is code, not a section", `**Thing.** Example:\n\n${FENCE3}md\n### Fixed\n- not a bullet\n${FENCE3}`, `**Thing.** Example: ${link(50)}\n\n${FENCE3}md\n### Fixed\n- not a bullet\n${FENCE3}`],
+    [
+      "a paragraph then a fenced block with a blank line inside",
+      `**Thing.** Use it:\n\n${FENCE3}sh\nfoo\n\nbar\n${FENCE3}`,
+      `**Thing.** Use it: ${link(50)}\n\n${FENCE3}sh\nfoo\n\nbar\n${FENCE3}`,
+    ],
+    [
+      "prose directly followed by a fence gets the link on its prose line",
+      `**Thing.** Use it:\n${FENCE3}sh\nfoo\n${FENCE3}`,
+      `**Thing.** Use it: ${link(50)}\n${FENCE3}sh\nfoo\n${FENCE3}`,
+    ],
+    [
+      "a backtick fence inside a tilde fence does not close it",
+      `~~~md\n${FENCE3}js\nx\n\n**Next.** inside\n~~~\n\n**After.** prose`,
+      `~~~md\n${FENCE3}js\nx\n\n**Next.** inside\n~~~\n\n**After.** prose ${link(50)}`,
+    ],
+    [
+      "a shorter fence does not close a longer one",
+      "````\n```\n\nstill code\n````\n\n**After.** prose",
+      `\`\`\`\`\n\`\`\`\n\nstill code\n\`\`\`\`\n\n**After.** prose ${link(50)}`,
+    ],
+    [
+      "a ### line inside a fence is code, not a section",
+      `**Thing.** Example:\n\n${FENCE3}md\n### Fixed\n- not a bullet\n${FENCE3}`,
+      `**Thing.** Example: ${link(50)}\n\n${FENCE3}md\n### Fixed\n- not a bullet\n${FENCE3}`,
+    ],
   ])("%s", (_name, content, expected) => {
     expect(release(`${content}\n`)).toBe(expected)
   })
@@ -41,7 +73,10 @@ describe("code fences", () => {
 
   test("an unclosed fence is refused at PR time, before the fragment becomes immutable", () => {
     const input = { addedFiles: [], modifiedFiles: [], deletedFiles: [], isRelease: false, existsAtHead: () => true }
-    const verdict = checkPackageLogs({ ...input, fragment: `**Thing.** Use it:\n\n${FENCE3}sh\nfoo\n\n**Later.** prose\n` })
+    const verdict = checkPackageLogs({
+      ...input,
+      fragment: `**Thing.** Use it:\n\n${FENCE3}sh\nfoo\n\n**Later.** prose\n`,
+    })
     expect(verdict.pass).toBe(false)
     expect(verdict.reason).toContain("never closed")
   })
@@ -53,7 +88,9 @@ describe("code fences", () => {
 
   test("a nested bullet's fence is measured from its own item, so it stays a fence", () => {
     const content = `### Fixed\n\n- Outer:\n  - Inner:\n    ${FENCE3}sh\n    a\n\n    b\n    ${FENCE3}\n`
-    expect(release(content)).toBe(`### Fixed\n\n- Outer:\n  - Inner: ${link(50)}\n    ${FENCE3}sh\n    a\n\n    b\n    ${FENCE3}`)
+    expect(release(content)).toBe(
+      `### Fixed\n\n- Outer:\n  - Inner: ${link(50)}\n    ${FENCE3}sh\n    a\n\n    b\n    ${FENCE3}`,
+    )
   })
 
   test("the entry's own link inside a code block does not count as its link", () => {
@@ -81,9 +118,21 @@ describe("fences inside every kind of list item", () => {
     ["a 1) item", `1) x\n    ${F}\n    a\n    ${F}`, [false, true, true, true]],
     ["a 10. item (text at column 4)", `10. x\n       ${F}\n       a\n       ${F}`, [false, true, true, true]],
     ["too deep for a 1. item is indented code", `1. x\n        ${F}\n        a`, [false, false, false]],
-    ["a nested * item with a blank line in its fence", `* x\n  * y\n    ${F}\n    a\n\n    ${F}`, [false, false, true, true, true, true]],
-    ["a paragraph back in the outer item uses that item's column", `- a\n  - b\n    - c\n  para in a\n     ${F}\n     z\n     ${F}`, [false, false, false, false, true, true, true]],
-    ["a tab-indented item nested in a - item", `- a\n\t- c\n\t  ${F}\n\t  z\n\t  ${F}`, [false, false, true, true, true]],
+    [
+      "a nested * item with a blank line in its fence",
+      `* x\n  * y\n    ${F}\n    a\n\n    ${F}`,
+      [false, false, true, true, true, true],
+    ],
+    [
+      "a paragraph back in the outer item uses that item's column",
+      `- a\n  - b\n    - c\n  para in a\n     ${F}\n     z\n     ${F}`,
+      [false, false, false, false, true, true, true],
+    ],
+    [
+      "a tab-indented item nested in a - item",
+      `- a\n\t- c\n\t  ${F}\n\t  z\n\t  ${F}`,
+      [false, false, true, true, true],
+    ],
     ["a tab at column 0 is indented code, not a list item", `\t- c\n\t  ${F}`, [false, false]],
     ["a tab after the marker", `1.\tx\n    ${F}\n    a\n    ${F}`, [false, true, true, true]],
     ["outside any list, four spaces is indented code", `    ${F}\ncode`, [false, false]],
@@ -102,20 +151,39 @@ describe("fences inside every kind of list item", () => {
   // #11253 review round 3 HIGH 1: the PR check runs the release's own assembly, so whatever it accepts the stamp
   // places, and code inside list items keeps every byte even with a blank line before the fence.
   test.each([
-    ["a 10. item with a blank line before its fence", `10. Run:\n\n    ${F}sh\n    a\n    ${F}\n`, `    ${F}sh\n    a\n    ${F}`],
-    ["a nested * item with a blank line before its fence", `* x\n  * y\n\n    ${F}\n    a\n    ${F}\n`, `    ${F}\n    a\n    ${F}`],
-    ["an intro paragraph, then a numbered list with fenced steps", `**Steps.** Do this:\n\n1. Install:\n\n   ${F}sh\n   bun add x\n   ${F}\n\n2. Run it.\n`, `   ${F}sh\n   bun add x\n   ${F}`],
+    [
+      "a 10. item with a blank line before its fence",
+      `10. Run:\n\n    ${F}sh\n    a\n    ${F}\n`,
+      `    ${F}sh\n    a\n    ${F}`,
+    ],
+    [
+      "a nested * item with a blank line before its fence",
+      `* x\n  * y\n\n    ${F}\n    a\n    ${F}\n`,
+      `    ${F}\n    a\n    ${F}`,
+    ],
+    [
+      "an intro paragraph, then a numbered list with fenced steps",
+      `**Steps.** Do this:\n\n1. Install:\n\n   ${F}sh\n   bun add x\n   ${F}\n\n2. Run it.\n`,
+      `   ${F}sh\n   bun add x\n   ${F}`,
+    ],
   ])("the PR check accepts %s and the release places it with its code untouched", (_name, preamble, code) => {
     const input = { addedFiles: [], modifiedFiles: [], deletedFiles: [], isRelease: false, existsAtHead: () => true }
     expect(checkPackageLogs({ ...input, fragment: preamble }).pass).toBe(true)
     const body = release(preamble)
     expect(body).toContain(code)
-    expect(body.split("\n").filter((line) => line.includes(`(${PULL}/50)`)).every((line) => !line.trimStart().startsWith(F))).toBe(true)
+    expect(
+      body
+        .split("\n")
+        .filter((line) => line.includes(`(${PULL}/50)`))
+        .every((line) => !line.trimStart().startsWith(F)),
+    ).toBe(true)
   })
 
   test("a list that continues an intro paragraph is one entry, linked once at its end", () => {
     const preamble = `**Steps.** Do this:\n\n1. Install:\n\n   ${F}sh\n   bun add x\n   ${F}\n\n2. Run it.\n`
-    expect(release(preamble)).toBe(`**Steps.** Do this:\n\n1. Install:\n\n   ${F}sh\n   bun add x\n   ${F}\n\n2. Run it. ${link(50)}`)
+    expect(release(preamble)).toBe(
+      `**Steps.** Do this:\n\n1. Install:\n\n   ${F}sh\n   bun add x\n   ${F}\n\n2. Run it. ${link(50)}`,
+    )
   })
 
   test("paragraphs that each start at column 0 stay separate entries, each linked", () => {
@@ -127,13 +195,33 @@ describe("fences inside every kind of list item", () => {
 // PR link never lands inside it.
 describe("indented code blocks are never linked", () => {
   test.each([
-    ["a paragraph, then indented code, then a paragraph", "**A.** one\n\n    code\n\n**B.** two\n", `**A.** one ${link(50)}\n\n    code\n\n**B.** two ${link(50)}`],
+    [
+      "a paragraph, then indented code, then a paragraph",
+      "**A.** one\n\n    code\n\n**B.** two\n",
+      `**A.** one ${link(50)}\n\n    code\n\n**B.** two ${link(50)}`,
+    ],
     ["a paragraph followed by indented code", "**A.** one\n\n    code\n", `**A.** one ${link(50)}\n\n    code`],
-    ["indented code inside a list item", "**A.** steps:\n\n- a\n\n      code\n", `**A.** steps:\n\n- a ${link(50)}\n\n      code`],
+    [
+      "indented code inside a list item",
+      "**A.** steps:\n\n- a\n\n      code\n",
+      `**A.** steps:\n\n- a ${link(50)}\n\n      code`,
+    ],
     ["an entry that is all indented code stays as written", "    code\n", "    code"],
-    ["indented code right after a closing fence", `**A.** one\n\n${FENCE3}\nx\n${FENCE3}\n    code\n`, `**A.** one ${link(50)}\n\n${FENCE3}\nx\n${FENCE3}\n    code`],
-    ["indented code after a blank line after a closing fence", `**A.** one\n\n${FENCE3}\nx\n${FENCE3}\n\n    code\n`, `**A.** one ${link(50)}\n\n${FENCE3}\nx\n${FENCE3}\n\n    code`],
-    ["a lazy continuation line is paragraph text, not code", "**A.** one\n    more\n", `**A.** one\n    more ${link(50)}`],
+    [
+      "indented code right after a closing fence",
+      `**A.** one\n\n${FENCE3}\nx\n${FENCE3}\n    code\n`,
+      `**A.** one ${link(50)}\n\n${FENCE3}\nx\n${FENCE3}\n    code`,
+    ],
+    [
+      "indented code after a blank line after a closing fence",
+      `**A.** one\n\n${FENCE3}\nx\n${FENCE3}\n\n    code\n`,
+      `**A.** one ${link(50)}\n\n${FENCE3}\nx\n${FENCE3}\n\n    code`,
+    ],
+    [
+      "a lazy continuation line is paragraph text, not code",
+      "**A.** one\n    more\n",
+      `**A.** one\n    more ${link(50)}`,
+    ],
   ])("%s", (_name, content, expected) => {
     expect(release(content)).toBe(expected)
   })

@@ -3,7 +3,8 @@
 // `<repo>/.git/omo-sync/crdt/` (sync-design §5: plaintext stays inside the repository's git dir),
 // written by temp file + rename. Capture is the device API's captureOnDevice against that
 // baseline; a deleted working file captures as the item's tombstone; render is renderForDisk, so
-// a file whose model did not change keeps its own frontmatter style byte for byte.
+// a file whose model did not change keeps its own frontmatter style byte for byte. The recovery
+// operations (revive, rewind, adoptJournaled) live in device-item-recovery.ts over the same state.
 
 import { createHash } from "node:crypto"
 import { join } from "node:path"
@@ -15,23 +16,16 @@ import {
   createDeviceItemDoc,
   deleteItem,
   type ItemDevice,
-  type ItemFrontier,
   isLive,
   isSyncItemKey,
   itemFrontier,
   openItemDevice,
-  recordMaterialized,
-  renderDocContent,
   renderForDisk,
   renderItem,
 } from "../../item"
 import { readJson, writeAtomic, writeJson } from "../atomic"
 import type { BatchPayload, ItemStore } from "../ports"
-
-interface Baseline {
-  readonly text: string | null
-  readonly frontier: ItemFrontier
-}
+import { type Baseline, createItemRecovery } from "./device-item-recovery"
 
 export interface DeviceItemStoreOptions {
   /** The device's private state dir (peer + receipts), outside the synced memory root. */
@@ -40,6 +34,7 @@ export interface DeviceItemStoreOptions {
   /** `<repo>/.git/omo-sync`: item docs and baselines go under `crdt/`. */
   readonly syncDir: string
   readonly machineId?: string
+  readonly log?: (line: string) => void
 }
 
 const fileOf = (key: string): string => createHash("sha256").update(key).digest("hex")
@@ -49,31 +44,9 @@ const fileOf = (key: string): string => createHash("sha256").update(key).digest(
 const syncable = (key: string): boolean => isSyncItemKey(key) === null
 
 export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStore {
-  /**
-   * A person re-created a deleted item. The dead doc still holds its last content at its current
-   * frontier, so capture runs against exactly that (any new op past the tombstone makes the item
-   * live again). Re-created with that same content, the diff is empty, so one explicit no-change
-   * op revives it.
-   */
-  const revive = async (key: string, doc: LoroDoc, workingText: string): Promise<Uint8Array | null> => {
-    const ops = await captureOnDevice(theDevice(), key, doc, renderDocContent(doc), itemFrontier(doc), workingText)
-    if (ops !== null) return ops
-    const target = doc.fork()
-    try {
-      target.setPeerId(doc.peerId)
-      target.setRecordTimestamp(false)
-      const body = target.getText("body")
-      body.insert(0, "\u0000")
-      body.delete(0, 1)
-      target.commit()
-      return target.export({ mode: "update", from: doc.oplogVersion() })
-    } finally {
-      target.free()
-    }
-  }
   const crdt = join(options.syncDir, "crdt")
   const docs = new Map<string, LoroDoc>()
-  let baselines = new Map<string, Baseline>()
+  const baselines = new Map<string, Baseline>()
   const dirty = new Set<string>()
   let device: ItemDevice | null = null
   const theDevice = (): ItemDevice => {
@@ -87,6 +60,14 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
     docs.set(key, doc)
     return doc
   }
+  const recovery = createItemRecovery({
+    docs,
+    baselines,
+    dirty,
+    device: theDevice,
+    docOf,
+    ...(options.log === undefined ? {} : { log: options.log }),
+  })
   return {
     async load() {
       device = await openItemDevice({
@@ -95,7 +76,8 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
         ...(options.machineId === undefined ? {} : { machineId: options.machineId }),
       })
       const index = await readJson<Record<string, Baseline>>(join(crdt, "baselines.json"), {})
-      baselines = new Map(Object.entries(index).filter(([key]) => syncable(key)))
+      baselines.clear()
+      for (const [key, baseline] of Object.entries(index)) if (syncable(key)) baselines.set(key, baseline)
       // Every persisted doc's key, materialised or not: an item applied from a verified batch has
       // CRDT state before it has a baseline, and a crash in between must not drop that state.
       const docKeys = (await readJson<string[]>(join(crdt, "docs.json"), [])).filter(syncable)
@@ -126,7 +108,7 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
         dirty.add(key)
         return doc.export({ mode: "update", from })
       }
-      if (!isLive(doc) && doc.oplogVersion().toJSON().size > 0) return revive(key, doc, workingText)
+      if (!isLive(doc) && doc.oplogVersion().toJSON().size > 0) return recovery.revive(key, doc, workingText)
       return captureOnDevice(theDevice(), key, doc, base.text ?? "", base.frontier, workingText)
     },
     async apply(key, ops) {
@@ -140,15 +122,14 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
       return diskText === null ? renderItem(doc) : renderForDisk(doc, diskText)
     },
     async version(key) {
-      const frontier = itemFrontier(await docOf(key)).map((id) => `${id.peer}:${id.counter}`).sort()
+      const frontier = itemFrontier(await docOf(key))
+        .map((id) => `${id.peer}:${id.counter}`)
+        .sort()
       return frontier.join(",")
     },
-    async markMaterialized(key, text) {
-      const doc = await docOf(key)
-      if (text !== null) await recordMaterialized(theDevice(), key, doc, itemFrontier(doc), text)
-      baselines.set(key, { text, frontier: itemFrontier(doc) })
-      dirty.add(key)
-    },
+    markMaterialized: recovery.materialize,
+    adoptJournaled: recovery.adoptJournaled,
+    rewind: recovery.rewind,
     async applySnapshot(payload: BatchPayload) {
       for (const item of payload.items) {
         if (!syncable(item.key)) continue
@@ -160,7 +141,8 @@ export function createDeviceItemStore(options: DeviceItemStoreOptions): ItemStor
     async persist() {
       for (const key of dirty) {
         const doc = docs.get(key)
-        if (doc !== undefined && syncable(key)) await writeAtomic(join(crdt, "docs", `${fileOf(key)}.loro`), doc.export({ mode: "snapshot" }))
+        if (doc !== undefined && syncable(key))
+          await writeAtomic(join(crdt, "docs", `${fileOf(key)}.loro`), doc.export({ mode: "snapshot" }))
       }
       dirty.clear()
       await writeJson(join(crdt, "docs.json"), [...docs.keys()].filter(syncable).sort())

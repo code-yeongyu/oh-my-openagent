@@ -84,7 +84,9 @@ describe("handleSessionCreated – #3505 session readiness race", () => {
     // Patch executeActions on the module after import — use the real module path
     // but intercept via deps indirection through action-executor by spying on
     // startPolling (it must NOT be called if spawn is skipped).
-    const startPolling = mock(() => { callLog.push("startPolling") })
+    const startPolling = mock(() => {
+      callLog.push("startPolling")
+    })
     deps.startPolling = startPolling
 
     const event = makeEvent("ses_notready")
@@ -110,7 +112,9 @@ describe("handleSessionCreated – #3505 session readiness race", () => {
     // observable and asserted, not assumed.
     const callLog: string[] = []
     let resolveReadiness: ((ready: boolean) => void) | undefined
-    const readinessGate = new Promise<boolean>((resolve) => { resolveReadiness = resolve })
+    const readinessGate = new Promise<boolean>((resolve) => {
+      resolveReadiness = resolve
+    })
 
     const waitForSessionReady = mock(async (_id: string): Promise<boolean> => {
       callLog.push("waitForSessionReady:start")

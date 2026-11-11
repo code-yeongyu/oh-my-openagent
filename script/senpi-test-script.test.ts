@@ -62,23 +62,25 @@ describe("Senpi compatibility test script", () => {
       "root npm files must NOT ship packages/omo-senpi/plugin while the senpi platform flag is disabled for release",
     ).toBe(false)
     expect(launchSpecIndex, "the Senpi stage must generate the daemon launch spec").toBeGreaterThanOrEqual(0)
-    expect(syncSkillsIndex, "the daemon launch spec must be generated before skill sync").toBeGreaterThan(launchSpecIndex)
+    expect(syncSkillsIndex, "the daemon launch spec must be generated before skill sync").toBeGreaterThan(
+      launchSpecIndex,
+    )
     expect(senpiNode?.args, "the build orchestrator must generate Senpi plugin artifacts before publishing").toEqual([
       "run",
       "build:senpi-plugin:stage",
     ])
-    expect(senpiNode?.deps, "build graph senpi-plugin must wait for every shared runtime and plugin dependency").toEqual([
-      "ast-grep-mcp",
-      "lsp-daemon",
-      "codex-plugin",
-    ])
+    expect(
+      senpiNode?.deps,
+      "build graph senpi-plugin must wait for every shared runtime and plugin dependency",
+    ).toEqual(["ast-grep-mcp", "lsp-daemon", "codex-plugin"])
     expect(
       selectBuildNodes(BUILD_NODES, undefined).map((node) => node.id),
       "a default build must still schedule the Senpi plugin stage",
     ).toContain("senpi-plugin")
-    expect(prepublishOnlyScript, "prepublishOnly must route through build, which includes the Senpi plugin build").toContain(
-      "bun run build",
-    )
+    expect(
+      prepublishOnlyScript,
+      "prepublishOnly must route through build, which includes the Senpi plugin build",
+    ).toContain("bun run build")
   })
 
   test("#given a packed-layout root with only senpi plugin artifacts #when installer runs #then settings points at that shipped plugin tree", async () => {
@@ -147,6 +149,8 @@ describe("Senpi compatibility test script", () => {
       await writeFile(join(pluginRoot, "extensions", "assets.generated.json"), "{}\n")
       await mkdir(join(pluginRoot, "runtime", "agent-toolkit-sdk"), { recursive: true })
       await writeFile(join(pluginRoot, "runtime", "agent-toolkit-sdk", "sdk.js"), "export {}\n")
+      await mkdir(join(pluginRoot, "runtime", "bunshin-ts"), { recursive: true })
+      await writeFile(join(pluginRoot, "runtime", "bunshin-ts", "sdk.js"), "export {}\n")
       await mkdir(join(pluginRoot, "runtime", "thread-sdk"), { recursive: true })
       await writeFile(join(pluginRoot, "runtime", "thread-sdk", "sdk.js"), "export {}\n")
       await writeFile(join(pluginRoot, "extensions", "reflection-persona.md"), "# reflection persona fixture\n")
@@ -154,11 +158,16 @@ describe("Senpi compatibility test script", () => {
       await writeFile(join(pluginRoot, "extensions", "facts-persona.md"), "# facts persona fixture\n")
       await writeFile(join(pluginRoot, "extensions", "kibitzer-persona.md"), "# kibitzer persona fixture\n")
       // The daemon launch spec is a required root-level artifact; the installer refuses a payload without it.
-      await writeFile(join(pluginRoot, "daemon-launch-spec.json"), '{"spec_version":1,"core":{"session_runtime":"in-process","multi_session":true,"extensions":["."]},"tunables":{},"env":{}}\n')
+      await writeFile(
+        join(pluginRoot, "daemon-launch-spec.json"),
+        '{"spec_version":1,"core":{"session_runtime":"in-process","multi_session":true,"extensions":["."]},"tunables":{},"env":{}}\n',
+      )
       // The memory run supervisor ships as its own executable artifact beside the bundle, so a
       // packed root without it is genuinely incomplete and the installer is right to reject it.
       await writeFile(join(pluginRoot, "extensions", "memory-run-supervisor.mjs"), "#!/usr/bin/env node\n")
       await writeFile(join(pluginRoot, "extensions", "gateway-store-worker.mjs"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-computer-run-worker.mjs"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "quickjs.wasm"), "")
       await mkdir(join(pluginRoot, "scripts"), { recursive: true })
       await writeFile(join(pluginRoot, "scripts", "install.mjs"), "#!/usr/bin/env node\n")
       await mkdir(join(pluginRoot, "runtime", "lsp-daemon", "dist"), { recursive: true })
@@ -167,15 +176,21 @@ describe("Senpi compatibility test script", () => {
       await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", "index.d.ts"), "export {}\n")
       await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", "daemon-client.js"), "export {}\n")
       await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", "daemon-client.d.ts"), "export {}\n")
-      await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", "package.json"), JSON.stringify({ version: "0.1.0" }))
+      await writeFile(
+        join(pluginRoot, "runtime", "lsp-daemon", "dist", "package.json"),
+        JSON.stringify({ version: "0.1.0" }),
+      )
       await writeFile(join(pluginRoot, "runtime", "lsp-daemon", "dist", ".omo-runtime-manifest.json"), "{}\n")
       await mkdir(join(pluginRoot, "runtime", "agent-toolkit", "ulw-loop"), { recursive: true })
       await writeFile(join(pluginRoot, "runtime", "agent-toolkit", "cli.js"), "console.log('agent-toolkit')\n")
       await writeFile(join(pluginRoot, "runtime", "agent-toolkit", "ulw-loop", "cli.js"), "console.log('ulw-loop')\n")
       const toolkitShim = join(pluginRoot, "runtime", "agent-toolkit", "omo-agent-toolkit")
-      await writeFile(toolkitShim, "#!/bin/sh\nexec node \"$(dirname \"$0\")/cli.js\" \"$@\"\n")
+      await writeFile(toolkitShim, '#!/bin/sh\nexec node "$(dirname "$0")/cli.js" "$@"\n')
       await chmod(toolkitShim, 0o755)
-      await writeFile(join(pluginRoot, "runtime", "agent-toolkit", "omo-agent-toolkit.cmd"), "@echo off\r\nnode \"%~dp0cli.js\" %*\r\n")
+      await writeFile(
+        join(pluginRoot, "runtime", "agent-toolkit", "omo-agent-toolkit.cmd"),
+        '@echo off\r\nnode "%~dp0cli.js" %*\r\n',
+      )
       await mkdir(join(pluginRoot, "runtime", "ast-grep-mcp"), { recursive: true })
       const astGrepRuntime = join(pluginRoot, "runtime", "ast-grep-mcp", "cli.js")
       const astGrepRuntimeContent = "console.log('ast-grep mcp')\n"
@@ -207,9 +222,14 @@ describe("Senpi compatibility test script", () => {
       const settings = JSON.parse(await readFile(join(agentDir, "settings.json"), "utf8")) as Record<string, unknown>
       expect(result.pluginPath).toBe(pluginRoot)
       expect(settings.packages).toEqual([pluginRoot])
-      expect(commands, "packed installs must use shipped artifacts without requiring source rebuild scripts").toEqual([])
+      expect(commands, "packed installs must use shipped artifacts without requiring source rebuild scripts").toEqual(
+        [],
+      )
     } finally {
-      await Promise.all([rm(tempRoot, { recursive: true, force: true }), rm(agentDir, { recursive: true, force: true })])
+      await Promise.all([
+        rm(tempRoot, { recursive: true, force: true }),
+        rm(agentDir, { recursive: true, force: true }),
+      ])
     }
   })
 
@@ -261,6 +281,9 @@ describe("Senpi compatibility test script", () => {
     expect(posixScript).toContain("bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs")
     expect(posixScript).toContain("bun test --timeout 20000 packages/omo-senpi")
     expect(senpiJob).not.toContain("senpi install")
-    expect(needsReferences.length, "senpi-compatibility must be included in both downstream needs lists").toBeGreaterThanOrEqual(2)
+    expect(
+      needsReferences.length,
+      "senpi-compatibility must be included in both downstream needs lists",
+    ).toBeGreaterThanOrEqual(2)
   })
 })

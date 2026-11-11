@@ -7,7 +7,8 @@ import { type EndpointWatch, watchEndpointFile } from "./registrant-watch.ts"
 // each proof, and again whenever the status names a device it has not registered for on that connection. A
 // signed-out status, a refused register and a transport error reset that, so the next device id registers again. A
 // new connection comes from the endpoint file appearing (watched before the first existence check) or from the
-// previous connection closing; nothing polls. The only timers are the bounded connect retries.
+// previous connection closing; nothing polls. The only timers are the bounded connect retries and the watch's one
+// settle re-check after each arm (see registrant-watch.ts).
 
 const REGISTRANT_RETRY_DELAYS_MS: readonly number[] = [250, 1_000, 4_000]
 
@@ -89,7 +90,7 @@ function holdConnection(
 
   want(null)
   service
-    .watchStatus(status => {
+    .watchStatus((status) => {
       const deviceId = status.device?.id ?? null
       emit({ kind: "status", deviceId })
       if (deviceId === null) registeredFor = NONE
@@ -101,7 +102,9 @@ function holdConnection(
 export function startAgentDirRegistrant(options: AgentDirRegistrantOptions): AgentDirRegistrant {
   const endpoint = deviceServiceEndpointPath(options.stateDir)
   const emit = options.onEvent ?? (() => {})
-  const connect = options.connect ?? (() => connectDeviceService({ version: options.version, stateDir: options.stateDir, background: true }))
+  const connect =
+    options.connect ??
+    (() => connectDeviceService({ version: options.version, stateDir: options.stateDir, background: true }))
   const schedule = options.schedule ?? backgroundTimer
   let stopped = false
   let current: DeviceService | undefined
@@ -111,7 +114,7 @@ export function startAgentDirRegistrant(options: AgentDirRegistrantOptions): Age
   const attempt = (retry: number): void => {
     connecting = true
     connect().then(
-      service => {
+      (service) => {
         connecting = false
         if (stopped) {
           service.close()

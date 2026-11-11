@@ -4,24 +4,17 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GitMemoryRepo, createNodeGitExec } from "../git"
-import {
-  listReflectionLeftovers,
-  selectReflectionOrphans,
-  sweepReflectionOrphans,
-} from "./orphan-sweep"
+import { listReflectionLeftovers, selectReflectionOrphans, sweepReflectionOrphans } from "./orphan-sweep"
 import { removeTree } from "../../../../test-support/remove-tree"
 
 const roots: string[] = []
-const INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 30_000 : 10_000
 const HOUR_MS = 60 * 60_000
 const exec = createNodeGitExec()
 
-setDefaultTimeout(INTEGRATION_TEST_TIMEOUT)
+if (process.platform === "win32") setDefaultTimeout(30_000)
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) =>
-    removeTree(root, { maxRetries: 10, retryDelay: 200 })
-  ))
+  await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
 })
 
 async function branchExists(repoDir: string, branch: string): Promise<boolean> {
@@ -67,18 +60,17 @@ describe("reflection orphan sweep", () => {
     const leftovers = await listReflectionLeftovers(item.repo, item.worktreesDir, exec)
 
     // #then
-    expect([...leftovers.registeredWorktrees].sort((a, b) => a.dir.localeCompare(b.dir))).toEqual([
-      { dir: item.live.dir, branch: item.live.branch, present: true },
-      { dir: item.stale.dir, branch: item.stale.branch, present: true },
-      { dir: item.fresh.dir, branch: item.fresh.branch, present: true },
-    ].sort((a, b) => a.dir.localeCompare(b.dir)))
+    expect([...leftovers.registeredWorktrees].sort((a, b) => a.dir.localeCompare(b.dir))).toEqual(
+      [
+        { dir: item.live.dir, branch: item.live.branch, present: true },
+        { dir: item.stale.dir, branch: item.stale.branch, present: true },
+        { dir: item.fresh.dir, branch: item.fresh.branch, present: true },
+      ].sort((a, b) => a.dir.localeCompare(b.dir)),
+    )
     expect(leftovers.strayDirs).toEqual([item.strayDir])
-    expect([...leftovers.branches].sort()).toEqual([
-      item.fresh.branch,
-      item.live.branch,
-      item.stale.branch,
-      "reflection/run-3",
-    ].sort())
+    expect([...leftovers.branches].sort()).toEqual(
+      [item.fresh.branch, item.live.branch, item.stale.branch, "reflection/run-3"].sort(),
+    )
   })
 
   it("#given live and fresh leftovers #when orphans are selected #then only unowned aged items and legacy branches are chosen", () => {
@@ -89,7 +81,11 @@ describe("reflection orphan sweep", () => {
         { dir: `/w/${now - HOUR_MS}-run-stale`, branch: `memory/reflection-${now - HOUR_MS}-run-stale`, present: true },
         { dir: `/w/${now - HOUR_MS}-run-live`, branch: `memory/reflection-${now - HOUR_MS}-run-live`, present: true },
         { dir: `/w/${now - 60_000}-run-fresh`, branch: `memory/reflection-${now - 60_000}-run-fresh`, present: true },
-        { dir: `/w/${now - 60_000}-run-pruned`, branch: `memory/reflection-${now - 60_000}-run-pruned`, present: false },
+        {
+          dir: `/w/${now - 60_000}-run-pruned`,
+          branch: `memory/reflection-${now - 60_000}-run-pruned`,
+          present: false,
+        },
       ],
       strayDirs: [`/w/${now - HOUR_MS}-run-stray`, `/w/unrelated`],
       branches: ["reflection/run-3", "reflection/run-9", `memory/reflection-${now - 60_000}-run-fresh`],
@@ -126,11 +122,9 @@ describe("reflection orphan sweep", () => {
 
     // #then
     expect(receipts.every((receipt) => receipt.removed)).toBe(true)
-    expect(receipts.map((receipt) => `${receipt.kind}:${receipt.target}`).sort()).toEqual([
-      `branch:reflection/run-3`,
-      `directory:${item.strayDir}`,
-      `worktree:${item.stale.dir}`,
-    ].sort())
+    expect(receipts.map((receipt) => `${receipt.kind}:${receipt.target}`).sort()).toEqual(
+      [`branch:reflection/run-3`, `directory:${item.strayDir}`, `worktree:${item.stale.dir}`].sort(),
+    )
     expect(existsSync(item.stale.dir)).toBe(false)
     expect(await branchExists(item.repoDir, item.stale.branch)).toBe(false)
     expect(existsSync(item.strayDir)).toBe(false)

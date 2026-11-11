@@ -56,7 +56,9 @@ function recordingDependencies(input: {
 }
 
 describe("ensurePrebuiltNativeInputs", () => {
-  const omowrightRuntime = ["packages", "shared-skills", "skills", "browser", "runtime", "omowright", "index.js"].join(sep)
+  const omowrightRuntime = ["packages", "shared-skills", "skills", "browser", "runtime", "omowright", "index.js"].join(
+    sep,
+  )
 
   test("#given every prebuilt artifact present #when ensuring #then no root build script runs", () => {
     // given
@@ -119,9 +121,7 @@ describe("ensurePrebuiltNativeInputs", () => {
     const { dependencies } = recordingDependencies({ existing: [], scriptStatus: 7 })
 
     // when / then
-    expect(() => ensurePrebuiltNativeInputs(dependencies)).toThrow(
-      "build:lsp-daemon failed with exit code 7",
-    )
+    expect(() => ensurePrebuiltNativeInputs(dependencies)).toThrow("build:lsp-daemon failed with exit code 7")
   })
 
   test("#given the spawn itself errors #when ensuring #then the error propagates", () => {
@@ -145,11 +145,7 @@ describe("plugin payload allowlist parity", () => {
 
   test("#given the plugin files allowlist #when compared with the payload lists #then every published entry is copied", () => {
     // given
-    const copied = new Set<string>([
-      ...PAYLOAD_DIRECTORIES,
-      ...PAYLOAD_FILES,
-      PAYLOAD_SCRIPT.split(sep).join("/"),
-    ])
+    const copied = new Set<string>([...PAYLOAD_DIRECTORIES, ...PAYLOAD_FILES, PAYLOAD_SCRIPT.split(sep).join("/")])
 
     // when
     const uncopied = pluginFiles.filter((entry) => !copied.has(entry))

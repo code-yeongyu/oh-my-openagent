@@ -15,7 +15,13 @@ function harness() {
     logger: { info() {}, warn() {}, error() {} },
     config: { getFlag: () => undefined },
   }
-  const eventCtx = { ui: { setStatus: (key: string, text: string | undefined) => { statuses.push({ key, text }) } } }
+  const eventCtx = {
+    ui: {
+      setStatus: (key: string, text: string | undefined) => {
+        statuses.push({ key, text })
+      },
+    },
+  }
   return { handlers: pi.handlers, statuses, pi, ctx, eventCtx }
 }
 

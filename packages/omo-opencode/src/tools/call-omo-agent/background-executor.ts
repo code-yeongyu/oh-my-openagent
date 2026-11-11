@@ -27,15 +27,11 @@ export async function executeBackground(
 ): Promise<string> {
   try {
     const messageDir = getMessageDir(toolContext.sessionID)
-    const { prevMessage, firstMessageAgent } = await resolveMessageContext(
-      toolContext.sessionID,
-      client,
-      messageDir
-    )
+    const { prevMessage, firstMessageAgent } = await resolveMessageContext(toolContext.sessionID, client, messageDir)
 
     const sessionAgent = getSessionAgent(toolContext.sessionID)
     const parentAgent = toolContext.agent ?? sessionAgent ?? firstMessageAgent ?? prevMessage?.agent
-    
+
     log("[call_omo_agent] parentAgent resolution", {
       sessionID: toolContext.sessionID,
       messageDir,
@@ -74,7 +70,7 @@ export async function executeBackground(
       if (toolContext.abort?.aborted) {
         break
       }
-      await new Promise(resolve => setTimeout(resolve, WAIT_FOR_SESSION_INTERVAL_MS))
+      await new Promise((resolve) => setTimeout(resolve, WAIT_FOR_SESSION_INTERVAL_MS))
     }
 
     await toolContext.metadata?.({
@@ -82,7 +78,7 @@ export async function executeBackground(
       metadata: { sessionId: sessionId ?? "pending" },
     })
 
-		return `Background agent task launched successfully.
+    return `Background agent task launched successfully.
 
 Task ID: ${task.id}
 Session ID: ${sessionId ?? "pending"}

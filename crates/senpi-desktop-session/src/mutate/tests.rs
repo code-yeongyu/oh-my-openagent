@@ -202,6 +202,7 @@ fn type_and_keypress_pass_the_gate() {
         opts: None,
     });
     let pressed = Op::KeyChord(KeyChordParams {
+        force: false,
         target: "101".to_owned(),
         keys: vec!["enter".to_owned()],
         opts: None,

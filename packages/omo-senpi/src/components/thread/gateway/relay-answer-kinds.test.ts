@@ -7,6 +7,7 @@ import { gatewayDatabasePath } from "./paths"
 import { createGatewayRelay } from "./relay"
 import { ANSWER_IN_FLIGHT_MAX_MS } from "./store-relay-ops"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 let harness: GatewayHarness | undefined
 
@@ -41,11 +42,23 @@ function relayFor(handOff: HandOff) {
   let asks = 0
   const ask = async (kind?: UiRequestKind) => {
     asks += 1
-    const bound = await relay.bind({ principal: "session:A", binding: { platform: "custom", account_id: "qa", chat_id: `c-${asks}`, thread_id: "t1", session_durable_id: "B" } })
+    const bound = await relay.bind({
+      principal: "session:A",
+      binding: { platform: "custom", account_id: "qa", chat_id: `c-${asks}`, thread_id: "t1", session_durable_id: "B" },
+    })
     if (bound.kind !== "ok") throw new Error(`bind failed: ${JSON.stringify(bound)}`)
     const bindingId = bound.binding.binding_id
-    const reported = await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: bindingId, event: "question", text: "?", request_id: `ui-${asks}`, ...(kind === undefined ? {} : { request_kind: kind }) })
-    if (reported.kind !== "ok" || typeof reported.reply_token !== "string") throw new Error(`report failed: ${JSON.stringify(reported)}`)
+    const reported = await relay.report({
+      principal: "session:B",
+      session_durable_id: "B",
+      binding_id: bindingId,
+      event: "question",
+      text: "?",
+      request_id: `ui-${asks}`,
+      ...(kind === undefined ? {} : { request_kind: kind }),
+    })
+    if (reported.kind !== "ok" || typeof reported.reply_token !== "string")
+      throw new Error(`report failed: ${JSON.stringify(reported)}`)
     const token = reported.reply_token
     const answer = (text: string) => relay.answer({ binding_id: bindingId, reply_token: token, answer: text })
     const state = async () => {
@@ -75,6 +88,7 @@ function downgradeToV2(agentDir: string, before: (db: Database) => void = () => 
     db.run("ALTER TABLE session_meta DROP COLUMN endpoint_kind")
     db.run("ALTER TABLE session_meta DROP COLUMN endpoint_socket")
     db.run("ALTER TABLE deliveries DROP COLUMN actor_user_id")
+    db.run("ALTER TABLE deliveries DROP COLUMN wait_kind")
     db.run("DROP TABLE extension_schema")
     db.run("DROP TABLE extension_objects")
     db.run("DROP TABLE thread_creations")
@@ -107,13 +121,20 @@ function code(result: { readonly kind: string; readonly error?: { readonly code:
 
 function deferred<T>() {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((done) => { resolve = done })
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
   return { promise, resolve }
 }
 
-function within<T>(promise: Promise<T>, label: string, ms = 10_000): Promise<T> {
+function within<T>(promise: Promise<T>, label: string, ms = remainingTestTime()): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
-  return Promise.race([promise, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`waited ${ms} ms for ${label}`)), ms) })]).finally(() => clearTimeout(timer))
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`waited ${ms} ms for ${label}`)), ms)
+    }),
+  ]).finally(() => clearTimeout(timer))
 }
 
 describe("answer_while_another_answer_is_in_flight", () => {
@@ -157,7 +178,13 @@ describe("answer_while_another_answer_is_in_flight", () => {
     const stalled = createGatewayRelay({
       store: stalledStore,
       engine: h.engineFor(stalledStore),
-      endpoints: { wake: async () => ({ admitted: [] }), respondUi: () => { reached.resolve(); return new Promise<UiAnswerReply>(() => {}) } },
+      endpoints: {
+        wake: async () => ({ admitted: [] }),
+        respondUi: () => {
+          reached.resolve()
+          return new Promise<UiAnswerReply>(() => {})
+        },
+      },
       locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1", durable_session_id: "B" }),
       now: () => h.clock.now,
     })
@@ -173,7 +200,9 @@ describe("answer_while_another_answer_is_in_flight", () => {
     expect(sent).toEqual([{ value: "second", answers: {}, comment: "second" }])
   })
 
-  const lateOutcomes: ReadonlyArray<readonly [string, (late: { resolve: (reply: UiAnswerReply) => void; reject: (error: Error) => void }) => void]> = [
+  const lateOutcomes: ReadonlyArray<
+    readonly [string, (late: { resolve: (reply: UiAnswerReply) => void; reject: (error: Error) => void }) => void]
+  > = [
     ["refused by the session", (late) => late.resolve({ delivered: false, error: "question_already_resolved" })],
     ["failed with no reply", (late) => late.reject(new Error("rpc deadline"))],
   ]
@@ -184,12 +213,20 @@ describe("answer_while_another_answer_is_in_flight", () => {
       const q = await ask("select")
       const reached = deferred<void>()
       let late!: { resolve: (reply: UiAnswerReply) => void; reject: (error: Error) => void }
-      const pending = new Promise<UiAnswerReply>((resolve, reject) => { late = { resolve, reject } })
+      const pending = new Promise<UiAnswerReply>((resolve, reject) => {
+        late = { resolve, reject }
+      })
       const stalledStore = h.store()
       const stalled = createGatewayRelay({
         store: stalledStore,
         engine: h.engineFor(stalledStore),
-        endpoints: { wake: async () => ({ admitted: [] }), respondUi: () => { reached.resolve(); return pending } },
+        endpoints: {
+          wake: async () => ({ admitted: [] }),
+          respondUi: () => {
+            reached.resolve()
+            return pending
+          },
+        },
         locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1", durable_session_id: "B" }),
         now: () => h.clock.now,
       })
@@ -214,7 +251,10 @@ describe("answer_while_another_answer_is_in_flight", () => {
       // given
       const second = deferred<UiAnswerReply>()
       const secondReached = deferred<void>()
-      const { h, ask } = relayFor(async () => { secondReached.resolve(); return await second.promise })
+      const { h, ask } = relayFor(async () => {
+        secondReached.resolve()
+        return await second.promise
+      })
       const q = await ask("select")
       const reached = deferred<void>()
       const late = deferred<UiAnswerReply>()
@@ -222,7 +262,13 @@ describe("answer_while_another_answer_is_in_flight", () => {
       const stalled = createGatewayRelay({
         store: stalledStore,
         engine: h.engineFor(stalledStore),
-        endpoints: { wake: async () => ({ admitted: [] }), respondUi: () => { reached.resolve(); return late.promise } },
+        endpoints: {
+          wake: async () => ({ admitted: [] }),
+          respondUi: () => {
+            reached.resolve()
+            return late.promise
+          },
+        },
         locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1", durable_session_id: "B" }),
         now: () => h.clock.now,
       })
@@ -239,11 +285,14 @@ describe("answer_while_another_answer_is_in_flight", () => {
 
       // then
       expect(code(await within(takeover, "the second answer"))).toBe("already_answered")
-      expect(rowOf(h.agentDir, q.token)).toEqual({ question_state: "answered", answer_state: "delivered", answer: "from A" })
+      expect(rowOf(h.agentDir, q.token)).toEqual({
+        question_state: "answered",
+        answer_state: "delivered",
+        answer: "from A",
+      })
       expect(code(await q.answer("from C"))).toBe("already_answered")
     })
   }
-
 })
 
 describe("a_late_confirmation_is_the_fact_that_the_session_took_that_answer", () => {
@@ -251,7 +300,12 @@ describe("a_late_confirmation_is_the_fact_that_the_session_took_that_answer", ()
     // given
     let failSecond!: (error: Error) => void
     const secondReached = deferred<void>()
-    const { h, ask } = relayFor(() => { secondReached.resolve(); return new Promise<UiAnswerReply>((_, reject) => { failSecond = reject }) })
+    const { h, ask } = relayFor(() => {
+      secondReached.resolve()
+      return new Promise<UiAnswerReply>((_, reject) => {
+        failSecond = reject
+      })
+    })
     const q = await ask("select")
     const reached = deferred<void>()
     const late = deferred<UiAnswerReply>()
@@ -259,7 +313,13 @@ describe("a_late_confirmation_is_the_fact_that_the_session_took_that_answer", ()
     const stalled = createGatewayRelay({
       store: stalledStore,
       engine: h.engineFor(stalledStore),
-      endpoints: { wake: async () => ({ admitted: [] }), respondUi: () => { reached.resolve(); return late.promise } },
+      endpoints: {
+        wake: async () => ({ admitted: [] }),
+        respondUi: () => {
+          reached.resolve()
+          return late.promise
+        },
+      },
       locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1", durable_session_id: "B" }),
       now: () => h.clock.now,
     })
@@ -276,7 +336,11 @@ describe("a_late_confirmation_is_the_fact_that_the_session_took_that_answer", ()
 
     // then
     expect(code(await within(takeover, "the second answer"))).toBe("host_unavailable")
-    expect(rowOf(h.agentDir, q.token)).toEqual({ question_state: "answered", answer_state: "delivered", answer: "from A" })
+    expect(rowOf(h.agentDir, q.token)).toEqual({
+      question_state: "answered",
+      answer_state: "delivered",
+      answer: "from A",
+    })
     expect(code(await q.answer("from C"))).toBe("already_answered")
   })
 })
@@ -334,16 +398,28 @@ describe("answer_shape_follows_the_request_kind", () => {
     downgradeToV2(h.agentDir)
 
     const upgraded = relayOver()
-    expect(code(await upgraded.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "Option C" }))).toBe("ok")
+    expect(code(await upgraded.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "Option C" }))).toBe(
+      "ok",
+    )
     expect(sent).toEqual([{ value: "Option C", answers: {}, comment: "Option C" }])
     expect(await stateOf(upgraded, q.bindingId)).toEqual(["answered"])
   })
 
   test("#given a report that is not a question #when it names a request_kind #then it is invalid_arguments", async () => {
     const { relay } = relayFor(async () => ({ delivered: true }))
-    const bound = await relay.bind({ principal: "session:A", binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", session_durable_id: "B" } })
+    const bound = await relay.bind({
+      principal: "session:A",
+      binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", session_durable_id: "B" },
+    })
     if (bound.kind !== "ok") throw new Error("bind failed")
-    const reported = await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: bound.binding.binding_id, event: "milestone", text: "50%", request_kind: "confirm" })
+    const reported = await relay.report({
+      principal: "session:B",
+      session_durable_id: "B",
+      binding_id: bound.binding.binding_id,
+      event: "milestone",
+      text: "50%",
+      request_kind: "confirm",
+    })
     expect(code(reported)).toBe("invalid_arguments")
   })
 })
@@ -353,7 +429,8 @@ describe("blank_answers_only_where_the_kind_cannot_take_them", () => {
     const { ask, sent } = relayFor(async () => ({ delivered: true }))
     for (const kind of ["question", "select", "confirm"] as const) {
       const q = await ask(kind)
-      for (const text of ["", " \n\t", "\u200b", " \u200b\u200d\ufeff "]) expect(code(await q.answer(text))).toBe("invalid_arguments")
+      for (const text of ["", " \n\t", "\u200b", " \u200b\u200d\ufeff "])
+        expect(code(await q.answer(text))).toBe("invalid_arguments")
       expect(await q.state()).toEqual(["pending"])
     }
     expect(sent).toEqual([])
@@ -373,7 +450,10 @@ describe("a_question_claimed_before_v3", () => {
     const { h, ask, relayOver, sent } = relayFor(async () => ({ delivered: true }))
     const q = await ask()
     downgradeToV2(h.agentDir, (db) => {
-      db.run("UPDATE outbox SET question_state = 'answered', answer = 'lost', answered_at = ? WHERE reply_token = ?", [h.clock.now, q.token])
+      db.run("UPDATE outbox SET question_state = 'answered', answer = 'lost', answered_at = ? WHERE reply_token = ?", [
+        h.clock.now,
+        q.token,
+      ])
     })
     const upgraded = relayOver()
     const answer = () => upgraded.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "again" })
@@ -385,7 +465,6 @@ describe("a_question_claimed_before_v3", () => {
     expect(code(await answer())).toBe("already_answered")
     expect(sent).toEqual([{ value: "again", answers: {}, comment: "again" }])
   })
-
 })
 
 describe("settling_a_claim_in_the_store", () => {
@@ -394,18 +473,31 @@ describe("settling_a_claim_in_the_store", () => {
     const { h, ask } = relayFor(async () => ({ delivered: true }))
     const q = await ask("select")
     const store = h.store()
-    const claim = await store.claimAnswer({ now: h.clock.now, binding_id: q.bindingId, reply_token: q.token, answer: "first" })
+    const claim = await store.claimAnswer({
+      now: h.clock.now,
+      binding_id: q.bindingId,
+      reply_token: q.token,
+      answer: "first",
+    })
     if (claim.kind !== "ok") throw new Error(JSON.stringify(claim))
     const own = { reply_token: q.token, claimed_at: claim.claimed_at }
     expect(await store.confirmAnswer({ ...own, answer: "first" })).toBe(true)
 
     // when
     const released = await store.releaseAnswer(own)
-    const confirmedAgain = await store.confirmAnswer({ reply_token: q.token, claimed_at: claim.claimed_at + 1, answer: "second" })
+    const confirmedAgain = await store.confirmAnswer({
+      reply_token: q.token,
+      claimed_at: claim.claimed_at + 1,
+      answer: "second",
+    })
 
     // then
     expect({ released, confirmedAgain }).toEqual({ released: false, confirmedAgain: false })
-    expect(rowOf(h.agentDir, q.token)).toEqual({ question_state: "answered", answer_state: "delivered", answer: "first" })
+    expect(rowOf(h.agentDir, q.token)).toEqual({
+      question_state: "answered",
+      answer_state: "delivered",
+      answer: "first",
+    })
   })
 })
 
@@ -427,7 +519,10 @@ describe("an_answer_that_took_over_a_question_the_session_already_resolved", () 
     const { h, ask, relayOver, sent } = relayFor(session.handOff)
     const q = await ask()
     downgradeToV2(h.agentDir, (db) => {
-      db.run("UPDATE outbox SET question_state = 'answered', answer = 'old answer', answered_at = ? WHERE reply_token = ?", [h.clock.now, q.token])
+      db.run(
+        "UPDATE outbox SET question_state = 'answered', answer = 'old answer', answered_at = ? WHERE reply_token = ?",
+        [h.clock.now, q.token],
+      )
     })
     h.clock.now += ANSWER_IN_FLIGHT_MAX_MS + 1_000
     const upgraded = relayOver()
@@ -438,10 +533,17 @@ describe("an_answer_that_took_over_a_question_the_session_already_resolved", () 
     const second = await answer()
 
     // then
-    expect(first).toMatchObject({ kind: "error", error: { code: "already_answered", details: { reason: "question_already_resolved" } } })
+    expect(first).toMatchObject({
+      kind: "error",
+      error: { code: "already_answered", details: { reason: "question_already_resolved" } },
+    })
     expect(code(second)).toBe("already_answered")
     expect(sent).toHaveLength(1)
-    expect(rowOf(h.agentDir, q.token)).toEqual({ question_state: "answered", answer_state: "delivered", answer: "old answer" })
+    expect(rowOf(h.agentDir, q.token)).toEqual({
+      question_state: "answered",
+      answer_state: "delivered",
+      answer: "old answer",
+    })
   })
 
   test("#given a claimant whose frame the session took before the claimant died #when another answer takes the claim over after the bound #then it is already_answered, the row is delivered with the dead claimant's answer, and no later answer sends a frame", async () => {
@@ -454,7 +556,14 @@ describe("an_answer_that_took_over_a_question_the_session_already_resolved", () 
     const dead = createGatewayRelay({
       store: deadStore,
       engine: h.engineFor(deadStore),
-      endpoints: { wake: async () => ({ admitted: [] }), respondUi: (_endpoint, answer) => { session.resolved.add(answer.ui_request_id); reached.resolve(); return new Promise<UiAnswerReply>(() => {}) } },
+      endpoints: {
+        wake: async () => ({ admitted: [] }),
+        respondUi: (_endpoint, answer) => {
+          session.resolved.add(answer.ui_request_id)
+          reached.resolve()
+          return new Promise<UiAnswerReply>(() => {})
+        },
+      },
       locate: async () => ({ kind: "rpc_host", socket: "fake:B", routing_id: "rpc-1", durable_session_id: "B" }),
       now: () => h.clock.now,
     })
@@ -467,7 +576,11 @@ describe("an_answer_that_took_over_a_question_the_session_already_resolved", () 
 
     // then
     expect(code(takeover)).toBe("already_answered")
-    expect(rowOf(h.agentDir, q.token)).toEqual({ question_state: "answered", answer_state: "delivered", answer: "from the dead claimant" })
+    expect(rowOf(h.agentDir, q.token)).toEqual({
+      question_state: "answered",
+      answer_state: "delivered",
+      answer: "from the dead claimant",
+    })
     expect(code(await q.answer("from C"))).toBe("already_answered")
     expect(sent).toEqual([{ value: "from B" }])
   })
@@ -476,12 +589,17 @@ describe("an_answer_that_took_over_a_question_the_session_already_resolved", () 
     const { h, ask, relayOver } = relayFor(async () => ({ delivered: false, error: "question_incomplete" }))
     const q = await ask()
     downgradeToV2(h.agentDir, (db) => {
-      db.run("UPDATE outbox SET question_state = 'answered', answer = 'lost', answered_at = ? WHERE reply_token = ?", [h.clock.now, q.token])
+      db.run("UPDATE outbox SET question_state = 'answered', answer = 'lost', answered_at = ? WHERE reply_token = ?", [
+        h.clock.now,
+        q.token,
+      ])
     })
     h.clock.now += ANSWER_IN_FLIGHT_MAX_MS
     const upgraded = relayOver()
 
-    expect(code(await upgraded.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "again" }))).toBe("invalid_arguments")
+    expect(code(await upgraded.answer({ binding_id: q.bindingId, reply_token: q.token, answer: "again" }))).toBe(
+      "invalid_arguments",
+    )
     expect(rowOf(h.agentDir, q.token)).toEqual({ question_state: "pending", answer_state: null, answer: null })
   })
 
@@ -489,10 +607,25 @@ describe("an_answer_that_took_over_a_question_the_session_already_resolved", () 
     const { h, ask } = relayFor(async () => ({ delivered: true }))
     const q = await ask()
     const store = h.store()
-    const claim = await store.claimAnswer({ now: h.clock.now, binding_id: q.bindingId, reply_token: q.token, answer: "mine" })
+    const claim = await store.claimAnswer({
+      now: h.clock.now,
+      binding_id: q.bindingId,
+      reply_token: q.token,
+      answer: "mine",
+    })
     if (claim.kind !== "ok") throw new Error(JSON.stringify(claim))
 
-    expect(await store.markPriorDelivered({ reply_token: q.token, claimed_at: claim.claimed_at - 1, prior: { answer: "old", answered_at: 1 } })).toBe(false)
-    expect(rowOf(h.agentDir, q.token)).toEqual({ question_state: "answered", answer_state: "in_flight", answer: "mine" })
+    expect(
+      await store.markPriorDelivered({
+        reply_token: q.token,
+        claimed_at: claim.claimed_at - 1,
+        prior: { answer: "old", answered_at: 1 },
+      }),
+    ).toBe(false)
+    expect(rowOf(h.agentDir, q.token)).toEqual({
+      question_state: "answered",
+      answer_state: "in_flight",
+      answer: "mine",
+    })
   })
 })
