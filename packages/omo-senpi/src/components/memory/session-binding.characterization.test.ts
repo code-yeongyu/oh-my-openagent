@@ -234,13 +234,14 @@ describe("X8c memory binding at session_start (characterization)", () => {
     })
     const pi = new MemoryFakeExtensionAPI()
     const ctx = componentContext()
+    const syncCalls: SyncCall[] = []
     createMemoryComponent({
       env,
       loadConfig: (options) =>
         loadedMemoryConfig(memorySettings({ agent: options?.cwd === sessionCwd ? "session-agent" : "auto" })),
       now: () => 1237,
       resolveCwd: () => hostCwd,
-      syncRunner: recordingSyncRunner([]),
+      syncRunner: recordingSyncRunner(syncCalls),
       createRuntime: () => {
         throw new Error("bind-only characterization does not create an identity runtime")
       },
@@ -260,6 +261,9 @@ describe("X8c memory binding at session_start (characterization)", () => {
       createMemoryBinding({ identity: recorded.id, repoPath: recorded.paths.repo, boundAt: 1237 }),
     ])
     expect(notifications).toEqual([])
+    expect(syncCalls).toEqual([
+      { kind: "acquire", identity: recorded.id, repo: recorded.paths.repo, profile: "auto", projectDir: sessionCwd },
+    ])
     await pi.dispatch("session_shutdown", {}, sessionContext())
     started.splice(
       started.findIndex((entry) => entry.pi === pi),

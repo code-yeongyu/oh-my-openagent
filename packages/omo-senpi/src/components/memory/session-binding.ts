@@ -170,13 +170,16 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
       identityPaths: run.paths,
       durableRoot: run.durableRoot,
       binding,
-      projectScope: { memoryRoot, autoIdentity: sessionConfig.auto_identity },
+      projectScope: { memoryRoot, autoIdentity: bindConfig.auto_identity },
     })
     memoryModuleSupervisor.acquire()
     if (!oneShot) {
       state.syncRepo = identity.paths.repo
+      // The space key is the agent that named this identity. On a host-config fallback that is the
+      // host agent; the session folder's rejected agent would open a different space. Enablement
+      // stays the session folder's.
       void syncRunner.acquire(identity.id, identity.paths, sessionConfig.sync, {
-        profile: sessionConfig.agent,
+        profile: bindConfig.agent,
         projectDir: sessionCwd,
       })
     }
