@@ -131,7 +131,7 @@ test("OTLP spans allow only the pinned turn attributes", () => {
 const PIN_MODEL_IDS = new Set(PINNED_MODEL_ID_LIST)
 
 test("#given a client model id the collector pin does not list #when turn_completed is projected #then every model key carries a pinned value", () => {
-  const models = [...ALL_KNOWN_MODEL_IDS, "claude-fable-5-5", "custom"]
+  const models = [...ALL_KNOWN_MODEL_IDS, "claude-fable-5-2", "custom"]
   for (const model of models) {
     const projected = projectOtlpEvent("turn_completed", {
       provider: "anthropic", model_id: model, request_model_id: model, response_model_id: model,
@@ -142,18 +142,18 @@ test("#given a client model id the collector pin does not list #when turn_comple
       expect(typeof value === "string" && PIN_MODEL_IDS.has(value), `${key}=${String(value)} for ${model}`).toBe(true)
     }
   }
-  expect(projectOtlpEvent("turn_completed", { model_id: "claude-fable-5-5" })["omo.model_id"]).toBe("custom")
+  expect(projectOtlpEvent("turn_completed", { model_id: "claude-fable-5-2" })["omo.model_id"]).toBe("custom")
   expect(projectOtlpEvent("turn_completed", { model_id: "claude-opus-5-5" })["omo.model_id"]).toBe("claude-opus-5-5")
 })
 
 test("#given an unpinned model id on another event #when it is projected #then it leaves as custom", () => {
-  expect(projectOtlpEvent("session_started", { default_model: "claude-fable-5-5" })["omo.default_model"]).toBe("custom")
-  expect(projectOtlpEvent("category_config", { cat_quick: "claude-fable-5-5" })["omo.cat_quick"]).toBe("custom")
-  expect(projectOtlpEvent("kibitzer_summary", { model_top: "claude-fable-5-5" })["omo.model_top"]).toBe("custom")
+  expect(projectOtlpEvent("session_started", { default_model: "claude-fable-5-2" })["omo.default_model"]).toBe("custom")
+  expect(projectOtlpEvent("category_config", { cat_quick: "claude-fable-5-2" })["omo.cat_quick"]).toBe("custom")
+  expect(projectOtlpEvent("kibitzer_summary", { model_top: "claude-fable-5-2" })["omo.model_top"]).toBe("custom")
 })
 
 test("#given session_summary top-model ranks #when they are projected #then unpinned ids leave as custom and none stays none", () => {
-  const projected = projectOtlpEvent("session_summary", { m1_model: "claude-fable-5-5", m2_model: "claude-opus-5-5", m3_model: "none" })
+  const projected = projectOtlpEvent("session_summary", { m1_model: "claude-fable-5-2", m2_model: "claude-opus-5-5", m3_model: "none" })
   expect(projected["omo.m1_model"]).toBe("custom")
   expect(projected["omo.m2_model"]).toBe("claude-opus-5-5")
   expect(projected["omo.m3_model"]).toBe("none")

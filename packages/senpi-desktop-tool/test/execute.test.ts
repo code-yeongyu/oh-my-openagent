@@ -168,6 +168,28 @@ describe("computer tool execute", HANG_GUARD, () => {
 		});
 	}
 
+	it("returns an expired ref as a structured COMPUTER_STALE_REF failure the kernel facade can read", async () => {
+		// Given: the engine's real StaleRef reply, whose message names no code (crates/senpi-desktop-core ax/registry.rs).
+		const { handle, service } = desktopFixture({ auditLog: { enabled: false } });
+		const call = service.call.bind(service);
+		vi.spyOn(service, "call").mockImplementation((method, ...rest) =>
+			method.startsWith("ax.")
+				? Promise.reject(new DesktopEngineRpcError(method, {
+					code: -32000, message: "e5 expired; re-run ax()/find()", data: { code: "StaleRef" },
+				}))
+				: call(method, ...rest));
+
+		// When
+		const result = await toolFor(handle).execute("stale-ref", { action: "call", chain: [{ method: "ref", args: ["e5"] }] },
+			undefined, undefined, hostContext());
+
+		// Then
+		expect(result).toMatchObject({
+			isError: true,
+			details: { isError: true, value: { code: "COMPUTER_STALE_REF", message: "COMPUTER_STALE_REF: e5 expired; re-run ax()/find()" } },
+		});
+	});
+
 	it("still throws an unrelated capabilities failure", async () => {
 		const { handle, service } = desktopFixture({ auditLog: { enabled: false } });
 		const original = new Error("fixture capability transport failure");
@@ -220,6 +242,79 @@ describe("computer tool execute", HANG_GUARD, () => {
 		// Then
 		const open = log.requests.find((request) => request.method === "session.open");
 		expect(open?.params).toMatchObject({ macosCanary });
+	});
+
+	// Contract: tool result `details.report` (SDK ActionReport) for omo sessions; fails if the service stops asking for
+	// object reports, the tool drops them, or a pre-features engine's `null` stops mapping to the legacy report.
+	it.each([
+		["an engine advertising action-report", { FAKE_ENGINE_FEATURES: '["action-report"]' }, "object", {
+			disposition: { delivery: "delivered_unverified", retry: "unsafe" },
+			effect: "unverifiable",
+			focusRestoration: "not_needed",
+			auditIds: ["audit-typeText"],
+			legacy: false,
+		}],
+		["a v1 engine without features", {}, undefined, {
+			disposition: { delivery: "delivered_unverified", retry: "unsafe" },
+			effect: "unverifiable",
+			focusRestoration: "not_confirmed",
+			auditIds: [],
+			legacy: true,
+		}],
+	] as const)("returns the input action's report in details for %s", async (_engine, env, reportMode, report) => {
+		// Given
+		const { handle, log } = desktopFixture({}, env);
+		const params = {
+			action: "call" as const,
+			chain: [{ method: "window", args: [{ app: "Code" }] }, { method: "type", args: ["hi"] }],
+		};
+
+		// When
+		const result = await toolFor(handle).execute("call-report", params, undefined, undefined, hostContext());
+
+		// Then
+		const open = log.requests.find((request) => request.method === "session.open");
+		expect({
+			reportMode: (open?.params as { reportMode?: string } | undefined)?.reportMode,
+			report: result.details.report,
+			reports: result.details.reports,
+		}).toMatchObject({ reportMode, report, reports: undefined });
+	});
+
+	it("lists every input action's report in send order and leaves a read-only run without one", async () => {
+		// Given
+		const { handle } = desktopFixture({}, { FAKE_ENGINE_FEATURES: '["action-report"]' });
+		const tool = toolFor(handle);
+		const code = "const win = await desktop.window('101'); await win.type('a'); await win.press('enter');";
+
+		// When
+		const sent = await tool.execute("call-run", { action: "run", code }, undefined, undefined, hostContext());
+		const read = await tool.execute("call-read", { action: "call", chain: [{ method: "windows" }] }, undefined,
+			undefined, hostContext());
+
+		// Then
+		expect({
+			auditIds: sent.details.reports?.map((report) => report.auditIds),
+			last: sent.details.report?.auditIds,
+			read: "report" in read.details,
+		}).toEqual({ auditIds: [["audit-typeText"], ["audit-keyChord"]], last: ["audit-keyChord"], read: false });
+	});
+
+	// Contract: omo's resolved default `computer.intervention` (DESIGN 7, Q decision 1) reaches an engine that
+	// advertises `intervention-policy`; fails if the default reverts to pause or the open stops carrying it.
+	it.each([
+		["advertising intervention-policy", { FAKE_ENGINE_FEATURES: '["intervention-policy"]' }, "continue"],
+		["without the feature", {}, undefined],
+	] as const)("opens an engine %s with the resolved intervention default", async (_engine, env, intervention) => {
+		// Given
+		const { handle, log } = desktopFixture({}, env);
+
+		// When
+		await toolFor(handle).execute("call-1", { action: "capabilities" }, undefined, undefined, hostContext());
+
+		// Then
+		const open = log.requests.find((request) => request.method === "session.open");
+		expect((open?.params as { intervention?: string } | undefined)?.intervention).toBe(intervention);
 	});
 
 	it("arms the configured stop chord once across repeated calls", async () => {

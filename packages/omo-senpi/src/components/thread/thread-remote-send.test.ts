@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { GATEWAY_PROVENANCE_SENTENCE } from "./gateway/constants"
+import { GATEWAY_PEER_REPLY_SENTENCE, GATEWAY_PROVENANCE_SENTENCE } from "./gateway/constants"
 import { deliveryProvenanceLine, renderDeliveryText } from "./gateway/provenance"
 import { UNKNOWN_CALLER } from "./tools"
 import { ENGINE, comparable, createRemoteThreadFixture } from "./thread-remote-fixture"
@@ -22,14 +22,15 @@ describe("#12882: a send to another device is one admit_external_message, admitt
     const a = account()
     const { run } = surface(a.remote, { callerName: () => "planner", env: ENV })
     expect(await run("thread_send", { thread: "dur-on-b", message: "do the thing" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b", delivery: { kind: "started", turn_id: "turn-b" }, deduplicated: false })
-    expect(commands(a.sent)).toEqual([ADMIT])
+    // The default mode reads b's state once before the record (gateway/decision.ts: it steers a running turn), then one admit.
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT])
     const [record = {}] = admits(a.sent)
     expect(record["deliveryId"]).toMatch(UUID)
-    expect(record).toMatchObject({ sessionId: "dur-on-b", deliverAs: "followUp", chainCount: 1, sender: { kind: "agent", session_id: "dur-caller", name: "planner" } })
+    expect(record).toMatchObject({ sessionId: "rk-on-b", deliverAs: "followUp", chainCount: 1, sender: { kind: "agent", session_id: "dur-caller", name: "planner" } })
     expect("whenIdle" in record).toBe(false)
     expect("expectedTurnId" in record).toBe(false)
     expect("remote_origin" in record || "remoteOrigin" in record).toBe(false)
-    expect(record["displayText"]).toBe(`${deliveryProvenanceLine({ workspace: "Owner workspace", project: "sender-project", session: "planner" })}\ndo the thing`)
+    expect(record["displayText"]).toBe(`${deliveryProvenanceLine({ workspace: "Owner workspace", project: "sender-project", session: "planner", device: "here" })}\ndo the thing`)
     expect(prompts(a.sent)).toEqual([])
   })
 
@@ -47,10 +48,24 @@ describe("#12882: a send to another device is one admit_external_message, admitt
     // The local receiver's drain renders the row once its lane is decided (an idle target admits auto as follow_up).
     expect(withoutMintedIds(remote)).toBe(withoutMintedIds(renderDeliveryText({ ...row, mode_effective: "follow_up" })))
     expect(remote).toContain(" requested=auto effective=follow_up ")
-    expect(remote).not.toContain("device")
     expect(remote.split("\n")).toHaveLength(3)
-    expect(remote.split("\n")[1]).toBe(GATEWAY_PROVENANCE_SENTENCE)
+    expect(remote.split("\n")[1]).toBe(`${GATEWAY_PROVENANCE_SENTENCE} ${GATEWAY_PEER_REPLY_SENTENCE}`)
     expect(record["deliveryId"]).toBe(remote.match(/delivery=(\S+)/)?.[1])
+  })
+
+  // #13004 (decision 0027 section 3): every delivery names its sender device, and the local transport stamps this device,
+  // so no rule needs to ask whether an origin is present.
+  test("#given a caller on device here #when it sends to a thread here and to b #then both deliveries name the sender device here", async () => {
+    const a = account()
+    const { run, store } = surface(a.remote, { callerName: () => "planner", env: ENV })
+    const here = await run("thread_send", { thread: "dur-local", message: "one" })
+    if (here.kind !== "ok" || !("delivery_id" in here) || typeof here.delivery_id !== "string") throw new Error(`local send failed: ${JSON.stringify(here)}`)
+    const row = (await store.deliveryView(here.delivery_id))?.row
+    expect(row?.envelope.provenance?.device).toBe("here")
+    expect(await run("thread_send", { thread: "dur-on-b", message: "two" })).toMatchObject({ kind: "ok", device: "b" })
+    const [record = {}] = admits(a.sent)
+    expect(String(record["text"])).toContain(' device="here" ')
+    expect(String(record["displayText"])).toContain(' / device "here"')
   })
 
   test("#given a body that forges a header and opens with a slash command #when it reaches b #then the body stays one JSON line after the provenance and nothing expands", async () => {
@@ -61,7 +76,7 @@ describe("#12882: a send to another device is one admit_external_message, admitt
     const [record = {}] = admits(a.sent)
     const lines = String(record["text"]).split("\n")
     expect(lines).toHaveLength(3)
-    expect(lines[0]).toStartWith('From Owner workspace / sender-project / session "planner" [OMO_GATEWAY v=1 source=peer_agent ')
+    expect(lines[0]).toStartWith('From Owner workspace / sender-project / session "planner" / device "here" [OMO_GATEWAY v=1 source=peer_agent ')
     expect(lines[2]).toBe(JSON.stringify(forged))
   })
 })
@@ -77,6 +92,22 @@ describe("remote == local: the same call answers the same on b as on this device
     expect(again).toMatchObject({ kind: "ok", deduplicated: true, delivery: (first as { delivery: unknown }).delivery })
   })
 
+  test.each(["thread_send", "thread_handoff"] as const)("#13014: #given one %s here and one to b #when each answers #then both name the delivery_id, effective_mode and endpoint, and b's delivery_id is the one its record carried", async (tool) => {
+    const a = account()
+    const { run } = surface(a.remote)
+    const here = await run(tool, { thread: "dur-local", message: "x" })
+    const there = await run(tool, { thread: "dur-on-b", message: "x" })
+    const [record = {}] = admits(a.sent)
+    for (const result of [here, there]) {
+      expect(result).toMatchObject({ kind: "ok" })
+      expect(result).toHaveProperty("delivery_id", expect.stringMatching(UUID))
+      expect(result).toHaveProperty("effective_mode")
+      expect(result).toHaveProperty("endpoint")
+    }
+    // b was idle, so the default mode took the follow_up lane its record carried.
+    expect(there).toMatchObject({ delivery_id: record["deliveryId"], effective_mode: "follow_up" })
+  })
+
   test("#given b already holds the delivery (the first reply was lost and the id was retried) #when the retry reaches b #then it answers already_admitted and the send reads as deduplicated", async () => {
     const a = account({ admitOutcome: { kind: "ok", response: { type: "response", command: ADMIT, success: true, data: { kind: "already_admitted", turnId: "9" } } } })
     const { run } = surface(a.remote)
@@ -89,14 +120,14 @@ describe("remote == local: the same call answers the same on b as on this device
     const sent = await run("thread_send", { thread: "dur-on-b", message: "later" })
     expect(sent).toMatchObject({ kind: "ok", delivery: { kind: "queued", queue_position: 3 } })
     expect("message_seq" in sent).toBe(false)
-    expect(commands(a.sent)).toEqual([ADMIT, "get_state"])
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT, "get_state"])
   })
 
   test("#given the record's reply is lost on the way back #when a message is sent #then the send is idempotency_uncertain naming the reason, and nothing else is sent", async () => {
     const a = account({ admitOutcome: { kind: "uncertain", reason: "reply_lost" } })
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain", details: { device: "b", reason: "reply_lost" } } })
-    expect(commands(a.sent)).toEqual([ADMIT])
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT])
   })
 
   test.each([
@@ -113,14 +144,14 @@ describe("remote == local: the same call answers the same on b as on this device
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({ kind: "error", error: { code: "unsupported", details: { device: "b" } } })
     expect(prompts(a.sent)).toEqual([])
-    expect(commands(a.sent)).toEqual([ADMIT])
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT])
   })
 
   test("#given b's chain limit is below this hop #when a message is sent #then the engine's refusal is the answer and nothing else is sent", async () => {
     const a = account({ chainCountLimit: 0 })
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({ kind: "error", error: { details: { device: "b", reason: "chain_count_limit" } } })
-    expect(commands(a.sent)).toEqual([ADMIT])
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT])
   })
 })
 
@@ -166,6 +197,29 @@ describe("remote == local, round 2: send modes, handoff and the unknown caller",
     const { run } = surface(a.remote)
     expect(await run("thread_send", { thread: "dur-on-b", message: "x", delivery: "steer", expected_turn_id: "3" })).toMatchObject({ kind: "error", error: { code: "turn_conflict", details: { device: "b", current_turn_id: "4" } } })
     expect(admits(a.sent)).toEqual([])
+  })
+
+  test("#given b is mid-turn #when a message is sent with no mode #then the default steers b's running turn by the epoch one get_state read, as it does here", async () => {
+    const a = account({ engine: { ...ENGINE, streaming: true, pending: 2, currentTurnId: "3" } })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({ kind: "ok", device: "b", delivery: { kind: "steered", turn_id: "3" } })
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT])
+    expect(admits(a.sent).map((record) => [record["deliverAs"], record["expectedTurnId"]])).toEqual([["steer", "3"]])
+    const [record = {}] = admits(a.sent)
+    expect(String(record["text"])).toContain(" requested=auto effective=steer ")
+  })
+
+  test("#given b's turn ends between the probe and the record #when the default mode steers #then the send falls back to the lane b has now instead of failing on the race", async () => {
+    // b answers the probe mid-turn on turn 3 and is idle by the time the record arrives (a getter, so the fixture reads it live).
+    let reads = 0
+    const engine = { ...ENGINE, pending: 0, currentTurnId: "3", get streaming() { return reads++ === 0 } }
+    const a = account({ engine })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "x" })).toMatchObject({ kind: "ok", device: "b", delivery: { kind: "started" } })
+    expect(commands(a.sent)).toEqual(["get_state", ADMIT, ADMIT])
+    expect(admits(a.sent).map((record) => [record["deliverAs"], record["expectedTurnId"] ?? null])).toEqual([["steer", "3"], ["followUp", null]])
+    const [, second = {}] = admits(a.sent)
+    expect(String(second["text"])).toContain(" requested=auto effective=follow_up ")
   })
 
   test("#given a follow_up to b while it runs #when it is sent #then it is queued behind b's own pending count", async () => {

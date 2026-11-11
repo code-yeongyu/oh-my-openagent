@@ -9,13 +9,18 @@ import type { ThreadTranscriptEntry } from "./reader"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import type { ThreadCloseOutcome } from "./tools/ports"
 
-export const B_ROW: RemoteSessionRow = { device: "b", session_id: "dur-on-b", title: "on b", project: "/work/b", path: "/home/b/.omo/agent/sessions/dur-on-b.jsonl", state: "idle", updated_ms: 1_700_000_000_000 }
+// The listing key (what b's connector assigned) deliberately differs from the durable id (audit class C8, #13017): a test
+// that passes with either id proves nothing about which one a tool path matched.
+export const B_ROW: RemoteSessionRow = { device: "b", session_id: "rk-on-b", durable_id: "dur-on-b", title: "on b", project: "/work/b", path: "/home/b/.omo/agent/sessions/dur-on-b.jsonl", state: "idle", updated_ms: 1_700_000_000_000 }
 
 type Sent = { readonly via: "endpoint" | "session" | "read" | "watch"; readonly device: string; readonly session?: string; readonly rpc?: JsonObject }
 
-type Engine = { readonly messages: readonly ThreadTranscriptEntry[]; readonly interrupt: JsonObject; readonly streaming: boolean; readonly pending: number; readonly currentTurnId?: string; readonly turnEpoch?: string }
+type Engine = { readonly messages: readonly ThreadTranscriptEntry[]; readonly interrupt: JsonObject; readonly streaming: boolean; readonly pending: number; readonly currentTurnId?: string; readonly turnEpoch?: string; readonly pendingQuestions?: readonly JsonObject[]; readonly pendingDialogs?: readonly JsonObject[] }
 
 export const ENGINE: Engine = { messages: Array.from({ length: 30 }, (_, index) => ({ role: index % 2 === 0 ? "user" : "assistant", content: `message ${index} ${"x".repeat(60)}` })), interrupt: { interrupted: false }, streaming: false, pending: 0 }
+
+/** The levels both legs' engines run in these tests; `xhigh` is refused on both. */
+const THINKING_LEVELS: readonly string[] = ["off", "low", "high"]
 
 export const comparable = (result: ThreadToolResult): unknown => {
   const { thread_id: _id, link: _link, device: _device, ...rest } = result as Record<string, unknown>
@@ -30,7 +35,7 @@ export function createRemoteThreadFixture() {
     for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
   }
 
-  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; admitRefuse?: string; admitOutcome?: RemoteCommandOutcome; heldDraft?: number; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[]; rows?: readonly RemoteSessionRow[]; registryDown?: "refused" | "throws"; chainCountLimit?: number; relayKeys?: ReadonlyMap<string, string> } = {}) {
+  function account(options: { plan?: string; online?: boolean; refuse?: string; aliases?: Map<string, AliasHolder>; noRegistry?: boolean; engine?: Engine; promptResponse?: JsonObject; promptOutcome?: RemoteCommandOutcome; admitRefuse?: string; admitOutcome?: RemoteCommandOutcome; heldDraft?: number; openData?: JsonObject; failSessionsList?: boolean; failAliasesOf?: boolean; failClaim?: boolean; otherHolders?: number; unwritten?: boolean; unloadReason?: string; terminal?: boolean; rowState?: string; live?: readonly string[]; records?: readonly JsonObject[]; rows?: readonly RemoteSessionRow[]; registryDown?: "refused" | "throws"; chainCountLimit?: number; relayKeys?: ReadonlyMap<string, string> } = {}) {
     const engine = options.engine ?? ENGINE
     const sent: Sent[] = []
     // b's engine ledger of admitted delivery ids (senpi external-admission: a repeated id is already_admitted), and how many
@@ -45,19 +50,24 @@ export function createRemoteThreadFixture() {
     // The sessions b's engine holds. Its close rules are senpi's (2026.11.5-1): close_session from a connection that never
     // attached is refused unknown_session (senpi#1782); an attached close releases only that hold, so the session ends
     // only with no other holder; unload_session with force drains every hold, and refuses a session with no file yet.
-    const live = new Set(options.live ?? [B_ROW.session_id])
+    // b's engine knows its sessions by the listing key; rows a test builds with the durable id as key (titled(), the remote verbs' typed id) are live too.
+    const live = new Set(options.live ?? [B_ROW.session_id, ...(B_ROW.durable_id === undefined ? [] : [B_ROW.durable_id])])
     const answer = (rpc: JsonObject, attachedTo?: string): RemoteCommandOutcome => {
       // The engine's real reply envelope, as the device service hands it back (device-service-core's CommandResult.response):
       // every field the tools read lives under `data`.
       const ok = (data: JsonObject): RemoteCommandOutcome => ({ kind: "ok", response: { type: "response", id: null, command: rpc["type"] ?? null, success: true, data } })
       if (options.refuse !== undefined) return { kind: "refused", reason: options.refuse }
       if (attachedTo !== undefined && !live.has(attachedTo)) return { kind: "refused", reason: "unknown_session" }
+      // A terminal's engine takes no session lifecycle record (live-surface.ts `unsupported:` on this device): it answers the
+      // failed envelope the device service reports as this refusal.
+      if (options.terminal === true && (rpc["type"] === "close_session" || rpc["type"] === "unload_session")) return { kind: "refused", reason: "unsupported" }
       if (rpc["type"] === "close_session") {
         if (attachedTo === undefined) return { kind: "refused", reason: "unknown_session" }
         if ((options.otherHolders ?? 0) === 0) live.delete(attachedTo)
         return ok({})
       }
       if (rpc["type"] === "unload_session" && attachedTo !== undefined) {
+        if (options.unloadReason !== undefined) return ok({ outcome: "refused", reason: options.unloadReason, detail: `refused: ${options.unloadReason}` })
         if (options.unwritten === true) return ok({ outcome: "refused", reason: "unsupported", detail: "the session has no file to reopen it by" })
         if ((options.otherHolders ?? 0) > 0 && rpc["force"] !== true) return ok({ outcome: "refused", reason: "attached", detail: "1 other client(s) attached" })
         live.delete(attachedTo)
@@ -68,7 +78,7 @@ export function createRemoteThreadFixture() {
         live.add(opened)
         return ok(options.openData ?? { sessionId: "rpc-9", state: { durableSessionId: opened } })
       }
-      if (rpc["type"] === "get_state") return ok({ isStreaming: engine.streaming, pendingMessageCount: engine.pending, ...(engine.currentTurnId === undefined ? {} : { currentTurnId: engine.currentTurnId }) })
+      if (rpc["type"] === "get_state") return ok({ isStreaming: engine.streaming, pendingMessageCount: engine.pending, ...(engine.currentTurnId === undefined ? {} : { currentTurnId: engine.currentTurnId }), ...(engine.pendingQuestions === undefined ? {} : { pendingQuestions: [...engine.pendingQuestions] }), ...(engine.pendingDialogs === undefined ? {} : { pendingDialogs: [...engine.pendingDialogs] }) })
       if (rpc["type"] === "get_messages") return ok({ messages: [...engine.messages] })
       if (rpc["type"] === "interrupt") return ok(engine.interrupt)
       // b's user set `threads.chainCountLimit` (senpi S32): its engine answers `{success: false, errorCode: "chain_count_limit"}`,
@@ -94,6 +104,9 @@ export function createRemoteThreadFixture() {
       }
       if (rpc["type"] === "get_available_models") return ok({ models: [{ provider: "anthropic", id: "claude-opus", name: "Opus" }, { provider: "openai", id: "gpt-6" }] })
       if (rpc["type"] === "set_model") return ok({ provider: rpc["provider"] ?? null, id: rpc["modelId"] ?? null })
+      if (rpc["type"] === "get_available_thinking_levels") return ok({ levels: [...THINKING_LEVELS] })
+      // The engine refuses a level the active model cannot run with its text as the error (device-service.ts: errorCode, else error).
+      if (rpc["type"] === "set_thinking_level") return THINKING_LEVELS.includes(String(rpc["level"])) ? ok({}) : { kind: "refused", reason: `Thinking level ${String(rpc["level"])} is not supported by the active model.` }
       return ok({})
     }
     const devices: RemoteDevice[] = [{ device: "here", label: "this mac", online: true }, { device: "b", label: "studio", online: options.online ?? true }]
@@ -165,7 +178,7 @@ export function createRemoteThreadFixture() {
     return { remote, sent, hops, aliases, live, registryCalls }
   }
 
-  function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?: () => string | undefined; callerChainHop?: () => number; callerName?: () => string | undefined; env?: Readonly<Record<string, string | undefined>>; sessions?: ThreadHostSession[]; engine?: Engine; caller?: string; diskSessions?: readonly string[]; closeOutcome?: ThreadCloseOutcome } = {}) {
+  function surface(remote: RemoteThreadSurface | undefined, extra: { callerCause?: () => string | undefined; callerChainHop?: () => number; callerName?: () => string | undefined; callerReplyTargets?: () => readonly string[]; callerReplySenders?: () => readonly { readonly session_id: string; readonly name?: string }[]; env?: Readonly<Record<string, string | undefined>>; sessions?: ThreadHostSession[]; engine?: Engine; caller?: string; diskSessions?: readonly string[]; closeOutcome?: ThreadCloseOutcome } = {}) {
     const engine = extra.engine ?? ENGINE
     const local: ThreadHostSession = { sessionId: "route-local", durableSessionId: "dur-local", cwd: process.cwd(), name: "local peer", status: "open" }
     const sessions = extra.sessions ?? [local]
@@ -186,8 +199,8 @@ export function createRemoteThreadFixture() {
       setSessionName: async () => {},
       setModel: async (_s, provider, id) => ({ provider, id }),
       getAvailableModels: async () => [],
-      setThinkingLevel: async () => {},
-      getAvailableThinkingLevels: async () => [],
+      setThinkingLevel: async (_s, level) => { if (!THINKING_LEVELS.includes(level)) throw new Error(`thinking_level_unsupported:Thinking level ${level} is not supported by the active model.`) },
+      getAvailableThinkingLevels: async () => [...THINKING_LEVELS],
       closeSession: async (sessionId, durableId) => { closed.push([sessionId, durableId]); return extra.closeOutcome ?? "closed" },
     }
     const agentDir = mkdtempSync(join(tmpdir(), "thread-remote-"))
@@ -197,13 +210,19 @@ export function createRemoteThreadFixture() {
     // Session files with no live owner: the address book lists them from disk, and no host holds them.
     const disk = (extra.diskSessions ?? []).map((id) => ({ durable_id: id, name: null, cwd: process.cwd(), created_at: "2026-11-01T00:00:00Z", updated_at: null, session_path: join(agentDir, `${id}.jsonl`), source_host: null }))
     const caller = extra.caller ?? "dur-caller"
-    const tools = createThreadTools({ host, store, stateDirectory: join(agentDir, "state"), diskSessions: () => disk, callerSessionId: () => caller, callerWorkspaceRoot: () => process.cwd(), remote, ...(extra.callerCause === undefined ? {} : { callerCause: extra.callerCause }), ...(extra.callerChainHop === undefined ? {} : { callerChainHop: extra.callerChainHop }), ...(extra.callerName === undefined ? {} : { callerName: extra.callerName }), ...(extra.env === undefined ? {} : { env: extra.env }) })
+    const tools = createThreadTools({ host, store, stateDirectory: join(agentDir, "state"), diskSessions: () => disk, callerSessionId: () => caller, callerWorkspaceRoot: () => process.cwd(), remote, ...(extra.callerReplyTargets === undefined ? {} : { callerReplyTargets: extra.callerReplyTargets }), ...(extra.callerReplySenders === undefined ? {} : { callerReplySenders: extra.callerReplySenders }), ...(extra.callerCause === undefined ? {} : { callerCause: extra.callerCause }), ...(extra.callerChainHop === undefined ? {} : { callerChainHop: extra.callerChainHop }), ...(extra.callerName === undefined ? {} : { callerName: extra.callerName }), ...(extra.env === undefined ? {} : { env: extra.env }) })
     const run = async (name: ThreadToolName, args: unknown): Promise<ThreadToolResult> => {
       const tool = tools.find((candidate) => candidate.name === name)
       if (tool === undefined) throw new Error(`${name} is not registered`)
       return (await tool.execute(`call-${Math.random()}`, args, undefined, undefined, { sessionManager: { getSessionId: () => caller } } as never)).details.result as ThreadToolResult
     }
-    return { run, openSession, store, closed, agentDir }
+    // What thread_send asks the engine's permission system for, before it runs (tools/reply-permission.ts).
+    const permission = (args: Record<string, unknown>): unknown => {
+      const parse = tools.find((candidate) => candidate.name === "thread_send")?.permissionParser
+      if (parse === undefined) throw new Error("thread_send declares no permission parser")
+      return parse(args, process.cwd())
+    }
+    return { run, permission, openSession, store, closed, agentDir }
   }
 
   return { account, surface, cleanup }

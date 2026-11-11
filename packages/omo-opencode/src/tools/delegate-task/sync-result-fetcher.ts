@@ -103,7 +103,7 @@ export async function fetchSyncResult(
   // failed task as a successful completion. So the error/empty guard runs first;
   // only once the latest message is known-clean do we prefer the envelope.
   if (options?.strictAbortRecovery) {
-    if (lastMessage.info && "error" in lastMessage.info) {
+    if (lastMessage.info?.error !== undefined && lastMessage.info.error !== null) {
       return {
         ok: false,
         error: `Latest assistant message is an error; refusing abort recovery.\n\nSession ID: ${sessionID}`,
