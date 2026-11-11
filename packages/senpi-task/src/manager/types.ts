@@ -323,4 +323,4 @@ export type TaskManagerOptions = {
   readonly traceparentFor?: (parentSessionId: string) => string | undefined
 }
 
-export type { TaskManager } from "./manager-contract"
+export type { TaskLeaseHolderView, TaskManager } from "./manager-contract"

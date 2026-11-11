@@ -9,6 +9,21 @@ import type { TaskConcurrency } from "./concurrency"
 import type { HeldAdmissionResult } from "./held-admissions"
 import type { ContinueResult, ForgetOptions, ListScope, ListedTask, ManagerStartSpec, StartResult } from "./types"
 
+/** A limiter lease joined with its task, so a lease nobody is running behind stands out (#11677). */
+export type TaskLeaseHolderView = {
+  readonly task_id: string
+  readonly run_epoch: number
+  readonly model: string
+  readonly phase: "held" | "parked"
+  /** Absent when the record is gone. */
+  readonly status?: TaskRecord["status"]
+  readonly residency_state?: TaskRecord["residency_state"]
+  /** The record's current run epoch; a lease for any other epoch belongs to a run that already ended. */
+  readonly record_run_epoch?: number
+  /** This process still owns a live child handle for the task. */
+  readonly live: boolean
+}
+
 export type TaskManager = {
   readonly workpools?: WorkpoolEngine
   // Optional for structural adapters; the concrete manager exposes its live lease allocator.
@@ -40,6 +55,8 @@ export type TaskManager = {
   tryBeginSend?(taskId: string): boolean
   endSend?(taskId: string): void
   list(scope: ListScope): readonly ListedTask[]
+  // Optional diagnostic for structural fakes; the concrete manager lists every limiter lease's holder.
+  leaseHolders?(): readonly TaskLeaseHolderView[]
   waitFor(taskId: string, options?: { readonly signal?: AbortSignal }): Promise<TaskRecord>
   // Live read of the manager-owned run-stats accumulator. Snapshot and live TUI surfaces need
   // in-flight turns/tool-calls/tok-s; the record only carries run_stats once terminal.

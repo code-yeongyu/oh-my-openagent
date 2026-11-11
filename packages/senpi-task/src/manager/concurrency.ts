@@ -8,6 +8,14 @@ type Lease = QueuedTaskAdmission
 
 export type ParkedLease = Lease
 
+/** One lease the limiter counts against its capacity: held by a running run, or parked by a paused one. */
+export type TaskLeaseHolder = {
+  readonly taskId: string
+  readonly runEpoch: number
+  readonly model: string
+  readonly phase: "held" | "parked"
+}
+
 // Synchronous lease allocator. Model/provider precedence is intentionally unchanged; global
 // capacity is independent, so even an unbounded lane consumes one global permit.
 export class TaskConcurrency {
@@ -184,6 +192,14 @@ export class TaskConcurrency {
 
   getCount(model: string): number {
     return this.#counts.get(this.getKey(model)) ?? 0
+  }
+
+  // Diagnostic read (#11677): which task run holds each lease, so a limiter that stays full names its holders.
+  leaseHolders(): readonly TaskLeaseHolder[] {
+    const held = [...this.#leases.values()].map((lease) => ({ taskId: lease.taskId, runEpoch: lease.runEpoch, model: lease.model, phase: "held" as const }))
+    const parked = [...this.#parked.values()].flatMap((lane) => [...lane.values()].map(({ lease }) =>
+      ({ taskId: lease.taskId, runEpoch: lease.runEpoch, model: lease.model, phase: "parked" as const })))
+    return [...held, ...parked]
   }
 
   getRetainedKeyCounts(): { readonly lanes: number; readonly queues: number; readonly leases: number } {
