@@ -6,6 +6,7 @@
 
 use super::code::{ComputerCode, EngineCode};
 use super::reason::{LayerFailure, Reason};
+pub(super) use super::row::NextCall;
 use super::row::{DispositionRule, ErrorRow, FailureKey, NothingSent, Recovery, Source};
 use crate::report::Disposition;
 
@@ -27,6 +28,10 @@ const PREFIX: DispositionRule = DispositionRule::BySent {
 const INNER: DispositionRule = DispositionRule::OfInnerCode;
 const RUN: DispositionRule = DispositionRule::LastReport;
 
+/// Where the design says nothing follows: its code table's `nextCall` column reads `-`.
+const NOTHING_FOLLOWS: &str =
+    "design/d-sdk-skill.md '## Errors and retry hints', nextCall column: -";
+
 const ASK: Option<Recovery> = Some(Recovery::AskUser);
 const INSPECT: Option<Recovery> = Some(Recovery::InspectStateThenRetry);
 const REFRESH: Option<Recovery> = Some(Recovery::RefreshSnapshotThenRetry);
@@ -38,7 +43,7 @@ const fn make(
     rule: DispositionRule,
     nothing_sent: NothingSent,
     recovery: Option<Recovery>,
-    next_call: Option<&'static str>,
+    next_call: NextCall,
 ) -> ErrorRow {
     ErrorRow {
         key: FailureKey { source, reason },
@@ -51,9 +56,9 @@ const fn make(
     }
 }
 
-/// `e!(EngineCode, Reason|_ => ComputerCode, rule, Yes|No|Depends, recovery, nextCall|_)`.
+/// `e!(EngineCode, Reason|_ => ComputerCode, rule, Yes|No|Depends, recovery, "call" | none | nothing "cite")`: the last slot is mandatory; `none` is the design's `-`.
 macro_rules! e {
-    ($code:ident, $($reason:ident)? $(_)? => $computer:ident, $rule:expr, $sent:ident, $recovery:expr, $($next:literal)? $(_)?) => {
+    ($code:ident, $($reason:ident)? $(_)? => $computer:ident, $rule:expr, $sent:ident, $recovery:expr, $($next:tt)+) => {
         make(
             Source::Engine(EngineCode::$code),
             e!(@reason $($reason)?),
@@ -61,18 +66,21 @@ macro_rules! e {
             $rule,
             NothingSent::$sent,
             $recovery,
-            e!(@next $($next)?),
+            e!(@next $($next)+),
         )
     };
     (@reason) => { None };
     (@reason $reason:ident) => { Some(Reason::$reason) };
-    (@next) => { None };
-    (@next $next:literal) => { Some($next) };
+    // The next-call slot is mandatory: exactly one of "call", `none` (the design's `-`) or
+    // `nothing "cite"`. There is no empty arm, so a row without the slot does not build.
+    (@next $next:literal) => { NextCall::Call($next) };
+    (@next none) => { NextCall::Nothing { cite: NOTHING_FOLLOWS } };
+    (@next nothing $cite:literal) => { NextCall::Nothing { cite: $cite } };
 }
 
-/// `l!(LayerFailure, Reason|_ => ComputerCode, rule, Yes|No|Depends, recovery, nextCall|_)`.
+/// `l!(LayerFailure, Reason|_ => ComputerCode, rule, Yes|No|Depends, recovery, "call" | none | nothing "cite")`: the last slot is mandatory; `none` is the design's `-`.
 macro_rules! l {
-    ($layer:ident, $($reason:ident)? $(_)? => $computer:ident, $rule:expr, $sent:ident, $recovery:expr, $($next:literal)? $(_)?) => {
+    ($layer:ident, $($reason:ident)? $(_)? => $computer:ident, $rule:expr, $sent:ident, $recovery:expr, $($next:tt)+) => {
         make(
             Source::Layer(LayerFailure::$layer),
             e!(@reason $($reason)?),
@@ -80,7 +88,7 @@ macro_rules! l {
             $rule,
             NothingSent::$sent,
             $recovery,
-            e!(@next $($next)?),
+            e!(@next $($next)+),
         )
     };
 }
