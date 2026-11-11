@@ -273,7 +273,21 @@ export function createKibitzerComposition(options: KibitzerCompositionOptions): 
           onToolResult: (payload, eventCtx) => capture("tool_result", payload, eventCtx),
           onSettled,
         },
-        delivery,
+        // The hook does not await delivery (#13074); whenIdle still waits for it.
+        delivery: {
+          ...delivery,
+          onToolResult: (sessionId, context, eventCtx) => {
+            const pending = delivery.onToolResult(sessionId, context, eventCtx)
+            const settled: Promise<void> = pending
+              .then(
+                () => {},
+                () => {},
+              )
+              .finally(() => inFlight.delete(settled))
+            inFlight.add(settled)
+            return pending
+          },
+        },
         resolveContext: options.resolveContext,
         resolveSessionId: sessionIdFrom,
         ...(logger === undefined ? {} : { logger }),
