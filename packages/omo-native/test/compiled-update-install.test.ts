@@ -56,6 +56,18 @@ describe("verified standalone binary installation", () => {
     })
   }
 
+  test("#given a crashed reclaim guard #then recovery completes in the same update invocation", async () => {
+    const f = await fixture()
+    const lockPath = `${f.destination}.update-lock`
+    const record = staleRecord(2_147_483_647)
+    const guardPath = `${lockPath}.reclaim-${createHash("sha256").update(record).digest("hex").slice(0, 16)}`
+    await writeFile(lockPath, record)
+    await writeFile(guardPath, staleRecord(2_147_483_647))
+    await installReleaseBinary(f.options)
+    expect(await readFile(f.destination, "utf8")).toBe("new executable")
+    expect(await readdir(f.root)).toEqual(["omo"])
+  })
+
   test("#given two simultaneous stale-lock reclaimers #then exactly one updater enters and the other cannot delete its lock", async () => {
     const f = await fixture()
     await writeFile(`${f.destination}.update-lock`, staleRecord(2_147_483_647))

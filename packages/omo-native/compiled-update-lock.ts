@@ -15,6 +15,13 @@ function expired(record: ObservedLockRecord): boolean {
 /** The shared record includes PID, acquisition time, incarnation and OS process-start identity. */
 export async function acquireBinaryUpdateLock(lockPath: string) {
   const record = await buildLockRecord("omo-binary-update")
+  const guard = async <T>(expected: string, action: () => Promise<T>) => {
+    const attempt = () => withRecordGuard(lockPath, expected, BINARY_UPDATE_TIMEOUT_MS, {}, action)
+    const result = await attempt()
+    // The shared primitive removes a crashed guard before yielding "busy". Finish that
+    // recovery in this invocation; an active guard is still refused, not waited out.
+    return result === "busy" ? await attempt() : result
+  }
   const publish = async () => {
     let file
     try {
@@ -42,7 +49,7 @@ export async function acquireBinaryUpdateLock(lockPath: string) {
     if (observed === null || !await stale(observed)) return
     // Reapers and releasers of one record share this guard. Re-read inside it: a fresh
     // successor must never be removed on the strength of an earlier stale observation.
-    const acquired = await withRecordGuard(lockPath, observed.content, BINARY_UPDATE_TIMEOUT_MS, {}, async () => {
+    const acquired = await guard(observed.content, async () => {
       const current = await readLockRecord(lockPath)
       if (current === null || current.content !== observed.content || !await stale(current)) return false
       await rm(lockPath)
@@ -52,7 +59,7 @@ export async function acquireBinaryUpdateLock(lockPath: string) {
   }
   return {
     async run(install: () => Promise<void>): Promise<boolean> {
-      const ran = await withRecordGuard(lockPath, record, BINARY_UPDATE_TIMEOUT_MS, {}, async () => {
+      const ran = await guard(record, async () => {
         const current = await readLockRecord(lockPath)
         if (current === null || current.content !== record || expired(current)) return false
         // Fence the swap, installed probe and rollback against reclamation. Downloads remain
@@ -64,7 +71,7 @@ export async function acquireBinaryUpdateLock(lockPath: string) {
     },
     async release(): Promise<void> {
       try {
-        await withRecordGuard(lockPath, record, BINARY_UPDATE_TIMEOUT_MS, {}, async () => {
+        await guard(record, async () => {
           if ((await readLockRecord(lockPath))?.content === record) await rm(lockPath)
         })
       } finally {
