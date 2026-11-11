@@ -69,6 +69,12 @@ engine. Running the helper directly with mode `none` gives the negative control:
 the launcher is still alive after the 2 s window and the helper kills it. The live row with the
 real launcher (`B-05d`) waits for row 62.
 
+Errors are never verdicts. A row whose measurement throws (for example a failed `git grep`)
+reads `UNMEASURED` with the error text. A root leg whose helper prints no parseable report
+reads `UNMEASURED` with the helper's stderr. A source-check file that is missing, unreadable,
+empty, not JSON or without `bunshinSrc`/`rows` ends the run with one exit-2 line that names
+the file and the reason.
+
 Verdicts: `closed`, `open-with-row`, `needs-installer` and `UNMEASURED` are the ledger
 grammar. A probe that finds a different state prints `CHANGED` (a source check no longer holds,
 or a precondition that used to be missing is now present) or `CONTRADICTS` (a control or a

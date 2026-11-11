@@ -115,6 +115,32 @@ type RootLeg = {
 // The helper exits 3 when python3 is missing; that is a precondition, never a measurement.
 const ROOT_HELPER_NO_PYTHON = 3
 
+const parseRootLeg = (stdout: string): RootLeg | undefined => {
+  const last = stdout.trim().split("\n").at(-1) ?? ""
+  if (!last) return undefined
+  let raw: unknown
+  try {
+    raw = JSON.parse(last)
+  } catch {
+    return undefined
+  }
+  if (typeof raw !== "object" || raw === null) return undefined
+  const o: Record<string, unknown> = { ...raw }
+  const nums = ["pdeathsigAfterDrop", "launcherGoneMs", "engineGoneMs"]
+  const strs = ["mode", "hostWatch", "launcherEnded"]
+  if (!nums.every((k) => typeof o[k] === "number") || !strs.every((k) => typeof o[k] === "string")) return undefined
+  if (!Array.isArray(o.residualPids)) return undefined
+  return {
+    mode: String(o.mode),
+    pdeathsigAfterDrop: Number(o.pdeathsigAfterDrop),
+    hostWatch: String(o.hostWatch),
+    launcherEnded: String(o.launcherEnded),
+    launcherGoneMs: Number(o.launcherGoneMs),
+    engineGoneMs: Number(o.engineGoneMs),
+    residualPids: o.residualPids.map(Number),
+  }
+}
+
 // One stand-in leg as root. "pidfd" proves the pidfd watch alone (the launcher must end by its own
 // exit 137); "pdeathsig" proves the re-armed parent-death signal alone (the launcher must end by SIGKILL).
 const rootLeg = async (ctx: Ctx, mode: "pidfd" | "pdeathsig"): Promise<Measured> => {
@@ -125,7 +151,13 @@ const rootLeg = async (ctx: Ctx, mode: "pidfd" | "pdeathsig"): Promise<Measured>
   const r = await run(["sudo", "-n", "/bin/sh", HELPER, uid, gid, mode])
   if (r.code === ROOT_HELPER_NO_PYTHON) fail("SP-B precondition missing: python3 not found for the root leg")
   if (r.code !== 0) return { verdict: "CONTRADICTS", measured: `helper exited ${r.code}: ${r.stderr.trim()}` }
-  const d: RootLeg = JSON.parse(r.stdout.trim().split("\n").at(-1) ?? "{}")
+  const d = parseRootLeg(r.stdout)
+  // No parseable report is no measurement: say so with the helper's stderr, never a verdict built on a default.
+  if (!d)
+    return {
+      verdict: "UNMEASURED",
+      measured: `root leg gave no parseable report (stdout ${JSON.stringify(r.stdout.trim().slice(0, 80))}); stderr: ${r.stderr.trim() || "<empty>"}`,
+    }
   const wantEnd = mode === "pidfd" ? "exit 137" : "signal 9"
   const ok =
     d.pdeathsigAfterDrop === 0 &&
@@ -445,6 +477,29 @@ const writeLedger = async (file: string, results: Array<Row & Measured>, single:
   await writeFile(file, `${[LEDGER_HEADER.join("\t"), ...body].join("\n")}\n`)
 }
 
+// Every way the local check file can be unusable is one precondition line naming the file and the reason.
+const loadSpec = async (specPath: string): Promise<SourceSpec> => {
+  const why = (reason: string): never =>
+    fail(`SP-B precondition missing: local bunshin source-check file ${reason} (${specPath})`)
+  let text = ""
+  try {
+    text = await readFile(specPath, "utf8")
+  } catch (e) {
+    const code = e instanceof Error && "code" in e ? String(e.code) : "unknown"
+    why(code === "ENOENT" ? "not found" : `unreadable (${code})`)
+  }
+  if (!text.trim()) why("is empty")
+  let raw: unknown
+  try {
+    raw = JSON.parse(text)
+  } catch {
+    why("is not valid JSON")
+  }
+  if (typeof raw !== "object" || raw === null || !("bunshinSrc" in raw) || !("rows" in raw))
+    why("lacks bunshinSrc or rows")
+  return raw as SourceSpec
+}
+
 // The root leg is opt-in: it needs Linux, passwordless sudo and python3 under sudo, each a precondition.
 const checkRootPreconditions = async () => {
   if (process.platform !== "linux") fail("SP-B precondition missing: --allow-sudo needs Linux")
@@ -476,9 +531,7 @@ const main = async () => {
     )
   const runRoot = process.env.CU_RUN ?? path.join(os.homedir(), "omo-runs", "cu-v3")
   const specPath = process.env.SPB_SOURCE_CHECKS ?? path.join(runRoot, "evidence", "task-11.bunshin-source-checks.json")
-  const specText = await readFile(specPath, "utf8").catch(() => undefined)
-  if (!specText) fail(`SP-B precondition missing: local bunshin source-check file not found (${specPath})`)
-  const spec = JSON.parse(specText ?? "{}") as SourceSpec
+  const spec = await loadSpec(specPath)
   if ((await run(["git", "-C", spec.bunshinSrc, "rev-parse", "HEAD"])).code !== 0)
     fail("SP-B precondition missing: the bunshin checkout named by the source-check file is not a git checkout")
 
@@ -493,7 +546,7 @@ const main = async () => {
     for (const row of selected) {
       const m = await row
         .measure(ctx)
-        .catch((e: Error) => ({ verdict: "CHANGED" as Verdict, measured: `error: ${e.message}` }))
+        .catch((e: Error) => ({ verdict: "UNMEASURED" as Verdict, measured: `measurement error: ${e.message}` }))
       results.push({ ...row, ...m })
     }
   } finally {
