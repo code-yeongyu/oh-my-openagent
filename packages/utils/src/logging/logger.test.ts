@@ -50,4 +50,37 @@ describe("#given a bound utils logger", () => {
 
     expect(logger.getLogFilePath()).toBe(defaultLogFilePath)
   })
+
+  test("#when the logger module is first imported while a fake clock holds globalThis.setTimeout #then its flush still runs on the real clock", async () => {
+    // given: a stub clock that records scheduled callbacks and never fires them
+    const realSetTimeout = globalThis.setTimeout
+    const realClearTimeout = globalThis.clearTimeout
+    const stubbed: Array<() => void> = []
+    globalThis.setTimeout = ((callback: () => void) => {
+      stubbed.push(callback)
+      return 0 as unknown as ReturnType<typeof setTimeout>
+    }) as unknown as typeof setTimeout
+    globalThis.clearTimeout = (() => {}) as unknown as typeof clearTimeout
+    try {
+      // when: a fresh logger module is imported under the stub clock, then logs one line
+      const fresh = (await import(`./logger.ts?logger-fake-clock-${Date.now()}`)) as typeof import("./logger")
+      const logger = fresh.createLogger({ logFileName: "unused.log", resolveLogFilePath: () => logFilePath })
+      logger.log("LOGGER-FAKE-CLOCK", { qa: true })
+      // then: the flush was scheduled on the real clock, not on the stub
+      expect(stubbed.length).toBe(0)
+    } finally {
+      globalThis.setTimeout = realSetTimeout
+      globalThis.clearTimeout = realClearTimeout
+    }
+    // then: the real 500 ms flush interval writes the line without any fake-clock advance.
+    // Poll for the write with a bounded deadline instead of a fixed sleep: a fixed 900 ms
+    // wait leaves the 500 ms flush only a 400 ms margin, so a loaded runner could flake
+    // the test and every run pays ~0.9 s.
+    const deadline = Date.now() + 5_000
+    while (Date.now() < deadline) {
+      if (fs.existsSync(logFilePath) && fs.readFileSync(logFilePath, "utf8").includes("LOGGER-FAKE-CLOCK")) break
+      await Bun.sleep(25)
+    }
+    expect(fs.readFileSync(logFilePath, "utf8")).toContain("LOGGER-FAKE-CLOCK")
+  })
 })
