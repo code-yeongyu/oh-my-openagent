@@ -1,9 +1,15 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process"
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
+
+// The tracked mode of the generated installer. It is never executed directly
+// (every caller runs `node scripts/install.mjs`), so it stays 0644; bun build
+// marks a shebang entry's output executable, which flipped this file to 0755
+// on a container regen (#12394).
+const INSTALLER_MODE = 0o644
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const pluginRoot = dirname(scriptDir)
@@ -45,6 +51,10 @@ export async function buildInstallCli(options = {}) {
   )
   if (result.error !== undefined) throw result.error
   if (result.status !== 0) process.exit(result.status ?? 1)
+  // bun build marks a shebang entry's output executable; the tracked installer
+  // is never executed directly, so pin its mode instead of letting the
+  // generator's umask or a pre-existing mode ride into the repo (#12394).
+  await chmod(output, INSTALLER_MODE)
   return { output }
 }
 
@@ -64,6 +74,13 @@ export async function checkInstallCliCurrent(options = {}) {
     ])
     if (current === undefined) return { current: false, reason: `missing installer: ${committed}` }
     if (current !== fresh) return { current: false, reason: `stale installer: ${committed} differs from a fresh build of src/install/cli-local.ts` }
+    // A mode-only drift is invisible to the content comparison above, yet it
+    // is exactly how #12394 shipped: fail the gate so a regen cannot flip
+    // the tracked mode silently. Windows has no POSIX mode bits to compare.
+    if (process.platform !== "win32") {
+      const mode = (await stat(committed)).mode & 0o777
+      if (mode !== INSTALLER_MODE) return { current: false, reason: `installer mode is 0o${mode.toString(8)}, expected 0o${INSTALLER_MODE.toString(8)}: ${committed}` }
+    }
     return { current: true }
   } finally {
     await rm(tempRoot, { recursive: true, force: true })
