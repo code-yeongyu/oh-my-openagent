@@ -125,8 +125,8 @@ function deliveryOf(message: EngineMessage):
   if (message.role !== "custom" || message.customType !== SESSION_CONTROL_DELIVERY_TYPE) return undefined
   const details = (message.details ?? undefined) as DeliveryDetails | undefined
   const id = details?.delivery_id
-  // A delivery message without a string id is malformed: it starts work like any delivery (nobody approved) and
-  // never passes as a turn the engine started, which would keep the earlier group's allowance (#13056).
+  // A delivery message without a string id is malformed: after an answer it starts a new group with nobody approved,
+  // and it never passes as a turn the engine started, which would keep the earlier group's allowance (#13056).
   if (typeof id !== "string") return "malformed"
   const count = details?.chain_count
   return {
@@ -165,13 +165,17 @@ function noteInput(run: RunContext, message: EngineMessage): void {
   if (message.role !== "user" && message.role !== "custom") return
   const delivery = deliveryOf(message)
   if (delivery === "malformed") {
-    run.cause = undefined
-    run.consumed = []
-    run.replyTo = []
-    run.replySenders = []
-    run.chainHop = 0
-    run.local = false
-    run.answered = false
+    // Like a delivery it ends an answered group (nothing of the earlier group survives) and, unlike a valid one, adds
+    // no sender; while work is running it joins it as a valid delivery would, adding nothing and keeping the hop.
+    if (run.answered) {
+      run.cause = undefined
+      run.consumed = []
+      run.replyTo = []
+      run.replySenders = []
+      run.chainHop = 0
+      run.local = false
+      run.answered = false
+    }
     return
   }
   if (message.role === "custom" && delivery === undefined) {

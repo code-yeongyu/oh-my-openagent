@@ -177,6 +177,29 @@ describe("#13056 a malformed delivery starts work with nobody approved", () => {
   })
 })
 
+describe("#13056 a malformed delivery joins running work without changing it", () => {
+  test("#given a run woken by an agent's delivery #when a session_control_delivery without a string delivery_id arrives mid-run #then the earlier sender stays auto-approved and the malformed sender is not", async () => {
+    const agentDir = mkdtempSync(join(tmpdir(), "thr-peer-reply-malformed-midrun-"))
+    const { store, dispatch, requests } = component(agentDir)
+    try {
+      await dispatch("agent_start")
+      await dispatch("message_start", delivery({ kind: "agent", session_id: SENDER, name: "A" }))
+      await dispatch("message_start", {
+        message: {
+          role: "custom",
+          customType: "session_control_delivery",
+          details: { delivery_id: 42, sender: { kind: "agent", session_id: OTHER, name: "B" } },
+        },
+      })
+      expect(requests(SENDER)).not.toEqual(ASK)
+      expect(requests(OTHER)).toEqual(ASK)
+    } finally {
+      await store.dispose()
+      rmSync(agentDir, { recursive: true, force: true })
+    }
+  })
+})
+
 describe("#12886 a peer-delivered run replies to its sender", () => {
   test("#given a run woken by an agent's delivery #when it sends back to that agent's session id #then the request is scoped to it with the ask auto-approved, and any other target or spelling still asks", async () => {
     const agentDir = mkdtempSync(join(tmpdir(), "thr-peer-reply-"))
