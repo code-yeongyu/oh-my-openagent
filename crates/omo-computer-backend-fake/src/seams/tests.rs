@@ -124,7 +124,7 @@ fn a_panic_fault_panics_and_the_backend_survives() {
     assert_eq!(
         fake.post_input(&click(), Route::ForegroundHid)
             .map_err(|r| (r.code, r.reason)),
-        Err((EngineCode::InputFailed, "activation_refused"))
+        Err((EngineCode::InputFailed, Some("activation_refused")))
     );
     assert!(fake.sink().is_empty());
 }

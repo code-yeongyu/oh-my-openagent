@@ -11,12 +11,11 @@ use crate::ax_tree::{element_info, flatten, parse_ref, render, NODES_PER_MS};
 use crate::backend::FakeBackend;
 use crate::handles::FakeAxEvents;
 use crate::method::FakeMethod;
-use crate::refusals::bare;
 use crate::scenario::FakeAxNode;
 use crate::state::{CallOutcome, FakeState};
 
 fn stale() -> Refusal {
-    bare(EngineCode::StaleRef)
+    Refusal::bare(EngineCode::StaleRef)
 }
 
 /// The node a ref names and the window it lives in.
@@ -49,16 +48,16 @@ impl AxBackend for FakeBackend {
     fn snapshot(&mut self, request: &SnapshotRequest) -> BackendResult<AxSnapshot> {
         self.call(FakeMethod::AxSnapshot, |state, _| {
             let Target::Window(window) = &request.target else {
-                return Err(bare(EngineCode::InvalidTarget));
+                return Err(Refusal::bare(EngineCode::InvalidTarget));
             };
             if state.exited.contains(window) {
-                return Err(bare(EngineCode::WindowNotFound));
+                return Err(Refusal::bare(EngineCode::WindowNotFound));
             }
             let root = state
                 .scenario
                 .ax
                 .get(window)
-                .ok_or_else(|| bare(EngineCode::AxFailed))?;
+                .ok_or_else(|| Refusal::bare(EngineCode::AxFailed))?;
             let nodes = flatten(root);
             let padded = state
                 .scenario
@@ -119,7 +118,7 @@ impl AxBackend for FakeBackend {
             // An unanswered write went out and nothing confirms it: `AxUnconfirmed`, whose
             // table row reads `delivery_uncertain/unsafe` with something sent.
             if outcome == CallOutcome::CannotComplete {
-                return Err(bare(EngineCode::AxUnconfirmed));
+                return Err(Refusal::bare(EngineCode::AxUnconfirmed));
             }
             Ok(Delivered { count: 1, of: 1 })
         })

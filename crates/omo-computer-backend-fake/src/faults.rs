@@ -6,7 +6,6 @@ use omo_computer_core::backend::Refusal;
 use omo_computer_core::error::{EngineCode, Reason};
 
 use crate::method::FakeMethod;
-use crate::refusals::bare;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Fault {
@@ -37,7 +36,7 @@ impl Fault {
     pub const fn refusal(code: EngineCode, reason: Option<Reason>) -> Refusal {
         match reason {
             Some(reason) => Refusal::new(code, reason.wire()),
-            None => bare(code),
+            None => Refusal::bare(code),
         }
     }
 }

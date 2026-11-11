@@ -122,7 +122,7 @@ fn v3_fields_change_behaviour_against_their_null_control() {
         set.capture(&window, &NO_CROSSHAIR)
             .map(|_| ())
             .map_err(|r| (r.code, r.reason)),
-        Err((EngineCode::CaptureUnavailable, "unmapped"))
+        Err((EngineCode::CaptureUnavailable, Some("unmapped")))
     );
     assert!(
         null.capture(&window, &NO_CROSSHAIR).is_ok()

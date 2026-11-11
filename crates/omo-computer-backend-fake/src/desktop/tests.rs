@@ -8,8 +8,7 @@ use omo_computer_core::params::Point;
 use omo_computer_core::error::{ComputerCode, EngineCode};
 
 use crate::{
-    fixtures_dir, refusal_row, FakeBackend, FakeScenario, FocusRecordKind, FocusRecordOutcome,
-    UserInputKind,
+    fixtures_dir, FakeBackend, FakeScenario, FocusRecordKind, FocusRecordOutcome, UserInputKind,
 };
 
 fn fixture(name: &str) -> FakeBackend {
@@ -76,10 +75,10 @@ fn faults_delays_and_presses_run_before_the_call() {
         .expect_err("scripted");
     assert_eq!(
         (refused.code, refused.reason),
-        (EngineCode::CaptureUnavailable, "minimized")
+        (EngineCode::CaptureUnavailable, Some("minimized"))
     );
     assert_eq!(
-        refusal_row(&refused).map(|row| row.computer),
+        refused.row().map(|row| row.computer),
         Ok(ComputerCode::CaptureUnavailable),
         "the scripted pair is typed through the table"
     );
@@ -174,7 +173,9 @@ fn imported_error_code_faults_keep_their_exact_code_and_row() {
         for code in scripted {
             let refused = fake.displays().expect_err("scripted");
             assert_eq!(refused.code, code, "{name}");
-            let row = refusal_row(&refused).unwrap_or_else(|e| panic!("{name} {code:?}: {e}"));
+            let row = refused
+                .row()
+                .unwrap_or_else(|e| panic!("{name} {code:?}: {e}"));
             assert_eq!(
                 row.key.reason, None,
                 "{name}: the imported faults are bare codes"

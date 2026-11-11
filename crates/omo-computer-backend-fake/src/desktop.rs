@@ -17,7 +17,6 @@ use crate::capabilities::fake_capabilities;
 use crate::frame::{pixels, solid_png};
 use crate::handles::{FakeEpochSource, FakePresence, FakeStopListener};
 use crate::method::FakeMethod;
-use crate::refusals::bare;
 use crate::scenario::{FakeDisplay, FakeWindow};
 use crate::sink::quoted;
 use crate::state::FakeState;
@@ -108,7 +107,7 @@ fn capture_rect(state: &FakeState, target: &Target) -> BackendResult<(Rect, f64)
         Target::Window(id) => {
             let window = state
                 .live_window(id)
-                .ok_or(bare(EngineCode::WindowNotFound))?;
+                .ok_or(Refusal::bare(EngineCode::WindowNotFound))?;
             Ok((
                 window.bounds(),
                 display_of(state, window).map_or(1.0, |d| d.scale),
@@ -119,14 +118,14 @@ fn capture_rect(state: &FakeState, target: &Target) -> BackendResult<(Rect, f64)
                 .displays
                 .iter()
                 .find(|d| &d.id == id)
-                .ok_or(bare(EngineCode::InvalidTarget))?;
+                .ok_or(Refusal::bare(EngineCode::InvalidTarget))?;
             Ok((display_info(display).bounds, display.scale))
         }
         Target::Desktop => {
             let display = state
                 .displays
                 .first()
-                .ok_or(bare(EngineCode::CaptureUnavailable))?;
+                .ok_or(Refusal::bare(EngineCode::CaptureUnavailable))?;
             Ok((display_info(display).bounds, display.scale))
         }
     }

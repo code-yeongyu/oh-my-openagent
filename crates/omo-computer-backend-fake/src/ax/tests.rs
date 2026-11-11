@@ -6,7 +6,7 @@ use omo_computer_core::params::ObserveOptions;
 use omo_computer_core::error::{ComputerCode, DispositionRule, EngineCode, NothingSent};
 use omo_computer_core::report::Disposition;
 
-use crate::{fixtures_dir, refusal_row, FakeBackend, FakeScenario};
+use crate::{fixtures_dir, FakeBackend, FakeScenario};
 
 fn fixture(name: &str) -> FakeBackend {
     FakeBackend::new(
@@ -76,7 +76,7 @@ fn deadline_cuts_a_dense_tree_and_unanswered_writes_are_ax_unconfirmed() {
         .perform(&field, &Semantic("focus".to_owned()))
         .expect_err("an unanswered write is AxUnconfirmed");
     assert_eq!(unconfirmed.code, EngineCode::AxUnconfirmed);
-    let row = refusal_row(&unconfirmed).expect("AxUnconfirmed has a row");
+    let row = unconfirmed.row().expect("AxUnconfirmed has a row");
     assert_eq!(
         (row.computer, row.nothing_sent),
         (ComputerCode::AxUnconfirmed, NothingSent::No)
@@ -120,7 +120,7 @@ fn every_refusal_the_fake_emits_has_a_table_row() {
         .err();
     for refusal in refusals.into_iter().chain([unsupported]) {
         let refusal = refusal.expect("each probe refuses");
-        let row = refusal_row(&refusal).unwrap_or_else(|e| panic!("{refusal:?}: {e}"));
+        let row = refusal.row().unwrap_or_else(|e| panic!("{refusal:?}: {e}"));
         assert_eq!(row.nothing_sent, NothingSent::Yes, "{refusal:?}");
     }
     assert!(fake.sink().is_empty());
