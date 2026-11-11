@@ -17,7 +17,10 @@ function planUnresolvedManager(error: PlanResolutionError): TeamRuntimeManagerPo
 }
 
 async function failureMessage(error: PlanResolutionError): Promise<string> {
-  const spec = normalizeSenpiTeamSpec({ members: [{ name: "bench-landscape", kind: "category", category: "deep", prompt: "work" }] }, "bench")
+  const spec = normalizeSenpiTeamSpec(
+    { members: [{ name: "bench-landscape", kind: "category", category: "deep", prompt: "work" }] },
+    "bench",
+  )
   const result = await spawnTeamMembers({
     spec,
     teamRunId: "run-1",

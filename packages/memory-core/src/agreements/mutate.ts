@@ -70,8 +70,14 @@ export function applyAgreementRecords(
     if (known.has(agreementEventKey(agreementId(record.text), record))) continue
     const status = 1 >= policy.needsHumanThreshold ? "needs-human" : "active"
     const created: AgreementItem = {
-      id: agreementId(record.text), scope: record.applies, by: "agent", text: record.text,
-      n: 1, since: record.date, last: record.date, status,
+      id: agreementId(record.text),
+      scope: record.applies,
+      by: "agent",
+      text: record.text,
+      n: 1,
+      since: record.date,
+      last: record.date,
+      status,
     }
     if (items.length >= policy.maxItems) {
       const victim = evictionCandidate(items.filter((item) => committed.has(item.id)))
@@ -104,16 +110,17 @@ export function addHumanAgreement(
 ): readonly AgreementItem[] {
   const at = findAgreement(existing, text)
   const found = at >= 0 ? existing[at] : undefined
-  const item: AgreementItem = found === undefined
-    ? { id: agreementId(text), scope, by: "human", text, n: 0, since: date, status: "active" }
-    : { ...found, scope, by: "human", text }
+  const item: AgreementItem =
+    found === undefined
+      ? { id: agreementId(text), scope, by: "human", text, n: 0, since: date, status: "active" }
+      : { ...found, scope, by: "human", text }
   const rest = existing.filter((_, index) => index !== at)
   return sortAgreements([...rest, item])
 }
 
 export function ackAgreement(existing: readonly AgreementItem[], id: string): readonly AgreementItem[] | undefined {
   if (!existing.some((item) => item.id === id)) return undefined
-  return existing.map((item) => item.id === id ? { ...item, n: 0, status: "active" } : item)
+  return existing.map((item) => (item.id === id ? { ...item, n: 0, status: "active" } : item))
 }
 
 export function dropAgreement(existing: readonly AgreementItem[], id: string): readonly AgreementItem[] | undefined {

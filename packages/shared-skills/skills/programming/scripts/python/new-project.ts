@@ -15,10 +15,10 @@
  * Exit codes: 0 created, 1 scaffold or uv failure, 2 usage error.
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { parseArgs } from "node:util";
-import { assertNever, runTool } from "../shared/run-tool.ts";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import { parseArgs } from "node:util"
+import { assertNever, runTool } from "../shared/run-tool.ts"
 
 const USAGE = `Usage: bun run new-project.ts <name> [--path <dir>] [--lib]
 
@@ -28,7 +28,7 @@ Arguments:
 Options:
   -p, --path    Parent directory (default: current dir)
   --lib         Create as publishable library (uv init --lib)
-  -h, --help    Show this help`;
+  -h, --help    Show this help`
 
 const TOOL_CONFIG = `
 [dependency-groups]
@@ -81,7 +81,7 @@ convention = "google"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers --strict-config"
-`;
+`
 
 const GITIGNORE = `__pycache__/
 *.py[cod]
@@ -93,22 +93,22 @@ dist/
 htmlcov/
 .basedpyright/
 .ruff_cache/
-`;
+`
 
-type ProjectOptions = { readonly name: string; readonly path: string; readonly lib: boolean };
+type ProjectOptions = { readonly name: string; readonly path: string; readonly lib: boolean }
 
 type Cli =
   | { readonly kind: "run"; readonly options: ProjectOptions }
   | { readonly kind: "help" }
-  | { readonly kind: "usage"; readonly problem: string };
+  | { readonly kind: "usage"; readonly problem: string }
 
 class ScaffoldError extends Error {
   constructor(
     readonly kind: "exists" | "uv-unavailable" | "uv-init-failed",
     message: string,
   ) {
-    super(message);
-    this.name = "ScaffoldError";
+    super(message)
+    this.name = "ScaffoldError"
   }
 }
 
@@ -123,109 +123,109 @@ function parseCli(): Cli {
       },
       allowPositionals: true,
       strict: true,
-    });
-    if (values.help) return { kind: "help" };
-    const [name, ...extra] = positionals;
-    if (name === undefined || extra.length > 0) return { kind: "usage", problem: "expected exactly one project name" };
-    return { kind: "run", options: { name, path: values.path, lib: values.lib } };
+    })
+    if (values.help) return { kind: "help" }
+    const [name, ...extra] = positionals
+    if (name === undefined || extra.length > 0) return { kind: "usage", problem: "expected exactly one project name" }
+    return { kind: "run", options: { name, path: values.path, lib: values.lib } }
   } catch (error) {
-    if (error instanceof TypeError) return { kind: "usage", problem: error.message };
-    throw error;
+    if (error instanceof TypeError) return { kind: "usage", problem: error.message }
+    throw error
   }
 }
 
 function withoutDependencyGroups(pyproject: string): string {
-  const kept: string[] = [];
-  let skipping = false;
+  const kept: string[] = []
+  let skipping = false
   for (const line of pyproject.split(/(?<=\n)/)) {
-    const trimmed = line.trim();
+    const trimmed = line.trim()
     if (trimmed.startsWith("[dependency-groups]")) {
-      skipping = true;
-      continue;
+      skipping = true
+      continue
     }
-    if (skipping && trimmed.startsWith("[")) skipping = false;
-    if (!skipping) kept.push(line);
+    if (skipping && trimmed.startsWith("[")) skipping = false
+    if (!skipping) kept.push(line)
   }
-  return `${kept.join("").replace(/\n+$/, "")}\n`;
+  return `${kept.join("").replace(/\n+$/, "")}\n`
 }
 
 function initProject(projectDir: string, lib: boolean): void {
-  const init = runTool("uv", ["init", lib ? "--lib" : "--app", projectDir]);
+  const init = runTool("uv", ["init", lib ? "--lib" : "--app", projectDir])
   switch (init.kind) {
     case "ok":
-      return;
+      return
     case "unavailable":
       throw new ScaffoldError(
         "uv-unavailable",
         `uv could not be started (${init.reason}); install it: curl -LsSf https://astral.sh/uv/install.sh | sh`,
-      );
+      )
     case "failed":
-      throw new ScaffoldError("uv-init-failed", `uv init failed: ${init.stderr}`);
+      throw new ScaffoldError("uv-init-failed", `uv init failed: ${init.stderr}`)
     default:
-      return assertNever(init);
+      return assertNever(init)
   }
 }
 
 function addDevTools(projectDir: string): void {
-  const added = runTool("uv", ["add", "--dev", "basedpyright", "ruff", "pytest", "pytest-cov"], projectDir);
+  const added = runTool("uv", ["add", "--dev", "basedpyright", "ruff", "pytest", "pytest-cov"], projectDir)
   switch (added.kind) {
     case "ok":
-      return;
+      return
     case "unavailable":
-      console.error(`warn: uv add --dev could not start (${added.reason}); run it once uv is reachable`);
-      return;
+      console.error(`warn: uv add --dev could not start (${added.reason}); run it once uv is reachable`)
+      return
     case "failed":
-      console.error(`warn: uv add --dev failed; pyproject.toml still lists the dev tools:\n${added.stderr}`);
-      return;
+      console.error(`warn: uv add --dev failed; pyproject.toml still lists the dev tools:\n${added.stderr}`)
+      return
     default:
-      return assertNever(added);
+      return assertNever(added)
   }
 }
 
 function scaffold({ name, path, lib }: ProjectOptions): void {
-  const projectDir = join(path, name);
-  if (existsSync(projectDir)) throw new ScaffoldError("exists", `${projectDir} already exists`);
-  initProject(projectDir, lib);
+  const projectDir = join(path, name)
+  if (existsSync(projectDir)) throw new ScaffoldError("exists", `${projectDir} already exists`)
+  initProject(projectDir, lib)
 
-  const pyprojectPath = join(projectDir, "pyproject.toml");
-  writeFileSync(pyprojectPath, withoutDependencyGroups(readFileSync(pyprojectPath, "utf8")) + TOOL_CONFIG);
-  addDevTools(projectDir);
+  const pyprojectPath = join(projectDir, "pyproject.toml")
+  writeFileSync(pyprojectPath, withoutDependencyGroups(readFileSync(pyprojectPath, "utf8")) + TOOL_CONFIG)
+  addDevTools(projectDir)
 
-  mkdirSync(join(projectDir, "tests"), { recursive: true });
-  appendFileSync(join(projectDir, "tests", "__init__.py"), "");
-  writeFileSync(join(projectDir, ".gitignore"), GITIGNORE);
+  mkdirSync(join(projectDir, "tests"), { recursive: true })
+  appendFileSync(join(projectDir, "tests", "__init__.py"), "")
+  writeFileSync(join(projectDir, ".gitignore"), GITIGNORE)
 
-  const srcDir = join(projectDir, "src", name.replaceAll("-", "_"));
-  if (lib && existsSync(srcDir)) appendFileSync(join(srcDir, "py.typed"), "");
+  const srcDir = join(projectDir, "src", name.replaceAll("-", "_"))
+  if (lib && existsSync(srcDir)) appendFileSync(join(srcDir, "py.typed"), "")
 
-  console.log(`✓ Created: ${projectDir}`);
-  console.log(`  cd ${name} && uv sync && uv run basedpyright . && uv run ruff check .`);
+  console.log(`✓ Created: ${projectDir}`)
+  console.log(`  cd ${name} && uv sync && uv run basedpyright . && uv run ruff check .`)
 }
 
 function main(): number {
-  const cli = parseCli();
+  const cli = parseCli()
   switch (cli.kind) {
     case "help":
-      console.log(USAGE);
-      return 0;
+      console.log(USAGE)
+      return 0
     case "usage":
-      console.error(`Error: ${cli.problem}\n\n${USAGE}`);
-      return 2;
+      console.error(`Error: ${cli.problem}\n\n${USAGE}`)
+      return 2
     case "run":
-      break;
+      break
     default:
-      return assertNever(cli);
+      return assertNever(cli)
   }
   try {
-    scaffold(cli.options);
-    return 0;
+    scaffold(cli.options)
+    return 0
   } catch (error) {
     if (error instanceof ScaffoldError) {
-      console.error(`Error: ${error.message}`);
-      return 1;
+      console.error(`Error: ${error.message}`)
+      return 1
     }
-    throw error;
+    throw error
   }
 }
 
-process.exit(main());
+process.exit(main())

@@ -63,13 +63,16 @@ export interface PruneKibitzerSidecarsResult {
  * owner is recovered only on proof). The idle check is repeated under the lock so a session that
  * came alive during the scan keeps its directory. Anything that is not a directory is ignored.
  */
-export async function pruneKibitzerSidecars(options: PruneKibitzerSidecarsOptions): Promise<PruneKibitzerSidecarsResult> {
+export async function pruneKibitzerSidecars(
+  options: PruneKibitzerSidecarsOptions,
+): Promise<PruneKibitzerSidecarsResult> {
   const now = options.now ?? Date.now
   const maxAgeMs = options.maxAgeMs ?? KIBITZER_SIDECAR_RETENTION_MS
   const owned = options.owned ?? new Set<string>()
   const root = kibitzerSidecarsRoot(options.recallDir)
   const names = await readdir(root).catch((error: unknown) => {
-    if (errorCode(error) !== "ENOENT") options.warn?.("kibitzer sidecar sweep listing failed", { path: root, error: describe(error) })
+    if (errorCode(error) !== "ENOENT")
+      options.warn?.("kibitzer sidecar sweep listing failed", { path: root, error: describe(error) })
     return [] as string[]
   })
   const pruned: string[] = []
@@ -115,11 +118,17 @@ async function idleFor(dir: string, at: number, maxAgeMs: number): Promise<boole
 }
 
 async function newestMtime(dir: string): Promise<number | undefined> {
-  const own = await lstat(dir).then((stats) => stats.mtimeMs, () => undefined)
+  const own = await lstat(dir).then(
+    (stats) => stats.mtimeMs,
+    () => undefined,
+  )
   if (own === undefined) return undefined
   let newest = own
   for (const name of await readdir(dir).catch(() => [] as string[])) {
-    const stamp = await lstat(join(dir, name)).then((stats) => stats.mtimeMs, () => undefined)
+    const stamp = await lstat(join(dir, name)).then(
+      (stats) => stats.mtimeMs,
+      () => undefined,
+    )
     if (stamp !== undefined && stamp > newest) newest = stamp
   }
   return newest
@@ -143,7 +152,8 @@ async function claimAndRemove(
     record = await createLockRecord(KIBITZER_SIDECAR_OWNER_LOCK_PURPOSE)
     await acquireLock(lockPath, record, { waitTimeoutMs: 0 })
   } catch (error) {
-    if (!(error instanceof LockContentionError)) warn?.("kibitzer sidecar sweep lock failed", { lockPath, error: describe(error) })
+    if (!(error instanceof LockContentionError))
+      warn?.("kibitzer sidecar sweep lock failed", { lockPath, error: describe(error) })
     return "locked"
   }
   let tombstone: string

@@ -20,11 +20,17 @@ export type ActiveHolderVerdict = ReflectionLockVerdict
 export type ActiveHolderSeams = StaleLockProbe
 
 /** The shared decision (memory-core reflection/stale-holder.ts); `omo doctor` runs the same code. */
-export function classifyActiveReflectionHolder(reflectionDir: string, seams: ActiveHolderSeams = {}): Promise<ActiveHolderVerdict> {
+export function classifyActiveReflectionHolder(
+  reflectionDir: string,
+  seams: ActiveHolderSeams = {},
+): Promise<ActiveHolderVerdict> {
   return classifyReflectionLockHolder(reflectionDir, seams)
 }
 
-export function staleReflectionLockNotice(_reflectionDir: string, verdict: { readonly runId: string; readonly reason: string }): string {
+export function staleReflectionLockNotice(
+  _reflectionDir: string,
+  verdict: { readonly runId: string; readonly reason: string },
+): string {
   return `memory reflection is stuck on a stale lock: run ${verdict.runId} still holds it and ${verdict.reason}, so new reflection requests only queue. Next step: run /doctor; if no reflection run is active, run \`omo doctor --fix\`, which releases a provably dead holder and moves a torn lock aside.`
 }
 
@@ -55,12 +61,19 @@ export async function recoverStaleReflectionHolder(input: {
   const { decision, before, after } = report
   if (decision.kind === "none") return { verdict: before }
   if (report.action === "settle-declined") {
-    return { verdict: before, notice: staleReflectionLockNotice(input.reflectionDir, { runId: decision.runId, reason: NOT_RELEASED }) }
+    return {
+      verdict: before,
+      notice: staleReflectionLockNotice(input.reflectionDir, { runId: decision.runId, reason: NOT_RELEASED }),
+    }
   }
   if (report.action === "settled" || report.action === "reaped") {
-    if (after.state === "stuck") return { verdict: after, notice: staleReflectionLockNotice(input.reflectionDir, after) }
+    if (after.state === "stuck")
+      return { verdict: after, notice: staleReflectionLockNotice(input.reflectionDir, after) }
     if (after.state === "dead" && after.runId === decision.runId) {
-      return { verdict: after, notice: staleReflectionLockNotice(input.reflectionDir, { runId: after.runId, reason: NOT_RELEASED }) }
+      return {
+        verdict: after,
+        notice: staleReflectionLockNotice(input.reflectionDir, { runId: after.runId, reason: NOT_RELEASED }),
+      }
     }
     return { verdict: before, recoveredRunId: decision.runId }
   }

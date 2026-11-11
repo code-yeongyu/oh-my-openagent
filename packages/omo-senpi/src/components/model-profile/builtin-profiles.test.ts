@@ -17,7 +17,11 @@ const BANNED_VENDOR_TOKENS: readonly string[] = [["mini", "max"].join(""), ["gem
 
 const PROVIDER_VOCABULARY: Readonly<Record<string, readonly string[]>> = KNOWN_MODELS
 
-function rungs(): readonly { readonly profile: string; readonly providers: readonly string[]; readonly model: string }[] {
+function rungs(): readonly {
+  readonly profile: string
+  readonly providers: readonly string[]
+  readonly model: string
+}[] {
   return Object.entries(BUILTIN_MODEL_PROFILES).flatMap(([profile, definition]) =>
     definition.models.map((rung) => ({ profile, providers: rung.providers, model: rung.model })),
   )
@@ -66,7 +70,9 @@ describe("BUILTIN_MODEL_PROFILES", () => {
   it("never lists a gateway aggregator on a builtin rung", () => {
     const gateways = ["opengateway", "openrouter", "vercel-ai-gateway", "cloudflare-ai-gateway"]
     const offenders = rungs().flatMap((rung) =>
-      rung.providers.filter((provider) => gateways.includes(provider)).map((provider) => `${rung.profile}: ${provider}`),
+      rung.providers
+        .filter((provider) => gateways.includes(provider))
+        .map((provider) => `${rung.profile}: ${provider}`),
     )
     expect(offenders).toEqual([])
   })
@@ -116,7 +122,11 @@ describe("BUILTIN_MODEL_PROFILES", () => {
   it("heads every Claude rung with the anthropic-subscription lane", () => {
     const claudeRungs = rungs().filter((rung) => rung.model.startsWith("claude-"))
     expect(claudeRungs.length).toBeGreaterThan(0)
-    expect(claudeRungs.filter((rung) => rung.providers[0] !== "anthropic-subscription").map((rung) => `${rung.profile}: ${rung.model}`)).toEqual([])
+    expect(
+      claudeRungs
+        .filter((rung) => rung.providers[0] !== "anthropic-subscription")
+        .map((rung) => `${rung.profile}: ${rung.model}`),
+    ).toEqual([])
   })
 
   it("orders daily-normal opus medium then kimi max then glm max", () => {
@@ -140,10 +150,18 @@ describe("BUILTIN_MODEL_PROFILES", () => {
 
   it("runs geeky-normal as gpt-6-astra medium on every GPT lane, then gpt-6.1-sol-fast and gpt-6.1-sol medium on the OpenAI lanes, then gpt-5.6-sol medium on every GPT lane", () => {
     expect(BUILTIN_MODEL_PROFILES["geeky-normal"]?.models).toEqual([
-      { providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"], model: "gpt-6-astra", variant: "medium" },
+      {
+        providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
+        model: "gpt-6-astra",
+        variant: "medium",
+      },
       { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol-fast", variant: "medium" },
       { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol", variant: "medium" },
-      { providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"], model: "gpt-5.6-sol", variant: "medium" },
+      {
+        providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
+        model: "gpt-5.6-sol",
+        variant: "medium",
+      },
     ])
   })
 

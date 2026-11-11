@@ -24,7 +24,8 @@ describe("Claude Fable 5.2 recognition", () => {
       "us.anthropic.claude-fable-5-2",
     ]
     // when / then
-    for (const selector of [...fableSelectors, "claude-mythos-5-2"]) expect(isClaudeFableOrMythosModel(selector)).toBe(true)
+    for (const selector of [...fableSelectors, "claude-mythos-5-2"])
+      expect(isClaudeFableOrMythosModel(selector)).toBe(true)
     for (const selector of fableSelectors) expect(isClaudeOpus47OrLaterModel(selector)).toBe(true)
     expect(isClaudeFable5Model(`anthropic/${MODEL}`)).toBe(true)
   })

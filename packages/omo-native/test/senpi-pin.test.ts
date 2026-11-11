@@ -28,7 +28,9 @@ describe("senpi dependency pin", () => {
 
       test("#then OpenCode uses the same engine and catalog as Native", () => {
         expect(omoOpenCodeManifest.dependencies["@code-yeongyu/senpi"]).toBe(SENPI_PIN)
-        expect(omoOpenCodeManifest.dependencies["@earendil-works/pi-ai"]).toBe(`npm:@code-yeongyu/senpi-ai@${SENPI_PIN}`)
+        expect(omoOpenCodeManifest.dependencies["@earendil-works/pi-ai"]).toBe(
+          `npm:@code-yeongyu/senpi-ai@${SENPI_PIN}`,
+        )
       })
 
       test("#then senpi-task pins match", () => {

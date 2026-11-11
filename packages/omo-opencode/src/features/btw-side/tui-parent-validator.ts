@@ -1,7 +1,5 @@
 export function createBtwParentValidator(dependencies: {
-  fetchStatus: (
-    sessionID: string,
-  ) => Promise<"exists" | "missing" | "retry">
+  fetchStatus: (sessionID: string) => Promise<"exists" | "missing" | "retry">
 }) {
   const deletedSessionIDs = new Set<string>()
 
