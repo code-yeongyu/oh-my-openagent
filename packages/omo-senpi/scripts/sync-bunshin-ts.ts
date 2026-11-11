@@ -110,11 +110,24 @@ const flag = (argv: readonly string[], name: string): string | undefined => {
 	return at >= 0 ? argv[at + 1] : undefined
 }
 
+/**
+ * `git archive <commit> | tar -x` into `tree`. Every path reaches the shell as a positional argument, never
+ * spliced into the script, so a TMPDIR holding a quote, `$` or a backtick cannot break or alter it (#12498).
+ */
+export const archiveExtractCommand = (checkout: string, commit: string, tree: string): string[] => [
+	"sh",
+	"-c",
+	'mkdir -p "$2" && git -C "$0" archive "$1" | tar -x -C "$2"',
+	checkout,
+	commit,
+	tree,
+]
+
 const buildAt = async (checkout: string, pinned: PinnedPackage, commit: string, work: string): Promise<string> => {
 	const tree = join(work, "tree")
 	const out = join(work, "out")
 	const sha = await run(["git", "-C", checkout, "rev-parse", "--verify", `${commit}^{commit}`], work)
-	await run(["sh", "-c", `mkdir -p "${tree}" && git -C "$0" archive "$1" | tar -x -C "${tree}"`, checkout, sha], work)
+	await run(archiveExtractCommand(checkout, sha, tree), work)
 	await run(["bun", "install", "--frozen-lockfile", "--ignore-scripts"], tree)
 	await run(["bun", join(pinned.packageDir, "scripts", "build.ts"), out], tree)
 	return out
