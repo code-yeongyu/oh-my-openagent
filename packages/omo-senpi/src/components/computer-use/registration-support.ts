@@ -27,23 +27,41 @@ export function toolActivatedNames(payload: unknown): readonly string[] {
 }
 
 /**
- * Wires the control-grant revocation events (#9651 B5b): a finished agent run and the session
- * shutdown each send `control.revoke` (idempotent, bounded, failure logged by the service).
- * `session.close` stays the backstop; a runtime that never started has no engine to revoke on,
- * and a component without a runtime (computer use unavailable) wires nothing.
+ * The lifecycle of the session that holds this component's grant. A fused session reports it through its loop
+ * events; the hand of a split session gets no loop events, so its scope's run end and close arrive from the host
+ * through another source.
  */
-export function wireComputerControlEvents(pi: { on(event: string, handler: (payload: unknown, ctx?: unknown) => unknown | Promise<unknown>): void }, runtime: { started(): Promise<ComputerUseRuntime> | undefined } | undefined): void {
+export interface ComputerLifecycleSource {
+  onRunEnd(handler: () => Promise<void>): void
+  onClose(handler: () => Promise<void>): void
+}
+
+export function hostLifecycleSource(pi: { on(event: string, handler: () => Promise<void>): void }): ComputerLifecycleSource {
+  return {
+    onRunEnd: (handler) => pi.on("agent_end", handler),
+    onClose: (handler) => pi.on("session_shutdown", handler),
+  }
+}
+
+/**
+ * Wires the control-grant revocation events (#9651 B5b): a finished agent run and the session
+ * close each send `control.revoke` (idempotent, bounded, failure logged by the service), and the
+ * close then ends the engine session, which stays the backstop that always releases the grant.
+ * A runtime that never started has no engine to revoke on or close, and a component without a
+ * runtime (computer use unavailable) wires nothing.
+ */
+export function wireComputerControlEvents(lifecycle: ComputerLifecycleSource, runtime: { started(): Promise<ComputerUseRuntime> | undefined } | undefined): void {
   if (runtime === undefined) return
   const revokeStarted = async (): Promise<void> => {
     const started = runtime.started()
     if (started === undefined) return
     await (await started).service.revokeControl()
   }
-  pi.on("agent_end", async () => {
-    await revokeStarted()
-  })
-  pi.on("session_shutdown", async () => {
-    await revokeStarted()
+  lifecycle.onRunEnd(revokeStarted)
+  lifecycle.onClose(revokeStarted)
+  lifecycle.onClose(async () => {
+    const started = runtime.started()
+    if (started !== undefined) await (await started).handle.close()
   })
 }
 
