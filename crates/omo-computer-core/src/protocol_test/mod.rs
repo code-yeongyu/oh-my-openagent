@@ -287,3 +287,17 @@ fn paired_params_publish_their_own_schema() {
         .collect();
     assert!(leaked.is_empty(), "wire structs in $defs: {leaked:?}");
 }
+
+/// The x/y pairing is published, not only enforced at decode: `dependentRequired` makes
+/// each coordinate require the other, so a schema-driven client cannot build `{x: 5}`.
+#[test]
+fn paired_coordinates_are_published_as_dependent_required() {
+    let schema = engine_schema();
+    for name in ["ClickParams", "MouseDownParams"] {
+        assert_eq!(
+            schema["$defs"][name]["dependentRequired"],
+            serde_json::json!({"x": ["y"], "y": ["x"]}),
+            "{name} does not publish the x/y pairing"
+        );
+    }
+}
