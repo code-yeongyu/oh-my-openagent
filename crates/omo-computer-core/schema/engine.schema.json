@@ -437,7 +437,7 @@
       "effect": "exec",
       "exposure": "public",
       "params": {
-        "$ref": "#/$defs/AxRefParams"
+        "$ref": "#/$defs/AxFocusParams"
       },
       "result": {
         "$ref": "#/$defs/ExecReply"
@@ -1579,6 +1579,43 @@
       ],
       "description": "`{available, reason?}`."
     },
+    "AxFocusParams": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "ref"
+      ],
+      "description": "`ax.focus`: an exec verb, so it carries the exec members the read-tier ref params lack."
+    },
     "AxNode": {
       "type": "object",
       "additionalProperties": false,
@@ -1670,6 +1707,30 @@
         },
         "action": {
           "type": "string"
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -1773,6 +1834,30 @@
         },
         "text": {
           "type": "string"
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -3673,6 +3758,30 @@
           "type": "integer",
           "format": "uint64",
           "minimum": 0
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -3700,6 +3809,30 @@
           "type": "integer",
           "format": "uint64",
           "minimum": 0
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -3773,6 +3906,30 @@
           "items": {
             "type": "string"
           }
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -5013,6 +5170,30 @@
       "properties": {
         "kind": {
           "$ref": "#/$defs/SurfaceKind"
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -5231,6 +5412,30 @@
       "properties": {
         "windowId": {
           "type": "string"
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -6760,6 +6965,30 @@
         },
         "text": {
           "type": "string"
+        },
+        "callId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "runGeneration": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "observeAfter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObserveOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [

@@ -96,7 +96,7 @@ pub use reads::{
     WindowsParams, ZoomParams,
 };
 pub use v1::{
-    AdvanceClockParams, AxPerformParams, AxRefParams, AxSetValueParams, AxTargetParams,
+    AdvanceClockParams, AxFocusParams, AxPerformParams, AxRefParams, AxSetValueParams, AxTargetParams,
     AxTypeTextParams, CancelParams, CaptureParams, ClickParams, ControlGrantParams, HoldKeysParams,
     HoldMouseParams, KeyChordParams, ObserveAx, ObserveParams, OnOff, RaiseWindowParams,
     ReportMode, SessionOpenParams, StopPathResumeParams, StopPathStartParams, StopPathStopParams,

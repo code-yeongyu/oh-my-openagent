@@ -3,7 +3,10 @@
 use serde_json::json;
 
 use crate::methods::Method;
-use crate::requests::{read_click, read_session_open, TraceMode, Verb};
+use crate::requests::{
+    read_ax_focus, read_ax_perform, read_click, read_session_open, read_type_text, TraceMode,
+    V1Verb, Verb,
+};
 
 #[test]
 fn session_open_reads_key_priming_and_trace() {
@@ -56,5 +59,28 @@ fn a_lone_coordinate_is_refused_not_dropped() {
                 .validate_params(whole.clone())
                 .unwrap_or_else(|error| panic!("{} refused {whole}: {error}", method.spec().name));
         }
+    }
+}
+
+#[test]
+fn v1_exec_verbs_reach_the_exec_funnel_with_their_authority() {
+    let bound = json!({"callId": "c7", "runGeneration": 3, "observeAfter": {"screenshot": false}});
+    let with = |mut params: serde_json::Value| {
+        params
+            .as_object_mut()
+            .expect("params object")
+            .extend(bound.as_object().expect("members").clone());
+        params
+    };
+    let focus = read_ax_focus(serde_json::from_value(with(json!({"ref": "s1:e4"}))).expect("exec params"));
+    assert_eq!(focus.verb, Verb::V1(V1Verb::AxFocus));
+    assert_eq!(focus.reference.as_deref(), Some("s1:e4"));
+    let perform = read_ax_perform(serde_json::from_value(with(json!({"ref": "s1:e4", "action": "AXPress"}))).expect("exec params"));
+    let typed = read_type_text(serde_json::from_value(with(json!({"target": "101", "text": "hi"}))).expect("exec params"));
+    assert_eq!(typed.target.as_deref(), Some("101"));
+    for request in [focus, perform, typed] {
+        assert_eq!(request.authority.call_id.as_deref(), Some("c7"));
+        assert_eq!(request.authority.run_generation, Some(3));
+        assert!(request.observe_after.is_some(), "{request:?} lost observeAfter");
     }
 }

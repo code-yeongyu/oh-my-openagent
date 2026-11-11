@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "e1a69b4352785474815f4a025293cf8e2ee5414572cbb34ec9b7ca1cff50be12" as const
+export const SCHEMA_SHA256 = "43e724a023f9f2978d3fc1e09cc3c34404fa4335c374274922ca1d3fb0d7fbb6" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -480,6 +480,13 @@ export type Availability = {
 	reason?: string | null
 }
 
+export type AxFocusParams = {
+	ref: string
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
+}
+
 export type AxNode = {
 	ref: string
 	role: string
@@ -500,6 +507,9 @@ export type AxNode = {
 export type AxPerformParams = {
 	ref: string
 	action: string
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
 }
 
 export type AxRefParams = {
@@ -527,6 +537,9 @@ export type AxTargetParams = {
 export type AxTypeTextParams = {
 	ref: string
 	text: string
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
 }
 
 export type AxTypeTextReply = {
@@ -913,6 +926,9 @@ export type HoldKeysParams = {
 	target: string
 	keys: string[]
 	duration: number
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
 }
 
 export type HoldMouseParams = {
@@ -920,6 +936,9 @@ export type HoldMouseParams = {
 	x: number
 	y: number
 	duration: number
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
 }
 
 export type IdentityMatch = "match" | "mismatch" | "unknown"
@@ -938,6 +957,9 @@ export type Intervention = "continue" | "pause"
 export type KeyChordParams = {
 	target: string
 	keys: string[]
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
 }
 
 export type KeyDownParams = {
@@ -1184,6 +1206,9 @@ export type OnOff = "on" | "off"
 
 export type OpenSystemSurfaceParams = {
 	kind: SurfaceKind
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
 }
 
 export type PasteFormat = "text" | "markdown" | "html"
@@ -1230,6 +1255,9 @@ export type PressParams = {
 
 export type RaiseWindowParams = {
 	windowId: string
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
 }
 
 export type Rect = {
@@ -1527,6 +1555,9 @@ export type TypeTextMethod = "inserted" | "keys"
 export type TypeTextParams = {
 	target: string
 	text: string
+	callId?: string | null
+	runGeneration?: number | null
+	observeAfter?: ObserveOptions | null
 }
 
 export type UnknownLiteral = "unknown"
@@ -1680,7 +1711,7 @@ export type MethodParams = {
 	"raiseWindow": RaiseWindowParams
 	"ax.setValue": AxSetValueParams
 	"ax.perform": AxPerformParams
-	"ax.focus": AxRefParams
+	"ax.focus": AxFocusParams
 	"ax.typeText": AxTypeTextParams
 	"ax.selectText": SelectTextParams
 	"menu.select": MenuSelectParams

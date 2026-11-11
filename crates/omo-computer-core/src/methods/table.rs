@@ -9,7 +9,7 @@ use crate::hello::Hello;
 use crate::listing::{AppInfo, ElementInfo, Surface};
 use crate::observation::{Frame, Observation};
 use crate::params::{
-    AdvanceClockParams, AppsOpenParams, AppsQuitParams, AxPerformParams, AxRefParams,
+    AdvanceClockParams, AppsOpenParams, AppsQuitParams, AxFocusParams, AxPerformParams, AxRefParams,
     AxSetValueParams, AxTargetParams, AxTypeTextParams, CancelParams, CaptureParams, ClickParams,
     ClipboardWriteParams, ControlGrantParams, DragParams, DrillParams, ElementAtParams,
     EmptyParams, HoldKeysParams, HoldMouseParams, KeyChordParams, KeyDownParams, KeyUpParams,
@@ -112,7 +112,7 @@ method_table! {
     RaiseWindow = "raiseWindow", Exec, PUBLIC, RaiseWindowParams => ExecReply;
     AxSetValue = "ax.setValue", Exec, PUBLIC, AxSetValueParams => ExecReply;
     AxPerform = "ax.perform", Exec, PUBLIC, AxPerformParams => ExecReply;
-    AxFocus = "ax.focus", Exec, PUBLIC, AxRefParams => ExecReply;
+    AxFocus = "ax.focus", Exec, PUBLIC, AxFocusParams => ExecReply;
     AxTypeText = "ax.typeText", Exec, PUBLIC, AxTypeTextParams => AxTypeTextReply;
     AxSelectText = "ax.selectText", Exec, PUBLIC, SelectTextParams => ExecReply;
     MenuSelect = "menu.select", Exec, PUBLIC, MenuSelectParams => ExecReply;

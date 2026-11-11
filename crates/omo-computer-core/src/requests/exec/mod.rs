@@ -15,6 +15,7 @@ pub use targets::{
     read_window, read_window_frame,
 };
 
+use super::legacy::V1Verb;
 use super::options::{read_observe_options, At, ObserveSpec, TextSpan};
 use crate::params::{Button, Delivery, ObserveOptions, PasteFormat, ScrollDirection};
 
@@ -119,6 +120,8 @@ pub enum Verb {
         text: String,
         format: Option<PasteFormat>,
     },
+    /// A v1 exec verb or `openSystemSurface`.
+    V1(V1Verb),
 }
 
 /// The one shape every exec verb reaches `mutate()` in.
