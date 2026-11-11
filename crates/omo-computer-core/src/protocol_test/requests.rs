@@ -2,6 +2,7 @@
 
 use serde_json::json;
 
+use crate::methods::Method;
 use crate::requests::{read_click, read_session_open, TraceMode, Verb};
 
 #[test]
@@ -38,4 +39,22 @@ fn click_reads_force_into_the_send_policy() {
     let plain = read_click(serde_json::from_value(json!({"ref": "s1:e2"})).expect("click"));
     assert!(!plain.policy.force);
     assert_eq!(plain.reference.as_deref(), Some("s1:e2"));
+}
+
+#[test]
+fn a_lone_coordinate_is_refused_not_dropped() {
+    for method in [Method::Click, Method::MouseDown] {
+        for lone in [json!({"target": "101", "x": 5}), json!({"target": "101", "y": 5})] {
+            assert!(
+                method.validate_params(lone.clone()).is_err(),
+                "{} accepted the lone coordinate {lone}",
+                method.spec().name
+            );
+        }
+        for whole in [json!({"target": "101", "x": 5, "y": 6}), json!({"target": "101"})] {
+            method
+                .validate_params(whole.clone())
+                .unwrap_or_else(|error| panic!("{} refused {whole}: {error}", method.spec().name));
+        }
+    }
 }
