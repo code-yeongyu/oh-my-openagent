@@ -34,10 +34,26 @@ fn the_fake_reads_no_environment() {
         concat!("let home = std", "::en", "v::var(\"HOME\");"),
         concat!("use std", "::env;"),
         concat!("let seam = env", "::var_os(\"OMO_COMPUTER_FAKE_CLOCK\");"),
+        // A grouped import, then a module call: neither names the module with its crate path.
+        concat!("use std::{e", "nv, fs};"),
+        concat!("let args = e", "nv::args();"),
+        concat!("let tmp = e", "nv::temp_dir();"),
+        concat!("use std::{fs, e", "nv};"),
+        concat!("use std::{fs, e", "nv as ambient};"),
     ] {
         assert!(
             !scan_text("probe.rs", probe).is_empty(),
             "the guard catches {probe}"
+        );
+    }
+    for clean in [
+        concat!("let dir = e", "nv!(\"CARGO_MANIFEST_DIR\");"),
+        "let gate_env = 1;",
+        concat!("use crate::gate_e", "nv::Seam;"),
+    ] {
+        assert!(
+            scan_text("probe.rs", clean).is_empty(),
+            "no finding for {clean}"
         );
     }
 }
