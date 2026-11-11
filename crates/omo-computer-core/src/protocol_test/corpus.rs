@@ -372,3 +372,37 @@ fn a_ledgered_reply_is_still_type_checked() {
         "a hello reply with a numeric protocolVersion passed: {checked:?}"
     );
 }
+
+/// A ledgered member is filled with a value its declared type admits, including a
+/// `minLength` string, a `minItems` array and a tuple (`prefixItems`).
+#[test]
+fn a_filled_member_meets_its_length_and_tuple_bounds() {
+    #[derive(serde::Deserialize, schemars::JsonSchema)]
+    #[allow(dead_code)]
+    struct Bounded {
+        #[schemars(length(min = 3))]
+        name: String,
+        #[schemars(length(min = 2))]
+        list: Vec<u8>,
+        pair: (u8, String),
+    }
+    let mut generator = schemars::SchemaGenerator::default();
+    let reference = generator.subschema_for::<Bounded>().to_value();
+    let schema = serde_json::json!({"$defs": generator.definitions().clone()});
+    let filled = example(&schema, &reference);
+    assert!(
+        filled["name"]
+            .as_str()
+            .is_some_and(|name| name.chars().count() >= 3),
+        "name ignores minLength: {filled}"
+    );
+    assert!(
+        filled["list"]
+            .as_array()
+            .is_some_and(|list| list.len() >= 2),
+        "list ignores minItems: {filled}"
+    );
+    serde_json::from_value::<Bounded>(filled.clone()).unwrap_or_else(|error| {
+        panic!("the filled value does not fit its type: {error}: {filled}")
+    });
+}
