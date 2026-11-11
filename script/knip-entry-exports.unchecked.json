@@ -21,7 +21,6 @@
     "packages/isolation-core/src/owner.ts",
     "packages/isolation-core/src/process-identity.ts",
     "packages/isolation-core/src/sweep.ts",
-    "packages/memory-core/src/cleanup/index.ts",
     "packages/memory-core/src/compile/external-projection.ts",
     "packages/memory-core/src/recall/bm25-persist.ts",
     "packages/memory-core/src/reflection/completion-links.ts",
