@@ -127,10 +127,7 @@ export function numberConstraint(property: string): PropertyConstraint {
  * else the pattern table; numbers get bounds. Undefined means the property has no constraint, which
  * the artifact generator turns into a hard failure.
  */
-export function propertyConstraint(
-  property: string,
-  schema: OmoNativePropertySchema,
-): PropertyConstraint | undefined {
+export function propertyConstraint(property: string, schema: OmoNativePropertySchema): PropertyConstraint | undefined {
   if (schema.type === "boolean") return {}
   if (schema.type === "number") return numberConstraint(property)
   if (schema.values !== undefined) return { values: schema.values }

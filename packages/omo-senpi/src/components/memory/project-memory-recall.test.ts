@@ -37,7 +37,8 @@ const SESSION = "session-project-recall"
 
 afterEach(async () => {
   await Promise.all(caches.splice(0).map((cache) => cache.settled()))
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 function git(cwd: string, ...args: string[]): void {
@@ -65,11 +66,23 @@ function world(options: { recall?: boolean; large?: boolean } = {}) {
   for (const dir of [child, sibling]) mkdirSync(dir, { recursive: true })
   const env = { [MEMORY_ROOT_ENV_VAR]: join(root, "memory") }
   const ownIdentity = resolveMemoryIdentity("auto", workspace, env)
-  commitNotes(ownIdentity.paths.repo, { "notes/own.md": { description: "workspace conventions", body: "Use bun for scripts." } })
+  commitNotes(ownIdentity.paths.repo, {
+    "notes/own.md": { description: "workspace conventions", body: "Use bun for scripts." },
+  })
   const childIdentity = resolveMemoryIdentity("auto", child, env)
   commitNotes(childIdentity.paths.repo, {
-    ...(options.large ? Object.fromEntries(Array.from({ length: 220 }, (_, i) => [`notes/filler-${i}.md`, { description: `garden plants ${i}`, body: `garden plants sunlight ${i}` }])) : {}),
-    "reference/invoices.md": { description: "How billing invoices are reconciled", body: "Reconcile invoices nightly against the ledger." },
+    ...(options.large
+      ? Object.fromEntries(
+          Array.from({ length: 220 }, (_, i) => [
+            `notes/filler-${i}.md`,
+            { description: `garden plants ${i}`, body: `garden plants sunlight ${i}` },
+          ]),
+        )
+      : {}),
+    "reference/invoices.md": {
+      description: "How billing invoices are reconciled",
+      body: "Reconcile invoices nightly against the ledger.",
+    },
   })
   commitNotes(resolveMemoryIdentity("auto", sibling, env).paths.repo, {
     "reference/invoices.md": { description: "Sibling invoices note", body: "Reconcile invoices weekly." },
@@ -101,10 +114,14 @@ function world(options: { recall?: boolean; large?: boolean } = {}) {
     projectSource: scope.sourceFor,
   })
   const touch = (path: string) =>
-    pi.dispatch("tool_result", { type: "tool_result", toolName: "read", input: { path }, content: [] }, {
-      cwd: workspace,
-      sessionManager: { getSessionId: () => SESSION },
-    })
+    pi.dispatch(
+      "tool_result",
+      { type: "tool_result", toolName: "read", input: { path }, content: [] },
+      {
+        cwd: workspace,
+        sessionManager: { getSessionId: () => SESSION },
+      },
+    )
   const childPath = `${PROJECT_MEMORY_PATH_PREFIX}${childIdentity.id}/reference/invoices.md`
   return { scope, recall, touch, own, child, sibling, childIdentity, childPath, cache, logs }
 }
@@ -138,7 +155,9 @@ describe("project memory in Kibitzer recall (#10044)", () => {
 
     const cold = new RecallCorpusCache({ termStore: loadRecallStoreRuntime })
     caches.push(cold)
-    const restored = await cold.load(new GitMemoryRepo({ dir: w.childIdentity.paths.repo, agentId: w.childIdentity.id }))
+    const restored = await cold.load(
+      new GitMemoryRepo({ dir: w.childIdentity.paths.repo, agentId: w.childIdentity.id }),
+    )
     expect(restored.documents).not.toBe(documents)
     expect(restored.documents.every((document) => recallTermIndex.access.current(document) !== undefined)).toBe(true)
   }, 30_000)
@@ -154,17 +173,21 @@ describe("project memory in Kibitzer recall (#10044)", () => {
     await w.cache.settled()
 
     expect(collected?.candidates.map((candidate) => candidate.path)).toContain(w.childPath)
-    expect(w.logs.logs).toContainEqual(expect.objectContaining({
-      level: "warn",
-      details: expect.objectContaining({ error: expect.stringContaining(RECALL_TERM_STORE_NAME) }),
-    }))
+    expect(w.logs.logs).toContainEqual(
+      expect.objectContaining({
+        level: "warn",
+        details: expect.objectContaining({ error: expect.stringContaining(RECALL_TERM_STORE_NAME) }),
+      }),
+    )
     expect(statSync(store).isDirectory()).toBe(true)
   }, 30_000)
 
   test("#given a project note already surfaced #when recalled again #then its qualified ledger key excludes the original document", async () => {
     const w = world()
     await w.touch(join(w.child, "a.ts"))
-    await new RecallLedger(w.own.identityPaths.recallLedger).markSurfaced(SESSION, [{ path: w.childPath, hash: "test" }])
+    await new RecallLedger(w.own.identityPaths.recallLedger).markSurfaced(SESSION, [
+      { path: w.childPath, hash: "test" },
+    ])
 
     const collected = await w.recall.collectCandidates(ASK)
 
@@ -199,7 +222,10 @@ describe("project memory in Kibitzer recall (#10044)", () => {
     const w = world()
     await w.touch(join(w.child, "src", "invoice.ts"))
     const source = join(w.childIdentity.paths.repo, "reference", "invoices.md")
-    const read = eventContext([assistantEntry("a1", `Reading ${source} first.`), userEntry("u1", "how do we reconcile invoices")], SESSION)
+    const read = eventContext(
+      [assistantEntry("a1", `Reading ${source} first.`), userEntry("u1", "how do we reconcile invoices")],
+      SESSION,
+    )
 
     // when
     const collected = await w.recall.collectCandidates(read)
@@ -217,7 +243,9 @@ describe("project memory in Kibitzer recall (#10044)", () => {
     const collected = await w.recall.collectCandidates(ASK)
 
     // then
-    expect((collected?.candidates ?? []).some((candidate) => candidate.path.startsWith(PROJECT_MEMORY_PATH_PREFIX))).toBe(false)
+    expect(
+      (collected?.candidates ?? []).some((candidate) => candidate.path.startsWith(PROJECT_MEMORY_PATH_PREFIX)),
+    ).toBe(false)
   }, 30_000)
 
   test("#given the recall switch is off #when the child was touched #then its notes stay out of recall", async () => {

@@ -63,7 +63,12 @@ describe("memory tool activation", () => {
     const [memoryTool] = createMemoryTools(() => undefined)
 
     // when
-    const memoryResult = await memoryTool.execute("call-1", { command: "create", reason: "x", file_path: "a.md", description: "d" })
+    const memoryResult = await memoryTool.execute("call-1", {
+      command: "create",
+      reason: "x",
+      file_path: "a.md",
+      description: "d",
+    })
 
     // then
     expect(memoryResult.isError).toBe(true)
@@ -79,9 +84,19 @@ describe("memory tool activation", () => {
     const [memoryTool] = createMemoryTools(() => holder.current)
 
     // when
-    const stale = await memoryTool.execute("call-1", { command: "create", reason: "early", file_path: "a.md", description: "d" })
+    const stale = await memoryTool.execute("call-1", {
+      command: "create",
+      reason: "early",
+      file_path: "a.md",
+      description: "d",
+    })
     holder.current = fixture.context
-    const bound = await memoryTool.execute("call-2", { command: "create", reason: "Track a", file_path: "a.md", description: "d" })
+    const bound = await memoryTool.execute("call-2", {
+      command: "create",
+      reason: "Track a",
+      file_path: "a.md",
+      description: "d",
+    })
 
     // then
     expect(stale.isError).toBe(true)

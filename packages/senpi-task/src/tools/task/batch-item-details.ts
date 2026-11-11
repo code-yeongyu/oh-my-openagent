@@ -19,7 +19,11 @@ export function itemError(
   }
 }
 
-export function failedStartDetail(item: ResolvedSpawnItem, start: FailedStartResult, skills?: TaskSkillSummary): TaskToolItemDetail {
+export function failedStartDetail(
+  item: ResolvedSpawnItem,
+  start: FailedStartResult,
+  skills?: TaskSkillSummary,
+): TaskToolItemDetail {
   switch (start.kind) {
     case "held":
       return { task_id: start.task_id, status: "paused" }
@@ -43,7 +47,11 @@ export function failedStartDetail(item: ResolvedSpawnItem, start: FailedStartRes
   }
 }
 
-export function startedDetail(item: ResolvedSpawnItem, start: StartedResult, skills?: TaskSkillSummary): TaskToolItemDetail {
+export function startedDetail(
+  item: ResolvedSpawnItem,
+  start: StartedResult,
+  skills?: TaskSkillSummary,
+): TaskToolItemDetail {
   return {
     task_id: start.task_id,
     ...(start.run_epoch === undefined ? {} : { run_epoch: start.run_epoch }),

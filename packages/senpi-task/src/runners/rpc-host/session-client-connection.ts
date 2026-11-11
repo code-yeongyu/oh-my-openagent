@@ -1,4 +1,11 @@
-import type { OpenedHostSession, HostSessionCommand, HostSessionParked, HostSessionClosed, HostSessionReplaced, HostSessionClientOptions } from "./session-client-contract"
+import type {
+  OpenedHostSession,
+  HostSessionCommand,
+  HostSessionParked,
+  HostSessionClosed,
+  HostSessionReplaced,
+  HostSessionClientOptions,
+} from "./session-client-contract"
 import type { RpcSessionState, RpcTransportGoneError } from "@code-yeongyu/senpi"
 import { log } from "@oh-my-opencode/utils"
 
@@ -29,7 +36,6 @@ import type { TaskParentWire } from "../task-parent-control"
 import { confirmHostSessionAbsent } from "./session-close-proof"
 import { openHostSessionConnection } from "./session-client-opening"
 import { reapplyPermissionPreset, type PermissionPushPorts } from "./permission-push"
-
 
 /**
  * ONE senpi `RpcClient` per child, over the machine-wide daemon's public socket. The client probes
@@ -97,7 +103,9 @@ export class HostSessionClient {
       ...this.ports,
       onDisconnect: (error) => this.handleTransportLoss(error),
       onEvent: (record) => this.ingest(record),
-      bindClient: (client) => { this.client = client },
+      bindClient: (client) => {
+        this.client = client
+      },
     })
     this.identity = identity
     this.routingId = opened.sessionId
@@ -182,7 +190,10 @@ export class HostSessionClient {
       // A stop failure after the host answered must not erase that answer (omo#11765).
       await client.stop().catch((error: unknown) => {
         if (!answered) throw error
-        log("senpi-task host session client stop failed after an answered close", { socket: this.socketPath, error: String(error) })
+        log("senpi-task host session client stop failed after an answered close", {
+          socket: this.socketPath,
+          error: String(error),
+        })
       })
     }
     return answered
@@ -239,7 +250,8 @@ export class HostSessionClient {
         const sessionId = this.routingId ?? control.sessionId
         this.routingId = undefined
         try {
-          for (const listener of this.parkedListeners) listener({ sessionId, sessionPath: control.sessionPath, reason: SESSION_PARKED_CAUSE })
+          for (const listener of this.parkedListeners)
+            listener({ sessionId, sessionPath: control.sessionPath, reason: SESSION_PARKED_CAUSE })
         } finally {
           this.releaseEndedSession()
         }
@@ -282,11 +294,14 @@ export class HostSessionClient {
   // Never awaited, so a UI request cannot hold up the record stream or a command in flight: a forwardable dialog
   // waits for the parent's answer (#6189 F2d), anything else gets the deny/cancel default at once.
   private answerUi(request: AutoAnswerableUiRequest & Readonly<Record<string, unknown>>): void {
-    this.parent.answer(request, async (answer) => { await this.client?.sendExtensionUIResponse(answer) })
+    this.parent.answer(request, async (answer) => {
+      await this.client?.sendExtensionUIResponse(answer)
+    })
   }
 
   private async pushPermissionPreset(preset: string): Promise<void> {
-    if (this.openInput === undefined || this.routingId === undefined) throw new HostSessionDetachedError("set_permission_preset")
+    if (this.openInput === undefined || this.routingId === undefined)
+      throw new HostSessionDetachedError("set_permission_preset")
     await reapplyPermissionPreset({ ...this.openInput, permissionPreset: preset }, this.ports)
   }
 

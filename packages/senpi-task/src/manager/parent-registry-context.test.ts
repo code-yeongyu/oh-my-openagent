@@ -107,8 +107,16 @@ describe("createParentRegistrySessionContext", () => {
   test("#given the parent did not trust its project #when a child starts or resumes #then the child is told the project is untrusted", () => {
     // given
     const registry = registryWithMockProvider()
-    const resolved: ResolvedModelRecord = { provider: "omo-mock", model_id: "mock-1", display: "omo-mock/mock-1", source: "category" }
-    const provide = createParentRegistrySessionContext(() => registry, () => false)
+    const resolved: ResolvedModelRecord = {
+      provider: "omo-mock",
+      model_id: "mock-1",
+      display: "omo-mock/mock-1",
+      source: "category",
+    }
+    const provide = createParentRegistrySessionContext(
+      () => registry,
+      () => false,
+    )
 
     // when
     const started = provide(baseSpec({ model: "omo-mock/mock-1" }))
@@ -121,7 +129,10 @@ describe("createParentRegistrySessionContext", () => {
 
   test("#given the parent trusted its project but has no registry yet #when a child starts #then the trust decision still reaches the child", () => {
     // given
-    const provide = createParentRegistrySessionContext(() => undefined, () => true)
+    const provide = createParentRegistrySessionContext(
+      () => undefined,
+      () => true,
+    )
 
     // when
     const context = provide(baseSpec())

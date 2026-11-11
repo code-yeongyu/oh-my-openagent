@@ -1,11 +1,11 @@
 import { Buffer } from "node:buffer"
+import { createPrivateKey, createPublicKey, generateKeyPairSync, sign as ed25519Sign } from "node:crypto"
 import {
-  createPrivateKey,
-  createPublicKey,
-  generateKeyPairSync,
-  sign as ed25519Sign,
-} from "node:crypto"
-import { canonicalizeJson, CanonicalJsonError, type CanonicalJsonViolation, requireCanonicalJson } from "./canonical-json"
+  canonicalizeJson,
+  CanonicalJsonError,
+  type CanonicalJsonViolation,
+  requireCanonicalJson,
+} from "./canonical-json"
 import { openHpkeSealedBox } from "./hpke-sealed-box"
 
 /**
@@ -97,7 +97,10 @@ function parseCanonical(bytes: Uint8Array, what: "record" | "snapshot"): unknown
     return requireCanonicalJson(bytes)
   } catch (error) {
     if (!(error instanceof CanonicalJsonError)) throw error
-    throw new DeviceKeyringSignError(CANONICAL_REASONS[error.violation], `sign: ${what} preimage is not RFC 8785 canonical JSON: ${error.message}`)
+    throw new DeviceKeyringSignError(
+      CANONICAL_REASONS[error.violation],
+      `sign: ${what} preimage is not RFC 8785 canonical JSON: ${error.message}`,
+    )
   }
 }
 
@@ -107,7 +110,10 @@ function validateSignRequest(request: DeviceKeyringSignRequest): Uint8Array {
   }
   if (request.purpose === "object-digest") {
     if (!(request.digest instanceof Uint8Array) || request.digest.length !== 32) {
-      throw new DeviceKeyringSignError("digest-length", "sign: object-digest needs exactly 32 bytes (SHA-256 of the batch object)")
+      throw new DeviceKeyringSignError(
+        "digest-length",
+        "sign: object-digest needs exactly 32 bytes (SHA-256 of the batch object)",
+      )
     }
     return request.digest
   }
@@ -116,7 +122,12 @@ function validateSignRequest(request: DeviceKeyringSignRequest): Uint8Array {
       throw new DeviceKeyringSignError("record-json", "sign: record needs RFC 8785 canonical JSON bytes")
     }
     const parsed = parseCanonical(request.canonicalJson, "record")
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed) || typeof (parsed as { t?: unknown }).t !== "string") {
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed) ||
+      typeof (parsed as { t?: unknown }).t !== "string"
+    ) {
       throw new DeviceKeyringSignError("record-json", 'sign: record preimage needs a top-level "t" string')
     }
     const t = (parsed as { t: string }).t
@@ -126,7 +137,10 @@ function validateSignRequest(request: DeviceKeyringSignRequest): Uint8Array {
     // A record never carries another purpose's tag as its type: snapshots sign under
     // their own purpose, and the object-digest tag names no record.
     if (t === SIGNING_DOMAIN_TAGS["object-digest"] || t === SIGNING_DOMAIN_TAGS.snapshot) {
-      throw new DeviceKeyringSignError("record-prefix", 'sign: record "t" must name a keyring record type, not another purpose\'s tag')
+      throw new DeviceKeyringSignError(
+        "record-prefix",
+        'sign: record "t" must name a keyring record type, not another purpose\'s tag',
+      )
     }
     return request.canonicalJson
   }
@@ -137,11 +151,17 @@ function validateSignRequest(request: DeviceKeyringSignRequest): Uint8Array {
     const parsed = parseCanonical(request.canonicalJson, "snapshot")
     const t = typeof parsed === "object" && parsed !== null ? (parsed as { t?: unknown }).t : undefined
     if (t !== SIGNING_DOMAIN_TAGS.snapshot) {
-      throw new DeviceKeyringSignError("snapshot-prefix", 'sign: snapshot preimage "t" must be exactly "omo-sync/v1/snapshot"')
+      throw new DeviceKeyringSignError(
+        "snapshot-prefix",
+        'sign: snapshot preimage "t" must be exactly "omo-sync/v1/snapshot"',
+      )
     }
     return request.canonicalJson
   }
-  throw new DeviceKeyringSignError("unknown-purpose", `sign: unsupported purpose ${JSON.stringify((request as { purpose?: unknown }).purpose ?? null)}`)
+  throw new DeviceKeyringSignError(
+    "unknown-purpose",
+    `sign: unsupported purpose ${JSON.stringify((request as { purpose?: unknown }).purpose ?? null)}`,
+  )
 }
 
 export interface DeviceKeyring {
@@ -184,7 +204,8 @@ export type WrapBinding = { readonly account: string; readonly epoch: number; re
 const WRAP_INFO = Buffer.concat([Buffer.from("omo-sync/v1/wrap", "ascii"), Buffer.from([0])])
 
 const wrapAad = (binding: WrapBinding): Uint8Array => {
-  if (!Number.isSafeInteger(binding.epoch) || binding.epoch < 0) throw new Error("unseal: the wrap epoch must be a non-negative integer")
+  if (!Number.isSafeInteger(binding.epoch) || binding.epoch < 0)
+    throw new Error("unseal: the wrap epoch must be a non-negative integer")
   return canonicalizeJson({ account: binding.account, epoch: binding.epoch, id: binding.id })
 }
 
@@ -220,8 +241,16 @@ export function generateDeviceKeyMaterial(): DeviceKeyMaterial & { publicKeys: {
  * stay inside the returned closures; the object exposes only the port surface.
  */
 export function createDeviceKeyring(id: string, material: DeviceKeyMaterial): DeviceKeyring {
-  const signingPrivateKey = createPrivateKey({ key: Buffer.from(material.signingPrivatePkcs8, "base64url"), format: "der", type: "pkcs8" })
-  const sealingPrivateKey = createPrivateKey({ key: Buffer.from(material.sealingPrivatePkcs8, "base64url"), format: "der", type: "pkcs8" })
+  const signingPrivateKey = createPrivateKey({
+    key: Buffer.from(material.signingPrivatePkcs8, "base64url"),
+    format: "der",
+    type: "pkcs8",
+  })
+  const sealingPrivateKey = createPrivateKey({
+    key: Buffer.from(material.sealingPrivatePkcs8, "base64url"),
+    format: "der",
+    type: "pkcs8",
+  })
   const signingPublic = createPublicKey(signingPrivateKey).export({ format: "jwk" }).x
   const sealingPublic = createPublicKey(sealingPrivateKey).export({ format: "jwk" }).x
   if (!signingPublic || !sealingPublic) throw new Error("invalid device key material")
@@ -233,11 +262,12 @@ export function createDeviceKeyring(id: string, material: DeviceKeyMaterial): De
   return {
     principal: () => ({ kind: "device", id }),
     publicKeys: () => ({ ...publicKeys }),
-    sign: async request => {
+    sign: async (request) => {
       const payload = validateSignRequest(request)
       return ed25519Sign(null, domainSeparatedMessage(request.purpose, payload), signingPrivateKey)
     },
-    unseal: async (wrap, binding) => openHpkeSealedBox(sealingPrivateRaw, sealingPublicRaw, wrap, WRAP_INFO, wrapAad(binding)),
+    unseal: async (wrap, binding) =>
+      openHpkeSealedBox(sealingPrivateRaw, sealingPublicRaw, wrap, WRAP_INFO, wrapAad(binding)),
   }
 }
 

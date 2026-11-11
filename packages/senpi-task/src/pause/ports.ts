@@ -53,26 +53,36 @@ export type ChildPausePort = {
   pauseForRun(child: ManagedChildHandle, owner: RunPauseOwner): Promise<EngineInheritReceipt>
   // Undefined when the child's engine reports no pause view.
   observeHold?(child: ManagedChildHandle, parentSessionId: string): Promise<ObservedHold | undefined>
-  resumeTurn(child: ManagedChildHandle, request: RunPauseOwner & {
-    readonly resumeId: string
-    readonly childSeqCutoff: number
-  }): Promise<ResumedChildTurn | { readonly otherHoldLive: true; readonly childSeq?: number }>
-  holdInput(child: ManagedChildHandle, input: {
-    readonly inputId: string
-    readonly revision: number
-    readonly text: string
-  }, owner: { readonly parentSessionId: string }): Promise<EngineHoldInputResult>
+  resumeTurn(
+    child: ManagedChildHandle,
+    request: RunPauseOwner & {
+      readonly resumeId: string
+      readonly childSeqCutoff: number
+    },
+  ): Promise<ResumedChildTurn | { readonly otherHoldLive: true; readonly childSeq?: number }>
+  holdInput(
+    child: ManagedChildHandle,
+    input: {
+      readonly inputId: string
+      readonly revision: number
+      readonly text: string
+    },
+    owner: { readonly parentSessionId: string },
+  ): Promise<EngineHoldInputResult>
 }
 
 export type GuardedChild = {
   readonly child: ManagedChildHandle
   // Initialization is staged: no session-start producer or first prompt may execute before
   // this final admission check. A closed ticket installs inherited custody before binding.
-  activate(): Promise<ResumedChildTurn | {
-    readonly kind: "paused"
-    readonly childSeq: number
-    readonly owner: RunPauseOwner
-  }>
+  activate(): Promise<
+    | ResumedChildTurn
+    | {
+        readonly kind: "paused"
+        readonly childSeq: number
+        readonly owner: RunPauseOwner
+      }
+  >
 }
 
 export type ChildCreationPort = {

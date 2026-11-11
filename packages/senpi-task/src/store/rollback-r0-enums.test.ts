@@ -47,7 +47,9 @@ describe("R0 persisted enum compatibility", () => {
     test(`#given current ${path} vocabulary #when read by R0 #then every value remains readable`, () => {
       // A status is checked in its on-disk encoding: the store never writes a status R0 cannot read.
       const persisted = (value: string): Record<string, unknown> =>
-        path === "status" ? { ...storedStatus(TASK_STATUSES.find(status => status === value) ?? "running") } : recordWith(path, value)
+        path === "status"
+          ? { ...storedStatus(TASK_STATUSES.find((status) => status === value) ?? "running") }
+          : recordWith(path, value)
       for (const value of values) expect(() => parseR0PersistedReasons(persisted(value))).not.toThrow()
     })
   }

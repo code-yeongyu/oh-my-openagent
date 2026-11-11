@@ -19,7 +19,9 @@ export function crashedParentProblems(facts) {
   else {
     if (!(row.crashes >= 1)) problems.push(`crashed endpoint reports crashes=${row.crashes}, want >= 1`)
     if (typeof row.instanceId !== "string" || row.instanceId === facts.crashedInstanceBefore) {
-      problems.push(`crashed endpoint instanceId ${row.instanceId} is not a new instance (was ${facts.crashedInstanceBefore})`)
+      problems.push(
+        `crashed endpoint instanceId ${row.instanceId} is not a new instance (was ${facts.crashedInstanceBefore})`,
+      )
     }
   }
   return problems

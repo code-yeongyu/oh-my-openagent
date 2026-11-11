@@ -38,8 +38,8 @@ export function findLatestMemoryBinding(entries: readonly SessionEntryLike[]): M
 function isMemorySessionBinding(value: unknown): value is MemorySessionBinding {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false
   return (
-    typeof Reflect.get(value, "identity") === "string"
-    && typeof Reflect.get(value, "repoPathHash") === "string"
-    && typeof Reflect.get(value, "boundAt") === "number"
+    typeof Reflect.get(value, "identity") === "string" &&
+    typeof Reflect.get(value, "repoPathHash") === "string" &&
+    typeof Reflect.get(value, "boundAt") === "number"
   )
 }

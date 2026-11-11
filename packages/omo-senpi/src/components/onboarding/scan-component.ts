@@ -127,23 +127,29 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
       if (typeof pi.on === "function") {
         pi.on("session_start", (_payload, eventCtx) => {
           modelRegistry = resolveMemoryModelRegistry(eventCtx) ?? modelRegistry
-          const registry = isRecord(eventCtx) && isRecord(eventCtx["modelRegistry"]) ? eventCtx["modelRegistry"] : undefined
+          const registry =
+            isRecord(eventCtx) && isRecord(eventCtx["modelRegistry"]) ? eventCtx["modelRegistry"] : undefined
           const candidate = isRecord(registry?.["authStorage"]) ? registry?.["authStorage"] : undefined
           if (
-            candidate !== undefined && typeof candidate["getStoragePath"] === "function" && typeof candidate["modify"] === "function"
+            candidate !== undefined &&
+            typeof candidate["getStoragePath"] === "function" &&
+            typeof candidate["modify"] === "function"
           ) {
             capturedStore = candidate as unknown as OnboardingEngineAuthStore
             shared.latestAuthStore = capturedStore
           }
         })
       }
-      const expired = (entry: Pick<HeldScan, "finishedAt">): boolean => entry.finishedAt !== undefined && now() - entry.finishedAt > ONBOARDING_SCAN_TTL_MS
+      const expired = (entry: Pick<HeldScan, "finishedAt">): boolean =>
+        entry.finishedAt !== undefined && now() - entry.finishedAt > ONBOARDING_SCAN_TTL_MS
       // Understanding's handlers ship in the lazy runtime: the first understanding call loads them, once
       // per shell (concurrent first calls share one load), so its runs map scopes skip and stop. A failed
       // load is not kept; the next call retries.
       let understandingHandlers: Promise<OnboardingUnderstandingHandlers> | undefined
       const understanding = async (): Promise<OnboardingUnderstandingHandlers | string> => {
-        const pending = understandingHandlers ??= loadRuntime().then((runtime) => runtime.createOnboardingUnderstandingHandlers(pi, understandingDeps))
+        const pending = (understandingHandlers ??= loadRuntime().then((runtime) =>
+          runtime.createOnboardingUnderstandingHandlers(pi, understandingDeps),
+        ))
         try {
           return await pending
         } catch (error) {
@@ -159,14 +165,26 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
         expired,
         ...(deps.understanding === undefined ? {} : { seams: deps.understanding }),
       }
-      const delegate = (pick: (handlers: OnboardingUnderstandingHandlers) => (request: unknown) => unknown) =>
+      const delegate =
+        (pick: (handlers: OnboardingUnderstandingHandlers) => (request: unknown) => unknown) =>
         async (request: unknown): Promise<unknown> => {
           const handlers = await understanding()
-          return typeof handlers === "string" ? { kind: "unavailable", reason: handlers } : await pick(handlers)(request)
+          return typeof handlers === "string"
+            ? { kind: "unavailable", reason: handlers }
+            : await pick(handlers)(request)
         }
-      handle(ONBOARDING_UNDERSTAND_RPC_METHOD, delegate((handlers) => handlers.understand))
-      handle(ONBOARDING_UNDERSTAND_SKIP_RPC_METHOD, delegate((handlers) => handlers.skip))
-      handle(ONBOARDING_UNDERSTAND_STOP_RPC_METHOD, delegate((handlers) => handlers.stop))
+      handle(
+        ONBOARDING_UNDERSTAND_RPC_METHOD,
+        delegate((handlers) => handlers.understand),
+      )
+      handle(
+        ONBOARDING_UNDERSTAND_SKIP_RPC_METHOD,
+        delegate((handlers) => handlers.skip),
+      )
+      handle(
+        ONBOARDING_UNDERSTAND_STOP_RPC_METHOD,
+        delegate((handlers) => handlers.stop),
+      )
 
       handle(ONBOARDING_SCAN_RPC_METHOD, (request): OnboardingScanResponse => {
         const scanId = randomUUID()
@@ -189,7 +207,13 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
           .then(loadRuntime)
           .then((runtime) => runtime.runOnboardingScan(environment(), { scanId, includeCustomProviders }, emit))
           .catch((error: unknown) => {
-            emit({ scanId, kind: "done", source: "all", elapsedMs: 0, reason: error instanceof Error ? error.message : String(error) })
+            emit({
+              scanId,
+              kind: "done",
+              source: "all",
+              elapsedMs: 0,
+              reason: error instanceof Error ? error.message : String(error),
+            })
             return undefined
           })
         scans.set(scanId, held)
@@ -207,11 +231,13 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
       handle(ONBOARDING_APPLY_RPC_METHOD, async (request): Promise<OnboardingApplyResponse> => {
         const scanId = isRecord(request) ? request["scanId"] : undefined
         const stages = isRecord(request) ? request["stages"] : undefined
-        if (typeof scanId !== "string" || !Array.isArray(stages)) return { kind: "invalid", reason: "apply needs a scanId and a stages list" }
+        if (typeof scanId !== "string" || !Array.isArray(stages))
+          return { kind: "invalid", reason: "apply needs a scanId and a stages list" }
         const unknown = stages.filter((stage) => !isApplyStage(stage))
         if (unknown.length > 0) return { kind: "invalid", reason: `unknown stages: ${unknown.map(String).join(", ")}` }
         const held = scans.get(scanId)
-        if (held === undefined || held.applied) return { kind: "unavailable", reason: "No scan with this id; it finished long ago or was already applied." }
+        if (held === undefined || held.applied)
+          return { kind: "unavailable", reason: "No scan with this id; it finished long ago or was already applied." }
         // One apply per scan: its plans describe the files as they were when the scan read them. The
         // scan itself stays retained, so the desktop's understanding step can still read its digests
         // after About you applies (#12508); it leaves the store when it expires or is evicted.
@@ -226,11 +252,17 @@ export function createOnboardingScanComponent(deps: OnboardingScanComponentDepen
         }
         if (held.finishedAt === undefined || expired(held)) {
           drop()
-          return { kind: "stale", reason: "The scan expired; retained scans live ten minutes. Run omo.onboarding.scan again.", paths: [] }
+          return {
+            kind: "stale",
+            reason: "The scan expired; retained scans live ten minutes. Run omo.onboarding.scan again.",
+            paths: [],
+          }
         }
         // Everything past the expiry check needs the runtime, so it ships there: the auth checks and the writers.
         // The scan was marked applied above, synchronously, so two applies racing on one scan never both run.
-        return await (await loadRuntime()).applyRetainedScan(scanId, plans.plans, stages.filter(isApplyStage), authStore)
+        return await (
+          await loadRuntime()
+        ).applyRetainedScan(scanId, plans.plans, stages.filter(isApplyStage), authStore)
       })
     },
   }
@@ -246,7 +278,9 @@ function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
 
 export async function loadOnboardingScanRuntime(): Promise<OnboardingScanRuntime> {
   const bundled = typeof OMO_SENPI_BUNDLED !== "undefined" && OMO_SENPI_BUNDLED
-  const loaded: unknown = await import(new URL(bundled ? ONBOARDING_SCAN_RUNTIME_FILE : "scan-runtime.ts", import.meta.url).href)
+  const loaded: unknown = await import(
+    new URL(bundled ? ONBOARDING_SCAN_RUNTIME_FILE : "scan-runtime.ts", import.meta.url).href
+  )
   if (!isRecord(loaded)) throw new Error("onboarding scan runtime did not load")
   const missing = RUNTIME_EXPORTS.filter((name) => typeof loaded[name] !== "function")
   if (missing.length > 0) throw new Error(`onboarding scan runtime is missing ${missing.join(", ")}`)

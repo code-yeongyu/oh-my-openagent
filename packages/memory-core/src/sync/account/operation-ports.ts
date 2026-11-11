@@ -14,11 +14,14 @@ export const accountOperation = (http: AccountHttp, operation: SyncOperationOpti
 })
 
 export const pairingOperation = (http: PairingHttp, operation: SyncOperationOptions = {}): PairingHttp => ({
-  openPending: (account, commitment) => admitSyncOperation(operation, () => http.openPending(account, commitment, operation)),
+  openPending: (account, commitment) =>
+    admitSyncOperation(operation, () => http.openPending(account, commitment, operation)),
   readPending: (id) => admitSyncOperation(operation, () => http.readPending(id, operation)),
   listPending: () => admitSyncOperation(operation, () => http.listPending(operation)),
-  answerPending: (id, principal, nonce) => admitSyncOperation(operation, () => http.answerPending(id, principal, nonce, operation)),
-  revealPending: (id, principal, nonce) => admitSyncOperation(operation, () => http.revealPending(id, principal, nonce, operation)),
+  answerPending: (id, principal, nonce) =>
+    admitSyncOperation(operation, () => http.answerPending(id, principal, nonce, operation)),
+  revealPending: (id, principal, nonce) =>
+    admitSyncOperation(operation, () => http.revealPending(id, principal, nonce, operation)),
   setAccountSync: (enabled) => admitSyncOperation(operation, () => http.setAccountSync(enabled, operation)),
   setDeviceSync: (id, enabled) => admitSyncOperation(operation, () => http.setDeviceSync(id, enabled, operation)),
 })

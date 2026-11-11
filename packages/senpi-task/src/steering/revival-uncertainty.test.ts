@@ -35,7 +35,13 @@ describe("task_send lazy terminal RPC revival", () => {
     const port: SteeringPort = {
       store,
       liveHandle: () => (live ? handle : undefined),
-      reserveForRevive: () => ({ ok: true, commit: () => { commits += 1 }, release: () => undefined }),
+      reserveForRevive: () => ({
+        ok: true,
+        commit: () => {
+          commits += 1
+        },
+        release: () => undefined,
+      }),
       reviveDetached: async () => {
         live = true
         store.mutate(record.task_id, (fresh) => ({ ...fresh, residency_state: "resident", host_pid: 6000 }))
@@ -46,7 +52,11 @@ describe("task_send lazy terminal RPC revival", () => {
         return "rolled_back"
       },
       dequeuePending: () => false,
-      destruction: { destroyResidentTask: async () => { destroys += 1 } },
+      destruction: {
+        destroyResidentTask: async () => {
+          destroys += 1
+        },
+      },
       runStatsSnapshot: () => undefined,
       now: () => Date.parse("2026-09-02T00:00:00.000Z"),
     }
@@ -122,7 +132,15 @@ describe("task_send lazy terminal RPC revival", () => {
     const port: SteeringPort = {
       store,
       liveHandle: () => (live ? handle : undefined),
-      reserveForRevive: () => ({ ok: true, commit: () => { commits += 1 }, release: () => { releases += 1 } }),
+      reserveForRevive: () => ({
+        ok: true,
+        commit: () => {
+          commits += 1
+        },
+        release: () => {
+          releases += 1
+        },
+      }),
       reviveDetached: async () => {
         live = true
         store.mutate(record.task_id, (fresh) => ({ ...fresh, residency_state: "resident", host_pid: 6000 }))
@@ -130,7 +148,11 @@ describe("task_send lazy terminal RPC revival", () => {
       },
       rollbackDetachedRevival: () => "not_owner",
       dequeuePending: () => false,
-      destruction: { destroyResidentTask: async () => { destroys += 1 } },
+      destruction: {
+        destroyResidentTask: async () => {
+          destroys += 1
+        },
+      },
       runStatsSnapshot: () => undefined,
       now: () => Date.parse("2026-09-02T00:00:00.000Z"),
     }
@@ -143,7 +165,11 @@ describe("task_send lazy terminal RPC revival", () => {
     expect(commits).toBe(0)
     expect(releases).toBe(1)
     const current = store.load(record.task_id)
-    expect(current).toMatchObject({ status: "cancelled", error_message: "cancelled by user", notification: { run_epoch: 1 } })
+    expect(current).toMatchObject({
+      status: "cancelled",
+      error_message: "cancelled by user",
+      notification: { run_epoch: 1 },
+    })
     expect(current?.revive_delivery_uncertain).toBeUndefined()
   })
 
@@ -176,7 +202,15 @@ describe("task_send lazy terminal RPC revival", () => {
     const port: SteeringPort = {
       store,
       liveHandle: () => (live ? handle : undefined),
-      reserveForRevive: () => ({ ok: true, commit: () => { commits += 1 }, release: () => { releases += 1 } }),
+      reserveForRevive: () => ({
+        ok: true,
+        commit: () => {
+          commits += 1
+        },
+        release: () => {
+          releases += 1
+        },
+      }),
       reviveDetached: async () => {
         live = true
         baseStore.mutate(record.task_id, (fresh) => ({ ...fresh, residency_state: "resident", host_pid: 6000 }))
@@ -184,7 +218,11 @@ describe("task_send lazy terminal RPC revival", () => {
       },
       rollbackDetachedRevival: () => "not_owner",
       dequeuePending: () => false,
-      destruction: { destroyResidentTask: async () => { destroys += 1 } },
+      destruction: {
+        destroyResidentTask: async () => {
+          destroys += 1
+        },
+      },
       runStatsSnapshot: () => undefined,
       now: () => Date.parse("2026-09-02T00:00:00.000Z"),
     }

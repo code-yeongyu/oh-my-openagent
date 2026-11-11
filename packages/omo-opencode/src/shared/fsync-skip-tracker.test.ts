@@ -1,17 +1,8 @@
 import { beforeEach, describe, expect, it } from "bun:test"
 
-import {
-  clearAllSkips,
-  drainSkipsAfter,
-  recordFsyncSkip,
-} from "./fsync-skip-tracker"
+import { clearAllSkips, drainSkipsAfter, recordFsyncSkip } from "./fsync-skip-tracker"
 
-type PathClassification =
-  | "icloud"
-  | "onedrive"
-  | "desktop-sync"
-  | "network-drive"
-  | "unknown"
+type PathClassification = "icloud" | "onedrive" | "desktop-sync" | "network-drive" | "unknown"
 
 function recordSkip(index: number, pathClassification: PathClassification = "unknown"): void {
   recordFsyncSkip({

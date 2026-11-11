@@ -6,7 +6,8 @@ import type { AutoAnswerableUiRequest } from "./rpc/ui-auto-answer"
 
 /**
  * The parent session's approval mode as its children follow it (#6189 F2c/F2e): `current` is the preset the parent's
- * next gated decision uses (`pi.getPermissionPreset()`), `onChange` fires when a client moves the parent to another one.
+ * next gated decision uses (`pi.getPermissionPreset()`), `onChange` fires wherever that mode may have moved: a client
+ * named a new one, or the parent session restarted or began a turn (#12853). It may fire with an unchanged mode.
  */
 export interface ParentPermissionMode {
   current(): string | undefined
@@ -36,8 +37,16 @@ export class ChildParentLink {
     private readonly onWarning?: (message: string, token: string) => void | (() => void),
   ) {}
 
-  answer(frame: AutoAnswerableUiRequest & Readonly<Record<string, unknown>>, send: (response: RpcExtensionUIResponse) => void | Promise<void>): void {
-    answerChildUiRequest(frame, this.forwarder === undefined ? undefined : { forwarder: this.forwarder, taskId: this.taskId }, this.#abort.signal, send)
+  answer(
+    frame: AutoAnswerableUiRequest & Readonly<Record<string, unknown>>,
+    send: (response: RpcExtensionUIResponse) => void | Promise<void>,
+  ): void {
+    answerChildUiRequest(
+      frame,
+      this.forwarder === undefined ? undefined : { forwarder: this.forwarder, taskId: this.taskId },
+      this.#abort.signal,
+      send,
+    )
   }
 
   // An aborted turn cancels the child's own pending dialogs, so their forwarded copies on the parent go too.
@@ -86,9 +95,16 @@ export class ChildParentLink {
         this.#applied = undefined
         // A link closed while this push was in flight reports nothing: its child is gone and nothing could release it.
         if (this.#unfollow === undefined) return
-        log("senpi-task child did not follow its parent's approval mode", { taskId: this.taskId, preset, error: String(error) })
+        log("senpi-task child did not follow its parent's approval mode", {
+          taskId: this.taskId,
+          preset,
+          error: String(error),
+        })
         this.#releaseWarning?.()
-        const release = this.onWarning?.(`task ${this.taskId} may not have followed its parent's approval mode (${preset}); its mode is unknown (last confirmed ${confirmed ?? "none"}) until the parent's next change reaches it: ${error instanceof Error ? error.message : String(error)}`, `follow:${this.taskId}`)
+        const release = this.onWarning?.(
+          `task ${this.taskId} may not have followed its parent's approval mode (${preset}); its mode is unknown (last confirmed ${confirmed ?? "none"}) until the parent's next change reaches it: ${error instanceof Error ? error.message : String(error)}`,
+          `follow:${this.taskId}`,
+        )
         this.#releaseWarning = typeof release === "function" ? release : undefined
       }
     })

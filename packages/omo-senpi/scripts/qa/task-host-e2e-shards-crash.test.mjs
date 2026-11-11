@@ -41,7 +41,10 @@ function facts() {
 }
 
 const rows = (value) => crashRowsForReport(value, "/tmp/artifacts")
-const failed = (value) => Object.entries(rows(value)).filter(([, row]) => row.status !== "pass").map(([id]) => id)
+const failed = (value) =>
+  Object.entries(rows(value))
+    .filter(([, row]) => row.status !== "pass")
+    .map(([id]) => id)
 
 describe("crashRowsForReport", () => {
   test("silent recovery with a new host generation and completed children passes every row", () => {
@@ -50,7 +53,8 @@ describe("crashRowsForReport", () => {
 
   const crashedMutations = {
     "a recovered crash emits a warning": (value) => value.notices.crashed.push(`host_shard_crash:${KEY_A} crash`),
-    "a recovered crash emits a closing line": (value) => value.notices.crashed.push(`host_shard_crash_done:${KEY_A} done`),
+    "a recovered crash emits a closing line": (value) =>
+      value.notices.crashed.push(`host_shard_crash_done:${KEY_A} done`),
     "another shard leaks a warning": (value) => value.notices.crashed.push(`host_shard_crash:${KEY_B} crash`),
     "the notice list was never read": (value) => {
       value.notices.crashed = null

@@ -28,7 +28,9 @@ test("win32 refuses a path at or past the length its git opens, and only from th
   expect(grammarValidKeyOfLength(longestAllowed)).toHaveLength(longestAllowed)
   expect(commitPathProblem(GIT_WINDOWS_ROOT, grammarValidKeyOfLength(longestAllowed), "win32")).toBeNull()
   expect(commitPathProblem(`${GIT_WINDOWS_ROOT}\\`, grammarValidKeyOfLength(longestAllowed), "win32")).toBeNull()
-  expect(commitPathProblem(GIT_WINDOWS_ROOT, grammarValidKeyOfLength(longestAllowed + 1), "win32")).toBe("git-path-too-long")
+  expect(commitPathProblem(GIT_WINDOWS_ROOT, grammarValidKeyOfLength(longestAllowed + 1), "win32")).toBe(
+    "git-path-too-long",
+  )
 })
 
 test("win32 refuses a key inside the grammar whose working path git cannot open", () => {
@@ -48,75 +50,85 @@ test("a landing follows this platform's git capacity", async () => {
   try {
     const key = grammarValidKeyOfLength(300)
     // POSIX decides through its own probe and accepts this path; Windows reaches the same key past MAX_PATH, where git could not stage it, so it is refused before anything is written.
-    expect(await prepareLanding(root, key)).toEqual(process.platform === "win32" ? { refused: "git-path-too-long" } : { path: key, working: null })
+    expect(await prepareLanding(root, key)).toEqual(
+      process.platform === "win32" ? { refused: "git-path-too-long" } : { path: key, working: null },
+    )
   } finally {
     await rm(root, { recursive: true, force: true })
   }
 })
 
-posix("a FIFO at a received key's path is refused with a receipt instead of blocking the cycle", async () => {
-  const root = await mkdtemp(join(tmpdir(), "omo-sync-landing-"))
-  try {
-    const key = "memory/note.md"
-    await mkdir(join(root, "memory"), { recursive: true })
-    const made = Bun.spawn(["mkfifo", join(root, key)])
-    expect(await made.exited).toBe(0)
-    // The pre-fix code read the leaf here, which blocks on a FIFO until a writer opens it. The
-    // bounded race keeps that run from hanging the suite: it settles as a timeout instead.
-    // #12568 review: clear the 5-second race timer once `prepareLanding` wins, so the test
-    // does not leave a stray timer alive after it settles.
-    let timeoutId: ReturnType<typeof setTimeout> | undefined
-    const timeout = new Promise<{ kind: "timed-out" }>((resolve) => {
-      timeoutId = setTimeout(() => resolve({ kind: "timed-out" }), 5_000)
-    })
+posix(
+  "a FIFO at a received key's path is refused with a receipt instead of blocking the cycle",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "omo-sync-landing-"))
     try {
-      const settled = await Promise.race([
-        prepareLanding(root, key).then((result) => ({ kind: "landed" as const, result })),
-        timeout,
-      ])
-      expect(settled).toEqual({ kind: "landed", result: { refused: "non-regular-file" } })
+      const key = "memory/note.md"
+      await mkdir(join(root, "memory"), { recursive: true })
+      const made = Bun.spawn(["mkfifo", join(root, key)])
+      expect(await made.exited).toBe(0)
+      // The pre-fix code read the leaf here, which blocks on a FIFO until a writer opens it. The
+      // bounded race keeps that run from hanging the suite: it settles as a timeout instead.
+      // #12568 review: clear the 5-second race timer once `prepareLanding` wins, so the test
+      // does not leave a stray timer alive after it settles.
+      let timeoutId: ReturnType<typeof setTimeout> | undefined
+      const timeout = new Promise<{ kind: "timed-out" }>((resolve) => {
+        timeoutId = setTimeout(() => resolve({ kind: "timed-out" }), 5_000)
+      })
+      try {
+        const settled = await Promise.race([
+          prepareLanding(root, key).then((result) => ({ kind: "landed" as const, result })),
+          timeout,
+        ])
+        expect(settled).toEqual({ kind: "landed", result: { refused: "non-regular-file" } })
+      } finally {
+        if (timeoutId !== undefined) clearTimeout(timeoutId)
+      }
     } finally {
-      if (timeoutId !== undefined) clearTimeout(timeoutId)
+      await rm(root, { recursive: true, force: true })
     }
-  } finally {
-    await rm(root, { recursive: true, force: true })
-  }
-}, 10_000)
+  },
+  10_000,
+)
 
 // #12575: the kind of leaf is judged on the opened descriptor, so a FIFO swapped in after prepareLanding's lstat (or a
 // known key's file replaced by one before capture) settles as a refusal instead of blocking the read.
-posix("reading a FIFO leaf settles at once with the non-regular-file refusal, with no writer on the other end", async () => {
-  const root = await mkdtemp(join(tmpdir(), "omo-sync-landing-"))
-  try {
-    // given
-    const key = "memory/note.md"
-    await mkdir(join(root, "memory"), { recursive: true })
-    const made = Bun.spawn(["mkfifo", join(root, key)])
-    expect(await made.exited).toBe(0)
-    let timeoutId: ReturnType<typeof setTimeout> | undefined
-    const timeout = new Promise<{ kind: "timed-out" }>((resolve) => {
-      timeoutId = setTimeout(() => resolve({ kind: "timed-out" }), 5_000)
-    })
-
-    // when
+posix(
+  "reading a FIFO leaf settles at once with the non-regular-file refusal, with no writer on the other end",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "omo-sync-landing-"))
     try {
-      const settled = await Promise.race([
-        readWorking(root, key).then(
-          (text) => ({ kind: "read" as const, text }),
-          (error: unknown) => ({ kind: "refused" as const, reason: fsRefusal(error)?.toLowerCase() }),
-        ),
-        timeout,
-      ])
+      // given
+      const key = "memory/note.md"
+      await mkdir(join(root, "memory"), { recursive: true })
+      const made = Bun.spawn(["mkfifo", join(root, key)])
+      expect(await made.exited).toBe(0)
+      let timeoutId: ReturnType<typeof setTimeout> | undefined
+      const timeout = new Promise<{ kind: "timed-out" }>((resolve) => {
+        timeoutId = setTimeout(() => resolve({ kind: "timed-out" }), 5_000)
+      })
 
-      // then
-      expect(settled).toEqual({ kind: "refused", reason: "non-regular-file" })
+      // when
+      try {
+        const settled = await Promise.race([
+          readWorking(root, key).then(
+            (text) => ({ kind: "read" as const, text }),
+            (error: unknown) => ({ kind: "refused" as const, reason: fsRefusal(error)?.toLowerCase() }),
+          ),
+          timeout,
+        ])
+
+        // then
+        expect(settled).toEqual({ kind: "refused", reason: "non-regular-file" })
+      } finally {
+        if (timeoutId !== undefined) clearTimeout(timeoutId)
+      }
     } finally {
-      if (timeoutId !== undefined) clearTimeout(timeoutId)
+      await rm(root, { recursive: true, force: true })
     }
-  } finally {
-    await rm(root, { recursive: true, force: true })
-  }
-}, 10_000)
+  },
+  10_000,
+)
 
 posix("reading a leaf that is a symlink fails instead of following it", async () => {
   const root = await mkdtemp(join(tmpdir(), "omo-sync-landing-"))
@@ -127,7 +139,10 @@ posix("reading a leaf that is a symlink fails instead of following it", async ()
     await symlink("real.md", join(root, "memory", "note.md"))
 
     // when
-    const reason = await readWorking(root, "memory/note.md").then(() => undefined, (error: unknown) => fsRefusal(error))
+    const reason = await readWorking(root, "memory/note.md").then(
+      () => undefined,
+      (error: unknown) => fsRefusal(error),
+    )
 
     // then
     expect(reason).toBe("ELOOP")
