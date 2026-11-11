@@ -10,6 +10,7 @@ import { GitMemoryRepo, NoEffectiveChangesError, type GitCommitAuthor, type GitT
 import { mkdir, readdir, readFile, writeFile } from "../fs/resilient"
 import type { MemoryWriteLock } from "../tools/commit-write"
 import { AGENTS_DIRNAME, buildIdentityPaths, type MemoryIdentityPaths } from "./layout"
+import { createInTarget, isPlainTreePath } from "./merge-paths"
 import { markIdentityMerged, readIdentityRecord } from "./record"
 import { resolveAutoIdentity } from "./resolve"
 
@@ -233,6 +234,10 @@ export async function planIdentityMerge(
     .filter((entry) => mergedBefore?.get(entry.path) !== entry.oid)
     .sort((left, right) => left.path.localeCompare(right.path))
     .map((entry): MergeAction => {
+      // A source tree is data: plumbing or another tool can name an entry `..`, `.git` or `a\b`, and such a
+      // name must never become a target path (#12974 security).
+      if (!isPlainTreePath(entry.path))
+        throw new Error(`memory merge: ${entry.path} in ${sourceId} is not a plain memory path; nothing was merged`)
       const existing = targetBlobs.get(entry.path)
       if (existing?.oid === entry.oid) return { path: entry.path, action: "skip" }
       const foldedCollision = existing === undefined && targetFolded.has(entry.path.toLowerCase())
@@ -310,14 +315,20 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
       }
     }
     const destinations = writes.map((action) => action.destination)
+    // Only files this merge created are rolled back; a path it refused may hold the user's own bytes.
+    const written: string[] = []
     try {
       for (const action of writes) {
         const content = contents.get(requiredOid(oids, action.path))
         if (content === undefined)
           throw new Error(`memory merge: blob for ${action.path} could not be read from ${plan.sourceId}`)
-        const destination = join(target.repo, action.destination)
-        await mkdir(dirname(destination), { recursive: true })
-        await writeFile(destination, content, "utf8")
+        const handle = await createInTarget(target.repo, action.destination)
+        written.push(action.destination)
+        try {
+          await writeFile(handle, content, "utf8")
+        } finally {
+          await handle.close()
+        }
       }
       const message = [
         `chore(memory): merge memories from ${plan.sourceId}`,
@@ -332,10 +343,10 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
       return { plan, sha }
     } catch (error) {
       if (error instanceof NoEffectiveChangesError) {
-        await targetRepo.restorePaths(destinations)
+        await targetRepo.restorePaths(written)
         return { plan }
       }
-      await targetRepo.restorePaths(destinations)
+      await targetRepo.restorePaths(written)
       throw error
     }
   })

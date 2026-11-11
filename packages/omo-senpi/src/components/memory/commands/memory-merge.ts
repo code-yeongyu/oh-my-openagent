@@ -69,13 +69,16 @@ async function runMemoryMerge(deps: MemoryCommandDeps, args: string, ctx: Memory
 
   if (!apply) {
     const lines = await Promise.all(
-      found.predecessors.map(async (predecessor) =>
-        describePlan(
-          await planIdentityMerge(
-            predecessor.paths,
-            identity.identityPaths,
-            predecessor.mergedInto === identity.identity ? predecessor.mergedHead : undefined,
-          ),
+      // One store whose plan is refused (a tree entry that is not a plain path) must not hide the others.
+      found.predecessors.map((predecessor) =>
+        planIdentityMerge(
+          predecessor.paths,
+          identity.identityPaths,
+          predecessor.mergedInto === identity.identity ? predecessor.mergedHead : undefined,
+        ).then(
+          describePlan,
+          (error: unknown) =>
+            `- ${predecessor.id}: refused (${error instanceof Error ? error.message : String(error)})`,
         ),
       ),
     )

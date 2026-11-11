@@ -58,7 +58,7 @@ async function desktopLayout() {
   const pi = new MemoryFakeExtensionAPI()
   const deps = fakeDeps({ identity: target.id, identityPaths: target.paths }, { env })
   registerMemoryMergeCommand(pi, deps)
-  return { pi, deps, target, old, targetRepo }
+  return { pi, deps, target, old, targetRepo, env, main }
 }
 
 describe("/memory-merge (#10070)", () => {
@@ -163,5 +163,40 @@ describe("/memory-merge (#10070)", () => {
     expect(await readFile(join(target.paths.repo, "notes/habit.md"), "utf8")).toBe(note("thread habit"))
     expect(existsSync(join(target.paths.repo, "system/persona.md"))).toBe(true)
     expect(existsSync(join(target.paths.repo, ".git/hooks/pre-commit"))).toBe(true)
+  }, 60_000)
+  test("#given two stores that map here, one holding a tree entry whose name is not a plain path #when /memory-merge runs dry and then with --apply #then the other store is still reported and merged and the refused one changes nothing (#12974 security)", async () => {
+    const { pi, target, old, targetRepo, env, main } = await desktopLayout()
+    const sub = join(main, "packages", "sub")
+    mkdirSync(sub, { recursive: true })
+    const refused = resolveAutoIdentity(sub, env, "path")
+    await seed(refused, { "notes/sub.md": note("sub") })
+    await recordIdentityBind(refused.paths.root, {
+      id: refused.id,
+      kind: "auto",
+      mode: "path",
+      source: sub,
+      spelling: sub,
+    })
+    // Plumbing takes the entry name porcelain refuses; on Windows its backslashes are separators.
+    const plumb = (args: readonly string[], input?: string): string =>
+      execFileSync("git", [...GIT, ...args], { cwd: refused.paths.repo, input, stdio: ["pipe", "pipe", "ignore"] })
+        .toString()
+        .trim()
+    const blob = plumb(["hash-object", "-w", "--stdin"], note("carried"))
+    const entries = plumb(["ls-tree", "-z", "HEAD"]).split("\0").filter(Boolean)
+    const tree = plumb(
+      ["mktree", "-z"],
+      [...entries, `100644 blob ${blob}\tnotes\\..\\system\\persona.md`, ""].join("\0"),
+    )
+    plumb(["update-ref", "HEAD", plumb(["commit-tree", tree, "-p", "HEAD", "-m", "a tree porcelain would refuse"])])
+
+    const dry = await invoke(pi, "memory-merge", "", fakeCommandContext())
+    const applied = await invoke(pi, "memory-merge", "--apply", fakeCommandContext())
+
+    expect(dry).toContain(old.id)
+    expect(dry).toContain(refused.id)
+    expect(applied).toContain(`merged ${old.id}`)
+    expect(await readFile(join(target.paths.repo, "system/persona.md"), "utf8")).toBe(note("main persona"))
+    expect((await targetRepo.status()).trim()).toBe("")
   }, 60_000)
 })

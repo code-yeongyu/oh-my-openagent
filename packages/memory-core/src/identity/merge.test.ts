@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { execFileSync } from "node:child_process"
 import { realpathSync, symlinkSync } from "node:fs"
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, readFile, readlink, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -49,6 +49,60 @@ async function identity(root: string, id: string, files: Record<string, string>,
 }
 
 const note = (body: string) => `---\ndescription: ${body}\n---\n\n${body}\n`
+
+function plumb(cwd: string, args: readonly string[], input?: string): string {
+  return execFileSync(
+    "git",
+    ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", "-c", "commit.gpgsign=false", ...args],
+    { cwd, input, stdio: ["pipe", "pipe", "ignore"] },
+  ).toString()
+}
+
+/**
+ * Commits `path` on top of HEAD with plumbing, replacing the top-level entry of the same name. `git mktree`
+ * takes any entry name (`..`, `.git`, one holding a backslash), so this builds the tree porcelain refuses to
+ * build but a store can still hold: written by another tool, cloned, or carried over from another system.
+ */
+function commitTreePath(repoDir: string, path: string, content: string): void {
+  const names = path.split("/")
+  let entry = `100644 blob ${plumb(repoDir, ["hash-object", "-w", "--stdin"], content).trim()}`
+  for (const name of names.slice(1).reverse()) {
+    entry = `040000 tree ${plumb(repoDir, ["mktree", "-z"], `${entry}\t${name}\0`).trim()}`
+  }
+  const kept = plumb(repoDir, ["ls-tree", "-z", "HEAD"])
+    .split("\0")
+    .filter((line) => line !== "" && !line.endsWith(`\t${names[0]}`))
+  const tree = plumb(repoDir, ["mktree", "-z"], [...kept, `${entry}\t${names[0]}`, ""].join("\0")).trim()
+  const commit = plumb(repoDir, ["commit-tree", tree, "-p", "HEAD", "-m", "a tree porcelain would refuse"]).trim()
+  plumb(repoDir, ["update-ref", "HEAD", commit])
+}
+
+/** Every directory, file and link under `dir` (links unresolved), so a test can show what a merge touched. */
+async function fingerprint(dir: string, skip: readonly string[] = []): Promise<Record<string, string>> {
+  const seen: Record<string, string> = {}
+  const walk = async (current: string, label: string): Promise<void> => {
+    for (const entry of await readdir(current, { withFileTypes: true })) {
+      const name = `${label}${entry.name}`
+      if (skip.includes(name)) continue
+      if (entry.isSymbolicLink()) seen[name] = `link to ${await readlink(join(current, entry.name))}`
+      else if (entry.isDirectory()) {
+        seen[`${name}/`] = "directory"
+        await walk(join(current, entry.name), `${name}/`)
+      } else seen[name] = await readFile(join(current, entry.name), "utf8")
+    }
+  }
+  await walk(dir, "")
+  return seen
+}
+
+function changedEntries(before: Record<string, string>, after: Record<string, string>): string[] {
+  return Object.keys({ ...before, ...after })
+    .filter((name) => before[name] !== after[name])
+    .sort()
+}
+
+// Object storage and the index are rewritten by git reads; no path a merge writes can name them.
+const GIT_READ_STATE = ["repo/.git/objects", "repo/.git/index"]
 
 describe("identity merge (#10070)", () => {
   it("#given per-worktree identities whose recorded spellings now resolve to the repository identity #when predecessors are found #then they are listed and an unrelated identity is reported unmapped", async () => {
@@ -548,4 +602,173 @@ describe("identity merge (#10070)", () => {
     expect(rerun.status).toBe("nothing-to-merge")
     expect(await readIdentityRecord(source.paths.root)).toMatchObject({ mergedHead: newHead })
   }, 30_000)
+
+  // Security contract (#12974): a source tree is data. An entry name that is not plain `/`-separated names
+  // must never reach the disk: `..` leaves the repository (or lands in its `.git`), a backslash is a
+  // separator on Windows and in `restorePaths`, and git's own directory has more spellings than `.git`.
+  it.each([
+    ["deep/../../outside.md", note("carried")],
+    ["deep/../system/persona.md", note("carried")],
+    ["deep/../.git/hooks/pre-commit", "#!/bin/sh\ntouch ../hook-ran\n"],
+    ["deep/../.git/refs/heads/planted", note("carried")],
+    ["notes/./base.md", note("carried")],
+    ["notes\\..\\..\\outside.md", note("carried")],
+    ["notes\\..\\system\\persona.md", note("carried")],
+    ["system\\persona.md", note("carried")],
+    ["skills/.git/config", "[core]\n\tbare = false\n"],
+    ["skills/.GIT/config", "[core]\n\tbare = false\n"],
+    ["skills/git~1/config", "[core]\n\tbare = false\n"],
+    ["skills/.git./config", "[core]\n\tbare = false\n"],
+    ["skills/.git /config", "[core]\n\tbare = false\n"],
+    ["skills/.git::$INDEX_ALLOCATION/config", "[core]\n\tbare = false\n"],
+    ["skills/.g\u200cit/config", "[core]\n\tbare = false\n"],
+  ])(
+    "#given a source tree entry named %j #when the merge is planned and applied #then both refuse it and nothing in or beside the target repository changes (#12974 security)",
+    async (path, content) => {
+      const root = await memoryRoot()
+      const target = await identity(
+        root,
+        "project-aaaa1111",
+        { "notes/base.md": note("base"), "system/persona.md": note("target persona") },
+        ["/work/project"],
+      )
+      const hook = join(target.paths.repo, ".git/hooks/pre-commit")
+      await mkdir(dirname(hook), { recursive: true })
+      await writeFile(hook, "#!/bin/sh\nexit 0\n", { mode: 0o755 })
+      const source = await identity(root, "project-feature-bbbb2222", { "notes/ok.md": note("ok") }, [
+        "/work/project-feature",
+      ])
+      commitTreePath(source.paths.repo, path, content)
+      const before = await fingerprint(target.paths.root, GIT_READ_STATE)
+
+      const planned = await planIdentityMerge(source.paths, target.paths).then(
+        () => "planned",
+        (error: unknown) => String(error),
+      )
+      const applied = await applyIdentityMerge({
+        source: source.paths,
+        target: target.paths,
+        lock,
+        author: AUTHOR,
+      }).then(
+        (result) => result.status,
+        (error: unknown) => String(error),
+      )
+
+      expect(changedEntries(before, await fingerprint(target.paths.root, GIT_READ_STATE))).toEqual([])
+      expect(planned).toContain(path)
+      expect(applied).toContain(path)
+    },
+    30_000,
+  )
+
+  it.each([
+    [
+      "a tracked directory link",
+      { "notes/kept.md": note("from source") },
+      async (repo: string, outside: string) => {
+        await rm(join(repo, "notes"), { recursive: true })
+        symlinkSync(outside, join(repo, "notes"))
+      },
+    ],
+    [
+      "the aside root as a tracked link",
+      { "notes/base.md": note("from source") },
+      async (repo: string, outside: string) => {
+        symlinkSync(outside, join(repo, "reference"))
+      },
+    ],
+    [
+      "a git-ignored file link",
+      { "local/kept.md": note("from source") },
+      async (repo: string, outside: string) => {
+        await mkdir(join(repo, "local"))
+        symlinkSync(join(outside, "kept.md"), join(repo, "local/kept.md"))
+      },
+    ],
+  ] as const)(
+    "#given a destination that leaves the target repository through %s #when the merge applies #then it is refused and nothing outside the repository is written, created or removed (#12974 security)",
+    async (_link, sourceFiles, plant) => {
+      const root = await memoryRoot()
+      const outside = join(root, "outside")
+      await mkdir(outside)
+      await writeFile(join(outside, "kept.md"), "not memory\n")
+      const target = await identity(
+        root,
+        "project-aaaa1111",
+        { ".gitignore": "local/\n", "notes/base.md": note("base") },
+        ["/work/project"],
+      )
+      await plant(target.paths.repo, outside)
+      plumb(target.paths.repo, ["add", "-A"])
+      plumb(target.paths.repo, ["commit", "-q", "--no-verify", "--allow-empty", "-m", "links"])
+      const source = await identity(root, "project-feature-bbbb2222", sourceFiles, ["/work/project-feature"])
+      const outsideBefore = await fingerprint(outside)
+      const targetBefore = await fingerprint(target.paths.root, GIT_READ_STATE)
+
+      const outcome = await applyIdentityMerge({
+        source: source.paths,
+        target: target.paths,
+        lock,
+        author: AUTHOR,
+      }).catch((error: unknown) => error)
+
+      expect(changedEntries(outsideBefore, await fingerprint(outside))).toEqual([])
+      expect(changedEntries(targetBefore, await fingerprint(target.paths.root, GIT_READ_STATE))).toEqual([])
+      expect(outcome).toBeInstanceOf(Error)
+    },
+    30_000,
+  )
+
+  it.each([
+    [
+      "a git-ignored file",
+      (repo: string, sourceRepo: string) => {
+        commitTreePath(sourceRepo, "local/mine.md", note("from source"))
+        return writeFile(join(repo, "local/mine.md"), "kept out of memory on purpose\n")
+      },
+    ],
+    [
+      "a git-ignored link to a tracked file",
+      async (repo: string, sourceRepo: string) => {
+        commitTreePath(sourceRepo, "local/mine.md", note("from source"))
+        symlinkSync(join(repo, "system/persona.md"), join(repo, "local/mine.md"))
+      },
+    ],
+    [
+      // The same file only where the disk folds Unicode forms (default macOS); elsewhere a second file.
+      "the other Unicode form of a tracked name",
+      async (_repo: string, sourceRepo: string) => {
+        commitTreePath(sourceRepo, "people/cafe\u0301.md", note("from source"))
+      },
+    ],
+  ] as const)(
+    "#given a planned path that is already on the target disk as %s #when the merge applies #then what was there keeps its bytes and the target is left clean (#12974 security)",
+    async (_existing, plant) => {
+      const root = await memoryRoot()
+      const target = await identity(
+        root,
+        "project-aaaa1111",
+        {
+          ".gitignore": "local/\n",
+          "system/persona.md": note("target persona"),
+          "people/caf\u00e9.md": note("target person"),
+        },
+        ["/work/project"],
+      )
+      await mkdir(join(target.paths.repo, "local"))
+      const source = await identity(root, "project-feature-bbbb2222", {}, ["/work/project-feature"])
+      await plant(target.paths.repo, source.paths.repo)
+      const before = await fingerprint(target.paths.repo, [".git"])
+
+      await applyIdentityMerge({ source: source.paths, target: target.paths, lock, author: AUTHOR }).catch(
+        (error: unknown) => error,
+      )
+
+      const after = await fingerprint(target.paths.repo, [".git"])
+      expect(Object.keys(before).filter((name) => after[name] !== before[name])).toEqual([])
+      expect((await target.repo.status()).trim()).toBe("")
+    },
+    30_000,
+  )
 })
