@@ -79,7 +79,10 @@ describe("primeMemoryPersonaAssets", () => {
     const reads: string[] = []
     const targets: readonly PersonaPrimeTarget[] = [
       { asset: "kibitzer-persona.md", load: () => reads.push("kibitzer") },
-      { asset: "#omo-task-runtime", load: () => Promise.reject(new Error("Cannot find module './extensions/omo-task.js'")) },
+      {
+        asset: "#omo-task-runtime",
+        load: () => Promise.reject(new Error("Cannot find module './extensions/omo-task.js'")),
+      },
     ]
     const { logger, warnings } = recordingLogger()
 
@@ -92,7 +95,10 @@ describe("primeMemoryPersonaAssets", () => {
     expect(readSynchronously).toEqual(["kibitzer"])
     expect(unavailable).toEqual(["#omo-task-runtime"])
     expect(warnings).toHaveLength(1)
-    expect(warnings[0]?.details).toMatchObject({ asset: "#omo-task-runtime", error: "Cannot find module './extensions/omo-task.js'" })
+    expect(warnings[0]?.details).toMatchObject({
+      asset: "#omo-task-runtime",
+      error: "Cannot find module './extensions/omo-task.js'",
+    })
   })
 
   it("#given the task runtime import resolves #when priming #then nothing is reported", async () => {

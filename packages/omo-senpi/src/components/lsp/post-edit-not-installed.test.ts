@@ -113,9 +113,9 @@ describe("omo-senpi post-edit not-installed guidance (#9223)", () => {
     const root = tempRoot("senpi-9223-noproject-")
     const pi = setup(root)
 
-    expect(await appendedTexts(pi, touch(join(root, "rules_test.mjs")), eventContext("s", join(root, "agent")))).toEqual(
-      [],
-    )
+    expect(
+      await appendedTexts(pi, touch(join(root, "rules_test.mjs")), eventContext("s", join(root, "agent"))),
+    ).toEqual([])
   })
 
   it("#given a recorded declined decision #when edits repeat #then the declined text is appended every time", async () => {
@@ -133,7 +133,11 @@ describe("omo-senpi post-edit not-installed guidance (#9223)", () => {
     const project = join(root, "project")
     touch(join(project, "package.json"))
     const pi = setup(project)
-    const texts = await appendedTexts(pi, "src/a.ts", eventContext("session-13126", join(root, "home", ".omo", "agent")))
+    const texts = await appendedTexts(
+      pi,
+      "src/a.ts",
+      eventContext("session-13126", join(root, "home", ".omo", "agent")),
+    )
     expect(texts).toHaveLength(1)
     expect(texts[0]).toContain("LSP note for")
     expect(texts[0]).toContain("the edit itself is not affected")

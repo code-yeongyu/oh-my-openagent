@@ -122,10 +122,7 @@ describe("parseFallbackModelEntry (extended)", () => {
 
 describe("parseFallbackModelObjectEntry", () => {
   it("parses object with model only", () => {
-    const result = parseFallbackModelObjectEntry(
-      { model: "anthropic/claude-sonnet-4-6" },
-      undefined,
-    )
+    const result = parseFallbackModelObjectEntry({ model: "anthropic/claude-sonnet-4-6" }, undefined)
     expect(result).toEqual({
       providers: ["anthropic"],
       model: "claude-sonnet-4-6",
@@ -133,10 +130,7 @@ describe("parseFallbackModelObjectEntry", () => {
   })
 
   it("parses object with variant override", () => {
-    const result = parseFallbackModelObjectEntry(
-      { model: "anthropic/claude-sonnet-4-6", variant: "high" },
-      undefined,
-    )
+    const result = parseFallbackModelObjectEntry({ model: "anthropic/claude-sonnet-4-6", variant: "high" }, undefined)
     expect(result).toEqual({
       providers: ["anthropic"],
       model: "claude-sonnet-4-6",
@@ -219,16 +213,11 @@ describe("parseFallbackModelObjectEntry", () => {
 describe("buildFallbackChainFromModels (mixed)", () => {
   it("handles string input", () => {
     const result = buildFallbackChainFromModels("anthropic/claude-sonnet-4-6", undefined)
-    expect(result).toEqual([
-      { providers: ["anthropic"], model: "claude-sonnet-4-6" },
-    ])
+    expect(result).toEqual([{ providers: ["anthropic"], model: "claude-sonnet-4-6" }])
   })
 
   it("handles string array", () => {
-    const result = buildFallbackChainFromModels(
-      ["anthropic/claude-sonnet-4-6", "openai/gpt-5.4"],
-      undefined,
-    )
+    const result = buildFallbackChainFromModels(["anthropic/claude-sonnet-4-6", "openai/gpt-5.4"], undefined)
     expect(result).toEqual([
       { providers: ["anthropic"], model: "claude-sonnet-4-6" },
       { providers: ["openai"], model: "gpt-5.4" },
@@ -261,13 +250,8 @@ describe("buildFallbackChainFromModels (mixed)", () => {
   })
 
   it("filters out invalid entries", () => {
-    const result = buildFallbackChainFromModels(
-      ["", "anthropic/claude-sonnet-4-6", "  "],
-      undefined,
-    )
-    expect(result).toEqual([
-      { providers: ["anthropic"], model: "claude-sonnet-4-6" },
-    ])
+    const result = buildFallbackChainFromModels(["", "anthropic/claude-sonnet-4-6", "  "], undefined)
+    expect(result).toEqual([{ providers: ["anthropic"], model: "claude-sonnet-4-6" }])
   })
 })
 
@@ -277,63 +261,57 @@ describe("flattenToFallbackModelStrings", () => {
   })
 
   it("passes through plain strings", () => {
-    expect(flattenToFallbackModelStrings(["anthropic/claude-sonnet-4-6"])).toEqual([
-      "anthropic/claude-sonnet-4-6",
-    ])
+    expect(flattenToFallbackModelStrings(["anthropic/claude-sonnet-4-6"])).toEqual(["anthropic/claude-sonnet-4-6"])
   })
 
   it("flattens object with explicit variant", () => {
-    expect(flattenToFallbackModelStrings([
-      { model: "anthropic/claude-sonnet-4-6", variant: "high" },
-    ])).toEqual(["anthropic/claude-sonnet-4-6(high)"])
+    expect(flattenToFallbackModelStrings([{ model: "anthropic/claude-sonnet-4-6", variant: "high" }])).toEqual([
+      "anthropic/claude-sonnet-4-6(high)",
+    ])
   })
 
   it("preserves inline variant when no explicit variant", () => {
-    expect(flattenToFallbackModelStrings([
-      { model: "anthropic/claude-sonnet-4-6(high)" },
-    ])).toEqual(["anthropic/claude-sonnet-4-6(high)"])
+    expect(flattenToFallbackModelStrings([{ model: "anthropic/claude-sonnet-4-6(high)" }])).toEqual([
+      "anthropic/claude-sonnet-4-6(high)",
+    ])
   })
 
   it("explicit variant overrides inline variant (no double-suffix)", () => {
-    expect(flattenToFallbackModelStrings([
-      { model: "anthropic/claude-sonnet-4-6(low)", variant: "high" },
-    ])).toEqual(["anthropic/claude-sonnet-4-6(high)"])
+    expect(flattenToFallbackModelStrings([{ model: "anthropic/claude-sonnet-4-6(low)", variant: "high" }])).toEqual([
+      "anthropic/claude-sonnet-4-6(high)",
+    ])
   })
 
   it("explicit variant overrides space-suffix variant", () => {
-    expect(flattenToFallbackModelStrings([
-      { model: "openai/gpt-5.4 high", variant: "low" },
-    ])).toEqual(["openai/gpt-5.4(low)"])
+    expect(flattenToFallbackModelStrings([{ model: "openai/gpt-5.4 high", variant: "low" }])).toEqual([
+      "openai/gpt-5.4(low)",
+    ])
   })
 
   it("explicit variant overrides minimal space-suffix variant", () => {
-    expect(flattenToFallbackModelStrings([
-      { model: "openai/gpt-5.6-luna minimal", variant: "low" },
-    ])).toEqual(["openai/gpt-5.6-luna(low)"])
+    expect(flattenToFallbackModelStrings([{ model: "openai/gpt-5.6-luna minimal", variant: "low" }])).toEqual([
+      "openai/gpt-5.6-luna(low)",
+    ])
   })
 
   it("preserves trailing non-variant suffixes when adding explicit variant", () => {
-    expect(flattenToFallbackModelStrings([
-      { model: "openai/gpt-5.4 preview", variant: "low" },
-    ])).toEqual(["openai/gpt-5.4 preview(low)"])
+    expect(flattenToFallbackModelStrings([{ model: "openai/gpt-5.4 preview", variant: "low" }])).toEqual([
+      "openai/gpt-5.4 preview(low)",
+    ])
   })
 
   it("flattens object without variant", () => {
-    expect(flattenToFallbackModelStrings([
-      { model: "openai/gpt-5.4" },
-    ])).toEqual(["openai/gpt-5.4"])
+    expect(flattenToFallbackModelStrings([{ model: "openai/gpt-5.4" }])).toEqual(["openai/gpt-5.4"])
   })
 
   it("handles mixed array", () => {
-    expect(flattenToFallbackModelStrings([
-      "anthropic/claude-sonnet-4-6",
-      { model: "openai/gpt-5.4", variant: "high" },
-      { model: "google/gemini-3-flash(low)" },
-    ])).toEqual([
-      "anthropic/claude-sonnet-4-6",
-      "openai/gpt-5.4(high)",
-      "google/gemini-3-flash(low)",
-    ])
+    expect(
+      flattenToFallbackModelStrings([
+        "anthropic/claude-sonnet-4-6",
+        { model: "openai/gpt-5.4", variant: "high" },
+        { model: "google/gemini-3-flash(low)" },
+      ]),
+    ).toEqual(["anthropic/claude-sonnet-4-6", "openai/gpt-5.4(high)", "google/gemini-3-flash(low)"])
   })
 })
 
@@ -348,17 +326,13 @@ describe("findMostSpecificFallbackEntry", () => {
   })
 
   it("returns prefix match when no exact match exists", () => {
-    const chain = [
-      { providers: ["openai"], model: "gpt-5.4" },
-    ]
+    const chain = [{ providers: ["openai"], model: "gpt-5.4" }]
     const result = findMostSpecificFallbackEntry("openai", "gpt-5.4-preview", chain)
     expect(result?.model).toBe("gpt-5.4")
   })
 
   it("returns undefined when no entry matches", () => {
-    const chain = [
-      { providers: ["anthropic"], model: "claude-sonnet-4-6" },
-    ]
+    const chain = [{ providers: ["anthropic"], model: "claude-sonnet-4-6" }]
     expect(findMostSpecificFallbackEntry("openai", "gpt-5.4", chain)).toBeUndefined()
   })
 
@@ -374,9 +348,7 @@ describe("findMostSpecificFallbackEntry", () => {
   })
 
   it("is case-insensitive", () => {
-    const chain = [
-      { providers: ["OpenAI"], model: "GPT-5.4" },
-    ]
+    const chain = [{ providers: ["OpenAI"], model: "GPT-5.4" }]
     const result = findMostSpecificFallbackEntry("openai", "gpt-5.4-preview", chain)
     expect(result?.model).toBe("GPT-5.4")
   })
@@ -426,7 +398,7 @@ describe("parseFallbackModelEntry: non-string input (issue #4145)", () => {
     //#given: FallbackModelObject whose .model was somehow forwarded as a nested
     //object instead of a flat string (issue #4145 reproduction).
     const malformedObject = {
-      model: ({ model: "claude-opus-4-7" } as unknown) as string,
+      model: { model: "claude-opus-4-7" } as unknown as string,
       variant: "high",
     }
 
@@ -439,10 +411,7 @@ describe("parseFallbackModelEntry: non-string input (issue #4145)", () => {
 
   test("buildFallbackChainFromModels skips entries whose model is a number", () => {
     //#given
-    const fallbackModels = [
-      "openai/gpt-5.5",
-      (42 as unknown) as string,
-    ]
+    const fallbackModels = ["openai/gpt-5.5", 42 as unknown as string]
 
     //#when
     const chain = buildFallbackChainFromModels(fallbackModels, "openai")

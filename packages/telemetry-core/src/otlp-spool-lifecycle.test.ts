@@ -31,7 +31,9 @@ function root(): string {
 }
 
 function uids(calls: readonly { readonly body: Uint8Array }[]): string[] {
-  return calls.flatMap((c) => logRecordsOf(decodeLogs(c.body))).map((r) => String(attributeMap(r.attributes)["log.record.uid"]))
+  return calls
+    .flatMap((c) => logRecordsOf(decodeLogs(c.body)))
+    .map((r) => String(attributeMap(r.attributes)["log.record.uid"]))
 }
 
 function ids(count: number): string[] {
@@ -127,7 +129,13 @@ describe("producer versus replayer", () => {
     capture(a, "feature_used", { event_id: e1 })
 
     // when
-    const b = makeTransport(dir, { fetch, pid: 4_102, bootId: "b".repeat(32), isPidAlive, nowMs: () => Date.now() + 600_000 })
+    const b = makeTransport(dir, {
+      fetch,
+      pid: 4_102,
+      bootId: "b".repeat(32),
+      isPidAlive,
+      nowMs: () => Date.now() + 600_000,
+    })
     b.sweep()
     await b.flush()
     const sentWhileAWritesE1 = calls.length
@@ -161,8 +169,22 @@ describe("producer versus replayer", () => {
     const isPidAlive = (pid: number): boolean => pid !== 4_201
 
     // when
-    const one = makeTransport(dir, { fetch, pid: 4_202, bootId: "1".repeat(32), isPidAlive, nowMs: later, autoStart: true })
-    const two = makeTransport(dir, { fetch, pid: 4_203, bootId: "2".repeat(32), isPidAlive, nowMs: later, autoStart: true })
+    const one = makeTransport(dir, {
+      fetch,
+      pid: 4_202,
+      bootId: "1".repeat(32),
+      isPidAlive,
+      nowMs: later,
+      autoStart: true,
+    })
+    const two = makeTransport(dir, {
+      fetch,
+      pid: 4_203,
+      bootId: "2".repeat(32),
+      isPidAlive,
+      nowMs: later,
+      autoStart: true,
+    })
     await Promise.all([one.ready, two.ready])
     await Promise.all([one.shutdown(), two.shutdown()])
 
@@ -234,7 +256,12 @@ describe("replay-time consent and acknowledgment", () => {
     let consented = true
     const { calls, fetch } = recordingFetch()
     const scheduler = manualScheduler()
-    const transport = makeTransport(dir, { fetch, consent: () => consented, autoStart: true, scheduleEvery: scheduler.scheduleEvery })
+    const transport = makeTransport(dir, {
+      fetch,
+      consent: () => consented,
+      autoStart: true,
+      scheduleEvery: scheduler.scheduleEvery,
+    })
     await transport.ready
     sealedBatch(dir, 2, Date.now())
 
@@ -285,7 +312,9 @@ describe("replay-time consent and acknowledgment", () => {
     sealedBatch(dir, 2, Date.now() - 1_000)
     const drained = toBinary(
       ExportLogsServiceResponseSchema,
-      create(ExportLogsServiceResponseSchema, { partialSuccess: { rejectedLogRecords: 0n, errorMessage: "mode: drain" } }),
+      create(ExportLogsServiceResponseSchema, {
+        partialSuccess: { rejectedLogRecords: 0n, errorMessage: "mode: drain" },
+      }),
     )
     const { calls, fetch } = recordingFetch(() => new Response(drained, { status: 200 }))
     const transport = makeTransport(dir, { fetch })

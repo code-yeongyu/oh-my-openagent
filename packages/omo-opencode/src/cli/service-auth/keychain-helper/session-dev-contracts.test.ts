@@ -5,13 +5,22 @@ import { fakeApi, grant, temporaryHome } from "../test-support"
 import { A, API, credentials, fakeKeychain, helperSession } from "./fake-keychain.test-support"
 
 const stored = JSON.stringify(credentials)
-const generationOf = (text: string | undefined): unknown => (JSON.parse(text ?? "{}") as { credentialGeneration?: unknown }).credentialGeneration
+const generationOf = (text: string | undefined): unknown =>
+  (JSON.parse(text ?? "{}") as { credentialGeneration?: unknown }).credentialGeneration
 
 // The store's helper view under the service-auth contracts dev added after #11589 branched (#11262).
 describe("the keychain helper path under dev's credential contracts", () => {
   test("#given a section holding the origin lock #when a nested section takes it again #then both run on the outer lease", async () => {
     const home = await temporaryHome()
-    const [outer, nested, held] = await withCredentialLock(API, async lease => [lease, await withCredentialLock(API, async again => again, home), heldCredentialLease(API, home)], home)
+    const [outer, nested, held] = await withCredentialLock(
+      API,
+      async (lease) => [
+        lease,
+        await withCredentialLock(API, async (again) => again, home),
+        heldCredentialLease(API, home),
+      ],
+      home,
+    )
     expect(nested).toBe(outer)
     expect(held).toBe(outer)
     expect(heldCredentialLease(API, home)).toBeUndefined()
@@ -38,7 +47,15 @@ describe("the keychain helper path under dev's credential contracts", () => {
     await store.write({ ...credentials, accessToken: "rotated" })
     expect(generationOf(keychain.items.get(A)?.value)).toBe(first)
     const captured = JSON.parse(keychain.items.get(A)?.value ?? "null")
-    keychain.put(A, JSON.stringify({ ...credentials, device: { ...credentials.device, id: "device-b" }, credentialGeneration: "generation-b" }), "helper")
+    keychain.put(
+      A,
+      JSON.stringify({
+        ...credentials,
+        device: { ...credentials.device, id: "device-b" },
+        credentialGeneration: "generation-b",
+      }),
+      "helper",
+    )
     await session.update(async () => store.write(captured))
     const after = generationOf(keychain.items.get(A)?.value)
     expect([first, "generation-b"]).not.toContain(after)
@@ -53,19 +70,26 @@ describe("the keychain helper path under dev's credential contracts", () => {
     })
     const keychain = fakeKeychain()
     const account = credentialId(api)
-    keychain.put(account, JSON.stringify({ ...credentials, accessTokenExpiresAt: "2000-01-01T00:00:00.000Z" }), "helper")
+    keychain.put(
+      account,
+      JSON.stringify({ ...credentials, accessTokenExpiresAt: "2000-01-01T00:00:00.000Z" }),
+      "helper",
+    )
     const { session } = await helperSession(keychain, false, { api })
     expect(await session.accessToken()).toBe("new-access")
     expect(refreshes).toBe(1)
-    expect(JSON.parse(keychain.items.get(account)?.value ?? "null")).toMatchObject({ accessToken: "new-access", refreshToken: "new-refresh" })
-    expect(keychain.events.filter(event => event.startsWith("write"))).toHaveLength(2)
+    expect(JSON.parse(keychain.items.get(account)?.value ?? "null")).toMatchObject({
+      accessToken: "new-access",
+      refreshToken: "new-refresh",
+    })
+    expect(keychain.events.filter((event) => event.startsWith("write"))).toHaveLength(2)
     expect(keychain.stats).toEqual({ approves: 0, unleasedMutations: 0 })
   })
 
   test("#given no sign-in item #when a locked section reads #then only the locked view reads it, never the outside-lock reader as well", async () => {
     const keychain = fakeKeychain()
     const { store, session } = await helperSession(keychain)
-    const reads = () => keychain.events.filter(event => event.startsWith("read ")).length
+    const reads = () => keychain.events.filter((event) => event.startsWith("read ")).length
     const { inside, plain, authoritative } = await session.transaction(async () => {
       const before = reads()
       const value = await store.read()

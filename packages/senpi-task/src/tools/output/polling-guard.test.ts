@@ -199,7 +199,8 @@ describe("task_output polling guard", () => {
     await execute()
     const repeated = await execute()
     expect(repeated.details.kind).toBe("no_progress")
-    if (repeated.details.kind === "no_progress") expect(repeated.details.reason).toContain("Await its completion notification")
+    if (repeated.details.kind === "no_progress")
+      expect(repeated.details.reason).toContain("Await its completion notification")
   })
 
   test("#given an unchanged legacy terminal task with a failed delivery #when status is polled again #then it directs the caller to await the retry", async () => {
@@ -251,14 +252,27 @@ describe("task_output polling guard", () => {
       await execute()
       const repeated = await execute()
       expect(repeated.details.kind).toBe("no_progress")
-      if (repeated.details.kind === "no_progress") expect(repeated.details.reason).toContain("Await its completion notification")
+      if (repeated.details.kind === "no_progress")
+        expect(repeated.details.reason).toContain("Await its completion notification")
     }
   })
 
   test("#given an unchanged task without a deliverable completion notification #when status is polled again #then it does not promise one", async () => {
     const records = [
-      makeRecord({ task_id: "st_cancelled_notification", name: "worker", status: "cancelled", notify_on_terminal: true }),
-      makeRecord({ task_id: "st_delivered_notification", name: "worker", status: "completed", notify_on_terminal: true, run_epoch: 1, notified_epoch: 1 }),
+      makeRecord({
+        task_id: "st_cancelled_notification",
+        name: "worker",
+        status: "cancelled",
+        notify_on_terminal: true,
+      }),
+      makeRecord({
+        task_id: "st_delivered_notification",
+        name: "worker",
+        status: "completed",
+        notify_on_terminal: true,
+        run_epoch: 1,
+        notified_epoch: 1,
+      }),
     ]
 
     for (const record of records) {

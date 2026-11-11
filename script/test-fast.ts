@@ -17,9 +17,7 @@ export function isReentry(env: Readonly<Record<string, string | undefined>>): bo
   return (env[REENTRY_ENV_VAR] ?? "") !== ""
 }
 
-export function childEnv(
-  parent: Readonly<Record<string, string | undefined>>,
-): Record<string, string | undefined> {
+export function childEnv(parent: Readonly<Record<string, string | undefined>>): Record<string, string | undefined> {
   return { ...parent, [REENTRY_ENV_VAR]: "1" }
 }
 
@@ -72,8 +70,7 @@ export async function shutdownChildren(
   registry: ChildRegistry,
   signal: TerminationSignal,
   kill: KillProcessGroup,
-  waitGrace: () => Promise<void> = () =>
-    new Promise((resolve) => void setTimeout(resolve, SHUTDOWN_GRACE_MS)),
+  waitGrace: () => Promise<void> = () => new Promise((resolve) => void setTimeout(resolve, SHUTDOWN_GRACE_MS)),
 ): Promise<void> {
   registry.killAll(signal, kill)
   await waitGrace()
@@ -126,22 +123,14 @@ export interface ChildLifecycleEvents {
 }
 
 export interface SpawnedChild extends ChildHandle {
-  once<E extends keyof ChildLifecycleEvents>(
-    event: E,
-    listener: (payload: ChildLifecycleEvents[E]) => void,
-  ): unknown
+  once<E extends keyof ChildLifecycleEvents>(event: E, listener: (payload: ChildLifecycleEvents[E]) => void): unknown
 }
 
-export type SpawnChildProcess = (
-  command: string,
-  args: readonly string[],
-  options: SpawnGroupOptions,
-) => SpawnedChild
+export type SpawnChildProcess = (command: string, args: readonly string[], options: SpawnGroupOptions) => SpawnedChild
 
 /** Selects node's three-argument overload; the bare `spawn` symbol carries a
  * two-argument overload that is not assignable to the seam. */
-const spawnChildProcess: SpawnChildProcess = (command, args, options) =>
-  spawn(command, args, options)
+const spawnChildProcess: SpawnChildProcess = (command, args, options) => spawn(command, args, options)
 
 /**
  * Every group child inherits the parent's stdio, carries the re-entry marker so
@@ -186,11 +175,7 @@ export async function runTestFast(
   shutdownSurvivors: () => void | Promise<void> = () => {},
 ): Promise<number> {
   const groups = testFastGroups()
-  log(
-    `[test-fast] running ${groups.length} groups in parallel: ${groups
-      .map((group) => group.name)
-      .join(", ")}`,
-  )
+  log(`[test-fast] running ${groups.length} groups in parallel: ${groups.map((group) => group.name).join(", ")}`)
   try {
     const exits = await Promise.all(groups.map(spawnGroup))
     return exits.every((exit) => exit === 0) ? 0 : 1
@@ -202,9 +187,7 @@ export async function runTestFast(
 
 if (import.meta.main) {
   if (isReentry(process.env)) {
-    console.error(
-      `[test-fast] re-entry blocked: ${REENTRY_ENV_VAR} is set; refusing to recurse`,
-    )
+    console.error(`[test-fast] re-entry blocked: ${REENTRY_ENV_VAR} is set; refusing to recurse`)
     process.exit(1)
   }
   const registry = createChildRegistry(process.platform)
@@ -212,17 +195,11 @@ if (import.meta.main) {
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.once(signal, () => {
       console.error(`[test-fast] ${signal} received: terminating group children`)
-      void shutdownChildren(registry, signal, killGroup).then(() =>
-        process.exit(signalExitCode(signal)),
-      )
+      void shutdownChildren(registry, signal, killGroup).then(() => process.exit(signalExitCode(signal)))
     })
   }
-  process.exitCode = await runTestFast(
-    spawnInheritingStdio(registry, console.log),
-    console.log,
-    () => {
-      console.error("[test-fast] group failed to start: terminating surviving groups")
-      return shutdownChildren(registry, "SIGTERM", killGroup)
-    },
-  )
+  process.exitCode = await runTestFast(spawnInheritingStdio(registry, console.log), console.log, () => {
+    console.error("[test-fast] group failed to start: terminating surviving groups")
+    return shutdownChildren(registry, "SIGTERM", killGroup)
+  })
 }

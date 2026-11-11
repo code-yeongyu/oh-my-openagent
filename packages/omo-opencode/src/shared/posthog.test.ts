@@ -151,9 +151,7 @@ describe("posthog client creation", () => {
     const capturedOptions: TelemetryTransportOptions[] = []
 
     const posthogModule = usePostHogModule(await importPostHogModule())
-    posthogModule.__setTransportFactoryForTesting(
-      createCapturingTransportFactory([], capturedOptions),
-    )
+    posthogModule.__setTransportFactoryForTesting(createCapturingTransportFactory([], capturedOptions))
 
     // when
     posthogModule.createCliPostHog()
@@ -180,9 +178,7 @@ describe("posthog client creation", () => {
     enableTelemetryEnv()
     const capturedOptions: TelemetryTransportOptions[] = []
     const posthogModule = usePostHogModule(await importPostHogModule())
-    posthogModule.__setTransportFactoryForTesting(
-      createCapturingTransportFactory([], capturedOptions),
-    )
+    posthogModule.__setTransportFactoryForTesting(createCapturingTransportFactory([], capturedOptions))
 
     // when
     posthogModule.createCliPostHog()
@@ -348,7 +344,31 @@ describe("posthog trackActive emission contract", () => {
     expect(dailyEvent?.event).toBe("omo_daily_active")
     expect(dailyEvent?.distinctId).toMatch(/^[0-9a-f]{64}$/)
     const properties = dailyEvent.properties ?? {}
-    const expectedPropertyKeys = ["$os", "$os_version", "$process_person_profile", "ci", "cpu_count", "cpu_model", "day_utc", "locale", "os_arch", "os_type", "package_name", "package_version", "platform", "plugin_name", "product_name", "reason", "runtime", "runtime_version", "shell", "source", "terminal", "timezone", "total_memory_gb"]
+    const expectedPropertyKeys = [
+      "$os",
+      "$os_version",
+      "$process_person_profile",
+      "ci",
+      "cpu_count",
+      "cpu_model",
+      "day_utc",
+      "locale",
+      "os_arch",
+      "os_type",
+      "package_name",
+      "package_version",
+      "platform",
+      "plugin_name",
+      "product_name",
+      "reason",
+      "runtime",
+      "runtime_version",
+      "shell",
+      "source",
+      "terminal",
+      "timezone",
+      "total_memory_gb",
+    ]
     expect(Object.keys(properties).sort()).toEqual(expectedPropertyKeys.sort())
     expect(properties).toMatchObject({
       platform: "oh-my-opencode",

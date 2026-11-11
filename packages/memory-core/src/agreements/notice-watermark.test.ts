@@ -88,11 +88,10 @@ describe("needs-human notice watermark (exactly-once contract)", () => {
     const temporaries: string[] = []
     for (const status of ["active", "needs-human"]) {
       await commitLedger(line(3, status))
-      temporaries.push(await observeWatermarkPublication(target, () =>
-        consumeAgreementsNoticeDelta(repo, options),
-      ))
+      temporaries.push(await observeWatermarkPublication(target, () => consumeAgreementsNoticeDelta(repo, options)))
       expect(JSON.parse(await readFile(target, "utf8"))).toEqual({
-        version: 1, announced: status === "active" ? [] : ["3f9a1c0b2e"],
+        version: 1,
+        announced: status === "active" ? [] : ["3f9a1c0b2e"],
       })
     }
     expect(new Set(temporaries).size).toBe(2)

@@ -32,12 +32,18 @@ export const LEGACY_TUI_COMMANDS: ReadonlySet<string> = new Set([
 ])
 
 export function tuiCommandsFrom(protocolInfo: unknown): ReadonlySet<string> {
-  const commands = typeof protocolInfo === "object" && protocolInfo !== null && "commands" in protocolInfo ? protocolInfo.commands : undefined
+  const commands =
+    typeof protocolInfo === "object" && protocolInfo !== null && "commands" in protocolInfo
+      ? protocolInfo.commands
+      : undefined
   if (!Array.isArray(commands)) return LEGACY_TUI_COMMANDS
   return new Set(commands.filter((command): command is string => typeof command === "string"))
 }
 
-export function acceptedControls(kind: EndpointKind, tuiCommands: ReadonlySet<string> | undefined): readonly ThreadControl[] {
+export function acceptedControls(
+  kind: EndpointKind,
+  tuiCommands: ReadonlySet<string> | undefined,
+): readonly ThreadControl[] {
   if (kind !== "tui") return ALL_CONTROLS
   const accepted = tuiCommands ?? LEGACY_TUI_COMMANDS
   return ALL_CONTROLS.filter((control) => CONTROL_COMMANDS[control].every((command) => accepted.has(command)))

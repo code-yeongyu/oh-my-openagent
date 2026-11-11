@@ -18,7 +18,9 @@ describe("cold-revive progress watchdog", () => {
   test("#given a request written after the last stage #when the child stays silent #then the stall is counted from the write", async () => {
     // given a traced child that never answers, and a watchdog armed at its last stage
     const trace = createColdReviveTrace()
-    const child = trace.spawnProcess(process.execPath, ["-e", "process.stdin.resume()"], { stdio: ["pipe", "pipe", "pipe"] })
+    const child = trace.spawnProcess(process.execPath, ["-e", "process.stdin.resume()"], {
+      stdio: ["pipe", "pipe", "pipe"],
+    })
     await once(child, "spawn")
     const progress = trace.watchProgress(WINDOW_MS)
     try {
@@ -32,7 +34,7 @@ describe("cold-revive progress watchdog", () => {
       // then the stall fires a full window after the write and names it
       expect(firedAfterSendMs).toBeGreaterThanOrEqual(WINDOW_MS)
       expect(error).toBeInstanceOf(Error)
-      expect((error as Error).message).toContain("\"request_sent:get_state (launch 1)\"")
+      expect((error as Error).message).toContain('"request_sent:get_state (launch 1)"')
     } finally {
       progress.dispose()
       const closed = once(child, "close")
@@ -55,13 +57,20 @@ describe("cold-revive progress watchdog", () => {
         children.push(child)
         return child
       },
-      buildSpawn: () => ({ command: process.execPath, args: ["-e", "process.stdin.resume()"], cwd: root, env: { PATH: process.env.PATH } }),
+      buildSpawn: () => ({
+        command: process.execPath,
+        args: ["-e", "process.stdin.resume()"],
+        cwd: root,
+        env: { PATH: process.env.PATH },
+      }),
     })
     const progress = trace.watchProgress(WINDOW_MS)
     let started: Promise<unknown> = Promise.resolve()
     try {
       // when the runner sends its first prompt and the heartbeat keeps probing
-      started = runner.start({ task_id: "st_heartbeat", cwd: root, state_dir: root, prompt: "work" }).catch((error: unknown) => error)
+      started = runner
+        .start({ task_id: "st_heartbeat", cwd: root, state_dir: root, prompt: "work" })
+        .catch((error: unknown) => error)
       const error = await progress.stalled.catch((stall: unknown) => stall)
       const firedAt = performance.now()
 
@@ -69,11 +78,17 @@ describe("cold-revive progress watchdog", () => {
       // yet the stall names that stage and fires a full window after it
       const spawned = trace.stages.find((stage) => stage.stage === "process_spawned")
       expect(spawned).toBeDefined()
-      expect(trace.stages.some((stage) => stage.stage === "request_sent" && stage.facts["command"] === "prompt")).toBe(true)
-      expect(trace.stages.some((stage) => stage.stage === "heartbeat_probe" && stage.elapsed_ms > (spawned?.elapsed_ms ?? 0))).toBe(true)
+      expect(trace.stages.some((stage) => stage.stage === "request_sent" && stage.facts["command"] === "prompt")).toBe(
+        true,
+      )
+      expect(
+        trace.stages.some(
+          (stage) => stage.stage === "heartbeat_probe" && stage.elapsed_ms > (spawned?.elapsed_ms ?? 0),
+        ),
+      ).toBe(true)
       expect(firedAt - (startedAt + (spawned?.elapsed_ms ?? 0))).toBeGreaterThanOrEqual(WINDOW_MS)
       expect(error).toBeInstanceOf(Error)
-      expect((error as Error).message).toContain("after \"process_spawned (launch 1)\"")
+      expect((error as Error).message).toContain('after "process_spawned (launch 1)"')
     } finally {
       progress.dispose()
       for (const child of children) child.kill()

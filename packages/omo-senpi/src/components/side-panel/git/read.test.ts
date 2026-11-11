@@ -88,9 +88,7 @@ describe("readGitStatus", () => {
 
   test("#given only the numstat reads fail #when read #then files still render without deltas", async () => {
     // given
-    const { exec } = fakeExec((args) =>
-      args[0] === "status" ? { stdout: STATUS, code: 0 } : new Error("interrupted"),
-    )
+    const { exec } = fakeExec((args) => (args[0] === "status" ? { stdout: STATUS, code: 0 } : new Error("interrupted")))
 
     // when
     const status = await readGitStatus(exec, "/repo")

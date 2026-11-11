@@ -1,7 +1,12 @@
 import type { DeviceService } from "../device-service-core/src/index.ts"
 import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
 import { createRelaySessionHost } from "../omo-senpi/src/components/thread/control/relay-session-host"
-import { answered, closeThread, interruptThread, setModelOn } from "../omo-senpi/src/components/thread/control/operations"
+import {
+  answered,
+  closeThread,
+  interruptThread,
+  setModelOn,
+} from "../omo-senpi/src/components/thread/control/operations"
 import { createRelayControl } from "../omo-senpi/src/components/thread/control/relay-control"
 import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
 import { randomUUID } from "node:crypto"
@@ -44,7 +49,7 @@ export function gatewayWorkerAnchor(root: string = packageRoot): URL | undefined
 // (K8) starts at its first hop: a person at a terminal is no thread chain.
 const deviceServiceSurface = (service: DeviceService): RemoteThreadSurface => ({
   sessions: createDeviceServiceSessions({ version: service.serviceVersion, connect: async () => service }),
-  chain: { stamp: record => record },
+  chain: { stamp: (record) => record },
 })
 
 type Show = (result: ThreadToolResult, label: string) => number
@@ -58,7 +63,12 @@ const NO_SUCH_SESSION: ReadonlySet<string> = new Set(["session_not_found", "unkn
  * control of the session, so the agent and this CLI reach another device's session the same way. --json prints the
  * body's typed result as is.
  */
-export async function runSession(service: DeviceService, args: SessionArgs, json: boolean, dependencies: RemoteCommandDependencies): Promise<number> {
+export async function runSession(
+  service: DeviceService,
+  args: SessionArgs,
+  json: boolean,
+  dependencies: RemoteCommandDependencies,
+): Promise<number> {
   const remote = (dependencies.remote ?? deviceServiceSurface)(service)
   const show: Show = (result, label) => {
     if (json) dependencies.output(JSON.stringify(result))
@@ -113,12 +123,19 @@ async function openOn(
     dependencies.error(error.message)
     return REMOTE_EXIT.usage
   }
-  const open = await createRelaySessionHost(remote, args.device).open({ permissionPreset: mode, ...(args.project === undefined ? {} : { cwd: args.project }) })
+  const open = await createRelaySessionHost(remote, args.device).open({
+    permissionPreset: mode,
+    ...(args.project === undefined ? {} : { cwd: args.project }),
+  })
   const opened: ThreadToolResult = open.kind === "ok" ? { kind: "ok", thread: open.thread, deduplicated: false } : open
   const wanted = args.model
   if (opened.kind !== "ok" || !("thread" in opened) || wanted === undefined) return show(opened, "")
   const label = `${args.device}/${opened.thread.thread_id}`
-  const created: RemoteSessionRow = { ...namedDeviceRow(args.device, opened.thread.thread_id), title: opened.thread.name, project: opened.thread.cwd }
+  const created: RemoteSessionRow = {
+    ...namedDeviceRow(args.device, opened.thread.thread_id),
+    title: opened.thread.name,
+    project: opened.thread.cwd,
+  }
   const model = await answered(() => setModelOn(createRelayControl(remote, created), wanted, undefined))
   if (model.kind === "error") {
     // The session exists on its device (opened to be kept), so the failure names it: a retry must not leave another one
@@ -136,7 +153,11 @@ async function openOn(
 }
 
 /** The provenance a person's `omo remote send` carries: this device stamped as on every delivery path (#13004). */
-export function personSenderProvenance(remote: RemoteThreadSurface, cwd = process.cwd(), env: NodeJS.ProcessEnv = process.env): () => Promise<Provenance> {
+export function personSenderProvenance(
+  remote: RemoteThreadSurface,
+  cwd = process.cwd(),
+  env: NodeJS.ProcessEnv = process.env,
+): () => Promise<Provenance> {
   return () => stampThisDevice(resolveProvenance({ cwd, env }), remote)
 }
 
@@ -152,18 +173,59 @@ async function sendTo(
   // Its receipt is written to this device's gateway store under a key minted per invocation (a person's retry is a new
   // send, so nothing dedupes it). A steer names no turn: the transport reads the running one once and steers it.
   const anchor = gatewayWorkerAnchor(dependencies.packageRoot ?? packageRoot)
-  const store = createGatewayStore({ agentDir: canonicalAgentDir(), ...(anchor === undefined ? {} : { workerModuleUrl: anchor }) })
+  const store = createGatewayStore({
+    agentDir: canonicalAgentDir(),
+    ...(anchor === undefined ? {} : { workerModuleUrl: anchor }),
+  })
   // This device stamped as on every delivery path (#13004), through the one pipeline (#13016).
   const senderProvenance = personSenderProvenance(remote)
   // This command holds no session of its own, so the local transport's engine has an empty address book.
-  const engine = createGatewayEngine({ store, endpoints: { wake: async (endpoint) => { throw new Error(`host_unavailable:${endpoint.socket}`) } }, resolve: resolveFromEntries(() => [], () => process.cwd()), senderProvenance })
-  const pipeline = createDeliveryPipeline({ local: createLocalTransport(engine), relay: createRelayTransport({ remote, store, senderProvenance }) })
+  const engine = createGatewayEngine({
+    store,
+    endpoints: {
+      wake: async (endpoint) => {
+        throw new Error(`host_unavailable:${endpoint.socket}`)
+      },
+    },
+    resolve: resolveFromEntries(
+      () => [],
+      () => process.cwd(),
+    ),
+    senderProvenance,
+  })
+  const pipeline = createDeliveryPipeline({
+    local: createLocalTransport(engine),
+    relay: createRelayTransport({ remote, store, senderProvenance }),
+  })
   const person = { kind: "person" as const, uid: process.getuid?.() ?? 0, user: userInfo().username }
   const deliver = async (): Promise<ThreadToolResult> => {
-    const sent = await pipeline.deliver({ sender: person, caller_id: `person:${person.uid}`, target: { kind: "remote", row }, text: args.text, mode: args.delivery, idempotency_key: randomUUID(), args: { target: label, text: args.text, delivery: args.delivery } })
+    const sent = await pipeline.deliver({
+      sender: person,
+      caller_id: `person:${person.uid}`,
+      target: { kind: "remote", row },
+      text: args.text,
+      mode: args.delivery,
+      idempotency_key: randomUUID(),
+      args: { target: label, text: args.text, delivery: args.delivery },
+    })
     if (sent.kind === "error") return sent
-    if (!("device" in sent)) return { kind: "error", error: { code: "internal_error", message: `A send to ${label} was answered by this device's gateway.`, next_action: "Report this: a device-named address goes to the relay transport." } }
-    return { kind: "ok", thread_id: row.session_id, link: threadLink(row.session_id, row.title), delivery: sent.delivery, deduplicated: sent.deduplicated, device: row.device }
+    if (!("device" in sent))
+      return {
+        kind: "error",
+        error: {
+          code: "internal_error",
+          message: `A send to ${label} was answered by this device's gateway.`,
+          next_action: "Report this: a device-named address goes to the relay transport.",
+        },
+      }
+    return {
+      kind: "ok",
+      thread_id: row.session_id,
+      link: threadLink(row.session_id, row.title),
+      delivery: sent.delivery,
+      deduplicated: sent.deduplicated,
+      device: row.device,
+    }
   }
   const nothingToSteer = (result: ThreadToolResult): number | undefined => {
     if (result.kind !== "error" || result.error.code !== "not_steerable" || json) return undefined
@@ -180,7 +242,7 @@ async function sendTo(
     }
     // Followed before the send, so no delta of the turn it starts can arrive unseen.
     let reply = ""
-    follow = await followRemote(remote, row, text => {
+    follow = await followRemote(remote, row, (text) => {
       reply += text
       if (!json) dependencies.write(text)
     })

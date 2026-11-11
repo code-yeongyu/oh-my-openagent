@@ -32,9 +32,7 @@ describe("executePreCompactHooks", () => {
       }),
       stderr: "",
     })
-    const config = createConfig([
-      { matcher: "*", hooks: [{ type: "command", command: "pre-compact-hook" }] },
-    ])
+    const config = createConfig([{ matcher: "*", hooks: [{ type: "command", command: "pre-compact-hook" }] }])
 
     // when
     const result = await executePreCompactHooks(createContext(), config)
@@ -54,9 +52,7 @@ describe("executePreCompactHooks", () => {
     const parseSpy = spyOn(JSON, "parse").mockImplementation(() => {
       throw thrownValue
     })
-    const config = createConfig([
-      { matcher: "*", hooks: [{ type: "command", command: "pre-compact-hook" }] },
-    ])
+    const config = createConfig([{ matcher: "*", hooks: [{ type: "command", command: "pre-compact-hook" }] }])
 
     try {
       // when
