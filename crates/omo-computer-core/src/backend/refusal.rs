@@ -1,61 +1,20 @@
 //! The typed refusal every default backend method answers with. Nothing is sent on a
 //! refusal: a default never reaches the OS.
 
-/// The engine codes a default backend method refuses with.
-// row 13: replace with the total `(engineCode, data.reason)` -> COMPUTER_* error table; these
-// are the closest codes the contract names, mapped one to one below.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RefusalCode {
-    /// The backend has no such capability (`Unavailable{reason}`).
-    Unavailable,
-    /// The backend cannot capture (`CaptureUnavailable{reason}`).
-    CaptureUnavailable,
-    /// The backend has no accessibility tree (`AxUnavailable{reason}`).
-    AxUnavailable,
-    /// The backend has no stop listener (`StopPathUnavailable{reason}`).
-    StopPathUnavailable,
-    /// The backend has no presence surface (`PresenceUnavailable{reason}`).
-    PresenceUnavailable,
-}
+use crate::error::{self, ComputerCode, EngineCode, ErrorRow, UnknownFailure};
 
-impl RefusalCode {
-    /// The engine code's wire name.
-    #[must_use]
-    pub const fn engine_code(self) -> &'static str {
-        match self {
-            Self::Unavailable => "Unavailable",
-            Self::CaptureUnavailable => "CaptureUnavailable",
-            Self::AxUnavailable => "AxUnavailable",
-            Self::StopPathUnavailable => "StopPathUnavailable",
-            Self::PresenceUnavailable => "PresenceUnavailable",
-        }
-    }
-
-    /// The `COMPUTER_*` code the tool and the adapter show.
-    // row 13: StopPathUnavailable has no COMPUTER_* member of its own in the interface block;
-    // COMPUTER_SUPERVISOR_NOT_LIVE is the closest until the total table decides the row.
-    #[must_use]
-    pub const fn computer_code(self) -> &'static str {
-        match self {
-            Self::Unavailable => "COMPUTER_UNAVAILABLE",
-            Self::CaptureUnavailable => "COMPUTER_CAPTURE_UNAVAILABLE",
-            Self::AxUnavailable => "COMPUTER_AX_UNAVAILABLE",
-            Self::StopPathUnavailable => "COMPUTER_SUPERVISOR_NOT_LIVE",
-            Self::PresenceUnavailable => "COMPUTER_PRESENCE_UNAVAILABLE",
-        }
-    }
-}
-
-/// A refusal before any send: `nothingSent` is always true.
+/// A refusal before any send: `nothingSent` is always true. `code` is one of the closed
+/// engine codes and `reason` its `data.reason` token; the pair maps to its `COMPUTER_*` row
+/// through the one error table.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Refusal {
-    pub code: RefusalCode,
+    pub code: EngineCode,
     pub reason: &'static str,
 }
 
 impl Refusal {
     #[must_use]
-    pub const fn new(code: RefusalCode, reason: &'static str) -> Self {
+    pub const fn new(code: EngineCode, reason: &'static str) -> Self {
         Self { code, reason }
     }
 
@@ -63,6 +22,22 @@ impl Refusal {
     #[must_use]
     pub const fn nothing_sent(&self) -> bool {
         true
+    }
+
+    /// The table row of `(code, reason)`.
+    ///
+    /// # Errors
+    /// `UnknownFailure` when the reason token or the pair has no row.
+    pub fn row(&self) -> Result<&'static ErrorRow, UnknownFailure> {
+        error::from_wire(self.code.number(), Some(self.reason))
+    }
+
+    /// The `COMPUTER_*` member the tool and the adapter show.
+    ///
+    /// # Errors
+    /// `UnknownFailure` when the pair has no row.
+    pub fn computer_code(&self) -> Result<ComputerCode, UnknownFailure> {
+        self.row().map(|row| row.computer)
     }
 }
 
