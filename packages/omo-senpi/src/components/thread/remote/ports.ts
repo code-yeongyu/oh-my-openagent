@@ -4,6 +4,8 @@ export type JsonObject = { readonly [key: string]: unknown }
 export type RemoteSessionRow = {
   readonly device: string
   readonly session_id: string
+  /** The session's omo durable id when its device publishes it (#12996); a delivery header names its sender by this id. */
+  readonly durable_id?: string
   readonly title: string
   readonly project: string
   /** The session file on its own device; `open_session` on that device takes it. */
@@ -31,8 +33,7 @@ export type RemoteCommandOutcome =
 export type RemoteServiceState = { readonly state: string }
 
 export type RemoteLocateOutcome =
-  | { readonly kind: "ok"; readonly sessionId: string }
-  | { readonly kind: "refused"; readonly reason: string }
+  { readonly kind: "ok"; readonly sessionId: string } | { readonly kind: "refused"; readonly reason: string }
 
 /** A session on another device followed from now on: its records go to the listener until `stop` or the attach ends. */
 export type RemoteSessionWatch = {
@@ -41,7 +42,8 @@ export type RemoteSessionWatch = {
   readonly stop: () => void
 }
 
-export type RemoteWatchOutcome = { readonly kind: "ok"; readonly watch: RemoteSessionWatch } | { readonly kind: "refused"; readonly reason: string }
+export type RemoteWatchOutcome =
+  { readonly kind: "ok"; readonly watch: RemoteSessionWatch } | { readonly kind: "refused"; readonly reason: string }
 
 export type RemoteSessionsPort = {
   /** The device service state; `plan_required` means the account's plan has no relay (A5: paid only). */
@@ -54,7 +56,11 @@ export type RemoteSessionsPort = {
    * attach: the attach-less `session.command {device, endpoint, rpc}` shape (relay daemon #393). `locate` asks a
    * create or fork for its new session's listing key on the reply (`located`), so no session.locate follows it.
    */
-  readonly endpointCommand: (device: string, rpc: JsonObject, options?: { readonly locate?: boolean }) => Promise<RemoteCommandOutcome>
+  readonly endpointCommand: (
+    device: string,
+    rpc: JsonObject,
+    options?: { readonly locate?: boolean },
+  ) => Promise<RemoteCommandOutcome>
   /**
    * The id a session just created on `device` is addressed by (its listing row's `session_id`, the key an attach
    * takes), from the durable engine session id the create reply names; settles once that id attaches.
@@ -64,13 +70,22 @@ export type RemoteSessionsPort = {
    * An engine record for one session on `device` (`prompt`, `abort`, `get_state`), through an attach. A read the
    * session's mirror holds is answered locally unless `fresh` is set.
    */
-  readonly sessionCommand: (device: string, sessionId: string, rpc: JsonObject, options?: { readonly fresh?: boolean }) => Promise<RemoteCommandOutcome>
+  readonly sessionCommand: (
+    device: string,
+    sessionId: string,
+    rpc: JsonObject,
+    options?: { readonly fresh?: boolean },
+  ) => Promise<RemoteCommandOutcome>
   readonly read: (device: string, sessionId: string, tail: number) => Promise<RemoteCommandOutcome>
   /**
    * The records `device`'s session writes from now on (none of the ones before), on the attach this port holds for it.
    * Refused, typed, when that attach cannot be made.
    */
-  readonly watch: (device: string, sessionId: string, listener: (record: JsonObject) => void) => Promise<RemoteWatchOutcome>
+  readonly watch: (
+    device: string,
+    sessionId: string,
+    listener: (record: JsonObject) => void,
+  ) => Promise<RemoteWatchOutcome>
   /** Closes the device-service connection this port opened, if any; a short-lived caller (the CLI) calls it at the end. */
   readonly close?: () => Promise<void>
 }
@@ -93,13 +108,26 @@ export type AliasError = {
   readonly details?: { readonly holder?: AliasHolder; readonly reason?: string }
 }
 
-export type AliasResult<T> = { readonly kind: "ok"; readonly value: T } | { readonly kind: "error"; readonly error: AliasError }
+export type AliasResult<T> =
+  { readonly kind: "ok"; readonly value: T } | { readonly kind: "error"; readonly error: AliasError }
 
 /** Frozen port v1 (`o8/alias-port.v1.ts`): the account service's alias registry implements exactly this. */
 export type AliasRegistry = {
-  readonly claim: (input: { readonly alias: string; readonly holder: AliasHolder; readonly idempotency_key: string }) => Promise<AliasResult<{ readonly alias: string; readonly holder: AliasHolder }>>
-  readonly rename: (input: { readonly session_id: string; readonly from: string; readonly to: string; readonly idempotency_key: string }) => Promise<AliasResult<{ readonly alias: string; readonly holder: AliasHolder }>>
-  readonly release: (input: { readonly session_id: string; readonly alias: string }) => Promise<AliasResult<{ readonly released: boolean }>>
+  readonly claim: (input: {
+    readonly alias: string
+    readonly holder: AliasHolder
+    readonly idempotency_key: string
+  }) => Promise<AliasResult<{ readonly alias: string; readonly holder: AliasHolder }>>
+  readonly rename: (input: {
+    readonly session_id: string
+    readonly from: string
+    readonly to: string
+    readonly idempotency_key: string
+  }) => Promise<AliasResult<{ readonly alias: string; readonly holder: AliasHolder }>>
+  readonly release: (input: {
+    readonly session_id: string
+    readonly alias: string
+  }) => Promise<AliasResult<{ readonly released: boolean }>>
   readonly resolve: (alias: string) => Promise<AliasResult<AliasHolder>>
   readonly aliasesOf: (sessionIds: readonly string[]) => Promise<AliasResult<ReadonlyMap<string, string>>>
 }
@@ -110,4 +138,9 @@ export type RemoteThreadSurface = {
   /** Absent until the account service's alias registry ships: aliases are then refused typed, never guessed. */
   readonly aliases?: AliasRegistry
   readonly chain: ChainCountWire
+  /** The approval mode a session this surface creates is opened in (#6189): the creator's own. Absent: none is named. */
+  readonly permissionPreset?: () => string | undefined
 }
+
+/** The id a listing row has ABOVE the ports (decision 0027 D2): its durable id and nothing else; "" when the device publishes none. */
+export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? ""

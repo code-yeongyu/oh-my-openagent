@@ -3,6 +3,9 @@
 // Behavior is driven by the incoming commands plus a few env flags:
 //   FAKE_IGNORE_TERM=1   install a SIGTERM handler that ignores it (proves SIGKILL escalation)
 //   FAKE_EMIT_UI=1       emit an extension_ui_request confirm at startup
+//   FAKE_EMIT_UI_FRAME=<json> emit this extension_ui_request at startup instead
+//   FAKE_PERMISSION_PRESET=refuse answer set_permission_preset with an error (an engine without the record)
+//   FAKE_PERMISSION_PRESET=apply-then-refuse apply the preset (announce it) but answer with an error (a lost ack)
 //   FAKE_EMIT_MALFORMED=1 emit one malformed line then a valid event at startup
 //   FAKE_CAPABILITIES=a,b get_protocol_info advertises these capabilities (unset: retry_fallback_command,
 //                        as the pinned engine does; set it empty for an engine without it)
@@ -60,7 +63,13 @@ function handlePrompt(cmd) {
     return
   }
   if (process.env.FAKE_PROMPT_REFUSAL) {
-    emit({ type: "response", command: "prompt", id: cmd.id, success: false, ...JSON.parse(process.env.FAKE_PROMPT_REFUSAL) })
+    emit({
+      type: "response",
+      command: "prompt",
+      id: cmd.id,
+      success: false,
+      ...JSON.parse(process.env.FAKE_PROMPT_REFUSAL),
+    })
     return
   }
   if (message.startsWith("delay:")) {
@@ -145,13 +154,31 @@ function handleCommand(cmd) {
       return respond("get_protocol_info", cmd.id, {
         data: {
           protocolVersion: 1,
-          capabilities: (process.env.FAKE_CAPABILITIES ?? "retry_fallback_command").split(",").filter((entry) => entry.length > 0),
+          capabilities: (process.env.FAKE_CAPABILITIES ?? "retry_fallback_command")
+            .split(",")
+            .filter((entry) => entry.length > 0),
         },
       })
+    case "set_permission_preset":
+      if (process.env.FAKE_PERMISSION_PRESET === "refuse")
+        return reject("set_permission_preset", cmd.id, "unknown command type: set_permission_preset")
+      if (process.env.FAKE_PERMISSION_PRESET === "apply-then-refuse") {
+        emit({ type: "session_info_changed", name: `preset:${cmd.permissionPreset}` })
+        return reject("set_permission_preset", cmd.id, "the reply was lost")
+      }
+      respond("set_permission_preset", cmd.id, {
+        data: {
+          permissionPreset: cmd.permissionPreset,
+          permissionPresetSource: "client",
+          permissionPresetStatus: "applied",
+        },
+      })
+      return emit({ type: "session_info_changed", name: `preset:${cmd.permissionPreset}` })
     case "set_retry_fallback":
       if (process.env.FAKE_RETRY_FALLBACK === "hang") return
       if (process.env.FAKE_RETRY_FALLBACK === "exit") return process.exit(3)
-      if (process.env.FAKE_RETRY_FALLBACK === "refuse") return reject("set_retry_fallback", cmd.id, "set_retry_fallback is refused once a turn has started")
+      if (process.env.FAKE_RETRY_FALLBACK === "refuse")
+        return reject("set_retry_fallback", cmd.id, "set_retry_fallback is refused once a turn has started")
       return respond("set_retry_fallback", cmd.id)
     case "get_state":
       return respond("get_state", cmd.id, {
@@ -189,7 +216,14 @@ function handleLine(line) {
     }
   }
   if (parsed.type === "extension_ui_response") {
-    const outcome = parsed.confirmed === false ? "denied" : parsed.cancelled ? "cancelled" : "confirmed"
+    const outcome =
+      typeof parsed.value === "string"
+        ? `value:${parsed.value}`
+        : parsed.confirmed === false
+          ? "denied"
+          : parsed.cancelled
+            ? "cancelled"
+            : "confirmed"
     emit({ type: "session_info_changed", name: `ui:${outcome}` })
     return
   }
@@ -205,6 +239,11 @@ if (process.env.FAKE_IGNORE_TERM === "1") {
 if (process.env.FAKE_EMIT_MALFORMED === "1") {
   process.stdout.write("this-is-not-json\n")
   emit({ type: "agent_start" })
+}
+
+if (process.env.FAKE_EMIT_UI_FRAME) {
+  const frame = JSON.parse(process.env.FAKE_EMIT_UI_FRAME)
+  setTimeout(() => emit({ type: "extension_ui_request", ...frame }), 5)
 }
 
 if (process.env.FAKE_EMIT_UI === "1") {

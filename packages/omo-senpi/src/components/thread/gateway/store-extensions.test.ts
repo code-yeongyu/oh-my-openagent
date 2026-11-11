@@ -9,19 +9,32 @@ import type { StoreExtensionRegistration } from "./store-extensions"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 
 let harness: GatewayHarness | undefined
-afterEach(async () => { await harness?.dispose(); harness = undefined })
+afterEach(async () => {
+  await harness?.dispose()
+  harness = undefined
+})
 
 const moduleUrl = new URL("./testing/store-extension.mjs", import.meta.url).href
 const extension = (name = "alpha"): StoreExtensionRegistration => ({
-  name, moduleUrl,
-  migrations: [[`CREATE TABLE ${name}_items (id INTEGER PRIMARY KEY, value TEXT)`, `INSERT INTO ${name}_items VALUES (0, 'seed')`]],
+  name,
+  moduleUrl,
+  migrations: [
+    [`CREATE TABLE ${name}_items (id INTEGER PRIMARY KEY, value TEXT)`, `INSERT INTO ${name}_items VALUES (0, 'seed')`],
+  ],
 })
-const bind = { principal: "connector:test", binding: { platform: "custom", account_id: "bot", chat_id: "chat", session_durable_id: "target", ttl_seconds: null } }
+const bind = {
+  principal: "connector:test",
+  binding: { platform: "custom", account_id: "bot", chat_id: "chat", session_durable_id: "target", ttl_seconds: null },
+}
 
 describe("store extension migrations", () => {
   test("#given a mixed-case extension table registered on a v6 store #when the store upgrades to the current schema #then the extension registers again and owns its one table row", async () => {
     const h = (harness = createGatewayHarness())
-    const mixed: StoreExtensionRegistration = { name: "alpha", moduleUrl, migrations: [["CREATE TABLE Alpha_Items (id INTEGER PRIMARY KEY, value TEXT)"]] }
+    const mixed: StoreExtensionRegistration = {
+      name: "alpha",
+      moduleUrl,
+      migrations: [["CREATE TABLE Alpha_Items (id INTEGER PRIMARY KEY, value TEXT)"]],
+    }
     const first = h.store()
     expect(await first.registerStoreExtension(mixed)).toMatchObject({ kind: "ok" })
     await first.dispose()
@@ -31,6 +44,7 @@ describe("store extension migrations", () => {
       db.exec("DROP TABLE thread_creations")
       db.exec("DROP TABLE extension_registrations")
       db.exec("DROP TABLE toolkit_replay_receipts")
+      db.exec("ALTER TABLE deliveries DROP COLUMN wait_kind")
       db.exec("DELETE FROM extension_objects WHERE owner IS NULL AND name NOT IN (SELECT name FROM sqlite_schema)")
       db.exec("PRAGMA user_version = 6")
     } finally {
@@ -41,42 +55,86 @@ describe("store extension migrations", () => {
     const check = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
     try {
       expect(check.query("PRAGMA user_version").get()).toEqual({ user_version: GATEWAY_MIGRATIONS.length })
-      expect(check.query("SELECT name, owner FROM extension_objects WHERE type = 'table' AND lower(name) = 'alpha_items'").all()).toEqual([{ name: "alpha_items", owner: "alpha" }])
+      expect(
+        check
+          .query("SELECT name, owner FROM extension_objects WHERE type = 'table' AND lower(name) = 'alpha_items'")
+          .all(),
+      ).toEqual([{ name: "alpha_items", owner: "alpha" }])
     } finally {
       check.close()
     }
   })
 
   test.each([
-    ["the old branch numbering at v8 (thread tables, no receipts table, no provenance trigger)", "DROP TRIGGER deliveries_require_provenance; DROP TABLE toolkit_replay_receipts", 8, 1],
-    ["the old branch numbering at v9 (thread tables and receipts table, no provenance trigger)", "DROP TRIGGER deliveries_require_provenance", 9, 1],
-    ["dev's v8 (the provenance trigger, none of these tables)", "DROP TABLE thread_creations; DROP TABLE extension_registrations; DROP TABLE toolkit_replay_receipts", 8, 0],
-  ])("#given a store migrated by %s #when the new code opens it #then it reaches the current version with every table, the trigger and its rows", async (_label, rewind, version, keptRows) => {
-    const h = (harness = createGatewayHarness())
-    const first = h.store()
-    expect(await first.registerStoreExtension(extension())).toMatchObject({ kind: "ok" })
-    await first.dispose()
-    const db = new Database(gatewayDatabasePath(h.agentDir))
-    try {
-      db.exec("INSERT INTO thread_creations (creator_durable_id, created_durable_id, created_at) VALUES ('parent', 'child', 1)")
-      db.exec(rewind as string)
-      db.exec("DELETE FROM extension_objects WHERE owner IS NULL AND name NOT IN (SELECT name FROM sqlite_schema)")
-      db.exec(`PRAGMA user_version = ${version}`)
-    } finally {
-      db.close()
-    }
-    expect(await h.store().registerStoreExtension(extension())).toMatchObject({ kind: "ok" })
-    const check = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
-    try {
-      expect(check.query("PRAGMA user_version").get()).toEqual({ user_version: GATEWAY_MIGRATIONS.length })
-      expect(check.query("SELECT name FROM sqlite_schema WHERE type = 'table' AND name IN ('thread_creations', 'extension_registrations', 'toolkit_replay_receipts') ORDER BY name").all())
-        .toEqual([{ name: "extension_registrations" }, { name: "thread_creations" }, { name: "toolkit_replay_receipts" }])
-      expect(check.query("SELECT name FROM sqlite_schema WHERE type = 'trigger' AND name = 'deliveries_require_provenance'").all()).toEqual([{ name: "deliveries_require_provenance" }])
-      expect(check.query("SELECT count(*) AS rows FROM thread_creations WHERE creator_durable_id = 'parent' AND created_durable_id = 'child'").get()).toEqual({ rows: keptRows })
-    } finally {
-      check.close()
-    }
-  })
+    [
+      "the old branch numbering at v8 (thread tables, no receipts table, no provenance trigger)",
+      "DROP TRIGGER deliveries_require_provenance; DROP TABLE toolkit_replay_receipts",
+      8,
+      1,
+    ],
+    [
+      "the old branch numbering at v9 (thread tables and receipts table, no provenance trigger)",
+      "DROP TRIGGER deliveries_require_provenance",
+      9,
+      1,
+    ],
+    [
+      "dev's v8 (the provenance trigger, none of these tables)",
+      "DROP TABLE thread_creations; DROP TABLE extension_registrations; DROP TABLE toolkit_replay_receipts",
+      8,
+      0,
+    ],
+  ])(
+    "#given a store migrated by %s #when the new code opens it #then it reaches the current version with every table, the trigger and its rows",
+    async (_label, rewind, version, keptRows) => {
+      const h = (harness = createGatewayHarness())
+      const first = h.store()
+      expect(await first.registerStoreExtension(extension())).toMatchObject({ kind: "ok" })
+      await first.dispose()
+      const db = new Database(gatewayDatabasePath(h.agentDir))
+      try {
+        db.exec(
+          "INSERT INTO thread_creations (creator_durable_id, created_durable_id, created_at) VALUES ('parent', 'child', 1)",
+        )
+        db.exec(rewind as string)
+        db.exec("ALTER TABLE deliveries DROP COLUMN wait_kind")
+        db.exec("DELETE FROM extension_objects WHERE owner IS NULL AND name NOT IN (SELECT name FROM sqlite_schema)")
+        db.exec(`PRAGMA user_version = ${version}`)
+      } finally {
+        db.close()
+      }
+      expect(await h.store().registerStoreExtension(extension())).toMatchObject({ kind: "ok" })
+      const check = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
+      try {
+        expect(check.query("PRAGMA user_version").get()).toEqual({ user_version: GATEWAY_MIGRATIONS.length })
+        expect(
+          check
+            .query(
+              "SELECT name FROM sqlite_schema WHERE type = 'table' AND name IN ('thread_creations', 'extension_registrations', 'toolkit_replay_receipts') ORDER BY name",
+            )
+            .all(),
+        ).toEqual([
+          { name: "extension_registrations" },
+          { name: "thread_creations" },
+          { name: "toolkit_replay_receipts" },
+        ])
+        expect(
+          check
+            .query("SELECT name FROM sqlite_schema WHERE type = 'trigger' AND name = 'deliveries_require_provenance'")
+            .all(),
+        ).toEqual([{ name: "deliveries_require_provenance" }])
+        expect(
+          check
+            .query(
+              "SELECT count(*) AS rows FROM thread_creations WHERE creator_durable_id = 'parent' AND created_durable_id = 'child'",
+            )
+            .get(),
+        ).toEqual({ rows: keptRows })
+      } finally {
+        check.close()
+      }
+    },
+  )
 
   test("#given a core table added after the v6 snapshot #when an extension takes its name #then registration is refused and the table stays core", async () => {
     const h = (harness = createGatewayHarness())
@@ -85,7 +143,9 @@ describe("store extension migrations", () => {
     expect(result).toMatchObject({ kind: "refused", code: "extension_schema_violation" })
     const db = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
     try {
-      expect(db.query("SELECT owner FROM extension_objects WHERE type = 'table' AND name = 'thread_creations'").get()).toEqual({ owner: null })
+      expect(
+        db.query("SELECT owner FROM extension_objects WHERE type = 'table' AND name = 'thread_creations'").get(),
+      ).toEqual({ owner: null })
       expect(db.query("SELECT name FROM extension_schema").all()).toEqual([])
     } finally {
       db.close()
@@ -97,13 +157,24 @@ describe("store extension migrations", () => {
     const store = h.store()
     expect(await store.registerStoreExtension(extension())).toEqual({ kind: "ok", value: { version: 1 } })
     expect(await store.registerStoreExtension(extension())).toEqual({ kind: "ok", value: { version: 1 } })
-    expect(await store.extensionCall("alpha", "put", { name: "alpha", id: 1, value: "kept" })).toEqual({ kind: "ok", value: { value: "kept" } })
-    expect(await store.extensionCall("alpha", "rows", { name: "alpha" })).toEqual({ kind: "ok", value: [{ id: 0, value: "seed" }, { id: 1, value: "kept" }] })
+    expect(await store.extensionCall("alpha", "put", { name: "alpha", id: 1, value: "kept" })).toEqual({
+      kind: "ok",
+      value: { value: "kept" },
+    })
+    expect(await store.extensionCall("alpha", "rows", { name: "alpha" })).toEqual({
+      kind: "ok",
+      value: [
+        { id: 0, value: "seed" },
+        { id: 1, value: "kept" },
+      ],
+    })
     const db = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
     try {
       expect(db.query("SELECT name, version FROM extension_schema").all()).toEqual([{ name: "alpha", version: 1 }])
       expect(db.query("PRAGMA user_version").get()).toEqual({ user_version: GATEWAY_MIGRATIONS.length })
-    } finally { db.close() }
+    } finally {
+      db.close()
+    }
   })
 
   test("#given two namespaces #when their operations run #then their rows do not collide and cross reads fail", async () => {
@@ -111,8 +182,14 @@ describe("store extension migrations", () => {
     const store = h.store()
     for (const name of ["alpha", "beta"]) expect((await store.registerStoreExtension(extension(name))).kind).toBe("ok")
     expect((await store.extensionCall("alpha", "put", { name: "alpha", id: 1, value: "alpha only" })).kind).toBe("ok")
-    expect(await store.extensionCall("beta", "rows", { name: "beta" })).toEqual({ kind: "ok", value: [{ id: 0, value: "seed" }] })
-    expect(await store.extensionCall("beta", "rows", { name: "alpha" })).toMatchObject({ kind: "refused", code: "extension_schema_violation" })
+    expect(await store.extensionCall("beta", "rows", { name: "beta" })).toEqual({
+      kind: "ok",
+      value: [{ id: 0, value: "seed" }],
+    })
+    expect(await store.extensionCall("beta", "rows", { name: "alpha" })).toMatchObject({
+      kind: "refused",
+      code: "extension_schema_violation",
+    })
     expect(await store.journalMode()).toBe("wal")
   })
 
@@ -126,20 +203,34 @@ describe("store extension migrations", () => {
     ["core view", "CREATE VIEW alpha_view AS SELECT * FROM receipts"],
     ["schema version", "PRAGMA user_version = 900"],
     ["transaction escape", "COMMIT"],
-  ])("#given a forbidden %s #when migrating #then the step rolls back and the worker serves core operations", async (_label, statement) => {
-    const h = (harness = createGatewayHarness())
-    const store = h.store()
-    const descriptor = extension()
-    const result = await store.registerStoreExtension({ ...descriptor, migrations: [[...descriptor.migrations[0], statement]] })
-    expect(result).toMatchObject({ kind: "refused", code: "extension_schema_violation", message: expect.any(String) })
-    expect(await store.journalMode()).toBe("wal")
-    const db = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
-    try {
-      expect(db.query("SELECT name FROM sqlite_schema WHERE name IN ('alpha_items', 'outsider', 'alpha_hook', 'alpha_view')").all()).toEqual([])
-      expect(db.query("SELECT * FROM extension_schema").all()).toEqual([])
-      expect(db.query("SELECT COUNT(*) AS n FROM deliveries").get()).toEqual({ n: 0 })
-    } finally { db.close() }
-  })
+  ])(
+    "#given a forbidden %s #when migrating #then the step rolls back and the worker serves core operations",
+    async (_label, statement) => {
+      const h = (harness = createGatewayHarness())
+      const store = h.store()
+      const descriptor = extension()
+      const result = await store.registerStoreExtension({
+        ...descriptor,
+        migrations: [[...descriptor.migrations[0], statement]],
+      })
+      expect(result).toMatchObject({ kind: "refused", code: "extension_schema_violation", message: expect.any(String) })
+      expect(await store.journalMode()).toBe("wal")
+      const db = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
+      try {
+        expect(
+          db
+            .query(
+              "SELECT name FROM sqlite_schema WHERE name IN ('alpha_items', 'outsider', 'alpha_hook', 'alpha_view')",
+            )
+            .all(),
+        ).toEqual([])
+        expect(db.query("SELECT * FROM extension_schema").all()).toEqual([])
+        expect(db.query("SELECT COUNT(*) AS n FROM deliveries").get()).toEqual({ n: 0 })
+      } finally {
+        db.close()
+      }
+    },
+  )
 })
 
 describe("store extension calls", () => {
@@ -154,32 +245,59 @@ describe("store extension calls", () => {
     const h = (harness = createGatewayHarness())
     const store = h.store()
     expect((await store.registerStoreExtension(extension())).kind).toBe("ok")
-    expect(await store.extensionCall("alpha", "sql", { sql })).toMatchObject({ kind: "refused", code: "extension_schema_violation" })
-    expect(await store.extensionCall("alpha", "rows", { name: "alpha" })).toEqual({ kind: "ok", value: [{ id: 0, value: "seed" }] })
+    expect(await store.extensionCall("alpha", "sql", { sql })).toMatchObject({
+      kind: "refused",
+      code: "extension_schema_violation",
+    })
+    expect(await store.extensionCall("alpha", "rows", { name: "alpha" })).toEqual({
+      kind: "ok",
+      value: [{ id: 0, value: "seed" }],
+    })
     expect(await store.list()).toEqual([])
   })
 
   test.each([
     ["schema denial", "DROP TABLE deliveries", "extension_schema_violation"],
     ["constraint error", "INSERT INTO alpha_items VALUES (0, 'duplicate')", "extension_operation_failed"],
-  ])("#given a module catches a %s #when returning #then the whole transaction still rolls back", async (_kind, sql, code) => {
-    const h = (harness = createGatewayHarness())
-    const store = h.store()
-    await store.registerStoreExtension(extension())
-    expect(await store.extensionCall("alpha", "swallow", { before: "INSERT INTO alpha_items VALUES (1, 'uncommitted')", sql })).toMatchObject({ kind: "refused", code })
-    expect(await store.extensionCall("alpha", "rows", { name: "alpha" })).toEqual({ kind: "ok", value: [{ id: 0, value: "seed" }] })
-    expect(await store.list()).toEqual([])
-  })
+  ])(
+    "#given a module catches a %s #when returning #then the whole transaction still rolls back",
+    async (_kind, sql, code) => {
+      const h = (harness = createGatewayHarness())
+      const store = h.store()
+      await store.registerStoreExtension(extension())
+      expect(
+        await store.extensionCall("alpha", "swallow", {
+          before: "INSERT INTO alpha_items VALUES (1, 'uncommitted')",
+          sql,
+        }),
+      ).toMatchObject({ kind: "refused", code })
+      expect(await store.extensionCall("alpha", "rows", { name: "alpha" })).toEqual({
+        kind: "ok",
+        value: [{ id: 0, value: "seed" }],
+      })
+      expect(await store.list()).toEqual([])
+    },
+  )
 
   test("#given missing module name and op #when requested #then all refusals are typed and core requests still succeed", async () => {
     const h = (harness = createGatewayHarness())
     const store = h.store()
-    expect(await store.registerStoreExtension({ ...extension(), moduleUrl: new URL("./missing.mjs", import.meta.url).href })).toMatchObject({ kind: "refused", code: "extension_import_failed", message: expect.any(String) })
+    expect(
+      await store.registerStoreExtension({ ...extension(), moduleUrl: new URL("./missing.mjs", import.meta.url).href }),
+    ).toMatchObject({ kind: "refused", code: "extension_import_failed", message: expect.any(String) })
     expect(await store.list()).toEqual([])
-    expect(await store.extensionCall("missing", "rows", {})).toMatchObject({ kind: "refused", code: "extension_unknown_name", message: expect.any(String) })
+    expect(await store.extensionCall("missing", "rows", {})).toMatchObject({
+      kind: "refused",
+      code: "extension_unknown_name",
+      message: expect.any(String),
+    })
     expect(await store.journalMode()).toBe("wal")
     await store.registerStoreExtension(extension())
-    expect(await store.extensionCall("alpha", "missing", {})).toMatchObject({ kind: "refused", code: "extension_unknown_op", message: expect.any(String) })
+    expect(await store.extensionCall("alpha", "missing", {})).toMatchObject({
+      kind: "refused",
+      code: "extension_unknown_op",
+      message: expect.any(String),
+    })
     expect(await store.list()).toEqual([])
   })
 
@@ -188,13 +306,31 @@ describe("store extension calls", () => {
     h.phantom("target")
     const store = h.store()
     await store.registerStoreExtension(extension())
-    const bound = await store.extensionCall<{ kind: "ok"; binding: { binding_id: string } }>("alpha", "core", { op: "bind", request: bind })
+    const bound = await store.extensionCall<{ kind: "ok"; binding: { binding_id: string } }>("alpha", "core", {
+      op: "bind",
+      request: bind,
+    })
     if (bound.kind !== "ok") throw new Error(JSON.stringify(bound))
-    const result = await store.extensionCall("alpha", "enqueueThenThrow", { request: { binding_id: bound.value.binding.binding_id, event_id: "rolled-back", text: "hello", author: { platform_user_id: "p1", display: "Alice", user_id: "u1" } }, inbox: gatewayInboxDirectory(h.agentDir, "target") })
+    const result = await store.extensionCall("alpha", "enqueueThenThrow", {
+      request: {
+        binding_id: bound.value.binding.binding_id,
+        event_id: "rolled-back",
+        text: "hello",
+        author: { platform_user_id: "p1", display: "Alice", user_id: "u1" },
+      },
+      inbox: gatewayInboxDirectory(h.agentDir, "target"),
+    })
     expect(result).toEqual({ kind: "refused", code: "extension_operation_failed", message: "rollback requested" })
     expect(await store.list()).toEqual([])
-    expect(existsSync(gatewayInboxDirectory(h.agentDir, "target")) ? readdirSync(gatewayInboxDirectory(h.agentDir, "target")) : []).toEqual([])
-    expect(await store.extensionCall("alpha", "rows", { name: "alpha" })).toEqual({ kind: "ok", value: [{ id: 0, value: "seed" }] })
+    expect(
+      existsSync(gatewayInboxDirectory(h.agentDir, "target"))
+        ? readdirSync(gatewayInboxDirectory(h.agentDir, "target"))
+        : [],
+    ).toEqual([])
+    expect(await store.extensionCall("alpha", "rows", { name: "alpha" })).toEqual({
+      kind: "ok",
+      value: [{ id: 0, value: "seed" }],
+    })
   })
 
   test("#given binding and inbound in one op #when committed #then binding reads actor attribution and markers are published", async () => {
@@ -203,7 +339,8 @@ describe("store extension calls", () => {
     const store = h.store()
     await store.registerStoreExtension(extension())
     const result = await store.extensionCall("alpha", "bindThenEnqueue", {
-      bind, address: { platform: "custom", account_id: "bot", chat_id: "chat", thread_id: "@chat" },
+      bind,
+      address: { platform: "custom", account_id: "bot", chat_id: "chat", thread_id: "@chat" },
       send: { event_id: "sent", text: "hello", author: { platform_user_id: "p1", display: "Alice", user_id: "u1" } },
     })
     expect(result).toMatchObject({ kind: "ok", value: { found: { status: "active" }, sent: { kind: "ok" } } })
@@ -211,7 +348,15 @@ describe("store extension calls", () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].actor_user_id).toBe("u1")
     expect(existsSync(join(gatewayInboxDirectory(h.agentDir, "target"), rows[0].delivery_id))).toBe(true)
-    const moved = await store.extensionCall("alpha", "rebindThenThrow", { request: { principal: "connector:test", binding_id: rows[0].binding_id, expected_revision: 1, session_durable_id: "target2" }, marker: join(gatewayInboxDirectory(h.agentDir, "target"), rows[0].delivery_id) })
+    const moved = await store.extensionCall("alpha", "rebindThenThrow", {
+      request: {
+        principal: "connector:test",
+        binding_id: rows[0].binding_id,
+        expected_revision: 1,
+        session_durable_id: "target2",
+      },
+      marker: join(gatewayInboxDirectory(h.agentDir, "target"), rows[0].delivery_id),
+    })
     expect(moved).toEqual({ kind: "refused", code: "extension_operation_failed", message: "rollback requested" })
     expect((await store.list())[0].state).toBe("queued")
     expect(existsSync(join(gatewayInboxDirectory(h.agentDir, "target"), rows[0].delivery_id))).toBe(true)

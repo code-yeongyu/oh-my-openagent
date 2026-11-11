@@ -1,9 +1,19 @@
 import { chmod, writeFile } from "@oh-my-opencode/memory-core/fs"
-import { getProcessStartIdentity, loadFactsPersona, serializeFactsPayload, type FactsPayload } from "@oh-my-opencode/memory-core"
+import {
+  getProcessStartIdentity,
+  loadFactsPersona,
+  serializeFactsPayload,
+  type FactsPayload,
+} from "@oh-my-opencode/memory-core"
 import { join } from "node:path"
 
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
-import { runInProcessMemoryChild, type InProcessMemoryChildState, type MemoryChildResult, type StartChildInput } from "./in-process-memory-child"
+import {
+  runInProcessMemoryChild,
+  type InProcessMemoryChildState,
+  type MemoryChildResult,
+  type StartChildInput,
+} from "./in-process-memory-child"
 import { createFactsRecordTool, FACTS_RECORD_TOOL_NAME, payloadExchanges } from "./facts-record-tool"
 import { createFactsAgreementTool, FACTS_AGREEMENT_TOOL_NAME, type FactsAgreementTool } from "./facts-agreement-tool"
 import { FACTS_AGREEMENTS_FILENAME } from "./facts-agreements"
@@ -40,7 +50,10 @@ type FactsInProcessLaunchInput = {
 
 export async function launchFactsInProcess(input: FactsInProcessLaunchInput): Promise<boolean> {
   const candidates: readonly [ReflectionModelCandidate, ...ReflectionModelCandidate[]] = [
-    { model: input.resolution.model, ...(input.resolution.thinking === undefined ? {} : { thinking: input.resolution.thinking }) },
+    {
+      model: input.resolution.model,
+      ...(input.resolution.thinking === undefined ? {} : { thinking: input.resolution.thinking }),
+    },
     ...(input.oversized === true ? [] : input.resolution.fallbacks),
   ]
   const registry = input.modelRegistry
@@ -49,9 +62,10 @@ export async function launchFactsInProcess(input: FactsInProcessLaunchInput): Pr
   for (const [index, candidate] of candidates.entries()) {
     const attempt = index + 1
     tried.push(candidate.model)
-    const model = registry === undefined || !isModelFinder(registry)
-      ? undefined
-      : taskRuntime.findModelReference<ResolvedChildModel>(registry, candidate.model)
+    const model =
+      registry === undefined || !isModelFinder(registry)
+        ? undefined
+        : taskRuntime.findModelReference<ResolvedChildModel>(registry, candidate.model)
     if (registry === undefined || model === undefined || model === null) {
       input.options.logger?.warn("facts model candidate skipped because it is not visible in the live registry", {
         model: candidate.model,
@@ -64,7 +78,9 @@ export async function launchFactsInProcess(input: FactsInProcessLaunchInput): Pr
     if (result.cause === "cancelled") return true
     if (result.cause !== "session_create_failed") return false
   }
-  throw new Error(`No facts model candidate launched; tried: ${tried.length === 0 ? candidates.map((candidate) => candidate.model).join(", ") : tried.join(", ")}`)
+  throw new Error(
+    `No facts model candidate launched; tried: ${tried.length === 0 ? candidates.map((candidate) => candidate.model).join(", ") : tried.join(", ")}`,
+  )
 }
 
 async function launchCandidate(
@@ -74,7 +90,8 @@ async function launchCandidate(
   attempt: number,
   fallbacks: readonly ReflectionModelCandidate[],
 ): Promise<MemoryChildResult> {
-  const payload = typeof input.payload === "string" ? input.payload : { ...input.payload, agreementEventVersion: 1 as const }
+  const payload =
+    typeof input.payload === "string" ? input.payload : { ...input.payload, agreementEventVersion: 1 as const }
   const payloadText = typeof payload === "string" ? payload : serializeFactsPayload(payload)
   const payloadPath = join(input.runDir, "facts-payload.json")
   const extractionPath = join(input.runDir, "extraction.jsonl")
@@ -83,27 +100,38 @@ async function launchCandidate(
   if (input.oversized === true && (typeof input.payload === "string" || !admitOversizedFacts(input.payload, model))) {
     throw new Error("oversized facts input does not fit the pinned model budget")
   }
-  const guard = input.oversized !== true ? undefined : createOversizedFactsGuard({
-    model,
-    ...(input.options.createSession === undefined ? {} : { createSession: input.options.createSession }),
-    onFailure: (reason) => {
-      tool.deactivate()
-      input.options.logger?.warn("oversized facts run refused", { runId: input.runId, reason })
-    },
-  })
+  const guard =
+    input.oversized !== true
+      ? undefined
+      : createOversizedFactsGuard({
+          model,
+          ...(input.options.createSession === undefined ? {} : { createSession: input.options.createSession }),
+          onFailure: (reason) => {
+            tool.deactivate()
+            input.options.logger?.warn("oversized facts run refused", { runId: input.runId, reason })
+          },
+        })
   const tool = createFactsRecordTool({
-    extractionPath, state,
+    extractionPath,
+    state,
     // A text payload (onboarding session digests) has no proposal and reply turns, so it can never carry consent.
     exchanges: typeof input.payload === "string" ? [] : payloadExchanges(input.payload),
-    ...(guard === undefined ? {} : { maxBytes: FACTS_RECORD_BYTES, maxRecords: FACTS_RECORD_LIMIT, onFailure: guard.fail }),
+    ...(guard === undefined
+      ? {}
+      : { maxBytes: FACTS_RECORD_BYTES, maxRecords: FACTS_RECORD_LIMIT, onFailure: guard.fail }),
     ...(input.recordLimits === undefined ? {} : input.recordLimits),
   })
   const known = typeof input.payload === "string" ? undefined : input.payload.agreements
-  const agreementTool = known === undefined || typeof payload === "string" ? undefined : createFactsAgreementTool({
-    extractionPath: agreementsPath, state, knownIds: new Set(known.map((item) => item.id)),
-    payload,
-    ...(guard === undefined ? {} : { onFailure: guard.fail }),
-  })
+  const agreementTool =
+    known === undefined || typeof payload === "string"
+      ? undefined
+      : createFactsAgreementTool({
+          extractionPath: agreementsPath,
+          state,
+          knownIds: new Set(known.map((item) => item.id)),
+          payload,
+          ...(guard === undefined ? {} : { onFailure: guard.fail }),
+        })
   const createSession = guard?.createSession ?? input.options.createSession
   input.onState?.(state)
   let result = await runInProcessMemoryChild({
@@ -140,11 +168,26 @@ async function launchCandidate(
     agreementTool?.deactivate()
     return result
   }
-  if (result.status === "completed" && guard !== undefined && !guard.succeeded()) result = { status: "failed", cause: "child_failed" }
+  if (result.status === "completed" && guard !== undefined && !guard.succeeded())
+    result = { status: "failed", cause: "child_failed" }
   const timedOut = result.status === "failed" && result.cause === "deadline"
   const outcome: RunOutcome = timedOut
-    ? { version: 1, runId: input.runId, attempt, finishedAt: new Date().toISOString(), childExit: { code: null, signal: null }, timedOut: true }
-    : { version: 1, runId: input.runId, attempt, finishedAt: new Date().toISOString(), childExit: { code: result.status === "completed" ? 0 : 1, signal: null }, timedOut: false }
+    ? {
+        version: 1,
+        runId: input.runId,
+        attempt,
+        finishedAt: new Date().toISOString(),
+        childExit: { code: null, signal: null },
+        timedOut: true,
+      }
+    : {
+        version: 1,
+        runId: input.runId,
+        attempt,
+        finishedAt: new Date().toISOString(),
+        childExit: { code: result.status === "completed" ? 0 : 1, signal: null },
+        timedOut: false,
+      }
   await writeRunJsonAtomic(join(input.runDir, "outcome.json"), outcome)
   tool.deactivate()
   agreementTool?.deactivate()
@@ -161,6 +204,8 @@ function buildStart(
   agreementTool: FactsAgreementTool | undefined,
 ): StartChildInput {
   const childRegistry = isChildModelRegistry(input.modelRegistry) ? input.modelRegistry : undefined
+  const ownTools =
+    agreementTool === undefined ? [FACTS_RECORD_TOOL_NAME] : [FACTS_RECORD_TOOL_NAME, FACTS_AGREEMENT_TOOL_NAME]
   return {
     taskId: `facts-${input.runId}`,
     cwd: input.runDir,
@@ -171,11 +216,12 @@ function buildStart(
     ...childModelChainSpec({ model: candidate.model, fallbacks }),
     ...(input.oversized === true ? { retry: { maxRetries: 0 } } : {}),
     ...(candidate.thinking === undefined ? {} : { thinkingLevel: candidate.thinking }),
-    toolAllowlist: agreementTool === undefined ? [FACTS_RECORD_TOOL_NAME] : [FACTS_RECORD_TOOL_NAME, FACTS_AGREEMENT_TOOL_NAME],
+    toolAllowlist: ownTools,
     memberScopedTools: agreementTool === undefined ? [tool] : [tool, agreementTool],
     depth: 1,
     parentSessionId: `facts-${input.runId}`,
     rootSessionId: `facts-${input.runId}`,
+    ownApprovalMode: { allowTools: ownTools },
     systemPrompt: loadFactsPersona(),
     promptEnvelope: "bare",
     completion: "turn",
@@ -183,11 +229,17 @@ function buildStart(
   }
 }
 
-function isModelFinder(value: unknown): value is { readonly find: (provider: string, modelId: string) => ResolvedChildModel | undefined } {
+function isModelFinder(
+  value: unknown,
+): value is { readonly find: (provider: string, modelId: string) => ResolvedChildModel | undefined } {
   return value !== null && typeof value === "object" && "find" in value && typeof value.find === "function"
 }
 
 function isChildModelRegistry(value: unknown): value is ChildModelRegistry {
-  return value !== null && typeof value === "object" && "getProviderAuth" in value
-    && typeof value.getProviderAuth === "function"
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "getProviderAuth" in value &&
+    typeof value.getProviderAuth === "function"
+  )
 }

@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
 import { getBuiltInRequirementModelIDs } from "./model-capability-guardrails"
-import { FABLE_55_RELEASED } from "./fable-55-launch"
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 const GPT_PROVIDERS = ["openai", "chatgpt-subscription", "github-copilot", "opencode"]
@@ -31,7 +30,11 @@ describe("GPT-6 family routing", () => {
 
   test.each(["explore", "librarian"])("%s carries gpt-6-luna-fast low as its OpenAI rung", (agentName) => {
     const chain = AGENT_MODEL_REQUIREMENTS[agentName].fallbackChain
-    expect(chain[1]).toEqual({ providers: ["openai", "chatgpt-subscription"], model: "gpt-6-luna-fast", variant: "low" })
+    expect(chain[1]).toEqual({
+      providers: ["openai", "chatgpt-subscription"],
+      model: "gpt-6-luna-fast",
+      variant: "low",
+    })
     expect(chain.map(({ model }) => model)).not.toContain("gpt-5.6-luna-fast")
   })
 
@@ -46,10 +49,9 @@ describe("GPT-6 family routing", () => {
   test.each([
     ["artistry", CATEGORY_MODEL_REQUIREMENTS],
     ["prometheus", AGENT_MODEL_REQUIREMENTS],
-  ] as const)("%s follows Fable 5.5 (once released) and 5.1 with claude-opus-5-5 max", (name, table) => {
+  ] as const)("%s follows Fable 5.2 and 5.1 with claude-opus-5-5 max", (name, table) => {
     const chain = table[name].fallbackChain
-    // The 5.5 rung exists only once FABLE_55_RELEASED is true.
-    const fableLead = [...(FABLE_55_RELEASED ? ["claude-fable-5-5"] : []), "claude-fable-5-1"]
+    const fableLead = ["claude-fable-5-2", "claude-fable-5-1"]
     expect(chain.slice(0, fableLead.length).map((rung) => rung.model)).toEqual(fableLead)
     expect(chain[fableLead.length]).toMatchObject({ model: "claude-opus-5-5", variant: "max" })
     for (const rung of chain.slice(1, fableLead.length + 1)) expect(rung.providers).toEqual(chain[0]?.providers)

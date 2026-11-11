@@ -53,7 +53,11 @@ export async function commitMemoryWrite(options: CommitMemoryWriteOptions): Prom
     if (violation !== undefined) throw new MemoryToolError(violation)
     let result
     try {
-      result = await repo.commitWrite(paths, memoryCommitMessage(reason, provenance, writer, provenanceStrippedTrailers(applied.strippedPaths ?? [])), author)
+      result = await repo.commitWrite(
+        paths,
+        memoryCommitMessage(reason, provenance, writer, provenanceStrippedTrailers(applied.strippedPaths ?? [])),
+        author,
+      )
     } catch (error) {
       if (error instanceof NoEffectiveChangesError) {
         throw new MemoryToolError(noChangesMessage ?? "made no effective changes", { cause: error })

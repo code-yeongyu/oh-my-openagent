@@ -19,7 +19,8 @@ function loadDefaultPrometheusPrompt(): string {
 export const PROMETHEUS_SYSTEM_PROMPT = loadDefaultPrometheusPrompt()
 
 export function getPrometheusPrompt(model?: string, disabledTools?: readonly string[]): string {
-  const tools = ["read", "grep", "glob", "bash", "edit", "write", "question", "skill"]
-    .filter((name) => !disabledTools?.includes(name))
+  const tools = ["read", "grep", "glob", "bash", "edit", "write", "question", "skill"].filter(
+    (name) => !disabledTools?.includes(name),
+  )
   return buildNativeAgentPrompt(model, PROMETHEUS_SYSTEM_PROMPT, tools)
 }

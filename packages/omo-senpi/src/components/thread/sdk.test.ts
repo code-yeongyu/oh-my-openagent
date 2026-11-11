@@ -9,6 +9,8 @@ import type { RemoteThreadSurface } from "./remote/ports"
 import { createThreadSdk, type ThreadSdk } from "./sdk"
 import { createRemoteThreadFixture } from "./thread-remote-fixture"
 import type { ThreadHost, ThreadHostSession } from "./tools"
+import type { ThreadHostViewRequest } from "./tools/ports"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 const TUI_SOCKET = "/tmp/t-0123456789abcdef.sock"
 const HOST_SOCKET = "/tmp/i-0123456789abcdef.sock"
@@ -20,31 +22,76 @@ afterEach(async () => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
-function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, request: ReleaseSessionRequest) => Promise<never>; readonly store?: (agentDir: string) => GatewayStore; readonly sdkOwnsStore?: boolean; readonly remote?: RemoteThreadSurface; readonly cwd?: string } = {}) {
+function fixture(
+  options: {
+    readonly release?: (endpoint: GatewayEndpointRef, request: ReleaseSessionRequest) => Promise<never>
+    readonly store?: (agentDir: string) => GatewayStore
+    readonly sdkOwnsStore?: boolean
+    readonly remote?: RemoteThreadSurface
+    readonly cwd?: string
+    readonly noHostAnswering?: boolean
+    readonly diskOnly?: readonly string[]
+  } = {},
+) {
   const agentDir = mkdtempSync(join(tmpdir(), "thread-sdk-"))
   directories.push(agentDir)
   const store: GatewayStore = options.store?.(agentDir) ?? createGatewayStore({ agentDir })
-  const hostSession: ThreadHostSession = { sessionId: "rpc-1", durableSessionId: "dur-host", cwd: process.cwd(), name: "host lane", status: "open", socket: HOST_SOCKET, endpoint_kind: "rpc_host" }
-  const tuiSession: ThreadHostSession = { sessionId: "dur-tui", durableSessionId: "dur-tui", cwd: process.cwd(), name: "my-tui", status: "open", socket: TUI_SOCKET, endpoint_kind: "tui" }
+  const hostSession: ThreadHostSession = {
+    sessionId: "rpc-1",
+    durableSessionId: "dur-host",
+    cwd: process.cwd(),
+    name: "host lane",
+    status: "open",
+    socket: HOST_SOCKET,
+    endpoint_kind: "rpc_host",
+  }
+  const tuiSession: ThreadHostSession = {
+    sessionId: "dur-tui",
+    durableSessionId: "dur-tui",
+    cwd: process.cwd(),
+    name: "my-tui",
+    status: "open",
+    socket: TUI_SOCKET,
+    endpoint_kind: "tui",
+  }
   const sessionsDir = join(agentDir, "sessions", "--fixture--")
   mkdirSync(sessionsDir, { recursive: true })
-  for (const session of [hostSession, tuiSession]) writeFileSync(join(sessionsDir, `epoch_${session.durableSessionId}.jsonl`), JSON.stringify({ type: "session", id: session.durableSessionId, cwd: session.cwd, timestamp: "2026-10-02T00:00:00Z" }) + "\n")
+  const diskOnly = (options.diskOnly ?? []).map((id) => ({ durableSessionId: id, cwd: process.cwd() }))
+  for (const session of [hostSession, tuiSession, ...diskOnly])
+    writeFileSync(
+      join(sessionsDir, `epoch_${session.durableSessionId}.jsonl`),
+      JSON.stringify({
+        type: "session",
+        id: session.durableSessionId,
+        cwd: session.cwd,
+        timestamp: "2026-10-02T00:00:00Z",
+      }) + "\n",
+    )
   const wakes: { readonly endpoint: GatewayEndpointRef; readonly ids: readonly string[] }[] = []
   const releases: { readonly endpoint: GatewayEndpointRef; readonly request: ReleaseSessionRequest }[] = []
+  const views: (ThreadHostViewRequest | undefined)[] = []
   const unused = async (): Promise<never> => {
     throw new Error("not used by the SDK")
   }
   const host: ThreadHost = {
     socket: "/tmp/thread-sdk-legacy.sock",
     listSessions: async () => [hostSession, tuiSession],
-    listView: async () => ({
-      sessions: [hostSession, tuiSession],
-      hosts: [
-        { socket: HOST_SOCKET, list_sessions: { sessions: [hostSession] }, endpoint_kind: "rpc_host", alive: true },
-        { socket: TUI_SOCKET, list_sessions: { sessions: [tuiSession] }, endpoint_kind: "tui", alive: true },
-      ],
-      disk: [],
-    }),
+    listView: async (request) => {
+      views.push(request)
+      // The live surface's contract: when no endpoint answers it throws, unless the caller takes nothing live as the offline case.
+      if (options.noHostAnswering === true) {
+        if (request?.offline !== true) throw new Error("connect ECONNREFUSED")
+        return { sessions: [], hosts: [], disk: [] }
+      }
+      return {
+        sessions: [hostSession, tuiSession],
+        hosts: [
+          { socket: HOST_SOCKET, list_sessions: { sessions: [hostSession] }, endpoint_kind: "rpc_host", alive: true },
+          { socket: TUI_SOCKET, list_sessions: { sessions: [tuiSession] }, endpoint_kind: "tui", alive: true },
+        ],
+        disk: [],
+      }
+    },
     openSession: unused,
     getMessages: async () => [{ role: "user", content: "hello from the host" }],
     getState: async () => ({ isStreaming: false }),
@@ -60,23 +107,79 @@ function fixture(options: { readonly release?: (endpoint: GatewayEndpointRef, re
         wakes.push({ endpoint, ids })
         return { admitted: [] }
       },
-      releaseSession: options.release ?? (async (endpoint, request) => {
-        releases.push({ endpoint, request })
-        return { success: true, data: { released: true, session_path: "/sessions/dur-host.jsonl", attachments: 0, dropped: { deliveries: ["d-1"], user_messages: ["queued ask"] } } }
-      }),
+      releaseSession:
+        options.release ??
+        (async (endpoint, request) => {
+          releases.push({ endpoint, request })
+          return {
+            success: true,
+            data: {
+              released: true,
+              session_path: "/sessions/dur-host.jsonl",
+              attachments: 0,
+              dropped: { deliveries: ["d-1"], user_messages: ["queued ask"] },
+            },
+          }
+        }),
     },
   }
-  const sdk = createThreadSdk({ agentDir, cwd: options.cwd ?? process.cwd(), uid: 501, user: "qa-user", host, ...(options.sdkOwnsStore === true ? {} : { store }), ...(options.remote === undefined ? {} : { remote: options.remote }) })
+  const sdk = createThreadSdk({
+    agentDir,
+    cwd: options.cwd ?? process.cwd(),
+    uid: 501,
+    user: "qa-user",
+    host,
+    ...(options.sdkOwnsStore === true ? {} : { store }),
+    ...(options.remote === undefined ? {} : { remote: options.remote }),
+  })
   sdks.push(sdk)
-  return { sdk, store, wakes, releases }
+  return { sdk, store, wakes, releases, views }
+}
+
+/** The remote surface with every device-service and alias-registry call it takes recorded by method name. */
+function countingRemote(remote: RemoteThreadSurface): {
+  readonly remote: RemoteThreadSurface
+  readonly calls: string[]
+} {
+  const calls: string[] = []
+  const counted = <T extends object>(port: T): T =>
+    new Proxy(port, {
+      get: (target, key, receiver) => {
+        const value: unknown = Reflect.get(target, key, receiver)
+        if (typeof value !== "function") return value
+        return (...args: unknown[]) => {
+          calls.push(String(key))
+          return Reflect.apply(value, target, args)
+        }
+      },
+    })
+  return {
+    remote: {
+      ...remote,
+      sessions: counted(remote.sessions),
+      ...(remote.aliases === undefined ? {} : { aliases: counted(remote.aliases) }),
+    },
+    calls,
+  }
 }
 
 describe("thread SDK: sessions", () => {
   test("#given a host and a terminal session #when listed and read #then rows carry surface and endpoint and the live transcript comes from the session's endpoint", async () => {
     const { sdk } = fixture()
     const listed = await sdk.list({})
-    expect(listed).toMatchObject({ kind: "ok", scope: "workspace", threads: [{ thread_id: "dur-host", surface: "desktop", endpoint: { kind: "rpc_host", socket: HOST_SOCKET } }, { thread_id: "dur-tui", surface: "tui", endpoint: { kind: "tui" } }] })
-    expect(await sdk.read({ thread: "host lane" })).toMatchObject({ kind: "ok", thread_id: "dur-host", items: [{ seq: 1, role: "user", content: JSON.stringify("hello from the host") }] })
+    expect(listed).toMatchObject({
+      kind: "ok",
+      scope: "workspace",
+      threads: [
+        { thread_id: "dur-host", surface: "desktop", endpoint: { kind: "rpc_host", socket: HOST_SOCKET } },
+        { thread_id: "dur-tui", surface: "tui", endpoint: { kind: "tui" } },
+      ],
+    })
+    expect(await sdk.read({ thread: "host lane" })).toMatchObject({
+      kind: "ok",
+      thread_id: "dur-host",
+      items: [{ seq: 1, role: "user", content: JSON.stringify("hello from the host") }],
+    })
   })
 
   test("#given no binding #when the CLI sends to the terminal #then the row is written by the cli principal with a cli origin and only a wake reaches the terminal", async () => {
@@ -84,9 +187,23 @@ describe("thread SDK: sessions", () => {
     const sent = await sdk.send({ thread: "my-tui", text: "ping" })
     expect(sent).toMatchObject({ kind: "ok", endpoint_kind: "tui", effective_mode: "auto", deduplicated: false })
     const rows = await store.list({ target_durable_id: "dur-tui" })
-    expect(rows.map((row) => ({ sender: row.sender, origin: row.envelope.origin, actor: row.envelope.actor }))).toEqual([
-      { sender: "cli:501", origin: { external: { platform: "cli", account_id: "qa-user", chat_id: "@cli", thread_id: "@chat", message_id: rows[0]?.delivery_id ?? "" } }, actor: "qa-user" },
-    ])
+    expect(rows.map((row) => ({ sender: row.sender, origin: row.envelope.origin, actor: row.envelope.actor }))).toEqual(
+      [
+        {
+          sender: "cli:501",
+          origin: {
+            external: {
+              platform: "cli",
+              account_id: "qa-user",
+              chat_id: "@cli",
+              thread_id: "@chat",
+              message_id: rows[0]?.delivery_id ?? "",
+            },
+          },
+          actor: "qa-user",
+        },
+      ],
+    )
     expect(wakes.map((wake) => wake.endpoint.kind)).toEqual(["tui"])
     expect(sdk.principal).toBe("cli:501")
   })
@@ -99,7 +216,9 @@ describe("thread SDK: sessions", () => {
 
   test("#given an author on a send without a binding #when called #then it is invalid_arguments and nothing is written", async () => {
     const { sdk, store } = fixture()
-    expect(await sdk.send({ thread: "my-tui", text: "ping", author: { platform_user_id: "U1", display: "Jane" } })).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(
+      await sdk.send({ thread: "my-tui", text: "ping", author: { platform_user_id: "U1", display: "Jane" } }),
+    ).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
     expect(await store.list()).toEqual([])
   })
 })
@@ -109,25 +228,120 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
   afterEach(remoteFixture.cleanup)
 
   test("#given aliases held by a thread here and by one on b #when omo thread read names each alias #then the first reads this device's transcript and the second b's", async () => {
-    const account = remoteFixture.account({ aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }], ["lane-b", { session_id: "dur-on-b", device: "b" }]]) })
+    const account = remoteFixture.account({
+      aliases: new Map([
+        ["lane-here", { session_id: "dur-host", device: "here" }],
+        ["lane-b", { session_id: "dur-on-b", device: "b" }],
+      ]),
+    })
     const { sdk } = fixture({ remote: account.remote })
     expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread_id: "dur-host" })
     expect(await sdk.read({ thread: "lane-b" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
-    expect(account.sent.filter((entry) => entry.via === "session").map((entry) => [entry.device, entry.rpc?.["type"]])).toEqual([["b", "get_messages"]])
+    expect(
+      account.sent.filter((entry) => entry.via === "session").map((entry) => [entry.device, entry.rpc?.["type"]]),
+    ).toEqual([["b", "get_messages"]])
   })
 
-  test("#given an alias held by a thread on this device and omo thread run from another workspace #when read names the alias without all_scope #then it reads that thread; the raw id alone stays scope_denied", async () => {
-    const account = remoteFixture.account({ aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]) })
-    const { sdk } = fixture({ remote: account.remote, cwd: "/thread-sdk-other-workspace" })
+  test("#given an alias held by a thread on this device and omo thread run from another workspace #when read and send name the alias without all_scope #then both reach that thread; the raw id alone stays scope_denied", async () => {
+    const account = remoteFixture.account({
+      aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]),
+    })
+    const { sdk, store } = fixture({ remote: account.remote, cwd: "/thread-sdk-other-workspace" })
     expect(await sdk.read({ thread: "lane-here" })).toMatchObject({ kind: "ok", thread_id: "dur-host" })
     expect(await sdk.read({ thread: "dur-host" })).toMatchObject({ kind: "error", error: { code: "scope_denied" } })
+    expect(await sdk.send({ thread: "lane-here", text: "ping" })).toMatchObject({ kind: "ok", deduplicated: false })
+    expect((await store.list({ target_durable_id: "dur-host" })).map((row) => row.sender)).toEqual(["cli:501"])
+  })
+
+  test("#given a thread that is not running and no host or terminal answering #when omo thread send names it by id and by an own alias #then both are stored queued_offline, never internal_error (#12860)", async () => {
+    const account = remoteFixture.account({
+      aliases: new Map([["lane-off", { session_id: "dur-off", device: "here" }]]),
+    })
+    const { sdk, store } = fixture({ remote: account.remote, noHostAnswering: true, diskOnly: ["dur-off"] })
+    expect(await sdk.send({ thread: "dur-off", text: "by id" })).toMatchObject({
+      kind: "ok",
+      delivery: { kind: "queued_offline" },
+    })
+    expect(await sdk.send({ thread: "lane-off", text: "by alias" })).toMatchObject({
+      kind: "ok",
+      delivery: { kind: "queued_offline" },
+    })
+    expect((await store.list({ target_durable_id: "dur-off" })).map((row) => row.sender)).toEqual([
+      "cli:501",
+      "cli:501",
+    ])
+  })
+
+  test("#given a published thread id and the account surface set #when omo thread send names that id #then it is delivered with no host listing, no alias call and no listing, and its one device-service call is the thisDevice read that stamps its sender device (#12860, #13004)", async () => {
+    const account = remoteFixture.account({
+      aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]),
+    })
+    const counting = countingRemote(account.remote)
+    const { sdk, store, views } = fixture({ remote: counting.remote })
+    await store.registerIncarnation({
+      durable_id: "dur-host",
+      incarnation: "rpc-1",
+      endpoint: { kind: "rpc_host", socket: HOST_SOCKET },
+    })
+    expect(await sdk.send({ thread: "dur-host", text: "ping" })).toMatchObject({ kind: "ok", deduplicated: false })
+    expect((await store.list({ target_durable_id: "dur-host" })).map((row) => row.sender)).toEqual(["cli:501"])
+    expect(views).toEqual([])
+    // Decision 0027 section 3: every delivery names its sender device, read once and kept for the process.
+    expect(counting.calls).toEqual(["thisDevice"])
+    expect((await store.list({ target_durable_id: "dur-host" }))[0]?.envelope.provenance?.device).toBe("here")
+    expect(await sdk.send({ thread: "dur-host", text: "again" })).toMatchObject({ kind: "ok" })
+    expect(counting.calls).toEqual(["thisDevice"])
+  })
+
+  test("#given the device service cannot answer #when omo thread send names a thread here #then the send still goes and its row names why it carries no sender device (#13004)", async () => {
+    const account = remoteFixture.account()
+    const down = {
+      ...account.remote,
+      sessions: {
+        ...account.remote.sessions,
+        thisDevice: async () => {
+          throw new Error("device service down")
+        },
+      },
+    }
+    const { sdk, store } = fixture({ remote: down })
+    await store.registerIncarnation({
+      durable_id: "dur-host",
+      incarnation: "rpc-1",
+      endpoint: { kind: "rpc_host", socket: HOST_SOCKET },
+    })
+    expect(await sdk.send({ thread: "dur-host", text: "ping" })).toMatchObject({ kind: "ok", deduplicated: false })
+    const provenance = (await store.list({ target_durable_id: "dur-host" }))[0]?.envelope.provenance
+    expect({ device: provenance?.device, device_absent: provenance?.device_absent }).toEqual({
+      device: undefined,
+      device_absent: "device_service_unavailable",
+    })
+  })
+
+  test("#given a thread on b #when omo thread send names it #then the command-line sender is refused there as data (the engine admits one only from its own machine) and nothing is sent, while a send to a thread here still delivers as cli", async () => {
+    const account = remoteFixture.account({ aliases: new Map([["lane-b", { session_id: "dur-on-b", device: "b" }]]) })
+    const { sdk, store } = fixture({ remote: account.remote })
+    expect(await sdk.send({ thread: "lane-b", text: "ping b" })).toMatchObject({
+      kind: "error",
+      error: { code: "unsupported", details: { device: "b", reason: "sender_not_allowed" } },
+    })
+    expect(account.sent.filter((entry) => entry.via === "session")).toEqual([])
+    expect(await sdk.send({ thread: "my-tui", text: "ping here" })).toMatchObject({
+      kind: "ok",
+      endpoint_kind: "tui",
+      deduplicated: false,
+    })
+    expect((await store.list({ target_durable_id: "dur-tui" })).map((row) => row.sender)).toEqual(["cli:501"])
   })
 })
 
 describe("thread SDK: bindings and the connector surface", () => {
   test("#given a binding #when the same inbound event is sent twice through it #then the binding principal writes it once in the binding's mode", async () => {
     const { sdk, store } = fixture()
-    const bound = await sdk.bind({ session: "my-tui", binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", inbound_mode: "follow_up" } })
+    const bound = await sdk.bind({
+      session: "my-tui",
+      binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", inbound_mode: "follow_up" },
+    })
     expect(bound).toMatchObject({ kind: "ok", binding: { session_durable_id: "dur-tui", revision: 1 } })
     const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
     const first = await sdk.send({ binding_id: bindingId, text: "hello from outside", idempotency_key: "evt-1" })
@@ -140,45 +354,107 @@ describe("thread SDK: bindings and the connector surface", () => {
 
   test("#given a binding #when a send carries an author and a per-message mode #then the row keeps the author on its external origin and the requested mode; steer and expected_turn_id are refused", async () => {
     const { sdk, store } = fixture()
-    const bound = await sdk.bind({ session: "my-tui", binding: { platform: "custom", account_id: "qa", chat_id: "c1" } })
+    const bound = await sdk.bind({
+      session: "my-tui",
+      binding: { platform: "custom", account_id: "qa", chat_id: "c1" },
+    })
     const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
     const author = { platform_user_id: "U123", display: "Jane Doe" }
-    expect(await sdk.send({ binding_id: bindingId, text: "hi", author, mode: "follow_up", idempotency_key: "evt-1" })).toMatchObject({ kind: "ok", effective_mode: "follow_up" })
-    expect(await sdk.send({ binding_id: bindingId, text: "hi", mode: "steer" })).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
-    expect(await sdk.send({ binding_id: bindingId, text: "hi", expected_turn_id: 2 })).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(
+      await sdk.send({ binding_id: bindingId, text: "hi", author, mode: "follow_up", idempotency_key: "evt-1" }),
+    ).toMatchObject({ kind: "ok", effective_mode: "follow_up" })
+    expect(await sdk.send({ binding_id: bindingId, text: "hi", mode: "steer" })).toMatchObject({
+      kind: "error",
+      error: { code: "invalid_arguments" },
+    })
+    expect(await sdk.send({ binding_id: bindingId, text: "hi", expected_turn_id: 2 })).toMatchObject({
+      kind: "error",
+      error: { code: "invalid_arguments" },
+    })
     const rows = await store.list({ target_durable_id: "dur-tui" })
-    expect(rows.map((row) => ({ mode: row.mode_requested, origin: row.envelope.origin }))).toEqual([{ mode: "follow_up", origin: { external: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "@chat", message_id: "evt-1", author } } }])
+    expect(rows.map((row) => ({ mode: row.mode_requested, origin: row.envelope.origin }))).toEqual([
+      {
+        mode: "follow_up",
+        origin: {
+          external: {
+            platform: "custom",
+            account_id: "qa",
+            chat_id: "c1",
+            thread_id: "@chat",
+            message_id: "evt-1",
+            author,
+          },
+        },
+      },
+    ])
   })
 
   test("#given a binding of one session #when a send names another session as its target #then it is refused and nothing is written", async () => {
     const { sdk, store } = fixture()
-    const bound = await sdk.bind({ session: "my-tui", binding: { platform: "custom", account_id: "qa", chat_id: "c1" } })
+    const bound = await sdk.bind({
+      session: "my-tui",
+      binding: { platform: "custom", account_id: "qa", chat_id: "c1" },
+    })
     const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
-    expect(await sdk.send({ thread: "host lane", binding_id: bindingId, text: "wrong target" })).toMatchObject({ kind: "error", error: { code: "invalid_arguments", details: { session: "dur-tui" } } })
+    expect(await sdk.send({ thread: "host lane", binding_id: bindingId, text: "wrong target" })).toMatchObject({
+      kind: "error",
+      error: { code: "invalid_arguments", details: { session: "dur-tui" } },
+    })
     expect(await store.list()).toEqual([])
   })
 
   test("#given a milestone in the outbox #when a connector reads, acks and re-reads #then the ack moves the cursor and an older cursor still re-reads the row", async () => {
     const { sdk } = fixture()
-    const bound = await sdk.bind({ session: "dur-tui", binding: { platform: "custom", account_id: "qa", chat_id: "c1" } })
+    const bound = await sdk.bind({
+      session: "dur-tui",
+      binding: { platform: "custom", account_id: "qa", chat_id: "c1" },
+    })
     const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
-    const reported = await sdk.report({ session: "my-tui", binding_id: bindingId, kind: "milestone", text: "done step 1" })
+    const reported = await sdk.report({
+      session: "my-tui",
+      binding_id: bindingId,
+      kind: "milestone",
+      text: "done step 1",
+    })
     expect(reported).toMatchObject({ kind: "ok", binding_id: bindingId, event: "milestone" })
     const cursor = (reported as { cursor: number }).cursor
-    expect(await sdk.outbox({ binding_id: bindingId })).toMatchObject({ kind: "ok", rows: [{ cursor, text: "done step 1" }] })
-    expect(await sdk.ack({ binding_id: bindingId, cursor, provider_message_id: "m-1" })).toEqual({ kind: "ok", binding_id: bindingId, acked_cursor: cursor, changed: true })
+    expect(await sdk.outbox({ binding_id: bindingId })).toMatchObject({
+      kind: "ok",
+      rows: [{ cursor, text: "done step 1" }],
+    })
+    expect(await sdk.ack({ binding_id: bindingId, cursor, provider_message_id: "m-1" })).toEqual({
+      kind: "ok",
+      binding_id: bindingId,
+      acked_cursor: cursor,
+      changed: true,
+    })
     expect(await sdk.outbox({ binding_id: bindingId })).toMatchObject({ kind: "ok", rows: [] })
-    expect(await sdk.outbox({ binding_id: bindingId, after_cursor: cursor - 1 })).toMatchObject({ kind: "ok", rows: [{ cursor }] })
+    expect(await sdk.outbox({ binding_id: bindingId, after_cursor: cursor - 1 })).toMatchObject({
+      kind: "ok",
+      rows: [{ cursor }],
+    })
   })
 
   test("#given a running session #when the CLI arms a completion and reports a milestone #then only the arm wakes the session's endpoint, with no delivery ids", async () => {
     const { sdk, wakes } = fixture()
-    const bound = await sdk.bind({ session: "host lane", binding: { platform: "custom", account_id: "qa", chat_id: "c1", outbound_events: ["milestone", "completion"] } })
+    const bound = await sdk.bind({
+      session: "host lane",
+      binding: { platform: "custom", account_id: "qa", chat_id: "c1", outbound_events: ["milestone", "completion"] },
+    })
     const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
-    expect(await sdk.report({ session: "host lane", binding_id: bindingId, kind: "milestone", text: "step 1" })).toMatchObject({ kind: "ok", armed: false })
+    expect(
+      await sdk.report({ session: "host lane", binding_id: bindingId, kind: "milestone", text: "step 1" }),
+    ).toMatchObject({ kind: "ok", armed: false })
     expect(wakes).toEqual([])
-    expect(await sdk.report({ session: "host lane", binding_id: bindingId, kind: "completion", text: "done" })).toMatchObject({ kind: "ok", armed: true })
-    expect(wakes).toEqual([{ endpoint: { kind: "rpc_host", socket: HOST_SOCKET, routing_id: "rpc-1", durable_session_id: "dur-host" }, ids: [] }])
+    expect(
+      await sdk.report({ session: "host lane", binding_id: bindingId, kind: "completion", text: "done" }),
+    ).toMatchObject({ kind: "ok", armed: true })
+    expect(wakes).toEqual([
+      {
+        endpoint: { kind: "rpc_host", socket: HOST_SOCKET, routing_id: "rpc-1", durable_session_id: "dur-host" },
+        ids: [],
+      },
+    ])
   })
 
   test("#given an answer release that gave up at the store's lock-wait bound #when the SDK is disposed #then the background release retry makes no further attempt", async () => {
@@ -192,20 +468,39 @@ describe("thread SDK: bindings and the connector surface", () => {
           ...base,
           releaseAnswer: async (request) => {
             releases++
-            if (releases === 1) throw Object.assign(new Error("gateway store lock wait exceeded: release_answer waited 25000 ms for the write lock (limit 30000 ms); another process holds it"), { code: "gateway_lock_wait_exceeded" })
+            if (releases === 1)
+              throw Object.assign(
+                new Error(
+                  "gateway store lock wait exceeded: release_answer waited 25000 ms for the write lock (limit 30000 ms); another process holds it",
+                ),
+                { code: "gateway_lock_wait_exceeded" },
+              )
             return await base.releaseAnswer(request)
           },
         }
       },
     })
-    const bound = await sdk.bind({ session: "my-tui", binding: { platform: "custom", account_id: "qa", chat_id: "c1" } })
+    const bound = await sdk.bind({
+      session: "my-tui",
+      binding: { platform: "custom", account_id: "qa", chat_id: "c1" },
+    })
     const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
-    const asked = await sdk.report({ session: "my-tui", binding_id: bindingId, kind: "question", text: "deploy?", request_id: "ui-1" })
+    const asked = await sdk.report({
+      session: "my-tui",
+      binding_id: bindingId,
+      kind: "question",
+      text: "deploy?",
+      request_id: "ui-1",
+    })
     // The fixture's host has no respondUi, so the claimed answer cannot be handed off and its release
     // hits the bound. The retry it arms runs on the fake clock, so the test decides when it would be due.
     jest.useFakeTimers()
     try {
-      await sdk.answer({ binding_id: bindingId, reply_token: (asked as { reply_token: string }).reply_token, answer: "yes" })
+      await sdk.answer({
+        binding_id: bindingId,
+        reply_token: (asked as { reply_token: string }).reply_token,
+        answer: "yes",
+      })
       expect(releases).toBe(1)
       await sdk.dispose()
       // Well past the retry's due time: a retry that survived dispose would count itself here.
@@ -218,24 +513,45 @@ describe("thread SDK: bindings and the connector surface", () => {
 
   test("#given a question asked through binding X #when the answer arrives through binding Y #then it is binding_mismatch and the question stays pending", async () => {
     const { sdk } = fixture()
-    const x = await sdk.bind({ session: "my-tui", binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "x" } })
-    const y = await sdk.bind({ session: "my-tui", binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "y" } })
+    const x = await sdk.bind({
+      session: "my-tui",
+      binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "x" },
+    })
+    const y = await sdk.bind({
+      session: "my-tui",
+      binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "y" },
+    })
     const xId = (x as { binding: { binding_id: string } }).binding.binding_id
     const yId = (y as { binding: { binding_id: string } }).binding.binding_id
-    const asked = await sdk.report({ session: "my-tui", binding_id: xId, kind: "question", text: "proceed?", request_id: "ui-1" })
+    const asked = await sdk.report({
+      session: "my-tui",
+      binding_id: xId,
+      kind: "question",
+      text: "proceed?",
+      request_id: "ui-1",
+    })
     const token = (asked as { reply_token: string }).reply_token
-    expect(await sdk.answer({ binding_id: yId, reply_token: token, answer: "yes" })).toMatchObject({ kind: "error", error: { code: "binding_mismatch" } })
-    expect(await sdk.outbox({ binding_id: xId })).toMatchObject({ rows: [{ event: "question", question_state: "pending" }] })
+    expect(await sdk.answer({ binding_id: yId, reply_token: token, answer: "yes" })).toMatchObject({
+      kind: "error",
+      error: { code: "binding_mismatch" },
+    })
+    expect(await sdk.outbox({ binding_id: xId })).toMatchObject({
+      rows: [{ event: "question", question_state: "pending" }],
+    })
   })
 })
 
 describe("thread SDK: store extensions", () => {
-  const EXTENSION = { name: "alpha", moduleUrl: new URL("./gateway/testing/store-extension.mjs", import.meta.url).href, migrations: [["CREATE TABLE alpha_items (id INTEGER PRIMARY KEY, value TEXT)"]] }
+  const EXTENSION = {
+    name: "alpha",
+    moduleUrl: new URL("./gateway/testing/store-extension.mjs", import.meta.url).href,
+    migrations: [["CREATE TABLE alpha_items (id INTEGER PRIMARY KEY, value TEXT)"]],
+  }
   const SETTLE_MS = 10_000
   async function settled<T>(what: string, call: Promise<T>): Promise<T> {
     let timer: ReturnType<typeof setTimeout> | undefined
     const bound = new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => reject(new Error(`${what} did not settle within ${SETTLE_MS} ms`)), SETTLE_MS)
+      timer = setTimeout(() => reject(new Error(`${what} did not settle within the test budget`)), remainingTestTime())
     })
     try {
       return await Promise.race([call, bound])
@@ -247,27 +563,79 @@ describe("thread SDK: store extensions", () => {
   // The gateway connector opens the store through the SDK and admits every inbound chat message with
   // one extension call that binds or enqueues inside the store worker's transaction. That target
   // lookup runs while the worker is busy with the call, so it must not ask the same store anything.
-  test("#given the SDK's own store #when an extension operation binds a session and enqueues through that binding #then both settle and the delivery is written", async () => {
-    const { sdk } = fixture({ sdkOwnsStore: true })
-    expect((await sdk.registerStoreExtension(EXTENSION)).kind).toBe("ok")
-    const bound = await settled("tx.bind", sdk.extensionCall<{ kind: string; binding?: { binding_id: string } }>("alpha", "core", { op: "bind", request: { principal: "test", binding: { platform: "custom", account_id: "qa", chat_id: "c1", session_durable_id: "dur-tui", ttl_seconds: null } } }))
-    expect(bound).toMatchObject({ kind: "ok", value: { kind: "ok", binding: { session_durable_id: "dur-tui" } } })
-    const bindingId = bound.kind === "ok" ? (bound.value as { binding: { binding_id: string } }).binding.binding_id : ""
-    const sent = await settled("tx.enqueue", sdk.extensionCall("alpha", "core", { op: "enqueue", request: { binding_id: bindingId, event_id: "evt-1", text: "hello from the chat" } }))
-    expect(sent).toMatchObject({ kind: "ok", value: { kind: "ok", deduplicated: false } })
-  }, SETTLE_MS * 3)
+  test(
+    "#given the SDK's own store #when an extension operation binds a session and enqueues through that binding #then both settle and the delivery is written",
+    async () => {
+      useTestTimeout(SETTLE_MS * 3)
+      const { sdk } = fixture({ sdkOwnsStore: true })
+      expect((await sdk.registerStoreExtension(EXTENSION)).kind).toBe("ok")
+      const bound = await settled(
+        "tx.bind",
+        sdk.extensionCall<{ kind: string; binding?: { binding_id: string } }>("alpha", "core", {
+          op: "bind",
+          request: {
+            principal: "test",
+            binding: {
+              platform: "custom",
+              account_id: "qa",
+              chat_id: "c1",
+              session_durable_id: "dur-tui",
+              ttl_seconds: null,
+            },
+          },
+        }),
+      )
+      expect(bound).toMatchObject({ kind: "ok", value: { kind: "ok", binding: { session_durable_id: "dur-tui" } } })
+      const bindingId =
+        bound.kind === "ok" ? (bound.value as { binding: { binding_id: string } }).binding.binding_id : ""
+      const sent = await settled(
+        "tx.enqueue",
+        sdk.extensionCall("alpha", "core", {
+          op: "enqueue",
+          request: { binding_id: bindingId, event_id: "evt-1", text: "hello from the chat" },
+        }),
+      )
+      expect(sent).toMatchObject({ kind: "ok", value: { kind: "ok", deduplicated: false } })
+    },
+    SETTLE_MS * 3,
+  )
 })
 
 describe("thread SDK: request kinds", () => {
   test("#given a confirm question reported with request_kind #when an unknown kind is named, and when the question is answered no #then the unknown kind is invalid_arguments and the answer is not refused as blank or unreadable", async () => {
     const { sdk } = fixture()
-    const bound = await sdk.bind({ session: "my-tui", binding: { platform: "custom", account_id: "qa", chat_id: "c-kind" } })
+    const bound = await sdk.bind({
+      session: "my-tui",
+      binding: { platform: "custom", account_id: "qa", chat_id: "c-kind" },
+    })
     const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
-    expect(await sdk.report({ session: "my-tui", binding_id: bindingId, kind: "question", text: "ok?", request_id: "ui-k", request_kind: "radio" })).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
-    const asked = await sdk.report({ session: "my-tui", binding_id: bindingId, kind: "question", text: "ok?", request_id: "ui-k", request_kind: "confirm" })
+    expect(
+      await sdk.report({
+        session: "my-tui",
+        binding_id: bindingId,
+        kind: "question",
+        text: "ok?",
+        request_id: "ui-k",
+        request_kind: "radio",
+      }),
+    ).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    const asked = await sdk.report({
+      session: "my-tui",
+      binding_id: bindingId,
+      kind: "question",
+      text: "ok?",
+      request_id: "ui-k",
+      request_kind: "confirm",
+    })
     const token = (asked as { reply_token: string }).reply_token
-    expect(await sdk.answer({ binding_id: bindingId, reply_token: token, answer: "maybe" })).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
-    expect(await sdk.answer({ binding_id: bindingId, reply_token: token, answer: "no" })).not.toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    expect(await sdk.answer({ binding_id: bindingId, reply_token: token, answer: "maybe" })).toMatchObject({
+      kind: "error",
+      error: { code: "invalid_arguments" },
+    })
+    expect(await sdk.answer({ binding_id: bindingId, reply_token: token, answer: "no" })).not.toMatchObject({
+      kind: "error",
+      error: { code: "invalid_arguments" },
+    })
   })
 })
 
@@ -275,14 +643,34 @@ describe("thread SDK: takeover", () => {
   test("#given a host session #when located and released #then the release carries reason takeover and the flags on the serving endpoint", async () => {
     const { sdk, releases } = fixture()
     const located = await sdk.locate({ thread: "host lane" })
-    expect(located).toMatchObject({ kind: "ok", thread: { thread_id: "dur-host", surface: "desktop", alive: true, endpoint: { kind: "rpc_host", socket: HOST_SOCKET, routing_id: "rpc-1", durable_session_id: "dur-host" } } })
+    expect(located).toMatchObject({
+      kind: "ok",
+      thread: {
+        thread_id: "dur-host",
+        surface: "desktop",
+        alive: true,
+        endpoint: { kind: "rpc_host", socket: HOST_SOCKET, routing_id: "rpc-1", durable_session_id: "dur-host" },
+      },
+    })
     if (located.kind !== "ok") throw new Error("located")
-    expect(await sdk.release(located.thread, { interrupt: true })).toMatchObject({ success: true, data: { session_path: "/sessions/dur-host.jsonl" } })
-    expect(releases).toEqual([{ endpoint: { kind: "rpc_host", socket: HOST_SOCKET, routing_id: "rpc-1", durable_session_id: "dur-host" }, request: { reason: "takeover", interrupt: true } }])
+    expect(await sdk.release(located.thread, { interrupt: true })).toMatchObject({
+      success: true,
+      data: { session_path: "/sessions/dur-host.jsonl" },
+    })
+    expect(releases).toEqual([
+      {
+        endpoint: { kind: "rpc_host", socket: HOST_SOCKET, routing_id: "rpc-1", durable_session_id: "dur-host" },
+        request: { reason: "takeover", interrupt: true },
+      },
+    ])
   })
 
   test("#given an endpoint that fails in transport #when released #then the failure is data, never a throw", async () => {
-    const { sdk } = fixture({ release: async () => { throw new Error(`host_unavailable:${HOST_SOCKET}`) } })
+    const { sdk } = fixture({
+      release: async () => {
+        throw new Error(`host_unavailable:${HOST_SOCKET}`)
+      },
+    })
     const located = await sdk.locate({ thread: "dur-host" })
     if (located.kind !== "ok") throw new Error("located")
     expect(await sdk.release(located.thread, {})).toMatchObject({ success: false, error: "host_unavailable" })

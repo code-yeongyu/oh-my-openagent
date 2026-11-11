@@ -69,11 +69,9 @@ fn failed_observation_rolls_back_frame_and_both_delivered_ax_generations() {
     assert_ne!(h.worker.frames.latest(&target, None).unwrap(), frame);
     assert_eq!(retry.capture.coordinate_width, 32);
     assert!(retry.node_count > 0);
-    for reference in refs(&retry.ax).iter().chain(&current) {
+    // Eight generations stay live, so the retry keeps both delivered ones.
+    for reference in refs(&retry.ax).iter().chain(&current).chain(&previous) {
         assert!(h.worker.registry.resolve(reference).is_ok());
-    }
-    for reference in previous {
-        assert_eq!(h.worker.registry.resolve(&reference).err().unwrap().code, ErrorCode::StaleRef);
     }
 }
 

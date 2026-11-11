@@ -17,6 +17,38 @@ await session.stop()         // ALWAYS, on success and failure
 on purpose. Throws `BskRpcError` `no_browser_connected` when no extension is attached — that is a
 stop, not a cue to launch something else.
 
+## Shared control (BrowserSkill 0.4+)
+
+The person at the keyboard can work in the task tab while you do, so the extension refuses every
+gated page action with `permission_denied` / `data.reason: "cooperation_sync_required"` unless it
+carries the `context_id` of the latest `session.cooperate("sync")`. The daemon never fills it in
+for you.
+
+```js
+const sync = async () => (await session.cooperate("sync")).context_id
+await session.click("@e3", { context: await sync() })                 // one context, one action
+await session.fill("#q", "hello", { clearBefore: true, context: await sync() })
+```
+
+| Call | Use |
+|---|---|
+| `session.cooperate("sync", { tabId, maxTokens })` | returns `{ context_id, ... }`; pass it as `{ context }` to the next gated action, then sync again |
+| `session.cooperate("wait", { tabId, timeoutMs })` | after `cooperation_sync_required`: blocks (at most 25 s per call) until the person is done; repeat until it reports `ready`, then sync and replan from the live page |
+
+- **Gated** (need `{ context }`): `navigate` (except the first navigation of the untouched blank tab),
+  `back`, `forward`, `reload`, `click`, `hover`, `focus`, `blur`, `fill`, `press`, `select`,
+  `scrollTo`, `wheel`, `evaluate` (and so `bskSnapshot`), `tabClose`, `resize`, `emulate`,
+  `observe({ probeHover: true })`, `screenshot({ fullPage: true })`.
+- **Not gated:** `observe`, `snapshot`, `getHtml`, `screenshot()`, `console`, `network`,
+  `waitForNavigation`, the tab list/borrow/return calls, `requestHelp`.
+- `dependsOn: ["@e2", ...]` narrows the check to the observed regions your decision used.
+- A gated action accepts only its own options plus `{ context, dependsOn }`; any other key
+  (`contextId`, a stray option copied from another method) throws a `TypeError` before anything is
+  sent. Two exceptions: `bskSnapshot` and `screenshot({ fullPage: true })` pass unknown keys
+  through instead of throwing, so a misspelt `contextId` there sends no context and the daemon
+  refuses the call with `cooperation_sync_required`.
+- Never replay a refused action blindly: the page may have changed under the person's hands.
+
 ## Targets
 
 | Form | Meaning |
@@ -30,12 +62,12 @@ stop, not a cue to launch something else.
 
 | Call | Returns |
 |---|---|
-| `bskSnapshot(session, { interactive, maxDepth })` | `{ tree, refs, css }` — the OmOWright accessibility tree with refs, computed in the page **without** leaving a global or touching the DOM |
+| `bskSnapshot(session, { interactive, maxDepth, context })` | `{ tree, refs, css }` — the OmOWright accessibility tree with refs, computed in the page **without** leaving a global or touching the DOM |
 | `session.observe({ maxTokens, cursor, probeHover })` | the daemon's semantic tree (`@vom`) with `@eN` refs, layers and hover probes — **the default read for shadow DOM and iframes** |
 | `session.snapshot({ maxDepth, maxTokens })` | the daemon's plain accessibility tree |
 | `session.getHtml({ ref, maxBytes })` | exact markup |
 | `session.screenshot({ ref })` / `screenshot({ fullPage: true })` | `{ buffer, width, height, captureId }`; full-page captures stream back in chunks |
-| `session.evaluate(expression, { awaitPromise, timeoutMs })` | `{ ok, value, error }` — **check `.ok`**; a resolved promise does not mean the script succeeded |
+| `session.evaluate(expression, { awaitPromise, timeoutMs, context })` | `{ ok, value, error }` — **check `.ok`**; a resolved promise does not mean the script succeeded |
 | `session.console({ since })` / `session.network({ since })` | buffered console entries / request metadata (no bodies) |
 
 **Refs are reissued by every read.** Read a ref and act on it in the same cycle. A ref captured
@@ -43,6 +75,10 @@ two calls ago silently addresses a different element — this is how a click lan
 neighbouring row.
 
 ## Acting
+
+Every call here is gated: add `context` (from `cooperate("sync")`) to its options object, as in
+`session.click(target, { context })`, `session.resize(width, height, { context })`,
+`session.tabClose(id, { context })`.
 
 | Need | Call |
 |---|---|
@@ -75,7 +111,7 @@ Traps:
 const { tabs } = await session.tabList({ scope: "user" })   // "user" | "agent" | "all"
 await session.tabBorrow(tabId)                                // the user confirms in the browser (60 s)
 await session.tabReturn(tabId)                                // stop() returns anything still borrowed
-await session.tabCreate({ url }); await session.tabSelect(id); await session.tabClose(id)
+await session.tabCreate({ url }); await session.tabSelect(id); await session.tabClose(id, { context: await sync() })
 ```
 
 Never invent tab ids and never repeat a denied borrow.
@@ -96,7 +132,8 @@ Every refusal is a `BskRpcError` with the daemon's own `code`:
 | `no_browser_connected` | no extension attached | run the onboarding script, relay the human step, wait |
 | `not_found` | stale ref or unknown session | read again; if the session is gone, start a new one |
 | `invalid_params` | wrong option shape | fix the call, do not retry as-is |
-| `permission_denied` | `evaluate` on a tab outside the Agent Window, or a denied borrow | stop; the user said no |
+| `permission_denied` with `data.reason: "cooperation_sync_required"` | a gated action without the latest sync context, or the person is using the tab | `cooperate("wait")` until `ready`, sync, read the page again, replan |
+| `permission_denied` (any other reason) | `evaluate` on a tab outside the Agent Window, or a denied borrow | stop; the user said no |
 | `timeout` | the tool did not finish in its budget | read the page state before retrying once |
 | `user_aborted` | the user pressed Stop in the browser | stop the task and report |
 | `cdp_failed` | the page cannot be attached (restricted URL, DevTools open) | say which page and why |

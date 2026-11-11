@@ -55,9 +55,7 @@ function ascending(left: FactsQueueEntry, right: FactsQueueEntry): number {
   return left.range.end_snapshot_line - right.range.end_snapshot_line
 }
 
-function groupByConversation(
-  entries: readonly FactsQueueEntry[],
-): Map<string, FactsQueueEntry[]> {
+function groupByConversation(entries: readonly FactsQueueEntry[]): Map<string, FactsQueueEntry[]> {
   const groups = new Map<string, FactsQueueEntry[]>()
   for (const entry of entries) {
     const bucket = groups.get(entry.conversationId)

@@ -5,12 +5,7 @@ import { describe, expect, test } from "bun:test"
 import { TeamSpecSchema } from "../types"
 
 import type { Member, TeamSpec } from "../types"
-import {
-  TeamSpecValidationError,
-  validateDualSupport,
-  validateMemberEligibility,
-  validateSpec,
-} from "./validator"
+import { TeamSpecValidationError, validateDualSupport, validateMemberEligibility, validateSpec } from "./validator"
 
 const PROMETHEUS_REJECTION_MESSAGE =
   "Agent 'prometheus' is plan-mode-only; can only write to .omo/*.md (enforced by prometheusMdOnly hook). Cannot write to team mailbox. Use delegate-task with subagent_type: 'plan' instead."
@@ -179,10 +174,7 @@ describe("team-registry validator", () => {
       name: "hyperplan",
       createdAt: 1,
       leadAgentId: "architect",
-      members: [
-        createHyperplanMember("researcher", "deep"),
-        createHyperplanMember("architect", "ultrabrain"),
-      ],
+      members: [createHyperplanMember("researcher", "deep"), createHyperplanMember("architect", "ultrabrain")],
     }
 
     // when

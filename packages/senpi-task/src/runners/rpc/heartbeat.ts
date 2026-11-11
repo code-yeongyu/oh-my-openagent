@@ -1,6 +1,17 @@
 import { RpcRequestTimeout } from "./errors"
 
 export const HEARTBEAT_DEADLINE_MS = 10_000
+export const HEARTBEAT_MISSES_BEFORE_UNRESPONSIVE = 3
+
+/** Request ids of liveness probes, so a reader of the wire can tell a probe from a request that carries work. */
+export const HEARTBEAT_REQUEST_ID_PREFIX = "senpi-task_heartbeat_"
+let heartbeatRequests = 0
+
+export function heartbeatRequestId(): string {
+  heartbeatRequests += 1
+  return `${HEARTBEAT_REQUEST_ID_PREFIX}${heartbeatRequests}`
+}
+
 const STOPPED = Symbol("heartbeat stopped")
 
 export function unresponsiveMessage(taskId: string): string {
@@ -30,7 +41,7 @@ export function startHeartbeat<T>(input: {
       if (stopped || input.paused()) return
       input.onFailure(error)
       failures++
-      if (failures === 3) {
+      if (failures === HEARTBEAT_MISSES_BEFORE_UNRESPONSIVE) {
         stopped = true
         clearInterval(interval)
         clearTimeout(deadline)
@@ -54,21 +65,26 @@ export function startHeartbeat<T>(input: {
     // A detached port can throw synchronously; Promise adoption keeps the same failure path. A stop that
     // settles before this launch (a teardown continuation queued ahead of it) sends no probe (#11673).
     const work = Promise.resolve().then<T | typeof STOPPED>(() => (stopped ? STOPPED : input.probe()))
-    void work.then((state) => {
-      if (state === STOPPED || stopped || input.paused()) return
-      failures = 0
-      input.onState(state)
-    }, (error: unknown) => {
-      if (stopped || input.paused()) return
-      // A request rejection after a missed probe must not count the same silence twice.
-      if (!missed) fail(error)
-    }).finally(() => {
-      clearTimeout(deadline)
-      deadline = undefined
-      pending = false
-      // Do not lose the tick coinciding with a timeout. Fast refusals still wait for the next interval.
-      if (!stopped && failures > 0 && Date.now() - startedAt >= input.intervalMs) tick()
-    })
+    void work
+      .then(
+        (state) => {
+          if (state === STOPPED || stopped || input.paused()) return
+          failures = 0
+          input.onState(state)
+        },
+        (error: unknown) => {
+          if (stopped || input.paused()) return
+          // A request rejection after a missed probe must not count the same silence twice.
+          if (!missed) fail(error)
+        },
+      )
+      .finally(() => {
+        clearTimeout(deadline)
+        deadline = undefined
+        pending = false
+        // Do not lose the tick coinciding with a timeout. Fast refusals still wait for the next interval.
+        if (!stopped && failures > 0 && Date.now() - startedAt >= input.intervalMs) tick()
+      })
   }
   const interval = setInterval(tick, input.intervalMs)
   interval.unref?.()

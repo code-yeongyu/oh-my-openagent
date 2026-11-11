@@ -21,21 +21,37 @@ type ExtensionToolOutput = AgentToolResult<{ readonly result: ExtensionCallResul
  * A routing id (`rpc-<n>`, a per-process counter that repeats across hosts) never resolves, nor does
  * an absent or unknown identity: the caller fails closed as `caller_context_missing`.
  */
-export function resolveCallerDurableId(options: Omit<ThreadToolSurfaceOptions, "store">, view: ThreadHostView, runtimeId: string): string | undefined {
+export function resolveCallerDurableId(
+  options: Omit<ThreadToolSurfaceOptions, "store">,
+  view: ThreadHostView,
+  runtimeId: string,
+): string | undefined {
   if (runtimeId.length === 0 || runtimeId === UNKNOWN_CALLER) return undefined
   return addressBook(options, view).find((entry) => entry.durable_id === runtimeId)?.durable_id
 }
 
 function runtimeIdOf(options: ThreadToolSurfaceOptions, ectx: unknown): string {
-  return (ectx as { sessionManager?: { getSessionId?: () => string } } | undefined)?.sessionManager?.getSessionId?.() ?? options.callerSessionId()
+  return (
+    (ectx as { sessionManager?: { getSessionId?: () => string } } | undefined)?.sessionManager?.getSessionId?.() ??
+    options.callerSessionId()
+  )
 }
 
 /** thread_create records its creator (the engine-resolved caller) once the host opened the session; a session op's `caller_created_target` reads it. */
-export async function recordThreadCreator(options: ThreadToolSurfaceOptions, view: ThreadHostView, runtimeId: string, created: ThreadToolResult): Promise<ThreadToolResult> {
-  const createdId = created.kind === "ok" ? (created as { readonly thread?: { readonly thread_id?: unknown } }).thread?.thread_id : undefined
+export async function recordThreadCreator(
+  options: ThreadToolSurfaceOptions,
+  view: ThreadHostView,
+  runtimeId: string,
+  created: ThreadToolResult,
+): Promise<ThreadToolResult> {
+  const createdId =
+    created.kind === "ok"
+      ? (created as { readonly thread?: { readonly thread_id?: unknown } }).thread?.thread_id
+      : undefined
   if (typeof createdId !== "string") return created
   const creator = resolveCallerDurableId(options, view, runtimeId)
-  if (creator !== undefined && creator !== createdId) await options.store.recordThreadCreation({ creator_durable_id: creator, created_durable_id: createdId })
+  if (creator !== undefined && creator !== createdId)
+    await options.store.recordThreadCreation({ creator_durable_id: creator, created_durable_id: createdId })
   return created
 }
 
@@ -55,13 +71,16 @@ function extensionTool(options: ThreadToolSurfaceOptions, op: DeclaredSessionOp)
       const view = await hostView(options, { offline: true })
       const caller = resolveCallerDurableId(options, view, runtimeIdOf(options, ectx))
       if (caller === undefined) {
-        return output({ kind: "refused", code: "caller_context_missing", message: "The calling session's durable id is not in the thread address book; the op was not run." })
+        return output({
+          kind: "refused",
+          code: "caller_context_missing",
+          message: "The calling session's durable id is not in the thread address book; the op was not run.",
+        })
       }
       return output(await options.store.extensionSessionAwait(op.extension, op.op, args, { callerDurableId: caller }))
     },
   }
 }
-
 
 /** One tool per declared session op; reads the store's declarations and imports no extension module. */
 export async function buildExtensionTools(options: ThreadToolSurfaceOptions): Promise<AnyTool[]> {
@@ -84,9 +103,16 @@ export type ExtensionToolHost = {
  * and logged once per process. A wake hint that could not be written after a committed call is
  * logged once; the connector's backstop covers it.
  */
-export function registerExtensionTools(pi: ExtensionToolHost & Required<Pick<ExtensionToolHost, "on">>, options: ThreadToolSurfaceOptions, log: (line: string) => void): void {
+export function registerExtensionTools(
+  pi: ExtensionToolHost & Required<Pick<ExtensionToolHost, "on">>,
+  options: ThreadToolSurfaceOptions,
+  log: (line: string) => void,
+): void {
   options.store.onEvent((event) => {
-    if (event.kind === "extension_error" && event.phase === "after_commit") log(`thread gateway: extension ${event.extension} committed, but an after-commit effect (its wake hint) failed: ${event.error}`)
+    if (event.kind === "extension_error" && event.phase === "after_commit")
+      log(
+        `thread gateway: extension ${event.extension} committed, but an after-commit effect (its wake hint) failed: ${event.error}`,
+      )
   })
   const mine = new Set<string>()
   const reported = new Set<string>()
@@ -103,14 +129,18 @@ export function registerExtensionTools(pi: ExtensionToolHost & Required<Pick<Ext
         for (const tool of tools) counts.set(tool.name, (counts.get(tool.name) ?? 0) + 1)
         for (const tool of tools) {
           if ((counts.get(tool.name) ?? 0) > 1) skip(tool.name, "more than one extension declares it")
-          else if (present.has(tool.name) && !mine.has(tool.name)) skip(tool.name, "the session already has a tool by that name")
+          else if (present.has(tool.name) && !mine.has(tool.name))
+            skip(tool.name, "the session already has a tool by that name")
           else {
             mine.add(tool.name)
             pi.registerTool({ ...tool })
           }
         }
       },
-      (error: unknown) => log(`thread gateway: extension session tools were not registered: ${error instanceof Error ? error.message : String(error)}`),
+      (error: unknown) =>
+        log(
+          `thread gateway: extension session tools were not registered: ${error instanceof Error ? error.message : String(error)}`,
+        ),
     )
   })
 }

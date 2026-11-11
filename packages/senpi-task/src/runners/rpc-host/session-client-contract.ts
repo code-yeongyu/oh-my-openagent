@@ -1,4 +1,5 @@
 import type { EffectiveModel } from "../pinned-model-equivalence"
+import type { ChildParentLink } from "../parent-link"
 import type { HostRpcClientFactory, HostProtocolProbe } from "./session-transport"
 
 export interface OpenedHostSession {
@@ -16,7 +17,12 @@ export interface OpenedHostSession {
 
 /** The turn-delivery seam: the commands a child handle issues on its session. */
 export type HostSessionCommand =
-  | { readonly type: "prompt"; readonly message: string; readonly streamingBehavior?: "steer" | "followUp"; readonly clientMessageId?: string }
+  | {
+      readonly type: "prompt"
+      readonly message: string
+      readonly streamingBehavior?: "steer" | "followUp"
+      readonly clientMessageId?: string
+    }
   | { readonly type: "steer"; readonly message: string; readonly clientMessageId?: string }
   | { readonly type: "followUp"; readonly message: string; readonly clientMessageId?: string }
   | { readonly type: "abort" }
@@ -24,7 +30,8 @@ export type HostSessionCommand =
   | { readonly type: "set_session_context"; readonly patch: Readonly<Record<string, string | number | boolean | null>> }
 
 /** Why a child parked itself instead of reattaching. */
-export type HostParkReason = "host_incompatible" | "own_host_unreachable" | "store_index_unavailable" | "daemon_unavailable"
+export type HostParkReason =
+  "host_incompatible" | "own_host_unreachable" | "store_index_unavailable" | "daemon_unavailable"
 
 /**
  * Why the HOST parked a session it holds: its idle sweep (`idle_evicted`) or a generation handoff that
@@ -66,4 +73,6 @@ export interface HostSessionClientPorts {
 export interface HostSessionClientOptions {
   readonly socketPath: string
   readonly ports?: HostSessionClientPorts
+  // The parent session this child answers dialogs on and follows the approval mode of (#6189 F2d/F2e).
+  readonly parent?: ChildParentLink
 }

@@ -46,10 +46,7 @@ function commandContext(options: {
   }
 }
 
-async function runPalace(
-  fixture: PalaceFixture,
-  ctx: PalaceCommandContext,
-): Promise<MemoryFakeExtensionAPI> {
+async function runPalace(fixture: PalaceFixture, ctx: PalaceCommandContext): Promise<MemoryFakeExtensionAPI> {
   const pi = new MemoryFakeExtensionAPI()
   registerPalaceCommand(pi, () => fixture.context)
   const registration = pi.commands.find((entry) => entry.name === "palace")

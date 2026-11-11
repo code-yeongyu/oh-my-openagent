@@ -33,7 +33,9 @@ const REMOTE_USAGE = `usage: omo remote <command> [--json]
                                            device's sessions (on unless you turn it off)
   bootstrap                                set up this device's service for your sign-in (every omo start runs it)
   attach <device>/<session>                open a session on another device in the terminal UI, to watch and type
-  open <device> [--project P] [--model M]  start a session on another device; prints <device>/<session>
+  open <device> [--project P] [--model M] [--permission-preset MODE]
+                                           start a session on another device; prints <device>/<session>; it runs
+                                           in MODE (default: this device's own setting, else full-access)
   send <device>/<session> <text> [--steer|--follow-up] [--no-wait]
                                            send a message and print the answer as it arrives (--steer: into the
                                            running turn; --no-wait: return once the session took it)
@@ -53,6 +55,14 @@ export interface RemoteCommandDependencies {
   readonly error: (line: string) => void
   /** The thread tools' remote surface over a connected service; the device service's own by default. Test seam. */
   readonly remote?: (service: DeviceService) => RemoteThreadSurface
+  /** The mode `open` names when no --permission-preset is given; this device's engine settings by default. Test seam. */
+  readonly localPermissionPreset?: () => string
+  /**
+   * Where this omo's staged plugin payload lives (`<root>/plugin/extensions/` holds the gateway store's worker sidecar):
+   * the npm package root by default; the compiled binary passes its provisioned runtime directory, because its own
+   * module paths sit inside the executable and resolve to nothing on disk.
+   */
+  readonly packageRoot?: string
 }
 
 /** `omo remote` verbs; `bootstrap` also needs the pinned install, the stored keys and this omo binary. */
@@ -63,7 +73,7 @@ export interface RemoteVerbDependencies extends RemoteCommandDependencies {
 const VERBS = ["status", "devices", "sessions", "enable", "disable", "control", "bootstrap", ...SESSION_VERBS] as const
 const CONTROL_VALUES = ["on", "off"] as const
 type ControlValue = (typeof CONTROL_VALUES)[number]
-const isControlValue = (value: string | undefined): value is ControlValue => CONTROL_VALUES.some(v => v === value)
+const isControlValue = (value: string | undefined): value is ControlValue => CONTROL_VALUES.some((v) => v === value)
 
 type Parsed = {
   readonly command: string
@@ -73,7 +83,8 @@ type Parsed = {
   readonly session?: SessionArgs
 }
 
-const isRowState = (value: string): value is SessionRowState => (SESSION_ROW_STATES as readonly string[]).includes(value)
+const isRowState = (value: string): value is SessionRowState =>
+  (SESSION_ROW_STATES as readonly string[]).includes(value)
 
 function parse(args: readonly string[]): Parsed {
   const [command = "", ...rest] = args
@@ -88,7 +99,8 @@ function parse(args: readonly string[]): Parsed {
       continue
     }
     if (command === "control") {
-      if (control !== undefined || !isControlValue(flag)) throw new UsageError("omo remote control: the value is on or off")
+      if (control !== undefined || !isControlValue(flag))
+        throw new UsageError("omo remote control: the value is on or off")
       control = flag
       continue
     }
@@ -121,7 +133,7 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
     }
     case "sessions": {
       const [result, devices] = await Promise.all([service.sessions(parsed.filter), service.devices()])
-      const labels = new Map(devices.map(device => [device.device, device.label]))
+      const labels = new Map(devices.map((device) => [device.device, device.label]))
       return print(result, () => sessionLines(result, labels, dependencies.now()))
     }
     case "enable":
@@ -131,10 +143,15 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
     }
     case "control": {
       if (!service.capabilities.includes("control")) {
-        dependencies.error("The OmO device service on this device does not have remote control yet. Update OmO, then try again.")
+        dependencies.error(
+          "The OmO device service on this device does not have remote control yet. Update OmO, then try again.",
+        )
         return REMOTE_EXIT.unavailable
       }
-      const state = parsed.control === undefined ? await service.attachControl() : await service.setAttachControl(parsed.control === "on")
+      const state =
+        parsed.control === undefined
+          ? await service.attachControl()
+          : await service.setAttachControl(parsed.control === "on")
       return print(state, () => controlLines(state, dependencies.now()))
     }
     case "open":
@@ -145,22 +162,29 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
       if (parsed.session !== undefined) return runSession(service, parsed.session, parsed.json, dependencies)
       throw new UsageError(`omo remote ${parsed.command}: arguments were not parsed`)
     default:
-      throw new UsageError(parsed.command === "" ? "omo remote: a command is required" : `omo remote: unknown command ${parsed.command}`)
+      throw new UsageError(
+        parsed.command === "" ? "omo remote: a command is required" : `omo remote: unknown command ${parsed.command}`,
+      )
   }
 }
 
 // A stopped service: its socket is gone (POSIX) or its TCP endpoint refuses (Windows keeps endpoint.json).
 const isServiceStopped = (error: unknown): boolean =>
-  (error instanceof Error && "code" in error && ["ENOENT", "ECONNREFUSED", "ECONNRESET"].includes(String(error.code))) ||
+  (error instanceof Error &&
+    "code" in error &&
+    ["ENOENT", "ECONNREFUSED", "ECONNRESET"].includes(String(error.code))) ||
   (error instanceof LocalApiError && error.code === "handshake_timeout")
 
 export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: readonly string[]): Promise<number> {
   let parsed: Parsed
   try {
     parsed = parse(args)
-    if (!VERBS.some(verb => verb === parsed.command)) throw new UsageError(
-      parsed.command === "" || parsed.command === "help" || parsed.command === "--help" ? "" : `omo remote: unknown command ${parsed.command}`,
-    )
+    if (!VERBS.some((verb) => verb === parsed.command))
+      throw new UsageError(
+        parsed.command === "" || parsed.command === "help" || parsed.command === "--help"
+          ? ""
+          : `omo remote: unknown command ${parsed.command}`,
+      )
   } catch (error) {
     if (!(error instanceof UsageError)) throw error
     if (error.message) dependencies.error(error.message)
@@ -168,7 +192,9 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
     return REMOTE_EXIT.usage
   }
   if (parsed.command === "bootstrap")
-    return (await runBootstrapVerb(dependencies, dependencies.bootstrap, parsed.json)) === "connected" ? REMOTE_EXIT.ok : REMOTE_EXIT.unavailable
+    return (await runBootstrapVerb(dependencies, dependencies.bootstrap, parsed.json)) === "connected"
+      ? REMOTE_EXIT.ok
+      : REMOTE_EXIT.unavailable
   const signedOut = await accountNotice(dependencies)
   if (signedOut !== undefined) return signedOut
   if (!existsSync(dependencies.stateDir)) {
@@ -221,7 +247,10 @@ export type RemoteAttachLaunch = { readonly engineArgs: readonly string[] }
  * `omo remote attach <device>/<session>`: attaches through the device service and serves the session on a private
  * endpoint for the engine's attach TUI. Returns the engine arguments to launch, or the exit code when it cannot.
  */
-export async function prepareRemoteAttach(dependencies: RemoteCommandDependencies, args: readonly string[]): Promise<RemoteAttachLaunch | number> {
+export async function prepareRemoteAttach(
+  dependencies: RemoteCommandDependencies,
+  args: readonly string[],
+): Promise<RemoteAttachLaunch | number> {
   const [target, ...extra] = args
   const slash = target?.indexOf("/") ?? -1
   if (target === undefined || extra.length > 0 || slash <= 0 || slash === target.length - 1) {

@@ -120,7 +120,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
         .string()
         .optional()
         .describe(
-          "CDP endpoint URL to connect Playwright to an existing browser (e.g. http://localhost:9222). Creates a separate MCP instance per unique URL."
+          "CDP endpoint URL to connect Playwright to an existing browser (e.g. http://localhost:9222). Creates a separate MCP instance per unique URL.",
         ),
     },
     async execute(args: SkillMcpArgs, toolContext: ToolContext) {
@@ -171,7 +171,9 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
 
       switch (operation.type) {
         case "tool": {
-          const result = await runWithRequestAbort(() => manager.callTool(info, context, operation.name, parsedArgs, cdpOptions))
+          const result = await runWithRequestAbort(() =>
+            manager.callTool(info, context, operation.name, parsedArgs, cdpOptions),
+          )
           if (result.isError === true) {
             throw new Error(`MCP tool "${operation.name}" failed: ${JSON.stringify(result, null, 2)}`)
           }
@@ -179,7 +181,9 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
           break
         }
         case "resource": {
-          const result = await runWithRequestAbort(() => manager.readResource(info, context, operation.name, cdpOptions))
+          const result = await runWithRequestAbort(() =>
+            manager.readResource(info, context, operation.name, cdpOptions),
+          )
           output = JSON.stringify(result, null, 2)
           break
         }
@@ -188,7 +192,9 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
           for (const [key, value] of Object.entries(parsedArgs)) {
             stringArgs[key] = String(value)
           }
-          const result = await runWithRequestAbort(() => manager.getPrompt(info, context, operation.name, stringArgs, cdpOptions))
+          const result = await runWithRequestAbort(() =>
+            manager.getPrompt(info, context, operation.name, stringArgs, cdpOptions),
+          )
           output = JSON.stringify(result, null, 2)
           break
         }

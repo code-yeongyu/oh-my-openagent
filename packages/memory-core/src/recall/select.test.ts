@@ -152,8 +152,7 @@ describe("selectRecallCandidates", () => {
 
   it("#given a term match inside the body #when the excerpt is built #then it is a centered whitespace-normalized window", () => {
     // given
-    const body =
-      "Start of the note. The kubernetes rollout paused because of the cert rotation. End of the note."
+    const body = "Start of the note. The kubernetes rollout paused because of the cert rotation. End of the note."
     const documents = [doc("reference/a.md", "Deploy", body)]
 
     // when
@@ -193,9 +192,7 @@ describe("selectRecallCandidates", () => {
 
   it("#given a multi-line body #when the excerpt is built #then newlines collapse to single spaces", () => {
     // given
-    const documents = [
-      doc("reference/a.md", "Deploy", "first line\n\nsecond line mentions kubernetes\nthird line"),
-    ]
+    const documents = [doc("reference/a.md", "Deploy", "first line\n\nsecond line mentions kubernetes\nthird line")]
 
     // when
     const candidates = selectRecallCandidates(documents, ["kubernetes"], BASE_OPTS)
@@ -255,12 +252,7 @@ describe("selectRecallCandidates", () => {
 
   it("#given a pre-normalized haystack #when the normalized scorer runs #then it equals the raw-input scorer", () => {
     // given
-    const samples = [
-      "Deploy\nThe KUBERNETES ingress   gateway\nis flaky",
-      "   ",
-      "",
-      "kubernetes\n\ningress gateway",
-    ]
+    const samples = ["Deploy\nThe KUBERNETES ingress   gateway\nis flaky", "   ", "", "kubernetes\n\ningress gateway"]
     const queries = ["kubernetes", '"ingress gateway"', "kubernetes missing", '"unclosed', "  "]
 
     // when / then
@@ -482,7 +474,9 @@ describe("selectRecallCandidates with the hybrid strategy", () => {
     const hybrid = selectRecallCandidates(pair, queries, HYBRID_OPTS)
 
     // then
-    expect(paths(selectRecallCandidates(pair, queries, { ...BASE_OPTS, strategy: "substring" }))).toEqual(["a/tokens.md"])
+    expect(paths(selectRecallCandidates(pair, queries, { ...BASE_OPTS, strategy: "substring" }))).toEqual([
+      "a/tokens.md",
+    ])
     expect(paths(selectRecallCandidates(pair, queries, { ...BASE_OPTS, strategy: "bm25" }))).toEqual(["z/publish.md"])
     expect(paths(hybrid)).toEqual(["z/publish.md", "a/tokens.md"])
     expect(hybrid[0]?.score).toBe(hybrid[1]?.score ?? Number.NaN)
@@ -597,7 +591,10 @@ describe("selectRecallCandidates with expansions", () => {
   it("#given a small English memory and a question worded differently #when the caller adds synonyms #then the note is found and the excerpt shows the matched passage", () => {
     // when
     const plain = selectRecallCandidates(small, ["undo shipment"], BASE_OPTS)
-    const widened = selectRecallCandidates(small, ["undo shipment"], { ...BASE_OPTS, expansions: { synonyms: ["revert", "release"] } })
+    const widened = selectRecallCandidates(small, ["undo shipment"], {
+      ...BASE_OPTS,
+      expansions: { synonyms: ["revert", "release"] },
+    })
 
     // then
     expect(plain).toEqual([])
@@ -623,21 +620,35 @@ describe("selectRecallCandidates with expansions", () => {
     const korean = [...small, doc("notes/ko.md", "배포", "퍼블리시 절차와 배포 체크리스트")]
 
     // when / then
-    for (const [documents, query] of [[small, "deploy rollback"], [small, "release"], [korean, "퍼블리시할 배포"]] as const) {
+    for (const [documents, query] of [
+      [small, "deploy rollback"],
+      [small, "release"],
+      [korean, "퍼블리시할 배포"],
+    ] as const) {
       const plain = selectRecallCandidates(documents, [query], BASE_OPTS)
       expect(selectRecallCandidates(documents, [query], { ...BASE_OPTS, expansions: {} })).toEqual(plain)
-      expect(selectRecallCandidates(documents, [query], { ...BASE_OPTS, expansions: { synonyms: [], related: ["  "], noteLine: "" } })).toEqual(plain)
+      expect(
+        selectRecallCandidates(documents, [query], {
+          ...BASE_OPTS,
+          expansions: { synonyms: [], related: ["  "], noteLine: "" },
+        }),
+      ).toEqual(plain)
     }
   })
 
   it("#given a large memory #when the search is widened #then the hybrid keeps the full match first and adds the note an added term found", () => {
     // given
-    const fillers = Array.from({ length: 220 }, (_, index) => doc(`archive/filler-${String(index).padStart(3, "0")}.md`, "Filler", `unrelated words number ${index}`))
+    const fillers = Array.from({ length: 220 }, (_, index) =>
+      doc(`archive/filler-${String(index).padStart(3, "0")}.md`, "Filler", `unrelated words number ${index}`),
+    )
     const documents = [...small, ...fillers]
 
     // when
     const plain = selectRecallCandidates(documents, ["deploy rollback"], BASE_OPTS)
-    const widened = selectRecallCandidates(documents, ["deploy rollback"], { ...BASE_OPTS, expansions: { synonyms: ["revert", "canary"] } })
+    const widened = selectRecallCandidates(documents, ["deploy rollback"], {
+      ...BASE_OPTS,
+      expansions: { synonyms: ["revert", "canary"] },
+    })
 
     // then
     expect(paths(plain)).toEqual(["notes/deploy.md"])
@@ -654,17 +665,24 @@ describe("selectRecallCandidates with expansions", () => {
 
     // when
     const plain = selectRecallCandidates(documents, ["deploy"], BASE_OPTS)
-    const widened = selectRecallCandidates(documents, ["deploy"], { ...BASE_OPTS, expansions: { synonyms: ["rollout"] } })
+    const widened = selectRecallCandidates(documents, ["deploy"], {
+      ...BASE_OPTS,
+      expansions: { synonyms: ["rollout"] },
+    })
 
     // then
     expect(paths(plain)).toEqual(["notes/a.md", "notes/b.md"])
     expect(paths(widened)).toEqual(["notes/a.md", "notes/b.md", "notes/c.md"])
-    expect(widened.slice(0, 2).map((candidate) => candidate.excerpt)).toEqual(plain.map((candidate) => candidate.excerpt))
+    expect(widened.slice(0, 2).map((candidate) => candidate.excerpt)).toEqual(
+      plain.map((candidate) => candidate.excerpt),
+    )
   })
 
   it("#given a large memory where an added term also matches a verbatim partial match #when one candidate is asked for #then the note holding the whole query word keeps first place", () => {
     // given ("run" is the whole query word after the English fold; "outrunning" only contains it)
-    const fillers = Array.from({ length: 200 }, (_, index) => doc(`archive/filler-${String(index).padStart(3, "0")}.md`, "", "alpha beta gamma"))
+    const fillers = Array.from({ length: 200 }, (_, index) =>
+      doc(`archive/filler-${String(index).padStart(3, "0")}.md`, "", "alpha beta gamma"),
+    )
     const documents = [doc("full.md", "", "run"), doc("partial.md", "", "outrunning rollout"), ...fillers]
     const one = { maxItems: 1, surfaced: new Set<string>() }
 
@@ -679,23 +697,36 @@ describe("selectRecallCandidates with expansions", () => {
 
   it("#given expansions that only repeat the query or hold no word #when candidates are selected #then the list equals the search as written", () => {
     // given (a verbatim partial match next to the note holding the whole query word, as above)
-    const fillers = Array.from({ length: 200 }, (_, index) => doc(`archive/filler-${String(index).padStart(3, "0")}.md`, "", "alpha beta gamma"))
+    const fillers = Array.from({ length: 200 }, (_, index) =>
+      doc(`archive/filler-${String(index).padStart(3, "0")}.md`, "", "alpha beta gamma"),
+    )
     const documents = [doc("full.md", "", "run"), doc("partial.md", "", "outrunning rollout"), ...fillers]
 
     // when / then
     const plain = selectRecallCandidates(documents, ["running"], BASE_OPTS)
     expect(paths(plain)).toEqual(["full.md", "partial.md"])
-    for (const expansions of [{ synonyms: ["running"] }, { synonyms: ["!!!"] }, { related: ["Running", "runs"], noteLine: "..." }]) {
+    for (const expansions of [
+      { synonyms: ["running"] },
+      { synonyms: ["!!!"] },
+      { related: ["Running", "runs"], noteLine: "..." },
+    ]) {
       expect(selectRecallCandidates(documents, ["running"], { ...BASE_OPTS, expansions })).toEqual(plain)
     }
   })
 
   it("#given a note found only through an added Han character #when selected #then the excerpt shows that character", () => {
     // given
-    const documents = [doc("notes/key.md", "One", `${"padding ".repeat(60)}鍵`), doc("notes/lost.md", "One", "lost and found box")]
+    const documents = [
+      doc("notes/key.md", "One", `${"padding ".repeat(60)}鍵`),
+      doc("notes/lost.md", "One", "lost and found box"),
+    ]
 
     // when
-    const widened = selectRecallCandidates(documents, ["lost"], { ...BASE_OPTS, strategy: "bm25", expansions: { keywords: ["鍵"] } })
+    const widened = selectRecallCandidates(documents, ["lost"], {
+      ...BASE_OPTS,
+      strategy: "bm25",
+      expansions: { keywords: ["鍵"] },
+    })
 
     // then
     expect(paths(widened)).toEqual(["notes/lost.md", "notes/key.md"])
@@ -704,7 +735,11 @@ describe("selectRecallCandidates with expansions", () => {
 
   it("#given a widened search on any strategy #when candidates are returned #then the scores ascend", () => {
     for (const strategy of ["substring", "bm25", "hybrid"] as const) {
-      const widened = selectRecallCandidates(small, ["deploy rollback"], { ...BASE_OPTS, strategy, expansions: { synonyms: ["revert", "canary"], related: ["noodles"] } })
+      const widened = selectRecallCandidates(small, ["deploy rollback"], {
+        ...BASE_OPTS,
+        strategy,
+        expansions: { synonyms: ["revert", "canary"], related: ["noodles"] },
+      })
       expect(paths(widened)).toEqual(["notes/deploy.md", "notes/revert.md", "notes/lunch.md"])
       const scores = widened.map((candidate) => candidate.score)
       expect(scores).toEqual([...scores].sort((left, right) => left - right))

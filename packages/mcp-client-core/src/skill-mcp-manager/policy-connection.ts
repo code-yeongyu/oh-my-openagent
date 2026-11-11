@@ -10,7 +10,9 @@ export class McpEnvironmentPolicyChangedError extends Error {
 }
 
 export async function connectWithPolicySignal(
-  client: McpClient, transport: McpTransport, signal?: AbortSignal,
+  client: McpClient,
+  transport: McpTransport,
+  signal?: AbortSignal,
   waitForConnection: (connection: Promise<void>) => Promise<void> = (connection) => connection,
 ): Promise<void> {
   if (!signal) return waitForConnection(client.connect(transport))
@@ -20,7 +22,9 @@ export async function connectWithPolicySignal(
     aborted.reject(new McpEnvironmentPolicyChangedError())
     for (const close of [() => transport.close(), () => client.close()]) {
       void close().catch((error: unknown) => {
-        log("[skill-mcp-env] invalidated connection cleanup failed", { error: error instanceof Error ? error.name : "unknown" })
+        log("[skill-mcp-env] invalidated connection cleanup failed", {
+          error: error instanceof Error ? error.name : "unknown",
+        })
       })
     }
   }

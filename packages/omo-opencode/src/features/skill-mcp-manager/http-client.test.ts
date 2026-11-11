@@ -24,10 +24,7 @@ class MockHttpClient {
   readonly getPrompt = mock(async () => ({ messages: [] }))
   readonly connect = mock(async (_transport: McpTransport) => {})
 
-  constructor(
-    _clientInfo: { name: string; version: string },
-    _options: { capabilities: Record<string, never> },
-  ) {
+  constructor(_clientInfo: { name: string; version: string }, _options: { capabilities: Record<string, never> }) {
     createdClients.push(this)
     configureNextClient?.(this)
   }
@@ -330,13 +327,16 @@ describe("createHttpClient connection deadlines", () => {
       const clientKey = createClientKey(info)
       const policy = new AbortController()
       const started = Promise.withResolvers<void>()
-      configureNextClient = (client) => client.connect.mockImplementation(() =>
-        new Promise<void>(() => started.resolve()))
+      configureNextClient = (client) =>
+        client.connect.mockImplementation(() => new Promise<void>(() => started.resolve()))
       jest.useFakeTimers()
       try {
         // when
         const outcome = captureCreateHttpClientError({
-          state, clientKey, info, config: { ...createConfig(), type: "sse" },
+          state,
+          clientKey,
+          info,
+          config: { ...createConfig(), type: "sse" },
           policySignal: withPolicy ? policy.signal : undefined,
         })
         await started.promise

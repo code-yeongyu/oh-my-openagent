@@ -1,33 +1,56 @@
 import type { DeviceService } from "../device-service-core/src/index.ts"
 import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
-import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
-import type { RemoteSender } from "../omo-senpi/src/components/thread/remote/peer-text"
-import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
-import { setModelRemote } from "../omo-senpi/src/components/thread/remote/remote-controls"
+import { createRelaySessionHost } from "../omo-senpi/src/components/thread/control/relay-session-host"
 import {
-  closeRemote,
-  followRemote,
-  interruptRemote,
-  openRemote,
-  promptRemote,
-  remoteAvailable,
-  type RemoteSendRequest,
-  runningTurnRemote,
-} from "../omo-senpi/src/components/thread/remote/remote-ops"
+  answered,
+  closeThread,
+  interruptThread,
+  setModelOn,
+} from "../omo-senpi/src/components/thread/control/operations"
+import { createRelayControl } from "../omo-senpi/src/components/thread/control/relay-control"
+import { createDeviceServiceSessions } from "../omo-senpi/src/components/thread/remote/device-service"
+import { randomUUID } from "node:crypto"
+import { existsSync } from "node:fs"
+import { userInfo } from "node:os"
+import { join } from "node:path"
+import { pathToFileURL } from "node:url"
+import { createGatewayStore, GATEWAY_STORE_WORKER_BUNDLE_NAME } from "../omo-senpi/src/components/thread/gateway/store"
+import { resolveProvenance } from "../omo-senpi/src/components/thread/gateway/provenance-resolver"
+import { createRelayTransport } from "../omo-senpi/src/components/thread/remote/relay-transport"
+import { createGatewayEngine, resolveFromEntries } from "../omo-senpi/src/components/thread/gateway/engine"
+import { createLocalTransport } from "../omo-senpi/src/components/thread/gateway/local-transport"
+import { createDeliveryPipeline } from "../omo-senpi/src/components/thread/gateway/pipeline"
+import { namedDeviceRow } from "../omo-senpi/src/components/thread/remote/address-book"
+import { stampThisDevice } from "../omo-senpi/src/components/thread/remote/this-device"
+import type { Provenance } from "../omo-senpi/src/components/thread/gateway/types"
+import { threadLink } from "../omo-senpi/src/components/thread/thread-link"
+import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
+import { packageRoot } from "./bin/lib/package-paths.js"
+import type { RemoteSessionRow, RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
+import { deviceOnline, followRemote, remoteAvailable } from "../omo-senpi/src/components/thread/remote/remote-ops"
 import type { RemoteCommandDependencies } from "./remote-cli"
-import { REMOTE_EXIT } from "./remote-exit"
+import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import { sessionVerbLines } from "./remote-render"
+import { localPermissionPreset } from "./remote-permission-preset"
 import type { SessionArgs } from "./remote-session-args"
+
+/**
+ * Where the gateway store's worker is in the shipped `omo`: the `gateway-store-worker.mjs` sidecar beside the plugin's
+ * extension bundle (`<package>/plugin/extensions/`), the one place the payload carries it; `bin/lib` holds no worker, so
+ * the store's default (a worker beside the module it runs in) finds nothing there. From source the sidecar is absent and
+ * the store resolves `store-worker.ts` itself. Returns the anchor the store resolves the sidecar from, or undefined.
+ */
+export function gatewayWorkerAnchor(root: string = packageRoot): URL | undefined {
+  const anchor = pathToFileURL(join(root, "plugin", "extensions", "omo.js"))
+  return existsSync(new URL(`./${GATEWAY_STORE_WORKER_BUNDLE_NAME}`, anchor)) ? anchor : undefined
+}
 
 // The surface the agent's thread tools reach other devices through, on this command's own connection. The chain count
 // (K8) starts at its first hop: a person at a terminal is no thread chain.
 const deviceServiceSurface = (service: DeviceService): RemoteThreadSurface => ({
   sessions: createDeviceServiceSessions({ version: service.serviceVersion, connect: async () => service }),
-  chain: { stamp: record => record },
+  chain: { stamp: (record) => record },
 })
-
-// The person at this terminal sends their own input, not a peer session's message (#12852).
-const PERSON: RemoteSender = { kind: "person", hop: 1 }
 
 type Show = (result: ThreadToolResult, label: string) => number
 
@@ -36,10 +59,16 @@ type Show = (result: ThreadToolResult, label: string) => number
 const NO_SUCH_SESSION: ReadonlySet<string> = new Set(["session_not_found", "unknown_session"])
 
 /**
- * The session verbs: each is one of the thread tools' remote ops (omo-senpi thread/remote), so the agent and this CLI
- * reach another device's session the same way. --json prints the op's typed result as is.
+ * The session verbs: each runs the thread tools' one body for that operation (omo-senpi thread/control) over the relay
+ * control of the session, so the agent and this CLI reach another device's session the same way. --json prints the
+ * body's typed result as is.
  */
-export async function runSession(service: DeviceService, args: SessionArgs, json: boolean, dependencies: RemoteCommandDependencies): Promise<number> {
+export async function runSession(
+  service: DeviceService,
+  args: SessionArgs,
+  json: boolean,
+  dependencies: RemoteCommandDependencies,
+): Promise<number> {
   const remote = (dependencies.remote ?? deviceServiceSurface)(service)
   const show: Show = (result, label) => {
     if (json) dependencies.output(JSON.stringify(result))
@@ -62,16 +91,21 @@ export async function runSession(service: DeviceService, args: SessionArgs, json
   const label = `${args.target.device}/${args.target.session}`
   // Addressed directly, as the SDK does: its device refuses a session it does not hold (unknown_session). The
   // account listing settles only with the slowest device (seconds) and lags a session just opened.
-  const row: RemoteSessionRow = { device: args.target.device, session_id: args.target.session, title: "", project: "", path: "", state: "idle", updated_ms: 0 }
+  // The id a caller types is the id above the port (decision 0027 D2); the relay address book turns the device-named
+  // address into its transport reference.
+  const row = namedDeviceRow(args.target.device, args.target.session)
+  if (args.verb === "send") return sendTo(remote, row, args, { label, json, show }, dependencies)
+  // The device is found online once, before its control is used, as the thread tools' locate does (A3).
+  const offline = await deviceOnline(remote, row.device)
+  if (offline !== undefined) return show(offline, label)
+  const control = createRelayControl(remote, row)
   switch (args.verb) {
     case "model":
-      return show(await setModelRemote(remote, row, { model: args.model }), label)
+      return show(await answered(() => setModelOn(control, args.model, undefined)), label)
     case "interrupt":
-      return show(await interruptRemote(remote, row, undefined), label)
+      return show(await answered(() => interruptThread(control, undefined)), label)
     case "close":
-      return show(await closeRemote(remote, row), label)
-    case "send":
-      return sendTo(remote, row, args, { label, json, show }, dependencies)
+      return show(await answered(() => closeThread(control)), label)
   }
 }
 
@@ -81,11 +115,28 @@ async function openOn(
   { json, show }: { readonly json: boolean; readonly show: Show },
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
-  const opened = await openRemote(remote, { kind: "create", device: args.device, ...(args.project === undefined ? {} : { cwd: args.project }) })
-  if (opened.kind !== "ok" || !("thread" in opened) || args.model === undefined) return show(opened, "")
+  let mode: string
+  try {
+    mode = args.permissionPreset ?? (dependencies.localPermissionPreset ?? localPermissionPreset)()
+  } catch (error) {
+    if (!(error instanceof UsageError)) throw error
+    dependencies.error(error.message)
+    return REMOTE_EXIT.usage
+  }
+  const open = await createRelaySessionHost(remote, args.device).open({
+    permissionPreset: mode,
+    ...(args.project === undefined ? {} : { cwd: args.project }),
+  })
+  const opened: ThreadToolResult = open.kind === "ok" ? { kind: "ok", thread: open.thread, deduplicated: false } : open
+  const wanted = args.model
+  if (opened.kind !== "ok" || !("thread" in opened) || wanted === undefined) return show(opened, "")
   const label = `${args.device}/${opened.thread.thread_id}`
-  const created: RemoteSessionRow = { device: args.device, session_id: opened.thread.thread_id, title: opened.thread.name, project: opened.thread.cwd, path: "", state: "idle", updated_ms: 0 }
-  const model = await setModelRemote(remote, created, { model: args.model })
+  const created: RemoteSessionRow = {
+    ...namedDeviceRow(args.device, opened.thread.thread_id),
+    title: opened.thread.name,
+    project: opened.thread.cwd,
+  }
+  const model = await answered(() => setModelOn(createRelayControl(remote, created), wanted, undefined))
   if (model.kind === "error") {
     // The session exists on its device (opened to be kept), so the failure names it: a retry must not leave another one
     // behind unseen. --json: the model's typed error with the thread that was opened.
@@ -101,6 +152,15 @@ async function openOn(
   return show({ ...opened, model: model.model } as ThreadToolResult, "")
 }
 
+/** The provenance a person's `omo remote send` carries: this device stamped as on every delivery path (#13004). */
+export function personSenderProvenance(
+  remote: RemoteThreadSurface,
+  cwd = process.cwd(),
+  env: NodeJS.ProcessEnv = process.env,
+): () => Promise<Provenance> {
+  return () => stampThisDevice(resolveProvenance({ cwd, env }), remote)
+}
+
 async function sendTo(
   remote: RemoteThreadSurface,
   row: RemoteSessionRow,
@@ -108,29 +168,87 @@ async function sendTo(
   { label, json, show }: { readonly label: string; readonly json: boolean; readonly show: Show },
   dependencies: RemoteCommandDependencies,
 ): Promise<number> {
-  let request: RemoteSendRequest = { message: args.text, delivery: args.delivery }
-  // A person steers whatever runs; the op still checks that turn, and the engine checks it again on arrival.
-  if (args.delivery === "steer") {
-    const running = await runningTurnRemote(remote, row)
-    if (running.kind === "error") return show(running, label)
-    if (!("turn_id" in running) || running.turn_id === undefined) {
-      dependencies.error(`omo remote: nothing is running on ${label} to steer.`)
-      dependencies.error("Send without --steer to start a turn.")
-      return REMOTE_EXIT.failed
-    }
-    request = { ...request, expected_turn_id: running.turn_id }
-  }
-  if (!args.wait) return show(await promptRemote(remote, row, request, PERSON), label)
-  // Followed before the send, so no delta of the turn it starts can arrive unseen.
-  let reply = ""
-  const follow = await followRemote(remote, row, text => {
-    reply += text
-    if (!json) dependencies.write(text)
+  // The person at this terminal sends their own input through the one delivery pipeline the thread tools use (#12885,
+  // #13016): the target's kind picks the transport, and the relay keeps a `person` sender on the engine's prompt record.
+  // Its receipt is written to this device's gateway store under a key minted per invocation (a person's retry is a new
+  // send, so nothing dedupes it). A steer names no turn: the transport reads the running one once and steers it.
+  const anchor = gatewayWorkerAnchor(dependencies.packageRoot ?? packageRoot)
+  const store = createGatewayStore({
+    agentDir: canonicalAgentDir(),
+    ...(anchor === undefined ? {} : { workerModuleUrl: anchor }),
   })
-  if ("kind" in follow) return show(follow, label)
+  // This device stamped as on every delivery path (#13004), through the one pipeline (#13016).
+  const senderProvenance = personSenderProvenance(remote)
+  // This command holds no session of its own, so the local transport's engine has an empty address book.
+  const engine = createGatewayEngine({
+    store,
+    endpoints: {
+      wake: async (endpoint) => {
+        throw new Error(`host_unavailable:${endpoint.socket}`)
+      },
+    },
+    resolve: resolveFromEntries(
+      () => [],
+      () => process.cwd(),
+    ),
+    senderProvenance,
+  })
+  const pipeline = createDeliveryPipeline({
+    local: createLocalTransport(engine),
+    relay: createRelayTransport({ remote, store, senderProvenance }),
+  })
+  const person = { kind: "person" as const, uid: process.getuid?.() ?? 0, user: userInfo().username }
+  const deliver = async (): Promise<ThreadToolResult> => {
+    const sent = await pipeline.deliver({
+      sender: person,
+      caller_id: `person:${person.uid}`,
+      target: { kind: "remote", row },
+      text: args.text,
+      mode: args.delivery,
+      idempotency_key: randomUUID(),
+      args: { target: label, text: args.text, delivery: args.delivery },
+    })
+    if (sent.kind === "error") return sent
+    if (!("device" in sent))
+      return {
+        kind: "error",
+        error: {
+          code: "internal_error",
+          message: `A send to ${label} was answered by this device's gateway.`,
+          next_action: "Report this: a device-named address goes to the relay transport.",
+        },
+      }
+    return {
+      kind: "ok",
+      thread_id: row.session_id,
+      link: threadLink(row.session_id, row.title),
+      delivery: sent.delivery,
+      deduplicated: sent.deduplicated,
+      device: row.device,
+    }
+  }
+  const nothingToSteer = (result: ThreadToolResult): number | undefined => {
+    if (result.kind !== "error" || result.error.code !== "not_steerable" || json) return undefined
+    dependencies.error(`omo remote: nothing is running on ${label} to steer.`)
+    dependencies.error("Send without --steer to start a turn.")
+    return REMOTE_EXIT.failed
+  }
+  let follow: Awaited<ReturnType<typeof followRemote>> | undefined
   try {
-    const sent = await promptRemote(remote, row, request, PERSON)
-    if (sent.kind === "error") return show(sent, label)
+    // The person at this terminal sends their own input as a prompt; a peer session's message is a delivery (#12882).
+    if (!args.wait) {
+      const sent = await deliver()
+      return nothingToSteer(sent) ?? show(sent, label)
+    }
+    // Followed before the send, so no delta of the turn it starts can arrive unseen.
+    let reply = ""
+    follow = await followRemote(remote, row, (text) => {
+      reply += text
+      if (!json) dependencies.write(text)
+    })
+    if ("kind" in follow) return show(follow, label)
+    const sent = await deliver()
+    if (sent.kind === "error") return nothingToSteer(sent) ?? show(sent, label)
     const end = await follow.settled
     if (!json && reply.length > 0 && !reply.endsWith("\n")) dependencies.write("\n")
     // --json: the send's typed result, with the answer it streamed.
@@ -141,6 +259,9 @@ async function sendTo(
     }
     return REMOTE_EXIT.ok
   } finally {
-    follow.stop()
+    // Every exit, early refusals included, releases the follow and the store worker this send opened.
+    if (follow !== undefined && !("kind" in follow)) follow.stop()
+    pipeline.dispose()
+    await store.dispose()
   }
 }

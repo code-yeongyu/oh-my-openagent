@@ -56,4 +56,4 @@ Read the plan, then verify references by reading the cited files; parallelize in
 
 If REJECT - **Blocking Issues** (max 3): numbered, each naming the exact issue and the change needed.
 
-Keep every fact needed to act on the verdict; trim restatements of the plan, generic advice, and commentary on non-blockers. Match the language of the plan content.`;
+Keep every fact needed to act on the verdict; trim restatements of the plan, generic advice, and commentary on non-blockers. Match the language of the plan content.`

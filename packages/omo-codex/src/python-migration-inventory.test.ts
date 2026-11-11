@@ -5,9 +5,7 @@ import { join, relative, sep } from "node:path"
 const repoRoot = join(import.meta.dir, "..", "..", "..")
 const packageRoot = join(repoRoot, "packages", "omo-codex")
 
-const requiredRetainedPythonFiles = [
-  "packages/omo-codex/plugin/components/lsp/test/fixtures/broken.py",
-] as const
+const requiredRetainedPythonFiles = ["packages/omo-codex/plugin/components/lsp/test/fixtures/broken.py"] as const
 // plugin/scripts/sync-skills.mjs copies packages/shared-skills into plugin/skills/ (gitignored).
 // Those copies are owned by shared-skills, so this inventory only classifies hand-authored Python.
 const generatedSkillsRoot = join(packageRoot, "plugin", "skills")

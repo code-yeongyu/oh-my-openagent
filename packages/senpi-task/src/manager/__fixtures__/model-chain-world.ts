@@ -27,7 +27,10 @@ export type ModelChainWorld = {
   readonly calls: readonly ProviderCall[]
   toolRuns(): number
   runner(): ManagedRunner
-  engineRunner(kind: EngineRunnerKind, options?: { readonly hiddenCapabilities?: readonly string[] }): Promise<ManagedRunner>
+  engineRunner(
+    kind: EngineRunnerKind,
+    options?: { readonly hiddenCapabilities?: readonly string[] },
+  ): Promise<ManagedRunner>
   /** The settings file an engine runner reads, copied byte for byte from `settingsPath` when it starts. */
   engineSettingsPath(kind: EngineRunnerKind): string
   dispose(): Promise<void>
@@ -52,8 +55,12 @@ export async function createModelChainWorld(
   const agentDir = join(root, "agent")
   mkdirSync(agentDir, { recursive: true })
   const settingsPath = join(agentDir, "settings.json")
-  const retry = options.userFallbackChains === undefined ? {} : { retry: { fallbackChains: options.userFallbackChains } }
-  writeFileSync(settingsPath, `${JSON.stringify({ defaultProvider: CLAUDE, defaultModel: "primary", ...retry }, null, 2)}\n`)
+  const retry =
+    options.userFallbackChains === undefined ? {} : { retry: { fallbackChains: options.userFallbackChains } }
+  writeFileSync(
+    settingsPath,
+    `${JSON.stringify({ defaultProvider: CLAUDE, defaultModel: "primary", ...retry }, null, 2)}\n`,
+  )
   const engines: EngineRunner[] = []
   const modelRuntime = ModelRuntime.createSync({ agentDir })
   const modelRegistry = new ModelRegistry(modelRuntime)
@@ -62,18 +69,27 @@ export async function createModelChainWorld(
   let toolRuns = 0
 
   for (const [provider, ids] of Object.entries(MODELS)) {
-    Reflect.apply(modelRegistry.registerProvider, modelRegistry, [provider, {
-      api: "openai-completions",
-      baseUrl: `file://${provider}`,
-      apiKey: "test-key",
-      models: ids.map(testModel),
-      streamSimple(model: { readonly id: string }, context: { readonly messages: readonly { readonly role: string }[] }) {
-        const key = `${provider}/${model.id}`
-        calls.push({ model: key, toolResults: context.messages.filter((message) => message.role === "toolResult").length })
-        const step = remaining.get(key)?.shift() ?? "complete"
-        return answer(provider, model.id, step)
+    Reflect.apply(modelRegistry.registerProvider, modelRegistry, [
+      provider,
+      {
+        api: "openai-completions",
+        baseUrl: `file://${provider}`,
+        apiKey: "test-key",
+        models: ids.map(testModel),
+        streamSimple(
+          model: { readonly id: string },
+          context: { readonly messages: readonly { readonly role: string }[] },
+        ) {
+          const key = `${provider}/${model.id}`
+          calls.push({
+            model: key,
+            toolResults: context.messages.filter((message) => message.role === "toolResult").length,
+          })
+          const step = remaining.get(key)?.shift() ?? "complete"
+          return answer(provider, model.id, step)
+        },
       },
-    }])
+    ])
   }
 
   const countTool: ToolDefinition = {
@@ -93,11 +109,26 @@ export async function createModelChainWorld(
       return [...calls, ...engines.flatMap((engine) => engine.calls.map((model) => ({ model, toolResults: 0 })))]
     },
     toolRuns: () => toolRuns,
-    runner: () => createInProcessManagedRunner(new InProcessRunner({ sharedParentTools: [countTool] }), (spec) => {
-      const [provider, id] = (spec.model ?? "").split("/")
-      const model = provider === undefined || id === undefined ? undefined : modelRegistry.find(provider, id)
-      return { agentDir, projectTrusted: false, modelRegistry, modelRuntime, ...(model === undefined ? {} : { model }) }
-    }),
+    // The parent's UI allows the child's gated call: from senpi 2026.11.6-3 a delegated child whose parent session is not
+    // live asks before running the shared tool (it would be refused with no UI), so the count tool would never run.
+    runner: () =>
+      createInProcessManagedRunner(
+        new InProcessRunner({
+          sharedParentTools: [countTool],
+          dialogs: { forward: async () => ({ kind: "value", value: "Allow once" }) },
+        }),
+        (spec) => {
+          const [provider, id] = (spec.model ?? "").split("/")
+          const model = provider === undefined || id === undefined ? undefined : modelRegistry.find(provider, id)
+          return {
+            agentDir,
+            projectTrusted: false,
+            modelRegistry,
+            modelRuntime,
+            ...(model === undefined ? {} : { model }),
+          }
+        },
+      ),
     engineRunner: async (kind, engineOptions = {}) => {
       const engine = await startEngineRunner(kind, { root, settingsPath, scripts, ...engineOptions })
       engines.push(engine)

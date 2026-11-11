@@ -52,9 +52,7 @@ describe("skill_mcp tool", () => {
       })
 
       // when / #then
-      await expect(
-        tool.execute({ mcp_name: "test-server" }, mockContext)
-      ).rejects.toThrow(/Missing operation/)
+      await expect(tool.execute({ mcp_name: "test-server" }, mockContext)).rejects.toThrow(/Missing operation/)
     })
 
     it("throws when multiple operations specified", async () => {
@@ -67,11 +65,14 @@ describe("skill_mcp tool", () => {
 
       // when / #then
       await expect(
-        tool.execute({
-          mcp_name: "test-server",
-          tool_name: "some-tool",
-          resource_name: "some://resource",
-        }, mockContext)
+        tool.execute(
+          {
+            mcp_name: "test-server",
+            tool_name: "some-tool",
+            resource_name: "some://resource",
+          },
+          mockContext,
+        ),
       ).rejects.toThrow(/Multiple operations/)
     })
 
@@ -89,9 +90,9 @@ describe("skill_mcp tool", () => {
       })
 
       // when / #then
-      await expect(
-        tool.execute({ mcp_name: "unknown-server", tool_name: "some-tool" }, mockContext)
-      ).rejects.toThrow(/not found/)
+      await expect(tool.execute({ mcp_name: "unknown-server", tool_name: "some-tool" }, mockContext)).rejects.toThrow(
+        /not found/,
+      )
     })
 
     it("includes available MCP servers in error message", async () => {
@@ -111,9 +112,9 @@ describe("skill_mcp tool", () => {
       })
 
       // when / #then
-      await expect(
-        tool.execute({ mcp_name: "missing", tool_name: "test" }, mockContext)
-      ).rejects.toThrow(/sqlite.*db-skill|rest-api.*api-skill/s)
+      await expect(tool.execute({ mcp_name: "missing", tool_name: "test" }, mockContext)).rejects.toThrow(
+        /sqlite.*db-skill|rest-api.*api-skill/s,
+      )
     })
 
     it("throws on invalid JSON arguments", async () => {
@@ -131,11 +132,14 @@ describe("skill_mcp tool", () => {
 
       // when / #then
       await expect(
-        tool.execute({
-          mcp_name: "test-server",
-          tool_name: "some-tool",
-          arguments: "not valid json",
-        }, mockContext)
+        tool.execute(
+          {
+            mcp_name: "test-server",
+            tool_name: "some-tool",
+            arguments: "not valid json",
+          },
+          mockContext,
+        ),
       ).rejects.toThrow(/Invalid arguments JSON/)
     })
   })
@@ -186,15 +190,14 @@ describe("skill_mcp tool", () => {
         getSessionID: () => "session",
       })
       const cdpUrlSchema = tool.args.cdp_url
-      const cdpUrlDef = typeof cdpUrlSchema === "object" && cdpUrlSchema !== null
-        ? Reflect.get(cdpUrlSchema, "def")
-        : undefined
-      const cdpUrlInnerType = typeof cdpUrlDef === "object" && cdpUrlDef !== null
-        ? Reflect.get(cdpUrlDef, "innerType")
-        : undefined
-      const cdpUrlInnerDef = typeof cdpUrlInnerType === "object" && cdpUrlInnerType !== null
-        ? Reflect.get(cdpUrlInnerType, "def")
-        : undefined
+      const cdpUrlDef =
+        typeof cdpUrlSchema === "object" && cdpUrlSchema !== null ? Reflect.get(cdpUrlSchema, "def") : undefined
+      const cdpUrlInnerType =
+        typeof cdpUrlDef === "object" && cdpUrlDef !== null ? Reflect.get(cdpUrlDef, "innerType") : undefined
+      const cdpUrlInnerDef =
+        typeof cdpUrlInnerType === "object" && cdpUrlInnerType !== null
+          ? Reflect.get(cdpUrlInnerType, "def")
+          : undefined
 
       // then
       expect(cdpUrlSchema).toBeDefined()
@@ -219,12 +222,15 @@ describe("skill_mcp tool", () => {
       })
 
       // when
-      await tool.execute({
-        mcp_name: "playwright",
-        tool_name: "browser_navigate",
-        arguments: { url: "https://example.com" },
-        cdp_url: "http://localhost:9222",
-      }, mockContext)
+      await tool.execute(
+        {
+          mcp_name: "playwright",
+          tool_name: "browser_navigate",
+          arguments: { url: "https://example.com" },
+          cdp_url: "http://localhost:9222",
+        },
+        mockContext,
+      )
 
       // then
       expect(callToolSpy).toHaveBeenCalledWith(
@@ -251,11 +257,14 @@ describe("skill_mcp tool", () => {
       })
 
       // when
-      await tool.execute({
-        mcp_name: "playwright",
-        tool_name: "browser_navigate",
-        arguments: { url: "https://example.com" },
-      }, mockContext)
+      await tool.execute(
+        {
+          mcp_name: "playwright",
+          tool_name: "browser_navigate",
+          arguments: { url: "https://example.com" },
+        },
+        mockContext,
+      )
 
       // then
       expect(callToolSpy).toHaveBeenCalledWith(
@@ -284,7 +293,13 @@ describe("skill_mcp tool", () => {
           let requestSignal: AbortSignal | undefined
           const cancelRequest = () => response.reject(requestSignal?.reason)
           const startRequest = (options: unknown) => {
-            if (!options || typeof options !== "object" || !("signal" in options) || !(options.signal instanceof AbortSignal)) throw new Error("Expected a request signal")
+            if (
+              !options ||
+              typeof options !== "object" ||
+              !("signal" in options) ||
+              !(options.signal instanceof AbortSignal)
+            )
+              throw new Error("Expected a request signal")
             requestSignal = options.signal
             if (requestSignal.aborted) response.reject(requestSignal.reason)
             else requestSignal.addEventListener("abort", cancelRequest, { once: true })
@@ -292,13 +307,21 @@ describe("skill_mcp tool", () => {
             return response.promise
           }
           const call = spyOn(manager, operation.method).mockImplementation((...args: unknown[]) =>
-            startRequest(args.at(-1)).then(() => operation.method === "callTool" ? { content: [] } : []))
-          const tool = createSkillMcpTool({ manager, getLoadedSkills: () => [createMockSkillWithMcp("fixture", { fixture: { command: "fixture" } })] })
+            startRequest(args.at(-1)).then(() => (operation.method === "callTool" ? { content: [] } : [])),
+          )
+          const tool = createSkillMcpTool({
+            manager,
+            getLoadedSkills: () => [createMockSkillWithMcp("fixture", { fixture: { command: "fixture" } })],
+          })
           if (completion === "pre-aborted") parent.abort(reason)
 
           // when
-          const outcome = tool.execute({ mcp_name: "fixture", ...operation.args }, { ...mockContext, abort: parent.signal })
-            .then((result) => ({ result, error: undefined }), (error: unknown) => ({ result: undefined, error }))
+          const outcome = tool
+            .execute({ mcp_name: "fixture", ...operation.args }, { ...mockContext, abort: parent.signal })
+            .then(
+              (result) => ({ result, error: undefined }),
+              (error: unknown) => ({ result: undefined, error }),
+            )
           onTestFinished(async () => {
             response.resolve()
             await outcome
@@ -336,9 +359,16 @@ describe("skill_mcp tool", () => {
         structuredContent: { code: "fixture-failure" },
       })
       const tool = createSkillMcpTool({ manager, getLoadedSkills: () => loadedSkills })
-      await expect(tool.execute({
-        mcp_name: "fixture", tool_name: "fail", grep: "cannot-match",
-      }, mockContext)).rejects.toThrow("fixture-failure")
+      await expect(
+        tool.execute(
+          {
+            mcp_name: "fixture",
+            tool_name: "fail",
+            grep: "cannot-match",
+          },
+          mockContext,
+        ),
+      ).rejects.toThrow("fixture-failure")
     })
 
     for (const structuredContent of [{ count: 2 }, [1, "two"], 0, false, null, "value"]) {
@@ -357,8 +387,9 @@ describe("skill_mcp tool", () => {
       const content = [{ type: "text", text: "unchanged" }]
       spyOn(manager, "callTool").mockResolvedValue({ content })
       const tool = createSkillMcpTool({ manager, getLoadedSkills: () => loadedSkills })
-      expect(await tool.execute({ mcp_name: "fixture", tool_name: "plain" }, mockContext))
-        .toBe(JSON.stringify(content, null, 2))
+      expect(await tool.execute({ mcp_name: "fixture", tool_name: "plain" }, mockContext)).toBe(
+        JSON.stringify(content, null, 2),
+      )
     })
   })
 

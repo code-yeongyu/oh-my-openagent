@@ -115,23 +115,17 @@ describe("build:omo-native staged payload", () => {
           const skillCount = readdirSync(join(outputDir, "skills"), {
             withFileTypes: true,
           }).filter(
-            (entry) =>
-              entry.isDirectory() && existsSync(join(outputDir, "skills", entry.name, "SKILL.md")),
+            (entry) => entry.isDirectory() && existsSync(join(outputDir, "skills", entry.name, "SKILL.md")),
           ).length
           expect(skillCount).toBeGreaterThanOrEqual(18)
 
           const files = listRelativeFiles(outputDir)
           expect(files.filter((file) => file.includes(".test."))).toEqual([])
           expect(files.filter((file) => file.split("/").includes("node_modules"))).toEqual([])
-          expect(files.filter((file) => file.startsWith("scripts/"))).toEqual([
-            "scripts/install.mjs",
-          ])
+          expect(files.filter((file) => file.startsWith("scripts/"))).toEqual(["scripts/install.mjs"])
 
           expect(
-            readFileSync(join(repoRoot, "packages", "omo-native", ".gitignore"), "utf8").replaceAll(
-              "\r\n",
-              "\n",
-            ),
+            readFileSync(join(repoRoot, "packages", "omo-native", ".gitignore"), "utf8").replaceAll("\r\n", "\n"),
           ).toBe("/plugin/\n")
 
           rmSync(join(outputDir, "extensions", "kibitzer-persona.md"))
