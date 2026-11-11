@@ -1,9 +1,10 @@
-//! Every default of `Backend` / `AxBackend` refuses with nothing sent: a backend that
-//! overrides nothing can neither read nor drive the desktop.
+//! Every default of `Backend` / `AxBackend` refuses: a backend that overrides nothing can
+//! neither read nor drive the desktop, and no default reaches the send path.
 
 use crate::backend::{
-    AxBackend, Backend, CaptureOptions, InputEvent, PermissionProbe, Ref, Refusal, Route, Semantic,
-    SnapshotRequest, TaggedInput, Target, WindowFilter, PRESENCE_UNAVAILABLE,
+    AxBackend, Backend, BackendResult, CaptureOptions, Delivered, InputEvent, PermissionProbe, Ref,
+    Refusal, Route, Semantic, SnapshotRequest, TaggedInput, Target, WindowFilter,
+    PRESENCE_UNAVAILABLE,
 };
 use crate::error::{ComputerCode, EngineCode};
 use crate::params::{ObserveOptions, Point};
@@ -26,7 +27,6 @@ fn assert_refused<T: std::fmt::Debug>(
         refusal.computer_code().map(ComputerCode::wire),
         Ok(computer)
     );
-    assert!(refusal.nothing_sent(), "{reason}: a refusal sends nothing");
 }
 
 #[test]
@@ -137,5 +137,74 @@ fn ax_backend_defaults_refuse() {
         EngineCode::AxUnsupported,
         "COMPUTER_AX_UNAVAILABLE",
         "ax_events_unsupported",
+    );
+}
+
+/// A backend whose only overrides are the two send paths, each recording what it was asked
+/// to send. Every other method is the default.
+#[derive(Default)]
+struct Recorder {
+    sent: Vec<String>,
+}
+
+impl Backend for Recorder {
+    fn post_input(&mut self, input: &TaggedInput, route: Route) -> BackendResult<Delivered> {
+        self.sent
+            .push(format!("post_input {:?} via {route:?}", input.event));
+        Ok(Delivered { count: 1, of: 1 })
+    }
+}
+
+impl AxBackend for Recorder {
+    fn perform(&mut self, reference: &Ref, action: &Semantic) -> BackendResult<Delivered> {
+        self.sent
+            .push(format!("perform {} on {}", action.0, reference.0));
+        Ok(Delivered { count: 1, of: 1 })
+    }
+}
+
+#[test]
+fn no_default_reaches_the_send_path() {
+    let mut recorder = Recorder::default();
+    let target = Target::Desktop;
+    let capture = CaptureOptions {
+        cursor: true,
+        crosshair: None,
+        region: None,
+    };
+    let reference = Ref("s1:e2".to_owned());
+    let request = SnapshotRequest {
+        target: Target::Desktop,
+        options: ObserveOptions::default(),
+    };
+    let _ = recorder.capabilities();
+    let _ = recorder.probe_permissions();
+    assert!(recorder.windows(&WindowFilter::default()).is_err());
+    assert!(recorder.displays().is_err());
+    assert!(recorder.capture(&target, &capture).is_err());
+    assert!(recorder.stop_listener().is_err());
+    assert!(recorder.epoch_source().next_change().is_err());
+    assert!(recorder.presence().is_none());
+    assert!(recorder.snapshot(&request).is_err());
+    assert!(recorder.resolve(&reference).is_err());
+    assert!(recorder.events().next_event().is_err());
+    assert!(
+        recorder.sent.is_empty(),
+        "a default reached the send path: {:?}",
+        recorder.sent
+    );
+    let input = TaggedInput {
+        event: InputEvent::Text("a".to_owned()),
+        tag: 1,
+    };
+    assert!(recorder.post_input(&input, Route::Ax).is_ok());
+    assert!(recorder
+        .perform(&reference, &Semantic("press".to_owned()))
+        .is_ok());
+    assert_eq!(
+        recorder.sent.len(),
+        2,
+        "the recorder hears both send paths: {:?}",
+        recorder.sent
     );
 }

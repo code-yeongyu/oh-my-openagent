@@ -18,12 +18,6 @@ impl Refusal {
         Self { code, reason }
     }
 
-    /// A refusal is decided before the OS is touched.
-    #[must_use]
-    pub const fn nothing_sent(&self) -> bool {
-        true
-    }
-
     /// The table row of `(code, reason)`.
     ///
     /// # Errors
