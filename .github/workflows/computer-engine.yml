@@ -100,3 +100,15 @@ jobs:
       - name: Package tests
         shell: bash
         run: bun run test:computer
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Computer engine native contract (${{ matrix.os }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Clippy (-D warnings) and cargo test for every crates/omo-computer-* crate.
+            - bun run test:computer: the Cargo pin check, then the packages/omo-computer-* vitest suites.
+          JOB_SUMMARY_NEXT: Start with the first clippy or test failure; a backend crate failing on one OS is usually a cfg-gated path.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
