@@ -4,7 +4,7 @@
 // loopless runtimes joined to it by the engine's reference transport over an in-process carrier. Both sides load the
 // same extension factory, exactly as a split session loads omo; the model is the engine's faux provider.
 
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -132,7 +132,12 @@ async function openSession(placement: Placement, extension: ExtensionFactory): P
     api: faux.api,
     models: faux.models,
   })
-  const settingsManager = sdk.SettingsManager.inMemory({ defaultProjectTrust: "always", enabledBuiltinExtensions: [] })
+  // Both sides run with the same settings and no engine builtins. The hand reads its settings from its agent dir, and
+  // left at the defaults it loads every builtin: the bundled ones register process-wide Bun.plugin virtual modules, and
+  // its mcp builtin binds the process-wide MCP service, a binding that disposing the hand's runtimes never releases.
+  const settings = { defaultProjectTrust: "always", enabledBuiltinExtensions: [] }
+  writeFileSync(join(handAgentDir, "settings.json"), JSON.stringify(settings))
+  const settingsManager = sdk.SettingsManager.inMemory(settings)
   const loader = new sdk.DefaultResourceLoader({
     cwd,
     agentDir,

@@ -5,7 +5,7 @@ import type { ThreadHostSession } from "./tools"
 const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
 
-const UNLOAD = { type: "unload_session", sessionId: "dur-on-b", force: true, interrupt: true, children: "detach" }
+const UNLOAD = { type: "unload_session", sessionId: "rk-on-b", force: true, interrupt: true, children: "detach" }
 
 describe("thread_close: close a thread on this device or on another one", () => {
   test("#given a live thread on this device #when thread_close names it and is retried #then its host closes it once and the retry replays the answer", async () => {
@@ -44,7 +44,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       closed: true,
       device: "b",
     })
-    expect(a.live.has("dur-on-b")).toBe(false)
+    expect(a.live.has("rk-on-b")).toBe(false)
     expect(a.sent.map((entry) => [entry.via, entry.device, entry.rpc])).toEqual([["session", "b", UNLOAD]])
     expect(closed).toEqual([])
   })
@@ -58,7 +58,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       closed: true,
       device: "b",
     })
-    expect(a.live.has("dur-on-b")).toBe(false)
+    expect(a.live.has("rk-on-b")).toBe(false)
     expect(a.sent.map((entry) => [entry.via, entry.rpc?.["type"]])).toEqual([
       ["session", "unload_session"],
       ["session", "close_session"],
@@ -73,7 +73,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       kind: "error",
       error: { code: "foreign_live_owner", details: { device: "b" } },
     })
-    expect(a.live.has("dur-on-b")).toBe(true)
+    expect(a.live.has("rk-on-b")).toBe(true)
   })
 
   test("#given a thread on device b whose session has ended #when thread_close names it #then it answers closed false and sends nothing", async () => {
@@ -135,7 +135,7 @@ describe("thread_close: close a thread on this device or on another one", () => 
       error: { code: "unsupported", details: { device: "b", command: "unload_session", reason: "attached" } },
     })
     expect(a.sent.map((entry) => entry.rpc?.["type"])).toEqual(["unload_session"])
-    expect(a.live.has("dur-on-b")).toBe(true)
+    expect(a.live.has("rk-on-b")).toBe(true)
   })
 
   test("#given device b refuses the command #when thread_close names a thread on b #then the refusal is data naming b", async () => {

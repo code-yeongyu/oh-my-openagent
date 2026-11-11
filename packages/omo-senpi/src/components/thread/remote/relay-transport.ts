@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { rowThreadId } from "./ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { hashArgs } from "../gateway/bindings"
 import { decideDelivery } from "../gateway/decision"
@@ -332,7 +333,7 @@ export function createRelayTransport(
     let record = recordFor(lane)
     const ok = (kind: GatewayDeliveryDelivery, deduplicated = false): RelayDeliverySuccess => ({
       kind: "ok",
-      thread_id: row.session_id,
+      thread_id: rowThreadId(row),
       delivery: kind,
       deduplicated,
       device: row.device,
@@ -416,13 +417,14 @@ export function createRelayTransport(
 
   // The person at a terminal sends their own input: the engine's `prompt` record, raw text with no envelope (they are
   // that session's user, not a peer), kept by design (#12885). The same preflight as a session's steer, the same
-  // idempotency through the tool receipt store, and the same outcome mapping as every other relay request.
+  // idempotency through the tool receipt store, and the same outcome mapping as every other relay request. A person's
+  // steer that names no turn steers the one this preflight reads (#13016): the state is read once, here.
   const prompt = async (delivery: OutboundDelivery, row: RemoteSessionRow): Promise<SendOutcome> => {
     const offline = await deviceOnline(remote, row.device)
     if (offline !== undefined) return offline
     const ok = (kind: GatewayDeliveryDelivery): RelayDeliverySuccess => ({
       kind: "ok",
-      thread_id: row.session_id,
+      thread_id: rowThreadId(row),
       delivery: kind,
       deduplicated: false,
       device: row.device,
@@ -445,11 +447,11 @@ export function createRelayTransport(
       if (engine.turnEpoch === null)
         return fail(
           REFUSAL_CODES.turn_conflict.code,
-          `Turn ${delivery.expected_turn_id} of ${row.session_id} cannot be confirmed on device ${row.device}.`,
+          `Turn ${delivery.expected_turn_id ?? "(running)"} of ${row.session_id} cannot be confirmed on device ${row.device}.`,
           REFUSAL_CODES.turn_conflict.next,
           { device: row.device },
         )
-      if (String(engine.turnEpoch) !== delivery.expected_turn_id)
+      if (delivery.expected_turn_id !== undefined && String(engine.turnEpoch) !== delivery.expected_turn_id)
         return fail(
           REFUSAL_CODES.turn_conflict.code,
           `Turn ${delivery.expected_turn_id} is not the running turn of ${row.session_id} on device ${row.device}.`,
@@ -525,12 +527,6 @@ export function createRelayTransport(
           `Use omo remote send ${row.device}/${row.session_id} instead.`,
           { device: row.device, reason: "sender_not_allowed" },
         )
-      if (delivery.mode === "steer" && delivery.expected_turn_id === undefined)
-        return fail(
-          "invalid_arguments",
-          "A steer needs expected_turn_id (the target's current turn_epoch).",
-          "Fix the arguments and send again.",
-        )
       if (delivery.expected_turn_id !== undefined && !/^\d+$/.test(delivery.expected_turn_id))
         return fail(
           "turn_conflict",
@@ -539,6 +535,12 @@ export function createRelayTransport(
         )
       if (delivery.sender.kind === "person")
         return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, () => prompt(delivery, row))
+      if (delivery.mode === "steer" && delivery.expected_turn_id === undefined)
+        return fail(
+          "invalid_arguments",
+          "A steer needs expected_turn_id (the target's current turn_epoch).",
+          "Fix the arguments and send again.",
+        )
       if (delivery.caller_id === UNKNOWN_CALLER)
         return fail(
           "caller_context_missing",

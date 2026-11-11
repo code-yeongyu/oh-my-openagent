@@ -97,6 +97,7 @@ test.each(["thread_send", "thread_handoff"])(
       project: "runtime-project",
       lane: "review",
       session: "planner",
+      device_absent: "no_device_service",
     })
     expect(receiver.runtime.senderOf(row.delivery_id)?.display_text).toBe(
       `From Runtime workspace / runtime-project / lane review / session "planner"\n${body}`,
@@ -123,6 +124,7 @@ test("#given a CLI SDK with an explicit environment #when sending #then its own 
       workspace: "Runtime workspace",
       project: "runtime-project",
       lane: "review",
+      device_absent: "no_device_service",
     })
     expect(renderDeliveryText(row).split("\n")[0]).toStartWith(
       "From Runtime workspace / runtime-project / lane review [OMO_GATEWAY v=1 ",
@@ -217,7 +219,11 @@ test("#given an unclassified session sender #when delivering internally #then th
   expect(result).toMatchObject({ details: { result: { kind: "ok", delivery: { kind: "started" } } } })
   const [row] = await receiver.store.list()
   if (row === undefined) throw new Error("missing delivery")
-  expect(row.envelope.provenance).toEqual({ workspace: "unclassified", project: basename(h.agentDir) })
+  expect(row.envelope.provenance).toEqual({
+    workspace: "unclassified",
+    project: basename(h.agentDir),
+    device_absent: "no_device_service",
+  })
   expect(receiver.runtime.textOf(row.delivery_id)?.split("\n")[0]).toStartWith(
     `From unclassified / ${basename(h.agentDir)} [OMO_GATEWAY v=1 `,
   )
@@ -256,6 +262,7 @@ test("#given a connector SDK outside its process cwd #when a store extension enq
       workspace: "Runtime workspace",
       project: "runtime-project",
       lane: "review",
+      device_absent: "no_device_service",
     })
   } finally {
     await sdk.dispose()

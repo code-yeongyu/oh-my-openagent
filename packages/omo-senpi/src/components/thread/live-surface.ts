@@ -779,8 +779,8 @@ export function createCliRemoteSurface(options: {
     loadAliasRegistry: async () => createServiceAliasRegistry(await options.loadAccess()),
   })
 }
-export { crossTarget, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
-export { deviceOnline, promptRemote } from "./remote/remote-ops"
+export { listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
+export { deviceOnline } from "./remote/remote-ops"
 export { outcomeFailure } from "./remote/outcome"
 export { createRelayTransport } from "./remote/relay-transport"
 export { createRelayControl } from "./control/relay-control"

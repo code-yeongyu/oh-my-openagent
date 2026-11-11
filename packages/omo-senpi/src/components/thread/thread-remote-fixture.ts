@@ -18,9 +18,12 @@ import type { ThreadTranscriptEntry } from "./reader"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import type { ThreadCloseOutcome } from "./tools/ports"
 
+// The listing key (what b's connector assigned) deliberately differs from the durable id (audit class C8, #13017): a test
+// that passes with either id proves nothing about which one a tool path matched.
 export const B_ROW: RemoteSessionRow = {
   device: "b",
-  session_id: "dur-on-b",
+  session_id: "rk-on-b",
+  durable_id: "dur-on-b",
   title: "on b",
   project: "/work/b",
   path: "/home/b/.omo/agent/sessions/dur-on-b.jsonl",
@@ -119,7 +122,10 @@ export function createRemoteThreadFixture() {
     // The sessions b's engine holds. Its close rules are senpi's (2026.11.5-1): close_session from a connection that never
     // attached is refused unknown_session (senpi#1782); an attached close releases only that hold, so the session ends
     // only with no other holder; unload_session with force drains every hold, and refuses a session with no file yet.
-    const live = new Set(options.live ?? [B_ROW.session_id])
+    // b's engine knows its sessions by the listing key; rows a test builds with the durable id as key (titled(), the remote verbs' typed id) are live too.
+    const live = new Set(
+      options.live ?? [B_ROW.session_id, ...(B_ROW.durable_id === undefined ? [] : [B_ROW.durable_id])],
+    )
     const answer = (rpc: JsonObject, attachedTo?: string): RemoteCommandOutcome => {
       // The engine's real reply envelope, as the device service hands it back (device-service-core's CommandResult.response):
       // every field the tools read lives under `data`.
@@ -352,6 +358,8 @@ export function createRemoteThreadFixture() {
       callerCause?: () => string | undefined
       callerChainHop?: () => number
       callerName?: () => string | undefined
+      callerReplyTargets?: () => readonly string[]
+      callerReplySenders?: () => readonly { readonly session_id: string; readonly name?: string }[]
       env?: Readonly<Record<string, string | undefined>>
       sessions?: ThreadHostSession[]
       engine?: Engine
@@ -425,6 +433,8 @@ export function createRemoteThreadFixture() {
       callerSessionId: () => caller,
       callerWorkspaceRoot: () => process.cwd(),
       remote,
+      ...(extra.callerReplyTargets === undefined ? {} : { callerReplyTargets: extra.callerReplyTargets }),
+      ...(extra.callerReplySenders === undefined ? {} : { callerReplySenders: extra.callerReplySenders }),
       ...(extra.callerCause === undefined ? {} : { callerCause: extra.callerCause }),
       ...(extra.callerChainHop === undefined ? {} : { callerChainHop: extra.callerChainHop }),
       ...(extra.callerName === undefined ? {} : { callerName: extra.callerName }),
@@ -439,7 +449,13 @@ export function createRemoteThreadFixture() {
         } as never)
       ).details.result as ThreadToolResult
     }
-    return { run, openSession, store, closed, agentDir }
+    // What thread_send asks the engine's permission system for, before it runs (tools/reply-permission.ts).
+    const permission = (args: Record<string, unknown>): unknown => {
+      const parse = tools.find((candidate) => candidate.name === "thread_send")?.permissionParser
+      if (parse === undefined) throw new Error("thread_send declares no permission parser")
+      return parse(args, process.cwd())
+    }
+    return { run, permission, openSession, store, closed, agentDir }
   }
 
   return { account, surface, cleanup }

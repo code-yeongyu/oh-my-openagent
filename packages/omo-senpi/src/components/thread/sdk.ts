@@ -32,12 +32,12 @@ import {
   resolveEntries,
   resolveStoredSession,
   sendAddressBook,
+  resolveAcross,
 } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { listThreads, readThread } from "./tools/read-ops"
-import { crossTarget } from "./remote/cross-device"
 import type { RemoteThreadSurface } from "./remote/ports"
-import { localScope } from "./remote/local-scope"
+import { stampThisDevice } from "./remote/this-device"
 
 export type ThreadSdkOptions = {
   readonly agentDir: string
@@ -235,11 +235,14 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     createGatewayStore({
       agentDir: options.agentDir,
       senderProvenance: () =>
-        resolveProvenance({
-          cwd: options.cwd,
-          env,
-          ...(options.provenanceWorkspaces === undefined ? {} : { workspaces: options.provenanceWorkspaces }),
-        }),
+        stampThisDevice(
+          resolveProvenance({
+            cwd: options.cwd,
+            env,
+            ...(options.provenanceWorkspaces === undefined ? {} : { workspaces: options.provenanceWorkspaces }),
+          }),
+          options.remote,
+        ),
       resolveTarget: (address, request) => resolveForExtension(address, request),
       ...(options.workerModuleUrl === undefined ? {} : { workerModuleUrl: options.workerModuleUrl }),
     })
@@ -388,26 +391,28 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         const remote = options.remote
         if (remote !== undefined && (await store.sessionOwner(request.thread)) === null) {
           const offline = await hostView(surface, { offline: true })
-          const across = await crossTarget(
-            remote,
+          const across = await resolveAcross(
+            { ...surface, remote },
+            toThreadAddressEntries(sendAddressBook(surface, offline, request.thread, true)),
             request.thread,
-            resolution(
-              surface,
-              toThreadAddressEntries(sendAddressBook(surface, offline, request.thread, true)),
-              request.thread,
-              UNKNOWN_CALLER,
-              true,
-            ),
+            UNKNOWN_CALLER,
+            request.all_scope,
           )
           if (across.kind === "error")
-            return across.result.kind === "error"
-              ? across.result
-              : fail("internal_error", "The target could not be resolved.", "Run omo thread list and retry.")
-          const scope = across.kind === "local" ? localScope(across, request.all_scope) : undefined
+            return fail(
+              across.code,
+              across.message,
+              across.next_action,
+              "details" in across ? (across as { details?: Readonly<Record<string, unknown>> }).details : undefined,
+            )
           target =
-            across.kind === "remote"
-              ? { kind: "remote", row: across.row }
-              : { kind: "local", thread_id: across.address, ...(scope === undefined ? {} : { all_scope: scope }) }
+            across.entry.transport?.kind === "relay"
+              ? { kind: "remote", row: across.entry.transport.row }
+              : {
+                  kind: "local",
+                  thread_id: across.entry.thread_id,
+                  ...(across.all_scope === undefined ? {} : { all_scope: across.all_scope }),
+                }
         }
         const sent = await pipeline.deliver({
           sender: { kind: "cli", uid: options.uid, user: options.user },

@@ -1,4 +1,5 @@
 import type * as CrossDevice from "./cross-device"
+import { rowThreadId } from "./ports"
 import type * as RemoteOps from "./remote-ops"
 import type * as RelayTransport from "./relay-transport"
 import type * as RelayControl from "../control/relay-control"
@@ -6,7 +7,7 @@ import type { SessionControl } from "../control/port"
 import type { DeliveryTransport } from "../gateway/transport"
 import type { RemoteSessionRow, RemoteThreadSurface } from "./ports"
 
-type Runtime = Pick<typeof CrossDevice, "crossTarget" | "listAcross" | "planCreate" | "renameAlias" | "withAlias"> &
+type Runtime = Pick<typeof CrossDevice, "listAcross" | "planCreate" | "renameAlias" | "withAlias"> &
   Pick<typeof RemoteOps, "deviceOnline"> &
   Pick<typeof RelayTransport, "createRelayTransport"> &
   Pick<typeof RelayControl, "createRelayControl">
@@ -15,8 +16,6 @@ type Runtime = Pick<typeof CrossDevice, "crossTarget" | "listAcross" | "planCrea
 // operation already loads for the live host, so `omo.js` carries none of it.
 const runtime = (): Promise<Runtime> => import("#omo-thread-client-runtime")
 
-export const crossTarget = async (...args: Parameters<Runtime["crossTarget"]>) =>
-  await (await runtime()).crossTarget(...args)
 export const listAcross = async (...args: Parameters<Runtime["listAcross"]>) =>
   await (await runtime()).listAcross(...args)
 export const planCreate = async (...args: Parameters<Runtime["planCreate"]>) =>
@@ -54,7 +53,7 @@ export const createRelayTransport = (
 export const createRelayControl = (remote: RemoteThreadSurface, row: RemoteSessionRow): SessionControl => {
   const built = runtime().then((loaded) => loaded.createRelayControl(remote, row))
   return {
-    thread_id: row.session_id,
+    thread_id: rowThreadId(row),
     device: row.device,
     title: row.title,
     interrupt: async (turnId) => await (await built).interrupt(turnId),

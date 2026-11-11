@@ -90,6 +90,7 @@ const DELIVERY_COLUMNS = [
   "claimed_at",
   "attempt",
   "admission_kind",
+  "wait_kind",
   "turn_epoch",
   "root_id",
   "hop",
@@ -133,6 +134,7 @@ function rowFrom(record: SqlRow): DeliveryRow {
     claimed_at: nullableNumber(record.claimed_at),
     attempt: Number(record.attempt),
     admission_kind: record.admission_kind === null ? null : String(record.admission_kind),
+    wait_kind: record.wait_kind === "approval" ? "approval" : null,
     turn_epoch: nullableNumber(record.turn_epoch),
     root_id: String(record.root_id),
     hop: Number(record.hop),
@@ -311,6 +313,7 @@ function insertDelivery(ctx: StoreContext, row: DeliveryRow): void {
       row.claimed_at,
       row.attempt,
       row.admission_kind,
+      row.wait_kind,
       row.turn_epoch,
       row.root_id,
       row.hop,
@@ -478,13 +481,12 @@ type CausalPlacement = {
 
 function placeCausally(ctx: StoreContext, request: EnqueueRequest): CausalPlacement | StoreRefusal {
   let placement: CausalPlacement
-  if (request.cause_delivery_id !== null) {
-    const cause = selectRow(ctx, request.cause_delivery_id)
+  const cause = request.cause_delivery_id === null ? undefined : selectRow(ctx, request.cause_delivery_id)
+  if (cause !== undefined) {
     // The cause is the delivery whose message the sender's model consumed (runtime context, never a
     // model), so a row still `admitting` is one the runtime took but could not record yet (its outcome
     // write gave up at the lock-wait bound): the chain continues rather than refusing the send.
     if (
-      cause === undefined ||
       cause.target_durable_id !== request.sender_node ||
       (cause.state !== "admitting" && cause.state !== "admitted" && cause.state !== "applied")
     ) {
@@ -501,7 +503,8 @@ function placeCausally(ctx: StoreContext, request: EnqueueRequest): CausalPlacem
       new_root: false,
     }
   } else {
-    // An input from another device has no row here, so the chain starts a new root but keeps counting from its hop (K8).
+    // No cause, or a cause no row here holds (a delivery another device sent, decision 0027 section 3): the chain starts a
+    // new root and keeps counting from its hop (K8). Nothing here asks where the delivery came from.
     placement = {
       root_id: `root-${randomUUID()}`,
       hop: (request.inbound_hop ?? 0) + 1,
@@ -686,6 +689,7 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
       claimed_at: null,
       attempt: 0,
       admission_kind: null,
+      wait_kind: null,
       turn_epoch: null,
       root_id: placement.root_id,
       hop: placement.hop,
@@ -811,7 +815,7 @@ function claimFingerprint(row: DeliveryRow): string {
 }
 
 const CLEARED_CLAIM =
-  "admitted_by = NULL, claimed_at = NULL, mode_effective = NULL, admission_kind = NULL, turn_epoch = NULL"
+  "admitted_by = NULL, claimed_at = NULL, mode_effective = NULL, admission_kind = NULL, wait_kind = NULL, turn_epoch = NULL"
 
 function transition(
   ctx: StoreContext,
@@ -950,12 +954,11 @@ export async function recordOutcome(ctx: StoreContext, request: RecordOutcomeReq
     if (outcome.kind === "requeue") transition(ctx, row, "queued", request.now)
     else if (outcome.kind === "refused") transition(ctx, row, "refused", request.now, { reason: outcome.reason })
     else {
-      write(ctx, "UPDATE deliveries SET admission_kind = ?, turn_epoch = ?, updated_at = ? WHERE delivery_id = ?", [
-        outcome.admission_kind,
-        outcome.turn_epoch,
-        request.now,
-        row.delivery_id,
-      ])
+      write(
+        ctx,
+        "UPDATE deliveries SET admission_kind = ?, wait_kind = ?, turn_epoch = ?, updated_at = ? WHERE delivery_id = ?",
+        [outcome.admission_kind, outcome.wait_kind ?? null, outcome.turn_epoch, request.now, row.delivery_id],
+      )
       if (row.state !== outcome.kind) transition(ctx, row, outcome.kind, request.now)
     }
     return { kind: "claimed", row: selectRow(ctx, request.delivery_id) as DeliveryRow }
@@ -1200,6 +1203,7 @@ export async function migrateLegacyMailboxes(ctx: StoreContext, now: number): Pr
           claimed_at: null,
           attempt: 0,
           admission_kind: null,
+          wait_kind: null,
           turn_epoch: null,
           root_id: rootId,
           hop: 1,

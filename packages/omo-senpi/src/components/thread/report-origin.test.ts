@@ -369,6 +369,19 @@ async function setup(
    * schedules the continuation instead of settling: a new run takes the next follow-up (or all of
    * them), and `agent_settled` does not fire. `local` is a prompt the user queued in the terminal.
    */
+  /** The run answers, then the engine starts its own turn (an open-todo reminder) before the session settles (#13042). */
+  const answerAndEngineTurn = async () => {
+    await message(finalAnswer)
+    await dispatch("agent_end", { messages: [finalAnswer] })
+    await dispatch("agent_start")
+    await dispatch("turn_start")
+    await message({
+      role: "custom",
+      customType: "senpi.todo-owed",
+      content: [{ type: "text", text: "open todos remain" }],
+      timestamp: 0,
+    })
+  }
   const answerAndContinue = async (local?: string) => {
     await message(finalAnswer)
     await dispatch("agent_end", { messages: [finalAnswer] })
@@ -404,6 +417,7 @@ async function setup(
     steerAskUserAnswer,
     runLocalPrompt,
     answerAndContinue,
+    answerAndEngineTurn,
     answerAndSettle,
     texts,
     written: () => completionsWritten(runtimeStore),
@@ -458,6 +472,22 @@ describe("a report or completion without binding_id goes to the thread whose mes
       b: [],
     })
     expect(await s.callReport("report", "no run now")).toMatchObject({
+      kind: "error",
+      error: { code: "invalid_arguments" },
+    })
+  })
+
+  // #13042: the run's deliveries end with its final answer in every order - an engine-started message (a reminder) that
+  // arrives after the answer and before the settle starts a new group for reports, exactly as the settle does.
+  test("#given A's run answered #when the engine starts its own follow-up turn before the session settles #then a report without binding_id must name its thread", async () => {
+    const s = await setup()
+    const a = await s.bindThread("chat-a")
+    await s.bindThread("chat-b")
+    expect(await s.send(a, "please do the job")).toMatchObject({ kind: "ok", delivery: { kind: "started" } })
+    await s.runStartedDelivery()
+    expect(await s.callReport("report", "halfway there")).toMatchObject({ kind: "ok", binding_id: a })
+    await s.answerAndEngineTurn()
+    expect(await s.callReport("report", "no binding named")).toMatchObject({
       kind: "error",
       error: { code: "invalid_arguments" },
     })

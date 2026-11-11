@@ -161,10 +161,14 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
           now: now(),
           delivery_id: row.delivery_id,
           self,
+          // A delivery queued while the session waits on a question waits on that approval (#13014), as the relay leg reports it.
           outcome: {
             kind: written ? "applied" : "admitted",
             admission_kind: result.kind,
             turn_epoch: result.turn_epoch,
+            ...(result.kind === "queued" && runtime.phase() === "waiting_question"
+              ? { wait_kind: "approval" as const }
+              : {}),
           },
         })
       }

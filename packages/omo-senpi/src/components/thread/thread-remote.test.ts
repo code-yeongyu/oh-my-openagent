@@ -21,12 +21,12 @@ describe("thread_set_model on another device", () => {
       device: "b",
     })
     expect(a.sent.map((entry) => [entry.via, entry.device, entry.session, entry.rpc])).toEqual([
-      ["session", "b", "dur-on-b", { type: "get_available_models", sessionId: "dur-on-b" }],
+      ["session", "b", "rk-on-b", { type: "get_available_models", sessionId: "rk-on-b" }],
       [
         "session",
         "b",
-        "dur-on-b",
-        { type: "set_model", sessionId: "dur-on-b", provider: "anthropic", modelId: "claude-opus" },
+        "rk-on-b",
+        { type: "set_model", sessionId: "rk-on-b", provider: "anthropic", modelId: "claude-opus" },
       ],
     ])
   })
@@ -239,6 +239,7 @@ describe("#12833: a name reaches a thread on another device by its title", () =>
     ...B_ROW,
     device,
     session_id,
+    durable_id: session_id,
     title,
     state,
   })

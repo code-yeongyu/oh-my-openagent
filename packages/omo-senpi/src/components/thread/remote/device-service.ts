@@ -123,6 +123,12 @@ const recordKey = (record: WireRpc): string =>
  * closes or fails, and one attach per remote session, kept across ops and dropped when it ends (the next op attaches
  * again), with the session's model catalog held on it: a command costs one round trip, and a held catalog none.
  */
+// The listing's optional durable_id (device-service-core #12996); a daemon or core that predates it lists none.
+function durableIdOf(row: object): { readonly durable_id?: string } {
+  const value = Reflect.get(row, "durable_id")
+  return typeof value === "string" && value !== "" ? { durable_id: value } : {}
+}
+
 export function createDeviceServiceSessions(options: DeviceServiceSessionsOptions): RemoteSessionsPort {
   let service: Promise<DeviceService> | undefined
   const attaches = new Map<string, Promise<Session>>()
@@ -172,6 +178,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       (await (await svc()).sessions()).rows.map((row) => ({
         device: row.device,
         session_id: row.session_id,
+        ...durableIdOf(row),
         title: row.title,
         project: row.project,
         path: row.path,

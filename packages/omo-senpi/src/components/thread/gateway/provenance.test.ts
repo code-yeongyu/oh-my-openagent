@@ -31,6 +31,7 @@ function delivery(): DeliveryRow {
     claimed_at: null,
     attempt: 0,
     admission_kind: null,
+    wait_kind: null,
     turn_epoch: null,
     root_id: "root-1",
     hop: 1,
