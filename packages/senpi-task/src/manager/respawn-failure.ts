@@ -22,8 +22,12 @@ export function hostRefusal(error: unknown): RespawnResult | undefined {
 
 export function isTeamRuntimeUnavailable(error: unknown): boolean {
   if (!(error instanceof Error) || error.name !== "TeamMemberRespawnLaunchError" || !("code" in error)) return false
-  return error.code === "runtime_unavailable" || error.code === "runtime_inactive" ||
-    error.code === "member_missing" || error.code === "task_mapping_mismatch"
+  return (
+    error.code === "runtime_unavailable" ||
+    error.code === "runtime_inactive" ||
+    error.code === "member_missing" ||
+    error.code === "task_mapping_mismatch"
+  )
 }
 
 export function failure(

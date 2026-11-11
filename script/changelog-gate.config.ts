@@ -22,4 +22,4 @@ export const GATE_CONFIG = {
     // stamp-release-changelog.ts writes the fragments' log blocks into their logs in the release commit.
     /^packages\/[^/]+\/changes\.md$/,
   ],
-} as const;
+} as const

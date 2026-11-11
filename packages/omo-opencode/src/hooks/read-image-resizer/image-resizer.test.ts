@@ -168,10 +168,15 @@ describe("resizeImage", () => {
     const oversizedPng = createOversizedPngDataUrl(3000, 2000)
 
     //#when
-    const result = await resizeImage(oversizedPng, "image/png", {
-      width: 1568,
-      height: 1045,
-    }, { loadSharpModule: loadUnavailableSharpModule })
+    const result = await resizeImage(
+      oversizedPng,
+      "image/png",
+      {
+        width: 1568,
+        height: 1045,
+      },
+      { loadSharpModule: loadUnavailableSharpModule },
+    )
 
     //#then
     expect(result).not.toBeNull()
@@ -185,10 +190,15 @@ describe("resizeImage", () => {
     const { resizeImage } = await importFreshImageResizerModule()
 
     //#when
-    const result = await resizeImage(PNG_1X1_DATA_URL, "image/jpeg", {
-      width: 1,
-      height: 1,
-    }, { loadSharpModule: loadUnavailableSharpModule })
+    const result = await resizeImage(
+      PNG_1X1_DATA_URL,
+      "image/jpeg",
+      {
+        width: 1,
+        height: 1,
+      },
+      { loadSharpModule: loadUnavailableSharpModule },
+    )
 
     //#then
     expect(result).toBeNull()
@@ -200,10 +210,15 @@ describe("resizeImage", () => {
     const oversizedPng = createOversizedPngDataUrl(2000, 1000)
 
     //#when
-    const result = await resizeImage(oversizedPng, "image/png", {
-      width: 1568,
-      height: 784,
-    }, { loadSharpModule: async () => ({ default: "not-a-function" }) })
+    const result = await resizeImage(
+      oversizedPng,
+      "image/png",
+      {
+        width: 1568,
+        height: 784,
+      },
+      { loadSharpModule: async () => ({ default: "not-a-function" }) },
+    )
 
     //#then
     expect(result).not.toBeNull()
@@ -221,10 +236,15 @@ describe("resizeImage", () => {
     const { resizeImage } = await importFreshImageResizerModule()
 
     //#when
-    const result = await resizeImage(PNG_1X1_DATA_URL, "image/png", {
-      width: 1,
-      height: 1,
-    }, { loadSharpModule: async () => ({ default: mockSharpFactory }) })
+    const result = await resizeImage(
+      PNG_1X1_DATA_URL,
+      "image/png",
+      {
+        width: 1,
+        height: 1,
+      },
+      { loadSharpModule: async () => ({ default: mockSharpFactory }) },
+    )
 
     //#then
     expect(result).toBeNull()

@@ -1,5 +1,11 @@
 import { resolveAgentHome } from "../../agent-home"
-import { authenticateRpcHost, authRequiredError, resolveRpcSocketTransport, RpcIdentityError, withRpcSocket } from "./socket-client"
+import {
+  authenticateRpcHost,
+  authRequiredError,
+  resolveRpcSocketTransport,
+  RpcIdentityError,
+  withRpcSocket,
+} from "./socket-client"
 
 export type HostReply = Readonly<Record<string, unknown>>
 
@@ -10,7 +16,12 @@ export type HostReply = Readonly<Record<string, unknown>>
  * runner uses the logical socket path directly on POSIX and its authenticated named-pipe transport
  * on Windows.
  */
-export async function askHost(socket: string, request: HostReply, timeoutMs: number, options: { readonly keyRoot?: string; readonly agentDir?: string } = {}): Promise<HostReply | undefined> {
+export async function askHost(
+  socket: string,
+  request: HostReply,
+  timeoutMs: number,
+  options: { readonly keyRoot?: string; readonly agentDir?: string } = {},
+): Promise<HostReply | undefined> {
   const transport = await resolveRpcSocketTransport(socket)
   if (transport === undefined) return undefined
   const agentDir = options.agentDir ?? resolveAgentHome({ env: process.env })
@@ -18,11 +29,17 @@ export async function askHost(socket: string, request: HostReply, timeoutMs: num
   try {
     return await withRpcSocket(transport.address, { timeoutMs, secret: transport.secret }, async (send) => {
       if (process.platform !== "win32") {
-        const info = await authenticateRpcHost(send, socket, keyRoot, request.type === "get_protocol_info" ? request : undefined)
+        const info = await authenticateRpcHost(
+          send,
+          socket,
+          keyRoot,
+          request.type === "get_protocol_info" ? request : undefined,
+        )
         if (request.type === "get_protocol_info") return info
       }
       const reply = await send(request)
-      if (reply.success === false && (reply.errorCode ?? reply.error) === "auth_required") throw authRequiredError(socket)
+      if (reply.success === false && (reply.errorCode ?? reply.error) === "auth_required")
+        throw authRequiredError(socket)
       return reply
     })
   } catch (error) {

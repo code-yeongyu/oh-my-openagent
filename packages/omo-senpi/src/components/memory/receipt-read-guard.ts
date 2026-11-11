@@ -15,13 +15,21 @@ const RECEIPT_LIKE_TEXT = /verified\s*user\s*receipt/
 export function unverifiedReceiptNotice(payload: unknown): { content: readonly Record<string, unknown>[] } | undefined {
   const result = readResult(payload)
   if (result === undefined) return undefined
-  const shown = lookAlikeSkeleton(result.content.map((item) => (typeof item["text"] === "string" ? item["text"] : "")).join("\n")).replace(/\s+/g, " ")
+  const shown = lookAlikeSkeleton(
+    result.content.map((item) => (typeof item["text"] === "string" ? item["text"] : "")).join("\n"),
+  ).replace(/\s+/g, " ")
   if (!USER_RECEIPT_TEXT.test(shown) && !RECEIPT_LIKE_TEXT.test(shown)) return undefined
   return { content: [...result.content, { type: "text", text: UNVERIFIED_RECEIPT_NOTICE }] }
 }
 
 function readResult(payload: unknown): ReadResult | undefined {
-  if (!isRecord(payload) || payload["type"] !== "tool_result" || !isReadTool(payload["toolName"]) || payload["isError"] === true) return undefined
+  if (
+    !isRecord(payload) ||
+    payload["type"] !== "tool_result" ||
+    !isReadTool(payload["toolName"]) ||
+    payload["isError"] === true
+  )
+    return undefined
   const content = payload["content"]
   return Array.isArray(content) ? { content: content.filter(isRecord) } : undefined
 }

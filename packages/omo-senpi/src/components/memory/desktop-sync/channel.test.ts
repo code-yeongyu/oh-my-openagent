@@ -18,7 +18,10 @@ async function pair() {
 }
 
 test("a missing private stream is the typed unavailable answer, never the CLI source (#11997 row 3)", async () => {
-  expect(await attachDesktopSyncChannel(undefined)).toEqual({ kind: "unavailable", reason: "private_channel_unavailable" })
+  expect(await attachDesktopSyncChannel(undefined)).toEqual({
+    kind: "unavailable",
+    reason: "private_channel_unavailable",
+  })
 })
 
 test("bootstraps once and sends requests synchronously on the private duplex", async () => {
@@ -33,7 +36,9 @@ test("bootstraps once and sends requests synchronously on the private duplex", a
       const packet = JSON.parse(pending.slice(0, end))
       pending = pending.slice(end + 1)
       packets.push(packet)
-      peer.write(`${JSON.stringify({ id: packet.id, ok: true, value: packet.op === "bootstrap" ? { child: "test-child" } : { accepted: true } })}\n`)
+      peer.write(
+        `${JSON.stringify({ id: packet.id, ok: true, value: packet.op === "bootstrap" ? { child: "test-child" } : { accepted: true } })}\n`,
+      )
     }
   })
   try {
@@ -59,9 +64,15 @@ test("rejects a malformed bootstrap without exposing its body", async () => {
   const { engine, peer } = await pair()
   peer.once("data", () => peer.write('{"id":1,"ok":true,"value":{"child":"test","secret":"canary"}}\n'))
   try {
-    expect(await attachDesktopSyncChannel(engine)).toEqual({ kind: "unavailable", reason: "private_channel_unavailable" })
+    expect(await attachDesktopSyncChannel(engine)).toEqual({
+      kind: "unavailable",
+      reason: "private_channel_unavailable",
+    })
     expect(engine.destroyed).toBe(true)
-  } finally { engine.destroy(); peer.destroy() }
+  } finally {
+    engine.destroy()
+    peer.destroy()
+  }
 })
 
 test("a bootstrap main never answers is unavailable at the 10 s bound, and a late reply is discarded", async () => {
@@ -96,7 +107,8 @@ async function connected(answer: (packet: { id: number; op: string }, peer: Sock
     for (let end = pending.indexOf("\n"); end >= 0; end = pending.indexOf("\n")) {
       const packet = JSON.parse(pending.slice(0, end))
       pending = pending.slice(end + 1)
-      if (packet.op === "bootstrap") peer.write(`${JSON.stringify({ id: packet.id, ok: true, value: { child: "test-child" } })}\n`)
+      if (packet.op === "bootstrap")
+        peer.write(`${JSON.stringify({ id: packet.id, ok: true, value: { child: "test-child" } })}\n`)
       else answer(packet, peer)
     }
   })
@@ -116,7 +128,11 @@ test("round-trips binary values through the canonical byte tag", async () => {
     const value = await channel.request({ op: "service", handle: "h", data: { payload: bytes } })
     expect(seen).toMatchObject({ request: { data: { payload: { $omoSyncBytes: "AAH-_w" } } } })
     expect(value).toEqual({ echo: bytes })
-  } finally { channel.close(); engine.destroy(); peer.destroy() }
+  } finally {
+    channel.close()
+    engine.destroy()
+    peer.destroy()
+  }
 })
 
 test("a peer disconnect aborts the lifetime and rejects every waiter with the fixed error", async () => {
@@ -131,7 +147,9 @@ test("a peer disconnect aborts the lifetime and rejects every waiter with the fi
       expect(outcome).toMatchObject({ status: "rejected", reason: { name: "DesktopSyncUnavailable" } })
     }
     await expect(channel.request({ op: "descriptor" })).rejects.toMatchObject({ name: "DesktopSyncUnavailable" })
-  } finally { engine.destroy() }
+  } finally {
+    engine.destroy()
+  }
 })
 
 test("a non-canonical byte encoding closes the channel without echoing it", async () => {
@@ -139,10 +157,16 @@ test("a non-canonical byte encoding closes the channel without echoing it", asyn
     socket.write(`${JSON.stringify({ id: packet.id, ok: true, value: { $omoSyncBytes: "AAH-_w==" } })}\n`)
   })
   try {
-    const outcome = await channel.request({ op: "descriptor" }).then(() => "resolved", (error: Error) => error.message)
+    const outcome = await channel.request({ op: "descriptor" }).then(
+      () => "resolved",
+      (error: Error) => error.message,
+    )
     expect(outcome).not.toContain("AAH")
     expect(channel.signal.aborted).toBe(true)
-  } finally { engine.destroy(); peer.destroy() }
+  } finally {
+    engine.destroy()
+    peer.destroy()
+  }
 })
 
 test("an event for another child or an unknown reply id retires the channel", async () => {
@@ -157,7 +181,10 @@ test("an event for another child or an unknown reply id retires the channel", as
       peer.write(`${JSON.stringify(frame)}\n`)
       await aborted
       await expect(waiter).rejects.toMatchObject({ name: "DesktopSyncUnavailable" })
-    } finally { engine.destroy(); peer.destroy() }
+    } finally {
+      engine.destroy()
+      peer.destroy()
+    }
   }
 })
 
@@ -165,7 +192,12 @@ test("delivers its own child's events and stops at 64 requests in flight", async
   const { channel, engine, peer } = await connected(() => {})
   try {
     const events: unknown[] = []
-    const delivered = new Promise((resolve) => channel.onEvent((event) => { events.push(event); resolve(undefined) }))
+    const delivered = new Promise((resolve) =>
+      channel.onEvent((event) => {
+        events.push(event)
+        resolve(undefined)
+      }),
+    )
     peer.write(`${JSON.stringify({ event: "connected", child: "test-child", handle: "h", connected: true })}\n`)
     await delivered
     expect(events).toEqual([{ event: "connected", child: "test-child", handle: "h", connected: true }])
@@ -174,5 +206,8 @@ test("delivers its own child's events and stops at 64 requests in flight", async
     expect(channel.signal.aborted).toBe(false)
     channel.close()
     await Promise.all(inFlight)
-  } finally { engine.destroy(); peer.destroy() }
+  } finally {
+    engine.destroy()
+    peer.destroy()
+  }
 })

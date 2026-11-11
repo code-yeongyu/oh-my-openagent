@@ -10,7 +10,10 @@ export function shouldNotifyStatus(status: TaskStatus): boolean {
 }
 
 /** A notifying status, or an interrupt the parent did not request (it has no tool result that told it). */
-export function shouldNotifyRecord(record: { readonly status: TaskStatus; readonly interrupt_cause?: string }): boolean {
+export function shouldNotifyRecord(record: {
+  readonly status: TaskStatus
+  readonly interrupt_cause?: string
+}): boolean {
   return shouldNotifyStatus(record.status) || (record.status === "interrupted" && record.interrupt_cause !== undefined)
 }
 

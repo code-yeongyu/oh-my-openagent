@@ -2,11 +2,19 @@ import { describe, expect, test } from "bun:test"
 
 import type { PersistedTaskEvent } from "../store"
 import type { ManagedChildEvent, ManagedChildHandle } from "./child-handle"
-import { TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_TOOL_EVENT, logTranscriptEvent, subscribeTranscriptLog } from "./transcript-log"
+import {
+  TRANSCRIPT_ASSISTANT_EVENT,
+  TRANSCRIPT_TOOL_EVENT,
+  logTranscriptEvent,
+  subscribeTranscriptLog,
+} from "./transcript-log"
 
 type Appended = { readonly taskId: string; readonly event: PersistedTaskEvent }
 
-function recordingStore(): { readonly appendEvent: (taskId: string, event: PersistedTaskEvent) => string; readonly appended: Appended[] } {
+function recordingStore(): {
+  readonly appendEvent: (taskId: string, event: PersistedTaskEvent) => string
+  readonly appended: Appended[]
+} {
   const appended: Appended[] = []
   return {
     appended,

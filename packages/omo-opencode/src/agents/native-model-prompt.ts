@@ -3,10 +3,7 @@ import {
   resolvePreset,
   type BuildDynamicSystemPromptOptions,
 } from "@code-yeongyu/senpi/prompt-presets"
-import {
-  getBuiltinModels,
-  getBuiltinProviders,
-} from "@earendil-works/pi-ai/providers/all"
+import { getBuiltinModels, getBuiltinProviders } from "@earendil-works/pi-ai/providers/all"
 import { frameNativePrompt, replaceNativePromptFrames, type NativePromptContext } from "./native-prompt-frame"
 import { assertHephaestusSupportedModel, isHephaestusSupportedModel } from "./hephaestus/model-support"
 
@@ -40,9 +37,11 @@ export function nativePromptOptions(
   return {
     cwd: "",
     selectedTools: selectedTools.map(nativeName),
-    toolSnippets: Object.fromEntries(selectedTools
-      .filter((name) => toolSnippets[name] !== undefined)
-      .map((name) => [nativeName(name), toolSnippets[name]])),
+    toolSnippets: Object.fromEntries(
+      selectedTools
+        .filter((name) => toolSnippets[name] !== undefined)
+        .map((name) => [nativeName(name), toolSnippets[name]]),
+    ),
     promptGuidelines: [],
     contextFiles: [],
     skills: [],
@@ -96,26 +95,50 @@ export function reconcileNativeModelPrompts(
   runtimePermissions?: NativePromptContext["toolPermissions"],
 ): void {
   if (!model && !toolSnippets) return
-  replaceNativePromptFrames(system, model, (context) => {
-    if (context.restriction === "hephaestus" && !isHephaestusSupportedModel(context.model)) return undefined
-    const rules = toolPermissions ?? context.toolPermissions
-    const snippets = toolSnippets ?? context.toolSnippets
-    const selected = toolSnippets ? Object.keys(toolSnippets).filter((name) => {
-      let allowed = true
-      const permissionName = ["edit", "write", "apply_patch"].includes(name) ? "edit"
-        : ["list_mcp_resources", "list_mcp_resource_templates", "read_mcp_resource"].includes(name) ? "read" : name
-      for (const rule of [...rules ?? [], ...runtimePermissions ?? []]) {
-        const pattern = rule.pattern.split("*").map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join(".*")
-        if (new RegExp(`^${pattern}$`).test(permissionName)) {
-          allowed = rule.permission !== "deny" || (rule.scope !== undefined && rule.scope !== "*")
-        }
-      }
-      return allowed
-    }) : context.tools
-    const selectedSnippets = snippets
-      ? Object.fromEntries(selected.map((name) => [name, snippets[name]]).filter((entry): entry is [string, string] => entry[1] !== undefined))
-      : undefined
-    return buildNativeAgentPrompt(context.model, "", selected, context.restriction,
-      context.useTaskSystem, selectedSnippets, rules)
-  }, toolSnippets !== undefined)
+  replaceNativePromptFrames(
+    system,
+    model,
+    (context) => {
+      if (context.restriction === "hephaestus" && !isHephaestusSupportedModel(context.model)) return undefined
+      const rules = toolPermissions ?? context.toolPermissions
+      const snippets = toolSnippets ?? context.toolSnippets
+      const selected = toolSnippets
+        ? Object.keys(toolSnippets).filter((name) => {
+            let allowed = true
+            const permissionName = ["edit", "write", "apply_patch"].includes(name)
+              ? "edit"
+              : ["list_mcp_resources", "list_mcp_resource_templates", "read_mcp_resource"].includes(name)
+                ? "read"
+                : name
+            for (const rule of [...(rules ?? []), ...(runtimePermissions ?? [])]) {
+              const pattern = rule.pattern
+                .split("*")
+                .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+                .join(".*")
+              if (new RegExp(`^${pattern}$`).test(permissionName)) {
+                allowed = rule.permission !== "deny" || (rule.scope !== undefined && rule.scope !== "*")
+              }
+            }
+            return allowed
+          })
+        : context.tools
+      const selectedSnippets = snippets
+        ? Object.fromEntries(
+            selected
+              .map((name) => [name, snippets[name]])
+              .filter((entry): entry is [string, string] => entry[1] !== undefined),
+          )
+        : undefined
+      return buildNativeAgentPrompt(
+        context.model,
+        "",
+        selected,
+        context.restriction,
+        context.useTaskSystem,
+        selectedSnippets,
+        rules,
+      )
+    },
+    toolSnippets !== undefined,
+  )
 }

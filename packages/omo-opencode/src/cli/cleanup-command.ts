@@ -24,14 +24,17 @@ export function configureCleanupCommand(program: Command): void {
     .option("--codex-home <path>", "Codex home to clean (defaults to CODEX_HOME or ~/.codex)")
     .option("--project <path>", "Project directory to inspect for project-local .codex artifacts")
     .option("--json", "Output structured JSON result")
-    .addHelpText("after", `
+    .addHelpText(
+      "after",
+      `
 Examples:
   $ npx lazycodex-ai uninstall
   $ omo-agent-toolkit uninstall --platform=codex
   $ npx lazycodex-ai cleanup
   $ omo-agent-toolkit cleanup --platform=codex
   $ omo-agent-toolkit uninstall --platform=codex --project /path/to/project
-`)
+`,
+    )
     .action(async (options: CleanupCommandOptions) => {
       const rootOptions = program.opts<CleanupRootCommandOptions>()
       const platform = resolveCleanupPlatform({ platform: options.platform ?? rootOptions.platform })

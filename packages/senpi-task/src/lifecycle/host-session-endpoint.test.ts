@@ -52,15 +52,31 @@ class EndpointWorld {
     const socket = input.socket ?? "<unnamed>"
     this.ensures.push(socket)
     this.lockSeenDuringEnsure.push(existsSync(join(this.store.stateDir, "locks", "session-parent-1.lock")))
-    if (this.incompatible.has(socket)) return Promise.reject(new HostUnavailableError("protocol", { fallbackAllowed: false }))
+    if (this.incompatible.has(socket))
+      return Promise.reject(new HostUnavailableError("protocol", { fallbackAllowed: false }))
     this.answering.add(socket)
-    return Promise.resolve({ action: "start" as const, reason: "no_host", socket, pid: 7, reused: false, upgradeable: false })
+    return Promise.resolve({
+      action: "start" as const,
+      reason: "no_host",
+      socket,
+      pid: 7,
+      reused: false,
+      upgradeable: false,
+    })
   }
 }
 
 function endpointDeps(store: TaskRecordStore, world: EndpointWorld, ownHostSocket: string | undefined) {
   const fixture = hostLifecycleDeps({ store, hostPid: HOST_PID, respawn: () => Promise.resolve(OK) })
-  const pi = { sessionContext: { role: "child", shard_key: "aa", tree_key: "aa", ...(ownHostSocket === undefined ? {} : { host_socket: ownHostSocket }), host_instance: "H1" } }
+  const pi = {
+    sessionContext: {
+      role: "child",
+      shard_key: "aa",
+      tree_key: "aa",
+      ...(ownHostSocket === undefined ? {} : { host_socket: ownHostSocket }),
+      host_instance: "H1",
+    },
+  }
   const deps: LifecycleDeps = {
     ...fixture.deps,
     hostSessionProbe: {
@@ -171,11 +187,17 @@ describe("revival reaches the RECORDED endpoint and only it", () => {
     const fixture = hostLifecycleDeps({
       store,
       hostPid: HOST_PID,
-      respawn: () => Promise.resolve({ ok: false, disposition: "retryable", code: "store_index_unavailable", reason: "index" }),
+      respawn: () =>
+        Promise.resolve({ ok: false, disposition: "retryable", code: "store_index_unavailable", reason: "index" }),
     })
     const lifecycle = createTaskLifecycle({
       ...fixture.deps,
-      hostSessionProbe: { daemonAlive: () => Promise.resolve(true), sessionLive: () => Promise.resolve(false), sessionLiveness: () => Promise.resolve("gone"), refresh: () => undefined },
+      hostSessionProbe: {
+        daemonAlive: () => Promise.resolve(true),
+        sessionLive: () => Promise.resolve(false),
+        sessionLiveness: () => Promise.resolve("gone"),
+        refresh: () => undefined,
+      },
     })
     seedParked(store, "st_0c000005", hostSession("st_0c000005", { socket: OTHER_SHARD }))
 
@@ -183,7 +205,11 @@ describe("revival reaches the RECORDED endpoint and only it", () => {
     const result = await lifecycle.reconcileOnSessionStart("parent-1")
 
     // then
-    expect(result.outcomes).toContainEqual({ task_id: "st_0c000005", kind: "deferred", reason: "store_index_unavailable" })
+    expect(result.outcomes).toContainEqual({
+      task_id: "st_0c000005",
+      kind: "deferred",
+      reason: "store_index_unavailable",
+    })
     expect(store.load("st_0c000005")?.residency_state).toBe("rpc_detached")
     expect(store.load("st_0c000005")?.suspension_reason).toBe("store_index_unavailable")
   })

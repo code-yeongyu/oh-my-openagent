@@ -74,20 +74,16 @@ const RETRYABLE_MESSAGE_PATTERNS = [
   "selected provider is forbidden",
   "provider is forbidden",
   // Chinese retryable patterns (Zhipu, etc.)
-  "频率限制",           // "rate limit"
-  "请求过于频繁",       // "too many requests"
-  "暂时不可用",         // "temporarily unavailable"
-  "服务不可用",         // "service unavailable"
+  "频率限制", // "rate limit"
+  "请求过于频繁", // "too many requests"
+  "暂时不可用", // "temporarily unavailable"
+  "服务不可用", // "service unavailable"
   "server_error",
   "an error occurred while processing",
   "upstream request failed",
 ]
 
-const AUTO_RETRY_GATE_PATTERNS = [
-  "rate limit",
-  "cooling down",
-  "credentials for model",
-]
+const AUTO_RETRY_GATE_PATTERNS = ["rate limit", "cooling down", "credentials for model"]
 
 function hasProviderAutoRetrySignal(message: string): boolean {
   if (!message.includes("retrying in")) {
@@ -134,10 +130,7 @@ export function isRetryableModelError(error: ErrorInfo): boolean {
 
   // HTTP status code check: catches rate-limit errors regardless of message format/language.
   // Uses the same codes as runtime-fallback config (400 excluded as it is a permanent client error).
-  if (
-    error.statusCode != null &&
-    (error.statusCode === 429 || error.statusCode === 503 || error.statusCode === 529)
-  ) {
+  if (error.statusCode != null && (error.statusCode === 429 || error.statusCode === 503 || error.statusCode === 529)) {
     return true
   }
 
@@ -156,20 +149,14 @@ export function shouldRetryError(error: ErrorInfo): boolean {
  * Gets the next fallback model from the chain based on attempt count.
  * Returns undefined if all fallbacks have been exhausted.
  */
-export function getNextFallback(
-  fallbackChain: FallbackEntry[],
-  attemptCount: number,
-): FallbackEntry | undefined {
+export function getNextFallback(fallbackChain: FallbackEntry[], attemptCount: number): FallbackEntry | undefined {
   return fallbackChain[attemptCount]
 }
 
 /**
  * Checks if there are more fallbacks available after the current attempt.
  */
-export function hasMoreFallbacks(
-  fallbackChain: FallbackEntry[],
-  attemptCount: number,
-): boolean {
+export function hasMoreFallbacks(fallbackChain: FallbackEntry[], attemptCount: number): boolean {
   return attemptCount < fallbackChain.length
 }
 
@@ -180,15 +167,8 @@ export function hasMoreFallbacks(
  * 2) Preferred provider when connected (and entry providers are unavailable)
  * 3) First provider listed in the fallback entry
  */
-export function selectFallbackProvider(
-  providers: string[],
-  preferredProviderID?: string,
-): string {
-  return selectFallbackProviderWithCache(
-    providers,
-    connectedProvidersCache,
-    preferredProviderID,
-  )
+export function selectFallbackProvider(providers: string[], preferredProviderID?: string): string {
+  return selectFallbackProviderWithCache(providers, connectedProvidersCache, preferredProviderID)
 }
 
 export function selectFallbackProviderWithCache(
@@ -198,7 +178,7 @@ export function selectFallbackProviderWithCache(
 ): string {
   const connectedProviders = providerCache.readConnectedProvidersCache()
   if (connectedProviders) {
-    const connectedSet = new Set(connectedProviders.map(p => p.toLowerCase()))
+    const connectedSet = new Set(connectedProviders.map((p) => p.toLowerCase()))
 
     for (const provider of providers) {
       if (connectedSet.has(provider.toLowerCase())) {
@@ -206,10 +186,7 @@ export function selectFallbackProviderWithCache(
       }
     }
 
-    if (
-      preferredProviderID &&
-      connectedSet.has(preferredProviderID.toLowerCase())
-    ) {
+    if (preferredProviderID && connectedSet.has(preferredProviderID.toLowerCase())) {
       return preferredProviderID
     }
   }

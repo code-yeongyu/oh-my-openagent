@@ -176,7 +176,9 @@ export async function getSdkSessionMessagePage(
   signal?: AbortSignal,
 ): Promise<SessionMessagePage> {
   // `before` is served by the route but missing from the v1 SDK's query type; the client serializes every query key.
-  const query: { limit: number; before?: string } = page.before ? { limit: page.limit, before: page.before } : { limit: page.limit }
+  const query: { limit: number; before?: string } = page.before
+    ? { limit: page.limit, before: page.before }
+    : { limit: page.limit }
   const response = await fetchSdkResponse(
     () => client.session.messages({ path: { id: sessionID }, query, ...(signal ? { signal } : {}) }),
     signal,
@@ -205,7 +207,9 @@ export async function forEachSdkSessionMessagePage(
     if (page.messages.length === 0) return
     // A full page whose cursor cannot be read would end the walk early and silently truncate the session.
     if (!page.cursorReadable && page.messages.length >= pageSize) {
-      throw new Error(`Cannot page session ${sessionID}: the message response exposed no headers, so older messages may remain unread`)
+      throw new Error(
+        `Cannot page session ${sessionID}: the message response exposed no headers, so older messages may remain unread`,
+      )
     }
     if (visit(page.messages) === false) return
     if (!page.nextCursor || page.nextCursor === before) return
@@ -248,25 +252,28 @@ function getResponseHeaders(response: unknown): { get(name: string): string | nu
 }
 
 function toSessionMessages(response: unknown): SessionMessage[] {
-  const rawMessages = normalizeSDKResponse(response, [] as Array<{
-    info?: {
-      id?: string
-      role?: string
-      agent?: string
-      time?: { created?: number; updated?: number }
-    }
-    parts?: Array<{
-      id?: string
-      type?: string
-      text?: string
-      thinking?: string
-      tool?: string
-      callID?: string
-      input?: Record<string, unknown>
-      output?: string
-      error?: string
-    }>
-  }>)
+  const rawMessages = normalizeSDKResponse(
+    response,
+    [] as Array<{
+      info?: {
+        id?: string
+        role?: string
+        agent?: string
+        time?: { created?: number; updated?: number }
+      }
+      parts?: Array<{
+        id?: string
+        type?: string
+        text?: string
+        thinking?: string
+        tool?: string
+        callID?: string
+        input?: Record<string, unknown>
+        output?: string
+        error?: string
+      }>
+    }>,
+  )
 
   const messages: SessionMessage[] = rawMessages
     .filter((message) => message.info?.id)
@@ -305,12 +312,15 @@ function toSessionMessages(response: unknown): SessionMessage[] {
 export async function getSdkSessionTodos(client: PluginInput["client"], sessionID: string): Promise<TodoItem[]> {
   const response = await fetchSdkResponse(() => client.session.todo({ path: { id: sessionID } }))
 
-  const data = normalizeSDKResponse(response, [] as Array<{
-    id?: string
-    content?: string
-    status?: string
-    priority?: string
-  }>)
+  const data = normalizeSDKResponse(
+    response,
+    [] as Array<{
+      id?: string
+      content?: string
+      status?: string
+      priority?: string
+    }>,
+  )
 
   return data.map((item) => ({
     id: item.id || "",
