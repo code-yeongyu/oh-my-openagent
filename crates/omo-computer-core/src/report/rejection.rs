@@ -44,6 +44,9 @@ pub enum ReportRejection {
     NotDelivered { effect: Effect, delivery: Delivery },
     /// `delivered_verified` with no receipt-class entry.
     VerifiedWithoutReceipt,
+    /// A receipt-class entry under `not_delivered` or `delivered_unverified`: the receipt
+    /// proves the target consumed the input, so the delivery is `delivered_verified`.
+    ReceiptWithoutVerifiedDelivery { delivery: Delivery },
     /// `partial` without `delivered{count, of}`.
     PartialWithoutDelivered,
     /// `refused` whose delivery is not `not_delivered`.

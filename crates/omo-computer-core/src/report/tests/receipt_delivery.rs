@@ -67,9 +67,13 @@ fn receipt_requires_a_delivered_verified_disposition() {
                     );
                     let built = build(verb, counted(disposition, effect, vec![receipt.clone()]));
                     println!("{label}: {:?}", built.as_ref().err());
+                    let why = built.err().unwrap_or_else(|| {
+                        panic!("{label}: accepted, though the same report without the receipt is valid")
+                    });
                     assert!(
-                        built.is_err(),
-                        "{label}: accepted, though the same report without the receipt is valid"
+                        why.contains("ReceiptWithoutVerifiedDelivery")
+                            || why.contains("ConfirmingReceiptUnderOtherEffect"),
+                        "{label}: refused for something other than the receipt: {why}"
                     );
                     refused += 1;
                     wire += usize::from(verb.is_none());
