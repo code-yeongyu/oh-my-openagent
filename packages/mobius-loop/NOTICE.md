@@ -14,9 +14,10 @@ proposal does not establish maintainer acceptance or endorsement.
 - Source path: `packages/omo-senpi/skills/mobius-loop/`.
 - Standalone extraction:
   [agno01/mobius-loop](https://github.com/agno01/mobius-loop), revision
-  `e4179feda989313cf6453ce46870fa0e76b96701`. This port preserves its runtime,
-  declarations, skill, references and package-local development configuration.
-  The artifact consumer imports its event type through `mobius.d.mts`.
+  `e4179feda989313cf6453ce46870fa0e76b96701`. Skill and reference markdown
+  match that revision. JavaScript and TypeScript sources are reformatted with
+  this repository's `bun fmt` (print width 120, no semicolons); behavior is
+  unchanged. The artifact consumer imports its event type through `mobius.d.mts`.
   README, this notice and `docs/releasing.md` are adapted for
   the optional local monorepo package; its standalone workflows are omitted.
 

@@ -19,9 +19,11 @@ Registry ownership and publication are not configured; the registry name
 `mobius-loop` is provisional.
 
 The implementation was ported from the standalone package at revision
-`e4179feda989313cf6453ce46870fa0e76b96701`. Runtime, declaration, skill,
-reference and development configuration bytes are preserved. The artifact
-consumer imports its event type through the engine's declaration boundary.
+`e4179feda989313cf6453ce46870fa0e76b96701`. Skill and reference markdown
+match that revision. JavaScript and TypeScript sources are reformatted with
+this repository's `bun fmt` (print width 120, no semicolons); behavior is
+unchanged. The artifact consumer imports its event type through the engine's
+declaration boundary.
 This README, [NOTICE.md](NOTICE.md) and the release guide are adapted for local
 monorepo use while preserving the original source and license provenance.
 This opt-in proposal does not establish maintainer acceptance.
