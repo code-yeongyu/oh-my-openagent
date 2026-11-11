@@ -89,8 +89,7 @@ impl Evidence {
     ) -> EvidenceClass {
         match kind {
             EvidenceKind::BarrierConsumed | EvidenceKind::Xi2RawConfirm => EvidenceClass::Receipt,
-            EvidenceKind::ValueReadback => {
-                let _ = (intended, value);
+            EvidenceKind::ValueReadback if intended.is_some() && intended == value => {
                 EvidenceClass::Receipt
             }
             _ => EvidenceClass::Observation,
@@ -233,6 +232,20 @@ impl TryFrom<WireEvidence> for Evidence {
     type Error = ReportRejection;
 
     fn try_from(wire: WireEvidence) -> Result<Self, Self::Error> {
+        let derived = Self::derived_class(wire.kind, wire.intended.as_deref(), wire.value.as_deref());
+        if wire.class != derived {
+            return Err(ReportRejection::ClassMismatch {
+                kind: wire.kind,
+                tagged: wire.class,
+                derived,
+            });
+        }
+        if wire.intended.is_some() && wire.kind != EvidenceKind::ValueReadback {
+            return Err(ReportRejection::IntendedOutsideValueReadback { kind: wire.kind });
+        }
+        if wire.event.is_some() != (wire.kind == EvidenceKind::AxNotification) {
+            return Err(ReportRejection::EventMismatch { kind: wire.kind });
+        }
         Ok(Self {
             kind: wire.kind,
             class: wire.class,

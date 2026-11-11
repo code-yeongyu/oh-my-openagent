@@ -18,6 +18,22 @@ pub enum Settle {
 /// The effect of a send that was delivered exactly once and completed.
 #[must_use]
 pub fn completed_effect(context: ReportContext, evidence: &[Evidence], settle: Settle) -> Effect {
-    let _ = (context, evidence, settle, EvidenceClass::Receipt);
-    Effect::NoChange
+    let confirming = evidence
+        .iter()
+        .any(|entry| entry.is_receipt() && entry.kind() == context.verb.confirming_kind());
+    let read_target = evidence
+        .iter()
+        .any(|entry| entry.class() == EvidenceClass::Observation && entry.kind().reads_target());
+    let observed_anything = evidence
+        .iter()
+        .any(|entry| entry.class() == EvidenceClass::Observation);
+    if confirming {
+        Effect::Confirmed
+    } else if read_target {
+        Effect::Observed
+    } else if settle == Settle::QuietSuspect && !observed_anything {
+        Effect::SuspectedNoop
+    } else {
+        Effect::Unverifiable
+    }
 }

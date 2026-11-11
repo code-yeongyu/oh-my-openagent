@@ -63,7 +63,6 @@ impl From<backend::Route> for Route {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum FocusRestoration {
-    NotNeeded,
     Untouched,
     Restored,
     UserMovedOn,
@@ -71,7 +70,7 @@ pub enum FocusRestoration {
 }
 
 impl FocusRestoration {
-    pub const ALL: [Self; 5] = [Self::NotNeeded, Self::Untouched, Self::Restored, Self::UserMovedOn, Self::Failed];
+    pub const ALL: [Self; 4] = [Self::Untouched, Self::Restored, Self::UserMovedOn, Self::Failed];
 }
 
 /// The element read under the point before the send.

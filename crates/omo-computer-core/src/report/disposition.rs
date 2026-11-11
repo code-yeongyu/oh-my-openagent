@@ -141,8 +141,16 @@ impl Disposition {
     /// or `unknown`; both delivered classes with `unsafe` only; `unknown` with `unknown`.
     #[must_use]
     pub const fn is_valid(delivery: Delivery, retry: Retry) -> bool {
-        let _ = (delivery, retry);
-        true
+        matches!(
+            (delivery, retry),
+            (Delivery::NotDelivered, Retry::Safe | Retry::AfterUser)
+                | (Delivery::DeliveryUncertain, Retry::Unsafe | Retry::Unknown)
+                | (
+                    Delivery::DeliveredUnverified | Delivery::DeliveredVerified,
+                    Retry::Unsafe
+                )
+                | (Delivery::Unknown, Retry::Unknown)
+        )
     }
 
     #[must_use]
@@ -172,7 +180,7 @@ impl TryFrom<WireDisposition> for Disposition {
     type Error = InvalidDisposition;
 
     fn try_from(wire: WireDisposition) -> Result<Self, Self::Error> {
-        Err(InvalidDisposition { delivery: wire.delivery, retry: wire.retry })
+        Self::new(wire.delivery, wire.retry)
     }
 }
 

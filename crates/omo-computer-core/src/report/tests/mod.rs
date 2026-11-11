@@ -47,6 +47,14 @@ fn wire_check(report: &Value, context: Option<ReportContext>) -> Result<ActionRe
 }
 
 #[test]
+fn every_exec_reply_method_has_a_verb_class() {
+    for spec in crate::methods::METHODS {
+        let classed = VerbClass::of(spec.method).is_some();
+        assert_eq!(classed, spec.result == "ExecReply", "{}: verb class", spec.name);
+    }
+}
+
+#[test]
 fn disposition_table_accepts_7_rejects_13() {
     let (mut accepted, mut rejected) = (Vec::new(), Vec::new());
     for delivery in Delivery::ALL {
