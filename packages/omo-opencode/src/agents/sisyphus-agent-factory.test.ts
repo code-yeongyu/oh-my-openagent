@@ -51,10 +51,10 @@ describe("createSisyphusAgent", () => {
     });
   });
 
-  describe("#given GPT-family Sisyphus models", () => {
+  describe("#given Sisyphus models using high reasoning effort", () => {
     test("#when creating agents #then preserves reasoning and leaves apply_patch available", () => {
       // given
-      const models = ["openai/gpt-5.5", "openai/gpt-5.4"];
+      const models = ["openai/gpt-5.5", "openai/gpt-5.4", "opencode-go/kimi-k3", "kimi-for-coding/k3-256k"];
 
       for (const model of models) {
         // when
