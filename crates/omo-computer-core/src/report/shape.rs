@@ -119,7 +119,7 @@ fn check_effect(shape: &Shape<'_>, verb: Option<VerbClass>) -> Result<(), Report
         }
         _ if matches!(
             delivery,
-            Delivery::NotDelivered | Delivery::DeliveredUnverified
+            Delivery::NotDelivered | Delivery::DeliveredUnverified | Delivery::Unknown
         ) && receipts().next().is_some() =>
         {
             Err(ReportRejection::ReceiptWithoutVerifiedDelivery { delivery })
