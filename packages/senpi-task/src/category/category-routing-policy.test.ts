@@ -75,6 +75,11 @@ describe("Senpi category routing policy", () => {
         variant: "max",
       },
       {
+        providers: ["vertex-garden"],
+        model: "deepseek-v4.1-flash-maas",
+        variant: "medium",
+      },
+      {
         providers: ["xiaomi", "opencode-go"],
         model: "mimo-v2.5-pro",
         variant: "high",

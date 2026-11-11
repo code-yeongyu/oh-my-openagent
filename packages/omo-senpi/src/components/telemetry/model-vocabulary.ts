@@ -185,6 +185,7 @@ export const KNOWN_MODELS = Object.freeze({
   ]),
   "qwen-token-plan": Object.freeze(["qwen3.6-flash", "qwen3.8-max-preview"]),
   "qwen-token-plan-cn": Object.freeze(["qwen3.8-max-preview"]),
+  "vertex-garden": Object.freeze(["deepseek-ai/deepseek-v4.1-flash-maas", "deepseek-v4.1-flash-maas"]),
   vercel: Object.freeze([
     "claude-fable-5",
     "claude-fable-5-1",

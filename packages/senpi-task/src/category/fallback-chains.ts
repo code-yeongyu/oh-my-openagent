@@ -127,6 +127,8 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       variant: "medium",
     },
     { providers: ["deepseek"], model: "deepseek-flash", variant: "off" },
+    // Vertex lane stays non-reasoning on the quick rung (senpi#6270: off/medium only).
+    { providers: ["vertex-garden"], model: "deepseek-v4.1-flash-maas", variant: "off" },
     {
       providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan"],
       model: "qwen3.6-flash",
@@ -171,6 +173,8 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       variant: "high",
     },
     { providers: ["deepseek", "opencode-go"], model: "deepseek-v4-pro", variant: "max" },
+    // Vertex Model Garden lane (ADC): same Flash tier, thinking capped at medium (senpi#6270).
+    { providers: ["vertex-garden"], model: "deepseek-v4.1-flash-maas", variant: "medium" },
     { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.5-pro", variant: "high" },
   ],
   "unspecified-high": [

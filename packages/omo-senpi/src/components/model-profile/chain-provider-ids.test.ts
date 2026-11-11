@@ -39,6 +39,9 @@ const CHAIN_PROVIDER_ID_ALLOWLIST: Readonly<Record<string, string>> = {
   // OpenCode CN Alibaba token-plan id. Engine CN Qwen is `qwen-token-plan-cn`; kept on
   // unspecified-low so a leftover OpenCode key still matches.
   "alibaba-token-plan-cn": "OpenCode CN Alibaba token-plan alias",
+  // OpenCode Vertex Model Garden ADC lane. The engine catalog uses this provider id when
+  // Application Default Credentials are present; it is not a pi-ai builtin.
+  "vertex-garden": "OpenCode Vertex Model Garden ADC lane",
 }
 
 function chainProviderIds(): readonly string[] {
