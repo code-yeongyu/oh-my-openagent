@@ -39,6 +39,8 @@ export interface PostEditDiagnosticsResult {
 interface DiagnosticBlock {
   filePath: string
   diagnostics: string
+  /** lsp-core marks missing-server guidance `false`: a note about the tool, never a code error. */
+  readonly blocking: boolean
 }
 
 export interface LspPostEditSessionState {
@@ -107,9 +109,13 @@ export async function appendPostEditDiagnostics(
   return {
     content: [
       ...event.content,
-      ...blocks.map(({ filePath, diagnostics }) => ({
+      // Missing-server guidance is non-blocking (lsp-core blocking: false): it is a note about the tool, not a
+      // defect in the edit, so it never reads as "please fix" (#13126; the codex hook treats it the same way).
+      ...blocks.map(({ filePath, diagnostics, blocking }) => ({
         type: "text" as const,
-        text: `\n\nLSP errors detected in ${filePath}, please fix:\n${diagnostics}`,
+        text: blocking
+          ? `\n\nLSP errors detected in ${filePath}, please fix:\n${diagnostics}`
+          : `\n\nLSP note for ${filePath} (the edit itself is not affected):\n${diagnostics}`,
       })),
     ],
     widgetLines: undefined,
