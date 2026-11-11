@@ -111,6 +111,20 @@ function expectFindings(
 }
 
 describe("computer-v3-guards --residue", () => {
+  test("residue_reports_an_unreadable_removal_path_as_an_input_error_naming_it", () => {
+    withRepo((repo) => {
+      // given a removal path's parent that is a self-referencing symlink: lstat fails with ELOOP, not ENOENT or ENOTDIR
+      repo.write({ "README.md": "the computer module\n" })
+      symlinkSync("crates", join(repo.root, "crates"))
+      repo.commit("symlink loop")
+
+      // then the guard reports one finding that names the path, instead of crashing or calling it absent
+      const result = repo.guard("--residue")
+      expect(result.exitCode).toBe(1)
+      expect(result.findings.filter((line) => line.includes("crates/") && line.includes("cannot be checked (ELOOP)"))).toHaveLength(1)
+    })
+  })
+
   test("residue_treats_a_removal_path_under_a_file_parent_as_absent_instead_of_crashing", () => {
     withRepo((repo) => {
       // given a file where a removal path expects a directory: lstat('crates/<old crate>') fails with ENOTDIR
