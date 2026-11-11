@@ -9,14 +9,14 @@ import type { CleanupAction, MemoryCleanupFinding } from "./types"
 type MergeAction = Extract<CleanupAction, { kind: "merge" }>
 type ArchiveAction = Extract<CleanupAction, { kind: "archive" }>
 
-export const ARCHIVE_DESCRIPTION =
+const ARCHIVE_DESCRIPTION =
   "Archived memory notes: retired by cleanup or reflection with the reason and the note that replaced each one."
 
-export function dayOf(now: number): string {
+function dayOf(now: number): string {
   return new Date(now).toISOString().slice(0, 10)
 }
 
-export function mergeSection(action: MergeAction, now: number): string {
+function mergeSection(action: MergeAction, now: number): string {
   return `\n\n## Merged from ${action.from} (memory cleanup ${dayOf(now)})\n\n${action.paragraphs.join("\n\n")}\n`
 }
 

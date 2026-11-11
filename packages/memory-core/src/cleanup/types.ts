@@ -96,8 +96,8 @@ export interface MemoryCleanupPlan {
   readonly snapshot: Readonly<Record<string, string>>
 }
 
-export const DEFAULT_CLEANUP_SIMILARITY = 0.9
-export const DEFAULT_CLEANUP_CONTAINMENT = 0.9
+const DEFAULT_CLEANUP_SIMILARITY = 0.9
+const DEFAULT_CLEANUP_CONTAINMENT = 0.9
 
 export const LOAD_BEARING_PATHS: ReadonlySet<string> = new Set([
   "system/persona.md",

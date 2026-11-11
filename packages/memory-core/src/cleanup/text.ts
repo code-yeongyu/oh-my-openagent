@@ -27,7 +27,7 @@ export function splitParagraphs(body: string): Paragraph[] {
 }
 
 /** Lower-case, markup-free, whitespace-collapsed form of a span of markdown. */
-export function normalizeText(text: string): string {
+function normalizeText(text: string): string {
   return text
     .toLowerCase()
     .split("\n")
@@ -59,7 +59,7 @@ export function containment(inner: ReadonlySet<string>, outer: ReadonlySet<strin
   return inner.size === 0 ? 0 : sharedCount(inner, outer) / inner.size
 }
 
-export function sharedCount(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
+function sharedCount(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
   let shared = 0
   const [small, large] = a.size <= b.size ? [a, b] : [b, a]
   for (const key of small) if (large.has(key)) shared += 1
@@ -76,7 +76,7 @@ export interface DatedName {
   readonly retired?: RetirementToken
 }
 
-export const RETIREMENT_TOKENS = ["LIFTED", "EXPIRED", "RETIRED", "SUPERSEDED"] as const
+const RETIREMENT_TOKENS = ["LIFTED", "EXPIRED", "RETIRED", "SUPERSEDED"] as const
 export type RetirementToken = (typeof RETIREMENT_TOKENS)[number]
 
 const DATED_NAME_RE = /^(.*?)-(\d{8})([a-z]?)(?:-(\d{4}))?(?:-(LIFTED|EXPIRED|RETIRED|SUPERSEDED))?\.md$/
