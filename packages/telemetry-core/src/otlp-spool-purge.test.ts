@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { execFileSync } from "node:child_process"
-import { mkdirSync, readFileSync, renameSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs"
+import { lstatSync, mkdirSync, readFileSync, renameSync, symlinkSync, unlinkSync, writeFileSync, type BigIntStats } from "node:fs"
 import { dirname, join } from "node:path"
 
 import { createBatchId } from "./otlp-spool-dir"
@@ -26,6 +26,18 @@ function spool(): { dir: string; sealed: string; wal: string } {
 
 function errnoError(code: string): Error {
   return Object.assign(new Error(code), { code })
+}
+
+/** A staged file identity: only the fields the purge reads (type checks, dev/ino, uid). */
+function fakeFileStat(identity: { dev: bigint; ino: bigint }): BigIntStats {
+  return {
+    dev: identity.dev,
+    ino: identity.ino,
+    uid: BigInt(process.getuid?.() ?? 0),
+    isFile: () => true,
+    isDirectory: () => false,
+    isSymbolicLink: () => false,
+  } as unknown as BigIntStats
 }
 
 /** Records what the purge reports: skipped entries by kind, failed deletions by errno code. */
@@ -140,6 +152,36 @@ describe("the purge keeps sweeping when one entry cannot be deleted", () => {
 
     // when
     const outcome = purgeSpool(dir, dirname(dir), report, { unlink })
+
+    // then
+    expect(outcome).toBe("purged")
+    expect(report.kinds).toEqual(["other"])
+    expect(report.failed).toEqual([])
+    expect(spoolNames(dir)).toEqual([sealed])
+    expect(spoolNames(dir)).not.toContain(wal)
+  })
+
+  test("#given a spool file replaced by a different regular file whose file ID differs only below 2^53 precision between its check and its unlink #when the unlink fails with EACCES #then the entry is reported as a skip of kind other, not as a failure, and the sweep goes on", () => {
+    // given
+    const { dir, sealed, wal } = spool()
+    const report = recorder()
+    const swapped = join(dir, sealed)
+    const above = 2n ** 53n
+    const checkedStat = fakeFileStat({ dev: 7n, ino: above })
+    const swappedStat = fakeFileStat({ dev: 7n, ino: above + 1n })
+    let reads = 0
+    const lstat = (path: string): BigIntStats => {
+      if (path !== swapped) return lstatSync(path, { bigint: true })
+      reads += 1
+      return reads === 1 ? checkedStat : swappedStat
+    }
+    const unlink = (path: string): void => {
+      if (path !== swapped) return unlinkSync(path)
+      throw errnoError("EACCES")
+    }
+
+    // when
+    const outcome = purgeSpool(dir, dirname(dir), report, { unlink, lstat })
 
     // then
     expect(outcome).toBe("purged")

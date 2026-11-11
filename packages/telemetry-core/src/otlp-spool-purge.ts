@@ -1,4 +1,4 @@
-import { lstatSync, readdirSync, realpathSync, rmdirSync, type Stats, unlinkSync } from "node:fs"
+import { lstatSync, readdirSync, realpathSync, rmdirSync, type BigIntStats, unlinkSync } from "node:fs"
 import { isAbsolute, join, relative } from "node:path"
 
 import { isPidAlive } from "./otlp-pid-alive"
@@ -71,9 +71,17 @@ export type PurgeReport = {
 export type PurgeSeams = {
   readonly unlink?: (path: string) => void
   readonly ownerOf?: (path: string, uid: number) => number
+  /** Identity reads for the check / re-check pair. A test uses it to stage file IDs a real filesystem cannot
+   * produce on this OS (for example NTFS file IDs above 2^53, whose low bits a JS-number `ino` loses). */
+  readonly lstat?: (path: string) => BigIntStats
 }
 
-type Owner = (path: string, stat: Stats) => boolean
+/** The real identity read: bigint stats, so file IDs above 2^53 keep their low bits. */
+function realLstat(path: string): BigIntStats {
+  return lstatSync(path, { bigint: true })
+}
+
+type Owner = (path: string, stat: BigIntStats) => boolean
 
 function errorCode(error: unknown): string | undefined {
   return error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : undefined
@@ -86,12 +94,12 @@ function hasCode(error: unknown, codes: readonly string[]): boolean {
 
 /** False only where uids exist (not on Windows) and the entry belongs to someone else. */
 function ownerCheck(ownerOf: PurgeSeams["ownerOf"]): Owner {
-  return (path, stat) => typeof process.getuid !== "function" || (ownerOf ? ownerOf(path, stat.uid) : stat.uid) === process.getuid()
+  return (path, stat) => typeof process.getuid !== "function" || (ownerOf ? ownerOf(path, Number(stat.uid)) : Number(stat.uid)) === process.getuid()
 }
 
 function realDirectory(path: string, owned: Owner): "dir" | "missing" | "other" {
   try {
-    const stat = lstatSync(path)
+    const stat = lstatSync(path, { bigint: true })
     return stat.isDirectory() && !stat.isSymbolicLink() && owned(path, stat) ? "dir" : "other"
   } catch (error) {
     if (hasCode(error, ["ENOENT"])) return "missing"
@@ -111,9 +119,9 @@ function isStrictlyInside(root: string, dir: string): boolean {
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel)
 }
 
-function lstatOrGone(path: string): Stats | "gone" {
+function lstatOrGone(path: string, lstat: (path: string) => BigIntStats): BigIntStats | "gone" {
   try {
-    return lstatSync(path)
+    return lstat(path)
   } catch (error) {
     if (hasCode(error, ["ENOENT"])) return "gone"
     throw error
@@ -121,8 +129,8 @@ function lstatOrGone(path: string): Stats | "gone" {
 }
 
 /** The checked regular file of the current user, or why it is not deleted. */
-function checkEntry(path: string, owned: Owner): Stats | TelemetrySpoolEntryKind | "gone" {
-  const stat = lstatOrGone(path)
+function checkEntry(path: string, owned: Owner, lstat: (path: string) => BigIntStats): BigIntStats | TelemetrySpoolEntryKind | "gone" {
+  const stat = lstatOrGone(path, lstat)
   if (stat === "gone") return "gone"
   if (stat.isSymbolicLink()) return "symlink"
   if (stat.isDirectory()) return "directory"
@@ -130,9 +138,13 @@ function checkEntry(path: string, owned: Owner): Stats | TelemetrySpoolEntryKind
   return owned(path, stat) ? stat : "foreign_owner"
 }
 
-/** After a failed unlink: did the checked file vanish, get replaced (other inode or type), or stay put? */
-function afterFailedUnlink(path: string, checked: Stats): "gone" | "swapped" | "same" {
-  const now = lstatOrGone(path)
+/**
+ * After a failed unlink: did the checked file vanish, get replaced (other inode or type), or stay put?
+ * Identity is compared as bigints: on Windows a file ID can exceed 2^53, and comparing JS-number `ino`
+ * values would mistake two different files for the same one when they differ only in the lost low bits.
+ */
+function afterFailedUnlink(path: string, checked: BigIntStats, lstat: (path: string) => BigIntStats): "gone" | "swapped" | "same" {
+  const now = lstatOrGone(path, lstat)
   if (now === "gone") return "gone"
   return now.isFile() && now.dev === checked.dev && now.ino === checked.ino ? "same" : "swapped"
 }
@@ -143,18 +155,19 @@ const DENIED_OR_SWAPPED: readonly string[] = ["EPERM", "EACCES", "EBUSY", "EISDI
 type Sweep = {
   readonly owned: Owner
   readonly unlink: (path: string) => void
+  readonly lstat: (path: string) => BigIntStats
   readonly report: PurgeReport
   failed: number
 }
 
-function unlinkChecked(path: string, checked: Stats, sweep: Sweep): void {
+function unlinkChecked(path: string, checked: BigIntStats, sweep: Sweep): void {
   try {
     sweep.unlink(path)
   } catch (error) {
     const code = errorCode(error)
     if (code === "ENOENT") return
     if (code === undefined || !DENIED_OR_SWAPPED.includes(code)) throw error
-    const state = afterFailedUnlink(path, checked)
+    const state = afterFailedUnlink(path, checked, sweep.lstat)
     if (state === "swapped") sweep.report.onSkipped("other")
     if (state !== "same") return
     sweep.failed += 1
@@ -166,7 +179,7 @@ function unlinkOwned(dir: string, names: readonly string[], sweep: Sweep): void 
   for (const name of names) {
     if (!isSpoolFileName(name)) continue
     const path = join(dir, name)
-    const checked = checkEntry(path, sweep.owned)
+    const checked = checkEntry(path, sweep.owned, sweep.lstat)
     if (checked === "gone") continue
     if (typeof checked === "string") sweep.report.onSkipped(checked)
     else unlinkChecked(path, checked, sweep)
@@ -221,7 +234,7 @@ export function purgeSpool(
   if (kind === "other" || !isStrictlyInside(root, dir)) return "refused"
   const quarantine = join(dir, QUARANTINE_DIR)
   if (realDirectory(quarantine, owned) === "other") return "refused"
-  const sweep: Sweep = { owned, unlink: seams.unlink ?? unlinkSync, report, failed: 0 }
+  const sweep: Sweep = { owned, unlink: seams.unlink ?? unlinkSync, lstat: seams.lstat ?? realLstat, report, failed: 0 }
   unlinkOwned(dir, readdirSync(dir), sweep)
   try {
     unlinkOwned(quarantine, readdirSync(quarantine), sweep)
