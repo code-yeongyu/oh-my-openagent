@@ -34,7 +34,11 @@ function assertValidFilter(filter: object): void {
 }
 
 /** The SDK selector of a run filter: an empty field matches every window, as it always has here. */
-function sdkFilter(filter: WindowFilter = {}): { readonly id?: string; readonly app?: string; readonly title?: string } {
+function sdkFilter(filter: WindowFilter = {}): {
+  readonly id?: string
+  readonly app?: string
+  readonly title?: string
+} {
   return {
     ...(filter.id ? { id: filter.id } : {}),
     ...(filter.app ? { app: filter.app } : {}),
