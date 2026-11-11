@@ -57,6 +57,26 @@ interface ComputerAxOptions {
 	all?: boolean;
 	maxDepth?: number;
 	maxNodes?: number;
+	/** Only nodes changed after this snapshot generation. */
+	since?: number;
+}
+
+/** A state `computer.verify` polls for with read calls. */
+type ComputerExpectation =
+	| { kind: "elementExists"; ref: string; exists?: boolean }
+	| { kind: "elementValue"; ref: string; value: string }
+	| { kind: "elementEnabled"; ref: string; enabled?: boolean }
+	| { kind: "elementSelected"; ref: string; selected?: boolean }
+	| { kind: "windowExists"; window: string | ComputerWindowFilter }
+	| { kind: "windowGone"; window: string | ComputerWindowFilter }
+	| { kind: "windowBounds"; window: string | ComputerWindowFilter; bounds: Partial<ComputerBounds>; tolerance?: number };
+
+/** `satisfied` before the deadline, `unsatisfied` at it, or `unknown` when a read failed. */
+interface ComputerVerdict {
+	status: "satisfied" | "unsatisfied" | "unknown";
+	reads: number;
+	elapsedMs: number;
+	cause?: string;
 }
 
 /** One window capture and AX snapshot, committed together. */
@@ -258,6 +278,8 @@ interface ComputerWindow extends ComputerInputTarget {
 	observe(options?: ComputerObserveOptions): Promise<ComputerObserveResult>;
 	find(query: ComputerAxQuery): Promise<ComputerElement[]>;
 	ref(ref: string): Promise<ComputerElement | null>;
+	/** Formatted accessibility tree under one element of this window; the parent snapshot's refs stay valid. */
+	drill(ref: string, options?: ComputerAxOptions): Promise<string>;
 }
 
 /** Desktop helpers shared by the direct `computer` facade and the `desktop` object inside `computer.run`. */
@@ -338,4 +360,6 @@ declare const computer: ComputerDesktop & {
 	run<R = unknown>(code: string, options?: ComputerRunOptions): Promise<R>;
 	/** End the persistent desktop session; later calls fail. */
 	close(): Promise<void>;
+	/** Poll read calls until `expectation` holds or `timeoutMs` (default 2000) passes; never sends input. */
+	verify(expectation: ComputerExpectation, options?: { timeoutMs?: number; intervalMs?: number }): Promise<ComputerVerdict>;
 };

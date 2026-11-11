@@ -3,6 +3,7 @@
 //! core's `AxRegistry`.
 
 mod actions;
+mod batch_attrs;
 mod date;
 mod foreground;
 pub(crate) mod menus;
@@ -10,10 +11,11 @@ mod point_owner;
 mod popup;
 pub(crate) mod element;
 mod props;
+mod retained;
 mod text_input;
 mod tree;
 
-use senpi_desktop_core::ax::{AxBackend, AxHandle, AxOwner, AxProps};
+use senpi_desktop_core::ax::{AxBackend, AxHandle, AxObserved, AxOwner, AxProps};
 use senpi_desktop_core::error::CoreResult;
 use senpi_desktop_core::types::DesktopWindow;
 
@@ -140,8 +142,18 @@ impl AxBackend for MacAx {
         props::read_props(element(h)?)
     }
 
+    /// One batched attribute read per node, evidence from each attribute's
+    /// own error.
+    fn observe(&mut self, h: &AxHandle) -> CoreResult<AxObserved> {
+        batch_attrs::observe(element(h)?)
+    }
+
     fn children(&mut self, h: &AxHandle) -> CoreResult<Vec<AxHandle>> {
         Ok(tree::children(element(h)?).into_iter().map(handle).collect())
+    }
+
+    fn identifier(&mut self, h: &AxHandle) -> CoreResult<Option<String>> {
+        Ok(element::copy_string(element(h)?, "AXIdentifier"))
     }
 
     fn parent(&mut self, h: &AxHandle) -> CoreResult<Option<AxHandle>> {
@@ -169,6 +181,18 @@ impl AxBackend for MacAx {
 
     fn focused_element(&mut self) -> CoreResult<Option<AxHandle>> {
         tree::focused_element().map(|found| found.map(handle))
+    }
+
+    fn app_focused_element(&mut self, pid: u32) -> CoreResult<Option<AxHandle>> {
+        tree::app_focused_element(pid).map(|found| found.map(handle))
+    }
+
+    /// `AXSecureTextField` as the role or the subrole; an unreadable or
+    /// malformed subrole counts as secure.
+    fn is_secure_text_field(&mut self, h: &AxHandle) -> CoreResult<bool> {
+        let element = element(h)?;
+        Ok(element::copy_string(element, "AXRole").as_deref() == Some("AXSecureTextField")
+            || text_input::is_secure(element))
     }
 
     fn attributes(&mut self, h: &AxHandle) -> CoreResult<Vec<(String, String)>> {

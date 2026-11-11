@@ -317,6 +317,8 @@ var REQUIRED_PLUGIN_ARTIFACTS = [
   join4("extensions", "omo-member.js"),
   join4("extensions", "memory-run-supervisor.mjs"),
   join4("extensions", "gateway-store-worker.mjs"),
+  join4("extensions", "omo-computer-run-worker.mjs"),
+  join4("extensions", "quickjs.wasm"),
   ...PERSONA_ASSET_FILES.map((filename) => join4("extensions", filename)),
   join4("skills", "ast-grep", "SKILL.md"),
   join4("skills", "browser", "SKILL.md"),

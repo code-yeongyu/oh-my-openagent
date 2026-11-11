@@ -84,7 +84,10 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
     for (const row of reconciled.queued) {
       const gate = runtime.admissionGate()
       const heldRevision = held.get(row.delivery_id)
-      if (heldRevision !== undefined && !RELEASING_REASONS.has(event.reason) && heldRevision === gate.editor_revision) break
+      if (heldRevision !== undefined && !RELEASING_REASONS.has(event.reason) && heldRevision === gate.editor_revision) {
+        admitted.push({ delivery_id: row.delivery_id, kind: "held_draft" })
+        break
+      }
       if (!gate.can_admit) {
         held.set(row.delivery_id, gate.editor_revision)
         noticeQueued(row)
@@ -134,7 +137,8 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
           now: now(),
           delivery_id: row.delivery_id,
           self,
-          outcome: { kind: written ? "applied" : "admitted", admission_kind: result.kind, turn_epoch: result.turn_epoch },
+          // A delivery queued while the session waits on a question waits on that approval (#13014), as the relay leg reports it.
+          outcome: { kind: written ? "applied" : "admitted", admission_kind: result.kind, turn_epoch: result.turn_epoch, ...(result.kind === "queued" && runtime.phase() === "waiting_question" ? { wait_kind: "approval" as const } : {}) },
         })
       }
       admitted.push({ delivery_id: row.delivery_id, kind: result.kind })

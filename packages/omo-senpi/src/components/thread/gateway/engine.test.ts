@@ -7,6 +7,8 @@ import { join } from "node:path"
 import { ROOT_LIFETIME_MS } from "./constants"
 import type { GatewayDeliverRequest } from "./engine"
 import { gatewayInboxDirectory } from "./paths"
+import { createRemoteThreadFixture } from "../thread-remote-fixture"
+import type { RemoteThreadSurface } from "../remote/ports"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 import { settled } from "./testing/settled"
 import type { GatewayDeliveryResult } from "./types"
@@ -54,7 +56,7 @@ describe("all_fifteen_delivery_state_cases", () => {
     h.session("A")
     const expected: Record<string, readonly [string, string | null]> = {
       "idle/auto": ["started", "applied"], "idle/steer": ["error:not_steerable", "refused"], "idle/follow_up": ["started", "applied"],
-      "mid_turn/auto": ["queued", "admitted"], "mid_turn/steer": ["steered", "admitted"], "mid_turn/follow_up": ["queued", "admitted"],
+      "mid_turn/auto": ["steered", "admitted"], "mid_turn/steer": ["steered", "admitted"], "mid_turn/follow_up": ["queued", "admitted"],
       "waiting_question/auto": ["queued", "admitted"], "waiting_question/steer": ["error:not_steerable", "refused"], "waiting_question/follow_up": ["queued", "admitted"],
       "compacting/auto": ["queued", "admitted"], "compacting/steer": ["error:not_steerable", "refused"], "compacting/follow_up": ["queued", "admitted"],
       "offline/auto": ["queued_offline", "queued"], "offline/steer": ["error:turn_conflict", null], "offline/follow_up": ["queued_offline", "queued"],
@@ -76,6 +78,38 @@ describe("all_fifteen_delivery_state_cases", () => {
     // Fifteen sessions, each opening its own store worker, sent to in sequence; nothing here waits on a
     // timer, so a loaded runner only needs room past the 5 s default (it took 5.1 s in a CPU-capped run).
   }, 30_000)
+})
+
+describe("#13014: a local send to a session parked on a question names the wait, as a send to another device does", () => {
+  const remote = createRemoteThreadFixture().account().remote
+  const down: RemoteThreadSurface = { ...remote, sessions: { ...remote.sessions, thisDevice: async () => { throw new Error("device service down") } } }
+  test.each([
+    ["whose device service names this device", remote, { kind: "approval", device: "here" }],
+    ["whose device service is down", down, { kind: "approval" }],
+    ["with no device service", undefined, { kind: "approval" }],
+  ] as const)("#given B waits on a question and A runs on an install %s #when A sends a follow_up #then it is queued with waiting_on approval, naming this device only when the stamp has one", async (_label, surface, waiting) => {
+    harness = createGatewayHarness(surface === undefined ? {} : { remote: surface })
+    const h = harness
+    h.session("A")
+    const b = h.session("B")
+    b.runtime.beginUserTurn()
+    b.runtime.phaseValue = "waiting_question"
+    const result = await send(h, "A", "B", "after your question", { mode: "follow_up", idempotency_key: "k-wait" })
+    if (result.kind !== "ok" || result.delivery.kind !== "queued") throw new Error(`expected queued, got ${JSON.stringify(result)}`)
+    expect(result.delivery).toEqual({ kind: "queued", queue_position: 1, waiting_on: waiting })
+    // A retry under the same idempotency key replays the completed receipt's stored answer, which names the same wait.
+    const replay = await send(h, "A", "B", "after your question", { mode: "follow_up", idempotency_key: "k-wait" })
+    expect(replay).toMatchObject({ kind: "ok", deduplicated: true, delivery: { waiting_on: waiting } })
+  })
+
+  test("#given B is busy in a turn, not on a question #when A sends a follow_up #then it is queued with no waiting_on", async () => {
+    const h = open()
+    h.session("A")
+    h.session("B").runtime.beginUserTurn()
+    const result = await send(h, "A", "B", "later", { mode: "follow_up" })
+    expect(result).toMatchObject({ kind: "ok", delivery: { kind: "queued" } })
+    expect(result.kind === "ok" && "waiting_on" in result.delivery).toBe(false)
+  })
 })
 
 describe("turn_epoch_cas_and_fifo", () => {
@@ -125,13 +159,37 @@ describe("turn_epoch_cas_and_fifo", () => {
   })
 })
 
+describe("wake_reached_no_drain", () => {
+  test("#given an idle live session whose control endpoint never registered #when A sends auto and follow_up #then nothing starts and each result says queued_offline, not queued", async () => {
+    const h = open()
+    h.session("A")
+    const target = h.session("T", { drainRegistered: false })
+    for (const mode of ["auto", "follow_up"] as const) {
+      expect(summary(await send(h, "A", "T", `brief ${mode}`, { mode }))).toBe("queued_offline")
+    }
+    await h.quiesce()
+    expect(h.wakes.filter((wake) => wake.target === "T")).toHaveLength(2)
+    expect(target.runtime.listAdmittedDeliveries().pending).toEqual([])
+    expect((await target.store.list({ target_durable_id: "T" })).map((row) => row.state)).toEqual(["queued", "queued"])
+  })
+
+  test("#given a live drain holding an earlier delivery behind the user's draft #when another delivery is sent #then it stays queued, because the drain reported the held row", async () => {
+    const h = open()
+    h.session("A")
+    const target = h.session("T")
+    target.runtime.editorHold = "draft"
+    expect(summary(await send(h, "A", "T", "first"))).toBe("queued")
+    expect(summary(await send(h, "A", "T", "second"))).toBe("queued")
+  })
+})
+
 describe("repeated_wake_during_streaming", () => {
   test("#given B streams #when M1 is queued and three more wakes arrive before the turn ends #then the follow-up is enqueued once and applied once, after it is emitted", async () => {
     const h = open()
     h.session("A")
     const b = h.session("B")
     b.runtime.beginUserTurn()
-    const result = await send(h, "A", "B", "M1", { mode: "auto" })
+    const result = await send(h, "A", "B", "M1", { mode: "follow_up" })
     expect(summary(result)).toBe("queued")
     const m1 = okId(result)
     for (let wake = 0; wake < 3; wake++) await b.drain.drain({ reason: "command" })
@@ -191,7 +249,7 @@ describe("lost_ack_and_durable_recovery", () => {
     await b.drain.drain({ reason: "start" })
     await h.quiesce()
     const replayed = await retrying.deliver(request("admitted"))
-    expect(replayed.kind === "ok" && { delivery: replayed.delivery.kind, deduplicated: replayed.deduplicated }).toEqual({ delivery: "queued", deduplicated: true })
+    expect(replayed.kind === "ok" && { delivery: replayed.delivery.kind, deduplicated: replayed.deduplicated }).toEqual({ delivery: "steered", deduplicated: true })
 
     const stillUncertain = await retrying.deliver(request("unadmitted"))
     expect(summary(stillUncertain)).toBe("error:idempotency_uncertain")
@@ -235,6 +293,21 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     expect(views.map((view) => [view?.row.state === "admitted" || view?.row.state === "applied", view?.row.hop])).toEqual([[true, 3], [true, 4]])
     const self = await send(h, "A", "A", "me")
     expect(self.kind === "error" && self.error.details?.guard).toBe("self_send")
+  })
+
+  test("#given a run woken by a delivery from another device (no row here, chain_count 2) #when it sends here #then the row continues at hop 3 under a fresh root, and a local cause at hop 1 beside an inbound hop 4 continues at hop 5", async () => {
+    const h = open()
+    for (const id of ["A", "B", "C"]) h.session(id)
+    const fromDevice = okId(await send(h, "A", "B", "continued from device", { inbound_hop: 2 }))
+    await h.quiesce()
+    const first = (await h.get("A").store.deliveryView(fromDevice))?.row
+    expect([first?.hop, first?.root_id?.startsWith("root-")]).toEqual([3, true])
+    const local = okId(await send(h, "B", "C", "local cause"))
+    await h.quiesce()
+    const both = okId(await send(h, "C", "A", "both", { cause_delivery_id: local, inbound_hop: 4 }))
+    await h.quiesce()
+    const row = (await h.get("A").store.deliveryView(both))?.row
+    expect([row?.hop, row?.root_id]).toEqual([5, (await h.get("A").store.deliveryView(local))?.row.root_id])
   })
 
   test("#given P and Q under one root #when P->Q and Q->P are sent concurrently from two processes #then both are accepted", async () => {
@@ -335,6 +408,16 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     const lateView = await h.get("B").store.deliveryView(late)
     const firstView = await h.get("A").store.deliveryView(ab)
     expect({ hop: lateView?.row.hop, sameRoot: lateView?.row.root_id === firstView?.row.root_id }).toEqual({ hop: 2, sameRoot: false })
+  })
+
+  // #13004 (decision 0027 section 3): a run's cause is the delivery it consumed on either transport. One that no row here
+  // holds (it came from another device) continues the hop under a new root; nothing asks where it came from.
+  test("#given a run consumed a delivery no row here holds #when it sends #then the send is delivered under a new root with the inbound hop continued", async () => {
+    const h = open()
+    for (const id of ["A", "B"]) h.session(id)
+    const sent = okId(await send(h, "A", "B", "continue", { cause_delivery_id: "d-from-another-device", inbound_hop: 2 }))
+    const view = await h.get("A").store.deliveryView(sent)
+    expect({ hop: view?.row.hop, root: view?.row.root_id.startsWith("root-") }).toEqual({ hop: 3, root: true })
   })
 
   test("#given one root #when a session keeps fanning out under it across turns #then the 64th and later deliveries of the root are still accepted", async () => {

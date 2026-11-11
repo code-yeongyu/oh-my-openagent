@@ -112,6 +112,8 @@ export type DeviceAdopt = {
   readonly device: DeviceRef;
   readonly signing_private_key: string;
   readonly sealing_private_key: string;
+  /** omo addition: sent only to a service at or above ADOPT_ACCOUNT_MIN_SERVICE_VERSION (device-service.ts). */
+  readonly account?: string;
 };
 export type DeviceForget = { readonly id: string; readonly type: "device.forget" };
 export type DeviceInfo = { readonly id: string; readonly type: "device.info" };
@@ -130,8 +132,11 @@ export type SessionsList = {
   readonly id: string;
   readonly type: "sessions.list";
   readonly filter?: SessionFilter;
-  /** 2: this query's rows may carry `kind`, `parent` and `parent_listed` (#316); absent, they never do. */
-  readonly rows?: 2;
+  /**
+   * 2: this query's rows may carry `kind`, `parent` and `parent_listed` (#316); 3: those and `durable_id` (#12996);
+   * absent, they never do.
+   */
+  readonly rows?: 2 | 3;
 };
 export type SessionAttach = {
   readonly id: string;

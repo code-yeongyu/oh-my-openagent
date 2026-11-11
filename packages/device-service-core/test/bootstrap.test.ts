@@ -47,11 +47,16 @@ const ownerAt = async (stateDir: string, version: string): Promise<FakeOwner> =>
   return owner
 }
 
-type Harness = { readonly deps: BootstrapDependencies; readonly calls: { install: number; connect: number } }
+type Harness = { readonly deps: BootstrapDependencies; readonly calls: { install: number; connect: number }; readonly credentialReads: () => number }
 
 const harness = (stateDir: string, overrides: Partial<BootstrapDependencies> = {}): Harness => {
   const calls = { install: 0, connect: 0 }
+  // Design D r9 section 3: the bootstrap's own credential read is OFF relay's path. A credential reader is still
+  // offered here (as omo 1dc315f1cc wired one), and the bootstrap must never call it.
+  let reads = 0
+  const offered = { credential: async (): Promise<DeviceCredential> => { reads += 1; return credential() } }
   const deps: BootstrapDependencies = {
+    ...offered,
     accountShow: async () => SIGNED_IN,
     stateDir,
     pinVersion: PIN,
@@ -66,33 +71,35 @@ const harness = (stateDir: string, overrides: Partial<BootstrapDependencies> = {
       services.push(service)
       return service
     },
-    credential: async () => credential(),
     refresher: REFRESHER,
     agentDir: AGENT_DIR,
     ...overrides,
   }
-  return { deps, calls }
+  return { deps, calls, credentialReads: () => reads }
 }
 
 describe("device service bootstrap", () => {
   test("signed in proceeds: an installed service at the pin is connected without an acquisition", async () => {
     const stateDir = home()
     const owner = await ownerAt(stateDir, PIN)
-    const { deps, calls } = harness(stateDir)
+    const { deps, calls, credentialReads } = harness(stateDir)
     const outcome = await bootstrapDeviceService(deps)
     expect(outcome.kind).toBe("connected")
     expect(calls.install).toBe(0)
-    expect(owner.state.adoptions).toBe(1)
+    expect(owner.state.adoptions).toBe(0)
+    expect(credentialReads()).toBe(0)
   })
 
   test("a clean home signed in ends connected against the fake owner with the sequence asserted", async () => {
     const stateDir = home()
-    const { deps, calls } = harness(stateDir)
+    const { deps, calls, credentialReads } = harness(stateDir)
     const outcome = await bootstrapDeviceService(deps)
     expect(outcome).toMatchObject({ kind: "connected", status: { state: "connected" } })
     expect(calls).toEqual({ install: 1, connect: 1 })
     const owner = owners[0]
-    expect(owner?.state.log).toEqual(["refresher.register", "device.adopt", "endpoints.register", "status.get"])
+    // No device.adopt: keys reach the service only from a credential a client already holds in memory.
+    expect(owner?.state.log).toEqual(["refresher.register", "endpoints.register", "status.get"])
+    expect(credentialReads()).toBe(0)
     expect(owner?.state.refresher).toEqual({ binary_path: REFRESHER.binaryPath, version: REFRESHER.version })
     expect([...(owner?.state.endpoints ?? [])]).toEqual([AGENT_DIR])
   })
@@ -187,7 +194,7 @@ describe("device service bootstrap", () => {
     })
     expect((await bootstrapDeviceService(deps)).kind).toBe("connected")
     expect(calls).toEqual({ install: 0, connect: 2 })
-    expect(owner.state.adoptions).toBe(1)
+    expect(owner.state.adoptions).toBe(0)
   })
 
   test("a bad server_proof drops the connection with zero adopts and installs nothing", async () => {
