@@ -101,22 +101,27 @@ fn definition_name(reference: &Value) -> Option<&str> {
     reference.as_str()?.strip_prefix("#/$defs/")
 }
 
-/// Every member the method's result definition requires that the reply does not carry. A
-/// nullable result (`anyOf: [null, $ref]`, the exec reply) is read through its object branch.
+/// The method's result definition; a nullable result (`anyOf: [null, $ref]`, the exec
+/// reply) is read through its object branch.
+fn result_definition<'a>(schema: &'a Value, method: &str) -> Option<&'a str> {
+    let name = definition_name(&schema["methods"][method]["result"]["$ref"])?;
+    Some(
+        schema["$defs"][name]["anyOf"]
+            .as_array()
+            .and_then(|branches| {
+                branches
+                    .iter()
+                    .find_map(|branch| definition_name(&branch["$ref"]))
+            })
+            .unwrap_or(name),
+    )
+}
+
+/// Every member the method's result definition requires that the reply does not carry.
 fn missing_members(schema: &Value, method: &str, reply: &Value) -> Vec<String> {
-    let Some(mut name) = definition_name(&schema["methods"][method]["result"]["$ref"]) else {
+    let Some(name) = result_definition(schema, method) else {
         return Vec::new();
     };
-    if let Some(branch) = schema["$defs"][name]["anyOf"]
-        .as_array()
-        .and_then(|branches| {
-            branches
-                .iter()
-                .find_map(|branch| definition_name(&branch["$ref"]))
-        })
-    {
-        name = branch;
-    }
     let (Some(required), Some(present)) = (
         schema["$defs"][name]["required"].as_array(),
         reply.as_object(),
@@ -157,13 +162,82 @@ fn reply_problem(
             unledgered.join(", ")
         ));
     }
-    if !missing.is_empty() {
-        return Ok(true);
+    // The ledgered members are filled with a value of their declared type, so the members
+    // the reply does carry are type-checked like any other reply's.
+    let mut filled = result.clone();
+    if let (Some(object), Some(definition)) = (
+        filled.as_object_mut(),
+        result_definition(schema, method.spec().name),
+    ) {
+        for member in &missing {
+            let declared = &schema["$defs"][definition]["properties"][member.as_str()];
+            object.insert(member.clone(), example(schema, declared));
+        }
     }
     method
-        .validate_result(result.clone())
-        .map(|()| false)
-        .map_err(|error| format!("result: {error}"))
+        .validate_result(filled)
+        .map(|()| !missing.is_empty())
+        .map_err(|error| {
+            if missing.is_empty() {
+                format!("result: {error}")
+            } else {
+                format!("result (ledgered {} filled in): {error}", missing.join(", "))
+            }
+        })
+}
+
+/// The smallest value the schema node admits: the first `const` / `enum` value or branch,
+/// the minimum of a number, an empty string or array, and an object of its required members.
+fn example(schema: &Value, node: &Value) -> Value {
+    if let Some(name) = definition_name(&node["$ref"]) {
+        return example(schema, &schema["$defs"][name]);
+    }
+    if let Some(value) = node.get("const") {
+        return value.clone();
+    }
+    if let Some(first) = node["enum"].as_array().and_then(|values| values.first()) {
+        return first.clone();
+    }
+    for key in ["anyOf", "oneOf"] {
+        if let Some(branches) = node[key].as_array() {
+            let branch = branches
+                .iter()
+                .find(|branch| branch["type"] != "null")
+                .or_else(|| branches.first());
+            if let Some(branch) = branch {
+                return example(schema, branch);
+            }
+        }
+    }
+    let kind = match &node["type"] {
+        Value::Array(kinds) => kinds
+            .iter()
+            .find(|kind| *kind != "null")
+            .and_then(Value::as_str)
+            .unwrap_or("null"),
+        kind => kind.as_str().unwrap_or("object"),
+    };
+    match kind {
+        "string" => Value::String(String::new()),
+        "integer" | "number" => node.get("minimum").cloned().unwrap_or_else(|| 0.into()),
+        "boolean" => Value::Bool(false),
+        "array" => Value::Array(Vec::new()),
+        "null" => Value::Null,
+        _ => Value::Object(
+            node["required"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .map(|member| {
+                    (
+                        member.to_owned(),
+                        example(schema, &node["properties"][member]),
+                    )
+                })
+                .collect(),
+        ),
+    }
 }
 
 fn error_code(expect: &[Value]) -> Option<i64> {
@@ -241,7 +315,7 @@ fn corpus_requests_name_table_methods_and_fit_their_types() {
             }
         }
     }
-    println!("corpus: {requests} requests, {replies} replies ({ledgered} lacking only a ledgered additive member), {pushed} notifications checked");
+    println!("corpus: {requests} requests, {replies} replies ({ledgered} lacking only a ledgered additive member, type-checked with it filled in), {pushed} notifications checked");
     assert!(
         requests > 100 && replies > 50,
         "the corpus walk read too little: {requests} requests, {replies} replies"
