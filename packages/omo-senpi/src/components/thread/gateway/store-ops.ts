@@ -74,7 +74,7 @@ export type StoreContext = {
 
 const DELIVERY_COLUMNS = [
   "delivery_id", "target_durable_id", "seq", "sender", "sender_turn", "envelope", "body", "bytes", "mode_requested",
-  "mode_effective", "expected_turn_id", "state", "reason", "admitted_by", "claimed_at", "attempt", "admission_kind",
+  "mode_effective", "expected_turn_id", "state", "reason", "admitted_by", "claimed_at", "attempt", "admission_kind", "wait_kind",
   "turn_epoch", "root_id", "hop", "created_at", "updated_at", "expires_at", "binding_id", "binding_revision", "actor_user_id",
 ] as const
 
@@ -105,6 +105,7 @@ function rowFrom(record: SqlRow): DeliveryRow {
     claimed_at: nullableNumber(record.claimed_at),
     attempt: Number(record.attempt),
     admission_kind: record.admission_kind === null ? null : String(record.admission_kind),
+    wait_kind: record.wait_kind === "approval" ? "approval" : null,
     turn_epoch: nullableNumber(record.turn_epoch),
     root_id: String(record.root_id),
     hop: Number(record.hop),
@@ -251,7 +252,7 @@ function insertDelivery(ctx: StoreContext, row: DeliveryRow): void {
     [
       row.delivery_id, row.target_durable_id, row.seq, row.sender, row.sender_turn, JSON.stringify(row.envelope), row.body, row.bytes,
       row.mode_requested, row.mode_effective, row.expected_turn_id, row.state, row.reason,
-      row.admitted_by === null ? null : JSON.stringify(row.admitted_by), row.claimed_at, row.attempt, row.admission_kind,
+      row.admitted_by === null ? null : JSON.stringify(row.admitted_by), row.claimed_at, row.attempt, row.admission_kind, row.wait_kind,
       row.turn_epoch, row.root_id, row.hop, row.created_at, row.updated_at, row.expires_at, row.binding_id, row.binding_revision, row.actor_user_id,
     ],
   )
@@ -526,7 +527,7 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
       admitted_by: null,
       claimed_at: null,
       attempt: 0,
-      admission_kind: null,
+      admission_kind: null, wait_kind: null,
       turn_epoch: null,
       root_id: placement.root_id,
       hop: placement.hop,
@@ -628,7 +629,7 @@ function claimFingerprint(row: DeliveryRow): string {
   return `${JSON.stringify(row.admitted_by)}#${row.attempt}`
 }
 
-const CLEARED_CLAIM = "admitted_by = NULL, claimed_at = NULL, mode_effective = NULL, admission_kind = NULL, turn_epoch = NULL"
+const CLEARED_CLAIM = "admitted_by = NULL, claimed_at = NULL, mode_effective = NULL, admission_kind = NULL, wait_kind = NULL, turn_epoch = NULL"
 
 function transition(ctx: StoreContext, row: DeliveryRow, to: DeliveryState, now: number, extra: { readonly reason?: RefusalReason } = {}): void {
   if (to === "queued") {
@@ -740,7 +741,7 @@ export async function recordOutcome(ctx: StoreContext, request: RecordOutcomeReq
     if (outcome.kind === "requeue") transition(ctx, row, "queued", request.now)
     else if (outcome.kind === "refused") transition(ctx, row, "refused", request.now, { reason: outcome.reason })
     else {
-      write(ctx, "UPDATE deliveries SET admission_kind = ?, turn_epoch = ?, updated_at = ? WHERE delivery_id = ?", [outcome.admission_kind, outcome.turn_epoch, request.now, row.delivery_id])
+      write(ctx, "UPDATE deliveries SET admission_kind = ?, wait_kind = ?, turn_epoch = ?, updated_at = ? WHERE delivery_id = ?", [outcome.admission_kind, outcome.wait_kind ?? null, outcome.turn_epoch, request.now, row.delivery_id])
       if (row.state !== outcome.kind) transition(ctx, row, outcome.kind, request.now)
     }
     return { kind: "claimed", row: selectRow(ctx, request.delivery_id) as DeliveryRow }
@@ -883,7 +884,7 @@ export async function migrateLegacyMailboxes(ctx: StoreContext, now: number): Pr
           admitted_by: null,
           claimed_at: null,
           attempt: 0,
-          admission_kind: null,
+          admission_kind: null, wait_kind: null,
           turn_epoch: null,
           root_id: rootId,
           hop: 1,
