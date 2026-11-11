@@ -5,13 +5,14 @@ import { spawnSync } from "node:child_process"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 // #12965: the engine refuses to load next to a redaction registry slot it did not pin, and that refusal is permanent
 // for the process. A child start awaits loadSenpiBarrel(), so the load must fail with the remedy (a restart) instead
 // of the raw import error. Each case runs in a fresh Bun process whose loader makes the engine module's own evaluation
 // throw, which is how the engine refuses; the barrel promise is process-wide and cannot be reset in this process.
 
-const BARREL = new URL("./senpi-barrel.ts", import.meta.url).pathname
+const BARREL = pathToFileURL(fileURLToPath(new URL("./senpi-barrel.ts", import.meta.url))).href
 const roots: string[] = []
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
