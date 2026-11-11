@@ -1,4 +1,10 @@
-import { connect, FanoutRun, type BunshinClient, type FleetEvent, type FleetEventSource } from "../../vendor/bunshin-ts/index.js"
+import {
+  connect,
+  FanoutRun,
+  type BunshinClient,
+  type FleetEvent,
+  type FleetEventSource,
+} from "../../vendor/bunshin-ts/index.js"
 
 import { pickTransport } from "./bunshin-ts-pick-transport"
 
@@ -73,7 +79,11 @@ export function createLazyBunshinClient(
     findMachine: (query) => client().then((c) => c.findMachine(query)),
     listTools: (idOrAlias) => client().then((c) => c.listTools(idOrAlias)),
     resultOf: (requestId) => client().then((c) => c.resultOf(requestId)),
-    events: (eventOptions) => lazyEvents(client().then((c) => c.events(eventOptions)), reportError),
+    events: (eventOptions) =>
+      lazyEvents(
+        client().then((c) => c.events(eventOptions)),
+        reportError,
+      ),
     close: async () => {
       const pending = memo
       memo = undefined
@@ -82,4 +92,6 @@ export function createLazyBunshinClient(
   }
 }
 
-export const bunshin: BunshinClient = createLazyBunshinClient(async () => connect({ transport: await pickTransport(process.env) }))
+export const bunshin: BunshinClient = createLazyBunshinClient(async () =>
+  connect({ transport: await pickTransport(process.env) }),
+)

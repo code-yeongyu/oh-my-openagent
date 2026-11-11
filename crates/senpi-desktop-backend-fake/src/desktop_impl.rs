@@ -92,11 +92,15 @@ impl Backend for FakeBackend {
             self.cursor = self.cursor.and(event.end_point());
         }
         self.deliver_focus(target, mode);
+        let opens = matches!(event, RecordedPointer::Click { .. });
         self.record(SinkOp::Pointer {
             target: target.clone(),
             event,
             mode,
         });
+        if opens {
+            self.open_next_surface();
+        }
         Ok(())
     }
 

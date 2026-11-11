@@ -2,7 +2,16 @@
 // the verifier refuses what a real one would - an object naming another batch, another account,
 // or any seq the test marks as failing a receiver check.
 
-import type { BatchPayload, PulledEntry, RefusalCode, SealedBatch, Sealer, SnapshotRef, Verdict, Verifier } from "./ports"
+import type {
+  BatchPayload,
+  PulledEntry,
+  RefusalCode,
+  SealedBatch,
+  Sealer,
+  SnapshotRef,
+  Verdict,
+  Verifier,
+} from "./ports"
 
 interface Sealed {
   readonly account: string
@@ -28,7 +37,12 @@ export class FakeSealer implements Sealer {
   constructor(private readonly account: string) {}
 
   async seal(batchId: string, baseSeq: number, payload: BatchPayload): Promise<SealedBatch> {
-    return { bytes: encodePayload(this.account, batchId, baseSeq, payload), epoch: 1, link: "A".repeat(43), recordSig: "S".repeat(86) }
+    return {
+      bytes: encodePayload(this.account, batchId, baseSeq, payload),
+      epoch: 1,
+      link: "A".repeat(43),
+      recordSig: "S".repeat(86),
+    }
   }
 }
 

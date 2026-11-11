@@ -7,8 +7,6 @@ import { reclaimStaleReservations } from "../team-mailbox/reservation"
 import type { RuntimeStateMember } from "../types"
 import { transitionRuntimeState } from "./store"
 
-
-
 function getMessagesData(response: unknown): unknown[] {
   if (isRecord(response) && Array.isArray(response.data)) {
     return response.data
@@ -78,17 +76,23 @@ async function reconcileReclaimedReservations(
   }
 
   const reclaimedMessageIdSet = new Set(reclaimedMessageIds)
-  await transitionRuntimeState(teamRunId, (currentRuntimeState) => ({
-    ...currentRuntimeState,
-    members: currentRuntimeState.members.map((currentMember) => (
-      currentMember.name === member.name
-        ? {
-          ...currentMember,
-          pendingInjectedMessageIds: currentMember.pendingInjectedMessageIds.filter((messageId) => !reclaimedMessageIdSet.has(messageId)),
-        }
-        : currentMember
-    )),
-  }), config)
+  await transitionRuntimeState(
+    teamRunId,
+    (currentRuntimeState) => ({
+      ...currentRuntimeState,
+      members: currentRuntimeState.members.map((currentMember) =>
+        currentMember.name === member.name
+          ? {
+              ...currentMember,
+              pendingInjectedMessageIds: currentMember.pendingInjectedMessageIds.filter(
+                (messageId) => !reclaimedMessageIdSet.has(messageId),
+              ),
+            }
+          : currentMember,
+      ),
+    }),
+    config,
+  )
 }
 
 export async function reconcileStaleReservationsForMember(
@@ -98,11 +102,6 @@ export async function reconcileStaleReservationsForMember(
   config: TeamModeConfig,
   staleReservationTtlMs: number,
 ): Promise<void> {
-  const reclaimedMessageIds = await reclaimStaleReservations(
-    teamRunId,
-    member.name,
-    config,
-    staleReservationTtlMs,
-  )
+  const reclaimedMessageIds = await reclaimStaleReservations(teamRunId, member.name, config, staleReservationTtlMs)
   await reconcileReclaimedReservations(ctx, teamRunId, member, reclaimedMessageIds, config)
 }

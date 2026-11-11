@@ -22,6 +22,7 @@
 	"dependencies": {
 		"@oh-my-opencode/senpi-desktop-prelude": "workspace:*",
 		"@oh-my-opencode/senpi-desktop-protocol": "workspace:*",
+		"@oh-my-opencode/senpi-desktop-sdk": "workspace:*",
 		"@oh-my-opencode/senpi-desktop-service": "workspace:*",
 		"typebox": "1.3.34"
 	},

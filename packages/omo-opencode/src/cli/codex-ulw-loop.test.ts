@@ -30,8 +30,32 @@ describe("Codex ulw-loop routing", () => {
   test("falls back to the newest cached ulw-loop component cli", () => {
     // given
     const root = join(tmpdir(), `omo-ulw-loop-cache-${randomUUID()}`)
-    const oldCli = join(root, ".codex", "plugins", "cache", "sisyphuslabs", "omo", "0.1.0", "components", "ulw-loop", "dist", "cli.js")
-    const newCli = join(root, ".codex", "plugins", "cache", "sisyphuslabs", "omo", "0.2.0", "components", "ulw-loop", "dist", "cli.js")
+    const oldCli = join(
+      root,
+      ".codex",
+      "plugins",
+      "cache",
+      "sisyphuslabs",
+      "omo",
+      "0.1.0",
+      "components",
+      "ulw-loop",
+      "dist",
+      "cli.js",
+    )
+    const newCli = join(
+      root,
+      ".codex",
+      "plugins",
+      "cache",
+      "sisyphuslabs",
+      "omo",
+      "0.2.0",
+      "components",
+      "ulw-loop",
+      "dist",
+      "cli.js",
+    )
     mkdirSync(dirname(oldCli), { recursive: true })
     mkdirSync(dirname(newCli), { recursive: true })
     writeFileSync(oldCli, "#!/usr/bin/env node\n")
@@ -51,8 +75,31 @@ describe("Codex ulw-loop routing", () => {
     // given
     const root = join(tmpdir(), `omo-ulw-loop-codex-home-${randomUUID()}`)
     const codexHome = join(root, "codex-home")
-    const homeDirCache = join(root, ".codex", "plugins", "cache", "sisyphuslabs", "omo", "9.9.9", "components", "ulw-loop", "dist", "cli.js")
-    const codexHomeCache = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "0.1.0", "components", "ulw-loop", "dist", "cli.js")
+    const homeDirCache = join(
+      root,
+      ".codex",
+      "plugins",
+      "cache",
+      "sisyphuslabs",
+      "omo",
+      "9.9.9",
+      "components",
+      "ulw-loop",
+      "dist",
+      "cli.js",
+    )
+    const codexHomeCache = join(
+      codexHome,
+      "plugins",
+      "cache",
+      "sisyphuslabs",
+      "omo",
+      "0.1.0",
+      "components",
+      "ulw-loop",
+      "dist",
+      "cli.js",
+    )
     mkdirSync(dirname(homeDirCache), { recursive: true })
     mkdirSync(dirname(codexHomeCache), { recursive: true })
     writeFileSync(homeDirCache, "#!/usr/bin/env node\n")
@@ -73,7 +120,19 @@ describe("Codex ulw-loop routing", () => {
     const root = join(tmpdir(), `omo-ulw-loop-self-${randomUUID()}`)
     const binDir = join(root, "bin")
     const selfBin = join(binDir, "omo")
-    const componentCli = join(root, ".codex", "plugins", "cache", "sisyphuslabs", "omo", "0.1.0", "components", "ulw-loop", "dist", "cli.js")
+    const componentCli = join(
+      root,
+      ".codex",
+      "plugins",
+      "cache",
+      "sisyphuslabs",
+      "omo",
+      "0.1.0",
+      "components",
+      "ulw-loop",
+      "dist",
+      "cli.js",
+    )
     mkdirSync(binDir, { recursive: true })
     mkdirSync(dirname(componentCli), { recursive: true })
     writeFileSync(selfBin, "#!/usr/bin/env node\n")
@@ -95,10 +154,22 @@ describe("Codex ulw-loop routing", () => {
     const root = join(tmpdir(), `omo-ulw-loop-root-wrapper-${randomUUID()}`)
     const binDir = join(root, "bin")
     const rootOmo = join(binDir, "omo")
-    const componentCli = join(root, ".codex", "plugins", "cache", "sisyphuslabs", "omo", "0.1.0", "components", "ulw-loop", "dist", "cli.js")
+    const componentCli = join(
+      root,
+      ".codex",
+      "plugins",
+      "cache",
+      "sisyphuslabs",
+      "omo",
+      "0.1.0",
+      "components",
+      "ulw-loop",
+      "dist",
+      "cli.js",
+    )
     mkdirSync(binDir, { recursive: true })
     mkdirSync(dirname(componentCli), { recursive: true })
-    writeFileSync(rootOmo, "#!/bin/sh\nexec bun /repo/dist/cli/index.js \"$@\"\n")
+    writeFileSync(rootOmo, '#!/bin/sh\nexec bun /repo/dist/cli/index.js "$@"\n')
     writeFileSync(componentCli, "#!/usr/bin/env node\n")
 
     // when

@@ -1,11 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { GitNotFoundError, GitTimeoutError } from "./errors"
-import {
-  createNodeGitExec,
-  type GitExecResult,
-  type NodeGitExecRuntime,
-} from "./exec"
+import { createNodeGitExec, type GitExecResult, type NodeGitExecRuntime } from "./exec"
 
 type CommandRunner = NonNullable<NodeGitExecRuntime["runCommand"]>
 
@@ -60,9 +56,7 @@ describe("createNodeGitExec", () => {
       throw original
     }, "linux")
 
-    await expect(
-      exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files" })),
-    ).rejects.toBe(original)
+    await expect(exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files" }))).rejects.toBe(original)
     expect(attempts).toEqual(["git"])
   })
 
@@ -75,9 +69,7 @@ describe("createNodeGitExec", () => {
         throw failure
       })
 
-      await expect(
-        exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files" })),
-      ).rejects.toBe(failure)
+      await expect(exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files" }))).rejects.toBe(failure)
       expect(attempts).toEqual(["git"])
     })
   }
@@ -91,18 +83,18 @@ describe("createNodeGitExec", () => {
       return SUCCESS
     })
 
-    const result = await exec.run(["--version"], execOptions({
-      ProgramFiles: "\\\\server\\share",
-      ProgramW6432: "\\\\?\\C:\\Program Files",
-      "ProgramFiles(x86)": "\\Program Files (x86)",
-      LOCALAPPDATA: "C:\\Users\\Example User\\AppData\\Local",
-    }))
+    const result = await exec.run(
+      ["--version"],
+      execOptions({
+        ProgramFiles: "\\\\server\\share",
+        ProgramW6432: "\\\\?\\C:\\Program Files",
+        "ProgramFiles(x86)": "\\Program Files (x86)",
+        LOCALAPPDATA: "C:\\Users\\Example User\\AppData\\Local",
+      }),
+    )
 
     expect(result).toBe(SUCCESS)
-    expect(attempts).toEqual([
-      "git",
-      "C:\\Users\\Example User\\AppData\\Local\\Programs\\Git\\cmd\\git.exe",
-    ])
+    expect(attempts).toEqual(["git", "C:\\Users\\Example User\\AppData\\Local\\Programs\\Git\\cmd\\git.exe"])
   })
 
   test("#given distinct standard roots #when every executable is absent #then candidates are attempted in deterministic order", async () => {
@@ -113,12 +105,17 @@ describe("createNodeGitExec", () => {
       throw executable === "git" ? original : missingGitError()
     })
 
-    await expect(exec.run(["--version"], execOptions({
-      ProgramFiles: "C:\\Program Files",
-      ProgramW6432: "D:\\Program Files",
-      "ProgramFiles(x86)": "E:\\Program Files (x86)",
-      LOCALAPPDATA: "F:\\User Data",
-    }))).rejects.toBe(original)
+    await expect(
+      exec.run(
+        ["--version"],
+        execOptions({
+          ProgramFiles: "C:\\Program Files",
+          ProgramW6432: "D:\\Program Files",
+          "ProgramFiles(x86)": "E:\\Program Files (x86)",
+          LOCALAPPDATA: "F:\\User Data",
+        }),
+      ),
+    ).rejects.toBe(original)
 
     expect(attempts).toEqual([
       "git",
@@ -137,11 +134,16 @@ describe("createNodeGitExec", () => {
       throw executable === "git" ? original : missingGitError()
     })
 
-    await expect(exec.run(["--version"], execOptions({
-      ProgramFiles: "C:\\Program Files",
-      ProgramW6432: "c:\\PROGRAM FILES",
-      "ProgramFiles(x86)": "D:\\Program Files (x86)",
-    }))).rejects.toBe(original)
+    await expect(
+      exec.run(
+        ["--version"],
+        execOptions({
+          ProgramFiles: "C:\\Program Files",
+          ProgramW6432: "c:\\PROGRAM FILES",
+          "ProgramFiles(x86)": "D:\\Program Files (x86)",
+        }),
+      ),
+    ).rejects.toBe(original)
 
     expect(attempts).toEqual([
       "git",
@@ -160,17 +162,16 @@ describe("createNodeGitExec", () => {
       return SUCCESS
     })
 
-    const result = await exec.run(["--version"], execOptions({
-      ProgramFiles: "C:\\Program Files",
-      ProgramW6432: "D:\\Program Files",
-    }))
+    const result = await exec.run(
+      ["--version"],
+      execOptions({
+        ProgramFiles: "C:\\Program Files",
+        ProgramW6432: "D:\\Program Files",
+      }),
+    )
 
     expect(result).toBe(SUCCESS)
-    expect(attempts).toEqual([
-      "git",
-      "C:\\Program Files\\Git\\cmd\\git.exe",
-      "D:\\Program Files\\Git\\cmd\\git.exe",
-    ])
+    expect(attempts).toEqual(["git", "C:\\Program Files\\Git\\cmd\\git.exe", "D:\\Program Files\\Git\\cmd\\git.exe"])
   })
 
   for (const code of ["EACCES", "EPERM", "EIO"] as const) {
@@ -184,10 +185,15 @@ describe("createNodeGitExec", () => {
         throw failure
       })
 
-      await expect(exec.run(["--version"], execOptions({
-        ProgramFiles: "C:\\Program Files",
-        ProgramW6432: "D:\\Program Files",
-      }))).rejects.toBe(failure)
+      await expect(
+        exec.run(
+          ["--version"],
+          execOptions({
+            ProgramFiles: "C:\\Program Files",
+            ProgramW6432: "D:\\Program Files",
+          }),
+        ),
+      ).rejects.toBe(failure)
       expect(attempts).toEqual(["git", "C:\\Program Files\\Git\\cmd\\git.exe"])
     })
   }
@@ -203,10 +209,15 @@ describe("createNodeGitExec", () => {
         throw failure
       })
 
-      await expect(exec.run(["--version"], execOptions({
-        ProgramFiles: "C:\\Program Files",
-        ProgramW6432: "D:\\Program Files",
-      }))).rejects.toBe(failure)
+      await expect(
+        exec.run(
+          ["--version"],
+          execOptions({
+            ProgramFiles: "C:\\Program Files",
+            ProgramW6432: "D:\\Program Files",
+          }),
+        ),
+      ).rejects.toBe(failure)
       expect(attempts).toEqual(["git", "C:\\Program Files\\Git\\cmd\\git.exe"])
     })
   }
@@ -221,10 +232,15 @@ describe("createNodeGitExec", () => {
       throw timeout
     })
 
-    await expect(exec.run(["--version"], execOptions({
-      ProgramFiles: "C:\\Program Files",
-      ProgramW6432: "D:\\Program Files",
-    }))).rejects.toBe(timeout)
+    await expect(
+      exec.run(
+        ["--version"],
+        execOptions({
+          ProgramFiles: "C:\\Program Files",
+          ProgramW6432: "D:\\Program Files",
+        }),
+      ),
+    ).rejects.toBe(timeout)
     expect(attempts).toEqual(["git", "C:\\Program Files\\Git\\cmd\\git.exe"])
   })
 
@@ -238,10 +254,13 @@ describe("createNodeGitExec", () => {
       return nonzero
     })
 
-    const result = await exec.run(["status"], execOptions({
-      ProgramFiles: "C:\\Program Files",
-      ProgramW6432: "D:\\Program Files",
-    }))
+    const result = await exec.run(
+      ["status"],
+      execOptions({
+        ProgramFiles: "C:\\Program Files",
+        ProgramW6432: "D:\\Program Files",
+      }),
+    )
 
     expect(result).toBe(nonzero)
     expect(attempts).toEqual(["git", "C:\\Program Files\\Git\\cmd\\git.exe"])
@@ -273,7 +292,10 @@ describe("createNodeGitExec", () => {
       return SUCCESS
     })
 
-    await exec.run(["-c", "user.name=fixture-writer", "status", "--porcelain"], execOptions({ ProgramFiles: "C:\\Program Files" }))
+    await exec.run(
+      ["-c", "user.name=fixture-writer", "status", "--porcelain"],
+      execOptions({ ProgramFiles: "C:\\Program Files" }),
+    )
 
     const expected = ["-c", "core.fsmonitor=false", "-c", "user.name=fixture-writer", "status", "--porcelain"]
     expect(argvs).toEqual([expected, expected])
@@ -287,9 +309,7 @@ describe("createNodeGitExec", () => {
       throw failure
     })
 
-    await expect(
-      exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files" })),
-    ).rejects.toBe(failure)
+    await expect(exec.run(["--version"], execOptions({ ProgramFiles: "C:\\Program Files" }))).rejects.toBe(failure)
     expect(attempts).toEqual(["git"])
   })
 })

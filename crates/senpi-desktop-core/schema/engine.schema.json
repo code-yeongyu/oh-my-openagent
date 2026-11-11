@@ -3710,7 +3710,7 @@
             "string",
             "null"
           ],
-          "description": "Machine-readable cause, an open token set per code (object mode),\ne.g. `InvalidCoordinateFrame`: `resized`, `consumed`, `zoom`,\n`wrong_target`, `out_of_bounds`; `WindowNotFound`: `identity_changed`;\n`InvalidTarget`: `ambiguous`; `BackgroundUnavailable`:\n`key_route_unproven`, `user_active_in_target`,\n`pointer_reading_toolkit`, `electron_select`,\n`wayland_window_targeting`; `InvalidKey`: `dangerous_chord`;\n`ControlRequired`: `headless_host`, `spawn_inside_session`,\n`lease_missing`; `Suspended`: `stop_marker`; `Internal`:\n`request_too_large`, `other`."
+          "description": "Machine-readable cause, an open token set per code (object mode),\ne.g. `InvalidCoordinateFrame`: `resized`, `consumed`, `zoom`,\n`wrong_target`, `out_of_bounds`; `WindowNotFound`: `identity_changed`;\n`InvalidTarget`: `ambiguous`; `BackgroundUnavailable`:\n`key_route_unproven`, `user_active_in_target`,\n`pointer_reading_toolkit`, `electron_select`,\n`wayland_window_targeting`; `InvalidKey`: `dangerous_chord`;\n`AxUnsupported`: `disabled`, `action_unsupported`, `not_visible`,\n`unstable`, `occluded` (the actionability battery);\n`ControlRequired`: `headless_host`, `spawn_inside_session`,\n`lease_missing`; `Suspended`: `stop_marker`; `Internal`:\n`request_too_large`, `other`."
         },
         "disposition": {
           "anyOf": [
@@ -3742,6 +3742,17 @@
               "type": "null"
             }
           ]
+        },
+        "nextCall": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/NextCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The next rung of the refusal ladder (element action, keyboard,\nforeground), object mode; never followed automatically."
         }
       },
       "required": [

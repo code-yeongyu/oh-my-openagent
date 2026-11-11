@@ -4,10 +4,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { Readable } from "node:stream"
-import {
-  ensureVendoredLspDaemonBuilt,
-  type RunVendoredLspCommand,
-} from "./ensure-vendored-lsp-daemon"
+import { ensureVendoredLspDaemonBuilt, type RunVendoredLspCommand } from "./ensure-vendored-lsp-daemon"
 
 interface Deferred<T> {
   promise: Promise<T>
@@ -27,9 +24,7 @@ const ownerFixturePath = join(import.meta.dir, "fixtures", "vendored-lsp-build-o
 type OwnerProcess = ChildProcessByStdio<null, Readable, Readable>
 
 afterEach(async () => {
-  await Promise.all(
-    temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
-  )
+  await Promise.all(temporaryRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
 describe("ensureVendoredLspDaemonBuilt", () => {
@@ -259,9 +254,7 @@ describe("ensureVendoredLspDaemonBuilt", () => {
     })
 
     // then
-    await expect(result).rejects.toThrow(
-      "lsp-daemon npm ci failed with signal SIGTERM",
-    )
+    await expect(result).rejects.toThrow("lsp-daemon npm ci failed with signal SIGTERM")
   })
 })
 
@@ -269,10 +262,7 @@ function observeExit(child: OwnerProcess): Promise<void> {
   return new Promise((resolve) => child.once("exit", () => resolve()))
 }
 
-function waitForLine(
-  child: OwnerProcess,
-  expected: string,
-): Promise<void> {
+function waitForLine(child: OwnerProcess, expected: string): Promise<void> {
   return new Promise((resolve, reject) => {
     let stdout = ""
 
