@@ -37,7 +37,7 @@ export const ComputerSettingsSchema = Type.Object(
 		runSandbox: Type.Optional(
 			Type.Union([Type.Literal("vm"), Type.Literal("quickjs")], {
 				default: "vm",
-				description: "Where `run` code executes; reserved: every run uses `vm` until the QuickJS cell lands",
+				description: "Where model-written `run` code executes: `vm` (default) or `quickjs`, the QuickJS cell; host-origin runs always use `vm`",
 			}),
 		),
 		intervention: Type.Optional(
