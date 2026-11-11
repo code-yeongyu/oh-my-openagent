@@ -43,16 +43,21 @@ export function cliDeviceServiceHandoff(options: {
   const connect = options.connect ?? (() => connectDeviceService({ version: packageJson.version, stateDir }))
   const doFetch = options.fetch ?? fetch
   const report = (what: string) => (error: unknown) => {
-    options.log(`OmO device service: ${what} did not complete (${error instanceof Error ? error.message : String(error)}).`)
+    options.log(
+      `OmO device service: ${what} did not complete (${error instanceof Error ? error.message : String(error)}).`,
+    )
   }
   return {
-    adopt: async credentials => {
+    adopt: async (credentials) => {
       // No running service: nothing to hand over, so not even the account is asked for.
       if (!existsSync(deviceServiceEndpointPath(stateDir))) return
       try {
         const account = await accountOf(options.api, credentials, doFetch)
         await handDeviceKeys({
-          stateDir, connect, when: "always", log: options.log,
+          stateDir,
+          connect,
+          when: "always",
+          log: options.log,
           credential: {
             device: { id: credentials.device.id, name: credentials.device.name },
             signingPrivateKey: credentials.signingPrivateKey,
@@ -98,26 +103,36 @@ export function cliMachineDeviceService(options: {
       return await use(service)
     } catch (error) {
       const older = error instanceof LocalApiError && (error.code === "unknown_type" || error.code === "unsupported")
-      if (!older) options.log(`OmO device service: ${what} did not complete (${error instanceof Error ? error.message : String(error)}).`)
+      if (!older)
+        options.log(
+          `OmO device service: ${what} did not complete (${error instanceof Error ? error.message : String(error)}).`,
+        )
       return undefined
     } finally {
       service?.close()
     }
   }
   return {
-    binding: machineSalt => withService("binding this sign-in to the machine", async service => {
-      const answer = await service.machineBinding(machineSalt)
-      return {
-        machineHash: answer.machine_hash,
-        device: answer.device === null ? null : {
-          id: answer.device.id, signingKey: answer.device.signing_public_key, sealingKey: answer.device.sealing_public_key,
-        },
-        mergeDeviceIds: answer.merge_device_ids,
-      }
-    }),
-    heldDevice: () => withService("reading its device", async service => {
-      const status = await service.status()
-      return status.device === null || NOT_HOLDING.has(status.state) ? null : status.device.id
-    }),
+    binding: (machineSalt) =>
+      withService("binding this sign-in to the machine", async (service) => {
+        const answer = await service.machineBinding(machineSalt)
+        return {
+          machineHash: answer.machine_hash,
+          device:
+            answer.device === null
+              ? null
+              : {
+                  id: answer.device.id,
+                  signingKey: answer.device.signing_public_key,
+                  sealingKey: answer.device.sealing_public_key,
+                },
+          mergeDeviceIds: answer.merge_device_ids,
+        }
+      }),
+    heldDevice: () =>
+      withService("reading its device", async (service) => {
+        const status = await service.status()
+        return status.device === null || NOT_HOLDING.has(status.state) ? null : status.device.id
+      }),
   }
 }

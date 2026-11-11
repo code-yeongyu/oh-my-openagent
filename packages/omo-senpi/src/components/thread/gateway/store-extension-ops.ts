@@ -1,12 +1,31 @@
-import { declarationProblem, declaredOpNames, importExtensionModule, persistDescriptor, readDescriptor, toolNameTaken } from "./extension-registrations"
-import { assertExtensionName, checkExtensionSchema, ExtensionSchemaViolation, extensionSchema, extensionSql, sqliteName } from "./extension-sql"
+import {
+  declarationProblem,
+  declaredOpNames,
+  importExtensionModule,
+  persistDescriptor,
+  readDescriptor,
+  toolNameTaken,
+} from "./extension-registrations"
+import {
+  assertExtensionName,
+  checkExtensionSchema,
+  ExtensionSchemaViolation,
+  extensionSchema,
+  extensionSql,
+  sqliteName,
+} from "./extension-sql"
 import { ExtensionArgumentError, extensionTransaction } from "./extension-transaction"
 import { singleExtensionStatement } from "./extension-statement"
 import type { GatewayEngineOptions, GatewayResolve } from "./engine"
 import { isLockWaitExceeded } from "./lock-wait"
 import { GatewaySchemaVersionError } from "./schema"
 import { transaction, type StoreContext } from "./store-ops"
-import type { StoreExtensionOperation, StoreExtensionRefusal, StoreExtensionRegistration, StoreExtensionResult } from "./store-extensions"
+import type {
+  StoreExtensionOperation,
+  StoreExtensionRefusal,
+  StoreExtensionRegistration,
+  StoreExtensionResult,
+} from "./store-extensions"
 
 type Registered = {
   readonly descriptor: StoreExtensionRegistration
@@ -19,7 +38,12 @@ function refusal(code: StoreExtensionRefusal["code"], message: string): StoreExt
 
 function fromError(error: unknown): StoreExtensionRefusal {
   const message = error instanceof Error ? error.message : String(error)
-  if (error instanceof ExtensionSchemaViolation || error instanceof GatewaySchemaVersionError || error instanceof ExtensionArgumentError) return refusal(error.code, message)
+  if (
+    error instanceof ExtensionSchemaViolation ||
+    error instanceof GatewaySchemaVersionError ||
+    error instanceof ExtensionArgumentError
+  )
+    return refusal(error.code, message)
   if (isLockWaitExceeded(error)) return refusal("gateway_lock_wait_exceeded", message)
   return refusal("extension_operation_failed", message)
 }
@@ -37,12 +61,23 @@ export type ExtensionRun = {
 export class StoreExtensions {
   private readonly registered = new Map<string, Registered>()
 
-  constructor(private readonly ctx: StoreContext, private readonly resolveTarget: GatewayResolve, private readonly senderProvenance: GatewayEngineOptions["senderProvenance"]) {}
+  constructor(
+    private readonly ctx: StoreContext,
+    private readonly resolveTarget: GatewayResolve,
+    private readonly senderProvenance: GatewayEngineOptions["senderProvenance"],
+  ) {}
 
   /** `restoredAt`: a restarted worker replaying a registration this process made then (`persistDescriptor`). */
-  async register(descriptor: StoreExtensionRegistration, now: number, restoredAt?: number): Promise<StoreExtensionResult<{ readonly version: number }>> {
-    if (!/^[a-z][a-z0-9_]{1,31}$/.test(descriptor.name) || !Array.isArray(descriptor.migrations)
-      || !descriptor.migrations.every((step) => Array.isArray(step) && step.every((sql) => typeof sql === "string"))) {
+  async register(
+    descriptor: StoreExtensionRegistration,
+    now: number,
+    restoredAt?: number,
+  ): Promise<StoreExtensionResult<{ readonly version: number }>> {
+    if (
+      !/^[a-z][a-z0-9_]{1,31}$/.test(descriptor.name) ||
+      !Array.isArray(descriptor.migrations) ||
+      !descriptor.migrations.every((step) => Array.isArray(step) && step.every((sql) => typeof sql === "string"))
+    ) {
       return refusal("invalid_arguments", "An extension needs a valid namespace and an array of SQL migration steps.")
     }
     const declared = declarationProblem(descriptor)
@@ -56,7 +91,10 @@ export class StoreExtensions {
     try {
       module = await importExtensionModule(descriptor.moduleUrl)
     } catch (error) {
-      return refusal("extension_import_failed", `Cannot import extension ${descriptor.name}: ${error instanceof Error ? error.message : String(error)}`)
+      return refusal(
+        "extension_import_failed",
+        `Cannot import extension ${descriptor.name}: ${error instanceof Error ? error.message : String(error)}`,
+      )
     }
     const exported = declarationProblem(descriptor, module)
     if (exported !== undefined) return refusal("invalid_arguments", `Extension ${descriptor.name}: ${exported}.`)
@@ -67,7 +105,9 @@ export class StoreExtensions {
     try {
       const version = await this.ensure(descriptor, now)
       // The newest registration of a name replaces its persisted descriptor, so every process lists its session ops.
-      const raced = await transaction(this.ctx, "extension_register", () => persistDescriptor(this.ctx, descriptor, now, restoredAt))
+      const raced = await transaction(this.ctx, "extension_register", () =>
+        persistDescriptor(this.ctx, descriptor, now, restoredAt),
+      )
       if (raced !== undefined) return refusal("invalid_arguments", `Extension ${descriptor.name}: ${raced}.`)
       this.registered.set(descriptor.name, { descriptor, module })
       return { kind: "ok", value: { version } }
@@ -83,7 +123,10 @@ export class StoreExtensions {
     return this.registered.get(descriptor.name)?.descriptor === descriptor
   }
 
-  private async ensure(descriptor: Pick<StoreExtensionRegistration, "name" | "migrations">, now: number): Promise<number> {
+  private async ensure(
+    descriptor: Pick<StoreExtensionRegistration, "name" | "migrations">,
+    now: number,
+  ): Promise<number> {
     const { name, migrations } = descriptor
     // Like core `migrate`, a current extension costs no write lock: read its version lock-free and
     // take the lock only when a step is pending or the version is unknown.
@@ -93,13 +136,22 @@ export class StoreExtensions {
       const step = await transaction(this.ctx, "extension_migrate", () => {
         const row = this.ctx.sql.one(["version"], "SELECT version FROM extension_schema WHERE name = ?", [name])
         const version = Number(row?.version ?? 0)
-        if (version > migrations.length) throw new GatewaySchemaVersionError(version, migrations.length, `Extension ${name}`)
+        if (version > migrations.length)
+          throw new GatewaySchemaVersionError(version, migrations.length, `Extension ${name}`)
         const before = extensionSchema(this.ctx.sql)
-        if (row === undefined && before.objects.some((object) => sqliteName(String(object.name)).startsWith(`${name}_`) && before.owners.get(`${String(object.type)}:${sqliteName(String(object.name))}`) == null)) {
+        if (
+          row === undefined &&
+          before.objects.some(
+            (object) =>
+              sqliteName(String(object.name)).startsWith(`${name}_`) &&
+              before.owners.get(`${String(object.type)}:${sqliteName(String(object.name))}`) == null,
+          )
+        ) {
           throw new ExtensionSchemaViolation(`Namespace ${name} already contains unowned objects.`)
         }
         if (version === migrations.length) {
-          if (row === undefined) this.ctx.sql.run("INSERT INTO extension_schema (name, version, updated_at) VALUES (?, 0, ?)", [name, now])
+          if (row === undefined)
+            this.ctx.sql.run("INSERT INTO extension_schema (name, version, updated_at) VALUES (?, 0, ?)", [name, now])
           return { version, applied: false }
         }
         for (const statement of migrations[version]) {
@@ -109,7 +161,10 @@ export class StoreExtensions {
           checkExtensionSchema(this.ctx.sql, name, beforeStatement, extensionSchema(this.ctx.sql))
         }
         checkExtensionSchema(this.ctx.sql, name, before, extensionSchema(this.ctx.sql))
-        this.ctx.sql.run("INSERT INTO extension_schema (name, version, updated_at) VALUES (?, ?, ?) ON CONFLICT(name) DO UPDATE SET version = excluded.version, updated_at = excluded.updated_at", [name, version + 1, now])
+        this.ctx.sql.run(
+          "INSERT INTO extension_schema (name, version, updated_at) VALUES (?, ?, ?) ON CONFLICT(name) DO UPDATE SET version = excluded.version, updated_at = excluded.updated_at",
+          [name, version + 1, now],
+        )
         return { version: version + 1, applied: true }
       })
       if (!step.applied) return step.version
@@ -121,7 +176,10 @@ export class StoreExtensions {
     const own = this.registered.get(name)
     const persisted = readDescriptor(this.ctx, name)
     if (declaredOpNames(own?.descriptor).has(op) || declaredOpNames(persisted).has(op)) {
-      return refusal("caller_not_allowed", `${name}.${op} is session-callable: only the session's own tool reaches it, with the caller the engine resolved.`)
+      return refusal(
+        "caller_not_allowed",
+        `${name}.${op} is session-callable: only the session's own tool reaches it, with the caller the engine resolved.`,
+      )
     }
     const entry = own ?? (await this.load(name, persisted))
     if ("kind" in entry) return entry
@@ -134,7 +192,8 @@ export class StoreExtensions {
    * import answers this call only, and the next one imports again.
    */
   async load(name: string, persisted = readDescriptor(this.ctx, name)): Promise<Registered | StoreExtensionRefusal> {
-    if (persisted === undefined) return refusal("extension_unknown_name", `No store extension is registered as ${name}.`)
+    if (persisted === undefined)
+      return refusal("extension_unknown_name", `No store extension is registered as ${name}.`)
     try {
       assertExtensionName(this.ctx.sql, name)
     } catch (error) {
@@ -143,14 +202,18 @@ export class StoreExtensions {
     try {
       return { descriptor: { ...persisted, name }, module: await importExtensionModule(persisted.moduleUrl) }
     } catch (error) {
-      return refusal("extension_import_failed", `Cannot import extension ${name}: ${error instanceof Error ? error.message : String(error)}`)
+      return refusal(
+        "extension_import_failed",
+        `Cannot import extension ${name}: ${error instanceof Error ? error.message : String(error)}`,
+      )
     }
   }
 
   async run(request: ExtensionRun, now: number): Promise<StoreExtensionResult<unknown>> {
     const { name, op, module } = request
     const operation = Object.hasOwn(module, op) ? module[op] : undefined
-    if (typeof operation !== "function") return refusal("extension_unknown_op", `Extension ${name} exports no operation ${op}.`)
+    if (typeof operation !== "function")
+      return refusal("extension_unknown_op", `Extension ${name} exports no operation ${op}.`)
     const effects: (() => void)[] = []
     const compensations: (() => void)[] = []
     let value: unknown
@@ -160,9 +223,16 @@ export class StoreExtensions {
         // Re-check under the call's own lock: a newer binary may have migrated the extension since.
         const row = this.ctx.sql.one(["version"], "SELECT version FROM extension_schema WHERE name = ?", [name])
         const locked = Number(row?.version ?? 0)
-        if (locked !== version) throw new GatewaySchemaVersionError(locked, request.descriptor.migrations.length, `Extension ${name}`)
+        if (locked !== version)
+          throw new GatewaySchemaVersionError(locked, request.descriptor.migrations.length, `Extension ${name}`)
         const before = extensionSchema(this.ctx.sql)
-        const scope = extensionTransaction({ ...this.ctx, afterCommit: effects, afterRollback: compensations }, name, now, this.resolveTarget, this.senderProvenance)
+        const scope = extensionTransaction(
+          { ...this.ctx, afterCommit: effects, afterRollback: compensations },
+          name,
+          now,
+          this.resolveTarget,
+          this.senderProvenance,
+        )
         let timer: ReturnType<typeof setTimeout> | undefined
         try {
           const run = async () => {
@@ -175,7 +245,11 @@ export class StoreExtensions {
           const deadline = new Promise<never>((_resolve, reject) => {
             timer = setTimeout(() => {
               scope.cancel()
-              reject(new Error(`Extension ${name}.${op} exceeded its ${this.ctx.config.lock_wait_max_ms} ms operation budget.`))
+              reject(
+                new Error(
+                  `Extension ${name}.${op} exceeded its ${this.ctx.config.lock_wait_max_ms} ms operation budget.`,
+                ),
+              )
             }, this.ctx.config.lock_wait_max_ms)
           })
           const result = await Promise.race([run(), deadline])
@@ -197,7 +271,12 @@ export class StoreExtensions {
         try {
           compensation()
         } catch (compensationError) {
-          this.ctx.emit({ kind: "extension_error", extension: name, phase: "after_rollback", error: compensationError instanceof Error ? compensationError.message : String(compensationError) })
+          this.ctx.emit({
+            kind: "extension_error",
+            extension: name,
+            phase: "after_rollback",
+            error: compensationError instanceof Error ? compensationError.message : String(compensationError),
+          })
         }
       }
       return fromError(error)
@@ -209,7 +288,12 @@ export class StoreExtensions {
       try {
         effect()
       } catch (error) {
-        this.ctx.emit({ kind: "extension_error", extension: name, phase: "after_commit", error: error instanceof Error ? error.message : String(error) })
+        this.ctx.emit({
+          kind: "extension_error",
+          extension: name,
+          phase: "after_commit",
+          error: error instanceof Error ? error.message : String(error),
+        })
       }
     }
     return { kind: "ok", value }

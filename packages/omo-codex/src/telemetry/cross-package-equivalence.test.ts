@@ -7,8 +7,7 @@ const CODEX_ROOT = join(REPO_ROOT, "packages", "omo-codex")
 const COMPONENT_ROOT = join(CODEX_ROOT, "plugin", "components", "telemetry")
 const REMOVED_SYNC_SCRIPT_NAME = ["sync", "telemetry", "component"].join("-")
 const TELEMETRY_CORE_PACKAGE = "@oh-my-opencode/telemetry-core"
-const SYNCED_COMPONENT_SOURCE_PATTERN =
-  /(atomic-write|data-path|diagnostics|env-flags|posthog-activity-state)\.ts$/
+const SYNCED_COMPONENT_SOURCE_PATTERN = /(atomic-write|data-path|diagnostics|env-flags|posthog-activity-state)\.ts$/
 
 function readText(path: string): string {
   return readFileSync(path, "utf-8")

@@ -101,7 +101,9 @@ function parseProfileMatch(match: Record<string, unknown>): CodexReasoningProfil
   } = {}
   if (typeof match["model"] === "string") profile.model = match["model"]
   if (typeof match["model_context_window"] === "number") profile.modelContextWindow = match["model_context_window"]
-  if (typeof match["model_reasoning_effort"] === "string") profile.modelReasoningEffort = match["model_reasoning_effort"]
-  if (typeof match["plan_mode_reasoning_effort"] === "string") profile.planModeReasoningEffort = match["plan_mode_reasoning_effort"]
+  if (typeof match["model_reasoning_effort"] === "string")
+    profile.modelReasoningEffort = match["model_reasoning_effort"]
+  if (typeof match["plan_mode_reasoning_effort"] === "string")
+    profile.planModeReasoningEffort = match["plan_mode_reasoning_effort"]
   return profile
 }

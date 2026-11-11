@@ -4,11 +4,7 @@ import { existsSync, readFileSync, realpathSync, rmSync, writeFileSync } from "n
 import { observeState, stopParent } from "./task-host-e2e-events.mjs"
 import { HostClient } from "./task-host-e2e-shards-rpc.mjs"
 import { lastJsonLine, runBin } from "./task-host-e2e-process.mjs"
-import {
-  stopEndpoint,
-  taskRecords,
-  teardownSandbox,
-} from "./task-host-e2e-shard-cost-support.mjs"
+import { stopEndpoint, taskRecords, teardownSandbox } from "./task-host-e2e-shard-cost-support.mjs"
 import { generationNames } from "./task-host-e2e-shards-support.mjs"
 import {
   createHttpScenario,
@@ -62,23 +58,29 @@ export async function runAltRootSuccessorScenario(current, olderBin, artifacts) 
     parent = startHttpParent(old, ALT_ROOT)
     const parentRecord = await observeState(sandbox.root, () => {
       const record = taskRecords(project).find((entry) => entry.name === "alt-parent-child")
-      return record?.host_session?.socket && requestSeen(requestLog, ALT_PARENT)
-        ? record
-        : undefined
+      return record?.host_session?.socket && requestSeen(requestLog, ALT_PARENT) ? record : undefined
     })
     if (parentRecord === undefined) throw new Error("alternate-root parent child did not start")
     const named = runBin(old, [
-      "host", "shard-path", "--kind", "i", "--owner", "alt-thread",
-      "--root", dirname(parentRecord.host_session.socket), "--json",
+      "host",
+      "shard-path",
+      "--kind",
+      "i",
+      "--owner",
+      "alt-thread",
+      "--root",
+      dirname(parentRecord.host_session.socket),
+      "--json",
     ])
     const threadSocket = lastJsonLine(named.stdout)?.socket
     if (named.status !== 0 || typeof threadSocket !== "string") {
       throw new Error(`alternate i shard-path failed: ${named.stderr || named.stdout}`)
     }
-    const ensured = runBin(old, [
-      "host", "ensure", "--socket", threadSocket, "--launch-spec", current.specPath,
-      "--policy", "never", "--json",
-    ], { timeoutMs: 120_000 })
+    const ensured = runBin(
+      old,
+      ["host", "ensure", "--socket", threadSocket, "--launch-spec", current.specPath, "--policy", "never", "--json"],
+      { timeoutMs: 120_000 },
+    )
     if (ensured.status !== 0) throw new Error(`alternate i ensure failed: ${ensured.stderr || ensured.stdout}`)
     client = await HostClient.connect(threadSocket, "alt-i")
     const opened = await client.openSession({
@@ -90,37 +92,28 @@ export async function runAltRootSuccessorScenario(current, olderBin, artifacts) 
       modelId: "mock-1",
     })
     const prompt = client.request({ type: "prompt", sessionId: opened.routingId, message: ALT_THREAD })
-    await observeState(sandbox.root, () => requestSeen(requestLog, ALT_THREAD) ? true : undefined)
+    await observeState(sandbox.root, () => (requestSeen(requestLog, ALT_THREAD) ? true : undefined))
     sockets = [parentRecord.host_session.socket, threadSocket]
-    const before = Object.fromEntries(sockets.map((socket) => [
-      socket,
-      endpoint(sandbox, socket === threadSocket ? "i" : "p")?.instanceId,
-    ]))
-    swapBinary(current.bin, binary)
-    const handoffRun = startCommand(
-      { ...sandbox, bin: binary },
-      ["daemon", "handoff", "--json"],
+    const before = Object.fromEntries(
+      sockets.map((socket) => [socket, endpoint(sandbox, socket === threadSocket ? "i" : "p")?.instanceId]),
     )
+    swapBinary(current.bin, binary)
+    const handoffRun = startCommand({ ...sandbox, bin: binary }, ["daemon", "handoff", "--json"])
     const after = await observeState(sandbox.root, () => {
       const rows = ["p", "i"].map((kind) => endpoint(sandbox, kind))
-      return rows.every((row) => row && row.instanceId !== before[row.socket])
-        ? rows
-        : undefined
+      return rows.every((row) => row && row.instanceId !== before[row.socket]) ? rows : undefined
     })
     const notices = sockets.map((socket) => {
       const path = socket.replace(/\.sock$/, ".meta.json")
-      return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")).notice ?? null : null
+      return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")).notice ?? null) : null
     })
     const noticeTokens = notices.map((notice) =>
-      notice?.startsWith("host_notice:") ? notice : `host_notice:${notice}`)
-    const generations = Object.fromEntries(sockets.map((socket) => [
-      socket,
-      generationNames(sandbox, socket),
-    ]))
+      notice?.startsWith("host_notice:") ? notice : `host_notice:${notice}`,
+    )
+    const generations = Object.fromEntries(sockets.map((socket) => [socket, generationNames(sandbox, socket)]))
     const facts = {
       sockets,
-      all_under_fixed_alt_root: sockets.every((socket) =>
-        /^\/(?:private\/)?tmp\/omo-rpc-/.test(socket)),
+      all_under_fixed_alt_root: sockets.every((socket) => /^\/(?:private\/)?tmp\/omo-rpc-/.test(socket)),
       raw_meta_notices: notices,
       notice_tokens: noticeTokens,
       successor_instances: after?.map((row) => row.instanceId) ?? [],

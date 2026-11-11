@@ -40,7 +40,7 @@ async function fixture(attempt: number) {
     mergePolicy: "auto",
     worktreeDir: join(root, "missing-worktree"),
     worktreeBranch: "memory/reflection-missing",
-    baseSha: await new GitMemoryRepo({ dir: identity.paths.repo, agentId: identity.id }).head() ?? "",
+    baseSha: (await new GitMemoryRepo({ dir: identity.paths.repo, agentId: identity.id }).head()) ?? "",
     gitFilePath: join(root, "missing-worktree", ".git"),
     gitFileSnapshot: "gitdir: missing\n",
     commonConfigPath: join(identity.paths.repo, ".git", "config"),
@@ -86,11 +86,15 @@ describe("run finalization publication races", () => {
     }
 
     // when
-    const result = await abandonReservationRun({
-      identity: item.identity,
-      reservation,
-      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
-    }, item.runDir, item.ledger)
+    const result = await abandonReservationRun(
+      {
+        identity: item.identity,
+        reservation,
+        now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+      },
+      item.runDir,
+      item.ledger,
+    )
 
     // then
     expect(result?.outcome).toBe("timed_out")
@@ -110,24 +114,28 @@ describe("run finalization publication races", () => {
     }
 
     // when
-    const result = await abandonReservationRun({
-      identity: item.identity,
-      reservation,
-      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
-      getPidLiveness: () => {
-        publication ??= (async () => {
-          await claimRunTerminal(item.runDir, { runId: ledger.runId, attempt: ledger.attempt ?? 1 }, "publish")
-          await new Promise<void>((resolve) => setImmediate(resolve))
-          await writeRunJsonAtomic(join(item.runDir, "publishing.json"), {
-            version: 1,
-            runId: "run-1",
-            attempt: 1,
-            finishedAt: "2026-08-11T10:00:01.000Z",
-          })
-        })()
-        return "unknown"
+    const result = await abandonReservationRun(
+      {
+        identity: item.identity,
+        reservation,
+        now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+        getPidLiveness: () => {
+          publication ??= (async () => {
+            await claimRunTerminal(item.runDir, { runId: ledger.runId, attempt: ledger.attempt ?? 1 }, "publish")
+            await new Promise<void>((resolve) => setImmediate(resolve))
+            await writeRunJsonAtomic(join(item.runDir, "publishing.json"), {
+              version: 1,
+              runId: "run-1",
+              attempt: 1,
+              finishedAt: "2026-08-11T10:00:01.000Z",
+            })
+          })()
+          return "unknown"
+        },
       },
-    }, item.runDir, ledger)
+      item.runDir,
+      ledger,
+    )
     await publication
 
     // then
@@ -156,11 +164,16 @@ describe("run finalization publication races", () => {
     }
 
     // when
-    const result = await failReservationRun({
-      identity: item.identity,
-      reservation,
-      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
-    }, item.runDir, item.ledger, "failed")
+    const result = await failReservationRun(
+      {
+        identity: item.identity,
+        reservation,
+        now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+      },
+      item.runDir,
+      item.ledger,
+      "failed",
+    )
 
     // then
     expect(result?.outcome).toBe("failed")

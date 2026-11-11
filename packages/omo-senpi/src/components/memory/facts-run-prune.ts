@@ -92,10 +92,7 @@ export async function pruneTerminalFactsRuns(
 }
 
 /** Newest-first survivors under both limits; everything after them is prunable. */
-async function selectPrunable(
-  runsDir: string,
-  options: PruneTerminalFactsRunsOptions,
-): Promise<readonly string[]> {
+async function selectPrunable(runsDir: string, options: PruneTerminalFactsRunsOptions): Promise<readonly string[]> {
   const keepLast = options.keepLast ?? FACTS_RUN_KEEP_LAST
   const maxTotalBytes = options.maxTotalBytes ?? FACTS_RUN_MAX_TOTAL_BYTES
   const runs = await readTerminalRuns(runsDir)
@@ -119,8 +116,10 @@ async function readTerminalRuns(runsDir: string): Promise<readonly TerminalRun[]
     const run = await readTerminalRun(runsDir, name)
     if (run !== undefined) runs.push(run)
   }
-  return runs.sort((left, right) =>
-    right.finishedAt - left.finishedAt || (left.name < right.name ? 1 : left.name > right.name ? -1 : 0))
+  return runs.sort(
+    (left, right) =>
+      right.finishedAt - left.finishedAt || (left.name < right.name ? 1 : left.name > right.name ? -1 : 0),
+  )
 }
 
 /** A run is terminal only when ledger, sentinel and directory name all name the same run. */
@@ -136,15 +135,17 @@ async function readTerminalRun(runsDir: string, name: string): Promise<TerminalR
 }
 
 async function readSentinel(runDir: string): Promise<{ readonly runId: string; readonly at: string } | undefined> {
-  const final = await readRunJson<{ runId?: unknown; finishedAt?: unknown }>(join(runDir, "final.json"))
-    .catch(() => undefined)
+  const final = await readRunJson<{ runId?: unknown; finishedAt?: unknown }>(join(runDir, "final.json")).catch(
+    () => undefined,
+  )
   if (final !== undefined) {
     return typeof final.runId === "string" && typeof final.finishedAt === "string"
       ? { runId: final.runId, at: final.finishedAt }
       : undefined
   }
-  const abandoned = await readRunJson<{ runId?: unknown; abandonedAt?: unknown }>(join(runDir, "abandoned.json"))
-    .catch(() => undefined)
+  const abandoned = await readRunJson<{ runId?: unknown; abandonedAt?: unknown }>(join(runDir, "abandoned.json")).catch(
+    () => undefined,
+  )
   if (abandoned === undefined) return undefined
   return typeof abandoned.runId === "string" && typeof abandoned.abandonedAt === "string"
     ? { runId: abandoned.runId, at: abandoned.abandonedAt }
@@ -163,11 +164,7 @@ async function directoryBytes(path: string): Promise<number> {
 }
 
 /** Renames the run away under its own finalize lock; a busy lock means skip, never wait. */
-async function claimForPruning(
-  runsDir: string,
-  locksDir: string,
-  name: string,
-): Promise<string | undefined> {
+async function claimForPruning(runsDir: string, locksDir: string, name: string): Promise<string | undefined> {
   const record = await createLockRecord("facts-finalize", { runId: name })
   const finalizeLock = runFinalizationLockPath(locksDir, name)
   try {

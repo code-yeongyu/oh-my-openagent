@@ -41,9 +41,7 @@ describe("applyProviderConfig", () => {
     })
 
     // then
-    expect(Array.from(modelCacheState.modelContextLimitsCache.entries())).toEqual([
-      ["google/gemini-2.5-pro", 1048576],
-    ])
+    expect(Array.from(modelCacheState.modelContextLimitsCache.entries())).toEqual([["google/gemini-2.5-pro", 1048576]])
   })
 
   test("caches vision-capable models from modalities and capabilities", () => {
@@ -87,10 +85,7 @@ describe("applyProviderConfig", () => {
     applyProviderConfig({ config, modelCacheState })
 
     // then
-    expect(Array.from(visionCapableModelsCache.keys())).toEqual([
-      "rundao/public/qwen3.5-397b",
-      "google/gemini-3-flash",
-    ])
+    expect(Array.from(visionCapableModelsCache.keys())).toEqual(["rundao/public/qwen3.5-397b", "google/gemini-3-flash"])
     expect(readVisionCapableModelsCache()).toEqual([
       { providerID: "rundao", modelID: "public/qwen3.5-397b" },
       { providerID: "google", modelID: "gemini-3-flash" },
@@ -124,12 +119,8 @@ describe("applyProviderConfig", () => {
     })
 
     // then - trusted model is in cache even though provider config did not declare image support
-    expect(Array.from(visionCapableModelsCache.keys())).toEqual([
-      "zhipuai-coding-plan/glm-5.1",
-    ])
-    expect(readVisionCapableModelsCache()).toEqual([
-      { providerID: "zhipuai-coding-plan", modelID: "glm-5.1" },
-    ])
+    expect(Array.from(visionCapableModelsCache.keys())).toEqual(["zhipuai-coding-plan/glm-5.1"])
+    expect(readVisionCapableModelsCache()).toEqual([{ providerID: "zhipuai-coding-plan", modelID: "glm-5.1" }])
   })
 
   test("does not duplicate a trusted model already discovered via provider modalities", () => {
@@ -159,9 +150,7 @@ describe("applyProviderConfig", () => {
     })
 
     // then
-    expect(Array.from(visionCapableModelsCache.keys())).toEqual([
-      "google/gemini-3-flash",
-    ])
+    expect(Array.from(visionCapableModelsCache.keys())).toEqual(["google/gemini-3-flash"])
   })
 
   test("ignores malformed trusted vision-capable model strings", () => {

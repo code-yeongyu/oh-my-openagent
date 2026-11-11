@@ -1,6 +1,10 @@
 import { join } from "node:path"
 
-import { TRANSCRIPT_ASSISTANT_EVENT, TRANSCRIPT_ERROR_EVENT, TRANSCRIPT_TOOL_EVENT } from "../../../manager/transcript-log"
+import {
+  TRANSCRIPT_ASSISTANT_EVENT,
+  TRANSCRIPT_ERROR_EVENT,
+  TRANSCRIPT_TOOL_EVENT,
+} from "../../../manager/transcript-log"
 import type { TranscriptEntry, TranscriptReadResult } from "../types"
 import { readBoundedFileText } from "./read-bounded"
 

@@ -49,44 +49,57 @@ export default function registerDepthMockProvider(pi: ExtensionAPI): void {
     baseUrl: "file://mock-provider",
     apiKey: "mock",
     api: "openai-completions" satisfies Api,
-    models: [{
-      id: "mock-1",
-      name: "Mock 1",
-      reasoning: false,
-      input: ["text"],
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 200_000,
-      maxTokens: 4096,
-    }],
+    models: [
+      {
+        id: "mock-1",
+        name: "Mock 1",
+        reasoning: false,
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 200_000,
+        maxTokens: 4096,
+      },
+    ],
     streamSimple(_model: unknown, context: Context, options?: { signal?: AbortSignal }) {
       requestCount += 1
       const toolResult = lastToolResultText(context)
       const hasTaskTool = (context.tools ?? []).some((tool) => tool.name === "task")
       const delegate = toolResult === undefined && hasTaskTool
-      appendFileSync(join(context.cwd ?? process.cwd(), "depth-requests.jsonl"), `${JSON.stringify({
-        pid: process.pid,
-        rpc: process.argv.includes("rpc"),
-        depth_env: env["OMO_SENPI_TASK_DEPTH"] ?? null,
-        root_env: env["OMO_SENPI_TASK_ROOT_SESSION_ID"] ?? null,
-        has_task_tool: hasTaskTool,
-        action: delegate ? "delegate" : "answer",
-        tool_result: toolResult?.slice(0, 400) ?? null,
-        at: Date.now(),
-      })}\n`)
+      appendFileSync(
+        join(context.cwd ?? process.cwd(), "depth-requests.jsonl"),
+        `${JSON.stringify({
+          pid: process.pid,
+          rpc: process.argv.includes("rpc"),
+          depth_env: env["OMO_SENPI_TASK_DEPTH"] ?? null,
+          root_env: env["OMO_SENPI_TASK_ROOT_SESSION_ID"] ?? null,
+          has_task_tool: hasTaskTool,
+          action: delegate ? "delegate" : "answer",
+          tool_result: toolResult?.slice(0, 400) ?? null,
+          at: Date.now(),
+        })}\n`,
+      )
       if (delegate) {
-        return streamStep({
-          type: "tool_call",
-          name: "task",
-          arguments: {
-            subagent_type: "worker",
-            model: "omo-mock/mock-1",
-            prompt: "Delegate this to another worker subagent; never do it yourself.",
-            run_in_background: false,
-            load_skills: [],
+        return streamStep(
+          {
+            type: "tool_call",
+            name: "task",
+            arguments: {
+              subagent_type: "worker",
+              model: "omo-mock/mock-1",
+              prompt: "Delegate this to another worker subagent; never do it yourself.",
+              run_in_background: false,
+              load_skills: [],
+            },
           },
-        }, requestCount, options)
+          requestCount,
+          options,
+        )
       }
-      return streamStep({ type: "text", text: `depth mock answered: ${toolResult ?? "no task tool"}` }, requestCount, options)
+      return streamStep(
+        { type: "text", text: `depth mock answered: ${toolResult ?? "no task tool"}` },
+        requestCount,
+        options,
+      )
     },
   })
 }
@@ -104,8 +117,11 @@ function lastToolResultText(context: Context): string | undefined {
 function textOf(content: unknown): string {
   if (typeof content === "string") return content
   if (!Array.isArray(content)) return ""
-  return content.map((part: unknown) =>
-    typeof part === "object" && part !== null && "text" in part && typeof part.text === "string" ? part.text : "").join("")
+  return content
+    .map((part: unknown) =>
+      typeof part === "object" && part !== null && "text" in part && typeof part.text === "string" ? part.text : "",
+    )
+    .join("")
 }
 
 // Streams one step with every partial carrying the content block it announces. senpi's RPC event

@@ -111,7 +111,9 @@ function carriesProfileNotice(context: unknown): boolean {
   if (typeof context !== "object" || context === null) return false
   const messages = Reflect.get(context, "messages")
   if (!Array.isArray(messages)) return false
-  return messages.some((message) => /OmO Native: model[ _]profile/.test(JSON.stringify(Reflect.get(Object(message), "content") ?? "")))
+  return messages.some((message) =>
+    /OmO Native: model[ _]profile/.test(JSON.stringify(Reflect.get(Object(message), "content") ?? "")),
+  )
 }
 
 function appendCapture(record: Record<string, unknown>): void {
@@ -122,18 +124,14 @@ function wrapStreamSimple(providerId: string, original: StreamSimple): StreamSim
   return (model, context, options) => {
     appendCapture({
       provider: providerId,
-      model: typeof model === "object" && model !== null ? Reflect.get(model, "id") ?? null : null,
-      thinking:
-        readThinking(options) ??
-        readThinking(context) ??
-        readThinking(model) ??
-        null,
+      model: typeof model === "object" && model !== null ? (Reflect.get(model, "id") ?? null) : null,
+      thinking: readThinking(options) ?? readThinking(context) ?? readThinking(model) ?? null,
       configurationUpdateEffort: lastConfigurationUpdateEffort(context),
       profileNoticeInRequest: carriesProfileNotice(context),
       thinkingSelection:
-        typeof options === "object" && options !== null ? Reflect.get(options, "thinkingSelection") ?? null : null,
+        typeof options === "object" && options !== null ? (Reflect.get(options, "thinkingSelection") ?? null) : null,
       modelThinkingLevelMap:
-        typeof model === "object" && model !== null ? Reflect.get(model, "thinkingLevelMap") ?? null : null,
+        typeof model === "object" && model !== null ? (Reflect.get(model, "thinkingLevelMap") ?? null) : null,
       optionKeys: typeof options === "object" && options !== null ? Object.keys(options) : [],
       contextKeys: typeof context === "object" && context !== null ? Object.keys(context) : [],
     })

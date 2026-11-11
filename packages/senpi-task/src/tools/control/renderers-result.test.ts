@@ -22,24 +22,99 @@ const TERMINAL_CONTROL_PATTERN = /[\u0000-\u001f\u007f-\u009f]/u
 type SendResultRenderCase = readonly [name: string, details: SendResultDetails, expected: string]
 
 const SEND_RESULT_RENDER_CASES = [
-  ["unresponsive", { kind: "unresponsive", task_id: "st_1", retryable: true, reason: "HOST_STATUS_SENTINEL" }, "[muted]task_send unresponsive st_1: HOST_STATUS_SENTINEL[/muted]"],
-  ["uncertain", { kind: "uncertain", task_id: "st_1", effect_id: "st_1:0:1", reason: "Delivery pending." }, "[warning]task_send Delivery pending. Effect id: st_1:0:1[/warning]"],
-  ["failed", { kind: "failed", task_id: "st_1", effect_id: "st_1:0:1", reason: "conflict", detail: "Different input", action: "Use a new id" }, "[error]task_send conflict: Different input. Action: Use a new id.[/error]"],
-  ["steered", { kind: "steered", task_id: "st_1", status: "running", delivered: "steer" }, "[accent]task_send delivered st_1 as steer (running)[/accent]"],
+  [
+    "unresponsive",
+    { kind: "unresponsive", task_id: "st_1", retryable: true, reason: "HOST_STATUS_SENTINEL" },
+    "[muted]task_send unresponsive st_1: HOST_STATUS_SENTINEL[/muted]",
+  ],
+  [
+    "uncertain",
+    { kind: "uncertain", task_id: "st_1", effect_id: "st_1:0:1", reason: "Delivery pending." },
+    "[warning]task_send Delivery pending. Effect id: st_1:0:1[/warning]",
+  ],
+  [
+    "failed",
+    {
+      kind: "failed",
+      task_id: "st_1",
+      effect_id: "st_1:0:1",
+      reason: "conflict",
+      detail: "Different input",
+      action: "Use a new id",
+    },
+    "[error]task_send conflict: Different input. Action: Use a new id.[/error]",
+  ],
+  [
+    "steered",
+    { kind: "steered", task_id: "st_1", status: "running", delivered: "steer" },
+    "[accent]task_send delivered st_1 as steer (running)[/accent]",
+  ],
   ["revived", { kind: "revived", task_id: "st_1", run_epoch: 2 }, "[success]task_send revived st_1 epoch 2[/success]"],
-  ["delivery_uncertain", { kind: "delivery_uncertain", task_id: "st_1", run_epoch: 2, reason: "Child exited.", suggestion: "Inspect output." }, "[warning]task_send delivery uncertain st_1 epoch 2: Child exited. Inspect output.[/warning]"],
+  [
+    "delivery_uncertain",
+    {
+      kind: "delivery_uncertain",
+      task_id: "st_1",
+      run_epoch: 2,
+      reason: "Child exited.",
+      suggestion: "Inspect output.",
+    },
+    "[warning]task_send delivery uncertain st_1 epoch 2: Child exited. Inspect output.[/warning]",
+  ],
   ["queued", { kind: "queued", task_id: "st_1", queue_position: 3 }, "[muted]task_send queued st_1 position 3[/muted]"],
-  ["not_continuable", { kind: "not_continuable", task_id: "st_1", reason: "Task is cancelled.", suggestion: "Start a new task." }, "[warning]task_send not continuable st_1: Task is cancelled. Start a new task.[/warning]"],
-  ["scope_denied", { kind: "scope_denied", task_id: "st_1", owning_session_id: "owner", reason: "Denied." }, "[error]task_send denied st_1 owner:owner[/error]"],
-  ["one_shot_agent", { kind: "one_shot_agent", task_id: "st_1", agent: "momus", message: "reminder" }, "[error]task_send denied st_1 one-shot:momus[/error]"],
-  ["not_found", { kind: "not_found", reason: "No task.", known_tasks: ["alpha"] }, "[error]task_send not found: No task. known:alpha[/error]"],
-  ["invalid_arguments", { kind: "invalid_arguments", reason: "message is required" }, "[error]task_send invalid: message is required[/error]"],
-  ["team_message", { kind: "team_message", team: { kind: "to_lead", message_id: "msg-1" } }, "[success]task_send team message msg-1 enqueued to lead[/success]"],
-  ["shutdown_requested", { kind: "shutdown_requested", team_run_id: "team-1", member: "builder" }, "[warning]task_send shutdown requested team-1 member:builder[/warning]"],
-  ["shutdown_responded", { kind: "shutdown_responded", team_run_id: "team-1", member: "builder", approved: false }, "[warning]task_send shutdown rejected team-1 member:builder[/warning]"],
-  ["shutdown_failed", { kind: "shutdown_failed", operation: "reject", team_run_id: "team-1", member: "builder", code: "team_state_missing", reason: "Team state is unavailable." }, "[error]task_send shutdown reject failed team-1 member:builder: Team state is unavailable.[/error]"],
+  [
+    "not_continuable",
+    { kind: "not_continuable", task_id: "st_1", reason: "Task is cancelled.", suggestion: "Start a new task." },
+    "[warning]task_send not continuable st_1: Task is cancelled. Start a new task.[/warning]",
+  ],
+  [
+    "scope_denied",
+    { kind: "scope_denied", task_id: "st_1", owning_session_id: "owner", reason: "Denied." },
+    "[error]task_send denied st_1 owner:owner[/error]",
+  ],
+  [
+    "one_shot_agent",
+    { kind: "one_shot_agent", task_id: "st_1", agent: "momus", message: "reminder" },
+    "[error]task_send denied st_1 one-shot:momus[/error]",
+  ],
+  [
+    "not_found",
+    { kind: "not_found", reason: "No task.", known_tasks: ["alpha"] },
+    "[error]task_send not found: No task. known:alpha[/error]",
+  ],
+  [
+    "invalid_arguments",
+    { kind: "invalid_arguments", reason: "message is required" },
+    "[error]task_send invalid: message is required[/error]",
+  ],
+  [
+    "team_message",
+    { kind: "team_message", team: { kind: "to_lead", message_id: "msg-1" } },
+    "[success]task_send team message msg-1 enqueued to lead[/success]",
+  ],
+  [
+    "shutdown_requested",
+    { kind: "shutdown_requested", team_run_id: "team-1", member: "builder" },
+    "[warning]task_send shutdown requested team-1 member:builder[/warning]",
+  ],
+  [
+    "shutdown_responded",
+    { kind: "shutdown_responded", team_run_id: "team-1", member: "builder", approved: false },
+    "[warning]task_send shutdown rejected team-1 member:builder[/warning]",
+  ],
+  [
+    "shutdown_failed",
+    {
+      kind: "shutdown_failed",
+      operation: "reject",
+      team_run_id: "team-1",
+      member: "builder",
+      code: "team_state_missing",
+      reason: "Team state is unavailable.",
+    },
+    "[error]task_send shutdown reject failed team-1 member:builder: Team state is unavailable.[/error]",
+  ],
 ] satisfies readonly SendResultRenderCase[]
-
 
 function firstLine(component: { render(width: number): string[] }, width: number): string {
   return component.render(width)[0] ?? ""
@@ -48,7 +123,6 @@ function firstLine(component: { render(width: number): string[] }, width: number
 function expectNoTerminalControls(value: string): void {
   expect(value).not.toMatch(TERMINAL_CONTROL_PATTERN)
 }
-
 
 describe("task_send result renderers", () => {
   test.each(SEND_RESULT_RENDER_CASES)(
@@ -77,7 +151,9 @@ describe("task_send result renderers", () => {
       120,
     )
 
-    expect(line).toBe("[error]task_send shutdown approve failed team-9 member:builder: Team state is unavailable.[/error]")
+    expect(line).toBe(
+      "[error]task_send shutdown approve failed team-9 member:builder: Team state is unavailable.[/error]",
+    )
     expect(line).not.toContain("ENOENT")
     expect(line).not.toContain("/private/secret")
     expect(line).not.toContain("state.json")
@@ -96,9 +172,18 @@ describe("task_send result renderers", () => {
 
     // when
     const send = firstLine(renderTaskSendResult(toolResult("ignored", sendDetails), RESULT_OPTIONS, ANSI_THEME), 120)
-    const cancel = firstLine(renderTaskCancelResult(toolResult("ignored", cancelDetails), RESULT_OPTIONS, ANSI_THEME), 120)
-    const plainSend = firstLine(renderTaskSendResult(toolResult("ignored", sendDetails), RESULT_OPTIONS, TEST_THEME), 120)
-    const plainCancel = firstLine(renderTaskCancelResult(toolResult("ignored", cancelDetails), RESULT_OPTIONS, TEST_THEME), 120)
+    const cancel = firstLine(
+      renderTaskCancelResult(toolResult("ignored", cancelDetails), RESULT_OPTIONS, ANSI_THEME),
+      120,
+    )
+    const plainSend = firstLine(
+      renderTaskSendResult(toolResult("ignored", sendDetails), RESULT_OPTIONS, TEST_THEME),
+      120,
+    )
+    const plainCancel = firstLine(
+      renderTaskCancelResult(toolResult("ignored", cancelDetails), RESULT_OPTIONS, TEST_THEME),
+      120,
+    )
 
     // then
     expect(send).toStartWith("\u001b[33m")
@@ -108,5 +193,4 @@ describe("task_send result renderers", () => {
     expectNoTerminalControls(plainSend)
     expectNoTerminalControls(plainCancel)
   })
-
 })

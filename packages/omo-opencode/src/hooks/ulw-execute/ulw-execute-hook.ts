@@ -68,14 +68,11 @@ function findFrameworkSessionContextRanges(text: string): readonly TextRange[] {
 
     const instructionOpen = text.lastIndexOf(COMMAND_INSTRUCTION_OPEN, markerIndex)
     const instructionBodyStart = instructionOpen + COMMAND_INSTRUCTION_OPEN.length
-    const instructionClose = text.indexOf(
-      COMMAND_INSTRUCTION_CLOSE,
-      markerIndex + ULW_EXECUTE_TEMPLATE_MARKER.length,
-    )
+    const instructionClose = text.indexOf(COMMAND_INSTRUCTION_CLOSE, markerIndex + ULW_EXECUTE_TEMPLATE_MARKER.length)
     if (
-      instructionOpen < searchFrom
-      || instructionClose < 0
-      || text.slice(instructionBodyStart, markerIndex).trim() !== ""
+      instructionOpen < searchFrom ||
+      instructionClose < 0 ||
+      text.slice(instructionBodyStart, markerIndex).trim() !== ""
     ) {
       searchFrom = markerIndex + ULW_EXECUTE_TEMPLATE_MARKER.length
       continue
@@ -102,11 +99,7 @@ function findFrameworkSessionContextRanges(text: string): readonly TextRange[] {
   return ranges
 }
 
-function substituteSessionContextPlaceholders(
-  parts: TextPart[],
-  sessionId: string,
-  timestamp: string,
-): void {
+function substituteSessionContextPlaceholders(parts: TextPart[], sessionId: string, timestamp: string): void {
   let offset = 0
   const entries: TextEntry[] = []
   for (const part of parts) {
@@ -129,19 +122,19 @@ function substituteSessionContextPlaceholders(
       const localStart = overlapStart - entry.start
       const localEnd = overlapEnd - entry.start
       substituted += entry.text.slice(cursor, localStart)
-      substituted += entry.text.slice(localStart, localEnd).replace(
-        RUNTIME_PLACEHOLDER_PATTERN,
-        (placeholder) => placeholder === "$SESSION_ID" ? sessionId : timestamp,
-      )
+      substituted += entry.text
+        .slice(localStart, localEnd)
+        .replace(RUNTIME_PLACEHOLDER_PATTERN, (placeholder) => (placeholder === "$SESSION_ID" ? sessionId : timestamp))
       cursor = localEnd
     }
     entry.part.text = substituted + entry.text.slice(cursor)
   }
 }
 
-function resolveWorktreeContext(
-  explicitWorktreePath: string | null,
-): { worktreePath: string | undefined; block: string } {
+function resolveWorktreeContext(explicitWorktreePath: string | null): {
+  worktreePath: string | undefined
+  block: string
+} {
   if (explicitWorktreePath === null) {
     return { worktreePath: undefined, block: "" }
   }
@@ -158,10 +151,7 @@ function resolveWorktreeContext(
 }
 
 export function createUlwExecuteHook(ctx: PluginInput) {
-  const processUlwExecute = async (
-    input: UlwExecuteHookInput,
-    output: UlwExecuteHookOutput,
-  ): Promise<void> => {
+  const processUlwExecute = async (input: UlwExecuteHookInput, output: UlwExecuteHookOutput): Promise<void> => {
     const parts = output.parts
     const promptText =
       parts
@@ -170,17 +160,12 @@ export function createUlwExecuteHook(ctx: PluginInput) {
         .join("\n")
         .trim() || ""
 
-    if (
-      !promptText.includes("<session-context>")
-      || !promptText.includes(ULW_EXECUTE_TEMPLATE_MARKER)
-    ) {
+    if (!promptText.includes("<session-context>") || !promptText.includes(ULW_EXECUTE_TEMPLATE_MARKER)) {
       return
     }
 
     log(`[${HOOK_NAME}] Processing ulw-execute command`, { sessionID: input.sessionID })
-    const activeAgent = isAgentRegistered("atlas")
-      ? "atlas"
-      : "sisyphus"
+    const activeAgent = isAgentRegistered("atlas") ? "atlas" : "sisyphus"
     updateSessionAgent(input.sessionID, activeAgent)
     if (output.message) {
       output.message["agent"] = resolveRegisteredAgentName(activeAgent) ?? activeAgent

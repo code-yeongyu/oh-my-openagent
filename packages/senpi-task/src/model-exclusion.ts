@@ -28,6 +28,7 @@ export function withoutExcludedModels<TModel extends SenpiModelPort>(
         return key === undefined || !isExcludedModel(key, patterns)
       })
     },
-    find: (provider, modelId) => isExcludedModel(`${provider}/${modelId}`, patterns) ? undefined : registry.find(provider, modelId),
+    find: (provider, modelId) =>
+      isExcludedModel(`${provider}/${modelId}`, patterns) ? undefined : registry.find(provider, modelId),
   }
 }

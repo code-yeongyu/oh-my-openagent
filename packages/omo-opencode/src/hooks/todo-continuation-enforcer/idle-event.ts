@@ -8,7 +8,14 @@ import { latestAssistantTurnBlocksInternalPrompt } from "@oh-my-opencode/utils/p
 
 import { isLastAssistantMessageAborted } from "./abort-detection"
 import { acknowledgeCompactionGuard, isCompactionGuardActive } from "./compaction-guard"
-import { ABORT_WINDOW_MS, CONTINUATION_COOLDOWN_MS, DEFAULT_SKIP_AGENTS, FAILURE_RESET_WINDOW_MS, HOOK_NAME, MAX_CONSECUTIVE_FAILURES } from "./constants"
+import {
+  ABORT_WINDOW_MS,
+  CONTINUATION_COOLDOWN_MS,
+  DEFAULT_SKIP_AGENTS,
+  FAILURE_RESET_WINDOW_MS,
+  HOOK_NAME,
+  MAX_CONSECUTIVE_FAILURES,
+} from "./constants"
 import { startCountdown } from "./countdown"
 import { hasUnansweredQuestion } from "./pending-question-detection"
 import { resolveLatestMessageInfo } from "./resolve-message-info"
@@ -40,7 +47,10 @@ export async function handleSessionIdle(args: {
   const observedCompactionEpoch = state.recentCompactionEpoch
 
   if (state.allTodosCompletedAt) {
-    log(`[${HOOK_NAME}] Skipped: all todos were already completed`, { sessionID, allTodosCompletedAt: state.allTodosCompletedAt })
+    log(`[${HOOK_NAME}] Skipped: all todos were already completed`, {
+      sessionID,
+      allTodosCompletedAt: state.allTodosCompletedAt,
+    })
     return
   }
 
@@ -65,7 +75,9 @@ export async function handleSessionIdle(args: {
   }
 
   if (state.unrecoverableErrorDetected) {
-    log(`[${HOOK_NAME}] Skipped: non-retryable request error detected, re-injecting would rebuild the same request`, { sessionID })
+    log(`[${HOOK_NAME}] Skipped: non-retryable request error detected, re-injecting would rebuild the same request`, {
+      sessionID,
+    })
     return
   }
 
@@ -80,8 +92,10 @@ export async function handleSessionIdle(args: {
   }
 
   const hasRunningBgTasks = backgroundManager
-    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running" || task.status === "pending")
-      || backgroundManager.hasPendingParentWake?.(sessionID) === true
+    ? backgroundManager
+        .getTasksByParentSession(sessionID)
+        .some((task: { status: string }) => task.status === "running" || task.status === "pending") ||
+      backgroundManager.hasPendingParentWake?.(sessionID) === true
     : false
 
   if (hasRunningBgTasks) {
@@ -144,23 +158,32 @@ export async function handleSessionIdle(args: {
   }
 
   if (
-    state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES
-    && state.lastInjectedAt
-    && Date.now() - state.lastInjectedAt >= FAILURE_RESET_WINDOW_MS
+    state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES &&
+    state.lastInjectedAt &&
+    Date.now() - state.lastInjectedAt >= FAILURE_RESET_WINDOW_MS
   ) {
     state.consecutiveFailures = 0
-    log(`[${HOOK_NAME}] Reset consecutive failures after recovery window`, { sessionID, failureResetWindowMs: FAILURE_RESET_WINDOW_MS })
+    log(`[${HOOK_NAME}] Reset consecutive failures after recovery window`, {
+      sessionID,
+      failureResetWindowMs: FAILURE_RESET_WINDOW_MS,
+    })
   }
 
   if (state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-    log(`[${HOOK_NAME}] Skipped: max consecutive failures reached`, { sessionID, consecutiveFailures: state.consecutiveFailures })
+    log(`[${HOOK_NAME}] Skipped: max consecutive failures reached`, {
+      sessionID,
+      consecutiveFailures: state.consecutiveFailures,
+    })
     return
   }
 
-  const effectiveCooldown =
-    CONTINUATION_COOLDOWN_MS * 2 ** Math.min(state.consecutiveFailures, 5)
+  const effectiveCooldown = CONTINUATION_COOLDOWN_MS * 2 ** Math.min(state.consecutiveFailures, 5)
   if (state.lastInjectedAt && Date.now() - state.lastInjectedAt < effectiveCooldown) {
-    log(`[${HOOK_NAME}] Skipped: cooldown active`, { sessionID, effectiveCooldown, consecutiveFailures: state.consecutiveFailures })
+    log(`[${HOOK_NAME}] Skipped: cooldown active`, {
+      sessionID,
+      effectiveCooldown,
+      consecutiveFailures: state.consecutiveFailures,
+    })
     return
   }
 
@@ -187,7 +210,9 @@ export async function handleSessionIdle(args: {
     resolvedInfo = { ...resolvedInfo, agent: sessionAgent }
   }
 
-  const acknowledgedCompaction = resolvedInfo?.agent ? acknowledgeCompactionGuard(state, observedCompactionEpoch) : false
+  const acknowledgedCompaction = resolvedInfo?.agent
+    ? acknowledgeCompactionGuard(state, observedCompactionEpoch)
+    : false
   const compactionGuardActive = isCompactionGuardActive(state, Date.now())
 
   log(`[${HOOK_NAME}] Agent check`, {
@@ -201,7 +226,7 @@ export async function handleSessionIdle(args: {
   })
 
   const resolvedAgentName = resolvedInfo?.agent
-  if (resolvedAgentName && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(resolvedAgentName))) {
+  if (resolvedAgentName && skipAgents.some((s) => getAgentConfigKey(s) === getAgentConfigKey(resolvedAgentName))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: resolvedAgentName })
     return
   }
@@ -210,7 +235,11 @@ export async function handleSessionIdle(args: {
     return
   }
   if (compactionGuardActive) {
-    log(`[${HOOK_NAME}] Skipped: compaction guard still armed for current epoch`, { sessionID, observedCompactionEpoch, currentCompactionEpoch: state.recentCompactionEpoch })
+    log(`[${HOOK_NAME}] Skipped: compaction guard still armed for current epoch`, {
+      sessionID,
+      observedCompactionEpoch,
+      currentCompactionEpoch: state.recentCompactionEpoch,
+    })
     return
   }
 
@@ -219,11 +248,7 @@ export async function handleSessionIdle(args: {
     return
   }
 
-  const progressUpdate = sessionStateStore.trackContinuationProgress(
-    sessionID,
-    incompleteCount,
-    todos,
-  )
+  const progressUpdate = sessionStateStore.trackContinuationProgress(sessionID, incompleteCount, todos)
   if (state.continuationBlockReason) {
     log(`[${HOOK_NAME}] Skipped: continuation paused at turn boundary`, {
       sessionID,

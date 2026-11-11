@@ -25,8 +25,12 @@ function slowHost() {
   return {
     surface,
     calls: () => calls,
-    advance: (ms: number) => { clock += ms },
-    finishEnumeration: () => { for (const done of pending.splice(0)) done() },
+    advance: (ms: number) => {
+      clock += ms
+    },
+    finishEnumeration: () => {
+      for (const done of pending.splice(0)) done()
+    },
     enumerating: () => pending.length > 0,
   }
 }

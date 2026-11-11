@@ -1,9 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
-import {
-  _resetForTesting,
-  subagentSessions,
-  syncSubagentSessions,
-} from "../../features/claude-code-session-state"
+import { _resetForTesting, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
 import { executeSync } from "./sync-executor"
 
 type ExecuteSyncArgs = Parameters<typeof executeSync>[0]

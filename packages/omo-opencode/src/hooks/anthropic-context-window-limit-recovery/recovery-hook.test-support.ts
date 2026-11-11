@@ -41,18 +41,15 @@ const pluginConfig = {
 } satisfies OhMyOpenCodeConfig
 
 export function createRecoveryHook() {
-  return createAnthropicContextWindowLimitRecoveryHook(
-    createMockContext(),
-    {
-      pluginConfig,
-      dependencies: {
-        executeCompact: executeCompactMock,
-        getLastAssistant: getLastAssistantMock,
-        log: () => {},
-        parseAnthropicTokenLimitError: parseAnthropicTokenLimitErrorMock,
-      },
-    } as never,
-  )
+  return createAnthropicContextWindowLimitRecoveryHook(createMockContext(), {
+    pluginConfig,
+    dependencies: {
+      executeCompact: executeCompactMock,
+      getLastAssistant: getLastAssistantMock,
+      log: () => {},
+      parseAnthropicTokenLimitError: parseAnthropicTokenLimitErrorMock,
+    },
+  } as never)
 }
 
 export function createMockContext(): PluginInput {
