@@ -38,15 +38,29 @@ export function registerHostToolExecution(
   pi.rpc?.handle?.("omo.toolkit.executeHostTool", async (data: unknown, context?: ExtensionRpcRequestContext) => {
     const request = parseRequest(data)
     // The engine's per-request transport context; dispatching through `admit` ties the write to that request.
-    if (request === undefined || !names.has(request.name) || pi.cwd === undefined || typeof context?.admit !== "function") {
-      return { isError: true, content: [{ type: "text", text: "The host tool is not available to this session." }], details: {} }
+    if (
+      request === undefined ||
+      !names.has(request.name) ||
+      pi.cwd === undefined ||
+      typeof context?.admit !== "function"
+    ) {
+      return {
+        isError: true,
+        content: [{ type: "text", text: "The host tool is not available to this session." }],
+        details: {},
+      }
     }
     const cwd = pi.cwd
     try {
       // The pin bump installs this public SDK export. Checking the module at the
       // boundary reports a broken pin instead of substituting another preparation.
       const sdk = await loadSdk()
-      if (typeof sdk !== "object" || sdk === null || !("writeHtmlPage" in sdk) || typeof sdk.writeHtmlPage !== "function") {
+      if (
+        typeof sdk !== "object" ||
+        sdk === null ||
+        !("writeHtmlPage" in sdk) ||
+        typeof sdk.writeHtmlPage !== "function"
+      ) {
         throw new Error("The pinned SDK does not provide writeHtmlPage.")
       }
       const writeHtmlPage = sdk.writeHtmlPage

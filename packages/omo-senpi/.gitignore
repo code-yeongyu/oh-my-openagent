@@ -20,6 +20,8 @@
 !/plugin/extensions/loro_wasm_bg.wasm
 !/plugin/extensions/CaseFolding.txt
 !/plugin/extensions/omo-computer-use.js
+!/plugin/extensions/omo-computer-run-worker.mjs
+!/plugin/extensions/quickjs.wasm
 !/plugin/extensions/omo-init-deep-advisor.js
 !/plugin/extensions/omo-member.js
 !/plugin/extensions/omo-onboarding-scan.js

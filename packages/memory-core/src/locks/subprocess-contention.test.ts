@@ -47,7 +47,10 @@ async function killAndAwait(child: ChildProcess): Promise<void> {
 function waitForOutput(child: ChildProcessWithoutNullStreams, expected: string): Promise<void> {
   return new Promise((resolve, reject) => {
     let output = ""
-    const timeout = setTimeout(() => reject(new Error(`timed out waiting for ${expected}; stderr=${child.stderr.read() ?? ""}`)), 5_000)
+    const timeout = setTimeout(
+      () => reject(new Error(`timed out waiting for ${expected}; stderr=${child.stderr.read() ?? ""}`)),
+      5_000,
+    )
     const onData = (chunk: Buffer): void => {
       output += chunk.toString("utf8")
       if (!output.includes(expected)) return
@@ -63,7 +66,9 @@ function waitForOutput(child: ChildProcessWithoutNullStreams, expected: string):
   })
 }
 
-function waitForExit(child: ChildProcessWithoutNullStreams): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
+function waitForExit(
+  child: ChildProcessWithoutNullStreams,
+): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("timed out waiting for child exit")), 5_000)
     child.once("exit", (code, signal) => {
@@ -98,9 +103,11 @@ afterEach(async () => {
       }
     }
   }
-  await Promise.all(temporaryDirectories.splice(0).map(async (directory) => {
-    await removeTree(directory, { maxRetries: 10, retryDelay: 200 })
-  }))
+  await Promise.all(
+    temporaryDirectories.splice(0).map(async (directory) => {
+      await removeTree(directory, { maxRetries: 10, retryDelay: 200 })
+    }),
+  )
 })
 
 describe("real subprocess lock contention", () => {
@@ -110,7 +117,13 @@ describe("real subprocess lock contention", () => {
     const first = spawnWorker(["gated-increment", fixture.lockPath, fixture.counterPath, fixture.logPath, "first"])
     const firstExitPromise = waitForExit(first)
     await waitForOutput(first, "ready\n")
-    const second = spawnWorker(["contending-increment", fixture.lockPath, fixture.counterPath, fixture.logPath, "second"])
+    const second = spawnWorker([
+      "contending-increment",
+      fixture.lockPath,
+      fixture.counterPath,
+      fixture.logPath,
+      "second",
+    ])
     const secondExitPromise = waitForExit(second)
     await waitForOutput(second, "contended\n")
 
@@ -123,9 +136,12 @@ describe("real subprocess lock contention", () => {
     expect(secondExit).toEqual({ code: 0, signal: null })
     expect(await readFile(fixture.counterPath, "utf8")).toBe("2\n")
     expect((await readFile(fixture.logPath, "utf8")).trim().split("\n")).toEqual([
-      "first:enter", "first:exit", "second:enter", "second:exit",
+      "first:enter",
+      "first:exit",
+      "second:enter",
+      "second:exit",
     ])
-  }, 10_000)
+  })
 
   test("#given a SIGKILLed Bun lock holder #when another process acquires #then proven-dead ownership is recovered", async () => {
     // #given
@@ -144,7 +160,7 @@ describe("real subprocess lock contention", () => {
     expect(killed.signal).toBe("SIGKILL")
     expect(JSON.parse(await readFile(fixture.lockPath, "utf8"))).toEqual(successor)
     expect(await releaseLock(fixture.lockPath, successor)).toBe(true)
-  }, 10_000)
+  })
 
   test("#given a live Bun lock holder #when a contender tries immediately #then the live owner is never stolen", async () => {
     // #given
@@ -154,7 +170,10 @@ describe("real subprocess lock contention", () => {
     const contender = await createLockRecord("memory-write", { runId: "contender" })
 
     // #when
-    const error = await acquireLock(fixture.lockPath, contender).then(() => null, (cause: unknown) => cause)
+    const error = await acquireLock(fixture.lockPath, contender).then(
+      () => null,
+      (cause: unknown) => cause,
+    )
 
     // #then
     expect(error).toBeInstanceOf(LockContentionError)
@@ -162,7 +181,7 @@ describe("real subprocess lock contention", () => {
     const exitPromise = waitForExit(holder)
     holder.kill("SIGKILL")
     await exitPromise
-  }, 10_000)
+  })
 })
 
 describe("subprocess lock holder lifecycle", () => {
@@ -195,7 +214,9 @@ describe("subprocess lock holder lifecycle", () => {
     const fixture = await createFixture()
     const workerPidPath = path.join(fixture.directory, "worker.pid")
     const wrapperPath = path.join(fixture.directory, "abrupt-wrapper.mjs")
-    await writeFile(wrapperPath, `
+    await writeFile(
+      wrapperPath,
+      `
 import { spawn } from "node:child_process"
 import { writeFileSync } from "node:fs"
 const worker = spawn(
@@ -215,22 +236,29 @@ worker.stdout.on("data", (chunk) => {
 process.stdin.on("data", () => { acknowledged = true; dieOnceArmed() })
 process.stdin.on("end", () => process.kill(process.pid, "SIGKILL"))
 process.stdin.resume()
-`, "utf8")
-    const wrapper = track(spawn(process.execPath, [wrapperPath], {
-      stdio: ["pipe", "ignore", "ignore"],
-      env: {
-        ...process.env,
-        WORKER_PATH: workerPath,
-        LOCK_PATH: fixture.lockPath,
-        COUNTER_PATH: fixture.counterPath,
-        LOG_PATH: fixture.logPath,
-        WORKER_PID_PATH: workerPidPath,
-      },
-    }))
+`,
+      "utf8",
+    )
+    const wrapper = track(
+      spawn(process.execPath, [wrapperPath], {
+        stdio: ["pipe", "ignore", "ignore"],
+        env: {
+          ...process.env,
+          WORKER_PATH: workerPath,
+          LOCK_PATH: fixture.lockPath,
+          COUNTER_PATH: fixture.counterPath,
+          LOG_PATH: fixture.logPath,
+          WORKER_PID_PATH: workerPidPath,
+        },
+      }),
+    )
     // Subscribe to the wrapper's death BEFORE it can fire: the wrapper SIGKILLs itself in the
     // same tick it reads the acknowledgement, so listening only afterwards would miss the event.
     const wrapperExit = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("wrapper did not terminate after worker readiness")), READY_TIMEOUT_MS)
+      const timer = setTimeout(
+        () => reject(new Error("wrapper did not terminate after worker readiness")),
+        READY_TIMEOUT_MS,
+      )
       wrapper.once("exit", (code, signal) => {
         clearTimeout(timer)
         resolve({ code, signal })
@@ -262,7 +290,8 @@ process.stdin.resume()
       await killAndAwait(wrapper)
       // Identity-guarded: never signal a pid that has since been reused by another process.
       if (workerIdentity !== null) killIfAlive(workerIdentity)
-      else if (workerPid !== null && pidAlive(workerPid)) throw new Error(`worker pid ${String(workerPid)} is alive but its identity was never captured`)
+      else if (workerPid !== null && pidAlive(workerPid))
+        throw new Error(`worker pid ${String(workerPid)} is alive but its identity was never captured`)
     }
   }, 30_000)
 

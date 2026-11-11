@@ -14,7 +14,14 @@ export function isScriptName(value: string): value is ScriptName {
 
 export function serveScript(request: Request, ctx: RequestContext, name: ScriptName): Response {
   if (request.method === "GET") {
-    recordDownload(ctx.env, { kind: "script", source: "worker", version: "", asset: name, country: requestCountry(request), qa: isQaInstall(request) })
+    recordDownload(ctx.env, {
+      kind: "script",
+      source: "worker",
+      version: "",
+      asset: name,
+      country: requestCountry(request),
+      qa: isQaInstall(request),
+    })
   }
   return new Response(request.method === "HEAD" ? null : SCRIPTS[name], {
     headers: {

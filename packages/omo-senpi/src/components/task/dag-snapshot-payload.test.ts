@@ -107,10 +107,7 @@ describe("dagUpdatedPayload", () => {
     it("#when the payload is built #then amend_count reports the amend history length", () => {
       // given two amendments recorded on the run
       const run = runSnapshot({
-        amendHistory: [
-          { at: "2026-08-14T00:01:00.000Z" },
-          { at: "2026-08-14T00:02:00.000Z" },
-        ],
+        amendHistory: [{ at: "2026-08-14T00:01:00.000Z" }, { at: "2026-08-14T00:02:00.000Z" }],
       })
 
       // when

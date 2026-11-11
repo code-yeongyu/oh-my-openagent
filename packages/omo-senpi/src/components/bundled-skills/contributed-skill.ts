@@ -7,11 +7,13 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 
 export function readDisabledSkills(cwd: string, env: Record<string, string | undefined>): ReadonlySet<string> {
   const loaded = loadOmoConfig({ cwd, env })
-  return new Set(collectDisabledSkills({
-    harness: "senpi",
-    layers: loaded.layers,
-    ...(loaded.profile === undefined ? {} : { profile: loaded.profile }),
-  }))
+  return new Set(
+    collectDisabledSkills({
+      harness: "senpi",
+      layers: loaded.layers,
+      ...(loaded.profile === undefined ? {} : { profile: loaded.profile }),
+    }),
+  )
 }
 
 export type ContributedSkill =
@@ -27,6 +29,33 @@ export interface ResolveContributedSkillOptions {
   readonly env: Record<string, string | undefined>
 }
 
+export type BundledSkillProvenance = { readonly shadowed: false } | { readonly shadowed: true }
+
+/**
+ * Which file the session's skills listing resolves for `name`, compared with the bundled copy at
+ * `builtinPath`. This is the onboarding tour's fail-open read: senpi appends extension skill paths
+ * after the user, project, settings and package skills it has already loaded and keeps the first
+ * skill of each name, so a same-name user or project skill wins and the built-in drops out of the
+ * listing (#12544 review). No entry reads as unshadowed: the host may predate `getCommands`,
+ * discovery may not have run yet, or `disabled_skills` may hide the skill, and in all three the
+ * name form is the fail-open default for the tour (the disabled case falls back to the path in
+ * the caller, where the config is known; see `component.ts`).
+ *
+ * Do NOT reuse this for contributed skills: `resolveContributedSkill` below keeps the older,
+ * stricter rule (any loaded same-name entry shadows), because a contributed duplicate that the
+ * listing cannot place would otherwise surface as a skill-conflict collision (#9160).
+ */
+export function resolveBundledSkillProvenance(
+  pi: SenpiExtensionAPI,
+  name: string,
+  builtinPath: string,
+): BundledSkillProvenance {
+  const loaded = pi.getCommands?.().find((entry) => entry.source === "skill" && entry.name === `skill:${name}`)
+  const ownerPath = loaded?.sourceInfo?.path
+  if (ownerPath === undefined || canonicalPath(ownerPath) === canonicalPath(builtinPath)) return { shadowed: false }
+  return { shadowed: true }
+}
+
 /**
  * One `resources_discover` pass for a skill an omo component contributes on its own (computer-use,
  * x-search), as opposed to the bundled skills directory.
@@ -34,8 +63,10 @@ export interface ResolveContributedSkillOptions {
  * senpi appends extension skill paths after the user, project, settings and package skills it has
  * already loaded, keeps the first skill of each name, and reports every later one as a "Skill
  * conflicts" collision (#9160). A same-name skill that is already loaded wins either way, so ours
- * yields without a word. Our own copy left over from an earlier pass is not a rival. `disabled_skills`
- * hides the skill exactly as it hides a bundled one.
+ * yields without a word, even when the listing carries no `sourceInfo.path` for it, because the
+ * entry still occupies the name and contributing ours would collide. Our own copy left over from
+ * an earlier pass is not a rival. `disabled_skills` hides the skill exactly as it hides a bundled
+ * one.
  */
 export function resolveContributedSkill(options: ResolveContributedSkillOptions): ContributedSkill {
   if (readDisabledSkills(options.cwd, options.env).has(options.name)) return { kind: "disabled" }

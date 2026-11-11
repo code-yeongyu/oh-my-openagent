@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
+import { afterEach, describe, expect, it } from "bun:test"
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -14,10 +14,7 @@ const AUTHOR: GitCommitAuthor = {
   authorName: "Soul Watermark Test Agent",
 }
 
-const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
 const roots: string[] = []
-
-setDefaultTimeout(WINDOWS_INTEGRATION_TEST_TIMEOUT)
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
@@ -39,12 +36,7 @@ async function fixture(): Promise<{
   return { repo, noticesDir, locksDir }
 }
 
-async function commit(
-  repo: GitMemoryRepo,
-  path: string,
-  content: string,
-  message: string,
-): Promise<string> {
+async function commit(repo: GitMemoryRepo, path: string, content: string, message: string): Promise<string> {
   const fullPath = join(repo.dir, path)
   await mkdir(join(repo.dir, path.split("/").slice(0, -1).join("/")), { recursive: true })
   await writeFile(fullPath, content, "utf8")
@@ -69,9 +61,9 @@ describe("consumeSoulNoticeDelta", () => {
     const temporaries: string[] = []
     for (const revision of ["first", "second"]) {
       const head = await commit(repo, "system/persona.md", `${revision}\n`, revision)
-      temporaries.push(await observeWatermarkPublication(target, () =>
-        consumeSoulNoticeDelta(repo, { noticesDir, locksDir }),
-      ))
+      temporaries.push(
+        await observeWatermarkPublication(target, () => consumeSoulNoticeDelta(repo, { noticesDir, locksDir })),
+      )
       expect(await readWatermark(noticesDir)).toEqual({ version: 1, lastNotifiedHead: head })
     }
     expect(new Set(temporaries).size).toBe(2)
@@ -86,7 +78,8 @@ describe("consumeSoulNoticeDelta", () => {
       const head = await commit(repo, "system/persona.md", "reflection\n", "reflection")
       await withWatermarkReadFault(join(noticesDir, "soul-head.json"), fault, async () => {
         expect(await consumeSoulNoticeDelta(repo, { noticesDir, locksDir })).toEqual({
-          sha: head, subject: "reflection",
+          sha: head,
+          subject: "reflection",
         })
       })
       expect(await readWatermark(noticesDir)).toEqual({ version: 1, lastNotifiedHead: head })

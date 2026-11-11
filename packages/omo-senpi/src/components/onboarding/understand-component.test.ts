@@ -25,6 +25,7 @@ import {
   ONBOARDING_UNDERSTAND_STOP_RPC_METHOD,
   type OnboardingUnderstandEvent,
 } from "./understand-contract"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const EVENT_TIMEOUT_MS = 20_000
 const cleanups: Array<() => Promise<void>> = []
@@ -37,7 +38,10 @@ type Handler = (data: unknown) => unknown
 async function within<T>(label: string, pending: Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const expired = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`waited ${EVENT_TIMEOUT_MS}ms for ${label}, never happened`)), EVENT_TIMEOUT_MS)
+    timer = setTimeout(
+      () => reject(new Error(`waited out the test budget for ${label}, never happened`)),
+      remainingTestTime(),
+    )
   })
   try {
     return await Promise.race([pending, expired])
@@ -96,7 +100,9 @@ function host(input: {
         if (name === ONBOARDING_UNDERSTAND_RPC_EVENT) understandEvents.push(data as OnboardingUnderstandEvent)
         for (const waiter of waiters.splice(0)) waiter()
       },
-      handle(name: string, handler: Handler) { handlers.set(name, handler) },
+      handle(name: string, handler: Handler) {
+        handlers.set(name, handler)
+      },
     },
     on(event: string, handler: (payload: unknown, ctx?: unknown) => unknown) {
       if (event === "session_start") sessionHandlers.push(handler)
@@ -109,30 +115,35 @@ function host(input: {
     ...(input.scanStore === undefined ? {} : { scanStore: input.scanStore }),
     ...(input.now === undefined ? {} : { now: input.now }),
   }).register(pi, {} as never)
-  if (input.withRegistry !== false) for (const handler of sessionHandlers) handler({}, { modelRegistry: registrySnapshot() })
+  if (input.withRegistry !== false)
+    for (const handler of sessionHandlers) handler({}, { modelRegistry: registrySnapshot() })
 
   const until = async (label: string, ready: () => boolean): Promise<void> => {
-    const deadline = Date.now() + EVENT_TIMEOUT_MS
+    const deadline = Date.now() + remainingTestTime()
     while (!ready()) {
-      if (Date.now() > deadline) throw new Error(`waited ${EVENT_TIMEOUT_MS}ms for ${label}, never fired`)
+      if (Date.now() > deadline) throw new Error(`waited out the test budget for ${label}, never fired`)
       await new Promise<void>((resolve) => {
         waiters.push(resolve)
-        setTimeout(resolve, EVENT_TIMEOUT_MS).unref?.()
+        setTimeout(resolve, Math.min(EVENT_TIMEOUT_MS, Math.max(0, deadline - Date.now()))).unref?.()
       })
     }
   }
   const call = async (method: string, request: unknown) => {
     const handler = handlers.get(method)
     if (handler === undefined) throw new Error(`${method} is not registered`)
-    return await handler(request) as Record<string, unknown>
+    return (await handler(request)) as Record<string, unknown>
   }
   const scan = async (): Promise<string> => {
     const { scanId } = await call(ONBOARDING_SCAN_RPC_METHOD, {})
-    await until(`scan ${String(scanId)} done`, () => scanEvents.some((event) => event.scanId === scanId && event.kind === "done"))
+    await until(`scan ${String(scanId)} done`, () =>
+      scanEvents.some((event) => event.scanId === scanId && event.kind === "done"),
+    )
     return String(scanId)
   }
   const understandDone = async (understandId: string) => {
-    await until(`understanding ${understandId} done`, () => understandEvents.some((event) => event.understandId === understandId && event.kind === "done"))
+    await until(`understanding ${understandId} done`, () =>
+      understandEvents.some((event) => event.understandId === understandId && event.kind === "done"),
+    )
     return understandEvents.filter((event) => event.understandId === understandId)
   }
   return { call, scan, understandDone, starts: model.starts }
@@ -147,7 +158,11 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
 
     // when
     const missing = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, { scanId, model: UNDERSTAND_MODEL })
-    const refused = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, { scanId, model: UNDERSTAND_MODEL, consent: false })
+    const refused = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, {
+      scanId,
+      model: UNDERSTAND_MODEL,
+      consent: false,
+    })
 
     // then
     expect(missing).toMatchObject({ kind: "invalid" })
@@ -180,7 +195,11 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
     now += ONBOARDING_SCAN_TTL_MS + 1
 
     // when
-    const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, { scanId, model: UNDERSTAND_MODEL, consent: true })
+    const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, {
+      scanId,
+      model: UNDERSTAND_MODEL,
+      consent: true,
+    })
 
     // then
     expect(response).toMatchObject({ kind: "unavailable" })
@@ -191,15 +210,22 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
   test("#given an applied scan #when understanding is requested #then it reads that scan's digests, as the desktop's About you then Understanding you does (#12508)", async () => {
     // given
     const { environment } = await profile()
-    const rpc = host({ environment, turn: async ({ record }) => {
-      await record("The user tests with bun.")
-      return "completed"
-    } })
+    const rpc = host({
+      environment,
+      turn: async ({ record }) => {
+        await record("The user tests with bun.")
+        return "completed"
+      },
+    })
     const scanId = await rpc.scan()
     expect(await rpc.call(ONBOARDING_APPLY_RPC_METHOD, { scanId, stages: [] })).toMatchObject({ scanId, applied: [] })
 
     // when
-    const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, { scanId, model: UNDERSTAND_MODEL, consent: true })
+    const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, {
+      scanId,
+      model: UNDERSTAND_MODEL,
+      consent: true,
+    })
 
     // then
     expect(response).toEqual({ understandId: expect.any(String) })
@@ -220,7 +246,11 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
     now += ONBOARDING_SCAN_TTL_MS + 1
 
     // when
-    const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, { scanId, model: UNDERSTAND_MODEL, consent: true })
+    const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, {
+      scanId,
+      model: UNDERSTAND_MODEL,
+      consent: true,
+    })
 
     // then
     expect(response).toMatchObject({ kind: "unavailable" })
@@ -232,9 +262,13 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
     // given
     const { environment } = await profile()
     let release: (() => void) | undefined
-    const holding = new Promise<void>((resolve) => { release = resolve })
+    const holding = new Promise<void>((resolve) => {
+      release = resolve
+    })
     let entered: (() => void) | undefined
-    const running = new Promise<void>((resolve) => { entered = resolve })
+    const running = new Promise<void>((resolve) => {
+      entered = resolve
+    })
     const scanStore = createOnboardingScanStore()
     const turn: FakeTurn = async () => {
       entered?.()
@@ -249,7 +283,11 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
 
     // when
     const second = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, { scanId, model: UNDERSTAND_MODEL, consent: true })
-    const fromOtherSession = await otherSession.call(ONBOARDING_UNDERSTAND_RPC_METHOD, { scanId, model: UNDERSTAND_MODEL, consent: true })
+    const fromOtherSession = await otherSession.call(ONBOARDING_UNDERSTAND_RPC_METHOD, {
+      scanId,
+      model: UNDERSTAND_MODEL,
+      consent: true,
+    })
     release?.()
     await rpc.understandDone(String(first["understandId"]))
 
@@ -263,14 +301,21 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
   test("#given a finished scan and consent #when understanding is requested #then the caller's model reads the scan's digests and returns candidates", async () => {
     // given
     const { environment } = await profile()
-    const rpc = host({ environment, turn: async ({ record }) => {
-      await record("The user tests with bun.")
-      return "completed"
-    } })
+    const rpc = host({
+      environment,
+      turn: async ({ record }) => {
+        await record("The user tests with bun.")
+        return "completed"
+      },
+    })
     const scanId = await rpc.scan()
 
     // when
-    const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, { scanId, model: UNDERSTAND_MODEL, consent: true })
+    const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, {
+      scanId,
+      model: UNDERSTAND_MODEL,
+      consent: true,
+    })
     const events = await rpc.understandDone(String(response["understandId"]))
 
     // then
@@ -288,7 +333,11 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
     const rpc = host({ environment, turn: async () => "completed" })
 
     // when
-    const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, { scanId: "never-scanned", model: UNDERSTAND_MODEL, consent: true })
+    const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, {
+      scanId: "never-scanned",
+      model: UNDERSTAND_MODEL,
+      consent: true,
+    })
 
     // then
     expect(response).toMatchObject({ kind: "unavailable" })
@@ -311,10 +360,17 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
     const scanId = await rpc.scan()
 
     // when
-    const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, { scanId, model: UNDERSTAND_MODEL, consent: true })
+    const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, {
+      scanId,
+      model: UNDERSTAND_MODEL,
+      consent: true,
+    })
 
     // then
-    expect(response).toEqual({ kind: "unavailable", reason: expect.stringContaining("omo-onboarding-scan.js is missing") })
+    expect(response).toEqual({
+      kind: "unavailable",
+      reason: expect.stringContaining("omo-onboarding-scan.js is missing"),
+    })
     expect(rpc.starts).toHaveLength(0)
   })
 
@@ -325,7 +381,11 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
     const scanId = await rpc.scan()
 
     // when
-    const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, { scanId, model: UNDERSTAND_MODEL, consent: true })
+    const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, {
+      scanId,
+      model: UNDERSTAND_MODEL,
+      consent: true,
+    })
 
     // then
     expect(response).toMatchObject({ kind: "unavailable" })
@@ -336,21 +396,31 @@ describe("omo.onboarding.understand RPC (#10480)", () => {
     const { environment } = await profile()
     let understandId = ""
     const controlled: Array<Record<string, unknown>> = []
-    const rpc = host({ environment, turn: async () => {
-      controlled.push(await rpc.call(ONBOARDING_UNDERSTAND_SKIP_RPC_METHOD, { understandId, project: "/elsewhere" }))
-      controlled.push(await rpc.call(ONBOARDING_UNDERSTAND_STOP_RPC_METHOD, { understandId }))
-      return "hang"
-    } })
+    const rpc = host({
+      environment,
+      turn: async () => {
+        controlled.push(await rpc.call(ONBOARDING_UNDERSTAND_SKIP_RPC_METHOD, { understandId, project: "/elsewhere" }))
+        controlled.push(await rpc.call(ONBOARDING_UNDERSTAND_STOP_RPC_METHOD, { understandId }))
+        return "hang"
+      },
+    })
     const scanId = await rpc.scan()
 
     // when
-    const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, { scanId, model: UNDERSTAND_MODEL, consent: true })
+    const response = await rpc.call(ONBOARDING_UNDERSTAND_RPC_METHOD, {
+      scanId,
+      model: UNDERSTAND_MODEL,
+      consent: true,
+    })
     understandId = String(response["understandId"])
     const events = await rpc.understandDone(understandId)
     const unknown = await rpc.call(ONBOARDING_UNDERSTAND_STOP_RPC_METHOD, { understandId: "nope" })
 
     // then
-    expect(controlled).toEqual([{ understandId, accepted: true }, { understandId, accepted: true }])
+    expect(controlled).toEqual([
+      { understandId, accepted: true },
+      { understandId, accepted: true },
+    ])
     expect(events.at(-1)).toMatchObject({ kind: "done", stopped: true })
     expect(unknown).toMatchObject({ kind: "unavailable" })
   })

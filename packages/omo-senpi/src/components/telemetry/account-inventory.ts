@@ -47,10 +47,16 @@ export function loadEngineTables(load: () => Promise<unknown> = () => import("@e
 
 function isEngineTables(value: unknown): value is EngineTables {
   if (value === null || typeof value !== "object") return false
-  return ["normalizeProviderId", "getApiKeyEnvVars", "apiKeyEnvProviders"].every((name) => typeof Reflect.get(value, name) === "function")
+  return ["normalizeProviderId", "getApiKeyEnvVars", "apiKeyEnvProviders"].every(
+    (name) => typeof Reflect.get(value, name) === "function",
+  )
 }
 
-export function readConnectedAccounts(agentDir: string, env: Env, tables: EngineTables | undefined = loadedTables): string {
+export function readConnectedAccounts(
+  agentDir: string,
+  env: Env,
+  tables: EngineTables | undefined = loadedTables,
+): string {
   if (tables === undefined) return ""
   const kinds = new Map<string, number>()
   for (const [provider, count] of connectedAccountCounts(readAuth(join(agentDir, "auth.json")), env, tables)) {
@@ -63,7 +69,11 @@ export function readConnectedAccounts(agentDir: string, env: Env, tables: Engine
     .join(",")
 }
 
-export function connectedAccountCounts(auth: Readonly<Record<string, unknown>>, env: Env, piAi: EngineTables): Map<string, number> {
+export function connectedAccountCounts(
+  auth: Readonly<Record<string, unknown>>,
+  env: Env,
+  piAi: EngineTables,
+): Map<string, number> {
   const stored = new Map<string, unknown>()
   for (const [key, value] of Object.entries(auth)) {
     const canonical = piAi.normalizeProviderId(key)
@@ -79,7 +89,13 @@ export function connectedAccountCounts(auth: Readonly<Record<string, unknown>>, 
 
 function engineAccountCount(provider: string, credential: unknown, env: Env, piAi: EngineTables): number {
   const claude = piAi.normalizeProviderId(provider) === CLAUDE
-  if (credential !== undefined && credential !== null && credential !== false && credential !== "" && credential !== 0) {
+  if (
+    credential !== undefined &&
+    credential !== null &&
+    credential !== false &&
+    credential !== "" &&
+    credential !== 0
+  ) {
     const accounts = typeof credential === "object" ? Reflect.get(credential, "accounts") : undefined
     if (!claude) return Array.isArray(accounts) && accounts.length > 0 ? accounts.length : 1
     const cliAccounts = Array.isArray(accounts) ? accounts.filter(isClaudeCliSlot).length : 0
@@ -116,7 +132,9 @@ function kindOf(provider: string): string {
 function readAuth(path: string): Readonly<Record<string, unknown>> {
   try {
     const parsed: unknown = JSON.parse(readFileSync(path, "utf8"))
-    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {}
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {}
   } catch {
     return {}
   }

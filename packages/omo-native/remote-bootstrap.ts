@@ -4,17 +4,15 @@ import {
   type BootstrapDependencies,
   bootstrapDeviceService,
   DEVICE_SERVICE_VERSION,
-  type DeviceCredential,
   deviceServiceHost,
   installDeviceService,
 } from "../device-service-core/src/index.ts"
-import { createCredentialStore, SESSION_READ_WAIT } from "../omo-opencode/src/cli/service-auth/keystore"
 import packageJson from "./package.json" with { type: "json" }
 import { statusLines } from "./remote-render"
 
 // `omo remote bootstrap`: the device service bootstrap every interactive omo start runs in the background (the
 // omo-senpi device-service component starts it). One JSON line with --json: {state: "connected", status} or
-// {state, notice}; the component shows the notice for every stop but signed_out.
+// {state, notice}; the component shows the notice for every stop but signed_out, store_unavailable and not_published.
 
 /** Everything the bootstrap needs besides the account read, the state dir and the connection `omo remote` already has. */
 export type BootstrapSetup = Omit<BootstrapDependencies, "accountShow" | "stateDir" | "connect">
@@ -26,10 +24,9 @@ type BootstrapIo = Pick<BootstrapDependencies, "accountShow" | "stateDir" | "con
 
 const UNSUPPORTED_HOST = "The OmO device service does not run on this platform yet."
 
-/** This build's bootstrap inputs: the pinned release and its verified install, the stored sign-in, this omo binary. */
+/** This build's bootstrap inputs: the pinned release and its verified install and this omo binary; never a credential. */
 export function deviceServiceBootstrapSetup(options: {
   readonly stateDir: string
-  readonly credential: () => Promise<DeviceCredential | null>
   readonly binaryPath: string
   readonly agentDir: string
   readonly platform?: NodeJS.Platform
@@ -50,22 +47,8 @@ export function deviceServiceBootstrapSetup(options: {
             stateDir: options.stateDir,
             engineVersion: packageJson.dependencies["@code-yeongyu/senpi"],
           }),
-    credential: options.credential,
     refresher: { binaryPath: options.binaryPath, version: packageJson.version },
     agentDir: options.agentDir,
-  }
-}
-
-/** The stored sign-in's device and keys, read only after `omo account show` reported signed in. */
-export function storedDeviceCredential(api: string): () => Promise<DeviceCredential | null> {
-  return async () => {
-    const stored = await createCredentialStore(api, { wait: SESSION_READ_WAIT }).read()
-    if (stored === null) return null
-    return {
-      device: { id: stored.device.id, name: stored.device.name },
-      signingPrivateKey: stored.signingPrivateKey,
-      sealingPrivateKey: stored.sealingPrivateKey,
-    }
   }
 }
 
@@ -82,8 +65,17 @@ export function omoBinaryPath(env: Readonly<Record<string, string | undefined>> 
   return resolve(process.argv[1] ?? process.execPath)
 }
 
-export async function runBootstrapVerb(io: BootstrapIo, setup: BootstrapSetup, json: boolean): Promise<"connected" | "stopped"> {
-  const outcome = await bootstrapDeviceService({ accountShow: io.accountShow, stateDir: io.stateDir, connect: io.connect, ...setup })
+export async function runBootstrapVerb(
+  io: BootstrapIo,
+  setup: BootstrapSetup,
+  json: boolean,
+): Promise<"connected" | "stopped"> {
+  const outcome = await bootstrapDeviceService({
+    accountShow: io.accountShow,
+    stateDir: io.stateDir,
+    connect: io.connect,
+    ...setup,
+  })
   if (outcome.kind === "stopped") {
     if (json) io.output(JSON.stringify({ state: outcome.state, notice: outcome.notice }))
     else io.error(outcome.notice)

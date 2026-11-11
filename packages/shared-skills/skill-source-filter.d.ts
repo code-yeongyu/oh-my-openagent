@@ -1,9 +1,9 @@
-export const ignoredSkillSourceDirNames: readonly string[];
-export const ignoredSkillSourceFileNames: readonly string[];
+export const ignoredSkillSourceDirNames: readonly string[]
+export const ignoredSkillSourceFileNames: readonly string[]
 
 export interface SkillSourceCopyFilterOptions {
-	/** Additional file names (basename) to skip, merged with the shared defaults. */
-	ignoredFileNames?: readonly string[];
+  /** Additional file names (basename) to skip, merged with the shared defaults. */
+  ignoredFileNames?: readonly string[]
 }
 
 /**
@@ -11,6 +11,6 @@ export interface SkillSourceCopyFilterOptions {
  * evaluated against the path RELATIVE to sourceRoot, never against the checkout's ancestors.
  */
 export function createSkillSourceCopyFilter(
-	sourceRoot: string,
-	options?: SkillSourceCopyFilterOptions,
-): (sourcePath: string) => boolean;
+  sourceRoot: string,
+  options?: SkillSourceCopyFilterOptions,
+): (sourcePath: string) => boolean

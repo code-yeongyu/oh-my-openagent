@@ -8,8 +8,6 @@ import { recallBm25IndexFor, recallTermFigures } from "./bm25-index"
 import { RecallCorpusCache, type RecallDocument, recallMemoryFigures } from "./provider"
 import { removeTree } from "../../../../test-support/remove-tree"
 
-const GIT_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
-
 const tempDirs: string[] = []
 
 afterEach(async () => {
@@ -30,7 +28,10 @@ async function createRepo(): Promise<GitMemoryRepo> {
 }
 
 function textBytes(documents: readonly RecallDocument[]): number {
-  return documents.reduce((sum, document) => sum + 2 * (document.path.length + document.description.length + document.body.length), 0)
+  return documents.reduce(
+    (sum, document) => sum + 2 * (document.path.length + document.description.length + document.body.length),
+    0,
+  )
 }
 
 // The memory report (senpi#2564) reads these figures on demand to attribute a session's heap to the
@@ -55,7 +56,7 @@ describe("recallMemoryFigures", () => {
     expect(after.corpusCaches - before.corpusCaches).toBe(1)
     expect(after.documents - before.documents).toBe(2)
     expect(after.documentTextBytes - before.documentTextBytes).toBe(textBytes(corpus.documents))
-  }, GIT_INTEGRATION_TEST_TIMEOUT)
+  })
 })
 
 describe("recallTermFigures", () => {

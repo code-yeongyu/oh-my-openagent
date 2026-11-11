@@ -18,7 +18,7 @@ function lockPath(): string {
 }
 
 function exitedChildPid(): number {
-  const child = Bun.spawnSync(["/usr/bin/true"])
+  const child = Bun.spawnSync([process.execPath, "-e", ""])
   return child.pid
 }
 
@@ -55,7 +55,7 @@ describe("machine-wide prompt lock (#11262 design 3.6 R4; rows 12, 13)", () => {
     const path = lockPath()
     let heldWhileRemoving: boolean | undefined
     const release = await promptLockAt(path, {
-      removeRecord: async target => {
+      removeRecord: async (target) => {
         heldWhileRemoving = keychainProcessState().heldPromptLocks.has(target)
         rmSync(target, { force: true })
       },
@@ -65,8 +65,6 @@ describe("machine-wide prompt lock (#11262 design 3.6 R4; rows 12, 13)", () => {
     expect(keychainProcessState().heldPromptLocks.has(path)).toBe(false)
     expect(existsSync(path)).toBe(false)
   })
-
-
 
   test("#given this process holds it #when released and taken again #then the second take succeeds", async () => {
     const path = lockPath()

@@ -81,12 +81,16 @@ function getPendingParentWakes(manager: BackgroundManager): Map<string, unknown>
 }
 
 async function notifyParentSessionForTest(manager: BackgroundManager, task: BackgroundTask): Promise<void> {
-  const notifyParentSession = unsafeTestValue<(task: BackgroundTask) => Promise<void>>(Reflect.get(manager, "notifyParentSession"))
+  const notifyParentSession = unsafeTestValue<(task: BackgroundTask) => Promise<void>>(
+    Reflect.get(manager, "notifyParentSession"),
+  )
   await notifyParentSession.call(manager, task)
 }
 
 async function flushPendingParentWakeForTest(manager: BackgroundManager, sessionID: string): Promise<void> {
-  const flushPendingParentWake = unsafeTestValue<(sessionID: string) => Promise<void>>(Reflect.get(manager, "flushPendingParentWake"))
+  const flushPendingParentWake = unsafeTestValue<(sessionID: string) => Promise<void>>(
+    Reflect.get(manager, "flushPendingParentWake"),
+  )
   await flushPendingParentWake.call(manager, sessionID)
 }
 

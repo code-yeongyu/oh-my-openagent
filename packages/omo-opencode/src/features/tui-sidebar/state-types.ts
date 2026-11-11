@@ -20,20 +20,13 @@ export type RosterRow = {
 }
 
 export type ConfigState =
-  | { readonly kind: "valid" }
-  | { readonly kind: "invalid"; readonly messages: readonly string[] }
+  { readonly kind: "valid" } | { readonly kind: "invalid"; readonly messages: readonly string[] }
 
-export type RosterState =
-  | { readonly kind: "empty" }
-  | { readonly kind: "rows"; readonly rows: readonly RosterRow[] }
+export type RosterState = { readonly kind: "empty" } | { readonly kind: "rows"; readonly rows: readonly RosterRow[] }
 
-export type AgentsState =
-  | { readonly kind: "none" }
-  | { readonly kind: "list"; readonly agents: readonly AgentRow[] }
+export type AgentsState = { readonly kind: "none" } | { readonly kind: "list"; readonly agents: readonly AgentRow[] }
 
-export type JobBoardState =
-  | { readonly kind: "none" }
-  | { readonly kind: "list"; readonly jobs: readonly JobRow[] }
+export type JobBoardState = { readonly kind: "none" } | { readonly kind: "list"; readonly jobs: readonly JobRow[] }
 
 export type LoopLive = {
   readonly kind: "live"
@@ -48,9 +41,7 @@ export type LoopLive = {
 
 export type LoopState = { readonly kind: "none" } | LoopLive
 
-export type ConfigBanner =
-  | { readonly kind: "none" }
-  | { readonly kind: "invalid" }
+export type ConfigBanner = { readonly kind: "none" } | { readonly kind: "invalid" }
 
 export type SidebarView =
   | {

@@ -14,12 +14,22 @@ const startedAt = new Date().toISOString()
 
 try {
   const result = await dispatch(scenario)
-  writeFileSync(out, JSON.stringify({ case: scenario, sha, startedAt, endedAt: new Date().toISOString(), ...result }, null, 2))
+  writeFileSync(
+    out,
+    JSON.stringify({ case: scenario, sha, startedAt, endedAt: new Date().toISOString(), ...result }, null, 2),
+  )
 } catch (error) {
   writeFileSync(
     out,
     JSON.stringify(
-      { case: scenario, sha, startedAt, endedAt: new Date().toISOString(), passed: false, error: error instanceof Error ? error.stack : String(error) },
+      {
+        case: scenario,
+        sha,
+        startedAt,
+        endedAt: new Date().toISOString(),
+        passed: false,
+        error: error instanceof Error ? error.stack : String(error),
+      },
       null,
       2,
     ),

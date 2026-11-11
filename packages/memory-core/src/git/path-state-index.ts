@@ -31,9 +31,10 @@ export async function writeIndexIfIdentity(options: {
   try {
     if (!sameIdentity(await options.capture(), options.expected)) return false
     await copyFile(indexPath, temporary)
-    const argv = options.next === null
-      ? ["update-index", "--force-remove", "--", options.path]
-      : ["update-index", "--add", "--cacheinfo", options.next.mode, options.next.oid, options.path]
+    const argv =
+      options.next === null
+        ? ["update-index", "--force-remove", "--", options.path]
+        : ["update-index", "--add", "--cacheinfo", options.next.mode, options.next.oid, options.path]
     await git(options, argv, { GIT_INDEX_FILE: temporary })
     await writeHandleAll(lock, await readFile(temporary))
     await lock.sync()

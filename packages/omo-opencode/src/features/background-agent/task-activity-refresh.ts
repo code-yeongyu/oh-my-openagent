@@ -7,10 +7,7 @@ export type TaskActivityRefreshResult =
   | { readonly type: "missing" }
   | { readonly type: "unavailable" }
 
-function updateTaskActivityFromLookup(
-  task: BackgroundTask,
-  lookup: SessionActivityLookup,
-): TaskActivityRefreshResult {
+function updateTaskActivityFromLookup(task: BackgroundTask, lookup: SessionActivityLookup): TaskActivityRefreshResult {
   if (lookup.type !== "activity") return lookup
 
   const activityTime = lookup.activity.getTime()

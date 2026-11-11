@@ -39,8 +39,10 @@ import { keychainHelperPayload, stageKeychainHelper } from "./release-keychain-h
 import {
   desktopEngineTarget,
   engineTrustHelperTarget,
+  gitJobHelperTarget,
   stageCompiledDesktopEngine,
   stageCompiledEngineTrustHelper,
+  stageCompiledGitJobHelper,
 } from "./release-desktop-engine-target"
 import { EMBEDDED_PAYLOAD_ROOT, RUNTIME_MANIFEST_REL_PATH } from "./embedded-payload-naming"
 import {
@@ -63,7 +65,7 @@ const repoRoot = resolve(scriptDir, "..")
 const compileEntry = join(repoRoot, "packages", "omo-native", "compile-entry.ts")
 
 /**
- * Hard per-binary size budget (200 MiB). It exists to keep the download and install of one
+ * Hard per-binary size budget (210 MiB). It exists to keep the download and install of one
  * platform binary small: every install, `omo update` and CI smoke fetches the full binary, so
  * growth is a user-facing cost, not just a storage one. A release that crosses it fails loud
  * rather than shipping a quietly larger download. Raised from 150 MiB for 5.1.26, when linux-x64
@@ -76,9 +78,12 @@ const compileEntry = join(repoRoot, "packages", "omo-native", "compile-entry.ts"
  * (an empty `bun build --compile --target=bun-linux-x64`: 90,798,048 bytes on 1.4.3, 109,123,760 on
  * 1.4.4; v5.1.48 rebuilt with 1.4.4 already measures 199,542,960); the compiled JS graph added +409,318
  * and the embedded payload +49,434, which together make up the +18,784,464.
+ * Raised to 210 MiB after the 5.1.67 publish failed: its linux-x64 and linux-x64-baseline binaries measured
+ * 209,889,456 bytes (5.1.66's linux-x64: 209,664,176), +225,280 in one release and 174,256 bytes (0.08%)
+ * over 200 MiB. 210 MiB keeps a hard ceiling with about 5% headroom over that size.
  * `reportBinaryHeadroom` warns well before the next crossing.
  */
-export const MAX_BINARY_BYTES = 200 * 1024 * 1024
+export const MAX_BINARY_BYTES = 210 * 1024 * 1024
 
 /** Below this much headroom under the budget, the build warns so growth is seen a release ahead. */
 export const BINARY_HEADROOM_WARN_BYTES = 5 * 1024 * 1024
@@ -105,10 +110,13 @@ export interface ReleaseBinaryTarget {
   readonly nativePrebuilds: readonly NativePrebuild[]
 }
 
-const nativeFixtureTargets = z.record(z.string(), z.object({
-  available: z.boolean(),
-  prebuildHost: z.string().min(1).nullable(),
-}))
+const nativeFixtureTargets = z.record(
+  z.string(),
+  z.object({
+    available: z.boolean(),
+    prebuildHost: z.string().min(1).nullable(),
+  }),
+)
 const nativeFixtureSchema = z.object({
   $comment: z.string(),
   generatedAt: z.string(),
@@ -130,9 +138,9 @@ const nativeFixtureSchema = z.object({
 function readEnginePin(): string {
   // packages/omo-native is the npm channel that ships the engine, so its pin is
   // authoritative for the binary channel too (both stay lockstep).
-  const nativePackage = JSON.parse(
-    readFileSync(join(repoRoot, "packages", "omo-native", "package.json"), "utf8"),
-  ) as { dependencies?: Record<string, string> }
+  const nativePackage = JSON.parse(readFileSync(join(repoRoot, "packages", "omo-native", "package.json"), "utf8")) as {
+    dependencies?: Record<string, string>
+  }
   const pin = nativePackage.dependencies?.["@code-yeongyu/senpi"]
   if (pin === undefined) {
     throw new Error("packages/omo-native/package.json does not pin @code-yeongyu/senpi")
@@ -160,10 +168,7 @@ const TARGET_DEFINITIONS: readonly (readonly [string, ReleaseBinaryTarget["os"],
 ]
 
 /** Validates the per-package fixture and resolves each available addon's pin. */
-export function loadReleaseBinaryTargets(
-  input: unknown,
-  enginePin = ENGINE_PIN,
-): readonly ReleaseBinaryTarget[] {
+export function loadReleaseBinaryTargets(input: unknown, enginePin = ENGINE_PIN): readonly ReleaseBinaryTarget[] {
   const fixture = nativeFixtureSchema.parse(input)
   return TARGET_DEFINITIONS.map(([target, os, bunTarget]) => {
     const nativePrebuilds: NativePrebuild[] = []
@@ -274,20 +279,31 @@ export async function buildRuntimeManifest(
       }
     })
   const releaseEngineBuild =
-    options.engineBuild !== undefined && options.engineBuild.scheme === "epoch"
-      ? options.engineBuild
-      : undefined
-  const digestPayload = options.buildInfo === undefined
-    ? releaseEngineBuild === undefined
-      ? { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, entries }
-      : { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, engineBuild: releaseEngineBuild, entries }
-    : { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, buildInfo: options.buildInfo, entries }
+    options.engineBuild !== undefined && options.engineBuild.scheme === "epoch" ? options.engineBuild : undefined
+  const digestPayload =
+    options.buildInfo === undefined
+      ? releaseEngineBuild === undefined
+        ? { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, entries }
+        : { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, engineBuild: releaseEngineBuild, entries }
+      : { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, buildInfo: options.buildInfo, entries }
   const manifestSha = createHash("sha256").update(JSON.stringify(digestPayload)).digest("hex")
   if (options.buildInfo !== undefined) {
-    return { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, manifestSha, buildInfo: options.buildInfo, entries }
+    return {
+      omoAiVersion: options.omoAiVersion,
+      enginePin: options.enginePin,
+      manifestSha,
+      buildInfo: options.buildInfo,
+      entries,
+    }
   }
   if (releaseEngineBuild !== undefined) {
-    return { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, manifestSha, engineBuild: releaseEngineBuild, entries }
+    return {
+      omoAiVersion: options.omoAiVersion,
+      enginePin: options.enginePin,
+      manifestSha,
+      engineBuild: releaseEngineBuild,
+      entries,
+    }
   }
   return { omoAiVersion: options.omoAiVersion, enginePin: options.enginePin, manifestSha, entries }
 }
@@ -336,7 +352,16 @@ export function reportBinaryHeadroom(
 
 // Mirrors PAYLOAD_DIRECTORIES / PAYLOAD_FILES in script/build-omo-native.ts (locked by build-omo-binary.test.ts).
 export const PLUGIN_PAYLOAD_DIRECTORIES = ["extensions", "skills", "skills-conditional", "runtime"] as const
-export const PLUGIN_PAYLOAD_FILES = ["package.json", "CHANGELOG.md", "README.md", "NOTICE", "LICENSE", "daemon-launch-spec.json", "telemetry-schema.json", "telemetry-schema.omo-cloud.json"] as const
+export const PLUGIN_PAYLOAD_FILES = [
+  "package.json",
+  "CHANGELOG.md",
+  "README.md",
+  "NOTICE",
+  "LICENSE",
+  "daemon-launch-spec.json",
+  "telemetry-schema.json",
+  "telemetry-schema.omo-cloud.json",
+] as const
 
 const EXPORT_HTML_KEEP = new Set([
   "template.html",
@@ -431,6 +456,8 @@ export function resolveExpectedSidecarRelPaths(target: ReleaseBinaryTarget): str
   if (keychainHelper !== null) relPaths.add(keychainHelper)
   const trustHelper = engineTrustHelperTarget(target.target).payload
   if (trustHelper !== null) relPaths.add(trustHelper)
+  const gitJobHelper = gitJobHelperTarget(target.target).payload
+  if (gitJobHelper !== null) relPaths.add(gitJobHelper)
   return [...relPaths].sort()
 }
 
@@ -502,9 +529,9 @@ function resolveNativePackageDir(packageName: string): string | undefined {
   if (packageName === "@code-yeongyu/senpi") return senpiPackageDir
   const packageDir = resolvePackageDir(packageName)
   // The installed engine currently declares senpi-pty through this npm alias.
-  return packageDir ?? (packageName === "@code-yeongyu/senpi-pty"
-    ? resolvePackageDir("@earendil-works/pi-pty")
-    : undefined)
+  return (
+    packageDir ?? (packageName === "@code-yeongyu/senpi-pty" ? resolvePackageDir("@earendil-works/pi-pty") : undefined)
+  )
 }
 
 /** Stages exactly the promised addon, preferring the installed package over npm. */
@@ -565,8 +592,14 @@ export function stageSidecarPayload(
   if (keychainHelper !== null) staged.add(keychainHelper)
   const trustHelper = stageCompiledEngineTrustHelper(target.target, stageDir, desktopEngineSourceRoot)
   if (trustHelper !== null) staged.add(trustHelper)
+  const gitJobHelper = stageCompiledGitJobHelper(target.target, stageDir, desktopEngineSourceRoot)
+  if (gitJobHelper !== null) staged.add(gitJobHelper)
   const releaseEngineBuild = releaseEngineBuildStamp(omoBinaryEngineStamp(buildInfo, senpiPackageDir))
-  writeFileSync(join(stageDir, "package.json"), createStampedPackageJson(omoAiVersion, buildInfo, releaseEngineBuild), "utf8")
+  writeFileSync(
+    join(stageDir, "package.json"),
+    createStampedPackageJson(omoAiVersion, buildInfo, releaseEngineBuild),
+    "utf8",
+  )
   staged.add("package.json")
   const claudeCodePin = claudeCodePinFor(target.target, repoRoot)
   if (claudeCodePin !== undefined) {
@@ -575,7 +608,11 @@ export function stageSidecarPayload(
   }
   for (const source of engineSidecarSources()) {
     const excluded = process.env.OMO_SIDECAR_EXCLUDE
-    if (excluded && (source.to.endsWith(`/node_modules/${excluded}`) || source.to.includes(`/node_modules/${excluded}/`))) continue
+    if (
+      excluded &&
+      (source.to.endsWith(`/node_modules/${excluded}`) || source.to.includes(`/node_modules/${excluded}/`))
+    )
+      continue
     stageSource(source, stageDir, staged)
   }
   stagePluginPayload(stageDir, staged)
@@ -626,7 +663,11 @@ export async function buildReleaseBinary(
       buildInfo: options.buildInfo,
       engineBuild: releaseEngineBuildStamp(stamp),
     })
-    writeFileSync(join(stageDir, RUNTIME_MANIFEST_REL_PATH), runtimeManifestFileContent(manifest, target.target), "utf8")
+    writeFileSync(
+      join(stageDir, RUNTIME_MANIFEST_REL_PATH),
+      runtimeManifestFileContent(manifest, target.target),
+      "utf8",
+    )
 
     mkdirSync(outDir, { recursive: true })
     // RULING-74: every runtime ships its declared capabilities beside it; the desktop bundles this file with the

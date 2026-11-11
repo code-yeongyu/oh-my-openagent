@@ -7,7 +7,7 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
       resume: async () => {
         throw new Error(
           "Task bg_running is currently running and cannot accept a continuation prompt. " +
-          "Wait for it to complete before resuming it with task_id.",
+            "Wait for it to complete before resuming it with task_id.",
         )
       },
     }

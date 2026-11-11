@@ -3,6 +3,8 @@ import { describe, expect, test } from "bun:test"
 import { createChatMessageHandler } from "./chat-message-handler"
 import { createFallbackState } from "./fallback-state"
 import type { HookDeps } from "./types"
+import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
+import { OMO_RUNTIME_FALLBACK_RETRY_MARKER } from "../../shared/runtime-fallback-retry-marker"
 
 function createDeps(): HookDeps {
   return {
@@ -170,6 +172,131 @@ describe("createChatMessageHandler runtime fallback model override", () => {
     })
   })
 
+  test("#given our own marker-carrying fallback retry dispatch after a state wipe #when chat.message fires with the prepared fallback model #then the state is not reset as a manual model change (issue #6751)", async () => {
+    // given - a mid-cycle wipe cleared pendingFallbackModel; OMO's own retry
+    // dispatch (marked parts, model = prepared fallback) must not be misread
+    // as a manual model change, which would corrupt originalModel and enable
+    // a backward hop to the just-failed primary.
+    const deps = createDeps()
+    const sessionID = "session-6751-marker-dispatch"
+    const state = createFallbackState("zai/primary")
+    state.currentModel = "go/fallback-a"
+    state.fallbackIndex = 1
+    state.attemptCount = 1
+    state.failedModels.set("zai/primary", Date.now())
+    deps.sessionStates.set(sessionID, state)
+    const handler = createChatMessageHandler(deps)
+    const output: {
+      message: { model?: { providerID: string; modelID: string } }
+      parts?: Array<{ type: string; text?: string }>
+    } = {
+      message: {},
+      parts: [{ type: "text", text: "continue\n<!-- OMO_RUNTIME_FALLBACK_RETRY -->" }],
+    }
+
+    // when - requestedModel (go/fallback-a) matches currentModel here only by
+    // coincidence of the wipe shape; the marker alone must suppress resets.
+    await handler(
+      {
+        sessionID,
+        model: {
+          providerID: "go",
+          modelID: "fallback-a",
+        },
+      },
+      output,
+    )
+
+    // then
+    expect(deps.sessionStates.get(sessionID)).toBe(state)
+    expect(state.originalModel).toBe("zai/primary")
+    expect(state.currentModel).toBe("go/fallback-a")
+    expect(state.fallbackIndex).toBe(1)
+    expect(state.attemptCount).toBe(1)
+    expect(state.failedModels.get("zai/primary")).toBeDefined()
+  })
+
+  test("#given our own marker-carrying dispatch whose model mismatches the wiped currentModel #when chat.message fires #then position bookkeeping survives untouched (issue #6751)", async () => {
+    // given - worst-case interleaving from the issue log: the retry dispatch
+    // lands against a state whose currentModel is still the primary and whose
+    // pendingFallbackModel was lost. The manual-change branch must not fire.
+    const deps = createDeps()
+    const sessionID = "session-6751-marker-mismatch"
+    const state = createFallbackState("zai/primary")
+    state.currentModel = "zai/primary"
+    state.fallbackIndex = 1
+    state.attemptCount = 1
+    state.pendingFallbackModel = undefined
+    state.failedModels.set("zai/primary", Date.now())
+    deps.sessionStates.set(sessionID, state)
+    const handler = createChatMessageHandler(deps)
+    const output: {
+      message: { model?: { providerID: string; modelID: string } }
+      parts?: Array<{ type: string; text?: string }>
+    } = {
+      message: {},
+      parts: [{ type: "text", text: "retry payload\n<!-- OMO_RUNTIME_FALLBACK_RETRY -->" }],
+    }
+
+    // when
+    await handler(
+      {
+        sessionID,
+        model: {
+          providerID: "go",
+          modelID: "fallback-a",
+        },
+      },
+      output,
+    )
+
+    // then - same object, same position fields, originalModel not corrupted
+    expect(deps.sessionStates.get(sessionID)).toBe(state)
+    expect(state.originalModel).toBe("zai/primary")
+    expect(state.fallbackIndex).toBe(1)
+    expect(state.attemptCount).toBe(1)
+    expect(state.failedModels.get("zai/primary")).toBeDefined()
+  })
+
+  test("#given a marker-carrying dispatch matching pendingFallbackModel #when chat.message fires #then pending is consumed and no reset happens", async () => {
+    // given - happy path that must keep working: the dispatcher set
+    // pendingFallbackModel before sending; chat.message consumes it quietly.
+    const deps = createDeps()
+    const sessionID = "session-6751-marker-consume"
+    const state = createFallbackState("zai/primary")
+    state.currentModel = "go/fallback-a"
+    state.fallbackIndex = 1
+    state.pendingFallbackModel = "go/fallback-a"
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionStatusRetryKeys.set(sessionID, new Set(["unknown:1:rate limit"]))
+    const handler = createChatMessageHandler(deps)
+    const output: {
+      message: { model?: { providerID: string; modelID: string } }
+      parts?: Array<{ type: string; text?: string }>
+    } = {
+      message: {},
+      parts: [{ type: "text", text: "continue\n<!-- OMO_RUNTIME_FALLBACK_RETRY -->" }],
+    }
+
+    // when
+    await handler(
+      {
+        sessionID,
+        model: {
+          providerID: "go",
+          modelID: "fallback-a",
+        },
+      },
+      output,
+    )
+
+    // then
+    expect(deps.sessionStates.get(sessionID)).toBe(state)
+    expect(state.pendingFallbackModel).toBe(undefined)
+    expect(state.originalModel).toBe("zai/primary")
+    expect(deps.sessionStatusRetryKeys.has(sessionID)).toBe(false)
+  })
+
   test("#given an explicit-variant fallback and a base primary #when cooldown restoration runs #then the fallback-only variant is removed", async () => {
     // given
     const deps = createDeps()
@@ -253,5 +380,140 @@ describe("createChatMessageHandler runtime fallback model override", () => {
       },
       variant: "high",
     })
+  })
+
+  test("#given a capped state #when a human prompt arrives #then only the cap counters reset", async () => {
+    const deps = createDeps()
+    const sessionID = "session-capped-human-prompt"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "google/gemini-2.5-pro"
+    state.fallbackIndex = 1
+    state.attemptCount = deps.config.max_fallback_attempts
+    state.failedModels.set("openai/gpt-5.4", Date.now())
+    deps.sessionStates.set(sessionID, state)
+    const handler = createChatMessageHandler(deps)
+
+    await handler(
+      { sessionID, model: { providerID: "google", modelID: "gemini-2.5-pro" } },
+      {
+        message: {},
+        parts: [{ type: "text", text: "Please continue with the task" }],
+      },
+    )
+
+    expect(state.attemptCount).toBe(0)
+    expect(state.fallbackIndex).toBe(-1)
+    expect(state.failedModels.size).toBe(1)
+    expect(state.currentModel).toBe("google/gemini-2.5-pro")
+  })
+
+  test("#given a capped state #when an internal initiator prompt arrives #then the cap remains", async () => {
+    const deps = createDeps()
+    const sessionID = "session-capped-internal-prompt"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.attemptCount = deps.config.max_fallback_attempts
+    state.fallbackIndex = 1
+    deps.sessionStates.set(sessionID, state)
+
+    await createChatMessageHandler(deps)(
+      { sessionID },
+      {
+        message: {},
+        parts: [{ type: "text", text: `wake${OMO_INTERNAL_INITIATOR_MARKER}` }],
+      },
+    )
+
+    expect(state.attemptCount).toBe(deps.config.max_fallback_attempts)
+    expect(state.fallbackIndex).toBe(1)
+  })
+
+  test("#given a capped state #when a runtime fallback retry prompt arrives #then the cap remains", async () => {
+    const deps = createDeps()
+    const sessionID = "session-capped-retry-prompt"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.attemptCount = deps.config.max_fallback_attempts
+    state.fallbackIndex = 1
+    deps.sessionStates.set(sessionID, state)
+
+    await createChatMessageHandler(deps)(
+      { sessionID },
+      {
+        message: {},
+        parts: [{ type: "text", text: `retry this${OMO_RUNTIME_FALLBACK_RETRY_MARKER}` }],
+      },
+    )
+
+    expect(state.attemptCount).toBe(deps.config.max_fallback_attempts)
+    expect(state.fallbackIndex).toBe(1)
+  })
+
+  test("#given a capped state #when chat.message has no parts #then the cap remains", async () => {
+    const deps = createDeps()
+    const sessionID = "session-capped-no-parts"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.attemptCount = deps.config.max_fallback_attempts
+    state.fallbackIndex = 1
+    deps.sessionStates.set(sessionID, state)
+
+    await createChatMessageHandler(deps)({ sessionID }, { message: {} })
+
+    expect(state.attemptCount).toBe(deps.config.max_fallback_attempts)
+    expect(state.fallbackIndex).toBe(1)
+  })
+
+  test("#given a capped state #when the rerouted compaction auto-continue prompt arrives #then the cap remains", async () => {
+    const deps = createDeps()
+    const sessionID = "session-capped-compaction-continue"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.currentModel = "google/gemini-2.5-pro"
+    state.attemptCount = deps.config.max_fallback_attempts
+    state.fallbackIndex = 1
+    deps.sessionStates.set(sessionID, state)
+    const COMPACTION_CONTINUE_TEXT =
+      "Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed."
+    const reissuedParts: Array<{ type: string; text?: string; metadata?: { compaction_continue: boolean } }> = [
+      { type: "text", text: COMPACTION_CONTINUE_TEXT, metadata: { compaction_continue: true } },
+    ]
+
+    await createChatMessageHandler(deps)(
+      { sessionID, model: { providerID: "google", modelID: "gemini-2.5-pro" } },
+      { message: {}, parts: reissuedParts ?? [] },
+    )
+
+    expect(state.attemptCount).toBe(deps.config.max_fallback_attempts)
+    expect(state.fallbackIndex).toBe(1)
+  })
+
+  test("#given a capped state #when a marker-less synthetic prompt arrives #then the cap remains", async () => {
+    const deps = createDeps()
+    const sessionID = "session-capped-synthetic-prompt"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.attemptCount = deps.config.max_fallback_attempts
+    state.fallbackIndex = 1
+    deps.sessionStates.set(sessionID, state)
+    const syntheticParts = [{ type: "text", text: "Continue if you have next steps", synthetic: true }]
+
+    await createChatMessageHandler(deps)({ sessionID }, { message: {}, parts: syntheticParts })
+
+    expect(state.attemptCount).toBe(deps.config.max_fallback_attempts)
+    expect(state.fallbackIndex).toBe(1)
+  })
+
+  test("#given a capped state #when a human prompt carries a synthetic attachment part #then the cap counters reset", async () => {
+    const deps = createDeps()
+    const sessionID = "session-capped-human-prompt-with-synthetic-part"
+    const state = createFallbackState("openai/gpt-5.4")
+    state.attemptCount = deps.config.max_fallback_attempts
+    state.fallbackIndex = 1
+    deps.sessionStates.set(sessionID, state)
+    const humanPartsWithAttachment = [
+      { type: "text", text: "Please review this file" },
+      { type: "text", text: "Called the Read tool with the following input: {}", synthetic: true },
+    ]
+
+    await createChatMessageHandler(deps)({ sessionID }, { message: {}, parts: humanPartsWithAttachment })
+
+    expect(state.attemptCount).toBe(0)
+    expect(state.fallbackIndex).toBe(-1)
   })
 })
