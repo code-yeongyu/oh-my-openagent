@@ -94,3 +94,37 @@ fn non_object_root_is_scenario_invalid() {
         );
     }
 }
+
+#[test]
+fn zero_nth_and_unlisted_windows_are_reference_invalid() {
+    let window = r#"{"id":"101","title":"t","app":"a","pid":1,"x":0,"y":0,"width":10,"height":10,"focused":true,"elevated":null}"#;
+    let cases = [
+        (
+            r#""epoch_events":[{"after_call":"windows","nth":0,"reason":"lock"}]"#,
+            "/epoch_events/0/nth",
+        ),
+        (
+            r#""identity_changes":[{"after_call":"capture","nth":0,"window":"101","new_pid":2,"new_processStart":3}]"#,
+            "/identity_changes/0/nth",
+        ),
+        (
+            r#""target_exit":[{"after_call":"capture","nth":0,"window":"101"}]"#,
+            "/target_exit/0/nth",
+        ),
+        (
+            r#""displays_change":{"after_call":"click","nth":0,"displays":[]}"#,
+            "/displays_change/nth",
+        ),
+        (r#""ax":{"202":{"role":"window"}}"#, "/ax/202"),
+        (r#""ax_node_count":{"101":50}"#, "/ax_node_count/101"),
+    ];
+    for (member, pointer) in cases {
+        let json = format!(r#"{{"windows":[{window}],{member}}}"#);
+        let invalid = FakeScenario::from_json(&json).expect_err("a reference that cannot hold");
+        assert_eq!(
+            (invalid.kind, invalid.pointer.as_str()),
+            (InvalidKind::Reference, pointer),
+            "{member}"
+        );
+    }
+}
