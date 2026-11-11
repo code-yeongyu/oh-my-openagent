@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process"
 import { existsSync, realpathSync, symlinkSync } from "node:fs"
 import { mkdir, mkdtemp, readdir, readFile, readlink, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { basename, dirname, join, relative } from "node:path"
 
 import { GitMemoryRepo, type GitCommitAuthor } from "../git"
 import { removeTree } from "../../../../test-support/remove-tree"
@@ -492,6 +492,28 @@ describe("identity merge (#10070)", () => {
     git(main, ["worktree", "add", "--quiet", "-b", "t2", sibling])
 
     const dirs = await repositoryWorktreeDirs([outside])
+
+    expect(dirs).toEqual(expect.arrayContaining([realpathSync(main), realpathSync(sibling)]))
+  }, 30_000)
+
+  it("#given a linked worktree whose gitdir pointer is relative (worktree.useRelativePaths) #when candidates are collected #then it resolves against the pointer's own directory, never the process cwd (#12974 review)", async () => {
+    const root = await memoryRoot()
+    const main = join(root, "checkout", "project")
+    const sibling = join(root, "checkout", "project-sibling")
+    await mkdir(main, { recursive: true })
+    const git = (cwd: string, args: readonly string[]) =>
+      execFileSync("git", ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", ...args], {
+        cwd,
+        stdio: "ignore",
+      })
+    git(main, ["init", "--quiet", "--initial-branch=main"])
+    git(main, ["commit", "--quiet", "--allow-empty", "-m", "init"])
+    git(main, ["worktree", "add", "--quiet", "-b", "sibling", sibling])
+    const pointer = join(main, ".git", "worktrees", basename(sibling), "gitdir")
+    const absolute = (await readFile(pointer, "utf8")).trim()
+    await writeFile(pointer, `${relative(dirname(pointer), absolute)}\n`)
+
+    const dirs = await repositoryWorktreeDirs([main])
 
     expect(dirs).toEqual(expect.arrayContaining([realpathSync(main), realpathSync(sibling)]))
   }, 30_000)

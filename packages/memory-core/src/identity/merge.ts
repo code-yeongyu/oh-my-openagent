@@ -173,8 +173,9 @@ export async function repositoryWorktreeDirs(dirs: readonly string[]): Promise<s
     for (const name of await readdir(join(common, "worktrees")).catch(() => [] as string[])) {
       const pointer = await readFile(join(common, "worktrees", name, "gitdir"), "utf8").catch(() => undefined)
       const gitFile = pointer?.split(/\r?\n/, 1)[0]?.trim()
-      // git writes this pointer with forward slashes on Windows; resolve() gives every entry the platform spelling.
-      if (gitFile !== undefined && gitFile !== "") found.add(resolve(dirname(gitFile)))
+      // git writes this pointer with forward slashes on Windows, and as a path relative to its own directory under
+      // worktree.useRelativePaths (git >= 2.48): resolve it against that directory so every entry is absolute in the platform spelling.
+      if (gitFile !== undefined && gitFile !== "") found.add(resolve(join(common, "worktrees", name), dirname(gitFile)))
     }
   }
   return [...found].sort()
