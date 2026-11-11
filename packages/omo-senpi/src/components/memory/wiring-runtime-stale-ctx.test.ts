@@ -102,6 +102,68 @@ describe("reflection launch after the trigger ctx is retired (#10339)", () => {
 
 /** A live ctx of the session that replaced the triggering one: none of its facts may reach that launch. */
 describe("a launch without a trigger snapshot (#10339)", () => {
+  // #13070: an admitted shutdown dream must retain the registry after its last live ctx retires.
+  test.each(["session-A", "session-B"])("#given %s retires without a successor #when an admitted dream launches #then the shared registry survives without session facts", async (currentSessionId) => {
+    // given
+    const root = await mkdtemp(`${tmpdir()}/omo-shutdown-registry-`)
+    roots.push(root)
+    const identity = createMemoryIdentityContext({
+      identity: "shutdown-registry-agent",
+      identityPaths: buildIdentityPaths(root, "shutdown-registry-agent"),
+      binding: { identity: "shutdown-registry-agent", repoPathHash: "hash", boundAt: 1 },
+    })
+    const registry = { find: () => undefined, getProviderAuth: () => undefined }
+    const live = retirableContext(NEW_SESSION_MESSAGE, {
+      sessionManager: {
+        getSessionId: () => currentSessionId,
+        getSessionFile: () => `${root}/${currentSessionId}.jsonl`,
+        getUsageTotals: () => ({ cacheRead: 42 }),
+      },
+      modelRegistry: registry,
+      model: { provider: "anthropic", id: "retired-session-model" },
+      getContextUsage: () => ({ tokens: 1234 }),
+      agentDir: root,
+    })
+    let deps: MemoryIdentityRuntimeDeps | undefined
+    let observed: Record<string, unknown> | undefined
+    const wiring = createMemoryRuntimeWiring({
+      sessions: new Map([["session-A", { context: identity }]]),
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      env: {},
+      createRuntime: (_identity, runtimeDeps) => {
+        deps = runtimeDeps
+        return fakeRuntime(identity, () => {
+          observed = {
+            registry: deps?.resolveModelRegistry(),
+            model: deps?.resolveSessionModel?.(),
+            file: deps?.resolveParentSessionFile?.(),
+            tokens: deps?.resolveParentContextTokens?.(),
+            cacheReusable: deps?.resolveParentCacheReusable?.(),
+          }
+        })
+      },
+    }, { current: live.ctx })
+    const dream = wiring.dreamSessionById("session-A")
+    const run: ReservedRun = {
+      runId: "shutdown-dream",
+      request: { trigger: "dream", origin: "shutdown", conversationIds: ["session-A"], snapshots: [] },
+    }
+
+    // when
+    live.retire()
+    await withLaunchScope({ conversationIds: run.request.conversationIds }, () => dream?.launch(run))
+
+    // then
+    expect(observed).toEqual({
+      registry,
+      model: undefined,
+      file: undefined,
+      tokens: undefined,
+      cacheReusable: false,
+    })
+  }, 30_000)
+
   test("#given a reconcile launch for session A while session B is current #when it resolves its facts #then it gets none of B's session facts, only the shared model registry", async () => {
     // given
     const root = await mkdtemp(`${tmpdir()}/omo-10339-rec-`)
@@ -139,7 +201,7 @@ describe("a launch without a trigger snapshot (#10339)", () => {
 })
 
 describe("facts extraction outside a launch scope (#10339)", () => {
-  test("#given session B is current #when a facts launch without a captured selection resolves its model #then it gets no session model, only the shared registry", async () => {
+  test.each([false, true])("#given session B is current with retired=%s #when a facts launch without a captured selection resolves its model #then it gets no session model, only the shared registry", async (retired) => {
     // given: a facts launch that was not handed a selection (unpark, reconcile, final delta) reads the
     // resolvers directly; whatever session is current must not choose the model for another session's facts.
     const root = await mkdtemp(`${tmpdir()}/omo-10339-facts-`)
@@ -150,6 +212,12 @@ describe("facts extraction outside a launch scope (#10339)", () => {
       binding: { identity: "agent-10339", repoPathHash: "hash", boundAt: 1 },
     })
     let extractor: { resolveModelRegistry: () => unknown; resolveSessionModel?: () => unknown } | undefined
+    const registry = { find: () => undefined, getProviderAuth: () => undefined }
+    const live = retirableContext(NEW_SESSION_MESSAGE, {
+      sessionManager: { getSessionId: () => "session-B" },
+      modelRegistry: registry,
+      model: { provider: "openai", id: "other" },
+    })
     const wiring = createMemoryRuntimeWiring({
       sessions: new Map(),
       loadConfig: () => loadedMemoryConfig(memorySettings()),
@@ -159,13 +227,14 @@ describe("facts extraction outside a launch scope (#10339)", () => {
         extractor = options
         return { launchPending: async () => ({ status: "empty" }), reconcilePending: async () => ({ status: "empty" }) }
       },
-    }, { current: successorContext() })
+    }, { current: live.ctx })
 
     // when
     wiring.factsWiringFor(identity)
+    if (retired) live.retire()
 
     // then
-    expect(extractor?.resolveModelRegistry()).toBeDefined()
+    expect(extractor?.resolveModelRegistry()).toBe(registry)
     expect(extractor?.resolveSessionModel?.()).toBeUndefined()
   }, 30_000)
 })
