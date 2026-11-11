@@ -1,6 +1,8 @@
 //! Totality of the `COMPUTER_*` table over the closed engine codes, every reason, every
 //! layer failure, the imported corpus's numbered errors and the backend defaults.
 
+mod design_reasons;
+
 use std::collections::BTreeSet;
 use std::path::Path;
 

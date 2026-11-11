@@ -23,4 +23,8 @@ pub(super) static ROWS: &[ErrorRow] = &[
     e!(ControlRequired, UrlPolicy => ControlRequired, NDAU, Yes, ASK, _),
     e!(ControlRequired, IdentityChanged => ControlRequired, NDAU, Yes, ASK, _),
     e!(ControlRequired, NoPresenceSurface => PresenceUnavailable, NDAU, Yes, ASK, _),
+    e!(ControlRequired, WaylandNoEscape => PresenceUnavailable, NDAU, Yes, ASK, _),
+    e!(ControlRequired, DeniedApp => ControlRequired, NDAU, Yes, ASK, _),
+    e!(ControlRequired, OriginUnattended => ControlRequired, NDAU, Yes, ASK, _),
+    e!(ControlRequired, Rebased => ControlRequired, NDAU, Yes, ASK, "computer.hands()"),
 ];
