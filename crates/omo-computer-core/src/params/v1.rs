@@ -76,9 +76,10 @@ params! {
     }
 }
 
-exec_params! {
-    /// `click`: a point (v1) or a ref; `consume` asks for a consumption receipt.
-    ClickParams {
+paired_exec_params! {
+    /// `click`: a point (v1) or a ref; `consume` asks for a consumption receipt. A lone
+    /// `x` or `y` is refused.
+    ClickParams via ClickWire = "ClickWire" pairs (x, y) {
         ;
         target: String,
         x: f64,

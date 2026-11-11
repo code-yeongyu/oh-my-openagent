@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "61e82ab22e11ca3014190b4c1d976cd40d20657adaed5a82a8861a80cdbf7b0f" as const
+export const SCHEMA_SHA256 = "e1a69b4352785474815f4a025293cf8e2ee5414572cbb34ec9b7ca1cff50be12" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const

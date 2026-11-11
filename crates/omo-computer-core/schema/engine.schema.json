@@ -2299,7 +2299,7 @@
           ]
         }
       },
-      "description": "`click`: a point (v1) or a ref; `consume` asks for a consumption receipt."
+      "description": "`click`: a point (v1) or a ref; `consume` asks for a consumption receipt. A lone\n`x` or `y` is refused."
     },
     "ClipboardContent": {
       "type": "object",
@@ -4471,7 +4471,8 @@
       },
       "required": [
         "target"
-      ]
+      ],
+      "description": "`mouse.down`: a lone `x` or `y` is refused."
     },
     "MouseUpParams": {
       "type": "object",

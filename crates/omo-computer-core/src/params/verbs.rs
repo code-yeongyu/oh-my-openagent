@@ -31,7 +31,10 @@ pub enum TextRange {
 }
 
 exec_params! { MoveParams { target: String, x: f64, y: f64; frame_id: String, } }
-exec_params! { MouseDownParams { target: String; button: Button, x: f64, y: f64, frame_id: String, } }
+paired_exec_params! {
+    /// `mouse.down`: a lone `x` or `y` is refused.
+    MouseDownParams via MouseDownWire = "MouseDownWire" pairs (x, y) { target: String; button: Button, x: f64, y: f64, frame_id: String, }
+}
 exec_params! { MouseUpParams { target: String; button: Button, } }
 exec_params! { KeyDownParams { target: String, chord: String; frame_id: String, force: bool, } }
 exec_params! { KeyUpParams { target: String, chord: String; } }
