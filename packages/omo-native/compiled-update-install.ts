@@ -10,11 +10,22 @@ export function releaseVersionOf(omoAiVersion: string): string {
   return omoAiVersion.replace(/^(\d+\.\d+\.\d+)-0\.(.+)$/, "$1-$2")
 }
 
-export type BinaryUpdateCode = "directory_not_writable" | "update_in_progress" | "download_failed" | "integrity_failed" | "verification_failed" | "install_failed" | "rollback_failed"
+export type BinaryUpdateCode =
+  | "directory_not_writable"
+  | "update_in_progress"
+  | "download_failed"
+  | "integrity_failed"
+  | "verification_failed"
+  | "install_failed"
+  | "rollback_failed"
 
 export class BinaryUpdateError extends Error {
   override readonly name = "BinaryUpdateError"
-  constructor(readonly code: BinaryUpdateCode, message: string, options?: ErrorOptions) {
+  constructor(
+    readonly code: BinaryUpdateCode,
+    message: string,
+    options?: ErrorOptions,
+  ) {
     super(message, options)
   }
 }
@@ -32,15 +43,23 @@ const execute = promisify(execFile)
 const run: Run = async (file, args) => {
   const env = { ...process.env }
   // A release probe must boot that release, not inherit the old runtime's identity or Bun CLI mode.
-  for (const key of ["BUN_BE_BUN", "OMO_PROVISIONED_HANDOFF", "OMO_PROVISIONED_LAUNCHER", "OMO_PACKAGE_DIR", "SENPI_PACKAGE_DIR"]) delete env[key]
+  for (const key of [
+    "BUN_BE_BUN",
+    "OMO_PROVISIONED_HANDOFF",
+    "OMO_PROVISIONED_LAUNCHER",
+    "OMO_PACKAGE_DIR",
+    "SENPI_PACKAGE_DIR",
+  ])
+    delete env[key]
   const result = await execute(file, [...args], { env, encoding: "utf8", timeout: 120_000, windowsHide: true })
   return { code: 0, stdout: result.stdout }
 }
 
-const fetchAsset = (url: string, deadline: AbortSignal): Promise<Response> => fetch(url, {
-  headers: { "User-Agent": "omo" },
-  signal: AbortSignal.any([deadline, AbortSignal.timeout(600_000)]),
-})
+const fetchAsset = (url: string, deadline: AbortSignal): Promise<Response> =>
+  fetch(url, {
+    headers: { "User-Agent": "omo" },
+    signal: AbortSignal.any([deadline, AbortSignal.timeout(600_000)]),
+  })
 
 async function download(version: string, asset: string, fetchAsset: FetchAsset): Promise<Response> {
   const bases = ["https://get.omo.dev/v", "https://github.com/code-yeongyu/oh-my-openagent/releases/download"]
@@ -60,10 +79,12 @@ async function download(version: string, asset: string, fetchAsset: FetchAsset):
 }
 
 /** Preserve signed release bytes; a fetch-written file has no browser quarantine attribute. */
-export async function installReleaseBinary(options: BinaryInstallRequest & {
-  readonly fetchAsset?: FetchAsset
-  readonly run?: Run
-}): Promise<void> {
+export async function installReleaseBinary(
+  options: BinaryInstallRequest & {
+    readonly fetchAsset?: FetchAsset
+    readonly run?: Run
+  },
+): Promise<void> {
   const { asset, version, platform } = options
   const destination = await realpath(options.destination)
   const deadline = AbortSignal.timeout(BINARY_UPDATE_TIMEOUT_MS)
@@ -81,7 +102,8 @@ export async function installReleaseBinary(options: BinaryInstallRequest & {
   } catch (cause) {
     throw new BinaryUpdateError("directory_not_writable", "the install lock could not be written", { cause })
   }
-  if (lock === undefined) throw new BinaryUpdateError("update_in_progress", `another binary update holds ${JSON.stringify(lockPath)}`)
+  if (lock === undefined)
+    throw new BinaryUpdateError("update_in_progress", `another binary update holds ${JSON.stringify(lockPath)}`)
   const next = `${destination}.new-${randomUUID()}`
   const previous = `${destination}.old-${randomUUID()}`
   let backedUp = false
@@ -89,9 +111,9 @@ export async function installReleaseBinary(options: BinaryInstallRequest & {
   let preserveBackup = false
   try {
     const sums = await (await download(version, "SHA256SUMS", fetch)).text()
-    const matches = [...sums.matchAll(/^([a-fA-F0-9]{64}) [ *](.+)\r?$/gm)]
-      .filter((match) => match[2] === asset)
-    if (matches.length !== 1) throw new BinaryUpdateError("integrity_failed", `SHA256SUMS must contain one checksum for ${asset}`)
+    const matches = [...sums.matchAll(/^([a-fA-F0-9]{64}) [ *](.+)\r?$/gm)].filter((match) => match[2] === asset)
+    if (matches.length !== 1)
+      throw new BinaryUpdateError("integrity_failed", `SHA256SUMS must contain one checksum for ${asset}`)
     const response = await download(version, asset, fetch)
     const file = await open(next, "wx", 0o600)
     const hash = createHash("sha256")
@@ -105,14 +127,17 @@ export async function installReleaseBinary(options: BinaryInstallRequest & {
     } finally {
       await file.close()
     }
-    if (hash.digest("hex") !== matches[0][1].toLowerCase()) throw new BinaryUpdateError("integrity_failed", `checksum mismatch for ${asset}`)
+    if (hash.digest("hex") !== matches[0][1].toLowerCase())
+      throw new BinaryUpdateError("integrity_failed", `checksum mismatch for ${asset}`)
     await chmod(next, 0o755)
     if (platform === "darwin") {
       try {
         const signature = await probe("/usr/bin/codesign", ["--verify", "--strict", next])
         if (signature.code !== 0) throw new Error("codesign verification failed")
       } catch (cause) {
-        throw new BinaryUpdateError("verification_failed", "the macOS release signature could not be verified", { cause })
+        throw new BinaryUpdateError("verification_failed", "the macOS release signature could not be verified", {
+          cause,
+        })
       }
     }
     const installed = await lock.run(async () => {
@@ -130,7 +155,9 @@ export async function installReleaseBinary(options: BinaryInstallRequest & {
             throw new Error(`the installed executable did not report omo ${version}`)
           }
         } catch (cause) {
-          throw new BinaryUpdateError("verification_failed", `the installed executable did not report omo ${version}`, { cause })
+          throw new BinaryUpdateError("verification_failed", `the installed executable did not report omo ${version}`, {
+            cause,
+          })
         }
       } catch (cause) {
         if (backedUp && (swapped || platform === "win32")) {
@@ -140,13 +167,19 @@ export async function installReleaseBinary(options: BinaryInstallRequest & {
             backedUp = false
           } catch (rollbackCause) {
             preserveBackup = true
-            throw new BinaryUpdateError("rollback_failed", `restore the previous executable from ${previous}`, { cause: rollbackCause })
+            throw new BinaryUpdateError("rollback_failed", `restore the previous executable from ${previous}`, {
+              cause: rollbackCause,
+            })
           }
         }
         throw cause
       }
     })
-    if (!installed) throw new BinaryUpdateError("update_in_progress", `the update lease expired or changed at ${JSON.stringify(lockPath)}`)
+    if (!installed)
+      throw new BinaryUpdateError(
+        "update_in_progress",
+        `the update lease expired or changed at ${JSON.stringify(lockPath)}`,
+      )
   } catch (cause) {
     if (cause instanceof BinaryUpdateError) throw cause
     throw new BinaryUpdateError("install_failed", cause instanceof Error ? cause.message : String(cause), { cause })
@@ -158,7 +191,11 @@ export async function installReleaseBinary(options: BinaryInstallRequest & {
           await rm(previous, { force: true })
         } catch (cause) {
           // Windows can rename a loaded image but cannot delete it until its processes exit.
-          if (platform !== "win32" || !["EPERM", "EBUSY", "EACCES"].includes((cause as NodeJS.ErrnoException).code ?? "")) throw cause
+          if (
+            platform !== "win32" ||
+            !["EPERM", "EBUSY", "EACCES"].includes((cause as NodeJS.ErrnoException).code ?? "")
+          )
+            throw cause
         }
       }
     } finally {

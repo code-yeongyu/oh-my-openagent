@@ -13,7 +13,8 @@
 	"types": "./src/index.ts",
 	"scripts": {
 		"typecheck": "tsgo --noEmit -p tsconfig.json",
-		"test": "vitest --run test"
+		"test": "vitest --run test",
+		"generate": "bun scripts/generate-protocol.ts"
 	},
 	"devDependencies": {
 		"@types/node": "26.6.2",

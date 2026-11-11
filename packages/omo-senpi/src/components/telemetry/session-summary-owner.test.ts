@@ -25,7 +25,13 @@ const ownerEntry = (dir: string, pid: number) => join(summaryDir(dir), "owners",
 describe("owner registry pid reuse", () => {
   test("#given a killed owner whose pid now names a process started at another time #when a sweep runs #then its window, pending event and claim are recovered and its entry is removed", async () => {
     const dir = stateDirs.make()
-    const killed = createTestRecorder({ dir, pid: 515_151, startAt: T0, ack: false, startTimes: () => "started-before-the-kill" })
+    const killed = createTestRecorder({
+      dir,
+      pid: 515_151,
+      startAt: T0,
+      ack: false,
+      startTimes: () => "started-before-the-kill",
+    })
     await killed.summary.recordTurn("pending", summaryTurn())
     await killed.summary.finish("pending", "quit")
     await killed.summary.recordTurn("open", summaryTurn())
@@ -35,7 +41,13 @@ describe("owner registry pid reuse", () => {
     expect(killed.storage.pendingUuids()).toHaveLength(1)
 
     // when: pid 515151 is alive again, but as an unrelated process started later
-    const sweeper = createTestRecorder({ dir, pid: 616_161, otherPidsAlive: true, startAt: T0 + STALE, startTimes: () => "started-after-the-kill" })
+    const sweeper = createTestRecorder({
+      dir,
+      pid: 616_161,
+      otherPidsAlive: true,
+      startAt: T0 + STALE,
+      startTimes: () => "started-after-the-kill",
+    })
     await sweeper.summary.recover()
 
     // then
@@ -53,8 +65,17 @@ describe("owner registry pid reuse", () => {
     const dir = stateDirs.make()
     const killed = { pid: 1, bootId: "killed" }
     createSummaryStorage({ stateDir: dir, owner: killed, isPidAlive: () => false }).writeWindow("k", {
-      consent: "enabled", scope: { cwd: "/p" }, sessionHash: "k", sessionRole: "root", owner: killed, heartbeatAt: Date.now(),
-      epoch: "0123456789abcdef", seq: 0, sampleRate: 0, windowId: null, window: null,
+      consent: "enabled",
+      scope: { cwd: "/p" },
+      sessionHash: "k",
+      sessionRole: "root",
+      owner: killed,
+      heartbeatAt: Date.now(),
+      epoch: "0123456789abcdef",
+      seq: 0,
+      sampleRate: 0,
+      windowId: null,
+      window: null,
     })
     expect(existsSync(ownerEntry(dir, 1))).toBe(true)
 
@@ -72,7 +93,9 @@ describe("owner registry pid reuse", () => {
     createOwnerRegistry({ dir: summaryDir(dir), owner }).register()
 
     // when
-    const reader = withRecoveryOps(createSummaryStorage({ stateDir: dir, owner: { pid: 2_147_483_000, bootId: "reader" } }))
+    const reader = withRecoveryOps(
+      createSummaryStorage({ stateDir: dir, owner: { pid: 2_147_483_000, bootId: "reader" } }),
+    )
 
     // then
     expect(reader.isOwnerAlive(owner)).toBe(true)
@@ -87,7 +110,13 @@ describe("owner registry without a readable start time", () => {
     const path = join(dir, "owners", "313131.json")
     writeFileSync(path, JSON.stringify(owner))
     const now = Date.now()
-    const isAlive = createOwnerLiveness({ dir, owner: { pid: 1_212, bootId: "reader" }, isPidAlive: () => true, now: () => now, processStartTime: () => "readable" })
+    const isAlive = createOwnerLiveness({
+      dir,
+      owner: { pid: 1_212, bootId: "reader" },
+      isPidAlive: () => true,
+      now: () => now,
+      processStartTime: () => "readable",
+    })
 
     expect(isAlive(owner)).toBe(true)
 
@@ -99,7 +128,13 @@ describe("owner registry without a readable start time", () => {
     expect(existsSync(path)).toBe(true)
 
     // when
-    const afterExit = createOwnerLiveness({ dir, owner: { pid: 1_212, bootId: "reader" }, isPidAlive: () => false, now: () => now, processStartTime: () => "readable" })
+    const afterExit = createOwnerLiveness({
+      dir,
+      owner: { pid: 1_212, bootId: "reader" },
+      isPidAlive: () => false,
+      now: () => now,
+      processStartTime: () => "readable",
+    })
 
     // then
     expect(afterExit(owner)).toBe(false)
@@ -111,7 +146,13 @@ describe("owner registry without a readable start time", () => {
     let clock = T0
     const owner = { pid: 414_141, bootId: "no-start-time" }
     createOwnerRegistry({ dir, owner, now: () => clock, processStartTime: () => null }).register()
-    const isAlive = createOwnerLiveness({ dir, owner: { pid: 1_313, bootId: "reader" }, isPidAlive: () => true, now: () => clock, processStartTime: () => null })
+    const isAlive = createOwnerLiveness({
+      dir,
+      owner: { pid: 1_313, bootId: "reader" },
+      isPidAlive: () => true,
+      now: () => clock,
+      processStartTime: () => null,
+    })
 
     expect(isAlive(owner)).toBe(true)
 
@@ -126,16 +167,27 @@ describe("owner registry without a readable start time", () => {
     const dir = summaryDir(stateDirs.make())
     const pid = 525_252
     const register = (bootId: string) =>
-      createOwnerRegistry({ dir, owner: { pid, bootId }, processStartTime: () => `${bootId}-start`, now: () => T0 }).register()
+      createOwnerRegistry({
+        dir,
+        owner: { pid, bootId },
+        processStartTime: () => `${bootId}-start`,
+        now: () => T0,
+      }).register()
     register("old")
     const reuseThenProbe = (outcome: boolean) => () => {
       register("new")
       return outcome
     }
-    const byStartTime = createOwnerLiveness({ dir, owner: { pid: 1_515, bootId: "reader" }, isPidAlive: () => true, now: () => T0, processStartTime: () => {
-      register("new")
-      return "new-start"
-    } })
+    const byStartTime = createOwnerLiveness({
+      dir,
+      owner: { pid: 1_515, bootId: "reader" },
+      isPidAlive: () => true,
+      now: () => T0,
+      processStartTime: () => {
+        register("new")
+        return "new-start"
+      },
+    })
 
     // when: the old owner is judged dead by its start time, after the new process registered the pid
     expect(byStartTime({ pid, bootId: "old" })).toBe(false)
@@ -145,7 +197,12 @@ describe("owner registry without a readable start time", () => {
 
     // when: the pid read as dead, then a new process took it and registered before the removal
     register("old")
-    const byPid = createOwnerLiveness({ dir, owner: { pid: 1_515, bootId: "reader" }, isPidAlive: reuseThenProbe(false), now: () => T0 })
+    const byPid = createOwnerLiveness({
+      dir,
+      owner: { pid: 1_515, bootId: "reader" },
+      isPidAlive: reuseThenProbe(false),
+      now: () => T0,
+    })
     expect(byPid({ pid, bootId: "old" })).toBe(false)
 
     // then
@@ -160,7 +217,13 @@ describe("owner registry without a readable start time", () => {
     owner.advance(4 * 60_000)
     owner.tick()
 
-    const isAlive = createOwnerLiveness({ dir: summaryDir(dir), owner: { pid: 1_414, bootId: "reader" }, isPidAlive: () => true, now: () => T0 + 8 * 60_000, processStartTime: () => null })
+    const isAlive = createOwnerLiveness({
+      dir: summaryDir(dir),
+      owner: { pid: 1_414, bootId: "reader" },
+      isPidAlive: () => true,
+      now: () => T0 + 8 * 60_000,
+      processStartTime: () => null,
+    })
     expect(isAlive(owner.storage.owner)).toBe(true)
   })
 })
@@ -173,7 +236,10 @@ describe("owner registry heartbeat while idle", () => {
     throw errorWithCode(code)
   }
 
-  const idleOwnerThenResume = async (probes: { readonly startTimes: (pid: number) => string | null; readonly ownerSeenAlive: (pid: number) => boolean }) => {
+  const idleOwnerThenResume = async (probes: {
+    readonly startTimes: (pid: number) => string | null
+    readonly ownerSeenAlive: (pid: number) => boolean
+  }) => {
     const dir = stateDirs.make()
     const owner = createTestRecorder({ dir, pid: 818_181, startAt: T0, startTimes: probes.startTimes })
     await owner.summary.recordTurn("s1", summaryTurn())
@@ -196,7 +262,10 @@ describe("owner registry heartbeat while idle", () => {
   }
 
   test("#given a live owner without a readable start time whose window closed at a checkpoint #when it idles past the stale window #then a resuming process does not adopt its file", async () => {
-    const { dir, resumer } = await idleOwnerThenResume({ startTimes: () => null, ownerSeenAlive: (pid) => pid === 818_181 })
+    const { dir, resumer } = await idleOwnerThenResume({
+      startTimes: () => null,
+      ownerSeenAlive: (pid) => pid === 818_181,
+    })
 
     // then: the shared file still belongs to the idle owner, and the resumer wrote its own copy beside it
     const shared = resumer.storage.readWindow(resumer.storage.windowKey("s1"))
@@ -220,9 +289,11 @@ describe("owner registry heartbeat while idle", () => {
     expect(processIsAlive(2_147_483_000, () => true)).toBe(true)
     expect(processIsAlive(2_147_483_000, killThrowing("EPERM"))).toBe(true)
     expect(processIsAlive(2_147_483_000, killThrowing("EACCES"))).toBe(true)
-    expect(processIsAlive(2_147_483_000, () => {
-      throw "not an error"
-    })).toBe(true)
+    expect(
+      processIsAlive(2_147_483_000, () => {
+        throw "not an error"
+      }),
+    ).toBe(true)
     expect(processIsAlive(2_147_483_000, killThrowing("ESRCH"))).toBe(false)
   })
 })

@@ -27,11 +27,7 @@ export const memfsRestore: MemfsSubcommand = async ({ deps, ctx, parsed, identit
   let name: string
   if (requested === undefined) {
     if (!isInteractive(ctx)) {
-      return respond(
-        ctx,
-        `specify a backup name: /memfs restore <name>; available: ${backups.join(", ")}`,
-        "error",
-      )
+      return respond(ctx, `specify a backup name: /memfs restore <name>; available: ${backups.join(", ")}`, "error")
     }
     const selected = await ctx.ui?.select?.("Restore memory backup", [...backups])
     if (selected === undefined) return respond(ctx, "restore cancelled; nothing changed")

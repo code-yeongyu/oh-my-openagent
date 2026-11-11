@@ -23,15 +23,25 @@ export function parseSkillMcpConfigFromFrontmatter(content: string): SkillMcpCon
   return undefined
 }
 
-export async function loadMcpJsonFromDir(skillDir: string, provenance: SkillProvenance = { kind: "user", selectedRoot: skillDir }, onDiagnostic?: SkillDiagnosticSink): Promise<SkillMcpConfig | undefined> {
+export async function loadMcpJsonFromDir(
+  skillDir: string,
+  provenance: SkillProvenance = { kind: "user", selectedRoot: skillDir },
+  onDiagnostic?: SkillDiagnosticSink,
+): Promise<SkillMcpConfig | undefined> {
   return readMcpJsonFromDirChecked(skillDir, provenance, onDiagnostic)
 }
 
-export function readMcpJsonFromDirChecked(skillDir: string, provenance: SkillProvenance, onDiagnostic?: SkillDiagnosticSink): SkillMcpConfig | undefined {
+export function readMcpJsonFromDirChecked(
+  skillDir: string,
+  provenance: SkillProvenance,
+  onDiagnostic?: SkillDiagnosticSink,
+): SkillMcpConfig | undefined {
   const mcpJsonPath = join(skillDir, "mcp.json")
 
   try {
-    try { lstatSync(mcpJsonPath) } catch (error) {
+    try {
+      lstatSync(mcpJsonPath)
+    } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined
       throw error
     }
@@ -44,7 +54,7 @@ export function readMcpJsonFromDirChecked(skillDir: string, provenance: SkillPro
 
     if (parsed && typeof parsed === "object" && !("mcpServers" in parsed)) {
       const hasCommandField = Object.values(parsed).some(
-        (value) => value && typeof value === "object" && "command" in (value as Record<string, unknown>)
+        (value) => value && typeof value === "object" && "command" in (value as Record<string, unknown>),
       )
       if (hasCommandField) {
         return parsed as SkillMcpConfig

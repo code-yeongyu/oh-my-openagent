@@ -16,8 +16,11 @@ function cachePath(root: string): string {
 }
 
 function validKey(key: unknown, hash: string): key is string {
-  return typeof key === "string" && key.startsWith(`v1.omo-senpi.${hash}.`)
-    && /^v1\.omo-senpi\.[a-f0-9]{64}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(key)
+  return (
+    typeof key === "string" &&
+    key.startsWith(`v1.omo-senpi.${hash}.`) &&
+    /^v1\.omo-senpi\.[a-f0-9]{64}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(key)
+  )
 }
 
 function readCache(path: string): { endpoint?: unknown; key?: unknown; notBefore?: unknown } {
@@ -53,7 +56,9 @@ export async function resolveInstallIngestKey(input: {
   try {
     const base = new URL(resolveOtlpEndpoint(input.env))
     endpoint = `${base.origin}${base.pathname.replace(/\/+$/u, "")}`
-  } catch { return null }
+  } catch {
+    return null
+  }
   let entry = keys.get(path)
   if (entry === undefined) {
     const pending = (async () => {
@@ -67,7 +72,8 @@ export async function resolveInstallIngestKey(input: {
       }
       if (!input.consent()) return null
       const response = await fetch(`${endpoint}/v1/register`, {
-        method: "POST", redirect: "error",
+        method: "POST",
+        redirect: "error",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ product: "omo-senpi", install_hash: input.hash }),
         signal: AbortSignal.timeout(REGISTRATION_TIMEOUT_MS),
@@ -78,13 +84,17 @@ export async function resolveInstallIngestKey(input: {
         const seconds = retryAfter === null || retryAfter.trim() === "" ? NaN : Number(retryAfter)
         const at = Number.isFinite(seconds) ? Date.now() + seconds * 1_000 : Date.parse(retryAfter ?? "")
         const now = Date.now()
-        const notBefore = Math.min(now + MAX_BACKOFF_MS, Math.max(now + DEFAULT_BACKOFF_MS, Number.isFinite(at) ? at : 0))
+        const notBefore = Math.min(
+          now + MAX_BACKOFF_MS,
+          Math.max(now + DEFAULT_BACKOFF_MS, Number.isFinite(at) ? at : 0),
+        )
         writeCache(path, { endpoint, notBefore })
         return null
       }
       if (response.status !== 200) return null
       const value: unknown = await response.json()
-      if (typeof value !== "object" || value === null || !("key" in value) || !validKey(value.key, input.hash)) return null
+      if (typeof value !== "object" || value === null || !("key" in value) || !validKey(value.key, input.hash))
+        return null
       if (!input.consent()) return null
       writeCache(path, { endpoint, key: value.key })
       return value.key

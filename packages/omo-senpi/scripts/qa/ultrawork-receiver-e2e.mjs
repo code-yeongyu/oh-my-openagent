@@ -43,7 +43,11 @@ function hiddenDirectives(agentDir) {
       } catch {
         continue
       }
-      if (entry?.type === "custom_message" && entry.customType === "omo-ultrawork:directive" && typeof entry.content === "string") {
+      if (
+        entry?.type === "custom_message" &&
+        entry.customType === "omo-ultrawork:directive" &&
+        typeof entry.content === "string"
+      ) {
         found.push(entry.content)
       }
     }
@@ -72,7 +76,12 @@ function runScenario(resolvedSenpi, scenario, directives, evidenceDir) {
       ["-e", mockProviderEntry, "-p", "--provider", "omo-mock", "--model", scenario.model, "ulw say hello"],
       {
         cwd: sandbox.cwd,
-        env: { ...isolatedChildEnv(process.env, sandbox.agentDir), SENPI_CODING_AGENT_DIR: sandbox.agentDir, XDG_CONFIG_HOME: sandbox.xdgConfigHome, OMO_SENPI_QA: "1" },
+        env: {
+          ...isolatedChildEnv(process.env, sandbox.agentDir),
+          SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+          XDG_CONFIG_HOME: sandbox.xdgConfigHome,
+          OMO_SENPI_QA: "1",
+        },
         encoding: "utf8",
         timeout: 90_000,
       },
@@ -90,7 +99,10 @@ function runScenario(resolvedSenpi, scenario, directives, evidenceDir) {
     if (evidenceDir !== undefined) {
       mkdirSync(evidenceDir, { recursive: true })
       writeFileSync(join(evidenceDir, `${scenario.name}.delivered.txt`), content)
-      writeFileSync(join(evidenceDir, `${scenario.name}.stdout.txt`), `${run.stdout ?? ""}\n--- stderr ---\n${run.stderr ?? ""}`)
+      writeFileSync(
+        join(evidenceDir, `${scenario.name}.stdout.txt`),
+        `${run.stdout ?? ""}\n--- stderr ---\n${run.stderr ?? ""}`,
+      )
     }
     return {
       name: scenario.name,

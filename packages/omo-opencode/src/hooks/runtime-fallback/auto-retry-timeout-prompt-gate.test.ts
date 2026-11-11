@@ -161,10 +161,7 @@ describe("session timeout fallback through the real internal-prompt gate", () =>
 
     // when
     helpers.scheduleSessionFallbackTimeout(SESSION_ID, undefined)
-    const reachedTerminalFailure = await pumpUntil(
-      clock,
-      () => harness.toastTitles.length > 0,
-    )
+    const reachedTerminalFailure = await pumpUntil(clock, () => harness.toastTitles.length > 0)
 
     // then
     expect(reachedTerminalFailure).toBe(true)

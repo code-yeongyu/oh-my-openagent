@@ -16,7 +16,12 @@ import { readReflectionRetentionGuard, readReservations, reservedRunIds } from "
 import { readUnreflectedRetentionGate } from "./reflection-health-signal"
 import { classifyJournalEntry, removeTranscriptJournalUnderLock } from "./journals"
 import { DAY_MS, listNames, newestMtime, type RetentionContext, type RuntimeRetentionPolicy } from "./policy"
-import { RETENTION_TOMBSTONE_PREFIX, claimReflectionRun, classifyReflectionRun, removeTombstone } from "./reflection-runs"
+import {
+  RETENTION_TOMBSTONE_PREFIX,
+  claimReflectionRun,
+  classifyReflectionRun,
+  removeTombstone,
+} from "./reflection-runs"
 import {
   KIBITZER_ENCODED_SESSION_PATTERN,
   KIBITZER_SIDECAR_TOMBSTONE_PREFIX,
@@ -34,7 +39,20 @@ export type RuntimeCapTier =
   | "partly-reflected-transcript"
   | "unfolded-run"
 
-export type RuntimeCapKeepReason = "reserved" | "reflection-unhealthy" | "unreflected-retention-off" | "high-water" | "newest" | "newest-unfolded" | "reserved" | "locked" | "recent" | "live" | "owned" | "changed-during-removal" | "state-unreadable"
+export type RuntimeCapKeepReason =
+  | "reserved"
+  | "reflection-unhealthy"
+  | "unreflected-retention-off"
+  | "high-water"
+  | "newest"
+  | "newest-unfolded"
+  | "reserved"
+  | "locked"
+  | "recent"
+  | "live"
+  | "owned"
+  | "changed-during-removal"
+  | "state-unreadable"
 
 export interface RuntimeSizeCapOptions extends Omit<RetentionContext, "policy"> {
   readonly policy: RuntimeRetentionPolicy
@@ -100,11 +118,25 @@ const RUNTIME_CAP_SIDECAR_FLOOR_MS = 60 * 60 * 1000
 const RUNTIME_CAP_JOURNAL_FLOOR_MS = 24 * 60 * 60 * 1000
 const RUNTIME_CAP_KEPT_UNFOLDED_RUNS = 10
 
-const CAP_KEEP_REASONS: ReadonlySet<string> = new Set<RuntimeCapKeepReason>(["reserved", "reflection-unhealthy", "unreflected-retention-off", "high-water", "newest", "newest-unfolded", "reserved", "locked", "recent", "live", "owned", "changed-during-removal", "state-unreadable"])
+const CAP_KEEP_REASONS: ReadonlySet<string> = new Set<RuntimeCapKeepReason>([
+  "reserved",
+  "reflection-unhealthy",
+  "unreflected-retention-off",
+  "high-water",
+  "newest",
+  "newest-unfolded",
+  "reserved",
+  "locked",
+  "recent",
+  "live",
+  "owned",
+  "changed-during-removal",
+  "state-unreadable",
+])
 
 function capOutcome(outcome: string): "removed" | RuntimeCapKeepReason {
   if (outcome === "removed") return "removed"
-  return CAP_KEEP_REASONS.has(outcome) ? outcome as RuntimeCapKeepReason : "recent"
+  return CAP_KEEP_REASONS.has(outcome) ? (outcome as RuntimeCapKeepReason) : "recent"
 }
 
 interface Candidate {
@@ -131,18 +163,35 @@ export async function runRuntimeSizeCap(options: RuntimeSizeCapOptions): Promise
   const keptResume = options.resume === undefined ? {} : { cursor: options.resume }
   let beforeBytes: number
   try {
-    beforeBytes = (await measureRuntimeSize(options.paths.runtime, budgetSignal === undefined ? {} : { signal: budgetSignal })).bytes
+    beforeBytes = (
+      await measureRuntimeSize(options.paths.runtime, budgetSignal === undefined ? {} : { signal: budgetSignal })
+    ).bytes
   } catch (error) {
     // A disposed caller is an abort, never a budget stop: the pass must not stamp itself complete.
     options.signal?.throwIfAborted()
     if (budgetSignal?.aborted !== true) throw error
     skipped.push("measure-over-budget")
-    return { maxBytes: options.maxBytes, beforeBytes: 0, afterBytes: 0, exceededBytes: 0, evicted, kept, skipped, measureMs: clock() - measureStart, unreflectedHeldBytes: 0, ...keptResume }
+    return {
+      maxBytes: options.maxBytes,
+      beforeBytes: 0,
+      afterBytes: 0,
+      exceededBytes: 0,
+      evicted,
+      kept,
+      skipped,
+      measureMs: clock() - measureStart,
+      unreflectedHeldBytes: 0,
+      ...keptResume,
+    }
   }
   const measureEnd = clock()
   const measureMs = measureEnd - measureStart
   const base = { maxBytes: options.maxBytes, beforeBytes, evicted, kept, skipped, measureMs, unreflectedHeldBytes: 0 }
-  const unchanged = () => ({ ...base, afterBytes: beforeBytes, exceededBytes: options.maxBytes > 0 ? Math.max(0, beforeBytes - options.maxBytes) : 0 })
+  const unchanged = () => ({
+    ...base,
+    afterBytes: beforeBytes,
+    exceededBytes: options.maxBytes > 0 ? Math.max(0, beforeBytes - options.maxBytes) : 0,
+  })
   if (options.budgetMs !== undefined && measureMs > options.budgetMs) {
     skipped.push("measure-over-budget")
     return { ...unchanged(), ...keptResume }
@@ -162,7 +211,8 @@ export async function runRuntimeSizeCap(options: RuntimeSizeCapOptions): Promise
       if (isBeforeCursor(candidate, options.resume)) continue
       options.signal?.throwIfAborted()
       if (clock() >= deadline) {
-        cursor = last === undefined ? options.resume : { store: "cap", tier: last.tier, clock: last.at, lastName: last.name }
+        cursor =
+          last === undefined ? options.resume : { store: "cap", tier: last.tier, clock: last.at, lastName: last.name }
         break walk
       }
       const size = await measureTreeBytes(candidate.measuredPath)
@@ -238,9 +288,10 @@ export interface RuntimeCapExcess {
 export function describeRuntimeCapExcess(input: RuntimeCapExcess): string | undefined {
   if (input.overCapBytes <= 0) return undefined
   const over = `cap exceeded by ${formatRuntimeBytes(input.overCapBytes)}`
-  const held = !input.discardUnreflectedJournals && input.unreflectedBytes > 0
-    ? `held by unreflected journals: ${formatRuntimeBytes(input.unreflectedBytes)} (discard_unreflected_journals off)`
-    : undefined
+  const held =
+    !input.discardUnreflectedJournals && input.unreflectedBytes > 0
+      ? `held by unreflected journals: ${formatRuntimeBytes(input.unreflectedBytes)} (discard_unreflected_journals off)`
+      : undefined
   if (input.evictableBytes >= input.overCapBytes) {
     return `${over}; the next maintenance pass evicts it (${formatRuntimeBytes(input.evictableBytes)} evictable)`
   }
@@ -253,7 +304,9 @@ export function describeRuntimeCapExcess(input: RuntimeCapExcess): string | unde
 
 function isBeforeCursor(candidate: Candidate, cursor: RuntimeCapCursor | undefined): boolean {
   if (cursor === undefined || candidate.tier !== cursor.tier) return false
-  return candidate.at < cursor.clock || (candidate.at === cursor.clock && candidate.name.localeCompare(cursor.lastName) <= 0)
+  return (
+    candidate.at < cursor.clock || (candidate.at === cursor.clock && candidate.name.localeCompare(cursor.lastName) <= 0)
+  )
 }
 
 async function clearTombstones(options: RuntimeSizeCapOptions): Promise<void> {
@@ -289,7 +342,10 @@ async function tiers(
   // Journals are classified only when the walk reaches their first tier, so a pass that fits on tier 1
   // reads no transcript (#12538 review r3 L1).
   let journalScan: ReturnType<typeof journalCandidates> | undefined
-  const journals = async () => guard === undefined ? undefined : await (journalScan ??= journalCandidates(options, guard.reservedConversationIds, kept))
+  const journals = async () =>
+    guard === undefined
+      ? undefined
+      : await (journalScan ??= journalCandidates(options, guard.reservedConversationIds, kept))
   const unfolded = async (entries: readonly Candidate[]): Promise<readonly Candidate[]> => {
     if (entries.length === 0) return entries
     const hold = async (reason: RuntimeCapKeepReason): Promise<readonly Candidate[]> => {
@@ -331,7 +387,8 @@ async function runCandidates(
     if (name.startsWith(RETENTION_TOMBSTONE_PREFIX)) continue
     const classified = await classifyReflectionRun(join(runsDir, name), name)
     if (typeof classified !== "string") folded.push({ name, at: classified.finishedAt })
-    else if (classified === "unfolded-terminal") unfolded.push({ name, at: (await newestMtime(join(runsDir, name))) ?? 0 })
+    else if (classified === "unfolded-terminal")
+      unfolded.push({ name, at: (await newestMtime(join(runsDir, name))) ?? 0 })
   }
   const byAge = (left: { name: string; at: number }, right: { name: string; at: number }) =>
     left.at - right.at || left.name.localeCompare(right.name)
@@ -362,9 +419,10 @@ async function runCandidates(
   const keptUnfolded = new Set(unfolded.slice(-RUNTIME_CAP_KEPT_UNFOLDED_RUNS).map((run) => run.name))
   const unfoldedCandidates: Candidate[] = []
   for (const run of unfolded) {
-    const reason = exempt(run.name)
-      ?? (keptUnfolded.has(run.name) ? "newest-unfolded" : undefined)
-      ?? (run.at > retentionCutoff ? "recent" : undefined)
+    const reason =
+      exempt(run.name) ??
+      (keptUnfolded.has(run.name) ? "newest-unfolded" : undefined) ??
+      (run.at > retentionCutoff ? "recent" : undefined)
     if (reason !== undefined) {
       kept[run.name] = reason
       continue
@@ -390,14 +448,25 @@ async function journalCandidates(
   const floorDays = (options.journalFloorMs ?? RUNTIME_CAP_JOURNAL_FLOOR_MS) / DAY_MS
   const context: RetentionContext = {
     ...options,
-    policy: { ...options.policy, retentionDays: options.journalFloorMs === undefined ? 0 : floorDays, abandonedJournalDays: floorDays },
+    policy: {
+      ...options.policy,
+      retentionDays: options.journalFloorMs === undefined ? 0 : floorDays,
+      abandonedJournalDays: floorDays,
+    },
   }
   const lock = options.journalLock ?? withLocalJournalLock
   // Classes come from an open gate with the switch on; the switch and the health gate are applied per
   // tier below (with the held bytes reported), and the locked claim re-checks the real gate.
-  const classifyContext: RetentionContext = { ...context, policy: { ...context.policy, discardUnreflectedJournals: true } }
+  const classifyContext: RetentionContext = {
+    ...context,
+    policy: { ...context.policy, discardUnreflectedJournals: true },
+  }
   const realGate = await readUnreflectedRetentionGate(options.paths.reflection, options.reflectionEnabled ?? true)
-  const found = { fully: [] as { name: string; at: number }[], never: [] as { name: string; at: number }[], partly: [] as { name: string; at: number }[] }
+  const found = {
+    fully: [] as { name: string; at: number }[],
+    never: [] as { name: string; at: number }[],
+    partly: [] as { name: string; at: number }[],
+  }
   for (const sessionId of await listNames(options.paths.transcripts)) {
     const dir = join(options.paths.transcripts, sessionId)
     if (options.isLiveSession?.(sessionId) === true) {
@@ -413,7 +482,11 @@ async function journalCandidates(
     if (verdict === undefined || typeof verdict === "string") continue
     found[verdict.kind].push({ name: sessionId, at: (await newestMtime(dir)) ?? 0 })
   }
-  const toCandidates = (entries: { name: string; at: number }[], tier: RuntimeCapTier, transcriptOnly: boolean): Candidate[] =>
+  const toCandidates = (
+    entries: { name: string; at: number }[],
+    tier: RuntimeCapTier,
+    transcriptOnly: boolean,
+  ): Candidate[] =>
     entries
       .sort((left, right) => left.at - right.at || left.name.localeCompare(right.name))
       .map((entry) => {
@@ -425,10 +498,15 @@ async function journalCandidates(
           measuredPath: transcriptOnly ? join(dir, "transcript.jsonl") : dir,
           // A journal that turns unreadable between its classification and the locked eviction is kept
           // with that reason, as the pass's own visit keeps it (#12538 review r4 L); an abort propagates.
-          evict: async () => capOutcome(await removeTranscriptJournalUnderLock(context, dir, lock, realGate).catch((error: unknown): RuntimeCapKeepReason => {
-            if (options.signal?.aborted === true) throw error
-            return "state-unreadable"
-          })),
+          evict: async () =>
+            capOutcome(
+              await removeTranscriptJournalUnderLock(context, dir, lock, realGate).catch(
+                (error: unknown): RuntimeCapKeepReason => {
+                  if (options.signal?.aborted === true) throw error
+                  return "state-unreadable"
+                },
+              ),
+            ),
         }
       })
   return {
@@ -438,7 +516,10 @@ async function journalCandidates(
   }
 }
 
-async function sidecarCandidates(options: RuntimeSizeCapOptions, kept: Record<string, RuntimeCapKeepReason>): Promise<Candidate[]> {
+async function sidecarCandidates(
+  options: RuntimeSizeCapOptions,
+  kept: Record<string, RuntimeCapKeepReason>,
+): Promise<Candidate[]> {
   const root = kibitzerSidecarsRoot(options.paths.recall)
   const entries: { name: string; at: number }[] = []
   for (const name of await listNames(root)) {
@@ -463,12 +544,19 @@ async function sidecarCandidates(options: RuntimeSizeCapOptions, kept: Record<st
     name: entry.name,
     at: entry.at,
     measuredPath: join(root, entry.name),
-    evict: async () => capOutcome(await claimKibitzerSidecar(
-      join(root, entry.name),
-      kibitzerSidecarOwnerLockPathFor(options.paths.locks, entry.name),
-      options.now(),
-      RUNTIME_CAP_SIDECAR_FLOOR_MS,
-      { recallDir: options.paths.recall, locksDir: options.paths.locks, ...(options.warn === undefined ? {} : { warn: options.warn }) },
-    )),
+    evict: async () =>
+      capOutcome(
+        await claimKibitzerSidecar(
+          join(root, entry.name),
+          kibitzerSidecarOwnerLockPathFor(options.paths.locks, entry.name),
+          options.now(),
+          RUNTIME_CAP_SIDECAR_FLOOR_MS,
+          {
+            recallDir: options.paths.recall,
+            locksDir: options.paths.locks,
+            ...(options.warn === undefined ? {} : { warn: options.warn }),
+          },
+        ),
+      ),
   }))
 }
