@@ -10,9 +10,10 @@ import { generateDeviceKeyMaterial } from "../../../../memory-core/src/sync/keyr
 import { deviceIdOf } from "../../../../memory-core/src/sync/crypto/signatures"
 import { createWorld, removeWorldStateDirs } from "../../../../memory-core/src/sync/recovery/testing/world.test-support"
 import { startChainWireServer } from "../../../../memory-core/src/sync/account/testing/chain-wire-server.test-support"
+import { testBudgetSignal, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 async function receive(worker: Worker, kind: string): Promise<unknown> {
-  for await (const args of on(worker, "message", { signal: AbortSignal.timeout(10_000) })) {
+  for await (const args of on(worker, "message", { signal: testBudgetSignal(`the worker's ${kind} message`) })) {
     const parsed = z.object({ kind: z.string(), result: z.unknown().optional() }).safeParse(args[0])
     if (parsed.success && parsed.data.kind === kind) return parsed.data.result
   }
@@ -20,13 +21,19 @@ async function receive(worker: Worker, kind: string): Promise<unknown> {
 }
 
 test("#given two real coordinator workers #when both enable one device #then service sees one pending ceremony", async () => {
+  useTestTimeout(20_000)
   const root = await mkdtemp(join(tmpdir(), "g3-worker-rpc-"))
   const world = await createWorld("worker-pairing")
   const server = startChainWireServer(world.account, world.server.chain(world.account))
   const material = generateDeviceKeyMaterial()
   const principalId = await deviceIdOf(material.publicKeys.signing)
   if (principalId === null) throw new Error("invalid generated key")
-  const token = server.tokenFor({ kind: "device", id: principalId, signing_public_key: material.publicKeys.signing, sealing_public_key: material.publicKeys.sealing })
+  const token = server.tokenFor({
+    kind: "device",
+    id: principalId,
+    signing_public_key: material.publicKeys.signing,
+    sealing_public_key: material.publicKeys.sealing,
+  })
   const workers: Worker[] = []
   try {
     const start = async () => {

@@ -59,9 +59,10 @@ export function applyCachedClaudeCode(
 const megabytes = (bytes: number): string => `${Math.round(bytes / 1_048_576)} MB`
 
 export function claudeCodeProgressLine(pin: ClaudeCodePin, progress: ClaudeCodeDownloadProgress): string {
-  const amount = progress.totalBytes === undefined
-    ? megabytes(progress.receivedBytes)
-    : `${Math.floor((progress.receivedBytes / progress.totalBytes) * 100)}% of ${megabytes(progress.totalBytes)}`
+  const amount =
+    progress.totalBytes === undefined
+      ? megabytes(progress.receivedBytes)
+      : `${Math.floor((progress.receivedBytes / progress.totalBytes) * 100)}% of ${megabytes(progress.totalBytes)}`
   return `Downloading Claude Code ${pin.claudeCodeVersion ?? pin.version}: ${amount}`
 }
 
@@ -79,7 +80,11 @@ export function createClaudeCodeComponent(options: ClaudeCodeComponentOptions = 
       if (pin === undefined) return
       let settled: Promise<void> | undefined
       const ensure = (turn: TurnContext | undefined): Promise<void> => {
-        if (env.CLAUDE_CODE_EXECUTABLE || (options.which ?? ((command: string) => findOnPath(command, env)))("claude") !== null) return Promise.resolve()
+        if (
+          env.CLAUDE_CODE_EXECUTABLE ||
+          (options.which ?? ((command: string) => findOnPath(command, env)))("claude") !== null
+        )
+          return Promise.resolve()
         let shownStep = -1
         settled ??= acquireClaudeCode({
           pin,
@@ -88,7 +93,10 @@ export function createClaudeCodeComponent(options: ClaudeCodeComponentOptions = 
           fetch: options.fetch,
           onDownloadStart: (message) => turn?.ui?.notify?.(message, "info"),
           onProgress: (progress) => {
-            const step = progress.totalBytes === undefined ? Math.floor(progress.receivedBytes / 10_485_760) : Math.floor((progress.receivedBytes / progress.totalBytes) * 10)
+            const step =
+              progress.totalBytes === undefined
+                ? Math.floor(progress.receivedBytes / 10_485_760)
+                : Math.floor((progress.receivedBytes / progress.totalBytes) * 10)
             if (step === shownStep) return
             shownStep = step
             turn?.ui?.setStatus?.(CLAUDE_CODE_STATUS_KEY, claudeCodeProgressLine(pin, progress))

@@ -35,7 +35,11 @@ describe("recall term store codec", () => {
     unalignedBuffer.set(bytes)
 
     // when
-    const decoded = [decodeRecallTermStore(bytes), decodeRecallTermStore(unaligned), decodeRecallTermStore(unalignedBuffer)]
+    const decoded = [
+      decodeRecallTermStore(bytes),
+      decodeRecallTermStore(unaligned),
+      decodeRecallTermStore(unalignedBuffer),
+    ]
 
     // then
     for (const result of decoded) expect(plain(result)).toEqual(plain(store()))

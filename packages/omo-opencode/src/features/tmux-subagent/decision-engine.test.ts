@@ -1,12 +1,12 @@
 import { describe, it, expect } from "bun:test"
-import { 
-  decideSpawnActions, 
-  calculateCapacity, 
-  canSplitPane, 
+import {
+  decideSpawnActions,
+  calculateCapacity,
+  canSplitPane,
   canSplitPaneAnyDirection,
   getBestSplitDirection,
   findSpawnTarget,
-  type SessionMapping 
+  type SessionMapping,
 } from "./decision-engine"
 import type { WindowState, CapacityConfig, TmuxPaneInfo } from "./types"
 import { MIN_PANE_WIDTH, MIN_PANE_HEIGHT } from "./types"
@@ -221,11 +221,19 @@ describe("decideSpawnActions", () => {
   const createWindowState = (
     windowWidth: number,
     windowHeight: number,
-    agentPanes: Array<{ paneId: string; width: number; height: number; left: number; top: number }> = []
+    agentPanes: Array<{ paneId: string; width: number; height: number; left: number; top: number }> = [],
   ): WindowState => ({
     windowWidth,
     windowHeight,
-    mainPane: { paneId: "%0", width: Math.floor(windowWidth / 2), height: windowHeight, left: 0, top: 0, title: "main", isActive: true },
+    mainPane: {
+      paneId: "%0",
+      width: Math.floor(windowWidth / 2),
+      height: windowHeight,
+      left: 0,
+      top: 0,
+      title: "main",
+      isActive: true,
+    },
     agentPanes: agentPanes.map((p, i) => ({
       ...p,
       title: `agent-${i}`,
@@ -261,12 +269,8 @@ describe("decideSpawnActions", () => {
 
     it("respects configured agent min width for split decisions", () => {
       // given
-      const state = createWindowState(240, 44, [
-        { paneId: "%1", width: 100, height: 44, left: 140, top: 0 },
-      ])
-      const mappings: SessionMapping[] = [
-        { sessionId: "old-ses", paneId: "%1", createdAt: new Date("2024-01-01") },
-      ]
+      const state = createWindowState(240, 44, [{ paneId: "%1", width: 100, height: 44, left: 140, top: 0 }])
+      const mappings: SessionMapping[] = [{ sessionId: "old-ses", paneId: "%1", createdAt: new Date("2024-01-01") }]
       const strictConfig: CapacityConfig = {
         mainPaneSize: 60,
         mainPaneMinWidth: 120,
@@ -289,7 +293,15 @@ describe("decideSpawnActions", () => {
       const state: WindowState = {
         windowWidth,
         windowHeight,
-        mainPane: { paneId: "%0", width: windowWidth, height: windowHeight, left: 0, top: 0, title: "main", isActive: true },
+        mainPane: {
+          paneId: "%0",
+          width: windowWidth,
+          height: windowHeight,
+          left: 0,
+          top: 0,
+          title: "main",
+          isActive: true,
+        },
         agentPanes: [],
       }
 
@@ -309,7 +321,15 @@ describe("decideSpawnActions", () => {
       const state: WindowState = {
         windowWidth,
         windowHeight,
-        mainPane: { paneId: "%0", width: windowWidth, height: windowHeight, left: 0, top: 0, title: "main", isActive: true },
+        mainPane: {
+          paneId: "%0",
+          width: windowWidth,
+          height: windowHeight,
+          left: 0,
+          top: 0,
+          title: "main",
+          isActive: true,
+        },
         agentPanes: [],
       }
 
@@ -374,12 +394,8 @@ describe("decideSpawnActions", () => {
 
     it("closes oldest pane when existing panes are too small to split", () => {
       // given - existing pane is below minimum splittable size
-      const state = createWindowState(220, 30, [
-        { paneId: "%1", width: 50, height: 15, left: 110, top: 0 },
-      ])
-      const mappings: SessionMapping[] = [
-        { sessionId: "old-ses", paneId: "%1", createdAt: new Date("2024-01-01") },
-      ]
+      const state = createWindowState(220, 30, [{ paneId: "%1", width: 50, height: 15, left: 110, top: 0 }])
+      const mappings: SessionMapping[] = [{ sessionId: "old-ses", paneId: "%1", createdAt: new Date("2024-01-01") }]
 
       // when
       const result = decideSpawnActions(state, "ses1", "test", defaultConfig, mappings)
@@ -453,12 +469,8 @@ describe("decideSpawnActions", () => {
 
     it("uses configured main pane size for split/defer decision", () => {
       // given
-      const state = createWindowState(240, 44, [
-        { paneId: "%1", width: 90, height: 44, left: 150, top: 0 },
-      ])
-      const mappings: SessionMapping[] = [
-        { sessionId: "old-ses", paneId: "%1", createdAt: new Date("2024-01-01") },
-      ]
+      const state = createWindowState(240, 44, [{ paneId: "%1", width: 90, height: 44, left: 150, top: 0 }])
+      const mappings: SessionMapping[] = [{ sessionId: "old-ses", paneId: "%1", createdAt: new Date("2024-01-01") }]
       const wideMainConfig: CapacityConfig = {
         mainPaneSize: 80,
         mainPaneMinWidth: 120,
@@ -566,30 +578,38 @@ describe("calculateCapacity", () => {
     expect(customCapacity.cols).toBeGreaterThanOrEqual(defaultCapacity.cols)
   })
 
-	it("#given non-50 main pane width #when calculating capacity #then uses real agent area width", () => {
-		//#given
-		const windowWidth = 220
-		const windowHeight = 44
-		const mainPaneWidth = 132
+  it("#given non-50 main pane width #when calculating capacity #then uses real agent area width", () => {
+    //#given
+    const windowWidth = 220
+    const windowHeight = 44
+    const mainPaneWidth = 132
 
-		//#when
-		const capacity = calculateCapacity(windowWidth, windowHeight, 52, mainPaneWidth)
+    //#when
+    const capacity = calculateCapacity(windowWidth, windowHeight, 52, mainPaneWidth)
 
-		//#then
-		expect(capacity.cols).toBe(1)
-		expect(capacity.total).toBe(3)
-	})
+    //#then
+    expect(capacity.cols).toBe(1)
+    expect(capacity.total).toBe(3)
+  })
 })
 
 describe("decideSpawnActions with custom agentPaneWidth", () => {
   const createWindowState = (
     windowWidth: number,
     windowHeight: number,
-    agentPanes: Array<{ paneId: string; width: number; height: number; left: number; top: number }> = []
+    agentPanes: Array<{ paneId: string; width: number; height: number; left: number; top: number }> = [],
   ): WindowState => ({
     windowWidth,
     windowHeight,
-    mainPane: { paneId: "%0", width: Math.floor(windowWidth / 2), height: windowHeight, left: 0, top: 0, title: "main", isActive: true },
+    mainPane: {
+      paneId: "%0",
+      width: Math.floor(windowWidth / 2),
+      height: windowHeight,
+      left: 0,
+      top: 0,
+      title: "main",
+      isActive: true,
+    },
     agentPanes: agentPanes.map((p, i) => ({
       ...p,
       title: `agent-${i}`,
@@ -614,12 +634,8 @@ describe("decideSpawnActions with custom agentPaneWidth", () => {
   it("#given custom agentPaneWidth and splittable existing pane #when deciding spawn #then uses spawn without eviction", () => {
     //#given
     const customConfig: CapacityConfig = { mainPaneMinWidth: 120, agentPaneWidth: 40 }
-    const state = createWindowState(220, 44, [
-      { paneId: "%1", width: 90, height: 30, left: 110, top: 0 },
-    ])
-    const mappings: SessionMapping[] = [
-      { sessionId: "old-ses", paneId: "%1", createdAt: new Date("2024-01-01") },
-    ]
+    const state = createWindowState(220, 44, [{ paneId: "%1", width: 90, height: 30, left: 110, top: 0 }])
+    const mappings: SessionMapping[] = [{ sessionId: "old-ses", paneId: "%1", createdAt: new Date("2024-01-01") }]
 
     //#when
     const result = decideSpawnActions(state, "ses1", "test", customConfig, mappings)
@@ -634,39 +650,39 @@ describe("decideSpawnActions with custom agentPaneWidth", () => {
     }
   })
 
-	it("#given wider main pane #when capacity needs two evictions #then defer is chosen", () => {
-		//#given
-		const config: CapacityConfig = { mainPaneMinWidth: 120, agentPaneWidth: 40 }
-		const state = createWindowState(220, 44, [
-			{ paneId: "%1", width: 43, height: 44, left: 133, top: 0 },
-			{ paneId: "%2", width: 43, height: 44, left: 177, top: 0 },
-			{ paneId: "%3", width: 43, height: 21, left: 133, top: 22 },
-			{ paneId: "%4", width: 43, height: 21, left: 177, top: 22 },
-			{ paneId: "%5", width: 43, height: 21, left: 133, top: 33 },
-		])
-		state.mainPane = {
-			paneId: "%0",
-			width: 132,
-			height: 44,
-			left: 0,
-			top: 0,
-			title: "main",
-			isActive: true,
-		}
-		const mappings: SessionMapping[] = [
-			{ sessionId: "old-1", paneId: "%1", createdAt: new Date("2024-01-01") },
-			{ sessionId: "old-2", paneId: "%2", createdAt: new Date("2024-01-02") },
-			{ sessionId: "old-3", paneId: "%3", createdAt: new Date("2024-01-03") },
-			{ sessionId: "old-4", paneId: "%4", createdAt: new Date("2024-01-04") },
-			{ sessionId: "old-5", paneId: "%5", createdAt: new Date("2024-01-05") },
-		]
+  it("#given wider main pane #when capacity needs two evictions #then defer is chosen", () => {
+    //#given
+    const config: CapacityConfig = { mainPaneMinWidth: 120, agentPaneWidth: 40 }
+    const state = createWindowState(220, 44, [
+      { paneId: "%1", width: 43, height: 44, left: 133, top: 0 },
+      { paneId: "%2", width: 43, height: 44, left: 177, top: 0 },
+      { paneId: "%3", width: 43, height: 21, left: 133, top: 22 },
+      { paneId: "%4", width: 43, height: 21, left: 177, top: 22 },
+      { paneId: "%5", width: 43, height: 21, left: 133, top: 33 },
+    ])
+    state.mainPane = {
+      paneId: "%0",
+      width: 132,
+      height: 44,
+      left: 0,
+      top: 0,
+      title: "main",
+      isActive: true,
+    }
+    const mappings: SessionMapping[] = [
+      { sessionId: "old-1", paneId: "%1", createdAt: new Date("2024-01-01") },
+      { sessionId: "old-2", paneId: "%2", createdAt: new Date("2024-01-02") },
+      { sessionId: "old-3", paneId: "%3", createdAt: new Date("2024-01-03") },
+      { sessionId: "old-4", paneId: "%4", createdAt: new Date("2024-01-04") },
+      { sessionId: "old-5", paneId: "%5", createdAt: new Date("2024-01-05") },
+    ]
 
-		//#when
-		const result = decideSpawnActions(state, "ses-new", "new task", config, mappings)
+    //#when
+    const result = decideSpawnActions(state, "ses-new", "new task", config, mappings)
 
-		//#then
-		expect(result.canSpawn).toBe(false)
-		expect(result.actions).toHaveLength(0)
-		expect(result.reason).toContain("defer attach")
-	})
+    //#then
+    expect(result.canSpawn).toBe(false)
+    expect(result.actions).toHaveLength(0)
+    expect(result.reason).toContain("defer attach")
+  })
 })

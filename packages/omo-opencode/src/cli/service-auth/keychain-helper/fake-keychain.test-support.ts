@@ -2,7 +2,13 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { onTestFinished } from "bun:test"
-import { createCredentialStore, credentialId, INTERACTIVE_READ_WAIT, SESSION_READ_WAIT, type SecretApi } from "../keystore"
+import {
+  createCredentialStore,
+  credentialId,
+  INTERACTIVE_READ_WAIT,
+  SESSION_READ_WAIT,
+  type SecretApi,
+} from "../keystore"
 import type { Credentials } from "../protocol"
 import { type BeforeKeysDiscarded, createSession } from "../session"
 import { grant, privateKeys } from "../test-support"
@@ -12,7 +18,14 @@ import type { HelperCall, HelperLease, HelperReply } from "./client"
 import { OLD_SLOT_COUNT, oldSlotName } from "./recovery"
 
 export type Owner = "helper" | "bun" | "runtime" | "other-app"
-type Item = { value: string; owner: Owner; partition: "ours" | "other" | "none"; marker: boolean; cdat: number; mdat: number }
+type Item = {
+  value: string
+  owner: Owner
+  partition: "ours" | "other" | "none"
+  marker: boolean
+  cdat: number
+  mdat: number
+}
 
 export const credentials: Credentials = { ...grant, ...privateKeys }
 export const API = "https://api.example.test"
@@ -23,7 +36,15 @@ export const A = credentialId(API)
  * overwrite keeps the item's owner (m5), a rename works for anyone (m10), a delete by a non-owner is refused (m6).
  * `secrets` is this process's own identity (`bun`); `access` is the signed helper, which counts every approve dialog.
  */
-export function fakeKeychain(options: { readonly approve?: "allow" | "deny" | "locked"; readonly approveGate?: Promise<void>; readonly onApprove?: () => void; readonly failReadWhenMissing?: boolean; readonly singleOldSlot?: boolean } = {}) {
+export function fakeKeychain(
+  options: {
+    readonly approve?: "allow" | "deny" | "locked"
+    readonly approveGate?: Promise<void>
+    readonly onApprove?: () => void
+    readonly failReadWhenMissing?: boolean
+    readonly singleOldSlot?: boolean
+  } = {},
+) {
   const items = new Map<string, Item>()
   let clock = 1_000
   const events: string[] = []
@@ -54,8 +75,13 @@ export function fakeKeychain(options: { readonly approve?: "allow" | "deny" | "l
   })
   const secrets = secretsAs("bun")
 
-  const slots = (base: string) => Array.from({ length: OLD_SLOT_COUNT }, (_, slot) => slot).filter(slot => items.has(oldSlotName(base, slot)))
-  const present = (base: string) => ({ staging: items.has(`${base}.staging`), old: slots(base).length > 0, oldSlots: slots(base) })
+  const slots = (base: string) =>
+    Array.from({ length: OLD_SLOT_COUNT }, (_, slot) => slot).filter((slot) => items.has(oldSlotName(base, slot)))
+  const present = (base: string) => ({
+    staging: items.has(`${base}.staging`),
+    old: slots(base).length > 0,
+    oldSlots: slots(base),
+  })
   const rename = (from: string, to: string): HelperReply => {
     const item = items.get(from)
     if (item === undefined) return { error: "missing" }
@@ -72,10 +98,35 @@ export function fakeKeychain(options: { readonly approve?: "allow" | "deny" | "l
     switch (request.verb) {
       case "read": {
         if (options.failReadWhenMissing === true && item === undefined) return { error: "locked" }
-        if (item !== undefined && item.owner === "helper") return { owned: true, value: item.value, marker: item.marker, cdat: item.cdat, mdat: item.mdat, present: present(name) }
-        if (item !== undefined) return { owned: false, marker: false, cdat: item.cdat, mdat: item.mdat, partition: item.partition, present: present(name) }
+        if (item !== undefined && item.owner === "helper")
+          return {
+            owned: true,
+            value: item.value,
+            marker: item.marker,
+            cdat: item.cdat,
+            mdat: item.mdat,
+            present: present(name),
+          }
+        if (item !== undefined)
+          return {
+            owned: false,
+            marker: false,
+            cdat: item.cdat,
+            mdat: item.mdat,
+            partition: item.partition,
+            present: present(name),
+          }
         const staged = items.get(`${name}.staging`)
-        if (staged?.owner === "helper") return { owned: true, value: staged.value, recover: true, marker: true, cdat: staged.cdat, mdat: staged.mdat, present: present(name) }
+        if (staged?.owner === "helper")
+          return {
+            owned: true,
+            value: staged.value,
+            recover: true,
+            marker: true,
+            cdat: staged.cdat,
+            mdat: staged.mdat,
+            present: present(name),
+          }
         return { missing: true, present: present(name) }
       }
       case "approve": {
@@ -133,7 +184,11 @@ export type SessionProcess = {
 }
 
 /** One omo process on the fake machine; a process other than the default has its own approval cache, as a real one does. */
-export async function helperSession(keychain: ReturnType<typeof fakeKeychain>, background = false, proc: SessionProcess = {}) {
+export async function helperSession(
+  keychain: ReturnType<typeof fakeKeychain>,
+  background = false,
+  proc: SessionProcess = {},
+) {
   const home = proc.home ?? (await mkdtemp(join(tmpdir(), "omo-helper-session-")))
   if (proc.home === undefined) onTestFinished(() => rm(home, { recursive: true, force: true }))
   const api = proc.api ?? API
@@ -147,12 +202,21 @@ export async function helperSession(keychain: ReturnType<typeof fakeKeychain>, b
     keychainHelper: {
       access: async () => keychain.access,
       home,
-      silently: run => run(),
+      silently: (run) => run(),
       ownerMarker: async () => "absent",
       cache: proc.identity === undefined ? keychain.cache : createApprovalCache(),
       ...(proc.noDialog === undefined ? {} : { noDialog: proc.noDialog }),
       ...(proc.handOff === undefined ? {} : { handOff: proc.handOff }),
     },
   })
-  return { store, session: createSession({ beforeKeysDiscarded: proc.beforeKeysDiscarded ?? (async () => undefined), api, store, home }), home }
+  return {
+    store,
+    session: createSession({
+      beforeKeysDiscarded: proc.beforeKeysDiscarded ?? (async () => undefined),
+      api,
+      store,
+      home,
+    }),
+    home,
+  }
 }

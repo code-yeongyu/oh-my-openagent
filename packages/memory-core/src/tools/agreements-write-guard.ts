@@ -3,7 +3,10 @@ import { readAgreementsAt, readAgreementsWorktree } from "../agreements/ledger-f
 import { AGREEMENTS_PATH } from "../agreements/types"
 import type { GitMemoryRepo } from "../git"
 
-export async function refuseAgreementsViolation(repo: GitMemoryRepo, paths: readonly string[]): Promise<string | undefined> {
+export async function refuseAgreementsViolation(
+  repo: GitMemoryRepo,
+  paths: readonly string[],
+): Promise<string | undefined> {
   if (!paths.includes(AGREEMENTS_PATH)) return undefined
   const head = await repo.head()
   const before = head === null ? undefined : await readAgreementsAt(repo, head)

@@ -4,7 +4,7 @@
 // loopless runtimes joined to it by the engine's reference transport over an in-process carrier. Both sides load the
 // same extension factory, exactly as a split session loads omo; the model is the engine's faux provider.
 
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -15,30 +15,66 @@ const senpiDist = dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi
 const scopeDir = join(senpiDist, "..", "..", "..", "@earendil-works")
 const importDist = async <T>(path: string): Promise<T> => (await import(pathToFileURL(path).href)) as T
 
-interface Transport { readonly __transport: unique symbol }
-interface TransportSide extends Transport { readonly __side: unique symbol }
+interface Transport {
+  readonly __transport: unique symbol
+}
+interface TransportSide extends Transport {
+  readonly __side: unique symbol
+}
 
 const core = await importDist<{
-  createInProcessNetwork(): { listen(endpoint: unknown, side: TransportSide): () => void; dial(endpoint: unknown, side: TransportSide): { connect(): void; drop(): void } }
-  createReliableTransport(options: { clock: { now(): number; setTimer(callback: () => void, ms: number): () => void }; onHandlerError(error: unknown): void }): TransportSide
-  createRemoteExecutor(options: { authority: { kind: "self" }; fileChannel: boolean; transport: Transport; openScope: unknown; onFault(error: unknown): void }): { close(): Promise<void> | void }
-  createRemoteToolHost(options: { transport: Transport; placement: "split-local"; planes?: Record<string, unknown> }): unknown
+  createInProcessNetwork(): {
+    listen(endpoint: unknown, side: TransportSide): () => void
+    dial(endpoint: unknown, side: TransportSide): { connect(): void; drop(): void }
+  }
+  createReliableTransport(options: {
+    clock: { now(): number; setTimer(callback: () => void, ms: number): () => void }
+    onHandlerError(error: unknown): void
+  }): TransportSide
+  createRemoteExecutor(options: {
+    authority: { kind: "self" }
+    fileChannel: boolean
+    transport: Transport
+    openScope: unknown
+    onFault(error: unknown): void
+  }): { close(): Promise<void> | void }
+  createRemoteToolHost(options: {
+    transport: Transport
+    placement: "split-local"
+    planes?: Record<string, unknown>
+  }): unknown
   localEndpoint(platform: string, name: string, root: string): unknown
 }>(join(scopeDir, "pi-agent-core", "dist", "index.js"))
 const ai = await importDist<{
-  registerFauxProvider(): { getModel(): { provider: string; id: string }; setResponses(responses: unknown[]): void; unregister?(): void; api: string; models: unknown[] }
+  registerFauxProvider(): {
+    getModel(): { provider: string; id: string }
+    setResponses(responses: unknown[]): void
+    unregister?(): void
+    api: string
+    models: unknown[]
+  }
   fauxAssistantMessage(content: unknown, options?: { stopReason?: string }): unknown
   fauxToolCall(name: string, args: Record<string, unknown>, options?: { id?: string }): unknown
 }>(join(scopeDir, "pi-ai", "dist", "compat.js"))
 const args = await importDist<{ parseArgs(argv: string[]): unknown }>(join(senpiDist, "cli", "args.js"))
-const scopes = await importDist<{ createLooplessHandScopes(configuration: unknown, local: { extensionFactories: ExtensionFactory[] }): unknown }>(join(senpiDist, "modes", "rpc", "remote-executor-scope.js"))
-const forwarding = await importDist<{ EXTENSION_EVENTS_PLANE: string; serveExtensionEvents(runner: unknown): unknown }>(join(senpiDist, "core", "extensions", "two-sided-forwarding.js"))
+const scopes = await importDist<{
+  createLooplessHandScopes(configuration: unknown, local: { extensionFactories: ExtensionFactory[] }): unknown
+}>(join(senpiDist, "modes", "rpc", "remote-executor-scope.js"))
+const forwarding = await importDist<{ EXTENSION_EVENTS_PLANE: string; serveExtensionEvents(runner: unknown): unknown }>(
+  join(senpiDist, "core", "extensions", "two-sided-forwarding.js"),
+)
 const sdk = await importDist<{
   createAgentSession(options: Record<string, unknown>): Promise<{ session: SplitSession }>
-  DefaultResourceLoader: new (options: Record<string, unknown>) => { reload(): Promise<void>; getExtensions(): { errors: unknown[] } }
+  DefaultResourceLoader: new (options: Record<string, unknown>) => {
+    reload(): Promise<void>
+    getExtensions(): { errors: unknown[] }
+  }
   SessionManager: { inMemory(cwd: string): unknown }
   SettingsManager: { inMemory(settings?: Record<string, unknown>): unknown }
-  ModelRegistry: new (runtime: unknown) => { registerProvider(name: string, config: Record<string, unknown>): void; find(provider: string, id: string): unknown }
+  ModelRegistry: new (runtime: unknown) => {
+    registerProvider(name: string, config: Record<string, unknown>): void
+    find(provider: string, id: string): unknown
+  }
   ModelRuntime: { createSync(options: { modelsPath: null }): unknown }
 }>(join(senpiDist, "index.js"))
 
@@ -77,25 +113,55 @@ async function openSession(placement: Placement, extension: ExtensionFactory): P
   const faults: unknown[] = []
   let handToolCalls = 0
   const handProbe: ExtensionFactory = (pi) => {
-    (pi as unknown as { on(event: string, handler: () => undefined, options: { runs: "hand" }): void })
-      .on("tool_call", () => { handToolCalls += 1; return undefined }, { runs: "hand" })
+    ;(pi as unknown as { on(event: string, handler: () => undefined, options: { runs: "hand" }): void }).on(
+      "tool_call",
+      () => {
+        handToolCalls += 1
+        return undefined
+      },
+      { runs: "hand" },
+    )
   }
 
   const faux = ai.registerFauxProvider()
   const model = faux.getModel()
   const registry = new sdk.ModelRegistry(sdk.ModelRuntime.createSync({ modelsPath: null }))
-  registry.registerProvider(model.provider, { baseUrl: "http://127.0.0.1:1", apiKey: "faux-key", api: faux.api, models: faux.models })
-  const settingsManager = sdk.SettingsManager.inMemory({ defaultProjectTrust: "always", enabledBuiltinExtensions: [] })
+  registry.registerProvider(model.provider, {
+    baseUrl: "http://127.0.0.1:1",
+    apiKey: "faux-key",
+    api: faux.api,
+    models: faux.models,
+  })
+  // Both sides run with the same settings and no engine builtins. The hand reads its settings from its agent dir, and
+  // left at the defaults it loads every builtin: the bundled ones register process-wide Bun.plugin virtual modules, and
+  // its mcp builtin binds the process-wide MCP service, a binding that disposing the hand's runtimes never releases.
+  const settings = { defaultProjectTrust: "always", enabledBuiltinExtensions: [] }
+  writeFileSync(join(handAgentDir, "settings.json"), JSON.stringify(settings))
+  const settingsManager = sdk.SettingsManager.inMemory(settings)
   const loader = new sdk.DefaultResourceLoader({
-    cwd, agentDir, settingsManager, noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true,
+    cwd,
+    agentDir,
+    settingsManager,
+    noExtensions: true,
+    noSkills: true,
+    noPromptTemplates: true,
+    noThemes: true,
+    noContextFiles: true,
     extensionFactories: [extension],
   })
   await loader.reload()
   const loadErrors = loader.getExtensions().errors
   if (loadErrors.length > 0) throw new Error(`extension load errors: ${JSON.stringify(loadErrors)}`)
   const { session } = await sdk.createAgentSession({
-    cwd, agentDir, settingsManager, modelRegistry: registry, model: registry.find(model.provider, model.id), thinkingLevel: "off",
-    resourceLoader: loader, sessionManager: sdk.SessionManager.inMemory(cwd), autoTitleSessions: false,
+    cwd,
+    agentDir,
+    settingsManager,
+    modelRegistry: registry,
+    model: registry.find(model.provider, model.id),
+    thinkingLevel: "off",
+    resourceLoader: loader,
+    sessionManager: sdk.SessionManager.inMemory(cwd),
+    autoTitleSessions: false,
   })
   cleanups.push(() => session.dispose())
   await session.bindExtensions({ mode: "print" })
@@ -103,28 +169,54 @@ async function openSession(placement: Placement, extension: ExtensionFactory): P
   session.agent.toolExecution = "sequential"
 
   if (placement === "split-local") {
-    const clock = { now: () => Date.now(), setTimer: (callback: () => void, ms: number) => { const timer = setTimeout(callback, ms); return () => clearTimeout(timer) } }
-    const side = () => core.createReliableTransport({ clock, onHandlerError: (error) => { faults.push(error) } })
+    const clock = {
+      now: () => Date.now(),
+      setTimer: (callback: () => void, ms: number) => {
+        const timer = setTimeout(callback, ms)
+        return () => clearTimeout(timer)
+      },
+    }
+    const side = () =>
+      core.createReliableTransport({
+        clock,
+        onHandlerError: (error) => {
+          faults.push(error)
+        },
+      })
     const network = core.createInProcessNetwork()
-    const endpoint = core.localEndpoint(process.platform === "win32" ? "win32" : "linux", `hand-${crypto.randomUUID()}`, root)
+    const endpoint = core.localEndpoint(
+      process.platform === "win32" ? "win32" : "linux",
+      `hand-${crypto.randomUUID()}`,
+      root,
+    )
     const brain = side()
     const hand = side()
     const stop = network.listen(endpoint, hand)
     const link = network.dial(endpoint, brain)
     link.connect()
-    cleanups.push(() => { link.drop(); stop() })
+    cleanups.push(() => {
+      link.drop()
+      stop()
+    })
     const configuration = {
       parsed: args.parseArgs(["--mode", "rpc", "--no-skills", "--no-context-files", "--no-prompt-templates"]),
-      cwd, agentDir: handAgentDir, appMode: "rpc",
+      cwd,
+      agentDir: handAgentDir,
+      appMode: "rpc",
     }
     const executor = core.createRemoteExecutor({
-      authority: { kind: "self" }, fileChannel: true, transport: hand,
+      authority: { kind: "self" },
+      fileChannel: true,
+      transport: hand,
       openScope: scopes.createLooplessHandScopes(configuration, { extensionFactories: [extension, handProbe] }),
-      onFault: (error) => { faults.push(error) },
+      onFault: (error) => {
+        faults.push(error)
+      },
     })
     cleanups.push(() => executor.close())
     session.agent.toolHost = core.createRemoteToolHost({
-      transport: brain, placement: "split-local",
+      transport: brain,
+      placement: "split-local",
       planes: { [forwarding.EXTENSION_EVENTS_PLANE]: forwarding.serveExtensionEvents(session.extensionRunner) },
     })
   }
@@ -136,7 +228,10 @@ async function openSession(placement: Placement, extension: ExtensionFactory): P
     handToolCalls: () => handToolCalls,
     async turn(calls) {
       faux.setResponses([
-        ai.fauxAssistantMessage(calls.map(([name, callArgs]) => ai.fauxToolCall(name, callArgs, { id: `call-${callIndex++}` })), { stopReason: "toolUse" }),
+        ai.fauxAssistantMessage(
+          calls.map(([name, callArgs]) => ai.fauxToolCall(name, callArgs, { id: `call-${callIndex++}` })),
+          { stopReason: "toolUse" },
+        ),
         ai.fauxAssistantMessage("done"),
       ])
       await session.prompt("go")

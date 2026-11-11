@@ -9,172 +9,167 @@ async function importFreshTarZipEntryListingModule(): Promise<TarZipEntryListing
 }
 
 function createTarFileLine(fileName: string): string {
-	return `-rw-r--r-- 1 user group 123 Jan 01 12:34 ${fileName}`
+  return `-rw-r--r-- 1 user group 123 Jan 01 12:34 ${fileName}`
 }
 
 type LogSpy = {
-	readonly mock: {
-		readonly calls: readonly (readonly unknown[])[]
-	}
+  readonly mock: {
+    readonly calls: readonly (readonly unknown[])[]
+  }
 }
 
 function getWarnedUnparsedLines(logSpy: LogSpy): string[] {
-	return logSpy.mock.calls.flatMap((call) => {
-		const [message, data] = call
-		if (
-			message !== "warning: unparsed tar listing line" ||
-			typeof data !== "object" ||
-			data === null ||
-			!("line" in data) ||
-			typeof data.line !== "string"
-		) {
-			return []
-		}
+  return logSpy.mock.calls.flatMap((call) => {
+    const [message, data] = call
+    if (
+      message !== "warning: unparsed tar listing line" ||
+      typeof data !== "object" ||
+      data === null ||
+      !("line" in data) ||
+      typeof data.line !== "string"
+    ) {
+      return []
+    }
 
-		return [data.line]
-	})
+    return [data.line]
+  })
 }
 
 function captureThrownError(run: () => void): Error {
-	try {
-		run()
-	} catch (error) {
-		if (error instanceof Error) {
-			return error
-		}
-	}
+  try {
+    run()
+  } catch (error) {
+    if (error instanceof Error) {
+      return error
+    }
+  }
 
-	throw new Error("Expected parser to throw")
+  throw new Error("Expected parser to throw")
 }
 
 describe("parseTarListingOutput", () => {
-	afterEach(() => {
-		mock.restore()
-	})
+  afterEach(() => {
+    mock.restore()
+  })
 
-	describe("#given a tar listing month token", () => {
-		it("#when the month is ASCII #then parses the entry", async () => {
-			const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
+  describe("#given a tar listing month token", () => {
+    it("#when the month is ASCII #then parses the entry", async () => {
+      const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
 
-			expect(
-				parseTarListingOutput("-rw-r--r--  0 0 0 12 Sep 30 12:00 a.txt")
-			).toEqual([{ path: "a.txt", type: "file" }])
-		})
+      expect(parseTarListingOutput("-rw-r--r--  0 0 0 12 Sep 30 12:00 a.txt")).toEqual([
+        { path: "a.txt", type: "file" },
+      ])
+    })
 
-		it("#when the month is localized #then parses the entry", async () => {
-			const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
+    it("#when the month is localized #then parses the entry", async () => {
+      const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
 
-			expect(
-				parseTarListingOutput("-rw-r--r--  0 0 0 12 сен 30 12:00 a.txt")
-			).toEqual([{ path: "a.txt", type: "file" }])
-		})
+      expect(parseTarListingOutput("-rw-r--r--  0 0 0 12 сен 30 12:00 a.txt")).toEqual([
+        { path: "a.txt", type: "file" },
+      ])
+    })
 
-		it("#when the month contains replacement characters #then parses the entry", async () => {
-			const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
+    it("#when the month contains replacement characters #then parses the entry", async () => {
+      const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
 
-			expect(
-				parseTarListingOutput("-rw-r--r--  0 0 0 12 ��� 30 12:00 a.txt")
-			).toEqual([{ path: "a.txt", type: "file" }])
-		})
+      expect(parseTarListingOutput("-rw-r--r--  0 0 0 12 ��� 30 12:00 a.txt")).toEqual([
+        { path: "a.txt", type: "file" },
+      ])
+    })
 
-		it("#when the listing is malformed #then throws the fail-closed error", async () => {
-			const logSpy = spyOn(logger, "log").mockImplementation(() => {})
-			const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
+    it("#when the listing is malformed #then throws the fail-closed error", async () => {
+      const logSpy = spyOn(logger, "log").mockImplementation(() => {})
+      const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
 
-			expect(() => parseTarListingOutput("malformed listing line")).toThrow(
-				"zip entry listing failed: 1/1 tar listing lines could not be parsed (fail-closed)"
-			)
-			expect(getWarnedUnparsedLines(logSpy)).toEqual(["malformed listing line"])
-		})
-	})
+      expect(() => parseTarListingOutput("malformed listing line")).toThrow(
+        "zip entry listing failed: 1/1 tar listing lines could not be parsed (fail-closed)",
+      )
+      expect(getWarnedUnparsedLines(logSpy)).toEqual(["malformed listing line"])
+    })
+  })
 
-	describe("#given a tar listing line with trailing filename whitespace", () => {
-		it("#when parsing the line #then preserves the original trailing whitespace", async () => {
-			// given
-			const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
-			const listedOutput = createTarFileLine("trailing-space.txt ")
+  describe("#given a tar listing line with trailing filename whitespace", () => {
+    it("#when parsing the line #then preserves the original trailing whitespace", async () => {
+      // given
+      const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
+      const listedOutput = createTarFileLine("trailing-space.txt ")
 
-			// when
-			const parsedEntries = parseTarListingOutput(listedOutput)
+      // when
+      const parsedEntries = parseTarListingOutput(listedOutput)
 
-			// then
-			expect(parsedEntries).toEqual([
-				{
-					path: "trailing-space.txt ",
-					type: "file",
-				},
-			])
-		})
-	})
+      // then
+      expect(parsedEntries).toEqual([
+        {
+          path: "trailing-space.txt ",
+          type: "file",
+        },
+      ])
+    })
+  })
 
-		describe("#given tar output with any unparsed lines", () => {
-		it("#when parsing the output #then throws immediately (fail-closed)", async () => {
-			// given
-			const logSpy = spyOn(logger, "log").mockImplementation(() => {})
-			const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
-			const listedOutput = [
-				createTarFileLine("file-1.txt"),
-				createTarFileLine("file-2.txt"),
-				"unparsed listing line",
-			].join("\n")
+  describe("#given tar output with any unparsed lines", () => {
+    it("#when parsing the output #then throws immediately (fail-closed)", async () => {
+      // given
+      const logSpy = spyOn(logger, "log").mockImplementation(() => {})
+      const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
+      const listedOutput = [
+        createTarFileLine("file-1.txt"),
+        createTarFileLine("file-2.txt"),
+        "unparsed listing line",
+      ].join("\n")
 
-			// when
-			const thrownError = captureThrownError(() => parseTarListingOutput(listedOutput))
+      // when
+      const thrownError = captureThrownError(() => parseTarListingOutput(listedOutput))
 
-			// then
-			expect(thrownError.message).toMatch(/could not be parsed/i)
-			expect(getWarnedUnparsedLines(logSpy)).toContain("unparsed listing line")
-		})
-	})
+      // then
+      expect(thrownError.message).toMatch(/could not be parsed/i)
+      expect(getWarnedUnparsedLines(logSpy)).toContain("unparsed listing line")
+    })
+  })
 
-		describe("#given tar output with multiple unparsed lines", () => {
-		it("#when parsing the output #then throws with count details", async () => {
-			// given
-			const logSpy = spyOn(logger, "log").mockImplementation(() => {})
-			const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
-			const listedOutput = [
-				createTarFileLine("file-1.txt"),
-				createTarFileLine("file-2.txt"),
-				createTarFileLine("file-3.txt"),
-				createTarFileLine("file-4.txt"),
-				createTarFileLine("file-5.txt"),
-				createTarFileLine("file-6.txt"),
-				createTarFileLine("file-7.txt"),
-				createTarFileLine("file-8.txt"),
-				"unparsed listing line 1",
-				"unparsed listing line 2",
-			].join("\n")
+  describe("#given tar output with multiple unparsed lines", () => {
+    it("#when parsing the output #then throws with count details", async () => {
+      // given
+      const logSpy = spyOn(logger, "log").mockImplementation(() => {})
+      const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
+      const listedOutput = [
+        createTarFileLine("file-1.txt"),
+        createTarFileLine("file-2.txt"),
+        createTarFileLine("file-3.txt"),
+        createTarFileLine("file-4.txt"),
+        createTarFileLine("file-5.txt"),
+        createTarFileLine("file-6.txt"),
+        createTarFileLine("file-7.txt"),
+        createTarFileLine("file-8.txt"),
+        "unparsed listing line 1",
+        "unparsed listing line 2",
+      ].join("\n")
 
-			// when
-			const thrownError = captureThrownError(() => parseTarListingOutput(listedOutput))
+      // when
+      const thrownError = captureThrownError(() => parseTarListingOutput(listedOutput))
 
-			// then
-			expect(thrownError.message).toMatch(/could not be parsed/i)
-			expect(getWarnedUnparsedLines(logSpy)).toEqual(
-				expect.arrayContaining([
-					"unparsed listing line 1",
-					"unparsed listing line 2",
-				])
-			)
-		})
-	})
+      // then
+      expect(thrownError.message).toMatch(/could not be parsed/i)
+      expect(getWarnedUnparsedLines(logSpy)).toEqual(
+        expect.arrayContaining(["unparsed listing line 1", "unparsed listing line 2"]),
+      )
+    })
+  })
 
-		describe("#given tar output where every non-empty line is unparsed", () => {
-		it("#when parsing the output #then rejects the listing", async () => {
-			// given
-			const logSpy = spyOn(logger, "log").mockImplementation(() => {})
-			const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
+  describe("#given tar output where every non-empty line is unparsed", () => {
+    it("#when parsing the output #then rejects the listing", async () => {
+      // given
+      const logSpy = spyOn(logger, "log").mockImplementation(() => {})
+      const { parseTarListingOutput } = await importFreshTarZipEntryListingModule()
 
-			// when
-			const thrownError = captureThrownError(() =>
-				parseTarListingOutput(["unknown format 1", "unknown format 2"].join("\n"))
-			)
+      // when
+      const thrownError = captureThrownError(() =>
+        parseTarListingOutput(["unknown format 1", "unknown format 2"].join("\n")),
+      )
 
-			// then
-			expect(thrownError.message).toMatch(/could not be parsed/i)
-			expect(getWarnedUnparsedLines(logSpy)).toEqual(
-				expect.arrayContaining(["unknown format 1", "unknown format 2"])
-			)
-		})
-	})
+      // then
+      expect(thrownError.message).toMatch(/could not be parsed/i)
+      expect(getWarnedUnparsedLines(logSpy)).toEqual(expect.arrayContaining(["unknown format 1", "unknown format 2"]))
+    })
+  })
 })

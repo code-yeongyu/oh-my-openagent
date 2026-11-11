@@ -61,7 +61,11 @@ export async function createTeam(
   const config = toTeamCoreConfig(deps.taskSettings, teamStorageBaseDir(deps.stateDir))
   const runtimeState = await createRuntimeState(spec, deps.leadSessionId, toTeamCoreSpecSource(source), config)
   const teamRunId = runtimeState.teamRunId
-  await ensureTeamRuntimeDirs(deps.stateDir, teamRunId, spec.members.map((member) => member.name))
+  await ensureTeamRuntimeDirs(
+    deps.stateDir,
+    teamRunId,
+    spec.members.map((member) => member.name),
+  )
 
   const result = await spawnTeamMembers({
     spec,
@@ -73,16 +77,18 @@ export async function createTeam(
     maxParallel: deps.taskSettings.team.max_parallel_members,
     deadlineAt: now() + deps.taskSettings.team.max_wall_clock_minutes * MS_PER_MINUTE,
     now,
-    ...(deps.memberExtension !== undefined ? {
-      memberExtension: {
-        ...deps.memberExtension,
-        teamConfig: JSON.stringify({
-          ...config,
-          stateDir: resolveStateDir(deps.stateDir),
-          members: spec.members.map((member) => member.name),
-        }),
-      },
-    } : {}),
+    ...(deps.memberExtension !== undefined
+      ? {
+          memberExtension: {
+            ...deps.memberExtension,
+            teamConfig: JSON.stringify({
+              ...config,
+              stateDir: resolveStateDir(deps.stateDir),
+              members: spec.members.map((member) => member.name),
+            }),
+          },
+        }
+      : {}),
   })
 
   if (result.failure !== undefined) {
@@ -129,17 +135,20 @@ function toCreatedMemberInfos(
     const outcome = spawned.get(member.name)
     if (outcome === undefined) return []
     const stateMember = state.members.find((candidate) => candidate.name === member.name)
-    return [{
-      name: member.name,
-      taskId: outcome.taskId,
-      status: stateMember?.status ?? outcome.status,
-      role: member.kind === "category"
-        ? { kind: "category", category: member.category }
-        : { kind: "subagent_type", subagentType: member.subagent_type },
-      ...(outcome.resolvedModel !== undefined ? { model: outcome.resolvedModel } : {}),
-      ...(member.prompt !== undefined ? { promptExcerpt: excerptPrompt(member.prompt) } : {}),
-      ...(member.task_summary !== undefined ? { taskSummary: member.task_summary } : {}),
-    }]
+    return [
+      {
+        name: member.name,
+        taskId: outcome.taskId,
+        status: stateMember?.status ?? outcome.status,
+        role:
+          member.kind === "category"
+            ? { kind: "category", category: member.category }
+            : { kind: "subagent_type", subagentType: member.subagent_type },
+        ...(outcome.resolvedModel !== undefined ? { model: outcome.resolvedModel } : {}),
+        ...(member.prompt !== undefined ? { promptExcerpt: excerptPrompt(member.prompt) } : {}),
+        ...(member.task_summary !== undefined ? { taskSummary: member.task_summary } : {}),
+      },
+    ]
   })
 }
 
@@ -155,7 +164,11 @@ async function activateTeam(
       members: state.members.map((member) => {
         const outcome = spawned.get(member.name)
         if (outcome === undefined) return member
-        return { ...member, status: outcome.status, ...(outcome.sessionId !== undefined ? { sessionId: outcome.sessionId } : {}) }
+        return {
+          ...member,
+          status: outcome.status,
+          ...(outcome.sessionId !== undefined ? { sessionId: outcome.sessionId } : {}),
+        }
       }),
     }),
     config,
@@ -224,7 +237,11 @@ async function performDeleteTeam(teamRunId: string, deps: DeleteTeamDeps): Promi
   const cancelledTaskIds = await cancelMemberTasks(teamRunId, runtimeDir, deps)
 
   if (runtimeState.status !== "deleted") {
-    await transitionRuntimeState(teamRunId, (state) => (state.status === "deleted" ? state : { ...state, status: "deleted" }), config)
+    await transitionRuntimeState(
+      teamRunId,
+      (state) => (state.status === "deleted" ? state : { ...state, status: "deleted" }),
+      config,
+    )
   }
   await rm(runtimeDir, { recursive: true, force: true })
   return { teamRunId, cancelledTaskIds }
@@ -255,10 +272,10 @@ async function cancelMemberTasks(teamRunId: string, runtimeDir: string, deps: De
     if (outcome.kind === "noop" && outcome.status !== "cancelled" && observed?.residency_state === "resident") {
       const current = deps.manager.get(taskId)
       if (
-        current !== undefined
-        && current.status !== "pending"
-        && current.status !== "running"
-        && current.residency_state === "resident"
+        current !== undefined &&
+        current.status !== "pending" &&
+        current.status !== "running" &&
+        current.residency_state === "resident"
       ) {
         await deps.destruction.destroyResidentTask(taskId, "cancel")
       }

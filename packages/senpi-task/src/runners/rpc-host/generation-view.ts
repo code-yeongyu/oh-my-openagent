@@ -23,7 +23,12 @@ export function createHostGenerationView(agentDir: string): HostGenerationView {
     parkedEntryPresent: async (hostSession) => {
       const dir = join(hostDaemonDir(agentDir, hostSession.socket), "handover-parked")
       for (const sessionPath of sessionPathSpellings(hostSession)) {
-        if (await present(join(dir, `${createHash("sha256").update(sessionPath, "utf8").digest("hex").slice(0, 16)}.json`))) return true
+        if (
+          await present(
+            join(dir, `${createHash("sha256").update(sessionPath, "utf8").digest("hex").slice(0, 16)}.json`),
+          )
+        )
+          return true
       }
       return false
     },

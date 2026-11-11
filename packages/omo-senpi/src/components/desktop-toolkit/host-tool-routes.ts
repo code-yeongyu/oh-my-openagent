@@ -5,17 +5,26 @@ import { callThreadTool, HOST_TOOL_ROUTE_CHANNEL } from "./thread-tools"
 export function callingSessionId(context: unknown): string | undefined {
   if (typeof context !== "object" || context === null || !("sessionManager" in context)) return undefined
   const manager = context.sessionManager
-  if (typeof manager !== "object" || manager === null || !("getSessionId" in manager) || typeof manager.getSessionId !== "function") return undefined
+  if (
+    typeof manager !== "object" ||
+    manager === null ||
+    !("getSessionId" in manager) ||
+    typeof manager.getSessionId !== "function"
+  )
+    return undefined
   const id: unknown = manager.getSessionId()
   return typeof id === "string" && id.length > 0 ? id : undefined
 }
 
 /** Routes are runtime-wide; their grants and shutdown lifetimes belong to one session. */
-export function createHostToolRoutes(pi: SenpiExtensionAPI, options: {
-  readonly grants: Map<string, ToolkitGrant>
-  readonly timeoutMs: number
-  readonly onLost: (sessionId: string) => void
-}) {
+export function createHostToolRoutes(
+  pi: SenpiExtensionAPI,
+  options: {
+    readonly grants: Map<string, ToolkitGrant>
+    readonly timeoutMs: number
+    readonly onLost: (sessionId: string) => void
+  },
+) {
   const owners = new Map<string, { readonly sessionId: string }>()
   function clear(sessionId: string): void {
     for (const [name, owner] of owners) {
@@ -34,7 +43,13 @@ export function createHostToolRoutes(pi: SenpiExtensionAPI, options: {
       owners.set(name, owner)
       pi.events?.emit(HOST_TOOL_ROUTE_CHANNEL, {
         name,
-        async execute(_id: string, args: Record<string, unknown>, signal?: AbortSignal, _onUpdate?: unknown, callCtx?: unknown) {
+        async execute(
+          _id: string,
+          args: Record<string, unknown>,
+          signal?: AbortSignal,
+          _onUpdate?: unknown,
+          callCtx?: unknown,
+        ) {
           const caller = callingSessionId(callCtx)
           const grant = caller === undefined ? undefined : options.grants.get(`host:${caller}`)
           try {

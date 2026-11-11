@@ -82,7 +82,12 @@ describe("createSkillInvocationTracker - plan-artifact reference counting", () =
     await pi.dispatch("tool_result", toolResult("read", { path: "/repo/.omo/plans/alpha.md" }), CTX_A)
 
     // then count outranks recency
-    expect(tracker.stateFor("sess-a").planArtifactReferences().map((ref) => [ref.path, ref.count])).toEqual([
+    expect(
+      tracker
+        .stateFor("sess-a")
+        .planArtifactReferences()
+        .map((ref) => [ref.path, ref.count]),
+    ).toEqual([
       ["/repo/.omo/plans/alpha.md", 2],
       ["/repo/.omo/plans/beta.md", 1],
     ])

@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import { OWNER_STALE_MS, SUMMARY_TTL_MS, summaryDir } from "./session-summary-storage"
 import { createTempStateDirs } from "./session-summary.test-support"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 // Crash-safety contract (plan todo 8, cases a-f), proven with real processes on real files: each fixture
 // process runs the production recorder and storage, the test kills it with SIGKILL (or the fixture kills
@@ -11,7 +12,6 @@ import { createTempStateDirs } from "./session-summary.test-support"
 // window exactly once, under the window's own id.
 
 const FIXTURE = join(import.meta.dir, "session-summary-process.test-support.ts")
-const WAIT_MS = 15_000
 const T0 = 1_700_000_000_000
 const STALE = OWNER_STALE_MS + 1
 
@@ -32,7 +32,14 @@ function startFixture(dir: string, now: number, mode = "ack", platform?: typeof 
     stdin: "pipe",
     stdout: "pipe",
     stderr: "inherit",
-    env: { ...process.env, SUMMARY_STATE_DIR: dir, SUMMARY_SINK: join(dir, "sink.jsonl"), SUMMARY_NOW: String(now), SUMMARY_MODE: mode, ...(platform === undefined ? {} : { SUMMARY_PLATFORM: platform }) },
+    env: {
+      ...process.env,
+      SUMMARY_STATE_DIR: dir,
+      SUMMARY_SINK: join(dir, "sink.jsonl"),
+      SUMMARY_NOW: String(now),
+      SUMMARY_MODE: mode,
+      ...(platform === undefined ? {} : { SUMMARY_PLATFORM: platform }),
+    },
   })
   const lines: string[] = []
   const waiters: Array<() => void> = []
@@ -49,10 +56,13 @@ function startFixture(dir: string, now: number, mode = "ack", platform?: typeof 
     for (const wake of waiters.splice(0)) wake()
   })()
   let sent = 0
-  const bounded = <T>(work: Promise<T>, what: string) => Promise.race([
-    work,
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`waited ${WAIT_MS} ms for ${what}`)), WAIT_MS).unref()),
-  ])
+  const bounded = <T>(work: Promise<T>, what: string) =>
+    Promise.race([
+      work,
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`waited out the test budget for ${what}`)), remainingTestTime()).unref(),
+      ),
+    ])
   const exited = proc.exited.then(() => proc.exitCode)
   return {
     exited,
@@ -86,7 +96,10 @@ function startFixture(dir: string, now: number, mode = "ack", platform?: typeof 
 function sinkRows(dir: string): SinkRow[] {
   const path = join(dir, "sink.jsonl")
   if (!existsSync(path)) return []
-  return readFileSync(path, "utf8").split("\n").filter((line) => line.length > 0).map((line) => JSON.parse(line) as SinkRow)
+  return readFileSync(path, "utf8")
+    .split("\n")
+    .filter((line) => line.length > 0)
+    .map((line) => JSON.parse(line) as SinkRow)
 }
 
 function windowIdOf(dir: string, sessionHash: string): string {
@@ -96,7 +109,8 @@ function windowIdOf(dir: string, sessionHash: string): string {
   return windowId
 }
 
-const pendingFiles = (dir: string) => readdirSync(join(summaryDir(dir), "pending")).filter((name) => name.endsWith(".json"))
+const pendingFiles = (dir: string) =>
+  readdirSync(join(summaryDir(dir), "pending")).filter((name) => name.endsWith(".json"))
 
 describe("session_summary across killed processes", () => {
   test("(a) #given a process SIGKILLed mid-window #when another process starts after the stale window #then exactly one recovered row carries the window's totals and id", async () => {
@@ -116,26 +130,38 @@ describe("session_summary across killed processes", () => {
     const rows = sinkRows(dir)
     expect(rows).toHaveLength(1)
     expect(rows[0]?.uuid).toBe(windowId)
-    expect(rows[0]?.properties).toMatchObject({ $session_id: "s1", ended_by: "recovered", turns: 2, total_tokens: 42, summary_seq: 0 })
+    expect(rows[0]?.properties).toMatchObject({
+      $session_id: "s1",
+      ended_by: "recovered",
+      turns: 2,
+      total_tokens: 42,
+      summary_seq: 0,
+    })
   })
 
-  test.each([["the host platform", undefined], ["the win32 probe (no readable start time)", "win32" as const]])("(b) #given two live processes on one session hash on %s #when the second sweeps past the stale threshold #then it never claims the first's window", async (_label, platform) => {
-    const dir = stateDirs.make()
-    const owner = startFixture(dir, T0, "ack", platform)
-    expect(await owner.send("turn s1 0 10")).toBe("ok")
+  test.each([
+    ["the host platform", undefined],
+    ["the win32 probe (no readable start time)", "win32" as const],
+  ])(
+    "(b) #given two live processes on one session hash on %s #when the second sweeps past the stale threshold #then it never claims the first's window",
+    async (_label, platform) => {
+      const dir = stateDirs.make()
+      const owner = startFixture(dir, T0, "ack", platform)
+      expect(await owner.send("turn s1 0 10")).toBe("ok")
 
-    const other = startFixture(dir, T0 + STALE * 3, "ack", platform)
-    expect(await other.send("recover")).toBe("ok")
-    expect(await other.send("turn s1 5 7")).toBe("ok")
-    expect(await other.send("finish s1 quit")).toBe("ok")
-    expect(await owner.send("finish s1 quit")).toBe("ok")
-    await Promise.all([owner.close(), other.close()])
+      const other = startFixture(dir, T0 + STALE * 3, "ack", platform)
+      expect(await other.send("recover")).toBe("ok")
+      expect(await other.send("turn s1 5 7")).toBe("ok")
+      expect(await other.send("finish s1 quit")).toBe("ok")
+      expect(await owner.send("finish s1 quit")).toBe("ok")
+      await Promise.all([owner.close(), other.close()])
 
-    const rows = sinkRows(dir)
-    expect(rows.map(({ properties }) => properties.ended_by)).toEqual(["shutdown", "shutdown"])
-    expect(rows.map(({ properties }) => properties.total_tokens).toSorted()).toEqual([10, 7].toSorted())
-    expect(new Set(rows.map(({ uuid }) => uuid)).size).toBe(2)
-  })
+      const rows = sinkRows(dir)
+      expect(rows.map(({ properties }) => properties.ended_by)).toEqual(["shutdown", "shutdown"])
+      expect(rows.map(({ properties }) => properties.total_tokens).toSorted()).toEqual([10, 7].toSorted())
+      expect(new Set(rows.map(({ uuid }) => uuid)).size).toBe(2)
+    },
+  )
 
   test("(c1) #given death immediately before the pending file is written #when a later process recovers #then the window is published once", async () => {
     const dir = stateDirs.make()
@@ -149,7 +175,9 @@ describe("session_summary across killed processes", () => {
       expect(await next.send("recover")).toBe("ok")
       await next.close()
     }
-    expect(sinkRows(dir).map(({ uuid, properties }) => [uuid, properties.ended_by, properties.turns])).toEqual([[windowId, "recovered", 1]])
+    expect(sinkRows(dir).map(({ uuid, properties }) => [uuid, properties.ended_by, properties.turns])).toEqual([
+      [windowId, "recovered", 1],
+    ])
   })
 
   test("(c2) #given death right after the event was sent but before its acknowledgment #when a later process starts #then the pending copy is re-sent once with the same uuid and no second window appears", async () => {
@@ -198,7 +226,10 @@ describe("session_summary across killed processes", () => {
     expect(await resumed.send("turn s1 2 10")).toBe("ok")
     expect(await resumed.send("finish s1 quit")).toBe("ok")
     await resumed.close()
-    expect(sinkRows(dir).map(({ properties }) => [properties.summary_seq, properties.ended_by])).toEqual([[0, "checkpoint"], [1, "shutdown"]])
+    expect(sinkRows(dir).map(({ properties }) => [properties.summary_seq, properties.ended_by])).toEqual([
+      [0, "checkpoint"],
+      [1, "shutdown"],
+    ])
   })
 
   test("(f) #given an unsent window and an unacknowledged event older than 14 days #when a process starts #then both are deleted unsent and counted as dropped", async () => {

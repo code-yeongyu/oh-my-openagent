@@ -10,17 +10,23 @@ type AttachRecord = Extract<AttachEvent, { readonly kind: "records" }>["records"
 function attachWithHistory(history: readonly AttachRecord[]) {
   const listeners = new Set<(event: AttachEvent) => void>()
   let end: (reason: string) => void = () => {}
-  const detached = new Promise<string>((resolve) => { end = resolve })
+  const detached = new Promise<string>((resolve) => {
+    end = resolve
+  })
   const attach = {
     onEvent: (listener: (event: AttachEvent) => void) => {
       listener({ kind: "records", attach_id: 1, records: [...history] })
       listeners.add(listener)
-      return () => { listeners.delete(listener) }
+      return () => {
+        listeners.delete(listener)
+      }
     },
     detached,
   } as unknown as RemoteAttach
   const service = { attach: async () => attach, closed: new Promise(() => {}) } as unknown as DeviceService
-  const write = (records: readonly AttachRecord[]) => { for (const listener of [...listeners]) listener({ kind: "records", attach_id: 1, records: [...records] }) }
+  const write = (records: readonly AttachRecord[]) => {
+    for (const listener of [...listeners]) listener({ kind: "records", attach_id: 1, records: [...records] })
+  }
   return { service, write, end }
 }
 

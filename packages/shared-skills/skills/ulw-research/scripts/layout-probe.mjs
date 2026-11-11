@@ -31,18 +31,20 @@ export const PATH_FUNCTION_SOURCE = `function ulwSelectorPath(el, idCount) {
 }`
 
 export class ProbeError extends Error {
-	constructor(code, message) {
-		super(message)
-		this.name = "ProbeError"
-		this.code = code
-	}
+  constructor(code, message) {
+    super(message)
+    this.name = "ProbeError"
+    this.code = code
+  }
 }
 
 /** @param {{ cap?: number, root?: string }} [options] */
 export function buildProbeSource({ cap = 400, root = "main, article" } = {}) {
-	if (!Number.isInteger(cap) || cap <= 0) throw new ProbeError("invalid_cap", `--cap requires a positive integer, got ${cap}`)
-	if (typeof root !== "string" || root.trim().length === 0) throw new ProbeError("invalid_root", "--root requires a non-empty CSS selector")
-	return `(async () => {
+  if (!Number.isInteger(cap) || cap <= 0)
+    throw new ProbeError("invalid_cap", `--cap requires a positive integer, got ${cap}`)
+  if (typeof root !== "string" || root.trim().length === 0)
+    throw new ProbeError("invalid_root", "--root requires a non-empty CSS selector")
+  return `(async () => {
 	const CAP = ${cap};
 	const IMAGE_WAIT_MS = 5000;
 	const ROOT = document.querySelector(${JSON.stringify(root)}) || document.body;
