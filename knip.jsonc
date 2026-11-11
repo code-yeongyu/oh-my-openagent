@@ -1465,6 +1465,20 @@
       "packages/senpi-desktop-tool/src/skill.ts": ["computerSkillMarkdown"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/senpi-desktop-tool/vitest.config.ts": ["default"],
+      // computer-use v3 (row 5): the vitest config default export, same shape as packages/senpi-desktop-sdk
+      "packages/omo-computer-protocol/vitest.config.ts": ["default"],
+      // computer-use v3 (row 5): the vitest config default export, same shape as packages/senpi-desktop-sdk
+      "packages/omo-computer-sdk/vitest.config.ts": ["default"],
+      // computer-use v3 (row 5): the vitest config default export, same shape as packages/senpi-desktop-sdk
+      "packages/omo-computer-engine/vitest.config.ts": ["default"],
+      // computer-use v3 (row 5): the vitest config default export, same shape as packages/senpi-desktop-sdk
+      "packages/omo-computer-hand/vitest.config.ts": ["default"],
+      // computer-use v3 (row 5): the vitest config default export, same shape as packages/senpi-desktop-sdk
+      "packages/omo-computer-carriers/vitest.config.ts": ["default"],
+      // computer-use v3 (row 5): the vitest config default export, same shape as packages/senpi-desktop-sdk
+      "packages/omo-computer-tool/vitest.config.ts": ["default"],
+      // computer-use v3 (row 5): the vitest config default export, same shape as packages/senpi-desktop-sdk
+      "packages/omo-computer-prelude/vitest.config.ts": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) hostKill, daemonRestart, idleEvict, handoff
       "packages/senpi-task/src/__adversarial__/chaos-host-actions.ts": ["hostKill", "daemonRestart", "idleEvict", "handoff"],
       // pre-existing at origin dev 4686e425b5: unused export(s) HOST_CHAOS_SOCKET, ChaosDaemon, ChaosHostRegistry
@@ -3564,6 +3578,90 @@
         "test/fixtures/quickjs-crash-worker.mjs",
         // run by path as the computer.run QuickJS sandbox Worker (src/run/sandbox/quickjs.ts), never imported
         "src/run/sandbox/worker.ts",
+        "vitest.config.ts",
+      ],
+    },
+    "packages/omo-computer-protocol": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them) and the test and config files plugins report with
+      // exports unchecked: listing them export-checks them too (script/knip-entry-exports.test.ts probes every knip entry).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "vitest.config.ts",
+      ],
+    },
+    "packages/omo-computer-sdk": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them) and the test and config files plugins report with
+      // exports unchecked: listing them export-checks them too (script/knip-entry-exports.test.ts probes every knip entry).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "vitest.config.ts",
+      ],
+    },
+    "packages/omo-computer-engine": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them) and the test and config files plugins report with
+      // exports unchecked: listing them export-checks them too (script/knip-entry-exports.test.ts probes every knip entry).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "vitest.config.ts",
+      ],
+    },
+    "packages/omo-computer-hand": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them) and the test and config files plugins report with
+      // exports unchecked: listing them export-checks them too (script/knip-entry-exports.test.ts probes every knip entry).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "vitest.config.ts",
+      ],
+    },
+    "packages/omo-computer-carriers": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them) and the test and config files plugins report with
+      // exports unchecked: listing them export-checks them too (script/knip-entry-exports.test.ts probes every knip entry).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "vitest.config.ts",
+      ],
+    },
+    "packages/omo-computer-tool": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them) and the test and config files plugins report with
+      // exports unchecked: listing them export-checks them too (script/knip-entry-exports.test.ts probes every knip entry).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "vitest.config.ts",
+      ],
+    },
+    "packages/omo-computer-prelude": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them) and the test and config files plugins report with
+      // exports unchecked: listing them export-checks them too (script/knip-entry-exports.test.ts probes every knip entry).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
         "vitest.config.ts",
       ],
     },
