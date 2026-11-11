@@ -58,12 +58,14 @@ CNF
 	openssl req -x509 -newkey rsa:2048 -nodes -days 30 -config "$tmp/req.cnf" \
 		-keyout "$tmp/key.pem" -out "$tmp/cert.pem" 2>/dev/null
 	legacy=()
-	if openssl version | grep -q '^OpenSSL 3'; then legacy=(-legacy); fi
+	ossl=$(openssl version) # a failed openssl is an error, never "not OpenSSL 3"
+	case "$ossl" in "OpenSSL 3"*) legacy=(-legacy) ;; esac
 	openssl pkcs12 -export ${legacy[@]+"${legacy[@]}"} -inkey "$tmp/key.pem" -in "$tmp/cert.pem" -name "$name" \
 		-out "$tmp/id.p12" -passout "pass:$p12pass"
 	security create-keychain -p "$(cat "$dir/keychain-password")" "$keychain"
 	restore_search_list
-	if security list-keychains -d user | grep -qF "$keychain"; then die "the T3 keychain is still on the user search list"; fi
+	after_list=$(security list-keychains -d user) # a failed list is an error, never "not on the list"
+	case "$after_list" in *"$keychain"*) die "the T3 keychain is still on the user search list" ;; esac
 	security set-keychain-settings "$keychain" # no auto-lock timeout, no lock on sleep
 	security unlock-keychain -p "$(cat "$dir/keychain-password")" "$keychain"
 	security import "$tmp/id.p12" -k "$keychain" -f pkcs12 -P "$p12pass" -T /usr/bin/codesign >/dev/null

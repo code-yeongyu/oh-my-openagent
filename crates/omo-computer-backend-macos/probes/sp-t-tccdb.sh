@@ -8,7 +8,8 @@
 #   service  client  client_type  auth_value  auth_reason  last_modified
 # A database the process cannot read prints `#db <scope> UNREADABLE <reason>` and no rows: reading TCC.db needs
 # Full Disk Access for the reading process, and the system database also needs root (`sudo -n`). Nothing is
-# ever written; the database is opened with mode=ro.
+# ever written; the database is opened with mode=ro. Exit 0 only when BOTH databases were read; exit 3 when either is
+# unreadable, so a failed read is never taken for "no rows" (the Accessibility rows live in the system database).
 set -euo pipefail
 
 die() { echo "sp-t-tccdb: $*" >&2; exit 2; }
@@ -32,7 +33,11 @@ read_db() { # <scope> <path>
 		return
 	fi
 	echo "#db $scope UNREADABLE $(printf '%s' "$direct_error" | head -1)"
+	unreadable=$((unreadable + 1))
 }
+
+unreadable=0
 
 read_db user "$HOME/Library/Application Support/com.apple.TCC/TCC.db"
 read_db system "/Library/Application Support/com.apple.TCC/TCC.db"
+[ "$unreadable" = 0 ] || exit 3

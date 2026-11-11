@@ -236,7 +236,7 @@ spawner)
 	[ $# -eq 2 ] || die "usage: spawner <out-binary>"
 	mkdir -p "$(dirname "$2")"
 	compile "$2" "spawner"
-	codesign --force --sign - "$2" >/dev/null 2>&1
+	codesign --force --sign - "$2" >/dev/null 2>&1 || die "ad-hoc codesign failed for $2"
 	echo "spawner=$2"
 	;;
 app)
@@ -272,6 +272,8 @@ PLIST
 	codesign --verify --strict "$app" || die "codesign --verify failed for $app"
 	cdhash=$(codesign -dvvv "$app" 2>&1 | sed -n 's/^CDHash=//p' | head -1)
 	requirement=$(codesign -d -r- "$app" 2>&1 | sed -n 's/^designated => //p' | head -1)
+	[ -n "$cdhash" ] || die "codesign -dvvv printed no CDHash for $app"
+	[ -n "$requirement" ] || die "codesign -d -r- printed no designated requirement for $app"
 	echo "cdhash=$cdhash"
 	echo "requirement=$requirement"
 	;;

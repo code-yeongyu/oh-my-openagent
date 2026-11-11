@@ -85,4 +85,8 @@ deadline=$((SECONDS + timeout))
 # the done file sits in the QA account's 0700 results directory: test it with the same privilege as the bootstrap
 done_exists() { ${as[@]+"${as[@]}"} test -e "$done_file"; }
 while ! done_exists && [ $SECONDS -lt $deadline ]; do sleep 0.25; done
-if done_exists; then echo "leg=done"; else echo "leg=timeout after ${timeout}s"; exit 4; fi
+if done_exists; then echo "leg=done"; exit 0; fi
+# done_exists is false both for "no file" and for a failed sudo: tell them apart before reporting a timeout
+if [ "$route" = sudo ] && ! sudo -n true 2>/dev/null; then echo "leg=unknown: the root sudo ticket was lost while waiting"; exit 5; fi
+echo "leg=timeout after ${timeout}s"
+exit 4

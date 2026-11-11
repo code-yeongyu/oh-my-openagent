@@ -77,6 +77,10 @@ The `prompt.*` rows reset the prompt-probe identifier with `tccutil reset Access
 no dialog; a failed reset after it is named in the note. Still unverified: whether a non-root `tccutil reset` clears
 an Accessibility row held in the system `TCC.db`; the first person slot reads it back with `sp-t-tccdb.sh`.
 
+A failed reader is never read as a negative: a `log show` or `TCC.db` read-back that exits non-zero (or a `TCC.db`
+read with either database unreadable) makes the row `UNMEASURED` with the reason, a `pgrep` error is an error and not
+"not running", and every other command whose output a verdict depends on fails the row with its exit code.
+
 The leg results directory (`$CU_RUN/sp-t-work/results`) belongs to the QA account with mode 0700, because its spec
 files decide what a QA-account leg runs; the probe refuses it when it is a symlink, has another owner or another
 mode, and reads and writes it as the QA account. `--self-test` checks the pure classification logic and the row table

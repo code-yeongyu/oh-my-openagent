@@ -257,20 +257,21 @@ async function hostEnv(): Promise<HostEnv> {
     if (!Bun.which(tool)) throw new Precondition(`the ${tool} command`)
   }
   if (!existsSync(LSREGISTER)) throw new Precondition("lsregister (LaunchServices support tool)")
-  const product = await run(["sw_vers", "-productVersion"])
-  const build = await run(["sw_vers", "-buildVersion"])
-  const arch = await run(["uname", "-m"])
-  const qaUser = process.env.SPT_QA_USER ?? (await run(["id", "-un"])).stdout
+  const product = must(await run(["sw_vers", "-productVersion"]), "sw_vers -productVersion")
+  const build = must(await run(["sw_vers", "-buildVersion"]), "sw_vers -buildVersion")
+  const arch = must(await run(["uname", "-m"]), "uname -m")
+  const qaUser = process.env.SPT_QA_USER ?? must(await run(["id", "-un"]), "id -un").stdout
   const uid = await run(["id", "-u", qaUser])
   if (uid.code !== 0) throw new Precondition(`the QA account ${qaUser}`)
-  const sameUser = uid.stdout === (await run(["id", "-u"])).stdout
+  const sameUser = uid.stdout === must(await run(["id", "-u"]), "id -u").stdout
   if (!sameUser && (await run(["sudo", "-n", "true"])).code !== 0)
     throw new Precondition("a root sudo ticket (the probe runs as another account than the QA account)")
-  const session = await run(["ps", "-U", qaUser, "-o", "comm="])
+  // a failed ps is an error, never "no GUI session"
+  const session = must(await run(["ps", "-U", qaUser, "-o", "comm="]), "ps -U")
   const comms = session.stdout.split("\n")
   if (!comms.some((c) => c.endsWith("/Dock")) || !comms.some((c) => c.endsWith("/Finder")))
     throw new Precondition(`a live GUI session of the QA account (no Dock/Finder under ${qaUser})`)
-  const qaHome = (await run(["dscl", ".", "-read", `/Users/${qaUser}`, "NFSHomeDirectory"])).stdout.replace(
+  const qaHome = must(await run(["dscl", ".", "-read", `/Users/${qaUser}`, "NFSHomeDirectory"]), "dscl").stdout.replace(
     /^NFSHomeDirectory:\s*/,
     "",
   )
@@ -285,9 +286,11 @@ async function hostEnv(): Promise<HostEnv> {
     sameUser,
     work,
     ev,
-    commit: process.env.SPT_COMMIT ?? ((await run(["git", "-C", PROBE_DIR, "rev-parse", "HEAD"])).stdout || "unknown"),
+    commit:
+      process.env.SPT_COMMIT ??
+      must(await run(["git", "-C", PROBE_DIR, "rev-parse", "HEAD"]), "git rev-parse (set SPT_COMMIT)").stdout,
     bun: process.env.SPT_BUN ?? process.execPath,
-    ownManager: (await run(["launchctl", "managername"])).stdout,
+    ownManager: must(await run(["launchctl", "managername"]), "launchctl managername").stdout,
   }
   const bunCheck = await run(asQa(env, [env.bun, "--version"]))
   if (bunCheck.code !== 0) throw new Precondition("a bun the QA account can execute (set SPT_BUN)")
@@ -323,9 +326,9 @@ async function newGeneration(env: HostEnv, marker: string) {
   const built = await buildApp(staging, BUNDLE_ID, DISPLAY_NAME, marker)
   const genDir = join(p.generations, built.cdhash)
   mkdirSync(genDir, { recursive: true })
-  await run(["ditto", "--noextattr", "--noqtn", staging, join(genDir, APP_NAME)])
+  must(await run(["ditto", "--noextattr", "--noqtn", staging, join(genDir, APP_NAME)]), "ditto")
   rmSync(join(env.work, `staging-${marker}`), { recursive: true, force: true })
-  await run(asQa(env, [LSREGISTER, "-f", join(genDir, APP_NAME)]))
+  must(await run(asQa(env, [LSREGISTER, "-f", join(genDir, APP_NAME)])), "lsregister -f")
   return { ...built, app: join(genDir, APP_NAME) }
 }
 
@@ -399,7 +402,7 @@ async function leg(specPath: string): Promise<number> {
   const result: LegResult = {
     hostPid: process.pid,
     hostExe: process.execPath,
-    hostManager: (await run(["launchctl", "managername"])).stdout,
+    hostManager: must(await run(["launchctl", "managername"]), "launchctl managername").stdout,
     launch: { argv, ...launch },
     report,
     waitedMs: Date.now() - startedAt,
@@ -407,7 +410,7 @@ async function leg(specPath: string): Promise<number> {
     ...(tapping ? { tapFile: spec.result } : {}),
   }
   writeFileSync(`${spec.done}.tmp`, JSON.stringify(result))
-  await run(["mv", `${spec.done}.tmp`, spec.done])
+  must(await run(["mv", `${spec.done}.tmp`, spec.done]), "mv of the leg result")
   return report || tapping ? 0 : 1
 }
 
@@ -495,13 +498,27 @@ interface TccRow {
   authValue: string
 }
 
-// pure: the tccd log lines that mention a needle (RED stub: keeps the old behaviour)
+function firstLine(text: string): string {
+  return text.trim().split("\n")[0] ?? ""
+}
+
+// pure: the tccd log lines that mention a needle; a failed `log show` is an error, never "no lines"
 function parseTccLog(out: RunOut, needles: string[]): Parsed<string[]> {
+  if (out.code !== 0) return { ok: false, error: `log show exited ${out.code}: ${firstLine(out.stderr)}` }
   return { ok: true, value: out.stdout.split("\n").filter((line) => needles.some((n) => n && line.includes(n))) }
 }
 
-// pure: the TCC.db rows (RED stub: keeps the old behaviour)
+// pure: the TCC.db rows. The helper exits non-zero when a database is unreadable, and both database headers must be
+// present: a failed or partial read is an error, never "no grant" (Accessibility rows live in the system database)
 function parseTccDb(out: RunOut): Parsed<TccRow[]> {
+  if (out.code !== 0)
+    return {
+      ok: false,
+      error: `sp-t-tccdb.sh exited ${out.code}: ${firstLine(out.stderr) || out.stdout.split("\n").find((l) => l.includes("UNREADABLE")) || ""}`,
+    }
+  for (const scope of ["user", "system"])
+    if (!out.stdout.split("\n").some((l) => l.startsWith(`#db ${scope} `)))
+      return { ok: false, error: `TCC.db read-back is missing the ${scope} database header` }
   const rows = out.stdout
     .split("\n")
     .filter((l) => l && !l.startsWith("#"))
@@ -509,14 +526,24 @@ function parseTccDb(out: RunOut): Parsed<TccRow[]> {
       const [service = "", client = "", clientType = "", authValue = ""] = l.split("\t")
       return { service, client, clientType, authValue }
     })
-  const unreadable = out.stdout.split("\n").filter((l) => l.includes("UNREADABLE"))
-  return unreadable.length < 2 ? { ok: true, value: rows } : { ok: false, error: unreadable.join(" | ") }
+  return { ok: true, value: rows }
 }
 
-// pure: whether pgrep found a match (RED stub: keeps the old behaviour)
+// pure: whether pgrep found a match; exit 1 is "no match", anything else is an error, never "not running"
 function pgrepFound(out: RunOut): boolean {
-  return out.code === 0
+  if (out.code === 0) return true
+  if (out.code === 1) return false
+  throw new Error(`pgrep exited ${out.code}: ${firstLine(out.stderr)}`)
 }
+
+// a command whose failure must not be read as an answer: throw with its exit code and stderr
+function must(out: RunOut, what: string): RunOut {
+  if (out.code !== 0) throw new Error(`${what} exited ${out.code}: ${firstLine(out.stderr)}`)
+  return out
+}
+
+// a reader that could not produce its evidence: the row is UNMEASURED with the reason
+class Unmeasurable extends Error {}
 
 async function tccLog(env: HostEnv, log: EvidenceLog, since: number, needles: string[]) {
   const out = await run([
@@ -529,26 +556,24 @@ async function tccLog(env: HostEnv, log: EvidenceLog, since: number, needles: st
     "--predicate",
     'subsystem == "com.apple.TCC" OR process == "universalAccessAuthWarn"',
   ])
-  const lines = out.stdout.split("\n").filter((line) => needles.some((n) => n && line.includes(n)))
+  const parsed = parseTccLog(out, needles)
+  if (!parsed.ok) {
+    log.add(`tccd log since ${logTimestamp(since - 2000)} FAILED`, out)
+    throw new Unmeasurable(parsed.error)
+  }
   log.add(
-    `tccd log since ${logTimestamp(since - 2000)} (${lines.length} matching lines, exit ${out.code})`,
-    lines.join("\n") || "(none)",
+    `tccd log since ${logTimestamp(since - 2000)} (${parsed.value.length} matching lines, exit ${out.code})`,
+    parsed.value.join("\n") || "(none)",
   )
-  return lines
+  return parsed.value
 }
 
-async function tccDb(env: HostEnv, log: EvidenceLog, client: string) {
+async function tccDb(env: HostEnv, log: EvidenceLog, client: string): Promise<TccRow[]> {
   const out = await run(["bash", join(PROBE_DIR, "sp-t-tccdb.sh"), client], { env: { HOME: env.qaHome } })
   log.add(`TCC.db read-back for ${client}`, out)
-  const rows = out.stdout
-    .split("\n")
-    .filter((l) => l && !l.startsWith("#"))
-    .map((l) => {
-      const [service = "", cl = "", clientType = "", authValue = ""] = l.split("\t")
-      return { service, client: cl, clientType, authValue }
-    })
-  const unreadable = out.stdout.split("\n").filter((l) => l.includes("UNREADABLE"))
-  return { rows, unreadable, readable: unreadable.length < 2 }
+  const parsed = parseTccDb(out)
+  if (!parsed.ok) throw new Unmeasurable(`TCC.db read-back failed: ${parsed.error}`)
+  return parsed.value
 }
 
 // ---------------------------------------------------------------------------------------------- classification
@@ -634,14 +659,8 @@ function clientType(path: "open" | "disclaim") {
     if (!(await grantPresent(env, log))) return AWAITING_H3
     const result = await runLeg(env, log, "gui", actionFor(path), currentApp(env))
     if (!result.report) return noReport(result, "client_type")
-    const db = await tccDb(env, log, "omo-computer-helper")
-    if (!db.readable)
-      return {
-        verdict: "UNMEASURED",
-        measured: base(result.report, result),
-        note: `TCC.db unreadable: ${db.unreadable.join(" | ")}`,
-      }
-    const ax = db.rows.filter(
+    const rows = await tccDb(env, log, "omo-computer-helper")
+    const ax = rows.filter(
       (r) => r.service === "kTCCServiceAccessibility" && (r.client === BUNDLE_ID || r.client.includes(`/${APP_NAME}`)),
     )
     const covered = result.report.preflight.accessibility === 1
@@ -697,8 +716,9 @@ async function byNameOpen(env: HostEnv, log: EvidenceLog): Promise<Measured> {
   const p = paths(env)
   const current = realpathSync(join(p.current, APP_NAME))
   const previous = realpathSync(join(p.previous, APP_NAME))
-  for (const app of [current, previous]) await run(asQa(env, [LSREGISTER, "-f", app]))
-  const dump = await run(asQa(env, ["bash", "-c", `${LSREGISTER} -dump | grep -c '${BUNDLE_ID}$' || true`]))
+  for (const app of [current, previous]) must(await run(asQa(env, [LSREGISTER, "-f", app])), "lsregister -f")
+  const dumpOut = must(await run(asQa(env, [LSREGISTER, "-dump"])), "lsregister -dump")
+  const dump = { stdout: String(dumpOut.stdout.split("\n").filter((l) => l.endsWith(BUNDLE_ID)).length) }
   const result = await runLeg(env, log, "gui", "open-name", BUNDLE_NAME)
   if (!result.report) return noReport(result, "open -a")
   const exe = result.report.exe
@@ -813,7 +833,7 @@ function resetFailed(when: "before" | "after", out: { code: number; stderr: stri
 async function pollForProcess(name: string, boundMs: number): Promise<number | null> {
   const start = Date.now()
   while (Date.now() - start < boundMs) {
-    if ((await run(["pgrep", "-x", name])).code === 0) return Date.now() - start
+    if (pgrepFound(await run(["pgrep", "-x", name]))) return Date.now() - start
     await sleep(250)
   }
   return null
@@ -827,7 +847,7 @@ function promptVerdict(lines: string[], authWarnSeen: boolean): "shown" | "none"
 }
 
 async function bunshinDomain(env: HostEnv, log: EvidenceLog): Promise<Measured> {
-  const ps = await run(["ps", "-axo", "pid=,uid=,command="])
+  const ps = must(await run(["ps", "-axo", "pid=,uid=,command="]), "ps -axo")
   const agents = ps.stdout
     .split("\n")
     .map((l) => l.trim())
@@ -1113,6 +1133,8 @@ async function measureRow(
   } catch (error) {
     if (error instanceof Precondition)
       measured = { verdict: "UNMEASURED", measured: {}, note: `precondition missing: ${error.message}` }
+    else if (error instanceof Unmeasurable)
+      measured = { verdict: "UNMEASURED", measured: {}, note: `evidence reader failed: ${error.message}` }
     else {
       measured = {
         verdict: "ERROR",
@@ -1164,11 +1186,11 @@ async function cleanup(env: HostEnv) {
   }
   const reset = await run(asQa(env, ["tccutil", "reset", "Accessibility", PROMPT_BUNDLE_ID]))
   receipts.push(`tccutil reset Accessibility ${PROMPT_BUNDLE_ID}: exit ${reset.code}`)
-  const jobs = await run(asQa(env, ["launchctl", "list"]))
+  const jobs = must(await run(asQa(env, ["launchctl", "list"])), "launchctl list")
   const left = jobs.stdout.split("\n").filter((l) => l.includes("ai.sisyphuslabs.sp-t."))
   receipts.push(`leftover sp-t launchd jobs: ${left.length}`)
   const procs = await run(["pgrep", "-f", "omo-computer-helper.app/Contents/MacOS/omo-computer-engine"])
-  receipts.push(`procs ${procs.stdout ? procs.stdout.split("\n").length : 0}`)
+  receipts.push(`procs ${pgrepFound(procs) ? procs.stdout.split("\n").length : 0}`)
   // the results directory belongs to the QA account (0700), so it is removed as that account first
   const results = env.sameUser ? { code: 0 } : await run(asQa(env, ["rm", "-rf", p.results]))
   receipts.push(`results dir removed as the QA account: exit ${results.code}`)
@@ -1307,6 +1329,17 @@ function selfTest(): number {
       "tcc db: a database header missing is an error",
       parseTccDb({ code: 0, stdout: "#db user direct", stderr: "" }),
       { ok: false, error: "TCC.db read-back is missing the system database header" },
+    ],
+    [
+      "must: a failed command throws with its exit code",
+      (() => {
+        try {
+          return must({ code: 4, stdout: "", stderr: "boom\nmore" }, "lsregister -f").code
+        } catch (error) {
+          return error instanceof Error ? error.message : String(error)
+        }
+      })(),
+      "lsregister -f exited 4: boom",
     ],
     ["pgrep: match", pgrepFound({ code: 0, stdout: "12", stderr: "" }), true],
     ["pgrep: no match", pgrepFound({ code: 1, stdout: "", stderr: "" }), false],
