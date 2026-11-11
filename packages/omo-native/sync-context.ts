@@ -61,9 +61,11 @@ export async function signedInSyncContext(options: SyncContextOptions): Promise<
       log: (line) => process.stderr.write(`${line}\n`),
     }),
   })
-  const sameIdentity = (current: Credentials): boolean => current.device.id === credentials.device.id
-    && current.signingPrivateKey === credentials.signingPrivateKey && current.sealingPrivateKey === credentials.sealingPrivateKey
-    && current.credentialGeneration === credentials.credentialGeneration
+  const sameIdentity = (current: Credentials): boolean =>
+    current.device.id === credentials.device.id &&
+    current.signingPrivateKey === credentials.signingPrivateKey &&
+    current.sealingPrivateKey === credentials.sealingPrivateKey &&
+    current.credentialGeneration === credentials.credentialGeneration
   const token = () => session.accessToken(sameIdentity)
   const doFetch = options.fetch ?? fetch
   const me = await doFetch(`${api}/v1/me`, { headers: { authorization: `Bearer ${await token()}` } })
