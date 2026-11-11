@@ -34,10 +34,16 @@ export type GatewayServices = {
 }
 
 /** The store-free live-and-disk resolver for extension calls, which run inside the store worker's transaction. */
-export function createGatewayResolver(options: Omit<ThreadToolSurfaceOptions, "store">, view: () => Promise<ThreadHostView>): GatewayResolve {
+export function createGatewayResolver(
+  options: Omit<ThreadToolSurfaceOptions, "store">,
+  view: () => Promise<ThreadHostView>,
+): GatewayResolve {
   return async (address, request) => {
     const current = await view()
-    return await resolveFromEntries(() => toGatewayAddressEntries(sendAddressBook(options, current, address, request.all_scope)), options.callerWorkspaceRoot)(address, request)
+    return await resolveFromEntries(
+      () => toGatewayAddressEntries(sendAddressBook(options, current, address, request.all_scope)),
+      options.callerWorkspaceRoot,
+    )(address, request)
   }
 }
 
@@ -48,19 +54,34 @@ export function createGatewayResolver(options: Omit<ThreadToolSurfaceOptions, "s
  * one that answers even when nothing is live): a target no endpoint lists resolves from disk
  * (`sendAddressBook`) and is queued offline.
  */
-export function createGatewayServices(options: ThreadToolSurfaceOptions, view: () => Promise<ThreadHostView>): GatewayServices {
+export function createGatewayServices(
+  options: ThreadToolSurfaceOptions,
+  view: () => Promise<ThreadHostView>,
+): GatewayServices {
   // The SDK and tools send through a fresh `list_sessions` on only the target's socket (#9222's
   // single-lookup rule); the extension path shares the plain live-and-disk resolver (no store).
   const resolve: GatewayResolve = async (address, request) => {
     const current = await sendView(options, address, view)
-    return await resolveFromEntries(() => toGatewayAddressEntries(sendAddressBook(options, current, address, request.all_scope)), options.callerWorkspaceRoot)(address, request)
+    return await resolveFromEntries(
+      () => toGatewayAddressEntries(sendAddressBook(options, current, address, request.all_scope)),
+      options.callerWorkspaceRoot,
+    )(address, request)
   }
   const store = options.store
   const now = options.now ?? store.now
   const endpoints = options.host.gateway ?? UNREACHABLE
   const entries = async () => toGatewayAddressEntries(addressBook(options, await view()))
   // Both transports read this one provenance, so a local and a relayed delivery name the same sender device (#13004).
-  const senderProvenance = (): Promise<Provenance> => stampThisDevice(resolveProvenance({ cwd: options.callerWorkspaceRoot(), env: options.env, ...(options.loadProvenanceWorkspaces === undefined ? {} : { loadWorkspaces: options.loadProvenanceWorkspaces }), ...(options.onProvenanceWarning === undefined ? {} : { onWarning: options.onProvenanceWarning }) }), options.remote)
+  const senderProvenance = (): Promise<Provenance> =>
+    stampThisDevice(
+      resolveProvenance({
+        cwd: options.callerWorkspaceRoot(),
+        env: options.env,
+        ...(options.loadProvenanceWorkspaces === undefined ? {} : { loadWorkspaces: options.loadProvenanceWorkspaces }),
+        ...(options.onProvenanceWarning === undefined ? {} : { onWarning: options.onProvenanceWarning }),
+      }),
+      options.remote,
+    )
   const engine = createGatewayEngine({ store, endpoints, resolve, now, senderProvenance })
   const locate = async (durableId: string): Promise<GatewayEndpointRef | null> => {
     const entry = (await entries()).find((candidate) => candidate.thread_id === durableId)
@@ -69,13 +90,18 @@ export function createGatewayServices(options: ThreadToolSurfaceOptions, view: (
   const relay = createGatewayRelay({ store, engine, endpoints, locate, now })
   const pipeline = createDeliveryPipeline({
     local: createLocalTransport(engine),
-    ...(options.remote === undefined ? {} : {
-      relay: createRelayTransport({
-        remote: options.remote, store, now, senderProvenance,
-        ...(options.callerCause === undefined ? {} : { callerCause: options.callerCause }),
-        ...(options.callerChainHop === undefined ? {} : { callerChainHop: options.callerChainHop }),
-      }),
-    }),
+    ...(options.remote === undefined
+      ? {}
+      : {
+          relay: createRelayTransport({
+            remote: options.remote,
+            store,
+            now,
+            senderProvenance,
+            ...(options.callerCause === undefined ? {} : { callerCause: options.callerCause }),
+            ...(options.callerChainHop === undefined ? {} : { callerChainHop: options.callerChainHop }),
+          }),
+        }),
   })
   return { store, endpoints, engine, pipeline, relay, senderProvenance, locate }
 }

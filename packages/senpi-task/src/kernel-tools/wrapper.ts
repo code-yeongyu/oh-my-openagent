@@ -19,11 +19,7 @@ export type KernelToolResultDetails = {
  * so: it still satisfies ToolDefinition (fewer parameters), and a caller does not have to invent a tool context.
  */
 export type KernelToolWrapper = Omit<ToolDefinition, "execute"> & {
-  execute(
-    toolCallId: string,
-    args: unknown,
-    signal?: AbortSignal,
-  ): Promise<AgentToolResult<KernelToolResultDetails>>
+  execute(toolCallId: string, args: unknown, signal?: AbortSignal): Promise<AgentToolResult<KernelToolResultDetails>>
 }
 
 export type KernelToolWrapperOptions = {
@@ -33,9 +29,10 @@ export type KernelToolWrapperOptions = {
 }
 
 function envelope(details: KernelToolResultDetails, value: unknown): AgentToolResult<KernelToolResultDetails> {
-  const body = details.error === undefined
-    ? { kernel_tool: details.kernel_tool, value: value ?? null }
-    : { kernel_tool: details.kernel_tool, error: details.error }
+  const body =
+    details.error === undefined
+      ? { kernel_tool: details.kernel_tool, value: value ?? null }
+      : { kernel_tool: details.kernel_tool, error: details.error }
   return {
     content: [{ type: "text", text: JSON.stringify(body) }],
     details,
@@ -59,9 +56,8 @@ function wrapper(
   return {
     name: descriptor.name,
     label: descriptor.name,
-    description: descriptor.description.length > 0
-      ? descriptor.description
-      : `Parent-defined JavaScript tool ${descriptor.name}.`,
+    description:
+      descriptor.description.length > 0 ? descriptor.description : `Parent-defined JavaScript tool ${descriptor.name}.`,
     parameters: Type.Unsafe<Record<string, unknown>>(descriptor.input_schema),
     execute: async (toolCallId, args, signal) => {
       // Descriptor tuple + identity are validated locally first; the fenced tuple then travels with
@@ -85,9 +81,7 @@ function wrapper(
         // always posted (a bare signal), never an option an older runtime would silently ignore.
         const value = await grant.capability.invoke(
           request,
-          grant.scope === undefined
-            ? signal
-            : { ...(signal === undefined ? {} : { signal }), scope: grant.scope },
+          grant.scope === undefined ? signal : { ...(signal === undefined ? {} : { signal }), scope: grant.scope },
         )
         return envelope({ kernel_tool: descriptor.name }, value)
       } catch (error) {

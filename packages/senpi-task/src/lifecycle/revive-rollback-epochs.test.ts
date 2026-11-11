@@ -17,10 +17,22 @@ const OWNER = { ownerSessionId: "parent-1" }
 /** A parked task revived once by this host, then rolled back: the handle minted for that run names an undone run. */
 function revivedThenRolledBack(taskId: string): { readonly store: TaskRecordStore; readonly undone: HandleRef } {
   const store = tempStore()
-  const prior = seedRecord(store, { task_id: taskId, status: "completed", residency_state: "rpc_detached", execution_mode: "process", run_epoch: 0 })
+  const prior = seedRecord(store, {
+    task_id: taskId,
+    status: "completed",
+    residency_state: "rpc_detached",
+    execution_mode: "process",
+    run_epoch: 0,
+  })
   const revived: TaskRecord = { ...buildRevived(prior, new Date().toISOString()), host_pid: HOST_PID }
   store.replace(revived)
-  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), hostPid: HOST_PID })
+  const lifecycle = createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
+    store,
+    registry: new FakeRegistry(),
+    config: settings(),
+    hostPid: HOST_PID,
+  })
   expect(lifecycle.rollbackDetachedRevival(prior)).toBe("rolled_back")
   lifecycle.dispose?.()
   return { store, undone: { kind: "agent", id: taskId, run_epoch: revived.notification.run_epoch } }
@@ -58,19 +70,31 @@ describe("a rolled-back run's epoch is never issued again (#9562)", () => {
           return { kind: "steered", task_id: input.idOrName, status: "running", delivered: "followUp" }
         },
       },
-      workpools: { inspect: () => { throw new Error("no pools") }, cancel: () => { throw new Error("no pools") }, subscribe: () => () => undefined },
+      workpools: {
+        inspect: () => {
+          throw new Error("no pools")
+        },
+        cancel: () => {
+          throw new Error("no pools")
+        },
+        subscribe: () => () => undefined,
+      },
       poolCaller: (sessionId) => ({ sessionId, rootSessionId: sessionId, depth: 0, cwd: "/" }),
       stateDir: store.stateDir,
     })
 
-    await expect(host.send(undone, "meant for the undone run", OWNER)).rejects.toMatchObject({ code: "eval_handle_stale" })
+    await expect(host.send(undone, "meant for the undone run", OWNER)).rejects.toMatchObject({
+      code: "eval_handle_stale",
+    })
     expect(delivered).toEqual([])
   })
 
   test("the burnt epoch survives a reload of the record from disk, so a restarted host still skips it", () => {
     const { store, undone } = revivedThenRolledBack("st_00009564")
 
-    const reloaded = createTaskRecordStore({ project_dir: "/unused", task: { state_dir: store.stateDir } }).load(undone.id)
+    const reloaded = createTaskRecordStore({ project_dir: "/unused", task: { state_dir: store.stateDir } }).load(
+      undone.id,
+    )
 
     if (reloaded === null) throw new Error("record vanished")
     expect(buildRevived(reloaded, new Date().toISOString()).notification.run_epoch).toBeGreaterThan(undone.run_epoch)
@@ -78,9 +102,21 @@ describe("a rolled-back run's epoch is never issued again (#9562)", () => {
 
   test("a rollback that undid only a claim (no run was started) burns nothing: the next run takes the very next epoch", () => {
     const store = tempStore()
-    const prior = seedRecord(store, { task_id: "st_00009565", status: "completed", residency_state: "rpc_detached", execution_mode: "process", run_epoch: 3 })
+    const prior = seedRecord(store, {
+      task_id: "st_00009565",
+      status: "completed",
+      residency_state: "rpc_detached",
+      execution_mode: "process",
+      run_epoch: 3,
+    })
     store.replace({ ...prior, residency_state: "resident", host_pid: HOST_PID })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), hostPid: HOST_PID })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+      hostPid: HOST_PID,
+    })
 
     expect(lifecycle.rollbackDetachedRevival(prior)).toBe("rolled_back")
     lifecycle.dispose?.()

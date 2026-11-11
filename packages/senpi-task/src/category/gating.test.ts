@@ -44,7 +44,10 @@ describe("category activation gating", () => {
 
     test("#when the registry offers claude-fable-5-1 #then architect resolves at max", () => {
       // given
-      const models = registry([...MODELS_THE_PRE_GATING_CHAINS_WOULD_HAVE_ACCEPTED, model("anthropic", "claude-fable-5-1")])
+      const models = registry([
+        ...MODELS_THE_PRE_GATING_CHAINS_WOULD_HAVE_ACCEPTED,
+        model("anthropic", "claude-fable-5-1"),
+      ])
 
       // when
       const result = resolveCategory("architect", {}, models)
@@ -91,11 +94,7 @@ describe("category activation gating", () => {
       const models = registry([model("kimi-coding", "k3")])
 
       // when
-      const result = resolveCategory(
-        "architect",
-        { categories: { architect: { model: "kimi-coding/k3" } } },
-        models,
-      )
+      const result = resolveCategory("architect", { categories: { architect: { model: "kimi-coding/k3" } } }, models)
 
       // then
       expect(result.kind).toBe("resolved")

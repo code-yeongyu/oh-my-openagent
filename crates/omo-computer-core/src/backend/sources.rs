@@ -1,7 +1,8 @@
 //! The long-lived handles a backend hands out, and the refusing handle each default returns.
 
-use super::refusal::{BackendResult, Refusal, RefusalCode};
+use super::refusal::{BackendResult, Refusal};
 use super::types::{AxEvent, EpochChange};
+use crate::error::EngineCode;
 
 /// A listen-only stop listener that injected input cannot trigger.
 pub trait StopListener: Send {
@@ -48,7 +49,7 @@ pub struct NoEpochSource;
 impl EpochSource for NoEpochSource {
     fn next_change(&mut self) -> BackendResult<Option<EpochChange>> {
         Err(Refusal::new(
-            RefusalCode::Unavailable,
+            EngineCode::Internal,
             "epoch_source_unsupported",
         ))
     }
@@ -61,7 +62,7 @@ pub struct NoAxEvents;
 impl AxEventSource for NoAxEvents {
     fn next_event(&mut self) -> BackendResult<Option<AxEvent>> {
         Err(Refusal::new(
-            RefusalCode::AxUnavailable,
+            EngineCode::AxUnsupported,
             "ax_events_unsupported",
         ))
     }

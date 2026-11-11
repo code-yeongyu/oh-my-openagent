@@ -6,16 +6,18 @@ export function resolveCompactionModel(
   pluginConfig: OhMyOpenCodeConfig,
   sessionID: string,
   originalProviderID: string,
-  originalModelID: string
+  originalModelID: string,
 ): { providerID: string; modelID: string } {
   const sessionAgentName = getSessionAgent(sessionID)
-  
+
   if (!sessionAgentName || !pluginConfig.agents) {
     return { providerID: originalProviderID, modelID: originalModelID }
   }
 
   const agentConfigKey = getAgentConfigKey(sessionAgentName)
-  const agentConfig = (pluginConfig.agents as Record<string, { compaction?: { model?: string } } | undefined>)[agentConfigKey]
+  const agentConfig = (pluginConfig.agents as Record<string, { compaction?: { model?: string } } | undefined>)[
+    agentConfigKey
+  ]
   const compactionConfig = agentConfig?.compaction
 
   if (!compactionConfig?.model) {

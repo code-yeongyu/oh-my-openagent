@@ -35,9 +35,7 @@ describe("executePostToolUseHooks", () => {
       }),
       stderr: "",
     })
-    const config = createConfig([
-      { matcher: "Write", hooks: [{ type: "command", command: "hook-context" }] },
-    ])
+    const config = createConfig([{ matcher: "Write", hooks: [{ type: "command", command: "hook-context" }] }])
 
     // when
     const result = await executePostToolUseHooks(createContext(), config)
@@ -54,9 +52,7 @@ describe("executePostToolUseHooks", () => {
       stdout: "\r\nFirst line\r\nSecond line\rThird line\r\n",
       stderr: "",
     })
-    const config = createConfig([
-      { matcher: "Write", hooks: [{ type: "command", command: "hook-text" }] },
-    ])
+    const config = createConfig([{ matcher: "Write", hooks: [{ type: "command", command: "hook-text" }] }])
 
     // when
     const result = await executePostToolUseHooks(createContext(), config)

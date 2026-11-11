@@ -3,21 +3,13 @@ import { log } from "@oh-my-opencode/utils"
 import { asSenpiThinkingLevel } from "../../senpi/thinking-level"
 import { splitModelDecorators } from "../../senpi/explicit-pin"
 import type { HostSessionLiveness } from "./handle-port"
-import {
-  SESSION_START_FAILURE_REASONS,
-  isTaskStartFailureReason,
-  type TaskStartFailureReason,
-} from "../../state"
+import { SESSION_START_FAILURE_REASONS, isTaskStartFailureReason, type TaskStartFailureReason } from "../../state"
 import { RunnerError } from "../in-process/runner-error"
 import { rpcChildAncestry } from "../child-ancestry"
 import { differsOnlyByPriorityAlias, reportedEffectiveModel, startedOnPinnedModel } from "../pinned-model-equivalence"
 import type { RpcRunnerSpec } from "../types"
 import { HostUnavailableError } from "./daemon"
-import {
-  HostSessionOpenError,
-  SessionHeldElsewhereError,
-  type OpenedHostSession,
-} from "./session-client"
+import { HostSessionOpenError, SessionHeldElsewhereError, type OpenedHostSession } from "./session-client"
 import { buildChildContext } from "./session-context"
 import { childRetryFallbackProfile } from "../retry-fallback-profile"
 import type { HostRetryFallbackProfile, HostSessionOpenInput } from "./session-transport"
@@ -35,7 +27,8 @@ export async function openTaskHostSession(input: {
   readonly sessionPath: string
 }): Promise<OpenedHostSession> {
   const model = splitModelRef(input.spec.model)
-  const thinkingLevel = asSenpiThinkingLevel(input.spec.reasoning ?? input.spec.variant) ?? asSenpiThinkingLevel(model?.thinkingLevel)
+  const thinkingLevel =
+    asSenpiThinkingLevel(input.spec.reasoning ?? input.spec.variant) ?? asSenpiThinkingLevel(model?.thinkingLevel)
   const spawnedBy = rpcChildAncestry(input.spec)
   let opened: OpenedHostSession
   try {
@@ -98,8 +91,15 @@ export async function openTaskHostSession(input: {
       try {
         if (input.client.getAvailableModels === undefined) throw new Error("get_available_models is unavailable")
         const catalog = await input.client.getAvailableModels()
-        pinnedEntry = catalog.find(entry => typeof entry === "object" && entry !== null
-          && "provider" in entry && entry.provider === pinned.provider && "id" in entry && entry.id === pinned.id)
+        pinnedEntry = catalog.find(
+          (entry) =>
+            typeof entry === "object" &&
+            entry !== null &&
+            "provider" in entry &&
+            entry.provider === pinned.provider &&
+            "id" in entry &&
+            entry.id === pinned.id,
+        )
       } catch (error) {
         await input.client.close?.().catch(() => undefined)
         throw new RunnerError({
@@ -116,7 +116,11 @@ export async function openTaskHostSession(input: {
         message: `the host opened the child on ${effective.provider}/${effective.id} instead of the requested ${model.provider}/${model.modelId}; refusing the substitution`,
       })
     }
-    return { ...opened, reportedModel: reportedEffectiveModel(effective, serviceTier), ...withDurableId(durableSessionId) }
+    return {
+      ...opened,
+      reportedModel: reportedEffectiveModel(effective, serviceTier),
+      ...withDurableId(durableSessionId),
+    }
   }
   if (freshOpen && input.client.getState !== undefined) {
     // Not fatal without a pin: the child still starts, and its first heartbeat learns the durable id,
@@ -126,7 +130,8 @@ export async function openTaskHostSession(input: {
       return undefined
     })
     const effective = state?.model
-    const reported = effective === undefined ? {} : { reportedModel: reportedEffectiveModel(effective, state?.serviceTier) }
+    const reported =
+      effective === undefined ? {} : { reportedModel: reportedEffectiveModel(effective, state?.serviceTier) }
     return { ...opened, ...reported, ...withDurableId(state?.sessionId) }
   }
   return opened
@@ -163,7 +168,9 @@ function childRetryFallback(spec: RpcRunnerSpec): { readonly retryFallback?: Hos
  * (#9722): the suffix rides `thinkingLevel` instead of being sent as part of the id. A reference
  * with no usable provider/model boundary yields undefined, so the host keeps its own resolution.
  */
-function splitModelRef(model: string | undefined): { readonly provider: string; readonly modelId: string; readonly thinkingLevel?: string } | undefined {
+function splitModelRef(
+  model: string | undefined,
+): { readonly provider: string; readonly modelId: string; readonly thinkingLevel?: string } | undefined {
   if (model === undefined) return undefined
   const { base, thinkingLevel } = splitModelDecorators(model)
   const separator = base.indexOf("/")

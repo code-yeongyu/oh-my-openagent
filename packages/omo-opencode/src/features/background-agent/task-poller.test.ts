@@ -61,7 +61,6 @@ describe("checkAndInterruptStaleTasks", () => {
     Date.now = originalDateNow
   })
 
-
   it("should interrupt tasks with lastUpdate exceeding stale timeout", async () => {
     //#given
     const task = createRunningTask({
@@ -911,7 +910,7 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(task.error).toContain("Stale timeout")
   })
 
-  it('should NOT protect task when session has unknown status type', async () => {
+  it("should NOT protect task when session has unknown status type", async () => {
     //#given - lastUpdate is 5min old, session has an unknown status
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 300_000),
@@ -1185,12 +1184,15 @@ describe("pruneStaleTasksAndNotifications", () => {
     const terminalStatuses: BackgroundTask["status"][] = ["completed", "error", "cancelled", "interrupt"]
 
     for (const status of terminalStatuses) {
-      tasks.set(status, createTerminalTask({
-        id: status,
-        description: status,
-        prompt: status,
+      tasks.set(
         status,
-      }))
+        createTerminalTask({
+          id: status,
+          description: status,
+          prompt: status,
+          status,
+        }),
+      )
     }
 
     const pruned: string[] = []

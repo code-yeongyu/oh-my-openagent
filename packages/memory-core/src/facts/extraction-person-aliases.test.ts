@@ -8,11 +8,7 @@ import { createNodeGitExec, GitMemoryRepo, type GitExec } from "../git"
 import { parseMemoryFile, renderMemoryFile } from "../memfs"
 import { parsePeopleCard, type ObservationEntry } from "../people"
 import { buildDefaultSeedFiles } from "../seeds"
-import {
-  applyFactsBatch,
-  parseFactsExtractionJsonl,
-  type FactsExtractionRecord,
-} from "./extraction"
+import { applyFactsBatch, parseFactsExtractionJsonl, type FactsExtractionRecord } from "./extraction"
 import { removeTree } from "../../../../test-support/remove-tree"
 
 const AUTHOR = { agentId: "facts-agent", authorName: "Facts Extractor" }
@@ -70,12 +66,7 @@ async function commitPersonCard(
   await repo.commitWrite([`people/${slug}/card.md`], `test: seed ${slug} card`, AUTHOR)
 }
 
-async function commitObservations(
-  repo: GitMemoryRepo,
-  slug: string,
-  name: string,
-  body: string,
-): Promise<void> {
+async function commitObservations(repo: GitMemoryRepo, slug: string, name: string, body: string): Promise<void> {
   await mkdir(join(repo.dir, "people", slug), { recursive: true })
   await writeFile(
     join(repo.dir, "people", slug, "observations.md"),
@@ -99,10 +90,15 @@ describe("person routing alias resolution", () => {
     await commitPersonCard(repo, "mina", "Mina", ["Min"])
 
     // when
-    const result = await applyFactsBatch(repo, {
-      batchId: "44444444-4444-4444-8444-444444444444",
-      records: [personRecord("Min", [], "Min is reviewing the memory plan.")],
-    }, AUTHOR, { people: PEOPLE })
+    const result = await applyFactsBatch(
+      repo,
+      {
+        batchId: "44444444-4444-4444-8444-444444444444",
+        records: [personRecord("Min", [], "Min is reviewing the memory plan.")],
+      },
+      AUTHOR,
+      { people: PEOPLE },
+    )
 
     // then
     expect(result.outcome).toBe("committed")
@@ -120,16 +116,23 @@ describe("person routing alias resolution", () => {
     await commitPersonCard(repo, "mina-lee", "Mina Lee", ["Mina"])
 
     // when
-    await applyFactsBatch(repo, {
-      batchId: "55555555-5555-4555-8555-555555555555",
-      records: [personRecord("Mina", ["Min"], "Mina reviewed the plan.")],
-    }, AUTHOR, { people: PEOPLE })
+    await applyFactsBatch(
+      repo,
+      {
+        batchId: "55555555-5555-4555-8555-555555555555",
+        records: [personRecord("Mina", ["Min"], "Mina reviewed the plan.")],
+      },
+      AUTHOR,
+      { people: PEOPLE },
+    )
 
     // then
-    expect((await readExplicitEntries(dir, "mina-lee")).map((entry) => entry.content))
-      .toEqual(["Mina reviewed the plan."])
-    expect(await readFile(join(dir, "people", "mina-kim", "observations.md"), "utf8").catch(() => undefined))
-      .toBeUndefined()
+    expect((await readExplicitEntries(dir, "mina-lee")).map((entry) => entry.content)).toEqual([
+      "Mina reviewed the plan.",
+    ])
+    expect(
+      await readFile(join(dir, "people", "mina-kim", "observations.md"), "utf8").catch(() => undefined),
+    ).toBeUndefined()
   }, 30_000)
 
   test("#given two cards with equal-length matching aliases #when resolved #then the smallest slug wins and the tie is logged", async () => {
@@ -140,14 +143,20 @@ describe("person routing alias resolution", () => {
     const ties: { alias: string; slugs: readonly string[]; chosen: string }[] = []
 
     // when
-    await applyFactsBatch(repo, {
-      batchId: "66666666-6666-4666-8666-666666666666",
-      records: [personRecord("Min", [], "Min joined the platform guild.")],
-    }, AUTHOR, { people: PEOPLE, onAliasTie: (tie) => ties.push(tie) })
+    await applyFactsBatch(
+      repo,
+      {
+        batchId: "66666666-6666-4666-8666-666666666666",
+        records: [personRecord("Min", [], "Min joined the platform guild.")],
+      },
+      AUTHOR,
+      { people: PEOPLE, onAliasTie: (tie) => ties.push(tie) },
+    )
 
     // then
-    expect((await readExplicitEntries(dir, "aaa-min")).map((entry) => entry.content))
-      .toEqual(["Min joined the platform guild."])
+    expect((await readExplicitEntries(dir, "aaa-min")).map((entry) => entry.content)).toEqual([
+      "Min joined the platform guild.",
+    ])
     expect(ties).toEqual([{ alias: "Min", slugs: ["aaa-min", "bbb-min"], chosen: "aaa-min" }])
   }, 30_000)
 
@@ -162,18 +171,22 @@ describe("person routing alias resolution", () => {
     await repo.commitWrite(["system/human.md"], "test: alias the human", AUTHOR)
 
     // when
-    const result = await applyFactsBatch(repo, {
-      batchId: "77777777-7777-4777-8777-777777777777",
-      records: [personRecord("Lo", [], "Lo prefers dark themes.")],
-    }, AUTHOR, { people: PEOPLE })
+    const result = await applyFactsBatch(
+      repo,
+      {
+        batchId: "77777777-7777-4777-8777-777777777777",
+        records: [personRecord("Lo", [], "Lo prefers dark themes.")],
+      },
+      AUTHOR,
+      { people: PEOPLE },
+    )
 
     // then
     expect(result.outcome).toBe("committed")
     if (result.outcome === "committed") {
       expect(result.affectedPaths).toEqual(["people/human/observations.md"])
     }
-    expect((await readExplicitEntries(dir, "human")).map((entry) => entry.content))
-      .toEqual(["Lo prefers dark themes."])
+    expect((await readExplicitEntries(dir, "human")).map((entry) => entry.content)).toEqual(["Lo prefers dark themes."])
     expect(existsSync(join(dir, "people", "human", "card.md"))).toBe(false)
   }, 30_000)
 })

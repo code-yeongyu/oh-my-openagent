@@ -43,8 +43,12 @@ export function selectPreviousReleaseTag(currentVersion: string, tags: readonly 
   const targetChannel = releaseChannel(target)
   const candidates = tags.flatMap((tag) => {
     const version = tag.replace(/^v/, "")
-    if (!RELEASE_VERSION_PATTERN.test(version) || !isComparableRelease(version, target, targetChannel) ||
-      Bun.semver.order(version, target) >= 0) return []
+    if (
+      !RELEASE_VERSION_PATTERN.test(version) ||
+      !isComparableRelease(version, target, targetChannel) ||
+      Bun.semver.order(version, target) >= 0
+    )
+      return []
     return [{ tag, version }]
   })
   candidates.sort((left, right) => Bun.semver.order(right.version, left.version))
@@ -65,9 +69,7 @@ async function generateChangelog(previousTag: string): Promise<string[]> {
 
   try {
     const log = await $`git log ${previousTag}..HEAD --oneline --format="%h %s"`.text()
-    const commits = log
-      .split("\n")
-      .filter((line) => line && !isExcludedReleaseNoteSubject(line.replace(/^\w+ /, "")))
+    const commits = log.split("\n").filter((line) => line && !isExcludedReleaseNoteSubject(line.replace(/^\w+ /, "")))
 
     if (commits.length > 0) {
       for (const commit of commits) {
@@ -119,8 +121,12 @@ async function getContributors(previousTag: string): Promise<string[]> {
 
 async function main() {
   const packageJson: unknown = await Bun.file(new URL("../package.json", import.meta.url)).json()
-  if (typeof packageJson !== "object" || packageJson === null || !("version" in packageJson) ||
-    typeof packageJson.version !== "string") {
+  if (
+    typeof packageJson !== "object" ||
+    packageJson === null ||
+    !("version" in packageJson) ||
+    typeof packageJson.version !== "string"
+  ) {
     throw new TypeError("package.json must contain a string version")
   }
   const previousTag = await getLatestReleasedTag(packageJson.version)

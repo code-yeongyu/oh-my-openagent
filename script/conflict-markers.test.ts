@@ -9,7 +9,11 @@ import { join } from "node:path"
 const MARKER_LINE = /^(?:<<<<<<<|\|\|\|\|\|\|\||>>>>>>>)(?: |$)/
 
 function committedMarkerLines(repoRoot: string): string[] {
-  const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: repoRoot, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
+  const tracked = execFileSync("git", ["ls-files", "-z"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  })
     .split("\0")
     .filter(Boolean)
   const found: string[] = []

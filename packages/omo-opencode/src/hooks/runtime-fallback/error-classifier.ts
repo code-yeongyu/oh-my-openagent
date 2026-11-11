@@ -18,9 +18,10 @@ export const extractRetryableSignal = getRuntimeFallbackRetryableSignal
 
 export const classifyErrorType = classifyRuntimeFallbackError
 
-export function containsErrorContent(
-  parts: Array<{ type?: string; text?: string }> | undefined
-): { hasError: boolean; errorMessage?: string } {
+export function containsErrorContent(parts: Array<{ type?: string; text?: string }> | undefined): {
+  hasError: boolean
+  errorMessage?: string
+} {
   if (!parts || parts.length === 0) return { hasError: false }
 
   const errorParts = parts.filter((p) => p.type === "error")
