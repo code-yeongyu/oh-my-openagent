@@ -22,6 +22,10 @@ function isInternalAllCompleteWake(message: SessionMessage): boolean {
   return isTerminalNoReplyUserMessage(message) && getTextParts(message).includes(ALL_BACKGROUND_TASKS_COMPLETE_MARKER)
 }
 
+export function hasRelevantUserMessage(messages: readonly SessionMessage[]): boolean {
+  return messages.some((message) => message.info?.role === "user" && !isInternalAllCompleteWake(message))
+}
+
 function getLastSessionTurns(messages: readonly SessionMessage[]): LastSessionTurns {
   let lastRelevantUser: SessionMessage | undefined
   let lastAssistant: SessionMessage | undefined
