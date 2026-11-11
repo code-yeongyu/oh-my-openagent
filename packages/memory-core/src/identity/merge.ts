@@ -7,7 +7,7 @@
 import { basename, dirname, isAbsolute, join, resolve } from "node:path"
 
 import { GitMemoryRepo, NoEffectiveChangesError, type GitCommitAuthor, type GitTreeBlobEntry } from "../git"
-import { mkdir, readdir, readFile, writeFile } from "../fs/resilient"
+import { readdir, readFile, writeFile } from "../fs/resilient"
 import type { MemoryWriteLock } from "../tools/commit-write"
 import { AGENTS_DIRNAME, buildIdentityPaths, type MemoryIdentityPaths } from "./layout"
 import { createInTarget, isPlainTreePath } from "./merge-paths"
@@ -234,6 +234,7 @@ export async function planIdentityMerge(
     .filter((entry) => mergedBefore?.get(entry.path) !== entry.oid)
     .sort((left, right) => left.path.localeCompare(right.path))
     .map((entry): MergeAction => {
+      assertMergePathConfined(entry.path)
       // A source tree is data: plumbing or another tool can name an entry `..`, `.git` or `a\b`, and such a
       // name must never become a target path (#12974 security).
       if (!isPlainTreePath(entry.path))
@@ -322,6 +323,7 @@ export async function applyIdentityMerge(options: ApplyIdentityMergeOptions): Pr
         const content = contents.get(requiredOid(oids, action.path))
         if (content === undefined)
           throw new Error(`memory merge: blob for ${action.path} could not be read from ${plan.sourceId}`)
+        assertMergePathConfined(action.destination)
         const handle = await createInTarget(target.repo, action.destination)
         written.push(action.destination)
         try {
@@ -376,6 +378,24 @@ function freeAsidePath(
   for (let suffix = 2; ; suffix += 1) {
     const numbered = `${MERGED_ASIDE_ROOT}/${sourceId}@${sourceHead.slice(0, 12)}-${suffix}/${path}`
     if (!taken(numbered)) return numbered
+  }
+}
+
+/**
+ * A tree entry is written under the target repository only as a plain relative path: git stores a backslash
+ * as an ordinary character, so a name like notes\\..\\..\\x.md would climb out once a platform treats it as a
+ * separator. Absolute paths and empty, '.' or '..' segments (after normalising backslashes) are refused.
+ */
+function assertMergePathConfined(path: string): void {
+  const normalized = path.replaceAll("\\", "/")
+  const windowsAbsolute = /^[a-zA-Z]:\//.test(normalized)
+  const segments = normalized.split("/")
+  if (
+    normalized.startsWith("/") ||
+    windowsAbsolute ||
+    segments.some((segment) => segment === "" || segment === "." || segment === "..")
+  ) {
+    throw new Error(`memory merge: ${path} is outside the memory repository; nothing was merged`)
   }
 }
 

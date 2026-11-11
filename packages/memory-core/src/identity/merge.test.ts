@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { execFileSync } from "node:child_process"
-import { realpathSync, symlinkSync } from "node:fs"
+import { existsSync, realpathSync, symlinkSync } from "node:fs"
 import { mkdir, mkdtemp, readdir, readFile, readlink, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
@@ -601,6 +601,77 @@ describe("identity merge (#10070)", () => {
 
     expect(rerun.status).toBe("nothing-to-merge")
     expect(await readIdentityRecord(source.paths.root)).toMatchObject({ mergedHead: newHead })
+  }, 30_000)
+
+  it("#given a source path whose backslashes decode to a climb out of the repository #when the merge applies #then it is refused and nothing is written outside", async () => {
+    const root = await memoryRoot()
+    const target = await identity(root, "project-aaaa1111", { "notes/base.md": note("base") }, ["/work/project"])
+    const source = await identity(root, "project-feature-bbbb2222", { "notes/ok.md": note("ok") }, [
+      "/work/project-feature",
+    ])
+    const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], {
+      cwd: source.paths.repo,
+      input: note("escaped"),
+    })
+      .toString()
+      .trim()
+    execFileSync("git", ["update-index", "--add", "--cacheinfo", `100644,${blob},notes\\..\\..\\outside.md`], {
+      cwd: source.paths.repo,
+      stdio: "ignore",
+    })
+    execFileSync(
+      "git",
+      ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", "commit", "-q", "--no-verify", "-m", "escape"],
+      { cwd: source.paths.repo, stdio: "ignore" },
+    )
+    const before = await target.repo.head()
+    const escaped = join(target.paths.repo, "..", "outside.md")
+
+    const outcome = await applyIdentityMerge({
+      source: source.paths,
+      target: target.paths,
+      lock,
+      author: AUTHOR,
+    }).catch((error: unknown) => error)
+
+    expect(outcome).toBeInstanceOf(Error)
+    expect(String(outcome)).toContain("outside the memory repository")
+    expect(await target.repo.head()).toBe(before)
+    expect(existsSync(escaped)).toBe(false)
+  }, 30_000)
+
+  it("#given the target notes directory is a symlink to outside the repository #when the merge applies #then the write is refused and the outside directory stays empty", async () => {
+    const root = await memoryRoot()
+    const target = await identity(root, "project-aaaa1111", { "notes/base.md": note("base") }, ["/work/project"])
+    const source = await identity(root, "project-feature-bbbb2222", { "notes/new.md": note("new") }, [
+      "/work/project-feature",
+    ])
+    const outside = join(root, "outside")
+    await mkdir(outside)
+    await rm(join(target.paths.repo, "notes"), { recursive: true })
+    symlinkSync(outside, join(target.paths.repo, "notes"))
+    execFileSync("git", ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", "add", "notes"], {
+      cwd: target.paths.repo,
+      stdio: "ignore",
+    })
+    execFileSync(
+      "git",
+      ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", "commit", "-q", "--no-verify", "-m", "link notes"],
+      {
+        cwd: target.paths.repo,
+        stdio: "ignore",
+      },
+    )
+
+    const outcome = await applyIdentityMerge({
+      source: source.paths,
+      target: target.paths,
+      lock,
+      author: AUTHOR,
+    }).catch((error: unknown) => error)
+
+    expect(outcome).toBeInstanceOf(Error)
+    expect(existsSync(join(outside, "new.md"))).toBe(false)
   }, 30_000)
 
   // Security contract (#12974): a source tree is data. An entry name that is not plain `/`-separated names
