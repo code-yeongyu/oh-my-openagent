@@ -127,6 +127,10 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     sessions: async () => (await (await svc()).sessions()).rows.map((row) => ({ device: row.device, session_id: row.session_id, ...durableIdOf(row), title: row.title, project: row.project, path: row.path, state: row.state, updated_ms: row.updated_ms })),
     // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
     // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
+    // The record goes on its own short-lived connection, closed once it settles (#12777): opening the session on the
+    // long-lived connection attaches the host's delegated engine connection to it as well, so the engine writes each
+    // streamed delta twice, once to the attach stream and once to the delegated connection. The attach that follows
+    // still rides the long-lived connection, which then carries one copy per delta.
     endpointCommand: async (device, rpc, endpointOptions) => {
       let record: WireRpc
       try {
@@ -136,7 +140,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       }
       let connected: DeviceService
       try {
-        connected = await svc()
+        connected = await connect()
       } catch (error) {
         return { kind: "refused", reason: notSentReason(error) }
       }
@@ -148,6 +152,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         if (error instanceof LocalApiError && error.not_sent === true) return { kind: "refused", reason: error.code }
         if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code)) return { kind: "refused", reason: error.code }
         return { kind: "uncertain", reason: "reply_lost" }
+      } finally {
+        connected.close()
       }
     },
     sessionCommand: async (device, sessionId, rpc, commandOptions) => {

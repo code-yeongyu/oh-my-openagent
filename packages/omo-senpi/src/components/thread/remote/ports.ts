@@ -55,6 +55,9 @@ export type RemoteSessionsPort = {
    * A session-less engine record (`open_session`, `list_sessions`) on `device`'s engine endpoint, with no
    * attach: the attach-less `session.command {device, endpoint, rpc}` shape (relay daemon #393). `locate` asks a
    * create or fork for its new session's listing key on the reply (`located`), so no session.locate follows it.
+   * Each call opens its own short-lived connection and closes it once the record settles (#12777): an `open_session`
+   * sent on the long-lived connection would attach the host's delegated engine connection to it as well, and the
+   * engine would write each streamed delta twice.
    */
   readonly endpointCommand: (device: string, rpc: JsonObject, options?: { readonly locate?: boolean }) => Promise<RemoteCommandOutcome>
   /**

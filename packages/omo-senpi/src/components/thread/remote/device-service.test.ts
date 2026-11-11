@@ -40,6 +40,7 @@ function fakeService(results: CommandResult[], sent: unknown[]): DeviceService {
     devices: async () => [{ device: "b", label: "studio", kind: "desktop", platform: "darwin", last_seen_ms: 1, online: true }],
     sessions: async () => ({ rows: [{ device: "b", session_id: "s1", title: "t", project: "/p", path: "/p/s1.jsonl", state: "idle", updated_ms: 2, source: "live", as_of: 2 }] }),
     attach: async () => attach,
+    close: () => {},
     closed: new Promise(() => {}),
   } as unknown as DeviceService
 }
@@ -75,6 +76,34 @@ describe("device-service adapter of the thread tools' account surface", () => {
     expect(await port.endpointCommand("b", { type: "open_session" })).toEqual({ kind: "refused", reason: "route_unlisted" })
     expect(await port.endpointCommand("b", { type: "open_session" })).toEqual({ kind: "refused", reason: "peer_not_found" })
     expect(await port.endpointCommand("b", { type: "open_session" })).toEqual({ kind: "uncertain", reason: "reply_lost" })
+  })
+
+  test("#given the CLI views a remote session #when open_session then a command run #then the open rides a short-lived connection that is closed, and the command stays on the long-lived one", async () => {
+    const opened: Array<{ service: DeviceService; closed: boolean }> = []
+    const connect = async () => {
+      const entry = { service: undefined as unknown as DeviceService, closed: false }
+      const service = {
+        ...fakeService([state({ state: "engine_applied" }, { turnId: "t1" })], []),
+        endpointCommand: async () => state({ state: "engine_applied" }, { type: "response", command: "open_session", success: true, data: { sessionId: "s-new" } }),
+        close: () => { entry.closed = true },
+        closed: new Promise(() => {}),
+      } as unknown as DeviceService
+      entry.service = service
+      opened.push(entry)
+      return service
+    }
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect })
+    expect(await port.endpointCommand("b", { type: "open_session" })).toEqual({ kind: "ok", response: { type: "response", command: "open_session", success: true, data: { sessionId: "s-new" } } })
+    expect(opened).toHaveLength(1)
+    const openConnection = opened[0]
+    if (openConnection === undefined) throw new Error("expected the open to connect once")
+    expect(openConnection.closed).toBe(true)
+    expect(await port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })).toEqual({ kind: "ok", response: { turnId: "t1" } })
+    expect(opened).toHaveLength(2)
+    const liveConnection = opened[1]
+    if (liveConnection === undefined) throw new Error("expected the command to connect again")
+    expect(liveConnection.closed).toBe(false)
+    expect(openConnection.service).not.toBe(liveConnection.service)
   })
 
   test("#given b's engine applied a command but its reply says success false #when the outcome maps to the port #then it is refused with the reply's errorCode, else its error, else engine_failed, never ok", async () => {
