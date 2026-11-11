@@ -138,10 +138,17 @@ function openNative() {
     mach_vm_read_overwrite: { args: [u32, u64, u64, P, P], returns: i32 },
     mach_absolute_time: { args: [], returns: u64 },
     getpid: { args: [], returns: i32 },
+    dlerror: { args: [], returns: cstring },
   })
   const handles = new Map<string, Pointer | null>()
+  // dlerror() text of each image that failed to load: a load failure is recorded, never read as "symbol absent".
+  const loadErrors = new Map<string, string>()
   const handle = (path: string): Pointer | null => {
-    if (!handles.has(path)) handles.set(path, sys.symbols.dlopen(cstr(path), 1) as Pointer | null)
+    if (!handles.has(path)) {
+      const h = sys.symbols.dlopen(cstr(path), 1) as Pointer | null
+      if (!h) loadErrors.set(path, String(sys.symbols.dlerror() ?? "") || "dlopen returned null without dlerror text")
+      handles.set(path, h)
+    }
     return handles.get(path) ?? null
   }
   // symIn: only the named image (and what it re-exports). symAnywhere: every loaded image (RTLD_DEFAULT, (void *)-2).
@@ -152,8 +159,13 @@ function openNative() {
   const symAnywhere = (name: string): Pointer | null => sys.symbols.dlsym(RTLD_DEFAULT, cstr(name)) as Pointer | null
   // sym: the named image first, then any loaded image, so a symbol exported from another framework still resolves.
   const sym = (path: string, name: string): Pointer | null => symIn(path, name) ?? symAnywhere(name)
-  const locate = (path: string, name: string): SymbolLocation =>
-    symbolLocation(symIn(path, name) !== null, symAnywhere(name) !== null)
+  const lookup = (path: string, name: string): Lookup => {
+    const inImage = symIn(path, name) !== null
+    const loadError = loadErrors.get(path)
+    const where = symbolLocation(inImage, symAnywhere(name) !== null, loadError)
+    return where === "load-error" && loadError !== undefined ? { name, where, loadError } : { name, where }
+  }
+  const locate = (path: string, name: string): SymbolLocation => lookup(path, name).where
   const taskSelfPtr = sym(PATHS.system, "mach_task_self_")
   const taskSelf = taskSelfPtr ? read.u32(taskSelfPtr, 0) : 0
   const cf = dlopen(PATHS.cf, {
@@ -198,7 +210,7 @@ function openNative() {
     sel_registerName: { args: [cstring], returns: P },
     class_getClassMethod: { args: [P, P], returns: P },
   })
-  return { sys, sym, locate, taskSelf, cf: cf.symbols, cg: cg.symbols, ax: ax.symbols, objc: objc.symbols }
+  return { sys, sym, lookup, locate, taskSelf, cf: cf.symbols, cg: cg.symbols, ax: ax.symbols, objc: objc.symbols }
 }
 
 // RTLD_DEFAULT is the pointer value -2; bun:ffi takes it as an unsigned 64-bit bigint.
@@ -208,9 +220,9 @@ const RTLD_DEFAULT = 0xfffffffffffffffen
 // or nowhere (`no`). `elsewhere` counts as resolved: the ledger reads it differently from absent.
 type SymbolLocation = "yes" | "elsewhere" | "no" | "load-error"
 function symbolLocation(inImage: boolean, anywhere: boolean, loadError?: string): SymbolLocation {
-  void loadError
   if (inImage) return "yes"
-  return anywhere ? "elsewhere" : "no"
+  if (anywhere) return "elsewhere"
+  return loadError === undefined ? "no" : "load-error"
 }
 
 // One symbol lookup as the ledger sees it; `loadError` carries dlerror() text when the named image did not load.
@@ -223,7 +235,15 @@ interface Lookup {
 // The negative verdict of a symbol row. A symbol is proven absent only when its image loaded and dlsym answered
 // null; a framework that failed to load proves nothing, so that row is UNMEASURED with the loader's text.
 function absenceOutcome(lookups: ReadonlyArray<Lookup>, measured: string, consequence: string): Outcome | undefined {
-  if (lookups.every((l) => l.where === "yes" || l.where === "elsewhere")) return undefined
+  const unresolved = lookups.filter((l) => l.where !== "yes" && l.where !== "elsewhere")
+  if (unresolved.length === 0) return undefined
+  const failed = unresolved.filter((l) => l.where === "load-error")
+  if (failed.length > 0)
+    return unmeasured(
+      `image did not load, so absence is not proven: ${failed.map((l) => `${l.name}: ${l.loadError ?? "no loader text"}`).join("; ")}`,
+      "-",
+      measured,
+    )
   return { verdict: "CONTRADICTS", resolves: "no", behaves: "-", measured, reason: consequence }
 }
 
@@ -347,32 +367,29 @@ interface WindowFields {
 // A window-list entry whose id, owner pid, layer or bounds could not be read is dropped, never defaulted to 0: a
 // made-up window id 0 would turn an unreadable entry into a capture or Space verdict.
 function windowFromFields(f: WindowFields): WindowInfo | undefined {
-  return {
-    id: f.id ?? 0,
-    pid: f.pid ?? 0,
-    owner: f.owner,
-    layer: f.layer ?? 0,
-    bounds: { x: f.x || 0, y: f.y || 0, w: f.w || 0, h: f.h || 0 },
-  }
+  const { id, pid, layer, x, y, w, h } = f
+  if (id === undefined || pid === undefined || layer === undefined) return undefined
+  if (x === undefined || y === undefined || w === undefined || h === undefined) return undefined
+  return { id, pid, owner: f.owner, layer, bounds: { x, y, w, h } }
 }
 
 function windowList(option: number): WindowInfo[] {
   const n = native()
   const arr = n.cg.CGWindowListCopyWindowInfo(option, 0) as Pointer | null
-  const out = arrayItems(arr).map((d) => {
+  const out = arrayItems(arr).flatMap((d) => {
     const b = dictGet(d, "kCGWindowBounds")
-    return {
-      id: fromCfNumber(dictGet(d, "kCGWindowNumber")) ?? 0,
-      pid: fromCfNumber(dictGet(d, "kCGWindowOwnerPID")) ?? 0,
+    const bound = (key: string): number | undefined => (b ? fromCfNumber(dictGet(b, key)) : undefined)
+    const win = windowFromFields({
+      id: fromCfNumber(dictGet(d, "kCGWindowNumber")),
+      pid: fromCfNumber(dictGet(d, "kCGWindowOwnerPID")),
+      layer: fromCfNumber(dictGet(d, "kCGWindowLayer")),
       owner: fromCfString(dictGet(d, "kCGWindowOwnerName")),
-      layer: fromCfNumber(dictGet(d, "kCGWindowLayer")) ?? 0,
-      bounds: {
-        x: (b && fromCfNumber(dictGet(b, "X"))) || 0,
-        y: (b && fromCfNumber(dictGet(b, "Y"))) || 0,
-        w: (b && fromCfNumber(dictGet(b, "Width"))) || 0,
-        h: (b && fromCfNumber(dictGet(b, "Height"))) || 0,
-      },
-    }
+      x: bound("X"),
+      y: bound("Y"),
+      w: bound("Width"),
+      h: bound("Height"),
+    })
+    return win ? [win] : []
   })
   if (arr) n.cf.CFRelease(arr)
   return out
@@ -408,12 +425,18 @@ function located(path: string, name: string): string {
   return `${name}=${native().locate(path, name)}`
 }
 
-function resolveAll(path: string, names: string[]): { all: boolean; detail: string } {
+// Lookups for an absenceOutcome: the symbols a row needs, each with where it was found or why it could not be.
+function lookups(path: string, names: string[]): Lookup[] {
   const n = native()
-  const found = names.map((name) => [name, n.locate(path, name)] as const)
+  return names.map((name) => n.lookup(path, name))
+}
+
+function resolveAll(path: string, names: string[]): { all: boolean; detail: string; lookups: Lookup[] } {
+  const found = lookups(path, names)
   return {
-    all: found.every(([, where]) => where !== "no"),
-    detail: found.map(([name, where]) => `${name}=${where}`).join(","),
+    all: found.every((l) => l.where === "yes" || l.where === "elsewhere"),
+    detail: found.map((l) => `${l.name}=${l.where}`).join(","),
+    lookups: found,
   }
 }
 
@@ -439,14 +462,13 @@ function qHwCapture(host: Host): Outcome {
   ])
   const capture = fn(n.sym(PATHS.skylight, "SLSHWCaptureWindowList"), [u32, P, i32, u32], P)
   const mainCid = fn(n.sym(PATHS.skylight, "SLSMainConnectionID"), [], i32)
-  if (!capture || !mainCid)
-    return {
-      verdict: "CONTRADICTS",
-      resolves: "no",
-      behaves: "-",
-      measured: r.detail,
-      reason: "symbol absent: SCK is the only capture path on this version",
-    }
+  const miss = absenceOutcome(
+    r.lookups.filter((l) => l.name !== "SLSHWCaptureWindowListInRect"),
+    r.detail,
+    "symbol absent: SCK is the only capture path on this version",
+  )
+  if (miss) return miss
+  if (!capture || !mainCid) return unmeasured("symbols resolved but could not be bound", "yes", r.detail)
   if (!host.session.screenRecording) return unmeasured(grantReason(["Screen Recording"]), "yes", r.detail)
   const win = foreignWindow()
   if (!win) return unmeasured("no on-screen foreign window to capture", "yes", r.detail)
@@ -494,13 +516,13 @@ function qPostToPidResolve(): Outcome {
   const resolves = sl !== null || sls !== null
   const measured = `${located(PATHS.skylight, "SLEventPostToPid")},${located(PATHS.skylight, "SLSEventPostToPid")},${located(PATHS.cg, "CGEventPostToPid")},public_distinct=${yesNo(distinct)}`
   if (!resolves)
-    return {
-      verdict: "CONTRADICTS",
-      resolves: "no",
-      behaves: "-",
-      measured,
-      reason: "no SkyLight per-pid post: background delivery is the foreground lease only",
-    }
+    return (
+      absenceOutcome(
+        lookups(PATHS.skylight, ["SLEventPostToPid", "SLSEventPostToPid"]),
+        measured,
+        "no SkyLight per-pid post: background delivery is the foreground lease only",
+      ) ?? unmeasured("lookup answered neither present nor absent", "-", measured)
+    )
   return {
     verdict: sls === null ? "NEW-EDGE" : "CONFIRMS",
     resolves: "yes",
@@ -547,14 +569,12 @@ function qPostToPidEcho(host: Host): Outcome {
 
 function qSetFront(host: Host): Outcome {
   const r = resolveAll(PATHS.skylight, ["SLSSetFrontProcessWithInfo", "kSLSSetFrontProcessRequestTimestampKey"])
-  if (!r.all)
-    return {
-      verdict: "CONTRADICTS",
-      resolves: "no",
-      behaves: "-",
-      measured: r.detail,
-      reason: "hand-back falls back to NSRunningApplication.activate with the 250 ms-stable rule",
-    }
+  const miss = absenceOutcome(
+    r.lookups,
+    r.detail,
+    "hand-back falls back to NSRunningApplication.activate with the 250 ms-stable rule",
+  )
+  if (miss) return miss
   void host
   return unmeasured(
     "the -13066 user-race leg needs a HID-level user action between the timestamp and the call: H4 virtual HID is not given and no person is at H1",
@@ -568,14 +588,13 @@ function qRemoteToken(host: Host): Outcome {
   const createTok = n.sym(PATHS.ax, "_AXUIElementRemoteTokenCreate")
   const fromTok = n.sym(PATHS.ax, "_AXUIElementCreateWithRemoteToken")
   const measuredNames = `${located(PATHS.ax, "_AXUIElementRemoteTokenCreate")},${located(PATHS.ax, "_AXUIElementCreateWithRemoteToken")}`
-  if (!createTok || !fromTok)
-    return {
-      verdict: "CONTRADICTS",
-      resolves: "no",
-      behaves: "-",
-      measured: measuredNames,
-      reason: "ref resolve keeps the retained AXUIElement object",
-    }
+  const miss = absenceOutcome(
+    lookups(PATHS.ax, ["_AXUIElementRemoteTokenCreate", "_AXUIElementCreateWithRemoteToken"]),
+    measuredNames,
+    "ref resolve keeps the retained AXUIElement object",
+  )
+  if (miss) return miss
+  if (!createTok || !fromTok) return unmeasured("symbols resolved but could not be bound", "yes", measuredNames)
   const win = foreignWindow()
   if (!win) return unmeasured("no on-screen foreign app to resolve", "yes", measuredNames)
   const create = CFunction({ ptr: createTok, args: [P], returns: P })
@@ -620,14 +639,11 @@ function qRemoteToken(host: Host): Outcome {
 
 // An on-screen window is on its display's current Space: the Space list SLSCopySpacesForWindows returns for it must
 // contain that id. A zero id (no current Space read) never matches.
-function onCurrentSpace(spaces: ReadonlyArray<number | undefined>, currentSpace: number): boolean {
-  return currentSpace !== 0 && spaces.includes(currentSpace)
-}
-
 // The copy-spaces decision: `unread` when the display's current Space could not be read (id 0), which is never a
 // negative verdict.
 function spaceDecision(spaces: ReadonlyArray<number | undefined>, currentSpace: number): "on" | "off" | "unread" {
-  return onCurrentSpace(spaces, currentSpace) ? "on" : "off"
+  if (currentSpace === 0) return "unread"
+  return spaces.includes(currentSpace) ? "on" : "off"
 }
 
 function qCopySpaces(): Outcome {
@@ -644,14 +660,14 @@ function qCopySpaces(): Outcome {
   const currentSpace = fn(n.sym(PATHS.skylight, "SLSManagedDisplayGetCurrentSpace"), [i32, P], u64)
   const spaceType = fn(n.sym(PATHS.skylight, "SLSSpaceGetType"), [i32, u64], i32)
   const mainCid = fn(n.sym(PATHS.skylight, "SLSMainConnectionID"), [], i32)
+  const miss = absenceOutcome(
+    r.lookups.filter((l) => l.name !== "SLSSpaceGetType"),
+    r.detail,
+    "no Space field: space:unknown with isOnScreen + AXMinimized",
+  )
+  if (miss) return miss
   if (!copy || !displayFor || !currentSpace || !mainCid)
-    return {
-      verdict: "CONTRADICTS",
-      resolves: "no",
-      behaves: "-",
-      measured: r.detail,
-      reason: "no Space field: space:unknown with isOnScreen + AXMinimized",
-    }
+    return unmeasured("symbols resolved but could not be bound", "yes", r.detail)
   const win = foreignWindow()
   if (!win) return unmeasured("no on-screen foreign window", "yes", r.detail)
   const cid = Number(mainCid())
@@ -670,7 +686,14 @@ function qCopySpaces(): Outcome {
   const currentId = Number(currentSpace(cid, display))
   n.cf.CFRelease(display)
   const type = spaceType ? Number(spaceType(cid, BigInt(currentId))) : -1
-  const ok = onCurrentSpace(list, currentId)
+  const decision = spaceDecision(list, currentId)
+  if (decision === "unread")
+    return unmeasured(
+      "the display's current Space read as 0 (unread); membership is not decided",
+      "yes",
+      `${r.detail};spaces_for_window=${list.length};owner=${win.owner}`,
+    )
+  const ok = decision === "on"
   return {
     verdict: ok ? "CONFIRMS" : "CONTRADICTS",
     resolves: "yes",
@@ -685,15 +708,12 @@ function qCopySpaces(): Outcome {
 function qMoveForeign(): Outcome {
   const n = native()
   const r = resolveAll(PATHS.skylight, ["SLSMoveWindowsToManagedSpace", "SLSCopyManagedDisplaySpaces"])
-  if (!n.sym(PATHS.skylight, "SLSMoveWindowsToManagedSpace")) {
-    return {
-      verdict: "CONTRADICTS",
-      resolves: "no",
-      behaves: "-",
-      measured: r.detail,
-      reason: "capabilities.spaces.move:false",
-    }
-  }
+  const miss = absenceOutcome(
+    r.lookups.filter((l) => l.name === "SLSMoveWindowsToManagedSpace"),
+    r.detail,
+    "capabilities.spaces.move:false",
+  )
+  if (miss) return miss
   const managed = fn(n.sym(PATHS.skylight, "SLSCopyManagedDisplaySpaces"), [i32], P)
   const mainCid = fn(n.sym(PATHS.skylight, "SLSMainConnectionID"), [], i32)
   let userSpaces = -1
@@ -782,6 +802,14 @@ function qAuthSymbol(): Outcome {
   // The class and selector come from the Objective-C runtime, which has no per-image answer: yes / no only.
   const measured = `${located(PATHS.skylight, "SLEventSetAuthenticationMessage")},SLSEventAuthenticationMessage_class=${yesNo(cls)},factory_selector=${yesNo(factory)}`
   const ok = Boolean(setMsg && cls && factory)
+  if (!setMsg) {
+    const miss = absenceOutcome(
+      lookups(PATHS.skylight, ["SLEventSetAuthenticationMessage"]),
+      measured,
+      "no auth message on this version: Chromium background keys read pointer_only",
+    )
+    if (miss) return miss
+  }
   return {
     verdict: ok ? "CONFIRMS" : "CONTRADICTS",
     resolves: yesNo(ok),
@@ -978,6 +1006,8 @@ function qSheetOwner(kind: "tcc" | "keychain" | "cfusernotification"): Outcome {
 
 function qSymbolOnly(path: string, names: string[], use: string): Outcome {
   const r = resolveAll(path, names)
+  const miss = absenceOutcome(r.lookups, r.detail, `${use} unavailable on this version`)
+  if (miss) return miss
   return {
     verdict: r.all ? "CONFIRMS" : "CONTRADICTS",
     resolves: yesNo(r.all),
@@ -1374,9 +1404,8 @@ function selfTest(): number {
     () => parsePending(["--pending", "15=awaiting H2"]).pending.get(15) === "awaiting H2",
   )
   // copy-spaces decision
-  expect("onCurrentSpace: on its display's current Space", () => onCurrentSpace([3, 7], 7))
-  expect("onCurrentSpace: not on it", () => !onCurrentSpace([3], 7))
-  expect("onCurrentSpace: an unread current Space (0) never matches", () => !onCurrentSpace([0], 0))
+  expect("spaceDecision: on its display's current Space", () => spaceDecision([3, 7], 7) === "on")
+  expect("spaceDecision: an unread current Space (0) never matches", () => spaceDecision([0], 0) !== "on")
   // swallowed errors: a failure to read or load is never a negative verdict
   expect("spaceDecision: an unread current Space (0) is 'unread', not 'off'", () => spaceDecision([3], 0) === "unread")
   expect(
