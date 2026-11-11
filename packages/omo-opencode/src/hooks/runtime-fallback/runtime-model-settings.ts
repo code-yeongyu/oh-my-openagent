@@ -15,21 +15,16 @@ export function resolveRuntimeModelSettings(
   if (!pluginConfig) return {}
 
   const registeredCategoryName = SessionCategoryRegistry.get(sessionID)
-  const registeredCategory = registeredCategoryName
-    ? pluginConfig.categories?.[registeredCategoryName]
-    : undefined
-  const agentConfig = agent
-    ? pluginConfig.agents?.[agent as keyof typeof pluginConfig.agents]
-    : undefined
-  const agentCategory = typeof agentConfig?.category === "string"
-    ? pluginConfig.categories?.[agentConfig.category]
-    : undefined
-  const reasoning = registeredCategory?.reasoning
-    ?? registeredCategory?.variant
-    ?? (agent ? resolveAgentVariant(pluginConfig, agent) : undefined)
-  const reasoningEffort = registeredCategory?.reasoningEffort
-    ?? agentConfig?.reasoningEffort
-    ?? agentCategory?.reasoningEffort
+  const registeredCategory = registeredCategoryName ? pluginConfig.categories?.[registeredCategoryName] : undefined
+  const agentConfig = agent ? pluginConfig.agents?.[agent as keyof typeof pluginConfig.agents] : undefined
+  const agentCategory =
+    typeof agentConfig?.category === "string" ? pluginConfig.categories?.[agentConfig.category] : undefined
+  const reasoning =
+    registeredCategory?.reasoning ??
+    registeredCategory?.variant ??
+    (agent ? resolveAgentVariant(pluginConfig, agent) : undefined)
+  const reasoningEffort =
+    registeredCategory?.reasoningEffort ?? agentConfig?.reasoningEffort ?? agentCategory?.reasoningEffort
 
   return {
     ...(reasoning !== undefined ? { reasoning } : {}),

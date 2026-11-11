@@ -10,7 +10,8 @@ const TEST_THEME: ControlRenderTheme = {
 
 describe("member-scoped task_send renderer", () => {
   test("#given a member-scoped team message #when its tool call renders #then delivery mode is not displayed", () => {
-    const rendered = renderMemberScopedTaskSendCall({ to: "lead", message: "peer update" }, TEST_THEME).render(120)[0] ?? ""
+    const rendered =
+      renderMemberScopedTaskSendCall({ to: "lead", message: "peer update" }, TEST_THEME).render(120)[0] ?? ""
 
     expect(rendered).not.toContain("deliver:")
     expect(rendered).not.toContain("followUp")

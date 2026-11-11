@@ -12,7 +12,9 @@ const ORIGINAL_CACHE_PACKAGE_JSON = existsSync(CACHE_PACKAGE_JSON_PATH)
 
 let importCounter = 0
 
-async function importFreshSyncPackageJsonModule(): Promise<typeof import("../auto-update-checker/checker/sync-package-json")> {
+async function importFreshSyncPackageJsonModule(): Promise<
+  typeof import("../auto-update-checker/checker/sync-package-json")
+> {
   return import(`../auto-update-checker/checker/sync-package-json?test=${importCounter++}`)
 }
 
@@ -20,7 +22,7 @@ function resetTestCache(currentVersion = "3.10.0"): void {
   mkdirSync(CACHE_PACKAGES_DIR, { recursive: true })
   writeFileSync(
     CACHE_PACKAGE_JSON_PATH,
-    JSON.stringify({ dependencies: { "oh-my-opencode": currentVersion, other: "1.0.0" } }, null, 2)
+    JSON.stringify({ dependencies: { "oh-my-opencode": currentVersion, other: "1.0.0" } }, null, 2),
   )
 }
 
@@ -151,7 +153,7 @@ describe("syncCachePackageJsonToIntent", () => {
       mkdirSync(CACHE_PACKAGES_DIR, { recursive: true })
       writeFileSync(
         join(CACHE_PACKAGES_DIR, "package.json"),
-        JSON.stringify({ dependencies: { other: "1.0.0" } }, null, 2)
+        JSON.stringify({ dependencies: { other: "1.0.0" } }, null, 2),
       )
 
       const { syncCachePackageJsonToIntent } = await importFreshSyncPackageJsonModule()
@@ -168,10 +170,10 @@ describe("syncCachePackageJsonToIntent", () => {
       expect(result.synced).toBe(true)
       expect(result.error).toBeNull()
 
-        const content = readFileSync(join(CACHE_PACKAGES_DIR, "package.json"), "utf-8")
-        const pkg = JSON.parse(content) as { dependencies?: Record<string, string> }
-        expect(pkg.dependencies?.["oh-my-opencode"]).toBe("latest")
-        expect(pkg.dependencies?.other).toBe("1.0.0")
+      const content = readFileSync(join(CACHE_PACKAGES_DIR, "package.json"), "utf-8")
+      const pkg = JSON.parse(content) as { dependencies?: Record<string, string> }
+      expect(pkg.dependencies?.["oh-my-opencode"]).toBe("latest")
+      expect(pkg.dependencies?.other).toBe("1.0.0")
     })
   })
 
@@ -211,9 +213,9 @@ describe("syncCachePackageJsonToIntent", () => {
       expect(result.synced).toBe(true)
       expect(result.error).toBeNull()
 
-        const content = readFileSync(join(CACHE_PACKAGES_DIR, "package.json"), "utf-8")
-        const pkg = JSON.parse(content) as { dependencies?: Record<string, string> }
-        expect(pkg.dependencies?.["other"]).toBe("1.0.0")
+      const content = readFileSync(join(CACHE_PACKAGES_DIR, "package.json"), "utf-8")
+      const pkg = JSON.parse(content) as { dependencies?: Record<string, string> }
+      expect(pkg.dependencies?.["other"]).toBe("1.0.0")
     })
   })
 
@@ -245,7 +247,7 @@ describe("syncCachePackageJsonToIntent", () => {
       mkdirSync(CACHE_PACKAGES_DIR, { recursive: true })
       writeFileSync(
         join(CACHE_PACKAGES_DIR, "package.json"),
-        JSON.stringify({ dependencies: { "oh-my-opencode": "3.10.0" } }, null, 2)
+        JSON.stringify({ dependencies: { "oh-my-opencode": "3.10.0" } }, null, 2),
       )
 
       const fs = await import("node:fs")
@@ -279,7 +281,7 @@ describe("syncCachePackageJsonToIntent", () => {
       mkdirSync(CACHE_PACKAGES_DIR, { recursive: true })
       writeFileSync(
         join(CACHE_PACKAGES_DIR, "package.json"),
-        JSON.stringify({ dependencies: { "oh-my-opencode": "3.10.0" } }, null, 2)
+        JSON.stringify({ dependencies: { "oh-my-opencode": "3.10.0" } }, null, 2),
       )
 
       const fs = await import("node:fs")
@@ -287,14 +289,14 @@ describe("syncCachePackageJsonToIntent", () => {
 
       let tempFilePath: string | null = null
 
-      const writeFileSyncSpy = spyOn(fs, "writeFileSync").mockImplementation((
-        (file: Parameters<typeof fs.writeFileSync>[0],
+      const writeFileSyncSpy = spyOn(fs, "writeFileSync").mockImplementation(((
+        file: Parameters<typeof fs.writeFileSync>[0],
         data: Parameters<typeof fs.writeFileSync>[1],
-        options?: Parameters<typeof fs.writeFileSync>[2]) => {
-          tempFilePath = String(file)
-          return originalWriteFileSync(file, data, options)
-        }
-      ) as typeof fs.writeFileSync)
+        options?: Parameters<typeof fs.writeFileSync>[2],
+      ) => {
+        tempFilePath = String(file)
+        return originalWriteFileSync(file, data, options)
+      }) as typeof fs.writeFileSync)
       const renameSyncSpy = spyOn(fs, "renameSync").mockImplementation(() => {
         throw new Error("EXDEV: cross-device link not permitted")
       })

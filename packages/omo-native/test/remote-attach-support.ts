@@ -6,7 +6,12 @@ import { join } from "node:path"
 
 import { connectDeviceService, type DeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
-import { defaultWorld, PEER, SESSION_ID, type World } from "../../device-service-core/test/local-api/conformance/world.ts"
+import {
+  defaultWorld,
+  PEER,
+  SESSION_ID,
+  type World,
+} from "../../device-service-core/test/local-api/conformance/world.ts"
 import { type RemoteAttachEndpoint, serveRemoteAttach } from "../remote-attach"
 
 // The attach endpoint's test rig, shared by the endpoint's test files: a fake device-service owner, a connected service
@@ -49,7 +54,10 @@ export type Line = Record<string, unknown>
 export class TuiPeer {
   readonly records: Line[] = []
   private readonly waiting = new Map<string, (line: Line) => void>()
-  private readonly recordWaiters: { readonly match: (line: Line) => boolean; readonly resolve: (line: Line) => void }[] = []
+  private readonly recordWaiters: {
+    readonly match: (line: Line) => boolean
+    readonly resolve: (line: Line) => void
+  }[] = []
   readonly closed: Promise<void>
 
   constructor(readonly socket: Socket) {
@@ -69,7 +77,7 @@ export class TuiPeer {
         newline = buffer.indexOf("\n")
       }
     })
-    this.closed = new Promise(resolve => socket.once("close", () => resolve()))
+    this.closed = new Promise((resolve) => socket.once("close", () => resolve()))
   }
 
   static async connect(socketPath: string, secret = readFileSync(`${socketPath}.secret`)): Promise<TuiPeer> {
@@ -89,7 +97,7 @@ export class TuiPeer {
   /** Sends `record` exactly as given (its own id) and waits for the response on that id. */
   answer(record: Line): Promise<Line> {
     const id = String(record.id)
-    const answered = new Promise<Line>(resolve => this.waiting.set(id, resolve))
+    const answered = new Promise<Line>((resolve) => this.waiting.set(id, resolve))
     this.socket.write(`${JSON.stringify(record)}\n`)
     return within(answered, `the ${String(record.type)} response`)
   }
@@ -97,7 +105,7 @@ export class TuiPeer {
   record(match: (line: Line) => boolean, what: string): Promise<Line> {
     const seen = this.records.find(match)
     if (seen) return Promise.resolve(seen)
-    return within(new Promise<Line>(resolve => this.recordWaiters.push({ match, resolve })), what)
+    return within(new Promise<Line>((resolve) => this.recordWaiters.push({ match, resolve })), what)
   }
 }
 

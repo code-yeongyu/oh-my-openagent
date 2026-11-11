@@ -28,7 +28,7 @@ describe("timing sync poll timeout defaults", () => {
   })
 })
 
-  describe("WAIT_FOR_SESSION_TIMEOUT_MS default", () => {
+describe("WAIT_FOR_SESSION_TIMEOUT_MS default", () => {
   test("default wait for session timeout is 1 minute", () => {
     // #given
     __resetTimingConfig()

@@ -1,5 +1,8 @@
 import type { TaskManager } from "../../manager"
-import { sharedForegroundDialogOrigins, type ForegroundDialogOrigins } from "../../runners/child-dialogs/foreground-origins"
+import {
+  sharedForegroundDialogOrigins,
+  type ForegroundDialogOrigins,
+} from "../../runners/child-dialogs/foreground-origins"
 import type { TaskRecord } from "../../state"
 import type { TaskToolContext } from "./types"
 

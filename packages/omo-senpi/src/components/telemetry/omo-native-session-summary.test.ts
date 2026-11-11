@@ -2,11 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
-import {
-  CHECKPOINT_MAX_TURNS,
-  CHECKPOINT_MAX_WINDOW_MS,
-  isSessionSampled,
-} from "./omo-native-session-summary"
+import { CHECKPOINT_MAX_TURNS, CHECKPOINT_MAX_WINDOW_MS, isSessionSampled } from "./omo-native-session-summary"
 import { OMO_NATIVE_PROPERTY_ALLOWLISTS } from "./product-identity"
 import * as sidecar from "./session-summary-recovery"
 import { OWNER_STALE_MS, summaryDir } from "./session-summary-storage"
@@ -16,14 +12,19 @@ import { percentile } from "./session-summary-window"
 const stateDirs = createTempStateDirs()
 afterEach(() => stateDirs.cleanup())
 
-const recorder = (input: { readonly sampleRate?: number } = {}) => createTestRecorder({ dir: stateDirs.make(), ...input })
+const recorder = (input: { readonly sampleRate?: number } = {}) =>
+  createTestRecorder({ dir: stateDirs.make(), ...input })
 
 // The race: this process read the dead owner's file, but a third process renamed it away before this claim.
 const claimLostToAnotherProcess = async () => ({
   ...sidecar,
   createRecoveryRuntime: (input: Parameters<typeof sidecar.createRecoveryRuntime>[0]) => {
     const storage = { ...sidecar.withRecoveryOps(input.storage), claimWindow: () => undefined }
-    return { ...sidecar.createRecoveryRuntime(input), adopt: (args: Parameters<sidecar.RecoveryRuntime["adopt"]>[0]) => sidecar.adoptForeignWindow({ ...args, storage }) }
+    return {
+      ...sidecar.createRecoveryRuntime(input),
+      adopt: (args: Parameters<sidecar.RecoveryRuntime["adopt"]>[0]) =>
+        sidecar.adoptForeignWindow({ ...args, storage }),
+    }
   },
 })
 
@@ -33,42 +34,85 @@ describe("session_summary windows", () => {
 
     await summary.recordTurn("s1", summaryTurn({ turnIndex: 0, totalTokens: 10, cost1e4: 1_000 }))
     advance(500)
-    await summary.recordTurn("s1", summaryTurn({ turnIndex: 1, totalTokens: 30, cost1e4: 2_000, stopReason: "error", toolErrorCount: 1 }))
+    await summary.recordTurn(
+      "s1",
+      summaryTurn({ turnIndex: 1, totalTokens: 30, cost1e4: 2_000, stopReason: "error", toolErrorCount: 1 }),
+    )
     advance(500)
-    await summary.recordTurn("s1", summaryTurn({ turnIndex: 2, totalTokens: 20, cost1e4: 3_000, modelId: "claude-opus-5", provider: "anthropic" }))
+    await summary.recordTurn(
+      "s1",
+      summaryTurn({ turnIndex: 2, totalTokens: 20, cost1e4: 3_000, modelId: "claude-opus-5", provider: "anthropic" }),
+    )
     await summary.finish("s1", "quit")
 
     expect(published).toHaveLength(1)
     expect(published[0]?.properties).toMatchObject({
-      $session_id: "s1", summary_seq: 0, is_final: true, ended_by: "shutdown", session_role: "root", turns: 3,
-      window_ms: 1_000, total_tokens: 60, total_tokens_p50: 20, total_tokens_p95: 30, total_tokens_max: 30,
-      cost_1e4: 6_000, cost_usd: 0.6, dropped_events: 0, error_turns: 1, tool_result_count: 6, tool_error_count: 1, model_count: 2,
-      m1_provider: "openai", m1_model: "gpt-5.5", m1_turns: 2, m1_total_tokens: 40, m1_cost_usd: 0.3,
-      m2_provider: "anthropic", m2_model: "claude-opus-5", m2_turns: 1, m2_total_tokens: 20,
-      m3_model: "none", m3_turns: 0, other_turns: 0,
+      $session_id: "s1",
+      summary_seq: 0,
+      is_final: true,
+      ended_by: "shutdown",
+      session_role: "root",
+      turns: 3,
+      window_ms: 1_000,
+      total_tokens: 60,
+      total_tokens_p50: 20,
+      total_tokens_p95: 30,
+      total_tokens_max: 30,
+      cost_1e4: 6_000,
+      cost_usd: 0.6,
+      dropped_events: 0,
+      error_turns: 1,
+      tool_result_count: 6,
+      tool_error_count: 1,
+      model_count: 2,
+      m1_provider: "openai",
+      m1_model: "gpt-5.5",
+      m1_turns: 2,
+      m1_total_tokens: 40,
+      m1_cost_usd: 0.3,
+      m2_provider: "anthropic",
+      m2_model: "claude-opus-5",
+      m2_turns: 1,
+      m2_total_tokens: 20,
+      m3_model: "none",
+      m3_turns: 0,
+      other_turns: 0,
     })
-    expect(Object.keys(published[0]?.properties ?? {}).toSorted()).toEqual([...OMO_NATIVE_PROPERTY_ALLOWLISTS.session_summary].toSorted())
+    expect(Object.keys(published[0]?.properties ?? {}).toSorted()).toEqual(
+      [...OMO_NATIVE_PROPERTY_ALLOWLISTS.session_summary].toSorted(),
+    )
   })
 
   test("#given five models #when summarized #then the top three keep their totals and the rest fold into other_*", async () => {
     const { published, summary } = recorder()
     const models = ["a", "a", "a", "b", "b", "c", "d", "e"]
-    for (const [index, modelId] of models.entries()) await summary.recordTurn("s1", summaryTurn({ turnIndex: index, modelId, totalTokens: 1 }))
+    for (const [index, modelId] of models.entries())
+      await summary.recordTurn("s1", summaryTurn({ turnIndex: index, modelId, totalTokens: 1 }))
     await summary.finish("s1", "quit")
 
     const row = published[0]?.properties ?? {}
     expect([row.m1_turns, row.m2_turns, row.m3_turns, row.other_turns]).toEqual([3, 2, 1, 2])
-    expect(Number(row.m1_total_tokens) + Number(row.m2_total_tokens) + Number(row.m3_total_tokens) + Number(row.other_total_tokens)).toBe(Number(row.total_tokens))
+    expect(
+      Number(row.m1_total_tokens) +
+        Number(row.m2_total_tokens) +
+        Number(row.m3_total_tokens) +
+        Number(row.other_total_tokens),
+    ).toBe(Number(row.total_tokens))
   })
 
   test("#given more turns than one window holds #when checkpoints fire #then summing the rows reproduces every turn once, each under its own uuid", async () => {
     const { published, summary } = recorder()
     const turns = CHECKPOINT_MAX_TURNS * 2 + 7
 
-    for (let index = 0; index < turns; index += 1) await summary.recordTurn("s1", summaryTurn({ turnIndex: index, totalTokens: index }))
+    for (let index = 0; index < turns; index += 1)
+      await summary.recordTurn("s1", summaryTurn({ turnIndex: index, totalTokens: index }))
     await summary.finish("s1", "quit")
 
-    expect(rows(published).map(([seq, endedBy]) => [seq, endedBy])).toEqual([[0, "checkpoint"], [1, "checkpoint"], [2, "shutdown"]])
+    expect(rows(published).map(([seq, endedBy]) => [seq, endedBy])).toEqual([
+      [0, "checkpoint"],
+      [1, "checkpoint"],
+      [2, "shutdown"],
+    ])
     const sum = (key: string) => published.reduce((total, { properties }) => total + Number(properties[key]), 0)
     expect(sum("turns")).toBe(turns)
     expect(sum("total_tokens")).toBe((turns * (turns - 1)) / 2)
@@ -85,9 +129,13 @@ describe("session_summary windows", () => {
 
   test("#given a session that ended right after a checkpoint #when it quits #then an empty final row still marks the end", async () => {
     const { published, summary } = recorder()
-    for (let index = 0; index < CHECKPOINT_MAX_TURNS; index += 1) await summary.recordTurn("s1", summaryTurn({ turnIndex: index }))
+    for (let index = 0; index < CHECKPOINT_MAX_TURNS; index += 1)
+      await summary.recordTurn("s1", summaryTurn({ turnIndex: index }))
     await summary.finish("s1", "quit")
-    expect(rows(published)).toEqual([[0, "checkpoint", CHECKPOINT_MAX_TURNS], [1, "shutdown", 0]])
+    expect(rows(published)).toEqual([
+      [0, "checkpoint", CHECKPOINT_MAX_TURNS],
+      [1, "shutdown", 0],
+    ])
   })
 
   test("#given a session with no turns #when it quits #then nothing is sent and no window file is left", async () => {
@@ -193,7 +241,9 @@ describe("session_summary windows", () => {
     await summary.finish("s1", "reload")
     consent = false
     await summary.recordTurn("s1", summaryTurn({ turnIndex: 1 }))
-    const left = readdirSync(summaryDir(dir), { recursive: true, withFileTypes: true }).filter((entry) => entry.isFile())
+    const left = readdirSync(summaryDir(dir), { recursive: true, withFileTypes: true }).filter((entry) =>
+      entry.isFile(),
+    )
     expect(left.map((entry) => entry.name).filter((name) => !/^\d+\.json$/.test(name))).toEqual([])
     consent = true
     await summary.recordTurn("s1", summaryTurn({ turnIndex: 2 }))
@@ -212,7 +262,10 @@ describe("session_summary windows", () => {
     await first.summary.finish("s1", "quit")
 
     const epochs = first.published.map(({ properties }) => properties.summary_epoch)
-    expect(rows(first.published)).toEqual([[0, "reload", 1], [1, "shutdown", 1]])
+    expect(rows(first.published)).toEqual([
+      [0, "reload", 1],
+      [1, "shutdown", 1],
+    ])
     for (const epoch of epochs) expect(String(epoch)).toMatch(/^[0-9a-f]{16}$/)
     expect(new Set(epochs).size).toBe(1)
     expect(existsSync(join(summaryDir(dir), "seq"))).toBe(false)
@@ -245,6 +298,11 @@ describe("percentile", () => {
     expect(percentile([], 0.5)).toBe(0)
     expect(percentile([7], 0.95)).toBe(7)
     expect(percentile([5, 1, 3, 2, 4], 0.5)).toBe(3)
-    expect(percentile(Array.from({ length: 100 }, (_, index) => index + 1), 0.95)).toBe(95)
+    expect(
+      percentile(
+        Array.from({ length: 100 }, (_, index) => index + 1),
+        0.95,
+      ),
+    ).toBe(95)
   })
 })

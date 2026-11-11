@@ -1,12 +1,7 @@
 import { isPlainRecord } from "./codex-cache-fs"
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
-import type {
-  MarketplaceManifest,
-  MarketplacePluginEntry,
-  MarketplacePluginSourceLocal,
-  PluginManifest,
-} from "./types"
+import type { MarketplaceManifest, MarketplacePluginEntry, MarketplacePluginSourceLocal, PluginManifest } from "./types"
 
 const DEFAULT_MARKETPLACE_PATH = "packages/omo-codex/marketplace.json"
 
@@ -96,7 +91,7 @@ function normalizeMarketplacePlugin(plugin: unknown, index: number): Marketplace
     const local: MarketplacePluginSourceLocal = { source: "local", path: plugin.source.path }
     return { name: plugin.name, source: local }
   }
-  throw new Error("local plugin source must be a string path or { source: \"local\", path } object")
+  throw new Error('local plugin source must be a string path or { source: "local", path } object')
 }
 
 function localSourcePath(source: string | MarketplacePluginSourceLocal | undefined): string {

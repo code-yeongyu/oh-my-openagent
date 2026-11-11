@@ -8,7 +8,8 @@ import { raiserOnly } from "../omo-senpi/src/components/thread/remote/dialog-mir
 // settled one as the `question_resolved` the TUI dismisses a dialog on. The raiser gets both shapes for one id; the TUI
 // shows a request id once.
 
-const isObject = (value: unknown): value is JsonObject => typeof value === "object" && value !== null && !Array.isArray(value)
+const isObject = (value: unknown): value is JsonObject =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 
 // Dialogs left pending when their settle never arrives (the session ended) stop being remembered past this many.
 const SHOWN_KEPT = 1024
@@ -22,7 +23,12 @@ export class MirroredDialogs {
     if (typeof uiRequestId !== "string" || uiRequestId === "") return undefined
     if (record["type"] === "ui_request_settled") {
       this.#shown.delete(uiRequestId)
-      return { type: "question_resolved", id: uiRequestId, outcome: record["disposition"] === "answered" ? "answered" : "cancelled", sessionId }
+      return {
+        type: "question_resolved",
+        id: uiRequestId,
+        outcome: record["disposition"] === "answered" ? "answered" : "cancelled",
+        sessionId,
+      }
     }
     if (record["type"] !== "ui_request_pending") return undefined
     const request = record["request"]
@@ -35,7 +41,13 @@ export class MirroredDialogs {
   /** The TUI answers a presented dialog by the id it was shown, its uiRequestId: the answer names it so. Others go as they are. */
   answer(record: JsonObject): JsonObject {
     const id = record["id"]
-    if (record["type"] !== "extension_ui_response" || typeof id !== "string" || record["uiRequestId"] !== undefined || !this.#shown.has(id)) return record
+    if (
+      record["type"] !== "extension_ui_response" ||
+      typeof id !== "string" ||
+      record["uiRequestId"] !== undefined ||
+      !this.#shown.has(id)
+    )
+      return record
     return { ...record, uiRequestId: id }
   }
 }

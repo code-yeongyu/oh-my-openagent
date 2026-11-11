@@ -5,4 +5,5 @@ import type { JsonObject } from "./ports"
  * answer to one (fail closed). A viewer that sees only the session's mirror is never shown one and never offered a way
  * to answer it, so no secret is typed into a terminal that cannot deliver it.
  */
-export const raiserOnly = (request: JsonObject): boolean => request["secret"] === true || request["grantSelect"] === true
+export const raiserOnly = (request: JsonObject): boolean =>
+  request["secret"] === true || request["grantSelect"] === true

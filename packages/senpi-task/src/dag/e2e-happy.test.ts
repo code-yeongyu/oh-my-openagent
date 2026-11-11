@@ -13,12 +13,7 @@ import { createTaskRecordStore } from "../store"
 import type { DagDefinition, DagNodeInput } from "./graph"
 import { createDagWaitSurface, type DagRunResult } from "./handle"
 import { createDagManager, type DagManager, type DagRunRecordV1, type DagStartResult } from "./manager"
-import {
-  createDagScheduler,
-  type DagNodeSendResult,
-  type DagRunReentry,
-  type DagScheduler,
-} from "./scheduler"
+import { createDagScheduler, type DagNodeSendResult, type DagRunReentry, type DagScheduler } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
 
@@ -236,19 +231,20 @@ function e2eFixture(options: { readonly admit?: AdmitResident; readonly runner?:
     cancel: (runId, reason) => controls(runId).cancel(runId, reason),
     // Event-driven: the child is attached once its task-attached event is journaled, which is what
     // makes the node addressable by the control verbs.
-    attached: (runId, nodeId) => new Promise<void>((resolve) => {
-      const scheduler = controls(runId)
-      const record = manager.record(runId, parentSessionId)
-      if (record.nodes.some((entry) => entry.id === nodeId && entry.taskId !== undefined)) {
-        resolve()
-        return
-      }
-      const unsubscribe = scheduler.subscribe((event) => {
-        if (event.type !== "dag.node.task-attached" || event.nodeId !== nodeId) return
-        unsubscribe()
-        resolve()
-      })
-    }),
+    attached: (runId, nodeId) =>
+      new Promise<void>((resolve) => {
+        const scheduler = controls(runId)
+        const record = manager.record(runId, parentSessionId)
+        if (record.nodes.some((entry) => entry.id === nodeId && entry.taskId !== undefined)) {
+          resolve()
+          return
+        }
+        const unsubscribe = scheduler.subscribe((event) => {
+          if (event.type !== "dag.node.task-attached" || event.nodeId !== nodeId) return
+          unsubscribe()
+          resolve()
+        })
+      }),
     retry(runId) {
       const reentry = controls(runId).retryNode(runId)
       schedulers.set(runId, reentry.scheduler)
@@ -306,10 +302,7 @@ function expectedSuccessSequence(waves: readonly (readonly string[])[]): readonl
     ...waves.flatMap((nodeIds, waveIndex) => [
       ...nodeIds.map((id) => `dag.node.transitioned:${id}:pending>scheduled`),
       `dag.wave.started:${waveIndex}:[${nodeIds.join(",")}]`,
-      ...nodeIds.flatMap((id) => [
-        `dag.node.task-attached:${id}`,
-        `dag.node.transitioned:${id}:scheduled>running`,
-      ]),
+      ...nodeIds.flatMap((id) => [`dag.node.task-attached:${id}`, `dag.node.transitioned:${id}:scheduled>running`]),
       ...nodeIds.map((id) => `dag.node.transitioned:${id}:running>completed`),
       `dag.wave.completed:${waveIndex}:[${nodeIds.join(",")}]`,
     ]),
@@ -382,7 +375,10 @@ function assertArtifacts(fixture: E2eFixture, runId: DagRunId, key: string, node
 }
 
 function runFiles(store: DagFileStore): readonly string[] {
-  return fs.readdirSync(store.paths.runs).filter((entry) => entry.endsWith(".json")).sort()
+  return fs
+    .readdirSync(store.paths.runs)
+    .filter((entry) => entry.endsWith(".json"))
+    .sort()
 }
 
 function within<T>(promise: Promise<T>, ms = 200): Promise<T> {
@@ -417,14 +413,16 @@ describe("DAG happy-path end to end", () => {
     await fixture.running(started.snapshot.runId)
 
     // then
-    expect(eventSequence(fixture.events(result.runId))).toEqual(expectedSuccessSequence([
-      ["plan"],
-      ["build"],
-      ["review"],
-    ]))
+    expect(eventSequence(fixture.events(result.runId))).toEqual(
+      expectedSuccessSequence([["plan"], ["build"], ["review"]]),
+    )
     expect(result.status).toBe("completed")
     expect(result.snapshot.counts).toEqual(expect.objectContaining({ total: 3, completed: 3 }))
-    expect(Object.fromEntries(Object.entries(result.nodes).map(([id, node]) => [id, node.state === "completed" ? node.output : ""]))).toEqual({
+    expect(
+      Object.fromEntries(
+        Object.entries(result.nodes).map(([id, node]) => [id, node.state === "completed" ? node.output : ""]),
+      ),
+    ).toEqual({
       plan: "output:plan",
       build: "output:build",
       review: "output:review",
@@ -452,11 +450,9 @@ describe("DAG happy-path end to end", () => {
       ["left", "right"],
       ["join"],
     ])
-    expect(eventSequence(fixture.events(result.runId))).toEqual(expectedSuccessSequence([
-      ["root"],
-      ["left", "right"],
-      ["join"],
-    ]))
+    expect(eventSequence(fixture.events(result.runId))).toEqual(
+      expectedSuccessSequence([["root"], ["left", "right"], ["join"]]),
+    )
     assertArtifacts(fixture, result.runId, input.key, ["root", "left", "right", "join"])
   })
 
@@ -473,12 +469,7 @@ describe("DAG happy-path end to end", () => {
       categoryNode("docs", ["evidence", "budget"], "writing"),
       agentNode("review", ["build", "docs"], "plan-reviewer"),
     ])
-    const waves = [
-      ["intake", "research"],
-      ["design", "evidence", "budget"],
-      ["build", "docs"],
-      ["review"],
-    ]
+    const waves = [["intake", "research"], ["design", "evidence", "budget"], ["build", "docs"], ["review"]]
 
     // when
     const started = await fixture.start(input)
@@ -499,7 +490,9 @@ describe("DAG happy-path end to end", () => {
     ])
     // Launch order follows the frontier, not declaration: budget starts as soon as intake
     // settles, ahead of evidence whose dependency research folded one settlement later.
-    expect(fixture.runner.startedSpecs.map((spec) => [spec.prompt.replace(/^do /, ""), spec.model, spec.agentType])).toEqual([
+    expect(
+      fixture.runner.startedSpecs.map((spec) => [spec.prompt.replace(/^do /, ""), spec.model, spec.agentType]),
+    ).toEqual([
       ["intake", "scripted/quick", undefined],
       ["research", "scripted/explore", "explore"],
       ["design", "scripted/visual-engineering", undefined],
@@ -509,8 +502,15 @@ describe("DAG happy-path end to end", () => {
       ["docs", "scripted/writing", undefined],
       ["review", "scripted/plan-reviewer", "plan-reviewer"],
     ])
-    expect(Object.values(result.nodes).every((node) => node.state === "completed" && node.output.startsWith("output:"))).toBe(true)
-    assertArtifacts(fixture, result.runId, input.key, input.nodes.map((node) => node.id))
+    expect(
+      Object.values(result.nodes).every((node) => node.state === "completed" && node.output.startsWith("output:")),
+    ).toBe(true)
+    assertArtifacts(
+      fixture,
+      result.runId,
+      input.key,
+      input.nodes.map((node) => node.id),
+    )
   })
 
   test("#given a completed run key #when the identical definition starts again #then the same run is reused without a second run file or event", async () => {
@@ -542,10 +542,21 @@ describe("DAG happy-path end to end", () => {
     // given
     const fixture = e2eFixture()
     Reflect.set(globalThis, "tool", {
-      workflow: async (args: { readonly action: string; readonly definition?: DagDefinition; readonly run_id?: string }) => {
+      workflow: async (args: {
+        readonly action: string
+        readonly definition?: DagDefinition
+        readonly run_id?: string
+      }) => {
         if (args.action === "start" && args.definition !== undefined) {
           const started = await fixture.start(args.definition)
-          return { details: { kind: "started", run_id: started.snapshot.runId, reused: started.reused, snapshot: started.snapshot } }
+          return {
+            details: {
+              kind: "started",
+              run_id: started.snapshot.runId,
+              reused: started.reused,
+              snapshot: started.snapshot,
+            },
+          }
         }
         if (args.action === "wait" && args.run_id !== undefined) {
           const result = await fixture.wait(args.run_id as DagRunId)
@@ -554,7 +565,7 @@ describe("DAG happy-path end to end", () => {
         throw new Error(`unexpected SDK action ${args.action}`)
       },
     })
-    const sdk = await import(sdkPath) as {
+    const sdk = (await import(sdkPath)) as {
       readonly define: (input: { readonly key: string; readonly name: string }) => {
         node(input: DagNodeInput): ReturnType<typeof sdk.define>
         start(): Promise<{ readonly details: { readonly run_id: DagRunId } }>
@@ -578,11 +589,9 @@ describe("DAG happy-path end to end", () => {
       implement: expect.objectContaining({ state: "completed", output: "output:implement" }),
       verify: expect.objectContaining({ state: "completed", output: "output:verify" }),
     })
-    expect(eventSequence(fixture.events(started.details.run_id))).toEqual(expectedSuccessSequence([
-      ["spec"],
-      ["implement"],
-      ["verify"],
-    ]))
+    expect(eventSequence(fixture.events(started.details.run_id))).toEqual(
+      expectedSuccessSequence([["spec"], ["implement"], ["verify"]]),
+    )
     assertArtifacts(fixture, started.details.run_id, "sdk-flow", ["spec", "implement", "verify"])
   })
 
@@ -592,10 +601,21 @@ describe("DAG happy-path end to end", () => {
       admit: () => Promise.resolve({ kind: "rejected", message: "resident child cap reached" }),
     })
     Reflect.set(globalThis, "tool", {
-      workflow: async (args: { readonly action: string; readonly definition?: DagDefinition; readonly run_id?: string }) => {
+      workflow: async (args: {
+        readonly action: string
+        readonly definition?: DagDefinition
+        readonly run_id?: string
+      }) => {
         if (args.action === "start" && args.definition !== undefined) {
           const started = await fixture.start(args.definition)
-          return { details: { kind: "started", run_id: started.snapshot.runId, reused: started.reused, snapshot: started.snapshot } }
+          return {
+            details: {
+              kind: "started",
+              run_id: started.snapshot.runId,
+              reused: started.reused,
+              snapshot: started.snapshot,
+            },
+          }
         }
         if (args.action === "wait" && args.run_id !== undefined) {
           const result = await fixture.wait(args.run_id as DagRunId)
@@ -604,14 +624,11 @@ describe("DAG happy-path end to end", () => {
         throw new Error(`unexpected SDK action ${args.action}`)
       },
     })
-    const sdk = await import(`${sdkPath}?residency-denied`) as {
+    const sdk = (await import(`${sdkPath}?residency-denied`)) as {
       readonly start: (definition: DagDefinition) => Promise<{ readonly run_id: DagRunId }>
       readonly wait: (runId: string) => Promise<{ readonly details: { readonly result: DagRunResult } }>
     }
-    const input = definition("sdk-residency-denied", [
-      categoryNode("first"),
-      agentNode("second"),
-    ])
+    const input = definition("sdk-residency-denied", [categoryNode("first"), agentNode("second")])
 
     // when
     const started = await sdk.start(input)
@@ -619,12 +636,14 @@ describe("DAG happy-path end to end", () => {
 
     // then
     expect(waited.details.result.status).toBe("failed")
-    expect(Object.fromEntries(
-      Object.entries(waited.details.result.nodes).map(([id, result]) => [
-        id,
-        result.state === "failed" ? result.error.code : result.state,
-      ]),
-    )).toEqual({
+    expect(
+      Object.fromEntries(
+        Object.entries(waited.details.result.nodes).map(([id, result]) => [
+          id,
+          result.state === "failed" ? result.error.code : result.state,
+        ]),
+      ),
+    ).toEqual({
       first: "residency_denied",
       second: "residency_denied",
     })
@@ -649,11 +668,13 @@ describe("DAG node control end to end", () => {
     expect(sent.delivery).toBe("steer")
     expect(runner.child("worker").steered).toEqual(["prefer the smaller diff"])
     expect(fixture.manager.record(runId, parentSessionId).nodes[0]?.state).toBe("running")
-    expect(fixture.events(runId)).toContainEqual(expect.objectContaining({
-      type: "dag.node.steered",
-      nodeId: "worker",
-      delivery: "steer",
-    }))
+    expect(fixture.events(runId)).toContainEqual(
+      expect.objectContaining({
+        type: "dag.node.steered",
+        nodeId: "worker",
+        delivery: "steer",
+      }),
+    )
 
     // and the steered child still settles the node normally
     runner.child("worker").settle({ status: "completed", finalResponse: "output:worker" })
@@ -666,7 +687,9 @@ describe("DAG node control end to end", () => {
     // given
     const runner = new HeldRunner()
     const fixture = e2eFixture({ runner })
-    const started = await fixture.start(definition("wait-rearm", [categoryNode("first"), categoryNode("second", ["first"])]))
+    const started = await fixture.start(
+      definition("wait-rearm", [categoryNode("first"), categoryNode("second", ["first"])]),
+    )
     const runId = started.snapshot.runId
     await runner.whenStarted(1)
     await fixture.cancel(runId, "operator stop")

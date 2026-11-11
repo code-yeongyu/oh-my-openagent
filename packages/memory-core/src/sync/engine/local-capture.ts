@@ -26,7 +26,12 @@ const keyLength = (key: string): number => Buffer.byteLength(key, "utf8")
 async function markImported(journal: SyncJournal, digests: ReadonlySet<string>): Promise<void> {
   if (digests.size === 0) return
   const now = await journal.pending()
-  await journal.setPending({ ...now, items: now.items.map((item) => (digests.has(item.digest) && item.imported !== true ? { ...item, imported: true as const } : item)) })
+  await journal.setPending({
+    ...now,
+    items: now.items.map((item) =>
+      digests.has(item.digest) && item.imported !== true ? { ...item, imported: true as const } : item,
+    ),
+  })
 }
 
 /**
@@ -49,7 +54,13 @@ async function workingFiles(deps: EngineDeps, journal: SyncJournal): Promise<Ite
  * The working text at `path`, or undefined (reported) when this device cannot read that path at all
  * or, for a known item the walk did not list, when its path goes through a symlink.
  */
-async function readCaptured(deps: EngineDeps, journal: SyncJournal, key: string, path: string, listed: boolean): Promise<string | null | undefined> {
+async function readCaptured(
+  deps: EngineDeps,
+  journal: SyncJournal,
+  key: string,
+  path: string,
+  listed: boolean,
+): Promise<string | null | undefined> {
   try {
     if (!listed && (await throughSymlink(deps.repo.root, path))) {
       await rejectItem(deps, journal, "capture", key, "symlink")
@@ -73,7 +84,10 @@ async function readCaptured(deps: EngineDeps, journal: SyncJournal, key: string,
 async function rewindQueued(deps: EngineDeps, journal: SyncJournal): Promise<void> {
   const pending = await journal.pending()
   const carried = new Set((pending.outgoing?.items ?? []).map((item) => item.digest))
-  const queued = planBatches(pending.items.filter((item) => !carried.has(item.digest)), batchBound(deps)).held
+  const queued = planBatches(
+    pending.items.filter((item) => !carried.has(item.digest)),
+    batchBound(deps),
+  ).held
   if (queued.length === 0) return
   const rewound = new Set<string>()
   for (const key of [...new Set(queued.map((item) => item.key))]) {
@@ -136,7 +150,11 @@ export interface CaptureHolds {
  * applied or made the baseline, so it syncs once it fits. A key held last cycle whose file and doc are
  * unchanged (same fingerprint) is held again without diffing it again (review L4).
  */
-export async function capture(deps: EngineDeps, journal: SyncJournal, resuming: CycleRecord | null = null): Promise<CaptureHolds> {
+export async function capture(
+  deps: EngineDeps,
+  journal: SyncJournal,
+  resuming: CycleRecord | null = null,
+): Promise<CaptureHolds> {
   await rewindQueued(deps, journal)
   const withheld = await adoptJournaled(deps, journal)
   const files = await workingFiles(deps, journal)
