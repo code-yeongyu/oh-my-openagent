@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde_json::Value;
 
 use super::crate_path;
-use super::read_sites::{reader_sites, sites_by_member, source_sites, Site};
+use super::read_sites::{reader_sites, sites_by_member, source_sites, Site, REST};
 use crate::requests::READER_SOURCES;
 use crate::schema::engine_schema;
 use crate::settings::{GROUPED_KEYS, SETTINGS_TABLE};
@@ -142,6 +142,13 @@ fn unread_in(schema: &Value, sites: &[Site]) -> (usize, Vec<String>) {
             }
         }
         for (member, at) in &read_sites {
+            if member == REST {
+                problems.push(format!(
+                    "unread: {definition} destructured with `..` - {}",
+                    describe(at)
+                ));
+                continue;
+            }
             let positional = member.chars().all(|character| character.is_ascii_digit());
             if positional && !at.iter().all(|site| site.read) {
                 problems.push(format!(

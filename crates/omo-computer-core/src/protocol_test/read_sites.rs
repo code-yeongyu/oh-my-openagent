@@ -1,13 +1,17 @@
 //! Finds the reader call sites in the reader sources: every struct pattern a reader function
 //! destructures, the fields it names and whether each bound value is used in that function.
 //! The field names come from the patterns themselves, and rustc rejects a pattern that does
-//! not name every field of its type exactly (no `..` is accepted here), so this list cannot
-//! drift from the types.
+//! not name every field of its type exactly, so this list cannot drift from the types. A
+//! pattern with `..` is refused: each field it names is unread, and a pattern that names no
+//! field at all is one unread site of its own.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use syn::visit::Visit;
 use syn::{ExprPath, ItemFn, Member, Pat, PatStruct, PatTupleStruct};
+
+/// The field name of the site a rest-only pattern (`T { .. }`) creates.
+pub(super) const REST: &str = "..";
 
 /// One field a reader's pattern names.
 #[derive(Debug, Clone)]
@@ -167,6 +171,17 @@ fn walk_function(function: &ItemFn, file: &str, sites: &mut Vec<Site>) {
     let mut walk = FunctionWalk::default();
     walk.visit_item_fn(function);
     for Pattern { ty, fields, rest } in &walk.patterns {
+        // A pattern that names no field but has `..` drops every member; it is one unread site.
+        if *rest && fields.is_empty() {
+            sites.push(Site {
+                ty: ty.clone(),
+                field: REST.to_owned(),
+                function: function.sig.ident.to_string(),
+                file: file.to_owned(),
+                read: false,
+                why_unread: "the pattern names no field and uses `..`".to_owned(),
+            });
+        }
         for (field, pat) in fields {
             let (read, why_unread) = judge(pat, &walk.used, *rest);
             sites.push(Site {
