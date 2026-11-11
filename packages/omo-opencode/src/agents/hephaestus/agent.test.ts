@@ -1,13 +1,13 @@
 /// <reference types="bun-types" />
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test"
 import {
   getHephaestusPromptSource,
   getHephaestusPrompt,
   createHephaestusAgent,
   isHephaestusSupportedModel,
   UnsupportedHephaestusModelError,
-} from "./index";
+} from "./index"
 
 describe("isHephaestusSupportedModel with a hosted vendor prefix", () => {
   test("#given Bedrock-hosted gpt-5 ids #when support is checked #then the vendor prefix is ignored", () => {
@@ -17,25 +17,25 @@ describe("isHephaestusSupportedModel with a hosted vendor prefix", () => {
       "amazon-bedrock/openai.gpt-5-4",
       "amazon-bedrock/openai.gpt-5.6",
       "amazon-bedrock/openai.gpt-5.3-codex",
-    ];
+    ]
 
     // when
-    const supported = bedrockModels.map((model) => isHephaestusSupportedModel(model));
+    const supported = bedrockModels.map((model) => isHephaestusSupportedModel(model))
 
     // then
-    expect(supported).toEqual([true, true, true, true]);
-  });
+    expect(supported).toEqual([true, true, true, true])
+  })
 
   test("#given a region-qualified Bedrock id #when support is checked #then every vendor segment is ignored", () => {
     // given
-    const model = "amazon-bedrock/us.openai.gpt-5.4";
+    const model = "amazon-bedrock/us.openai.gpt-5.4"
 
     // when
-    const supported = isHephaestusSupportedModel(model);
+    const supported = isHephaestusSupportedModel(model)
 
     // then
-    expect(supported).toBe(true);
-  });
+    expect(supported).toBe(true)
+  })
 
   test("#given ids without a hosted vendor prefix #when support is checked #then existing classification is unchanged", () => {
     // given
@@ -55,174 +55,174 @@ describe("isHephaestusSupportedModel with a hosted vendor prefix", () => {
       ["opencode-go/qwen3.5-plus", false],
       ["gpt-5.10", false],
       ["some-gpt-5.4-tune", false],
-    ];
+    ]
 
     // when
-    const actual = unchanged.map(([model]) => isHephaestusSupportedModel(model));
+    const actual = unchanged.map(([model]) => isHephaestusSupportedModel(model))
 
     // then
-    expect(actual).toEqual(unchanged.map(([, expected]) => expected));
-  });
+    expect(actual).toEqual(unchanged.map(([, expected]) => expected))
+  })
 
   test("#given a Bedrock id outside the gpt-5 family #when support is checked #then it stays unsupported", () => {
     // given
-    const models = ["amazon-bedrock/openai.gpt-4o", "amazon-bedrock/anthropic.claude-3.5-sonnet"];
+    const models = ["amazon-bedrock/openai.gpt-4o", "amazon-bedrock/anthropic.claude-3.5-sonnet"]
 
     // when
-    const supported = models.map((model) => isHephaestusSupportedModel(model));
+    const supported = models.map((model) => isHephaestusSupportedModel(model))
 
     // then
-    expect(supported).toEqual([false, false]);
-  });
-});
+    expect(supported).toEqual([false, false])
+  })
+})
 
 describe("getHephaestusPromptSource eligibility", () => {
   test("throws for generic GPT, unsupported GPT 5.x, non-GPT, and undefined models", () => {
     // given
-    const model1 = "openai/gpt-4o";
-    const model2 = "openai/gpt-5.9";
-    const model3 = "openai/gpt-5.10";
-    const model4 = "anthropic/claude-opus-4-7";
-    const model5 = undefined;
+    const model1 = "openai/gpt-4o"
+    const model2 = "openai/gpt-5.9"
+    const model3 = "openai/gpt-5.10"
+    const model4 = "anthropic/claude-opus-4-7"
+    const model5 = undefined
 
     // when
-    const getSource1 = () => getHephaestusPromptSource(model1);
-    const getSource2 = () => getHephaestusPromptSource(model2);
-    const getSource3 = () => getHephaestusPromptSource(model3);
-    const getSource4 = () => getHephaestusPromptSource(model4);
-    const getSource5 = () => getHephaestusPromptSource(model5);
+    const getSource1 = () => getHephaestusPromptSource(model1)
+    const getSource2 = () => getHephaestusPromptSource(model2)
+    const getSource3 = () => getHephaestusPromptSource(model3)
+    const getSource4 = () => getHephaestusPromptSource(model4)
+    const getSource5 = () => getHephaestusPromptSource(model5)
 
     // then
-    expect(getSource1).toThrow(UnsupportedHephaestusModelError);
-    expect(getSource2).toThrow(UnsupportedHephaestusModelError);
-    expect(getSource3).toThrow(UnsupportedHephaestusModelError);
-    expect(getSource4).toThrow(UnsupportedHephaestusModelError);
-    expect(getSource5).toThrow(UnsupportedHephaestusModelError);
-  });
-});
+    expect(getSource1).toThrow(UnsupportedHephaestusModelError)
+    expect(getSource2).toThrow(UnsupportedHephaestusModelError)
+    expect(getSource3).toThrow(UnsupportedHephaestusModelError)
+    expect(getSource4).toThrow(UnsupportedHephaestusModelError)
+    expect(getSource5).toThrow(UnsupportedHephaestusModelError)
+  })
+})
 
 describe("getHephaestusPrompt", () => {
   test("returns the prompt selected for the model family", () => {
     // given / when
-    const prompt = getHephaestusPrompt("openai/gpt-5.5");
+    const prompt = getHephaestusPrompt("openai/gpt-5.5")
 
     // then - the prompt matches the output of the routed source builder
-    expect(prompt).toBe(createHephaestusAgent("openai/gpt-5.5").prompt);
-    expect(prompt).not.toBe(getHephaestusPrompt("openai/gpt-5.4"));
-  });
+    expect(prompt).toBe(createHephaestusAgent("openai/gpt-5.5").prompt)
+    expect(prompt).not.toBe(getHephaestusPrompt("openai/gpt-5.4"))
+  })
 
   test("Claude model is rejected", () => {
     // given
-    const model = "anthropic/claude-opus-4-7";
+    const model = "anthropic/claude-opus-4-7"
 
     // when
-    const getPrompt = () => getHephaestusPrompt(model);
+    const getPrompt = () => getHephaestusPrompt(model)
 
     // then
-    expect(getPrompt).toThrow(UnsupportedHephaestusModelError);
-  });
+    expect(getPrompt).toThrow(UnsupportedHephaestusModelError)
+  })
 
   test("useTaskSystem=true wires the task tool contract", () => {
     // given
-    const model = "openai/gpt-5.4";
+    const model = "openai/gpt-5.4"
 
     // when
-    const prompt = getHephaestusPrompt(model, true);
+    const prompt = getHephaestusPrompt(model, true)
 
     // then
-    expect(prompt).toContain("task_create");
-    expect(prompt).toContain("task_update");
-    expect(prompt).not.toContain("todowrite");
-  });
+    expect(prompt).toContain("task_create")
+    expect(prompt).toContain("task_update")
+    expect(prompt).not.toContain("todowrite")
+  })
 
   test("useTaskSystem=false wires the todo tool contract", () => {
     // given
-    const model = "openai/gpt-5.4";
+    const model = "openai/gpt-5.4"
 
     // when
-    const prompt = getHephaestusPrompt(model, false);
+    const prompt = getHephaestusPrompt(model, false)
 
     // then
-    expect(prompt).toContain("todowrite");
-    expect(prompt).not.toContain("task_create");
-  });
-});
+    expect(prompt).toContain("todowrite")
+    expect(prompt).not.toContain("task_create")
+  })
+})
 
 describe("createHephaestusAgent", () => {
   test("returns AgentConfig with required fields", () => {
     // given
-    const model = "openai/gpt-5.4";
+    const model = "openai/gpt-5.4"
 
     // when
-    const config = createHephaestusAgent(model);
+    const config = createHephaestusAgent(model)
 
     // then
-    expect(config).toHaveProperty("description");
-    expect(config).toHaveProperty("mode", "primary");
-    expect(config).toHaveProperty("model", "openai/gpt-5.4");
-    expect(config).toHaveProperty("maxTokens", 32000);
-    expect(config).toHaveProperty("prompt");
-    expect(config).toHaveProperty("color", "#D97706");
-    expect(config).toHaveProperty("permission");
-    expect(config.permission).toHaveProperty("question", "allow");
-    expect(config.permission).toHaveProperty("call_omo_agent", "deny");
-    expect(config).toHaveProperty("reasoningEffort", "medium");
-  });
+    expect(config).toHaveProperty("description")
+    expect(config).toHaveProperty("mode", "primary")
+    expect(config).toHaveProperty("model", "openai/gpt-5.4")
+    expect(config).toHaveProperty("maxTokens", 32000)
+    expect(config).toHaveProperty("prompt")
+    expect(config).toHaveProperty("color", "#D97706")
+    expect(config).toHaveProperty("permission")
+    expect(config.permission).toHaveProperty("question", "allow")
+    expect(config.permission).toHaveProperty("call_omo_agent", "deny")
+    expect(config).toHaveProperty("reasoningEffort", "medium")
+  })
 
   test("generic GPT model is rejected", () => {
     // given
-    const model = "openai/gpt-4o";
+    const model = "openai/gpt-4o"
 
     // when
-    const createAgent = () => createHephaestusAgent(model);
+    const createAgent = () => createHephaestusAgent(model)
 
     // then
-    expect(createAgent).toThrow(UnsupportedHephaestusModelError);
-  });
+    expect(createAgent).toThrow(UnsupportedHephaestusModelError)
+  })
 
   test("supported GPT models do not force-deny apply_patch", () => {
     // given
-    const gpt54Model = "openai/gpt-5.4";
-    const gpt53CodexModel = "openai/gpt-5.3-codex";
+    const gpt54Model = "openai/gpt-5.4"
+    const gpt53CodexModel = "openai/gpt-5.3-codex"
 
     // when
-    const gpt54Config = createHephaestusAgent(gpt54Model);
-    const gpt53CodexConfig = createHephaestusAgent(gpt53CodexModel);
+    const gpt54Config = createHephaestusAgent(gpt54Model)
+    const gpt53CodexConfig = createHephaestusAgent(gpt53CodexModel)
 
     // then
-    expect(gpt54Config.permission ?? {}).not.toHaveProperty("apply_patch");
-    expect(gpt53CodexConfig.permission ?? {}).not.toHaveProperty("apply_patch");
-  });
+    expect(gpt54Config.permission ?? {}).not.toHaveProperty("apply_patch")
+    expect(gpt53CodexConfig.permission ?? {}).not.toHaveProperty("apply_patch")
+  })
 
   test("useTaskSystem=true produces Task Discipline prompt", () => {
     // given
-    const model = "openai/gpt-5.4";
+    const model = "openai/gpt-5.4"
 
     // when
-    const config = createHephaestusAgent(model, [], [], [], [], true);
+    const config = createHephaestusAgent(model, [], [], [], [], true)
 
     // then
-    expect(config.prompt).toContain("task_create");
-    expect(config.prompt).toContain("task_update");
-    expect(config.prompt).not.toContain("todowrite");
-  });
+    expect(config.prompt).toContain("task_create")
+    expect(config.prompt).toContain("task_update")
+    expect(config.prompt).not.toContain("todowrite")
+  })
 
   test("useTaskSystem=false produces Todo Discipline prompt", () => {
     // given
-    const model = "openai/gpt-5.4";
+    const model = "openai/gpt-5.4"
 
     // when
-    const config = createHephaestusAgent(model, [], [], [], [], false);
+    const config = createHephaestusAgent(model, [], [], [], [], false)
 
     // then
-    expect(config.prompt).toContain("todowrite");
-    expect(config.prompt).not.toContain("task_create");
-  });
-});
+    expect(config.prompt).toContain("todowrite")
+    expect(config.prompt).not.toContain("task_create")
+  })
+})
 
-import { maybeCreateHephaestusConfig } from "../builtin-agents/hephaestus-agent";
-import type { AgentOverrides } from "../types";
-import type { CategoryConfig } from "../../config/schema";
+import { maybeCreateHephaestusConfig } from "../builtin-agents/hephaestus-agent"
+import type { AgentOverrides } from "../types"
+import type { CategoryConfig } from "../../config/schema"
 
 describe("maybeCreateHephaestusConfig apply_patch permission", () => {
   describe("#given GPT model with user override allowing apply_patch", () => {
@@ -235,8 +235,8 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
             apply_patch: "allow",
           } as Record<string, "allow">,
         },
-      };
-      const mergedCategories: Record<string, CategoryConfig> = {};
+      }
+      const mergedCategories: Record<string, CategoryConfig> = {}
 
       // when
       const config = maybeCreateHephaestusConfig({
@@ -250,14 +250,14 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config).toBeDefined();
-      expect(config?.model).toBe("openai/gpt-5.4");
-      expect(config?.permission).toHaveProperty("apply_patch", "allow");
-    });
-  });
+      expect(config).toBeDefined()
+      expect(config?.model).toBe("openai/gpt-5.4")
+      expect(config?.permission).toHaveProperty("apply_patch", "allow")
+    })
+  })
 
   describe("#given non-GPT model with user override allowing apply_patch", () => {
     test("#when config is created #then Hephaestus is not registered", () => {
@@ -269,8 +269,8 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
             apply_patch: "allow",
           } as Record<string, "allow">,
         },
-      };
-      const mergedCategories: Record<string, CategoryConfig> = {};
+      }
+      const mergedCategories: Record<string, CategoryConfig> = {}
 
       // when
       const config = maybeCreateHephaestusConfig({
@@ -284,12 +284,12 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config).toBeUndefined();
-    });
-  });
+      expect(config).toBeUndefined()
+    })
+  })
 
   describe("#given generic GPT model with user override allowing apply_patch", () => {
     test("#when config is created #then Hephaestus is not registered", () => {
@@ -301,8 +301,8 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
             apply_patch: "allow",
           } as Record<string, "allow">,
         },
-      };
-      const mergedCategories: Record<string, CategoryConfig> = {};
+      }
+      const mergedCategories: Record<string, CategoryConfig> = {}
 
       // when
       const config = maybeCreateHephaestusConfig({
@@ -316,12 +316,12 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config).toBeUndefined();
-    });
-  });
+      expect(config).toBeUndefined()
+    })
+  })
 
   describe("#given Opus 4.7 model with user override allowing grep and glob", () => {
     test("#when config is created #then Hephaestus is not registered", () => {
@@ -334,8 +334,8 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
             glob: "allow",
           } as Record<string, "allow">,
         },
-      };
-      const mergedCategories: Record<string, CategoryConfig> = {};
+      }
+      const mergedCategories: Record<string, CategoryConfig> = {}
 
       // when
       const config = maybeCreateHephaestusConfig({
@@ -349,12 +349,12 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config).toBeUndefined();
-    });
-  });
+      expect(config).toBeUndefined()
+    })
+  })
 
   describe("#given dotted Opus 4.7 model with user override allowing grep and glob", () => {
     test("#when config is created #then Hephaestus is not registered", () => {
@@ -367,8 +367,8 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
             glob: "allow",
           } as Record<string, "allow">,
         },
-      };
-      const mergedCategories: Record<string, CategoryConfig> = {};
+      }
+      const mergedCategories: Record<string, CategoryConfig> = {}
 
       // when
       const config = maybeCreateHephaestusConfig({
@@ -382,12 +382,12 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config).toBeUndefined();
-    });
-  });
+      expect(config).toBeUndefined()
+    })
+  })
 
   describe("#given GPT 5.5 model with user override allowing grep and glob", () => {
     test("#when config is created #then grep and glob are still denied", () => {
@@ -400,8 +400,8 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
             glob: "allow",
           } as Record<string, "allow">,
         },
-      };
-      const mergedCategories: Record<string, CategoryConfig> = {};
+      }
+      const mergedCategories: Record<string, CategoryConfig> = {}
 
       // when
       const config = maybeCreateHephaestusConfig({
@@ -415,13 +415,13 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config?.permission).toHaveProperty("grep", "deny");
-      expect(config?.permission).toHaveProperty("glob", "deny");
-    });
-  });
+      expect(config?.permission).toHaveProperty("grep", "deny")
+      expect(config?.permission).toHaveProperty("glob", "deny")
+    })
+  })
 
   describe("#given frontier default model with category override to non-frontier model", () => {
     test("#when config is created #then stale grep and glob denies are cleared", () => {
@@ -430,12 +430,12 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
         hephaestus: {
           category: "non-frontier",
         },
-      };
+      }
       const mergedCategories: Record<string, CategoryConfig> = {
         "non-frontier": {
           model: "openai/gpt-5.4",
         },
-      };
+      }
 
       // when
       const config = maybeCreateHephaestusConfig({
@@ -449,14 +449,14 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config?.model).toBe("openai/gpt-5.4");
-      expect(config?.permission).not.toHaveProperty("grep");
-      expect(config?.permission).not.toHaveProperty("glob");
-    });
-  });
+      expect(config?.model).toBe("openai/gpt-5.4")
+      expect(config?.permission).not.toHaveProperty("grep")
+      expect(config?.permission).not.toHaveProperty("glob")
+    })
+  })
 
   describe("#given non-frontier model with user override denying grep and glob", () => {
     test("#when config is created #then explicit user denies are preserved", () => {
@@ -469,8 +469,8 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
             glob: "deny",
           } as Record<string, "deny">,
         },
-      };
-      const mergedCategories: Record<string, CategoryConfig> = {};
+      }
+      const mergedCategories: Record<string, CategoryConfig> = {}
 
       // when
       const config = maybeCreateHephaestusConfig({
@@ -484,13 +484,13 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config?.permission).toHaveProperty("grep", "deny");
-      expect(config?.permission).toHaveProperty("glob", "deny");
-    });
-  });
+      expect(config?.permission).toHaveProperty("grep", "deny")
+      expect(config?.permission).toHaveProperty("glob", "deny")
+    })
+  })
 
   describe("#given non-frontier model with legacy user tools denying grep and glob", () => {
     test("#when config is created #then explicit legacy denies are preserved", () => {
@@ -501,11 +501,11 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
           grep: false,
           glob: false,
         },
-      };
+      }
       const agentOverrides: AgentOverrides = {
         hephaestus: legacyOverride,
-      };
-      const mergedCategories: Record<string, CategoryConfig> = {};
+      }
+      const mergedCategories: Record<string, CategoryConfig> = {}
 
       // when
       const config = maybeCreateHephaestusConfig({
@@ -519,11 +519,11 @@ describe("maybeCreateHephaestusConfig apply_patch permission", () => {
         availableCategories: [],
         mergedCategories,
         useTaskSystem: false,
-      });
+      })
 
       // then
-      expect(config?.permission).toHaveProperty("grep", "deny");
-      expect(config?.permission).toHaveProperty("glob", "deny");
-    });
-  });
-});
+      expect(config?.permission).toHaveProperty("grep", "deny")
+      expect(config?.permission).toHaveProperty("glob", "deny")
+    })
+  })
+})

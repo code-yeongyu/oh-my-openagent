@@ -139,10 +139,12 @@ describe("monitor_stop tool", () => {
     const tool = createMonitorStop(manager)
 
     // when
-    const [firstResult, secondResult] = (await Promise.all([
-      tool.execute({ monitor_id: "monitor-1" }, TOOL_CONTEXT),
-      tool.execute({ monitor_id: "monitor-1" }, TOOL_CONTEXT),
-    ])).map(parseResult)
+    const [firstResult, secondResult] = (
+      await Promise.all([
+        tool.execute({ monitor_id: "monitor-1" }, TOOL_CONTEXT),
+        tool.execute({ monitor_id: "monitor-1" }, TOOL_CONTEXT),
+      ])
+    ).map(parseResult)
 
     // then
     expect([firstResult, secondResult]).toEqual([
@@ -154,9 +156,7 @@ describe("monitor_stop tool", () => {
 
   test("denies stopping a monitor owned by another session", async () => {
     // given
-    const manager = new FakeMonitorManager([
-      createRecord({ id: "other-monitor", parentSessionId: "other-session" }),
-    ])
+    const manager = new FakeMonitorManager([createRecord({ id: "other-monitor", parentSessionId: "other-session" })])
     const tool = createMonitorStop(manager)
 
     // when

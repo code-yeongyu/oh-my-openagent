@@ -17,18 +17,13 @@ export function summarizeWorkerLiveness(workerCheckResults: readonly WorkerLiven
   }
 }
 
-export function markDeadWorkersErrored(
-  runtimeState: RuntimeState,
-  deadWorkerNames: readonly string[],
-): RuntimeState {
+export function markDeadWorkersErrored(runtimeState: RuntimeState, deadWorkerNames: readonly string[]): RuntimeState {
   const deadWorkerNameSet = new Set(deadWorkerNames)
 
   return {
     ...runtimeState,
-    members: runtimeState.members.map((member) => (
-      deadWorkerNameSet.has(member.name)
-        ? { ...member, status: "errored" as const, sessionId: undefined }
-        : member
-    )),
+    members: runtimeState.members.map((member) =>
+      deadWorkerNameSet.has(member.name) ? { ...member, status: "errored" as const, sessionId: undefined } : member,
+    ),
   }
 }

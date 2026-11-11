@@ -11,18 +11,25 @@ import { fakeApi, minted, temporaryHome } from "./test-support"
 // Every other closed service-account argv keeps refusing (accounts-closed.test.ts).
 const root = resolve(import.meta.dir, "../../../../..")
 const launcher = join(root, "packages", "omo-native", "bin", "omo.js")
-const deviceLogins = [["login", "--device"], ["login", "--no-browser"]] as const
+const deviceLogins = [
+  ["login", "--device"],
+  ["login", "--no-browser"],
+] as const
 
 async function run(entry: string, args: readonly string[]) {
   const home = await temporaryHome()
   const paths: string[] = []
-  const api = fakeApi(request => {
+  const api = fakeApi((request) => {
     const path = new URL(request.url).pathname
     paths.push(path)
     if (path === "/v1/health") return Response.json({ ok: true })
-    if (path === "/v1/device/code") return Response.json({ ...minted, expiresAt: new Date(Date.now() + 300_000).toISOString(), intervalSeconds: 1 })
+    if (path === "/v1/device/code")
+      return Response.json({ ...minted, expiresAt: new Date(Date.now() + 300_000).toISOString(), intervalSeconds: 1 })
     if (path === "/v1/device/token") {
-      return Response.json({ error: { code: "access_denied", message: "denied", retryable: false, requestId: "r" } }, { status: 400 })
+      return Response.json(
+        { error: { code: "access_denied", message: "denied", retryable: false, requestId: "r" } },
+        { status: 400 },
+      )
     }
     return new Response("", { status: 404 })
   })
@@ -31,21 +38,35 @@ async function run(entry: string, args: readonly string[]) {
     {
       cwd: home,
       env: {
-        PATH: process.env.PATH, HOME: home, USERPROFILE: home, OMO_RUNTIME: "bun", BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
-        OMO_SERVICE_API_URL: api, OMO_SERVICE_ACCOUNTS_URL: api,
+        PATH: process.env.PATH,
+        HOME: home,
+        USERPROFILE: home,
+        OMO_RUNTIME: "bun",
+        BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
+        OMO_SERVICE_API_URL: api,
+        OMO_SERVICE_ACCOUNTS_URL: api,
+        // The child's own lock home: the test preload's account seam does not reach a child process (#12978).
+        OMO_TEST_CREDENTIAL_LOCK_HOME: home,
       },
-      stdin: "ignore", stdout: "pipe", stderr: "pipe",
+      stdin: "ignore",
+      stdout: "pipe",
+      stderr: "pipe",
     },
   )
-  onTestFinished(async () => { if (child.exitCode === null) child.kill(); await child.exited })
+  onTestFinished(async () => {
+    if (child.exitCode === null) child.kill()
+    await child.exited
+  })
   const [stdout, stderr, code] = await Promise.all([
-    new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
   ])
   return { stdout, stderr, code, paths }
 }
 
 {
-  test.each(deviceLogins.map(args => [args.join(" "), args] as const))(
+  test.each(deviceLogins.map((args) => [args.join(" "), args] as const))(
     `#given accounts are closed #when the launcher runs omo %s #then it runs the device flow and stores nothing on a denial`,
     async (_argv, args) => {
       const result = await run(launcher, args)
@@ -62,8 +83,33 @@ async function run(entry: string, args: readonly string[]) {
 }
 
 test("#given accounts are closed #then only the device-code login leaves the static refusal", () => {
-  expect(deviceLogins.map(args => trustLaunchKind(args))).toEqual(["one-shot-network", "one-shot-network"])
-  expect([
-    ["login"], ["login", "--accounts", "https://example.invalid"], ["login", "--help"], ["logout"], ["whoami"], ["whoami", "--device"],
-  ].map(args => trustLaunchKind(args))).toEqual(Array(6).fill("static"))
+  expect(deviceLogins.map((args) => trustLaunchKind(args))).toEqual(["one-shot-network", "one-shot-network"])
+  expect(
+    [
+      ["login"],
+      ["login", "--accounts", "https://example.invalid"],
+      ["login", "--help"],
+      ["logout"],
+      ["whoami"],
+      ["whoami", "--device"],
+    ].map((args) => trustLaunchKind(args)),
+  ).toEqual(Array(6).fill("static"))
+})
+
+// #12646: the compiled entry classifies a closed `login` with the same option parse commands.ts runs, so an argv the
+// command refuses is a static refusal at the entry as well, and an argv the command runs is not.
+test.each([
+  [["login", "--device"], "one-shot-network"],
+  [["login", "--no-browser"], "one-shot-network"],
+  [["login", "--api", "https://example.invalid", "--device"], "one-shot-network"],
+  [["login", "--device", "--api", "https://example.invalid"], "one-shot-network"],
+  [["login", "--", "--device"], "static"],
+  [["login", "--accounts", "https://example.invalid", "--device"], "static"],
+  [["login", "--accounts", "--device"], "static"],
+  [["login", "extra", "--device"], "static"],
+  [["login", "--api"], "static"],
+  [["login"], "static"],
+  [["login", "--help"], "static"],
+] as const)("#given accounts are closed #when the compiled entry classifies omo %j #then it is %s", (args, kind) => {
+  expect(trustLaunchKind(args)).toBe(kind)
 })

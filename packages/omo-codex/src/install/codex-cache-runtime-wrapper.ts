@@ -1,5 +1,5 @@
 import { join } from "node:path"
-import { windowsNodeDiscoveryLines } from "./codex-cache-command-shim"
+import { escapeCmdQuoted, windowsNodeDiscoveryLines } from "./codex-cache-command-shim"
 
 export const RUNTIME_WRAPPER_MARKER = "OMO_GENERATED_RUNTIME_WRAPPER"
 
@@ -101,17 +101,6 @@ export function windowsRuntimeWrapper(
     `"%BUN_BINARY%" "${cli}" %*`,
     "",
   ].join("\r\n")
-}
-
-/**
- * A value for a double-quoted spot in the `.cmd` wrapper. cmd expands `%VAR%` in every line, so `%` is doubled. After
- * `setlocal EnableDelayedExpansion` (`windowsNodeDiscoveryLines`) a line holding `!` also expands `!VAR!` and strips
- * carets even inside quotes, so there a value with `!` escapes `^` and `!` for that pass. Every other metacharacter is
- * literal inside the quotes (#12811). The doctors' readers (`doctor-migration.js`, `codex-runtime-wrapper.ts`) undo it.
- */
-function escapeCmdQuoted(value: string, delayedExpansion = true): string {
-  const percent = value.replaceAll("%", "%%")
-  return delayedExpansion && percent.includes("!") ? percent.replaceAll("^", "^^").replaceAll("!", "^!") : percent
 }
 
 function toPosixPath(path: string): string {

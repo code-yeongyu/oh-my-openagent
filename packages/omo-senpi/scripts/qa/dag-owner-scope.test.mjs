@@ -23,7 +23,9 @@ describe("synthetic DAG selection evidence", () => {
       expect(checkpoint.status).toBe("paused")
       expect(checkpoint.nodes.every((node) => node.state === "completed")).toBe(true)
       expect(result).toEqual({ output: "SYNTHETIC_COMPLETED_OUTPUT\n" })
-    } finally { rmSync(sandbox.root, { recursive: true, force: true }) }
+    } finally {
+      rmSync(sandbox.root, { recursive: true, force: true })
+    }
   })
 
   test("snapshot keys use posix separators so evaluate() prefixes match on every platform", () => {
@@ -37,7 +39,9 @@ describe("synthetic DAG selection evidence", () => {
       expect(keys).toEqual(["dag/events/a.jsonl", "dag/results/a/done.txt", "dag/runs/a.json"])
       expect(fixture.toPosixKey("dag\\events\\a.jsonl")).toBe("dag/events/a.jsonl")
       expect(fixture.toPosixKey("dag/results/a/done.txt")).toBe("dag/results/a/done.txt")
-    } finally { rmSync(sandbox.root, { recursive: true, force: true }) }
+    } finally {
+      rmSync(sandbox.root, { recursive: true, force: true })
+    }
   })
 
   test("detects an unrelated event mutation even without checkpoint reparenting", () => {
@@ -53,7 +57,9 @@ describe("synthetic DAG selection evidence", () => {
       expect(result.ok).toBe(false)
       expect(result.forbiddenMutations).toEqual(["a"])
       expect(result.changedPaths).toEqual(["dag/events/a.jsonl"])
-    } finally { rmSync(sandbox.root, { recursive: true, force: true }) }
+    } finally {
+      rmSync(sandbox.root, { recursive: true, force: true })
+    }
   })
 
   test("does not mistake no recovery for a healthy own-session control", () => {
@@ -67,7 +73,9 @@ describe("synthetic DAG selection evidence", () => {
       // then
       expect(result.ok).toBe(false)
       expect(result.healthyOwnRecovery).toBe(false)
-    } finally { rmSync(sandbox.root, { recursive: true, force: true }) }
+    } finally {
+      rmSync(sandbox.root, { recursive: true, force: true })
+    }
   })
 
   test("driver self-test detects ownership changes and rejects invalid options", () => {

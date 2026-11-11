@@ -24,7 +24,11 @@ function normalizeContext7ApiKey(value: string | undefined): string | null {
 }
 
 function isPlaceholderContext7ApiKey(value: string): boolean {
-  const normalized = value.trim().toLowerCase().replace(/[<>"'`]/g, "").replace(/[\s_-]+/g, " ")
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[<>"'`]/g, "")
+    .replace(/[\s_-]+/g, " ")
   return normalized.length === 0 || normalized === "your api key"
 }
 

@@ -6,12 +6,7 @@ export {
   splitCommandTokens,
   tokenLooksExecutable,
 } from "./command-match"
-export {
-  createDefaultProcessKiller,
-  defaultIsProcessAlive,
-  enumerateProcesses,
-  type ProcessKiller,
-} from "./exec"
+export { createDefaultProcessKiller, defaultIsProcessAlive, enumerateProcesses, type ProcessKiller } from "./exec"
 export {
   attestLspDaemonCliProcess,
   listLspDaemonVersionDirs,
@@ -34,12 +29,7 @@ export {
   type LspDaemonProxyProcess,
   type SelectOrphanedLspDaemonProxiesOptions,
 } from "./lsp-proxy-family"
-export {
-  isOrphaned,
-  parsePosixProcessTable,
-  parseWindowsProcessTable,
-  type ProcessInfo,
-} from "./process-table"
+export { isOrphaned, parsePosixProcessTable, parseWindowsProcessTable, type ProcessInfo } from "./process-table"
 export { discoverOmoOwnedRoots, type OmoOwnedRootsOptions } from "./roots"
 export {
   sweepOrphanedLspDaemonProxies,

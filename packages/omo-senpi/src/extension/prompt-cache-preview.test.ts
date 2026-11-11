@@ -3,10 +3,25 @@ import type { ExtensionContext } from "@code-yeongyu/senpi"
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { DefaultResourceLoader, ModelRegistry, ModelRuntime, SessionManager, SettingsManager, createAgentSession, getMcpService } from "../senpi-test-runtime"
+import {
+  DefaultResourceLoader,
+  ModelRegistry,
+  ModelRuntime,
+  SessionManager,
+  SettingsManager,
+  createAgentSession,
+  getMcpService,
+} from "../senpi-test-runtime"
 import omoExtension from "./index"
+import { testBudgetSignal, useTestTimeout, remainingTestTime } from "../../../../test-support/test-deadline"
 
-const ENV_KEYS = ["HOME", "OMO_CODING_AGENT_DIR", "SENPI_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR", "OMO_SENPI_DISABLE_POSTHOG"] as const
+const ENV_KEYS = [
+  "HOME",
+  "OMO_CODING_AGENT_DIR",
+  "SENPI_CODING_AGENT_DIR",
+  "PI_CODING_AGENT_DIR",
+  "OMO_SENPI_DISABLE_POSTHOG",
+] as const
 type EnvSnapshot = ReadonlyMap<(typeof ENV_KEYS)[number], string | undefined>
 const snapshotEnv = (): EnvSnapshot => new Map(ENV_KEYS.map((key) => [key, process.env[key]]))
 function restoreEnv(snapshot: EnvSnapshot): void {
@@ -19,7 +34,9 @@ function restoreEnv(snapshot: EnvSnapshot): void {
 // Safety net for a run bun abandons at its own timeout, where the scenario's teardown never runs: the next
 // test must still see this process's env, cwd and no leftover temp HOME.
 let baseline: { env: EnvSnapshot; cwd: string; roots: string[] } | undefined
-beforeEach(() => { baseline = { env: snapshotEnv(), cwd: process.cwd(), roots: [] } })
+beforeEach(() => {
+  baseline = { env: snapshotEnv(), cwd: process.cwd(), roots: [] }
+})
 afterEach(() => {
   if (baseline === undefined) return
   restoreEnv(baseline.env)
@@ -43,6 +60,8 @@ type Observed = {
   settledAfterPreview: Settle
 }
 const TEARDOWN_STEP_MS = 15_000
+/** The attach wait's share of the test budget: what is left after the three teardown steps the scenario reserves. */
+const attachBudget = (teardownStepMs: number): number => Math.max(0, remainingTestTime() - 3 * teardownStepMs)
 
 /** Resolves or rejects with `step`, or rejects once `ms` passes so a hung teardown step cannot hold the test. */
 async function bounded<T>(step: Promise<T>, ms: number, label: string): Promise<T> {
@@ -57,7 +76,13 @@ async function bounded<T>(step: Promise<T>, ms: number, label: string): Promise<
   }
 }
 
-type Teardown = { errors: unknown[]; mcpDisposed: boolean | undefined; homeEntries: string[]; homeRemoved: boolean; ownsProcess: boolean }
+type Teardown = {
+  errors: unknown[]
+  mcpDisposed: boolean | undefined
+  homeEntries: string[]
+  homeRemoved: boolean
+  ownsProcess: boolean
+}
 
 /**
  * Builds a real OmO session in a temp HOME and asks the engine for its prewarm prefix. Teardown always runs and
@@ -82,9 +107,12 @@ async function runPrefixScenario(options: {
   // The bundled remote MCPs (context7, grep_app) would race a network connect at startup in a fresh HOME;
   // a loaded or offline host turns that into an attach that does not settle. The documented switch is a
   // trusted user mcp.json entry with enabled:false.
-  writeFileSync(join(agentDir, "mcp.json"), JSON.stringify({
-    mcpServers: { context7: { enabled: false }, grep_app: { enabled: false }, ...options.extraMcpServers },
-  }))
+  writeFileSync(
+    join(agentDir, "mcp.json"),
+    JSON.stringify({
+      mcpServers: { context7: { enabled: false }, grep_app: { enabled: false }, ...options.extraMcpServers },
+    }),
+  )
   mkdirSync(join(root, ".omo"))
   writeFileSync(join(root, ".omo", "omo.json"), JSON.stringify({ memory: { enabled: false } }))
   // Fresh stamps throttle the session-start process sweeps, which would otherwise list this machine's
@@ -94,29 +122,56 @@ async function runPrefixScenario(options: {
   for (const stamp of ["lsp-proxy-sweep.stamp", "lsp-daemon-sweep.stamp"]) writeFileSync(join(sweepStamps, stamp), "")
   const cwd = process.cwd()
   const previous = snapshotEnv()
-  Object.assign(process.env, { HOME: root, OMO_CODING_AGENT_DIR: agentDir, SENPI_CODING_AGENT_DIR: agentDir, PI_CODING_AGENT_DIR: agentDir, OMO_SENPI_DISABLE_POSTHOG: "1" })
+  Object.assign(process.env, {
+    HOME: root,
+    OMO_CODING_AGENT_DIR: agentDir,
+    SENPI_CODING_AGENT_DIR: agentDir,
+    PI_CODING_AGENT_DIR: agentDir,
+    OMO_SENPI_DISABLE_POSTHOG: "1",
+  })
   process.chdir(root)
   // The OmO extension is loaded whole; of the engine builtins only those this test needs: the MCP host the
   // extension's servers attach to and the prewarm builtin. The goal builtin's session_start takes a goal-file
   // lock (mkdir under this HOME) that a loaded run can finish after the HOME is removed (#9766 leak).
-  const settingsManager = SettingsManager.inMemory({ defaultProjectTrust: "always", enabledBuiltinExtensions: ["cache-keepalive", "mcp"] })
+  const settingsManager = SettingsManager.inMemory({
+    defaultProjectTrust: "always",
+    enabledBuiltinExtensions: ["cache-keepalive", "mcp"],
+  })
   const registry = new ModelRegistry(ModelRuntime.createSync({ modelsPath: null }))
   registry.registerProvider("prefix-fixture", {
-    api: "openai-completions", baseUrl: "http://127.0.0.1:1/v1", apiKey: "fixture-key",
-    models: [{
-      id: "prefix-fixture", name: "prefix-fixture", reasoning: false, input: ["text"],
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 100_000, maxTokens: 4096,
-    }],
+    api: "openai-completions",
+    baseUrl: "http://127.0.0.1:1/v1",
+    apiKey: "fixture-key",
+    models: [
+      {
+        id: "prefix-fixture",
+        name: "prefix-fixture",
+        reasoning: false,
+        input: ["text"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 100_000,
+        maxTokens: 4096,
+      },
+    ],
   })
   let context: ExtensionContext | undefined
   const loader = new DefaultResourceLoader({
-    cwd: root, agentDir, settingsManager, noExtensions: true, noSkills: true,
-    noPromptTemplates: true, noThemes: true, noContextFiles: true,
-    extensionFactories: [async (pi) => {
-      await omoExtension(pi)
-      pi.on("session_start", (_event, ctx) => { context = ctx })
-    }],
+    cwd: root,
+    agentDir,
+    settingsManager,
+    noExtensions: true,
+    noSkills: true,
+    noPromptTemplates: true,
+    noThemes: true,
+    noContextFiles: true,
+    extensionFactories: [
+      async (pi) => {
+        await omoExtension(pi)
+        pi.on("session_start", (_event, ctx) => {
+          context = ctx
+        })
+      },
+    ],
   })
   let session: Session | undefined
   let mcp: ReturnType<typeof getMcpService> | undefined
@@ -127,34 +182,52 @@ async function runPrefixScenario(options: {
     const loadErrors = loader.getExtensions().errors
     if (loadErrors.length > 0) throw new Error(`extension load errors: ${JSON.stringify(loadErrors)}`)
     ;({ session } = await createAgentSession({
-      cwd: root, agentDir, settingsManager, modelRegistry: registry,
-      model: registry.find("prefix-fixture", "prefix-fixture"), thinkingLevel: "off",
-      resourceLoader: loader, sessionManager: SessionManager.inMemory(root),
-      autoTitleSessions: false, tools: [],
+      cwd: root,
+      agentDir,
+      settingsManager,
+      modelRegistry: registry,
+      model: registry.find("prefix-fixture", "prefix-fixture"),
+      thinkingLevel: "off",
+      resourceLoader: loader,
+      sessionManager: SessionManager.inMemory(root),
+      autoTitleSessions: false,
+      tools: [],
     }))
     await session.bindExtensions({ mode: "print" })
-    if (context?.getPromptCachePrefixRequest === undefined) throw new Error("session_start did not expose the engine prefix builder")
+    if (context?.getPromptCachePrefixRequest === undefined)
+      throw new Error("session_start did not expose the engine prefix builder")
     // Binding the session, not the preview, starts the MCP connects (ast-grep spawns past session_start and
     // logs into this HOME). Await their settled signal, bounded, before the preview so anything the preview
     // started would show, and so no connect is still writing when the HOME is removed.
     const service = getMcpService()
     mcp = service
     const settled = await (options.attachWait ?? realAttachWait)(service, options.attachSettleMs)
-    if (settled !== "settled") throw new Error(`MCP attach did not settle within ${options.attachSettleMs} ms (${String(settled)})`)
-    const servers = () => service.getServerSnapshots().map(({ name, lifecycleState, generation, pid }) => ({ name, lifecycleState, generation, pid }))
+    if (settled !== "settled")
+      throw new Error(`MCP attach did not settle within ${options.attachSettleMs} ms (${String(settled)})`)
+    const servers = () =>
+      service
+        .getServerSnapshots()
+        .map(({ name, lifecycleState, generation, pid }) => ({ name, lifecycleState, generation, pid }))
     const serversBefore = servers()
     const connectionsBefore = service.getSnapshot().connectionCount
     // when
-    const result = await context.getPromptCachePrefixRequest({ signal: AbortSignal.timeout(10_000) })
+    const result = await context.getPromptCachePrefixRequest({
+      signal: testBudgetSignal("context.getPromptCachePrefixRequest to settle"),
+    })
     console.info("OMO_PREWARM_PREFIX", JSON.stringify(result.status === "ready" ? { status: result.status } : result))
     observed = {
       status: result.status,
       systemPrompt: result.status === "ready" ? result.request.context.systemPrompt : undefined,
       messages: result.status === "ready" ? result.request.context.messages : undefined,
-      serversBefore, serversAfter: servers(), connectionsBefore,
+      serversBefore,
+      serversAfter: servers(),
+      connectionsBefore,
       connectionsAfter: service.getSnapshot().connectionCount,
-      // Anything the preview started would still be pending here; await that signal, bounded.
-      settledAfterPreview: await service.whenAttachSettled(10_000),
+      // Anything the preview started would still be pending here; await that signal within the test budget,
+      // keeping the three teardown steps of the budget for the teardown below.
+      settledAfterPreview: await service.whenAttachSettled(
+        Math.max(0, remainingTestTime() - 3 * (options.teardownStepMs ?? TEARDOWN_STEP_MS)),
+      ),
     }
   } catch (caught) {
     failure = caught
@@ -163,7 +236,11 @@ async function runPrefixScenario(options: {
   // throwing step cannot skip it - restore cwd + env and remove the HOME. Every assertion happens after this point.
   const errors: unknown[] = []
   const stepMs = options.teardownStepMs ?? TEARDOWN_STEP_MS
-  const disposeSession = options.disposeSession ?? (async (live: Session): Promise<void> => { await live.dispose() })
+  const disposeSession =
+    options.disposeSession ??
+    (async (live: Session): Promise<void> => {
+      await live.dispose()
+    })
   let mcpDisposed: boolean | undefined
   let homeEntries: string[] = []
   const ownsProcess = (): boolean => owner !== undefined && baseline === owner
@@ -176,30 +253,60 @@ async function runPrefixScenario(options: {
     // in the pinned release yet.
     try {
       const settled = await mcp?.whenAttachSettled(stepMs)
-      if (settled !== undefined && settled !== "settled") errors.push(new Error(`MCP attach still pending at teardown (${String(settled)})`))
-    } catch (caught) { errors.push(caught) }
+      if (settled !== undefined && settled !== "settled")
+        errors.push(new Error(`MCP attach still pending at teardown (${String(settled)})`))
+    } catch (caught) {
+      errors.push(caught)
+    }
     try {
-      await bounded(Promise.resolve(session?.extensionRunner?.emit({ type: "session_shutdown", reason: "quit" })), stepMs, "session_shutdown")
-    } catch (caught) { errors.push(caught) }
+      await bounded(
+        Promise.resolve(session?.extensionRunner?.emit({ type: "session_shutdown", reason: "quit" })),
+        stepMs,
+        "session_shutdown",
+      )
+    } catch (caught) {
+      errors.push(caught)
+    }
     try {
       if (session !== undefined) await bounded(disposeSession(session), stepMs, "session.dispose()")
-    } catch (caught) { errors.push(caught) }
+    } catch (caught) {
+      errors.push(caught)
+    }
     mcpDisposed = mcp?.getSnapshot().disposed
   } finally {
     if (ownsProcess()) {
       process.chdir(cwd)
       restoreEnv(previous)
-      try { homeEntries = readdirSync(root, { recursive: true }).map(String) } catch (caught) { errors.push(caught) }
+      try {
+        homeEntries = readdirSync(root, { recursive: true }).map(String)
+      } catch (caught) {
+        errors.push(caught)
+      }
       rmSync(root, { recursive: true, force: true })
     }
   }
-  const teardown: Teardown = { errors, mcpDisposed, homeEntries, homeRemoved: !existsSync(root), ownsProcess: ownsProcess() }
-  return { observed, failure, teardown, envAfter: snapshotEnv(), cwdAfter: process.cwd(), envBefore: previous, cwdBefore: cwd }
+  const teardown: Teardown = {
+    errors,
+    mcpDisposed,
+    homeEntries,
+    homeRemoved: !existsSync(root),
+    ownsProcess: ownsProcess(),
+  }
+  return {
+    observed,
+    failure,
+    teardown,
+    envAfter: snapshotEnv(),
+    cwdAfter: process.cwd(),
+    envBefore: previous,
+    cwdBefore: cwd,
+  }
 }
 
 test("#given a real OmO session #when the engine builds its prewarm prefix #then it is ready rather than skipped by unsafe handlers", async () => {
+  useTestTimeout(90_000)
   // given / when
-  const run = await runPrefixScenario({ attachSettleMs: 30_000 })
+  const run = await runPrefixScenario({ attachSettleMs: attachBudget(TEARDOWN_STEP_MS) })
   // then: teardown already restored the process, so these assertions cannot leak state into later tests
   if (run.failure !== undefined) throw run.failure
   expect(run.teardown.errors).toEqual([])
@@ -224,12 +331,22 @@ test("#given a real OmO session #when the engine builds its prewarm prefix #then
 const boundElapsedBeforeSettle: AttachWait = async () => "timeout"
 
 test("#given an MCP attach that never settles within the bound #when the prefix scenario fails #then the process env, cwd and temp HOME are restored before it reports", async () => {
+  useTestTimeout(90_000)
   // given: an eager stdio server that is spawned but never answers initialize. Its connect times out at 3 s, which is
   // meant to land inside teardown's bounded settle wait, so the dispose normally finds nothing still connecting; on a
   // loaded host, or when the settle wait answers early (the race senpi#4028 fixes), it can still be connecting.
-  const neverReady = { command: process.execPath, args: ["-e", "setInterval(() => {}, 1 << 30)"], lifecycle: "eager", connectTimeoutMs: 3_000 }
+  const neverReady = {
+    command: process.execPath,
+    args: ["-e", "setInterval(() => {}, 1 << 30)"],
+    lifecycle: "eager",
+    connectTimeoutMs: 3_000,
+  }
   // when
-  const run = await runPrefixScenario({ attachSettleMs: 1_000, attachWait: boundElapsedBeforeSettle, extraMcpServers: { "never-ready": neverReady } })
+  const run = await runPrefixScenario({
+    attachSettleMs: 1_000,
+    attachWait: boundElapsedBeforeSettle,
+    extraMcpServers: { "never-ready": neverReady },
+  })
   // then
   expect(String(run.failure)).toContain("MCP attach did not settle within 1000 ms (timeout)")
   expect(run.envAfter).toEqual(run.envBefore)
@@ -240,13 +357,18 @@ test("#given an MCP attach that never settles within the bound #when the prefix 
 }, 90_000)
 
 test("#given a session dispose that never settles #when the scenario tears down #then the bound reports it and env, cwd and the HOME are still restored", async () => {
+  useTestTimeout(90_000)
   // given: dispose does its real work, then never settles
   const hangingDispose = async (live: Session): Promise<void> => {
     await live.dispose()
     await new Promise<void>(() => {})
   }
   // when
-  const run = await runPrefixScenario({ attachSettleMs: 30_000, teardownStepMs: 1_000, disposeSession: hangingDispose })
+  const run = await runPrefixScenario({
+    attachSettleMs: attachBudget(1_000),
+    teardownStepMs: 1_000,
+    disposeSession: hangingDispose,
+  })
   // then
   expect(run.failure).toBeUndefined()
   expect(run.teardown.errors.map(String)).toEqual(["Error: session.dispose() did not settle within 1000 ms"])

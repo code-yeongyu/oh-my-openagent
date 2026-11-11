@@ -37,18 +37,18 @@ type ModelSelectionInput = {
   readonly matchedFallback?: boolean
 }
 
-function getOwnRecordValue<TValue>(
-  record: Readonly<Record<string, TValue>>,
-  key: string,
-): TValue | undefined {
+function getOwnRecordValue<TValue>(record: Readonly<Record<string, TValue>>, key: string): TValue | undefined {
   return Object.hasOwn(record, key) ? record[key] : undefined
 }
 
-function promptAppendForCategory(categoryName: string, model: string | undefined, userPromptAppend: string | undefined): string | undefined {
+function promptAppendForCategory(
+  categoryName: string,
+  model: string | undefined,
+  userPromptAppend: string | undefined,
+): string | undefined {
   const promptAppendResolver = getOwnRecordValue(CATEGORY_PROMPT_APPEND_RESOLVERS, categoryName)
-  const basePromptAppend = promptAppendResolver?.(model)
-    ?? getOwnRecordValue(CATEGORY_PROMPT_APPENDS, categoryName)
-    ?? ""
+  const basePromptAppend =
+    promptAppendResolver?.(model) ?? getOwnRecordValue(CATEGORY_PROMPT_APPENDS, categoryName) ?? ""
   if (!userPromptAppend) {
     return basePromptAppend || undefined
   }
@@ -81,9 +81,10 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   // A retired builtin name resolves to its replacement so third-party skills and AGENTS.md text
   // spawning the old category keep working; a user category of that name still wins over the alias.
   const userCategories = omoConfig.categories
-  const categoryName = userCategories !== undefined && Object.hasOwn(userCategories, requestedCategoryName)
-    ? requestedCategoryName
-    : canonicalCategoryName(requestedCategoryName)
+  const categoryName =
+    userCategories !== undefined && Object.hasOwn(userCategories, requestedCategoryName)
+      ? requestedCategoryName
+      : canonicalCategoryName(requestedCategoryName)
   const availableCategories = availableCategoryNames(omoConfig)
   const userConfig = userCategories ? getOwnRecordValue(userCategories, categoryName) : undefined
   if (userConfig?.disable === true) {
@@ -97,16 +98,27 @@ export function resolveCategory<TModel extends SenpiModelPort>(
 
   const builtinConfig = getOwnRecordValue(DEFAULT_CATEGORIES, categoryName)
   if (!builtinConfig && !userConfig) {
-    return { kind: "not_found", category: categoryName, availableCategories: gatedAvailableCategories(omoConfig, senpiModelRegistry) }
+    return {
+      kind: "not_found",
+      category: categoryName,
+      availableCategories: gatedAvailableCategories(omoConfig, senpiModelRegistry),
+    }
   }
 
   const mergedConfig = { ...builtinConfig, ...userConfig }
-  const config = mergedConfig.models && options.distributeModels
-    ? {
-        ...mergedConfig,
-        models: [...options.distributeModels(`category:${categoryName}`, mergedConfig.models, mergedConfig.models_distribution)],
-      }
-    : mergedConfig
+  const config =
+    mergedConfig.models && options.distributeModels
+      ? {
+          ...mergedConfig,
+          models: [
+            ...options.distributeModels(
+              `category:${categoryName}`,
+              mergedConfig.models,
+              mergedConfig.models_distribution,
+            ),
+          ],
+        }
+      : mergedConfig
   const availableModelsResult = parseAvailableModels(senpiModelRegistry.getAvailable())
   const availableModels = availableModelsResult.models
   if (!availableModelsResult.validContainer) {
@@ -122,19 +134,20 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   const availableModelSet: ReadonlySet<string> = new Set(availableModels)
   const gatedCategories = availableCategoryNames(omoConfig, availableModelSet)
   const fallbackChain = getOwnRecordValue(CATEGORY_FALLBACK_CHAINS, categoryName)
-  const chainDead = fallbackChain !== undefined
-    && fallbackChain.length > 0
-    && !fallbackChain.some((rung) => isCategoryChainRungResolvable(rung, availableModelSet))
-  const unlistedModel = chainDead && fallbackChain !== undefined
-    ? unlistedProviderModel(fallbackChain, availableModels)
-    : undefined
-  const deadChain = chainDead && fallbackChain !== undefined
-    ? {
-        attempted_chain: fallbackChain,
-        missing_providers: missingChainProviders(fallbackChain, availableModels),
-        ...(unlistedModel !== undefined ? { unlisted_provider_model: unlistedModel } : {}),
-      }
-    : undefined
+  const chainDead =
+    fallbackChain !== undefined &&
+    fallbackChain.length > 0 &&
+    !fallbackChain.some((rung) => isCategoryChainRungResolvable(rung, availableModelSet))
+  const unlistedModel =
+    chainDead && fallbackChain !== undefined ? unlistedProviderModel(fallbackChain, availableModels) : undefined
+  const deadChain =
+    chainDead && fallbackChain !== undefined
+      ? {
+          attempted_chain: fallbackChain,
+          missing_providers: missingChainProviders(fallbackChain, availableModels),
+          ...(unlistedModel !== undefined ? { unlisted_provider_model: unlistedModel } : {}),
+        }
+      : undefined
   if (!isCategoryGateSatisfied(categoryName, userConfig !== undefined, availableModelSet)) {
     return {
       kind: "model_unavailable",
@@ -149,9 +162,14 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   // Dead-chain short-circuit: a builtin chain with zero resolvable rungs can never produce a model,
   // so fail before resolution with the rungs that were attempted. An explicit user model or user
   // fallback list opts the category out (its failure stays a plain user-model miss without chain
-  // details), and a caller-supplied system default remains the resolver's last resort.
+  // details). There is no last resort: a category never resolves to a model outside its own chain.
   const userHasCanonicalModels = (userConfig?.models?.length ?? 0) > 0
-  if (deadChain !== undefined && !userHasCanonicalModels && userConfig?.model === undefined && userConfig?.fallback_models === undefined && options.systemDefaultModel === undefined) {
+  if (
+    deadChain !== undefined &&
+    !userHasCanonicalModels &&
+    userConfig?.model === undefined &&
+    userConfig?.fallback_models === undefined
+  ) {
     return {
       kind: "model_unavailable",
       category: categoryName,
@@ -164,16 +182,16 @@ export function resolveCategory<TModel extends SenpiModelPort>(
 
   // Canonical models[] wins over the legacy model + fallback_models branch only when present;
   // builtin categories have no models key and must keep their chain-based resolution.
-  const canonicalChain = config.models !== undefined && config.models.length > 0
-    ? categoryModelCandidates(config)
-    : undefined
+  const canonicalChain =
+    config.models !== undefined && config.models.length > 0 ? categoryModelCandidates(config) : undefined
   const canonicalReasoningByModel = new Map(
     (canonicalChain ?? []).map((candidate) => [candidate.model, candidate.reasoningEffort]),
   )
   const userModel = canonicalChain !== undefined ? canonicalChain[0].model : userConfig?.model
-  const userFallbackModels = canonicalChain !== undefined
-    ? canonicalChain.slice(1).map((candidate) => candidate.model)
-    : flattenFallbackModels(config.fallback_models)
+  const userFallbackModels =
+    canonicalChain !== undefined
+      ? canonicalChain.slice(1).map((candidate) => candidate.model)
+      : flattenFallbackModels(config.fallback_models)
   const resolution = resolveModelForDelegateTask(
     {
       userModel,
@@ -182,7 +200,6 @@ export function resolveCategory<TModel extends SenpiModelPort>(
       isUserConfiguredCategoryModel: false,
       fallbackChain,
       availableModels: new Set(availableModels),
-      systemDefaultModel: options.systemDefaultModel,
     },
     {
       connectedProviders: null,
@@ -201,16 +218,16 @@ export function resolveCategory<TModel extends SenpiModelPort>(
     }
   }
 
-  const selection = modelSelection(
-    {
-      selectedModel: resolution.model,
-      variant: resolution.variant,
-      fallbackEntry: resolution.fallbackEntry,
-      matchedFallback: resolution.matchedFallback,
-    },
-  )
+  const selection = modelSelection({
+    selectedModel: resolution.model,
+    variant: resolution.variant,
+    fallbackEntry: resolution.fallbackEntry,
+    matchedFallback: resolution.matchedFallback,
+  })
   const parsedModel = parseModel(selection.selectedModel)
-  const foundModel = parsedModel ? parseRegistryModel<TModel>(senpiModelRegistry.find(parsedModel.provider, parsedModel.modelId), parsedModel) : undefined
+  const foundModel = parsedModel
+    ? parseRegistryModel<TModel>(senpiModelRegistry.find(parsedModel.provider, parsedModel.modelId), parsedModel)
+    : undefined
   if (!parsedModel || !foundModel) {
     const fallback = nearestFallback(selection)
     return {
@@ -228,19 +245,19 @@ export function resolveCategory<TModel extends SenpiModelPort>(
   const variant = userConfig?.variant ?? selection.variant ?? config.variant
   // Canonical reasoning outranks the legacy reasoningEffort, whether it sits on the category or
   // on the selected canonical models entry; legacy reasoningEffort is the final fallback.
-  const effectiveReasoningEffort = canonicalReasoningByModel.get(selection.selectedModel)
-      ?? config.reasoning
-      ?? config.reasoningEffort
+  const effectiveReasoningEffort =
+    canonicalReasoningByModel.get(selection.selectedModel) ?? config.reasoning ?? config.reasoningEffort
   // Builtin chain rungs remaining after the selected one extend the runtime retry chain, appended
   // after any user-configured fallback_models so user entries keep priority (dedupe keeps firsts).
-  const chainCandidates = fallbackChain === undefined
-    ? []
-    : chainRungCandidates({
-        chain: fallbackChain,
-        selectedModel: selection.selectedModel,
-        ...(selection.fallbackEntry !== undefined ? { selectedRungEntry: selection.fallbackEntry } : {}),
-        availableModels: availableModelSet,
-      })
+  const chainCandidates =
+    fallbackChain === undefined
+      ? []
+      : chainRungCandidates({
+          chain: fallbackChain,
+          selectedModel: selection.selectedModel,
+          ...(selection.fallbackEntry !== undefined ? { selectedRungEntry: selection.fallbackEntry } : {}),
+          availableModels: availableModelSet,
+        })
   const runtimeModelChain = buildRuntimeModelChain({
     candidates: [
       ...categoryModelCandidates(config),

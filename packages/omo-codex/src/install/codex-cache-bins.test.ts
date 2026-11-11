@@ -143,7 +143,9 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
     // then
     expect(link).not.toBeNull()
     const wrapper = await readFile(link?.path ?? "", "utf8")
-    expect(wrapper).toContain('for /f "tokens=1,* delims==" %%A in (\'findstr /R /C:"NODE_REPL_NODE_PATH[ ]*=" "%CODEX_HOME%\\config.toml" 2^>nul\') do (')
+    expect(wrapper).toContain(
+      'for /f "tokens=1,* delims==" %%A in (\'findstr /R /C:"NODE_REPL_NODE_PATH[ ]*=" "%CODEX_HOME%\\config.toml" 2^>nul\') do (',
+    )
     expect(wrapper).toContain('set "OMO_NODE_BINARY=!OMO_NODE_BINARY:"=!"')
     expect(wrapper).toContain(`if "!OMO_NODE_BINARY:~0,1!"=="'" set "OMO_NODE_BINARY=!OMO_NODE_BINARY:~1!"`)
     expect(wrapper).toContain('if "%OMO_RUNTIME%"=="node" if defined OMO_NODE_BINARY if exist "')
@@ -154,66 +156,165 @@ describe("linkRootRuntimeBin runtime wrapper parity", () => {
 
   const posixOnly = process.platform === "win32" ? test.skip : test
   const windowsOnly = process.platform === "win32" ? test : test.skip
-  windowsOnly("#given NODE_REPL_NODE_PATH quoted in config.toml #when cmd runs the generated shim #then it reaches the target", async () => {
+  windowsOnly(
+    "#given NODE_REPL_NODE_PATH quoted in config.toml #when cmd runs the generated shim #then it reaches the target",
+    async () => {
+      // given
+      const root = mkdtempSync(join(tmpdir(), "omo-codex-cmd-shim-"))
+      const codexHome = join(root, "codex")
+      await mkdir(codexHome, { recursive: true })
+      await writeFile(
+        join(codexHome, "config.toml"),
+        `NODE_REPL_NODE_PATH = "${process.execPath.replaceAll("\\", "\\\\")}"\n`,
+      )
+      const target = join(root, "target.js")
+      await writeFile(target, 'console.log("SHIM_REACHED")\n')
+      const shim = join(root, "probe.cmd")
+      await writeFile(shim, windowsCommandShim(target))
+
+      // when
+      const child = Bun.spawn(["cmd.exe", "/d", "/c", shim], {
+        env: { ...Bun.env, CODEX_HOME: codexHome },
+        stderr: "pipe",
+        stdout: "pipe",
+      })
+      const [stdout, stderr, exitCode] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ])
+
+      // then
+      expect(stderr).not.toContain("syntax of the command is incorrect")
+      expect(stdout).toContain("SHIM_REACHED")
+      expect(exitCode).toBe(0)
+      await rm(root, { recursive: true, force: true })
+    },
+  )
+
+  it("#given a command-shim target holding %VAR% text, !, ^ and parentheses #when the shim is generated #then the quoted target is escaped for cmd (#12811)", () => {
     // given
-    const root = mkdtempSync(join(tmpdir(), "omo-codex-cmd-shim-"))
-    const codexHome = join(root, "codex")
-    await mkdir(codexHome, { recursive: true })
-    await writeFile(join(codexHome, "config.toml"), `NODE_REPL_NODE_PATH = "${process.execPath.replaceAll("\\", "\\\\")}"\n`)
-    const target = join(root, "target.js")
-    await writeFile(target, 'console.log("SHIM_REACHED")\n')
-    const shim = join(root, "probe.cmd")
-    await writeFile(shim, windowsCommandShim(target))
+    const target = join("odd %TEMP% !bang^ (x)", "target.js")
 
     // when
-    const child = Bun.spawn(["cmd.exe", "/d", "/c", shim], { env: { ...Bun.env, CODEX_HOME: codexHome }, stderr: "pipe", stdout: "pipe" })
-    const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    const shim = windowsCommandShim(target)
 
     // then
-    expect(stderr).not.toContain("syntax of the command is incorrect")
-    expect(stdout).toContain("SHIM_REACHED")
-    expect(exitCode).toBe(0)
-    await rm(root, { recursive: true, force: true })
+    expect(shim).toContain('"odd %%TEMP%% ^!bang^^ (x)')
   })
 
-  windowsOnly("#given a runtime target path holding %VAR% text, !, ^ and parentheses #when cmd runs the generated wrapper #then it runs that literal path (#12811)", async () => {
+  it("#given a command-shim target holding ^ and % but no ! #when the shim is generated #then carets stay literal and percent is doubled (#12811)", () => {
     // given
-    const root = mkdtempSync(join(tmpdir(), "omo-codex-cmd-escape-"))
-    const codexHome = join(root, "odd %TEMP% !bang^ (x)", ".codex")
-    const cliPath = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "1.0.0", "dist", "cli", "index.js")
-    await mkdir(dirname(cliPath), { recursive: true })
-    await writeFile(cliPath, 'console.log("WRAPPER_REACHED " + process.argv.slice(2).join(" "))\n')
-    const wrapper = join(root, "omo-agent-toolkit.cmd")
-    await writeFile(wrapper, windowsRuntimeWrapper("omo-agent-toolkit", cliPath, codexHome, root, join(dirname(cliPath), "..", "cli-node", "index.js")))
+    const target = join("a^b%c", "plain.js")
 
     // when
-    const child = Bun.spawn(["cmd.exe", "/d", "/c", wrapper, "probe"], { env: { ...Bun.env, BUN_BINARY: process.execPath, CODEX_HOME: codexHome }, stderr: "pipe", stdout: "pipe" })
-    const [stdout, stderr, exitCode] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited])
+    const shim = windowsCommandShim(target)
 
     // then
-    expect(stderr).not.toContain("runtime target missing")
-    expect(stdout).toContain("WRAPPER_REACHED probe")
-    expect(exitCode).toBe(0)
-    await rm(root, { recursive: true, force: true })
+    expect(shim).toContain('"a^b%%c')
+    expect(shim).not.toContain("a^^b")
   })
 
-  posixOnly("#given posix wrapper target was removed #when running omo #then exits with reinstall guidance", async () => {
-    // given
-    const fixture = await createRepoFixture()
-    const link = await linkRootRuntimeBin({ ...fixture, platform: "linux" })
-    if (link === null) throw new Error("expected runtime wrapper link")
-    await chmod(link.path, 0o755)
-    await rm(join(fixture.repoRoot, "dist", "cli", "index.js"))
+  windowsOnly(
+    "#given a command-shim target holding %VAR% text, !, ^ and parentheses #when cmd runs the shim #then it runs that literal path (#12811)",
+    async () => {
+      // given
+      const root = mkdtempSync(join(tmpdir(), "omo-codex-cmd-shim-escape-"))
+      const codexHome = join(root, "codex")
+      await mkdir(codexHome, { recursive: true })
+      await writeFile(
+        join(codexHome, "config.toml"),
+        `NODE_REPL_NODE_PATH = "${process.execPath.replaceAll("\\", "\\\\")}"\n`,
+      )
+      const target = join(root, "odd %TEMP% !bang^ (x)", "target.js")
+      await mkdir(dirname(target), { recursive: true })
+      await writeFile(target, 'console.log("SHIM_REACHED")\n')
+      const shim = join(root, "probe.cmd")
+      await writeFile(shim, windowsCommandShim(target))
 
-    // when
-    const process = Bun.spawn([link.path], { env: { ...Bun.env, BUN_BINARY: "bun" }, stderr: "pipe", stdout: "pipe" })
-    const [stderr, exitCode] = await Promise.all([new Response(process.stderr).text(), process.exited])
+      // when
+      const child = Bun.spawn(["cmd.exe", "/d", "/c", shim], {
+        env: { ...Bun.env, CODEX_HOME: codexHome },
+        stderr: "pipe",
+        stdout: "pipe",
+      })
+      const [stdout, stderr, exitCode] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ])
 
-    // then
-    expect(exitCode).toBe(1)
-    expect(stderr).toContain(`omo-agent-toolkit: runtime target missing at ${join(fixture.repoRoot, "dist", "cli", "index.js")}`)
-    expect(stderr).toContain("reinstall with: npx --yes lazycodex-ai@latest install --no-tui")
-  })
+      // then
+      expect(stderr).not.toContain("syntax of the command is incorrect")
+      expect(stdout).toContain("SHIM_REACHED")
+      expect(exitCode).toBe(0)
+      await rm(root, { recursive: true, force: true })
+    },
+  )
+
+  windowsOnly(
+    "#given a runtime target path holding %VAR% text, !, ^ and parentheses #when cmd runs the generated wrapper #then it runs that literal path (#12811)",
+    async () => {
+      // given
+      const root = mkdtempSync(join(tmpdir(), "omo-codex-cmd-escape-"))
+      const codexHome = join(root, "odd %TEMP% !bang^ (x)", ".codex")
+      const cliPath = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "1.0.0", "dist", "cli", "index.js")
+      await mkdir(dirname(cliPath), { recursive: true })
+      await writeFile(cliPath, 'console.log("WRAPPER_REACHED " + process.argv.slice(2).join(" "))\n')
+      const wrapper = join(root, "omo-agent-toolkit.cmd")
+      await writeFile(
+        wrapper,
+        windowsRuntimeWrapper(
+          "omo-agent-toolkit",
+          cliPath,
+          codexHome,
+          root,
+          join(dirname(cliPath), "..", "cli-node", "index.js"),
+        ),
+      )
+
+      // when
+      const child = Bun.spawn(["cmd.exe", "/d", "/c", wrapper, "probe"], {
+        env: { ...Bun.env, BUN_BINARY: process.execPath, CODEX_HOME: codexHome },
+        stderr: "pipe",
+        stdout: "pipe",
+      })
+      const [stdout, stderr, exitCode] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ])
+
+      // then
+      expect(stderr).not.toContain("runtime target missing")
+      expect(stdout).toContain("WRAPPER_REACHED probe")
+      expect(exitCode).toBe(0)
+      await rm(root, { recursive: true, force: true })
+    },
+  )
+
+  posixOnly(
+    "#given posix wrapper target was removed #when running omo #then exits with reinstall guidance",
+    async () => {
+      // given
+      const fixture = await createRepoFixture()
+      const link = await linkRootRuntimeBin({ ...fixture, platform: "linux" })
+      if (link === null) throw new Error("expected runtime wrapper link")
+      await chmod(link.path, 0o755)
+      await rm(join(fixture.repoRoot, "dist", "cli", "index.js"))
+
+      // when
+      const process = Bun.spawn([link.path], { env: { ...Bun.env, BUN_BINARY: "bun" }, stderr: "pipe", stdout: "pipe" })
+      const [stderr, exitCode] = await Promise.all([new Response(process.stderr).text(), process.exited])
+
+      // then
+      expect(exitCode).toBe(1)
+      expect(stderr).toContain(
+        `omo-agent-toolkit: runtime target missing at ${join(fixture.repoRoot, "dist", "cli", "index.js")}`,
+      )
+      expect(stderr).toContain("reinstall with: npx --yes lazycodex-ai@latest install --no-tui")
+    },
+  )
 
   posixOnly("#given ulw-loop command #when running omo wrapper #then preserves the ulw-loop token", async () => {
     // given

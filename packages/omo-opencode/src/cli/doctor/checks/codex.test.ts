@@ -4,7 +4,10 @@ import { join } from "node:path"
 import { describe, expect, test } from "bun:test"
 import { checkCodex, gatherCodexSummary } from "./codex"
 import { checkCodexRuntimeWrapper } from "./codex-runtime-wrapper"
-import { posixRuntimeWrapper, windowsRuntimeWrapper } from "../../../../../omo-codex/src/install/codex-cache-runtime-wrapper"
+import {
+  posixRuntimeWrapper,
+  windowsRuntimeWrapper,
+} from "../../../../../omo-codex/src/install/codex-cache-runtime-wrapper"
 
 async function createPlatformBin(binDir: string, name: string, target: string): Promise<void> {
   if (process.platform === "win32") {
@@ -15,7 +18,11 @@ async function createPlatformBin(binDir: string, name: string, target: string): 
   await symlink(target, join(binDir, name))
 }
 
-async function createInstalledCodexHome(): Promise<{ readonly codexHome: string; readonly binDir: string; readonly pluginRoot: string }> {
+async function createInstalledCodexHome(): Promise<{
+  readonly codexHome: string
+  readonly binDir: string
+  readonly pluginRoot: string
+}> {
   const root = await mkdtemp(join(tmpdir(), "omo-codex-doctor-"))
   const codexHome = join(root, ".codex")
   const binDir = join(root, "bin")
@@ -25,7 +32,10 @@ async function createInstalledCodexHome(): Promise<{ readonly codexHome: string;
   await mkdir(join(codexHome, "agents"), { recursive: true })
   await mkdir(binDir, { recursive: true })
   await writeFile(join(pluginRoot, ".codex-plugin", "plugin.json"), JSON.stringify({ name: "omo", version: "4.7.5" }))
-  await writeFile(join(pluginRoot, "lazycodex-install.json"), JSON.stringify({ packageName: "lazycodex-ai", version: "4.7.5" }))
+  await writeFile(
+    join(pluginRoot, "lazycodex-install.json"),
+    JSON.stringify({ packageName: "lazycodex-ai", version: "4.7.5" }),
+  )
   await writeFile(
     join(codexHome, "config.toml"),
     [
@@ -185,8 +195,12 @@ describe("codex doctor checks", () => {
     await writeFile(
       wrapperPath,
       process.platform === "win32"
-        ? ["@echo off", "rem OMO_GENERATED_RUNTIME_WRAPPER", `"%%BUN_BINARY%%" "${missingCliPath}" %%*`, ""].join("\r\n")
-        : ["#!/bin/sh", "# OMO_GENERATED_RUNTIME_WRAPPER", `exec "$BUN_BINARY" "${missingCliPath}" "$@"`, ""].join("\n"),
+        ? ["@echo off", "rem OMO_GENERATED_RUNTIME_WRAPPER", `"%%BUN_BINARY%%" "${missingCliPath}" %%*`, ""].join(
+            "\r\n",
+          )
+        : ["#!/bin/sh", "# OMO_GENERATED_RUNTIME_WRAPPER", `exec "$BUN_BINARY" "${missingCliPath}" "$@"`, ""].join(
+            "\n",
+          ),
     )
 
     // when
@@ -201,52 +215,89 @@ describe("codex doctor checks", () => {
     expect(issue?.fix).toContain("npx --yes lazycodex-ai@latest install --no-tui")
   })
 
-  test.skipIf(process.platform === "win32")("#given a generated wrapper whose runtime target path holds $ and a backtick #when the target exists #then no missing-target issue is reported (#12560)", async () => {
-    // given: the generator escapes $ and ` inside the double-quoted target
-    const { codexHome, binDir } = await createInstalledCodexHome()
-    const wrapperPath = join(binDir, "omo-agent-toolkit")
-    await rm(wrapperPath)
-    const oddRoot = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "we$ird`dir")
-    const cliPath = join(oddRoot, "dist", "cli", "index.js")
-    await mkdir(join(oddRoot, "dist", "cli"), { recursive: true })
-    await writeFile(cliPath, "#!/usr/bin/env node\n")
-    await writeFile(wrapperPath, posixRuntimeWrapper("omo-agent-toolkit", cliPath, codexHome, binDir, join(oddRoot, "dist", "cli-node", "index.js")))
+  test.skipIf(process.platform === "win32")(
+    "#given a generated wrapper whose runtime target path holds $ and a backtick #when the target exists #then no missing-target issue is reported (#12560)",
+    async () => {
+      // given: the generator escapes $ and ` inside the double-quoted target
+      const { codexHome, binDir } = await createInstalledCodexHome()
+      const wrapperPath = join(binDir, "omo-agent-toolkit")
+      await rm(wrapperPath)
+      const oddRoot = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "we$ird`dir")
+      const cliPath = join(oddRoot, "dist", "cli", "index.js")
+      await mkdir(join(oddRoot, "dist", "cli"), { recursive: true })
+      await writeFile(cliPath, "#!/usr/bin/env node\n")
+      await writeFile(
+        wrapperPath,
+        posixRuntimeWrapper(
+          "omo-agent-toolkit",
+          cliPath,
+          codexHome,
+          binDir,
+          join(oddRoot, "dist", "cli-node", "index.js"),
+        ),
+      )
 
-    // when
-    const result = await checkCodexRuntimeWrapper({ codexHome, binDir })
+      // when
+      const result = await checkCodexRuntimeWrapper({ codexHome, binDir })
 
-    // then
-    expect(result.issues.map((issue) => issue.title)).not.toContain("omo-agent-toolkit runtime wrapper target is missing")
-  })
+      // then
+      expect(result.issues.map((issue) => issue.title)).not.toContain(
+        "omo-agent-toolkit runtime wrapper target is missing",
+      )
+    },
+  )
 
-  test.skipIf(process.platform === "win32")("#given a generated wrapper whose runtime target path holds a double quote #when the target is gone #then the missing target is reported at the unescaped path (#12560)", async () => {
-    // given: the generator escapes the quote, which the old `([^"]+)` capture stopped at, so nothing was reported
-    const { codexHome, binDir } = await createInstalledCodexHome()
-    const wrapperPath = join(binDir, "omo-agent-toolkit")
-    await rm(wrapperPath)
-    const oddRoot = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", 'quo"ted')
-    const cliPath = join(oddRoot, "dist", "cli", "index.js")
-    await writeFile(wrapperPath, posixRuntimeWrapper("omo-agent-toolkit", cliPath, codexHome, binDir, join(oddRoot, "dist", "cli-node", "index.js")))
+  test.skipIf(process.platform === "win32")(
+    "#given a generated wrapper whose runtime target path holds a double quote #when the target is gone #then the missing target is reported at the unescaped path (#12560)",
+    async () => {
+      // given: the generator escapes the quote, which the old `([^"]+)` capture stopped at, so nothing was reported
+      const { codexHome, binDir } = await createInstalledCodexHome()
+      const wrapperPath = join(binDir, "omo-agent-toolkit")
+      await rm(wrapperPath)
+      const oddRoot = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", 'quo"ted')
+      const cliPath = join(oddRoot, "dist", "cli", "index.js")
+      await writeFile(
+        wrapperPath,
+        posixRuntimeWrapper(
+          "omo-agent-toolkit",
+          cliPath,
+          codexHome,
+          binDir,
+          join(oddRoot, "dist", "cli-node", "index.js"),
+        ),
+      )
 
-    // when
-    const result = await checkCodexRuntimeWrapper({ codexHome, binDir })
+      // when
+      const result = await checkCodexRuntimeWrapper({ codexHome, binDir })
 
-    // then
-    const issue = result.issues.find((entry) => entry.title === "omo-agent-toolkit runtime wrapper target is missing")
-    expect(issue?.description).toContain(`points to missing target ${cliPath}.`)
-  })
+      // then
+      const issue = result.issues.find((entry) => entry.title === "omo-agent-toolkit runtime wrapper target is missing")
+      expect(issue?.description).toContain(`points to missing target ${cliPath}.`)
+    },
+  )
 
   test("#given a generated .cmd wrapper whose runtime target path holds %VAR% text and ! #when checking runtime wrapper #then the literal path cmd runs is the one checked (#12811)", async () => {
     // given: the generator doubles % and escapes ! for delayed expansion; the target does not exist yet
     const { codexHome, binDir } = await createInstalledCodexHome()
     const oddRoot = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "odd %TEMP% !bang")
     const cliPath = join(oddRoot, "dist", "cli", "index.js")
-    await writeFile(join(binDir, "omo-agent-toolkit.cmd"), windowsRuntimeWrapper("omo-agent-toolkit", cliPath, codexHome, binDir, join(oddRoot, "dist", "cli-node", "index.js")))
+    await writeFile(
+      join(binDir, "omo-agent-toolkit.cmd"),
+      windowsRuntimeWrapper(
+        "omo-agent-toolkit",
+        cliPath,
+        codexHome,
+        binDir,
+        join(oddRoot, "dist", "cli-node", "index.js"),
+      ),
+    )
     const missingTitle = "omo-agent-toolkit runtime wrapper target is missing"
 
     // when / then: reported at the literal path while it is gone, silent once it exists
     const missing = await checkCodexRuntimeWrapper({ codexHome, binDir, platform: "win32" })
-    expect(missing.issues.find((entry) => entry.title === missingTitle)?.description).toContain(`points to missing target ${cliPath}.`)
+    expect(missing.issues.find((entry) => entry.title === missingTitle)?.description).toContain(
+      `points to missing target ${cliPath}.`,
+    )
     await mkdir(join(oddRoot, "dist", "cli"), { recursive: true })
     await writeFile(cliPath, "#!/usr/bin/env node\n")
     const present = await checkCodexRuntimeWrapper({ codexHome, binDir, platform: "win32" })
@@ -273,7 +324,10 @@ describe("codex doctor checks", () => {
     // given
     const { codexHome, binDir } = await createInstalledCodexHome()
     const legacyPath = join(binDir, process.platform === "win32" ? "omo.cmd" : "omo")
-    await writeFile(legacyPath, process.platform === "win32" ? "@echo off\r\necho user owned\r\n" : "#!/bin/sh\necho user-owned\n")
+    await writeFile(
+      legacyPath,
+      process.platform === "win32" ? "@echo off\r\necho user owned\r\n" : "#!/bin/sh\necho user-owned\n",
+    )
 
     // when
     const result = await checkCodexRuntimeWrapper({ codexHome, binDir })
@@ -350,7 +404,9 @@ describe("codex doctor checks", () => {
     expect(summary.config.companionPluginEnabled).toBe(true)
     expect(summary.config.companionLifecycleHookStateEvents).toEqual(["session_start", "stop"])
     expect(result.details).toContain("Companion plugin: codex@openai-codex enabled (SessionStart, Stop hook trust)")
-    const issue = result.issues.find((entry) => entry.title === "Codex Companion lifecycle hooks may conflict with LazyCodex")
+    const issue = result.issues.find(
+      (entry) => entry.title === "Codex Companion lifecycle hooks may conflict with LazyCodex",
+    )
     expect(issue).toBeDefined()
     expect(issue?.severity).toBe("warning")
     expect(issue?.description).toContain("codex@openai-codex is enabled")

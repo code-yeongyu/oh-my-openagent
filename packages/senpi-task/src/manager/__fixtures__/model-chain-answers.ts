@@ -7,7 +7,8 @@ const QUOTA_ERROR =
   `"type":"access_terminated_error"}`
 
 // A content-policy refusal and a rejected credential: neither is a usage limit.
-const REFUSAL_ERROR = "400: This request was flagged as a possible cybersecurity risk and refused under the content policy."
+const REFUSAL_ERROR =
+  "400: This request was flagged as a possible cybersecurity risk and refused under the content policy."
 const AUTH_ERROR = "401: Unauthorized - invalid api key"
 
 const ERRORS = { quota: QUOTA_ERROR, refusal: REFUSAL_ERROR, auth: AUTH_ERROR } as const
@@ -43,19 +44,34 @@ export function answer(provider: string, model: string, step: Step) {
     api: "openai-completions" as const,
     provider,
     model,
-    usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+    usage: {
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+      totalTokens: 0,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    },
     timestamp: Date.now(),
   }
   const toolCall = (name: string) => ({ type: "toolCall" as const, id: `call-${name}`, name, arguments: {} })
-  if (typeof step === "string" && step !== "complete") return stream([], { ...base, content: [], stopReason: "error" as const, errorMessage: ERRORS[step] })
+  if (typeof step === "string" && step !== "complete")
+    return stream([], { ...base, content: [], stopReason: "error" as const, errorMessage: ERRORS[step] })
   if (step === "complete") {
-    return stream([], { ...base, content: [{ type: "text" as const, text: `${provider}/${model} completed` }], stopReason: "stop" as const })
+    return stream([], {
+      ...base,
+      content: [{ type: "text" as const, text: `${provider}/${model} completed` }],
+      stopReason: "stop" as const,
+    })
   }
   if ("tool" in step) return stream([], { ...base, content: [toolCall(step.tool)], stopReason: "toolUse" as const })
   // The limit lands while the call is still streaming: the provider had opened it, then errored.
   const partial = { ...base, content: [toolCall(step.partialTool)], stopReason: "toolUse" as const }
   return stream(
-    [{ type: "start", partial }, { type: "toolcall_start", contentIndex: 0, partial }],
+    [
+      { type: "start", partial },
+      { type: "toolcall_start", contentIndex: 0, partial },
+    ],
     { ...partial, stopReason: "error" as const, errorMessage: QUOTA_ERROR },
   )
 }
@@ -63,7 +79,9 @@ export function answer(provider: string, model: string, step: Step) {
 function stream<Message extends { readonly stopReason: string }>(opening: readonly unknown[], message: Message) {
   const events = [
     ...opening,
-    message.stopReason === "error" ? { type: "error", reason: "error", error: message } : { type: "done", reason: message.stopReason, message },
+    message.stopReason === "error"
+      ? { type: "error", reason: "error", error: message }
+      : { type: "done", reason: message.stopReason, message },
   ]
   return {
     result: () => Promise.resolve(message),
