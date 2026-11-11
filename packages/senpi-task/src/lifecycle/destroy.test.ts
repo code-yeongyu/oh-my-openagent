@@ -103,7 +103,12 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
   test("#given an rpc resident #when destroyed #then it terminates (TERM->KILL) then detaches, never dispose-only", async () => {
     // given
     const store = tempStore()
-    seedRecord(store, { task_id: "st_0000000b", status: "cancelled", residency_state: "resident", execution_mode: "process" })
+    seedRecord(store, {
+      task_id: "st_0000000b",
+      status: "cancelled",
+      residency_state: "resident",
+      execution_mode: "process",
+    })
     const registry = new FakeRegistry()
     const order: CallLog = []
     registry.add(fakeHandle("st_0000000b", "rpc", order, { pid: 4242 }))
@@ -189,7 +194,13 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
         store.replace({ ...revived, host_pid: 7000 })
       },
     })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings(), hostPid: 6000 })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry,
+      config: settings(),
+      hostPid: 6000,
+    })
 
     await lifecycle.destroyResidentTask(prior.task_id, "revive_failure")
     const result = lifecycle.rollbackDetachedRevival(prior)
@@ -225,7 +236,14 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
       error_message: "cancelled by user",
       notification: { ...prior.notification, run_epoch: 5 },
     })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), hostPid: 6000, now: () => Date.parse("2026-09-02T00:00:00.000Z") })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+      hostPid: 6000,
+      now: () => Date.parse("2026-09-02T00:00:00.000Z"),
+    })
 
     const result = lifecycle.rollbackDetachedRevival(withTerminalFacts)
     const current = store.load(prior.task_id)
@@ -265,7 +283,14 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
       host_pid: 6000,
       notification: { ...prior.notification, run_epoch: 5 },
     })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), hostPid: 6000, now: () => Date.parse("2026-09-02T00:00:00.000Z") })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+      hostPid: 6000,
+      now: () => Date.parse("2026-09-02T00:00:00.000Z"),
+    })
 
     const result = lifecycle.rollbackDetachedRevival(withTerminalFacts)
     const restored = store.load(prior.task_id)
@@ -297,8 +322,22 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
     })
     const prior = { ...seeded, run_start_epoch: 3 }
     store.replace(prior)
-    store.replace({ ...prior, status: "running", residency_state: "resident", host_pid: 6000, run_start_epoch: 5, notification: { ...prior.notification, run_epoch: 5 } })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), hostPid: 6000, now: () => Date.parse("2026-09-02T00:00:00.000Z") })
+    store.replace({
+      ...prior,
+      status: "running",
+      residency_state: "resident",
+      host_pid: 6000,
+      run_start_epoch: 5,
+      notification: { ...prior.notification, run_epoch: 5 },
+    })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+      hostPid: 6000,
+      now: () => Date.parse("2026-09-02T00:00:00.000Z"),
+    })
 
     const result = lifecycle.rollbackDetachedRevival(prior)
     const restored = store.load(prior.task_id)
@@ -319,8 +358,22 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
       run_epoch: 4,
       updated_at: "2026-09-01T00:00:00.000Z",
     })
-    store.replace({ ...prior, status: "running", residency_state: "resident", host_pid: 6000, run_start_epoch: 5, notification: { ...prior.notification, run_epoch: 5 } })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings(), hostPid: 6000, now: () => Date.parse("2026-09-02T00:00:00.000Z") })
+    store.replace({
+      ...prior,
+      status: "running",
+      residency_state: "resident",
+      host_pid: 6000,
+      run_start_epoch: 5,
+      notification: { ...prior.notification, run_epoch: 5 },
+    })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+      hostPid: 6000,
+      now: () => Date.parse("2026-09-02T00:00:00.000Z"),
+    })
 
     lifecycle.rollbackDetachedRevival(prior)
     const restored = store.load(prior.task_id)
@@ -334,7 +387,12 @@ describe("destroyResidentTask (the single-writer destruction port)", () => {
     // given
     const store = tempStore()
     seedRecord(store, { task_id: "st_0000000d", status: "cancelled", residency_state: "resident" })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings() })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+    })
 
     // when
     await lifecycle.destroyResidentTask("st_0000000d", "cancel")

@@ -33,17 +33,25 @@ const keyringRow = z.object({
 })
 const bodyFields = z.object({ kind: z.string(), account: z.string(), epoch: SyncInteger })
 export const decodeSyncKeys = (input: unknown) =>
-  z.object({ entries: z.array(keyringRow) }).parse(input).entries.map(entry => ({
-    ...entry,
-    body: { ...entry.body, ...bodyFields.parse(entry.body) },
-  }))
+  z
+    .object({ entries: z.array(keyringRow) })
+    .parse(input)
+    .entries.map((entry) => ({
+      ...entry,
+      body: { ...entry.body, ...bodyFields.parse(entry.body) },
+    }))
 export const decodeSyncEntries = (input: unknown) => z.object({ entries: z.array(SyncChainRow) }).parse(input)
-export const decodeRecoveryWraps = (input: unknown) => z.object({
-  wraps: z.array(z.object({
-    record: z.object({ seq: SyncInteger, digest: z.string(), keyring_link: z.string() }),
-    entry: SyncWrap,
-  })),
-}).parse(input)
+export const decodeRecoveryWraps = (input: unknown) =>
+  z
+    .object({
+      wraps: z.array(
+        z.object({
+          record: z.object({ seq: SyncInteger, digest: z.string(), keyring_link: z.string() }),
+          entry: SyncWrap,
+        }),
+      ),
+    })
+    .parse(input)
 export const SyncPending = z.object({
   id: z.string(),
   account: z.string(),
@@ -70,19 +78,21 @@ export const SyncDescriptor = z.object({
 })
 export type SyncDescriptor = z.infer<typeof SyncDescriptor>
 export const SyncDevices = z.object({
-  devices: z.array(z.object({
-    id: z.string(),
-    name: z.string(),
-    kind: z.enum(["desktop", "cli"]),
-    platform: z.enum(["macos", "linux", "windows"]),
-    createdAt: z.string(),
-    lastSeenAt: z.string(),
-    approximateLocation: z.string().optional(),
-    current: z.boolean(),
-    syncing: z.boolean(),
-    revokedAt: z.string().nullable(),
-    syncPrincipal: z.string().nullable(),
-  })),
+  devices: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      kind: z.enum(["desktop", "cli"]),
+      platform: z.enum(["macos", "linux", "windows"]),
+      createdAt: z.string(),
+      lastSeenAt: z.string(),
+      approximateLocation: z.string().optional(),
+      current: z.boolean(),
+      syncing: z.boolean(),
+      revokedAt: z.string().nullable(),
+      syncPrincipal: z.string().nullable(),
+    }),
+  ),
 })
 const reply = z.union([
   z.strictObject({ kind: z.literal("json"), status: SyncInteger, body: z.unknown() }),

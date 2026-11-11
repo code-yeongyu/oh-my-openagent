@@ -21,14 +21,17 @@ const Summary = Type.Optional(Type.String({ description: "Optional one-line summ
 export const TaskSendParams = Type.Object({
   to: Recipient,
   message: Type.Optional(Type.Union([PlainMessage, StructuredMessage])),
-  team_run_id: Type.Optional(Type.String({ description: "Team run id for lead-to-member messages or shutdown messages." })),
+  team_run_id: Type.Optional(
+    Type.String({ description: "Team run id for lead-to-member messages or shutdown messages." }),
+  ),
   summary: Summary,
   all_scope: Type.Optional(
     Type.Boolean({ description: "Allow messaging a child owned by another session. Off by default." }),
   ),
   redispatch: Type.Optional(
     Type.Boolean({
-      description: "Re-dispatch a flagged 'resumed, waiting for input' task onto a fresh live session, replaying its persisted prompt. Off by default; message is forbidden with it.",
+      description:
+        "Re-dispatch a flagged 'resumed, waiting for input' task onto a fresh live session, replaying its persisted prompt. Off by default; message is forbidden with it.",
     }),
   ),
 })

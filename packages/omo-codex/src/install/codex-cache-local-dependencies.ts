@@ -4,7 +4,10 @@ import { readFile, readdir, writeFile } from "node:fs/promises"
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { isPathInside } from "./codex-cache-paths"
 
-export async function rewriteCachedPackageLocalFileDependencies(pluginRoot: string, sourceRoot: string): Promise<boolean> {
+export async function rewriteCachedPackageLocalFileDependencies(
+  pluginRoot: string,
+  sourceRoot: string,
+): Promise<boolean> {
   const packageJsonPaths: string[] = []
   await collectPackageJsonPaths(pluginRoot, pluginRoot, packageJsonPaths)
   const packageLock = await readPackageLock(pluginRoot)

@@ -10,17 +10,8 @@ import { buildIdentityPaths, GitMemoryRepo, LockContentionError, type ReservedRu
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import type { MemoryIdentityRuntime } from "./identity-runtime"
-import {
-  MEMORY_STATUS_RPC_METHOD,
-  MEMORY_UPDATED_RPC_EVENT,
-  type MemoryRpcSnapshot,
-} from "./memory-rpc-bridge"
-import {
-  MemoryFakeExtensionAPI,
-  componentContext,
-  loadedMemoryConfig,
-  memorySettings,
-} from "./memory.test-support"
+import { MEMORY_STATUS_RPC_METHOD, MEMORY_UPDATED_RPC_EVENT, type MemoryRpcSnapshot } from "./memory-rpc-bridge"
+import { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
 import type { MemoryStatusResult, RefreshMemoryStatusInput } from "./status"
 import { MEMORY_STATUS_KEY } from "./status"
 import { createMemoryWiring } from "./wiring"
@@ -28,7 +19,8 @@ import { recordReflectionCompletion, type ReflectionCompletionRecord } from "./w
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 class RpcFakeExtensionAPI extends MemoryFakeExtensionAPI {
@@ -149,33 +141,38 @@ describe("memory rpc wiring", () => {
     { env: {}, expectedReconciles: 1 },
     { env: { OMO_SENPI_TASK_RPC_CHILD: "1" }, expectedReconciles: 0 },
     { env: { SENPI_TASK_MEMBER: "run::worker" }, expectedReconciles: 0 },
-  ])("#given adapter environment %j #when RPC input is accepted #then runtime admission uses the passed environment", async ({ env, expectedReconciles }) => {
-    const fixture = await createFixture()
-    const pi = new RpcFakeExtensionAPI()
-    let reconciles = 0
-    const runtime = {
-      reconcile: async () => { reconciles += 1 },
-      launch: () => {},
-    } as unknown as MemoryIdentityRuntime
-    const wiring = createMemoryWiring({
-      sessions: new Map([[fixture.sessionId, { context: fixture.context }]]),
-      loadConfig: () => loadedMemoryConfig(memorySettings({ facts: { enabled: false, debounce_settles: 4 } })),
-      cwd: () => fixture.cwd,
-      env: { ...fixture.env, ...env },
-      createRuntime: () => runtime,
-    })
-    const eventCtx = sessionContext(fixture.sessionId)
-    wiring.registerStatic(pi, componentContext())
-    await wiring.afterBind(pi, fixture.sessionId, fixture.context, eventCtx)
-    expect(reconciles).toBe(0)
+  ])(
+    "#given adapter environment %j #when RPC input is accepted #then runtime admission uses the passed environment",
+    async ({ env, expectedReconciles }) => {
+      const fixture = await createFixture()
+      const pi = new RpcFakeExtensionAPI()
+      let reconciles = 0
+      const runtime = {
+        reconcile: async () => {
+          reconciles += 1
+        },
+        launch: () => {},
+      } as unknown as MemoryIdentityRuntime
+      const wiring = createMemoryWiring({
+        sessions: new Map([[fixture.sessionId, { context: fixture.context }]]),
+        loadConfig: () => loadedMemoryConfig(memorySettings({ facts: { enabled: false, debounce_settles: 4 } })),
+        cwd: () => fixture.cwd,
+        env: { ...fixture.env, ...env },
+        createRuntime: () => runtime,
+      })
+      const eventCtx = sessionContext(fixture.sessionId)
+      wiring.registerStatic(pi, componentContext())
+      await wiring.afterBind(pi, fixture.sessionId, fixture.context, eventCtx)
+      expect(reconciles).toBe(0)
 
-    await pi.dispatch("input", { source: "rpc", inputId: "env-input", text: "Continue." }, eventCtx)
-    await pi.dispatch("input_disposition", { inputId: "env-input", disposition: "started" }, eventCtx)
-    await pi.dispatch("agent_settled", {}, eventCtx)
+      await pi.dispatch("input", { source: "rpc", inputId: "env-input", text: "Continue." }, eventCtx)
+      await pi.dispatch("input_disposition", { inputId: "env-input", disposition: "started" }, eventCtx)
+      await pi.dispatch("agent_settled", {}, eventCtx)
 
-    expect(reconciles).toBe(expectedReconciles)
-    await wiring.onSessionShutdown({ reason: "reload", sessionId: fixture.sessionId, deadlineAt: Date.now() + 5_000 })
-  })
+      expect(reconciles).toBe(expectedReconciles)
+      await wiring.onSessionShutdown({ reason: "reload", sessionId: fixture.sessionId, deadlineAt: Date.now() + 5_000 })
+    },
+  )
 
   test("#given reflection lock contention on first-user-settle reconcile #when the session settles #then it logs a harmless skip, continues RPC sync, and does not retry every settle", async () => {
     const fixture = await createFixture()
@@ -292,8 +289,16 @@ describe("memory rpc wiring", () => {
 
       wiring.registerStatic(pi, componentContext())
       await wiring.afterBind(pi, fixture.sessionId, fixture.context, eventCtx)
-      await pi.dispatch("input", { type: "input", source: "rpc", inputId: "real-prompt", text: "Work on this." }, eventCtx)
-      await pi.dispatch("input_disposition", { type: "input_disposition", inputId: "real-prompt", disposition: "started" }, eventCtx)
+      await pi.dispatch(
+        "input",
+        { type: "input", source: "rpc", inputId: "real-prompt", text: "Work on this." },
+        eventCtx,
+      )
+      await pi.dispatch(
+        "input_disposition",
+        { type: "input_disposition", inputId: "real-prompt", disposition: "started" },
+        eventCtx,
+      )
       await pi.dispatch("agent_end", { aborted: false, willRetry: false }, eventCtx)
       await pi.dispatch("agent_settled", {}, eventCtx)
 
@@ -325,7 +330,9 @@ describe("memory rpc wiring", () => {
       }
       let liveSession: (() => Parameters<typeof recordReflectionCompletion>[2]) | undefined
       let releaseCompletion: (() => void) | undefined
-      const completionReleased = new Promise<void>((resolve) => { releaseCompletion = resolve })
+      const completionReleased = new Promise<void>((resolve) => {
+        releaseCompletion = resolve
+      })
       let completionTask: Promise<void> | undefined
       const run = reservedRun("run-live-completed")
       const completion: ReflectionCompletionRecord = {
@@ -370,8 +377,16 @@ describe("memory rpc wiring", () => {
 
       wiring.registerStatic(pi, componentContext())
       await wiring.afterBind(pi, fixture.sessionId, fixture.context, eventCtx)
-      await pi.dispatch("input", { type: "input", source: "rpc", inputId: "real-prompt", text: "Work on this." }, eventCtx)
-      await pi.dispatch("input_disposition", { type: "input_disposition", inputId: "real-prompt", disposition: "started" }, eventCtx)
+      await pi.dispatch(
+        "input",
+        { type: "input", source: "rpc", inputId: "real-prompt", text: "Work on this." },
+        eventCtx,
+      )
+      await pi.dispatch(
+        "input_disposition",
+        { type: "input_disposition", inputId: "real-prompt", disposition: "started" },
+        eventCtx,
+      )
       await pi.dispatch("agent_end", { aborted: false, willRetry: false }, eventCtx)
       await pi.dispatch("agent_settled", {}, eventCtx)
       expect(handles.size).toBe(1)
@@ -400,27 +415,32 @@ describe("memory rpc wiring", () => {
 
       wiring.registerStatic(pi, componentContext())
       await wiring.afterBind(pi, fixture.sessionId, fixture.context, eventCtx)
-      await pi.dispatch("input", { type: "input", source: "rpc", inputId: "real-prompt", text: "Work on this." }, eventCtx)
-      await pi.dispatch("input_disposition", { type: "input_disposition", inputId: "real-prompt", disposition: "started" }, eventCtx)
+      await pi.dispatch(
+        "input",
+        { type: "input", source: "rpc", inputId: "real-prompt", text: "Work on this." },
+        eventCtx,
+      )
+      await pi.dispatch(
+        "input_disposition",
+        { type: "input_disposition", inputId: "real-prompt", disposition: "started" },
+        eventCtx,
+      )
       await pi.dispatch("agent_end", { aborted: false, willRetry: false }, eventCtx)
       await pi.dispatch("agent_settled", {}, eventCtx)
       expect(pi.memoryEvents().at(-1)?.reflection.activeRun?.runId).toBe(run.runId)
 
-      await recordReflectionCompletion(
-        join(fixture.context.identityPaths.reflection, "completions"),
-        {
-          schemaVersion: 1,
-          runId: run.runId,
-          identity: fixture.identity,
-          category: "quick",
-          conversationIds: [fixture.sessionId],
-          trigger: "manual",
-          outcome: "merged",
-          startedAt: "2026-08-12T00:00:00.000Z",
-          finishedAt: "2026-08-12T00:00:01.000Z",
-          delivery: { status: "pending" },
-        },
-      )
+      await recordReflectionCompletion(join(fixture.context.identityPaths.reflection, "completions"), {
+        schemaVersion: 1,
+        runId: run.runId,
+        identity: fixture.identity,
+        category: "quick",
+        conversationIds: [fixture.sessionId],
+        trigger: "manual",
+        outcome: "merged",
+        startedAt: "2026-08-12T00:00:00.000Z",
+        finishedAt: "2026-08-12T00:00:01.000Z",
+        delivery: { status: "pending" },
+      })
       await wiring.afterBind(pi, fixture.sessionId, fixture.context, eventCtx)
 
       expect(pi.memoryEvents().at(-1)?.reflection.activeRun).toBeUndefined()

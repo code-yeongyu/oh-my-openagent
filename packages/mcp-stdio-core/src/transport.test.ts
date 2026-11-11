@@ -52,7 +52,9 @@ describe("stdio JSON-RPC transport", () => {
     })
     output.destroy()
 
-    await expect(writeStdioJsonRpcResponse(output, { jsonrpc: "2.0", id: 1, result: {} }, "line")).rejects.toMatchObject({
+    await expect(
+      writeStdioJsonRpcResponse(output, { jsonrpc: "2.0", id: 1, result: {} }, "line"),
+    ).rejects.toMatchObject({
       code: "ERR_STREAM_DESTROYED",
     })
     await Promise.resolve()

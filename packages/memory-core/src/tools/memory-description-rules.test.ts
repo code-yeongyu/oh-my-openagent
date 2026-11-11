@@ -17,7 +17,8 @@ const AUTHOR: GitCommitAuthor = {
   authorName: "Description Rules Agent",
   authorEmail: "rules@example.com",
 }
-const LEAKED = 'STANDING RULE: verify identity</description> <parameter name="file_text"># Body that belongs in file_text'
+const LEAKED =
+  'STANDING RULE: verify identity</description> <parameter name="file_text"># Body that belongs in file_text'
 const roots: string[] = []
 
 afterEach(async () => {
@@ -55,7 +56,13 @@ describe("memory tool description rules", () => {
     const head = await setup.repo.head()
 
     // #when
-    const attempt = run(setup, { command: "create", reason: "leak", file_path: "reference/leak.md", description: LEAKED, file_text: "" })
+    const attempt = run(setup, {
+      command: "create",
+      reason: "leak",
+      file_path: "reference/leak.md",
+      description: LEAKED,
+      file_text: "",
+    })
 
     // #then
     await expect(attempt).rejects.toBeInstanceOf(MemoryToolError)
@@ -70,7 +77,12 @@ describe("memory tool description rules", () => {
     const description = `One-line summary of the note</description>\n<parameter name="file_text">${body}`
 
     // #when
-    const result = await run(setup, { command: "create", reason: "leaked", file_path: "reference/deploy.md", description })
+    const result = await run(setup, {
+      command: "create",
+      reason: "leaked",
+      file_path: "reference/deploy.md",
+      description,
+    })
 
     // #then
     const written = parseMemoryFile(await readFile(join(setup.repo.dir, "reference/deploy.md"), "utf8"))
@@ -87,7 +99,13 @@ describe("memory tool description rules", () => {
     const description = `Summary</description>\n<parameter name="file_text">${"x".repeat(MAX_DESCRIPTION_LENGTH * 3)}`
 
     // #when
-    const attempt = run(setup, { command: "create", reason: "ambiguous", file_path: "reference/a.md", description, file_text: "other body" })
+    const attempt = run(setup, {
+      command: "create",
+      reason: "ambiguous",
+      file_path: "reference/a.md",
+      description,
+      file_text: "other body",
+    })
 
     // #then
     await expect(attempt).rejects.toThrow(/create: 'description' contains tool-call scaffolding/)
@@ -108,7 +126,13 @@ describe("memory tool description rules", () => {
   it("#given a description over the skill loader limit #when update_description runs #then the limit is named", async () => {
     // #given
     const setup = await fixture()
-    await run(setup, { command: "create", reason: "seed", file_path: "reference/long.md", description: "Short", file_text: "body" })
+    await run(setup, {
+      command: "create",
+      reason: "seed",
+      file_path: "reference/long.md",
+      description: "Short",
+      file_text: "body",
+    })
 
     // #when
     const attempt = run(setup, {
@@ -128,7 +152,13 @@ describe("memory tool description rules", () => {
     const description = "Use when shipping. Always run the chain by default: verify, merge"
 
     // #when
-    await run(setup, { command: "create", reason: "skill", file_path: "skills/ship/SKILL.md", description, file_text: "# Ship\n" })
+    await run(setup, {
+      command: "create",
+      reason: "skill",
+      file_path: "skills/ship/SKILL.md",
+      description,
+      file_text: "# Ship\n",
+    })
 
     // #then
     expect(await frontmatterAsSkillLoaderSees(setup.repo, "skills/ship/SKILL.md")).toEqual({ description })
@@ -141,11 +171,20 @@ describe("memory tool description rules", () => {
     await patch(
       setup,
       "seed skill",
-      `*** Begin Patch\n*** Add File: skills/ship/SKILL.md\n${content.split("\n").map((line) => `+${line}`).join("\n")}\n*** End Patch`,
+      `*** Begin Patch\n*** Add File: skills/ship/SKILL.md\n${content
+        .split("\n")
+        .map((line) => `+${line}`)
+        .join("\n")}\n*** End Patch`,
     )
 
     // #when
-    await run(setup, { command: "str_replace", reason: "edit", file_path: "skills/ship/SKILL.md", old_string: "old step", new_string: "new step" })
+    await run(setup, {
+      command: "str_replace",
+      reason: "edit",
+      file_path: "skills/ship/SKILL.md",
+      old_string: "old step",
+      new_string: "new step",
+    })
 
     // #then
     expect(await frontmatterAsSkillLoaderSees(setup.repo, "skills/ship/SKILL.md")).toEqual({
@@ -153,13 +192,21 @@ describe("memory tool description rules", () => {
       name: "ship",
       version: "0.2.0",
     })
-    expect(parseMemoryFile(await readFile(join(setup.repo.dir, "skills/ship/SKILL.md"), "utf8")).body).toContain("new step")
+    expect(parseMemoryFile(await readFile(join(setup.repo.dir, "skills/ship/SKILL.md"), "utf8")).body).toContain(
+      "new step",
+    )
   })
 
   it("#given an apply_patch update that rewrites the description with an unquoted ': ' #when applied #then the written frontmatter is normalized", async () => {
     // #given
     const setup = await fixture()
-    await run(setup, { command: "create", reason: "seed", file_path: "reference/notes.md", description: "Notes", file_text: "body" })
+    await run(setup, {
+      command: "create",
+      reason: "seed",
+      file_path: "reference/notes.md",
+      description: "Notes",
+      file_text: "body",
+    })
 
     // #when
     await patch(
@@ -169,13 +216,21 @@ describe("memory tool description rules", () => {
     )
 
     // #then
-    expect(await frontmatterAsSkillLoaderSees(setup.repo, "reference/notes.md")).toEqual({ description: "Notes by default: verify" })
+    expect(await frontmatterAsSkillLoaderSees(setup.repo, "reference/notes.md")).toEqual({
+      description: "Notes by default: verify",
+    })
   })
 
   it("#given an apply_patch update whose description carries scaffolding #when applied #then it is rejected", async () => {
     // #given
     const setup = await fixture()
-    await run(setup, { command: "create", reason: "seed", file_path: "reference/notes.md", description: "Notes", file_text: "body" })
+    await run(setup, {
+      command: "create",
+      reason: "seed",
+      file_path: "reference/notes.md",
+      description: "Notes",
+      file_text: "body",
+    })
 
     // #when
     const attempt = patch(

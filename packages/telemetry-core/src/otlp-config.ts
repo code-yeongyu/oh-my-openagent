@@ -10,11 +10,14 @@ export const DEFAULT_OTLP_ENDPOINT = "https://t.omo.dev"
  */
 export function resolveOtlpEndpoint(env: TelemetryEnv, configured?: string): string {
   const override = env["OMO_TELEMETRY_ENDPOINT"]?.trim()
-  const base = override !== undefined && override.length > 0 ? override : configured ?? DEFAULT_OTLP_ENDPOINT
+  const base = override !== undefined && override.length > 0 ? override : (configured ?? DEFAULT_OTLP_ENDPOINT)
   return base.replace(/\/+$/, "")
 }
 
-export function isOtlpTelemetryEnabled(input: { readonly env: TelemetryEnv; readonly productEnvPrefix: string }): boolean {
+export function isOtlpTelemetryEnabled(input: {
+  readonly env: TelemetryEnv
+  readonly productEnvPrefix: string
+}): boolean {
   if (input.env["OTEL_SDK_DISABLED"]?.trim().toLowerCase() === "true") return false
   return !shouldDisableTelemetry({ env: input.env, productEnvPrefix: input.productEnvPrefix })
 }

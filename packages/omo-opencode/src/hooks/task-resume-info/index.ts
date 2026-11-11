@@ -1,1 +1,1 @@
-export { createTaskResumeInfoHook } from "./hook";
+export { createTaskResumeInfoHook } from "./hook"

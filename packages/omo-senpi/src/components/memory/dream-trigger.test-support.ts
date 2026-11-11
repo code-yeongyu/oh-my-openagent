@@ -78,23 +78,33 @@ export interface Fixture {
   readonly session: DreamTriggerSession
 }
 
-export async function fixture(options: {
-  readonly settings?: Partial<DreamTriggerSettings>
-  readonly lastDreamAt?: string
-  readonly conversationText?: string | null
-  readonly reservationStore?: DreamTriggerSession["store"]
-  readonly now?: () => number
-  readonly work?: InFlightReads
-} = {}): Promise<Fixture> {
+export async function fixture(
+  options: {
+    readonly settings?: Partial<DreamTriggerSettings>
+    readonly lastDreamAt?: string
+    readonly conversationText?: string | null
+    readonly reservationStore?: DreamTriggerSession["store"]
+    readonly now?: () => number
+    readonly work?: InFlightReads
+  } = {},
+): Promise<Fixture> {
   const root = await mkdtemp(join(tmpdir(), "omo-dream-trigger-"))
   onTestFinished(() => rm(root, { recursive: true, force: true }))
-  const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
-  const text = options.conversationText === undefined ? "x".repeat(DREAM_VOLUME_GATE_BYTES + 1) : options.conversationText
+  const identity: MemoryIdentity = {
+    id: "agent-test",
+    safeSlug: "agent-test",
+    paths: buildIdentityPaths(root, "agent-test"),
+  }
+  const text =
+    options.conversationText === undefined ? "x".repeat(DREAM_VOLUME_GATE_BYTES + 1) : options.conversationText
   if (text !== null) await writeConversation(identity.paths.transcripts, CONVERSATION, text)
   if (options.lastDreamAt !== undefined) {
     const dreamDir = join(identity.paths.runtime, "dream")
     await mkdir(dreamDir, { recursive: true })
-    await writeFile(join(dreamDir, "state.json"), `${JSON.stringify({ last_dream_at: options.lastDreamAt, lastRunId: "run-0" })}\n`)
+    await writeFile(
+      join(dreamDir, "state.json"),
+      `${JSON.stringify({ last_dream_at: options.lastDreamAt, lastRunId: "run-0" })}\n`,
+    )
   }
   let runCounter = 0
   const store = new ReflectionReservationStore({
