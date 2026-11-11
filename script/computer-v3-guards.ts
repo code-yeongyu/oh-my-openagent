@@ -15,7 +15,7 @@
 //   --oracle                           imported fixtures unchanged, new cases v3-, ORACLE-DELTAS lines valid
 //   --stubs                            no unimplemented!, todo!(, .skip(, .only( or bare #[ignore] in new sources
 
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, lstatSync, readFileSync } from "node:fs"
 import { dirname, join, posix, resolve } from "node:path"
 
 import nameMap from "./computer-v3-name-map.json"
@@ -163,9 +163,10 @@ const readText = (cwd: string, path: string): string | undefined => readInput(jo
 
 function residue(git: Git, cwd: string): string[] {
   const findings = grepOldName(git, ["."]).map((line) => `residue: ${line}`)
-  // Absent means absent on disk: an empty directory or one holding only ignored files is still there.
-  const remaining = [...nameMap.removal.classA, ...nameMap.removal.classB.map((entry) => entry.path)].filter((path) =>
-    existsSync(join(cwd, path)),
+  // Absent means absent on disk: an empty directory, one holding only ignored files, or a dangling symlink is still
+  // there. lstat sees the entry itself; existsSync follows a symlink and calls a dangling one absent.
+  const remaining = [...nameMap.removal.classA, ...nameMap.removal.classB.map((entry) => entry.path)].filter(
+    (path) => lstatSync(join(cwd, path), { throwIfNoEntry: false }) !== undefined,
   )
   findings.push(...remaining.map((path) => `residue: ${path} still exists`))
   // Path names: every tracked file and every untracked one on disk, ignored included; a remaining removal path is reported once above.

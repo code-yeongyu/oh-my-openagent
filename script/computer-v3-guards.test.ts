@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -138,6 +138,28 @@ describe("computer-v3-guards --residue", () => {
         repo.guard("--residue"),
         "docs/guide.md:1:",
         "crates/senpi-desktop-core still exists",
+        ".github/workflows/desktop-engine.yml still exists",
+      )
+    })
+  })
+
+  test("residue_refuses_a_dangling_symlink_left_at_a_class_a_or_b_removal_path", () => {
+    withRepo((repo) => {
+      // given a tree where the removal paths are truly absent
+      repo.write({ "README.md": "the computer module\n" })
+      repo.commit("clean")
+      expectPass(repo.guard("--residue"))
+
+      // when a dangling symlink sits at a class A path and at a class B path (neither name matches the old family)
+      mkdirSync(join(repo.root, "crates"))
+      mkdirSync(join(repo.root, ".github/workflows"), { recursive: true })
+      symlinkSync("missing-crate", join(repo.root, "crates/desktop"))
+      symlinkSync("missing-workflow.yml", join(repo.root, ".github/workflows/desktop-engine.yml"))
+
+      // then each one is a finding, because a directory entry is still there
+      expectFindings(
+        repo.guard("--residue"),
+        "crates/desktop still exists",
         ".github/workflows/desktop-engine.yml still exists",
       )
     })
