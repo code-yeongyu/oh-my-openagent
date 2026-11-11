@@ -4,7 +4,9 @@ mod backend;
 mod corpus;
 mod hello;
 mod listing;
+mod read_sites;
 mod readers;
+mod requests;
 mod seams;
 mod settings;
 
