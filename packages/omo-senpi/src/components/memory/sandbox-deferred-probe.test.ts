@@ -10,7 +10,8 @@ import type { ReflectionSpawnArgs } from "./worker/spawn"
 
 const roots: string[] = []
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 function buildDeferred(policy: SandboxPolicy, verdicts: readonly SandboxUsability[]) {
@@ -32,7 +33,12 @@ function buildDeferred(policy: SandboxPolicy, verdicts: readonly SandboxUsabilit
     // the build-time call only learns that the probe is async; each later call is one spawn
     probe: async () => verdicts[Math.min(Math.max(calls++ - 1, 0), verdicts.length - 1)] ?? { usable: true },
   })
-  const spawnArgs = { command: "/bin/sh", args: ["-c", "exit 0"], cwd: worktree, env: {} } as unknown as ReflectionSpawnArgs
+  const spawnArgs = {
+    command: "/bin/sh",
+    args: ["-c", "exit 0"],
+    cwd: worktree,
+    env: {},
+  } as unknown as ReflectionSpawnArgs
   return { transform, spawnArgs }
 }
 
@@ -67,7 +73,10 @@ describe("deferred (async) bwrap probe", () => {
     ])
 
     // when
-    const outcome = await Promise.resolve(transform(spawnArgs)).then(() => undefined, (error: unknown) => error)
+    const outcome = await Promise.resolve(transform(spawnArgs)).then(
+      () => undefined,
+      (error: unknown) => error,
+    )
 
     // then
     expect(outcome).toBeInstanceOf(SandboxUnavailableError)

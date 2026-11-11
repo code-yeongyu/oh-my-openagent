@@ -1,10 +1,7 @@
 import type { AutoCompactState, RetryState, TruncateState } from "./types"
 import { clearAllSessionTimeouts } from "./session-timeout-map"
 
-export function getOrCreateRetryState(
-  autoCompactState: AutoCompactState,
-  sessionID: string,
-): RetryState {
+export function getOrCreateRetryState(autoCompactState: AutoCompactState, sessionID: string): RetryState {
   let state = autoCompactState.retryStateBySession.get(sessionID)
   if (!state) {
     state = { attempt: 0, lastAttemptTime: 0, firstAttemptTime: 0 }
@@ -13,10 +10,7 @@ export function getOrCreateRetryState(
   return state
 }
 
-export function getOrCreateTruncateState(
-  autoCompactState: AutoCompactState,
-  sessionID: string,
-): TruncateState {
+export function getOrCreateTruncateState(autoCompactState: AutoCompactState, sessionID: string): TruncateState {
   let state = autoCompactState.truncateStateBySession.get(sessionID)
   if (!state) {
     state = { truncateAttempt: 0 }
@@ -25,10 +19,7 @@ export function getOrCreateTruncateState(
   return state
 }
 
-export function clearSessionState(
-  autoCompactState: AutoCompactState,
-  sessionID: string,
-): void {
+export function clearSessionState(autoCompactState: AutoCompactState, sessionID: string): void {
   const retryTimer = autoCompactState.retryTimerBySession.get(sessionID)
   if (retryTimer !== undefined) {
     clearTimeout(retryTimer)
@@ -72,17 +63,11 @@ export function clearRetryTimer(autoCompactState: AutoCompactState, sessionID: s
   }
 }
 
-export function getEmptyContentAttempt(
-  autoCompactState: AutoCompactState,
-  sessionID: string,
-): number {
+export function getEmptyContentAttempt(autoCompactState: AutoCompactState, sessionID: string): number {
   return autoCompactState.emptyContentAttemptBySession.get(sessionID) ?? 0
 }
 
-export function incrementEmptyContentAttempt(
-  autoCompactState: AutoCompactState,
-  sessionID: string,
-): number {
+export function incrementEmptyContentAttempt(autoCompactState: AutoCompactState, sessionID: string): number {
   const attempt = getEmptyContentAttempt(autoCompactState, sessionID)
   autoCompactState.emptyContentAttemptBySession.set(sessionID, attempt + 1)
   return attempt

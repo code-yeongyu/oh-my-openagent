@@ -42,10 +42,21 @@ describe("host-wide identity sweep (DESIGN.r2 6b, H4)", () => {
     // then
     expect(first).toMatchObject({ status: "swept", completed: false })
     expect(cursor.cursor).toBe("agent-24")
-    expect(second).toMatchObject({ status: "swept", completed: true, visited: ["agent-25", "agent-26", "agent-27", "agent-28", "agent-29"] })
-    expect(seen.map((identity) => identity.name)).toEqual(Array.from({ length: 30 }, (_, index) => `agent-${String(index).padStart(2, "0")}`))
+    expect(second).toMatchObject({
+      status: "swept",
+      completed: true,
+      visited: ["agent-25", "agent-26", "agent-27", "agent-28", "agent-29"],
+    })
+    expect(seen.map((identity) => identity.name)).toEqual(
+      Array.from({ length: 30 }, (_, index) => `agent-${String(index).padStart(2, "0")}`),
+    )
     expect(await readHostSweepState(root)).toEqual({ version: 1, completedAt: new Date(2_000).toISOString() })
-    expect(seen.filter((identity) => !identity.hasRepo).map((identity) => identity.name).slice(0, 3)).toEqual(["agent-03", "agent-17", "agent-28"])
+    expect(
+      seen
+        .filter((identity) => !identity.hasRepo)
+        .map((identity) => identity.name)
+        .slice(0, 3),
+    ).toEqual(["agent-03", "agent-17", "agent-28"])
     expect(seen.some((identity) => identity.name === "no-runtime")).toBe(false)
   })
 
@@ -54,7 +65,11 @@ describe("host-wide identity sweep (DESIGN.r2 6b, H4)", () => {
     const root = memoryRoot(4)
 
     // when
-    const result = await sweepHostIdentities({ memoryRoot: root, steps: [async () => []], now: () => Date.parse("2026-11-05T06:00:00.000Z") })
+    const result = await sweepHostIdentities({
+      memoryRoot: root,
+      steps: [async () => []],
+      now: () => Date.parse("2026-11-05T06:00:00.000Z"),
+    })
 
     // then
     expect(result).toMatchObject({ status: "swept", completed: true })
@@ -84,7 +99,11 @@ describe("host-wide identity sweep (DESIGN.r2 6b, H4)", () => {
     const result = await sweepHostIdentities({ memoryRoot: root, steps: [async () => []] })
 
     // then
-    expect(result).toMatchObject({ status: "swept", completed: true, visited: ["agent-02", "agent-03", "agent-00", "agent-01"] })
+    expect(result).toMatchObject({
+      status: "swept",
+      completed: true,
+      visited: ["agent-02", "agent-03", "agent-00", "agent-01"],
+    })
   })
 
   test("#given a dry run #when it sweeps #then no cursor is written", async () => {

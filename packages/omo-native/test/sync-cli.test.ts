@@ -5,7 +5,14 @@ import { createInMemoryDeviceKeyring } from "../../memory-core/src/sync/keyring-
 import { Command } from "commander"
 
 import { ApiRefusal, refusalGuidance, SignInError } from "../../omo-opencode/src/cli/service-auth/protocol"
-import { fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "../../omo-opencode/src/cli/service-auth/test-support"
+import {
+  fakeApi,
+  grant,
+  memorySecrets,
+  privateKeys,
+  refusal,
+  temporaryHome,
+} from "../../omo-opencode/src/cli/service-auth/test-support"
 import { configureSyncCommands, EXIT_UNSUPPORTED_HERE, type SyncCommandDependencies } from "../sync-cli"
 import { signedInSyncContext, type SyncContext } from "../sync-context"
 
@@ -18,23 +25,48 @@ const unused = (): never => {
   throw new Error("not used by this case")
 }
 
-async function context(overrides: { readonly keys?: number; readonly pending?: PendingApproval[]; readonly switches?: string[] } = {}): Promise<SyncContext> {
+async function context(
+  overrides: { readonly keys?: number; readonly pending?: PendingApproval[]; readonly switches?: string[] } = {},
+): Promise<SyncContext> {
   const switches = overrides.switches ?? []
   const chain: AccountHttp = {
     listKeys: async () => Array.from({ length: overrides.keys ?? 0 }, unused),
-    listEntries: unused, listEntriesAfter: unused, listRecoveryWraps: unused, appendKeys: unused, recoveryJoin: unused, state: unused,
+    listEntries: unused,
+    listEntriesAfter: unused,
+    listRecoveryWraps: unused,
+    appendKeys: unused,
+    recoveryJoin: unused,
+    state: unused,
   }
   const pairing: PairingHttp = {
-    setAccountSync: async (enabled) => { switches.push(`account ${enabled}`) },
-    setDeviceSync: async (id, enabled) => { switches.push(`device ${id} ${enabled}`) },
+    setAccountSync: async (enabled) => {
+      switches.push(`account ${enabled}`)
+    },
+    setDeviceSync: async (id, enabled) => {
+      switches.push(`device ${id} ${enabled}`)
+    },
     listPending: async () => overrides.pending ?? [],
-    openPending: unused, readPending: unused, answerPending: unused, revealPending: unused,
+    openPending: unused,
+    readPending: unused,
+    answerPending: unused,
+    revealPending: unused,
   }
   const authority = { signal: new AbortController().signal, admit: <T>(dispatch: () => T): T => dispatch() }
-  return { account: "acct", serviceDeviceId: "dev_svc", keyring: createInMemoryDeviceKeyring("p"), pinDir: await temporaryHome(), chain, pairing, authority }
+  return {
+    account: "acct",
+    serviceDeviceId: "dev_svc",
+    keyring: createInMemoryDeviceKeyring("p"),
+    pinDir: await temporaryHome(),
+    chain,
+    pairing,
+    authority,
+  }
 }
 
-async function runSync(args: string[], dependencies: Partial<SyncCommandDependencies>): Promise<{ readonly out: string[]; readonly err: string[]; readonly exit: typeof process.exitCode }> {
+async function runSync(
+  args: string[],
+  dependencies: Partial<SyncCommandDependencies>,
+): Promise<{ readonly out: string[]; readonly err: string[]; readonly exit: typeof process.exitCode }> {
   const out: string[] = []
   const err: string[] = []
   const program = new Command("omo").exitOverride()
@@ -64,7 +96,11 @@ describe("omo sync", () => {
     const store = memorySecrets().store(api)
     await store.write({ ...grant, ...privateKeys })
     // when sync reads the signed-in account
-    const error = await signedInSyncContext({ env: { OMO_SERVICE_API_URL: api }, cwd: await temporaryHome(), store }).catch(error => error)
+    const error = await signedInSyncContext({
+      env: { OMO_SERVICE_API_URL: api },
+      cwd: await temporaryHome(),
+      store,
+    }).catch((error) => error)
     // then the refusal preserves machine values, not server prose
     expect(error).toBeInstanceOf(ApiRefusal)
     if (!(error instanceof ApiRefusal)) throw error
@@ -72,15 +108,19 @@ describe("omo sync", () => {
     expect(refusalGuidance(error.code, error.status)).toBe(guidance)
   })
 
-  test.each(["not json", "{}", '{"error":{"code":42}}'])("maps malformed /v1/me refusal by status: %s", async body => {
-    // given an unreadable refusal body
-    const api = fakeApi(() => new Response(body, { status: 403 }))
-    const store = memorySecrets().store(api)
-    await store.write({ ...grant, ...privateKeys })
-    // when sync reads the account, then the status fallback remains available
-    await expect(signedInSyncContext({ env: { OMO_SERVICE_API_URL: api }, cwd: await temporaryHome(), store }))
-      .rejects.toMatchObject({ code: "unknown", status: 403 })
-  })
+  test.each(["not json", "{}", '{"error":{"code":42}}'])(
+    "maps malformed /v1/me refusal by status: %s",
+    async (body) => {
+      // given an unreadable refusal body
+      const api = fakeApi(() => new Response(body, { status: 403 }))
+      const store = memorySecrets().store(api)
+      await store.write({ ...grant, ...privateKeys })
+      // when sync reads the account, then the status fallback remains available
+      await expect(
+        signedInSyncContext({ env: { OMO_SERVICE_API_URL: api }, cwd: await temporaryHome(), store }),
+      ).rejects.toMatchObject({ code: "unknown", status: 403 })
+    },
+  )
 
   test("recover points at the desktop passkey flow or approval from another device, and exits 2", async () => {
     const result = await runSync(["sync", "recover"], {})
@@ -102,14 +142,27 @@ describe("omo sync", () => {
 
   test("approve with nothing waiting says so; with two waiting it asks which one", async () => {
     expect((await runSync(["sync", "approve"], {})).exit).toBe(1)
-    const row = (id: string): PendingApproval => ({ id, account: "acct", commitment: "c", answer: null, reveal: null, expires_at: 1 })
-    const two = await runSync(["sync", "approve"], { context: async () => context({ pending: [row("one"), row("two")] }) })
+    const row = (id: string): PendingApproval => ({
+      id,
+      account: "acct",
+      commitment: "c",
+      answer: null,
+      reveal: null,
+      expires_at: 1,
+    })
+    const two = await runSync(["sync", "approve"], {
+      context: async () => context({ pending: [row("one"), row("two")] }),
+    })
     expect(two.exit).toBe(1)
     expect(two.err.join("\n")).toContain("one, two")
   })
 
   test("a signed-out device is told to sign in, with exit 1", async () => {
-    const result = await runSync(["sync", "enable"], { context: async () => { throw new SignInError("Not signed in. Run omo login first.") } })
+    const result = await runSync(["sync", "enable"], {
+      context: async () => {
+        throw new SignInError("Not signed in. Run omo login first.")
+      },
+    })
     expect(result).toMatchObject({ exit: 1, err: ["Not signed in. Run omo login first."] })
   })
 })

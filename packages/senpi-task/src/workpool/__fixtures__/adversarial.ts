@@ -24,8 +24,13 @@ export function runAdversarialCases(): void {
       expect(event.task_id).toBe(taskId)
       expect(event.run_epoch).toBe(epoch)
       if (epoch > 0) {
-        try { f.manager.workpools.yieldResults(taskId, 0, { op: "yield", results: [{ key: "k0", data: 1 }] }); throw new Error("expected stale yield") }
-        catch (error) { if (!(error instanceof WorkpoolError)) throw error; expect(error.code).toBe("stale_assignment") }
+        try {
+          f.manager.workpools.yieldResults(taskId, 0, { op: "yield", results: [{ key: "k0", data: 1 }] })
+          throw new Error("expected stale yield")
+        } catch (error) {
+          if (!(error instanceof WorkpoolError)) throw error
+          expect(error.code).toBe("stale_assignment")
+        }
       }
       const idle = f.manager.workpools.waitForEvent(pool.pool_id, "worker_idle", signal())
       expect((await f.manager.interruptTask(taskId)).kind).toBe("interrupted")
@@ -47,15 +52,27 @@ export function runAdversarialCases(): void {
     if (record === undefined) throw new Error("missing record")
     f.manager.workpools.dispose()
     let starts = 0
-    const runner = { start: async (): Promise<never> => { starts += 1; throw new Error("must not replay") } }
-    const reloaded = createTaskManager({ store: f.store, runners: { "in-process": runner, process: runner }, cwd: f.root,
-      planner: () => ({ kind: "resolved", plan: pool.worker_spec.plan }), config: OmoTaskSettingsSchema.parse({}) })
+    const runner = {
+      start: async (): Promise<never> => {
+        starts += 1
+        throw new Error("must not replay")
+      },
+    }
+    const reloaded = createTaskManager({
+      store: f.store,
+      runners: { "in-process": runner, process: runner },
+      cwd: f.root,
+      planner: () => ({ kind: "resolved", plan: pool.worker_spec.plan }),
+      config: OmoTaskSettingsSchema.parse({}),
+    })
     try {
       // when / then
       expect((await reloaded.respawn(record)).ok).toBe(false)
       expect(createWorkpoolStore(f.store.stateDir).load(pool.pool_id).items[0]?.status).toBe("assigned")
       expect(starts).toBe(0)
-    } finally { reloaded.workpools.dispose() }
+    } finally {
+      reloaded.workpools.dispose()
+    }
   })
   test("#given shared persisted queues #when two engine owners race for one item #then the binding CAS dispatches once", async () => {
     // given
@@ -73,9 +90,19 @@ export function runAdversarialCases(): void {
     const granted = f.manager.workpools.waitForEvent(pool.pool_id, "granted", signal())
     const observed = new ObservedConcurrency({ global_concurrency: 1 })
     observed.tryAcquire("test/model", "st_00000001", 0)
-    const runner = { start: async (): Promise<never> => { throw new Error("duplicate spawn") } }
-    const other = createTaskManager({ store: f.store, concurrency: observed, runners: { "in-process": runner, process: runner }, cwd: f.root,
-      planner: () => ({ kind: "resolved", plan: pool.worker_spec.plan }), config: OmoTaskSettingsSchema.parse({}) })
+    const runner = {
+      start: async (): Promise<never> => {
+        throw new Error("duplicate spawn")
+      },
+    }
+    const other = createTaskManager({
+      store: f.store,
+      concurrency: observed,
+      runners: { "in-process": runner, process: runner },
+      cwd: f.root,
+      planner: () => ({ kind: "resolved", plan: pool.worker_spec.plan }),
+      config: OmoTaskSettingsSchema.parse({}),
+    })
     try {
       const waiting = other.workpools.waitForEvent(pool.pool_id, "waiting", signal())
       // when
@@ -92,25 +119,35 @@ export function runAdversarialCases(): void {
       expect(f.starts).toHaveLength(1)
       expect(f.store.list().records).toHaveLength(1)
       expect(observed.getRetainedKeyCounts().leases).toBe(0)
-    } finally { other.workpools.dispose() }
+    } finally {
+      other.workpools.dispose()
+    }
   })
   test("#given pool and normal spawns #when residency observations race #then both share the existing session admission lease", async () => {
     // given
     const entered = deferred<void>()
     const resume = deferred<void>()
-    const f = fixture({ config: { global_concurrency: 2, default_concurrency: 2, residency_max_children: 1 }, admit: async parent => {
-      const result = await f.lifecycle.admitResident(parent)
-      entered.resolve()
-      await resume.promise
-      return result.kind === "rejected" ? { kind: "rejected", message: result.error.message } : result
-    } })
+    const f = fixture({
+      config: { global_concurrency: 2, default_concurrency: 2, residency_max_children: 1 },
+      admit: async (parent) => {
+        const result = await f.lifecycle.admitResident(parent)
+        entered.resolve()
+        await resume.promise
+        return result.kind === "rejected" ? { kind: "rejected", message: result.error.message } : result
+      },
+    })
     const pool = f.manager.workpools.create(f.caller, poolInput)
     const dispatched = f.manager.workpools.waitForEvent(pool.pool_id, "dispatched", signal())
     const admissionEntered = bounded(entered.promise)
     f.manager.workpools.push(f.caller, pool.pool_id, [{ key: "a", input: 1 }])
     await admissionEntered
     // when
-    const normal = f.manager.start({ parent_session_id: f.caller.sessionId, depth: 1, prompt: "Normal task", category: "quick" })
+    const normal = f.manager.start({
+      parent_session_id: f.caller.sessionId,
+      depth: 1,
+      prompt: "Normal task",
+      category: "quick",
+    })
     resume.resolve()
     await dispatched
     // then
@@ -122,7 +159,11 @@ export function runAdversarialCases(): void {
     // given
     const f = fixture()
     f.manager.workpools.setSpawnPolicy(() => undefined)
-    const pool = f.manager.workpools.create(f.caller, { ...poolInput, mode: "keep_alive", agent: { subagent_type: "plan-reviewer", prompt: "Review fixture" } })
+    const pool = f.manager.workpools.create(f.caller, {
+      ...poolInput,
+      mode: "keep_alive",
+      agent: { subagent_type: "plan-reviewer", prompt: "Review fixture" },
+    })
     const dispatched = f.manager.workpools.waitForEvent(pool.pool_id, "dispatched", signal())
     f.manager.workpools.push(f.caller, pool.pool_id, [{ key: "a", input: 1 }])
     const worker = await dispatched

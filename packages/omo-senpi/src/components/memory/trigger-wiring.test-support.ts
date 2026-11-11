@@ -36,19 +36,25 @@ export type Fixture = {
   readonly wiring: ReturnType<typeof createReflectionTriggerWiring>
 }
 
-export async function fixture(options: {
-  readonly stepCount?: number
-  readonly onCompaction?: boolean
-  readonly steps?: number
-  readonly onLaunch?: (request: ReflectionRequest) => void
-  readonly withoutLaunchHandler?: boolean
-  readonly session?: ReflectionTriggerSession | undefined
-  readonly enabled?: boolean
-  readonly onCompactionAccepted?: (conversationId: string) => void
-} = {}): Promise<Fixture> {
+export async function fixture(
+  options: {
+    readonly stepCount?: number
+    readonly onCompaction?: boolean
+    readonly steps?: number
+    readonly onLaunch?: (request: ReflectionRequest) => void
+    readonly withoutLaunchHandler?: boolean
+    readonly session?: ReflectionTriggerSession | undefined
+    readonly enabled?: boolean
+    readonly onCompactionAccepted?: (conversationId: string) => void
+  } = {},
+): Promise<Fixture> {
   const root = await mkdtemp(join(tmpdir(), "omo-trigger-wiring-"))
   roots.push(root)
-  const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
+  const identity: MemoryIdentity = {
+    id: "agent-test",
+    safeSlug: "agent-test",
+    paths: buildIdentityPaths(root, "agent-test"),
+  }
   const journal = new TranscriptJournal({ journalDir: join(identity.paths.transcripts, CONVERSATION) })
   await journal.reconcile(
     Array.from({ length: options.steps ?? 2 }, (_value, index) => ({
@@ -113,7 +119,22 @@ export async function compact(pi: FakeExtensionAPI, accepted: boolean): Promise<
   await pi.dispatch(
     "session_compact",
     accepted
-      ? { type: "session_compact", reason: "auto", requestId: "compact-1", accepted: true, fromExtension: false, willRetry: true }
-      : { type: "session_compact", reason: "manual", requestId: "compact-1", accepted: false, rejectionCause: "cancelled-by-extension", fromExtension: false, willRetry: false },
+      ? {
+          type: "session_compact",
+          reason: "auto",
+          requestId: "compact-1",
+          accepted: true,
+          fromExtension: false,
+          willRetry: true,
+        }
+      : {
+          type: "session_compact",
+          reason: "manual",
+          requestId: "compact-1",
+          accepted: false,
+          rejectionCause: "cancelled-by-extension",
+          fromExtension: false,
+          willRetry: false,
+        },
   )
 }

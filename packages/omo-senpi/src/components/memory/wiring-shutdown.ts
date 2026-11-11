@@ -24,7 +24,10 @@ export interface MemorySessionShutdownParts {
   readonly resetSession: (sessionId: string) => void
 }
 
-export async function runMemorySessionShutdown(parts: MemorySessionShutdownParts, input: ShutdownDrainInput): Promise<void> {
+export async function runMemorySessionShutdown(
+  parts: MemorySessionShutdownParts,
+  input: ShutdownDrainInput,
+): Promise<void> {
   const drain = parts.shutdownDrain
   // Background packing is never worth holding an exit for: stop it before the drain.
   parts.maintenance.dispose()
@@ -41,9 +44,10 @@ export async function runMemorySessionShutdown(parts: MemorySessionShutdownParts
   await drain.raceDetached(input, "recall-store-settle", () => parts.corpusCache.settled())
   await drain.raceDetached(input, "memory-block-settle", () => parts.promptCache.settled())
   parts.reflectionLive.shutdown(parts.sessions.get(input.sessionId)?.context?.identity)
-  // senpi awaits this handler with no host cap, so neither cleanup may be awaited past the
-  // drain deadline: both are started and raced against it, and whichever loses keeps running
-  // detached (the Kibitzer wake lease and the sidecar directory lock are still released).
+  // senpi bounds this handler with its own warn threshold, per-handler timeout and quit budget
+  // (defaults 2 s / 10 s / 2 s, all user-tunable), so neither cleanup may be awaited past the drain
+  // deadline: both are started and raced against it, and whichever loses keeps running detached (the
+  // Kibitzer wake lease and the sidecar directory lock are still released).
   const kibitzer = parts.kibitzerRef.current
   if (kibitzer !== undefined) {
     await drain.raceDetached(input, "kibitzer-shutdown", () => kibitzer.onSessionShutdown(input.sessionId))
@@ -52,7 +56,9 @@ export async function runMemorySessionShutdown(parts: MemorySessionShutdownParts
   if (identity !== undefined) {
     const facts = parts.factsWiringFor(identity)
     if (facts.cancelActive !== undefined) {
-      await drain.raceDetached(input, "facts-cancel", async () => { await facts.cancelActive?.() })
+      await drain.raceDetached(input, "facts-cancel", async () => {
+        await facts.cancelActive?.()
+      })
     }
   }
   await drain.run(input, { journalFlushed })

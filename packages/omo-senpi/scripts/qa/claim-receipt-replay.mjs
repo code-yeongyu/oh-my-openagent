@@ -33,7 +33,16 @@ const isAnswer = (entry) =>
   entry.message.stopReason === "stop" &&
   !(Array.isArray(entry.message.content) && entry.message.content.some((part) => part?.type === "toolCall"))
 
-const totals = { files: 0, unreadable: 0, answers: 0, answersWithClaims: 0, claims: 0, flaggedAnswers: 0, flaggedClaims: 0, nudges: 0 }
+const totals = {
+  files: 0,
+  unreadable: 0,
+  answers: 0,
+  answersWithClaims: 0,
+  claims: 0,
+  flaggedAnswers: 0,
+  flaggedClaims: 0,
+  nudges: 0,
+}
 const byStatus = {}
 const byStrength = {}
 const byReason = {}
@@ -43,7 +52,10 @@ const flaggedRows = []
 for (const file of files) {
   let entries
   try {
-    entries = readFileSync(file, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line))
+    entries = readFileSync(file, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
   } catch {
     totals.unreadable += 1
     continue

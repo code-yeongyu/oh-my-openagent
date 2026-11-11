@@ -73,18 +73,23 @@ describe("enforceMainPaneWidth", () => {
     const { enforceMainPaneWidth } = await import("./layout")
     const runCalls: Array<[string, string[]]> = []
 
-    await enforceMainPaneWidth("%1", 100, {
-      mainPaneSize: 50,
-      mainPaneMinWidth: 90,
-      agentPaneMinWidth: 20,
-    }, {
-      getTmuxPath: async () => "tmux",
-      runTmuxCommand: async (tmuxPath, args) => {
-        runCalls.push([tmuxPath, [...args]])
-        return successfulTmuxResult
+    await enforceMainPaneWidth(
+      "%1",
+      100,
+      {
+        mainPaneSize: 50,
+        mainPaneMinWidth: 90,
+        agentPaneMinWidth: 20,
       },
-      log: () => undefined,
-    })
+      {
+        getTmuxPath: async () => "tmux",
+        runTmuxCommand: async (tmuxPath, args) => {
+          runCalls.push([tmuxPath, [...args]])
+          return successfulTmuxResult
+        },
+        log: () => undefined,
+      },
+    )
 
     expect(runCalls).toEqual([["tmux", ["resize-pane", "-t", "%1", "-x", "79"]]])
   })

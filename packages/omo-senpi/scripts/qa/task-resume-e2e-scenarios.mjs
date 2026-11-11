@@ -19,7 +19,9 @@ const spawnBackground = (prompt, name) => ({
 })
 
 export const RESUME_OMO_CONFIG = {
-  categories: { mockcat: { description: "Local mock category pinned to the mock provider.", model: "omo-mock/mock-1" } },
+  categories: {
+    mockcat: { description: "Local mock category pinned to the mock provider.", model: "omo-mock/mock-1" },
+  },
 }
 
 export function resumeOmoConfig(taskOverrides) {
@@ -44,7 +46,11 @@ export function happyRun1Script(sentinel) {
 export function happyRun2Script(sentinel) {
   return {
     parentSteps: [
-      { type: "tool_call", name: "task_send", arguments: { to: "finchild", message: `${PING_TOKEN} post-resume steerability probe` } },
+      {
+        type: "tool_call",
+        name: "task_send",
+        arguments: { to: "finchild", message: `${PING_TOKEN} post-resume steerability probe` },
+      },
       bash(waitForFileCommand(sentinel)),
       text("run two settled, quitting"),
     ],
@@ -105,10 +111,7 @@ export function ttlRun1Script(sandbox, sentinel) {
 // Resume verification runs need no child spawns; the hold lets the witness continuation land.
 export function resumeProbeScript(sentinel) {
   return {
-    parentSteps: [
-      bash(waitForFileCommand(sentinel)),
-      text("resume probe settled, quitting"),
-    ],
+    parentSteps: [bash(waitForFileCommand(sentinel)), text("resume probe settled, quitting")],
   }
 }
 

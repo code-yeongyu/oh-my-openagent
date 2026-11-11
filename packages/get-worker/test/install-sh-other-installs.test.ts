@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, relative } from "node:path"
 import { spawnSync } from "node:child_process"
@@ -7,7 +17,16 @@ import { spawnSync } from "node:child_process"
 const installer = join(import.meta.dir, "..", "scripts", "install.sh")
 const roots: string[] = []
 
-type Fixture = { root: string; home: string; work: string; newOmo: string; oldOmo: string; packageDir: string; unrelated: string; env: Record<string, string> }
+type Fixture = {
+  root: string
+  home: string
+  work: string
+  newOmo: string
+  oldOmo: string
+  packageDir: string
+  unrelated: string
+  env: Record<string, string>
+}
 
 function file(path: string, content: string, executable = false): void {
   mkdirSync(dirname(path), { recursive: true })
@@ -31,21 +50,33 @@ function fixture(failingRemoval = false): Fixture {
   const newOmo = join(root, "new-bin", "omo")
   file(newOmo, "#!/bin/sh\necho 'omo 5.0.0'\n", true)
   const tools = join(root, "tools")
-  file(join(tools, "bun"), failingRemoval
-    ? "#!/bin/sh\nexit 1\n"
-    : "#!/bin/sh\nrm -rf \"$BUN_INSTALL/install/global/node_modules/omo-ai\"\nrm -f \"$BUN_INSTALL/bin/omo\"\n", true)
+  file(
+    join(tools, "bun"),
+    failingRemoval
+      ? "#!/bin/sh\nexit 1\n"
+      : '#!/bin/sh\nrm -rf "$BUN_INSTALL/install/global/node_modules/omo-ai"\nrm -f "$BUN_INSTALL/bin/omo"\n',
+    true,
+  )
   const unrelated = join(packageDir, "..", "unrelated-package", "keep.txt")
   file(unrelated, "keep\n")
   mkdirSync(work)
   return {
-    root, home, work, newOmo, oldOmo: join(bunBin, "omo"), packageDir, unrelated,
+    root,
+    home,
+    work,
+    newOmo,
+    oldOmo: join(bunBin, "omo"),
+    packageDir,
+    unrelated,
     env: { HOME: home, PATH: `${dirname(newOmo)}:${bunBin}:${tools}:/usr/bin:/bin`, OMO_INSTALL_SOURCE_ONLY: "1" },
   }
 }
 
 function report(f: Fixture, body: string, input?: string) {
   return spawnSync("/bin/bash", ["-c", `source ${JSON.stringify(installer)}\n${body}`], {
-    input, encoding: "utf8", env: f.env,
+    input,
+    encoding: "utf8",
+    env: f.env,
   })
 }
 
@@ -56,7 +87,11 @@ afterEach(() => {
 describe("install.sh other-install handling", () => {
   test("accepting the interactive prompt removes the bun-global install and leaves one omo on PATH", () => {
     const f = fixture()
-    const result = report(f, `is_interactive() { return 0; }\nreport_other_installs ${JSON.stringify(f.newOmo)} 0 ${JSON.stringify(f.work)}\ntype -ap omo`, "yes\n")
+    const result = report(
+      f,
+      `is_interactive() { return 0; }\nreport_other_installs ${JSON.stringify(f.newOmo)} 0 ${JSON.stringify(f.work)}\ntype -ap omo`,
+      "yes\n",
+    )
 
     expect(result.status).toBe(0)
     expect(result.stderr).toContain(`Remove the other omo install at ${f.oldOmo}? [y/N]`)
@@ -68,10 +103,15 @@ describe("install.sh other-install handling", () => {
 
   test("a non-interactive run never deletes without the explicit flag", () => {
     const f = fixture()
-    const result = report(f, `is_interactive() { return 1; }\nreport_other_installs ${JSON.stringify(f.newOmo)} 0 ${JSON.stringify(f.work)}`)
+    const result = report(
+      f,
+      `is_interactive() { return 1; }\nreport_other_installs ${JSON.stringify(f.newOmo)} 0 ${JSON.stringify(f.work)}`,
+    )
 
     expect(result.status).toBe(0)
-    expect(result.stderr).toContain("Nothing was removed in this non-interactive run. Re-run with --remove-other-installs")
+    expect(result.stderr).toContain(
+      "Nothing was removed in this non-interactive run. Re-run with --remove-other-installs",
+    )
     expect(readFileSync(join(f.packageDir, "package.json"), "utf8")).toContain('"name":"omo-ai"')
     expect(readFileSync(f.unrelated, "utf8")).toBe("keep\n")
   })
@@ -92,7 +132,11 @@ describe("install.sh other-install handling", () => {
   test("declining the prompt changes nothing on disk", () => {
     const f = fixture()
     const before = readFileSync(join(f.packageDir, "package.json"), "utf8")
-    const result = report(f, `is_interactive() { return 0; }\nreport_other_installs ${JSON.stringify(f.newOmo)} 0 ${JSON.stringify(f.work)}`, "no\n")
+    const result = report(
+      f,
+      `is_interactive() { return 0; }\nreport_other_installs ${JSON.stringify(f.newOmo)} 0 ${JSON.stringify(f.work)}`,
+      "no\n",
+    )
 
     expect(result.status).toBe(0)
     expect(result.stderr).toContain("Kept it. Remove it later with:")
@@ -102,7 +146,10 @@ describe("install.sh other-install handling", () => {
 
   test("a failed removal leaves the new install working and prints the exact command", () => {
     const f = fixture(true)
-    const result = report(f, `report_other_installs ${JSON.stringify(f.newOmo)} 1 ${JSON.stringify(f.work)}\n${JSON.stringify(f.newOmo)} --version`)
+    const result = report(
+      f,
+      `report_other_installs ${JSON.stringify(f.newOmo)} 1 ${JSON.stringify(f.work)}\n${JSON.stringify(f.newOmo)} --version`,
+    )
 
     expect(result.status).toBe(0)
     expect(result.stdout).toContain("omo 5.0.0")
