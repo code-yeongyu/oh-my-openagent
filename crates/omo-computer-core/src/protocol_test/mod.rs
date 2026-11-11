@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 
 use crate::doc::{protocol_doc, DOC_PATH};
 use crate::methods::{Effect, Exposure, Method, PeerKind, METHODS};
-use crate::schema::{engine_schema_text, SCHEMA_PATH};
+use crate::schema::{engine_schema, engine_schema_text, SCHEMA_PATH};
 
 pub(super) fn crate_path(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join(relative)
@@ -220,4 +220,33 @@ fn oneshot_names_resolve_through_the_prefix_and_the_alias() {
     );
     assert_eq!(Method::from_oneshot("desktop.nope"), None);
     assert_eq!(Method::from_name("desktop.click"), None);
+}
+
+/// Every public exec verb is bound to its call (`callId`, `runGeneration`) and takes
+/// `observeAfter`, and no exec verb decodes through a read method's params.
+#[test]
+fn public_exec_params_carry_the_exec_members() {
+    let schema = engine_schema();
+    let mut problems = Vec::new();
+    for spec in METHODS
+        .iter()
+        .filter(|spec| spec.effect == Effect::Exec && spec.exposure == P)
+    {
+        let name = spec.params;
+        for member in ["callId", "runGeneration", "observeAfter"] {
+            if schema["$defs"][name]["properties"].get(member).is_none() {
+                problems.push(format!("{}: {name} has no {member}", spec.name));
+            }
+        }
+        for read in METHODS
+            .iter()
+            .filter(|read| read.effect == Effect::Read && read.params == name)
+        {
+            problems.push(format!(
+                "{}: {name} is also the params of the read method {}",
+                spec.name, read.name
+            ));
+        }
+    }
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
