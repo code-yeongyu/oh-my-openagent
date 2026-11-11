@@ -5360,7 +5360,11 @@
     "memory": [
      {
       "identity": "<memory-identity:1>",
-      "files": {}
+      "files": {
+       "identity.json": {
+        "text": "{\n  \"version\": 1,\n  \"id\": \"<memory-identity:1>\",\n  \"kind\": \"auto\",\n  \"mode\": \"path\",\n  \"source\": \"<sandbox>/work\",\n  \"spellings\": [\n    \"<sandbox>/work\"\n  ]\n}\n"
+       }
+      }
      }
     ],
     "tasks": [
