@@ -1,4 +1,4 @@
-import { captureRepoBaseline, type WorktreeBaseline } from "./baseline"
+import { captureRepoBaseline, discoverNestedRepos, type WorktreeBaseline } from "./baseline"
 import { runGit } from "./command"
 
 /**
@@ -6,12 +6,14 @@ import { runGit } from "./command"
  * so the clone holds nothing a person could lose: no staged or unstaged edit, no untracked file the
  * source checkout did not already have (same content), and a HEAD that a remote-tracking ref reaches.
  *
- * Conservative by design: a clone with nested repositories, or any git error, answers false and keeps
- * being retained. Only the root repository is judged.
+ * Conservative by design: a clone with nested repositories (recorded on the baseline, or present in
+ * the clone now, including one the child created), or any git error, answers false and keeps being
+ * retained. Only the root repository is judged.
  */
 export async function isolatedWorkIsOnRemote(isolationDir: string, baseline: WorktreeBaseline): Promise<boolean> {
   if (baseline.nested.length > 0) return false
   try {
+    if ((await discoverNestedRepos(isolationDir)).length > 0) return false
     const current = await captureRepoBaseline(isolationDir)
     if (current.staged !== "" || current.unstaged !== "") return false
     if (current.untrackedPatch !== baseline.root.untrackedPatch) return false

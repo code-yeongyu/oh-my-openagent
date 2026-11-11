@@ -104,6 +104,7 @@
     "packages/isolation-core/src/git/command.ts",
     "packages/isolation-core/src/git/delta.ts",
     "packages/isolation-core/src/git/detach-git-dir.ts",
+    "packages/isolation-core/src/git/on-remote.ts",
     "packages/isolation-core/src/git/synthetic-tree.ts",
     "packages/isolation-core/src/index.ts",
     "packages/isolation-core/src/merge/branch-mode.ts",
