@@ -96,4 +96,22 @@ describe("selectedDeviceAccountSource", () => {
     const reloaded = after.selectedDeviceAccountSource({ env: {} }, runtime)
     expect(accountIdOf(await reloaded())).toBe("acct_3")
   })
+
+  test("#given a provider registered by an earlier omo build that had no process guard #when this build selects the account source #then the bootstrap failure names the in-place update and the restart remedy", async () => {
+    const guard = Symbol.for("omo.memory-sync.worker-data-provided.v1")
+    const provided = globalThis as typeof globalThis & { [key: symbol]: unknown }
+    // An earlier build provided the name but never set the guard: the registry holds the name, the guard is absent.
+    const fresh = await import("./account-runtime-loader?generation=older-build-registered")
+    fresh.selectedDeviceAccountSource({ env: {} }, async () => cliRuntime(() => async () => account("acct_4")))
+    const kept = provided[guard]
+    delete provided[guard]
+    try {
+      const current = await import("./account-runtime-loader?generation=after-older-build")
+      expect(() => current.selectedDeviceAccountSource({ env: {} }, async () => cliRuntime(() => async () => account("acct_4")))).toThrow(
+        /already provided.*restart the session/s,
+      )
+    } finally {
+      provided[guard] = kept
+    }
+  })
 })
