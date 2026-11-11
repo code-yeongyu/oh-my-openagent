@@ -92,20 +92,50 @@ function parseDistTags(distTagsJson) {
  * "behind" otherwise, with the floor (the newest of latest and every prerelease tag seen in either read) and the exact
  * command that repairs it.
  */
+function newestFloor(tagObjects) {
+  let floor = null
+  for (const tags of tagObjects) {
+    for (const [tag, value] of tags ? Object.entries(tags) : []) {
+      const parsed = typeof value === "string" ? parseVersion(value) : null
+      if (!parsed || (tag !== "latest" && parsed.pre.length === 0)) continue
+      if (floor === null || compareVersions(value, floor) > 0) floor = value
+    }
+  }
+  return floor
+}
+
+function validBeta(tags) {
+  return typeof tags.beta === "string" && parseVersion(tags.beta) ? tags.beta : ""
+}
+
+/**
+ * The dist-tag guard decision from one raw dist-tags JSON read: null when it is not a usable lookup, "ok" when beta is
+ * at least the floor (the newer of latest and every prerelease on any dist-tag), "behind" with that floor otherwise.
+ */
+export function guardBetaFromDistTags(distTagsJson) {
+  const tags = parseDistTags(distTagsJson)
+  if (!tags) return null
+  const floor = newestFloor([tags])
+  const beta = validBeta(tags)
+  if (beta && (floor === null || compareVersions(beta, floor) >= 0)) return { status: "ok", beta }
+  return { status: "behind", beta, floor }
+}
+
+/**
+ * Re-checks beta after our own "npm dist-tag add omo-ai@<written> beta" (#13149), from the raw dist-tags JSON of the
+ * read before the write and the read after it. status is "lookup-failed" when the second read is unusable, "behind"
+ * when beta is older than the floor (the newest of latest and every prerelease tag seen in either read), even when it
+ * is newer than what we wrote, with the floor and the exact command that repairs it; "ahead" when beta is newer than
+ * what we wrote and at or above the floor (someone moved it forward: leave it); "ok" otherwise.
+ */
 export function verifyBetaAfterMove(writtenVersion, beforeDistTagsJson, afterDistTagsJson) {
   const after = parseDistTags(afterDistTagsJson)
   if (!after) return { status: "lookup-failed" }
-  const before = parseDistTags(beforeDistTagsJson)
-  const seen = [before, after].flatMap((tags) => (tags ? Object.entries(tags) : []))
-  let floor = null
-  for (const [tag, value] of seen) {
-    const parsed = typeof value === "string" ? parseVersion(value) : null
-    if (!parsed || (tag !== "latest" && parsed.pre.length === 0)) continue
-    if (floor === null || compareVersions(value, floor) > 0) floor = value
-  }
-  const beta = typeof after.beta === "string" && parseVersion(after.beta) ? after.beta : ""
-  if (beta && compareVersions(beta, writtenVersion) > 0) return { status: "ahead", beta }
-  if (beta && (floor === null || compareVersions(beta, floor) >= 0)) return { status: "ok", beta }
+  const floor = newestFloor([parseDistTags(beforeDistTagsJson), after])
+  const beta = validBeta(after)
+  const belowFloor = beta !== "" && floor !== null && compareVersions(beta, floor) < 0
+  if (beta && !belowFloor && compareVersions(beta, writtenVersion) > 0) return { status: "ahead", beta }
+  if (beta && !belowFloor) return { status: "ok", beta }
   const target = floor ?? writtenVersion
   return { status: "behind", beta, floor: target, command: "npm dist-tag add omo-ai@" + target + " beta" }
 }
@@ -115,6 +145,12 @@ function cliDecision(args) {
     const result = verifyBetaAfterMove(args[1] ?? "", args[2] ?? "", args[3] ?? "")
     if (result.status === "lookup-failed") return "lookup=failed"
     return "beta=" + result.status + ":" + (result.status === "behind" ? result.floor : result.beta)
+  }
+
+  if (args[0] === "--guard") {
+    const result = guardBetaFromDistTags(args[1] ?? "")
+    if (result === null) return "lookup=failed"
+    return result.status === "ok" ? "beta=ok:" + result.beta : "beta=behind:" + result.floor + ":" + result.beta
   }
 
   if (args[0] === "--dist-tags") {

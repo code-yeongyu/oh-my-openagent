@@ -14,3 +14,6 @@ export function verifyBetaAfterMove(
   beforeDistTagsJson: string | null | undefined,
   afterDistTagsJson: string | null | undefined,
 ): VerifyBetaAfterMoveResult
+
+export type GuardBetaResult = { status: "ok"; beta: string } | { status: "behind"; beta: string; floor: string | null }
+export function guardBetaFromDistTags(distTagsJson: string | null | undefined): GuardBetaResult | null

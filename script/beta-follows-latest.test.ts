@@ -7,6 +7,7 @@ import {
   betaMustFollowLatest,
   betaMustFollowLatestFromDistTags,
   compareVersions,
+  guardBetaFromDistTags,
   verifyBetaAfterMove,
 } from "./beta-follows-latest.mjs"
 
@@ -107,6 +108,21 @@ describe("verifyBetaAfterMove", () => {
       after: { latest: "5.1.70", beta: "5.1.66" },
       expected: { status: "behind", floor: "5.1.70", command: "npm dist-tag add omo-ai@5.1.70 beta" },
     },
+    {
+      name: "beta ahead of our write but older than a newer prerelease on another dist-tag",
+      after: { latest: "5.1.66", beta: "5.2.0-0.beta.1", rc: "5.2.0-0.rc.1" },
+      expected: { status: "behind", floor: "5.2.0-0.rc.1", command: "npm dist-tag add omo-ai@5.2.0-0.rc.1 beta" },
+    },
+    {
+      name: "beta ahead of our write but older than a newer latest",
+      after: { latest: "5.1.70", beta: "5.1.68" },
+      expected: { status: "behind", floor: "5.1.70", command: "npm dist-tag add omo-ai@5.1.70 beta" },
+    },
+    {
+      name: "beta ahead of our write and above every prerelease",
+      after: { latest: "5.1.66", beta: "5.2.0-0.rc.2", rc: "5.2.0-0.rc.1" },
+      expected: { status: "ahead", beta: "5.2.0-0.rc.2" },
+    },
   ])("$name", ({ after, expected }) => {
     expect(verifyBetaAfterMove("5.1.66", before, tags(after))).toMatchObject(expected)
   })
@@ -132,6 +148,25 @@ describe("verifyBetaAfterMove", () => {
 
   test("an unusable first read does not hide a stale beta", () => {
     expect(verifyBetaAfterMove("5.1.66", "", tags({ latest: "5.1.66", beta: "5.1.0" })).status).toBe("behind")
+  })
+})
+
+describe("guardBetaFromDistTags", () => {
+  test.each([
+    { tags: { latest: "5.1.66", beta: "5.1.66" }, expected: { status: "ok", beta: "5.1.66" } },
+    { tags: { latest: "5.1.66", beta: "5.2.0-0.rc.2", rc: "5.2.0-0.rc.1" }, expected: { status: "ok" } },
+    { tags: { latest: "5.1.66", beta: "5.1.0" }, expected: { status: "behind", floor: "5.1.66" } },
+    { tags: { latest: "5.1.66" }, expected: { status: "behind", floor: "5.1.66", beta: "" } },
+    {
+      tags: { latest: "5.1.66", beta: "5.2.0-0.beta.1", rc: "5.2.0-0.rc.1" },
+      expected: { status: "behind", floor: "5.2.0-0.rc.1", beta: "5.2.0-0.beta.1" },
+    },
+  ])("reads $tags", ({ tags, expected }) => {
+    expect(guardBetaFromDistTags(JSON.stringify(tags))).toMatchObject(expected)
+  })
+
+  test("is null for an unusable lookup", () => {
+    expect(guardBetaFromDistTags("")).toBeNull()
   })
 })
 
@@ -177,6 +212,10 @@ describe("beta-follows-latest CLI", () => {
     {
       args: ["5.1.66", '{"latest":"5.1.66","beta":"5.1.0"}', '{"latest":"5.1.66","beta":"5.1.0"}'],
       stdout: "beta=behind:5.1.66\n",
+    },
+    {
+      args: ["5.1.66", '{"latest":"5.1.66"}', '{"latest":"5.1.66","beta":"5.2.0-0.beta.1","rc":"5.2.0-0.rc.1"}'],
+      stdout: "beta=behind:5.2.0-0.rc.1\n",
     },
     { args: ["5.1.66", '{"latest":"5.1.66"}', ""], stdout: "lookup=failed\n" },
   ])("--verify prints $stdout", ({ args, stdout }) => {

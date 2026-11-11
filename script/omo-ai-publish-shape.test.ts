@@ -126,9 +126,12 @@ function runStep(
     `    "dist-tag add "*) [ "\${ADD_FAIL:-}" != 1 ] || return 1`,
     `      spec="\${*: -2:1}"; printf '%s\\n' "\${spec#omo-ai@}" > "$CALLS.moved" ;;`,
     `    *"--json omo-ai dist-tags") [ "\${VIEW_FAIL:-}" != 1 ] || return 1`,
-    `      b="$BETA"; if [ -f "$CALLS.moved" ]; then reads=$(( $(cat "$CALLS.json-reads" 2>/dev/null || echo 0) + 1 )); echo "$reads" > "$CALLS.json-reads"`,
+    `      b="$BETA"; ctr="$CALLS.json-reads"; [ -f "$CALLS.moved" ] || ctr="$CALLS.json-reads-unmoved"; reads=$(( $(cat "$ctr" 2>/dev/null || echo 0) + 1 )); echo "$reads" > "$ctr"`,
+    `      if [ ! -f "$CALLS.moved" ] && [ -n "\${BETA_SETTLED:-}" ] && [ "$reads" -gt "\${BETA_LAG:-0}" ]; then b="$BETA_SETTLED"; fi`,
+    `      if [ -f "$CALLS.moved" ]; then`,
     `        if [ -n "\${AFTER_BETA:-}" ]; then b="$AFTER_BETA"; elif [ "$reads" -gt "\${BETA_LAG:-0}" ]; then b=$(cat "$CALLS.moved"); fi; fi`,
-    `      if [ -n "$b" ]; then printf '{"latest":"%s","beta":"%s"}\\n' "$LATEST" "$b"; else printf '{"latest":"%s"}\\n' "$LATEST"; fi ;;`,
+    `      rc=""; [ -z "\${RC:-}" ] || rc=",\\"rc\\":\\"$RC\\""`,
+    `      if [ -n "$b" ]; then printf '{"latest":"%s","beta":"%s"%s}\\n' "$LATEST" "$b" "$rc"; else printf '{"latest":"%s"%s}\\n' "$LATEST" "$rc"; fi ;;`,
     `    *dist-tags.latest*) printf '%s\\n' "$LATEST" ;;`,
     `    *dist-tags.beta*) reads=$(( $(cat "$CALLS.beta-reads" 2>/dev/null || echo 0) + 1 )); echo "$reads" > "$CALLS.beta-reads"`,
     `      if [ "$reads" -le "\${BETA_LAG:-0}" ]; then printf '%s\\n' "$BETA"`,
@@ -159,7 +162,7 @@ function runStep(
 describe("beta follows latest on a stable release (#12987)", () => {
   const betaMove = namedStep("post-publish-verify", "Move omo-ai beta up to the stable release")
 
-  test("the beta move runs in post-publish-verify between the readiness wait and the guard, for a fresh stable release only", () => {
+  test("the beta move runs in post-publish-verify between the readiness wait and the guard, for a stable release and not gated on already_published", () => {
     // publish-main gates the GitHub release, so a beta-tag hiccup there would strand an already-published version.
     expect(steps("publish-main").map((step) => step.name)).not.toContain("Move omo-ai beta up to the stable release")
     const names = steps("post-publish-verify").map((step) => step.name)
@@ -313,18 +316,25 @@ describe("beta follows latest on a stable release (#12987)", () => {
     { distTag: "latest", beta: "", passes: false },
     { distTag: "latest", beta: "5.1.66", passes: true },
     { distTag: "latest", beta: "5.2.0-0.beta.1", passes: true },
-  ])("the dist-tag guard with latest 5.1.66 and beta '$beta' passes: $passes", ({ distTag, beta, passes }) => {
-    const guard = namedStep("post-publish-verify", "Guard omo-ai dist-tags").run ?? ""
-    const result = runStep(guard, {
-      OMO_AI_VERSION: "5.1.66",
-      OMO_AI_DIST_TAG: distTag,
-      ALREADY_PUBLISHED: "false",
-      LATEST: "5.1.66",
-      BETA: beta,
-    })
-    expect(result.status).toBe(passes ? 0 : 1)
-    if (!passes) expect(result.stdout).toContain("older than latest 5.1.66")
-  })
+    { distTag: "latest", beta: "5.2.0-0.beta.1", rc: "5.2.0-0.rc.1", passes: false },
+    { distTag: "latest", beta: "5.2.0-0.rc.2", rc: "5.2.0-0.rc.1", passes: true },
+  ])(
+    "the dist-tag guard with latest 5.1.66, beta '$beta' and rc '$rc' passes: $passes",
+    ({ distTag, beta, rc, passes }) => {
+      const guard = namedStep("post-publish-verify", "Guard omo-ai dist-tags").run ?? ""
+      const result = runStep(guard, {
+        OMO_AI_VERSION: "5.1.66",
+        OMO_AI_DIST_TAG: distTag,
+        ALREADY_PUBLISHED: "false",
+        LATEST: "5.1.66",
+        BETA: beta,
+        RC: rc ?? "",
+      })
+      expect(result.status).toBe(passes ? 0 : 1)
+      if (!passes) expect(result.stdout).toContain("older than latest 5.1.66")
+      if (!passes && rc) expect(result.stdout).toContain("move beta to " + rc)
+    },
+  )
 
   test("the dist-tag guard re-reads a lagging beta until it reaches latest", () => {
     const guard = namedStep("post-publish-verify", "Guard omo-ai dist-tags").run ?? ""
@@ -338,7 +348,7 @@ describe("beta follows latest on a stable release (#12987)", () => {
       BETA_SETTLED: "5.1.66",
     })
     expect(result.status).toBe(0)
-    expect(result.calls.filter((call) => call.includes("dist-tags.beta"))).toHaveLength(4)
+    expect(result.calls.filter((call) => call.includes("--json omo-ai dist-tags"))).toHaveLength(4)
     expect(result.stdout).not.toContain("::error::")
   })
 
@@ -354,7 +364,7 @@ describe("beta follows latest on a stable release (#12987)", () => {
       BETA_SETTLED: "5.1.66",
     })
     expect(result.status).toBe(1)
-    expect(result.calls.filter((call) => call.includes("dist-tags.beta"))).toHaveLength(5)
+    expect(result.calls.filter((call) => call.includes("--json omo-ai dist-tags"))).toHaveLength(5)
     expect(result.stdout).toContain("::error::omo-ai beta points to 5.1.0, older than latest 5.1.66")
   })
 
