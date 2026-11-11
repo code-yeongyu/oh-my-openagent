@@ -22,6 +22,7 @@ import type {
   AutoSlashCommandHookOutput,
   CommandExecuteBeforeInput,
   CommandExecuteBeforeOutput,
+  SlashCommandInvocation,
 } from "./types"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 
@@ -212,7 +213,7 @@ export function createAutoSlashCommandHook(options?: AutoSlashCommandHookOptions
         arguments: input.arguments,
       })
 
-      const parsed = {
+      const parsed: SlashCommandInvocation = {
         command: input.command,
         args: input.arguments || "",
         raw: `/${input.command}${input.arguments ? " " + input.arguments : ""}`,

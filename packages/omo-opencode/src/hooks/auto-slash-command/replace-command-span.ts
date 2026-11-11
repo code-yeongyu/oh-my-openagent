@@ -8,7 +8,7 @@ export function replaceSlashCommandSpan(
   const text = part.text ?? ""
   const parsed = parseSlashCommand(text, commandName)
 
-  if (!parsed || parsed.start === undefined || parsed.end === undefined) {
+  if (!parsed) {
     return false
   }
 
