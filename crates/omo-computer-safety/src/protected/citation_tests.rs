@@ -13,24 +13,53 @@ const EXCERPT: &str = include_str!("design-excerpt.txt");
 
 /// The excerpt's lines by number, after its body hash is checked.
 fn excerpt() -> BTreeMap<u32, String> {
-    let header = EXCERPT
+    parse(EXCERPT).unwrap_or_else(|error| panic!("design-excerpt.txt: {error}"))
+}
+
+/// Parses an excerpt: its body must hash to its header's sha256.
+fn parse(excerpt: &str) -> Result<BTreeMap<u32, String>, String> {
+    let header = excerpt
         .lines()
         .find_map(|line| line.strip_prefix("# excerpt sha256 "))
-        .expect("excerpt sha256 header");
+        .ok_or("no excerpt sha256 header")?;
     let mut lines = BTreeMap::new();
     let mut body = String::new();
-    for line in EXCERPT.lines().filter(|line| !line.starts_with('#')) {
+    for line in excerpt.lines().filter(|line| !line.starts_with('#')) {
         let (number, text) = line.split_once('\t').unwrap_or((line, ""));
-        lines.insert(
-            number.parse().expect("a line number"),
-            text.replace('`', ""),
-        );
+        let number: u32 = number
+            .parse()
+            .map_err(|_| format!("line number {number:?}"))?;
+        lines.insert(number, text.replace('`', ""));
         body.push_str(text);
         body.push('\n');
     }
     let digest = format!("{:x}", Sha256::digest(body.as_bytes()));
-    assert_eq!(digest, header.trim(), "the excerpt was edited");
-    lines
+    if digest != header.trim() {
+        return Err("the excerpt was edited".to_owned());
+    }
+    Ok(lines)
+}
+
+/// The shipped excerpt with every line number moved by one: the text and its hash are
+/// unchanged, so only the numbering check can catch it.
+#[test]
+fn a_renumbered_excerpt_is_refused() {
+    let renumbered: String = EXCERPT
+        .lines()
+        .map(|line| match line.split_once('\t') {
+            _ if line.starts_with('#') => line.to_owned(),
+            Some((number, text)) => {
+                format!("{}\t{text}", number.parse::<u32>().expect("number") + 1)
+            }
+            None => (line.parse::<u32>().expect("number") + 1).to_string(),
+        })
+        .map(|line| line + "\n")
+        .collect();
+    assert!(parse(EXCERPT).is_ok(), "the shipped excerpt parses");
+    assert!(
+        parse(&renumbered).is_err(),
+        "a renumbered excerpt must be refused"
+    );
 }
 
 fn quotes(segment: &str) -> Vec<&str> {
