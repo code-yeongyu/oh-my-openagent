@@ -4,20 +4,25 @@
 //! step, the read-back, the `ActionReport`, the receipt, and one audit line per side effect.
 //! There is no retry anywhere in it.
 
+mod binding;
 mod funnel;
+mod record;
+mod recovery;
+mod report;
 
 #[cfg(test)]
 mod tests;
 
+pub use binding::{Binding, SecureInputProbe, SecureProbe};
+
 use std::path::{Path, PathBuf};
 
-use omo_computer_core::backend::{Backend, InputEvent, Refusal, Route};
+use omo_computer_core::backend::{InputEvent, Refusal, Route};
 use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::methods::Method;
 use omo_computer_core::paths::Roots;
 use omo_computer_core::report::Disposition;
 use omo_computer_core::requests::CallAuthority;
-use omo_computer_core::session_state::Tristate;
 use omo_computer_safety::Call;
 use serde_json::Value;
 
@@ -29,11 +34,15 @@ use crate::marker::{MarkerDir, MarkerStore, MemoryMarkers};
 use crate::Session;
 
 /// A marker that cannot be persisted: the input is not sent.
-pub const MARKER_UNAVAILABLE: Refusal =
-    Refusal::new(EngineCode::TransactionFailed, Reason::MarkerUnavailable.wire());
+pub const MARKER_UNAVAILABLE: Refusal = Refusal::new(
+    EngineCode::TransactionFailed,
+    Reason::MarkerUnavailable.wire(),
+);
 /// A marker of this `(issuer, scope)` is outstanding: completion of that call is unknown.
-pub const RECOVERY_REQUIRED: Refusal =
-    Refusal::new(EngineCode::TransactionFailed, Reason::RecoveryRequired.wire());
+pub const RECOVERY_REQUIRED: Refusal = Refusal::new(
+    EngineCode::TransactionFailed,
+    Reason::RecoveryRequired.wire(),
+);
 /// The `callId` already completed: its stored receipt answers, nothing is sent.
 pub const REPLAYED: Refusal = Refusal::new(EngineCode::TransactionFailed, Reason::Replayed.wire());
 /// The interaction lock could not be taken.
@@ -63,46 +72,6 @@ impl From<Refusal> for Refused {
     }
 }
 
-/// The `(issuer, scope)` lease key of the session's calls.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Binding {
-    pub issuer: String,
-    pub scope: String,
-}
-
-impl Default for Binding {
-    fn default() -> Self {
-        Self {
-            issuer: "local".to_owned(),
-            scope: "default".to_owned(),
-        }
-    }
-}
-
-/// The secure predicate the redaction table keys on.
-pub trait SecureProbe: Send {
-    fn secure(&self, backend: &dyn Backend, target: Option<&str>) -> bool;
-}
-
-/// Secure Input as the backend's session state reads it.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct SecureInputProbe;
-
-impl SecureProbe for SecureInputProbe {
-    fn secure(&self, backend: &dyn Backend, _target: Option<&str>) -> bool {
-        matches!(
-            backend.capabilities().session.secure_input_active,
-            Tristate::Known(true)
-        )
-    }
-}
-
-impl<F: Fn(Option<&str>) -> bool + Send> SecureProbe for F {
-    fn secure(&self, _backend: &dyn Backend, target: Option<&str>) -> bool {
-        self(target)
-    }
-}
-
 /// One mutating call as the funnel takes it.
 pub struct Mutation<'a> {
     pub method: Method,
@@ -120,7 +89,13 @@ pub struct Mutation<'a> {
 impl<'a> Mutation<'a> {
     /// An exec request's call, bound to its `callId` and `runGeneration`.
     #[must_use]
-    pub fn exec(method: Method, call: Call<'a>, events: Vec<InputEvent>, route: Route, authority: &CallAuthority) -> Self {
+    pub fn exec(
+        method: Method,
+        call: Call<'a>,
+        events: Vec<InputEvent>,
+        route: Route,
+        authority: &CallAuthority,
+    ) -> Self {
         Self {
             method,
             call,
@@ -184,7 +159,12 @@ pub(crate) struct Funnel {
 
 impl Funnel {
     pub(crate) fn in_memory() -> Self {
-        Self::with(Box::new(MemoryMarkers::default()), AuditSpec::Memory, None, None)
+        Self::with(
+            Box::new(MemoryMarkers::default()),
+            AuditSpec::Memory,
+            None,
+            None,
+        )
     }
 
     /// Markers and the interaction lock under the RUNTIME root; audit and artifacts under the
@@ -227,9 +207,17 @@ impl Funnel {
             .get_or_insert_with(|| match spec {
                 AuditSpec::Memory => Box::new(MemoryAudit::new(LOCAL_HAND, generation)),
                 AuditSpec::Dir(dir) => {
-                    match AuditWriter::open(dir, LOCAL_HAND, generation, WriterId::current(), AuditLimits::default()) {
+                    match AuditWriter::open(
+                        dir,
+                        LOCAL_HAND,
+                        generation,
+                        WriterId::current(),
+                        AuditLimits::default(),
+                    ) {
                         Ok(writer) => Box::new(writer),
-                        Err(_) => Box::new(UnavailableAudit::at(crate::audit::audit_path(dir, LOCAL_HAND))),
+                        Err(_) => Box::new(UnavailableAudit::at(crate::audit::audit_path(
+                            dir, LOCAL_HAND,
+                        ))),
                     }
                 }
             })

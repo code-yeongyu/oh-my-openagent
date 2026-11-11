@@ -186,11 +186,31 @@ pub struct AuditEvent {
 pub fn now_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_or(0, |since| u64::try_from(since.as_millis()).unwrap_or(u64::MAX))
+        .map_or(0, |since| {
+            u64::try_from(since.as_millis()).unwrap_or(u64::MAX)
+        })
 }
 
-/// RFC 3339 UTC with milliseconds (RED stub).
+/// RFC 3339 UTC with milliseconds, `YYYY-MM-DDTHH:MM:SS.mmmZ`.
 #[must_use]
-pub fn rfc3339_ms(_unix_ms: u64) -> String {
-    String::new()
+pub fn rfc3339_ms(unix_ms: u64) -> String {
+    let (days, ms_of_day) = (unix_ms / 86_400_000, unix_ms % 86_400_000);
+    let (year, month, day) = civil_from_days(days);
+    let (hour, minute) = (ms_of_day / 3_600_000, ms_of_day / 60_000 % 60);
+    let (second, milli) = (ms_of_day / 1000 % 60, ms_of_day % 1000);
+    format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}.{milli:03}Z")
+}
+
+/// Howard Hinnant's `civil_from_days` for days since 1970-01-01 (non-negative).
+const fn civil_from_days(days: u64) -> (u64, u64, u64) {
+    let z = days + 719_468;
+    let era = z / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + if month <= 2 { 1 } else { 0 };
+    (year, month, day)
 }

@@ -1,6 +1,6 @@
 design row	leg	recorded by row	owed to row	status
 C1	`trace_full_literal_accepted_true_is_jsonl_only` on the fake (needs the session trace writer)	12	20	owed
-C2	`hello_generation_quarantines_stale_reply` (restart-mid-call: 1 quarantined reply, `delivery_uncertain/unsafe`); AC-39 quarantine leg	12	17	owed
+C2	`hello_generation_quarantines_stale_reply` (restart-mid-call: 1 quarantined reply, `delivery_uncertain/unsafe`); AC-39 quarantine leg	12	17	passed:omo-computer-session::mutate::tests::recovery::hello_generation_quarantines_stale_reply
 C17	the `admissionKeys` set K8 fingerprints equals the rows the table marks (k-safety N5)	12	37	owed
 C3	the AC-75 `suspected_noop` fixtures of C19 run in this suite and assert membership in `ALL`	13	27	owed
 C3	a `confirmed` pointer / key report from the macOS, X11 or Wayland fake (the report produced by the fake's persona, not only built under that platform)	13	23	owed
@@ -19,3 +19,4 @@ C12	`Suspended{host_latch}` at `session.open` and `stopPath.resume` from the liv
 C12	Windows `deniedApps`: the Microsoft Store package-family keys of Dashlane, LastPass, NordPass, Proton Pass, KeePassXC and KeePass (d-safety.md:407 "the Microsoft Store AUMIDs of the same managers"; 1Password and Bitwarden ship now, the rest are measured with Get-AppxPackage on a Windows host)	16	60	owed
 C12	Windows `protectedSurfaces` `secure-desktop`: the Windows backend reports a target on an input desktop other than Default under that key (d-safety.md:407 "the secure desktop (OpenInputDesktop != Default)")	16	60	owed
 C12	`capabilities().stopPath.staleSinceMs` while the re-arm ladder runs: core's `StopPathCapability` (row 12's schema, mirrored into the TS protocol package) has no such member; the engine reads the value and `stale:true` is on the wire	16	46	owed
+C20	AC-74 fleet leg: over the fleet fixture, 100 hands over the inline budget for 1 h at 2 frames/s each end under 512 MiB and 2,000 files with `hands()` reporting `artifact{bytes, files, lastSweep}` per hand (needs the fleet harness and `hands()`)	17	63	owed

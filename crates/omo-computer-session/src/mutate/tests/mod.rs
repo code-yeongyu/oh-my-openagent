@@ -10,7 +10,9 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
-use omo_computer_backend_fake::{FakeBackend, FakeClock, FakeScenario, Persona, RecordingSink, StopPathScript};
+use omo_computer_backend_fake::{
+    FakeBackend, FakeClock, FakeScenario, Persona, RecordingSink, StopPathScript,
+};
 use omo_computer_core::backend::{
     Backend, BackendResult, CaptureOptions, Delivered, EpochSource, FrameBytes, PermissionProbe,
     Presence, Route, StopListener, TaggedInput, Target, WindowFilter, WindowList,
@@ -79,7 +81,8 @@ impl Run {
     }
 
     pub(super) fn marker(&self) -> Value {
-        serde_json::from_str(&fs::read_to_string(self.marker_file()).expect("a marker")).expect("marker JSON")
+        serde_json::from_str(&fs::read_to_string(self.marker_file()).expect("a marker"))
+            .expect("marker JSON")
     }
 
     pub(super) fn audit_lines(&self) -> Vec<Value> {
@@ -115,7 +118,8 @@ pub(super) fn open(mut session: Session) -> Session {
     session
 }
 
-type OnInput = Box<dyn FnMut(&mut FakeBackend, &TaggedInput, Route) -> BackendResult<Delivered> + Send>;
+type OnInput =
+    Box<dyn FnMut(&mut FakeBackend, &TaggedInput, Route) -> BackendResult<Delivered> + Send>;
 
 /// A fake backend whose `post_input` runs `on_input` and whose captures are counted.
 pub(super) struct Probe {
@@ -126,7 +130,11 @@ pub(super) struct Probe {
 
 impl Probe {
     pub(super) fn new(inner: FakeBackend, on_input: OnInput) -> Self {
-        Self { inner, on_input, captures: Arc::default() }
+        Self {
+            inner,
+            on_input,
+            captures: Arc::default(),
+        }
     }
 }
 

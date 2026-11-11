@@ -5,7 +5,8 @@
 //! that is there and cannot be read as a marker reads `Unreadable`, never absent.
 
 use std::collections::BTreeMap;
-use std::io;
+use std::fs::{self, File, OpenOptions};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -119,20 +120,57 @@ impl MarkerDir {
 }
 
 impl MarkerStore for MarkerDir {
-    fn read(&self, _issuer: &str, _scope: &str) -> MarkerRead {
-        MarkerRead::Absent
+    fn read(&self, issuer: &str, scope: &str) -> MarkerRead {
+        let Ok(path) = self.path(issuer, scope) else {
+            return MarkerRead::Unreadable;
+        };
+        match open_no_follow(&path) {
+            Err(error) if no_such_marker(&error) => MarkerRead::Absent,
+            Err(_) => MarkerRead::Unreadable,
+            Ok(mut file) => {
+                let mut text = String::new();
+                let owned = owner_ok(&file);
+                match (owned, file.read_to_string(&mut text)) {
+                    (true, Ok(_)) => serde_json::from_str::<PreInputMarker>(&text)
+                        .map_or(MarkerRead::Unreadable, |marker| {
+                            MarkerRead::Found(Box::new(marker))
+                        }),
+                    _ => MarkerRead::Unreadable,
+                }
+            }
+        }
     }
 
-    fn create(&mut self, _marker: &PreInputMarker) -> io::Result<()> {
-        Ok(())
+    fn create(&mut self, marker: &PreInputMarker) -> io::Result<()> {
+        let path = self.path(&marker.binding.issuer, &marker.binding.scope)?;
+        let dir = parent(&path)?;
+        private_dir(&self.root)?;
+        private_dir(dir)?;
+        write_new(&path, &serde_json::to_vec(marker)?)?;
+        File::open(dir)?.sync_all()
     }
 
-    fn record_receipt(&mut self, _marker: &PreInputMarker) -> io::Result<()> {
-        Ok(())
+    fn record_receipt(&mut self, marker: &PreInputMarker) -> io::Result<()> {
+        let path = self.path(&marker.binding.issuer, &marker.binding.scope)?;
+        let dir = parent(&path)?;
+        let temp = dir.join(format!(
+            ".{}.{}.tmp",
+            marker.binding.scope,
+            std::process::id()
+        ));
+        let _ = fs::remove_file(&temp);
+        write_new(&temp, &serde_json::to_vec(marker)?)?;
+        fs::rename(&temp, &path)?;
+        File::open(dir)?.sync_all()
     }
 
-    fn clear(&mut self, _issuer: &str, _scope: &str) -> io::Result<()> {
-        Ok(())
+    fn clear(&mut self, issuer: &str, scope: &str) -> io::Result<()> {
+        let path = self.path(issuer, scope)?;
+        match fs::remove_file(&path) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(error),
+            Ok(()) => File::open(parent(&path)?)?.sync_all(),
+        }
     }
 }
 
@@ -143,28 +181,138 @@ pub struct MemoryMarkers {
 }
 
 impl MarkerStore for MemoryMarkers {
-    fn read(&self, _issuer: &str, _scope: &str) -> MarkerRead {
-        MarkerRead::Absent
+    fn read(&self, issuer: &str, scope: &str) -> MarkerRead {
+        self.markers
+            .get(&(issuer.to_owned(), scope.to_owned()))
+            .map_or(MarkerRead::Absent, |marker| {
+                MarkerRead::Found(Box::new(marker.clone()))
+            })
     }
 
-    fn create(&mut self, _marker: &PreInputMarker) -> io::Result<()> {
+    fn create(&mut self, marker: &PreInputMarker) -> io::Result<()> {
+        let key = (marker.binding.issuer.clone(), marker.binding.scope.clone());
+        if self.markers.contains_key(&key) {
+            return Err(io::Error::from(io::ErrorKind::AlreadyExists));
+        }
+        self.markers.insert(key, marker.clone());
         Ok(())
     }
 
-    fn record_receipt(&mut self, _marker: &PreInputMarker) -> io::Result<()> {
+    fn record_receipt(&mut self, marker: &PreInputMarker) -> io::Result<()> {
+        let key = (marker.binding.issuer.clone(), marker.binding.scope.clone());
+        self.markers.insert(key, marker.clone());
         Ok(())
     }
 
-    fn clear(&mut self, _issuer: &str, _scope: &str) -> io::Result<()> {
+    fn clear(&mut self, issuer: &str, scope: &str) -> io::Result<()> {
+        self.markers.remove(&(issuer.to_owned(), scope.to_owned()));
         Ok(())
     }
 }
 
+/// A plain file-name component: 1-64 of `[A-Za-z0-9._-]`, never `.` or `..`.
 fn component(name: &str) -> io::Result<&str> {
-    Ok(name)
+    let plain = !name.is_empty()
+        && name.len() <= 64
+        && name != "."
+        && name != ".."
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'));
+    if plain {
+        Ok(name)
+    } else {
+        Err(io::Error::other(
+            "a marker key is not a plain path component",
+        ))
+    }
 }
 
-/// RED stub: creates nothing.
-pub(crate) fn private_dir(_dir: &Path) -> io::Result<()> {
+/// No marker can be there: the file or a directory on its path is missing, or a path
+/// component is not a directory (then no marker can be persisted either).
+fn no_such_marker(error: &io::Error) -> bool {
+    #[cfg(unix)]
+    let not_a_dir = error.raw_os_error() == Some(libc::ENOTDIR);
+    #[cfg(not(unix))]
+    let not_a_dir = false;
+    error.kind() == io::ErrorKind::NotFound || not_a_dir
+}
+
+fn parent(path: &Path) -> io::Result<&Path> {
+    path.parent()
+        .ok_or_else(|| io::Error::other("the marker path has no directory"))
+}
+
+fn write_new(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    no_follow_private(&mut options);
+    let mut file = options.open(path)?;
+    let written = file.write_all(bytes).and_then(|()| file.sync_all());
+    if written.is_err() {
+        let _ = fs::remove_file(path);
+    }
+    written
+}
+
+#[cfg(unix)]
+fn no_follow_private(options: &mut OpenOptions) {
+    use std::os::unix::fs::OpenOptionsExt;
+    options.mode(0o600).custom_flags(libc::O_NOFOLLOW);
+}
+
+#[cfg(not(unix))]
+const fn no_follow_private(_options: &mut OpenOptions) {}
+
+fn open_no_follow(path: &Path) -> io::Result<File> {
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW);
+    }
+    options.open(path)
+}
+
+/// Creates `dir` 0700 and checks it is a real directory this uid owns.
+pub(crate) fn private_dir(dir: &Path) -> io::Result<()> {
+    let mut builder = fs::DirBuilder::new();
+    builder.recursive(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        builder.mode(0o700);
+    }
+    builder.create(dir)?;
+    let meta = fs::symlink_metadata(dir)?;
+    if !meta.is_dir() {
+        return Err(io::Error::other("not a directory"));
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if meta.uid() != euid() {
+            return Err(io::Error::other("the directory has another owner"));
+        }
+    }
     Ok(())
+}
+
+#[cfg(unix)]
+fn owner_ok(file: &File) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    file.metadata()
+        .is_ok_and(|meta| meta.uid() == euid() && meta.mode() & 0o077 == 0)
+}
+
+#[cfg(not(unix))]
+fn owner_ok(_file: &File) -> bool {
+    true
+}
+
+#[cfg(unix)]
+fn euid() -> u32 {
+    // SAFETY: geteuid has no preconditions and cannot fail.
+    unsafe { libc::geteuid() }
 }
