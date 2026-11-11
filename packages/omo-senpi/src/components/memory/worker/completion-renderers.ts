@@ -56,12 +56,13 @@ function reflectionNoticeSpec(record: ReflectionCompletionEntry): NoticeSpec {
  * the label are dropped; a report without a summary item contributes its first prose line.
  */
 export function reflectionHeadline(text: string): string | undefined {
-  const lines = sanitizeReflectionReport(text).split("\n").map(stripMarkdown).filter((line) => line.length > 0)
+  const lines = sanitizeReflectionReport(text)
+    .split("\n")
+    .map(stripMarkdown)
+    .filter((line) => line.length > 0)
   const summaryPrefix = /^(?:(?:\d+[.)]|[-*+])\s+)*summary\b\s*[:-]?\s*/iu
   const summaryAt = lines.findIndex((line) => summaryPrefix.test(line))
-  const body = summaryAt < 0
-    ? lines[0]
-    : lines[summaryAt]?.replace(summaryPrefix, "") || lines[summaryAt + 1]
+  const body = summaryAt < 0 ? lines[0] : lines[summaryAt]?.replace(summaryPrefix, "") || lines[summaryAt + 1]
   if (body === undefined || body.length === 0) return undefined
   const prefix = /^(?:\d+\.\s+)*/u.exec(body)?.[0] ?? ""
   const content = body.slice(prefix.length)
@@ -70,7 +71,8 @@ export function reflectionHeadline(text: string): string | undefined {
 }
 
 function stripMarkdown(line: string): string {
-  return line.trim()
+  return line
+    .trim()
     .replace(/\*\*|__|`/gu, "")
     .replace(/^#+\s*/u, "")
     .replace(/^(?:[-*+]\s+)+/u, "")

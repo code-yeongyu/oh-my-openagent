@@ -8,13 +8,21 @@ import { updateOmoConfig } from "../writer"
 import { diffEdits, withoutMarker } from "./diff-edits"
 import { collectMigrationEdits, mergeWithoutClobber } from "./merge"
 import { hasMigrationMarker } from "./predicate"
-import { MigrationTransactionError, MigrationValidationError, type MigrationEnvironment, type MigrationFileSystem, type MigrationTargetWriter } from "./types"
+import {
+  MigrationTransactionError,
+  MigrationValidationError,
+  type MigrationEnvironment,
+  type MigrationFileSystem,
+  type MigrationTargetWriter,
+} from "./types"
 
 function parseDocument(path: string, content: string): Record<string, unknown> {
   const parsed = parseJsoncSafe<unknown>(content)
   if (parsed.errors.length > 0 || !isPlainObject(parsed.data)) {
     const detail = parsed.errors.map((error) => `${error.message} at ${error.offset}`).join(", ")
-    throw new MigrationTransactionError(`Migration document at ${path} is not a JSONC object${detail === "" ? "" : `: ${detail}`}`)
+    throw new MigrationTransactionError(
+      `Migration document at ${path} is not a JSONC object${detail === "" ? "" : `: ${detail}`}`,
+    )
   }
   return parsed.data
 }
@@ -24,7 +32,11 @@ function targetDocument(path: string, fileSystem: MigrationFileSystem): Record<s
   return parseDocument(path, fileSystem.readFileSync(path, "utf-8"))
 }
 
-function markerValue(target: Readonly<Record<string, unknown>>, migrationId: string, targetPath: string): readonly string[] {
+function markerValue(
+  target: Readonly<Record<string, unknown>>,
+  migrationId: string,
+  targetPath: string,
+): readonly string[] {
   const value = target["_migrations"]
   if (value === undefined) return [migrationId]
   if (!Array.isArray(value) || !value.every((entry) => typeof entry === "string")) {
@@ -39,7 +51,9 @@ function markerValue(target: Readonly<Record<string, unknown>>, migrationId: str
  * migration whose output must be stripped too, otherwise a `[senpi].codegraph` leftover survives
  * the rename as `[native].codegraph` and strict validation still rejects the file.
  */
-const OMO_HARNESS_BLOCKS: readonly string[] = [...OMO_CONFIG_HARNESS_IDS, ...OMO_CONFIG_LEGACY_HARNESS_IDS].map(harnessBlockKey)
+const OMO_HARNESS_BLOCKS: readonly string[] = [...OMO_CONFIG_HARNESS_IDS, ...OMO_CONFIG_LEGACY_HARNESS_IDS].map(
+  harnessBlockKey,
+)
 
 type RetiredCodegraphCleanup = {
   readonly diagnostics: readonly string[]
@@ -87,7 +101,10 @@ function validateTarget(targetPath: string, document: Readonly<Record<string, un
   throw new MigrationValidationError(targetPath, detail)
 }
 
-function writerInput(targetPath: string, env: MigrationEnvironment): { readonly projectDir?: string; readonly scope: "project" | "user" } {
+function writerInput(
+  targetPath: string,
+  env: MigrationEnvironment,
+): { readonly projectDir?: string; readonly scope: "project" | "user" } {
   const homeDir = resolveHomeDir(env)
   const userDirectory = toPosixPath(join(homeDir, ".omo"))
   const fileName = basename(targetPath)
@@ -148,7 +165,11 @@ export function prepareTargetWrite(input: {
     { path: ["_migrations"], value: marker },
   ]
   return {
-    diagnostics: uniqueDiagnostics([...merged.diagnostics, ...targetCleanup.diagnostics, ...additionsCleanup.diagnostics]),
+    diagnostics: uniqueDiagnostics([
+      ...merged.diagnostics,
+      ...targetCleanup.diagnostics,
+      ...additionsCleanup.diagnostics,
+    ]),
     document,
     edits,
   }

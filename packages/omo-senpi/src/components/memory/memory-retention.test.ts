@@ -61,15 +61,27 @@ async function foldedRun(paths: MemoryIdentityPaths, runId: string, finishedAt: 
 async function consumedCompletion(paths: MemoryIdentityPaths, runId: string, finishedAt: number): Promise<void> {
   const path = join(paths.reflection, "completions", `${runId}.json`)
   await writeJson(path, {
-    schemaVersion: 1, runId, identity: "agent-test", category: "quick", conversationIds: [], trigger: "manual",
-    outcome: "merged", startedAt: new Date(finishedAt).toISOString(), finishedAt: new Date(finishedAt).toISOString(),
+    schemaVersion: 1,
+    runId,
+    identity: "agent-test",
+    category: "quick",
+    conversationIds: [],
+    trigger: "manual",
+    outcome: "merged",
+    startedAt: new Date(finishedAt).toISOString(),
+    finishedAt: new Date(finishedAt).toISOString(),
     delivery: { status: "consumed" },
   })
   await ageTree(path, finishedAt)
 }
 
 async function prune(paths: MemoryIdentityPaths, extra: { readonly warn?: (message: string) => void } = {}) {
-  return runRuntimeRetention({ paths, policy: { ...DEFAULT_RUNTIME_RETENTION, discardUnreflectedJournals: true }, now: () => NOW, ...extra })
+  return runRuntimeRetention({
+    paths,
+    policy: { ...DEFAULT_RUNTIME_RETENTION, discardUnreflectedJournals: true },
+    now: () => NOW,
+    ...extra,
+  })
 }
 
 async function mint(paths: MemoryIdentityPaths): Promise<string> {
@@ -85,7 +97,8 @@ describe("run-id high water across a retention pass (H1)", () => {
         await writeJson(join(paths.reflectionSessions, "reflection-run-20", "session.json"), {})
         await ageTree(paths.reflectionSessions, daysAgo(30))
       },
-      "pending reservation": (paths) => writeJson(join(paths.reflection, "pending.json"), { runId: "reflection-run-20" }),
+      "pending reservation": (paths) =>
+        writeJson(join(paths.reflection, "pending.json"), { runId: "reflection-run-20" }),
     }
     for (const [shape, write] of Object.entries(shapes)) {
       const paths = await identity()
@@ -97,7 +110,10 @@ describe("run-id high water across a retention pass (H1)", () => {
       await prune(paths)
 
       expect({ shape, next: await mint(paths) }).toEqual({ shape, next: "reflection-run-21" })
-      expect({ shape, siblingGone: !existsSync(join(paths.reflection, "runs", "reflection-run-4")) }).toEqual({ shape, siblingGone: true })
+      expect({ shape, siblingGone: !existsSync(join(paths.reflection, "runs", "reflection-run-4")) }).toEqual({
+        shape,
+        siblingGone: true,
+      })
     }
   })
 
@@ -119,7 +135,8 @@ describe("run-id high water across a retention pass (H1)", () => {
 
   test("#given legacy reflection-sessions entries #when the pass removes the old ones #then the kept anchor still drives the mint (A22)", async () => {
     const paths = await identity()
-    for (const runId of ["reflection-run-3", "reflection-run-9"]) await writeJson(join(paths.reflectionSessions, runId, "s.json"), {})
+    for (const runId of ["reflection-run-3", "reflection-run-9"])
+      await writeJson(join(paths.reflectionSessions, runId, "s.json"), {})
     await ageTree(paths.reflectionSessions, daysAgo(8))
 
     await prune(paths)
@@ -132,14 +149,27 @@ describe("run-id high water across a retention pass (H1)", () => {
 // files with SessionManager, compact them with a real compaction entry, reopen them from disk, and
 // feed `getBranch()` through the production projection, exactly as journal-wiring does.
 type Text = { readonly role: "user" | "assistant"; readonly text: string }
-const usage = { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }
+const usage = {
+  input: 1,
+  output: 1,
+  cacheRead: 0,
+  cacheWrite: 0,
+  totalTokens: 2,
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+}
 
 function append(manager: SenpiSessionManager, message: Text): string {
   return message.role === "user"
     ? manager.appendMessage({ role: "user", content: [{ type: "text", text: message.text }], timestamp: NOW })
     : manager.appendMessage({
-        role: "assistant", content: [{ type: "text", text: message.text }], api: "anthropic-messages", provider: "fixture",
-        model: "fixture", usage, stopReason: "stop", timestamp: NOW,
+        role: "assistant",
+        content: [{ type: "text", text: message.text }],
+        api: "anthropic-messages",
+        provider: "fixture",
+        model: "fixture",
+        usage,
+        stopReason: "stop",
+        timestamp: NOW,
       })
 }
 
@@ -156,8 +186,10 @@ async function prunedSession(options: { readonly stamp: boolean; readonly fully?
   const paths = await identity()
   const manager = SessionManager.create(paths.root, join(paths.root, "sessions"))
   const ids = [
-    append(manager, { role: "user", text: "u1" }), append(manager, { role: "assistant", text: "a1" }),
-    append(manager, { role: "user", text: "u2" }), append(manager, { role: "assistant", text: "a2" }),
+    append(manager, { role: "user", text: "u1" }),
+    append(manager, { role: "assistant", text: "a1" }),
+    append(manager, { role: "user", text: "u2" }),
+    append(manager, { role: "assistant", text: "a2" }),
   ]
   const journalDir = join(paths.transcripts, "session-r1")
   const warnings: string[] = []
@@ -270,10 +302,35 @@ describe("runtime retention settings (A24)", () => {
       agents: { "agent-test": { runtime: { retention_days: 30 } } },
     })
 
-    expect(resolveRuntimeRetentionPolicy(settings, "agent-test")).toEqual({ retentionDays: 30, abandonedJournalDays: 5, completionsDays: 30, passBudgetMs: 60_000, discardUnreflectedJournals: false })
-    expect(resolveRuntimeRetentionPolicy(settings, "other")).toEqual({ retentionDays: 3, abandonedJournalDays: 5, completionsDays: 30, passBudgetMs: 60_000, discardUnreflectedJournals: false })
-    expect(resolveRuntimeRetentionPolicy(OmoMemorySettingsSchema.parse({}), "other")).toEqual({ retentionDays: 7, abandonedJournalDays: 14, completionsDays: 30, passBudgetMs: 60_000, discardUnreflectedJournals: false })
-    expect(resolveRuntimeRetentionPolicy(OmoMemorySettingsSchema.parse({ agents: { "agent-test": { runtime: { discard_unreflected_journals: true } } } }), "agent-test").discardUnreflectedJournals).toBe(true)
+    expect(resolveRuntimeRetentionPolicy(settings, "agent-test")).toEqual({
+      retentionDays: 30,
+      abandonedJournalDays: 5,
+      completionsDays: 30,
+      passBudgetMs: 60_000,
+      discardUnreflectedJournals: false,
+    })
+    expect(resolveRuntimeRetentionPolicy(settings, "other")).toEqual({
+      retentionDays: 3,
+      abandonedJournalDays: 5,
+      completionsDays: 30,
+      passBudgetMs: 60_000,
+      discardUnreflectedJournals: false,
+    })
+    expect(resolveRuntimeRetentionPolicy(OmoMemorySettingsSchema.parse({}), "other")).toEqual({
+      retentionDays: 7,
+      abandonedJournalDays: 14,
+      completionsDays: 30,
+      passBudgetMs: 60_000,
+      discardUnreflectedJournals: false,
+    })
+    expect(
+      resolveRuntimeRetentionPolicy(
+        OmoMemorySettingsSchema.parse({
+          agents: { "agent-test": { runtime: { discard_unreflected_journals: true } } },
+        }),
+        "agent-test",
+      ).discardUnreflectedJournals,
+    ).toBe(true)
   })
 
   test("#given a policy with short windows #when the pass runs #then the predicates use the resolved values", async () => {
@@ -281,7 +338,10 @@ describe("runtime retention settings (A24)", () => {
     await foldedRun(paths, "reflection-run-1", daysAgo(4))
     await foldedRun(paths, "reflection-run-2", daysAgo(4))
     await foldedRun(paths, "reflection-run-3", daysAgo(1))
-    const policy = resolveRuntimeRetentionPolicy(OmoMemorySettingsSchema.parse({ runtime: { retention_days: 3 } }), "agent-test")
+    const policy = resolveRuntimeRetentionPolicy(
+      OmoMemorySettingsSchema.parse({ runtime: { retention_days: 3 } }),
+      "agent-test",
+    )
 
     const report = await runRuntimeRetention({ paths, policy, now: () => NOW })
 
@@ -289,23 +349,38 @@ describe("runtime retention settings (A24)", () => {
     const defaults = await identity()
     await foldedRun(defaults, "reflection-run-1", daysAgo(4))
     await foldedRun(defaults, "reflection-run-3", daysAgo(1))
-    expect((await runRuntimeRetention({ paths: defaults, policy: DEFAULT_RUNTIME_RETENTION, now: () => NOW })).runs.removed).toEqual([])
+    expect(
+      (await runRuntimeRetention({ paths: defaults, policy: DEFAULT_RUNTIME_RETENTION, now: () => NOW })).runs.removed,
+    ).toEqual([])
   })
 })
 
 describe("byte offset after a prune (M5, A28)", () => {
   test("#given a fully-reflected journal pruned by J1 #when the dream selector measures it and the session then rebuilds #then the volume is 0 and the rebuilt offset is the anchor's", async () => {
     const session = await prunedSession({ stamp: true, fully: true })
-    const fullyState = JSON.parse(await readFile(join(session.journalDir, "state.json"), "utf8")) as Record<string, unknown>
+    const fullyState = JSON.parse(await readFile(join(session.journalDir, "state.json"), "utf8")) as Record<
+      string,
+      unknown
+    >
     expect(fullyState.reflected_through_byte_offset).toBeUndefined()
 
     expect(fullyState.transcript_pruned_at).toBeDefined()
-    expect(await computeUnreflectedVolumeFast({ transcriptsDir: session.paths.transcripts, autoSelectMax: 5, autoSelectMaxBytes: 150_000, now: () => new Date(NOW) })).toBe(0)
+    expect(
+      await computeUnreflectedVolumeFast({
+        transcriptsDir: session.paths.transcripts,
+        autoSelectMax: 5,
+        autoSelectMaxBytes: 150_000,
+        now: () => new Date(NOW),
+      }),
+    ).toBe(0)
 
     const journal = journalOf(session)
     await journal.reconcile(reopened(session))
     const rows = await journal.readEntries()
-    const rebuilt = JSON.parse(await readFile(join(session.journalDir, "state.json"), "utf8")) as Record<string, unknown>
+    const rebuilt = JSON.parse(await readFile(join(session.journalDir, "state.json"), "utf8")) as Record<
+      string,
+      unknown
+    >
     expect(rebuilt.reflected_through_byte_offset).toBe(reflectedThroughByteOffset(rows, session.ids[3] ?? ""))
     expect(rebuilt.transcript_pruned_at).toBeUndefined()
   })
@@ -319,18 +394,32 @@ describe("discard_unreflected_journals for identities this process does not host
     })
     expect(resolveForeignIdentityDiscardUnreflected(settings, "agent-off")).toBe(false)
     expect(resolveForeignIdentityDiscardUnreflected(settings, "agent-plain")).toBe(true)
-    expect(resolveForeignIdentityDiscardUnreflected(OmoMemorySettingsSchema.parse({ runtime: { discard_unreflected_journals: false }, agents: { "agent-on": { runtime: { discard_unreflected_journals: true } } } }), "agent-on")).toBe(false)
+    expect(
+      resolveForeignIdentityDiscardUnreflected(
+        OmoMemorySettingsSchema.parse({
+          runtime: { discard_unreflected_journals: false },
+          agents: { "agent-on": { runtime: { discard_unreflected_journals: true } } },
+        }),
+        "agent-on",
+      ),
+    ).toBe(false)
     expect(resolveForeignIdentityDiscardUnreflected(OmoMemorySettingsSchema.parse({}), "agent-plain")).toBe(false)
     expect(resolveForeignIdentityDiscardUnreflected(undefined, "agent-plain")).toBe(false)
 
     const paths = await identity()
     const dir = join(paths.transcripts, "never")
     const journal = new TranscriptJournal({ journalDir: dir })
-    await journal.reconcile([{ kind: "user", messageId: "u1", text: "x" }, { kind: "assistant", messageId: "a1", textBlocks: ["y"] }])
+    await journal.reconcile([
+      { kind: "user", messageId: "u1", text: "x" },
+      { kind: "assistant", messageId: "a1", textBlocks: ["y"] },
+    ])
     await ageTree(dir, daysAgo(60))
     const report = await runRuntimeRetention({
       paths,
-      policy: { ...DEFAULT_RUNTIME_RETENTION, discardUnreflectedJournals: resolveForeignIdentityDiscardUnreflected(settings, "agent-off") },
+      policy: {
+        ...DEFAULT_RUNTIME_RETENTION,
+        discardUnreflectedJournals: resolveForeignIdentityDiscardUnreflected(settings, "agent-off"),
+      },
       now: () => NOW,
     })
     expect(report.journals.kept["never"]).toBe("unreflected-retention-off")

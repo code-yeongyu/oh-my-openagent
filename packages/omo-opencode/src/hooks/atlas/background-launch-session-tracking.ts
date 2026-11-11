@@ -42,11 +42,13 @@ export async function syncBackgroundLaunchSessionTracking(input: {
     lineageSessionIDs,
   })
 
-  const trackedSessionId = subagentSessionId ?? await resolveFallbackTrackedSessionId({
-    ctx,
-    extractedSessionId,
-    lineageSessionIDs,
-  })
+  const trackedSessionId =
+    subagentSessionId ??
+    (await resolveFallbackTrackedSessionId({
+      ctx,
+      extractedSessionId,
+      lineageSessionIDs,
+    }))
   if (!trackedSessionId) {
     return
   }
@@ -107,8 +109,8 @@ async function resolveFallbackTrackedSessionId(input: {
     const parentSessionId = session.data?.parentID
     const normalizedLineageSessionIDs = input.lineageSessionIDs.map((sessionID) => normalizeSessionId(sessionID))
     if (
-      typeof parentSessionId === "string"
-      && normalizedLineageSessionIDs.includes(normalizeSessionId(parentSessionId))
+      typeof parentSessionId === "string" &&
+      normalizedLineageSessionIDs.includes(normalizeSessionId(parentSessionId))
     ) {
       return input.extractedSessionId
     }

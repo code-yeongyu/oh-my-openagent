@@ -23,9 +23,16 @@ export interface KillPointOptions {
  * Kills this process when `OMO_MEMORY_KILL_POINT` names `point`. Returns how it killed (a POSIX
  * `SIGKILL`, or Windows `TerminateProcess` through `process.kill(pid)`), or undefined when it did not.
  */
-export function maybeKillAt(point: MemoryKillPoint, options: KillPointOptions = {}): "signal" | "terminate" | undefined {
+export function maybeKillAt(
+  point: MemoryKillPoint,
+  options: KillPointOptions = {},
+): "signal" | "terminate" | undefined {
   if (process.env.OMO_MEMORY_KILL_POINT !== point) return undefined
-  const kill = options.kill ?? ((pid: number, signal?: NodeJS.Signals) => { process.kill(pid, signal) })
+  const kill =
+    options.kill ??
+    ((pid: number, signal?: NodeJS.Signals) => {
+      process.kill(pid, signal)
+    })
   if ((options.platform ?? process.platform) === "win32") {
     kill(process.pid)
     return "terminate"

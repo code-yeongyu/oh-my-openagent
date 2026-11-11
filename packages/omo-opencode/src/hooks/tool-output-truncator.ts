@@ -39,18 +39,14 @@ export function createToolOutputTruncatorHook(ctx: PluginInput, options?: ToolOu
 
   const toolExecuteAfter = async (
     input: { tool: string; sessionID: string; callID: string },
-    output: { title: string; output: string; metadata: unknown }
+    output: { title: string; output: string; metadata: unknown },
   ) => {
     if (!truncateAll && !TRUNCATABLE_TOOLS.includes(input.tool)) return
-    if (typeof output.output !== 'string') return
+    if (typeof output.output !== "string") return
 
     try {
       const targetMaxTokens = TOOL_SPECIFIC_MAX_TOKENS[input.tool] ?? DEFAULT_MAX_TOKENS
-      const { result, truncated } = await truncator.truncate(
-        input.sessionID,
-        output.output,
-        { targetMaxTokens }
-      )
+      const { result, truncated } = await truncator.truncate(input.sessionID, output.output, { targetMaxTokens })
       if (truncated) {
         output.output = result
       }

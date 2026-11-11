@@ -1,10 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import { DAG_VERIFICATION_DIRECTIVE, type ParentState } from "@oh-my-opencode/senpi-task"
 
-import {
-  IdleInjectionCoordinator,
-  type IdleInjectionMessage,
-} from "../../extension/idle-injection-coordinator"
+import { IdleInjectionCoordinator, type IdleInjectionMessage } from "../../extension/idle-injection-coordinator"
 import {
   createDagWake,
   DAG_WAKE_MESSAGE_TYPE,
@@ -69,18 +66,23 @@ function createHarness(initialParentState: ParentState = { kind: "streaming" }) 
   const coordinator = new IdleInjectionCoordinator(
     (message, options) => {
       let offset = 0
-      const details = options.items.flatMap(item => {
+      const details = options.items.flatMap((item) => {
         const start = offset
         offset += item.content.length + 2
-        return item.customType === undefined ? [] : [{
-          customType: item.customType, details: item.details,
-          ...(item.contextScoped === true ? { contentRange: [start, start + item.content.length] as const } : {}),
-        }]
+        return item.customType === undefined
+          ? []
+          : [
+              {
+                customType: item.customType,
+                details: item.details,
+                ...(item.contextScoped === true ? { contentRange: [start, start + item.content.length] as const } : {}),
+              },
+            ]
       })
       delivered.push({
-        message: { ...message, details, content: options.items.map(item => item.content).join("\n\n") },
+        message: { ...message, details, content: options.items.map((item) => item.content).join("\n\n") },
         options: { deliverAs: options.deliverAs },
-        runRefs: options.items.map(item => item.runRef),
+        runRefs: options.items.map((item) => item.runRef),
       })
     },
     { scheduleFlush: timers.schedule },
@@ -103,9 +105,12 @@ describe("dag wake", () => {
     const harness = createHarness({ kind: "idle" })
 
     // when
-    harness.wake.onRunEvent(run(), terminalEvent("dag.run.failed", "dag_1", {
-      error: { code: "task_error", message: "compile failed", nodeId: "build" },
-    }))
+    harness.wake.onRunEvent(
+      run(),
+      terminalEvent("dag.run.failed", "dag_1", {
+        error: { code: "task_error", message: "compile failed", nodeId: "build" },
+      }),
+    )
 
     // then the terminal owns one queued injection without using the streaming timer
     expect(harness.coordinator.pendingCount()).toBe(1)
@@ -118,20 +123,22 @@ describe("dag wake", () => {
     expect(harness.delivered).toHaveLength(1)
     expect(harness.delivered[0]?.options).toEqual({ deliverAs: "steer" })
     expect(harness.delivered[0]?.message.content).toBe(
-      "DAG \"release-pipeline\" failed: 3 completed, 1 failed, 0 cancelled, 0 skipped (4 total). First failure at build [task_error]: compile failed"
-      + `\n\n${DAG_VERIFICATION_DIRECTIVE}`,
+      'DAG "release-pipeline" failed: 3 completed, 1 failed, 0 cancelled, 0 skipped (4 total). First failure at build [task_error]: compile failed' +
+        `\n\n${DAG_VERIFICATION_DIRECTIVE}`,
     )
-    expect(harness.delivered[0]?.message.details).toEqual([{
-      customType: DAG_WAKE_MESSAGE_TYPE,
-      contentRange: [0, harness.delivered[0]?.message.content.length],
-      details: {
-        runId: "dag_1",
-        name: "release-pipeline",
-        status: "failed",
-        counts,
-        firstFailure: { code: "task_error", message: "compile failed", nodeId: "build" },
+    expect(harness.delivered[0]?.message.details).toEqual([
+      {
+        customType: DAG_WAKE_MESSAGE_TYPE,
+        contentRange: [0, harness.delivered[0]?.message.content.length],
+        details: {
+          runId: "dag_1",
+          name: "release-pipeline",
+          status: "failed",
+          counts,
+          firstFailure: { code: "task_error", message: "compile failed", nodeId: "build" },
+        },
       },
-    }])
+    ])
   })
 
   it("#given two terminal runs in one window #when the fake timer flushes #then one admission carries each run with its own reference", () => {
@@ -151,11 +158,16 @@ describe("dag wake", () => {
 
     // then
     expect(harness.delivered).toHaveLength(1)
-    expect(harness.delivered[0]?.message.content).toBe([
-      `DAG "release" completed: 3 completed, 1 failed, 0 cancelled, 0 skipped (4 total)\n\n${DAG_VERIFICATION_DIRECTIVE}`,
-      `DAG "docs" cancelled: 3 completed, 1 failed, 0 cancelled, 0 skipped (4 total)\n\n${DAG_VERIFICATION_DIRECTIVE}`,
-    ].join("\n\n"))
-    expect(harness.delivered[0]?.runRefs).toEqual([{ kind: "dag", id: "dag_1" }, { kind: "dag", id: "dag_2" }])
+    expect(harness.delivered[0]?.message.content).toBe(
+      [
+        `DAG "release" completed: 3 completed, 1 failed, 0 cancelled, 0 skipped (4 total)\n\n${DAG_VERIFICATION_DIRECTIVE}`,
+        `DAG "docs" cancelled: 3 completed, 1 failed, 0 cancelled, 0 skipped (4 total)\n\n${DAG_VERIFICATION_DIRECTIVE}`,
+      ].join("\n\n"),
+    )
+    expect(harness.delivered[0]?.runRefs).toEqual([
+      { kind: "dag", id: "dag_1" },
+      { kind: "dag", id: "dag_2" },
+    ])
     expect(harness.delivered[0]?.options).toEqual({ deliverAs: "steer" })
   })
 
@@ -179,7 +191,7 @@ describe("dag wake", () => {
     // then the buffer drains once through the coordinator's idle steer path
     expect(harness.wake.bufferedCount(SESSION_ID)).toBe(0)
     expect(harness.delivered).toHaveLength(1)
-    expect(harness.delivered[0]?.message.content).toContain("DAG \"release-pipeline\" completed")
+    expect(harness.delivered[0]?.message.content).toContain('DAG "release-pipeline" completed')
     expect(harness.delivered[0]?.options).toEqual({ deliverAs: "steer" })
   })
 
@@ -216,9 +228,9 @@ describe("dag wake", () => {
     // then
     expect(harness.delivered).toHaveLength(1)
     expect(harness.delivered[0]?.message.content).toBe(
-      "task st_1 completed\n\n"
-      + "DAG \"release-pipeline\" completed: 3 completed, 1 failed, 0 cancelled, 0 skipped (4 total)"
-      + `\n\n${DAG_VERIFICATION_DIRECTIVE}`,
+      "task st_1 completed\n\n" +
+        'DAG "release-pipeline" completed: 3 completed, 1 failed, 0 cancelled, 0 skipped (4 total)' +
+        `\n\n${DAG_VERIFICATION_DIRECTIVE}`,
     )
     expect(harness.delivered[0]?.runRefs).toEqual([undefined, { kind: "dag", id: "dag_1" }])
   })
@@ -235,12 +247,14 @@ describe("dag wake", () => {
     expect(harness.delivered).toHaveLength(1)
     expect(harness.delivered[0]?.options).toEqual({ deliverAs: "steer" })
     expect(harness.delivered[0]?.message.content).toBe(
-      "DAG \"release-pipeline\" paused (session_shutdown): it will resume when the session restarts.",
+      'DAG "release-pipeline" paused (session_shutdown): it will resume when the session restarts.',
     )
-    expect(harness.delivered[0]?.message.details).toEqual([{
-      customType: DAG_WAKE_MESSAGE_TYPE,
-      details: { runId: "dag_1", name: "release-pipeline", status: "paused", reason: "session_shutdown" },
-    }])
+    expect(harness.delivered[0]?.message.details).toEqual([
+      {
+        customType: DAG_WAKE_MESSAGE_TYPE,
+        details: { runId: "dag_1", name: "release-pipeline", status: "paused", reason: "session_shutdown" },
+      },
+    ])
   })
 
   it("#given a pause during session shutdown #when the session starts again #then the buffered pause notice is redelivered", async () => {
@@ -262,7 +276,7 @@ describe("dag wake", () => {
     // then
     expect(harness.wake.bufferedCount(SESSION_ID)).toBe(0)
     expect(harness.delivered).toHaveLength(1)
-    expect(harness.delivered[0]?.message.content).toContain("DAG \"release-pipeline\" paused")
+    expect(harness.delivered[0]?.message.content).toContain('DAG "release-pipeline" paused')
   })
 
   it("#given a terminal run event and an idle parent #when the injection is delivered #then its content carries the dag verification directive", async () => {
@@ -277,7 +291,7 @@ describe("dag wake", () => {
     const content = harness.delivered[0]?.message.content ?? ""
     expect(content).toContain(DAG_VERIFICATION_DIRECTIVE)
     expect(content).toContain(`\n\n${DAG_VERIFICATION_DIRECTIVE}`)
-    expect(content).toStartWith("DAG \"release-pipeline\" completed")
+    expect(content).toStartWith('DAG "release-pipeline" completed')
   })
 
   it("#given a paused run event #when the injection is delivered #then its content omits the dag verification directive", async () => {
@@ -302,7 +316,7 @@ describe("dag wake", () => {
 
     // then
     expect(harness.delivered[0]?.message.content).toBe(
-      "DAG \"release-pipeline\" paused: it will resume when the session restarts.",
+      'DAG "release-pipeline" paused: it will resume when the session restarts.',
     )
   })
 })

@@ -71,10 +71,7 @@ describe("filterDisabledProviderModels", () => {
       { model: "opencode/gpt-5.5", variant: "medium" },
     ]
     const result = filterDisabledProviderModels(input, ["github-copilot", "vercel"])
-    expect(result).toEqual([
-      "openai/gpt-5.5",
-      { model: "opencode/gpt-5.5", variant: "medium" },
-    ])
+    expect(result).toEqual(["openai/gpt-5.5", { model: "opencode/gpt-5.5", variant: "medium" }])
   })
 
   test("returns a fresh copy when the disabled list is empty", () => {
@@ -167,10 +164,7 @@ describe("applyDisabledProviders", () => {
       agents: {
         hephaestus: {
           model: "github-copilot/gpt-5.5",
-          fallback_models: [
-            "GITHUB-COPILOT/gpt-5.6-luna-fast",
-            "openai/gpt-5.5",
-          ],
+          fallback_models: ["GITHUB-COPILOT/gpt-5.6-luna-fast", "openai/gpt-5.5"],
         },
       },
     } as unknown as OhMyOpenCodeConfig

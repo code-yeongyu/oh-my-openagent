@@ -25,35 +25,37 @@ describe("background task description redaction", () => {
   test("#given task tool omits description #when launching in background #then generated prompt summary is not persisted", async () => {
     // given
     let launchedDescription = ""
-    const tool = createDelegateTask(unsafeTestValue({
-      directory: "/tmp/project",
-      connectedProvidersOverride: ["openai"],
-      availableModelsOverride: new Set(["openai/gpt-5.6-luna-fast"]),
-      manager: {
-        launch: async (input: { readonly description: string; readonly agent: string }) => {
-          launchedDescription = input.description
-          return {
-            id: "bg_tool_secret",
-            sessionId: "ses_tool_secret",
-            description: input.description,
-            agent: input.agent,
-            status: "running",
-          }
+    const tool = createDelegateTask(
+      unsafeTestValue({
+        directory: "/tmp/project",
+        connectedProvidersOverride: ["openai"],
+        availableModelsOverride: new Set(["openai/gpt-5.6-luna-fast"]),
+        manager: {
+          launch: async (input: { readonly description: string; readonly agent: string }) => {
+            launchedDescription = input.description
+            return {
+              id: "bg_tool_secret",
+              sessionId: "ses_tool_secret",
+              description: input.description,
+              agent: input.agent,
+              status: "running",
+            }
+          },
+          getTask: () => undefined,
         },
-        getTask: () => undefined,
-      },
-      client: {
-        app: { agents: async () => ({ data: [] }) },
-        config: { get: async () => ({ data: { model: "openai/gpt-5.6-luna-fast" } }) },
-        session: {
-          create: async () => ({ data: { id: "ses_tool_secret" } }),
-          prompt: async () => ({ data: {} }),
-          promptAsync: async () => ({ data: {} }),
-          messages: async () => ({ data: [] }),
-          status: async () => ({ data: {} }),
+        client: {
+          app: { agents: async () => ({ data: [] }) },
+          config: { get: async () => ({ data: { model: "openai/gpt-5.6-luna-fast" } }) },
+          session: {
+            create: async () => ({ data: { id: "ses_tool_secret" } }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+            messages: async () => ({ data: [] }),
+            status: async () => ({ data: {} }),
+          },
         },
-      },
-    }))
+      }),
+    )
 
     // when
     await tool.execute(
@@ -153,10 +155,12 @@ describe("background task description redaction", () => {
           session: {
             status: async () => ({ data: { ses_unstable_secret: { type: "idle" } } }),
             messages: async () => ({
-              data: [{
-                info: { role: "assistant", time: { created: 1 } },
-                parts: [{ type: "text", text: "done" }],
-              }],
+              data: [
+                {
+                  info: { role: "assistant", time: { created: 1 } },
+                  parts: [{ type: "text", text: "done" }],
+                },
+              ],
             }),
           },
         },

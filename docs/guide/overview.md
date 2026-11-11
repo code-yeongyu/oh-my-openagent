@@ -39,7 +39,7 @@ Want more control? Run `/ulw-plan` for interview-based planning, then `/ulw-exec
 
 You don't have to know model names to get a good main agent. Pick a profile by intent and omo picks the model:
 
-- **Capable**: the strongest generalist you have. Claude Fable 5.1, then Claude Opus 5.5, then Kimi K3, then GLM 5.3.
+- **Capable**: the strongest generalist you have. Claude Fable 5.2, then Claude Fable 5.1, then Claude Opus 5.5, then Kimi K3, then GLM 5.3.
 - **Deep work**: maximum reasoning for hard problems. GPT-6 Astra, then GPT-6 Sol.
 
 Set one key in `omo.json`:
@@ -60,7 +60,7 @@ We used to call this "Claude Code on steroids." That was wrong.
 
 This isn't about making Claude Code better. It's about breaking free from the idea that one model, one provider, one way of working is enough. Anthropic wants you locked in. OpenAI wants you locked in. Everyone wants you locked in.
 
-Oh My OpenAgent doesn't play that game. It orchestrates across models, picking the right brain for the right job. Your session model for orchestration. Visual work uses `claude-fable-5-1` max, then `claude-opus-5-5` max, then `kimi-k3` max. GPT-6 Astra for deep reasoning, with GPT-5.6 Sol behind it. GPT-6 Luna Fast for quick tasks, Kimi high-speed for codebase search. All working together, automatically.
+Oh My OpenAgent doesn't play that game. It orchestrates across models, picking the right brain for the right job. Your session model for orchestration. Visual work uses `claude-fable-5-2` max, then `claude-fable-5-1` max, then `claude-opus-5-5` max, then `kimi-k3` max. GPT-6 Astra for deep reasoning, with GPT-5.6 Sol behind it. GPT-6 Luna Fast for quick tasks, Kimi high-speed for codebase search. All working together, automatically.
 
 ---
 
@@ -171,10 +171,10 @@ Override specific categories or curated agents in `omo.json`:
 
   "categories": {
     // Design consultation: Fable 5 max
-    "architect": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
+    "architect": { "model": "anthropic/claude-fable-5-2", "reasoning": "max" },
 
     // Frontend/UI work: Fable 5 max, then Opus 5 max, then Kimi K3.1 Pro max
-    "visual-engineering": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
+    "visual-engineering": { "model": "anthropic/claude-fable-5-2", "reasoning": "max" },
 
     // Hard logic: GPT-6 Astra max, then GPT-5.6 Sol max
     "ultrabrain": { "model": "openai/gpt-6-astra", "reasoning": "max" },
@@ -183,7 +183,7 @@ Override specific categories or curated agents in `omo.json`:
     "deep-high": { "model": "openai/gpt-6-astra", "reasoning": "high" },
 
     // Creative and design work
-    "artistry": { "model": "anthropic/claude-fable-5-1", "reasoning": "max" },
+    "artistry": { "model": "anthropic/claude-fable-5-2", "reasoning": "max" },
 
     // Quick tasks: fast and cheap
     "quick": { "model": "openai/gpt-6-luna-fast", "reasoning": "low" },

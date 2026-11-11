@@ -68,9 +68,10 @@ export function resolveMemberScopedToolNames(
     if (matches.length !== 1 || tool === undefined) {
       throw new RunnerError({
         kind: "tools_unavailable",
-        message: matches.length === 0
-          ? `Member-scoped tool "${name}" is not available in the live parent tools.`
-          : `Member-scoped tool "${name}" matches ${matches.length} live parent tools.`,
+        message:
+          matches.length === 0
+            ? `Member-scoped tool "${name}" is not available in the live parent tools.`
+            : `Member-scoped tool "${name}" matches ${matches.length} live parent tools.`,
       })
     }
     resolved.push(tool)
@@ -106,18 +107,29 @@ export function buildChildSessionOptions(input: BuildChildSessionOptionsInput): 
   })
   const existingToolNames = childStructuralToolNames(mergedCustomTools.map((tool) => tool.name))
   const curated = spec.agentType !== undefined && CURATED_READONLY_AGENT_NAMES.has(spec.agentType)
-  const floor = curated ? (BUILTIN_AGENTS[spec.agentType ?? ""]?.tools ?? []).filter((rule) => rule.allow).map((rule) => rule.pattern) : undefined
-  const toolAllowlist = floor === undefined ? spec.toolAllowlist : floor.filter((name) => spec.toolAllowlist === undefined || spec.toolAllowlist.includes(name))
-  const kernelTools = input.revivedSessionPath === undefined
-    ? buildChildKernelTools(spec, existingToolNames, liveBindingGuard(spec, input.kernelToolBindings))
-    : buildRevivedChildKernelTools({
-      spec,
-      sessionPath: input.revivedSessionPath,
-      existingToolNames,
-      bindings: input.kernelToolBindings,
-    })
+  const floor = curated
+    ? (BUILTIN_AGENTS[spec.agentType ?? ""]?.tools ?? []).filter((rule) => rule.allow).map((rule) => rule.pattern)
+    : undefined
+  const toolAllowlist =
+    floor === undefined
+      ? spec.toolAllowlist
+      : floor.filter((name) => spec.toolAllowlist === undefined || spec.toolAllowlist.includes(name))
+  const kernelTools =
+    input.revivedSessionPath === undefined
+      ? buildChildKernelTools(spec, existingToolNames, liveBindingGuard(spec, input.kernelToolBindings))
+      : buildRevivedChildKernelTools({
+          spec,
+          sessionPath: input.revivedSessionPath,
+          existingToolNames,
+          bindings: input.kernelToolBindings,
+        })
   const customTools = curated
-    ? [...mergedCustomTools.filter((tool) => tool.name !== "bash" && (toolAllowlist?.includes(tool.name) || isWorkpoolYieldTool(tool))), createCuratedReadonlyBashTool(spec.cwd)]
+    ? [
+        ...mergedCustomTools.filter(
+          (tool) => tool.name !== "bash" && (toolAllowlist?.includes(tool.name) || isWorkpoolYieldTool(tool)),
+        ),
+        createCuratedReadonlyBashTool(spec.cwd),
+      ]
     : [...mergedCustomTools, ...kernelTools]
   const caller = {
     cwd: spec.cwd,
@@ -133,6 +145,7 @@ export function buildChildSessionOptions(input: BuildChildSessionOptionsInput): 
       settingsManager,
       ...(spec.agentDir === undefined ? {} : { agentDir: spec.agentDir }),
       ...(spec.systemPrompt === undefined ? {} : { systemPrompt: spec.systemPrompt }),
+      ...(spec.ownApprovalMode === undefined ? {} : { allowTools: spec.ownApprovalMode.allowTools }),
     }),
     customTools,
     ...(spec.agentDir !== undefined && { agentDir: spec.agentDir }),
@@ -146,7 +159,13 @@ export function buildChildSessionOptions(input: BuildChildSessionOptionsInput): 
     ...(spec.model !== undefined && { initialModelProvenance: "cli" }),
     ...(spec.thinkingLevel !== undefined && { thinkingLevel: spec.thinkingLevel }),
     settingsManager,
-    ...(toolAllowlist !== undefined && { tools: [...toolAllowlist, ...mergedCustomTools.filter(isWorkpoolYieldTool).map(tool => tool.name), ...kernelTools.map(tool => tool.name)] }),
+    ...(toolAllowlist !== undefined && {
+      tools: [
+        ...toolAllowlist,
+        ...mergedCustomTools.filter(isWorkpoolYieldTool).map((tool) => tool.name),
+        ...kernelTools.map((tool) => tool.name),
+      ],
+    }),
     ...(spec.toolDenylist !== undefined && { excludeTools: [...spec.toolDenylist] }),
   }
 }

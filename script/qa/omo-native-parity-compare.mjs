@@ -29,19 +29,65 @@ export function astGrepProbeCode({ budgetMs = 45_000, pollMs = 500 } = {}) {
 export const PARITY_STEPS = [
   { id: "eval-js", tool: "eval", arguments: { language: "js", code: "print(6 * 7)", summary: "parity js" } },
   { id: "eval-py", tool: "eval", arguments: { language: "py", code: "print(6 * 7)", summary: "parity python" } },
-  { id: "grep", tool: "eval", arguments: { language: "js", code: "const r = await tool.grep({ pattern: 'omo-parity-needle', path: '.' }); print(r.text.split('\\n')[0])", summary: "parity grep" } },
-  { id: "pty-bash", tool: "eval", arguments: { language: "js", code: "const r = await tool.bash({ command: 'echo parity-$((6*7))' }); print(r.text)", summary: "parity bash" } },
-  { id: "ast-grep", tool: "eval", arguments: { language: "js", code: astGrepProbeCode(), summary: "parity tool search", on_timeout: "error" } },
+  {
+    id: "grep",
+    tool: "eval",
+    arguments: {
+      language: "js",
+      code: "const r = await tool.grep({ pattern: 'omo-parity-needle', path: '.' }); print(r.text.split('\\n')[0])",
+      summary: "parity grep",
+    },
+  },
+  {
+    id: "pty-bash",
+    tool: "eval",
+    arguments: {
+      language: "js",
+      code: "const r = await tool.bash({ command: 'echo parity-$((6*7))' }); print(r.text)",
+      summary: "parity bash",
+    },
+  },
+  {
+    id: "ast-grep",
+    tool: "eval",
+    arguments: { language: "js", code: astGrepProbeCode(), summary: "parity tool search", on_timeout: "error" },
+  },
   { id: "webfetch", tool: "webfetch", arguments: { url: "{{PAGE_URL}}", format: "markdown" } },
   { id: "read-text", tool: "read", arguments: { path: "notes.txt" } },
   { id: "read-image", tool: "read", arguments: { path: "pixel.png" } },
   { id: "lsp", tool: "lsp_diagnostics", arguments: { filePath: "sample.ts" } },
-  { id: "apply-patch", tool: "apply_patch", arguments: { input: "*** Begin Patch\n*** Add File: added.ts\n+export const added = 42\n*** End Patch" } },
-  { id: "memory", tool: "memory", arguments: { command: "create", reason: "parity", file_path: "reference/parity.md", description: "parity note", file_text: "parity 42" } },
+  {
+    id: "apply-patch",
+    tool: "apply_patch",
+    arguments: { input: "*** Begin Patch\n*** Add File: added.ts\n+export const added = 42\n*** End Patch" },
+  },
+  {
+    id: "memory",
+    tool: "memory",
+    arguments: {
+      command: "create",
+      reason: "parity",
+      file_path: "reference/parity.md",
+      description: "parity note",
+      file_text: "parity 42",
+    },
+  },
   // The note as the memory repository stored it: proves a memory write commits through the real pre-commit hook with the
   // claim receipt header stamped (#10498 shipped a header the hook's key allowlist rejected, failing every write).
-  { id: "memory-note", tool: "eval", arguments: { language: "js", code: "const r = await tool.bash({ command: 'f=$(find \"$HOME\" -path \"*/repo/reference/parity.md\" 2>/dev/null | head -1); awk \"NR == 1 || !done { print } NR > 1 && /^---$/ { done = 1 }\" \"$f\"' }); print(r.text)", summary: "parity memory note" } },
-  { id: "task", tool: "task", arguments: { prompt: "parity child", category: "quick", task_summary: "parity child", run_in_background: false } },
+  {
+    id: "memory-note",
+    tool: "eval",
+    arguments: {
+      language: "js",
+      code: 'const r = await tool.bash({ command: \'f=$(find "$HOME" -path "*/repo/reference/parity.md" 2>/dev/null | head -1); awk "NR == 1 || !done { print } NR > 1 && /^---$/ { done = 1 }" "$f"\' }); print(r.text)',
+      summary: "parity memory note",
+    },
+  },
+  {
+    id: "task",
+    tool: "task",
+    arguments: { prompt: "parity child", category: "quick", task_summary: "parity child", run_in_background: false },
+  },
 ]
 
 // Lines doctor prints only on one distribution by design, each with the reason it is expected.
@@ -59,9 +105,19 @@ export const DOCTOR_EXPECTED_ONLY = {
     ["PASS computer use ", "the binary embeds the desktop engine, so its probe runs"],
     ["WARN computer use ", "results of that probe (permissions, display) on the runner"],
     ["INFO computer use stop path", "reported once the embedded engine answers"],
-    ["INFO Claude Code", "the binary pins the Claude Code it downloads for the anthropic-subscription lane (#9262); npm has no pin"],
+    [
+      "INFO computer use stop persistence",
+      "printed by the ready branch the embedded engine reaches; the npm doctor skips computer use until the engine downloads",
+    ],
+    [
+      "INFO Claude Code",
+      "the binary pins the Claude Code it downloads for the anthropic-subscription lane (#9262); npm has no pin",
+    ],
     ["PASS Claude Code", "the same pinned Claude Code, once it is downloaded"],
-    ["INFO engine trust", "the engine-trust section is part of the compiled doctor only; the npm launcher's doctor has none (omo#10762)"],
+    [
+      "INFO engine trust",
+      "the engine-trust section is part of the compiled doctor only; the npm launcher's doctor has none (omo#10762)",
+    ],
   ],
 }
 
@@ -98,8 +154,10 @@ export function compareLines(label, binaryLines, npmLines) {
   const differences = []
   const binaryKeys = new Set(binaryLines.filter((line) => line.trim() && !expectedOnly(line, "binary")).map(sectionKey))
   const npmKeys = new Set(npmLines.filter((line) => line.trim() && !expectedOnly(line, "npm")).map(sectionKey))
-  for (const key of npmKeys) if (!binaryKeys.has(key)) differences.push(`${label}: npm prints "${key}", the binary does not`)
-  for (const key of binaryKeys) if (!npmKeys.has(key)) differences.push(`${label}: the binary prints "${key}", npm does not`)
+  for (const key of npmKeys)
+    if (!binaryKeys.has(key)) differences.push(`${label}: npm prints "${key}", the binary does not`)
+  for (const key of binaryKeys)
+    if (!npmKeys.has(key)) differences.push(`${label}: the binary prints "${key}", npm does not`)
   return differences
 }
 
@@ -124,13 +182,23 @@ export function compareRuns(binary, npm) {
   const differences = []
   const binaryTools = new Set(binary.tools)
   const npmTools = new Set(npm.tools)
-  for (const tool of npmTools) if (!binaryTools.has(tool)) differences.push(`tools: npm registers "${tool}", the binary does not`)
-  for (const tool of binaryTools) if (!npmTools.has(tool)) differences.push(`tools: the binary registers "${tool}", npm does not`)
-  for (const [side, run] of [["binary", binary], ["npm", npm]]) {
+  for (const tool of npmTools)
+    if (!binaryTools.has(tool)) differences.push(`tools: npm registers "${tool}", the binary does not`)
+  for (const tool of binaryTools)
+    if (!npmTools.has(tool)) differences.push(`tools: the binary registers "${tool}", npm does not`)
+  for (const [side, run] of [
+    ["binary", binary],
+    ["npm", npm],
+  ]) {
     const probe = run.results["ast-grep"]
-    if (probe !== undefined && !probe.text.startsWith(AST_GREP_REGISTERED)) differences.push(`ast-grep: ${side} "${probe.text.slice(0, 200)}"`)
+    if (probe !== undefined && !probe.text.startsWith(AST_GREP_REGISTERED))
+      differences.push(`ast-grep: ${side} "${probe.text.slice(0, 200)}"`)
   }
-  for (const [side, run] of [["binary", binary], ["npm", npm]]) differences.push(...memoryReceiptFailures(side, run))
+  for (const [side, run] of [
+    ["binary", binary],
+    ["npm", npm],
+  ])
+    differences.push(...memoryReceiptFailures(side, run))
   for (const step of PARITY_STEPS) {
     const left = binary.results[step.id]
     const right = npm.results[step.id]
@@ -139,12 +207,17 @@ export function compareRuns(binary, npm) {
       continue
     }
     if (left.isError !== right.isError || left.text !== right.text) {
-      differences.push(`${step.id}: binary ${left.isError ? "error" : "ok"} "${left.text.slice(0, 200)}" vs npm ${right.isError ? "error" : "ok"} "${right.text.slice(0, 200)}"`)
+      differences.push(
+        `${step.id}: binary ${left.isError ? "error" : "ok"} "${left.text.slice(0, 200)}" vs npm ${right.isError ? "error" : "ok"} "${right.text.slice(0, 200)}"`,
+      )
     }
   }
   differences.push(...compareLines("doctor", binary.doctor, npm.doctor))
   differences.push(...compareLines("setup", binary.setup, npm.setup))
-  for (const [side, run] of [["binary", binary], ["npm", npm]]) {
+  for (const [side, run] of [
+    ["binary", binary],
+    ["npm", npm],
+  ]) {
     for (const warning of run.extensionFailures) differences.push(`${side}: ${warning}`)
   }
   return differences
@@ -155,7 +228,9 @@ export function compareRuns(binary, npm) {
 export function memoryReceiptFailures(side, run) {
   const write = run.results["memory"]
   const note = run.results["memory-note"]
-  if (write === undefined || write.isError) return [`memory: ${side} failed "${(write?.text ?? "no result").slice(0, 200)}"`]
-  if (note === undefined || note.isError || !/^provenance: /m.test(note.text)) return [`memory-note: ${side} note has no provenance header "${(note?.text ?? "no result").slice(0, 200)}"`]
+  if (write === undefined || write.isError)
+    return [`memory: ${side} failed "${(write?.text ?? "no result").slice(0, 200)}"`]
+  if (note === undefined || note.isError || !/^provenance: /m.test(note.text))
+    return [`memory-note: ${side} note has no provenance header "${(note?.text ?? "no result").slice(0, 200)}"`]
   return []
 }

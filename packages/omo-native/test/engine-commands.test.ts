@@ -10,7 +10,8 @@ import { buildSenpiArgs, shouldPrintCompiledBanner } from "../compile-args"
 
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const ENGINE_ROOT = dirname(dirname(Bun.resolveSync("@code-yeongyu/senpi", SOURCE_ROOT)))
-const engineModule = async (relative: string): Promise<Record<string, unknown>> => import(pathToFileURL(join(ENGINE_ROOT, "dist", relative)).href)
+const engineModule = async (relative: string): Promise<Record<string, unknown>> =>
+  import(pathToFileURL(join(ENGINE_ROOT, "dist", relative)).href)
 
 type Predicate = (args: readonly string[]) => boolean
 
@@ -21,8 +22,11 @@ async function engineDispatch() {
   const argvConstants = Object.entries(deferred)
     .filter(([name, value]) => name.endsWith("_COMMAND_ARGV") && typeof value === "string")
     .map(([name, value]) => ({ name, command: value as string }))
-  const packageVerbs = [...readFileSync(join(ENGINE_ROOT, "dist", "package-manager-cli.d.ts"), "utf8").matchAll(/export type PackageCommand = ([^;]+);/g)]
-    .flatMap((match) => [...match[1].matchAll(/"([a-z-]+)"/g)].map((verb) => verb[1]))
+  const packageVerbs = [
+    ...readFileSync(join(ENGINE_ROOT, "dist", "package-manager-cli.d.ts"), "utf8").matchAll(
+      /export type PackageCommand = ([^;]+);/g,
+    ),
+  ].flatMap((match) => [...match[1].matchAll(/"([a-z-]+)"/g)].map((verb) => verb[1]))
   return {
     argvConstants,
     packageVerbs,
@@ -42,7 +46,9 @@ describe("every one-shot engine command reaches the engine with the command firs
     const routed = [
       // app-server is retired here: omo refuses it itself (bin/lib/retired-command.js) even while an
       // installed engine still declares it.
-      ...engine.argvConstants.filter((entry) => entry.name !== "APP_SERVER_COMMAND_ARGV").map((entry) => [entry.command]),
+      ...engine.argvConstants
+        .filter((entry) => entry.name !== "APP_SERVER_COMMAND_ARGV")
+        .map((entry) => [entry.command]),
       ...engine.packageVerbs.map((verb) => [verb]),
       ...["uninstall"].filter((alias) => engine.isPackageCommandArgv([alias])).map((alias) => [alias]),
       ["auth"],
@@ -50,9 +56,16 @@ describe("every one-shot engine command reaches the engine with the command firs
     ]
     // then: the engine claims each one, and so does omo; a new engine command fails here until omo routes it
     for (const args of routed) {
-      const claimedByEngine = engine.argvConstants.some((entry) => entry.command === args[0])
-        || engine.isPackageCommandArgv(args) || engine.isAuthCommandHelp(args) || engine.isModelsDiscoverCommand(args)
-      expect({ args, claimedByEngine, routedByOmo: isEngineCommand(args) }).toEqual({ args, claimedByEngine: true, routedByOmo: true })
+      const claimedByEngine =
+        engine.argvConstants.some((entry) => entry.command === args[0]) ||
+        engine.isPackageCommandArgv(args) ||
+        engine.isAuthCommandHelp(args) ||
+        engine.isModelsDiscoverCommand(args)
+      expect({ args, claimedByEngine, routedByOmo: isEngineCommand(args) }).toEqual({
+        args,
+        claimedByEngine: true,
+        routedByOmo: true,
+      })
     }
   })
 
@@ -68,7 +81,11 @@ describe("every one-shot engine command reaches the engine with the command firs
 })
 
 describe("the compiled entry hands engine commands over unchanged (#9572)", () => {
-  for (const args of [["models", "discover", "custom"], ["schedule", "list"], ["uninstall", "source"]]) {
+  for (const args of [
+    ["models", "discover", "custom"],
+    ["schedule", "list"],
+    ["uninstall", "source"],
+  ]) {
     test(`#given ${args.join(" ")} #when the compiled binary builds the engine argv #then it is unchanged and prints no banner`, () => {
       expect(buildSenpiArgs([...args], "/provisioned")).toEqual(args)
       expect(shouldPrintCompiledBanner([...args], true)).toBe(false)
@@ -76,7 +93,13 @@ describe("the compiled entry hands engine commands over unchanged (#9572)", () =
   }
 
   test("#given a chat prompt starting with models #when built #then the plugin still comes first", () => {
-    expect(buildSenpiArgs(["models", "are", "great"], "/provisioned")).toEqual(["--extension", join("/provisioned", "plugin"), "models", "are", "great"])
+    expect(buildSenpiArgs(["models", "are", "great"], "/provisioned")).toEqual([
+      "--extension",
+      join("/provisioned", "plugin"),
+      "models",
+      "are",
+      "great",
+    ])
   })
 })
 
@@ -95,23 +118,59 @@ function launcherWithFakeEngine() {
     mkdirSync(dirname(path), { recursive: true })
     writeFileSync(path, content)
   }
-  write(join(packageRoot, "package.json"), JSON.stringify({ name: "omo-ai", version: "1.2.3-test.0", type: "module", dependencies: { "@code-yeongyu/senpi": "2026.8.9" } }))
+  write(
+    join(packageRoot, "package.json"),
+    JSON.stringify({
+      name: "omo-ai",
+      version: "1.2.3-test.0",
+      type: "module",
+      dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
+    }),
+  )
   const senpiRoot = join(packageRoot, "node_modules", "@code-yeongyu", "senpi")
-  write(join(senpiRoot, "package.json"), JSON.stringify({ name: "@code-yeongyu/senpi", version: "2026.8.9", type: "module", exports: { ".": "./dist/index.js" } }))
+  write(
+    join(senpiRoot, "package.json"),
+    JSON.stringify({
+      name: "@code-yeongyu/senpi",
+      version: "2026.8.9",
+      type: "module",
+      exports: { ".": "./dist/index.js" },
+    }),
+  )
   write(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
   write(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
-  write(join(senpiRoot, "dist", "cli.js"), `import { writeFileSync } from "node:fs"\nwriteFileSync(process.env.CAPTURE_FILE, JSON.stringify(process.argv.slice(2)))\n`)
+  write(
+    join(senpiRoot, "dist", "cli.js"),
+    `import { writeFileSync } from "node:fs"\nwriteFileSync(process.env.CAPTURE_FILE, JSON.stringify(process.argv.slice(2)))\n`,
+  )
   const captureFile = join(root, "capture.json")
   const launch = (args: string[]) => {
-    const env: NodeJS.ProcessEnv = { ...process.env, HOME: root, CAPTURE_FILE: captureFile, OMO_CODING_AGENT_DIR: join(root, "agent") }
-    const result = spawnSync(process.execPath, [join(packageRoot, "bin", "omo.js"), ...args], { cwd: root, encoding: "utf8", env })
-    return { status: result.status, stderr: result.stderr, argv: JSON.parse(readFileSync(captureFile, "utf8")) as string[] }
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      HOME: root,
+      CAPTURE_FILE: captureFile,
+      OMO_CODING_AGENT_DIR: join(root, "agent"),
+    }
+    const result = spawnSync(process.execPath, [join(packageRoot, "bin", "omo.js"), ...args], {
+      cwd: root,
+      encoding: "utf8",
+      env,
+    })
+    return {
+      status: result.status,
+      stderr: result.stderr,
+      argv: JSON.parse(readFileSync(captureFile, "utf8")) as string[],
+    }
   }
   return { packageRoot, launch }
 }
 
 describe("the npm launcher hands engine commands over unchanged (#9572)", () => {
-  for (const args of [["models", "discover", "custom"], ["schedule", "list"], ["uninstall", "source"]]) {
+  for (const args of [
+    ["models", "discover", "custom"],
+    ["schedule", "list"],
+    ["uninstall", "source"],
+  ]) {
     test(`#given omo ${args.join(" ")} #when launched #then the engine receives exactly those arguments`, () => {
       // given
       const fixture = launcherWithFakeEngine()
