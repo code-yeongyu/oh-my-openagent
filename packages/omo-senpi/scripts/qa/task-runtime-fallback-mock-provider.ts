@@ -22,7 +22,12 @@ interface AssistantMessage {
   readonly role: "assistant"
   readonly content: readonly (
     | { readonly type: "text"; readonly text: string }
-    | { readonly type: "toolCall"; readonly id: string; readonly name: string; readonly arguments: Readonly<Record<string, unknown>> }
+    | {
+        readonly type: "toolCall"
+        readonly id: string
+        readonly name: string
+        readonly arguments: Readonly<Record<string, unknown>>
+      }
   )[]
   readonly api: "openai-completions"
   readonly provider: string
@@ -47,22 +52,30 @@ interface EventStream extends AsyncIterable<unknown> {
 }
 
 interface ExtensionAPI {
-  registerProvider(id: string, provider: {
-    readonly name: string
-    readonly baseUrl: string
-    readonly apiKey: string
-    readonly api: "openai-completions"
-    readonly models: readonly {
-      readonly id: string
+  registerProvider(
+    id: string,
+    provider: {
       readonly name: string
-      readonly reasoning: boolean
-      readonly input: readonly ["text"]
-      readonly cost: { readonly input: number; readonly output: number; readonly cacheRead: number; readonly cacheWrite: number }
-      readonly contextWindow: number
-      readonly maxTokens: number
-    }[]
-    streamSimple(model: Model, context: Context): EventStream
-  }): void
+      readonly baseUrl: string
+      readonly apiKey: string
+      readonly api: "openai-completions"
+      readonly models: readonly {
+        readonly id: string
+        readonly name: string
+        readonly reasoning: boolean
+        readonly input: readonly ["text"]
+        readonly cost: {
+          readonly input: number
+          readonly output: number
+          readonly cacheRead: number
+          readonly cacheWrite: number
+        }
+        readonly contextWindow: number
+        readonly maxTokens: number
+      }[]
+      streamSimple(model: Model, context: Context): EventStream
+    },
+  ): void
 }
 
 const CHILD_IDENTITY = "running as an omo senpi-task child"
@@ -112,7 +125,10 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
       mockModel("limit-fable", "Usage-limited primary"),
       mockModel("limit-opus", "Same-account sibling"),
       mockModel("limit-after-tool", "Primary limited after a tool call"),
-      { ...mockModel(LIMIT_NEAR_COMPACTION, "Primary limited near the compaction threshold"), contextWindow: NEAR_COMPACTION_WINDOW },
+      {
+        ...mockModel(LIMIT_NEAR_COMPACTION, "Primary limited near the compaction threshold"),
+        contextWindow: NEAR_COMPACTION_WINDOW,
+      },
     ],
     streamSimple(model, context) {
       if (isChild(context)) {
@@ -129,7 +145,10 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
     api: "openai-completions",
     models: [mockModel("parent-gpt", "Parent session model")],
     streamSimple(model, context) {
-      if (isChild(context)) return streamMessage(assistant(model.id, "stop", [{ type: "text", text: FINAL_TEXT }], undefined, "omo-fallback-parent"))
+      if (isChild(context))
+        return streamMessage(
+          assistant(model.id, "stop", [{ type: "text", text: FINAL_TEXT }], undefined, "omo-fallback-parent"),
+        )
       return streamMessage(parentReply(model.id, "omo-fallback-parent"))
     },
   })
@@ -184,15 +203,26 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
   if (process.env.OMO_FALLBACK_DEBUG_DUMP === "1") {
     const fs = process.getBuiltinModule<typeof import("node:fs")>("node:fs")
     const dump = (label: string) => {
-      const registry = (pi as unknown as { modelRegistry?: { getAll(): { provider: string; id: string }[]; find(p: string, i: string): unknown } }).modelRegistry
+      const registry = (
+        pi as unknown as {
+          modelRegistry?: { getAll(): { provider: string; id: string }[]; find(p: string, i: string): unknown }
+        }
+      ).modelRegistry
       const ids = registry?.getAll().map((model) => `${model.provider}/${model.id}`) ?? []
-      fs.writeFileSync(`/tmp/fallback-dump-${label}.json`, JSON.stringify({
-        label,
-        count: ids.length,
-        quick: ids.filter((id) => id.includes("chatgpt-subscription") || id.includes("deepseek")),
-        mock: ids.filter((id) => id.includes("omo-fallback-mock")),
-        findQuickPrimary: registry?.find("chatgpt-subscription", "gpt-6-luna-fast") !== undefined,
-      }, null, 2))
+      fs.writeFileSync(
+        `/tmp/fallback-dump-${label}.json`,
+        JSON.stringify(
+          {
+            label,
+            count: ids.length,
+            quick: ids.filter((id) => id.includes("chatgpt-subscription") || id.includes("deepseek")),
+            mock: ids.filter((id) => id.includes("omo-fallback-mock")),
+            findQuickPrimary: registry?.find("chatgpt-subscription", "gpt-6-luna-fast") !== undefined,
+          },
+          null,
+          2,
+        ),
+      )
     }
     dump("t0")
     setTimeout(() => dump("t3s"), 3000)
@@ -202,22 +232,41 @@ export default function registerFallbackMockProvider(pi: ExtensionAPI): void {
 
 function parentReply(modelId: string, provider = "omo-fallback-mock"): AssistantMessage {
   parentCalls += 1
-  if (parentCalls > 1) return assistant(modelId, "stop", [{ type: "text", text: "parent observed fallback completion" }], undefined, provider)
-  return assistant(modelId, "toolUse", [{
-    type: "toolCall",
-    id: "fallback-task-call",
-    name: "task",
-    arguments: {
-      category: DESIGNATED_ONLY_SCENARIOS[SCENARIO] ?? (SCENARIO === "user-fallback"
-        ? "fallbackcat"
-        : SCENARIO === LIMIT_AFTER_TOOL || SCENARIO === LIMIT_NEAR_COMPACTION
-          ? "toolcat"
-          : SCENARIO in LIMIT_ERRORS ? "limitcat" : "quick"),
-      prompt: "complete through the configured fallback chain",
-      run_in_background: false,
-      name: "fallback-child",
-    },
-  }], undefined, provider)
+  if (parentCalls > 1)
+    return assistant(
+      modelId,
+      "stop",
+      [{ type: "text", text: "parent observed fallback completion" }],
+      undefined,
+      provider,
+    )
+  return assistant(
+    modelId,
+    "toolUse",
+    [
+      {
+        type: "toolCall",
+        id: "fallback-task-call",
+        name: "task",
+        arguments: {
+          category:
+            DESIGNATED_ONLY_SCENARIOS[SCENARIO] ??
+            (SCENARIO === "user-fallback"
+              ? "fallbackcat"
+              : SCENARIO === LIMIT_AFTER_TOOL || SCENARIO === LIMIT_NEAR_COMPACTION
+                ? "toolcat"
+                : SCENARIO in LIMIT_ERRORS
+                  ? "limitcat"
+                  : "quick"),
+          prompt: "complete through the configured fallback chain",
+          run_in_background: false,
+          name: "fallback-child",
+        },
+      },
+    ],
+    undefined,
+    provider,
+  )
 }
 
 function childReply(modelId: string, context: Context, provider = "omo-fallback-mock"): AssistantMessage {
@@ -225,29 +274,42 @@ function childReply(modelId: string, context: Context, provider = "omo-fallback-
     return hasToolResult(context)
       ? assistant(modelId, "error", [], LIMIT_AFTER_TOOL_ERROR)
       : {
-          ...assistant(modelId, "toolUse", [{
-            type: "toolCall",
-            id: "limit-near-compaction-call",
-            name: "bash",
-            arguments: { command: "printf limit-near-compaction-ran" },
-          }]),
-          usage: { input: NEAR_COMPACTION_INPUT, output: 40, cacheRead: 0, cacheWrite: 0, totalTokens: NEAR_COMPACTION_INPUT + 40, cost: 0 },
+          ...assistant(modelId, "toolUse", [
+            {
+              type: "toolCall",
+              id: "limit-near-compaction-call",
+              name: "bash",
+              arguments: { command: "printf limit-near-compaction-ran" },
+            },
+          ]),
+          usage: {
+            input: NEAR_COMPACTION_INPUT,
+            output: 40,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: NEAR_COMPACTION_INPUT + 40,
+            cost: 0,
+          },
         }
   }
   if ((SCENARIO === LIMIT_AFTER_TOOL || SCENARIO === "designated-only-after-tool") && modelId === LIMIT_AFTER_TOOL) {
     return hasToolResult(context)
       ? assistant(modelId, "error", [], LIMIT_AFTER_TOOL_ERROR)
-      : assistant(modelId, "toolUse", [{
-          type: "toolCall",
-          id: "limit-after-tool-call",
-          name: "bash",
-          arguments: { command: "printf limit-after-tool-ran" },
-        }])
+      : assistant(modelId, "toolUse", [
+          {
+            type: "toolCall",
+            id: "limit-after-tool-call",
+            name: "bash",
+            arguments: { command: "printf limit-after-tool-ran" },
+          },
+        ])
   }
   const limitError = LIMIT_ERRORS[SCENARIO]
   if (limitError !== undefined) {
     const spent = modelId === "limit-fable" || (modelId === "limit-opus" && SCENARIO === "limit-account")
-    return spent ? assistant(modelId, "error", [], limitError) : assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }])
+    return spent
+      ? assistant(modelId, "error", [], limitError)
+      : assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }])
   }
   if (modelId === "healthy-fallback") {
     return assistant(modelId, "stop", [{ type: "text", text: FINAL_TEXT }], undefined, provider)
@@ -319,9 +381,10 @@ function streamMessage(message: AssistantMessage): EventStream {
   })
 
   queueMicrotask(() => {
-    const event = message.stopReason === "error"
-      ? { type: "error", reason: "error", error: message }
-      : { type: "done", reason: message.stopReason, message }
+    const event =
+      message.stopReason === "error"
+        ? { type: "error", reason: "error", error: message }
+        : { type: "done", reason: message.stopReason, message }
     stream.push(event)
     stream.end(message)
   })

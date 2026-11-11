@@ -12,7 +12,7 @@ export function flattenFallbackModels(fallbackModels: OmoFallbackModels | undefi
   if (typeof fallbackModels === "string") {
     return [fallbackModels]
   }
-  return fallbackModels.map((fallback) => typeof fallback === "string" ? fallback : fallbackObjectToString(fallback))
+  return fallbackModels.map((fallback) => (typeof fallback === "string" ? fallback : fallbackObjectToString(fallback)))
 }
 export function categoryModelCandidates(config: OmoCategoryConfig): readonly ModelChainCandidate[] {
   // Canonical models[] wins over the legacy model + fallback_models branch: entry zero is the
@@ -29,15 +29,16 @@ export function categoryModelCandidates(config: OmoCategoryConfig): readonly Mod
   }
 
   const categoryReasoning = config.reasoning ?? config.reasoningEffort
-  const primary = config.model === undefined
-    ? []
-    : [{
-        model: config.model,
-        ...(config.variant !== undefined ? { variant: config.variant } : {}),
-        ...(categoryReasoning !== undefined
-          ? { reasoningEffort: categoryReasoning }
-          : {}),
-      }]
+  const primary =
+    config.model === undefined
+      ? []
+      : [
+          {
+            model: config.model,
+            ...(config.variant !== undefined ? { variant: config.variant } : {}),
+            ...(categoryReasoning !== undefined ? { reasoningEffort: categoryReasoning } : {}),
+          },
+        ]
   const fallbackModels = config.fallback_models
   if (fallbackModels === undefined) return primary
 
@@ -47,19 +48,15 @@ export function categoryModelCandidates(config: OmoCategoryConfig): readonly Mod
       return {
         model: entry,
         ...(config.variant !== undefined ? { variant: config.variant } : {}),
-        ...(config.reasoningEffort !== undefined
-          ? { reasoningEffort: config.reasoningEffort }
-          : {}),
+        ...(config.reasoningEffort !== undefined ? { reasoningEffort: config.reasoningEffort } : {}),
       }
     }
     return {
       model: entry.model,
-      ...(entry.variant ?? config.variant) !== undefined
-        ? { variant: entry.variant ?? config.variant }
-        : {},
-      ...(entry.reasoning ?? config.reasoning ?? entry.reasoningEffort ?? config.reasoningEffort) !== undefined
+      ...((entry.variant ?? config.variant) !== undefined ? { variant: entry.variant ?? config.variant } : {}),
+      ...((entry.reasoning ?? config.reasoning ?? entry.reasoningEffort ?? config.reasoningEffort) !== undefined
         ? { reasoningEffort: entry.reasoning ?? config.reasoning ?? entry.reasoningEffort ?? config.reasoningEffort }
-        : {},
+        : {}),
     }
   })
   return [...primary, ...fallbacks]

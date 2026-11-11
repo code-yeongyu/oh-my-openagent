@@ -62,7 +62,11 @@ export type ThreadSurface = "tui" | "desktop" | "child" | "daemon"
  * a worker session or a per-parent `p-*` shard is a task `child`, a per-thread `i-*` shard is a
  * `desktop` thread, and the legacy host's interactive sessions are `daemon` sessions.
  */
-export function deriveSurface(endpointKind: EndpointKind | undefined, sessionKind: string | undefined, socket: string): ThreadSurface {
+export function deriveSurface(
+  endpointKind: EndpointKind | undefined,
+  sessionKind: string | undefined,
+  socket: string,
+): ThreadSurface {
   if (endpointKind === "tui") return "tui"
   if (sessionKind === "worker") return "child"
   const name = basename(socket)
@@ -161,7 +165,15 @@ function validTimestamp<T extends string | null>(value: unknown, fallback: T): s
 }
 
 function fromDisk(session: DiskSession, host: AddressBookHost | undefined, failure?: string): AddressEntry {
-  const endpoint = session.source_host === null ? null : { kind: host?.endpoint_kind ?? "rpc_host", socket: session.source_host, routing_id: null, durable_session_id: session.durable_id }
+  const endpoint =
+    session.source_host === null
+      ? null
+      : {
+          kind: host?.endpoint_kind ?? "rpc_host",
+          socket: session.source_host,
+          routing_id: null,
+          durable_session_id: session.durable_id,
+        }
   return {
     durable_id: session.durable_id,
     routing_id: null,
@@ -205,7 +217,10 @@ export function assembleAddressBook(
   for (const session of diskSessions) {
     if (session.durable_id.length === 0) continue
     const failure = session.source_host === null ? undefined : failures.get(session.source_host)
-    byDurableId.set(session.durable_id, fromDisk(session, session.source_host === null ? undefined : bySocket.get(session.source_host), failure))
+    byDurableId.set(
+      session.durable_id,
+      fromDisk(session, session.source_host === null ? undefined : bySocket.get(session.source_host), failure),
+    )
   }
 
   for (const host of hosts) {
@@ -218,8 +233,13 @@ export function assembleAddressBook(
       if (typeof durableId !== "string" || durableId.length === 0) continue
       const disk = byDurableId.get(durableId)
       const sessionPath = session.sessionPath ?? disk?.session_path ?? null
-      const reported = { name: session.name ?? null, created: session.created_at ?? session.createdAt, updated: session.updated_at ?? session.updatedAt }
-      const needsFacts = reported.name === null || typeof reported.created !== "string" || typeof reported.updated !== "string"
+      const reported = {
+        name: session.name ?? null,
+        created: session.created_at ?? session.createdAt,
+        updated: session.updated_at ?? session.updatedAt,
+      }
+      const needsFacts =
+        reported.name === null || typeof reported.created !== "string" || typeof reported.updated !== "string"
       const facts = needsFacts && sessionPath !== null ? (opts.facts?.(sessionPath) ?? null) : null
       const createdAt = validTimestamp(reported.created, facts?.created_at ?? disk?.created_at ?? assembledAt)
       const updatedAt = validTimestamp(reported.updated, facts === null ? (disk?.updated_at ?? null) : facts.updated_at)
@@ -236,7 +256,12 @@ export function assembleAddressBook(
         created_at: createdAt,
         updated_at: updatedAt,
         thread_id: durableId,
-        endpoint: { kind: host.endpoint_kind ?? "rpc_host", socket: host.socket, routing_id: session.sessionId, durable_session_id: durableId },
+        endpoint: {
+          kind: host.endpoint_kind ?? "rpc_host",
+          socket: host.socket,
+          routing_id: session.sessionId,
+          durable_session_id: durableId,
+        },
         surface: deriveSurface(host.endpoint_kind, session.kind, host.socket),
         alive: host.alive !== false,
         title: threadTitle(name, facts?.first_user_text) ?? disk?.title ?? null,
@@ -245,7 +270,8 @@ export function assembleAddressBook(
   }
 
   return [...byDurableId.values()].sort((left, right) => {
-    if (left.updated_at !== right.updated_at) return left.updated_at === null ? 1 : right.updated_at === null ? -1 : left.updated_at < right.updated_at ? 1 : -1
+    if (left.updated_at !== right.updated_at)
+      return left.updated_at === null ? 1 : right.updated_at === null ? -1 : left.updated_at < right.updated_at ? 1 : -1
     return left.durable_id.localeCompare(right.durable_id)
   })
 }
@@ -301,7 +327,9 @@ export type FindDiskSessionsOptions = {
 
 /** senpi's session directory name for a cwd (`getDefaultSessionDirPath`), without the closing `--`: every cwd under `root` starts with it. */
 function sessionDirectoryPrefix(root: string): string {
-  return `--${resolve(root).replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}-`
+  return `--${resolve(root)
+    .replace(/^[/\\]/, "")
+    .replace(/[/\\:]/g, "-")}-`
 }
 
 function diskSessionFromFacts(path: string): DiskSession | null {
@@ -328,7 +356,11 @@ function diskSessionFromFacts(path: string): DiskSession | null {
  * workspace; `resolveTarget` still judges the scope of what is returned. `source_host` is null: no
  * endpoint serves these sessions.
  */
-export function findDiskSessions(sessionsDir: string, address: string, opts: FindDiskSessionsOptions = {}): DiskSession[] {
+export function findDiskSessions(
+  sessionsDir: string,
+  address: string,
+  opts: FindDiskSessionsOptions = {},
+): DiskSession[] {
   let projectDirs: string[]
   try {
     projectDirs = readdirSync(sessionsDir, { withFileTypes: true })
@@ -352,21 +384,28 @@ export function findDiskSessions(sessionsDir: string, address: string, opts: Fin
   }
 
   const idSuffix = `_${address}.jsonl`
-  const byId = projectDirs.flatMap((dir) => filesOf(dir).flatMap((name) => {
-    if (!name.endsWith(idSuffix)) return []
-    const session = diskSessionFromFacts(join(sessionsDir, dir, name))
-    return session !== null && session.durable_id === address ? [session] : []
-  }))
+  const byId = projectDirs.flatMap((dir) =>
+    filesOf(dir).flatMap((name) => {
+      if (!name.endsWith(idSuffix)) return []
+      const session = diskSessionFromFacts(join(sessionsDir, dir, name))
+      return session !== null && session.durable_id === address ? [session] : []
+    }),
+  )
   if (byId.length > 0 || opts.id_only === true) return byId
 
   const wanted = normalizeThreadName(address)
   if (wanted.length === 0) return []
   const prefixes = opts.all_scope === true ? undefined : (opts.workspaceRoots ?? []).map(sessionDirectoryPrefix)
-  const readable = prefixes === undefined ? projectDirs : projectDirs.filter((dir) => prefixes.some((prefix) => dir.startsWith(prefix)))
-  return readable.flatMap((dir) => filesOf(dir).flatMap((name) => {
-    const session = diskSessionFromFacts(join(sessionsDir, dir, name))
-    return session !== null && session.name !== null && normalizeThreadName(session.name) === wanted ? [session] : []
-  }))
+  const readable =
+    prefixes === undefined
+      ? projectDirs
+      : projectDirs.filter((dir) => prefixes.some((prefix) => dir.startsWith(prefix)))
+  return readable.flatMap((dir) =>
+    filesOf(dir).flatMap((name) => {
+      const session = diskSessionFromFacts(join(sessionsDir, dir, name))
+      return session !== null && session.name !== null && normalizeThreadName(session.name) === wanted ? [session] : []
+    }),
+  )
 }
 
 /**
@@ -374,10 +413,7 @@ export function findDiskSessions(sessionsDir: string, address: string, opts: Fin
  * only a traversal boundary; cwd and durable identity always come from the
  * JSONL header, avoiding the encoding's intentionally lossy dash replacement.
  */
-export function scanDiskSessions(
-  sessionsDir: string,
-  opts: ScanDiskSessionsOptions = {},
-): DiskSession[] {
+export function scanDiskSessions(sessionsDir: string, opts: ScanDiskSessionsOptions = {}): DiskSession[] {
   const found: DiskSession[] = []
   let projectDirs
   try {
@@ -403,7 +439,8 @@ export function scanDiskSessions(
   }
 
   return found.sort((left, right) => {
-    if (left.updated_at !== right.updated_at) return left.updated_at === null ? 1 : right.updated_at === null ? -1 : left.updated_at < right.updated_at ? 1 : -1
+    if (left.updated_at !== right.updated_at)
+      return left.updated_at === null ? 1 : right.updated_at === null ? -1 : left.updated_at < right.updated_at ? 1 : -1
     return left.durable_id.localeCompare(right.durable_id)
   })
 }

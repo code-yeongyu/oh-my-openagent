@@ -5,9 +5,14 @@ import { WORKPOOL_STATE_DIR_ENV, WORKPOOL_TASK_ID_ENV } from "../team/member-ext
 
 export async function workpoolProcessLaunch(stateDir: string, taskId: string, inherited?: InheritedExtensions) {
   // Keep explicit provider extensions, but never load the parent scheduler in the worker.
-  const extensions = (await resolveInheritedExtensionList(inherited))
-    .filter(entry => !["omo.js", "omo-task.js", "omo-member.js"].includes(basename(entry)))
-  return { extensions: [...extensions, resolveMemberExtensionEntryPath()], memberEnv: {
-    [WORKPOOL_STATE_DIR_ENV]: stateDir, [WORKPOOL_TASK_ID_ENV]: taskId,
-  } }
+  const extensions = (await resolveInheritedExtensionList(inherited)).filter(
+    (entry) => !["omo.js", "omo-task.js", "omo-member.js"].includes(basename(entry)),
+  )
+  return {
+    extensions: [...extensions, resolveMemberExtensionEntryPath()],
+    memberEnv: {
+      [WORKPOOL_STATE_DIR_ENV]: stateDir,
+      [WORKPOOL_TASK_ID_ENV]: taskId,
+    },
+  }
 }

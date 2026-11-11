@@ -67,7 +67,10 @@ function memoryStore() {
     list: async () => Object.fromEntries(grants),
     digest: async () => String(generation),
     add: async (digest: string, grant: Grant) => {
-      grants.set(digest, { ...grant, names: [...new Set([...(grants.get(digest)?.names ?? []), ...grant.names])].sort() })
+      grants.set(digest, {
+        ...grant,
+        names: [...new Set([...(grants.get(digest)?.names ?? []), ...grant.names])].sort(),
+      })
       generation++
       for (const listener of listeners) listener()
     },
@@ -78,41 +81,59 @@ function memoryStore() {
     },
     watch: (listener: () => void) => {
       listeners.add(listener)
-      return () => { listeners.delete(listener) }
+      return () => {
+        listeners.delete(listener)
+      }
     },
   }
 }
 function manager(grantStore = memoryStore()) {
-  const m = new SkillMcpManager(Object.assign({}, {
-    onEnvironmentNotice: (message: string) => notices.push(message),
-    grantStore,
-  }))
+  const m = new SkillMcpManager(
+    Object.assign(
+      {},
+      {
+        onEnvironmentNotice: (message: string) => notices.push(message),
+        grantStore,
+      },
+    ),
+  )
   managers.push(m)
   return m
 }
 const info = (scope: string) => ({
-  sessionID: "synthetic-session", skillName: "synthetic-skill", serverName: "synthetic-server",
-  scope, directory: "/synthetic/project",
-  provenance: { kind: scope === "host" ? "host" : "project-auto", selectedRoot: "/synthetic/project/skills", projectRoot: "/synthetic/project" },
+  sessionID: "synthetic-session",
+  skillName: "synthetic-skill",
+  serverName: "synthetic-server",
+  scope,
+  directory: "/synthetic/project",
+  provenance: {
+    kind: scope === "host" ? "host" : "project-auto",
+    selectedRoot: "/synthetic/project/skills",
+    projectRoot: "/synthetic/project",
+  },
   sourcePath: "/synthetic/project/skills/SKILL.md",
 })
 const config = { command: "synthetic-command", env: { AUTH_HEADER: "${GITHUB_TOKEN}", LITERAL: "synthetic-literal" } }
 
 describe("project MCP policy at the real manager boundary", () => {
-  test.each(["project", "opencode-project", "host"])("withholds off-pattern ambient names and literal-left refs for %s", async (scope) => {
-    // given
-    const m = manager()
-    // when
-    await m.getOrCreateClient(info(scope), config)
-    // then
-    const env = transports[0]?.env ?? {}
-    for (const name of ["OMO_TEST_OPAQUE", "OMO_TEST_DSN", "OMO_TEST_COOKIE", "LC_SECRET"]) expect(env[name]).toBeUndefined()
-    expect(env.AUTH_HEADER).toBe("${GITHUB_TOKEN}")
-    expect(env.LITERAL).toBe("synthetic-literal")
-    expect(notices.join("\n")).toContain("GITHUB_TOKEN")
-    expect(notices.join("\n")).toMatch(/\/omo-mcp-env-grant [a-zA-Z0-9_-]+/)
-    for (const value of Object.values(synthetic)) expect(notices.join("\n")).not.toContain(value)
-  })
+  test.each(["project", "opencode-project", "host"])(
+    "withholds off-pattern ambient names and literal-left refs for %s",
+    async (scope) => {
+      // given
+      const m = manager()
+      // when
+      await m.getOrCreateClient(info(scope), config)
+      // then
+      const env = transports[0]?.env ?? {}
+      for (const name of ["OMO_TEST_OPAQUE", "OMO_TEST_DSN", "OMO_TEST_COOKIE", "LC_SECRET"])
+        expect(env[name]).toBeUndefined()
+      expect(env.AUTH_HEADER).toBe("${GITHUB_TOKEN}")
+      expect(env.LITERAL).toBe("synthetic-literal")
+      expect(notices.join("\n")).toContain("GITHUB_TOKEN")
+      expect(notices.join("\n")).toMatch(/\/omo-mcp-env-grant [a-zA-Z0-9_-]+/)
+      for (const value of Object.values(synthetic)) expect(notices.join("\n")).not.toContain(value)
+    },
+  )
 
   test("user policy keeps today's NODE_ENV and JAVA_HOME unchanged", async () => {
     // given
@@ -154,20 +175,36 @@ describe("project MCP policy at the real manager boundary", () => {
     const source = mkdtempSync(join(tmpdir(), "mcp-policy-source-"))
     roots.push(source)
     const path = join(source, "SKILL.md")
-    writeFileSync(path, `---\nmcp:\n  synthetic-server:\n    command: synthetic-command\n    env:\n      AUTH_HEADER: "\${GITHUB_TOKEN}"\n      LITERAL: synthetic-literal\n---\nFixture\n`)
+    writeFileSync(
+      path,
+      `---\nmcp:\n  synthetic-server:\n    command: synthetic-command\n    env:\n      AUTH_HEADER: "\${GITHUB_TOKEN}"\n      LITERAL: synthetic-literal\n---\nFixture\n`,
+    )
     const skill = {
-      name: "synthetic-skill", scope: "project" as const,
+      name: "synthetic-skill",
+      scope: "project" as const,
       path,
       definition: { name: "synthetic-skill", template: "" },
       mcpConfig: { "synthetic-server": config },
     }
-    const tool = createSkillMcpTool({ manager: m, getLoadedSkills: () => [skill], getSessionID: () => "synthetic-session" })
-    // when
-    const result = await tool.execute({ mcp_name: "synthetic-server", tool_name: "synthetic" }, {
-      sessionID: "synthetic-session", messageID: "synthetic-message", agent: "synthetic",
-      directory: "/synthetic/project", worktree: "/synthetic/project",
-      abort: new AbortController().signal, metadata: () => {}, ask: async () => {},
+    const tool = createSkillMcpTool({
+      manager: m,
+      getLoadedSkills: () => [skill],
+      getSessionID: () => "synthetic-session",
     })
+    // when
+    const result = await tool.execute(
+      { mcp_name: "synthetic-server", tool_name: "synthetic" },
+      {
+        sessionID: "synthetic-session",
+        messageID: "synthetic-message",
+        agent: "synthetic",
+        directory: "/synthetic/project",
+        worktree: "/synthetic/project",
+        abort: new AbortController().signal,
+        metadata: () => {},
+        ask: async () => {},
+      },
+    )
     // then
     expect(result).toMatch(/\/omo-mcp-env-grant [a-zA-Z0-9_-]+/)
     expect(result).toContain("GITHUB_TOKEN")
@@ -225,7 +262,9 @@ describe("project MCP policy at the real manager boundary", () => {
   test("failed permanent grant writes never confirm or restore an environment value", async () => {
     // given
     const store = memoryStore()
-    store.add = async () => { throw new Error("synthetic store write failure") }
+    store.add = async () => {
+      throw new Error("synthetic store write failure")
+    }
     const m = manager(store)
     await m.getOrCreateClient(info("project"), config)
     const id = notices[0]?.match(/\/omo-mcp-env-grant ([a-zA-Z0-9_-]+)/)?.[1]

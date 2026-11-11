@@ -16,8 +16,12 @@ const filesystem: BaseDirIO = {
       await rmdir(probe)
       return true
     } catch (error) {
-      if (error instanceof Error && "code" in error
-        && (error.code === "EACCES" || error.code === "EPERM" || error.code === "EROFS")) return false
+      if (
+        error instanceof Error &&
+        "code" in error &&
+        (error.code === "EACCES" || error.code === "EPERM" || error.code === "EROFS")
+      )
+        return false
       throw error
     }
   },
@@ -34,7 +38,10 @@ export async function chooseBaseDir(
   id = "",
   io: BaseDirIO = filesystem,
 ): Promise<BaseDirSelection> {
-  const segment = `t${createHash("sha1").update(repoRoot + id).digest("hex").slice(0, 10)}`
+  const segment = `t${createHash("sha1")
+    .update(repoRoot + id)
+    .digest("hex")
+    .slice(0, 10)}`
   const homeBase = join(homeDir, ".omo", "wt", segment)
   const repoDevice = (await io.stat(repoRoot)).dev
   let homeParent = join(homeDir, ".omo")
@@ -62,7 +69,7 @@ export async function chooseBaseDir(
     const parent = dirname(volumeRoot)
     if (parent !== volumeRoot) {
       const parentStat = await io.stat(parent)
-      if (parentStat.dev !== repoDevice && await io.writable(parent)) {
+      if (parentStat.dev !== repoDevice && (await io.writable(parent))) {
         volumeRoot = parent
         referenceDevice = parentStat.dev
       }
@@ -78,6 +85,7 @@ export async function chooseBaseDir(
   // inside the repository being isolated.
   const repository = resolve(repoRoot)
   const insideRepository = volumeBase === repository || volumeBase.startsWith(repository + sep)
-  if (!insideRepository && await io.writable(volumeBase)) return { baseDir: join(volumeBase, segment), crossDevice: false }
+  if (!insideRepository && (await io.writable(volumeBase)))
+    return { baseDir: join(volumeBase, segment), crossDevice: false }
   return { baseDir: homeBase, crossDevice: true }
 }

@@ -27,12 +27,16 @@ const commit = (dir: string, message: string): Promise<void> =>
 
 async function finalize(dream: TargetedDreamSetup) {
   const item = await fixture(false, dream)
-  const result = await finalizeRecordedOutcome({
-    identity: item.identity,
-    reservation: item.store,
-    now: () => Date.parse("2026-08-11T10:01:00.000Z"),
-    withWriterLock: async (operation) => operation(),
-  }, item.runDir, item.ledger)
+  const result = await finalizeRecordedOutcome(
+    {
+      identity: item.identity,
+      reservation: item.store,
+      now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+      withWriterLock: async (operation) => operation(),
+    },
+    item.runDir,
+    item.ledger,
+  )
   return { item, result }
 }
 
@@ -40,7 +44,10 @@ describe("targeted dream finalization scope (#12642)", () => {
   test("#given a targeted dream that removes its linked target #when its recorded outcome finalizes #then it merges with the gate's link repair", async () => {
     // when
     const { item, result } = await finalize({
-      seedFiles: { [TARGET]: note("Target", "t\n"), "reference/user.md": note("User", "[[reference/target.md|the target]]\n") },
+      seedFiles: {
+        [TARGET]: note("Target", "t\n"),
+        "reference/user.md": note("User", "[[reference/target.md|the target]]\n"),
+      },
       targetDoc: TARGET,
       commit: async (dir) => {
         await git(dir, "rm", "-q", TARGET)

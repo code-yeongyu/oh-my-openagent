@@ -11,7 +11,11 @@ describe("omo remote send sender provenance", () => {
   test("#given the device service names this device #when a person sends from the command line #then the delivery names this device", async () => {
     const account = remoteFixture.account()
     try {
-      expect(await personSenderProvenance(account.remote, process.cwd(), ENV)()).toMatchObject({ workspace: "Owner workspace", project: "sender-project", device: "here" })
+      expect(await personSenderProvenance(account.remote, process.cwd(), ENV)()).toMatchObject({
+        workspace: "Owner workspace",
+        project: "sender-project",
+        device: "here",
+      })
     } finally {
       await remoteFixture.cleanup()
     }
@@ -22,7 +26,10 @@ describe("omo remote send sender provenance", () => {
     const unnamed = { ...account.remote, sessions: { ...account.remote.sessions, thisDevice: async () => null } }
     try {
       const provenance = await personSenderProvenance(unnamed, process.cwd(), ENV)()
-      expect({ device: provenance.device, device_absent: provenance.device_absent }).toEqual({ device: undefined, device_absent: "no_device_id" })
+      expect({ device: provenance.device, device_absent: provenance.device_absent }).toEqual({
+        device: undefined,
+        device_absent: "no_device_id",
+      })
     } finally {
       await remoteFixture.cleanup()
     }

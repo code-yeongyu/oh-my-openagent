@@ -20,7 +20,10 @@ function workspace(): Workspace {
   const agentDir = join(home, ".omo", "agent")
   const pluginRoot = join(root, "plugin")
   for (const dir of [project, agentDir, pluginRoot]) mkdirSync(dir, { recursive: true })
-  writeFileSync(join(pluginRoot, "daemon-launch-spec.json"), JSON.stringify({ schemaVersion: 1, argv: ["--mode", "rpc"], env: {} }))
+  writeFileSync(
+    join(pluginRoot, "daemon-launch-spec.json"),
+    JSON.stringify({ schemaVersion: 1, argv: ["--mode", "rpc"], env: {} }),
+  )
   return { home, project, agentDir, pluginRoot }
 }
 
@@ -207,7 +210,10 @@ describe("omo daemon task.host_idle_exit_ms source (#9192)", () => {
   test("#given a policy in omo.jsonc and an idle exit only in the deprecated file #when run and doctor #then each key keeps its own source", () => {
     const ws = workspace()
     write(join(ws.home, ".omo", "omo.jsonc"), JSON.stringify({ task: { host_engine_policy: "fallback" } }))
-    write(join(ws.agentDir, "omo.json"), JSON.stringify({ task: { host_engine_policy: "upgrade", host_idle_exit_ms: 5000 } }))
+    write(
+      join(ws.agentDir, "omo.json"),
+      JSON.stringify({ task: { host_engine_policy: "upgrade", host_idle_exit_ms: 5000 } }),
+    )
 
     const engine = runEngine(ws)
     const args = engine.calls[0] ?? []

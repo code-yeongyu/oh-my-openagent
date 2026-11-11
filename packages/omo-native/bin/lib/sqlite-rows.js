@@ -18,7 +18,9 @@ export function readRows(database, columns, sql) {
   const sink = `omo_sink_${Math.random().toString(36).slice(2, 10)}`
   database.function(sink, { varargs: true, deterministic: false }, (...values) => {
     const row = {}
-    columns.forEach((column, index) => { row[column] = values[index] })
+    columns.forEach((column, index) => {
+      row[column] = values[index]
+    })
     rows.push(row)
     return null
   })

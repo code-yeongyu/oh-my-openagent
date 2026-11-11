@@ -2,15 +2,13 @@ import { describe, expect, test } from "bun:test"
 
 import { SenpiShutdownError } from "../../team"
 import { createFakeTeamService, fakeRuntimeState } from "./__fixtures__/team-tool-fakes"
-import {
-  runTeamApproveShutdown,
-  runTeamRejectShutdown,
-  runTeamShutdownRequest,
-} from "./shutdown"
+import { runTeamApproveShutdown, runTeamRejectShutdown, runTeamShutdownRequest } from "./shutdown"
 
 describe("shutdown request route", () => {
   test("#given a member #when request runs #then it reports requested", async () => {
-    const service = createFakeTeamService({ requestShutdown: async () => fakeRuntimeState({ status: "shutdown_requested" }) })
+    const service = createFakeTeamService({
+      requestShutdown: async () => fakeRuntimeState({ status: "shutdown_requested" }),
+    })
     const result = await runTeamShutdownRequest(service, { team_run_id: "run-1", member: "alpha" })
     expect(result.details).toMatchObject({ kind: "requested", member: "alpha" })
     expect(service.calls[0]).toMatchObject({ method: "requestShutdown", args: ["run-1", "alpha"] })

@@ -1,6 +1,9 @@
 import type {
-  TelemetryCaptureMessage, TelemetryDiagnosticInput, TelemetryEnv,
-  TelemetryTransport, TelemetryTransportFactory,
+  TelemetryCaptureMessage,
+  TelemetryDiagnosticInput,
+  TelemetryEnv,
+  TelemetryTransport,
+  TelemetryTransportFactory,
 } from "@oh-my-opencode/telemetry-core"
 import { createLazyPostHogTransportFactory } from "./lazy-posthog"
 import { platform } from "node:os"
@@ -19,7 +22,7 @@ export function createSenpiTelemetryTransportFactory(input: TransportInput): Tel
   return createLazyPostHogTransportFactory({
     ...input,
     isOtlpEvent,
-    loadOtlp: message => createSenpiOtlpTransport(input, message),
+    loadOtlp: (message) => createSenpiOtlpTransport(input, message),
   })
 }
 

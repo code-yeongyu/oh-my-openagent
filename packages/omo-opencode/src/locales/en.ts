@@ -2,7 +2,7 @@ const locales = {
   "toast.new_background_task": "New Background Task",
   "toast.new_task_executed": "New Task Executed",
   "toast.task_completed": "Task Completed",
-  "toast.task_completion_message": "\"{{description}}\" finished in {{duration}}",
+  "toast.task_completion_message": '"{{description}}" finished in {{duration}}',
   "toast.task_completion_remaining": "Still running: {{running}} | Queued: {{queued}}",
   "toast.status_queued": "Queued",
   "toast.task_list_running": "Running ({{count}}):",

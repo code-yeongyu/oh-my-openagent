@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { OhMyOpenCodeConfig } from "../config"
-import {
-  applyAgentVariant,
-  lowerReasoningForModel,
-  resolveAgentVariant,
-  resolveVariantForModel,
-} from "./agent-variant"
+import { applyAgentVariant, lowerReasoningForModel, resolveAgentVariant, resolveVariantForModel } from "./agent-variant"
 
 describe("resolveAgentVariant", () => {
   test("returns undefined when agent name missing", () => {

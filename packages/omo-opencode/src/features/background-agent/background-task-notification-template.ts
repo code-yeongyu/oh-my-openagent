@@ -50,9 +50,8 @@ function formatAttemptTimeline(task: BackgroundTaskNotificationTask): string {
 
 function formatTaskSummaryLine(task: BackgroundTaskNotificationTask): string {
   const baseLine = `- \`${task.id}\`: ${task.description || task.id}`
-  const statusSuffix = task.status === "completed"
-    ? ""
-    : ` [${task.status.toUpperCase()}]${task.error ? ` - ${task.error}` : ""}`
+  const statusSuffix =
+    task.status === "completed" ? "" : ` [${task.status.toUpperCase()}]${task.error ? ` - ${task.error}` : ""}`
   const timeline = formatAttemptTimeline(task)
 
   return `${baseLine}${statusSuffix}${timeline ? `\n${timeline}` : ""}`
@@ -75,12 +74,9 @@ export function buildBackgroundTaskNotificationText(input: {
     const succeededTasks = completedTasks.filter((t) => t.status === "completed")
     const failedTasks = completedTasks.filter((t) => t.status !== "completed")
 
-    const succeededText = succeededTasks.length > 0
-      ? succeededTasks.map((t) => formatTaskSummaryLine(t)).join("\n")
-      : ""
-    const failedText = failedTasks.length > 0
-      ? failedTasks.map((t) => formatTaskSummaryLine(t)).join("\n")
-      : ""
+    const succeededText =
+      succeededTasks.length > 0 ? succeededTasks.map((t) => formatTaskSummaryLine(t)).join("\n") : ""
+    const failedText = failedTasks.length > 0 ? failedTasks.map((t) => formatTaskSummaryLine(t)).join("\n") : ""
 
     const hasFailures = failedTasks.length > 0
     const header = hasFailures
@@ -98,7 +94,8 @@ export function buildBackgroundTaskNotificationText(input: {
       body = `${formatTaskSummaryLine(task)}\n`
     }
 
-    const resultCollectionInstruction = "All sibling background tasks are complete. Your next action should be to call `background_output(task_id=\"<id>\")` for each task ID above."
+    const resultCollectionInstruction =
+      'All sibling background tasks are complete. Your next action should be to call `background_output(task_id="<id>")` for each task ID above.'
 
     return `<system-reminder>
 ${header}

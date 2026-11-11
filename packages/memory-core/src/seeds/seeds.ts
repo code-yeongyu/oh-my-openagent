@@ -29,10 +29,7 @@ import {
   DEFAULT_SELF_AWARE_BODY,
   DEFAULT_SELF_OBSERVATIONS_BODY,
 } from "./default-memory"
-import {
-  MEMORY_DISCIPLINE_SKILL_CONTENT,
-  MEMORY_DISCIPLINE_SKILL_PATH,
-} from "./memory-discipline"
+import { MEMORY_DISCIPLINE_SKILL_CONTENT, MEMORY_DISCIPLINE_SKILL_PATH } from "./memory-discipline"
 
 export { DEFAULT_MEMORY_BLOCK_LABELS } from "./default-memory"
 
@@ -107,10 +104,7 @@ export function buildDefaultSeedFiles(): readonly DefaultSeedFile[] {
  *
  * Returns the HEAD sha after initialization.
  */
-export async function initMemoryWithSeeds(
-  repo: GitMemoryRepo,
-  options: InitMemorySeedsOptions = {},
-): Promise<string> {
+export async function initMemoryWithSeeds(repo: GitMemoryRepo, options: InitMemorySeedsOptions = {}): Promise<string> {
   return repo.init({
     authorName: options.authorName,
     seedFiles: buildDefaultSeedFiles(),

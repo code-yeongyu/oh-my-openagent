@@ -14,7 +14,11 @@ import { rmEfaultTolerant } from "../teardown.test-support"
 const roots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 })
 
 function chmodFailure(code: string): NodeJS.ErrnoException {
@@ -52,7 +56,9 @@ describe("worker payload mode relaxation", () => {
       memoryUsageSource: join(base, "memory-usage.json"),
       dreamStateSource: join(base, "dream.json"),
       peoplePolicy: { enabled: true, max_entries: 40, max_entry_chars: 200 },
-      chmodFile: async () => { throw chmodFailure("EACCES") },
+      chmodFile: async () => {
+        throw chmodFailure("EACCES")
+      },
     }).catch((error: unknown) => error)
 
     expect((failure as NodeJS.ErrnoException).code).toBe("EACCES")
@@ -220,8 +226,11 @@ describe("worker senpi prefix args", () => {
     const quick = await prepareReflectionSpawn(input)
     const fork = await prepareReflectionForkSpawn({ ...input, parentSessionFile: join(base, "parent.jsonl") })
 
-    expect({ quickNoExtensions: quick.args.includes("--no-extensions"), quickOmo: quick.env.OMO_SENPI_DISABLED, forkOmo: fork.env.OMO_SENPI_DISABLED })
-      .toEqual({ quickNoExtensions: false, quickOmo: "1", forkOmo: undefined })
+    expect({
+      quickNoExtensions: quick.args.includes("--no-extensions"),
+      quickOmo: quick.env.OMO_SENPI_DISABLED,
+      forkOmo: fork.env.OMO_SENPI_DISABLED,
+    }).toEqual({ quickNoExtensions: false, quickOmo: "1", forkOmo: undefined })
   })
 
   test("#given runner-style senpiPrefixArgs #when prepareReflectionCandidateSpawn builds the spawn #then the prefix is forwarded onto args", async () => {

@@ -49,7 +49,12 @@ async function stillOpen(ports: readonly number[]): Promise<number[]> {
 
 type PrintRun = { readonly exit: number | "still running"; readonly stdout: string; readonly stderr: string }
 
-type BridgeRun = { readonly bridges: number; readonly stillListening: number; readonly stillOpen: number; readonly startError?: string }
+type BridgeRun = {
+  readonly bridges: number
+  readonly stillListening: number
+  readonly stillOpen: number
+  readonly startError?: string
+}
 
 // AC1/AC3 run in a fresh process: a shared test process can already hold module state from other
 // files (an earlier codemode load), which hides the bridge from a listen hook armed later.
@@ -77,13 +82,17 @@ async function spawnBounded(script: string, arg: string): Promise<PrintRun> {
 }
 
 describe("in-process child teardown shuts down its extensions (#9413)", () => {
-  test("#9413 AC1: disposing an in-process child that loaded the builtin extensions runs its session_shutdown handlers and closes its codemode bridge, leaving no listening socket", async () => {
-    // when: a real child with the builtin extensions settles its turn and is disposed
-    const run = await bridgeRun("ac1")
+  test(
+    "#9413 AC1: disposing an in-process child that loaded the builtin extensions runs its session_shutdown handlers and closes its codemode bridge, leaving no listening socket",
+    async () => {
+      // when: a real child with the builtin extensions settles its turn and is disposed
+      const run = await bridgeRun("ac1")
 
-    // then: it had opened exactly one codemode bridge, and after teardown nothing listens or accepts
-    expect(run).toEqual({ bridges: 1, stillListening: 0, stillOpen: 0 })
-  }, PRINT_RUN_BOUND_MS + 30_000)
+      // then: it had opened exactly one codemode bridge, and after teardown nothing listens or accepts
+      expect(run).toEqual({ bridges: 1, stillListening: 0, stillOpen: 0 })
+    },
+    PRINT_RUN_BOUND_MS + 30_000,
+  )
 
   test.each(["succeeds", "fails"] as const)(
     "#9413 AC2: a print run that delegates one in-process task to a child that %s exits with code 0 within the bound",
@@ -98,13 +107,17 @@ describe("in-process child teardown shuts down its extensions (#9413)", () => {
     PRINT_RUN_BOUND_MS + 30_000,
   )
 
-  test("#9413 AC3: discardUnstartedChildSession gives a child whose handle never started the same shutdown, closing its codemode bridge", async () => {
-    // when: a real builtin session opens, but its handle construction fails, so the runner discards it unstarted
-    const run = await bridgeRun("ac3")
+  test(
+    "#9413 AC3: discardUnstartedChildSession gives a child whose handle never started the same shutdown, closing its codemode bridge",
+    async () => {
+      // when: a real builtin session opens, but its handle construction fails, so the runner discards it unstarted
+      const run = await bridgeRun("ac3")
 
-    // then: the start failed, and the bridge that session opened was shut down before being disposed
-    expect(run).toEqual({ bridges: 1, stillListening: 0, stillOpen: 0, startError: "handle construction failed" })
-  }, PRINT_RUN_BOUND_MS + 30_000)
+      // then: the start failed, and the bridge that session opened was shut down before being disposed
+      expect(run).toEqual({ bridges: 1, stillListening: 0, stillOpen: 0, startError: "handle construction failed" })
+    },
+    PRINT_RUN_BOUND_MS + 30_000,
+  )
 
   test("a hung session_shutdown handler does not block child teardown past the host budget", async () => {
     // given: a child with an extension whose session_shutdown handler never settles, under a 300ms budget

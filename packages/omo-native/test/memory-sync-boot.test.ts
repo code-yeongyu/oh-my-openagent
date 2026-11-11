@@ -17,20 +17,68 @@ const NODE: EngineRuntimeFacts = { execArgv: [], versions: {} }
 
 const CASES = [
   ["an rpc engine whose table names memory-sync", RPC_HOST, DECLARED, true, BUN],
-  ["an rpc engine whose table names memory-sync without a usable descriptor", RPC_HOST, { SENPI_PRIVATE_FDS: '{"memory-sync":null}' }, true, BUN],
+  [
+    "an rpc engine whose table names memory-sync without a usable descriptor",
+    RPC_HOST,
+    { SENPI_PRIVATE_FDS: '{"memory-sync":null}' },
+    true,
+    BUN,
+  ],
   ["a launch without a table", RPC_HOST, {}, false, BUN],
   ["a table without a memory-sync entry", RPC_HOST, { SENPI_PRIVATE_FDS: '{"other":5}' }, false, BUN],
   ["a table that does not parse", RPC_HOST, { SENPI_PRIVATE_FDS: '{"memory-sync":5' }, false, BUN],
   ["a table that is not an object", RPC_HOST, { SENPI_PRIVATE_FDS: '["memory-sync"]' }, false, BUN],
-  ["`host ensure`, which hands the descriptor to its supervisor", ["host", "ensure", "--socket", "/tmp/s", "--mode", "rpc"], DECLARED, false, BUN],
-  ["the lifecycle supervisor, which hands it to the engine", ["--internal-rpc-host-supervisor", "--socket", "/tmp/s", "--mode", "rpc"], DECLARED, false, BUN],
+  [
+    "`host ensure`, which hands the descriptor to its supervisor",
+    ["host", "ensure", "--socket", "/tmp/s", "--mode", "rpc"],
+    DECLARED,
+    false,
+    BUN,
+  ],
+  [
+    "the lifecycle supervisor, which hands it to the engine",
+    ["--internal-rpc-host-supervisor", "--socket", "/tmp/s", "--mode", "rpc"],
+    DECLARED,
+    false,
+    BUN,
+  ],
   ["an interactive launch", ["--extension", "/plugin"], DECLARED, false, BUN],
   ["a json-mode launch", ["--mode", "json", "-p", "hi"], DECLARED, false, BUN],
-  ["`--mode rpc` only as message text after --", ["--extension", "/plugin", "--", "--mode", "rpc"], DECLARED, false, BUN],
-  ["a one-shot engine command, which omo's own check excludes", ["host", "status", "--mode", "rpc"], DECLARED, false, BUN],
-  ["senpi's CLI re-runs itself for exec arguments (requiresIsolatedProcess)", RPC_HOST, DECLARED, false, WITH_EXEC_ARGS],
-  ["senpi's CLI re-runs itself for an inherited inspector option", RPC_HOST, { ...DECLARED, NODE_OPTIONS: "--inspect=9229" }, false, BUN],
-  ["the isolated child senpi's CLI marked, which loads the agent itself", RPC_HOST, { ...DECLARED, SENPI_CLI_ISOLATED_CHILD: "1" }, true, WITH_EXEC_ARGS],
+  [
+    "`--mode rpc` only as message text after --",
+    ["--extension", "/plugin", "--", "--mode", "rpc"],
+    DECLARED,
+    false,
+    BUN,
+  ],
+  [
+    "a one-shot engine command, which omo's own check excludes",
+    ["host", "status", "--mode", "rpc"],
+    DECLARED,
+    false,
+    BUN,
+  ],
+  [
+    "senpi's CLI re-runs itself for exec arguments (requiresIsolatedProcess)",
+    RPC_HOST,
+    DECLARED,
+    false,
+    WITH_EXEC_ARGS,
+  ],
+  [
+    "senpi's CLI re-runs itself for an inherited inspector option",
+    RPC_HOST,
+    { ...DECLARED, NODE_OPTIONS: "--inspect=9229" },
+    false,
+    BUN,
+  ],
+  [
+    "the isolated child senpi's CLI marked, which loads the agent itself",
+    RPC_HOST,
+    { ...DECLARED, SENPI_CLI_ISOLATED_CHILD: "1" },
+    true,
+    WITH_EXEC_ARGS,
+  ],
   ["a Node runtime, which senpi's CLI may re-run under Bun", RPC_HOST, DECLARED, false, NODE],
 ] as const
 
@@ -54,14 +102,25 @@ console.log(JSON.stringify({
   table: process.env.SENPI_PRIVATE_FDS ?? null, captured: Reflect.has(globalThis, Symbol.for("senpi.private-fds.v3")),
 }))`
     const result = spawnSync(process.execPath, ["-e", probe], {
-      cwd: dirname(SIDECAR), encoding: "utf8", env: { PATH: process.env.PATH ?? "", SENPI_PRIVATE_FDS: table },
+      cwd: dirname(SIDECAR),
+      encoding: "utf8",
+      env: { PATH: process.env.PATH ?? "", SENPI_PRIVATE_FDS: table },
     })
     expect(result.stderr).toBe("")
-    expect(JSON.parse(result.stdout)).toEqual({ gate: "function", gateArity: 1, claim: "function", claimArity: 1, table, captured: false })
+    expect(JSON.parse(result.stdout)).toEqual({
+      gate: "function",
+      gateArity: 1,
+      claim: "function",
+      claimArity: 1,
+      table,
+      captured: false,
+    })
   })
 
   test.each(CASES)("answers like omo-native's gate: %s", async (_name, args, env, expected, runtime) => {
-    const { claimsMemorySyncAtBoot: built } = await import(pathToFileURL(SIDECAR).href) as { claimsMemorySyncAtBoot: typeof claimsMemorySyncAtBoot }
+    const { claimsMemorySyncAtBoot: built } = (await import(pathToFileURL(SIDECAR).href)) as {
+      claimsMemorySyncAtBoot: typeof claimsMemorySyncAtBoot
+    }
     expect(launchClaimsMemorySyncAtBoot([...args], env, built, runtime)).toBe(expected)
     expect(built([...args], env, runtime)).toBe(claimsMemorySyncAtBoot([...args], env, runtime))
   })
