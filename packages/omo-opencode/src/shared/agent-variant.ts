@@ -11,6 +11,9 @@ type ReasoningConfig = {
   category?: string
 }
 
+/** The config sections agent reasoning resolution reads. */
+export type AgentReasoningConfigView = Pick<OhMyOpenCodeConfig, "agents" | "categories">
+
 type OpenCodeReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max"
 
 export type LoweredReasoning = {
@@ -42,7 +45,7 @@ export function lowerReasoningForModel(
 }
 
 function findAgentOverride(
-  config: OhMyOpenCodeConfig,
+  config: AgentReasoningConfigView,
   agentName: string,
 ): ReasoningConfig | undefined {
   const stripped = stripInvisibleAgentCharacters(agentName)
@@ -54,14 +57,14 @@ function findAgentOverride(
 }
 
 function getCategoryConfig(
-  config: OhMyOpenCodeConfig,
+  config: AgentReasoningConfigView,
   categoryName: string | undefined,
 ): ReasoningConfig | undefined {
   return categoryName ? config.categories?.[categoryName] : undefined
 }
 
 export function resolveAgentVariant(
-  config: OhMyOpenCodeConfig,
+  config: AgentReasoningConfigView,
   agentName?: string,
 ): string | undefined {
   if (!agentName) return undefined

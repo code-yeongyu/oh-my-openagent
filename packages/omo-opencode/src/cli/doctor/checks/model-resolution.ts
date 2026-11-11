@@ -4,9 +4,16 @@ import { CHECK_IDS, CHECK_NAMES } from "../framework/constants"
 import type { CheckResult, DoctorIssue } from "../framework/types"
 import { loadAvailableModelsFromCache } from "./model-resolution-cache"
 import { loadOmoConfig } from "./model-resolution-config"
+import { resolveConfiguredCategoriesAtRuntime } from "./model-resolution-runtime-category"
 import { buildModelResolutionDetails } from "./model-resolution-details"
 import { buildEffectiveResolution, getEffectiveModel } from "./model-resolution-effective-model"
-import type { AgentResolutionInfo, CategoryResolutionInfo, ModelResolutionInfo, OmoConfig } from "./model-resolution-types"
+import type {
+  AgentResolutionInfo,
+  CategoryResolutionInfo,
+  ModelResolutionInfo,
+  OmoConfig,
+  RuntimeCategoryResolution,
+} from "./model-resolution-types"
 
 export function parseProviderModel(value: string): { providerID: string; modelID: string } | null {
   const slashIndex = value.indexOf("/")
@@ -58,7 +65,10 @@ export function getModelResolutionInfo(): ModelResolutionInfo {
   return { agents, categories }
 }
 
-export function getModelResolutionInfoWithOverrides(config: OmoConfig): ModelResolutionInfo {
+export function getModelResolutionInfoWithOverrides(
+  config: OmoConfig,
+  runtimeCategories: Record<string, RuntimeCategoryResolution> = {},
+): ModelResolutionInfo {
   const agents: AgentResolutionInfo[] = Object.entries(AGENT_MODEL_REQUIREMENTS).map(([name, requirement]) => {
     const userOverride = config.agents?.[name]?.model
     const userVariant = config.agents?.[name]?.variant
@@ -74,15 +84,39 @@ export function getModelResolutionInfoWithOverrides(config: OmoConfig): ModelRes
 
   const categories: CategoryResolutionInfo[] = Object.entries(CATEGORY_MODEL_REQUIREMENTS).map(
     ([name, requirement]) => {
-      const userOverride = config.categories?.[name]?.model
-      const userVariant = config.categories?.[name]?.variant
+      const runtime = runtimeCategories[name]
+      if (runtime?.disabled === true || config.categories?.[name]?.disable === true) {
+        return {
+          name,
+          requirement,
+          effectiveModel: getEffectiveModel(requirement),
+          effectiveResolution: "Disabled",
+          disabled: true,
+        }
+      }
+      if (runtime?.error !== undefined) {
+        return attachCapabilityDiagnostics({
+          name,
+          requirement,
+          effectiveModel: getEffectiveModel(requirement),
+          effectiveResolution: `Runtime error: ${runtime.error}`,
+          runtimeError: runtime.error,
+        })
+      }
+      const runtimeModel = runtime?.model
+      const runtimeResolved = runtimeModel !== undefined
+      const userOverride = runtime === undefined
+        ? config.categories?.[name]?.model
+        : runtime.userDefined ? runtime.model : undefined
+      const userVariant = runtime === undefined ? config.categories?.[name]?.variant : runtime.reasoning
       return attachCapabilityDiagnostics({
         name,
         requirement,
         userOverride,
         userVariant,
-        effectiveModel: getEffectiveModel(requirement, userOverride),
+        effectiveModel: runtimeModel ?? getEffectiveModel(requirement, userOverride),
         effectiveResolution: buildEffectiveResolution(requirement, userOverride),
+        ...(runtimeResolved ? { runtimeResolved } : {}),
       })
     }
   )
@@ -117,8 +151,8 @@ export function collectCapabilityResolutionIssues(info: ModelResolutionInfo): Do
 }
 
 export async function checkModels(): Promise<CheckResult> {
-  const config = loadOmoConfig() ?? {}
-  const info = getModelResolutionInfoWithOverrides(config)
+  const config = loadOmoConfig()
+  const info = getModelResolutionInfoWithOverrides(config, await resolveConfiguredCategoriesAtRuntime(config))
   const available = loadAvailableModelsFromCache()
   const issues: DoctorIssue[] = []
 
@@ -133,6 +167,15 @@ export async function checkModels(): Promise<CheckResult> {
   }
 
   issues.push(...collectCapabilityResolutionIssues(info))
+  const failedCategories = info.categories.filter((category) => category.runtimeError !== undefined)
+  if (failedCategories.length > 0) {
+    issues.push({
+      title: "Configured categories fail to resolve at runtime",
+      description: failedCategories.map((category) => `${category.name}: ${category.runtimeError}`).join("; "),
+      severity: "warning",
+      affects: failedCategories.map((category) => category.name),
+    })
+  }
 
   const overrideCount =
     info.agents.filter((agent) => Boolean(agent.userOverride)).length +
