@@ -80,10 +80,7 @@ describe("observeEventForWatchdog progress markers", () => {
   ] as const) {
     it(`#given a ${eventType} event with a sessionID #when observed #then onAssistantProgress is called`, () => {
       const calls = freshCalls()
-      observeEventForWatchdog(
-        { type: eventType, properties: { sessionID } },
-        createRecordingWatchdog(calls),
-      )
+      observeEventForWatchdog({ type: eventType, properties: { sessionID } }, createRecordingWatchdog(calls))
       expect(calls.progress).toEqual([sessionID])
     })
   }

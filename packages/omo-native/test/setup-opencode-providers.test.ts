@@ -1,6 +1,18 @@
 import { afterEach, describe, expect, setSystemTime, test as bunTest } from "bun:test"
 import { spawn, spawnSync, type ChildProcess } from "node:child_process"
-import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  cpSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -24,7 +36,8 @@ const SETUP_CHILD_BOUND_MS = 60_000
 const TEST_BREAKER_MS = 2 * SETUP_CHILD_BOUND_MS + 30_000
 type TestBody = () => Promise<void> | void
 const test = Object.assign((name: string, body: TestBody) => bunTest(name, body, TEST_BREAKER_MS), {
-  skipIf: (condition: boolean) => (name: string, body: TestBody) => bunTest.skipIf(condition)(name, body, TEST_BREAKER_MS),
+  skipIf: (condition: boolean) => (name: string, body: TestBody) =>
+    bunTest.skipIf(condition)(name, body, TEST_BREAKER_MS),
 })
 const liveChildren = new Map<ChildProcess, Promise<void>>()
 
@@ -40,7 +53,7 @@ function write(path: string, content: string): void {
   writeFileSync(path, content)
 }
 
-type Fixture = { home: string, agentDir: string, configHome: string, dataHome: string, tmp: string, launcher: string }
+type Fixture = { home: string; agentDir: string; configHome: string; dataHome: string; tmp: string; launcher: string }
 
 function fixture(): Fixture {
   const root = mkdtempSync(join(tmpdir(), "omo-providers-e2e-"))
@@ -94,33 +107,55 @@ function childEnv(item: Fixture): NodeJS.ProcessEnv {
   return env
 }
 
-type RunResult = { status: number | null, signal: NodeJS.Signals | null, stdout: string, stderr: string }
+type RunResult = { status: number | null; signal: NodeJS.Signals | null; stdout: string; stderr: string }
 
 async function run(item: Fixture, args: string[]): Promise<RunResult> {
   // --no-install: a module the copied app cannot resolve fails the run instead of Bun fetching it from the
   // registry into the fixture home, a cold network install on every run that timed out on Windows (#10210).
-  const child = spawn(process.execPath, ["--no-install", item.launcher, ...args], { env: childEnv(item), stdio: ["ignore", "pipe", "pipe"], windowsHide: true })
+  const child = spawn(process.execPath, ["--no-install", item.launcher, ...args], {
+    env: childEnv(item),
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  })
   let stdout = ""
   let stderr = ""
   child.stdout.setEncoding("utf8")
   child.stderr.setEncoding("utf8")
-  child.stdout.on("data", (chunk: string) => { stdout += chunk })
-  child.stderr.on("data", (chunk: string) => { stderr += chunk })
-  child.stdout.on("error", (error) => { stderr += `\n[stdout stream error] ${String(error)}` })
-  child.stderr.on("error", (error) => { stderr += `\n[stderr stream error] ${String(error)}` })
+  child.stdout.on("data", (chunk: string) => {
+    stdout += chunk
+  })
+  child.stderr.on("data", (chunk: string) => {
+    stderr += chunk
+  })
+  child.stdout.on("error", (error) => {
+    stderr += `\n[stdout stream error] ${String(error)}`
+  })
+  child.stderr.on("error", (error) => {
+    stderr += `\n[stderr stream error] ${String(error)}`
+  })
   const closed = new Promise<RunResult>((resolve, reject) => {
     child.once("error", reject)
     child.once("close", (status, signal) => resolve({ status, signal, stdout, stderr }))
   })
-  liveChildren.set(child, closed.then(() => undefined, () => undefined))
+  liveChildren.set(
+    child,
+    closed.then(
+      () => undefined,
+      () => undefined,
+    ),
+  )
   let timer: ReturnType<typeof setTimeout> | undefined
-  const breach = new Promise<"breach">((resolve) => { timer = setTimeout(() => resolve("breach"), SETUP_CHILD_BOUND_MS) })
+  const breach = new Promise<"breach">((resolve) => {
+    timer = setTimeout(() => resolve("breach"), SETUP_CHILD_BOUND_MS)
+  })
   try {
     const first = await Promise.race([closed, breach])
     if (first !== "breach") return first
     child.kill("SIGKILL")
     const killed = await closed
-    throw new Error(`omo ${args.join(" ")} did not exit within ${SETUP_CHILD_BOUND_MS} ms; killed (signal ${String(killed.signal)})\nstdout: ${stdout.slice(-2000)}\nstderr: ${stderr.slice(-2000)}`)
+    throw new Error(
+      `omo ${args.join(" ")} did not exit within ${SETUP_CHILD_BOUND_MS} ms; killed (signal ${String(killed.signal)})\nstdout: ${stdout.slice(-2000)}\nstderr: ${stderr.slice(-2000)}`,
+    )
   } finally {
     clearTimeout(timer)
     liveChildren.delete(child)
@@ -164,7 +199,9 @@ describe("omo setup opencode custom provider import", () => {
 
         expect(result.status).toBe(0)
         expect(config.getError()).toBeUndefined()
-        expect(acme.map((model: any) => [model.id, model.api, model.baseUrl, model.contextWindow, model.maxTokens])).toEqual([
+        expect(
+          acme.map((model: any) => [model.id, model.api, model.baseUrl, model.contextWindow, model.maxTokens]),
+        ).toEqual([
           ["acme-large", "openai-completions", "https://api.acme.example/v1", 200000, 32000],
           ["acme-alias", "openai-completions", "https://api.acme.example/v1", 128000, 16384],
         ])
@@ -202,8 +239,11 @@ describe("omo setup opencode custom provider import", () => {
 
         const result = await run(item, ["setup", "--yes"])
         const config = ModelConfig.loadSync(join(item.agentDir, "models.json"))
-        const endpoints = ["ant", "gw", "split"].flatMap((id) => composeModelProvider(id, undefined, config, undefined).getModels()
-          .map((model: any) => [`${id}/${model.id}`, model.api, model.baseUrl]))
+        const endpoints = ["ant", "gw", "split"].flatMap((id) =>
+          composeModelProvider(id, undefined, config, undefined)
+            .getModels()
+            .map((model: any) => [`${id}/${model.id}`, model.api, model.baseUrl]),
+        )
 
         expect(result.status).toBe(0)
         expect(config.getError()).toBeUndefined()
@@ -224,17 +264,21 @@ describe("omo setup opencode custom provider import", () => {
       test("#then auth.json holds one 0600 key per provider that the engine resolves to what opencode would send", async () => {
         const item = fixture()
         const literal = "sk-$HOME!${X}$$"
-        opencode(item, {
-          provider: {
-            acme: ACME,
-            inline: { options: { baseURL: "https://inline.example/v1", apiKey: literal }, models: { m: {} } },
-            stored: { options: { baseURL: "https://stored.example/v1" }, models: { m: {} } },
-            envonly: { env: ["ENVONLY_KEY"], options: { baseURL: "https://env.example/v1" }, models: { m: {} } },
+        opencode(
+          item,
+          {
+            provider: {
+              acme: ACME,
+              inline: { options: { baseURL: "https://inline.example/v1", apiKey: literal }, models: { m: {} } },
+              stored: { options: { baseURL: "https://stored.example/v1" }, models: { m: {} } },
+              envonly: { env: ["ENVONLY_KEY"], options: { baseURL: "https://env.example/v1" }, models: { m: {} } },
+            },
           },
-        }, {
-          acme: { type: "api", key: "loses-to-config-apiKey" },
-          stored: { type: "api", key: `stored-${literal}` },
-        })
+          {
+            acme: { type: "api", key: "loses-to-config-apiKey" },
+            stored: { type: "api", key: `stored-${literal}` },
+          },
+        )
 
         const result = await run(item, ["setup", "--yes"])
         const path = join(item.agentDir, "auth.json")
@@ -275,7 +319,12 @@ describe("omo setup opencode custom provider import", () => {
         expect(result.stdout).toContain("provider openai ")
         expect(result.stdout).toContain("custom provider hosted has no fixed baseURL")
         expect(result.stdout).toContain("providers-imported: acme\n")
-        expect(planOpencodeProviders({ home: item.home, env: { XDG_CONFIG_HOME: item.configHome, XDG_DATA_HOME: item.dataHome } }).skipped).toEqual(["gemini", "hosted", "openai"])
+        expect(
+          planOpencodeProviders({
+            home: item.home,
+            env: { XDG_CONFIG_HOME: item.configHome, XDG_DATA_HOME: item.dataHome },
+          }).skipped,
+        ).toEqual(["gemini", "hosted", "openai"])
       })
     })
   })
@@ -285,7 +334,10 @@ describe("omo setup opencode custom provider import", () => {
       test("#then existing entries stay byte-identical, the rest is added once with a backup, and the second run writes nothing", async () => {
         const item = fixture()
         const mine = { baseUrl: "https://mine.example/v1", api: "openai-completions", models: [{ id: "mine" }] }
-        write(join(item.agentDir, "models.json"), JSON.stringify({ providers: { acme: mine }, disabledProviders: ["x"] }))
+        write(
+          join(item.agentDir, "models.json"),
+          JSON.stringify({ providers: { acme: mine }, disabledProviders: ["x"] }),
+        )
         write(join(item.agentDir, "auth.json"), JSON.stringify({ fresh: { type: "api_key", key: "mine" } }))
         opencode(item, {
           provider: {
@@ -307,7 +359,9 @@ describe("omo setup opencode custom provider import", () => {
         expect(readJson(join(item.agentDir, "auth.json")).fresh).toEqual({ type: "api_key", key: "mine" })
         expect(backups.some((name) => name.startsWith("models.json.bak-"))).toBe(true)
         expect(second.status).toBe(0)
-        expect(["models.json", "auth.json"].map((name) => readFileSync(join(item.agentDir, name), "utf8"))).toEqual(bytes)
+        expect(["models.json", "auth.json"].map((name) => readFileSync(join(item.agentDir, name), "utf8"))).toEqual(
+          bytes,
+        )
         expect(readdirSync(item.agentDir).filter((name) => name.includes(".bak-"))).toEqual(backups)
         expect(second.stdout).toContain("providers-imported: none")
         expect(second.stdout).toContain("providers-skipped-existing: 2")
@@ -318,20 +372,23 @@ describe("omo setup opencode custom provider import", () => {
   describe("#given models.json is a symlink into a dotfiles checkout", () => {
     describe("#when setup is accepted", () => {
       // Creating a symlink on Windows needs a privilege CI runners do not hold.
-      test.skipIf(process.platform === "win32")("#then the provider lands in the linked file and the link stays a link", async () => {
-        const item = fixture()
-        const linked = join(dirname(item.agentDir), "dotfiles", "models.json")
-        write(linked, JSON.stringify({ providers: {} }))
-        mkdirSync(item.agentDir, { recursive: true })
-        symlinkSync(linked, join(item.agentDir, "models.json"))
-        opencode(item, { provider: { acme: ACME } })
+      test.skipIf(process.platform === "win32")(
+        "#then the provider lands in the linked file and the link stays a link",
+        async () => {
+          const item = fixture()
+          const linked = join(dirname(item.agentDir), "dotfiles", "models.json")
+          write(linked, JSON.stringify({ providers: {} }))
+          mkdirSync(item.agentDir, { recursive: true })
+          symlinkSync(linked, join(item.agentDir, "models.json"))
+          opencode(item, { provider: { acme: ACME } })
 
-        const result = await run(item, ["setup", "--yes"])
+          const result = await run(item, ["setup", "--yes"])
 
-        expect(result.status).toBe(0)
-        expect(lstatSync(join(item.agentDir, "models.json")).isSymbolicLink()).toBe(true)
-        expect(Object.keys(readJson(linked).providers)).toEqual(["acme"])
-      })
+          expect(result.status).toBe(0)
+          expect(lstatSync(join(item.agentDir, "models.json")).isSymbolicLink()).toBe(true)
+          expect(Object.keys(readJson(linked).providers)).toEqual(["acme"])
+        },
+      )
     })
   })
 
@@ -364,13 +421,23 @@ describe("omo setup opencode custom provider import", () => {
       test("#then the key the credential stage wrote in the same run is kept, not overwritten", async () => {
         // claude-sdk-oauth maps to anthropic-subscription, which is not a builtin id to the provider stage.
         const item = fixture()
-        const provider = { npm: "@ai-sdk/openai-compatible", options: { baseURL: "https://x.example/v1", apiKey: "provider-key" }, models: { m: {} } }
-        opencode(item, { provider: { "anthropic-subscription": provider } }, { "claude-sdk-oauth": { type: "api", key: "credential-key" } })
+        const provider = {
+          npm: "@ai-sdk/openai-compatible",
+          options: { baseURL: "https://x.example/v1", apiKey: "provider-key" },
+          models: { m: {} },
+        }
+        opencode(
+          item,
+          { provider: { "anthropic-subscription": provider } },
+          { "claude-sdk-oauth": { type: "api", key: "credential-key" } },
+        )
 
         const result = await run(item, ["setup", "--yes"])
 
         expect(result.status).toBe(0)
-        expect(readJson(join(item.agentDir, "auth.json"))).toEqual({ "anthropic-subscription": { type: "api_key", key: "credential-key" } })
+        expect(readJson(join(item.agentDir, "auth.json"))).toEqual({
+          "anthropic-subscription": { type: "api_key", key: "credential-key" },
+        })
         expect(result.stdout).toContain("provider-keys-imported: 0")
       })
     })
@@ -440,14 +507,24 @@ describe("omo setup opencode catalog provider import (#10158)", () => {
 
         expect(result.status).toBe(0)
         expect(config.getError()).toBeUndefined()
-        expect(models.map((model: any) => [model.id, model.api, model.baseUrl, model.contextWindow, model.maxTokens, model.reasoning])).toEqual([
-          ["kimi-k2.5", "openai-completions", "https://api.neuralwatt.com/v1", 262144, 32768, true],
-        ])
+        expect(
+          models.map((model: any) => [
+            model.id,
+            model.api,
+            model.baseUrl,
+            model.contextWindow,
+            model.maxTokens,
+            model.reasoning,
+          ]),
+        ).toEqual([["kimi-k2.5", "openai-completions", "https://api.neuralwatt.com/v1", 262144, 32768, true]])
         expect(readAuthStore(join(item.agentDir, "auth.json")).entries.neuralwatt).toMatchObject({ type: "api_key" })
         expect(result.stdout).toContain("providers-imported: neuralwatt")
         expect(result.stdout).not.toContain("could not read the engine's model list")
         expect(result.stdout).toContain("model-choices-carried: default model")
-        expect(readJson(join(item.agentDir, "settings.json"))).toMatchObject({ defaultProvider: "neuralwatt", defaultModel: "kimi-k2.5" })
+        expect(readJson(join(item.agentDir, "settings.json"))).toMatchObject({
+          defaultProvider: "neuralwatt",
+          defaultModel: "kimi-k2.5",
+        })
         expect(result.stdout).not.toContain("providers omo does not serve (neuralwatt)")
         expect(result.stdout).not.toContain("provider neuralwatt is not one omo serves")
       })
@@ -473,7 +550,14 @@ describe("omo setup opencode catalog provider import (#10158)", () => {
     describe("#when setup is accepted", () => {
       test("#then the block extends the catalog entry as opencode does, instead of replacing it", async () => {
         const item = fixture()
-        opencode(item, { provider: { neuralwatt: { options: { apiKey: "nw-inline" }, models: { "kimi-k2.5": { limit: { context: 131072, output: 16384 } } } } } })
+        opencode(item, {
+          provider: {
+            neuralwatt: {
+              options: { apiKey: "nw-inline" },
+              models: { "kimi-k2.5": { limit: { context: 131072, output: 16384 } } },
+            },
+          },
+        })
         write(join(item.home, ".cache", "opencode", "models.json"), JSON.stringify(NEURALWATT_CATALOG))
 
         const result = await run(item, ["setup", "--yes"])
@@ -492,7 +576,11 @@ describe("omo setup opencode catalog provider import (#10158)", () => {
     describe("#when setup is accepted", () => {
       test("#then the other limit and the model's own fields come from the catalog, as opencode merges them", async () => {
         const item = fixture()
-        opencode(item, { provider: { neuralwatt: { options: { apiKey: "nw-inline" }, models: { "kimi-k2.5": { limit: { context: 131072 } } } } } })
+        opencode(item, {
+          provider: {
+            neuralwatt: { options: { apiKey: "nw-inline" }, models: { "kimi-k2.5": { limit: { context: 131072 } } } },
+          },
+        })
         write(join(item.home, ".cache", "opencode", "models.json"), JSON.stringify(NEURALWATT_CATALOG))
 
         await run(item, ["setup", "--yes"])
@@ -515,7 +603,9 @@ describe("omo setup opencode catalog provider import (#10158)", () => {
 
         await run(item, ["setup", "--yes"])
 
-        expect(readAuthStore(join(item.agentDir, "auth.json")).entries.neuralwatt).toMatchObject({ key: "${NEURALWATT_API_KEY}" })
+        expect(readAuthStore(join(item.agentDir, "auth.json")).entries.neuralwatt).toMatchObject({
+          key: "${NEURALWATT_API_KEY}",
+        })
       })
     })
   })
@@ -525,9 +615,18 @@ describe("omo setup opencode catalog provider import (#10158)", () => {
       test("#then it is reported once, with the adapter reason, not also as a provider omo does not serve", async () => {
         const item = fixture()
         opencode(item, {}, { exotic: { type: "api", key: "ex-key" } })
-        write(join(item.home, ".cache", "opencode", "models.json"), JSON.stringify({
-          exotic: { id: "exotic", npm: "@ai-sdk/exotic", api: "https://exotic.example/v1", name: "Exotic", models: { m: { id: "m" } } },
-        }))
+        write(
+          join(item.home, ".cache", "opencode", "models.json"),
+          JSON.stringify({
+            exotic: {
+              id: "exotic",
+              npm: "@ai-sdk/exotic",
+              api: "https://exotic.example/v1",
+              name: "Exotic",
+              models: { m: { id: "m" } },
+            },
+          }),
+        )
 
         const result = await run(item, ["setup", "--yes"])
 
@@ -541,7 +640,9 @@ describe("omo setup opencode catalog provider import (#10158)", () => {
     describe("#when setup is accepted", () => {
       test("#then the proxy endpoint is used with the catalog's models, as opencode extends them", async () => {
         const item = fixture()
-        opencode(item, { provider: { neuralwatt: { options: { apiKey: "nw-inline", baseURL: "https://proxy.example/v1" } } } })
+        opencode(item, {
+          provider: { neuralwatt: { options: { apiKey: "nw-inline", baseURL: "https://proxy.example/v1" } } },
+        })
         write(join(item.home, ".cache", "opencode", "models.json"), JSON.stringify(NEURALWATT_CATALOG))
 
         const result = await run(item, ["setup", "--yes"])
@@ -561,7 +662,10 @@ describe("omo setup e2e temp isolation (#9766)", () => {
   test("#given a setup run #when the child process asks for its temp dir #then it is inside the fixture root that teardown removes", () => {
     const item = fixture()
 
-    const child = spawnSync(process.execPath, ["-e", "console.log(require('node:os').tmpdir())"], { encoding: "utf8", env: childEnv(item) })
+    const child = spawnSync(process.execPath, ["-e", "console.log(require('node:os').tmpdir())"], {
+      encoding: "utf8",
+      env: childEnv(item),
+    })
 
     expect(child.status).toBe(0)
     expect(realpathSync(child.stdout.trim())).toBe(realpathSync(item.tmp))
@@ -579,4 +683,3 @@ describe("omo setup e2e temp isolation (#9766)", () => {
     expect(readdirSync(item.tmp)).toEqual([])
   })
 })
-

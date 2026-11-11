@@ -16,7 +16,10 @@ export type PromptMessagesQuery = {
 export type PromptAsyncClient<TInput> = {
   readonly session?: {
     readonly status?: () => Promise<unknown>
-    readonly messages?: (input: { readonly path: { readonly id: string }; readonly query: PromptMessagesQuery }) => Promise<unknown>
+    readonly messages?: (input: {
+      readonly path: { readonly id: string }
+      readonly query: PromptMessagesQuery
+    }) => Promise<unknown>
     readonly promptAsync?: (input: TInput) => Promise<unknown>
   }
 }
@@ -24,7 +27,10 @@ export type PromptAsyncClient<TInput> = {
 export type PromptClient<TInput> = {
   readonly session?: {
     readonly status?: () => Promise<unknown>
-    readonly messages?: (input: { readonly path: { readonly id: string }; readonly query: PromptMessagesQuery }) => Promise<unknown>
+    readonly messages?: (input: {
+      readonly path: { readonly id: string }
+      readonly query: PromptMessagesQuery
+    }) => Promise<unknown>
     readonly prompt?: (input: TInput) => Promise<unknown>
   }
 }
@@ -52,10 +58,11 @@ type InternalPromptDispatchCommonArgs<TInput> = {
   readonly retryDispatchFailure?: (error: unknown) => boolean
 }
 
-export type InternalPromptDispatchArgs<TInput = PromptAsyncInput> = InternalPromptDispatchCommonArgs<TInput> & (
-  | { readonly mode: "async"; readonly client: PromptAsyncClient<TInput> }
-  | { readonly mode: "sync"; readonly client: PromptClient<TInput> }
-)
+export type InternalPromptDispatchArgs<TInput = PromptAsyncInput> = InternalPromptDispatchCommonArgs<TInput> &
+  (
+    | { readonly mode: "async"; readonly client: PromptAsyncClient<TInput> }
+    | { readonly mode: "sync"; readonly client: PromptClient<TInput> }
+  )
 
 export type PromptAsyncReservation = {
   readonly source: string
@@ -73,11 +80,11 @@ export type InternalPromptDispatchResult =
   | { readonly status: "cancelled" }
   | { readonly status: "unavailable" }
   | {
-    readonly status: "failed"
-    readonly error: unknown
-    readonly dispatchAttempted: boolean
-    readonly queueRetryable?: boolean
-  }
+      readonly status: "failed"
+      readonly error: unknown
+      readonly dispatchAttempted: boolean
+      readonly queueRetryable?: boolean
+    }
 
 export type PromptAsyncGateResult = InternalPromptDispatchResult
 
@@ -92,7 +99,10 @@ export type PromptAsyncReservationReleaseOptions = {
 export type PromptDispatchClient = {
   readonly session?: {
     readonly status?: () => Promise<unknown>
-    readonly messages?: (input: { readonly path: { readonly id: string }; readonly query: PromptMessagesQuery }) => Promise<unknown>
+    readonly messages?: (input: {
+      readonly path: { readonly id: string }
+      readonly query: PromptMessagesQuery
+    }) => Promise<unknown>
   }
 }
 

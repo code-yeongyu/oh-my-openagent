@@ -10,7 +10,9 @@ export function machineDigestOf(hardwareId: string): string {
 }
 
 /** This machine's digest, or undefined when no validated hardware id exists (no digest is sent then, never a sentinel). */
-export async function readMachineDigest(read: () => Promise<string | null> = readHardwareId): Promise<string | undefined> {
+export async function readMachineDigest(
+  read: () => Promise<string | null> = readHardwareId,
+): Promise<string | undefined> {
   const id = await read()
   return id === null ? undefined : machineDigestOf(id)
 }
@@ -19,6 +21,10 @@ export async function readMachineDigest(read: () => Promise<string | null> = rea
 export function advertisesMachineIdentity(health: unknown): boolean {
   if (typeof health !== "object" || health === null || !("capabilities" in health)) return false
   const capabilities = health.capabilities
-  return typeof capabilities === "object" && capabilities !== null && "machineIdentity" in capabilities
-    && capabilities.machineIdentity === MACHINE_IDENTITY_CAPABILITY
+  return (
+    typeof capabilities === "object" &&
+    capabilities !== null &&
+    "machineIdentity" in capabilities &&
+    capabilities.machineIdentity === MACHINE_IDENTITY_CAPABILITY
+  )
 }

@@ -42,16 +42,21 @@ export function cliDeviceServiceHandoff(options: {
   const connect = options.connect ?? (() => connectDeviceService({ version: packageJson.version, stateDir }))
   const doFetch = options.fetch ?? fetch
   const report = (what: string) => (error: unknown) => {
-    options.log(`OmO device service: ${what} did not complete (${error instanceof Error ? error.message : String(error)}).`)
+    options.log(
+      `OmO device service: ${what} did not complete (${error instanceof Error ? error.message : String(error)}).`,
+    )
   }
   return {
-    adopt: async credentials => {
+    adopt: async (credentials) => {
       // No running service: nothing to hand over, so not even the account is asked for.
       if (!existsSync(deviceServiceEndpointPath(stateDir))) return
       try {
         const account = await accountOf(options.api, credentials, doFetch)
         await handDeviceKeys({
-          stateDir, connect, when: "always", log: options.log,
+          stateDir,
+          connect,
+          when: "always",
+          log: options.log,
           credential: {
             device: { id: credentials.device.id, name: credentials.device.name },
             signingPrivateKey: credentials.signingPrivateKey,
@@ -66,10 +71,15 @@ export function cliDeviceServiceHandoff(options: {
     machineDevice: async () => {
       if (!existsSync(deviceServiceEndpointPath(stateDir))) return { kind: "absent" }
       let unreadable: string | undefined
-      const service = await connectOrNotRunning(connect, line => { unreadable = line; options.log(line) })
+      const service = await connectOrNotRunning(connect, (line) => {
+        unreadable = line
+        options.log(line)
+      })
       if (service === "not_running") {
         // A dead endpoint is a service that is gone; any other connect failure is a service we could not read.
-        return unreadable === undefined || unreadable.startsWith("OmO device service: dead_endpoint") ? { kind: "absent" } : { kind: "unknown", reason: unreadable }
+        return unreadable === undefined || unreadable.startsWith("OmO device service: dead_endpoint")
+          ? { kind: "absent" }
+          : { kind: "unknown", reason: unreadable }
       }
       try {
         const status = await service.status()

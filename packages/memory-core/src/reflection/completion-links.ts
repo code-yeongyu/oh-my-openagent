@@ -41,7 +41,9 @@ export async function recognizeLinkRepair(
   const runTip = parents[0]
   if (parents.length !== 1 || runTip === undefined || runTip === baseSha) return undefined
   if ((await run(["merge-base", "--is-ancestor", baseSha, runTip])).code !== 0) return undefined
-  const changed = (await must(run, ["diff", "--name-status", "--no-renames", "-z", runTip, tipSha, "--"])).split("\0").filter(Boolean)
+  const changed = (await must(run, ["diff", "--name-status", "--no-renames", "-z", runTip, tipSha, "--"]))
+    .split("\0")
+    .filter(Boolean)
   const paths = changed.filter((_, index) => index % 2 === 1)
   if (paths.length === 0 || changed.some((entry, index) => index % 2 === 0 && entry !== "M")) return undefined
   const skip = new Set((await readDroppedTrailers(exec, dir, baseSha, runTip)).map((entry) => entry.path))
@@ -80,25 +82,44 @@ export async function applyLinkRepair(
   } else {
     for (const [path, content] of writes) await writeFile(join(dir, path), content, "utf8")
     await must(run, ["add", "--", ...writes.keys()])
-    const [name = "reflection", email = "reflection@omo.local"] =
-      (await must(run, [...STABLE_LOG_OUTPUT, "log", "-1", "--format=%an%n%ae", runTip])).split("\n")
+    const [name = "reflection", email = "reflection@omo.local"] = (
+      await must(run, [...STABLE_LOG_OUTPUT, "log", "-1", "--format=%an%n%ae", runTip])
+    ).split("\n")
     await must(run, [
-      "-c", `user.name=${name}`, "-c", `user.email=${email}`,
-      "commit", "-q", "--no-verify", "-m", "chore(memory): repoint links to removed notes",
+      "-c",
+      `user.name=${name}`,
+      "-c",
+      `user.email=${email}`,
+      "commit",
+      "-q",
+      "--no-verify",
+      "-m",
+      "chore(memory): repoint links to removed notes",
     ])
     tipSha = (await must(run, ["rev-parse", "--verify", "HEAD"])).trim()
   }
-  const byRun = new Set((await must(run, ["diff", "--name-only", "-z", `${baseSha}..${runTip}`, "--"])).split("\0").filter(Boolean))
+  const byRun = new Set(
+    (await must(run, ["diff", "--name-only", "-z", `${baseSha}..${runTip}`, "--"])).split("\0").filter(Boolean),
+  )
   return { tipSha, linkRepairs: [...writes.keys()].filter((path) => !byRun.has(path)).sort() }
 }
 
-async function planLinkRepair(run: Run, baseSha: string, runTip: string, skip: ReadonlySet<string>): Promise<Map<string, string>> {
+async function planLinkRepair(
+  run: Run,
+  baseSha: string,
+  runTip: string,
+  skip: ReadonlySet<string>,
+): Promise<Map<string, string>> {
   const tree = await listTree(run, runTip)
   const live = new Set(tree.map((entry) => entry.path))
   const { removed, movedFrom } = await removedPaths(run, baseSha, runTip, live)
   const writes = new Map<string, string>()
   if (removed.size === 0) return writes
-  const notes = new Set(tree.filter((entry) => entry.regular && entry.path.endsWith(".md") && !skip.has(entry.path)).map((entry) => entry.path))
+  const notes = new Set(
+    tree
+      .filter((entry) => entry.regular && entry.path.endsWith(".md") && !skip.has(entry.path))
+      .map((entry) => entry.path),
+  )
   const candidates = new Set([...movedFrom.keys(), ...(await notesNaming(run, runTip, [...removed.keys()]))])
   for (const path of [...candidates].filter((candidate) => notes.has(candidate)).sort()) {
     const current = await noteText(run, runTip, path)
@@ -118,7 +139,10 @@ async function notesNaming(run: Run, revision: string, removed: readonly string[
   const result = await run(["grep", "-l", "-z", "-F", ...stems.flatMap((stem) => ["-e", stem]), revision])
   if (result.code === 1) return []
   if (result.code !== 0) throw new Error(result.stderr.trim() || "git grep failed")
-  return result.stdout.split("\0").filter(Boolean).map((entry) => entry.slice(revision.length + 1))
+  return result.stdout
+    .split("\0")
+    .filter(Boolean)
+    .map((entry) => entry.slice(revision.length + 1))
 }
 
 function screenAccepts(path: string, before: string, after: string): boolean {
@@ -142,7 +166,8 @@ function sameWrites(a: ReadonlyMap<string, string>, b: ReadonlyMap<string, strin
   return a.size === b.size && [...a].every(([path, content]) => b.get(path) === content)
 }
 
-const blob = (run: Run, revision: string, path: string): Promise<string> => must(run, ["cat-file", "blob", `${revision}:${path}`])
+const blob = (run: Run, revision: string, path: string): Promise<string> =>
+  must(run, ["cat-file", "blob", `${revision}:${path}`])
 
 const UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true })
 

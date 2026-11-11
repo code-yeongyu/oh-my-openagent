@@ -32,11 +32,21 @@ async function finishTurn(
     event: {
       type: "message.updated",
       properties: {
-        info: { role: "assistant", sessionID, providerID: "anthropic", modelID: "claude-sonnet-4-6", finish: true, tokens },
+        info: {
+          role: "assistant",
+          sessionID,
+          providerID: "anthropic",
+          modelID: "claude-sonnet-4-6",
+          finish: true,
+          tokens,
+        },
       },
     },
   })
-  await hook["tool.execute.after"]({ tool: "bash", sessionID, callID: "call_1" }, { title: "", output: "test", metadata: null })
+  await hook["tool.execute.after"](
+    { tool: "bash", sessionID, callID: "call_1" },
+    { title: "", output: "test", metadata: null },
+  )
 }
 
 describe("preemptive compaction counts cache writes as prompt tokens", () => {
@@ -46,7 +56,12 @@ describe("preemptive compaction counts cache writes as prompt tokens", () => {
     const ctx = createMockCtx()
     const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
 
-    await finishTurn(hook, "ses_cold_cache", { input: 33, output: 1000, reasoning: 0, cache: { read: 79_711, write: 800_000 } })
+    await finishTurn(hook, "ses_cold_cache", {
+      input: 33,
+      output: 1000,
+      reasoning: 0,
+      cache: { read: 79_711, write: 800_000 },
+    })
 
     expect(ctx.client.session.summarize).toHaveBeenCalledTimes(1)
   })
@@ -56,7 +71,12 @@ describe("preemptive compaction counts cache writes as prompt tokens", () => {
     const ctx = createMockCtx()
     const hook = createPreemptiveCompactionHook(ctx as never, {} as never)
 
-    await finishTurn(hook, "ses_warm_cache", { input: 100_000, output: 1000, reasoning: 0, cache: { read: 100_000, write: 500_000 } })
+    await finishTurn(hook, "ses_warm_cache", {
+      input: 100_000,
+      output: 1000,
+      reasoning: 0,
+      cache: { read: 100_000, write: 500_000 },
+    })
 
     expect(ctx.client.session.summarize).not.toHaveBeenCalled()
   })

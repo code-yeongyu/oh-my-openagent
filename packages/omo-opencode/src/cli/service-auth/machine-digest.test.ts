@@ -15,8 +15,13 @@ describe("hardware id normalization", () => {
   })
 
   test.each([
-    ["darwin", null], ["darwin", ""], ["darwin", "00000000-0000-0000-0000-000000000000"], ["darwin", "not-a-uuid"],
-    ["linux", "00000000000000000000000000000000"], ["linux", "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"], ["linux", "short"],
+    ["darwin", null],
+    ["darwin", ""],
+    ["darwin", "00000000-0000-0000-0000-000000000000"],
+    ["darwin", "not-a-uuid"],
+    ["linux", "00000000000000000000000000000000"],
+    ["linux", "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"],
+    ["linux", "short"],
     ["freebsd", "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"],
   ] as const)("%s %p yields no id, never a sentinel", (platform, raw) => {
     expect(normalizeHardwareId(platform, raw)).toBeNull()
@@ -25,7 +30,9 @@ describe("hardware id normalization", () => {
 
 describe("machine digest", () => {
   test("is SHA256 of omo-machine-v1 plus the normalized id, lowercase hex", () => {
-    expect(machineDigestOf("00000000-0000-4000-8000-0000000000ab")).toBe("c6004b5356942c15a68eaaced0d2f27cb73c35edf985ed2f1d920b02be26f6ae")
+    expect(machineDigestOf("00000000-0000-4000-8000-0000000000ab")).toBe(
+      "c6004b5356942c15a68eaaced0d2f27cb73c35edf985ed2f1d920b02be26f6ae",
+    )
   })
 
   test("no validated id means no digest", async () => {
@@ -34,7 +41,12 @@ describe("machine digest", () => {
 
   test("only the exact advertised capability enables the digest", () => {
     expect(advertisesMachineIdentity({ ok: true, capabilities: { machineIdentity: "hardware-digest-v1" } })).toBe(true)
-    for (const health of [null, { ok: true }, { capabilities: null }, { capabilities: { machineIdentity: "hardware-digest-v2" } }]) {
+    for (const health of [
+      null,
+      { ok: true },
+      { capabilities: null },
+      { capabilities: { machineIdentity: "hardware-digest-v2" } },
+    ]) {
       expect(advertisesMachineIdentity(health)).toBe(false)
     }
   })

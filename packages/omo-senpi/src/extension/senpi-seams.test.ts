@@ -36,14 +36,22 @@ function isTestOnly(file: string): boolean {
 function productionSources(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name)
-    if (entry.isDirectory()) return entry.name === "node_modules" || entry.name === "__fixtures__" ? [] : productionSources(path)
-    return entry.name.endsWith(".ts") && !entry.name.endsWith(".d.ts") && !isTestOnly(entry.name) && path !== SEAM_LIST_FILE ? [path] : []
+    if (entry.isDirectory())
+      return entry.name === "node_modules" || entry.name === "__fixtures__" ? [] : productionSources(path)
+    return entry.name.endsWith(".ts") &&
+      !entry.name.endsWith(".d.ts") &&
+      !isTestOnly(entry.name) &&
+      path !== SEAM_LIST_FILE
+      ? [path]
+      : []
   })
 }
 
 async function pinnedExtensionApi(): Promise<object> {
   let captured: object | undefined
-  await loadWithPinnedSenpi(SRC_ROOT, (pi) => { captured = pi })
+  await loadWithPinnedSenpi(SRC_ROOT, (pi) => {
+    captured = pi
+  })
   if (captured === undefined) throw new Error("senpi never ran the extension factory")
   return captured
 }
@@ -53,12 +61,15 @@ describe("senpi seam contract", () => {
     // given
     const sites = new Map<string, string[]>()
     for (const file of productionSources(SRC_ROOT)) {
-      for (const seam of guardedSeams(readFileSync(file, "utf8"))) sites.set(seam, [...(sites.get(seam) ?? []), relative(SRC_ROOT, file)])
+      for (const seam of guardedSeams(readFileSync(file, "utf8")))
+        sites.set(seam, [...(sites.get(seam) ?? []), relative(SRC_ROOT, file)])
     }
     const listed = new Set(Object.keys(SENPI_SEAMS))
 
     // when
-    const unlisted = [...sites.keys()].filter((seam) => !listed.has(seam)).map((seam) => `${seam} (${(sites.get(seam) ?? []).join(", ")})`)
+    const unlisted = [...sites.keys()]
+      .filter((seam) => !listed.has(seam))
+      .map((seam) => `${seam} (${(sites.get(seam) ?? []).join(", ")})`)
     const unguarded = [...listed].filter((seam) => !sites.has(seam))
 
     // then
@@ -68,29 +79,42 @@ describe("senpi seam contract", () => {
   test("#given a new guard on a seam #when the scanner reads it #then it reports that seam", () => {
     // given
     const source = [
-      "if (typeof pi.registerRpcRemoteSource !== \"function\") return false",
+      'if (typeof pi.registerRpcRemoteSource !== "function") return false',
       "const host = deps.pi.lifecycle?.markRunCompleted",
-      "if (\"getWidgets\" in pi) pi.getWidgets()",
+      'if ("getWidgets" in pi) pi.getWidgets()',
       "// typeof pi.commentedOut",
-      "const version = options.version ?? pi.hostVersion ?? \"unknown\"",
+      'const version = options.version ?? pi.hostVersion ?? "unknown"',
       "if (pi.getTheme) pi.getTheme()",
-      "const status = api.setStatus && api.setStatus(\"x\")",
+      'const status = api.setStatus && api.setStatus("x")',
       "if (!pi.setTitle) return",
       "const id = pi.sessionId || fallbackId",
-      "const label = pi.sessionLabel ? pi.sessionLabel : \"none\"",
-      "const n = pi.registerTool(tool) ?? pi.on(\"x\", handler) && pi.cwd",
+      'const label = pi.sessionLabel ? pi.sessionLabel : "none"',
+      'const n = pi.registerTool(tool) ?? pi.on("x", handler) && pi.cwd',
     ].join("\n")
 
     // when
     const seams = guardedSeams(source)
 
     // then
-    expect([...seams].sort()).toEqual(["getTheme", "getWidgets", "hostVersion", "lifecycle", "lifecycle.markRunCompleted", "registerRpcRemoteSource", "sessionId", "sessionLabel", "setStatus", "setTitle"])
+    expect([...seams].sort()).toEqual([
+      "getTheme",
+      "getWidgets",
+      "hostVersion",
+      "lifecycle",
+      "lifecycle.markRunCompleted",
+      "registerRpcRemoteSource",
+      "sessionId",
+      "sessionLabel",
+      "setStatus",
+      "setTitle",
+    ])
   })
 
   test("#given the installed senpi #when compared with the package pin #then it is the pinned version", () => {
     // given
-    const manifest = JSON.parse(readFileSync(join(SRC_ROOT, "..", "package.json"), "utf8")) as { devDependencies?: Record<string, string> }
+    const manifest = JSON.parse(readFileSync(join(SRC_ROOT, "..", "package.json"), "utf8")) as {
+      devDependencies?: Record<string, string>
+    }
 
     // when
     const pinned = manifest.devDependencies?.["@code-yeongyu/senpi"]
@@ -112,7 +136,9 @@ describe("senpi seam contract", () => {
 
   test("#given the pinned ExtensionAPI with seams removed #when checked #then exactly those seams are reported absent", async () => {
     // given
-    const pi = withSeamEdit(await pinnedExtensionApi(), { hide: ["registerReadClassifier", "rpc.handle", "sessionContext"] })
+    const pi = withSeamEdit(await pinnedExtensionApi(), {
+      hide: ["registerReadClassifier", "rpc.handle", "sessionContext"],
+    })
 
     // when
     const absent = absentSenpiSeams(pi)
@@ -126,7 +152,12 @@ describe("senpi seam contract", () => {
     const surface = { cwd: 42, rpc: { emit: () => undefined, handle: "not a function" } }
 
     // when
-    const absent = absentSenpiSeams(surface, { cwd: "string", rpc: "object", "rpc.emit": "function", "rpc.handle": "function" })
+    const absent = absentSenpiSeams(surface, {
+      cwd: "string",
+      rpc: "object",
+      "rpc.emit": "function",
+      "rpc.handle": "function",
+    })
 
     // then
     expect(absent).toEqual(["cwd", "rpc.handle"])

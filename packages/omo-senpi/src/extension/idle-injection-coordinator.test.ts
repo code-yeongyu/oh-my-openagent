@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test"
 
-import { IdleInjectionCoordinator, IdleInjectionRetiredError, type IdleInjectionDelivery } from "./idle-injection-coordinator"
+import {
+  IdleInjectionCoordinator,
+  IdleInjectionRetiredError,
+  type IdleInjectionDelivery,
+} from "./idle-injection-coordinator"
 
 interface DeliveredCall {
   content: string
@@ -16,7 +20,10 @@ function createCoordinator(): { coordinator: IdleInjectionCoordinator; calls: De
 // The fake engine combines content only after receiving the independent admission items.
 function admitItems(calls: DeliveredCall[]): IdleInjectionDelivery {
   return (_message, options) => {
-    calls.push({ content: options.items.map(item => item.content).join("\n\n"), options: { deliverAs: options.deliverAs } })
+    calls.push({
+      content: options.items.map((item) => item.content).join("\n\n"),
+      options: { deliverAs: options.deliverAs },
+    })
   }
 }
 
@@ -38,7 +45,9 @@ describe("IdleInjectionCoordinator", () => {
     expect(calls).toHaveLength(1)
     expect(calls[0]).toMatchObject({
       message: {
-        customType: "omo-senpi:wake", content: "task st_1 completed", display: false,
+        customType: "omo-senpi:wake",
+        content: "task st_1 completed",
+        display: false,
         details: [{ customType: "senpi-task:completion", details: { taskId: "st_1" } }],
       },
       options: { deliverAs: "steer", items: [{ producer: "task-completion", content: "task st_1 completed" }] },
@@ -142,7 +151,9 @@ describe("IdleInjectionCoordinator", () => {
     const calls: DeliveredCall[] = []
     const scheduled: Array<() => void> = []
     const coordinator = new IdleInjectionCoordinator(admitItems(calls), {
-      scheduleFlush: (flush) => { scheduled.push(flush) },
+      scheduleFlush: (flush) => {
+        scheduled.push(flush)
+      },
     })
     coordinator.enqueue({ key: "ulw", source: "ulw-continuation", content: "continue" })
 
@@ -166,7 +177,9 @@ describe("IdleInjectionCoordinator", () => {
     const calls: DeliveredCall[] = []
     const scheduled: Array<() => void> = []
     const coordinator = new IdleInjectionCoordinator(admitItems(calls), {
-      scheduleFlush: (flush) => { scheduled.push(flush) },
+      scheduleFlush: (flush) => {
+        scheduled.push(flush)
+      },
     })
     coordinator.enqueue({ key: "ulw", source: "ulw-continuation", content: "continue the run" })
     coordinator.scheduleFlush()
@@ -214,7 +227,9 @@ describe("IdleInjectionCoordinator", () => {
   it("#given an async delivery rejection #when the queue flushes #then the producer receives a failure receipt and onFlushed does not run", async () => {
     const events: string[] = []
     let rejectDelivery: (error: Error) => void = () => undefined
-    const delivery = new Promise<void>((_resolve, reject) => { rejectDelivery = reject })
+    const delivery = new Promise<void>((_resolve, reject) => {
+      rejectDelivery = reject
+    })
     const coordinator = new IdleInjectionCoordinator(() => delivery)
     coordinator.enqueue({
       key: "team-liveness:1",
@@ -261,7 +276,9 @@ describe("IdleInjectionCoordinator", () => {
     const calls: DeliveredCall[] = []
     const scheduled: Array<() => void> = []
     const coordinator = new IdleInjectionCoordinator(admitItems(calls), {
-      scheduleFlush: (flush) => { scheduled.push(flush) },
+      scheduleFlush: (flush) => {
+        scheduled.push(flush)
+      },
     })
     coordinator.enqueue({ key: "kibitzer:1", source: "kibitzer", content: "recall", passive: true })
 
@@ -283,7 +300,11 @@ describe("IdleInjectionCoordinator", () => {
         deliveries += 1
         throw new Error("stale extension generation after reload")
       },
-      { scheduleFlush: (flush) => { scheduled.push(flush) } },
+      {
+        scheduleFlush: (flush) => {
+          scheduled.push(flush)
+        },
+      },
     )
     coordinator.enqueue({
       key: "ulw",

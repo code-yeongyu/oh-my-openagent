@@ -30,8 +30,14 @@ function parentMode(initial: string | undefined): ParentPermissionMode & { chang
   const listeners = new Set<(preset: string) => void>()
   return {
     current: () => current,
-    onChange: (listener) => { listeners.add(listener); return () => listeners.delete(listener) },
-    change: (preset) => { current = preset; for (const listener of listeners) listener(preset) },
+    onChange: (listener) => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    change: (preset) => {
+      current = preset
+      for (const listener of listeners) listener(preset)
+    },
   }
 }
 
@@ -41,7 +47,11 @@ function startChild(options: {
   readonly env?: Readonly<Record<string, string>>
   readonly onWarning?: (message: string, token?: string) => void
   readonly taskId?: string
-}): { readonly started: Promise<RpcChildHandle>; readonly descriptor: () => RpcSpawnDescriptor | undefined; readonly commandLog: string } {
+}): {
+  readonly started: Promise<RpcChildHandle>
+  readonly descriptor: () => RpcSpawnDescriptor | undefined
+  readonly commandLog: string
+} {
   const stateDir = mkdtempSync(join(tmpdir(), "senpi-task-6189-"))
   tmpDirs.push(stateDir)
   const commandLog = join(stateDir, "commands.jsonl")
@@ -57,13 +67,21 @@ function startChild(options: {
       return child
     },
   })
-  const started = runner.start({ task_id: options.taskId ?? "st_6189b", cwd: process.cwd(), state_dir: stateDir, prompt: "hold" })
+  const started = runner.start({
+    task_id: options.taskId ?? "st_6189b",
+    cwd: process.cwd(),
+    state_dir: stateDir,
+    prompt: "hold",
+  })
   return { started, descriptor: () => descriptor, commandLog }
 }
 
 function nextEvent(handle: RpcChildHandle, name: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`waited ${WAIT_MS}ms for session_info_changed ${name}, never seen`)), WAIT_MS)
+    const timer = setTimeout(
+      () => reject(new Error(`waited ${WAIT_MS}ms for session_info_changed ${name}, never seen`)),
+      WAIT_MS,
+    )
     handle.subscribe((event) => {
       if (event.type === "session_info_changed" && "name" in event && event.name === name) {
         clearTimeout(timer)
@@ -83,7 +101,10 @@ describe("RpcProcessRunner with a parent session", () => {
 
     // then
     const args = launched.descriptor()?.args ?? []
-    expect(args.slice(args.indexOf("--permission-preset"), args.indexOf("--permission-preset") + 2)).toEqual(["--permission-preset", "ask"])
+    expect(args.slice(args.indexOf("--permission-preset"), args.indexOf("--permission-preset") + 2)).toEqual([
+      "--permission-preset",
+      "ask",
+    ])
   })
 
   test("#given a parent with no permission system #when a child launches #then no mode is named", async () => {
@@ -118,7 +139,12 @@ describe("RpcProcessRunner with a parent session", () => {
     await answered
 
     // then
-    expect(seen).toEqual([{ taskId: "st_6189b", dialog: { method: "select", title: "Run bash?", options: ["Allow", "Deny"], toolCallId: "call-b" } }])
+    expect(seen).toEqual([
+      {
+        taskId: "st_6189b",
+        dialog: { method: "select", title: "Run bash?", options: ["Allow", "Deny"], toolCallId: "call-b" },
+      },
+    ])
   })
 
   test("#given a running child in full-access #when the parent moves to ask #then the child is sent set_permission_preset ask", async () => {
@@ -133,7 +159,10 @@ describe("RpcProcessRunner with a parent session", () => {
 
     // then
     await applied
-    const sent = readFileSync(launched.commandLog, "utf8").trim().split("\n").map((line) => JSON.parse(line) as { type?: string })
+    const sent = readFileSync(launched.commandLog, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line) as { type?: string })
       .filter((command) => command.type === "set_permission_preset")
     expect(sent).toEqual([expect.objectContaining({ type: "set_permission_preset", permissionPreset: "ask" })])
   })
@@ -143,9 +172,16 @@ describe("RpcProcessRunner with a parent session", () => {
     // given
     const mode = parentMode("full-access")
     const warned = Promise.withResolvers<string>()
-    const launched = startChild({ mode, env: { FAKE_PERMISSION_PRESET: "refuse" }, onWarning: (message) => warned.resolve(message) })
+    const launched = startChild({
+      mode,
+      env: { FAKE_PERMISSION_PRESET: "refuse" },
+      onWarning: (message) => warned.resolve(message),
+    })
     await launched.started
-    const timer = setTimeout(() => warned.reject(new Error(`waited ${WAIT_MS}ms for the follow-failure warning, never sent`)), WAIT_MS)
+    const timer = setTimeout(
+      () => warned.reject(new Error(`waited ${WAIT_MS}ms for the follow-failure warning, never sent`)),
+      WAIT_MS,
+    )
 
     // when
     mode.change("ask")
@@ -161,7 +197,11 @@ describe("RpcProcessRunner with a parent session", () => {
     // given
     const mode = parentMode("full-access")
     const warned = Promise.withResolvers<void>()
-    const launched = startChild({ mode, env: { FAKE_PERMISSION_PRESET: "apply-then-refuse" }, onWarning: () => warned.resolve() })
+    const launched = startChild({
+      mode,
+      env: { FAKE_PERMISSION_PRESET: "apply-then-refuse" },
+      onWarning: () => warned.resolve(),
+    })
     const handle = await launched.started
     mode.change("ask")
     await warned.promise
@@ -180,7 +220,10 @@ describe("RpcProcessRunner with a parent session", () => {
     const mode = parentMode("full-access")
     const tokens: string[] = []
     const both = Promise.withResolvers<void>()
-    const onWarning = (_message: string, token?: string) => { tokens.push(token ?? ""); if (tokens.length === 2) both.resolve() }
+    const onWarning = (_message: string, token?: string) => {
+      tokens.push(token ?? "")
+      if (tokens.length === 2) both.resolve()
+    }
     await startChild({ mode, taskId: "st_follow_a", env: { FAKE_PERMISSION_PRESET: "refuse" }, onWarning }).started
     await startChild({ mode, taskId: "st_follow_b", env: { FAKE_PERMISSION_PRESET: "refuse" }, onWarning }).started
 

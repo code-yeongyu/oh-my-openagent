@@ -74,7 +74,11 @@ try {
       binaryPath,
       cwd: scratch.cwd,
       socketPath,
-      env: { ...isolatedChildEnv(scratch.env, scratch.agentDir), SENPI_CODING_AGENT_DIR: scratch.agentDir, OMO_CODING_AGENT_DIR: scratch.agentDir },
+      env: {
+        ...isolatedChildEnv(scratch.env, scratch.agentDir),
+        SENPI_CODING_AGENT_DIR: scratch.agentDir,
+        OMO_CODING_AGENT_DIR: scratch.agentDir,
+      },
     })
     const mirror = yield* makeOmoSessionMirror({
       shared,
@@ -115,7 +119,9 @@ try {
       mirror.refresh.pipe(
         Effect.repeat(Schedule.spaced("200 millis")),
         // A failed refresh ends the loop and would surface only as the 30 s timeout above; name it.
-        Effect.tapError((error) => Effect.sync(() => report.log(`mirror-refresh-failed ${error?._tag ?? "error"} ${JSON.stringify(error)}`))),
+        Effect.tapError((error) =>
+          Effect.sync(() => report.log(`mirror-refresh-failed ${error?._tag ?? "error"} ${JSON.stringify(error)}`)),
+        ),
         Effect.ignore,
       ),
     )
@@ -144,9 +150,7 @@ try {
 
     // ---- typed error path: the desktop client addressed at an unknown session ----
     const rowsBefore = (yield* Effect.promise(() => shell.shellSnapshot())).threads.length
-    const failure = yield* shared
-      .request({ type: "get_state", sessionId: "rpc-unknown-t13c" })
-      .pipe(Effect.flip)
+    const failure = yield* shared.request({ type: "get_state", sessionId: "rpc-unknown-t13c" }).pipe(Effect.flip)
     const rowsAfter = (yield* Effect.promise(() => shell.shellSnapshot())).threads.length
     report.assert(
       "unknown-target-typed-error",

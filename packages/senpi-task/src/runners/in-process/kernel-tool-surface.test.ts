@@ -49,16 +49,18 @@ describe("in-process runner kernel-tool grant", () => {
       },
     })
     const start = async (spec: Partial<ChildSpec>): Promise<unknown> =>
-      await runner.start({
-        taskId: "st_00000901",
-        cwd: process.cwd(),
-        sessionDir: `${process.cwd()}/`,
-        depth: 1,
-        parentSessionId: "parent",
-        rootSessionId: "parent",
-        prompt: "work",
-        ...spec,
-      } as ChildSpec).catch((error: unknown) => error)
+      await runner
+        .start({
+          taskId: "st_00000901",
+          cwd: process.cwd(),
+          sessionDir: `${process.cwd()}/`,
+          depth: 1,
+          parentSessionId: "parent",
+          rootSessionId: "parent",
+          prompt: "work",
+          ...spec,
+        } as ChildSpec)
+        .catch((error: unknown) => error)
     return { bindings, sessions, start }
   }
 

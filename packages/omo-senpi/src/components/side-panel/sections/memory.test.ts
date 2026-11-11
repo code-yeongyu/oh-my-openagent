@@ -57,7 +57,9 @@ describe("buildMemoryRows", () => {
   test("#given a parked identity #when the row is drawn #then it is a handle to the failure detail", () => {
     // given the actionable part is a 512-character detail that cannot fit in a column
     const rows = buildMemoryRows(
-      memory({ reflection: { streak: 3, parkedAt: "2026-09-21T09:00:00.000Z", nextProbeAt: "2026-09-21T15:00:00.000Z" } }),
+      memory({
+        reflection: { streak: 3, parkedAt: "2026-09-21T09:00:00.000Z", nextProbeAt: "2026-09-21T15:00:00.000Z" },
+      }),
       NOW,
       44,
     )
@@ -69,7 +71,9 @@ describe("buildMemoryRows", () => {
   test("#given the probe window has passed #when built #then the row says it is due rather than counting backwards", () => {
     // given a negative countdown would read as a time that already worked
     const rows = buildMemoryRows(
-      memory({ reflection: { streak: 3, parkedAt: "2026-09-20T09:00:00.000Z", nextProbeAt: "2026-09-21T09:00:00.000Z" } }),
+      memory({
+        reflection: { streak: 3, parkedAt: "2026-09-20T09:00:00.000Z", nextProbeAt: "2026-09-21T09:00:00.000Z" },
+      }),
       NOW,
       44,
     )
@@ -188,7 +192,12 @@ describe("buildMemoryDetailRows", () => {
     const rows = buildMemoryDetailRows(memory({ identity }), NOW)
 
     // then
-    expect(rows.slice(0, 2).map((entry) => entry.text.slice(8)).join("")).toBe(identity)
+    expect(
+      rows
+        .slice(0, 2)
+        .map((entry) => entry.text.slice(8))
+        .join(""),
+    ).toBe(identity)
   })
 })
 
@@ -196,7 +205,16 @@ describe("the kibitzer row", () => {
   test("#given settled wakes #when built #then the column says how many and how long ago", () => {
     // given the sidecar is invisible otherwise: it runs in another process on its own schedule
     const rows = buildMemoryRows(
-      memory({ kibitzer: { wakes: 4, lastWakeAt: "2026-09-21T11:48:00.000Z", lastFailed: false, nudged: 3, tokens: 20_400, partial: false } }),
+      memory({
+        kibitzer: {
+          wakes: 4,
+          lastWakeAt: "2026-09-21T11:48:00.000Z",
+          lastFailed: false,
+          nudged: 3,
+          tokens: 20_400,
+          partial: false,
+        },
+      }),
       NOW,
       44,
     )
@@ -211,7 +229,17 @@ describe("the kibitzer row", () => {
   test("#given the last wake failed #when built #then the row warns and stays clickable", () => {
     // given a kibitzer failing every wake is a memory that quietly stopped being updated
     const rows = buildMemoryRows(
-      memory({ kibitzer: { wakes: 3, lastWakeAt: "2026-09-21T11:48:00.000Z", lastFailed: true, lastStatus: "failed", nudged: 0, tokens: 900, partial: false } }),
+      memory({
+        kibitzer: {
+          wakes: 3,
+          lastWakeAt: "2026-09-21T11:48:00.000Z",
+          lastFailed: true,
+          lastStatus: "failed",
+          nudged: 0,
+          tokens: 900,
+          partial: false,
+        },
+      }),
       NOW,
       44,
     )
@@ -224,7 +252,16 @@ describe("the kibitzer row", () => {
   test("#given only the tail of the log was read #when built #then the count is marked as a floor", () => {
     // given claiming an exact total from a truncated read would be a lie
     const rows = buildMemoryRows(
-      memory({ kibitzer: { wakes: 40, lastWakeAt: "2026-09-21T11:48:00.000Z", lastFailed: false, nudged: 0, tokens: 0, partial: true } }),
+      memory({
+        kibitzer: {
+          wakes: 40,
+          lastWakeAt: "2026-09-21T11:48:00.000Z",
+          lastFailed: false,
+          nudged: 0,
+          tokens: 0,
+          partial: true,
+        },
+      }),
       NOW,
       44,
     )
@@ -241,7 +278,16 @@ describe("the kibitzer row", () => {
   test("#given wakes #when the frame is opened #then it carries what the row had no room for", () => {
     // given nudged paths and token spend are the numbers worth reading slowly
     const text = buildMemoryDetailRows(
-      memory({ kibitzer: { wakes: 4, lastWakeAt: "2026-09-21T11:48:00.000Z", lastFailed: false, nudged: 3, tokens: 20_400, partial: false } }),
+      memory({
+        kibitzer: {
+          wakes: 4,
+          lastWakeAt: "2026-09-21T11:48:00.000Z",
+          lastFailed: false,
+          nudged: 3,
+          tokens: 20_400,
+          partial: false,
+        },
+      }),
       NOW,
     )
       .map((entry) => entry.text)

@@ -37,7 +37,7 @@ describe("loadMcpConfigs", () => {
           scope: "local",
           projectPath: "/tmp/repo",
         },
-        "/tmp/repo"
+        "/tmp/repo",
       )
 
       expect(result).toBe(true)
@@ -49,7 +49,7 @@ describe("loadMcpConfigs", () => {
           scope: "local",
           projectPath: "/tmp/repo",
         },
-        "/tmp/repo/packages/app"
+        "/tmp/repo/packages/app",
       )
 
       expect(result).toBe(true)
@@ -61,7 +61,7 @@ describe("loadMcpConfigs", () => {
           scope: "local",
           projectPath: "/tmp/repo",
         },
-        "/tmp/other"
+        "/tmp/other",
       )
 
       expect(result).toBe(false)
@@ -73,7 +73,7 @@ describe("loadMcpConfigs", () => {
           scope: "local",
           projectPath: "/tmp/repo",
         },
-        "/tmp"
+        "/tmp",
       )
 
       expect(result).toBe(false)
@@ -108,21 +108,18 @@ describe("loadMcpConfigs", () => {
               scope: "local",
             },
           },
-        })
+        }),
       )
 
       const { loadMcpConfigs } = await import("./loader")
       const result = await loadMcpConfigs([], loaderOptions())
 
-        expect(result.servers).toHaveProperty("globalServer")
-        expect(result.servers).toHaveProperty("matchingLocal")
-        expect(result.servers).not.toHaveProperty("nonMatchingLocal")
-        expect(result.servers).not.toHaveProperty("missingProjectPath")
+      expect(result.servers).toHaveProperty("globalServer")
+      expect(result.servers).toHaveProperty("matchingLocal")
+      expect(result.servers).not.toHaveProperty("nonMatchingLocal")
+      expect(result.servers).not.toHaveProperty("missingProjectPath")
 
-        expect(result.loadedServers.map((server) => server.name)).toEqual([
-          "globalServer",
-          "matchingLocal",
-        ])
+      expect(result.loadedServers.map((server) => server.name)).toEqual(["globalServer", "matchingLocal"])
     })
   })
 })

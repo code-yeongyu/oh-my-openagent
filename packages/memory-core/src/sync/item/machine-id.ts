@@ -63,7 +63,8 @@ const LINUX_MACHINE_ID = /^[0-9a-f]{32}$/
 export function normalizeHardwareId(platform: NodeJS.Platform, raw: string | null): string | null {
   const text = (raw ?? "").trim().toLowerCase()
   const id = platform === "win32" && text.startsWith("{") && text.endsWith("}") ? text.slice(1, -1) : text
-  const valid = platform === "linux" ? LINUX_MACHINE_ID.test(id) : (platform === "darwin" || platform === "win32") && UUID.test(id)
+  const valid =
+    platform === "linux" ? LINUX_MACHINE_ID.test(id) : (platform === "darwin" || platform === "win32") && UUID.test(id)
   return valid && /[1-9a-f]/.test(id) ? id : null
 }
 
@@ -77,7 +78,12 @@ export async function readHardwareId(platform: NodeJS.Platform = process.platfor
       (value) => value,
       (error: unknown) => (error instanceof Error && "code" in error && error.code === "ENOENT" ? null : ""),
     )
-    const raw = primary ?? (await readFile("/var/lib/dbus/machine-id", "utf8").then((value) => value, () => ""))
+    const raw =
+      primary ??
+      (await readFile("/var/lib/dbus/machine-id", "utf8").then(
+        (value) => value,
+        () => "",
+      ))
     return normalizeHardwareId(platform, raw)
   }
   if (platform === "darwin") return normalizeHardwareId(platform, await darwinPlatformUuid())

@@ -43,15 +43,11 @@ function skill(dir: string, name: string, body = name): string {
 }
 
 function layout(kind: "source" | "packaged") {
-  const moduleDir = kind === "source"
-    ? join(root, "packages/omo-senpi/src/components/task")
-    : join(root, "runtime/plugin/extensions")
+  const moduleDir =
+    kind === "source" ? join(root, "packages/omo-senpi/src/components/task") : join(root, "runtime/plugin/extensions")
   mkdirSync(moduleDir, { recursive: true })
   const url = pathToFileURL(join(moduleDir, "module.js")).href
-  const bundled = [
-    resolve(moduleDir, "../../../plugin/skills"),
-    resolve(moduleDir, "../skills"),
-  ] as const
+  const bundled = [resolve(moduleDir, "../../../plugin/skills"), resolve(moduleDir, "../skills")] as const
   const conditional = [
     resolve(moduleDir, "../../../plugin/skills-conditional"),
     resolve(moduleDir, "../skills-conditional"),
@@ -83,7 +79,9 @@ describe("bundled skill directory override", () => {
       expect(dirs).toEqual([shared, ...conditional])
       for (const dir of bundled) expect(dirs).not.toContain(dir)
       const loader = createTaskSkillLoader({
-        homeDir: root, agentDir: join(root, "agent"), pluginSkillsDirs: dirs,
+        homeDir: root,
+        agentDir: join(root, "agent"),
+        pluginSkillsDirs: dirs,
       })
       const result = loader(["shared-skill", "x-search"], root)
       expect(result.resolved).toEqual(["shared-skill", "x-search"])
@@ -121,7 +119,8 @@ describe("bundled skill directory override", () => {
     skill(join(root, ".agents/skills"), "project-skill", "PROJECT BODY")
     process.env[variable] = shared
     const result = createTaskSkillLoader({ homeDir: root, agentDir })(
-      ["user-skill", "project-skill", "shared-skill"], root,
+      ["user-skill", "project-skill", "shared-skill"],
+      root,
     )
     expect(result.resolved).toEqual(["user-skill", "project-skill", "shared-skill"])
     expect(result.prepend).toContain("USER BODY")
@@ -138,14 +137,17 @@ describe("bundled skill directory override", () => {
     const memorySkills = join(identityPaths.repo, "skills")
     skill(memorySkills, "memory-skill")
     const memory = createMemoryIdentityContext({
-      identity: "override-test", identityPaths,
+      identity: "override-test",
+      identityPaths,
       binding: createMemoryBinding({ identity: "override-test", repoPath: identityPaths.repo, boundAt: 0 }),
     })
     const discover = createMemorySkillsScopeHandler({ resolveContext: () => memory })
-    expect(discover(
-      { type: "resources_discover", cwd: root, scopedEntries: true },
-      { sessionManager: { getSessionId: () => "session" } },
-    )).toEqual({ skillPaths: [{ path: memorySkills, scope: "user" }] })
+    expect(
+      discover(
+        { type: "resources_discover", cwd: root, scopedEntries: true },
+        { sessionManager: { getSessionId: () => "session" } },
+      ),
+    ).toEqual({ skillPaths: [{ path: memorySkills, scope: "user" }] })
   })
 
   for (const invalid of ["relative", "missing", "file", "unreadable"] as const) {
@@ -155,15 +157,20 @@ describe("bundled skill directory override", () => {
       if (invalid === "file") writeFileSync(value, "not a directory")
       if (invalid === "unreadable") mkdirSync(value)
       const accessSync = fs.accessSync
-      const deniedAccess = invalid === "unreadable"
-        ? spyOn(fs, "accessSync").mockImplementation((path, mode) => {
-          if (path === value) throw Object.assign(new Error("permission denied"), { code: "EACCES" })
-          accessSync(path, mode)
-        })
-        : undefined
+      const deniedAccess =
+        invalid === "unreadable"
+          ? spyOn(fs, "accessSync").mockImplementation((path, mode) => {
+              if (path === value) throw Object.assign(new Error("permission denied"), { code: "EACCES" })
+              accessSync(path, mode)
+            })
+          : undefined
       process.env[variable] = value
       const errors: string[] = []
-      const logger = { error: (message: string) => { errors.push(message) } }
+      const logger = {
+        error: (message: string) => {
+          errors.push(message)
+        },
+      }
       try {
         expect(resolveBundledSkillsDir(url, process.env, { logger })).toBe(bundled[1])
         expect(packagedSkillDirs(url, process.env, logger)).toEqual([...bundled, ...conditional])
