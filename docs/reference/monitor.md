@@ -135,7 +135,7 @@ Before `monitor_start` spawns anything, it checks the command through one of two
 1. Bash-equivalent permission, when the plugin has access to OpenCode's Bash permission ask API.
 2. `monitor.allowed_commands`, when Bash-equivalent permission is not available.
 
-The allowlist checks the command's program name, such as `bun` from `bun test`. It is a fallback gate and fails closed. If `allowed_commands` is empty or unset and Bash-equivalent permission is unavailable, Monitor denies the start request.
+The allowlist checks every program in a pipeline or command list, such as both `tail` and `grep` in `tail -f log | grep ERROR`. A prefix assignment (`FOO=bar`) is skipped. Compound commands (`for`, `if`, subshells), redirects, and command substitutions are denied on this fallback, because the allowlist cannot see every program they run. Those forms still run when Bash-equivalent permission accepts the whole command. If `allowed_commands` is empty or unset and Bash-equivalent permission is unavailable, Monitor denies the start request.
 
 Monitor never allows arbitrary commands based only on `monitor.enabled`.
 
