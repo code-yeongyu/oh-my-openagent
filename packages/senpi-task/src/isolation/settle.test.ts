@@ -10,7 +10,12 @@ function runtimeWith(kind: CoreMergeResult["kind"], workIsOnRemote: boolean) {
   const runtime = {
     captureDelta: async () => ({ rootPatch: "diff --git a/f b/f\n", nestedPatches: [] }),
     merge: async (): Promise<CoreMergeResult> =>
-      ({ kind, changes_applied: kind === "applied", summary_path: "summary.json", files_changed: 1 }) as CoreMergeResult,
+      ({
+        kind,
+        changes_applied: kind === "applied",
+        summary_path: "summary.json",
+        files_changed: 1,
+      }) as CoreMergeResult,
     retain: async () => {
       calls.push("retain")
       return "retained-path"
