@@ -17,7 +17,11 @@ import type * as AccountRuntime from "./account-runtime"
 export type DeviceAccountRuntimeModule = Pick<typeof AccountRuntime, "claimInheritedDesktopSync" | "selectedAccountSource" | "serveWorkerPort" | "workerMemorySyncSelection">
 
 const importDeviceAccountRuntime = (): Promise<DeviceAccountRuntimeModule> => import("#omo-device-account-runtime")
-let memorySyncHost: HostMemorySync | undefined
+// The host this process provided to senpi's worker-data registry. It lives on globalThis beside the host selection it
+// guards: senpi's registry is process-wide, and an extension hot reload re-evaluates this module, so a module-local
+// guard would provide the same name a second time.
+const PROVIDED_HOST_KEY = Symbol.for("omo.memory-sync.worker-data-provided.v1")
+type ProvidedHostGlobal = typeof globalThis & { [PROVIDED_HOST_KEY]?: HostMemorySync }
 
 /**
  * The thread's one account source: on the main thread it selects once per process and provides the Worker port; in a
@@ -35,14 +39,15 @@ export function selectedDeviceAccountSource(
   })
   let selection: () => Promise<MemorySyncSelection>
   if (isMainThread) {
-    const host = memorySyncHost ?? selectHostMemorySyncSource({
+    const provided = globalThis as ProvidedHostGlobal
+    const host = provided[PROVIDED_HOST_KEY] ?? selectHostMemorySyncSource({
       declared: launchCarriedPrivateTable,
       sidecar: runtime,
     })
-    // A duplicate/late provider is a bootstrap failure, not an unavailable account.
-    if (memorySyncHost === undefined) {
+    // A duplicate/late provider from anyone else is a bootstrap failure, not an unavailable account.
+    if (provided[PROVIDED_HOST_KEY] === undefined) {
       provideSessionWorkerData(MEMORY_SYNC_WORKER_DATA, host.workerData)
-      memorySyncHost = host
+      provided[PROVIDED_HOST_KEY] = host
     }
     selection = () => host.selection
   } else {

@@ -83,4 +83,17 @@ describe("selectedDeviceAccountSource", () => {
     expect(accountIdOf(second)).toBe("acct_2")
     expect(loads).toBe(2)
   })
+
+  test("#given omo.js re-evaluated by an extension hot reload #when the fresh module instance selects the account source #then it reuses the process's memory-sync provider instead of providing the name again", async () => {
+    type Loader = typeof import("./account-runtime-loader")
+    // A hot reload loads omo.js as a new module instance in the same process; senpi's worker-data registry survives it.
+    const generation = (name: string): Promise<Loader> => import(`./account-runtime-loader?generation=${name}`)
+    const before = await generation("before-reload")
+    const after = await generation("after-reload")
+    const runtime = async (): Promise<DeviceAccountRuntimeModule> => cliRuntime(() => async () => account("acct_3"))
+
+    before.selectedDeviceAccountSource({ env: {} }, runtime)
+    const reloaded = after.selectedDeviceAccountSource({ env: {} }, runtime)
+    expect(accountIdOf(await reloaded())).toBe("acct_3")
+  })
 })
