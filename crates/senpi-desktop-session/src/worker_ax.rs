@@ -1,5 +1,9 @@
 //! Accessibility requests. Refs (`eN`) resolve through the session's
-//! registry; a ref older than the previous snapshot fails `StaleRef`.
+//! registry; a ref older than the previous snapshot fails `StaleRef`. In an
+//! object-mode session every action first passes the actionability battery
+//! ([`crate::actionability`]).
+
+use std::cell::Cell;
 
 use senpi_desktop_core::ax::{self, register_node};
 use senpi_desktop_core::backend::DeliveryMode;
@@ -103,13 +107,16 @@ impl Worker {
         action: &str,
         cancelled: &dyn Fn() -> bool,
     ) -> CoreResult<Audited> {
-        let mutation = Mutation::new(
+        let mut mutation = Mutation::new(
             MutatingAction::AxPerform,
             self.ref_target(reference),
             DeliveryMode::Background,
         );
-        self.mutate(&mutation, cancelled, |worker| {
+        mutation.ax_actionability = Some((reference, Some(action)));
+        let baseline = Cell::new(None);
+        let audited = self.mutate(&mutation, cancelled, |worker| {
             let handle = worker.registry.resolve(reference)?;
+            baseline.set(worker.element_surface_baseline(&handle));
             let backend = worker.ax_parts()?.0;
             if action.eq_ignore_ascii_case("press") {
                 ax::ax_press(backend, &handle)?;
@@ -117,7 +124,9 @@ impl Worker {
                 backend.perform(&handle, action)?;
             }
             Ok(Response::Unit)
-        })
+        })?;
+        self.report_opened_surfaces(baseline.take());
+        Ok(audited)
     }
 
     pub(crate) fn ax_set_value(
@@ -128,6 +137,7 @@ impl Worker {
     ) -> CoreResult<Audited> {
         let mutation = Mutation {
             text: Some(value),
+            ax_actionability: Some((reference, None)),
             ..Mutation::new(
                 MutatingAction::AxSetValue,
                 self.ref_target(reference),
@@ -142,11 +152,12 @@ impl Worker {
     }
 
     pub(crate) fn ax_focus(&mut self, reference: &str, cancelled: &dyn Fn() -> bool) -> CoreResult<Audited> {
-        let mutation = Mutation::new(
+        let mut mutation = Mutation::new(
             MutatingAction::AxFocus,
             self.ref_target(reference),
             DeliveryMode::Background,
         );
+        mutation.ax_actionability = Some((reference, None));
         self.mutate(&mutation, cancelled, |worker| {
             let handle = worker.registry.resolve(reference)?;
             worker.ax_parts()?.0.focus(&handle)?;

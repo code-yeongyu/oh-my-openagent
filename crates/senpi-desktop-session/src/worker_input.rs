@@ -5,14 +5,15 @@ use senpi_desktop_core::ax::AxOwner;
 use senpi_desktop_core::backend::{DeliveryMode, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode, ErrorReport};
 use senpi_desktop_core::frame::{FrameGeometry, PointHit};
-use senpi_desktop_core::keys::parse_keys;
+use senpi_desktop_core::keys::{dangerous_chord, parse_keys, ChordHost, KeyName};
+use senpi_desktop_core::methods::Method;
 use senpi_desktop_core::protocol_params::{
     DragParams, KeyChordParams, PointParams, ScrollParams, TypeTextParams,
 };
-use senpi_desktop_core::report::{ActionEffect, ActionHit, Disposition, ReportMode};
+use senpi_desktop_core::report::{ActionEffect, ActionHit, Disposition, NextCall, ReportMode};
 use senpi_desktop_core::types::{DesktopWindow, PointerOptions, Target};
-
 use senpi_desktop_safety::{GateError, MutatingAction, StopPolicy, Supervisor};
+use serde_json::{Map, Value};
 
 use crate::mutate::Mutation;
 use crate::pointer::ParsedPointerOptions;
@@ -65,11 +66,13 @@ impl Worker {
                 ParsedPointerOptions::requested_mode(params.opts.as_ref()),
             )
         };
-        self.mutate(&mutation, cancelled, |worker| {
+        let baseline = std::cell::Cell::new(None);
+        let audited = self.mutate(&mutation, cancelled, |worker| {
             let options = ParsedPointerOptions::parse(params.opts.as_ref())?;
             let (frame, current) = worker.frame_for(&target, params.frame_id.as_deref())?;
             let (x, y) = frame.map_point(params.x, params.y, current.as_ref())?;
             worker.read_hit(x, y);
+            baseline.set(worker.surface_baseline(&target));
             let event = PointerEvent::Click {
                 x,
                 y,
@@ -77,10 +80,16 @@ impl Worker {
                 count: options.count,
                 modifiers: options.modifiers,
             };
-            let response = worker.pointer(&target, event, &frame, options.mode)?;
-            worker.judge(&target, &frame, options.count > 1)?;
+            let response = worker
+                .pointer(&target, event, &frame, options.mode)
+                .map_err(|error| with_next_call(error, || element_at(&target, x, y)))?;
+            if options.count > 1 {
+                worker.judge(&target, &frame)?;
+            }
             Ok(response)
-        })
+        })?;
+        self.report_opened_surfaces(baseline.take());
+        Ok(audited)
     }
 
     pub(crate) fn move_mouse(
@@ -103,9 +112,7 @@ impl Worker {
             let (frame, current) = worker.frame_for(&target, params.frame_id.as_deref())?;
             let (x, y) = frame.map_point(params.x, params.y, current.as_ref())?;
             worker.read_hit(x, y);
-            let response = worker.pointer(&target, PointerEvent::Move { x, y }, &frame, mode)?;
-            worker.judge(&target, &frame, false)?;
-            Ok(response)
+            worker.pointer(&target, PointerEvent::Move { x, y }, &frame, mode)
         })
     }
 
@@ -137,7 +144,7 @@ impl Worker {
                 modifiers: options.modifiers,
             };
             let response = worker.pointer(&target, event, &frame, options.mode)?;
-            worker.judge(&target, &frame, true)?;
+            worker.judge(&target, &frame)?;
             Ok(response)
         })
     }
@@ -168,9 +175,7 @@ impl Worker {
                 dx: params.dx,
                 dy: params.dy,
             };
-            let response = worker.pointer(&target, event, &frame, mode)?;
-            worker.judge(&target, &frame, false)?;
-            Ok(response)
+            worker.pointer(&target, event, &frame, mode)
         })
     }
 
@@ -200,13 +205,16 @@ impl Worker {
                 interrupted(&supervisor, &policy, cancelled, "typing")?;
                 epoch_unmoved(&epoch, mutation.text_delivered.get() > 0)
             };
-            worker.backend()?.type_text_interruptible(
-                &target,
-                &params.text,
-                mode,
-                &check_stop,
-                &mut || mutation.text_delivered.set(mutation.text_delivered.get().saturating_add(1)),
-            )?;
+            worker
+                .backend()?
+                .type_text_interruptible(
+                    &target,
+                    &params.text,
+                    mode,
+                    &check_stop,
+                    &mut || mutation.text_delivered.set(mutation.text_delivered.get().saturating_add(1)),
+                )
+                .map_err(|error| with_next_call(error, || target_tree(&target)))?;
             Ok(Response::Unit)
         })?;
         if !secure.get() {
@@ -257,8 +265,11 @@ impl Worker {
     }
 
     /// Object mode: whether the element that takes the keys is a secure text
-    /// field, read as the target window's focused element and the hit at its
-    /// center. A read that fails says no.
+    /// field. The element is the target app's own focused element, read from
+    /// that app (background keys land there even while another app is
+    /// frontmost), and it must sit in the target window; it is secure when its
+    /// own role says so or the hit at its center does. A read that fails says
+    /// no.
     fn typing_into_secure_field(&mut self, target: &Target) -> bool {
         let Target::Window(id) = target else { return false };
         if self.registry.report_mode() != ReportMode::Object {
@@ -266,11 +277,19 @@ impl Worker {
         }
         let Ok(backend) = self.backend() else { return false };
         let Ok(windows) = backend.windows() else { return false };
+        let pid = windows.iter().find(|window| window.id == *id).and_then(|window| window.pid);
         let center = {
             let Some(ax) = backend.ax() else { return false };
-            let Ok(Some(element)) = ax.focused_element() else { return false };
+            let focused = match pid {
+                Some(pid) => ax.app_focused_element(pid),
+                None => ax.focused_element(),
+            };
+            let Ok(Some(element)) = focused else { return false };
             if !matches!(ax.owner(&element, &windows), Ok(AxOwner::Window(owner)) if owner == *id) {
                 return false;
+            }
+            if ax.is_secure_text_field(&element).unwrap_or(false) {
+                return true;
             }
             let Some(bounds) = ax.props(&element).ok().and_then(|props| props.bounds) else { return false };
             (bounds.x + bounds.width / 2.0, bounds.y + bounds.height / 2.0)
@@ -294,19 +313,51 @@ impl Worker {
         };
         let supervisor = self.safety.supervisor.clone();
         let policy = self.stop_policy();
-        self.mutate(&mutation, cancelled, |worker| {
+        let baseline = std::cell::Cell::new(None);
+        let audited = self.mutate(&mutation, cancelled, |worker| {
             let keys = parse_keys(&params.keys)?;
             let mode = delivery(params.opts.as_ref())?;
+            worker.refuse_dangerous_chord(&keys, params.force, "it is sent only with force: true")?;
             worker.takeover_gate(&target, mode)?;
+            baseline.set(worker.surface_baseline(&target));
             let epoch = worker.epochs.probe();
             let pressed = std::cell::Cell::new(false);
             let check_stop = || {
                 interrupted(&supervisor, &policy, cancelled, "pressing keys")?;
                 epoch_unmoved(&epoch, pressed.replace(true))
             };
-            worker.backend()?.key_chord_interruptible(&target, &keys, mode, &check_stop)?;
+            worker
+                .backend()?
+                .key_chord_interruptible(&target, &keys, mode, &check_stop)
+                .map_err(|error| match mode {
+                    DeliveryMode::Background => with_next_call(error, || chord_in_foreground(params)),
+                    DeliveryMode::Foreground => error,
+                })?;
             Ok(Response::Unit)
-        })
+        })?;
+        self.report_opened_surfaces(baseline.take());
+        Ok(audited)
+    }
+
+    /// DESIGN 2 A13, object mode: `cmd+q`, `alt+f4` and `win+l` are sent
+    /// only with `force: true`; without it nothing is sent. `remedy` says
+    /// how the request could send it (a hold has no `force` and points to
+    /// `keyChord`).
+    pub(crate) fn refuse_dangerous_chord(&self, keys: &[KeyName], force: bool, remedy: &str) -> CoreResult<()> {
+        if force || self.registry.report_mode() != ReportMode::Object {
+            return Ok(());
+        }
+        let Some(chord) = dangerous_chord(keys, ChordHost::of_backend(&self.backend_name())) else {
+            return Ok(());
+        };
+        Err(DesktopError::invalid_key(format!(
+            "{chord} quits an app, closes a window or locks the screen, so {remedy}; nothing was sent"
+        ))
+        .with_report(ErrorReport {
+            reason: Some("dangerous_chord".to_owned()),
+            disposition: Some(Disposition::NOT_DELIVERED_SAFE),
+            ..ErrorReport::default()
+        }))
     }
 
     /// Object mode: the element under the mapped point, read before input
@@ -317,29 +368,24 @@ impl Worker {
             return;
         }
         let hit = self.backend().and_then(|backend| backend.hit_at(x, y)).ok().flatten().map(action_hit);
-        self.report_extras.set(Some(ReportExtras { route: None, hit, timings: None }));
+        self.report_extras.set(Some(ReportExtras { hit, ..ReportExtras::default() }));
     }
 
-    /// Object mode, window targets: once input was sent, judges it against
-    /// the window as it is now. A window whose owner changed, or (for input
-    /// of several events, `multi_event`) whose size changed since capture,
-    /// may have taken part of the input elsewhere: `delivery_uncertain`.
-    pub(crate) fn judge(&mut self, target: &Target, frame: &FrameGeometry, multi_event: bool) -> CoreResult<()> {
+    /// Object mode, window targets, input of several events (a drag, a
+    /// multi-click): once it was sent, judges it against the window as it is
+    /// now. A window that closed, changed owner or changed size since capture
+    /// may have taken part of the input elsewhere: `delivery_uncertain`. A
+    /// single event is never judged: a click that closes its dialog or hands
+    /// its window to another process has already landed where it was aimed.
+    pub(crate) fn judge(&mut self, target: &Target, frame: &FrameGeometry) -> CoreResult<()> {
         if self.registry.report_mode() != ReportMode::Object || !matches!(target, Target::Window(_)) {
             return Ok(());
         }
-        let captured = frame.identity().cloned();
-        if captured.is_none() && !multi_event {
-            return Ok(());
-        }
         let current = self.window(target).map_err(uncertain)?;
-        if captured.is_some_and(|captured| current.identity.as_ref() != Some(&captured)) {
+        if frame.identity().is_some_and(|captured| current.identity.as_ref() != Some(captured)) {
             return Err(uncertain(DesktopError::from(GateError::IdentityChanged)));
         }
-        if multi_event {
-            frame.check_size(&current).map_err(uncertain)?;
-        }
-        Ok(())
+        frame.check_size(&current).map_err(uncertain)
     }
 
     /// Raising a window is itself the focus change asked for: audited as
@@ -413,6 +459,59 @@ fn action_hit(hit: PointHit) -> ActionHit {
         }
     });
     ActionHit { role: hit.role, label }
+}
+
+/// Adds the next rung of the refusal ladder (element action, keyboard,
+/// foreground) to a `BackgroundUnavailable` refusal. A refusal that waits
+/// for the user (`user_active_in_target`) has no rung to suggest.
+pub(crate) fn with_next_call(mut error: DesktopError, next: impl FnOnce() -> NextCall) -> DesktopError {
+    if error.code != ErrorCode::BackgroundUnavailable {
+        return error;
+    }
+    let mut report = error.report.take().map(|report| *report).unwrap_or_default();
+    if report.reason.as_deref() != Some("user_active_in_target") {
+        report.next_call = Some(next());
+    }
+    error.with_report(report)
+}
+
+/// The element-action rung below a background click: read the element
+/// under the point, whose ref takes `ax.perform`. `ax.elementAt` returns the
+/// topmost element there, so where another window covers the target the
+/// element belongs to that window: check its owner before acting on it.
+fn element_at(target: &Target, x: f64, y: f64) -> NextCall {
+    let mut args = Map::new();
+    args.insert("target".to_owned(), Value::from(target.key()));
+    args.insert("x".to_owned(), Value::from(x));
+    args.insert("y".to_owned(), Value::from(y));
+    NextCall { method: Method::AxElementAt, args }
+}
+
+/// The element-action rung below background typing: read the target
+/// window's tree, whose `(focused)` element's ref takes `ax.typeText`. Never
+/// `ax.focused`: that reads the system-wide focused element, the frontmost
+/// app's field, not the refused background target. The text never enters
+/// the hint.
+fn target_tree(target: &Target) -> NextCall {
+    let mut args = Map::new();
+    args.insert("target".to_owned(), Value::from(target.key()));
+    NextCall { method: Method::AxSnapshot, args }
+}
+
+/// The foreground rung above background keys: the same chord, delivered in
+/// the foreground (which needs a control grant).
+fn chord_in_foreground(params: &KeyChordParams) -> NextCall {
+    let mut args = match serde_json::to_value(params) {
+        Ok(Value::Object(args)) => args,
+        _ => Map::new(),
+    };
+    let mut opts = match args.remove("opts") {
+        Some(Value::Object(opts)) => opts,
+        _ => Map::new(),
+    };
+    opts.insert("deliveryMode".to_owned(), Value::from("foreground"));
+    args.insert("opts".to_owned(), Value::Object(opts));
+    NextCall { method: Method::KeyChord, args }
 }
 
 /// An error judged after input was sent: whatever reason it carries, the

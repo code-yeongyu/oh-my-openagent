@@ -4,6 +4,8 @@ export type JsonObject = { readonly [key: string]: unknown }
 export type RemoteSessionRow = {
   readonly device: string
   readonly session_id: string
+  /** The session's omo durable id when its device publishes it (#12996); a delivery header names its sender by this id. */
+  readonly durable_id?: string
   readonly title: string
   readonly project: string
   /** The session file on its own device; `open_session` on that device takes it. */
@@ -113,3 +115,6 @@ export type RemoteThreadSurface = {
   /** The approval mode a session this surface creates is opened in (#6189): the creator's own. Absent: none is named. */
   readonly permissionPreset?: () => string | undefined
 }
+
+/** The id a listing row has ABOVE the ports (decision 0027 D2): its durable id and nothing else; "" when the device publishes none. */
+export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? ""
