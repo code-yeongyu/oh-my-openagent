@@ -55,6 +55,9 @@ export type TaskManager = {
   getResidentHandle(taskId: string): ManagedChildHandle | undefined
   // Subscribe at the runner-agnostic handle seam now or when a queued task is promoted.
   subscribeChild(taskId: string, listener: ManagedChildListener): () => void
+  // omo#10487: told when a settled task reopens itself (task_self_resumed), after its record is
+  // back to running, so an owner that already folded its outcome can wait for the resumed run's end.
+  subscribeSelfResumed?(taskId: string, listener: () => void): () => void
   residentTaskIds(): readonly string[]
   // #8396: session-scoped residency wake. Resolves the next time the parent session's residency
   // picture changes - a resident child reaches a terminal status, is forgotten (evicted, suspended,
