@@ -2,6 +2,7 @@
 //! shapes, and the imported corpus values against the contract's types.
 
 mod imported;
+mod receipt_delivery;
 mod receipts;
 mod shape_cases;
 mod shapes;
