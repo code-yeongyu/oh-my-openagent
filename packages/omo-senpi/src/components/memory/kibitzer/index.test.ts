@@ -166,6 +166,7 @@ describe("createKibitzerComposition", () => {
     // turn after its answer: delivery holds the nudge and the next tool_result steers it.
     expect(f.pi.messages).toHaveLength(0)
     await f.dispatch("tool_result", { toolName: "read", content: [{ type: "text", text: "ok" }] }, SESSION_A, 2)
+    await f.composition.whenIdle()
     expect(f.pi.messages).toHaveLength(1)
     expect(f.pi.messages[0]?.options).toEqual({ deliverAs: "steer" })
     expect(f.pi.messages[0]?.message).toMatchObject({ customType: RECALL_CUSTOM_TYPE, display: false })

@@ -138,6 +138,7 @@ describe("kibitzer registration wiring", () => {
 
     await nudgedThroughToolCall(f)
     await f.pi.dispatch("tool_result", { toolName: "read", isError: false }, f.eventCtx)
+    await f.wiring.whenIdle()
 
     expect(f.specs).toHaveLength(1)
     expect(f.specs[0]?.taskId).toBe(`kibitzer-${f.sessionId}-1`)

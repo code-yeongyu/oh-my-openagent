@@ -76,7 +76,11 @@ export function registerKibitzerHooks(pi: SenpiExtensionAPI, options: KibitzerHo
       if (sessionId !== undefined && toolCallId !== undefined) options.delivery.markToolFinished(sessionId, toolCallId)
       const context = sessionId === undefined ? undefined : options.resolveContext(sessionId)
       if (sessionId !== undefined && context !== undefined) {
-        await options.delivery.onToolResult(sessionId, context, eventCtx)
+        // Not awaited (#13074): delivery reads the ctx synchronously before its first await, and a steer or
+        // ledger write that never settles must not hold the PostToolUse hook, and with it the whole turn.
+        void options.delivery.onToolResult(sessionId, context, eventCtx).catch((error: unknown) => {
+          options.logger?.warn("omo-senpi kibitzer tool_result delivery failed", { error: describe(error) })
+        })
       }
     } catch (error: unknown) {
       options.logger?.warn("omo-senpi kibitzer tool_result delivery failed", { error: describe(error) })
