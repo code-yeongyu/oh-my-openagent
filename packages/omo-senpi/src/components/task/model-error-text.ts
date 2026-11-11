@@ -76,11 +76,38 @@ export function pinnedModelUnavailableText(
   return `${targetKind(target)} "${targetName(target)}" is pinned to "${pinnedModel}", which this machine's model registry does not serve: that provider is not connected, or it does not list that model id. Fix: connect the provider, or re-pick ${pinFixKey(target, pinKey)} in Settings. No child was spawned.`
 }
 
+export type CategoryChainRefusal = {
+  readonly category: string
+  readonly attempted_chain: readonly DelegateFallbackEntry[]
+  readonly missing_providers: readonly string[]
+}
+
 export type AgentUnavailable = {
   readonly agent?: string
   readonly attemptedModel: string | undefined
   readonly attempted_chain?: readonly DelegateFallbackEntry[]
   readonly missing_providers?: readonly string[]
+  readonly attempted_categories?: readonly CategoryChainRefusal[]
+}
+
+/**
+ * The refusal for an agent with no builtin chain whose categories all have dead chains (#12647). It
+ * names each category, the models its chain offers with their providers, the providers this machine
+ * has not connected, and the Settings keys that own the choice, like the chain refusal does.
+ */
+function categoryChainsUnavailableText(agent: string, refusals: readonly CategoryChainRefusal[]): string {
+  const missing = [...new Set(refusals.flatMap((refusal) => refusal.missing_providers))]
+  const reason = missing.length === 0
+    ? "the providers of its categories' chains are connected but none of them lists these model ids"
+    : `its categories' chains need providers this machine has not connected (${missing.join(", ")})`
+  const chains = refusals
+    .map((refusal) => `category "${refusal.category}": ${refusal.attempted_chain.length === 0 ? "none" : chainEntriesText(refusal.attempted_chain)}`)
+    .join("; ")
+  const keys = refusals.map((refusal) => `categories.${refusal.category}.model`).join(" or ")
+  const fix = missing.length === 0
+    ? `set ${keys} in Settings to a model you already run`
+    : `connect one of those providers, or set ${keys} in Settings to a model you already run`
+  return `Agent "${agent}" has no usable model: it resolves through its categories, and ${reason}. Chains, in order: ${chains}. Fix: ${fix}. No child was spawned.`
 }
 
 // A category refusal: a dead chain names every model and the fix, a pin the registry cannot serve
@@ -130,6 +157,9 @@ export function agentModelFailureText(
   if (pinned !== undefined) return pinnedModelUnavailableText({ agent }, pinned.model, pinned.key)
   if (resolution.attempted_chain !== undefined) {
     return chainUnavailableText({ agent }, resolution.attempted_chain, resolution.missing_providers ?? [], undefined)
+  }
+  if (resolution.attempted_categories !== undefined && resolution.attempted_categories.length > 0) {
+    return categoryChainsUnavailableText(agent, resolution.attempted_categories)
   }
   return `No available model for agent "${agent}" (attempted ${resolution.attemptedModel ?? "none"}).`
 }
