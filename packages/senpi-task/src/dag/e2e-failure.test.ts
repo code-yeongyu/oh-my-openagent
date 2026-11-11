@@ -32,7 +32,9 @@ import type { TaskRecord } from "../state"
 import { dagFingerprint } from "./fingerprint"
 import type { DagDefinition, DagNodeInput } from "./graph"
 import { createDagWaitSurface, type DagRunResult } from "./handle"
-import { createDagJournal } from "./journal"
+import { RetryClock } from "./infra-retry-fixture"
+import type { RetrySchedule } from "./infrastructure-retry"
+import { createDagJournal, subscribeDagJournal } from "./journal"
 import {
   createDagManager,
   DagManagerError,
@@ -127,7 +129,7 @@ type ScriptedOutcome =
   | {
       readonly status: "error"
       readonly killed: boolean
-      readonly failure: { readonly kind: "child-prompt-failed"; readonly message: string }
+      readonly failure: { readonly kind: "child-prompt-failed" | "child-unresponsive"; readonly message: string }
     }
 
 function completed(name: string): ScriptedOutcome {
@@ -142,9 +144,19 @@ function failed(name: string): ScriptedOutcome {
   }
 }
 
+function infrastructureFailed(name: string): ScriptedOutcome {
+  return {
+    status: "error",
+    killed: false,
+    failure: { kind: "child-unresponsive", message: `unresponsive:${name}` },
+  }
+}
+
 type ControlledHandle = {
   readonly handle: ManagedChildHandle
   readonly settle: (outcome: ScriptedOutcome) => void
+  /** Starts a run on the child's own (a woken monitor) and resolves once the manager reopened the record. */
+  readonly selfResume: () => Promise<void>
 }
 
 function controlledHandle(taskId: string): ControlledHandle {
@@ -162,9 +174,23 @@ function controlledHandle(taskId: string): ControlledHandle {
     if (ready !== undefined) return Promise.resolve(ready)
     return new Promise<ScriptedOutcome>((resolve) => waiters.push(resolve))
   }
+  const selfResumedListeners = new Set<() => void>()
+  let reopened: (() => void) | undefined
   return {
     settle,
+    selfResume: () => new Promise<void>((resolve) => {
+      reopened = resolve
+      for (const listener of [...selfResumedListeners]) listener()
+    }),
     handle: {
+      publishTaskStatus: (status) => {
+        if (status === "running") reopened?.()
+        return Promise.resolve()
+      },
+      onSelfResumed: (listener) => {
+        selfResumedListeners.add(listener)
+        return () => selfResumedListeners.delete(listener)
+      },
       task_id: taskId,
       sessionId: `child-${taskId}`,
       pid: undefined,
@@ -209,6 +235,12 @@ class ControlledRunner implements ManagedRunner {
     if (controlled === undefined) throw new Error(`missing controlled child ${name}`)
     this.#onSettle?.()
     controlled.settle(outcome)
+  }
+
+  selfResume(name: string): Promise<void> {
+    const controlled = this.#handles.get(name)
+    if (controlled === undefined) throw new Error(`missing controlled child ${name}`)
+    return controlled.selfResume()
   }
 }
 
@@ -262,6 +294,7 @@ type E2eFixtureOptions = {
   readonly defaultConcurrency?: number
   readonly materializeSkills?: ReturnType<typeof createDagSkillMaterializer>
   readonly maxRunsPerSession?: number
+  readonly scheduleRetry?: RetrySchedule
 }
 
 type E2eFixture = {
@@ -336,6 +369,7 @@ function e2eFixture(options: E2eFixtureOptions = {}): E2eFixture {
           store,
           taskManager,
           initialRecord: manager.record(runId, parentSessionId),
+          ...(options.scheduleRetry === undefined ? {} : { scheduleRetry: options.scheduleRetry }),
         })
         schedulers.set(runId, scheduler)
         runs.set(runId, scheduler.run())
@@ -1059,6 +1093,154 @@ describe("DAG retry, amend, and revive end to end", () => {
       "do after",
     ])
     expect(record.amendHistory).toHaveLength(1)
+  })
+
+  test("#11381 #given a completed node whose child resumed on its own #when the node is amended #then the stale child is cancelled before the amended attempt starts and is never adopted", async () => {
+    // given
+    const runner = new ControlledRunner()
+    const fixture = e2eFixture({ runner, materializeSkills: identityMaterializer })
+    const started = await fixture.start(definition("amend-stale-child", [categoryNode("A"), categoryNode("B", ["A"])]))
+    const runId = started.snapshot.runId
+    await runner.whenStarted(1)
+    runner.settle("A", completed("A"))
+    await runner.whenStarted(2)
+    const staleTaskId = fixture.taskManager.findOwnedTask({ kind: "dag", runId, nodeId: "A" as DagNodeId })?.task_id
+    if (staleTaskId === undefined) throw new Error("node A owns no task")
+    await runner.selfResume("A")
+    runner.settle("B", completed("B"))
+    await fixture.wait(runId)
+    expect(fixture.taskStore.load(staleTaskId)?.status).toBe("running")
+    const reattached = new Promise<{ readonly taskId: string; readonly staleStatus: string | undefined }>((resolve) => {
+      const unsubscribe = subscribeDagJournal(fixture.store, runId, (event) => {
+        if (event.type !== "dag.node.task-attached" || event.nodeId !== "A") return
+        unsubscribe()
+        resolve({ taskId: event.taskId, staleStatus: fixture.taskStore.load(staleTaskId)?.status })
+      })
+    })
+
+    // when
+    const reentry = await fixture.amend(definition("amend-stale-child", [
+      categoryNode("A", [], { prompt: "do A-fixed" }),
+      categoryNode("B", ["A"]),
+    ]), runId)
+    const attached = await reattached
+
+    // then
+    expect(attached.taskId).not.toBe(staleTaskId)
+    expect(attached.staleStatus).toBe("cancelled")
+    await runner.whenStarted(3)
+    runner.settle("A-fixed", completed("A-fixed"))
+    await runner.whenStarted(4)
+    runner.settle("B", completed("B"))
+    const record = await reentry.run
+    expect(record.status).toBe("completed")
+    expect(runner.startedSpecs.map((spec) => spec.prompt)).toEqual(["do A", "do B", "do A-fixed", "do B"])
+  })
+
+  test("#11381 #given an amended node's old child that resumed after the new attempt's task exists #when the run is cancelled #then the old child is cancelled too", async () => {
+    // given
+    const runner = new ControlledRunner()
+    const fixture = e2eFixture({ runner, materializeSkills: identityMaterializer })
+    const started = await fixture.start(definition("cancel-older-attempt", [categoryNode("A"), categoryNode("B", ["A"])]))
+    const runId = started.snapshot.runId
+    await runner.whenStarted(1)
+    runner.settle("A", completed("A"))
+    await runner.whenStarted(2)
+    runner.settle("B", completed("B"))
+    await fixture.wait(runId)
+    const staleTaskId = fixture.taskManager.findOwnedTask({ kind: "dag", runId, nodeId: "A" as DagNodeId })?.task_id
+    if (staleTaskId === undefined) throw new Error("node A owns no task")
+    const reentry = await fixture.amend(definition("cancel-older-attempt", [
+      categoryNode("A", [], { prompt: "do A-fixed" }),
+      categoryNode("B", ["A"]),
+    ]), runId)
+    await runner.whenStarted(3)
+    await runner.selfResume("A")
+    expect(fixture.taskManager.findOwnedTask({ kind: "dag", runId, nodeId: "A" as DagNodeId })?.task_id).not.toBe(staleTaskId)
+    expect(fixture.taskStore.load(staleTaskId)?.status).toBe("running")
+
+    // when
+    await reentry.scheduler.cancel(runId, "stop the run")
+    const record = await reentry.run
+
+    // then
+    expect(record.status).toBe("cancelled")
+    expect(fixture.taskStore.load(staleTaskId)?.status).toBe("cancelled")
+  })
+
+  test("#11381 #given an amended node's old child that resumed after the new attempt's task settled #when the node is amended again #then the old child is cancelled before the next attempt attaches", async () => {
+    // given
+    const runner = new ControlledRunner()
+    const fixture = e2eFixture({ runner, materializeSkills: identityMaterializer })
+    const started = await fixture.start(definition("amend-older-attempt", [categoryNode("A"), categoryNode("B", ["A"])]))
+    const runId = started.snapshot.runId
+    await runner.whenStarted(1)
+    runner.settle("A", completed("A"))
+    await runner.whenStarted(2)
+    runner.settle("B", completed("B"))
+    await fixture.wait(runId)
+    const staleTaskId = fixture.taskManager.findOwnedTask({ kind: "dag", runId, nodeId: "A" as DagNodeId })?.task_id
+    if (staleTaskId === undefined) throw new Error("node A owns no task")
+    const firstAmend = await fixture.amend(definition("amend-older-attempt", [
+      categoryNode("A", [], { prompt: "do A-fixed" }),
+      categoryNode("B", ["A"]),
+    ]), runId)
+    await runner.whenStarted(3)
+    runner.settle("A-fixed", completed("A-fixed"))
+    await runner.whenStarted(4)
+    await runner.selfResume("A")
+    runner.settle("B", completed("B"))
+    expect((await firstAmend.run).status).toBe("completed")
+    expect(fixture.taskStore.load(staleTaskId)?.status).toBe("running")
+    const reattached = new Promise<{ readonly taskId: string; readonly staleStatus: string | undefined }>((resolve) => {
+      const unsubscribe = subscribeDagJournal(fixture.store, runId, (event) => {
+        if (event.type !== "dag.node.task-attached" || event.nodeId !== "A") return
+        unsubscribe()
+        resolve({ taskId: event.taskId, staleStatus: fixture.taskStore.load(staleTaskId)?.status })
+      })
+    })
+
+    // when
+    const secondAmend = await fixture.amend(definition("amend-older-attempt", [
+      categoryNode("A", [], { prompt: "do A-again" }),
+      categoryNode("B", ["A"]),
+    ]), runId)
+    const attached = await reattached
+
+    // then
+    expect(attached.taskId).not.toBe(staleTaskId)
+    expect(attached.staleStatus).toBe("cancelled")
+    await runner.whenStarted(5)
+    runner.settle("A-again", completed("A-again"))
+    await runner.whenStarted(6)
+    runner.settle("B", completed("B"))
+    expect((await secondAmend.run).status).toBe("completed")
+  })
+
+  test("#11381 #given an infrastructure-failed child that resumed before its automatic retry #when the retry finds it live #then the child is cancelled and the node fails stale_attempt_alive", async () => {
+    // given
+    const clock = new RetryClock()
+    const runner = new ControlledRunner()
+    const fixture = e2eFixture({ runner, materializeSkills: identityMaterializer, scheduleRetry: clock.schedule })
+    const started = await fixture.start(definition("infra-retry-stale-child", [categoryNode("A")]))
+    const runId = started.snapshot.runId
+    await runner.whenStarted(1)
+    const retryScheduled = clock.whenScheduled(1)
+    runner.settle("A", infrastructureFailed("A"))
+    await retryScheduled
+    const staleTaskId = fixture.taskManager.findOwnedTask({ kind: "dag", runId, nodeId: "A" as DagNodeId })?.task_id
+    if (staleTaskId === undefined) throw new Error("node A owns no task")
+    await runner.selfResume("A")
+    expect(fixture.taskStore.load(staleTaskId)?.status).toBe("running")
+
+    // when
+    clock.advance()
+    const record = await fixture.running(runId)
+
+    // then
+    expect(record.nodes.find((entry) => entry.id === "A")).toMatchObject({ state: "failed", error: { code: "stale_attempt_alive" } })
+    expect(fixture.taskStore.load(staleTaskId)?.status).toBe("cancelled")
+    expect(runner.startedSpecs).toHaveLength(1)
   })
 
   test("#given a settled run #when an amendment adds a node #then the added node executes on re-entry", async () => {

@@ -129,6 +129,7 @@ export const DAG_NODE_ERROR_CODES = [
   "resume_task_orphaned",
   "lost_while_paused",
   "journal_corrupt",
+  "stale_attempt_alive",
 ] as const
 
 export type DagNodeErrorCode = (typeof DAG_NODE_ERROR_CODES)[number]

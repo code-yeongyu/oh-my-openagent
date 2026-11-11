@@ -203,6 +203,7 @@ describe("dag domain types", () => {
       "resume_task_orphaned",
       "lost_while_paused",
       "journal_corrupt",
+      "stale_attempt_alive",
     ])
     expect(DAG_NODE_TRANSITION_REASONS).toEqual([
       { kind: "unblocked" },
