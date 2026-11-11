@@ -57,7 +57,9 @@ any OS: a fake leg past its budget must produce that exact row, and the total mu
 
 ## Ledger columns
 
-`id`, `question`, `condition`, `measured`, `verdict`, `rerun`, `host`, `build`.
+`id`, `question`, `condition`, `measured`, `verdict`, `rerun`, `host`, `build`, `notes`.
+
+`notes` is free text kept across re-measures of the same host and row, for example the design decision that adopted a finding. It never changes a verdict.
 
 - `verdict` is one of:
   - `CONFIRMS`: the design's statement held.

@@ -20,7 +20,9 @@ const HELPER = join(HERE, "sp-n.ps1")
 const TARGET = join(HERE, "sp-n-target.ps1")
 export const LEDGER = "crates/omo-computer-backend-win32/probes/win32-delivery.tsv"
 const SELF = "crates/omo-computer-backend-win32/probes/probe-sp-n.ts"
-export const HEADER = ["id", "question", "condition", "measured", "verdict", "rerun", "host", "build"] as const
+// notes: free text kept across re-measures (for example a design decision that adopted the row), "-" when empty;
+// never read as a verdict.
+export const HEADER = ["id", "question", "condition", "measured", "verdict", "rerun", "host", "build", "notes"] as const
 export const H6 = "H6 Windows 11 VM"
 const HOSTED = "hosted windows-latest"
 const WARM = 5
@@ -860,9 +862,9 @@ export function readLedger(file: string): LedgerRow[] {
   })
 }
 export const rerun = (id: string) => `bun ${SELF} --verify ${LEDGER} --row ${id}`
-export const ledgerLine = (id: string, r: Result, host: string, build: string) => {
+export const ledgerLine = (id: string, r: Result, host: string, build: string, notes = "-") => {
   const spec = SPEC[id] ?? { question: "unknown row", condition: "-" }
-  return [id, spec.question, spec.condition, r.measured, r.verdict, rerun(id), host, build].map(clean).join("\t")
+  return [id, spec.question, spec.condition, r.measured, r.verdict, rerun(id), host, build, notes].map(clean).join("\t")
 }
 
 // ------------------------------------------------------------------ main
@@ -1012,11 +1014,15 @@ async function main() {
   }
   const ids = Object.keys(SPEC).filter((id) => want.has(id))
   if (opt.mode === "measure") {
-    const kept = readLedger(opt.file).filter((r) => r.host !== host)
+    const before = readLedger(opt.file)
+    const kept = before.filter((r) => r.host !== host)
+    const notes = new Map(before.filter((r) => r.host === host).map((r) => [r.id, r.notes]))
     const lines = [
       HEADER.join("\t"),
       ...kept.map((r) => HEADER.map((h) => r[h]).join("\t")),
-      ...ids.map((id) => ledgerLine(id, results[id] ?? UN("no leg produced this row"), host, build)),
+      ...ids.map((id) =>
+        ledgerLine(id, results[id] ?? UN("no leg produced this row"), host, build, notes.get(id) || "-"),
+      ),
     ]
     writeFileSync(opt.file, `${lines.join("\n")}\n`)
     for (const id of ids)
