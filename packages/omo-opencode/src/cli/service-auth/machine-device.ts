@@ -15,9 +15,14 @@ export class MachineAlreadySignedIn extends SignInError {}
  */
 export async function refuseSecondMachineDevice(session: Session, deviceService: DeviceServiceHandoff | undefined): Promise<void> {
   const stored = await session.accessSnapshot().catch((error: unknown) => {
+    if (!(error instanceof SessionEnded)) throw error
     // An uncertain refresh keeps its credential and keys: held, not absent (#12948 recovery).
-    if (error instanceof SessionEnded && error.code !== "refresh_recovery_expired") return null
-    throw error
+    if (error.code === "refresh_recovery_expired") {
+      throw new MachineAlreadySignedIn(
+        "This computer's OmO sign-in has a refresh whose outcome is unknown. omo kept its credential and keys and did not register another device. Run omo logout to end that sign-in, then run omo login again.",
+      )
+    }
+    return null
   })
   if (stored !== null) {
     throw new MachineAlreadySignedIn(
