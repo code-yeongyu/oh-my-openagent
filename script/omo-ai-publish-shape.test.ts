@@ -34,6 +34,7 @@ interface Job {
 }
 
 interface Workflow {
+  concurrency?: string | { group?: string; "cancel-in-progress"?: boolean }
   jobs?: Record<string, Job>
 }
 
@@ -165,9 +166,32 @@ describe("beta follows latest on a stable release (#12987)", () => {
     expect(names.indexOf("Guard omo-ai dist-tags")).toBe(moveIndex + 1)
     const condition = betaMove.if ?? ""
     expect(condition).toContain("needs.release-metadata.outputs.omo_ai_dist_tag == 'latest'")
-    expect(condition).toContain("needs.release-metadata.outputs.already_published != 'true'")
+    expect(condition).not.toContain("already_published")
     expect(condition).toContain("inputs.lazycodex_only != true")
     expect(betaMove.env?.NODE_AUTH_TOKEN).toBe(actionsExpression("secrets.NODE_AUTH_TOKEN"))
+  })
+
+  test("neither beta step is gated on already_published, so a re-run of a published release still repairs beta (#13148)", () => {
+    expect(betaMove.if ?? "").not.toContain("already_published")
+    expect(namedStep("post-publish-verify", "Guard omo-ai dist-tags").if ?? "").not.toContain("already_published")
+  })
+
+  test("the dist-tag guard fails a stale beta even when the release was already published (#13148)", () => {
+    const guard = namedStep("post-publish-verify", "Guard omo-ai dist-tags").run ?? ""
+    const result = runStep(guard, {
+      OMO_AI_VERSION: "5.1.66",
+      OMO_AI_DIST_TAG: "latest",
+      ALREADY_PUBLISHED: "true",
+      LATEST: "5.1.66",
+      BETA: "5.1.0",
+    })
+    expect(result.status).toBe(1)
+    expect(result.stdout).toContain("older than latest 5.1.66")
+  })
+
+  test("release runs are serialized by a workflow-wide concurrency group that never cancels a running release (#13149)", () => {
+    expect(workflow.concurrency).toBe("${{ github.workflow }}-${{ github.ref }}")
+    expect(workflowText).not.toContain("cancel-in-progress: true")
   })
 
   test.each([

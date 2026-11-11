@@ -1698,7 +1698,6 @@ jobs:
         # Trusted publishing covers `npm publish` only, so the dist-tag write authenticates with the registry token, as
         # npm-dist-tag-rollback.yml does.
         if: >-
-          needs.release-metadata.outputs.already_published != 'true' &&
           inputs.lazycodex_only != true &&
           needs.release-metadata.outputs.omo_ai_dist_tag == 'latest'
         env:
@@ -1784,7 +1783,7 @@ jobs:
 
           # beta is never older than latest (#12987): the step above moved it with this stable release. The registry can
           # serve that write with lag, so the read is retried (bounded, like the readiness wait) before it fails.
-          if [ "$OMO_AI_DIST_TAG" = "latest" ] && [ "$ALREADY_PUBLISHED" != "true" ]; then
+          if [ "$OMO_AI_DIST_TAG" = "latest" ]; then
             for attempt in 1 2 3 4 5; do
               BETA_VERSION=$(npm view --prefer-online omo-ai dist-tags.beta 2>/dev/null || true)
               BETA_DECISION=$(node script/beta-follows-latest.mjs "$LATEST_VERSION" "$BETA_VERSION" || true)
