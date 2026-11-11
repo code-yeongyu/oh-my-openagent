@@ -702,6 +702,7 @@ describe("identity merge (#10070)", () => {
   it.each([
     ["deep/../../outside.md", note("carried")],
     ["deep/../system/persona.md", note("carried")],
+    ["deep/.. /system/persona.md", note("carried")],
     ["deep/../.git/hooks/pre-commit", "#!/bin/sh\ntouch ../hook-ran\n"],
     ["deep/../.git/refs/heads/planted", note("carried")],
     ["notes/./base.md", note("carried")],
