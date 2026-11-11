@@ -14,7 +14,7 @@ export class MachineAlreadySignedIn extends SignInError {}
  * cleared no longer counts.
  */
 export async function refuseSecondMachineDevice(
-  session: Session,
+  session: Pick<Session, "accessSnapshot">,
   deviceService: DeviceServiceHandoff | undefined,
 ): Promise<void> {
   const stored = await session.accessSnapshot().catch((error: unknown) => {
@@ -40,7 +40,7 @@ export async function refuseSecondMachineDevice(
   }
   if (held.kind === "unknown") {
     throw new MachineAlreadySignedIn(
-      `omo could not read this computer's OmO device service (${terminalText(held.reason)}), so it did not register another device. Make sure the device service is running, then run omo login again.`,
+      `This computer's OmO device service is installed but did not answer (${terminalText(held.reason)}), so omo did not register another device. Start the device service, then run omo login again.`,
     )
   }
 }

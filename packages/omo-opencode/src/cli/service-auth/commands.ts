@@ -34,6 +34,19 @@ async function ensureServiceAvailable(session: Pick<Session, "request">, api: st
   }
 }
 
+/**
+ * Login order (#6503): refuse a second device from the stored sign-in and the machine's device service before
+ * `/v1/health`. A logged-out computer is the one that waits on accounts being reachable.
+ */
+export async function beginLogin(
+  session: Pick<Session, "accessSnapshot" | "request">,
+  deviceService: DeviceServiceHandoff | undefined,
+  api: string,
+): Promise<unknown> {
+  await refuseSecondMachineDevice(session, deviceService)
+  return ensureServiceAvailable(session, api)
+}
+
 type Options = {
   readonly api?: string
   readonly accounts?: string
@@ -108,9 +121,9 @@ async function run(
       console.log(saved ? `Signed in to ${api} as ${terminalText(saved.device.name)}.` : "Not signed in.")
       return
     }
-    const health = await ensureServiceAvailable(session, api)
-    // #6503: one device per machine; never mint a second one for a machine that already has its device.
-    await refuseSecondMachineDevice(session, deviceService)
+    // Local sign-in and the device service first, so an already-signed-in computer is told to log out
+    // even when accounts are unreachable. A logged-out computer then hears a health failure as itself.
+    const health = await beginLogin(session, deviceService, api)
     const machineDigest = advertisesMachineIdentity(health) ? await readMachineDigest() : undefined
     const digest = machineDigest === undefined ? {} : { machineDigest }
     const name = deviceName()

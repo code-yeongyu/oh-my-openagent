@@ -68,22 +68,28 @@ export function normalizeHardwareId(platform: NodeJS.Platform, raw: string | nul
   return valid && /[1-9a-f]/.test(id) ? id : null
 }
 
+type ReadText = (path: string, encoding: "utf8") => Promise<string>
+
+/** A failed read is null so the next source can run. A successful read, even an empty one, is kept. */
+async function readTextOrNull(path: string, read: ReadText): Promise<string | null> {
+  return read(path, "utf8").then(
+    (value) => value,
+    () => null,
+  )
+}
+
 /**
- * This machine's validated hardware id, or null when the platform has none that validates. Linux reads
- * /var/lib/dbus/machine-id only when /etc/machine-id is absent. Unlike `readMachineId`, there is no fallback marker.
+ * This machine's validated hardware id, or null when the platform has none that validates. Linux tries
+ * /etc/machine-id, then /var/lib/dbus/machine-id when that read fails for any reason (missing or unreadable),
+ * then no id. Unlike `readMachineId`, there is no fallback marker.
  */
-export async function readHardwareId(platform: NodeJS.Platform = process.platform): Promise<string | null> {
+export async function readHardwareId(
+  platform: NodeJS.Platform = process.platform,
+  read: ReadText = readFile,
+): Promise<string | null> {
   if (platform === "linux") {
-    const primary = await readFile("/etc/machine-id", "utf8").then(
-      (value) => value,
-      (error: unknown) => (error instanceof Error && "code" in error && error.code === "ENOENT" ? null : ""),
-    )
-    const raw =
-      primary ??
-      (await readFile("/var/lib/dbus/machine-id", "utf8").then(
-        (value) => value,
-        () => "",
-      ))
+    const primary = await readTextOrNull("/etc/machine-id", read)
+    const raw = primary ?? (await readTextOrNull("/var/lib/dbus/machine-id", read)) ?? ""
     return normalizeHardwareId(platform, raw)
   }
   if (platform === "darwin") return normalizeHardwareId(platform, await darwinPlatformUuid())

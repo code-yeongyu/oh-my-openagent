@@ -69,17 +69,18 @@ export function cliDeviceServiceHandoff(options: {
       }
     },
     machineDevice: async () => {
+      // No endpoint file: the service is not installed here. A leftover file that nothing answers is not absence.
       if (!existsSync(deviceServiceEndpointPath(stateDir))) return { kind: "absent" }
-      let unreadable: string | undefined
+      let failure: string | undefined
       const service = await connectOrNotRunning(connect, (line) => {
-        unreadable = line
+        failure = line
         options.log(line)
       })
       if (service === "not_running") {
-        // A dead endpoint is a service that is gone; any other connect failure is a service we could not read.
-        return unreadable === undefined || unreadable.startsWith("OmO device service: dead_endpoint")
-          ? { kind: "absent" }
-          : { kind: "unknown", reason: unreadable }
+        return {
+          kind: "unknown",
+          reason: failure ?? "the device service endpoint is present but nothing answered",
+        }
       }
       try {
         const status = await service.status()

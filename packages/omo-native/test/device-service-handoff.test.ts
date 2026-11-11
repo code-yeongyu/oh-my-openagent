@@ -158,6 +158,26 @@ describe("the omo CLI device service hand-off", () => {
     expect(await none.machineDevice?.()).toEqual({ kind: "absent" })
   })
 
+  test("#given an endpoint file nothing answers #when machineDevice reads it #then it is not-responding, not absent", async () => {
+    const stateDir = join(temp(), "ds")
+    mkdirSync(stateDir, { recursive: true, mode: 0o700 })
+    await Bun.write(deviceServiceEndpointPath(stateDir), "")
+    const lines: string[] = []
+    const handoff = cliDeviceServiceHandoff({
+      api: "http://127.0.0.1:9",
+      stateDir,
+      fetch: me,
+      log: (line) => lines.push(line),
+      connect: async () => {
+        throw Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" })
+      },
+    })
+    const state = await handoff.machineDevice?.()
+    expect(state?.kind).toBe("unknown")
+    expect(state && state.kind === "unknown" ? state.reason : "").toContain("dead_endpoint")
+    expect(lines.some((line) => line.includes("dead_endpoint"))).toBe(true)
+  })
+
   test("a failure is reported on the log and never fails the sign-in or sign-out", async () => {
     const stateDir = join(temp(), "ds")
     mkdirSync(stateDir, { recursive: true, mode: 0o700 })
