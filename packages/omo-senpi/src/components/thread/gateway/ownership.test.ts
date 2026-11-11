@@ -2,8 +2,14 @@ import { afterEach, expect, test } from "bun:test"
 import { publishedWorld } from "../published-endpoint-fixture"
 
 const worlds: Array<Awaited<ReturnType<typeof publishedWorld>>> = []
-afterEach(async () => { for (const w of worlds.splice(0)) await w.close() })
-async function world() { const w = await publishedWorld(); worlds.push(w); return w }
+afterEach(async () => {
+  for (const w of worlds.splice(0)) await w.close()
+})
+async function world() {
+  const w = await publishedWorld()
+  worlds.push(w)
+  return w
+}
 
 test("successful host registration publishes ownership and release clears it", async () => {
   const w = await world()
@@ -36,8 +42,15 @@ test("publishing a new incarnation invalidates the earlier ownership token", asy
   const w = await world()
   const a = await w.owner("a")
   const old = await w.store.sessionOwner("target")
-  await w.store.registerIncarnation({ durable_id: "target", incarnation: "new", endpoint: { kind: "rpc_host", socket: a.socketPath } })
+  await w.store.registerIncarnation({
+    durable_id: "target",
+    incarnation: "new",
+    endpoint: { kind: "rpc_host", socket: a.socketPath },
+  })
   await a.stop()
-  expect(await w.store.sessionOwner("target")).toEqual({ incarnation: "new", endpoint: { kind: "rpc_host", socket: a.socketPath } })
+  expect(await w.store.sessionOwner("target")).toEqual({
+    incarnation: "new",
+    endpoint: { kind: "rpc_host", socket: a.socketPath },
+  })
   expect(old?.incarnation).not.toBe("new")
 })

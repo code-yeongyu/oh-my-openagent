@@ -14,7 +14,10 @@ test("#given a delayed first-write refusal #when teardown holds its live child #
   const terminated = Promise.withResolvers<void>()
   const startSettled = Promise.withResolvers<void>()
   const watchdog = Promise.withResolvers<never>()
-  const watchdogTimer = setTimeout(() => watchdog.reject(new Error("start-refusal ordering did not settle within 2s")), 2_000)
+  const watchdogTimer = setTimeout(
+    () => watchdog.reject(new Error("start-refusal ordering did not settle within 2s")),
+    2_000,
+  )
   let child: ChildProcess | undefined
   let terminationStarted = false
   let settledKind: string | undefined
@@ -61,7 +64,9 @@ test("#given a delayed first-write refusal #when teardown holds its live child #
     // such a flake would throw here or fail the final kind assertion instead of proving the ordering.
     const rejectWrite = await Promise.race([
       writing.promise,
-      starting.then((result) => { throw new Error(`start settled before its first write: ${result.kind}`) }),
+      starting.then((result) => {
+        throw new Error(`start settled before its first write: ${result.kind}`)
+      }),
       watchdog.promise,
     ])
     rejectWrite(new Error("synthetic delayed first prompt refusal"))

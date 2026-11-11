@@ -85,10 +85,7 @@ describe("fsync-skip-warning startTimesByCallId eviction", () => {
     const hook = createFsyncSkipWarningHook() as ReturnType<typeof createFsyncSkipWarningHook> & {
       dispose?: () => void
     }
-    await hook["tool.execute.before"](
-      { tool: "write", sessionID: "ses_fsync", callID: "call_dispose" },
-      { args: {} },
-    )
+    await hook["tool.execute.before"]({ tool: "write", sessionID: "ses_fsync", callID: "call_dispose" }, { args: {} })
     expect(hasFsyncSkipStartTime("call_dispose")).toBe(true)
 
     //#when

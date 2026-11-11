@@ -57,7 +57,9 @@ function registry(
     ...(getAuth === undefined ? {} : { modelRuntime: { getAuth } }),
     authStorage: { get: (provider: string) => credentials[provider] },
     getProviderAuthStatus: (provider: string) =>
-      runtimeKeyProviders.includes(provider) ? { configured: true, source: "runtime" } : { configured: true, source: "stored" },
+      runtimeKeyProviders.includes(provider)
+        ? { configured: true, source: "runtime" }
+        : { configured: true, source: "stored" },
   }
 }
 
@@ -78,7 +80,9 @@ function refreshRejected(provider: string): Error {
 
 // A model header whose `!command` fails: senpi quotes the command in the message.
 function requestConfigurationFailed(model: FakeModel): Error {
-  return new Error(`Failed to resolve model "${model.provider}/${model.id}" header x-token from shell command: echo ${PRIVATE_MARKER} ${SHORT_SECRET}`)
+  return new Error(
+    `Failed to resolve model "${model.provider}/${model.id}" header x-token from shell command: echo ${PRIVATE_MARKER} ${SHORT_SECRET}`,
+  )
 }
 
 // senpi's credential-resolution failure that is not a refresh (for example a failing `!command` key).
@@ -91,7 +95,10 @@ function credentialsFailed(provider: string): Error {
 // senpi's own error for a refresh that failed transiently (connection refused, timeout, 408/429/5xx):
 // the real class, so the probe is tested against the marker senpi actually sets.
 function refreshUnavailable(provider: string): Error {
-  return new OAuthRefreshUnavailableError(provider, Object.assign(new Error("connect failed"), { code: "ECONNREFUSED" }))
+  return new OAuthRefreshUnavailableError(
+    provider,
+    Object.assign(new Error("connect failed"), { code: "ECONNREFUSED" }),
+  )
 }
 
 type ProbeFailures = {
@@ -117,13 +124,15 @@ function authProbe(failures: ProbeFailures = {}) {
     const slot = overrides?.slotName === undefined ? "" : `@${overrides.slotName}`
     if (typeof target === "string") {
       calls.push(`${target}${slot}`)
-      if (failures.dead?.includes(target) || failures.deadSlots?.includes(`${target}${slot}`)) throw refreshRejected(target)
+      if (failures.dead?.includes(target) || failures.deadSlots?.includes(`${target}${slot}`))
+        throw refreshRejected(target)
       if (failures.custom?.targets.includes(target)) throw failures.custom.throws(target)
       return { auth: { apiKey: "resolved" } }
     }
     calls.push(`${target.provider}/${target.id}${slot}`)
     if (failures.broken?.includes(`${target.provider}/${target.id}`)) throw requestConfigurationFailed(target)
-    if (failures.custom?.targets.includes(`${target.provider}/${target.id}`)) throw (failures.custom.modelThrows ?? failures.custom.throws)(target.provider)
+    if (failures.custom?.targets.includes(`${target.provider}/${target.id}`))
+      throw (failures.custom.modelThrows ?? failures.custom.throws)(target.provider)
     return { auth: { apiKey: "resolved" } }
   }
   return { getAuth, calls }
@@ -132,7 +141,11 @@ function authProbe(failures: ProbeFailures = {}) {
 function context(logs: string[]): ComponentContext {
   return {
     config: { getFlag: () => undefined },
-    logger: { error() {}, info: (message) => logs.push(`info:${message}`), warn: (message) => logs.push(`warn:${message}`) },
+    logger: {
+      error() {},
+      info: (message) => logs.push(`info:${message}`),
+      warn: (message) => logs.push(`warn:${message}`),
+    },
   }
 }
 
@@ -190,7 +203,11 @@ function appliedContent(pi: ProfileExtensionAPI): string {
 
 describe("createModelProfileComponent", () => {
   test("#given a TUI session #when it starts #then no profile applies, set or unset", async () => {
-    for (const config of [{}, { model_profile: "daily-heavy" }, { model_profile: "anthropic/claude-fable-5-1" }] satisfies OmoConfig[]) {
+    for (const config of [
+      {},
+      { model_profile: "daily-heavy" },
+      { model_profile: "anthropic/claude-fable-5-1" },
+    ] satisfies OmoConfig[]) {
       const { pi, start } = harness(config)
 
       await start(STARTUP, "session-tui", "tui")
@@ -225,7 +242,10 @@ describe("createModelProfileComponent", () => {
 
     expect(pi.sessionModels).toEqual([OPUS])
     expect(pi.sessionThinkingLevels).toEqual(["medium"])
-    expect(recordedOutcome(pi)).toMatchObject({ customType: MODEL_PROFILE_APPLIED_TYPE, details: { profile: "daily-normal" } })
+    expect(recordedOutcome(pi)).toMatchObject({
+      customType: MODEL_PROFILE_APPLIED_TYPE,
+      details: { profile: "daily-normal" },
+    })
   })
 
   test("#given unset and Opus only through a gateway aggregator #when the session starts #then the gateway is skipped and kimi max is applied", async () => {
@@ -366,7 +386,13 @@ describe("createModelProfileComponent", () => {
   })
 
   test("#given geeky-normal with GPT-6 Astra beside the Sol tiers #when the session starts #then gpt-6-astra medium is applied", async () => {
-    const { pi, start } = harness({ model_profile: "geeky-normal" }, [ASTRA, SOL_61, SOL_61_FAST, SOL_56_COPILOT, UNRELATED])
+    const { pi, start } = harness({ model_profile: "geeky-normal" }, [
+      ASTRA,
+      SOL_61,
+      SOL_61_FAST,
+      SOL_56_COPILOT,
+      UNRELATED,
+    ])
 
     await start(STARTUP)
 
@@ -426,7 +452,8 @@ describe("createModelProfileComponent", () => {
     expect(pi.entries).toHaveLength(1)
     expect(recordedOutcome(pi)).toMatchObject({
       customType: MODEL_PROFILE_APPLIED_TYPE,
-      content: 'OmO Native: model profile "anthropic/claude-opus-5-5" selected anthropic/claude-opus-5-5; mid-session fallback follows senpi\'s retry chains',
+      content:
+        'OmO Native: model profile "anthropic/claude-opus-5-5" selected anthropic/claude-opus-5-5; mid-session fallback follows senpi\'s retry chains',
     })
   })
 
@@ -477,7 +504,10 @@ describe("createModelProfileComponent", () => {
   })
 
   test("#given a chosen profile that no available model serves #when the session starts #then the user is warned with the step that host offers", async () => {
-    for (const [mode, step] of [["rpc", "Provider authentication settings"], ["print", "/login"]] as const) {
+    for (const [mode, step] of [
+      ["rpc", "Provider authentication settings"],
+      ["print", "/login"],
+    ] as const) {
       const { notices, start } = harness({ model_profile: "daily-normal" }, [UNRELATED])
 
       await start(STARTUP, `session-${mode}`, mode)
@@ -496,7 +526,8 @@ describe("createModelProfileComponent", () => {
     expect(pi.entries).toHaveLength(1)
     expect(recordedOutcome(pi)).toMatchObject({
       customType: MODEL_PROFILE_UNKNOWN_TYPE,
-      content: 'OmO Native: model_profile "turbo" is not defined; known profiles: daily-heavy, daily-normal, geeky-heavy, geeky-normal',
+      content:
+        'OmO Native: model_profile "turbo" is not defined; known profiles: daily-heavy, daily-normal, geeky-heavy, geeky-normal',
     })
     expect(notices).toEqual([{ message: appliedContent(pi), type: "warning" }])
   })
@@ -617,7 +648,9 @@ describe("createModelProfileComponent", () => {
     expect(appliedContent(pi)).not.toContain("/login")
     expect(appliedContent(pi)).not.toContain(PRIVATE_MARKER)
     expect(JSON.stringify(pi.entries[0])).not.toContain(PRIVATE_MARKER)
-    expect(logs.some((line) => line.startsWith("warn:") && line.includes("skipped anthropic/claude-opus-5-5"))).toBe(true)
+    expect(logs.some((line) => line.startsWith("warn:") && line.includes("skipped anthropic/claude-opus-5-5"))).toBe(
+      true,
+    )
     expect(logs.some((line) => line.includes(PRIVATE_MARKER))).toBe(false)
     // The user can act on the failed login, so it reaches them, not only the log (#11365 review).
     const { notices } = harnessed
@@ -764,40 +797,50 @@ describe("createModelProfileComponent", () => {
       applied: API_ASTRA,
       authFailed: [{ provider: "chatgpt-subscription", model: "gpt-6-astra", reason: "credentials" }],
     },
-  ])("#given geeky-normal with the subscription and the OpenAI API lane and $kind #when the session starts #then the expected lane serves GPT-6 Astra", async ({ custom, broken, applied, authFailed }) => {
-    const probe = authProbe({ custom, broken })
-    const { pi, start } = harness({ model_profile: "geeky-normal" }, [ASTRA, API_ASTRA], probe.getAuth)
+  ])(
+    "#given geeky-normal with the subscription and the OpenAI API lane and $kind #when the session starts #then the expected lane serves GPT-6 Astra",
+    async ({ custom, broken, applied, authFailed }) => {
+      const probe = authProbe({ custom, broken })
+      const { pi, start } = harness({ model_profile: "geeky-normal" }, [ASTRA, API_ASTRA], probe.getAuth)
 
-    await start(STARTUP)
+      await start(STARTUP)
 
-    expect(pi.sessionModels).toEqual([applied])
-    expect(recordedOutcome(pi)).toMatchObject({ customType: MODEL_PROFILE_APPLIED_TYPE })
-    const details = recordedOutcome(pi)?.["details"] as Record<string, unknown>
-    expect(details["authFailed"]).toEqual(authFailed)
-  })
+      expect(pi.sessionModels).toEqual([applied])
+      expect(recordedOutcome(pi)).toMatchObject({ customType: MODEL_PROFILE_APPLIED_TYPE })
+      const details = recordedOutcome(pi)?.["details"] as Record<string, unknown>
+      expect(details["authFailed"]).toEqual(authFailed)
+    },
+  )
 
   // The line says the first turn retries the refresh, so it is logged only while the refresh is still
   // unresolved: a model probe that resolves the credential itself means the retry already succeeded.
   test.each([
     { probe: "provider probe only (the model probe's refresh succeeds)", targets: ["chatgpt-subscription"], lines: 0 },
     { probe: "model probe", targets: ["chatgpt-subscription/gpt-6-astra"], lines: 1 },
-    { probe: "provider and model probes", targets: ["chatgpt-subscription", "chatgpt-subscription/gpt-6-astra"], lines: 1 },
-  ])("#given a transient refresh failure on the $probe #when the session keeps the subscription #then $lines warn line(s) name the kept candidate with only the error class and code", async ({ targets, lines }) => {
-    const probe = authProbe({ custom: { targets, throws: refreshUnavailable } })
-    const { logs, start } = harness({ model_profile: "geeky-normal" }, [ASTRA, API_ASTRA], probe.getAuth)
+    {
+      probe: "provider and model probes",
+      targets: ["chatgpt-subscription", "chatgpt-subscription/gpt-6-astra"],
+      lines: 1,
+    },
+  ])(
+    "#given a transient refresh failure on the $probe #when the session keeps the subscription #then $lines warn line(s) name the kept candidate with only the error class and code",
+    async ({ targets, lines }) => {
+      const probe = authProbe({ custom: { targets, throws: refreshUnavailable } })
+      const { logs, start } = harness({ model_profile: "geeky-normal" }, [ASTRA, API_ASTRA], probe.getAuth)
 
-    await start(STARTUP)
+      await start(STARTUP)
 
-    // The diagnosable fingerprint is the contract (candidate + error class/code + transport code),
-    // not the sentence around it; the raw message must not leak.
-    const kept = logs.filter((line) => line.startsWith("warn:") && line.includes("chatgpt-subscription/gpt-6-astra"))
-    expect(kept).toHaveLength(lines)
-    for (const line of kept) {
-      expect(line).toContain("OAuthRefreshUnavailableError/oauth")
-      expect(line).toContain("ECONNREFUSED")
-    }
-    expect(logs.some((line) => line.includes("connect failed"))).toBe(false)
-  })
+      // The diagnosable fingerprint is the contract (candidate + error class/code + transport code),
+      // not the sentence around it; the raw message must not leak.
+      const kept = logs.filter((line) => line.startsWith("warn:") && line.includes("chatgpt-subscription/gpt-6-astra"))
+      expect(kept).toHaveLength(lines)
+      for (const line of kept) {
+        expect(line).toContain("OAuthRefreshUnavailableError/oauth")
+        expect(line).toContain("ECONNREFUSED")
+      }
+      expect(logs.some((line) => line.includes("connect failed"))).toBe(false)
+    },
+  )
 
   test("#given a credential pool whose flat account is expired but a sibling account resolves #when the session starts #then the provider stays eligible through the healthy slot", async () => {
     const probe = authProbe({ deadSlots: ["anthropic@expired"] })
@@ -832,7 +875,10 @@ describe("createModelProfileComponent", () => {
     const { pi, agentDir, start } = harness({}, [OPUS, GLM], probe.getAuth, {
       anthropic: { accounts: [{ name: "expired" }, { name: "healthy" }] },
     })
-    writeFileSync(join(agentDir, "models.json"), '{\n  // JSONC, as senpi reads it\n  "providers": { "anthropic": { "credentials": { "rotation": false } } }\n}\n')
+    writeFileSync(
+      join(agentDir, "models.json"),
+      '{\n  // JSONC, as senpi reads it\n  "providers": { "anthropic": { "credentials": { "rotation": false } } }\n}\n',
+    )
 
     await start(STARTUP)
 
@@ -848,7 +894,10 @@ describe("createModelProfileComponent", () => {
     const { pi, agentDir, start } = harness({}, [OPUS, GLM], probe.getAuth, {
       anthropic: { accounts: [{ name: "expired" }, { name: "healthy" }] },
     })
-    writeFileSync(join(agentDir, "models.json"), JSON.stringify({ providers: { zai: { credentials: { rotation: false } } } }))
+    writeFileSync(
+      join(agentDir, "models.json"),
+      JSON.stringify({ providers: { zai: { credentials: { rotation: false } } } }),
+    )
 
     await start(STARTUP)
 
@@ -953,7 +1002,11 @@ describe("model profile diagnostics through the composed default logger", () => 
           sessionManager: { getSessionId: () => "session-composed" },
         },
       )
-      const lines = spies.flatMap((spy) => spy.mock.calls.map((call) => call.map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg))).join(" ")))
+      const lines = spies.flatMap((spy) =>
+        spy.mock.calls.map((call) =>
+          call.map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg))).join(" "),
+        ),
+      )
       return { pi, lines: lines.filter((line) => line.includes("model profile")) }
     } finally {
       for (const spy of spies) spy.mockRestore()
@@ -966,7 +1019,9 @@ describe("model profile diagnostics through the composed default logger", () => 
     const { pi, lines } = await captureComposedOutput(undefined)
 
     expect(pi.sessionModels).toEqual([KIMI])
-    expect(lines.some((line) => line.includes("skipped anthropic/claude-opus-5-5") && line.includes("refresh"))).toBe(true)
+    expect(lines.some((line) => line.includes("skipped anthropic/claude-opus-5-5") && line.includes("refresh"))).toBe(
+      true,
+    )
     expect(lines.some((line) => line.includes("skipped zai/glm-5.3") && line.includes("request"))).toBe(true)
     expect(lines.some((line) => line.includes(PRIVATE_MARKER))).toBe(false)
     expect(JSON.stringify(pi.entries)).not.toContain(PRIVATE_MARKER)
@@ -976,7 +1031,9 @@ describe("model profile diagnostics through the composed default logger", () => 
     const { lines } = await captureComposedOutput("1")
 
     expect(lines.some((line) => line.includes("skipped anthropic/claude-opus-5-5: ModelsError"))).toBe(true)
-    expect(lines.some((line) => line.includes("skipped zai/glm-5.3: Error") && line.includes("shell command: <redacted>"))).toBe(true)
+    expect(
+      lines.some((line) => line.includes("skipped zai/glm-5.3: Error") && line.includes("shell command: <redacted>")),
+    ).toBe(true)
     expect(lines.some((line) => line.includes(PRIVATE_MARKER))).toBe(false)
     expect(lines.some((line) => line.includes(SHORT_SECRET))).toBe(false)
   })

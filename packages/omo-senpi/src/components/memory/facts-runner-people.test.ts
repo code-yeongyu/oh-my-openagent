@@ -18,34 +18,37 @@ describe("people routing gate", () => {
 
     // then
     expect(result.status).toBe("committed")
-    expect(await readFile(join(identity.paths.repo, "people", "mina", "observations.md"), "utf8"))
-      .toContain("Mina prefers concise reviews.")
-    expect(await readFile(join(identity.paths.repo, "people", "mina", "card.md"), "utf8"))
-      .toContain("kind: person")
+    expect(await readFile(join(identity.paths.repo, "people", "mina", "observations.md"), "utf8")).toContain(
+      "Mina prefers concise reviews.",
+    )
+    expect(await readFile(join(identity.paths.repo, "people", "mina", "card.md"), "utf8")).toContain("kind: person")
   }, 90_000)
 
   test("#given people routing disabled #when a person record is applied #then it falls back to monthly notes", async () => {
     // given
     const { root, identity, queue } = await fixture()
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "person", {
-      loadConfig: () => ({
-        config: {
-          categories: { quick: { model: "omo-mock/mock-1" } },
-          memory: OmoMemorySettingsSchema.parse({ people: { enabled: false } }),
-        },
-        diagnostics: [],
-        layers: [],
-        sources: [],
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "person", {
+        loadConfig: () => ({
+          config: {
+            categories: { quick: { model: "omo-mock/mock-1" } },
+            memory: OmoMemorySettingsSchema.parse({ people: { enabled: false } }),
+          },
+          diagnostics: [],
+          layers: [],
+          sources: [],
+        }),
       }),
-    }))
+    )
 
     // when
     const result = await runner.launchPending()
 
     // then
     expect(result.status).toBe("committed")
-    expect(await readFile(join(identity.paths.repo, "notes", "facts", "2026-08.md"), "utf8"))
-      .toContain("Mina prefers concise reviews.")
+    expect(await readFile(join(identity.paths.repo, "notes", "facts", "2026-08.md"), "utf8")).toContain(
+      "Mina prefers concise reviews.",
+    )
     expect(existsSync(join(identity.paths.repo, "people", "mina"))).toBe(false)
   }, 90_000)
 })

@@ -13,20 +13,32 @@ const OPT_OUT = new Set(TELEMETRY_OPT_OUT_NAMES)
 // Values telemetry-core `shouldDisableTelemetry` reads as opted out, per opt-out name.
 const keepsOff = (name, text) => {
   const value = text.trim().toLowerCase()
-  return name.endsWith("_SEND_ANONYMOUS_TELEMETRY") ? ["0", "false", "no", "yes"].includes(value) : ["1", "true", "yes"].includes(value)
+  return name.endsWith("_SEND_ANONYMOUS_TELEMETRY")
+    ? ["0", "false", "no", "yes"].includes(value)
+    : ["1", "true", "yes"].includes(value)
 }
 const MAX_DEPTH = 24
 
 export const unwrap = (node) => {
   let current = node
-  while (current !== undefined && (ts.isParenthesizedExpression(current) || ts.isAsExpression(current)
-    || ts.isSatisfiesExpression(current) || ts.isAwaitExpression(current) || ts.isNonNullExpression(current))) {
+  while (
+    current !== undefined &&
+    (ts.isParenthesizedExpression(current) ||
+      ts.isAsExpression(current) ||
+      ts.isSatisfiesExpression(current) ||
+      ts.isAwaitExpression(current) ||
+      ts.isNonNullExpression(current))
+  ) {
     current = current.expression
   }
   return current
 }
 
-const isFunction = (node) => ts.isFunctionDeclaration(node) || ts.isFunctionExpression(node) || ts.isArrowFunction(node) || ts.isMethodDeclaration(node)
+const isFunction = (node) =>
+  ts.isFunctionDeclaration(node) ||
+  ts.isFunctionExpression(node) ||
+  ts.isArrowFunction(node) ||
+  ts.isMethodDeclaration(node)
 
 function functionNameOf(fn) {
   if (fn.name !== undefined && ts.isIdentifier(fn.name)) return fn.name.text
@@ -36,18 +48,31 @@ function functionNameOf(fn) {
 
 function bindingIn(statements, name, scope) {
   for (const statement of statements) {
-    if (ts.isFunctionDeclaration(statement) && statement.name?.text === name) return { kind: "function", node: statement }
+    if (ts.isFunctionDeclaration(statement) && statement.name?.text === name)
+      return { kind: "function", node: statement }
     if (ts.isImportDeclaration(statement)) {
       const bindings = statement.importClause?.namedBindings
-      const element = bindings !== undefined && ts.isNamedImports(bindings) ? bindings.elements.find((e) => e.name.text === name) : undefined
-      if (element !== undefined) return { kind: "import", node: statement, imported: (element.propertyName ?? element.name).text }
+      const element =
+        bindings !== undefined && ts.isNamedImports(bindings)
+          ? bindings.elements.find((e) => e.name.text === name)
+          : undefined
+      if (element !== undefined)
+        return { kind: "import", node: statement, imported: (element.propertyName ?? element.name).text }
     }
     const declarations = ts.isVariableStatement(statement) ? statement.declarationList.declarations : []
     for (const declaration of declarations) {
-      if (ts.isIdentifier(declaration.name) && declaration.name.text === name) return { kind: "value", node: declaration, scope }
+      if (ts.isIdentifier(declaration.name) && declaration.name.text === name)
+        return { kind: "value", node: declaration, scope }
       if (ts.isObjectBindingPattern(declaration.name)) {
         const element = declaration.name.elements.find((e) => ts.isIdentifier(e.name) && e.name.text === name)
-        if (element !== undefined) return { kind: "member", node: declaration, member: (element.propertyName ?? element.name).getText(), name, scope }
+        if (element !== undefined)
+          return {
+            kind: "member",
+            node: declaration,
+            member: (element.propertyName ?? element.name).getText(),
+            name,
+            scope,
+          }
       }
     }
   }
@@ -59,7 +84,8 @@ function parameterBinding(fn, name) {
     if (ts.isIdentifier(parameter.name) && parameter.name.text === name) return { kind: "param", node: fn, index, name }
     if (ts.isObjectBindingPattern(parameter.name)) {
       const element = parameter.name.elements.find((e) => ts.isIdentifier(e.name) && e.name.text === name)
-      if (element !== undefined) return { kind: "param", node: fn, index, name, member: (element.propertyName ?? element.name).getText() }
+      if (element !== undefined)
+        return { kind: "param", node: fn, index, name, member: (element.propertyName ?? element.name).getText() }
     }
   }
   return undefined
@@ -83,15 +109,21 @@ function bindingOf(identifier) {
 function assignmentsTo(scope, name) {
   const values = []
   const visit = (node) => {
-    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
-      && ts.isIdentifier(node.left) && node.left.text === name) values.push(node.right)
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      ts.isIdentifier(node.left) &&
+      node.left.text === name
+    )
+      values.push(node.right)
     ts.forEachChild(node, visit)
   }
   if (scope !== undefined) visit(scope)
   return values
 }
 
-const isDynamicImport = (node) => node !== undefined && ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword
+const isDynamicImport = (node) =>
+  node !== undefined && ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword
 
 function callsNamed(file, name) {
   const calls = []
@@ -158,13 +190,24 @@ export function createTracer(parseFile, paths) {
 
   const callableReaches = (binding, member, depth) => {
     if (binding === undefined || depth > MAX_DEPTH) return false
-    if (binding.kind === "import") return HELPERS.has(binding.imported) && member === undefined || callableReaches(imported(binding), member, depth + 1)
+    if (binding.kind === "import")
+      return (
+        (HELPERS.has(binding.imported) && member === undefined) || callableReaches(imported(binding), member, depth + 1)
+      )
     if (binding.kind === "member" && isDynamicImport(unwrap(binding.node.initializer))) {
-      return HELPERS.has(binding.member) && member === undefined || callableReaches(dynamicMember(binding), member, depth + 1)
+      return (
+        (HELPERS.has(binding.member) && member === undefined) ||
+        callableReaches(dynamicMember(binding), member, depth + 1)
+      )
     }
-    const fn = binding.kind === "function" ? binding.node : unwrap(binding.kind === "value" ? binding.node.initializer : undefined)
+    const fn =
+      binding.kind === "function"
+        ? binding.node
+        : unwrap(binding.kind === "value" ? binding.node.initializer : undefined)
     if (fn === undefined || !isFunction(fn)) return false
-    return every(returnsOf(fn), (r) => member === undefined ? reaches(r, depth + 1) : memberReaches(r, member, depth + 1))
+    return every(returnsOf(fn), (r) =>
+      member === undefined ? reaches(r, depth + 1) : memberReaches(r, member, depth + 1),
+    )
   }
 
   const bindingReaches = (binding, member, depth) => {
@@ -174,7 +217,9 @@ export function createTracer(parseFile, paths) {
       const init = binding.node.initializer
       const sources = [...(init === undefined ? [] : [init]), ...assignmentsTo(binding.scope, binding.node.name.text)]
       if (member === undefined && mutatesOptOut(binding.scope, binding.node.name.text)) return false
-      return every(sources, (source) => member === undefined ? reaches(source, depth + 1) : memberReaches(source, member, depth + 1))
+      return every(sources, (source) =>
+        member === undefined ? reaches(source, depth + 1) : memberReaches(source, member, depth + 1),
+      )
     }
     if (binding.kind === "member") {
       const init = binding.node.initializer
@@ -198,8 +243,11 @@ export function createTracer(parseFile, paths) {
     const value = unwrap(node)
     if (value === undefined || depth > MAX_DEPTH) return false
     if (ts.isObjectLiteralExpression(value)) {
-      const property = value.properties.findLast((p) => (ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p)) && p.name.getText() === member)
-      if (property !== undefined) return reaches(ts.isShorthandPropertyAssignment(property) ? property.name : property.initializer, depth + 1)
+      const property = value.properties.findLast(
+        (p) => (ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p)) && p.name.getText() === member,
+      )
+      if (property !== undefined)
+        return reaches(ts.isShorthandPropertyAssignment(property) ? property.name : property.initializer, depth + 1)
       return value.properties.some((p) => ts.isSpreadAssignment(p) && memberReaches(p.expression, member, depth + 1))
     }
     if (ts.isIdentifier(value)) return bindingReaches(bindingOf(value), member, depth + 1)
@@ -225,10 +273,16 @@ export function createTracer(parseFile, paths) {
       const properties = value.properties
       const routed = properties.findLastIndex((p) => ts.isSpreadAssignment(p) && reaches(p.expression, depth + 1))
       if (routed === -1) return false
-      return properties.slice(routed + 1).every((p) => ts.isSpreadAssignment(p) ? keepsOptOut(p.expression, depth + 1) : !propertyReenables(p))
+      return properties
+        .slice(routed + 1)
+        .every((p) => (ts.isSpreadAssignment(p) ? keepsOptOut(p.expression, depth + 1) : !propertyReenables(p)))
     }
-    if (ts.isConditionalExpression(value)) return reaches(value.whenTrue, depth + 1) && reaches(value.whenFalse, depth + 1)
-    if (ts.isBinaryExpression(value) && [ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.BarBarToken].includes(value.operatorToken.kind)) {
+    if (ts.isConditionalExpression(value))
+      return reaches(value.whenTrue, depth + 1) && reaches(value.whenFalse, depth + 1)
+    if (
+      ts.isBinaryExpression(value) &&
+      [ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.BarBarToken].includes(value.operatorToken.kind)
+    ) {
       return reaches(value.left, depth + 1) && reaches(value.right, depth + 1)
     }
     return false
@@ -241,7 +295,8 @@ export function createTracer(parseFile, paths) {
   const forOfOver = (identifier) => {
     for (let node = identifier.parent; node !== undefined; node = node.parent) {
       if (!ts.isForOfStatement(node) || !ts.isVariableDeclarationList(node.initializer)) continue
-      if (node.initializer.declarations.some((d) => ts.isIdentifier(d.name) && d.name.text === identifier.text)) return node.expression
+      if (node.initializer.declarations.some((d) => ts.isIdentifier(d.name) && d.name.text === identifier.text))
+        return node.expression
     }
     return undefined
   }
@@ -268,12 +323,19 @@ export function createTracer(parseFile, paths) {
   const reenables = (names, written) => {
     if (names === undefined) return true
     const literal = written === undefined ? undefined : unwrap(written)
-    return names.some((name) => OPT_OUT.has(name)
-      && !(literal !== undefined && ts.isStringLiteralLike(literal) && keepsOff(name, literal.text)))
+    return names.some(
+      (name) =>
+        OPT_OUT.has(name) &&
+        !(literal !== undefined && ts.isStringLiteralLike(literal) && keepsOff(name, literal.text)),
+    )
   }
 
-  const propertyNames = (name) => ts.isComputedPropertyName(name) ? stringValues(name.expression)
-    : ts.isIdentifier(name) || ts.isStringLiteralLike(name) ? [name.text] : undefined
+  const propertyNames = (name) =>
+    ts.isComputedPropertyName(name)
+      ? stringValues(name.expression)
+      : ts.isIdentifier(name) || ts.isStringLiteralLike(name)
+        ? [name.text]
+        : undefined
 
   const propertyReenables = (property) => {
     if (ts.isShorthandPropertyAssignment(property)) return reenables([property.name.text], property.name)
@@ -286,13 +348,19 @@ export function createTracer(parseFile, paths) {
     const value = unwrap(node)
     if (value === undefined || depth > MAX_DEPTH) return false
     if (ts.isObjectLiteralExpression(value)) {
-      return value.properties.every((p) => ts.isSpreadAssignment(p) ? keepsOptOut(p.expression, depth + 1) : !propertyReenables(p))
+      return value.properties.every((p) =>
+        ts.isSpreadAssignment(p) ? keepsOptOut(p.expression, depth + 1) : !propertyReenables(p),
+      )
     }
-    if (ts.isConditionalExpression(value)) return keepsOptOut(value.whenTrue, depth + 1) && keepsOptOut(value.whenFalse, depth + 1)
-    if (ts.isBinaryExpression(value) && [ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.BarBarToken].includes(value.operatorToken.kind)) {
+    if (ts.isConditionalExpression(value))
+      return keepsOptOut(value.whenTrue, depth + 1) && keepsOptOut(value.whenFalse, depth + 1)
+    if (
+      ts.isBinaryExpression(value) &&
+      [ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.BarBarToken].includes(value.operatorToken.kind)
+    ) {
       return keepsOptOut(value.left, depth + 1) && keepsOptOut(value.right, depth + 1)
     }
-    if (value.kind === ts.SyntaxKind.NullKeyword || ts.isIdentifier(value) && value.text === "undefined") return true
+    if (value.kind === ts.SyntaxKind.NullKeyword || (ts.isIdentifier(value) && value.text === "undefined")) return true
     // A helper result: withTelemetryOptOut keeps every opt-out, telemetryLocalSinkEnv opts in toward loopback only.
     if (reaches(value, depth + 1)) return true
     if (ts.isCallExpression(value) && ts.isIdentifier(unwrap(value.expression))) {
@@ -318,7 +386,8 @@ export function createTracer(parseFile, paths) {
     if (ts.isObjectLiteralExpression(value)) {
       return value.properties.every((p) => {
         if (ts.isSpreadAssignment(p)) return memberKeeps(p.expression, member, depth + 1)
-        if (!(ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p)) || p.name.getText() !== member) return true
+        if (!(ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p)) || p.name.getText() !== member)
+          return true
         return keepsOptOut(ts.isShorthandPropertyAssignment(p) ? p.name : p.initializer, depth + 1)
       })
     }
@@ -338,7 +407,7 @@ export function createTracer(parseFile, paths) {
   const bindingKeeps = (binding, member, depth) => {
     if (binding === undefined || depth > MAX_DEPTH) return false
     if (binding.kind === "import") return bindingKeeps(imported(binding), member, depth + 1)
-    const keeps = (node) => member === undefined ? keepsOptOut(node, depth + 1) : memberKeeps(node, member, depth + 1)
+    const keeps = (node) => (member === undefined ? keepsOptOut(node, depth + 1) : memberKeeps(node, member, depth + 1))
     if (binding.kind === "value") {
       const init = binding.node.initializer
       const sources = [...(init === undefined ? [] : [init]), ...assignmentsTo(binding.scope, binding.node.name.text)]
@@ -372,22 +441,30 @@ export function createTracer(parseFile, paths) {
       const target = unwrap(node)
       if (target === undefined) return null
       if (ts.isPropertyAccessExpression(target) && onName(target.expression)) return [target.name.text]
-      if (ts.isElementAccessExpression(target) && onName(target.expression)) return stringValues(target.argumentExpression)
+      if (ts.isElementAccessExpression(target) && onName(target.expression))
+        return stringValues(target.argumentExpression)
       return null
     }
     let found = false
     const visit = (node) => {
       if (found) return
-      if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
-        && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
+      if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+        node.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+      ) {
         const keys = keysOf(node.left)
         const plain = node.operatorToken.kind === ts.SyntaxKind.EqualsToken
         if (keys !== null && reenables(keys, plain ? node.right : undefined)) found = true
       } else if (ts.isDeleteExpression(node)) {
         const keys = keysOf(node.expression)
         if (keys !== null && reenables(keys, undefined)) found = true
-      } else if (ts.isCallExpression(node) && node.expression.getText() === "Object.assign" && onName(node.arguments[0])
-        && node.arguments.slice(1).some((argument) => !keepsOptOut(argument, 0))) {
+      } else if (
+        ts.isCallExpression(node) &&
+        node.expression.getText() === "Object.assign" &&
+        onName(node.arguments[0]) &&
+        node.arguments.slice(1).some((argument) => !keepsOptOut(argument, 0))
+      ) {
         found = true
       }
       if (!found) ts.forEachChild(node, visit)

@@ -68,7 +68,11 @@ export class FactsTerminalWrites {
   }
 
   /** Reconciliation could not prove the run dead; the endpoints still took a failure. */
-  async abandon(runDir: string, ledger: FactsRunLedger, reason: "unknown_liveness" | "session_shutdown"): Promise<void> {
+  async abandon(
+    runDir: string,
+    ledger: FactsRunLedger,
+    reason: "unknown_liveness" | "session_shutdown",
+  ): Promise<void> {
     if (reason === "unknown_liveness") {
       await this.record(ledgerTargets(ledger.queued), ledger.batchId, reason, "facts run liveness is unknown")
     }
@@ -135,7 +139,9 @@ export class FactsTerminalWrites {
 
   private async batchIdOf(runDir: string, runId: string): Promise<string | undefined> {
     try {
-      const ledger = await readRunJson<{ readonly runId?: unknown; readonly batchId?: unknown }>(join(runDir, "ledger.json"))
+      const ledger = await readRunJson<{ readonly runId?: unknown; readonly batchId?: unknown }>(
+        join(runDir, "ledger.json"),
+      )
       if (ledger.runId === runId && typeof ledger.batchId === "string") return ledger.batchId
       this.options.warn?.("facts receipt skipped: ledger does not name this run", { runDir })
       return undefined
@@ -197,9 +203,13 @@ export class FactsTerminalWrites {
 }
 
 function parkedAny(file: FactsFailuresFile, targets: readonly FactsFailureTarget[]): boolean {
-  return targets.some((target) => file.entries.some((entry) =>
-    entry.state === "parked"
-    && entry.conversationId === target.conversationId
-    && entry.end_message_id === target.endMessageId
-    && entry.end_snapshot_line === target.endSnapshotLine))
+  return targets.some((target) =>
+    file.entries.some(
+      (entry) =>
+        entry.state === "parked" &&
+        entry.conversationId === target.conversationId &&
+        entry.end_message_id === target.endMessageId &&
+        entry.end_snapshot_line === target.endSnapshotLine,
+    ),
+  )
 }

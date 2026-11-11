@@ -2,14 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 
 import { resolveSessionEventID } from "../../shared/event-session-id"
 
-const TASK_TOOLS = new Set([
-  "task",
-  "task_create",
-  "task_list",
-  "task_get",
-  "task_update",
-  "task_delete",
-])
+const TASK_TOOLS = new Set(["task", "task_create", "task_list", "task_get", "task_update", "task_delete"])
 const TURN_THRESHOLD = 10
 const REMINDER_MESSAGE = `
 

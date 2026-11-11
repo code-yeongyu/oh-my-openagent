@@ -45,7 +45,10 @@ export const Message = Type.String({
   description: `Instruction to deliver to the target thread; longer than ${THREAD_MESSAGE_MAX_BYTES} UTF-8 bytes returns message_too_large.`,
 })
 
-export const BindingId = Type.String({ minLength: 1, description: "Binding id as returned by thread_bind or thread_bindings." })
+export const BindingId = Type.String({
+  minLength: 1,
+  description: "Binding id as returned by thread_bind or thread_bindings.",
+})
 
 export const ExpectedRevision = Type.Integer({
   minimum: 1,

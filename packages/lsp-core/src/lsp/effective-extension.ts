@@ -1,10 +1,10 @@
-import { basename, extname } from "node:path";
+import { basename, extname } from "node:path"
 
 const BASENAME_EXTENSIONS: Record<string, string> = {
-	Dockerfile: ".dockerfile",
-	Containerfile: ".dockerfile",
-};
+  Dockerfile: ".dockerfile",
+  Containerfile: ".dockerfile",
+}
 
 export function effectiveExtension(filePath: string): string {
-	return BASENAME_EXTENSIONS[basename(filePath)] ?? extname(filePath);
+  return BASENAME_EXTENSIONS[basename(filePath)] ?? extname(filePath)
 }

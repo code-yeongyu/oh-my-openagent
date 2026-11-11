@@ -63,13 +63,18 @@ function createWindowsKiller(): ProcessKiller {
 
 function execFileText(command: string, args: readonly string[]): Promise<string> {
   return new Promise((resolvePromise, reject) => {
-    execFile(command, [...args], { encoding: "utf8", maxBuffer: 16 * 1024 * 1024, windowsHide: true }, (error, stdout) => {
-      if (error !== null) {
-        reject(error)
-        return
-      }
-      resolvePromise(stdout)
-    })
+    execFile(
+      command,
+      [...args],
+      { encoding: "utf8", maxBuffer: 16 * 1024 * 1024, windowsHide: true },
+      (error, stdout) => {
+        if (error !== null) {
+          reject(error)
+          return
+        }
+        resolvePromise(stdout)
+      },
+    )
   })
 }
 

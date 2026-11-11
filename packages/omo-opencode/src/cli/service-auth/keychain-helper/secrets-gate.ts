@@ -17,7 +17,7 @@ async function loadInteractionSwitch(): Promise<InteractionSwitch | null> {
     const security = dlopen("/System/Library/Frameworks/Security.framework/Security", {
       SecKeychainSetUserInteractionAllowed: { args: [FFIType.u8], returns: FFIType.i32 },
     })
-    state.interactionSwitch = allowed => {
+    state.interactionSwitch = (allowed) => {
       security.symbols.SecKeychainSetUserInteractionAllowed(allowed ? 1 : 0)
     }
   } catch {

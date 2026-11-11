@@ -172,11 +172,7 @@ describe("dead-chain category disabling", () => {
       const models = registry([model("omo-mock", "mock-parent")])
 
       // when
-      const result = resolveCategory(
-        "quick",
-        { categories: { quick: { model: "omo-mock/mock-parent" } } },
-        models,
-      )
+      const result = resolveCategory("quick", { categories: { quick: { model: "omo-mock/mock-parent" } } }, models)
 
       // then
       expect(result.kind).toBe("resolved")
@@ -188,11 +184,7 @@ describe("dead-chain category disabling", () => {
       const models = registry([model("omo-mock", "mock-parent")])
 
       // when
-      const result = resolveCategory(
-        "quick",
-        { categories: { quick: { model: "omo-mock/absent" } } },
-        models,
-      )
+      const result = resolveCategory("quick", { categories: { quick: { model: "omo-mock/absent" } } }, models)
 
       // then
       expect(result.kind).toBe("model_unavailable")

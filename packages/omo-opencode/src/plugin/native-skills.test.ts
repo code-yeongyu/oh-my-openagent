@@ -6,9 +6,15 @@ import type { PluginContext } from "./types"
 describe("native skill accessor", () => {
   test("uses PluginContext.skills when the host exposes it directly", () => {
     const directNativeSkills = {
-      all() { return [] },
-      get() { return undefined },
-      dirs() { return [] },
+      all() {
+        return []
+      },
+      get() {
+        return undefined
+      },
+      dirs() {
+        return []
+      },
     }
     const ctx = unsafeTestValue<PluginContext>({ skills: directNativeSkills })
 
@@ -23,12 +29,14 @@ describe("native skill accessor", () => {
       async get(options: unknown) {
         calls.push(options)
         return {
-          data: [{
-            name: "customize-opencode",
-            description: "Customize OpenCode",
-            location: "/opencode/customize-opencode.md",
-            content: "# Customizing opencode",
-          }],
+          data: [
+            {
+              name: "customize-opencode",
+              description: "Customize OpenCode",
+              location: "/opencode/customize-opencode.md",
+              content: "# Customizing opencode",
+            },
+          ],
           request: new Request("http://localhost/skill"),
           response: new Response(null),
         }
@@ -41,12 +49,14 @@ describe("native skill accessor", () => {
 
     const result = await nativeSkills.all()
 
-    expect(result).toEqual([{
-      name: "customize-opencode",
-      description: "Customize OpenCode",
-      location: "/opencode/customize-opencode.md",
-      content: "# Customizing opencode",
-    }])
+    expect(result).toEqual([
+      {
+        name: "customize-opencode",
+        description: "Customize OpenCode",
+        location: "/opencode/customize-opencode.md",
+        content: "# Customizing opencode",
+      },
+    ])
     expect(calls).toHaveLength(1)
     expect(calls[0]).toMatchObject({ url: "/skill", query: { directory: "/repo" } })
   })

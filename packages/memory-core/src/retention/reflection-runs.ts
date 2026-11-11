@@ -12,7 +12,16 @@ import { removeTree } from "../fs/remove-tree"
 import { LockContentionError, acquireLock, createLockRecord, releaseLock, runFinalizationLockPath } from "../locks"
 import { reflectionRunNumber } from "../reflection/run-id-high-water"
 import { reservedRunIds, type LazyRetentionGuard } from "./guard"
-import { DAY_MS, StoreTally, describeError, errorCode, idleSince, listNames, type RetentionContext, type RetentionStoreResult } from "./policy"
+import {
+  DAY_MS,
+  StoreTally,
+  describeError,
+  errorCode,
+  idleSince,
+  listNames,
+  type RetentionContext,
+  type RetentionStoreResult,
+} from "./policy"
 
 export const RETENTION_TOMBSTONE_PREFIX = ".prune-"
 const FOLDED_OUTCOMES = new Set(["merged", "no_changes"])
@@ -20,7 +29,10 @@ const TERMINAL_SENTINELS = ["abandoned.json", "quarantined.json"] as const
 
 type Folded = { readonly name: string; readonly finishedAt: number }
 
-export async function pruneReflectionRuns(context: RetentionContext, lazyGuard: LazyRetentionGuard): Promise<RetentionStoreResult> {
+export async function pruneReflectionRuns(
+  context: RetentionContext,
+  lazyGuard: LazyRetentionGuard,
+): Promise<RetentionStoreResult> {
   const runsDir = join(context.paths.reflection, "runs")
   const tally = new StoreTally()
   const folded: Folded[] = []
@@ -42,17 +54,26 @@ export async function pruneReflectionRuns(context: RetentionContext, lazyGuard: 
     if (context.budget?.admit("runs") === false) return tally.result()
     await removeTombstone(runDir, context)
   }
-  const newest = folded.reduce<Folded | undefined>((best, run) =>
-    best === undefined || run.finishedAt > best.finishedAt || (run.finishedAt === best.finishedAt && run.name > best.name) ? run : best, undefined)
+  const newest = folded.reduce<Folded | undefined>(
+    (best, run) =>
+      best === undefined ||
+      run.finishedAt > best.finishedAt ||
+      (run.finishedAt === best.finishedAt && run.name > best.name)
+        ? run
+        : best,
+    undefined,
+  )
   const cutoff = context.now() - context.policy.retentionDays * DAY_MS
   for (const run of folded) {
     if (context.budget?.skip("runs", run.name) === true) continue
     if (context.budget?.admit("runs") === false) break
-    const guard = run.name === newest?.name || run.finishedAt > cutoff || !(await idleSince(join(runsDir, run.name), cutoff))
-      ? undefined
-      : await lazyGuard.get()
+    const guard =
+      run.name === newest?.name || run.finishedAt > cutoff || !(await idleSince(join(runsDir, run.name), cutoff))
+        ? undefined
+        : await lazyGuard.get()
     if (run.name === newest?.name) tally.keep(run.name, "anchor")
-    else if (run.finishedAt > cutoff || !(await idleSince(join(runsDir, run.name), cutoff))) tally.keep(run.name, "recent")
+    else if (run.finishedAt > cutoff || !(await idleSince(join(runsDir, run.name), cutoff)))
+      tally.keep(run.name, "recent")
     else if (guard === undefined) tally.keep(run.name, "scheduler-busy")
     else if (guard.reserved.has(run.name)) tally.keep(run.name, "reserved")
     else if (reflectionRunNumber(run.name) === guard.highWater) tally.keep(run.name, "anchor")
@@ -66,7 +87,10 @@ export async function pruneReflectionRuns(context: RetentionContext, lazyGuard: 
   return tally.result()
 }
 
-async function classify(runDir: string, name: string): Promise<Folded | "malformed" | "unfolded-terminal" | "no-terminal"> {
+async function classify(
+  runDir: string,
+  name: string,
+): Promise<Folded | "malformed" | "unfolded-terminal" | "no-terminal"> {
   let raw: string
   try {
     raw = await readFile(join(runDir, "final.json"), "utf8")
@@ -111,7 +135,10 @@ async function claimAndRemove(
       await context.beforeClaimRename?.(join(runsDir, name), tombstone)
       await rename(join(runsDir, name), tombstone)
     } catch (error) {
-      context.warn?.("memory runtime retention could not claim a run directory", { runId: name, error: describeError(error) })
+      context.warn?.("memory runtime retention could not claim a run directory", {
+        runId: name,
+        error: describeError(error),
+      })
       return "claim-failed"
     }
   } finally {

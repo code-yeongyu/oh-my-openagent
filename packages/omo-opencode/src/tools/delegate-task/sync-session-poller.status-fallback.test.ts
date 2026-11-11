@@ -38,12 +38,17 @@ describe("pollSyncSession status fallback", () => {
     })
 
     // when
-    const result = await pollSyncSession(toolContext, client, {
-      sessionID: "ses_missing_status",
-      agentToUse: "sisyphus",
-      toastManager: null,
-      taskId: undefined,
-    }, 50)
+    const result = await pollSyncSession(
+      toolContext,
+      client,
+      {
+        sessionID: "ses_missing_status",
+        agentToUse: "sisyphus",
+        toastManager: null,
+        taskId: undefined,
+      },
+      50,
+    )
 
     // then
     expect(result).toBeNull()

@@ -39,10 +39,20 @@ function countingStore(base: DagFileStore): CountingStore {
       return base.readCheckpoint<T>(runId)
     },
   }
-  return { store, reads: () => reads, reset: () => { reads = 0 } }
+  return {
+    store,
+    reads: () => reads,
+    reset: () => {
+      reads = 0
+    },
+  }
 }
 
-async function seedRuns(dag: ReturnType<typeof createDagManager>, sessionId: string, count: number): Promise<DagRunId[]> {
+async function seedRuns(
+  dag: ReturnType<typeof createDagManager>,
+  sessionId: string,
+  count: number,
+): Promise<DagRunId[]> {
   const ids: DagRunId[] = []
   for (let index = 0; index < count; index += 1) {
     const started = await dag.start({
