@@ -6,6 +6,7 @@ import { log } from "../shared";
 import { setDefaultAgentForSort } from "../shared/agent-sort-shim";
 import { remapAgentKeysToDisplayNames } from "./agent-key-remapper";
 import { reorderAgentsByPriority } from "./agent-priority-order";
+import { translateProviderOptions } from "./provider-options-translator";
 import type { ApplyAgentConfigParams } from "./agent-config-types";
 
 export function finalizeAgentConfig(
@@ -21,6 +22,12 @@ export function finalizeAgentConfig(
     params.config.agent = reorderAgentsByPriority(
       params.config.agent as Record<string, unknown>,
       params.pluginConfig.agent_order,
+    );
+    params.config.agent = Object.fromEntries(
+      Object.entries(params.config.agent as Record<string, unknown>).map(([key, value]) => [
+        key,
+        translateProviderOptions(value as Record<string, unknown>),
+      ]),
     );
   }
 
