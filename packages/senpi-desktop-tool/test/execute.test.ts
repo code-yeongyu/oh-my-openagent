@@ -168,6 +168,28 @@ describe("computer tool execute", HANG_GUARD, () => {
 		});
 	}
 
+	it("returns an expired ref as a structured COMPUTER_STALE_REF failure the kernel facade can read", async () => {
+		// Given: the engine's real StaleRef reply, whose message names no code (crates/senpi-desktop-core ax/registry.rs).
+		const { handle, service } = desktopFixture({ auditLog: { enabled: false } });
+		const call = service.call.bind(service);
+		vi.spyOn(service, "call").mockImplementation((method, ...rest) =>
+			method.startsWith("ax.")
+				? Promise.reject(new DesktopEngineRpcError(method, {
+					code: -32000, message: "e5 expired; re-run ax()/find()", data: { code: "StaleRef" },
+				}))
+				: call(method, ...rest));
+
+		// When
+		const result = await toolFor(handle).execute("stale-ref", { action: "call", chain: [{ method: "ref", args: ["e5"] }] },
+			undefined, undefined, hostContext());
+
+		// Then
+		expect(result).toMatchObject({
+			isError: true,
+			details: { isError: true, value: { code: "COMPUTER_STALE_REF", message: "COMPUTER_STALE_REF: e5 expired; re-run ax()/find()" } },
+		});
+	});
+
 	it("still throws an unrelated capabilities failure", async () => {
 		const { handle, service } = desktopFixture({ auditLog: { enabled: false } });
 		const original = new Error("fixture capability transport failure");

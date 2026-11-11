@@ -16,8 +16,8 @@ describe("thread_set_model on another device", () => {
     const result = await run("thread_set_model", { thread: "dur-on-b", model: "opus" })
     expect(result).toEqual({ kind: "ok", thread_id: "dur-on-b", model: { provider: "anthropic", id: "claude-opus" }, device: "b" })
     expect(a.sent.map((entry) => [entry.via, entry.device, entry.session, entry.rpc])).toEqual([
-      ["session", "b", "dur-on-b", { type: "get_available_models", sessionId: "dur-on-b" }],
-      ["session", "b", "dur-on-b", { type: "set_model", sessionId: "dur-on-b", provider: "anthropic", modelId: "claude-opus" }],
+      ["session", "b", "rk-on-b", { type: "get_available_models", sessionId: "rk-on-b" }],
+      ["session", "b", "rk-on-b", { type: "set_model", sessionId: "rk-on-b", provider: "anthropic", modelId: "claude-opus" }],
     ])
   })
 
@@ -140,7 +140,7 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
 })
 
 describe("#12833: a name reaches a thread on another device by its title", () => {
-  const titled = (device: string, session_id: string, title: string, state = "idle") => ({ ...B_ROW, device, session_id, title, state })
+  const titled = (device: string, session_id: string, title: string, state = "idle") => ({ ...B_ROW, device, session_id, durable_id: session_id, title, state })
 
   test("#given b lists a live session titled with the name #when thread_send names it from this device #then it reaches b's session; this device's own row and an ended session are never matched by title", async () => {
     const a = account({ rows: [titled("b", "dur-on-b", "Release Train"), titled("here", "dur-local", "local peer"), titled("b", "dur-old-on-b", "stale", "ended")] })
@@ -275,6 +275,9 @@ describe("remote == local: the same call answers the same on b as on this device
     ["thread_interrupt on an idle thread with a made-up turn id", "thread_interrupt", { turn_id: "bogus" }],
     ["thread_rename to a blank name", "thread_rename", { name: "   " }],
     ["thread_rename to another visible thread's name", "thread_rename", { name: "Other Peer" }],
+    ["thread_set_reasoning to a level the model runs", "thread_set_reasoning", { level: "high" }],
+    ["thread_set_reasoning to a level the model cannot run (the supported list comes from the target's engine)", "thread_set_reasoning", { level: "xhigh" }],
+    ["thread_interrupt on an idle thread", "thread_interrupt", {}],
   ] as const)("#given %s #when it runs on this device and on b #then both answers are the same", async (_label, tool, args) => {
     const a = account()
     const other: ThreadHostSession = { sessionId: "route-other", durableSessionId: "dur-other", cwd: process.cwd(), name: "other peer", status: "open" }
@@ -283,6 +286,23 @@ describe("remote == local: the same call answers the same on b as on this device
     const here = await run(tool, { thread: "dur-local", ...args })
     const there = await run(tool, { thread: "dur-on-b", ...args })
     expect(comparable(there)).toEqual(comparable(here))
+  })
+
+  // The one close ladder on both legs: the same code for the same engine answer, with the thread named (and its device on b).
+  test.each([
+    ["a live thread", {}, {}, { kind: "ok", closed: true }],
+    ["a thread that is no longer live (its session file here; an ended session on b)", { rowState: "ended", live: [] }, { local: false }, { kind: "ok", closed: false }],
+    ["a thread with no session file yet that another client still holds", { unwritten: true, otherHolders: 1 }, { closeOutcome: "held_elsewhere" as const }, { kind: "error", code: "foreign_live_owner" }],
+    ["a thread held by an interactive terminal", { terminal: true }, { terminal: true }, { kind: "error", code: "unsupported" }],
+  ] as const)("#given %s #when thread_close runs on this device and on b #then both answer the same code", async (_label, accountOptions, surfaceOptions, expected) => {
+    const a = account({ ...accountOptions })
+    const here: ThreadHostSession = { sessionId: "route-local", durableSessionId: "dur-local", cwd: process.cwd(), name: "local peer", status: "open", ...("terminal" in surfaceOptions ? { endpoint_kind: "tui" as const } : {}) }
+    const { run } = surface(a.remote, { ...("local" in surfaceOptions ? { sessions: [], diskSessions: ["dur-local"] } : { sessions: [here] }), ...("closeOutcome" in surfaceOptions ? { closeOutcome: surfaceOptions.closeOutcome } : {}) })
+    const shape = (result: ThreadToolResult) => (result.kind === "error" ? { kind: "error", code: result.error.code } : { kind: "ok", closed: (result as { closed?: boolean }).closed })
+    const local = await run("thread_close", { thread: "dur-local" })
+    const remote = await run("thread_close", { thread: "dur-on-b" })
+    expect([shape(local), shape(remote)]).toEqual([expected, expected])
+    expect((remote as { device?: string; error?: { details?: { device?: string } } }).device ?? (remote as { error?: { details?: { device?: string } } }).error?.details?.device).toBe("b")
   })
 
   test("#given a truncated read on both #when each follows its next_cursor #then the second pages match too", async () => {

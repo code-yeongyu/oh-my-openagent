@@ -161,6 +161,8 @@ describe("Senpi compatibility test script", () => {
       // packed root without it is genuinely incomplete and the installer is right to reject it.
       await writeFile(join(pluginRoot, "extensions", "memory-run-supervisor.mjs"), "#!/usr/bin/env node\n")
       await writeFile(join(pluginRoot, "extensions", "gateway-store-worker.mjs"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "omo-computer-run-worker.mjs"), "export {}\n")
+      await writeFile(join(pluginRoot, "extensions", "quickjs.wasm"), "")
       await mkdir(join(pluginRoot, "scripts"), { recursive: true })
       await writeFile(join(pluginRoot, "scripts", "install.mjs"), "#!/usr/bin/env node\n")
       await mkdir(join(pluginRoot, "runtime", "lsp-daemon", "dist"), { recursive: true })
