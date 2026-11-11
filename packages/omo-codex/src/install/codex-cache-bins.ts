@@ -1,6 +1,6 @@
 import { chmod, lstat, mkdir, readFile, readdir, readlink, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { basename, isAbsolute, join, relative, resolve, sep } from "node:path"
-import { COMMAND_SHIM_MARKER, windowsCommandShim } from "./codex-cache-command-shim"
+import { hasCommandShimHeader, windowsCommandShim } from "./codex-cache-command-shim"
 import { removeDanglingManagedComponentBins } from "./codex-cache-dangling-bins"
 import { isNodeErrorWithCode, isPlainRecord } from "./codex-cache-fs"
 import { removeLegacyCodexComponentBins } from "./codex-cache-legacy-bins"
@@ -260,7 +260,7 @@ async function existingNonShim(path: string): Promise<boolean> {
     const stat = await lstat(path)
     if (!stat.isFile()) return true
     const content = await readFile(path, "utf8")
-    if (content.includes(COMMAND_SHIM_MARKER)) return false
+    if (hasCommandShimHeader(content)) return false
     throw new Error(`${path} already exists and is not a generated command shim`)
   } catch (error) {
     if (isNodeErrorWithCode(error) && error.code === "ENOENT") return false
