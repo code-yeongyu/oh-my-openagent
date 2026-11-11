@@ -5,6 +5,7 @@ use omo_computer_core::backend::{Backend, BackendResult, Refusal, StopListener, 
 use omo_computer_core::capabilities::DeafReason;
 use omo_computer_core::listing::WindowInfo;
 use omo_computer_core::params::Point;
+use omo_computer_core::paths::Roots;
 use omo_computer_core::results::{PermissionState, StopPathStatus};
 use omo_computer_core::session_state::Tristate;
 
@@ -14,7 +15,7 @@ pub use sources::{Clock, MonotonicClock, OwnProcess, ProcessSource};
 
 use crate::gate::{gate, Admitted, GateFacts, GateRefusal, Tables, Tier, VerbKind};
 use crate::latch::SuspendReason;
-use crate::marker::MemoryMarker;
+use crate::marker::{FileMarker, MemoryMarker};
 use crate::protected::{Os, ProtectedTable};
 use crate::resolve::{resolve, TargetRef};
 use crate::self_set::{watch_key, HostAdditions, SelfSet, SelfSetInputs};
@@ -69,6 +70,23 @@ impl Guard {
             self_set: SelfSet::default(),
             watched: std::collections::BTreeSet::new(),
         }
+    }
+
+    /// The engine's guard: the `global-stop` marker under the STATE root, brain session locks
+    /// under the RUNTIME root, the local loop's stop policy until `session.open` sets one.
+    #[must_use]
+    pub fn for_roots(roots: &Roots) -> Self {
+        let marker = FileMarker::at(roots.stop_marker());
+        let supervisor =
+            Supervisor::new(Box::new(marker), StopPolicy::default_for(Transport::Local));
+        let source = OwnProcess {
+            runtime_root: Some(roots.runtime.clone()),
+        };
+        Self::new(
+            supervisor,
+            Box::new(source),
+            Box::new(MonotonicClock::new()),
+        )
     }
 
     /// A guard whose latch persists only in memory (no STATE root: the self-test, in-process tests).

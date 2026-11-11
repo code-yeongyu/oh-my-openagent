@@ -84,10 +84,6 @@ pub struct SelfSet {
 impl SelfSet {
     #[must_use]
     pub fn compute(inputs: &SelfSetInputs<'_>) -> Self {
-        // RED: the self set is not computed yet.
-        if inputs.own_pid > 0 {
-            return Self::default();
-        }
         let snapshot = inputs.snapshot;
         let mut set = Self::default();
         set.chain(snapshot, inputs.own_pid);

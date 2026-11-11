@@ -1,0 +1,212 @@
+{
+  "description": "A stop listener that exists and cannot hear keys refuses every exec StopPathUnavailable{reason:deaf} before any OS call, under the default policy and with allowHostRelayOnlyStop and a fresh host heartbeat: the relay is never its fallback. The sink stays empty.",
+  "transport": "stdio",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "deaf"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "stopPath.start",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": false,
+              "heartbeatFresh": false,
+              "stopPath": "none",
+              "reason": "deaf"
+            }
+          },
+          "variable": []
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 10
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "error": {
+              "code": -32014,
+              "message": "StopPathUnavailable",
+              "data": {
+                "code": "StopPathUnavailable",
+                "hint": null,
+                "reason": "deaf"
+              }
+            }
+          },
+          "variable": []
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "session.open",
+        "params": {
+          "allowHostRelayOnlyStop": true
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": null,
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "stopPath.heartbeat",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": null
+          },
+          "variable": []
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "typeText",
+        "params": {
+          "target": "101",
+          "text": "hi"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "error": {
+              "code": -32014,
+              "message": "StopPathUnavailable",
+              "data": {
+                "code": "StopPathUnavailable",
+                "hint": null,
+                "reason": "deaf"
+              }
+            }
+          },
+          "variable": []
+        }
+      ],
+      "sink": 0
+    }
+  ]
+}

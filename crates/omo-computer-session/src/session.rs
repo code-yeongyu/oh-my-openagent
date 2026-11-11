@@ -1,6 +1,7 @@
 //! One engine session over one backend: `session.open`, `capabilities`, `session.close` and
-//! the thinnest `click` and `typeText` - the backend call and the reply shape. The gate, the
-//! mutate funnel, consent, receipts and settle are put around the two verbs by later rows.
+//! the thinnest `click` and `typeText` - the backend call and the reply shape. Both verbs
+//! pass the safety gate before any backend call; the mutate funnel, consent, receipts and
+//! settle are put around them by later rows.
 
 use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hasher};
@@ -13,11 +14,14 @@ use omo_computer_core::capabilities::{Capabilities, InputMode, LegacyCapabilitie
 use omo_computer_core::params::{
     Button, ClickParams, Delivery, Point, ReportMode, SessionOpenParams, TypeTextParams,
 };
+use omo_computer_core::params::{StopPathStartParams, StopPathStopParams};
+use omo_computer_core::paths::Roots;
 use omo_computer_core::requests::{read_click, read_session_open, read_type_text, V1Request, Verb};
 use omo_computer_core::results::{
-    CapabilitiesReply, ExecReply, PermissionState, SessionOpened,
+    CapabilitiesReply, ExecReply, PermissionState, SessionOpened, StopPathStatus,
 };
 use omo_computer_core::session_state::Tristate;
+use omo_computer_safety::{Call, Guard, HostAdditions, NoHolds, StopPolicy, TargetRef, Transport, VerbKind};
 
 /// `stopReason` while no stop path is armed: `session.open` arms none (`stopPath.start` does).
 pub const NO_GLOBAL_LISTENER: &str = "no-global-listener";
@@ -37,29 +41,70 @@ struct Opened {
 /// The session state of one engine process.
 pub struct Session {
     backend: Box<dyn Backend>,
+    guard: Guard,
     opened: Option<Opened>,
 }
 
 impl Session {
+    /// A session whose stop latch lives in memory only.
     #[must_use]
     pub fn new(backend: Box<dyn Backend>) -> Self {
+        Self::with_guard(backend, Guard::in_memory())
+    }
+
+    /// The engine's session: the stop marker under the per-uid STATE root of `roots`.
+    #[must_use]
+    pub fn for_roots(backend: Box<dyn Backend>, roots: &Roots) -> Self {
+        Self::with_guard(backend, Guard::for_roots(roots))
+    }
+
+    #[must_use]
+    pub fn with_guard(backend: Box<dyn Backend>, guard: Guard) -> Self {
         Self {
             backend,
+            guard,
             opened: None,
         }
     }
 
     /// Opens (or re-opens) the session and answers its capabilities and a fresh resume token.
-    pub fn open(&mut self, params: SessionOpenParams) -> SessionOpened {
+    ///
+    /// # Errors
+    /// `Suspended{reason}` while the stop latch is set (a marker at start included).
+    pub fn open(&mut self, params: SessionOpenParams) -> Result<SessionOpened, Refusal> {
         let request = read_session_open(params);
+        let policy = StopPolicy::read(Transport::Local, request.allow_host_relay_only_stop);
+        self.opened = None;
+        self.guard.open(policy, HostAdditions::default())?;
         self.opened = Some(Opened {
             report_mode: request.report_mode,
             tag: random_u64(),
         });
-        SessionOpened {
+        Ok(SessionOpened {
             capabilities: self.capabilities(),
             resume_token: format!("{:016x}{:016x}", random_u64(), random_u64()),
-        }
+        })
+    }
+
+    /// `stopPath.start`: arms (or re-arms a parked) stop listener.
+    pub fn stop_path_start(&mut self, params: StopPathStartParams) -> StopPathStatus {
+        let StopPathStartParams { chord: _ } = params;
+        self.guard.start_on(self.backend.as_mut())
+    }
+
+    /// `stopPath.stop{source}`: latches and commits the stop.
+    pub fn stop_path_stop(&mut self, params: StopPathStopParams) -> StopPathStatus {
+        self.guard.stop(params.source.as_deref(), &mut NoHolds).1
+    }
+
+    /// `stopPath.heartbeat` from the session's host.
+    pub fn stop_path_heartbeat(&mut self) {
+        self.guard.heartbeat();
+    }
+
+    #[must_use]
+    pub fn stop_path_status(&self) -> StopPathStatus {
+        self.guard.status()
     }
 
     /// The capabilities in the open session's report mode; with no session, the v1 shape.
@@ -94,6 +139,13 @@ impl Session {
             unreachable!("read_click always reads a click");
         };
         let at = at.ok_or(POINT_REQUIRED)?;
+        self.admit(Call {
+            verb: VerbKind::Pointer,
+            target: TargetRef::read(request.target.as_deref()),
+            points: vec![Point { x: at.x, y: at.y }],
+            chord: None,
+            force: false,
+        })?;
         let route = route_for(request.target.as_deref(), request.policy.delivery);
         let button = button.unwrap_or(Button::Left);
         let mut events = vec![InputEvent::PointerMove(Point { x: at.x, y: at.y })];
@@ -112,8 +164,23 @@ impl Session {
         let V1Request::TypeText { target, text } = read_type_text(params) else {
             unreachable!("read_type_text always reads a typeText");
         };
+        self.admit(Call {
+            verb: VerbKind::Keyboard,
+            target: TargetRef::read(Some(target.as_str())),
+            points: Vec::new(),
+            chord: None,
+            force: false,
+        })?;
         let route = route_for(Some(target.as_str()), None);
         self.send(vec![InputEvent::Text(text)], route)
+    }
+
+    /// The safety gate, before any backend input call: an open session, then the stop
+    /// listener polled (a physical stop latches here), then the eleven gates.
+    fn admit(&mut self, call: Call<'_>) -> Result<(), Refusal> {
+        self.opened.as_ref().ok_or(NOT_OPEN)?;
+        let admitted = self.guard.admit_on(self.backend.as_mut(), &call);
+        admitted.map(drop).map_err(|refused| refused.refusal)
     }
 
     /// Null in both report modes for now: the object-mode `ActionReport` is built by the
@@ -188,18 +255,22 @@ pub fn legacy_capabilities(caps: &Capabilities, probe: &PermissionProbe) -> Lega
 
 #[cfg(test)]
 mod tests {
-    use omo_computer_backend_fake::{FakeBackend, FakeScenario, RecordingSink};
+    use omo_computer_backend_fake::{FakeBackend, FakeScenario, RecordingSink, StopPathScript};
     use serde_json::json;
 
     use super::*;
 
+    const ONE_WINDOW: &str = r#"{"windows":[{"id":"1","title":"t","app":"Notes","pid":4242,"x":0,"y":0,"width":100,"height":100,"focused":true,"elevated":null}]}"#;
+
     fn session(sink: &RecordingSink) -> Session {
-        let backend = FakeBackend::with_parts(
-            FakeScenario::default(),
-            omo_computer_backend_fake::FakeClock::default(),
-            sink.clone(),
-        );
-        Session::new(Box::new(backend))
+        let scenario = FakeScenario::from_json(ONE_WINDOW).expect("scenario");
+        let clock = omo_computer_backend_fake::FakeClock::default();
+        let backend = FakeBackend::with_parts(scenario, clock, sink.clone());
+        Session::new(Box::new(backend.with_stop_path(StopPathScript::Live)))
+    }
+
+    fn start(session: &mut Session) {
+        session.stop_path_start(params(json!({})));
     }
 
     fn params<T: serde::de::DeserializeOwned>(value: serde_json::Value) -> T {
@@ -220,7 +291,8 @@ mod tests {
     fn null_mode_click_posts_and_replies_null() {
         let sink = RecordingSink::default();
         let mut session = session(&sink);
-        session.open(params(json!({})));
+        session.open(params(json!({}))).expect("open");
+        start(&mut session);
         let reply = session.click(params(json!({"target": "1", "x": 3, "y": 4})));
         assert_eq!(reply, Ok(ExecReply(None)));
         assert_eq!(sink.len(), 3, "move, down, up: {:?}", sink.lines());
@@ -231,7 +303,7 @@ mod tests {
     fn object_mode_reads_object_capabilities_and_close_ends_the_session() {
         let sink = RecordingSink::default();
         let mut session = session(&sink);
-        let opened = session.open(params(json!({"reportMode": "object"})));
+        let opened = session.open(params(json!({"reportMode": "object"}))).expect("open");
         assert!(matches!(opened.capabilities, CapabilitiesReply::Object(_)));
         assert_eq!(opened.resume_token.len(), 32);
         session.close();

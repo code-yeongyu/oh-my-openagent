@@ -118,11 +118,21 @@ impl Slot {
     }
 
     pub(super) fn global(&self, now_ms: u64) -> GlobalListener {
-        // RED: liveness, deafness and parking are not read yet.
-        let _ = (now_ms, HEARTBEAT_FRESH_MS, DeafReason::ListenerParked);
         match self {
             Self::Unarmed | Self::Absent => GlobalListener::None,
-            _ => GlobalListener::Fresh,
+            Self::Armed { beat_ms, .. }
+                if now_ms.saturating_sub(*beat_ms) <= HEARTBEAT_FRESH_MS =>
+            {
+                GlobalListener::Fresh
+            }
+            Self::Armed { beat_ms, .. } => GlobalListener::Stale { since_ms: *beat_ms },
+            Self::Deaf { reason, .. } => GlobalListener::Deaf { reason: *reason },
+            Self::ReArming(ladder, _) => GlobalListener::Stale {
+                since_ms: ladder.since_ms(),
+            },
+            Self::Parked => GlobalListener::Deaf {
+                reason: Some(DeafReason::ListenerParked),
+            },
         }
     }
 }

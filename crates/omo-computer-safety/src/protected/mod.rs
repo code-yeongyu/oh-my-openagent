@@ -103,10 +103,6 @@ impl ProtectedTable {
     /// grammar refuses it first).
     #[must_use]
     pub fn is_dangerous_chord(&self, chord: &str) -> bool {
-        // RED: the chord table is not consulted yet.
-        if !chord.is_empty() {
-            return false;
-        }
         let Some(chord) = Chord::parse(chord) else {
             return false;
         };

@@ -54,9 +54,20 @@ impl Supervisor {
     /// Latches `reason` (an earlier reason stays), releases every hold within the budget and
     /// persists the marker; either failure exits 1.
     pub fn stop(&mut self, reason: SuspendReason, holds: &mut dyn Holds) -> StopOutcome {
-        // RED: no release budget and no marker commit yet.
-        let _ = (holds, STOP_RELEASE_BUDGET_MS, Duration::ZERO, mpsc::channel::<()>);
         self.latch = Some(self.latch.unwrap_or(reason));
+        let (done, released) = mpsc::channel();
+        holds.release(done);
+        if released
+            .recv_timeout(Duration::from_millis(STOP_RELEASE_BUDGET_MS))
+            .is_err()
+        {
+            self.exit.exit(1);
+            return StopOutcome::Exited;
+        }
+        if self.marker.commit().is_err() {
+            self.exit.exit(1);
+            return StopOutcome::Exited;
+        }
         self.stop_epoch += 1;
         StopOutcome::Committed {
             stop_epoch: self.stop_epoch,

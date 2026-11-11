@@ -159,9 +159,49 @@ pub fn gate(
     tables: &Tables<'_>,
     targets: impl FnOnce() -> Vec<PointTarget>,
 ) -> Result<Admitted, GateRefusal> {
-    // RED: the gate order is not built yet.
-    let _ = (facts, tables, targets);
-    Ok(Admitted { stop_path: None })
+    let exec = facts.tier == Tier::Exec;
+    if let Some(latch) = facts.latch {
+        return Err(GateRefusal::new(Gate::Latch, latch.refusal()));
+    }
+    // Gate 2 refuses exec only: a read still answers on a deaf or relay-only hand.
+    let stop_path = if exec {
+        Some(
+            facts
+                .stop_path
+                .admit()
+                .map_err(|f| GateRefusal::new(Gate::StopPath, f.refusal()))?,
+        )
+    } else {
+        None
+    };
+    if exec && facts.screen_locked == Tristate::Known(true) {
+        return Err(GateRefusal::new(
+            Gate::Lock,
+            LockRefusal::ScreenLocked.refusal(),
+        ));
+    }
+    let targets = targets();
+    if exec {
+        target::check(facts.verb, &targets, tables)?;
+    }
+    if facts.permission == PermissionState::Denied {
+        return Err(GateRefusal::new(
+            Gate::OsPermission,
+            PermissionRefusal::Denied.refusal(),
+        ));
+    }
+    let single_denied = match targets.as_slice() {
+        [one] => target::denied_app(&one.resolution, tables),
+        _ => None,
+    };
+    if let Some(consent) = facts.consent.or(single_denied) {
+        return Err(GateRefusal::new(Gate::Consent, consent.refusal()));
+    }
+    if !exec {
+        return Ok(Admitted { stop_path: None });
+    }
+    exec_tail(facts, tables)?;
+    Ok(Admitted { stop_path })
 }
 
 /// Gates 7-11 of an exec call.

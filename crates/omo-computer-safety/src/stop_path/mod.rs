@@ -21,9 +21,8 @@ impl StopPolicy {
     /// `true` on relay and bunshin hands (no local stop UI), `false` on the local loop.
     #[must_use]
     pub const fn default_for(transport: Transport) -> Self {
-        let _ = transport;
         Self {
-            allow_host_relay_only: false,
+            allow_host_relay_only: !matches!(transport, Transport::Local),
         }
     }
 
@@ -103,8 +102,20 @@ impl StopPathView {
     /// The first refusal of the precedence `deaf` -> `host_relay_not_allowed` ->
     /// `heartbeat_stale` -> `no_listener`.
     pub const fn admit(&self) -> Result<StopPathKind, StopPathFailure> {
-        // RED: the pick order is not built yet.
-        Ok(StopPathKind::Global)
+        match self.global {
+            GlobalListener::Deaf { .. } => return Err(StopPathFailure::Deaf),
+            GlobalListener::Fresh => return Ok(StopPathKind::Global),
+            GlobalListener::None | GlobalListener::Stale { .. } => {}
+        }
+        match self.relay {
+            RelayBeat::Fresh if self.policy.allow_host_relay_only => Ok(StopPathKind::HostRelay),
+            RelayBeat::Fresh => Err(StopPathFailure::HostRelayNotAllowed),
+            RelayBeat::Stale => Err(StopPathFailure::HeartbeatStale),
+            RelayBeat::Absent => match self.global {
+                GlobalListener::Stale { .. } => Err(StopPathFailure::HeartbeatStale),
+                _ => Err(StopPathFailure::NoListener),
+            },
+        }
     }
 }
 
