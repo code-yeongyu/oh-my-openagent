@@ -18,7 +18,7 @@ function write(path: string, content: string): void {
   writeFileSync(path, content)
 }
 
-type Fixture = { home: string, agentDir: string, configHome: string, launcher: string }
+type Fixture = { home: string; agentDir: string; configHome: string; launcher: string }
 
 function fixture(): Fixture {
   const root = mkdtempSync(join(tmpdir(), "omo-assets-e2e-"))
@@ -70,12 +70,16 @@ describe("omo setup opencode asset import", () => {
     describe("#when setup is accepted", () => {
       test("#then they land in the engine's global mcp.json and global skill root", () => {
         const item = fixture()
-        opencode(item, {
-          mcp: {
-            "local-tool": { type: "local", command: ["node", "server.js"], environment: { A: "b" } },
-            "remote-tool": { type: "remote", url: "https://example.test/mcp" },
+        opencode(
+          item,
+          {
+            mcp: {
+              "local-tool": { type: "local", command: ["node", "server.js"], environment: { A: "b" } },
+              "remote-tool": { type: "remote", url: "https://example.test/mcp" },
+            },
           },
-        }, ["migrated-skill"])
+          ["migrated-skill"],
+        )
 
         const result = run(item, ["setup", "--yes"])
 
@@ -97,7 +101,10 @@ describe("omo setup opencode asset import", () => {
     describe("#when setup imports the rest", () => {
       test("#then the pinned engine still loads the written mcp.json and every imported server", () => {
         const item = fixture()
-        write(join(item.agentDir, "mcp.json"), JSON.stringify({ mcpServers: { mine: { type: "stdio", command: "mine" } } }))
+        write(
+          join(item.agentDir, "mcp.json"),
+          JSON.stringify({ mcpServers: { mine: { type: "stdio", command: "mine" } } }),
+        )
         opencode(item, {
           mcp: {
             bang: { type: "local", command: ["tool", "  !important"] },
@@ -105,19 +112,32 @@ describe("omo setup opencode asset import", () => {
             token: { type: "local", command: ["tool"], environment: { TOKEN: "{env:QA_TOKEN}" } },
             remote: { type: "remote", url: "https://example.test/mcp", headers: { A: "{env:QA_TOKEN}" }, oauth: false },
             off: { type: "local", command: ["off"], enabled: false },
-            client: { type: "remote", url: "https://o.test/mcp", oauth: { clientId: "cid", scope: "read write", callbackPort: 19876 } },
+            client: {
+              type: "remote",
+              url: "https://o.test/mcp",
+              oauth: { clientId: "cid", scope: "read write", callbackPort: 19876 },
+            },
             rooted: { type: "local", command: ["tool"], cwd: "/srv/tools" },
           },
         })
 
         const result = run(item, ["setup", "--yes"])
-        const loaded = loadMcpConfig({ agentDir: item.agentDir, cwd: item.home, projectTrusted: false, env: { QA_TOKEN: "t0k" } })
+        const loaded = loadMcpConfig({
+          agentDir: item.agentDir,
+          cwd: item.home,
+          projectTrusted: false,
+          env: { QA_TOKEN: "t0k" },
+        })
 
         expect(result.status).toBe(0)
         expect(result.stdout).toContain("mcp server bang")
         expect(result.stdout).toContain("mcp server subst")
         expect(Object.keys(loaded.servers).sort()).toEqual(["client", "mine", "off", "remote", "rooted", "token"])
-        expect(loaded.servers.client?.config?.oauth).toEqual({ clientId: "cid", scopes: ["read", "write"], callbackPort: 19876 })
+        expect(loaded.servers.client?.config?.oauth).toEqual({
+          clientId: "cid",
+          scopes: ["read", "write"],
+          callbackPort: 19876,
+        })
         expect(loaded.servers.rooted?.config?.cwd).toBe("/srv/tools")
         expect(loaded.servers.token?.config?.env).toEqual({ TOKEN: "t0k" })
         expect(loaded.servers.remote?.config?.headers).toEqual({ A: "t0k" })
@@ -130,18 +150,26 @@ describe("omo setup opencode asset import", () => {
     describe("#when setup is accepted", () => {
       test("#then neither is overwritten and both are reported as skipped", () => {
         const item = fixture()
-        const existingMcp = `${JSON.stringify({
-          mcpServers: { keep: { type: "stdio", command: "mine" } },
-          settings: { toolPrefix: "x" },
-        }, null, 2)}\n`
+        const existingMcp = `${JSON.stringify(
+          {
+            mcpServers: { keep: { type: "stdio", command: "mine" } },
+            settings: { toolPrefix: "x" },
+          },
+          null,
+          2,
+        )}\n`
         write(join(item.agentDir, "mcp.json"), existingMcp)
         write(join(item.agentDir, "skills", "keep-skill", "SKILL.md"), "mine\n")
-        opencode(item, {
-          mcp: {
-            keep: { type: "local", command: ["theirs"] },
-            fresh: { type: "local", command: ["new"] },
+        opencode(
+          item,
+          {
+            mcp: {
+              keep: { type: "local", command: ["theirs"] },
+              fresh: { type: "local", command: ["new"] },
+            },
           },
-        }, ["keep-skill"])
+          ["keep-skill"],
+        )
 
         const result = run(item, ["setup", "--yes"])
 
@@ -180,7 +208,10 @@ describe("omo setup opencode asset import", () => {
     describe("#when setup is accepted", () => {
       test("#then it is not copied over the bundled one and is reported as skipped", () => {
         const item = fixture()
-        write(join(dirname(dirname(item.launcher)), "plugin", "skills", "git-master", "SKILL.md"), "---\nname: git-master\ndescription: bundled\n---\n")
+        write(
+          join(dirname(dirname(item.launcher)), "plugin", "skills", "git-master", "SKILL.md"),
+          "---\nname: git-master\ndescription: bundled\n---\n",
+        )
         opencode(item, { mcp: {} }, ["git-master", "mine-only"])
 
         const result = run(item, ["setup", "--yes"])

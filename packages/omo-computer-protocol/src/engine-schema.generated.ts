@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "f50cb702634a4a9d743c078395de29335a4a263fe0a681970b023b3a8b736f61" as const
+export const SCHEMA_SHA256 = "61e82ab22e11ca3014190b4c1d976cd40d20657adaed5a82a8861a80cdbf7b0f" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -385,6 +385,23 @@ export const SETTINGS_TABLE = [
 	}
 ] as const
 
+export type ActionReport = {
+	disposition: Disposition
+	delivered?: Delivered | null
+	effect: Effect
+	route: Route
+	hit?: Hit | null
+	focusRestoration?: FocusRestoration | null
+	openedSurfaces?: Surface[]
+	nextCall?: string | null
+	note?: string | null
+	warning?: string | null
+	auditIds?: string[]
+	timings?: Timings | null
+	evidence: Evidence[]
+	observation: UntrustedText
+}
+
 export type AdvanceClockParams = {
 	ms: number
 }
@@ -679,6 +696,11 @@ export type DeafReason = "secure-input-active" | "portal-unavailable" | "xi2-raw
 
 export type DefaultDelivery = "foreground_lease_first"
 
+export type Delivered = {
+	count: number
+	of: number
+}
+
 export type Delivery = "background" | "foreground"
 
 export type DeliveryMode = "background" | "foreground"
@@ -718,6 +740,29 @@ export type DisplayInfo = {
 	truncated?: boolean | null
 }
 
+export type Disposition = {
+	delivery: "not_delivered"
+	retry: "safe"
+} | {
+	delivery: "not_delivered"
+	retry: "after_user"
+} | {
+	delivery: "delivery_uncertain"
+	retry: "unsafe"
+} | {
+	delivery: "delivery_uncertain"
+	retry: "unknown"
+} | {
+	delivery: "delivered_unverified"
+	retry: "unsafe"
+} | {
+	delivery: "delivered_verified"
+	retry: "unsafe"
+} | {
+	delivery: "unknown"
+	retry: "unknown"
+}
+
 export type DragParams = {
 	target: string
 	from: Point
@@ -735,6 +780,8 @@ export type DrillParams = {
 	ref: string
 	depth?: number | null
 }
+
+export type Effect = "confirmed" | "observed" | "partial" | "unverifiable" | "suspected_noop" | "no_change" | "refused"
 
 export type ElementAtParams = {
 	target: string
@@ -775,7 +822,20 @@ export type EventPredicate = {
 	kind: EventKind
 }
 
-export type ExecReply = Record<string, unknown> | null
+export type Evidence = {
+	kind: EvidenceKind
+	class: EvidenceClass
+	intended?: string | null
+	value?: string | null
+	baseline?: string | null
+	event?: string | null
+}
+
+export type EvidenceClass = "receipt" | "observation"
+
+export type EvidenceKind = "barrier_consumed" | "xi2_raw_confirm" | "value_readback" | "focus_readback" | "menu_readback" | "ax_notification" | "settle_frame_diff" | "ax_change"
+
+export type ExecReply = null | ActionReport
 
 export type FleetSettings = {
 	maxInFlight?: number | null
@@ -783,6 +843,8 @@ export type FleetSettings = {
 	perHandFramesPerSec?: number | null
 	maxImagePartsPerResult?: number | null
 }
+
+export type FocusRestoration = "untouched" | "restored" | "user_moved_on" | "failed"
 
 export type ForegroundConsent = "never" | "policy" | "granted"
 
@@ -840,6 +902,11 @@ export type Hello = {
 	generation: number
 	limits: Limits
 	machineId: string
+}
+
+export type Hit = {
+	role: string
+	label?: string | null
 }
 
 export type HoldKeysParams = {
@@ -1183,6 +1250,8 @@ export type ReportMode = "null" | "object"
 
 export type RequestId = number | string
 
+export type Route = "ax" | "background_window" | "background_pid" | "foreground_hid"
+
 export type RouteRung = "physical" | "semantic"
 
 export type RunLimits = {
@@ -1421,6 +1490,15 @@ export type TextRange = {
 }
 
 export type Tier = "read" | "exec"
+
+export type Timings = {
+	axResolve?: number | null
+	capture?: number | null
+	prime?: number | null
+	dispatch?: number | null
+	verify?: number | null
+	restore?: number | null
+}
 
 export type ToolkitClass = "canvas_gl" | "chromium_electron" | "pointer_hw" | "qt_xcb"
 

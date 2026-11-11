@@ -35,17 +35,17 @@ export const REJECTED_EVAL_EXECUTION_ROLLUP: EvalExecutionRollup = Object.freeze
 
 export type EvalExecutionParseResult =
   | {
-    readonly kind: "accepted"
-    readonly cellId: string
-    readonly rollup: EvalExecutionRollup
-  }
+      readonly kind: "accepted"
+      readonly cellId: string
+      readonly rollup: EvalExecutionRollup
+    }
   | {
-    readonly kind: "rejected"
-    readonly cellId: string
-  }
+      readonly kind: "rejected"
+      readonly cellId: string
+    }
   | {
-    readonly kind: "ignored"
-  }
+      readonly kind: "ignored"
+    }
 
 type ToolAggregate = {
   readonly count: number
@@ -75,20 +75,20 @@ export function parseEvalExecutionEvent(value: unknown): EvalExecutionParseResul
   const durationMs = finiteNonnegative(value["durationMs"])
   const kernelDurationMs = value["kernelDurationMs"]
   if (
-    value["version"] !== 1
-    || value["detailLevel"] !== "full"
-    || !isEvalLanguage(value["language"])
-    || typeof value["ok"] !== "boolean"
-    || typeof value["detached"] !== "boolean"
-    || !finiteNumber(value["startedAt"])
-    || !finiteNumber(value["completedAt"])
-    || durationMs === undefined
-    || (kernelDurationMs !== undefined && finiteNonnegative(kernelDurationMs) === undefined)
-    || toolCallCount === undefined
-    || pendingToolCallCount === undefined
-    || !Array.isArray(value["toolCalls"])
-    || !stringArray(value["distinctToolsCalled"])
-    || typeof value["toolAggregatesTruncated"] !== "boolean"
+    value["version"] !== 1 ||
+    value["detailLevel"] !== "full" ||
+    !isEvalLanguage(value["language"]) ||
+    typeof value["ok"] !== "boolean" ||
+    typeof value["detached"] !== "boolean" ||
+    !finiteNumber(value["startedAt"]) ||
+    !finiteNumber(value["completedAt"]) ||
+    durationMs === undefined ||
+    (kernelDurationMs !== undefined && finiteNonnegative(kernelDurationMs) === undefined) ||
+    toolCallCount === undefined ||
+    pendingToolCallCount === undefined ||
+    !Array.isArray(value["toolCalls"]) ||
+    !stringArray(value["distinctToolsCalled"]) ||
+    typeof value["toolAggregatesTruncated"] !== "boolean"
   ) {
     return { kind: "rejected", cellId }
   }
@@ -98,18 +98,12 @@ export function parseEvalExecutionEvent(value: unknown): EvalExecutionParseResul
   const overflowValue = value["toolAggregateOverflow"]
   const truncated = value["toolAggregatesTruncated"]
   const overflow = overflowValue === undefined ? undefined : parseToolAggregate(overflowValue)
-  if (
-    (truncated && overflow === undefined)
-    || (!truncated && overflowValue !== undefined)
-  ) {
+  if ((truncated && overflow === undefined) || (!truncated && overflowValue !== undefined)) {
     return { kind: "rejected", cellId }
   }
 
   const totals = overflow === undefined ? named : addAggregate(named, overflow)
-  if (
-    totals.count !== toolCallCount
-    || totals.pendingCount !== pendingToolCallCount
-  ) {
+  if (totals.count !== toolCallCount || totals.pendingCount !== pendingToolCallCount) {
     return { kind: "rejected", cellId }
   }
 
@@ -132,27 +126,19 @@ export function parseEvalExecutionEvent(value: unknown): EvalExecutionParseResul
   }
 }
 
-export function addEvalExecutionRollup(
-  left: EvalExecutionRollup,
-  right: EvalExecutionRollup,
-): EvalExecutionRollup {
+export function addEvalExecutionRollup(left: EvalExecutionRollup, right: EvalExecutionRollup): EvalExecutionRollup {
   return {
     eventCount: left.eventCount + right.eventCount,
     rejectedCount: left.rejectedCount + right.rejectedCount,
     okCount: left.okCount + right.okCount,
     detachedCount: left.detachedCount + right.detachedCount,
-    measuredExecutionDurationMsSum:
-      left.measuredExecutionDurationMsSum + right.measuredExecutionDurationMsSum,
+    measuredExecutionDurationMsSum: left.measuredExecutionDurationMsSum + right.measuredExecutionDurationMsSum,
     nestedToolCallCount: left.nestedToolCallCount + right.nestedToolCallCount,
     nestedToolCallOkCount: left.nestedToolCallOkCount + right.nestedToolCallOkCount,
-    nestedToolCallErrorCount:
-      left.nestedToolCallErrorCount + right.nestedToolCallErrorCount,
-    nestedToolCallPendingCount:
-      left.nestedToolCallPendingCount + right.nestedToolCallPendingCount,
-    measuredNestedToolDurationMsSum:
-      left.measuredNestedToolDurationMsSum + right.measuredNestedToolDurationMsSum,
-    truncatedExecutionCount:
-      left.truncatedExecutionCount + right.truncatedExecutionCount,
+    nestedToolCallErrorCount: left.nestedToolCallErrorCount + right.nestedToolCallErrorCount,
+    nestedToolCallPendingCount: left.nestedToolCallPendingCount + right.nestedToolCallPendingCount,
+    measuredNestedToolDurationMsSum: left.measuredNestedToolDurationMsSum + right.measuredNestedToolDurationMsSum,
+    truncatedExecutionCount: left.truncatedExecutionCount + right.truncatedExecutionCount,
   }
 }
 
@@ -175,12 +161,12 @@ function parseToolAggregate(value: unknown): ToolAggregate | undefined {
   const errorCount = safeCount(value["errorCount"])
   const pendingCount = safeCount(value["pendingCount"])
   if (
-    count === undefined
-    || totalDurationMs === undefined
-    || okCount === undefined
-    || errorCount === undefined
-    || pendingCount === undefined
-    || count !== okCount + errorCount + pendingCount
+    count === undefined ||
+    totalDurationMs === undefined ||
+    okCount === undefined ||
+    errorCount === undefined ||
+    pendingCount === undefined ||
+    count !== okCount + errorCount + pendingCount
   ) {
     return undefined
   }

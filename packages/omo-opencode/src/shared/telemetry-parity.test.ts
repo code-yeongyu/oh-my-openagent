@@ -11,10 +11,7 @@ import type {
   TelemetryOsProvider,
   TelemetryTransportFactory,
 } from "@oh-my-opencode/telemetry-core"
-import {
-  getTelemetryActivityStateFilePath,
-  resolveTelemetryStateDir,
-} from "@oh-my-opencode/telemetry-core"
+import { getTelemetryActivityStateFilePath, resolveTelemetryStateDir } from "@oh-my-opencode/telemetry-core"
 import { createOpencodeTelemetryProductConfig } from "./telemetry-product-identity"
 
 type CapturedPostHogMessage = TelemetryCaptureMessage
@@ -46,9 +43,7 @@ function resetTelemetryEnv(): void {
   process.env.POSTHOG_API_KEY = "test-api-key"
 }
 
-function createCapturingTransportFactory(
-  capturedMessages: CapturedPostHogMessage[],
-): TelemetryTransportFactory {
+function createCapturingTransportFactory(capturedMessages: CapturedPostHogMessage[]): TelemetryTransportFactory {
   return () => ({
     capture: (message) => {
       capturedMessages.push(message)

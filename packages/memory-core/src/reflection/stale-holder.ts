@@ -10,7 +10,12 @@ import { hostname as readHostname } from "node:os"
 import { join } from "node:path"
 
 import { readFile } from "../fs/resilient"
-import { getPidLiveness, getProcessStartIdentity, startIdentitiesComparable, type ProcessLiveness } from "../locks/process-identity"
+import {
+  getPidLiveness,
+  getProcessStartIdentity,
+  startIdentitiesComparable,
+  type ProcessLiveness,
+} from "../locks/process-identity"
 
 export type ReflectionLockVerdict =
   | { readonly state: "none" }
@@ -51,7 +56,7 @@ async function readJson(path: string, readText: (path: string) => Promise<string
 }
 
 function fieldsOf(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null ? value as Record<string, unknown> : {}
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {}
 }
 
 // The shape reconciliation reads as a RunOutcome (omo-senpi worker/run-artifacts.ts). A file that does
@@ -59,14 +64,18 @@ function fieldsOf(value: unknown): Record<string, unknown> {
 function isRunOutcome(value: unknown, runId: string): boolean {
   const fields = fieldsOf(value)
   const childExit = fieldsOf(fields.childExit)
-  return fields.version === 1
-    && fields.runId === runId
-    && typeof fields.finishedAt === "string"
-    && (fields.attempt === undefined || (typeof fields.attempt === "number" && Number.isInteger(fields.attempt) && fields.attempt > 0))
-    && typeof fields.childExit === "object" && fields.childExit !== null
-    && (childExit.code === null || typeof childExit.code === "number")
-    && (childExit.signal === null || typeof childExit.signal === "string")
-    && typeof fields.timedOut === "boolean"
+  return (
+    fields.version === 1 &&
+    fields.runId === runId &&
+    typeof fields.finishedAt === "string" &&
+    (fields.attempt === undefined ||
+      (typeof fields.attempt === "number" && Number.isInteger(fields.attempt) && fields.attempt > 0)) &&
+    typeof fields.childExit === "object" &&
+    fields.childExit !== null &&
+    (childExit.code === null || typeof childExit.code === "number") &&
+    (childExit.signal === null || typeof childExit.signal === "string") &&
+    typeof fields.timedOut === "boolean"
+  )
 }
 
 function stuck(runId: string, reason: string): ReflectionLockVerdict {
@@ -75,11 +84,16 @@ function stuck(runId: string, reason: string): ReflectionLockVerdict {
 
 // A live pid still counts as gone when its recorded start identity proves the pid was reused: the rule
 // reconciliation applies (worker/run-liveness.ts). An unreadable or incomparable start keeps it live.
-export async function reflectionLauncherLiveness(pid: number, recordedStart: unknown, probe: ReflectionLockProbe): Promise<ProcessLiveness> {
+export async function reflectionLauncherLiveness(
+  pid: number,
+  recordedStart: unknown,
+  probe: ReflectionLockProbe,
+): Promise<ProcessLiveness> {
   const liveness = (probe.getPidLiveness ?? getPidLiveness)(pid)
   if (liveness !== "alive" || typeof recordedStart !== "string") return liveness
   const actualStart = await (probe.getProcessStartIdentity ?? getProcessStartIdentity)(pid).catch(() => null)
-  if (actualStart !== null && startIdentitiesComparable(recordedStart, actualStart) && recordedStart !== actualStart) return "dead" // rule:pid-reused
+  if (actualStart !== null && startIdentitiesComparable(recordedStart, actualStart) && recordedStart !== actualStart)
+    return "dead" // rule:pid-reused
   return "alive"
 }
 
@@ -96,14 +110,17 @@ export async function classifyReflectionLockHolder(
   const runId = typeof fields.runId === "string" ? fields.runId : "unknown"
   const launcherPid = typeof fields.launcherPid === "number" ? fields.launcherPid : undefined
   const launcherHostname = typeof fields.launcherHostname === "string" ? fields.launcherHostname : undefined
-  if (launcherPid === undefined || launcherHostname === undefined) return stuck(runId, "its launcher identity is missing") // rule:launcher-identity
-  if (launcherHostname !== (probe.hostname ?? readHostname)()) return stuck(runId, `it is owned by host ${launcherHostname}, which cannot be checked from here`) // rule:other-host
+  if (launcherPid === undefined || launcherHostname === undefined)
+    return stuck(runId, "its launcher identity is missing") // rule:launcher-identity
+  if (launcherHostname !== (probe.hostname ?? readHostname)())
+    return stuck(runId, `it is owned by host ${launcherHostname}, which cannot be checked from here`) // rule:other-host
   const launcher = await reflectionLauncherLiveness(launcherPid, fields.launcherProcessStart, probe)
   if (launcher === "alive") return { state: "live", runId } // rule:launcher-alive
   if (launcher === "unknown") return stuck(runId, `launcher pid ${launcherPid} could not be checked`) // rule:launcher-unknown
   const runDir = join(reflectionDir, "runs", runId)
   const outcome = await readJson(join(runDir, "outcome.json"), readText)
-  if (outcome.kind === "missing") return stuck(runId, `launcher pid ${launcherPid} is gone and the run recorded no outcome`) // rule:outcome-missing
+  if (outcome.kind === "missing")
+    return stuck(runId, `launcher pid ${launcherPid} is gone and the run recorded no outcome`) // rule:outcome-missing
   if (outcome.kind === "unreadable") return stuck(runId, `its outcome could not be read (${outcome.code})`) // rule:outcome-unreadable
   if (outcome.kind === "invalid") return stuck(runId, "its outcome is not valid JSON") // rule:outcome-invalid
   if (!isRunOutcome(outcome.value, runId)) return stuck(runId, "its outcome is not a recorded run outcome") // rule:outcome-schema

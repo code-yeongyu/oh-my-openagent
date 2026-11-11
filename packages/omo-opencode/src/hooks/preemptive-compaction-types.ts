@@ -13,10 +13,7 @@ export interface CachedCompactionState {
 
 export interface PreemptiveCompactionClient {
   session: {
-    messages: (input: {
-      path: { id: string }
-      query?: { directory: string }
-    }) => Promise<unknown>
+    messages: (input: { path: { id: string }; query?: { directory: string } }) => Promise<unknown>
     summarize: (input: {
       path: { id: string }
       body: { providerID: string; modelID: string; auto?: boolean }

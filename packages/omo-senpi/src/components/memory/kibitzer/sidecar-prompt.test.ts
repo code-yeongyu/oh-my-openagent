@@ -76,7 +76,7 @@ function unescapeXml(value: string): string {
     .replace(/&#10;/g, "\n")
     .replace(/&#13;/g, "\r")
     .replace(/&#9;/g, "\t")
-    .replace(/&quot;/g, "\"")
+    .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
@@ -85,7 +85,7 @@ function unescapeXml(value: string): string {
 
 const EVENTS: readonly KibitzerSidecarEvent[] = [
   { cursor: 11, kind: "prompt", text: "rebase the worktree" },
-  { cursor: 12, kind: "tool_call", tool: "bash", args: "{\"command\":\"git rebase\"}" },
+  { cursor: 12, kind: "tool_call", tool: "bash", args: '{"command":"git rebase"}' },
   { cursor: 13, kind: "tool_result", tool: "bash", resultHead: "rebase in progress" },
   { cursor: 14, kind: "assistant", text: "the rebase is running" },
 ]
@@ -95,7 +95,14 @@ function envelope(overrides: Partial<KibitzerSidecarEnvelopeInput> = {}): Kibitz
     sessionId: "ses-1",
     maxItems: 2,
     events: EVENTS,
-    candidates: [{ path: "reference/project/head-watch.md", description: "rebase directive", excerpt: "never rebase mid-write", score: 0.42 }],
+    candidates: [
+      {
+        path: "reference/project/head-watch.md",
+        description: "rebase directive",
+        excerpt: "never rebase mid-write",
+        score: 0.42,
+      },
+    ],
     ...overrides,
   }
 }
@@ -118,10 +125,10 @@ describe("resident kibitzer prompt envelopes", () => {
     expect(root["cursor-to"]).toBe("14")
     expect(KIBITZER_SIDECAR_TOOL_NAMES).toEqual(["read", "grep", "session_entries", "memory", "nudge"])
     expect(toolNames(xml)).toEqual([...KIBITZER_SIDECAR_TOOL_NAMES])
-    expect(xml).toContain("operations=\"search,read\"")
-    expect(xml).toContain("<rule id=\"no-memory-write\">")
+    expect(xml).toContain('operations="search,read"')
+    expect(xml).toContain('<rule id="no-memory-write">')
     expect(sectionAttributes(xml, "candidates").count).toBe("1")
-    expect(xml).toContain("<candidate path=\"reference/project/head-watch.md\"")
+    expect(xml).toContain('<candidate path="reference/project/head-watch.md"')
     expect(eventCursors(xml)).toEqual([11, 12, 13, 14])
   })
 
@@ -154,14 +161,31 @@ describe("resident kibitzer prompt envelopes", () => {
   test("#given hostile transcript fields #when an envelope is rendered #then it escapes redacts and caps XML", () => {
     // given
     const input = envelope({
-      sessionId: "ses \"quoted\" & <tagged>\nline",
+      sessionId: 'ses "quoted" & <tagged>\nline',
       events: [
         { cursor: 5, kind: "prompt", text: `${"P".repeat(KIBITZER_FIELD_CAPS.prompt)}TAIL-MARKER` },
         { cursor: 6, kind: "assistant", text: `Authorization: Bearer abcdef1234567890 <script>alert('x')</script>` },
-        { cursor: 7, kind: "tool_call", tool: "read & grep", args: `${"A".repeat(KIBITZER_FIELD_CAPS.toolArgs)}ARGS-TAIL` },
-        { cursor: 8, kind: "tool_result", tool: "read", resultHead: `${"R".repeat(KIBITZER_FIELD_CAPS.resultHead)}RESULT-TAIL` },
+        {
+          cursor: 7,
+          kind: "tool_call",
+          tool: "read & grep",
+          args: `${"A".repeat(KIBITZER_FIELD_CAPS.toolArgs)}ARGS-TAIL`,
+        },
+        {
+          cursor: 8,
+          kind: "tool_result",
+          tool: "read",
+          resultHead: `${"R".repeat(KIBITZER_FIELD_CAPS.resultHead)}RESULT-TAIL`,
+        },
       ],
-      candidates: [{ path: "notes/<leaked>&key.md", description: "key sk-proj-ABCDEFGHIJKLMNOP lives here", excerpt: "token: hunter2hunter2", score: 1 }],
+      candidates: [
+        {
+          path: "notes/<leaked>&key.md",
+          description: "key sk-proj-ABCDEFGHIJKLMNOP lives here",
+          excerpt: "token: hunter2hunter2",
+          score: 1,
+        },
+      ],
       digest: { text: "D".repeat(KIBITZER_FIELD_CAPS.digest + 400), cursorFrom: 1, cursorTo: 4, folded: 4 },
     })
 
@@ -173,8 +197,8 @@ describe("resident kibitzer prompt envelopes", () => {
     expect(xml).toContain("&lt;script&gt;alert(&apos;x&apos;)&lt;/script&gt;")
     const root = rootAttributes(xml)
     expect(root.session).toBe("ses &quot;quoted&quot; &amp; &lt;tagged&gt;&#10;line")
-    expect(unescapeXml(root.session ?? "")).toBe("ses \"quoted\" & <tagged>\nline")
-    expect(xml).toContain("<candidate path=\"notes/&lt;leaked&gt;&amp;key.md\"")
+    expect(unescapeXml(root.session ?? "")).toBe('ses "quoted" & <tagged>\nline')
+    expect(xml).toContain('<candidate path="notes/&lt;leaked&gt;&amp;key.md"')
     // then: redaction happens before the text reaches the envelope
     expect(xml).not.toContain("abcdef1234567890")
     expect(xml).not.toContain("sk-proj-ABCDEFGHIJKLMNOP")
@@ -254,13 +278,16 @@ describe("resident kibitzer prompt envelopes", () => {
     expect(elements(section(xml, "rejected"), "path")).toEqual(["reference/a-one.md", "reference/a-two.md"])
     expect(elements(section(xml, "delivered"), "path")).toEqual(["reference/b-one.md"])
     expect(toolNames(xml)).toEqual([...KIBITZER_SIDECAR_TOOL_NAMES])
-    expect(xml).toContain("<rule id=\"no-memory-write\">")
+    expect(xml).toContain('<rule id="no-memory-write">')
     expect(xml.length).toBeLessThanOrEqual(KIBITZER_RESEED_MAX_CHARS)
   })
 
   test("#given more reseed paths than the bound allows #when the reseed envelope is rendered #then the output stays within the configured bound and reports the omitted counts", () => {
     // given
-    const paths = Array.from({ length: 80 }, (_, index) => `reference/project/${"long-path-segment-".repeat(4)}${index}.md`)
+    const paths = Array.from(
+      { length: 80 },
+      (_, index) => `reference/project/${"long-path-segment-".repeat(4)}${index}.md`,
+    )
 
     // when
     const xml = renderKibitzerReseedPrompt({
@@ -287,14 +314,21 @@ describe("resident kibitzer prompt envelopes", () => {
     const rendered = [
       renderKibitzerSeedPrompt(envelope()),
       renderKibitzerWakePrompt(envelope()),
-      renderKibitzerReseedPrompt({ sessionId: "ses-1", maxItems: 2, lastCursor: 3, taskSummary: "s", rejectedPaths: [], deliveredPaths: [] }),
+      renderKibitzerReseedPrompt({
+        sessionId: "ses-1",
+        maxItems: 2,
+        lastCursor: 3,
+        taskSummary: "s",
+        rejectedPaths: [],
+        deliveredPaths: [],
+      }),
     ]
 
     // when / then
     for (const xml of rendered) {
       expect(toolNames(xml)).toEqual([...KIBITZER_SIDECAR_TOOL_NAMES])
       expect(xml).not.toMatch(/<tool name="(?:write|edit|bash|find|ls|memory_write|memory_search|memory_read)"/)
-      expect(xml).toContain("<rule id=\"no-memory-write\">")
+      expect(xml).toContain('<rule id="no-memory-write">')
       expect(toolAttributes(xml, "memory").operations).toBe("search,read")
     }
   })

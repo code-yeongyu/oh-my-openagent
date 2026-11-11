@@ -13,13 +13,15 @@ describe("buildTaskExecute skill delivery", () => {
         return { kind: "started", task_id: "st_00000003", status: "running", name: "t" }
       },
     })
-    const execute = buildTaskExecute(makeDeps(manager, {
-      loadSkills: (names) => ({
-        prepend: names.length > 0 ? "SKILL DIRECTIVE\n\n" : "",
-        resolved: names,
-        missing: [],
+    const execute = buildTaskExecute(
+      makeDeps(manager, {
+        loadSkills: (names) => ({
+          prepend: names.length > 0 ? "SKILL DIRECTIVE\n\n" : "",
+          resolved: names,
+          missing: [],
+        }),
       }),
-    }))
+    )
 
     await execute(
       "resolved-skill",
@@ -42,13 +44,15 @@ describe("buildTaskExecute skill delivery", () => {
         name: "missing-skill-task",
       }),
     })
-    const execute = buildTaskExecute(makeDeps(manager, {
-      loadSkills: (names) => ({
-        prepend: "",
-        resolved: [],
-        missing: names,
+    const execute = buildTaskExecute(
+      makeDeps(manager, {
+        loadSkills: (names) => ({
+          prepend: "",
+          resolved: [],
+          missing: names,
+        }),
       }),
-    }))
+    )
 
     const result = await execute(
       "missing-skill",

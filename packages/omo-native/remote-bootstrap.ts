@@ -65,8 +65,17 @@ export function omoBinaryPath(env: Readonly<Record<string, string | undefined>> 
   return resolve(process.argv[1] ?? process.execPath)
 }
 
-export async function runBootstrapVerb(io: BootstrapIo, setup: BootstrapSetup, json: boolean): Promise<"connected" | "stopped"> {
-  const outcome = await bootstrapDeviceService({ accountShow: io.accountShow, stateDir: io.stateDir, connect: io.connect, ...setup })
+export async function runBootstrapVerb(
+  io: BootstrapIo,
+  setup: BootstrapSetup,
+  json: boolean,
+): Promise<"connected" | "stopped"> {
+  const outcome = await bootstrapDeviceService({
+    accountShow: io.accountShow,
+    stateDir: io.stateDir,
+    connect: io.connect,
+    ...setup,
+  })
   if (outcome.kind === "stopped") {
     if (json) io.output(JSON.stringify({ state: outcome.state, notice: outcome.notice }))
     else io.error(outcome.notice)

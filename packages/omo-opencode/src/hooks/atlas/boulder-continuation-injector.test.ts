@@ -249,7 +249,7 @@ describe("injectBoulderContinuation", () => {
       }
     }> = []
     const promptAsyncMock = mock(async (request: unknown) => {
-      capturedRequests.push(request as typeof capturedRequests[number])
+      capturedRequests.push(request as (typeof capturedRequests)[number])
       return undefined
     })
     const recentModel = {
@@ -258,14 +258,16 @@ describe("injectBoulderContinuation", () => {
       variant: "max",
     }
     const messagesMock = mock(async () => ({
-      data: [{
-        id: "msg_1",
-        info: {
-          agent: "atlas",
-          model: recentModel,
-          time: { created: Date.now() },
+      data: [
+        {
+          id: "msg_1",
+          info: {
+            agent: "atlas",
+            model: recentModel,
+            time: { created: Date.now() },
+          },
         },
-      }],
+      ],
     }))
 
     const ctx = unsafeTestValue<PluginInput>({

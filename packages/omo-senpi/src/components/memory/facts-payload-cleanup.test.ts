@@ -123,15 +123,17 @@ describe("facts terminal payload deletion", () => {
     // given
     const { root, identity, queue } = await fixture()
     let dirty = true
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
-      withWriterLock: async (operation) => {
-        if (dirty) {
-          dirty = false
-          await writeFile(join(identity.paths.repo, "foreign.md"), "parent bytes\n")
-        }
-        return operation()
-      },
-    }))
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        withWriterLock: async (operation) => {
+          if (dirty) {
+            dirty = false
+            await writeFile(join(identity.paths.repo, "foreign.md"), "parent bytes\n")
+          }
+          return operation()
+        },
+      }),
+    )
 
     // when
     const result = await runner.launchPending()
@@ -160,9 +162,11 @@ describe("facts terminal payload deletion", () => {
     const probe = deletionProbe(async (path) => {
       await Bun.file(path).delete()
     })
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
-      removeRunArtifact: probe.remove,
-    }))
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        removeRunArtifact: probe.remove,
+      }),
+    )
 
     // when
     const result = await runner.launchPending()
@@ -202,9 +206,9 @@ describe("facts terminal payload deletion", () => {
     })
 
     // when
-    const result = await reconcileOnly(new FactsExtractorRunner(
-      runnerOptions(root, identity, queue, "fail", { now: () => LATER }),
-    ))
+    const result = await reconcileOnly(
+      new FactsExtractorRunner(runnerOptions(root, identity, queue, "fail", { now: () => LATER })),
+    )
 
     // then
     expect(result.status).toBe("active")
@@ -215,12 +219,14 @@ describe("facts terminal payload deletion", () => {
     // given
     const { root, identity, queue } = await fixture()
     const collector = warnCollector()
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
-      logger: collector.logger,
-      removeRunArtifact: async (path: string) => {
-        throw new Error(`injected unlink failure: ${path}`)
-      },
-    }))
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        logger: collector.logger,
+        removeRunArtifact: async (path: string) => {
+          throw new Error(`injected unlink failure: ${path}`)
+        },
+      }),
+    )
 
     // when
     const result = await runner.launchPending()
@@ -238,14 +244,16 @@ describe("facts terminal payload deletion", () => {
     // lands - the deletion that follows must treat a missing file as success.
     const { root, identity, queue } = await fixture()
     const collector = warnCollector()
-    const runner = new FactsExtractorRunner(runnerOptions(root, identity, queue, "fact", {
-      logger: collector.logger,
-      writeTerminalSentinel: async (path: string, value: unknown) => {
-        const runDir = join(path, "..")
-        await Bun.file(payloadPath(runDir)).delete()
-        await writeRunJsonAtomic(path, value)
-      },
-    }))
+    const runner = new FactsExtractorRunner(
+      runnerOptions(root, identity, queue, "fact", {
+        logger: collector.logger,
+        writeTerminalSentinel: async (path: string, value: unknown) => {
+          const runDir = join(path, "..")
+          await Bun.file(payloadPath(runDir)).delete()
+          await writeRunJsonAtomic(path, value)
+        },
+      }),
+    )
 
     // when
     const result = await runner.launchPending()

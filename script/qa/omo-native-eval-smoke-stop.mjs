@@ -31,7 +31,10 @@ function isZombie(pid, readStat) {
     return false
   }
   // The command name in field 2 may contain spaces and parentheses; the state follows the last ")".
-  return stat.slice(stat.lastIndexOf(")") + 1).trimStart().startsWith("Z")
+  return stat
+    .slice(stat.lastIndexOf(")") + 1)
+    .trimStart()
+    .startsWith("Z")
 }
 
 function isAlive(pid, readStat) {
@@ -61,9 +64,14 @@ export async function waitForSmokeSupervisors(supervisors, options, observer = {
     if (pending.length === 0) return
     const elapsedMs = now() - started
     if (elapsedMs >= reserveMs) {
-      throw new Error(`shutdown leaked supervisors: ${pending.map(({ pid, command }) =>
-        `pid ${pid} survived ${Math.round(elapsedMs)} ms after drain (reserve ${reserveMs} ms)${command ? `: ${command}` : ""}`
-      ).join("; ")}`)
+      throw new Error(
+        `shutdown leaked supervisors: ${pending
+          .map(
+            ({ pid, command }) =>
+              `pid ${pid} survived ${Math.round(elapsedMs)} ms after drain (reserve ${reserveMs} ms)${command ? `: ${command}` : ""}`,
+          )
+          .join("; ")}`,
+      )
     }
     // Non-child supervisor pids have no portable exit event. Observe liveness
     // without ever extending the shared deadline, even for several supervisors.
@@ -74,7 +82,8 @@ export async function waitForSmokeSupervisors(supervisors, options, observer = {
 export async function stopSmokeHosts(binary, options, { supervisors = [], observer, onDrained } = {}) {
   const budgetMs = hostStopBudgetMs(options.env)
   const status = await exec(binary, ["daemon", "status", "--json"], {
-    ...options, timeout: budgetMs + EXEC_MARGIN_MS,
+    ...options,
+    timeout: budgetMs + EXEC_MARGIN_MS,
   }).catch((error) => {
     // Exit 3 means no endpoint answers, not that inventory failed. A stalled
     // generation still appears in its JSON and still needs the stop request.
@@ -88,10 +97,12 @@ export async function stopSmokeHosts(binary, options, { supervisors = [], observ
   try {
     result = await exec(binary, command.args, { ...options, timeout: command.timeout })
   } catch (error) {
-    const pids = hosts.flatMap((host) =>
-      (host.generations ?? []).map((generation) => generation.pid).concat(host.pid ?? [])
-    ).filter((pid) => pid !== undefined && pid !== null)
-    throw new Error(`daemon stop failed (pid ${[...new Set(pids)].join(", ") || "?"}): ${error.message}\n${error.stdout ?? ""}${error.stderr ?? ""}`)
+    const pids = hosts
+      .flatMap((host) => (host.generations ?? []).map((generation) => generation.pid).concat(host.pid ?? []))
+      .filter((pid) => pid !== undefined && pid !== null)
+    throw new Error(
+      `daemon stop failed (pid ${[...new Set(pids)].join(", ") || "?"}): ${error.message}\n${error.stdout ?? ""}${error.stderr ?? ""}`,
+    )
   }
   const drainedAt = (observer?.now ?? (() => performance.now()))()
   onDrained?.(result)

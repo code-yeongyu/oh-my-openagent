@@ -17,7 +17,9 @@ export type GatewayTarget = {
   readonly liveness: EndpointLiveness
 }
 
-export type GatewayResolution = { readonly kind: "ok"; readonly target: GatewayTarget } | { readonly kind: "error"; readonly error: ThreadToolFailure }
+export type GatewayResolution =
+  | { readonly kind: "ok"; readonly target: GatewayTarget }
+  | { readonly kind: "error"; readonly error: ThreadToolFailure }
 
 export type GatewayResolve = (address: string, options: { readonly all_scope?: boolean }) => Promise<GatewayResolution>
 
@@ -52,10 +54,16 @@ export type GatewayEngineOptions = {
   readonly now?: () => number
 }
 
-export function resolveFromEntries(entries: () => readonly GatewayAddressEntry[] | Promise<readonly GatewayAddressEntry[]>, callerWorkspaceRoot: () => string): GatewayResolve {
+export function resolveFromEntries(
+  entries: () => readonly GatewayAddressEntry[] | Promise<readonly GatewayAddressEntry[]>,
+  callerWorkspaceRoot: () => string,
+): GatewayResolve {
   return async (address, options) => {
     const known = await entries()
-    const resolved = resolveTarget(known, address, { all_scope: options.all_scope, callerWorkspaceRoot: callerWorkspaceRoot() })
+    const resolved = resolveTarget(known, address, {
+      all_scope: options.all_scope,
+      callerWorkspaceRoot: callerWorkspaceRoot(),
+    })
     if (resolved.kind !== "ok") {
       const details = resolved.candidates === undefined ? undefined : { candidates: resolved.candidates }
       return { kind: "error", error: threadToolFailure(resolved.code, resolved.message, resolved.next_action, details) }
@@ -75,8 +83,20 @@ const NEXT_ACTION: Partial<Record<ThreadErrorCode, string>> = {
   invalid_arguments: "Fix the arguments and send again.",
 }
 
-function fail(code: ThreadErrorCode, message: string, details?: Readonly<Record<string, unknown>>): GatewayDeliveryResult {
-  return { kind: "error", error: threadToolFailure(code, message, NEXT_ACTION[code] ?? "Call thread_list and retry after checking the target.", details) }
+function fail(
+  code: ThreadErrorCode,
+  message: string,
+  details?: Readonly<Record<string, unknown>>,
+): GatewayDeliveryResult {
+  return {
+    kind: "error",
+    error: threadToolFailure(
+      code,
+      message,
+      NEXT_ACTION[code] ?? "Call thread_list and retry after checking the target.",
+      details,
+    ),
+  }
 }
 
 function argsHash(value: unknown): string {
@@ -92,7 +112,14 @@ export function deliveryArgsHash(fields: {
   readonly binding: { readonly binding_id: string; readonly revision: number } | null
   readonly author: ExternalAuthor | undefined
 }): string {
-  return argsHash({ target: fields.target, text: fields.text, mode: fields.mode, expected_turn_id: fields.expected_turn_id, binding: fields.binding, author: fields.author })
+  return argsHash({
+    target: fields.target,
+    text: fields.text,
+    mode: fields.mode,
+    expected_turn_id: fields.expected_turn_id,
+    binding: fields.binding,
+    author: fields.author,
+  })
 }
 
 /**
@@ -107,17 +134,25 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
 
   async function deliver(request: GatewayDeliverRequest): Promise<GatewayDeliveryResult> {
     const mode = request.mode ?? "auto"
-    if (mode === "steer" && request.expected_turn_id === undefined) return fail("invalid_arguments", "A steer needs expected_turn_id (the target's current turn_epoch).")
+    if (mode === "steer" && request.expected_turn_id === undefined)
+      return fail("invalid_arguments", "A steer needs expected_turn_id (the target's current turn_epoch).")
     const bytes = Buffer.byteLength(request.text)
-    if (bytes > TARGET_MAX_BYTES) return fail("message_too_large", `The message is ${bytes} bytes, above the ${TARGET_MAX_BYTES}-byte limit.`)
+    if (bytes > TARGET_MAX_BYTES)
+      return fail("message_too_large", `The message is ${bytes} bytes, above the ${TARGET_MAX_BYTES}-byte limit.`)
     const resolved = await options.resolve(request.target, { all_scope: request.all_scope })
     if (resolved.kind === "error") return resolved
     const target = resolved.target
     const endpoint = target.liveness === "routable" ? target.endpoint : null
-    if (endpoint === null && decideDelivery("offline", mode, request.expected_turn_id ?? null, null).kind === "refuse") {
+    if (
+      endpoint === null &&
+      decideDelivery("offline", mode, request.expected_turn_id ?? null, null).kind === "refuse"
+    ) {
       return fail("turn_conflict", "The target has no live turn to steer.", { target: target.durable_id })
     }
-    const facts = senderFacts(request.sender, await (options.senderProvenance?.() ?? resolveProvenance({ cwd: process.cwd() })))
+    const facts = senderFacts(
+      request.sender,
+      await (options.senderProvenance?.() ?? resolveProvenance({ cwd: process.cwd() })),
+    )
     const deliveryId = randomUUID()
     const idempotencyKey = request.idempotency_key ?? `auto:${deliveryId}`
     const outcome = await store.enqueue({
@@ -140,11 +175,21 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       binding: facts.binding,
       receipt: {
         idempotency_key: idempotencyKey,
-        args_hash: deliveryArgsHash({ target: target.durable_id, text: request.text, mode, expected_turn_id: request.expected_turn_id ?? null, binding: facts.binding, author: request.sender.kind === "external" ? request.sender.origin.author : undefined }),
+        args_hash: deliveryArgsHash({
+          target: target.durable_id,
+          text: request.text,
+          mode,
+          expected_turn_id: request.expected_turn_id ?? null,
+          binding: facts.binding,
+          author: request.sender.kind === "external" ? request.sender.origin.author : undefined,
+        }),
       },
       endpoint_kind: endpoint?.kind ?? null,
     })
-    if (outcome.kind === "busy") return fail("overloaded", "The gateway store is locked by a suspended writer; nothing was sent.", { budget: "store_lock" })
+    if (outcome.kind === "busy")
+      return fail("overloaded", "The gateway store is locked by a suspended writer; nothing was sent.", {
+        budget: "store_lock",
+      })
     if (outcome.kind === "refused") return fail(outcome.code, outcome.message, outcome.details)
     if (outcome.kind === "replay") {
       const replayed = outcome.result as GatewayDeliveryResult
@@ -167,10 +212,20 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       // A live drain pass that finds a queued row always reports one (admitted, refused or held), so a
       // reply naming nothing while this row is still queued means no drain ran: the session has no
       // registered control endpoint, and nothing starts it before the session's next run (#12486).
-      const drained = reply !== undefined && reply.unroutable === undefined && (view.row.state !== "queued" || (reply.admitted ?? []).length > 0)
+      const drained =
+        reply !== undefined &&
+        reply.unroutable === undefined &&
+        (view.row.state !== "queued" || (reply.admitted ?? []).length > 0)
       return await settle(resultFromRow(view.row, view.queue_position, endpoint.kind, false, !drained))
     } catch (error) {
-      await store.abandonReceipt({ now: now(), principal: facts.principal, idempotency_key: idempotencyKey, error_note: error instanceof Error ? error.message : String(error) }).catch(() => false)
+      await store
+        .abandonReceipt({
+          now: now(),
+          principal: facts.principal,
+          idempotency_key: idempotencyKey,
+          error_note: error instanceof Error ? error.message : String(error),
+        })
+        .catch(() => false)
       throw error
     }
   }
