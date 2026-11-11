@@ -4,7 +4,18 @@ import { describe, expect, onTestFinished, test } from "bun:test"
 import { existsSync } from "node:fs"
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import { type AccountFacts, accountHome, chooseLockHome, lockDirectoryIn, type PlatformFacts, systemAccountFacts, TEST_LOCK_HOME_ENV, testLockHome, useAccountFacts, userRecordHome } from "./account-home"
+import {
+  type AccountFacts,
+  accountHome,
+  chooseLockHome,
+  lockDirectoryIn,
+  type PlatformFacts,
+  systemAccountFacts,
+  TEST_LOCK_HOME_ENV,
+  testLockHome,
+  useAccountFacts,
+  userRecordHome,
+} from "./account-home"
 import { credentialLockPaths, heldCredentialLease, withCredentialLock } from "./credential-lock"
 import type { CredentialStore } from "./keystore"
 import type { Credentials } from "./protocol"
@@ -12,10 +23,19 @@ import { createSession } from "./session"
 import { grant, privateKeys, temporaryHome } from "./test-support"
 
 const API = "https://api.example.test"
-const refuse = (what: string) => () => { throw new Error(`unexpected ${what}`) }
+const refuse = (what: string) => () => {
+  throw new Error(`unexpected ${what}`)
+}
 
 function platform(overrides: Partial<PlatformFacts> & Pick<PlatformFacts, "platform">): PlatformFacts {
-  return { uid: 501, env: { HOME: "/scratch/home", USERPROFILE: "C:\\scratch" }, readFile: refuse("readFile"), isFile: refuse("isFile"), run: refuse("run"), ...overrides }
+  return {
+    uid: 501,
+    env: { HOME: "/scratch/home", USERPROFILE: "C:\\scratch" },
+    readFile: refuse("readFile"),
+    isFile: refuse("isFile"),
+    run: refuse("run"),
+    ...overrides,
+  }
 }
 
 describe("userRecordHome reads the OS user record, never the environment", () => {
@@ -23,7 +43,16 @@ describe("userRecordHome reads the OS user record, never the environment", () =>
     const passwd = "root:x:0:0:root:/root:/bin/bash\nalice:x:501:501::/home/alice:/bin/bash\n"
     expect(userRecordHome(platform({ platform: "linux", readFile: () => passwd }))).toBe("/home/alice")
     expect(userRecordHome(platform({ platform: "linux", uid: 777, readFile: () => passwd }))).toBeUndefined()
-    expect(userRecordHome(platform({ platform: "linux", readFile: () => { throw new Error("ENOENT") } }))).toBeUndefined()
+    expect(
+      userRecordHome(
+        platform({
+          platform: "linux",
+          readFile: () => {
+            throw new Error("ENOENT")
+          },
+        }),
+      ),
+    ).toBeUndefined()
   })
 
   test("darwin: the home field of `id -P`, looked up by uid", () => {
@@ -35,7 +64,16 @@ describe("userRecordHome reads the OS user record, never the environment", () =>
     expect(userRecordHome(platform({ platform: "darwin", run }))).toBe("/Users/alice")
     expect(calls).toEqual([["/usr/bin/id", "-P"]])
     expect(userRecordHome(platform({ platform: "darwin", uid: 502, run }))).toBeUndefined()
-    expect(userRecordHome(platform({ platform: "darwin", run: () => { throw new Error("no id") } }))).toBeUndefined()
+    expect(
+      userRecordHome(
+        platform({
+          platform: "darwin",
+          run: () => {
+            throw new Error("no id")
+          },
+        }),
+      ),
+    ).toBeUndefined()
   })
 
   const WHOAMI = "C:\\Windows\\System32\\whoami.exe"
@@ -47,10 +85,18 @@ describe("userRecordHome reads the OS user record, never the environment", () =>
     const key = `HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\ProfileList\\${sid}`
     const run = (command: string, args: readonly string[]) => {
       if (command === WHOAMI) return `"desktop-1\\alice","${sid}"\r\n`
-      if (command === REG && args[1] === key) return `\r\n${key}\r\n    ProfileImagePath    REG_EXPAND_SZ    %SystemDrive%\\Users\\alice\r\n\r\n`
+      if (command === REG && args[1] === key)
+        return `\r\n${key}\r\n    ProfileImagePath    REG_EXPAND_SZ    %SystemDrive%\\Users\\alice\r\n\r\n`
       throw new Error(`unexpected ${command} ${args.join(" ")}`)
     }
-    const win = (env: Record<string, string>, runner = run) => platform({ platform: "win32", uid: undefined, env: { SystemRoot: "C:\\Windows", ...env }, isFile: systemTools, run: runner })
+    const win = (env: Record<string, string>, runner = run) =>
+      platform({
+        platform: "win32",
+        uid: undefined,
+        env: { SystemRoot: "C:\\Windows", ...env },
+        isFile: systemTools,
+        run: runner,
+      })
     expect(userRecordHome(win({ SystemDrive: "C:", USERPROFILE: "D:\\scratch" }))).toBe("C:\\Users\\alice")
     expect(userRecordHome(win({}))).toBeUndefined()
     expect(userRecordHome(win({}, () => "no sid here"))).toBeUndefined()
@@ -61,9 +107,13 @@ describe("userRecordHome reads the OS user record, never the environment", () =>
     const spawned: string[] = []
     const run = (command: string) => {
       spawned.push(command)
-      return command === WHOAMI ? "\"desktop-1\\alice\",\"S-1-5-21-1-2-3-1001\"" : "    ProfileImagePath    REG_SZ    C:\\Users\\alice"
+      return command === WHOAMI
+        ? '"desktop-1\\alice","S-1-5-21-1-2-3-1001"'
+        : "    ProfileImagePath    REG_SZ    C:\\Users\\alice"
     }
-    const home = userRecordHome(platform({ platform: "win32", uid: undefined, env: { SystemRoot: "C:\\Windows" }, isFile: systemTools, run }))
+    const home = userRecordHome(
+      platform({ platform: "win32", uid: undefined, env: { SystemRoot: "C:\\Windows" }, isFile: systemTools, run }),
+    )
     expect(spawned).toEqual([WHOAMI, REG])
     expect(home).toBe("C:\\Users\\alice")
   })
@@ -74,10 +124,22 @@ describe("userRecordHome reads the OS user record, never the environment", () =>
       spawned.push(command)
       return ""
     }
-    for (const env of [{}, { SystemRoot: "Windows" }, { SystemRoot: "\\\\server\\share\\Windows" }, { SystemRoot: "C:\\Windows\\..\\repo" }, { SystemRoot: "" }]) {
-      expect(userRecordHome(platform({ platform: "win32", uid: undefined, env, isFile: () => true, run }))).toBeUndefined()
+    for (const env of [
+      {},
+      { SystemRoot: "Windows" },
+      { SystemRoot: "\\\\server\\share\\Windows" },
+      { SystemRoot: "C:\\Windows\\..\\repo" },
+      { SystemRoot: "" },
+    ]) {
+      expect(
+        userRecordHome(platform({ platform: "win32", uid: undefined, env, isFile: () => true, run })),
+      ).toBeUndefined()
     }
-    expect(userRecordHome(platform({ platform: "win32", uid: undefined, env: { SystemRoot: "C:\\Windows" }, isFile: () => false, run }))).toBeUndefined()
+    expect(
+      userRecordHome(
+        platform({ platform: "win32", uid: undefined, env: { SystemRoot: "C:\\Windows" }, isFile: () => false, run }),
+      ),
+    ).toBeUndefined()
     expect(spawned).toEqual([])
   })
 
@@ -86,16 +148,23 @@ describe("userRecordHome reads the OS user record, never the environment", () =>
   })
 })
 
-function facts(overrides: Partial<AccountFacts>): AccountFacts & { readonly warnings: string[]; readonly prepared: string[] } {
+function facts(
+  overrides: Partial<AccountFacts>,
+): AccountFacts & { readonly warnings: string[]; readonly prepared: string[] } {
   const warnings: string[] = []
   const prepared: string[] = []
   return {
     recordHome: () => "/account/home",
     homedir: () => "/scratch/home",
-    prepareLockDirectory: directory => { prepared.push(directory) },
-    warn: message => { warnings.push(message) },
+    prepareLockDirectory: (directory) => {
+      prepared.push(directory)
+    },
+    warn: (message) => {
+      warnings.push(message)
+    },
     ...overrides,
-    warnings, prepared,
+    warnings,
+    prepared,
   }
 }
 
@@ -117,7 +186,11 @@ describe("chooseLockHome", () => {
   })
 
   test("an unusable record home falls back to homedir() with one warning naming both", () => {
-    const f = facts({ prepareLockDirectory: () => { throw Object.assign(new Error("read-only"), { code: "EROFS" }) } })
+    const f = facts({
+      prepareLockDirectory: () => {
+        throw Object.assign(new Error("read-only"), { code: "EROFS" })
+      },
+    })
     expect(chooseLockHome(f)).toBe("/scratch/home")
     expect(f.warnings).toHaveLength(1)
     expect(f.warnings[0]).toContain("/account/home")
@@ -138,7 +211,8 @@ describe("the test-only lock home a test hands a CLI child (#12978 review)", () 
   })
 
   test("an empty or relative value is ignored", () => {
-    for (const value of [undefined, "", "relative/home"]) expect(testLockHome({ [TEST_LOCK_HOME_ENV]: value }, marked)).toBeUndefined()
+    for (const value of [undefined, "", "relative/home"])
+      expect(testLockHome({ [TEST_LOCK_HOME_ENV]: value }, marked)).toBeUndefined()
   })
 })
 
@@ -150,9 +224,16 @@ describe("the default lock home of a process", () => {
     const home = join(root, "home")
     const warnings: string[] = []
     const previous = useAccountFacts({
-      ...systemAccountFacts, recordHome: () => join(blocker, "account-home"), homedir: () => home, warn: message => { warnings.push(message) },
+      ...systemAccountFacts,
+      recordHome: () => join(blocker, "account-home"),
+      homedir: () => home,
+      warn: (message) => {
+        warnings.push(message)
+      },
     })
-    onTestFinished(() => { useAccountFacts(previous) })
+    onTestFinished(() => {
+      useAccountFacts(previous)
+    })
     return { home, warnings }
   }
 
@@ -160,7 +241,10 @@ describe("the default lock home of a process", () => {
     const { home, warnings } = await unwritableAccount()
     expect(accountHome()).toBe(home)
     expect(accountHome()).toBe(home)
-    const [first, nested] = await withCredentialLock(API, async () => [credentialLockPaths(API).lock, heldCredentialLease(API) !== undefined] as const)
+    const [first, nested] = await withCredentialLock(
+      API,
+      async () => [credentialLockPaths(API).lock, heldCredentialLease(API) !== undefined] as const,
+    )
     expect(first).toBe(credentialLockPaths(API, home).lock)
     expect(nested).toBe(true)
     expect(warnings).toHaveLength(1)
@@ -172,11 +256,20 @@ describe("the default lock home of a process", () => {
     const store: CredentialStore = {
       read: async () => stored,
       readAuthoritative: async () => stored,
-      write: async value => { stored = value },
-      clear: async () => { stored = null },
+      write: async (value) => {
+        stored = value
+      },
+      clear: async () => {
+        stored = null
+      },
     }
     const session = createSession({ api: API, store, beforeKeysDiscarded: async () => undefined })
-    const credentials: Credentials = { ...grant, ...privateKeys, accountId: "account-a", credentialGeneration: "generation-a" }
+    const credentials: Credentials = {
+      ...grant,
+      ...privateKeys,
+      accountId: "account-a",
+      credentialGeneration: "generation-a",
+    }
     await session.save(credentials)
     expect(stored).toEqual(credentials)
     expect(existsSync(lockDirectoryIn(home))).toBe(true)

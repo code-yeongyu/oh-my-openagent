@@ -53,8 +53,10 @@ export function findPiConfigEdits({ agentDir, homeDir }) {
 export function formatPiConfigLines(agentDir, edits) {
   return [
     `INFO config dir: ${agentDir}`,
-    ...edits.map((edit) =>
-      `WARN You edited ${edit.piPath} after omo moved to ${agentDir}; omo reads ${edit.agentPath}. Copy your change there (or run: omo config import-pi ${edit.file}).`),
+    ...edits.map(
+      (edit) =>
+        `WARN You edited ${edit.piPath} after omo moved to ${agentDir}; omo reads ${edit.agentPath}. Copy your change there (or run: omo config import-pi ${edit.file}).`,
+    ),
   ]
 }
 
@@ -65,6 +67,9 @@ export function piConfigReport(options = {}) {
   try {
     return formatPiConfigLines(agentDir, findPiConfigEdits({ agentDir, homeDir }))
   } catch (error) {
-    return [`INFO config dir: ${agentDir}`, `WARN could not check ${join(homeDir, ".pi", "agent")} for config edits: ${error.message}`]
+    return [
+      `INFO config dir: ${agentDir}`,
+      `WARN could not check ${join(homeDir, ".pi", "agent")} for config edits: ${error.message}`,
+    ]
   }
 }

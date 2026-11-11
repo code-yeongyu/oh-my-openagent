@@ -19,8 +19,11 @@ describe("a second reader attaches to the approve already in flight (#11589 revi
   test("#given the first approve is pending #when a second reader reaches approveOnce #then it attaches and there is one dialog", async () => {
     let open = () => {}
     let started = () => {}
-    const approveStarted = new Promise<void>(resolve => (started = resolve))
-    const keychain = fakeKeychain({ approveGate: new Promise<void>(resolve => (open = resolve)), onApprove: () => started() })
+    const approveStarted = new Promise<void>((resolve) => (started = resolve))
+    const keychain = fakeKeychain({
+      approveGate: new Promise<void>((resolve) => (open = resolve)),
+      onApprove: () => started(),
+    })
     keychain.put(A, "stored-value", "runtime", "ours")
     const { access } = keychain
     if (access.kind !== "ready") throw new Error("fake helper not ready")

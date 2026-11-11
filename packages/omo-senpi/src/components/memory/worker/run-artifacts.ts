@@ -63,10 +63,7 @@ export interface RunChildExit {
   readonly timedOut: boolean
 }
 
-export function runOutcomeMatchesLedger(
-  ledger: { readonly attempt?: number },
-  outcome: RunOutcome,
-): boolean {
+export function runOutcomeMatchesLedger(ledger: { readonly attempt?: number }, outcome: RunOutcome): boolean {
   return ledger.attempt === outcome.attempt
 }
 
@@ -142,11 +139,13 @@ export async function unlinkRunArtifact(path: string): Promise<void> {
 }
 
 export function parseRunPrelaunchArtifact(value: unknown): RunPrelaunchArtifact {
-  if (!isRecord(value)
-    || value.version !== 1
-    || typeof value.runId !== "string"
-    || typeof value.worktreeDir !== "string"
-    || typeof value.worktreeBranch !== "string") {
+  if (
+    !isRecord(value) ||
+    value.version !== 1 ||
+    typeof value.runId !== "string" ||
+    typeof value.worktreeDir !== "string" ||
+    typeof value.worktreeBranch !== "string"
+  ) {
     throw new TypeError("Invalid reflection prelaunch artifact")
   }
   return {

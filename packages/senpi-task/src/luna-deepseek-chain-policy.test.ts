@@ -29,7 +29,11 @@ describe("Senpi Luna and DeepSeek chain policy", () => {
     expect(quick?.map((entry) => entry.model)).not.toContain("kimi-for-coding-highspeed")
     expect(quick?.slice(0, 3)).toEqual([
       { providers: ["chatgpt-subscription", "openai"], model: "gpt-6-luna-fast", variant: "low" },
-      { providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot"], model: "claude-haiku-5-5", variant: "medium" },
+      {
+        providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot"],
+        model: "claude-haiku-5-5",
+        variant: "medium",
+      },
       DEEPSEEK_OFF,
     ])
   })
@@ -42,7 +46,11 @@ describe("Senpi Luna and DeepSeek chain policy", () => {
       expect(chain?.slice(0, 4)).toEqual([
         KIMI_HIGHSPEED_OFF,
         { providers: ["chatgpt-subscription", "openai"], model: "gpt-6-luna-fast", variant: "low" },
-        { providers: ["anthropic-subscription", "anthropic", "github-copilot"], model: "claude-haiku-5-5", variant: "medium" },
+        {
+          providers: ["anthropic-subscription", "anthropic", "github-copilot"],
+          model: "claude-haiku-5-5",
+          variant: "medium",
+        },
         DEEPSEEK_MAX,
       ])
     },

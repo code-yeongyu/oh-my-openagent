@@ -40,15 +40,18 @@ describe("comment-checker exit protocol (#8850)", () => {
   test.each([
     ["STATUS_DLL_NOT_FOUND on Windows", 3221225781, ""],
     ["a generic failure", 1, "exec format error\n"],
-  ])("#given the checker exits outside the protocol (%s) #when run #then no comments are reported and the failure is exposed", async (_name, exitCode, stderr) => {
-    // when
-    const result = await run(exitCode, stderr)
+  ])(
+    "#given the checker exits outside the protocol (%s) #when run #then no comments are reported and the failure is exposed",
+    async (_name, exitCode, stderr) => {
+      // when
+      const result = await run(exitCode, stderr)
 
-    // then
-    expect(result.hasComments).toBe(false)
-    expect(result.message).toBe("")
-    expect(result.failure).toEqual({ exitCode, stderr: stderr.trim() })
-  })
+      // then
+      expect(result.hasComments).toBe(false)
+      expect(result.message).toBe("")
+      expect(result.failure).toEqual({ exitCode, stderr: stderr.trim() })
+    },
+  )
 
   test("#given a checker that cannot start exits before reading its input #when run #then the failure is still exposed", async () => {
     // when
@@ -60,7 +63,10 @@ describe("comment-checker exit protocol (#8850)", () => {
 
   test("#given the spawn fails after it returned (EACCES) and the output streams abort #when run #then the start failure is exposed", async () => {
     // given
-    const aborted = () => new ReadableStream<Uint8Array>({ start: (controller) => controller.error(new Error("The operation was aborted")) })
+    const aborted = () =>
+      new ReadableStream<Uint8Array>({
+        start: (controller) => controller.error(new Error("The operation was aborted")),
+      })
     const notStarted: SpawnProcess = {
       stdin: { send: () => Promise.reject(new Error("write EPIPE")) },
       stdout: aborted(),
@@ -76,7 +82,11 @@ describe("comment-checker exit protocol (#8850)", () => {
     )
 
     // then
-    expect(result).toEqual({ hasComments: false, message: "", failure: { exitCode: null, stderr: "spawn /fake/comment-checker EACCES" } })
+    expect(result).toEqual({
+      hasComments: false,
+      message: "",
+      failure: { exitCode: null, stderr: "spawn /fake/comment-checker EACCES" },
+    })
   })
 
   test("#given the checker exits 2 but its stderr cannot be read #when run #then no comments are reported", async () => {

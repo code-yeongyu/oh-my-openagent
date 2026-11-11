@@ -6,7 +6,11 @@ import { join } from "node:path"
 
 import { DEVICE_SERVICE_VERSION } from "../../device-service-core/src/index.ts"
 import { parseChecksums, parseManifest } from "../../device-service-core/src/release/release-assets.ts"
-import { DEVICE_SERVICE_RELEASE_KEYS, releaseKeySetBytes, verifyReleaseSignature } from "../../device-service-core/src/release/release-signature.ts"
+import {
+  DEVICE_SERVICE_RELEASE_KEYS,
+  releaseKeySetBytes,
+  verifyReleaseSignature,
+} from "../../device-service-core/src/release/release-signature.ts"
 import { compareVersions } from "../../device-service-core/src/release/version.ts"
 import packageJson from "../package.json" with { type: "json" }
 import { deviceServiceBootstrapSetup } from "../remote-bootstrap"
@@ -23,7 +27,8 @@ const PUBLISHED_BINARY_SHA256 = {
 }
 const SIGNED_ENTRY_FILES = ["checksums.txt", "checksums.txt.sig", "latest.json"] as const
 
-const published = (name: (typeof SIGNED_ENTRY_FILES)[number]): Uint8Array => new Uint8Array(readFileSync(join(FIXTURE_DIR, name)))
+const published = (name: (typeof SIGNED_ENTRY_FILES)[number]): Uint8Array =>
+  new Uint8Array(readFileSync(join(FIXTURE_DIR, name)))
 const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex")
 
 const dirs: string[] = []
@@ -42,7 +47,8 @@ describe("the pinned device service release is the published 0.1.27", () => {
 
     // when they are checked with this build's own key set and parsers
     const keys = releaseKeySetBytes(DEVICE_SERVICE_RELEASE_KEYS)
-    const verdict = keys === undefined ? undefined : await verifyReleaseSignature(keys, published("checksums.txt.sig"), checksums)
+    const verdict =
+      keys === undefined ? undefined : await verifyReleaseSignature(keys, published("checksums.txt.sig"), checksums)
     const digests = parseChecksums(checksums)
     const manifest = parseManifest(latest)
 
@@ -52,7 +58,9 @@ describe("the pinned device service release is the published 0.1.27", () => {
     expect(digests?.get("latest.json")).toBe(sha256(latest))
     for (const [name, digest] of Object.entries(PUBLISHED_BINARY_SHA256)) expect(digests?.get(name)).toBe(digest)
     expect(manifest).toEqual({ version: DEVICE_SERVICE_VERSION, min_engine_version: "5.1.62" })
-    expect(compareVersions(manifest?.min_engine_version ?? "", packageJson.dependencies["@code-yeongyu/senpi"])).toBeLessThanOrEqual(0)
+    expect(
+      compareVersions(manifest?.min_engine_version ?? "", packageJson.dependencies["@code-yeongyu/senpi"]),
+    ).toBeLessThanOrEqual(0)
   })
 
   test("the start-up install fetches the pinned release and passes its signature check before asking for the binary", async () => {
@@ -62,10 +70,10 @@ describe("the pinned device service release is the published 0.1.27", () => {
     const server = Bun.serve({
       hostname: "127.0.0.1",
       port: 0,
-      fetch: request => {
+      fetch: (request) => {
         const path = new URL(request.url).pathname
         requested.push(path)
-        const name = SIGNED_ENTRY_FILES.find(file => path === `${prefix}${file}`)
+        const name = SIGNED_ENTRY_FILES.find((file) => path === `${prefix}${file}`)
         return name === undefined ? new Response("not found", { status: 404 }) : new Response(published(name))
       },
     })
@@ -82,7 +90,7 @@ describe("the pinned device service release is the published 0.1.27", () => {
       arch: "x64",
       release: {
         origin: server.url.origin,
-        run: async argv => {
+        run: async (argv) => {
           runs.push(argv)
           return { exitCode: 0, output: "" }
         },
@@ -95,7 +103,9 @@ describe("the pinned device service release is the published 0.1.27", () => {
     // then it asked for the binary and latest.json, which acquire requests only after checksums.txt.sig verified and
     // checksums.txt named both; the binary is not served here, so it stops there, writing and running nothing
     expect(requested.toSorted()).toEqual(
-      ["checksums.txt", "checksums.txt.sig", "latest.json", "omo-device-service-linux-x64"].map(file => `${prefix}${file}`),
+      ["checksums.txt", "checksums.txt.sig", "latest.json", "omo-device-service-linux-x64"].map(
+        (file) => `${prefix}${file}`,
+      ),
     )
     expect(setup.pinVersion).toBe("0.1.27")
     expect(outcome).toEqual({

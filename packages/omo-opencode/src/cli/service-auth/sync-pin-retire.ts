@@ -19,7 +19,9 @@ export function retireSyncPinOnDiscard(options: {
 }): BeforeKeysDiscarded {
   const hook = async (discarded: DiscardedCredential) => {
     if (discarded.kind === "unreadable") {
-      options.log("memory sync: a stored sign-in could not be read while it was replaced; its sync pin was left in place")
+      options.log(
+        "memory sync: a stored sign-in could not be read while it was replaced; its sync pin was left in place",
+      )
       return
     }
     // A sign-in that names no account never ran `omo sync` here (the usual case): nothing to retire, silently.

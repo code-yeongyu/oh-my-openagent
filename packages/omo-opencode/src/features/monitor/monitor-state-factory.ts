@@ -3,7 +3,13 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
 import type { MonitorBatcher } from "./batcher"
 import { LineStream } from "./line-stream"
-import type { DEFAULT_MONITOR_CONFIG, InternalMonitorState, MonitorInjector, MonitorManagerDeps, MonitorPromptClient } from "./manager-internals"
+import type {
+  DEFAULT_MONITOR_CONFIG,
+  InternalMonitorState,
+  MonitorInjector,
+  MonitorManagerDeps,
+  MonitorPromptClient,
+} from "./manager-internals"
 import {
   MONITOR_OUTPUT_ACCEPTED_MESSAGE_SKEW_MS,
   MONITOR_OUTPUT_MAX_ACTIVE_DEFER_MS,
@@ -80,47 +86,49 @@ export function observeProcessExit(
   logger: typeof log,
   onTerminal: (parentSessionId: string) => void,
 ): void {
-  void state.process.exited.then((result) => {
-    if (state.record.status === "stopped") {
-      return
-    }
+  void state.process.exited
+    .then((result) => {
+      if (state.record.status === "stopped") {
+        return
+      }
 
-    state.record.status = "exited"
-    if (result.code !== null) {
-      state.record.exitCode = result.code
-    }
-    if (result.signal !== null) {
-      state.record.signal = result.signal
-    }
-    state.record.counters = state.ring.getCounters()
-    state.batcher.flushNow({ allowEmpty: true })
-    state.batcher.destroy()
-    state.pipeline.stop()
-    void state.injector.flushMonitor(state.record.id).catch((flushError) => {
-      logger("[monitor] Failed to flush monitor output after process exit", {
-        monitorId: state.record.id,
-        error: flushError,
+      state.record.status = "exited"
+      if (result.code !== null) {
+        state.record.exitCode = result.code
+      }
+      if (result.signal !== null) {
+        state.record.signal = result.signal
+      }
+      state.record.counters = state.ring.getCounters()
+      state.batcher.flushNow({ allowEmpty: true })
+      state.batcher.destroy()
+      state.pipeline.stop()
+      void state.injector.flushMonitor(state.record.id).catch((flushError) => {
+        logger("[monitor] Failed to flush monitor output after process exit", {
+          monitorId: state.record.id,
+          error: flushError,
+        })
       })
+      onTerminal(state.record.parentSessionId)
     })
-    onTerminal(state.record.parentSessionId)
-  }).catch((error) => {
-    if (state.record.status === "stopped") {
-      return
-    }
+    .catch((error) => {
+      if (state.record.status === "stopped") {
+        return
+      }
 
-    state.record.status = "failed"
-    state.batcher.flushNow({ allowEmpty: true })
-    state.batcher.destroy()
-    state.pipeline.stop()
-    void state.injector.flushMonitor(state.record.id).catch((flushError) => {
-      logger("[monitor] Failed to flush monitor output after process failure", {
-        monitorId: state.record.id,
-        error: flushError,
+      state.record.status = "failed"
+      state.batcher.flushNow({ allowEmpty: true })
+      state.batcher.destroy()
+      state.pipeline.stop()
+      void state.injector.flushMonitor(state.record.id).catch((flushError) => {
+        logger("[monitor] Failed to flush monitor output after process failure", {
+          monitorId: state.record.id,
+          error: flushError,
+        })
       })
+      logger("[monitor] monitored process failed", { monitorId: state.record.id, error })
+      onTerminal(state.record.parentSessionId)
     })
-    logger("[monitor] monitored process failed", { monitorId: state.record.id, error })
-    onTerminal(state.record.parentSessionId)
-  })
 }
 
 export function spawnMonitorProcess(
@@ -129,16 +137,19 @@ export function spawnMonitorProcess(
   maxRuntimeMs: number,
 ): MonitoredProcess {
   const spawn = deps?.spawnMonitoredProcess ?? spawnMonitoredProcess
-  return spawn({ command, maxRuntimeMs }, {
-    setTimer(fn, ms) {
-      const timer = setTimeout(fn, ms)
-      timer.unref?.()
-      return timer
+  return spawn(
+    { command, maxRuntimeMs },
+    {
+      setTimer(fn, ms) {
+        const timer = setTimeout(fn, ms)
+        timer.unref?.()
+        return timer
+      },
+      clearTimer(handle) {
+        clearTimeout(handle)
+      },
     },
-    clearTimer(handle) {
-      clearTimeout(handle)
-    },
-  })
+  )
 }
 
 export function createMonitorInjector(

@@ -84,8 +84,12 @@ function isSourceOmoPluginEntry(plugin: PluginEntry): boolean {
 
 function isPackageOmoPluginEntry(plugin: PluginEntry): boolean {
   const name = getPluginEntryName(plugin)
-  return name === PLUGIN_NAME || name.startsWith(`${PLUGIN_NAME}@`) ||
-    name === LEGACY_PLUGIN_NAME || name.startsWith(`${LEGACY_PLUGIN_NAME}@`)
+  return (
+    name === PLUGIN_NAME ||
+    name.startsWith(`${PLUGIN_NAME}@`) ||
+    name === LEGACY_PLUGIN_NAME ||
+    name.startsWith(`${LEGACY_PLUGIN_NAME}@`)
+  )
 }
 
 function isOurPlugin(plugin: PluginEntry): boolean {
@@ -220,9 +224,10 @@ export async function addPluginToOpenCodeConfig(currentVersion: string): Promise
 
   const primaryTarget = detectConfigFormat()
   const targets = getConfigTargets()
-  const preferredSourceEntry = targets
-    .map((target) => findSourcePluginEntryInTarget(target))
-    .find((entry): entry is PluginEntry => entry !== null) ?? null
+  const preferredSourceEntry =
+    targets
+      .map((target) => findSourcePluginEntryInTarget(target))
+      .find((entry): entry is PluginEntry => entry !== null) ?? null
   const pluginEntry = await getPluginNameWithVersion(currentVersion, PLUGIN_NAME)
 
   let primaryResult: ConfigMergeResult | null = null

@@ -30,10 +30,7 @@ export interface SessionCreatedHandlerDeps {
   executeActions?: typeof executeActions
 }
 
-export async function handleSessionCreated(
-  deps: SessionCreatedHandlerDeps,
-  event: SessionCreatedEvent,
-): Promise<void> {
+export async function handleSessionCreated(deps: SessionCreatedHandlerDeps, event: SessionCreatedEvent): Promise<void> {
   const enabled = deps.isEnabled()
   log("[tmux-session-manager] onSessionCreated called", {
     enabled,
@@ -79,13 +76,7 @@ export async function handleSessionCreated(
       agentPanes: state.agentPanes.map((p) => p.paneId),
     })
 
-    const decision = decideSpawnActions(
-      state,
-      sessionId,
-      title,
-      deps.getCapacityConfig(),
-      deps.getSessionMappings(),
-    )
+    const decision = decideSpawnActions(state, sessionId, title, deps.getCapacityConfig(), deps.getSessionMappings())
 
     log("[tmux-session-manager] spawn decision", {
       canSpawn: decision.canSpawn,

@@ -35,9 +35,7 @@ describe("task model distribution", () => {
       if (result.kind !== "resolved") throw new Error(JSON.stringify(result))
       return result.plan
     })
-    expect(plans.map((plan) => plan.model)).toEqual([
-      "test-provider/a", "test-provider/a", "test-provider/b",
-    ])
+    expect(plans.map((plan) => plan.model)).toEqual(["test-provider/a", "test-provider/a", "test-provider/b"])
     expect(plans[2].fallback_models?.map((entry) => entry.display)).toEqual(["test-provider/a"])
   })
 
@@ -55,7 +53,9 @@ describe("task model distribution", () => {
         const planner = createTaskChildPlanner(config, mapOmoConfigAgents(config), () => registry)
         const spawn = (name: string) => {
           const result = planner({
-            prompt: "fixture", parent_session_id: "parent", depth: 0,
+            prompt: "fixture",
+            parent_session_id: "parent",
+            depth: 0,
             ...(target === "category" ? { category: name } : { subagent_type: name }),
           })
           if (result.kind !== "resolved") throw new Error(JSON.stringify(result))
@@ -70,7 +70,8 @@ describe("task model distribution", () => {
         const fourth = spawn("distributed")
         const rotating = distribution === "round_robin"
         expect([first, second, third, fourth].map((plan) => plan.model)).toEqual(
-          rotating ? ["test-provider/a", "test-provider/b", "test-provider/c", "test-provider/a"]
+          rotating
+            ? ["test-provider/a", "test-provider/b", "test-provider/c", "test-provider/a"]
             : Array(4).fill("test-provider/a"),
         )
         expect(second.fallback_models?.map((entry) => entry.display)).toEqual(
