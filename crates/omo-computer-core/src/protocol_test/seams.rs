@@ -1,7 +1,9 @@
 //! Design row C17 with amendment A9: exactly nine seams, the fake-only ones refused
 //! unless the backend is the fake.
 
-use crate::env::{check_launch_env, SeamRefusal, ENV_SEAMS};
+use crate::env::{
+    check_launch_env, check_launch_env_on, env_name_matches, NameCase, SeamRefusal, ENV_SEAMS,
+};
 
 #[test]
 fn engine_env_seams_enumerated() {
@@ -74,6 +76,77 @@ fn an_unknown_seam_is_refused_and_other_variables_are_ignored() {
     );
     assert_eq!(
         check_launch_env([("HOME", "/home/user"), ("PATH", "/bin")]),
+        Ok(Vec::new())
+    );
+}
+
+#[test]
+fn env_names_compare_by_the_platform_rule() {
+    assert!(env_name_matches(
+        "OMO_COMPUTER_BACKEND",
+        "OMO_COMPUTER_BACKEND",
+        NameCase::Sensitive
+    ));
+    assert!(!env_name_matches(
+        "omo_computer_backend",
+        "OMO_COMPUTER_BACKEND",
+        NameCase::Sensitive
+    ));
+    assert!(env_name_matches(
+        "omo_computer_backend",
+        "OMO_COMPUTER_BACKEND",
+        NameCase::AsciiInsensitive
+    ));
+    assert!(env_name_matches(
+        "Omo_Computer_Backend",
+        "OMO_COMPUTER_BACKEND",
+        NameCase::AsciiInsensitive
+    ));
+    assert!(!env_name_matches(
+        "OMO_COMPUTER_BACKENDS",
+        "OMO_COMPUTER_BACKEND",
+        NameCase::AsciiInsensitive
+    ));
+    assert_eq!(
+        NameCase::current(),
+        if cfg!(windows) {
+            NameCase::AsciiInsensitive
+        } else {
+            NameCase::Sensitive
+        }
+    );
+}
+
+#[test]
+fn mis_cased_seams_are_refused_where_names_ignore_case() {
+    let windows = NameCase::AsciiInsensitive;
+    assert_eq!(
+        check_launch_env_on([("omo_computer_fake_scenario", "x")], windows),
+        Err(SeamRefusal::FakeOnlySeamWithRealBackend {
+            name: "omo_computer_fake_scenario".to_owned()
+        })
+    );
+    assert_eq!(
+        check_launch_env_on([("Omo_Computer_Nope", "1")], windows),
+        Err(SeamRefusal::UnknownSeam {
+            name: "Omo_Computer_Nope".to_owned()
+        })
+    );
+    let admitted = check_launch_env_on(
+        [
+            ("omo_computer_backend", "fake"),
+            ("Omo_Computer_Runtime_Dir", "/t"),
+        ],
+        windows,
+    )
+    .expect("a mis-cased fake backend admits the fake-only seams");
+    assert_eq!(
+        admitted.iter().map(|seam| seam.name).collect::<Vec<_>>(),
+        ["OMO_COMPUTER_BACKEND", "OMO_COMPUTER_RUNTIME_DIR"]
+    );
+    // Where names are case-sensitive a mis-cased name is another variable the engine never reads.
+    assert_eq!(
+        check_launch_env_on([("omo_computer_fake_scenario", "x")], NameCase::Sensitive),
         Ok(Vec::new())
     );
 }

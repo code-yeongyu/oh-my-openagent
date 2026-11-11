@@ -115,24 +115,74 @@ pub enum SeamRefusal {
 /// The prefix every seam carries.
 pub const SEAM_PREFIX: &str = "OMO_COMPUTER_";
 
-/// Checks a launch environment: refuses an unknown `OMO_COMPUTER_*` name and a fake-only
-/// seam without `OMO_COMPUTER_BACKEND=fake`. Returns the seams that are set, in table order.
+/// How the platform compares environment variable names: exactly on Unix, ASCII
+/// case-insensitively on Windows, where `omo_computer_backend` and `OMO_COMPUTER_BACKEND`
+/// are the same variable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NameCase {
+    Sensitive,
+    AsciiInsensitive,
+}
+
+impl NameCase {
+    /// The rule of the platform this engine runs on.
+    #[must_use]
+    pub const fn current() -> Self {
+        if cfg!(windows) {
+            Self::AsciiInsensitive
+        } else {
+            Self::Sensitive
+        }
+    }
+}
+
+/// Whether the environment name `candidate` names the variable `name` under `case`.
+#[must_use]
+pub fn env_name_matches(candidate: &str, name: &str, case: NameCase) -> bool {
+    match case {
+        NameCase::Sensitive => candidate == name,
+        NameCase::AsciiInsensitive => candidate.eq_ignore_ascii_case(name),
+    }
+}
+
+fn has_seam_prefix(name: &str, case: NameCase) -> bool {
+    name.get(..SEAM_PREFIX.len())
+        .is_some_and(|prefix| env_name_matches(prefix, SEAM_PREFIX, case))
+}
+
+/// Checks a launch environment under this platform's name rule; see [`check_launch_env_on`].
 ///
 /// # Errors
 /// The first refusal in name order.
 pub fn check_launch_env<'a>(
     vars: impl IntoIterator<Item = (&'a str, &'a str)>,
 ) -> Result<Vec<EnvSeam>, SeamRefusal> {
+    check_launch_env_on(vars, NameCase::current())
+}
+
+/// Checks a launch environment: refuses an unknown `OMO_COMPUTER_*` name and a fake-only
+/// seam without `OMO_COMPUTER_BACKEND=fake`, comparing names under `case`. Returns the seams
+/// that are set, in table order.
+///
+/// # Errors
+/// The first refusal in name order.
+pub fn check_launch_env_on<'a>(
+    vars: impl IntoIterator<Item = (&'a str, &'a str)>,
+    case: NameCase,
+) -> Result<Vec<EnvSeam>, SeamRefusal> {
     let mut set: Vec<(&str, &str)> = vars
         .into_iter()
-        .filter(|(name, _)| name.starts_with(SEAM_PREFIX))
+        .filter(|(name, _)| has_seam_prefix(name, case))
         .collect();
     set.sort_unstable();
-    let fake = set
-        .iter()
-        .any(|(name, value)| *name == "OMO_COMPUTER_BACKEND" && *value == FAKE_BACKEND);
+    let fake = set.iter().any(|(name, value)| {
+        env_name_matches(name, "OMO_COMPUTER_BACKEND", case) && *value == FAKE_BACKEND
+    });
     for (name, _) in &set {
-        let Some(seam) = ENV_SEAMS.iter().find(|seam| seam.name == *name) else {
+        let Some(seam) = ENV_SEAMS
+            .iter()
+            .find(|seam| env_name_matches(name, seam.name, case))
+        else {
             return Err(SeamRefusal::UnknownSeam {
                 name: (*name).to_owned(),
             });
@@ -146,6 +196,9 @@ pub fn check_launch_env<'a>(
     Ok(ENV_SEAMS
         .iter()
         .copied()
-        .filter(|seam| set.iter().any(|(name, _)| *name == seam.name))
+        .filter(|seam| {
+            set.iter()
+                .any(|(name, _)| env_name_matches(name, seam.name, case))
+        })
         .collect())
 }
