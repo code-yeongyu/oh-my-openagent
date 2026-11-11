@@ -7,6 +7,8 @@ import { join } from "node:path"
 import { ROOT_LIFETIME_MS } from "./constants"
 import type { GatewayDeliverRequest } from "./engine"
 import { gatewayInboxDirectory } from "./paths"
+import { createRemoteThreadFixture } from "../thread-remote-fixture"
+import type { RemoteThreadSurface } from "../remote/ports"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 import { settled } from "./testing/settled"
 import type { GatewayDeliveryResult } from "./types"
@@ -76,6 +78,38 @@ describe("all_fifteen_delivery_state_cases", () => {
     // Fifteen sessions, each opening its own store worker, sent to in sequence; nothing here waits on a
     // timer, so a loaded runner only needs room past the 5 s default (it took 5.1 s in a CPU-capped run).
   }, 30_000)
+})
+
+describe("#13014: a local send to a session parked on a question names the wait, as a send to another device does", () => {
+  const remote = createRemoteThreadFixture().account().remote
+  const down: RemoteThreadSurface = { ...remote, sessions: { ...remote.sessions, thisDevice: async () => { throw new Error("device service down") } } }
+  test.each([
+    ["whose device service names this device", remote, { kind: "approval", device: "here" }],
+    ["whose device service is down", down, { kind: "approval" }],
+    ["with no device service", undefined, { kind: "approval" }],
+  ] as const)("#given B waits on a question and A runs on an install %s #when A sends a follow_up #then it is queued with waiting_on approval, naming this device only when the stamp has one", async (_label, surface, waiting) => {
+    harness = createGatewayHarness(surface === undefined ? {} : { remote: surface })
+    const h = harness
+    h.session("A")
+    const b = h.session("B")
+    b.runtime.beginUserTurn()
+    b.runtime.phaseValue = "waiting_question"
+    const result = await send(h, "A", "B", "after your question", { mode: "follow_up", idempotency_key: "k-wait" })
+    if (result.kind !== "ok" || result.delivery.kind !== "queued") throw new Error(`expected queued, got ${JSON.stringify(result)}`)
+    expect(result.delivery).toEqual({ kind: "queued", queue_position: 1, waiting_on: waiting })
+    // A retry under the same idempotency key replays the completed receipt's stored answer, which names the same wait.
+    const replay = await send(h, "A", "B", "after your question", { mode: "follow_up", idempotency_key: "k-wait" })
+    expect(replay).toMatchObject({ kind: "ok", deduplicated: true, delivery: { waiting_on: waiting } })
+  })
+
+  test("#given B is busy in a turn, not on a question #when A sends a follow_up #then it is queued with no waiting_on", async () => {
+    const h = open()
+    h.session("A")
+    h.session("B").runtime.beginUserTurn()
+    const result = await send(h, "A", "B", "later", { mode: "follow_up" })
+    expect(result).toMatchObject({ kind: "ok", delivery: { kind: "queued" } })
+    expect(result.kind === "ok" && "waiting_on" in result.delivery).toBe(false)
+  })
 })
 
 describe("turn_epoch_cas_and_fifo", () => {
@@ -374,6 +408,16 @@ describe("causal_cycle_hop_rate_and_fanout_budgets", () => {
     const lateView = await h.get("B").store.deliveryView(late)
     const firstView = await h.get("A").store.deliveryView(ab)
     expect({ hop: lateView?.row.hop, sameRoot: lateView?.row.root_id === firstView?.row.root_id }).toEqual({ hop: 2, sameRoot: false })
+  })
+
+  // #13004 (decision 0027 section 3): a run's cause is the delivery it consumed on either transport. One that no row here
+  // holds (it came from another device) continues the hop under a new root; nothing asks where it came from.
+  test("#given a run consumed a delivery no row here holds #when it sends #then the send is delivered under a new root with the inbound hop continued", async () => {
+    const h = open()
+    for (const id of ["A", "B"]) h.session(id)
+    const sent = okId(await send(h, "A", "B", "continue", { cause_delivery_id: "d-from-another-device", inbound_hop: 2 }))
+    const view = await h.get("A").store.deliveryView(sent)
+    expect({ hop: view?.row.hop, root: view?.row.root_id.startsWith("root-") }).toEqual({ hop: 3, root: true })
   })
 
   test("#given one root #when a session keeps fanning out under it across turns #then the 64th and later deliveries of the root are still accepted", async () => {

@@ -28,7 +28,9 @@
                 "trace",
                 "key-priming",
                 "epoch",
-                "interaction-lock"
+                "interaction-lock",
+                "intervention-policy",
+                "dangerous-chord-force"
               ]
             }
           },
@@ -64,7 +66,9 @@
                 "trace",
                 "key-priming",
                 "epoch",
-                "interaction-lock"
+                "interaction-lock",
+                "intervention-policy",
+                "dangerous-chord-force"
               ]
             }
           },

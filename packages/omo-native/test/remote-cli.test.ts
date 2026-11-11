@@ -569,6 +569,20 @@ describe("omo remote session verbs", () => {
     expect(types(a.sent, "prompt").map(entry => [entry.rpc?.["streamingBehavior"], entry.rpc?.["expectedTurnId"]])).toEqual([["steer", "3"]])
   })
 
+  // #13016 (decision 0027 D4 step 1): the steer preflight is decided once, inside the transport the send goes through.
+  test("send --steer reads the session's state once and steers the turn it reports", async () => {
+    const port = recorded(fixture.account({ engine: { ...ENGINE, streaming: true, currentTurnId: "3" } }).remote)
+    const { code, out } = await run(["send", "b/dur-on-b", "faster", "--steer", "--no-wait"], undefined, SIGNED_IN, testBootstrap(), port.remote)
+    expect([code, out, port.calls]).toEqual([REMOTE_EXIT.ok, ["Steered turn 3 on b/dur-on-b."], ["status", "devices", "command:get_state", "command:prompt"]])
+  })
+
+  test("send --steer to a session running nothing sends nothing and says so", async () => {
+    const a = fixture.account()
+    const { code, err } = await run(["send", "b/dur-on-b", "faster", "--steer", "--no-wait"], undefined, SIGNED_IN, testBootstrap(), a.remote)
+    expect([code, err]).toEqual([REMOTE_EXIT.failed, ["omo remote: nothing is running on b/dur-on-b to steer.", "Send without --steer to start a turn."]])
+    expect(types(a.sent, "prompt")).toEqual([])
+  })
+
   test("send --follow-up queues behind the running turn", async () => {
     const a = fixture.account({ engine: { ...ENGINE, streaming: true, pending: 2 } })
     const { code, out } = await run(["send", "b/dur-on-b", "later", "--follow-up", "--no-wait"], undefined, SIGNED_IN, testBootstrap(), a.remote)

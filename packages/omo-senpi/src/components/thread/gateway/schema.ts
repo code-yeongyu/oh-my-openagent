@@ -275,6 +275,9 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
      SELECT s.type, s.name, NULL FROM sqlite_schema s
      WHERE NOT EXISTS (SELECT 1 FROM extension_objects e WHERE e.type = s.type AND e.name = s.name COLLATE NOCASE)`,
   ],
+
+  // v11 (#13014): what the receiver was parked on when its drain queued a delivery; NULL when it was not, and on older rows.
+  ["ALTER TABLE deliveries ADD COLUMN wait_kind TEXT CHECK (wait_kind IS NULL OR wait_kind = 'approval')"],
 ]
 
 export const GATEWAY_TABLES = ["deliveries", "receipts", "causal_roots", "causal_edges", "rate_buckets", "session_meta", "bindings", "outbox", "gateway_meta", "outbox_cursors", "completion_arms", "extension_schema", "extension_objects", "thread_creations", "extension_registrations", "toolkit_replay_receipts"] as const
