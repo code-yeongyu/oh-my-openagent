@@ -24,11 +24,12 @@ if (action === "launch") {
   }, { waitTimeoutMs: 5000 })
 } else {
   await store.transaction(async (tx) => {
-    const generation: Generation = { version: "2.0.0", asset: "omo-linux-x64", digest: createHash("sha256").update("payload 2.0.0").digest("hex"), protocol: 1, backwardCompatible: true }
+    const generation: Generation = { version: "2.0.0", asset: "omo-linux-x64", digest: createHash("sha256").update("payload 2.0.0").digest("hex"), protocol: action === "bootstrap" ? 2 : 1, backwardCompatible: true }
     const staging = await store.createStaging()
     await writeFile(join(staging, "omo"), "payload 2.0.0")
     await writeFile(join(staging, "plugin.txt"), "plugin 2.0.0")
     await tx.publish(staging, generation)
-    await tx.select(async () => {})
+    if (action === "bootstrap") await tx.maintainBootstrap(async () => {})
+    else await tx.select(async () => {})
   }, { waitTimeoutMs: 5000 })
 }

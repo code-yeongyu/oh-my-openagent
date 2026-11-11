@@ -156,11 +156,12 @@ test("two launchers, an updater and GC observe only complete committed generatio
   expect((await store.read())?.selected).toContain("2.0.0")
 })
 
-for (const boundary of ["journal-publish", "generation-published", "journal-select", "selection-committed"]) {
+for (const boundary of ["journal-publish", "generation-published", "journal-select", "selection-committed",
+  "journal-bootstrap", "bootstrap-replaced", "bootstrap-committed"]) {
   test(`SIGKILL at ${boundary} recovers a complete old or new record`, async () => {
     const { store, launcher } = await fixture()
     await seed(store)
-    const result = await child(store.root, launcher, "update", boundary)
+    const result = await child(store.root, launcher, boundary.includes("bootstrap") ? "bootstrap" : "update", boundary)
     expect(result.code).not.toBe(0)
     expect(result.stdout).toContain(boundary)
     await store.transaction(async (tx) => {

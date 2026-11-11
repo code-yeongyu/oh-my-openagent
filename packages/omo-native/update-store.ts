@@ -39,6 +39,7 @@ export type InstallationRecord = {
 }
 type Journal = { schema: 1; before: InstallationRecord; after: InstallationRecord; bootstrap?: { temporary: string } }
 type Checkpoint = "journal-publish" | "generation-published" | "journal-select" | "selection-committed"
+  | "journal-bootstrap" | "bootstrap-replaced" | "bootstrap-committed"
 type StoreOptions = { checkpoint?: (boundary: Checkpoint) => Promise<void> }
 
 function code(error: unknown): unknown {
@@ -460,12 +461,15 @@ export class UpdateTransaction {
           bootstrapVersion: candidate.version, selected: id, previous: before.selected, staged: undefined, reason: undefined,
         }
         await writeUpdateRecord(this.store.journalPath, { schema: 1, before, after, bootstrap: { temporary } } satisfies Journal)
+        await this.store.options.checkpoint?.("journal-bootstrap")
         await rename(temporary, this.store.launcher)
         await syncDirectory(dirname(this.store.launcher))
+        await this.store.options.checkpoint?.("bootstrap-replaced")
         await writeUpdateRecord(join(this.store.directory, "previous-selection.json"), {
           ...before, launcherFingerprint: after.launcherFingerprint, bootstrapVersion: after.bootstrapVersion,
         })
         await writeUpdateRecord(this.store.recordPath, after)
+        await this.store.options.checkpoint?.("bootstrap-committed")
         await rm(this.store.journalPath)
         await syncDirectory(this.store.directory)
         return true
