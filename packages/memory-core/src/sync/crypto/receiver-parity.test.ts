@@ -14,6 +14,10 @@ import * as vendorReceive from "./vendor/sync-format/receive.ts"
 import { signFramed } from "./vendor/sync-format/keys.ts"
 import { snapshotPreimage } from "./vendor/sync-format/snapshot.ts"
 
+// Explicit budget for CPU- or git-bound work that runs 1.5-2.6 s and can pass 5 s on a loaded host: a local
+// multi-file `bun test` gives every file after the first Bun's 5 s default, since only CI passes --timeout (#12453).
+const SLOW_TEST_TIMEOUT_MS = process.platform === "win32" ? 30_000 : 20_000
+
 // The client's local chain must refuse exactly what the merged omo-service receiver
 // (vendored sync-format receiveKeyringChain and createKeyringReceiver, 5de1455489) refuses, and accept what it accepts.
 
@@ -211,7 +215,7 @@ describe("the receiver walks the chain once per pull, not once per entry", () =>
       expect((await run(pull)).outcome.ok).toBe(true)
     })
     expect(walked).toBeLessThanOrEqual(2 * pull.length)
-  })
+  }, SLOW_TEST_TIMEOUT_MS)
 
   test("a 500-batch pull after a long keyring chain does not re-fold the keyring for each batch", async () => {
     const { entries: all } = await thousand()
@@ -244,7 +248,7 @@ describe("the receiver walks the chain once per pull, not once per entry", () =>
       expect(imported.ok ? "imported" : imported.reason).not.toBe("keyring_prefix_refused")
     })
     expect(walked).toBeLessThanOrEqual(2 * covered.length)
-  })
+  }, SLOW_TEST_TIMEOUT_MS)
 
   test("a batch checked alone gets the same verdict as the receiver over the whole verified history", async () => {
     const history = mainChain()
