@@ -12,6 +12,23 @@ const LSP_TOOLS_PACKAGE_REL = "packages/lsp-tools-mcp"
 const DIST_CLI_REL = "dist/cli.js"
 const SOURCE_CLI_REL = "src/cli.ts"
 const PROJECT_LSP_CONFIGS = [".opencode/lsp.json", ".omo/lsp.json", ".omo/lsp-client.json"] as const
+// Fallback project configs, read only when no dedicated lsp.json exists
+// (the loader takes the first existing path in order). These are the
+// oh-my-opencode plugin config files whose `lsp` block users still write
+// (issue #2821); dedicated lsp.json files always win over them.
+const PROJECT_LSP_FALLBACK_CONFIGS = [
+  ".opencode/oh-my-openagent.jsonc",
+  ".opencode/oh-my-openagent.json",
+  ".opencode/oh-my-opencode.jsonc",
+  ".opencode/oh-my-opencode.json",
+] as const
+// Same fallback set at user level, resolved against the opencode config dir.
+const USER_LSP_FALLBACK_CONFIGS = [
+  "oh-my-openagent.jsonc",
+  "oh-my-openagent.json",
+  "oh-my-opencode.jsonc",
+  "oh-my-opencode.json",
+] as const
 const DAEMON_PACKAGE_NAME = "@code-yeongyu/lsp-daemon"
 const OMO_LSP_DAEMON_CLI = "OMO_LSP_DAEMON_CLI"
 const OMO_LSP_DAEMON_VERSION = "OMO_LSP_DAEMON_VERSION"
@@ -133,10 +150,24 @@ function resolveLspCommand(options: LspMcpConfigOptions = {}): AncestorCliCandid
   return createBootstrapCandidate(findBootstrapRoot(candidates, pathExists), pathExists, resolveExecutable)
 }
 
+function resolveUserLspConfigPath(
+  configDir: string,
+  pathExists: (path: string) => boolean,
+): string {
+  const dedicated = resolve(configDir, "lsp.json")
+  if (pathExists(dedicated)) return dedicated
+  for (const fallback of USER_LSP_FALLBACK_CONFIGS) {
+    const candidate = resolve(configDir, fallback)
+    if (pathExists(candidate)) return candidate
+  }
+  return dedicated
+}
+
 export function createLspMcpConfig(options: LspMcpConfigOptions = {}): LocalMcpConfig {
   const resolvedCommand = resolveLspCommand(options)
   const cwd = resolve(options.cwd ?? process.cwd())
   const configDir = getOpenCodeConfigDir({ binary: "opencode" })
+  const pathExists = options.exists ?? existsSync
   const sourceVersion = hasCliSuffix(resolvedCommand.path, SOURCE_CLI_REL) ? readDaemonPackageVersion(resolvedCommand.root) : null
 
   return {
@@ -146,8 +177,10 @@ export function createLspMcpConfig(options: LspMcpConfigOptions = {}): LocalMcpC
     cwd,
     environment: {
       LSP_TOOLS_MCP_CWD: cwd,
-      LSP_TOOLS_MCP_PROJECT_CONFIG: PROJECT_LSP_CONFIGS.map((configPath) => resolve(cwd, configPath)).join(delimiter),
-      LSP_TOOLS_MCP_USER_CONFIG: resolve(configDir, "lsp.json"),
+      LSP_TOOLS_MCP_PROJECT_CONFIG: [...PROJECT_LSP_CONFIGS, ...PROJECT_LSP_FALLBACK_CONFIGS]
+        .map((configPath) => resolve(cwd, configPath))
+        .join(delimiter),
+      LSP_TOOLS_MCP_USER_CONFIG: resolveUserLspConfigPath(configDir, pathExists),
       LSP_TOOLS_MCP_INSTALL_DECISIONS: resolve(configDir, "lsp-install-decisions.json"),
       ...(sourceVersion
         ? {
