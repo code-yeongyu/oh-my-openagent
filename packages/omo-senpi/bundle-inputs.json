@@ -225,6 +225,7 @@
     "packages/memory-core/src/identity/git-layout.ts",
     "packages/memory-core/src/identity/index.ts",
     "packages/memory-core/src/identity/layout.ts",
+    "packages/memory-core/src/identity/merge-paths.ts",
     "packages/memory-core/src/identity/merge.ts",
     "packages/memory-core/src/identity/project-scope-fs.ts",
     "packages/memory-core/src/identity/project-scope.ts",
