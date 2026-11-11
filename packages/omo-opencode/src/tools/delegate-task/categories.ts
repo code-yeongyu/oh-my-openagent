@@ -53,7 +53,7 @@ function resolveAvailableModelEntry(
  */
 export function resolveCategoryConfig(
   categoryName: string,
-  options: ResolveCategoryConfigOptions
+  options: ResolveCategoryConfigOptions,
 ): ResolveCategoryConfigResult | null {
   const { userCategories, inheritedModel: _inheritedModel, systemDefaultModel, availableModels } = options
 

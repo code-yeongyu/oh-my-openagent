@@ -31,7 +31,9 @@ describe("BackgroundManager session permission", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }) })
+    const manager = new BackgroundManager({
+      pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }),
+    })
 
     // when
     await manager.launch({
@@ -113,7 +115,9 @@ describe("BackgroundManager session permission", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }) })
+    const manager = new BackgroundManager({
+      pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }),
+    })
 
     // when
     await manager.launch({
@@ -122,9 +126,7 @@ describe("BackgroundManager session permission", () => {
       agent: "explore",
       parentSessionId: "ses_parent",
       parentMessageId: "msg_parent",
-      sessionPermission: [
-        { permission: "question", action: "deny", pattern: "*" },
-      ],
+      sessionPermission: [{ permission: "question", action: "deny", pattern: "*" }],
     })
     await promptStarted.promise
     await manager.shutdown()
@@ -134,9 +136,7 @@ describe("BackgroundManager session permission", () => {
     expect(createCalls[0]?.body).toEqual({
       parentID: "ses_parent",
       title: "Test task (@explore subagent)",
-      permission: [
-        { permission: "question", action: "deny", pattern: "*" },
-      ],
+      permission: [{ permission: "question", action: "deny", pattern: "*" }],
     })
   })
 
@@ -158,7 +158,9 @@ describe("BackgroundManager session permission", () => {
         abort: async () => ({}),
       },
     }
-    const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }) })
+    const manager = new BackgroundManager({
+      pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }),
+    })
     const timeout = Promise.withResolvers<never>()
     const timeoutID = setTimeout(
       () => timeout.reject(new Error("waited 1s for categorized child session prompt")),
@@ -214,7 +216,9 @@ describe("BackgroundManager child session directory", () => {
   test("uses input.cwd for the child session create and prompt directory", async () => {
     // given
     const { client, createCalls, promptCalls, promptStarted } = createRecordingClient()
-    const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }) })
+    const manager = new BackgroundManager({
+      pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }),
+    })
 
     // when
     await manager.launch({
@@ -238,7 +242,9 @@ describe("BackgroundManager child session directory", () => {
   test("falls back to the parent directory when cwd is absent", async () => {
     // given
     const { client, createCalls, promptCalls, promptStarted } = createRecordingClient()
-    const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }) })
+    const manager = new BackgroundManager({
+      pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }),
+    })
 
     // when
     await manager.launch({
@@ -261,7 +267,9 @@ describe("BackgroundManager child session directory", () => {
   test("persists cwd on the task record", async () => {
     // given
     const { client, promptStarted } = createRecordingClient()
-    const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }) })
+    const manager = new BackgroundManager({
+      pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }),
+    })
 
     // when
     const task = await manager.launch({
@@ -282,7 +290,9 @@ describe("BackgroundManager child session directory", () => {
   test("resume prompts the continuation in the task cwd", async () => {
     // given
     const { client, promptCalls, promptStarted } = createRecordingClient()
-    const manager = new BackgroundManager({ pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }) })
+    const manager = new BackgroundManager({
+      pluginContext: unsafeTestValue<PluginInput>({ client, directory: tmpdir() }),
+    })
     const tasks = unsafeTestValue<{ tasks: Map<string, BackgroundTask> }>(manager).tasks
     tasks.set("bg_worktree", {
       id: "bg_worktree",

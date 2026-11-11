@@ -33,12 +33,20 @@ function harness() {
   })
   const context = { ...CTX, kernelTools: capability } as TaskToolContext
   const spawn = async (target: Record<string, unknown>): Promise<TaskToolDetails> =>
-    (await buildTaskExecute(deps)("call-1", {
-      prompt: "use the parent tool",
-      run_in_background: true,
-      tools: ["lookup"],
-      ...target,
-    } as never, undefined, undefined, context)).details
+    (
+      await buildTaskExecute(deps)(
+        "call-1",
+        {
+          prompt: "use the parent tool",
+          run_in_background: true,
+          tools: ["lookup"],
+          ...target,
+        } as never,
+        undefined,
+        undefined,
+        context,
+      )
+    ).details
   return { spawn, specs }
 }
 

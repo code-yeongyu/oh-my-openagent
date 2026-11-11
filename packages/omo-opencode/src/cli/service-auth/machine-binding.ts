@@ -36,10 +36,17 @@ export type MachineIdSources = {
 
 const defaultSources: MachineIdSources = {
   platform: process.platform,
-  readText: path => readFile(path, "utf8").then(text => text, () => undefined),
-  run: (file, args) => new Promise(resolve => {
-    execFile(file, [...args], { timeout: 5_000, windowsHide: true }, (error, stdout) => resolve(error === null ? stdout : undefined))
-  }),
+  readText: (path) =>
+    readFile(path, "utf8").then(
+      (text) => text,
+      () => undefined,
+    ),
+  run: (file, args) =>
+    new Promise((resolve) => {
+      execFile(file, [...args], { timeout: 5_000, windowsHide: true }, (error, stdout) =>
+        resolve(error === null ? stdout : undefined),
+      )
+    }),
 }
 
 /** The OS machine id read the same way relayd reads it (relay-daemon MID1); none means the device registers unbound. */
@@ -70,15 +77,20 @@ function deviceProfileOf(env: Readonly<Record<string, string | undefined>>): str
 }
 
 export function machineHash(machineSalt: string, profile: string, rawId: string): string {
-  return createHmac("sha256", Buffer.from(machineSalt, "base64url")).update(`omo-machine-v1\0${profile}\0${rawId}`).digest("base64url")
+  return createHmac("sha256", Buffer.from(machineSalt, "base64url"))
+    .update(`omo-machine-v1\0${profile}\0${rawId}`)
+    .digest("base64url")
 }
 
 const MACHINE_SALT = /^[A-Za-z0-9_-]{43}$/
 
 /** The hash computed in this process, for a machine whose device service is absent or too old to compute it. */
-export function localMachineHash(env: Readonly<Record<string, string | undefined>>, sources: MachineIdSources = defaultSources) {
+export function localMachineHash(
+  env: Readonly<Record<string, string | undefined>>,
+  sources: MachineIdSources = defaultSources,
+) {
   return {
-    available: async () => deviceProfileOf(env) !== undefined && await readMachineId(sources) !== undefined,
+    available: async () => deviceProfileOf(env) !== undefined && (await readMachineId(sources)) !== undefined,
     hash: async (machineSalt: string): Promise<string | undefined> => {
       const profile = deviceProfileOf(env)
       const rawId = profile === undefined ? undefined : await readMachineId(sources)
@@ -124,33 +136,56 @@ export async function prepareMachineSignIn(options: {
 }): Promise<MachineSignIn> {
   const { stored, local, deviceService } = options
   if (local === undefined || !(await local.available())) {
-    return { keys: generateDeviceKeys(), advertise: false, fields: () => ({}), adopt: () => true, retry: async () => false }
+    return {
+      keys: generateDeviceKeys(),
+      advertise: false,
+      fields: () => ({}),
+      adopt: () => true,
+      retry: async () => false,
+    }
   }
   const reused = stored === null ? undefined : publicKeysOf(stored)
-  const keys = stored !== null && reused !== undefined
-    ? { public: reused, private: { signingPrivateKey: stored.signingPrivateKey, sealingPrivateKey: stored.sealingPrivateKey } }
-    : generateDeviceKeys()
+  const keys =
+    stored !== null && reused !== undefined
+      ? {
+          public: reused,
+          private: { signingPrivateKey: stored.signingPrivateKey, sealingPrivateKey: stored.sealingPrivateKey },
+        }
+      : generateDeviceKeys()
   // The device the presented keys already name, if any: never asked to be folded into itself.
   const presented = reused === undefined ? undefined : stored?.device.id
   let bound: { readonly machineHash: string; readonly mergeDeviceIds: readonly string[] } | undefined
   let adopt = true
   return {
-    keys, advertise: true, adopt: () => adopt,
-    fields: () => bound === undefined ? {} : {
-      machineHash: bound.machineHash, ...(bound.mergeDeviceIds.length === 0 ? {} : { mergeDeviceIds: bound.mergeDeviceIds }),
-    },
-    retry: async error => {
+    keys,
+    advertise: true,
+    adopt: () => adopt,
+    fields: () =>
+      bound === undefined
+        ? {}
+        : {
+            machineHash: bound.machineHash,
+            ...(bound.mergeDeviceIds.length === 0 ? {} : { mergeDeviceIds: bound.mergeDeviceIds }),
+          },
+    retry: async (error) => {
       if (!(error instanceof ApiRefusal)) return false
       if (error.code === "machine_mismatch") throw new SignInError(MACHINE_MISMATCH)
       const salt = error.machineSalt
-      if (error.code !== "machine_hash_required" || salt === undefined || !MACHINE_SALT.test(salt) || bound !== undefined) return false
+      if (
+        error.code !== "machine_hash_required" ||
+        salt === undefined ||
+        !MACHINE_SALT.test(salt) ||
+        bound !== undefined
+      )
+        return false
       const relayd = await deviceService?.binding(salt)
       let hash: string | undefined
       const merge = new Set<string>()
       if (relayd !== undefined) {
         // The device service holds this machine's identity: present exactly its keys, or refuse rather than mint.
         if (relayd.device !== null) {
-          if (stored === null || reused === undefined || !keysEqual(stored, relayd.device)) throw new SignInError(HELD_BY_DEVICE_SERVICE)
+          if (stored === null || reused === undefined || !keysEqual(stored, relayd.device))
+            throw new SignInError(HELD_BY_DEVICE_SERVICE)
           adopt = false
         }
         hash = relayd.machineHash ?? undefined
@@ -163,7 +198,8 @@ export async function prepareMachineSignIn(options: {
         }
       }
       hash ??= await local.hash(salt)
-      if (hash === undefined) throw new SignInError("This computer's machine id could not be read, so OmO cannot bind this sign-in to it.")
+      if (hash === undefined)
+        throw new SignInError("This computer's machine id could not be read, so OmO cannot bind this sign-in to it.")
       if (stored !== null && stored.device.id !== presented) merge.add(stored.device.id)
       if (presented !== undefined) merge.delete(presented)
       bound = { machineHash: hash, mergeDeviceIds: [...merge].slice(0, 16) }

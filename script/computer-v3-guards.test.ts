@@ -15,7 +15,10 @@ const guardScript = join(import.meta.dir, "computer-v3-guards.ts")
 // user's: it turns off the detached `git maintenance run --auto` that could outlive a fixture's removal.
 const isolatedEnv: Record<string, string> = {
   ...Object.fromEntries(
-    Object.entries(process.env).filter((entry): entry is [string, string] => (!entry[0].startsWith("GIT_") || entry[0] === "GIT_CONFIG_GLOBAL") && entry[1] !== undefined),
+    Object.entries(process.env).filter(
+      (entry): entry is [string, string] =>
+        (!entry[0].startsWith("GIT_") || entry[0] === "GIT_CONFIG_GLOBAL") && entry[1] !== undefined,
+    ),
   ),
   GIT_CONFIG_NOSYSTEM: "1",
 }
@@ -39,12 +42,24 @@ function withRepo(body: (repo: Repo) => void): void {
   mkdirSync(root)
   mkdirSync(join(run, "evidence"), { recursive: true })
   const git = (...args: string[]): string => {
-    const result = Bun.spawnSync(["git", "-c", "user.name=guard-test", "-c", "user.email=guard-test@example.invalid", "-c", "commit.gpgsign=false", ...args], {
-      cwd: root,
-      env: isolatedEnv,
-      stdout: "pipe",
-      stderr: "pipe",
-    })
+    const result = Bun.spawnSync(
+      [
+        "git",
+        "-c",
+        "user.name=guard-test",
+        "-c",
+        "user.email=guard-test@example.invalid",
+        "-c",
+        "commit.gpgsign=false",
+        ...args,
+      ],
+      {
+        cwd: root,
+        env: isolatedEnv,
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    )
     if (result.exitCode !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr.toString()}`)
     return result.stdout.toString()
   }
@@ -86,7 +101,10 @@ function expectPass(result: { readonly exitCode: number; readonly findings: read
   expect(result.exitCode).toBe(0)
 }
 
-function expectFindings(result: { readonly exitCode: number; readonly findings: readonly string[] }, ...needles: string[]): void {
+function expectFindings(
+  result: { readonly exitCode: number; readonly findings: readonly string[] },
+  ...needles: string[]
+): void {
   expect(result.exitCode).toBe(1)
   expect(result.findings).toHaveLength(needles.length)
   for (const needle of needles) expect(result.findings.filter((line) => line.includes(needle))).toHaveLength(1)
@@ -116,7 +134,12 @@ describe("computer-v3-guards --residue", () => {
       repo.commit("residue")
 
       // then each is one finding
-      expectFindings(repo.guard("--residue"), "docs/guide.md:1:", "crates/senpi-desktop-core still exists", ".github/workflows/desktop-engine.yml still exists")
+      expectFindings(
+        repo.guard("--residue"),
+        "docs/guide.md:1:",
+        "crates/senpi-desktop-core still exists",
+        ".github/workflows/desktop-engine.yml still exists",
+      )
     })
   })
 
@@ -134,7 +157,11 @@ describe("computer-v3-guards --residue", () => {
       symlinkSync("missing-workflow.yml", join(repo.root, ".github/workflows/desktop-engine.yml"))
 
       // then each one is a finding, because a directory entry is still there
-      expectFindings(repo.guard("--residue"), "crates/desktop still exists", ".github/workflows/desktop-engine.yml still exists")
+      expectFindings(
+        repo.guard("--residue"),
+        "crates/desktop still exists",
+        ".github/workflows/desktop-engine.yml still exists",
+      )
     })
   })
 })
@@ -155,14 +182,20 @@ describe("computer-v3-guards --no-legacy-edge", () => {
 
       // when a new crate depends on an old crate by path, a package names the old ABI and a QA scenario the old engine
       repo.write({
-        "crates/omo-computer-safety/Cargo.toml": '[package]\nname = "omo-computer-safety"\n[dependencies]\nold = { path = "../desktop" }\n',
+        "crates/omo-computer-safety/Cargo.toml":
+          '[package]\nname = "omo-computer-safety"\n[dependencies]\nold = { path = "../desktop" }\n',
         "packages/omo-computer-sdk/src/index.ts": 'export const abi = "Senpi_Desktop/1"\n',
         "script/qa/computer/linux/boot.ts": "spawn('SENPI-DESKTOP-ENGINE')\n",
       })
       repo.commit("edges")
 
       // then each file is one finding
-      expectFindings(repo.guard("--no-legacy-edge"), "crates/omo-computer-safety/Cargo.toml", "packages/omo-computer-sdk/src/index.ts:1:", "script/qa/computer/linux/boot.ts:1:")
+      expectFindings(
+        repo.guard("--no-legacy-edge"),
+        "crates/omo-computer-safety/Cargo.toml",
+        "packages/omo-computer-sdk/src/index.ts:1:",
+        "script/qa/computer/linux/boot.ts:1:",
+      )
     })
   })
 })
@@ -171,7 +204,10 @@ describe("computer-v3-guards --copy <ref>", () => {
   test("copy_refuses_a_new_source_that_renames_or_copies_an_old_one", () => {
     withRepo((repo) => {
       const oldSource = numbered("old", 40)
-      repo.write({ "crates/senpi-desktop-core/src/lib.rs": oldSource, "crates/senpi-desktop-core/src/tiny.rs": numbered("tiny", 10) })
+      repo.write({
+        "crates/senpi-desktop-core/src/lib.rs": oldSource,
+        "crates/senpi-desktop-core/src/tiny.rs": numbered("tiny", 10),
+      })
       repo.commit("base")
       repo.git("branch", "base")
 
@@ -241,7 +277,10 @@ describe("computer-v3-guards --copy physical lines", () => {
       // given an old 19-line file and an old 24-line file whose every other line is blank
       const short = Array.from({ length: 19 }, (_, index) => `export const short_${index} = ${index};\n`).join("")
       const spaced = Array.from({ length: 12 }, (_, index) => `export const copied_${index} = ${index};\n\n`).join("")
-      repo.write({ "packages/senpi-desktop-tool/src/short.ts": short, "packages/senpi-desktop-tool/src/gate-copy-source.ts": spaced })
+      repo.write({
+        "packages/senpi-desktop-tool/src/short.ts": short,
+        "packages/senpi-desktop-tool/src/gate-copy-source.ts": spaced,
+      })
       repo.commit("base")
       repo.git("branch", "base")
 
@@ -279,11 +318,20 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
       expectPass(scope("2"))
 
       // when the row edits a path no rule names, an existing scenario file and a path matching only another row
-      repo.write({ "docs/other.md": "outside\n", "script/qa/computer/linux/existing.ts": "export const edited = 1\n", "docs/sibling.md": "row 4 owns this\n" })
+      repo.write({
+        "docs/other.md": "outside\n",
+        "script/qa/computer/linux/existing.ts": "export const edited = 1\n",
+        "docs/sibling.md": "row 4 owns this\n",
+      })
       repo.commit("out of scope")
 
       // then each is a finding naming the row
-      expectFindings(scope("2"), "docs/other.md is outside row 2's write scope", "script/qa/computer/linux/existing.ts", "docs/sibling.md")
+      expectFindings(
+        scope("2"),
+        "docs/other.md is outside row 2's write scope",
+        "script/qa/computer/linux/existing.ts",
+        "docs/sibling.md",
+      )
     })
   })
 
@@ -314,7 +362,12 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
       repo.commit("untouched units")
 
       // then those three are findings
-      expectFindings(scope("5"), "crates/omo-computer-safety/src/lib.rs", "crates/omo-computer-backend-macos/src/backend.rs", "crates/omo-computer-session/src/other.rs")
+      expectFindings(
+        scope("5"),
+        "crates/omo-computer-safety/src/lib.rs",
+        "crates/omo-computer-backend-macos/src/backend.rs",
+        "crates/omo-computer-session/src/other.rs",
+      )
     })
   })
 
@@ -348,15 +401,25 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
       const blockerEdits = join(repo.run, "evidence", "task-5.blocker-edits.txt")
 
       // given row 5 editing a path of row 3 (its blocker) and one of row 2 (a transitive blocker), both listed
-      writeFileSync(blockerEdits, "crates/omo-computer-core/data/table.json\tthe settle constants row 5 adds\ndocs/x-12.md\tthe note row 5 extends\n")
+      writeFileSync(
+        blockerEdits,
+        "crates/omo-computer-core/data/table.json\tthe settle constants row 5 adds\ndocs/x-12.md\tthe note row 5 extends\n",
+      )
       repo.write({ "crates/omo-computer-core/data/table.json": "{}\n", "docs/x-12.md": "note\n" })
       repo.commit("listed blocker edits")
       expectPass(scope("5"))
 
       // when it edits an unlisted path of a transitive blocker, a listed path of row 4 (not a blocker),
       // and a listed QA driver entry file of a blocker (entry files change only in the row that owns them)
-      writeFileSync(blockerEdits, "crates/omo-computer-core/data/table.json\tthe settle constants row 5 adds\ndocs/sibling.md\tnot a blocker\nscript/qa/computer/replay.ts\ta new flag\ndocs/x-12.md\tthe note\n")
-      repo.write({ "script/computer-v3-guards.ts": "export {}\n", "docs/sibling.md": "row 4\n", "script/qa/computer/replay.ts": "export {}\n" })
+      writeFileSync(
+        blockerEdits,
+        "crates/omo-computer-core/data/table.json\tthe settle constants row 5 adds\ndocs/sibling.md\tnot a blocker\nscript/qa/computer/replay.ts\ta new flag\ndocs/x-12.md\tthe note\n",
+      )
+      repo.write({
+        "script/computer-v3-guards.ts": "export {}\n",
+        "docs/sibling.md": "row 4\n",
+        "script/qa/computer/replay.ts": "export {}\n",
+      })
       repo.commit("unlisted and non-blocker edits")
 
       // then those three are findings
@@ -372,7 +435,10 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
 
       // given row 48 adding a new scenario file and making a listed edit to a non-scenario path of row 47 (its blocker)
       writeFileSync(blockerEdits, listedCapture)
-      repo.write({ "crates/omo-computer-backend-x11/src/capture/frame.rs": "// hook\n", "script/qa/computer/linux/atspi-walk.ts": "export {}\n" })
+      repo.write({
+        "crates/omo-computer-backend-x11/src/capture/frame.rs": "// hook\n",
+        "script/qa/computer/linux/atspi-walk.ts": "export {}\n",
+      })
       repo.commit("new scenario and listed blocker edit")
       expectPass(scope("48"))
 
@@ -388,12 +454,22 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
 
   test("scope_accepts_every_removal_inventory_path_for_the_removal_entry", () => {
     withRepo((repo) => {
-      repo.write({ "crates/senpi-desktop-core/src/lib.rs": "old\n", ".github/workflows/desktop-engine.yml": "old\n", "script/qa/desktop/a.ts": "old\n", "knip.jsonc": "{}\n" })
+      repo.write({
+        "crates/senpi-desktop-core/src/lib.rs": "old\n",
+        ".github/workflows/desktop-engine.yml": "old\n",
+        "script/qa/desktop/a.ts": "old\n",
+        "knip.jsonc": "{}\n",
+      })
       const scope = scopeRepo(repo)
 
       // given row 80 deleting class A and B paths and editing class C and D files
       repo.remove("crates/senpi-desktop-core", ".github/workflows/desktop-engine.yml", "script/qa/desktop")
-      repo.write({ "knip.jsonc": "{ }\n", "script/ci-fast-path.mjs": "// re-pointed\n", "packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json": "{}\n", "changes/unreleased/80.md": "removed\n" })
+      repo.write({
+        "knip.jsonc": "{ }\n",
+        "script/ci-fast-path.mjs": "// re-pointed\n",
+        "packages/omo-senpi/scripts/qa/fused-equivalence-golden/linux-x64/E21.json": "{}\n",
+        "changes/unreleased/80.md": "removed\n",
+      })
       repo.commit("removal")
 
       // then the removal row passes and row 2 does not
@@ -404,7 +480,12 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
 
   test("scope_reports_bad_plan_grammar_and_a_malformed_blocker_edits_line_as_findings", () => {
     withRepo((repo) => {
-      const scope = scopeRepo(repo, plan.replace("`crates/omo-computer-safety/src/gate/**`; ", "crates/omo-computer-safety/src/gate/**; ").replace("Blocked by: 3 |", "Blocked by: three |"))
+      const scope = scopeRepo(
+        repo,
+        plan
+          .replace("`crates/omo-computer-safety/src/gate/**`; ", "crates/omo-computer-safety/src/gate/**; ")
+          .replace("Blocked by: 3 |", "Blocked by: three |"),
+      )
       repo.write({ "docs/x-1.md": "note\n" })
       repo.commit("change")
       writeFileSync(join(repo.run, "evidence", "task-2.blocker-edits.txt"), "docs/x-1.md\n")
@@ -423,10 +504,18 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
       scopeRepo(repo)
 
       // when --plan names a directory
-      const result = Bun.spawnSync([process.execPath, guardScript, "--scope", "2", "base", "--plan", repo.run], { cwd: repo.root, env: isolatedEnv, stdout: "pipe", stderr: "pipe" })
+      const result = Bun.spawnSync([process.execPath, guardScript, "--scope", "2", "base", "--plan", repo.run], {
+        cwd: repo.root,
+        env: isolatedEnv,
+        stdout: "pipe",
+        stderr: "pipe",
+      })
 
       // then the CLI prints exactly one finding naming the plan and exits 1, not a stack trace
-      const lines = result.stdout.toString().split("\n").filter((line) => line.length > 0)
+      const lines = result.stdout
+        .toString()
+        .split("\n")
+        .filter((line) => line.length > 0)
       expect(lines).toHaveLength(1)
       expect(lines[0]).toContain(`plan file ${repo.run}`)
       expect(result.stderr.toString()).toBe("")
@@ -438,14 +527,23 @@ describe("computer-v3-guards --scope <row> <ref> --plan <file>", () => {
     const parsed = parseWriteScope(
       "  Write scope: `Cargo.toml (workspace members, shared-append)`; `package.json (workspaces, `test:computer` script; shared-append)`; `crates/omo-computer-backend-macos/probes/*.{sh,ps1}`; `omo-desktop-app repository: `.github/workflows/release.yml`, `x.yml` (three places)`; `$CU_RUN/evidence/ (no repository change)`; `<session working directory>/.omo/omo.jsonc (one added key)`; `GitHub issues and PR comments`; `changes/unreleased/<pr>.md`",
     )
-    expect(parsed).toEqual(["Cargo.toml", "package.json", "crates/omo-computer-backend-macos/probes/*.{sh,ps1}", "changes/unreleased/<pr>.md"])
+    expect(parsed).toEqual([
+      "Cargo.toml",
+      "package.json",
+      "crates/omo-computer-backend-macos/probes/*.{sh,ps1}",
+      "changes/unreleased/<pr>.md",
+    ])
   })
 })
 
 describe("computer-v3-guards --old-frozen <ref>", () => {
   test("old_frozen_refuses_a_change_under_an_old_directory", () => {
     withRepo((repo) => {
-      repo.write({ "README.md": "base\n", "crates/senpi-desktop-core/src/lib.rs": "old\n", "packages/senpi-desktop-tool/src/a.ts": "old\n" })
+      repo.write({
+        "README.md": "base\n",
+        "crates/senpi-desktop-core/src/lib.rs": "old\n",
+        "packages/senpi-desktop-tool/src/a.ts": "old\n",
+      })
       repo.commit("base")
       repo.git("branch", "base")
 
@@ -460,7 +558,11 @@ describe("computer-v3-guards --old-frozen <ref>", () => {
       repo.commit("touch old")
 
       // then both old paths are findings
-      expectFindings(repo.guard("--old-frozen", "base"), "old-frozen: crates/senpi-desktop-core/src/lib.rs", "old-frozen: packages/senpi-desktop-tool/src/a.ts")
+      expectFindings(
+        repo.guard("--old-frozen", "base"),
+        "old-frozen: crates/senpi-desktop-core/src/lib.rs",
+        "old-frozen: packages/senpi-desktop-tool/src/a.ts",
+      )
     })
   })
 })
@@ -486,7 +588,10 @@ describe("computer-v3-guards --parity", () => {
       expectPass(repo.guard("--parity"))
 
       // when one status is blank, one unknown and one line has too few columns
-      repo.write({ [manifestPath]: manifestHeader + "core\trust\tcore::a\t\t\n" + "core\trust\tcore::b\tdone\t\n" + "core\trust\tcore::c\n" })
+      repo.write({
+        [manifestPath]:
+          manifestHeader + "core\trust\tcore::a\t\t\n" + "core\trust\tcore::b\tdone\t\n" + "core\trust\tcore::c\n",
+      })
       repo.commit("broken")
 
       // then each line is a finding
@@ -498,8 +603,12 @@ describe("computer-v3-guards --parity", () => {
     withRepo((repo) => {
       // given a pending test and a fixture row, and a ledger with one leg owed after row 74 and one passed
       repo.write({
-        [manifestPath]: manifestHeader + "core\trust\tcore::frame::tests::crop\tpending\t\n" + "crates/senpi-desktop-core/fixtures/conformance/new.json\tfixture\tnew.json\tpending\t\n",
-        [legsPath]: legsHeader + "C17\tthe serve leg\t28\t75\towed\n" + "C18\tthe daemon leg\t28\t29\tpassed:v3-daemon-uds\n",
+        [manifestPath]:
+          manifestHeader +
+          "core\trust\tcore::frame::tests::crop\tpending\t\n" +
+          "crates/senpi-desktop-core/fixtures/conformance/new.json\tfixture\tnew.json\tpending\t\n",
+        [legsPath]:
+          legsHeader + "C17\tthe serve leg\t28\t75\towed\n" + "C18\tthe daemon leg\t28\t29\tpassed:v3-daemon-uds\n",
       })
       repo.commit("pending")
 
@@ -524,10 +633,17 @@ describe("computer-v3-guards --parity", () => {
       repo.commit("empty")
 
       // then --parity --final names both files and exits 1
-      expectFindings(repo.guard("--parity", "--final"), "test-parity-manifest.tsv is empty", "DEFERRED-LEGS.tsv is empty")
+      expectFindings(
+        repo.guard("--parity", "--final"),
+        "test-parity-manifest.tsv is empty",
+        "DEFERRED-LEGS.tsv is empty",
+      )
 
       // when each file holds one data line and no header
-      repo.write({ [manifestPath]: "core\trust\tcore::a\tpending\t\n", [legsPath]: "C17\tthe serve leg\t28\t74\towed\n" })
+      repo.write({
+        [manifestPath]: "core\trust\tcore::a\tpending\t\n",
+        [legsPath]: "C17\tthe serve leg\t28\t74\towed\n",
+      })
       repo.commit("headerless")
 
       // then the missing header is a finding for each file, never a skipped row
@@ -556,7 +672,10 @@ const caseFile = (reportMode: string | undefined): string =>
     {
       description: "a case",
       steps: [
-        { send: { id: 1, method: "engine.hello", params: {} }, expect: [{ message: { id: 1, result: { abi: "omo-computer/1", features: ["action-report"] } } }] },
+        {
+          send: { id: 1, method: "engine.hello", params: {} },
+          expect: [{ message: { id: 1, result: { abi: "omo-computer/1", features: ["action-report"] } } }],
+        },
         {
           send: { id: 2, method: "session.open", params: reportMode === undefined ? {} : { reportMode } },
           expect: [{ message: { id: 2, result: { disposition: "delivered_unverified", effect: "unverifiable" } } }],
@@ -567,13 +686,25 @@ const caseFile = (reportMode: string | undefined): string =>
     2,
   ) + "\n"
 
-const parametersFile = JSON.stringify({ computer: { properties: { action: { type: "string", description: "call: one chain" } } } }, null, 2) + "\n"
+const parametersFile =
+  JSON.stringify(
+    { computer: { properties: { action: { type: "string", description: "call: one chain" } } } },
+    null,
+    2,
+  ) + "\n"
 
 function oracleTree(deltaLines: string): Tree {
   // The null-mode case opens reportMode "object" on purpose: only its place on the null-mode list may refuse a replaced line in it.
-  const files: Tree = { [objectCasePath]: caseFile("object"), [nullCasePath]: caseFile("object"), [parametersPath]: parametersFile }
+  const files: Tree = {
+    [objectCasePath]: caseFile("object"),
+    [nullCasePath]: caseFile("object"),
+    [parametersPath]: parametersFile,
+  }
   const provenance = Object.entries(files)
-    .map(([path, content]) => `${path}\tcrates/senpi-desktop-core/x/${path.split("/").at(-1)}\td79bc6cc\t${sha256("old")}\t${sha256(content)}\t1;0;0\n`)
+    .map(
+      ([path, content]) =>
+        `${path}\tcrates/senpi-desktop-core/x/${path.split("/").at(-1)}\td79bc6cc\t${sha256("old")}\t${sha256(content)}\t1;0;0\n`,
+    )
     .join("")
   return { ...files, [provenancePath]: provenanceHeader + provenance, [deltasPath]: deltasHeader + deltaLines }
 }
@@ -582,12 +713,19 @@ describe("computer-v3-guards --oracle", () => {
   test("oracle_refuses_an_edited_or_missing_imported_fixture_and_an_unlisted_case_without_the_v3_prefix", () => {
     withRepo((repo) => {
       // given imported files byte-equal to their provenance rows and new cases prefixed v3-
-      repo.write({ ...oracleTree(""), "crates/omo-computer-core/fixtures/conformance/v3-settle.json": "{}\n", "crates/omo-computer-backend-fake/fixtures/v3-busy.json": "{}\n" })
+      repo.write({
+        ...oracleTree(""),
+        "crates/omo-computer-core/fixtures/conformance/v3-settle.json": "{}\n",
+        "crates/omo-computer-backend-fake/fixtures/v3-busy.json": "{}\n",
+      })
       repo.commit("oracle")
       expectPass(repo.guard("--oracle"))
 
       // when an imported fixture is edited, another is deleted and an unprefixed new file appears
-      repo.write({ [objectCasePath]: caseFile("object") + " ", "crates/omo-computer-backend-fake/fixtures/extra.json": "{}\n" })
+      repo.write({
+        [objectCasePath]: caseFile("object") + " ",
+        "crates/omo-computer-backend-fake/fixtures/extra.json": "{}\n",
+      })
       repo.remove(nullCasePath)
       repo.commit("edited")
 
@@ -606,7 +744,10 @@ describe("computer-v3-guards --oracle", () => {
       expectFindings(repo.guard("--oracle"), "ORACLE-PROVENANCE.tsv is empty", "ORACLE-DELTAS.tsv is empty")
 
       // when each file holds one junk line instead of its header
-      repo.write({ [provenancePath]: "junk\n", [deltasPath]: `${objectCasePath}\t/result/abi\tadditive\tAC-1\t12\t\t\n` })
+      repo.write({
+        [provenancePath]: "junk\n",
+        [deltasPath]: `${objectCasePath}\t/result/abi\tadditive\tAC-1\t12\t\t\n`,
+      })
       repo.commit("headerless")
 
       // then the missing header is a finding for each file
@@ -639,14 +780,22 @@ describe("computer-v3-guards --oracle", () => {
       repo.commit("relaxing")
 
       // then each line is a finding
-      expectFindings(repo.guard("--oracle"), "/result/abi", "/**/features/*", "/computer/properties/action/type", "mistyped")
+      expectFindings(
+        repo.guard("--oracle"),
+        "/result/abi",
+        "/**/features/*",
+        "/computer/properties/action/type",
+        "mistyped",
+      )
     })
   })
 
   test("oracle_rejects_a_replaced_line_in_a_null_mode_case_or_with_a_wrong_imported_value", () => {
     withRepo((repo) => {
       // given a replaced line in an object-mode case naming the imported value and a differing v3 value
-      repo.write(oracleTree(`${objectCasePath}\t/result/disposition\treplaced\tAC-61\t13\t"delivered_unverified"\t"observed"\n`))
+      repo.write(
+        oracleTree(`${objectCasePath}\t/result/disposition\treplaced\tAC-61\t13\t"delivered_unverified"\t"observed"\n`),
+      )
       repo.commit("replaced")
       expectPass(repo.guard("--oracle"))
 
@@ -672,7 +821,8 @@ describe("computer-v3-guards --stubs", () => {
     withRepo((repo) => {
       // given new sources with a live-ignored test, and stub words only outside the new directories
       repo.write({
-        "crates/omo-computer-core/src/lib.rs": '#[cfg(test)]\nmod tests {\n    #[test]\n    #[ignore = "live: needs a display"]\n    fn capture() {}\n}\n',
+        "crates/omo-computer-core/src/lib.rs":
+          '#[cfg(test)]\nmod tests {\n    #[test]\n    #[ignore = "live: needs a display"]\n    fn capture() {}\n}\n',
         "packages/omo-computer-sdk/test/a.test.ts": 'import { it } from "vitest"\nit("works", () => {})\n',
         "docs/notes.md": "unimplemented!() and it.skip( are forbidden\n",
       })
@@ -681,7 +831,8 @@ describe("computer-v3-guards --stubs", () => {
 
       // when the new directories carry each forbidden form
       repo.write({
-        "crates/omo-computer-session/src/lib.rs": 'fn a() { unimplemented!() }\nfn b() { todo!("later") }\n#[test]\n#[ignore]\nfn c() {}\n',
+        "crates/omo-computer-session/src/lib.rs":
+          'fn a() { unimplemented!() }\nfn b() { todo!("later") }\n#[test]\n#[ignore]\nfn c() {}\n',
         "packages/omo-computer-tool/test/a.test.ts": 'it.skip("a", () => {})\ndescribe.only("b", () => {})\n',
       })
       repo.commit("stubs")
@@ -728,7 +879,11 @@ describe("computer-v3-guards --stubs domain and --residue on disk", () => {
       expectPass(repo.guard("--residue"))
 
       // when a tracked doc and an ignored on-disk file carry the old name in their path, with neutral content
-      repo.write({ "docs/senpi-desktop-notes.md": "notes\n", ".gitignore": "*.log\n", "logs/SENPI_Desktop.log": "neutral\n" })
+      repo.write({
+        "docs/senpi-desktop-notes.md": "notes\n",
+        ".gitignore": "*.log\n",
+        "logs/SENPI_Desktop.log": "neutral\n",
+      })
       repo.commit("named paths")
 
       // then each path is a finding
@@ -739,12 +894,18 @@ describe("computer-v3-guards --stubs domain and --residue on disk", () => {
   test("stubs_refuses_a_skip_or_only_reached_through_a_modifier", () => {
     withRepo((repo) => {
       // given modifier chains that neither skip nor focus
-      repo.write({ "packages/omo-computer-sdk/test/a.test.ts": 'it.concurrent("runs", () => {})\ntest.each([1])("case %d", () => {})\ndescribe.each([1])("group", () => {})\n' })
+      repo.write({
+        "packages/omo-computer-sdk/test/a.test.ts":
+          'it.concurrent("runs", () => {})\ntest.each([1])("case %d", () => {})\ndescribe.each([1])("group", () => {})\n',
+      })
       repo.commit("clean")
       expectPass(repo.guard("--stubs"))
 
       // when a chain skips or focuses through a modifier
-      repo.write({ "packages/omo-computer-sdk/test/b.test.ts": 'it.concurrent.skip("a", () => {})\ntest.skip.each([1])("b", () => {})\ndescribe.only.each([1])("c", () => {})\n' })
+      repo.write({
+        "packages/omo-computer-sdk/test/b.test.ts":
+          'it.concurrent.skip("a", () => {})\ntest.skip.each([1])("b", () => {})\ndescribe.only.each([1])("c", () => {})\n',
+      })
       repo.commit("chains")
 
       // then each line is a finding
@@ -755,7 +916,9 @@ describe("computer-v3-guards --stubs domain and --residue on disk", () => {
   test("stubs_refuses_a_todo_test", () => {
     withRepo((repo) => {
       // given tests whose titles or variables merely say todo
-      repo.write({ "packages/omo-computer-tool/test/a.test.ts": 'const todo = 1\nit("keeps the todo list", () => {})\n' })
+      repo.write({
+        "packages/omo-computer-tool/test/a.test.ts": 'const todo = 1\nit("keeps the todo list", () => {})\n',
+      })
       repo.commit("clean")
       expectPass(repo.guard("--stubs"))
 
@@ -771,16 +934,26 @@ describe("computer-v3-guards --stubs domain and --residue on disk", () => {
   test("stubs_refuses_an_ignore_through_cfg_attr_and_keeps_the_live_reason_form", () => {
     withRepo((repo) => {
       // given a live-ignored test and a cfg_attr that does not ignore
-      repo.write({ "crates/omo-computer-core/src/lib.rs": '#[cfg_attr(test, derive(Debug))]\nstruct A;\n#[test]\n#[ignore = "live: needs a display"]\nfn capture() {}\n' })
+      repo.write({
+        "crates/omo-computer-core/src/lib.rs":
+          '#[cfg_attr(test, derive(Debug))]\nstruct A;\n#[test]\n#[ignore = "live: needs a display"]\nfn capture() {}\n',
+      })
       repo.commit("clean")
       expectPass(repo.guard("--stubs"))
 
       // when cfg_attr ignores a test, with or without a reason
-      repo.write({ "crates/omo-computer-safety/src/lib.rs": '#[test]\n#[cfg_attr(test, ignore)]\nfn a() {}\n#[cfg_attr(target_os = "linux", ignore = "flaky")]\nfn b() {}\n' })
+      repo.write({
+        "crates/omo-computer-safety/src/lib.rs":
+          '#[test]\n#[cfg_attr(test, ignore)]\nfn a() {}\n#[cfg_attr(target_os = "linux", ignore = "flaky")]\nfn b() {}\n',
+      })
       repo.commit("cfg_attr")
 
       // then each is a finding
-      expectFindings(repo.guard("--stubs"), "crates/omo-computer-safety/src/lib.rs:2:", "crates/omo-computer-safety/src/lib.rs:4:")
+      expectFindings(
+        repo.guard("--stubs"),
+        "crates/omo-computer-safety/src/lib.rs:2:",
+        "crates/omo-computer-safety/src/lib.rs:4:",
+      )
     })
   })
 
@@ -862,7 +1035,13 @@ describe("computer-v3-guards command line", () => {
       repo.write({ "crates/senpi-desktop-core/src/lib.rs": "old\n" })
       repo.commit("base")
       repo.git("branch", "base")
-      const cli = (...args: string[]) => Bun.spawnSync([process.execPath, guardScript, ...args], { cwd: repo.root, env: isolatedEnv, stdout: "pipe", stderr: "pipe" })
+      const cli = (...args: string[]) =>
+        Bun.spawnSync([process.execPath, guardScript, ...args], {
+          cwd: repo.root,
+          env: isolatedEnv,
+          stdout: "pipe",
+          stderr: "pipe",
+        })
 
       // given a clean branch, then the same branch with an old file edited
       const clean = cli("--old-frozen", "base")
@@ -882,7 +1061,12 @@ describe("computer-v3-guards command line", () => {
   })
 
   test("cli_prints_usage_and_exits_2_for_an_unknown_sub_command", () => {
-    const result = Bun.spawnSync([process.execPath, guardScript, "--nope"], { cwd: tmpdir(), env: isolatedEnv, stdout: "pipe", stderr: "pipe" })
+    const result = Bun.spawnSync([process.execPath, guardScript, "--nope"], {
+      cwd: tmpdir(),
+      env: isolatedEnv,
+      stdout: "pipe",
+      stderr: "pipe",
+    })
     expect(result.exitCode).toBe(2)
     expect(result.stderr.toString()).toContain("usage")
   })

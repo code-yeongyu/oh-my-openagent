@@ -69,26 +69,13 @@ describe("codex project-local cleanup", () => {
     await writeFile(join(nestedDir, ".codex", "hooks.json"), "{}\n")
     await writeFile(
       rootConfigPath,
-      [
-        "[features.multi_agent_v2]",
-        "enabled = true",
-        "",
-        "[agents]",
-        "max_threads = 8",
-        "max_depth = 3",
-        "",
-      ].join("\n"),
+      ["[features.multi_agent_v2]", "enabled = true", "", "[agents]", "max_threads = 8", "max_depth = 3", ""].join(
+        "\n",
+      ),
     )
     await writeFile(
       nestedConfigPath,
-      [
-        "[features.multi_agent_v2]",
-        "enabled = true",
-        "",
-        "[agents]",
-        "job_max_runtime_seconds = 7200",
-        "",
-      ].join("\n"),
+      ["[features.multi_agent_v2]", "enabled = true", "", "[agents]", "job_max_runtime_seconds = 7200", ""].join("\n"),
     )
 
     // when
@@ -109,9 +96,7 @@ describe("codex project-local cleanup", () => {
     expect(rootContent).not.toMatch(/^max_threads\s*=/m)
     expect(rootContent).toContain("max_depth = 3")
     expect(nestedContent).toContain("job_max_runtime_seconds = 7200")
-    expect(result.artifacts.map((artifact) => artifact.path).sort()).toEqual([
-      join(nestedDir, ".codex", "hooks.json"),
-    ])
+    expect(result.artifacts.map((artifact) => artifact.path).sort()).toEqual([join(nestedDir, ".codex", "hooks.json")])
   })
 
   test("#given project-local legacy artifacts #when repairing #then reports them without deleting user-owned paths", async () => {
@@ -125,14 +110,7 @@ describe("codex project-local cleanup", () => {
     await writeFile(join(projectRoot, ".codex", "hooks.json"), "{}\n")
     await writeFile(
       configPath,
-      [
-        "[features]",
-        "multi_agent_v2 = true",
-        "",
-        "[agents]",
-        "max_threads = 2",
-        "",
-      ].join("\n"),
+      ["[features]", "multi_agent_v2 = true", "", "[agents]", "max_threads = 2", ""].join("\n"),
     )
 
     // when
@@ -154,15 +132,7 @@ describe("codex project-local cleanup", () => {
     const projectRoot = await mkdtemp(join(tmpdir(), "omo-codex-project-no-mav2-"))
     const configPath = join(projectRoot, ".codex", "config.toml")
     await mkdir(join(projectRoot, ".codex"), { recursive: true })
-    await writeFile(
-      configPath,
-      [
-        "[agents]",
-        "max_threads = 4",
-        "max_depth = 2",
-        "",
-      ].join("\n"),
-    )
+    await writeFile(configPath, ["[agents]", "max_threads = 4", "max_depth = 2", ""].join("\n"))
 
     // when
     const result = await repairNearestProjectLocalCodexArtifacts({ startDirectory: projectRoot })
@@ -185,15 +155,9 @@ describe("codex project-local cleanup", () => {
     await mkdir(codexHome, { recursive: true })
     await writeFile(
       globalConfigPath,
-      [
-        "[features.multi_agent_v2]",
-        "enabled = true",
-        "",
-        "[agents]",
-        "max_threads = 99",
-        "max_depth = 9",
-        "",
-      ].join("\n"),
+      ["[features.multi_agent_v2]", "enabled = true", "", "[agents]", "max_threads = 99", "max_depth = 9", ""].join(
+        "\n",
+      ),
     )
 
     // when
@@ -222,15 +186,9 @@ describe("codex project-local cleanup", () => {
     await mkdir(join(projectRoot, ".codex"), { recursive: true })
     await writeFile(
       globalConfigPath,
-      [
-        "[features.multi_agent_v2]",
-        "enabled = true",
-        "",
-        "[agents]",
-        "max_threads = 99",
-        "max_depth = 9",
-        "",
-      ].join("\n"),
+      ["[features.multi_agent_v2]", "enabled = true", "", "[agents]", "max_threads = 99", "max_depth = 9", ""].join(
+        "\n",
+      ),
     )
     await symlink(globalConfigPath, projectConfigPath)
 

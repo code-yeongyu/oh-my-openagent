@@ -10,7 +10,12 @@ describe("an alias with no account", () => {
     const a = account({ registryDown: "signed_out" })
     const { run, openSession } = surface(a.remote)
     const result = await run("thread_create", { alias: "about-me" })
-    expect(result).toMatchObject({ kind: "ok", thread: { thread_id: "dur-created-here" }, alias_scope: "local", alias_unavailable: "sign_in" })
+    expect(result).toMatchObject({
+      kind: "ok",
+      thread: { thread_id: "dur-created-here" },
+      alias_scope: "local",
+      alias_unavailable: "sign_in",
+    })
     expect(result.kind === "ok" && "thread" in result ? result.thread.alias : "no thread").toBeUndefined()
     expect(openSession).toHaveBeenCalledTimes(1)
     expect(openSession.mock.calls[0]?.[0]).toMatchObject({ name: "about-me" })
@@ -20,35 +25,59 @@ describe("an alias with no account", () => {
   test("#given the alias registry answers sign_in #when thread_create sets an alias and a name #then the name is kept and the alias is reported local only", async () => {
     const a = account({ registryDown: "signed_out" })
     const { run, openSession } = surface(a.remote)
-    expect(await run("thread_create", { alias: "about-me", name: "notes" })).toMatchObject({ kind: "ok", alias_scope: "local", alias_unavailable: "sign_in" })
+    expect(await run("thread_create", { alias: "about-me", name: "notes" })).toMatchObject({
+      kind: "ok",
+      alias_scope: "local",
+      alias_unavailable: "sign_in",
+    })
     expect(openSession.mock.calls[0]?.[0]).toMatchObject({ name: "notes" })
   })
 
   test("#given the alias registry answers sign_in #when the alias matches a thread name here #then it is name_conflict and nothing is created", async () => {
     const a = account({ registryDown: "signed_out" })
     const { run, openSession } = surface(a.remote)
-    expect(await run("thread_create", { alias: "Local Peer" })).toMatchObject({ kind: "error", error: { code: "name_conflict" } })
+    expect(await run("thread_create", { alias: "Local Peer" })).toMatchObject({
+      kind: "error",
+      error: { code: "name_conflict" },
+    })
     expect(openSession).not.toHaveBeenCalled()
   })
 
   test("#given no remote surface #when thread_create sets an alias #then the thread is created here under the alias as its name; a device still needs the account", async () => {
     const { run, openSession } = surface(undefined)
-    expect(await run("thread_create", { alias: "about-me" })).toMatchObject({ kind: "ok", thread: { thread_id: "dur-created-here" }, alias_scope: "local", alias_unavailable: "no_remote" })
+    expect(await run("thread_create", { alias: "about-me" })).toMatchObject({
+      kind: "ok",
+      thread: { thread_id: "dur-created-here" },
+      alias_scope: "local",
+      alias_unavailable: "no_remote",
+    })
     expect(openSession.mock.calls[0]?.[0]).toMatchObject({ name: "about-me" })
-    expect(await run("thread_create", { alias: "x", device: "b" })).toMatchObject({ kind: "error", error: { code: "host_unavailable" } })
+    expect(await run("thread_create", { alias: "x", device: "b" })).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable" },
+    })
   })
 
   test("#given the alias registry answers sign_in #when thread_rename sets only an alias #then the thread is renamed to it and the result says the alias is local only", async () => {
     const a = account({ registryDown: "signed_out" })
     const { run, setSessionName } = surface(a.remote)
-    expect(await run("thread_rename", { thread: "local peer", alias: "about-me" })).toMatchObject({ kind: "ok", thread_id: "dur-local", name: "about-me", alias_scope: "local", alias_unavailable: "sign_in" })
+    expect(await run("thread_rename", { thread: "local peer", alias: "about-me" })).toMatchObject({
+      kind: "ok",
+      thread_id: "dur-local",
+      name: "about-me",
+      alias_scope: "local",
+      alias_unavailable: "sign_in",
+    })
     expect(setSessionName.mock.calls.map((call) => call[1])).toEqual(["about-me"])
   })
 
   test("#given the signed-in registry fails otherwise #when thread_rename sets an alias #then it is host_unavailable and the name is unchanged", async () => {
     const a = account({ registryDown: "refused" })
     const { run, setSessionName } = surface(a.remote)
-    expect(await run("thread_rename", { thread: "local peer", alias: "about-me" })).toMatchObject({ kind: "error", error: { code: "host_unavailable" } })
+    expect(await run("thread_rename", { thread: "local peer", alias: "about-me" })).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable" },
+    })
     expect(setSessionName).not.toHaveBeenCalled()
   })
 })

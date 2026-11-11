@@ -17,7 +17,8 @@ const PATH_ARGUMENT_NAMES = ["path", "filePath", "file_path", "target"] as const
 const NODE_PATH = { isAbsolute, relative, resolve }
 /** Per session; past it an ancestor call is denied rather than left unchecked. */
 const MAX_PENDING_ANCESTOR_CHECKS = 256
-const BASH_ADVISORY = "omo-senpi memory guard advisory: bash command references another memory identity; shell text is not blocked because this soft guard is not a security boundary"
+const BASH_ADVISORY =
+  "omo-senpi memory guard advisory: bash command references another memory identity; shell text is not blocked because this soft guard is not a security boundary"
 
 export interface MemoryGuardOptions {
   readonly getContext: (eventContext: unknown) => MemoryIdentityContext | undefined
@@ -90,9 +91,12 @@ export function registerMemoryGuard(
       const cwd = resolveCwd()
       // Built-ins open path.resolve()d targets; suffix-classified external tools may open raw strings.
       const name = normalizeToolName(event.toolName)
-      const target = name === operation || name === "apply_patch"
-        ? resolve(cwd, rawPath)
-        : isAbsolute(rawPath) ? rawPath : `${cwd}/${rawPath}`
+      const target =
+        name === operation || name === "apply_patch"
+          ? resolve(cwd, rawPath)
+          : isAbsolute(rawPath)
+            ? rawPath
+            : `${cwd}/${rawPath}`
       if (operation === "read" && isGrantedProjectMemoryRead(context, target)) continue
       const verdict = classifyTarget(target, cwd, roots, recursive)
       if (verdict === undefined) continue
@@ -111,7 +115,13 @@ export function registerMemoryGuard(
     const sessionId = readSessionId(eventContext)
     const pending = pendingAncestorChecks.get(sessionId) ?? new Map<string, PendingAncestorCheck>()
     if (event.toolCallId === undefined || pending.size >= MAX_PENDING_ANCESTOR_CHECKS) {
-      return { block: true, reason: ancestorDenyReason(ancestor.toolName, ancestor.rawPath, { kind: "unlisted", area: ancestor.areas[0] ?? ancestor.rawPath }) }
+      return {
+        block: true,
+        reason: ancestorDenyReason(ancestor.toolName, ancestor.rawPath, {
+          kind: "unlisted",
+          area: ancestor.areas[0] ?? ancestor.rawPath,
+        }),
+      }
     }
     pending.set(event.toolCallId, ancestor)
     pendingAncestorChecks.set(sessionId, pending)
@@ -121,7 +131,10 @@ export function registerMemoryGuard(
   // ONE tool_result registration for the whole guard: senpi runs a PostToolUse hook (one hookRunId index) per
   // handler on every tool call, and the EQ goldens pin that count. The ancestor re-check (enumeration tools) and
   // the receipt notice (read tools) never apply to the same call; a replaced result is final.
-  pi.on("tool_result", (payload, eventContext) => recheckAncestorResult(payload, eventContext) ?? unverifiedReceiptNotice(payload))
+  pi.on(
+    "tool_result",
+    (payload, eventContext) => recheckAncestorResult(payload, eventContext) ?? unverifiedReceiptNotice(payload),
+  )
 
   // The host checks only the enumeration root, so an identity created while the walk ran would be read.
   // Re-list the areas once the result exists and, if anything foreign appeared, replace the whole result.
@@ -171,7 +184,11 @@ function readAreaEntries(dir: string): readonly AreaEntry[] {
 }
 
 /** Names only the memory area, never the identity found in it. */
-function ancestorDenyReason(toolName: string, rawPath: string, scan: Exclude<ForeignRootScan, { readonly kind: "clear" }>): string {
+function ancestorDenyReason(
+  toolName: string,
+  rawPath: string,
+  scan: Exclude<ForeignRootScan, { readonly kind: "clear" }>,
+): string {
   return scan.kind === "foreign"
     ? `cross-identity memory access denied: ${toolName} to ${rawPath} would enumerate another memory identity found under ${scan.area}`
     : `cross-identity memory access denied: ${toolName} to ${rawPath} could not be checked for another memory identity under ${scan.area}`
@@ -208,7 +225,12 @@ function isRegisteredPatchTool(toolName: string, context: ComponentContext): boo
 function matchesToolName(toolName: string, expected: string): boolean {
   const normalized = normalizeToolName(toolName)
   const suffix = normalizeToolName(expected)
-  return normalized === suffix || normalized.endsWith(`_${suffix}`) || normalized.endsWith(`:${suffix}`) || normalized.endsWith(`/${suffix}`)
+  return (
+    normalized === suffix ||
+    normalized.endsWith(`_${suffix}`) ||
+    normalized.endsWith(`:${suffix}`) ||
+    normalized.endsWith(`/${suffix}`)
+  )
 }
 
 function normalizeToolName(toolName: string): string {
@@ -273,7 +295,12 @@ function resolveGuardRoots(context: MemoryIdentityContext): GuardRoots {
  * `inside`: the target is in a memory area outside the own root. `ancestor`: a recursive tool would walk into
  * a memory area from above, which is denied only when that area holds a foreign root (#12301).
  */
-function classifyTarget(rawPath: string, cwd: string, roots: GuardRoots, recursive: boolean): TargetVerdict | undefined {
+function classifyTarget(
+  rawPath: string,
+  cwd: string,
+  roots: GuardRoots,
+  recursive: boolean,
+): TargetVerdict | undefined {
   if (rawPath.includes("\0")) return undefined
   const lexical = resolve(cwd, rawPath)
   const candidates = uniquePaths([lexical, canonicalizeFromNearestExisting(rawPath)])
@@ -297,7 +324,10 @@ function classifyTarget(rawPath: string, cwd: string, roots: GuardRoots, recursi
  * area (a case-variant own directory under a symlinked home lists as `<canonical>/agents/Global`).
  */
 function ancestorScanInputs(roots: GuardRoots, ownRoots: readonly string[]): AncestorCheck {
-  const areas = roots.deniedRoots.map((root) => ({ lexical: root, canonical: canonicalizeFromNearestExisting(root) ?? root }))
+  const areas = roots.deniedRoots.map((root) => ({
+    lexical: root,
+    canonical: canonicalizeFromNearestExisting(root) ?? root,
+  }))
   const rerooted = areas
     .filter((area) => isWithin(area.lexical, roots.ownRoot))
     .map((area) => resolve(area.canonical, relative(area.lexical, roots.ownRoot)))

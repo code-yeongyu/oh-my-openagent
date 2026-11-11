@@ -1,7 +1,15 @@
 import type { TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
 import type { ResumeCredential } from "../pause/admission-barrier"
-import type { WorkpoolAgent, WorkpoolCaller, WorkpoolEvent, WorkpoolItem, WorkpoolRecord, WorkpoolSpec, WorkpoolWorker } from "./types"
+import type {
+  WorkpoolAgent,
+  WorkpoolCaller,
+  WorkpoolEvent,
+  WorkpoolItem,
+  WorkpoolRecord,
+  WorkpoolSpec,
+  WorkpoolWorker,
+} from "./types"
 
 export type WorkpoolRequest = {
   readonly resumeCredential?: ResumeCredential

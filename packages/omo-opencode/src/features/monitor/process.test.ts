@@ -235,43 +235,43 @@ describe("spawnMonitoredProcess", () => {
 })
 
 describe("spawnMonitoredProcess real subprocess smoke", () => {
-  test.skipIf(process.platform === "win32")("#given printf emits two lines #when monitored #then stdout lines arrive and no process group remains", async () => {
-    // given
-    let observedPid: number | undefined
-    const recordingSpawn = (
-      command: string[],
-      options?: Bun.SpawnOptions.SpawnOptions<"ignore", "pipe", "pipe">,
-    ): PipeSubprocess => {
-      const subprocess = Bun.spawn<"ignore", "pipe", "pipe">(command, options)
-      observedPid = subprocess.pid
-      return subprocess
-    }
+  test.skipIf(process.platform === "win32")(
+    "#given printf emits two lines #when monitored #then stdout lines arrive and no process group remains",
+    async () => {
+      // given
+      let observedPid: number | undefined
+      const recordingSpawn = (
+        command: string[],
+        options?: Bun.SpawnOptions.SpawnOptions<"ignore", "pipe", "pipe">,
+      ): PipeSubprocess => {
+        const subprocess = Bun.spawn<"ignore", "pipe", "pipe">(command, options)
+        observedPid = subprocess.pid
+        return subprocess
+      }
 
-    // when
-    const monitored = spawnMonitoredProcess(
-      { command: "printf 'a\nb\n'", maxRuntimeMs: 60_000 },
-      {
-        spawn: unsafeTestValue<typeof Bun.spawn>(recordingSpawn),
-        setTimer: (fn, ms) => setTimeout(fn, ms),
-        clearTimer: (handle) => clearTimeout(handle),
-      },
-    )
-    const [stdout, exit] = await Promise.all([
-      readProcessStream(monitored.stdout),
-      monitored.exited,
-    ])
+      // when
+      const monitored = spawnMonitoredProcess(
+        { command: "printf 'a\nb\n'", maxRuntimeMs: 60_000 },
+        {
+          spawn: unsafeTestValue<typeof Bun.spawn>(recordingSpawn),
+          setTimer: (fn, ms) => setTimeout(fn, ms),
+          clearTimer: (handle) => clearTimeout(handle),
+        },
+      )
+      const [stdout, exit] = await Promise.all([readProcessStream(monitored.stdout), monitored.exited])
 
-    // then
-    expect(stdout.split("\n").filter(Boolean)).toEqual(["a", "b"])
-    expect(exit.code).toBe(0)
-    expect(observedPid).toBeDefined()
-    let groupExists = true
-    try {
-      process.kill(-(observedPid ?? 0), 0)
-    } catch (error) {
-      void error
-      groupExists = false
-    }
-    expect(groupExists).toBe(false)
-  })
+      // then
+      expect(stdout.split("\n").filter(Boolean)).toEqual(["a", "b"])
+      expect(exit.code).toBe(0)
+      expect(observedPid).toBeDefined()
+      let groupExists = true
+      try {
+        process.kill(-(observedPid ?? 0), 0)
+      } catch (error) {
+        void error
+        groupExists = false
+      }
+      expect(groupExists).toBe(false)
+    },
+  )
 })

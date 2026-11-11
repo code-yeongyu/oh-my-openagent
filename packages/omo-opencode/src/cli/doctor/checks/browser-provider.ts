@@ -25,7 +25,10 @@ export async function checkBrowserProvider(): Promise<CheckResult> {
   return {
     name: "Browser Provider",
     status: issues.length > 0 ? "fail" : "pass",
-    message: issues.length > 0 ? "Browser provider configuration requires migration" : "Browser provider configuration is valid",
+    message:
+      issues.length > 0
+        ? "Browser provider configuration requires migration"
+        : "Browser provider configuration is valid",
     issues,
   }
 }

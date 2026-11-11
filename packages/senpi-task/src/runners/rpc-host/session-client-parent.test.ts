@@ -21,9 +21,20 @@ afterEach(async () => {
 
 type Forwarded = { readonly dialog: ForwardableDialog; readonly taskId: string }
 
-function recordingForwarder(answer: (dialog: ForwardableDialog) => ForwardedAnswer): { readonly forwarder: ChildDialogForwarder; readonly seen: Forwarded[] } {
+function recordingForwarder(answer: (dialog: ForwardableDialog) => ForwardedAnswer): {
+  readonly forwarder: ChildDialogForwarder
+  readonly seen: Forwarded[]
+} {
   const seen: Forwarded[] = []
-  return { seen, forwarder: { forward: async (dialog, child) => { seen.push({ dialog, taskId: child.taskId }); return answer(dialog) } } }
+  return {
+    seen,
+    forwarder: {
+      forward: async (dialog, child) => {
+        seen.push({ dialog, taskId: child.taskId })
+        return answer(dialog)
+      },
+    },
+  }
 }
 
 function parentMode(initial: string): ParentPermissionMode & { change(preset: string): void } {
@@ -31,12 +42,22 @@ function parentMode(initial: string): ParentPermissionMode & { change(preset: st
   const listeners = new Set<(preset: string) => void>()
   return {
     current: () => current,
-    onChange: (listener) => { listeners.add(listener); return () => listeners.delete(listener) },
-    change: (preset) => { current = preset; for (const listener of listeners) listener(preset) },
+    onChange: (listener) => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    change: (preset) => {
+      current = preset
+      for (const listener of listeners) listener(preset)
+    },
   }
 }
 
-function linkedClient(host: FakeHost, parent: ChildParentLink, probe = () => host.probeProtocolInfo()): HostSessionClient {
+function linkedClient(
+  host: FakeHost,
+  parent: ChildParentLink,
+  probe = () => host.probeProtocolInfo(),
+): HostSessionClient {
   const client = new HostSessionClient({ socketPath: host.socketPath, ports: { probeProtocolInfo: probe }, parent })
   clients.push(client)
   return client
@@ -52,11 +73,29 @@ describe("HostSessionClient with a parent session", () => {
     const answered = host.waitForCommand("extension_ui_response")
 
     // when
-    host.requestUi(opened.sessionId, { id: "ui-allow", method: "select", title: "Run bash?", options: ["Allow", "Deny"], toolCallId: "call-7", parentToolCallId: "cell-2" })
+    host.requestUi(opened.sessionId, {
+      id: "ui-allow",
+      method: "select",
+      title: "Run bash?",
+      options: ["Allow", "Deny"],
+      toolCallId: "call-7",
+      parentToolCallId: "cell-2",
+    })
 
     // then
     expect((await answered).payload).toMatchObject({ type: "extension_ui_response", id: "ui-allow", value: "Allow" })
-    expect(seen).toEqual([{ taskId: "st_t16a", dialog: { method: "select", title: "Run bash?", options: ["Allow", "Deny"], toolCallId: "call-7", parentToolCallId: "cell-2" } }])
+    expect(seen).toEqual([
+      {
+        taskId: "st_t16a",
+        dialog: {
+          method: "select",
+          title: "Run bash?",
+          options: ["Allow", "Deny"],
+          toolCallId: "call-7",
+          parentToolCallId: "cell-2",
+        },
+      },
+    ])
   })
 
   test("#given a child secret input #when it arrives #then it is never forwarded and the child gets the cancel", async () => {
@@ -88,8 +127,14 @@ describe("HostSessionClient with a parent session", () => {
 
     // then
     const opens = host.commands.filter((command) => command.type === "open_session")
-    expect(opens[0]?.payload).toMatchObject({ sessionPath: "/tmp/sessions/t17a.jsonl", permissionPreset: "full-access" })
-    expect((await reapplied).payload).toMatchObject({ sessionPath: "/tmp/sessions/t17a.jsonl", permissionPreset: "ask" })
+    expect(opens[0]?.payload).toMatchObject({
+      sessionPath: "/tmp/sessions/t17a.jsonl",
+      permissionPreset: "full-access",
+    })
+    expect((await reapplied).payload).toMatchObject({
+      sessionPath: "/tmp/sessions/t17a.jsonl",
+      permissionPreset: "ask",
+    })
     expect(client.sessionId).toBe(opened.sessionId)
     expect(await client.getState()).toBeDefined()
   })
@@ -101,7 +146,10 @@ describe("HostSessionClient with a parent session", () => {
     const mode = parentMode("full-access")
     let moved = false
     const probe = () => {
-      if (!moved) { moved = true; mode.change("ask") }
+      if (!moved) {
+        moved = true
+        mode.change("ask")
+      }
       return host.probeProtocolInfo()
     }
     const client = linkedClient(host, new ChildParentLink("st_m1", undefined, mode), probe)
@@ -153,9 +201,14 @@ function heldProbes(host: FakeHost) {
   const first = Promise.withResolvers<void>()
   return {
     firstHeld: first.promise,
-    hold: () => { holding = true },
+    hold: () => {
+      holding = true
+    },
     held: () => waiting.length,
-    releaseAll: () => { holding = false; for (const release of waiting.splice(0)) release() },
+    releaseAll: () => {
+      holding = false
+      for (const release of waiting.splice(0)) release()
+    },
     probe: async () => {
       if (holding) {
         const released = Promise.withResolvers<void>()
