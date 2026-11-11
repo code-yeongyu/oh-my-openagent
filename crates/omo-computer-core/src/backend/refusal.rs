@@ -14,6 +14,26 @@ pub struct Refusal {
 
 impl Refusal {
     /// A refusal carrying `reason` as its `data.reason`.
+    ///
+    /// `reason` is a member of the closed vocabulary:
+    /// ```
+    /// use omo_computer_core::backend::Refusal;
+    /// use omo_computer_core::error::{EngineCode, Reason};
+    /// let refusal = Refusal::new(EngineCode::StopPathUnavailable, Reason::NoListener);
+    /// assert_eq!(refusal.reason, Some(Reason::NoListener));
+    /// ```
+    /// A wire token is not a reason, so a mistyped one is a compile error, not a run-time
+    /// `UnknownFailure`:
+    /// ```compile_fail
+    /// use omo_computer_core::backend::Refusal;
+    /// use omo_computer_core::error::EngineCode;
+    /// let refusal = Refusal::new(EngineCode::StopPathUnavailable, "no_listenr");
+    /// ```
+    /// ```compile_fail
+    /// use omo_computer_core::backend::Refusal;
+    /// use omo_computer_core::error::EngineCode;
+    /// let refusal = Refusal { code: EngineCode::Closed, reason: Some("not_a_reason") };
+    /// ```
     #[must_use]
     pub const fn new(code: EngineCode, reason: &'static str) -> Self {
         Self {
