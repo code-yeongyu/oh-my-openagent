@@ -26,7 +26,7 @@ describe("#13012 route parity", () => {
     expect(a.sent.filter((sent) => sent.rpc?.["type"] === "admit_external_message").map((sent) => [sent.device, sent.session])).toEqual([[B_ROW.device, B_ROW.session_id]])
   })
 
-  test("#given a unique local fuzzy match and 600 ended remote rows #when fuzzy handoff runs #then it resolves locally instead of ambiguous_target", async () => {
+  test("#given a unique local fuzzy match and 600 ended remote rows #when fuzzy handoff runs #then the ended rows are not candidates and it resolves locally", async () => {
     const ended = Array.from({ length: 600 }, (_, i) => ({ ...B_ROW, session_id: `rk-old-${i}`, durable_id: `dur-old-${i}`, title: `archive ${i}`, state: "ended" as const }))
     const a = account({ rows: ended })
     let listings = 0
@@ -34,7 +34,15 @@ describe("#13012 route parity", () => {
     expect(await run("thread_handoff", { thread: "local pee", match: "fuzzy", message: "continue", all_scope: true })).toMatchObject({
       kind: "ok", thread: { thread_id: "dur-local" }, resolved_by: "fuzzy",
     })
-    expect(listings).toBe(0)
+    expect(listings).toBe(1)
+  })
+
+  test("#given a local near-match and a live remote exact title #when fuzzy handoff runs #then the better remote candidate wins", async () => {
+    const a = account({ rows: [{ ...B_ROW, title: "local peer review" }] })
+    const { run } = surface(a.remote)
+    expect(await run("thread_handoff", { thread: "local peer review", match: "fuzzy", message: "continue", all_scope: true })).toMatchObject({
+      kind: "ok", thread: { thread_id: B_ROW.durable_id, device: B_ROW.device }, resolved_by: "fuzzy",
+    })
   })
 
   test("#given the account session listing fails #when a remote address is resolved #then its typed transport error survives the resolver", async () => {

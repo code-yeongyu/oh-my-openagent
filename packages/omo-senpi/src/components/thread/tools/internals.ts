@@ -179,8 +179,7 @@ export function targetSession(view: ThreadHostView, durableId: string): ThreadHo
 
 /**
  * Decision 0027: ONE resolver over this device's entries and the relay transport's address book. A local hit never needs
- * the relay (an id hit, or a unique fuzzy hit: the account's rows only widen a local miss, so a large account cannot turn
- * a unique local match into ambiguous_target). Absent remote setup leaves a local miss unchanged; a configured relay's failed lookup, failing
+ * the relay. Fuzzy handoff compares local and live remote candidates together; ended remote sessions are not candidates. Absent remote setup leaves a local miss unchanged; a configured relay's failed lookup, failing
  * transport state (anything but connected once set up), plan refusal or alias holder's typed failure answers before not_found. An alias or entry on another
  * device is account-wide: the local scope no longer applies to it.
  */
@@ -193,15 +192,16 @@ export async function resolveAcross(options: ThreadToolSurfaceOptions, local: re
     return found.kind === "ok" ? { ...found, resolution: "name" } : found
   }
   const here = resolve(local)
-  // A local id hit never needs the relay; a unique local FUZZY hit does not either: the account's remote rows only widen
-  // a local miss (#13066 review: the 500-candidate cap must not turn a unique local match into ambiguous_target).
-  if (options.remote === undefined || (here.kind === "ok" && (here.resolution === "id" || match === "fuzzy"))) return here
+  if (options.remote === undefined || (here.kind === "ok" && here.resolution === "id")) return here
   const book = await relayAddressBook(options.remote, address).catch((error: unknown): RelayAddressBook => ({
     entries: [],
     unavailable: threadToolFailure("host_unavailable", "The account's session listing could not be reached.", "Retry when the device service is reachable.", { reason: error instanceof Error ? error.message : String(error) }),
   }))
   if (book.entries.length === 0 && here.kind === "ok") return here
-  const across = resolve([...local, ...book.entries])
+  // Ended sessions on other devices are not handoff targets: they stay out of the fuzzy candidate set, so a large
+  // account's history does not push the combined set over the fuzzy cap (ambiguous_target) when the live match is unique.
+  const candidates = match === "fuzzy" ? book.entries.filter((entry) => entry.status === "live") : book.entries
+  const across = resolve([...local, ...candidates])
   if (across.kind === "ok") return { ...across, all_scope: across.resolution === "alias" || across.entry.transport !== undefined ? true : allScope }
   if (book.aliasFailure !== undefined) return { kind: "error", ...book.aliasFailure } as ThreadResolveResult
   if (book.unavailable !== undefined && here.kind === "error" && here.code === "not_found") return { kind: "error", ...book.unavailable } as ThreadResolveResult
