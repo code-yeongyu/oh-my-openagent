@@ -1,0 +1,70 @@
+{
+  "v": 4,
+  "os": "linux",
+  "protectedSurfaces": [
+    "polkit-gnome-authentication-agent-1",
+    "polkit-kde-authentication-agent-1",
+    "lxpolkit",
+    "gnome-shell:modal",
+    "gnome-shell:unlock-dialog",
+    "gnome-shell:lock-screen",
+    "ksecretprompt",
+    "swaylock",
+    "hyprlock",
+    "kscreenlocker_greet",
+    "i3lock",
+    "gnome-control-center:privacy"
+  ],
+  "readOnlySurfaces": [],
+  "systemSurfaces": [
+    "gnome-shell:panel",
+    "gnome-shell:overview",
+    "plasmashell:panel",
+    "waybar"
+  ],
+  "processes": [
+    "gnome-shell",
+    "kwin",
+    "kwin_wayland",
+    "kwin_x11",
+    "sway",
+    "i3",
+    "xfwm4",
+    "plasmashell",
+    "systemd",
+    "gdm",
+    "sddm",
+    "lightdm"
+  ],
+  "deniedApps": [
+    "1password",
+    "Bitwarden",
+    "keepassxc",
+    "org.keepassxc.KeePassXC",
+    "org.gnome.seahorse.Application",
+    "kwalletmanager5"
+  ],
+  "dangerousChords": [
+    "ctrl+alt+backspace",
+    "ctrl+alt+del",
+    "ctrl+alt+f1",
+    "ctrl+alt+f2",
+    "ctrl+alt+f3",
+    "ctrl+alt+f4",
+    "ctrl+alt+f5",
+    "ctrl+alt+f6",
+    "ctrl+alt+f7",
+    "ctrl+alt+f8",
+    "ctrl+alt+f9",
+    "ctrl+alt+f10",
+    "ctrl+alt+f11",
+    "ctrl+alt+f12"
+  ],
+  "chordsMatchSupersets": false,
+  "secureLabelRegex": "\\b(passw(or)?d|passcode|pin|otp|cvv|cvc|csc|ssn|card number)\\b",
+  "secureInputSources": [
+    "ROLE_PASSWORD_TEXT",
+    "portal:secure",
+    "label:secureLabelRegex"
+  ]
+}

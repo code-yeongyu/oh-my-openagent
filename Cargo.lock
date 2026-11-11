@@ -2045,7 +2045,12 @@ dependencies = [
 name = "omo-computer-safety"
 version = "0.0.0"
 dependencies = [
+ "libc",
+ "omo-computer-backend-fake",
  "omo-computer-core",
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

@@ -9,3 +9,12 @@ crate-type = ["rlib"]
 
 [dependencies]
 omo-computer-core = { path = "../omo-computer-core" }
+serde.workspace = true
+serde_json.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[dev-dependencies]
+omo-computer-backend-fake = { path = "../omo-computer-backend-fake" }
+tempfile.workspace = true
