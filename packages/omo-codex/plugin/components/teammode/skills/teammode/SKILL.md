@@ -140,13 +140,16 @@ teams, and a refused command never changes `team.json`.
 **MultiAgentV2 teams:**
 1. If a member needs an isolated worktree, run `worktree-add` BEFORE spawning it - flat
    `spawn_agent` has no cwd argument, so the path must ride in the bootstrap message.
-2. Spawn each member with flat `spawn_agent` using only the V2 schema fields:
+2. Spawn each member with flat `spawn_agent` using the exposed V2 schema fields:
    `task_name` is that member's `--task-name`, `message` is the bootstrap printed by
    `add-member` / `member-prompt`, and `fork_turns` is `"none"` (members read
    `guide.md` for context; full parent history is not their context model). Put any
-   role, priority, or task-specific routing instruction in `message`; V2 does not accept
-   `agent_type`, `model`, `reasoning_effort`, or `service_tier`, so members inherit the
-   session model.
+   priority or task-specific routing instruction in `message`. When the spawn schema
+   exposes `agent_type`, pass an exact installed LazyCodex role for the member's slice:
+   `lazycodex-worker-low`, `lazycodex-worker-medium`, or `lazycodex-worker-high` by
+   difficulty, or `explorer` for read-only search; never generic `worker` or `default`.
+   Omit `model`, `reasoning_effort`, and `service_tier` so the role TOML supplies them.
+   If `agent_type` is not exposed, stop and report incompatible role routing.
 3. `bind-agent --agent-path` with the canonical task name the spawn returned (normally
    `/root/<task_name>`); binding confirms the runtime identity matches the roster and records
    the member's cwd. Members are durable: they persist as subagent threads, survive idling,
