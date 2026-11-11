@@ -4,7 +4,7 @@
 // repository as it was; the source's `identity.json` records `mergedInto` and the head that was merged,
 // so a repeated run is a no-op and later source commits merge incrementally.
 
-import { basename, dirname, isAbsolute, join } from "node:path"
+import { basename, dirname, isAbsolute, join, resolve } from "node:path"
 
 import { GitMemoryRepo, NoEffectiveChangesError, type GitCommitAuthor, type GitTreeBlobEntry } from "../git"
 import { mkdir, readdir, readFile, writeFile } from "../fs/resilient"
@@ -145,11 +145,12 @@ export async function repositoryWorktreeDirs(dirs: readonly string[]): Promise<s
     if (common === undefined) continue
     // The main working tree owns the common `.git`; a linked worktree outside the repository (Desktop keeps
     // thread worktrees under its own folder) reaches it only through its `.git` file.
-    if (basename(common) === ".git") found.add(dirname(common))
+    if (basename(common) === ".git") found.add(resolve(dirname(common)))
     for (const name of await readdir(join(common, "worktrees")).catch(() => [] as string[])) {
       const pointer = await readFile(join(common, "worktrees", name, "gitdir"), "utf8").catch(() => undefined)
       const gitFile = pointer?.split(/\r?\n/, 1)[0]?.trim()
-      if (gitFile !== undefined && gitFile !== "") found.add(dirname(gitFile))
+      // git writes this pointer with forward slashes on Windows; resolve() gives every entry the platform spelling.
+      if (gitFile !== undefined && gitFile !== "") found.add(resolve(dirname(gitFile)))
     }
   }
   return [...found].sort()

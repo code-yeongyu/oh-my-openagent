@@ -34,7 +34,8 @@ describe("identity record (#10070)", () => {
       source: "/work/project",
       spellings: ["/work/project"],
     })
-    expect((await stat(join(root, IDENTITY_RECORD_FILENAME))).mode & 0o777).toBe(0o600)
+    // Windows has no POSIX permission bits; stat reports 0o666 whatever the write asked for.
+    if (process.platform !== "win32") expect((await stat(join(root, IDENTITY_RECORD_FILENAME))).mode & 0o777).toBe(0o600)
   })
 
   test("#given an existing record #when a later bind arrives from another spelling and mode #then spellings accumulate once each and the latest mode and source win", async () => {
