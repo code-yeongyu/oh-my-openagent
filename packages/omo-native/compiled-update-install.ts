@@ -4,6 +4,11 @@ import { access, chmod, constants, link, open, rename, rm } from "node:fs/promis
 import { dirname } from "node:path"
 import { promisify } from "node:util"
 
+// omo-ai publishes `5.0.0-0.beta.90` while its GitHub release is tagged `v5.0.0-beta.90`.
+export function releaseVersionOf(omoAiVersion: string): string {
+  return omoAiVersion.replace(/^(\d+\.\d+\.\d+)-0\.(.+)$/, "$1-$2")
+}
+
 export type BinaryUpdateCode = "directory_not_writable" | "update_in_progress" | "download_failed" | "integrity_failed" | "verification_failed" | "install_failed" | "rollback_failed"
 
 export class BinaryUpdateError extends Error {
@@ -116,7 +121,8 @@ export async function installReleaseBinary(options: BinaryInstallRequest & {
     swapped = true
     try {
       const result = await probe(destination, ["--version"])
-      if (result.code !== 0 || !new RegExp(`^omo ${version.replaceAll(".", "\\.")}(?:\\s|$)`).test(result.stdout.trim())) {
+      const reported = /^omo ([^\s]+)(?:\s|$)/.exec(result.stdout.trim())?.[1]
+      if (result.code !== 0 || reported === undefined || releaseVersionOf(reported) !== version) {
         throw new Error(`the installed executable did not report omo ${version}`)
       }
     } catch (cause) {

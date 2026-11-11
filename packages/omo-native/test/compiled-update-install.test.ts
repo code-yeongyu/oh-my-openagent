@@ -88,6 +88,16 @@ describe("verified standalone binary installation", () => {
     expect(await readdir(f.root)).toEqual(["omo"])
   })
 
+  test("#given a beta release tagged without npm's zero prefix #then its branded --version is accepted", async () => {
+    const f = await fixture()
+    await installReleaseBinary({
+      ...f.options, version: "9.9.10-beta.1",
+      run: async () => ({ code: 0, stdout: "omo 9.9.10-0.beta.1 (engine: fixture)\n" }),
+    })
+    expect(await readFile(f.destination, "utf8")).toBe("new executable")
+    expect(await readdir(f.root)).toEqual(["omo"])
+  })
+
   test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("#given a non-writable install directory #then a typed refusal occurs before any download and leaves no partial state", async () => {
     const f = await fixture()
     await chmod(f.root, 0o555)

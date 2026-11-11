@@ -2,7 +2,8 @@ import { spawnSync } from "node:child_process"
 import { realpathSync } from "node:fs"
 import { isPrintOnlyUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 import { isProvisionedExecutable } from "./compile-runtime"
-import { BinaryUpdateError, installReleaseBinary, type BinaryInstallRequest, type BinaryUpdateCode } from "./compiled-update-install"
+import { BinaryUpdateError, installReleaseBinary, releaseVersionOf, type BinaryInstallRequest, type BinaryUpdateCode } from "./compiled-update-install"
+export { releaseVersionOf } from "./compiled-update-install"
 
 export const RELEASES_URL = "https://github.com/code-yeongyu/oh-my-openagent/releases"
 const RELEASES_API = "https://api.github.com/repos/code-yeongyu/oh-my-openagent/releases?per_page=100"
@@ -15,11 +16,6 @@ export type ProbeOwner = (path: string, platform: NodeJS.Platform) => PackageOwn
 /** Runs one ownership query; undefined when the tool is missing, fails, or prints nothing. */
 export type RunOwnerQuery = (command: string, args: readonly string[]) => string | undefined
 export type CompiledUpdateResult = { readonly output: string; readonly exitCode: number; readonly stream?: "stdout" | "stderr"; readonly errorCode?: BinaryUpdateCode }
-
-// omo-ai publishes betas as `5.0.0-0.beta.90` while the GitHub release is tagged `v5.0.0-beta.90`.
-export function releaseVersionOf(omoAiVersion: string): string {
-  return omoAiVersion.replace(/^(\d+\.\d+\.\d+)-0\.(.+)$/, "$1-$2")
-}
 
 export function releaseAssetName(releaseTarget: unknown, platform: NodeJS.Platform, arch: string): string {
   const flavor = typeof releaseTarget === "string" && RELEASE_TARGET.test(releaseTarget)
