@@ -37,7 +37,26 @@ describe("helloDesktopEngine", () => {
 			buildSha: "fake",
 			engineVersion: "0.0.0-fake",
 			protocolVersion: PROTOCOL_VERSION,
+			features: [],
 		});
+	});
+
+	it("records the features an engine advertises, reading a null list as none", async () => {
+		const advertised = await helloDesktopEngine(fakeEngine, {
+			spawnEngine: scriptEngine({ FAKE_ENGINE_FEATURES: '["action-report","some-future-feature"]' }),
+		});
+		const nulled = await helloDesktopEngine(fakeEngine, { spawnEngine: scriptEngine({ FAKE_ENGINE_FEATURES: "null" }) });
+
+		expect([advertised.features, nulled.features]).toEqual([["action-report", "some-future-feature"], []]);
+	});
+
+	it("rejects a features value that is not a list of names", async () => {
+		const error = await captureRejection(
+			helloDesktopEngine(fakeEngine, { spawnEngine: scriptEngine({ FAKE_ENGINE_FEATURES: '"action-report"' }) }),
+		);
+
+		if (!(error instanceof DesktopEngineHandshakeError)) throw error;
+		expect(error.message).toContain("malformed engine.hello result");
 	});
 
 	it("ignores notifications that precede the hello reply", async () => {

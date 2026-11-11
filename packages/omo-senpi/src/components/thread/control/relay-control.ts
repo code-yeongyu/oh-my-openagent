@@ -1,4 +1,5 @@
 import type { ThreadTranscriptEntry } from "../reader"
+import { rowThreadId } from "../remote/ports"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
 import { outcomeFailure } from "../remote/outcome"
 import { replyData } from "../remote/remote-ops"
@@ -39,7 +40,7 @@ export function createRelayControl(remote: RemoteThreadSurface, row: RemoteSessi
     return { kind: "ok", data: replyData(outcome.response) }
   }
   return {
-    thread_id: sessionId,
+    thread_id: rowThreadId(row),
     device,
     title: row.title,
     interrupt: async (turnId) => {

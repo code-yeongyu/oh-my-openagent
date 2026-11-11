@@ -74,8 +74,11 @@ export type LocalApiClient = {
   readonly list: (
     filter?: SessionFilter,
     onRevision?: (revision: ListingRevision) => void,
-    /** `rows: 2` asks for each row's kind and parent link (#316); a service before it answers invalid_request. */
-    rows?: 2,
+    /**
+     * `rows: 2` asks for each row's kind and parent link (#316), `rows: 3` for those and its durable_id (#12996); a
+     * service before either answers invalid_request.
+     */
+    rows?: 2 | 3,
   ) => Promise<ListingResult>;
   readonly read: (attach: string, options?: ReadOptions) => Promise<ReadPage>;
   readonly oversizedLines: () => number;

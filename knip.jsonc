@@ -3,14 +3,20 @@
   // Exported types are part of our contracts even before they have consumers.
   "rules": { "types": "off", "nsTypes": "off" },
   // pre-existing at origin dev 4686e425b5: executables root scripts and tests run that no package declares (OS and platform tools)
-  "ignoreBinaries": ["file", "icacls", "notepad.exe", "tasklist"],
+  // busctl, hyprctl: Linux session tools run by script/qa/desktop/hyprland.ts
+  // kdotool: KWin window tool run by script/qa/desktop/kwin.ts
+  "ignoreBinaries": ["busctl", "file", "gdbus", "gnome-extensions", "hyprctl", "icacls", "kdotool", "notepad.exe", "tasklist"],
   // Findings marked "pre-existing at origin dev 4686e425b5" were already present when this check was added. Each ignore is
   // scoped to one file (and its issue types) or one dependency, so new dead code anywhere else still fails the check.
   // Remove an entry when its finding is fixed. Root-workspace file ignores live at the top level (knip reads the root
   // workspace's ignoreIssues only there).
   // Third-party projects vendored as git submodules; the build materializes them, they are not this repository's code.
   // The bunshin-ts build output, vendored with only its dependency imports rewritten (pinned by packages/omo-senpi/vendor/PIN.json) is upstream code too.
-  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**"],
+  // The GNOME Shell extension entry runs inside gnome-shell's GJS (gi:// and resource:// imports, a default-exported
+  // Extension class the shell loads); its pure window-rects.js stays checked through window-rects.test.mjs.
+  // The omo 5.1.66 local API decoders, vendored byte for byte (git blob ids pinned in its PIN.json) so the old-client
+  // tests read a newer service's frames with a released client's decoders; their unused exports are that release's.
+  "ignore": ["packages/shared-skills/upstreams/**", "packages/omo-senpi/vendor/**", "packages/gnome-window-rects-extension/extension.js", "packages/device-service-core/vendor/omo-5.1.66-decoder/**"],
   // Unused exports already present at origin dev 4686e425b5, named per symbol. knip has no per-symbol ignore and a file-wide
   // ignoreIssues "exports" entry would also hide a new unused export in that file, so script/knip-preexisting-exports.ts
   // (shared byte for byte with omo-relay-daemon, sha256-pinned by script/knip-coverage.test.ts) drops exactly these names, and
@@ -335,8 +341,6 @@
       "packages/memory-core/src/sync/space/read-back.ts": ["toLf", "linesOf"],
       // pre-existing at origin dev 4686e425b5: unused export(s) MemoryApplyPatchError
       "packages/memory-core/src/tools/memory-apply-patch.ts": ["MemoryApplyPatchError"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) FABLE_55_PREDECESSOR
-      "packages/model-core/src/fable-55-launch.ts": ["FABLE_55_PREDECESSOR"],
       // pre-existing at origin dev 4686e425b5: unused export(s) isModelAvailable
       "packages/model-core/src/index.ts": ["isModelAvailable"],
       // pre-existing at origin dev 4686e425b5: unused export(s) isModelAvailable
@@ -1351,13 +1355,11 @@
       // pre-existing at origin dev 4686e425b5: unused export(s) registerIncarnation, clearEndpoint, sessionOwner
       "packages/omo-senpi/src/components/thread/gateway/store-ownership.ts": ["registerIncarnation", "clearEndpoint", "sessionOwner"],
       // pre-existing at origin dev 4686e425b5: unused export(s) toolReceiptBegin, toolReceiptSettle, registerIncarnation, pendingCompletionArms, latestCompletionArm, closeQuestion
-      "packages/omo-senpi/src/components/thread/gateway/store-relay-ops.ts": ["toolReceiptBegin", "toolReceiptSettle", "registerIncarnation", "pendingCompletionArms", "latestCompletionArm", "closeQuestion"],
+      "packages/omo-senpi/src/components/thread/gateway/store-relay-ops.ts": ["toolReceiptBegin", "toolReceiptSettle", "toolReceiptRevise", "registerIncarnation", "pendingCompletionArms", "latestCompletionArm", "closeQuestion"],
       // pre-existing at origin dev 4686e425b5: unused export(s) sweepRetention
       "packages/omo-senpi/src/components/thread/gateway/store-retention.ts": ["sweepRetention"],
       // pre-existing at origin dev 4686e425b5: unused export(s) matcherAwaits
       "packages/omo-senpi/src/components/thread/gateway/worker-reply-matchers.test.ts": ["matcherAwaits"],
-      // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_TOOL_SEARCH_GROUP
-      "packages/omo-senpi/src/components/thread/metadata.ts": ["THREAD_TOOL_SEARCH_GROUP"],
       // pre-existing at origin dev 4686e425b5: unused export(s) messageText, parseSessionLines, summarizeSessionEntries
       "packages/omo-senpi/src/components/thread/session-facts.ts": ["messageText", "parseSessionLines", "summarizeSessionEntries"],
       // pre-existing at origin dev 4686e425b5: unused export(s) THREAD_LINK_SCHEME
@@ -1428,6 +1430,11 @@
       "packages/senpi-desktop-prelude/test/python-setup.ts": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) default
       "packages/senpi-desktop-prelude/vitest.config.ts": ["default"],
+      // computer-use v2 row 15: the SDK's public delivery-mode constants (consumed by name from rows 24/26 and by SDK users)
+      "packages/senpi-desktop-sdk/src/index.ts": ["BACKGROUND", "FOREGROUND", "SEMANTIC"],
+      "packages/senpi-desktop-sdk/src/types.ts": ["BACKGROUND", "FOREGROUND", "SEMANTIC"],
+      // same shape as the sibling desktop packages: vitest config default export
+      "packages/senpi-desktop-sdk/vitest.config.ts": ["default"],
       // pre-existing at origin dev 4686e425b5: unused export(s) STANDARD_RPC_ERRORS
       "packages/senpi-desktop-protocol/src/index.ts": ["STANDARD_RPC_ERRORS"],
       // pre-existing at origin dev 4686e425b5: unused export(s) STANDARD_RPC_ERRORS
@@ -2128,6 +2135,10 @@
         "script/oxlint/biome-ports.ts",
         "script/patch-node-require-shim.ts",
         "script/print-release-notes.ts",
+        "script/qa/desktop/hyprland.ts",
+        "script/qa/desktop/kwin.ts",
+        // run by path as the live GNOME Wayland window-input QA (docs/guide/computer-use.md)
+        "script/qa/desktop/gnome.ts",
         "script/qa/desktop/linux.ts",
         "script/qa/desktop/linux/expect-sabotage.ts",
         "script/qa/desktop/windows.ts",
@@ -2286,6 +2297,9 @@
         "test-support/held-test-root.d.mts",
       ],
       "ignoreDependencies": [
+        // computer-use v2: script/package-registration-audit.test.ts requires every desktop workspace as a root devDependency;
+        // its by-name importers live inside packages/senpi-desktop-service, which knip does not count for the root manifest
+        "@oh-my-opencode/senpi-desktop-sdk",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
         "@clack/prompts",
         // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
@@ -2608,6 +2622,7 @@
         "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
+        "test/local-api/event-examples.ts",
         "test/local-api/support.ts",
         "test/local-api/support-windows.ts",
         "test/local-api/conformance/*.ts",
@@ -2910,6 +2925,8 @@
         "scripts/qa/fused-equivalence-e2e.mjs",
         // run by path as the bunshin-ts eval SDK's live QA driver (scripts/qa/AGENTS.md)
         "scripts/qa/bunshin-ts-eval-sdk-qa.mjs",
+        // run by path as computer-use v2 row 9's live macOS capture-consent and SkyLight measurement
+        "scripts/qa/capture-consent-probe-macos.mjs",
         "src/components/claim-receipt/runtime.ts",
         "src/components/computer-use/runtime.ts",
         "src/components/device-service/runtime.ts",
@@ -3381,7 +3398,8 @@
         "@oh-my-opencode/prompts-core",
       ],
       // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
-      "ignoreBinaries": ["icacls", "pgrep", "taskkill.exe", "vmmap"],
+      // plutil, screencapture: macOS tools run by scripts/qa/capture-consent-probe-macos.mjs
+      "ignoreBinaries": ["icacls", "pgrep", "plutil", "screencapture", "taskkill.exe", "vmmap"],
       "ignoreIssues": {
         // pre-existing at origin dev 4686e425b5: imports of undeclared packages @code-yeongyu/comment-checker
         "scripts/qa/drive.mjs": ["unlisted"],
@@ -3498,6 +3516,21 @@
         "src/prelude.js",
       ],
     },
+    "packages/senpi-desktop-sdk": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), the manifest generator run by path from
+      // package.json scripts, and the test, config and helper files plugins report with exports unchecked: listing them
+      // export-checks them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "scripts/generate-facade-manifest.ts",
+        "test/fake-port.ts",
+        "vitest.config.ts",
+      ],
+    },
     "packages/senpi-desktop-service": {
       "includeEntryExports": true,
       // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
@@ -3513,6 +3546,10 @@
         "test/fake-engine.mjs",
         "test/global-input-harness.ts",
         "test/harness.ts",
+        // run by path as a Worker by test/sandbox.test.ts, never imported
+        "test/fixtures/quickjs-crash-worker.mjs",
+        // run by path as the computer.run QuickJS sandbox Worker (src/run/sandbox/quickjs.ts), never imported
+        "src/run/sandbox/worker.ts",
         "vitest.config.ts",
       ],
     },
@@ -3666,6 +3703,8 @@
         "src/cli/install-codex/toml-section-editor.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/install-codex/types.ts",
+        // a child-process fixture: refresh-process.test.ts runs it under a scratch HOME, nothing imports it (#12978)
+        "src/cli/service-auth/account-home.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "src/cli/service-auth/accounts-closed.fixture.ts",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -4204,6 +4243,8 @@
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "extensions/gateway-store-worker.mjs",
+        // the bundled computer.run QuickJS sandbox Worker, loaded by path by senpi-desktop-service src/run/sandbox/quickjs.ts
+        "extensions/omo-computer-run-worker.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "extensions/omo-init-deep-advisor.js",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs

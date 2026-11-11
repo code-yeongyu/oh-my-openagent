@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.68] - 2026-11-10
+
+**Release binaries may be up to 210 MiB.** The 5.1.67 publish stopped on Linux x64 because its binary measured 209,889,456 bytes, 174,256 bytes over the 200 MiB per-binary budget (5.1.66's was 209,664,176). The budget moves to 210 MiB, about 5% above that size, and still fails any release that goes past it; the 5 MiB headroom warning is unchanged. (#13052) ([#13052](https://github.com/code-yeongyu/oh-my-openagent/pull/13052))
+
+## [5.1.67] - 2026-11-10
+
+**Thread tools no longer re-list every endpoint on a busy machine.** Where listing this machine's session endpoints took longer than the five-second reuse window, every answer arrived already expired, so each thread tool view, and each `thread_send`, listed every endpoint again, and a caller arriving mid-listing started a second one. The listing is now shared while it runs and reused for five seconds after it answers. (#12989) ([#13005](https://github.com/code-yeongyu/oh-my-openagent/pull/13005))
+
+**OmO runs on senpi 2026.11.10.** Claude Fable 5.2 and Mythos 5.2 get their own system prompt, tuned from Anthropic's Fable 5.2 prompting guide, and Fable 5.2 is in the model catalog as the recommended Fable model (senpi#6314, senpi#6309). ([#13003](https://github.com/code-yeongyu/oh-my-openagent/pull/13003))
+
+**A crash no longer locks the CLI sign-in for good.** When omo was killed between taking its credential lock and writing the lock record (an unclean reboot leaves the file empty), that empty record was never reclaimed: every later sign-in read waited 15 seconds and failed, and each `thread_send` addressed by name paid that wait on its alias lookup. Such a record is now reclaimed after a minute; a running owner still keeps its lock however long it holds it. (#12989) ([#12993](https://github.com/code-yeongyu/oh-my-openagent/pull/12993))
+
+**Two omo processes started with different `HOME` values no longer refresh the same OmO sign-in at once.** The credential lock was taken under `$HOME`, while the sign-in it guards (the Secret Service item on Linux) belongs to the OS account. A process launched with a scratch `HOME` therefore rotated the same refresh token as every other omo process, and the service revoked the sign-in and the device for refresh-token reuse. The lock now lives in the home the OS user record names (the passwd entry on Linux, `id -P` on macOS, the registry profile of the user's SID on Windows), so those processes take turns. If that home cannot hold the lock, omo warns once and keeps the lock under `HOME` instead of failing the sign-in. ([#12979](https://github.com/code-yeongyu/oh-my-openagent/pull/12979))
+
+**A message to an agent on another device that is waiting for a human's approval now says so.** `thread_send` answers `queued` with `waiting_on: { kind: "approval", device }` instead of an uncertain failure, so the sender knows the message runs once that approval is answered. ([#12975](https://github.com/code-yeongyu/oh-my-openagent/pull/12975), part of [#12886](https://github.com/code-yeongyu/oh-my-openagent/issues/12886))
+
+**An agent woken by another agent's message now answers it.** A message from an agent on another session tells the receiver that its answer reaches the sender only through `thread_send` to that sender's session, and a `thread_send` back to an agent whose message the run took in no longer waits for a permission approval (#12886). ([#12954](https://github.com/code-yeongyu/oh-my-openagent/pull/12954))
+
+**Claude Fable 5.2 is the current Fable.** The lanes that ran Fable 5.1 now run `claude-fable-5-2` at the same effort: Daily · Heavy, plan-consultant (Metis), Prometheus, `architect`, `artistry`, and `visual-engineering` after Argon. Fable 5.1 stays the next rung wherever a provider does not list 5.2 yet. 5.2 is recognized with its 1M context window on Anthropic, Vertex and Bedrock ids, Copilot gets its dotted `claude-fable-5.2` id, and Command Code setup offers it. The provisional "Fable 5.5" launch gate is gone; that release shipped as 5.2. ([#12953](https://github.com/code-yeongyu/oh-my-openagent/pull/12953))
+
+**Memory cleanup can be previewed and checked afterwards.** `omo doctor --fix --dry-run` now lists, per memory identity, what the next retention pass would remove and, over the size cap, what the cap would evict; nothing on disk changes. Every pass that removes something appends one line to `runtime/retention-log.jsonl` (bounded at 512 KiB, one previous generation kept), and `omo doctor` and `/doctor` show each identity's last cleanup or say none is recorded (#12932). ([#12949](https://github.com/code-yeongyu/oh-my-openagent/pull/12949))
+
+**Remote device commands keep working when the device service adds a reply field.** The client now ignores fields it does not know in what it reads from the device service (replies, events and snapshots) instead of failing every remote command with `protocol_violation`; a reply missing a required field is still refused. ([#12944](https://github.com/code-yeongyu/oh-my-openagent/pull/12944))
+
+**A task child running in another process now follows its parent's approval mode after the parent restarts or picks up a new host default, not only when a client names a new mode.** The parent's session start and each of its turns hand the children the mode the parent enforces then; a child already on it is not pushed again. ([#12938](https://github.com/code-yeongyu/oh-my-openagent/pull/12938), part of [#12853](https://github.com/code-yeongyu/oh-my-openagent/issues/12853))
+
+**The browser skill now ships omowright's MIT license next to its bundled copy of the library.** The skill's attribution note also states the real version pin, a semver range in package.json with the exact version recorded in bun.lock and the staged manifest, instead of claiming a commit pin. ([#12922](https://github.com/code-yeongyu/oh-my-openagent/pull/12922))
+
+**On macOS, clicking or typing in the target app while computer use runs its one-time background check now reports that you intervened, instead of saying background input is unavailable.** The check is not marked failed by your click, so the next background action runs it again rather than falling back to the foreground for the rest of the session. ([#12909](https://github.com/code-yeongyu/oh-my-openagent/pull/12909), fixes [#12908](https://github.com/code-yeongyu/oh-my-openagent/issues/12908))
+
+**A timed-out git's diagnostics record keeps the process table on hosts running thousands of processes.** With `OMO_GIT_TIMEOUT_DIAGNOSTICS_DIR` set, the memory git timeout snapshot (`ps` on macOS/Linux, PowerShell on Windows) now writes to a temporary file that is read back and deleted, instead of a pipe capped at 1 MiB, so a large process table no longer turns the record into `process snapshot failed: spawnSync ps ENOBUFS`. The snapshot keeps its 15 s timeout, and only a timed-out snapshot is still excused by the timeout test. ([#12801](https://github.com/code-yeongyu/oh-my-openagent/issues/12801)) ([#12815](https://github.com/code-yeongyu/oh-my-openagent/pull/12815))
+
+### Fixed
+
+- The init-deep advisor QA scripts no longer pin the plugin under test to one machine's local path: `qa-sandbox.sh` derives it from the repo root (override with `SENPI_BIN`), `qa-rpc-driver.mjs` requires `SENPI_BIN` and names it when missing, and a test fails if any QA script in the component carries an absolute `/Volumes` or `/Users` path. ([#12966](https://github.com/code-yeongyu/oh-my-openagent/pull/12966), fixes [#12964](https://github.com/code-yeongyu/oh-my-openagent/issues/12964))
+
 ## [5.1.66] - 2026-11-10
 
 **`omo thread` says when a broken install leaves it on this device only.** A thread client sidecar that cannot be loaded no longer makes `omo thread read <alias>` silently answer `not_found`: stderr names the sidecar, the error, and the reinstall step. The CLI sign-in's own warnings (a retired trust pin, a failed device-service forget) now reach stderr too. ([#12936](https://github.com/code-yeongyu/oh-my-openagent/pull/12936))

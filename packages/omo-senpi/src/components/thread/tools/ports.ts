@@ -128,6 +128,11 @@ export type ThreadToolSurfaceOptions = {
   readonly callerChainHop?: () => number
   /** The deliveries the caller's current answer is for (`component.ts` `RunContext.consumed`); a report without `binding_id` goes to their binding. */
   readonly callerRunDeliveries?: () => readonly string[]
+  /** The agent sessions whose deliveries the caller's current run took in: a `thread_send` back to one asks for no permission (#12886). */
+  readonly callerReplyTargets?: () => readonly string[]
+  /** The senders of the deliveries the current run consumed, as each delivery stated them (decision 0027 section 6): a reply
+   * to one of them, by durable id or by the stated name, is approved from that evidence alone and must resolve to it. */
+  readonly callerReplySenders?: () => readonly { readonly session_id: string; readonly name?: string }[]
   /** A `user` message (typed in the caller's terminal, or an extension's) is part of that same answer (`RunContext.local`); with a bound delivery there and another outbound binding, a report without `binding_id` is refused. */
   readonly callerRunHasLocalInput?: () => boolean
   /** `thread_report {kind: "completion"}` armed a completion (`arm_seq`) for this session; the component writes it at the next settle. */

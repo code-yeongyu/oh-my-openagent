@@ -7,6 +7,7 @@ import {
   fail,
   type Fields,
   jsonObject,
+  known,
   localId,
   oneOf,
   sha256Field,
@@ -40,7 +41,7 @@ export const eventFields = (
   v: Fields,
   names: readonly string[],
   optional: readonly string[] = [],
-): Fields => exactly(v, ["type", "kind", ...names], optional, "event");
+): Fields => known(v, ["type", "kind", ...names], optional, "event");
 export const attachOf = (m: Fields): string => localId(m["attach"], "attach");
 export const queryOf = (m: Fields): string => localId(m["query_id"], "query_id");
 const blobIdOf = (m: Fields): string => localId(m["id"], "blob id");
@@ -49,16 +50,16 @@ const targetOf = (m: Fields): BlobTarget => {
   const of = oneOf(BLOB_OF, m["of"], "blob of");
   switch (of) {
     case "state": {
-      const p = exactly(m["position"], ["attach_id"], [], "position");
+      const p = known(m["position"], ["attach_id"], [], "position");
       return { of, position: { attach_id: attachId(p["attach_id"]) } };
     }
     case "record": {
-      const p = exactly(m["position"], ["attach_id", "seq"], [], "position");
+      const p = known(m["position"], ["attach_id", "seq"], [], "position");
       const seq = uint(p["seq"], 1, Number.MAX_SAFE_INTEGER, "seq");
       return { of, position: { attach_id: attachId(p["attach_id"]), seq } };
     }
     case "entry": {
-      const p = exactly(m["position"], ["query_id", "entry_id"], [], "position");
+      const p = known(m["position"], ["query_id", "entry_id"], [], "position");
       return {
         of,
         position: { query_id: queryOf(p), entry_id: entryId(p["entry_id"], "position.entry_id") },
@@ -135,7 +136,7 @@ export const STREAM_EVENT_VALIDATORS: EventValidators<StreamKind> = {
       id: blobIdOf(head),
     } as const;
     if (reason !== "too_large") {
-      eventFields(v, ["attach", "id", "reason"]);
+      exactly(head, ["type", "kind", "attach", "id", "reason"], [], "event");
       return { ...base, reason };
     }
     const m = eventFields(v, ["attach", "id", "reason", "query_id", "entry_id"]);

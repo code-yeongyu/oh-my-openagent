@@ -104,6 +104,10 @@ export function sessionOpenParams(settings: ComputerSettings, context: ComputerH
 			coordinateSafe: usesCoordinateSafeImageSizing(context.model),
 			maxBytes: settings.screenshotMaxBytes,
 		},
+		// The service sends each of these only to an engine that advertises its feature.
+		intervention: settings.intervention,
+		macosKeyPriming: settings.macosKeyPriming,
+		trace: settings.trace,
 	};
 }
 

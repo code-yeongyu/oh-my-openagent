@@ -41,7 +41,8 @@ export type ThreadResultSummary = ThreadSummary & { readonly link: string }
 export type ThreadDelivery =
   | { readonly kind: "steered"; readonly turn_id: string }
   | { readonly kind: "started"; readonly turn_id: string }
-  | { readonly kind: "queued"; readonly queue_position: number }
+  /** `waiting_on`: the receiver is parked on an approval a human must answer on that device (`device`, absent when this install has no device identity); the message runs after it. */
+  | { readonly kind: "queued"; readonly queue_position: number; readonly waiting_on?: { readonly kind: "approval"; readonly device?: string } }
   /** Gateway only: the target has no answering endpoint; the message is durable and its drain takes it on the next start. */
   | { readonly kind: "queued_offline"; readonly queue_position: number }
 
@@ -124,8 +125,10 @@ export type ThreadHandoffResult =
       readonly thread: ThreadResultSummary
       readonly resolved_by: ThreadAddressResolution
       readonly delivery: ThreadDelivery
-      readonly message_seq: number
+      /** The gateway row's sequence; absent for a session on another device, which has no row here. */
+      readonly message_seq?: number
       readonly deduplicated: boolean
+      readonly device?: string
     } & ThreadGatewayDeliveryFacts)
   | ThreadDataError
 

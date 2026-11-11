@@ -16,6 +16,11 @@ import { ENGINE_MODELS, startHttpProviders } from "./model-chain-http"
 
 const HOST_READY_LINE = "senpi rpc listening on"
 const HOST_READY_TIMEOUT_MS = 30_000
+// #12638: a process child gets its designated chain by `set_retry_fallback` within a deadline (10 s by default),
+// and past it the first prompt goes out on the engine's own fallback settings, which here name the parent's
+// model. A loaded host that took longer to start the child recorded that extra call. The cases run with a 60 s
+// timeout, so the chain gets nearly all of it: they wait for the engine's answer instead of racing a window.
+const CHAIN_DEADLINE_MS = 50_000
 
 export type EngineRunnerKind = "process" | "host"
 
@@ -72,8 +77,13 @@ type Engine = Omit<EngineRunner, "calls">
 
 function processEngine(env: Readonly<Record<string, string>>, hiddenCapabilities: readonly string[]): Engine {
   const children: ChildProcess[] = []
+  const warnings: string[] = []
   const runner = new RpcProcessRunner({
     modelAdmission: async () => {},
+    fallbackChainDeadlineMs: CHAIN_DEADLINE_MS,
+    onWarning: (message) => {
+      warnings.push(message)
+    },
     buildSpawn: (spec) => buildRpcSpawn(spec, { parentEnv: env, resolveSenpiExecutable: () => null }),
     spawnChild: (descriptor) => {
       const child = spawn(descriptor.command, [...descriptor.args], { cwd: descriptor.cwd, env: descriptor.env, stdio: ["pipe", "pipe", "pipe"] })
@@ -90,6 +100,8 @@ function processEngine(env: Readonly<Record<string, string>>, hiddenCapabilities
       await runner.settleTeardowns()
       // A finished child stays resident; it must be gone before the world's directories are removed.
       await Promise.all(children.splice(0).map(stopChild))
+      // A chain that was not applied makes any model-call assertion meaningless, so it fails the case by name.
+      if (warnings.length > 0) throw new Error(`process runner warned: ${warnings.join("; ")}`)
     },
   }
 }
@@ -123,7 +135,14 @@ function withoutCapabilities(hidden: readonly string[]): Transform {
   })
 }
 
-async function hostEngine(root: string, engineEnv: Readonly<Record<string, string>>): Promise<Engine> {
+export type SocketHost = {
+  readonly socket: string
+  readonly pid: number
+  stop(): Promise<void>
+}
+
+/** A real multi-session senpi host process listening on a short socket, with no extensions or skills. */
+export async function startSocketHost(root: string, engineEnv: Readonly<Record<string, string>>): Promise<SocketHost> {
   // A socket host advertises `extension_events` (a capability omo requires of a task host) only for this client set.
   const env = { ...engineEnv, SENPI_RPC_CLIENT_CAPABILITIES: "extension_events" }
   const { dir: socketDir, socket } = shortSocketDir("model-chain-host", "h.sock")
@@ -143,6 +162,11 @@ async function hostEngine(root: string, engineEnv: Readonly<Record<string, strin
     await stop()
     throw error
   }
+  return { socket, pid: host.pid ?? 0, stop }
+}
+
+async function hostEngine(root: string, engineEnv: Readonly<Record<string, string>>): Promise<Engine> {
+  const { socket, pid, stop } = await startSocketHost(root, engineEnv)
   const clients: HostSessionClient[] = []
   const runner = new RpcHostRunner({
     createClient: (socketPath) => {
@@ -162,7 +186,7 @@ async function hostEngine(root: string, engineEnv: Readonly<Record<string, strin
     insideHost: () => false,
     onNotice: () => undefined,
     shardEvents: {},
-    ensureDaemon: () => Promise.resolve({ action: "reuse", reason: "compatible", socket, pid: host.pid ?? 0, reused: true, upgradeable: true }),
+    ensureDaemon: () => Promise.resolve({ action: "reuse", reason: "compatible", socket, pid, reused: true, upgradeable: true }),
   })
   return {
     runner: createRpcManagedRunner(runner),
