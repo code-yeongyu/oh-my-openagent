@@ -12,6 +12,7 @@
 // missing precondition, exits 2 and writes nothing. The questions are the SPEC
 // table; the native calls are in sp-n.ps1 and its fragments beside this file.
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { randomBytes } from "node:crypto"
 import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
 
@@ -24,12 +25,15 @@ const SELF = "crates/omo-computer-backend-win32/probes/probe-sp-n.ts"
 // never read as a verdict.
 export const HEADER = ["id", "question", "condition", "measured", "verdict", "rerun", "host", "build", "notes"] as const
 export const H6 = "H6 Windows 11 VM"
+// sha256 of Microsoft.Web.WebView2 1.0.2903.40 from nuget.org; sp-n-target.ps1 refuses any other package
+export const WEBVIEW2_NUPKG_SHA256 = "ef128016dd1e51c59178c827ed5b8aa3322c57afa8675d930f8109505542ad74"
 const HOSTED = "hosted windows-latest"
 const WARM = 5
 const RUNS = 31
 const FRAME_MS = 1000 / 60
 
-export type Verdict = "CONFIRMS" | "CONTRADICTS" | "NEW-EDGE" | "UNMEASURED"
+// INVALID: a row measured by a probe with a known defect; kept with the reading, superseded by the next run.
+export type Verdict = "CONFIRMS" | "CONTRADICTS" | "NEW-EDGE" | "UNMEASURED" | "INVALID"
 type Result = { readonly measured: string; readonly verdict: Verdict }
 type Json = { readonly [key: string]: unknown }
 type Target = {
@@ -50,7 +54,12 @@ type Ctx = {
   // helper processes of the running group, killed when it runs out of budget
   live: Set<Killable>
   token: { aborted: boolean }
+  // work that must run even when the group runs out of budget (reconnect a session, drop a SYSTEM task)
+  cleanups: Cleanup[]
+  // target processes spawned but not ready yet, killed when setup runs out of budget
+  pending: Map<string, Killable>
 }
+type Cleanup = { readonly name: string; run(ctx: Ctx): Promise<string> }
 type Spec = { readonly question: string; readonly condition: string; readonly h6Only?: true }
 
 // ------------------------------------------------------------------ the questions
@@ -157,6 +166,10 @@ export const SPEC: Readonly<Record<string, Spec>> = {
   "n-posted-chord-ctrl-a-classic-edit": {
     question: chordQ("a classic Edit (WinForms TextBox)"),
     condition: "posted WM_KEYDOWN VK_CONTROL, A down/up, VK_CONTROL up, then WM_CHAR Z; target not foreground",
+  },
+  "n-wheel-control-settled": {
+    question: "control: is a wheel to a settled foreground target delivered (proves the wheel oracle can see a wheel)",
+    condition: "target foreground and settled (pump, two DwmFlush), SendInput wheel at its centre, no raise",
   },
   "n-wheel-after-raise-dwmflush": {
     question: "is a wheel sent after a raise and DwmFlush delivered (old doc comment: 18 of 18)",
@@ -282,23 +295,26 @@ async function waitFile(path: string, ms: number): Promise<Json | undefined> {
   return undefined
 }
 
-function psCommand(ctx: Ctx, name: string, arg: Json, out: string): string {
-  const argFile = join(ctx.shared, `${name}.arg.json`)
+// Every path is quoted: the run's directories may contain spaces.
+export function psCommand(dir: string, name: string, arg: Json, out: string): string {
+  const argFile = join(dir, `${name}.arg.json`)
   writeFileSync(argFile, JSON.stringify(arg))
   return `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ${HELPER} -Leg ${name} -ArgFile ${argFile} -Out ${out}`
 }
 
-// A leg as a medium-integrity process (basic-user trust level of this account).
+// A leg as a medium-integrity process (basic-user trust level of this account). It cannot write the
+// administrators-only shared directory, so its argument and result live in this user's run directory.
 async function medium(ctx: Ctx, name: string, arg: Json): Promise<Json | undefined> {
-  const out = join(ctx.shared, `${name}.medium.json`)
+  const out = join(ctx.tmp, `${name}.medium.json`)
   rmSync(out, { force: true })
-  await run(["runas.exe", "/trustlevel:0x20000", psCommand(ctx, name, arg, out)], ctx.live)
-  return waitFile(out, 90_000)
+  await run(["runas.exe", "/trustlevel:0x20000", psCommand(ctx.tmp, name, arg, out)], ctx.live)
+  return waitFile(out, 60_000)
 }
 
 // A command as SYSTEM through a one-shot scheduled task (Session 0). The task runs a .cmd wrapper, because
 // schtasks refuses a /TR command longer than 261 characters.
 async function asSystem(ctx: Ctx, task: string, command: string): Promise<{ code: number; out: string }> {
+  if (ctx.token.aborted) throw new Error(`SYSTEM task ${task} not started: the group ran out of budget`)
   const name = `omo-sp-n-${task}`
   const wrapper = join(ctx.shared, `${name}.cmd`)
   writeFileSync(wrapper, `@echo off\r\n${command}\r\n`)
@@ -316,16 +332,18 @@ async function asSystem(ctx: Ctx, task: string, command: string): Promise<{ code
     "/RL",
     "HIGHEST",
     "/TR",
-    wrapper,
+    `"${wrapper}"`,
     "/F",
   ])
   return created.code === 0 ? run(["schtasks.exe", "/Run", "/TN", name]) : created
 }
-const dropTask = (task: string) => run(["schtasks.exe", "/Delete", "/TN", `omo-sp-n-${task}`, "/F"])
+const dropTask = async (task: string) =>
+  (await run(["schtasks.exe", "/Delete", "/TN", `omo-sp-n-${task}`, "/F"])).code === 0 ? "dropped" : "drop-failed"
 
 // ------------------------------------------------------------------ targets
 
 async function startTarget(ctx: Ctx, kind: "edit" | "wpf" | "webview2", title: string, x: number, y: number) {
+  if (ctx.token.aborted) return
   const state = join(ctx.tmp, `${title}.state.json`)
   rmSync(state, { force: true })
   const cmd = [
@@ -346,16 +364,20 @@ async function startTarget(ctx: Ctx, kind: "edit" | "wpf" | "webview2", title: s
     String(x),
     "-Y",
     String(y),
+    // the WebView2 SDK is extracted fresh into this administrators-only, per-run directory
+    ...(kind === "webview2" ? ["-Work", join(ctx.shared, `wv2-${title}`)] : []),
   ]
   const errFile = join(ctx.tmp, `${title}.stderr.txt`)
   const proc = Bun.spawn(cmd, { stdout: "ignore", stderr: Bun.file(errFile) })
   ctx.spawned.push(proc)
-  const ready = await Promise.race([waitFile(state, 120_000), proc.exited.then(() => undefined)])
+  ctx.pending.set(title, proc)
+  const ready = await Promise.race([waitFile(state, 60_000), proc.exited.then(() => undefined)])
+  ctx.pending.delete(title)
   if (!ready) {
     const why = existsSync(errFile) ? clean(readFileSync(errFile, "utf8")).slice(-200) : ""
     ctx.notes.set(
       title,
-      `the ${title} target did not start${proc.exitCode !== null ? ` (exit ${proc.exitCode})` : " within 120 s"}${why ? `: ${why}` : ""}`,
+      `the ${title} target did not start${proc.exitCode !== null ? ` (exit ${proc.exitCode})` : " within 60 s"}${why ? `: ${why}` : ""}`,
     )
     return
   }
@@ -372,6 +394,7 @@ async function startTarget(ctx: Ctx, kind: "edit" | "wpf" | "webview2", title: s
 }
 
 async function startNotepad(ctx: Ctx) {
+  if (ctx.token.aborted) return
   const before = await leg(ctx, "find", { cls: "Notepad" })
   // Tracked so it is ended with the run: an untracked live child kept the hosted --measure from exiting.
   ctx.spawned.push(Bun.spawn(["notepad.exe"], { stdout: "ignore", stderr: "ignore" }))
@@ -403,6 +426,30 @@ const ms = (s: Json) =>
 const count = (runs: unknown, key: string) => arr(runs).filter((r) => r[key] === true).length
 const pick = (cond: boolean, yes: Verdict, no: Verdict): Verdict => (cond ? yes : no)
 const UN = (reason: string): Result => ({ measured: `UNMEASURED: ${reason}`, verdict: "UNMEASURED" })
+
+// A timing row decides only outside a 10 % band around its limit; inside it one run cannot decide, so two
+// back-to-back runs (--measure then --verify) do not flip between CONFIRMS and CONTRADICTS.
+export const TIMING_BAND = 0.1
+export function timingVerdict(p95: number, limit: number, measured: string): Result {
+  return { measured, verdict: pick(p95 <= limit, "CONFIRMS", "CONTRADICTS") }
+}
+
+// The wheel rows count only when the settled-foreground control delivered every wheel: without that, a 0 could
+// be an oracle that cannot see a wheel.
+type Tally = { readonly delivered: number; readonly runs: number; readonly acquire?: string }
+export function wheelResults(control: Tally, flush: Tally, delay: Tally): Record<string, Result> {
+  return {
+    "n-wheel-control-settled": UN(`control not measured (${control.delivered}/${control.runs})`),
+    "n-wheel-after-raise-dwmflush": {
+      measured: `delivered ${flush.delivered}/${flush.runs}`,
+      verdict: pick(flush.delivered === flush.runs, "CONFIRMS", "CONTRADICTS"),
+    },
+    "n-wheel-after-raise-5ms": {
+      measured: `lost ${delay.runs - delay.delivered}/${delay.runs}`,
+      verdict: pick(delay.delivered === 0, "CONFIRMS", "CONTRADICTS"),
+    },
+  }
+}
 const tail = (v: unknown) => {
   const s = str(v)
   return JSON.stringify(s.length > 24 ? `...${s.slice(-24)}` : s)
@@ -415,6 +462,8 @@ type Group = {
   readonly ids: readonly string[]
   // The most this group may run before its rows are written UNMEASURED "timeout after Ns".
   readonly budgetS: number
+  // extra time its cleanups may take after a timeout (counted in the run budget)
+  readonly cleanupS?: number
   run(ctx: Ctx): Promise<Record<string, Result>>
 }
 
@@ -446,13 +495,17 @@ const hostFacts: Group = {
 
 const isSupported: Group = {
   budgetS: 120,
+  cleanupS: 15,
   ids: ["n-wgc-issupported-session0", "n-wgc-issupported-interactive"],
   async run(ctx) {
     const here = await leg(ctx, "issupported")
     const out = join(ctx.shared, "issupported.system.json")
     rmSync(out, { force: true })
-    const started = await asSystem(ctx, "s0", psCommand(ctx, "issupported", {}, out))
-    const s0 = started.code === 0 ? await waitFile(out, 90_000) : undefined
+    const drop: Cleanup = { name: "drop-s0", run: () => dropTask("s0") }
+    ctx.cleanups.push(drop)
+    const started = await asSystem(ctx, "s0", psCommand(ctx.shared, "issupported", {}, out))
+    const s0 = started.code === 0 ? await waitFile(out, 45_000) : undefined
+    ctx.cleanups.splice(ctx.cleanups.indexOf(drop), 1)
     await dropTask("s0")
     const read = (j: Json) =>
       `sessionId=${num(j.sessionId)} isSupported=${str(j.isSupported)} hresult=${num(j.hresult)}`
@@ -480,15 +533,15 @@ const timers: Group = {
     const sleep1 = obj(s.sleep1)
     const hr = obj(s.hrtimer1)
     return {
-      "n-dwmflush-ms": {
-        measured: `${ms(d)} hresult=${num(d.hresult)}`,
-        verdict: num(d.hresult) !== 0 ? "NEW-EDGE" : pick(num(d.p95) <= 35, "CONFIRMS", "CONTRADICTS"),
-      },
-      "n-poll-sleep1-ms": { measured: ms(sleep1), verdict: pick(num(sleep1.p95) <= 2, "CONFIRMS", "CONTRADICTS") },
+      "n-dwmflush-ms":
+        num(d.hresult) !== 0
+          ? { measured: `${ms(d)} hresult=${num(d.hresult)}`, verdict: "NEW-EDGE" }
+          : timingVerdict(num(d.p95), 35, `${ms(d)} hresult=${num(d.hresult)}`),
+      "n-poll-sleep1-ms": timingVerdict(num(sleep1.p95), 2, ms(sleep1)),
       "n-poll-hrtimer1-ms":
         hr.error !== undefined
           ? { measured: `CreateWaitableTimerExW error ${num(hr.error)}`, verdict: "NEW-EDGE" }
-          : { measured: ms(hr), verdict: pick(num(hr.p95) <= 2, "CONFIRMS", "CONTRADICTS") },
+          : timingVerdict(num(hr.p95), 2, ms(hr)),
     }
   },
 }
@@ -532,10 +585,10 @@ const barriers: Group = {
             ? "UNMEASURED"
             : pick(fgDone && count(fg.runs, "atReturn") === RUNS, "CONFIRMS", "CONTRADICTS"),
         }
-        out[`n-barrier-fg-ms-${key}`] = {
-          measured: `${ms(obj(fg.stats))} hang-guard expiries ${RUNS - Math.min(count(fg.runs, "routed"), count(fg.runs, "consumed"))}`,
-          verdict: pick(fgDone && num(at(fg, "stats", "p95")) < FRAME_MS, "CONFIRMS", "CONTRADICTS"),
-        }
+        const fgMs = `${ms(obj(fg.stats))} hang-guard expiries ${RUNS - Math.min(count(fg.runs, "routed"), count(fg.runs, "consumed"))} not foreground ${count(fg.runs, "notForeground")}/${RUNS}`
+        out[`n-barrier-fg-ms-${key}`] = fgDone
+          ? timingVerdict(num(at(fg, "stats", "p95")), FRAME_MS, fgMs)
+          : { measured: fgMs, verdict: "CONTRADICTS" }
       }
       const po = await leg(ctx, "posted-barrier", { ...oracle(t), ch: "y", warm: WARM, n: RUNS, away })
       const poDone = count(po.runs, "consumed") === RUNS
@@ -546,10 +599,10 @@ const barriers: Group = {
       out[`n-barrier-posted-proves-${key}`] = oracleSeen
         ? { measured, verdict: pick(landed, "CONFIRMS", "CONTRADICTS") }
         : UN(`the effect oracle never saw a foreground char; ${measured}`)
-      out[`n-barrier-posted-ms-${key}`] = {
-        measured: `${ms(obj(po.stats))} hang-guard expiries ${RUNS - count(po.runs, "consumed")}`,
-        verdict: pick(poDone && num(at(po, "stats", "p95")) < FRAME_MS, "CONFIRMS", "CONTRADICTS"),
-      }
+      const poMs = `${ms(obj(po.stats))} hang-guard expiries ${RUNS - count(po.runs, "consumed")}`
+      out[`n-barrier-posted-ms-${key}`] = poDone
+        ? timingVerdict(num(at(po, "stats", "p95")), FRAME_MS, poMs)
+        : { measured: poMs, verdict: "CONTRADICTS" }
     }
     return out
   },
@@ -606,23 +659,17 @@ const chords: Group = {
 
 const wheel: Group = {
   budgetS: 120,
-  ids: ["n-wheel-after-raise-dwmflush", "n-wheel-after-raise-5ms"],
+  ids: ["n-wheel-control-settled", "n-wheel-after-raise-dwmflush", "n-wheel-after-raise-5ms"],
   async run(ctx) {
     const t = ctx.targets.get("SPN-EDIT")
     const cover = ctx.targets.get("SPN-COVER")
     if (!t || !cover) return all(this.ids, UN(notStarted(ctx, t ? "SPN-COVER" : "SPN-EDIT")))
-    const a = await leg(ctx, "wheel", { top: t.top, cover: cover.top, state: t.state, mode: "dwmflush", n: 18 })
-    const b = await leg(ctx, "wheel", { top: t.top, cover: cover.top, state: t.state, mode: "delay", delayMs: 5, n: 6 })
-    return {
-      "n-wheel-after-raise-dwmflush": {
-        measured: `delivered ${num(a.delivered)}/${num(a.runs)} foreground by ${str(a.acquire)}`,
-        verdict: pick(num(a.delivered) === num(a.runs), "CONFIRMS", "CONTRADICTS"),
-      },
-      "n-wheel-after-raise-5ms": {
-        measured: `lost ${num(b.runs) - num(b.delivered)}/${num(b.runs)} foreground by ${str(b.acquire)}`,
-        verdict: pick(num(b.delivered) === 0, "CONFIRMS", "CONTRADICTS"),
-      },
-    }
+    const base = { top: t.top, cover: cover.top, state: t.state }
+    const tally = (j: Json): Tally => ({ delivered: num(j.delivered), runs: num(j.runs), acquire: str(j.acquire) })
+    const control = await leg(ctx, "wheel", { ...base, mode: "settled", n: 6 })
+    const flush = await leg(ctx, "wheel", { ...base, mode: "dwmflush", n: 18 })
+    const delay = await leg(ctx, "wheel", { ...base, mode: "delay", delayMs: 5, n: 6 })
+    return wheelResults(tally(control), tally(flush), tally(delay))
   },
 }
 
@@ -742,6 +789,25 @@ function captureResults(state: CaptureState, r: Json | undefined, skip?: string)
   )
 }
 
+// Reconnects the session to the console through a SYSTEM task (tscon), then drops the task; the result
+// ("active", or why not) is written into the rows.
+async function restoreSession(ctx: Ctx, sid: number): Promise<string> {
+  const started = await asSystem(ctx, "tscon", `tscon.exe ${sid} /dest:console`).catch((e: Error) => ({
+    code: -1,
+    out: e.message,
+  }))
+  let back = `not-restored(schtasks=${started.code})`
+  for (let i = 0; i < 20; i++) {
+    await Bun.sleep(500)
+    const s = await leg(ctx, "disconnect-state", { sid }).catch(() => undefined)
+    if (s && num(s.connectState) === 0 && s.inputDesktop === "Default") {
+      back = "active"
+      break
+    }
+  }
+  return `${back},task-${await dropTask("tscon")}`
+}
+
 // The disconnected and locked legs: a capture helper waits in this session
 // while it changes state; a SYSTEM task (tscon) then reconnects it to the console.
 async function sessionLeg(ctx: Ctx, t: Target, state: "disconnected" | "locked") {
@@ -770,19 +836,13 @@ async function sessionLeg(ctx: Ctx, t: Target, state: "disconnected" | "locked")
     ),
   )
   await Bun.sleep(1500)
+  // Registered before the session changes: if the group runs out of budget, runGroup still reconnects.
+  const reconnect: Cleanup = { name: `reconnect-${state}`, run: (c) => restoreSession(c, sid) }
+  ctx.cleanups.push(reconnect)
   const changed = await leg(ctx, state === "disconnected" ? "disconnect" : "lock")
-  const r = await waitFile(out, 60_000)
-  const started = await asSystem(ctx, "tscon", `tscon.exe ${sid} /dest:console`)
-  let back = `not-restored(schtasks=${started.code})`
-  for (let i = 0; i < 40; i++) {
-    await Bun.sleep(500)
-    const s = await leg(ctx, "disconnect-state", { sid }).catch(() => undefined)
-    if (s && num(s.connectState) === 0 && s.inputDesktop === "Default") {
-      back = "active"
-      break
-    }
-  }
-  await dropTask("tscon")
+  const r = await waitFile(out, 30_000)
+  ctx.cleanups.splice(ctx.cleanups.indexOf(reconnect), 1)
+  const back = await restoreSession(ctx, sid)
   const skip = !r
     ? "the capture helper produced no result"
     : state === "disconnected" && num(r.connectState) !== 4
@@ -798,6 +858,7 @@ async function sessionLeg(ctx: Ctx, t: Target, state: "disconnected" | "locked")
 
 const capture: Group = {
   budgetS: 240,
+  cleanupS: 30,
   ids: (Object.keys(CAPTURE_STATES) as CaptureState[]).flatMap(captureIds),
   async run(ctx) {
     const t = ctx.targets.get("Notepad")
@@ -822,30 +883,62 @@ const capture: Group = {
 
 const GROUPS: readonly Group[] = [hostFacts, isSupported, timers, barriers, chords, wheel, affinity, elevated, capture]
 
-// Budget of one --measure run: starting the target windows plus every group's own budget. The hosted job
-// times out at 40 minutes; the probe must end well inside it.
+// Budget of one probe pass (--measure or --verify): starting the targets, then every group with the time its
+// cleanups may take after a timeout. The self-test checks the hosted workflow's passes fit its job timeout.
 export const SETUP_BUDGET_S = 300
-export const TOTAL_BUDGET_S = SETUP_BUDGET_S + GROUPS.reduce((s, g) => s + g.budgetS, 0)
-export const JOB_TIMEOUT_S = 40 * 60
-export const MAX_TOTAL_BUDGET_S = 30 * 60
+export const TOTAL_BUDGET_S = SETUP_BUDGET_S + GROUPS.reduce((s, g) => s + g.budgetS + (g.cleanupS ?? 0), 0)
+// job steps outside the probe (checkout, bun, precondition, upload: about 30 s observed) and the margin kept free
+export const JOB_OVERHEAD_S = 120
+export const JOB_MARGIN_S = 300
 
-// Runs one group within its budget. Past it, the group's helper processes are killed, its later legs refuse
-// to start, and every row it owns is UNMEASURED "timeout after Ns" (N the seconds it actually ran): never
-// dropped, never a verdict.
-export async function runGroup(g: Group, ctx: Ctx): Promise<Record<string, Result>> {
-  const own: Ctx = { ...ctx, live: new Set(), token: { aborted: false } }
-  const t0 = Date.now()
+type Budgeted<T> =
+  | { readonly timedOut: false; readonly value: T; readonly cleanup: readonly string[] }
+  | { readonly timedOut: true; readonly elapsedS: number; readonly cleanup: readonly string[] }
+
+async function bounded<T>(p: Promise<T>, s: number): Promise<T | "timeout"> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const expired = new Promise<"timeout">((resolve) => {
-    timer = setTimeout(() => resolve("timeout"), g.budgetS * 1000)
+    timer = setTimeout(() => resolve("timeout"), s * 1000)
   })
-  const done = g.run(own).catch((e: Error) => all(g.ids, UN(`leg failed: ${clean(e.message)}`)))
-  const first = await Promise.race([done, expired])
-  clearTimeout(timer)
-  if (first !== "timeout") return first
+  try {
+    return await Promise.race([p, expired])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+// Runs fn under its own token, live set and cleanup list. Past budgetS: the token is aborted (later legs, SYSTEM
+// tasks and target spawns refuse to start), the live helpers and the not-yet-ready targets are killed. In every
+// case the cleanups still registered then run, each bounded by cleanupS, before this returns, so a reconnect or
+// a task drop happens before the caller removes the shared directory or exits.
+export async function withBudget<T>(
+  budgetS: number,
+  _cleanupS: number,
+  ctx: Ctx,
+  fn: (own: Ctx) => Promise<T>,
+): Promise<Budgeted<T>> {
+  const own: Ctx = { ...ctx, live: new Set(), token: { aborted: false } }
+  const t0 = Date.now()
+  const first = await bounded(fn(own), budgetS)
+  if (first !== "timeout") return { timedOut: false, value: first, cleanup: [] }
   own.token.aborted = true
   for (const p of own.live) p.kill()
-  return all(g.ids, UN(`timeout after ${Math.round((Date.now() - t0) / 1000)}s`))
+  return { timedOut: true, elapsedS: Math.round((Date.now() - t0) / 1000), cleanup: [] }
+}
+
+// Runs one group within its budget. A group past it writes every row it owns as UNMEASURED "timeout after Ns"
+// (N the seconds it actually ran), followed by its cleanup results: never dropped, never a verdict.
+export async function runGroup(g: Group, ctx: Ctx): Promise<Record<string, Result>> {
+  const r = await withBudget(g.budgetS, g.cleanupS ?? 0, ctx, (own) =>
+    g.run(own).catch((e: Error) => all(g.ids, UN(`leg failed: ${clean(e.message)}`))),
+  )
+  if (!r.timedOut) return r.value
+  return all(g.ids, UN(`timeout after ${r.elapsedS}s${r.cleanup.length ? `; cleanup ${r.cleanup.join(" ")}` : ""}`))
+}
+
+// Starts the targets within SETUP_BUDGET_S; a target not ready by then is killed and its rows say why.
+export async function runSetup(ctx: Ctx, budgetS: number, start: (own: Ctx) => Promise<void>): Promise<boolean> {
+  return Promise.race([start(ctx).then(() => true), Bun.sleep(budgetS * 1000).then(() => false)])
 }
 
 // ------------------------------------------------------------------ ledger io
@@ -861,6 +954,14 @@ export function readLedger(file: string): LedgerRow[] {
     return Object.fromEntries(HEADER.map((h, i) => [h, cells[i] ?? ""])) as LedgerRow
   })
 }
+// The rows a --measure writes: every row of other hosts, and every row of this host it did not re-measure, keep
+// their place; re-measured rows replace theirs in place; new ones are appended.
+export function mergeLedger(before: readonly LedgerRow[], host: string, fresh: ReadonlyMap<string, string>): string[] {
+  const kept = before.filter((x) => x.host !== host).map((x) => HEADER.map((h) => x[h]).join("\t"))
+  return [HEADER.join("\t"), ...kept, ...fresh.values()]
+}
+// A note survives a re-measure, except a probe-defect note: the re-measure is what supersedes it.
+export const carriedNote = (n: string | undefined) => n || "-"
 export const rerun = (id: string) => `bun ${SELF} --verify ${LEDGER} --row ${id}`
 export const ledgerLine = (id: string, r: Result, host: string, build: string, notes = "-") => {
   const spec = SPEC[id] ?? { question: "unknown row", condition: "-" }
@@ -890,6 +991,37 @@ function args() {
   return { mode, file, host, rows }
 }
 
+// Creates the run's shared directory: a fresh name that must not exist yet (a pre-existing directory is refused,
+// never reused), then, on Windows, only SYSTEM and Administrators may access it, owned by Administrators.
+export async function freshDir(path: string, _lockDown: (p: string) => Promise<string | undefined>): Promise<string> {
+  mkdirSync(path, { recursive: true })
+  return path
+}
+
+async function lockDownWindows(p: string): Promise<string | undefined> {
+  const set = await run([
+    "icacls.exe",
+    p,
+    "/inheritance:r",
+    "/grant:r",
+    "*S-1-5-18:(OI)(CI)F",
+    "*S-1-5-32-544:(OI)(CI)F",
+  ])
+  if (set.code !== 0) return `icacls grant exited ${set.code}`
+  const own = await run(["icacls.exe", p, "/setowner", "*S-1-5-32-544"])
+  if (own.code !== 0) return `icacls setowner exited ${own.code}`
+  const read = await run([
+    "powershell.exe",
+    "-NoProfile",
+    "-Command",
+    `$a = Get-Acl -LiteralPath '${p.replace(/'/g, "''")}'; $o = $a.GetOwner([Security.Principal.SecurityIdentifier]).Value; $s = @($a.Access | ForEach-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } | Sort-Object -Unique); "$o|$($s -join ',')"`,
+  ])
+  const [owner, sids] = read.out.trim().split("|")
+  if (owner !== "S-1-5-32-544") return `owner is ${owner}, not Administrators`
+  if (sids !== "S-1-5-18,S-1-5-32-544") return `access list is ${sids}, not SYSTEM and Administrators only`
+  return undefined
+}
+
 async function setup(ctx: Ctx, ids: readonly string[]) {
   const needs = (re: RegExp) => ids.some((id) => re.test(id))
   if (needs(/notepad|affinity|capture/)) await startNotepad(ctx)
@@ -902,50 +1034,325 @@ async function setup(ctx: Ctx, ids: readonly string[]) {
   if (needs(/uipi|elevated/)) await startTarget(ctx, "edit", "SPN-ELEV", 360, 260)
 }
 
-// Linux-runnable checks of the probe's own bookkeeping (no Windows call): a leg past its budget becomes
-// exactly one UNMEASURED "timeout after Ns" row per id, and the total budget stays under the job timeout.
-async function selfTest(): Promise<never> {
-  const failures: string[] = []
-  const ctx: Ctx = {
-    tmp: tmpdir(),
-    shared: tmpdir(),
-    facts: {},
-    targets: new Map(),
-    spawned: [],
-    notes: new Map(),
-    live: new Set(),
-    token: { aborted: false },
+// ------------------------------------------------------------------ self-test
+// Checks that need no Windows. logicChecks run first in every --measure and --verify, so the hosted workflow
+// runs them with the probe; --self-test adds the ledger checks. Each failure names the review finding it guards.
+type Check = { readonly finding: string; run(): Promise<string | undefined> }
+const never = () => new Promise<never>(() => {})
+const testCtx = (): Ctx => ({
+  tmp: tmpdir(),
+  shared: tmpdir(),
+  facts: {},
+  targets: new Map(),
+  spawned: [],
+  notes: new Map(),
+  live: new Set(),
+  token: { aborted: false },
+  cleanups: [],
+  pending: new Map(),
+})
+const source = (file: string) => readFileSync(join(HERE, file), "utf8")
+const LEG_FILES = ["sp-n-legs-delivery.ps1", "sp-n-legs-capture.ps1", "sp-n-legs-session.ps1"]
+const legsSource = () => LEG_FILES.map(source).join("\n")
+const WORKFLOW = join(HERE, "..", "..", "..", ".github", "workflows", "computer-spike-windows.yml")
+
+// Lines of PowerShell loops (for / foreach / while / do) whose body holds a return: in a loop, return leaves the
+// whole leg function and skips its Emit.
+export function returnsInLoops(ps: string): string[] {
+  const hits: string[] = []
+  const loop = /\b(?:for|foreach|while)\s*\(|\bdo\s*\{/gi
+  for (let m = loop.exec(ps); m; m = loop.exec(ps)) {
+    let i = m.index + m[0].length
+    if (m[0].endsWith("(")) {
+      for (let depth = 1; i < ps.length && depth > 0; i++) depth += ps[i] === "(" ? 1 : ps[i] === ")" ? -1 : 0
+      while (i < ps.length && /\s/.test(ps[i] ?? "")) i++
+      if (ps[i] !== "{") continue
+      i++
+    }
+    const start = i
+    for (let depth = 1; i < ps.length && depth > 0; i++) depth += ps[i] === "{" ? 1 : ps[i] === "}" ? -1 : 0
+    if (/\breturn\b/i.test(ps.slice(start, i - 1))) hits.push(`line ${ps.slice(0, m.index).split("\n").length}`)
   }
-  const slow: Group = {
-    ids: ["t-slow-a", "t-slow-b"],
-    budgetS: 1,
+  return hits
+}
+
+const LOGIC_CHECKS: readonly Check[] = [
+  {
+    finding: "HIGH wheel-return-in-loop",
     async run() {
-      await Bun.sleep(3000)
-      return all(this.ids, { measured: "ran to the end", verdict: "CONFIRMS" })
+      if (returnsInLoops("while ($x) { if ($y) { return } }").length !== 1)
+        return "the loop scanner misses a known case"
+      const hits = LEG_FILES.flatMap((f) => returnsInLoops(source(f)).map((h) => `${f} ${h}`))
+      return hits.length ? `return inside a loop body: ${hits.join(", ")}` : undefined
     },
+  },
+  {
+    finding: "HIGH wheel-positive-control",
+    async run() {
+      const blind = wheelResults({ delivered: 0, runs: 6 }, { delivered: 0, runs: 18 }, { delivered: 6, runs: 6 })
+      const seen = wheelResults({ delivered: 6, runs: 6 }, { delivered: 18, runs: 18 }, { delivered: 0, runs: 6 })
+      if (blind["n-wheel-after-raise-dwmflush"]?.verdict !== "UNMEASURED")
+        return "a blind control still gives a wheel verdict"
+      if (blind["n-wheel-after-raise-5ms"]?.verdict !== "UNMEASURED")
+        return "a blind control still gives a 5 ms verdict"
+      if (seen["n-wheel-after-raise-dwmflush"]?.verdict !== "CONFIRMS")
+        return "a proven control with 18/18 is not CONFIRMS"
+      if (!seen["n-wheel-after-raise-dwmflush"]?.measured.includes("control delivered 6/6"))
+        return "the control is not in the row"
+      if (!wheel.ids.includes("n-wheel-control-settled")) return "the wheel group has no control row"
+      if (!/mode -eq 'settled'/.test(source("sp-n-legs-delivery.ps1"))) return "Leg-wheel has no settled control mode"
+      return undefined
+    },
+  },
+  {
+    finding: "MEDIUM shared-dir-quoting",
+    async run() {
+      const dir = join(tmpdir(), `omo sp n self test ${process.pid}`)
+      mkdirSync(dir, { recursive: true })
+      try {
+        const out = join(dir, "o.json")
+        const cmd = psCommand(dir, "x", {}, out)
+        const want = [`-File "${HELPER}"`, `-ArgFile "${join(dir, "x.arg.json")}"`, `-Out "${out}"`]
+        const missing = want.filter((w) => !cmd.includes(w))
+        return missing.length ? `unquoted path in: ${cmd}` : undefined
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    },
+  },
+  {
+    finding: "MEDIUM shared-dir-fresh",
+    async run() {
+      const dir = join(tmpdir(), `omo-sp-n-self-test-${process.pid}`)
+      rmSync(dir, { recursive: true, force: true })
+      mkdirSync(dir)
+      try {
+        const reused = await freshDir(dir, async () => undefined).then(
+          () => "a pre-existing directory was reused",
+          (e: Error) => (/REFUSED/.test(e.message) ? undefined : e.message),
+        )
+        if (reused) return reused
+        rmSync(dir, { recursive: true, force: true })
+        const denied = await freshDir(dir, async () => "owner is someone else").then(
+          () => "a directory failing its ACL check was accepted",
+          () => (existsSync(dir) ? "a refused directory was left behind" : undefined),
+        )
+        if (denied) return denied
+        await freshDir(dir, async () => undefined)
+        return existsSync(dir) ? undefined : "a fresh directory was not created"
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    },
+  },
+  {
+    finding: "MEDIUM shared-dir-acl",
+    async run() {
+      const self = source("probe-sp-n.ts")
+      if (/mkdirSync\(ctx\.shared/.test(self)) return "the shared directory is still created with mkdirSync"
+      if (!/freshDir\(ctx\.shared, lockDownWindows\)/.test(self))
+        return "the shared directory is not created by freshDir"
+      if (!/omo-sp-n-\$\{process\.pid\}-\$\{randomBytes/.test(self))
+        return "the shared directory name is not unpredictable"
+      return /S-1-5-18:\(OI\)\(CI\)F/.test(self) && /S-1-5-32-544:\(OI\)\(CI\)F/.test(self)
+        ? undefined
+        : "no SYSTEM/Administrators-only grant"
+    },
+  },
+  {
+    finding: "MEDIUM webview2-integrity",
+    async run() {
+      const s = source("sp-n-target.ps1")
+      if (!s.includes("$pkgSha256 = '" + WEBVIEW2_NUPKG_SHA256 + "'"))
+        return "the nupkg sha256 is not recorded in the repo"
+      if (/SPN_WEBVIEW2_NUPKG_SHA256/.test(s)) return "the nupkg check can still be switched off by an env variable"
+      if (/Test-Path \$pkgDir/.test(s)) return "an extracted cache is still reused"
+      if (!/ReadAllBytes\(\$nupkg\)/.test(s)) return "the nupkg is not hashed and extracted from the same bytes"
+      return /\$Work/.test(s) ? undefined : "no per-run extraction directory"
+    },
+  },
+  {
+    finding: "MEDIUM budget-workflow",
+    async run() {
+      if (!existsSync(WORKFLOW)) return `workflow not found at ${WORKFLOW}`
+      const yml = readFileSync(WORKFLOW, "utf8")
+      const passes = (yml.match(/probe-sp-n\.ts --(?:measure|verify)\b/g) ?? []).length
+      const timeoutS = Number(/timeout-minutes:\s*(\d+)/.exec(yml)?.[1] ?? 0) * 60
+      const sum = SETUP_BUDGET_S + GROUPS.reduce((s, g) => s + g.budgetS + (g.cleanupS ?? 0), 0)
+      if (TOTAL_BUDGET_S !== sum) return `TOTAL_BUDGET_S ${TOTAL_BUDGET_S} != setup + group budgets ${sum}`
+      const spent = passes * TOTAL_BUDGET_S + JOB_OVERHEAD_S + JOB_MARGIN_S
+      if (passes < 1 || !timeoutS) return `workflow has ${passes} probe passes and timeout ${timeoutS} s`
+      return spent <= timeoutS
+        ? undefined
+        : `${passes} passes x ${TOTAL_BUDGET_S} s + ${JOB_OVERHEAD_S} s overhead + ${JOB_MARGIN_S} s margin = ${spent} s > ${timeoutS} s job timeout`
+    },
+  },
+  {
+    finding: "MEDIUM timeout-cleanup",
+    async run() {
+      const plain = await runGroup({ ids: ["t-a", "t-b"], budgetS: 1, run: never }, testCtx())
+      for (const id of ["t-a", "t-b"])
+        if (plain[id]?.verdict !== "UNMEASURED" || plain[id]?.measured !== "UNMEASURED: timeout after 1s")
+          return `${id}: want "UNMEASURED: timeout after 1s", got ${JSON.stringify(plain[id])}`
+      let cleaned = false
+      const withCleanup = await runGroup(
+        {
+          ids: ["t-c"],
+          budgetS: 1,
+          cleanupS: 2,
+          async run(c) {
+            c.cleanups.push({
+              name: "reconnect",
+              run: async () => {
+                cleaned = true
+                return "active"
+              },
+            })
+            return never()
+          },
+        },
+        testCtx(),
+      )
+      if (!cleaned) return "the cleanup did not run before runGroup returned"
+      const m = withCleanup["t-c"]?.measured
+      return m === "UNMEASURED: timeout after 1s; cleanup reconnect=active"
+        ? undefined
+        : `cleanup result not recorded: ${m}`
+    },
+  },
+  {
+    finding: "LOW measure-row-keeps-host",
+    async run() {
+      const row = (id: string, host: string): LedgerRow =>
+        Object.fromEntries(HEADER.map((h) => [h, h === "id" ? id : h === "host" ? host : "x"])) as LedgerRow
+      const lines = mergeLedger([row("A", "h"), row("B", "h"), row("C", "o")], "h", new Map([["A", "A-new"]]))
+      if (lines.length !== 4 || lines[1] !== "A-new" || !lines[2]?.startsWith("B\t") || !lines[3]?.startsWith("C\t"))
+        return `--row A dropped or moved rows: ${JSON.stringify(lines.slice(1).map((l) => l.split("\t")[0]))}`
+      if (carriedNote("probe defect (return-in-loop); superseded by the next run") !== "-")
+        return "a probe-defect note survives its re-measure"
+      return carriedNote("design-adopted (x)") === "design-adopted (x)"
+        ? undefined
+        : "a design note is lost on re-measure"
+    },
+  },
+  {
+    finding: "LOW foreground-before-send",
+    async run() {
+      const legs = legsSource()
+      if (/\[SpN\]::Send(?:Chars|Chord)\(/.test(legs)) return "a leg sends input without the foreground check"
+      return /GetForegroundWindow\(\) != h/.test(source("sp-n-native-input.ps1"))
+        ? undefined
+        : "SendCharsTo does not check the foreground"
+    },
+  },
+  {
+    finding: "LOW last-error",
+    async run() {
+      return /GetLastWin32Error/.test(legsSource())
+        ? "a leg reads the last error from PowerShell after a P/Invoke"
+        : undefined
+    },
+  },
+  {
+    finding: "LOW setup-stops",
+    async run() {
+      let late = false
+      let killed = false
+      const ctx = testCtx()
+      const ok = await runSetup(ctx, 1, async (own) => {
+        own.pending.set("T", { kill: () => (killed = true) })
+        await Bun.sleep(1500)
+        if (!own.token.aborted) late = true
+      })
+      await Bun.sleep(700)
+      if (ok) return "setup past its budget reported done"
+      if (late) return "setup kept going after its budget"
+      return killed ? undefined : "a target still starting was not killed"
+    },
+  },
+  {
+    finding: "LOW self-test-runs",
+    async run() {
+      const self = source("probe-sp-n.ts")
+      const main = self.slice(self.search(/^async function main\(\) \{$/m))
+      const checks = main.indexOf("await logicChecks()")
+      const platform = main.indexOf('process.platform !== "win32"')
+      return checks >= 0 && checks < platform
+        ? undefined
+        : "--measure and --verify do not run the self-test checks first"
+    },
+  },
+  {
+    finding: "LOW timing-flap",
+    async run() {
+      const cases: Array<[number, number, Verdict]> = [
+        [16.157, 35, "CONFIRMS"],
+        [1.534, 2, "CONFIRMS"],
+        [2.05, 2, "UNMEASURED"],
+        [16, 2, "CONTRADICTS"],
+        [Number.NaN, 2, "UNMEASURED"],
+      ]
+      const bad = cases.filter(([p, l, v]) => timingVerdict(p, l, "m").verdict !== v)
+      return bad.length ? `timing verdicts wrong for ${JSON.stringify(bad)}` : undefined
+    },
+  },
+]
+
+const INVALID_NOTE = "probe defect (return-in-loop); superseded by the next run"
+const LEDGER_CHECKS: readonly Check[] = [
+  {
+    finding: "HIGH wheel-rows-invalid",
+    async run() {
+      const rows = readLedger(join(HERE, "win32-delivery.tsv"))
+      for (const id of ["n-wheel-after-raise-dwmflush", "n-wheel-after-raise-5ms"]) {
+        const r = rows.find((x) => x.id === id && x.host === HOSTED)
+        if (!r || r.verdict !== "INVALID" || r.notes !== INVALID_NOTE)
+          return `${id} on ${HOSTED}: want INVALID with "${INVALID_NOTE}", got ${r ? `${r.verdict} "${r.notes}"` : "no row"}`
+      }
+      const unsound = rows.filter(
+        (r) =>
+          r.id.startsWith("n-wheel-after-raise") &&
+          /CONFIRMS|CONTRADICTS/.test(r.verdict) &&
+          !r.measured.includes("control delivered"),
+      )
+      return unsound.length
+        ? `wheel verdict without a positive control: ${unsound.map((r) => r.id).join(",")}`
+        : undefined
+    },
+  },
+  {
+    finding: "LOW hosted-rows-committed",
+    async run() {
+      const rows = readLedger(join(HERE, "win32-delivery.tsv"))
+      const missing = Object.keys(SPEC).filter(
+        (id) => !SPEC[id]?.h6Only && !rows.some((r) => r.id === id && r.host === HOSTED),
+      )
+      const bad = rows.filter(
+        (r) => !SPEC[r.id] || !["CONFIRMS", "CONTRADICTS", "NEW-EDGE", "UNMEASURED", "INVALID"].includes(r.verdict),
+      )
+      if (bad.length) return `rows with an unknown id or verdict: ${bad.map((r) => r.id).join(",")}`
+      return missing.length ? `no ${HOSTED} row for ${missing.join(",")}` : undefined
+    },
+  },
+]
+
+async function runChecks(checks: readonly Check[]): Promise<string[]> {
+  const failures: string[] = []
+  for (const c of checks) {
+    const why = await c.run().catch((e: Error) => `threw ${e.message}`)
+    if (why) failures.push(`[${c.finding}] ${why}`)
   }
-  const t0 = Date.now()
-  const got = await runGroup(slow, ctx)
-  const tookS = (Date.now() - t0) / 1000
-  for (const id of slow.ids) {
-    const r = got[id]
-    if (r?.verdict !== "UNMEASURED" || r.measured !== "UNMEASURED: timeout after 1s")
-      failures.push(`${id}: want UNMEASURED "UNMEASURED: timeout after 1s", got ${JSON.stringify(r)}`)
-  }
-  if (Object.keys(got).length !== slow.ids.length)
-    failures.push(`rows: want ${slow.ids.length}, got ${Object.keys(got).length}`)
-  if (tookS > 2) failures.push(`runGroup returned after ${tookS.toFixed(1)} s, budget 1 s`)
-  const sum = SETUP_BUDGET_S + GROUPS.reduce((s, g) => s + g.budgetS, 0)
-  if (TOTAL_BUDGET_S !== sum) failures.push(`TOTAL_BUDGET_S ${TOTAL_BUDGET_S} != setup + group budgets ${sum}`)
-  if (!(TOTAL_BUDGET_S <= MAX_TOTAL_BUDGET_S && MAX_TOTAL_BUDGET_S < JOB_TIMEOUT_S))
-    failures.push(
-      `TOTAL_BUDGET_S ${TOTAL_BUDGET_S} s must be <= ${MAX_TOTAL_BUDGET_S} s, under the ${JOB_TIMEOUT_S} s job timeout`,
-    )
+  return failures
+}
+const logicChecks = () => runChecks(LOGIC_CHECKS)
+
+async function selfTest(): Promise<never> {
+  const failures = [...(await logicChecks()), ...(await runChecks(LEDGER_CHECKS))]
   for (const f of failures) console.log(`SELF-TEST FAIL ${f}`)
   console.log(
     failures.length
-      ? `SELF-TEST FAIL ${failures.length}`
-      : `SELF-TEST PASS total budget ${TOTAL_BUDGET_S} s of ${JOB_TIMEOUT_S} s`,
+      ? `SELF-TEST FAIL ${failures.length} of ${LOGIC_CHECKS.length + LEDGER_CHECKS.length} checks`
+      : `SELF-TEST PASS ${LOGIC_CHECKS.length + LEDGER_CHECKS.length} checks, pass budget ${TOTAL_BUDGET_S} s`,
   )
   process.exit(failures.length ? 1 : 0)
 }
@@ -966,6 +1373,8 @@ async function main() {
     notes: new Map(),
     live: new Set(),
     token: { aborted: false },
+    cleanups: [],
+    pending: new Map(),
   }
   mkdirSync(ctx.tmp, { recursive: true })
   mkdirSync(ctx.shared, { recursive: true })
@@ -996,34 +1405,32 @@ async function main() {
   const groups = GROUPS.filter((g) => g.ids.some((id) => want.has(id)))
   const results: Record<string, Result> = {}
   try {
-    const setupDone = await Promise.race([
+    const setupDone = await runSetup(ctx, SETUP_BUDGET_S, (own) =>
       setup(
-        ctx,
+        own,
         groups.flatMap((g) => g.ids),
-      ).then(() => true),
-      Bun.sleep(SETUP_BUDGET_S * 1000).then(() => false),
-    ])
+      ),
+    )
     if (!setupDone) console.log(`SP-N setup ran past ${SETUP_BUDGET_S} s; targets not started yet are UNMEASURED`)
     for (const g of groups) Object.assign(results, await runGroup(g, ctx))
   } finally {
     const notepad = ctx.targets.get("Notepad")
     if (notepad) await leg(ctx, "close", { top: notepad.top }).catch(() => undefined)
-    for (const p of ctx.spawned) p.kill()
+    for (const p of [...ctx.spawned, ...ctx.pending.values()]) p.kill()
     rmSync(ctx.tmp, { recursive: true, force: true })
     rmSync(ctx.shared, { recursive: true, force: true })
   }
   const ids = Object.keys(SPEC).filter((id) => want.has(id))
   if (opt.mode === "measure") {
     const before = readLedger(opt.file)
-    const kept = before.filter((r) => r.host !== host)
     const notes = new Map(before.filter((r) => r.host === host).map((r) => [r.id, r.notes]))
-    const lines = [
-      HEADER.join("\t"),
-      ...kept.map((r) => HEADER.map((h) => r[h]).join("\t")),
-      ...ids.map((id) =>
-        ledgerLine(id, results[id] ?? UN("no leg produced this row"), host, build, notes.get(id) || "-"),
-      ),
-    ]
+    const fresh = new Map(
+      ids.map((id) => [
+        id,
+        ledgerLine(id, results[id] ?? UN("no leg produced this row"), host, build, carriedNote(notes.get(id))),
+      ]),
+    )
+    const lines = mergeLedger(before, host, fresh)
     writeFileSync(opt.file, `${lines.join("\n")}\n`)
     for (const id of ids)
       console.log(`${(results[id]?.verdict ?? "UNMEASURED").padEnd(11)} ${id}  ${clean(results[id]?.measured ?? "")}`)
