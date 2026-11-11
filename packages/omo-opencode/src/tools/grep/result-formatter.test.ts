@@ -58,10 +58,7 @@ describe("formatGrepResult", () => {
         const formatted = formatGrepResult(result)
 
         expect(formatted).toBe(
-          "Found 3 match(es) in 3 file(s)\n\n" +
-            "src/foo.ts\n\n" +
-            "src/bar.ts\n\n" +
-            "src/baz.ts\n",
+          "Found 3 match(es) in 3 file(s)\n\n" + "src/foo.ts\n\n" + "src/bar.ts\n\n" + "src/baz.ts\n",
         )
       })
     })
@@ -112,10 +109,7 @@ describe("formatGrepResult", () => {
         const formatted = formatGrepResult(result)
 
         expect(formatted).toBe(
-          "Found 3 match(es) in 2 file(s)\n\n" +
-            "src/foo.ts\n" +
-            "  10: function hello() {\n\n" +
-            "src/bar.ts\n",
+          "Found 3 match(es) in 2 file(s)\n\n" + "src/foo.ts\n" + "  10: function hello() {\n\n" + "src/bar.ts\n",
         )
       })
     })

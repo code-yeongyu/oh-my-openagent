@@ -29,8 +29,7 @@ export type CallerSettingsWorld = {
 }
 
 const QUOTA_ERROR =
-  `403: {"message":"You've reached your usage limit for this billing cycle.",` +
-  `"type":"access_terminated_error"}`
+  `403: {"message":"You've reached your usage limit for this billing cycle.",` + `"type":"access_terminated_error"}`
 
 /**
  * A caller whose settings.json lives in a temp agent dir, and a provider whose models either never
@@ -53,30 +52,42 @@ export async function createCallerSettingsWorld(
   const modelRegistry = new ModelRegistry(modelRuntime)
   const calls: ProviderCall[] = []
   let reportFirst: (call: ProviderCall) => void = () => {}
-  const firstCall = new Promise<ProviderCall>((resolve) => { reportFirst = resolve })
+  const firstCall = new Promise<ProviderCall>((resolve) => {
+    reportFirst = resolve
+  })
   const providerFor = (name: string) => ({
     api: "openai-completions",
     baseUrl: `file://${name}`,
     apiKey: "test-key",
     models: Object.keys(behaviors).map(testModel),
-    streamSimple(model: { readonly id: string }, _context: unknown, options: { readonly timeoutMs?: unknown; readonly signal?: AbortSignal }) {
+    streamSimple(
+      model: { readonly id: string },
+      _context: unknown,
+      options: { readonly timeoutMs?: unknown; readonly signal?: AbortSignal },
+    ) {
       const stream = createStream()
       const aborted = new Promise<string>((resolve) => {
-        options.signal?.addEventListener("abort", () => {
-          const reason: unknown = options.signal?.reason
-          resolve(reason instanceof Error ? reason.message : String(reason))
-          stream.end(assistant(name, model.id, "aborted"))
-        }, { once: true })
+        options.signal?.addEventListener(
+          "abort",
+          () => {
+            const reason: unknown = options.signal?.reason
+            resolve(reason instanceof Error ? reason.message : String(reason))
+            stream.end(assistant(name, model.id, "aborted"))
+          },
+          { once: true },
+        )
       })
       const call = { modelId: model.id, timeoutMs: options.timeoutMs, aborted }
       calls.push(call)
       reportFirst(call)
       const behavior = behaviors[model.id] ?? "complete"
-      if (behavior !== "hang") queueMicrotask(() => stream.end(assistant(name, model.id, behavior === "quota" ? "error" : "stop")))
+      if (behavior !== "hang")
+        queueMicrotask(() => stream.end(assistant(name, model.id, behavior === "quota" ? "error" : "stop")))
       return stream
     },
   })
-  for (const name of [PROVIDER, ALT_PROVIDER]) Reflect.apply(modelRegistry.registerProvider, modelRegistry, [name, providerFor(name)])
+  for (const name of [PROVIDER, ALT_PROVIDER])
+    Reflect.apply(modelRegistry.registerProvider, modelRegistry, [name, providerFor(name)])
   return {
     root,
     agentDir,
@@ -142,15 +153,18 @@ function createStream() {
   const queue: unknown[] = []
   let finished = false
   let settle: (message: Message) => void = () => {}
-  const result = new Promise<Message>((resolve) => { settle = resolve })
+  const result = new Promise<Message>((resolve) => {
+    settle = resolve
+  })
   return {
     end(message: Message) {
       if (finished) return
       finished = true
       settle(message)
-      const event = message.stopReason === "stop"
-        ? { type: "done", reason: "stop", message }
-        : { type: "error", reason: message.stopReason, error: message }
+      const event =
+        message.stopReason === "stop"
+          ? { type: "done", reason: "stop", message }
+          : { type: "error", reason: message.stopReason, error: message }
       const waiter = waiters.shift()
       if (waiter === undefined) queue.push(event)
       else waiter({ value: event, done: false })

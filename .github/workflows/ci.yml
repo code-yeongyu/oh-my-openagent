@@ -874,6 +874,9 @@ jobs:
           git -C "$RUNNER_TEMP/senpi-eq" -c advice.detachedHead=false checkout -q FETCH_HEAD
           # E24 observes the pinned TypeScript language server only; the runner's own servers never reach a case.
           npm install --prefix "$RUNNER_TEMP/eq-lsp" --no-save --no-audit --no-fund typescript-language-server@5.3.0 typescript@5.9.3
+          # E24 runs the pinned comment-checker binary from the Codex plugin workspace (the root install does not carry it);
+          # the binaries ship inside the npm tarball, so --ignore-scripts still installs them and nothing is downloaded mid-case.
+          npm --prefix packages/omo-codex/plugin ci --ignore-scripts --no-audit --no-fund
           node packages/omo-senpi/scripts/qa/fused-equivalence-e2e.mjs --compare --placement fused --senpi-repo "$RUNNER_TEMP/senpi-eq" \
             --lsp-dir "$RUNNER_TEMP/eq-lsp/node_modules/.bin" --evidence-dir "$RUNNER_TEMP/eq-omo"
 
@@ -1220,6 +1223,10 @@ jobs:
           cargo build --release -p senpi-desktop-engine --locked --target ${{ matrix.rust-target }}
           # build-omo-binary.ts stages the engine trust helper on Darwin and Windows (omo#10762); its own call, as release builds it.
           cargo build --release -p omo-engine-trust-helper --locked --target ${{ matrix.rust-target }}
+          # It stages the git job helper on Windows only (omo#10391); its own call, static CRT as released.
+          if [[ "${{ matrix.target }}" == windows-* ]]; then
+            RUSTFLAGS="-C target-feature=+crt-static" cargo build --release -p omo-git-job-helper --locked --target ${{ matrix.rust-target }}
+          fi
 
       # build-omo-binary embeds the keychain helper into darwin binaries (#11262); the release lane
       # signs it, this parity leg embeds an unsigned build.

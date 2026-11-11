@@ -30,7 +30,8 @@ const TARGET_EXCERPT_MAX = 56
 
 export function renderTaskOutputCall(args: TaskOutputInput, theme: OutputRenderTheme): RenderComponent {
   return {
-    render: (width: number): string[] => linesComponent([theme.fg("toolTitle", taskOutputCallLine(args, width))]).render(width),
+    render: (width: number): string[] =>
+      linesComponent([theme.fg("toolTitle", taskOutputCallLine(args, width))]).render(width),
     invalidate: (): void => {},
   }
 }
@@ -49,7 +50,10 @@ function taskOutputCallLine(args: TaskOutputInput, width: number): string {
   const tail = mode === "tail" ? `tail_lines:${args.tail_lines ?? DEFAULT_TAIL_LINES}` : undefined
   const beforeTarget = "task_output target:"
   const afterTarget = joinRendererTokens([`mode:${mode}`, "peek", tail])
-  const available = Math.min(TARGET_EXCERPT_MAX, Math.max(0, width - rendererVisibleWidth(beforeTarget) - rendererVisibleWidth(afterTarget) - 1))
+  const available = Math.min(
+    TARGET_EXCERPT_MAX,
+    Math.max(0, width - rendererVisibleWidth(beforeTarget) - rendererVisibleWidth(afterTarget) - 1),
+  )
   const target = excerptRendererText(args.task_id ?? args.name ?? "<missing>", available)
   return joinRendererTokens([`${beforeTarget}${target}`, afterTarget])
 }
@@ -97,7 +101,8 @@ function taskOutputResultRow(details: TaskOutputDetails): ResultRow {
 }
 
 function notFoundRow(details: Extract<TaskOutputDetails, { readonly kind: "not_found" }>): string {
-  const known = details.known_tasks.length > 0 ? `known:${excerptRendererText(details.known_tasks.join(","))}` : undefined
+  const known =
+    details.known_tasks.length > 0 ? `known:${excerptRendererText(details.known_tasks.join(","))}` : undefined
   return joinRendererTokens([`task_output not found: ${details.reason}`, known])
 }
 

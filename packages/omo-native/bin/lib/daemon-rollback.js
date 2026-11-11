@@ -48,7 +48,7 @@ function indexStores(agentDir) {
 function collectStores(agentDir, explicitStores) {
   const index = indexStores(agentDir)
   const metadata = sidecars(agentDir)
-  const fromSidecars = metadata.flatMap(({ document }) => Array.isArray(document.stores) ? document.stores : [])
+  const fromSidecars = metadata.flatMap(({ document }) => (Array.isArray(document.stores) ? document.stores : []))
   const stores = [
     ...new Set([...index.stores, ...fromSidecars, ...explicitStores].map((store) => resolve(store))),
   ].toSorted()
@@ -61,16 +61,11 @@ function collectStores(agentDir, explicitStores) {
 }
 
 function statusForSocket(engine, socket, agentDir, env) {
-  const result = engine.run(
-    ["host", "status", "--json", "--socket", socket, "--include-workers"],
-    { env: { ...env, OMO_AGENT_DIR: agentDir } },
-  )
+  const result = engine.run(["host", "status", "--json", "--socket", socket, "--include-workers"], {
+    env: { ...env, OMO_AGENT_DIR: agentDir },
+  })
   const parsed = parseEngineLine(result.stdout ?? "")
-  if (
-    parsed === undefined ||
-    !Array.isArray(parsed.generations) ||
-    typeof parsed.claims_live !== "number"
-  ) {
+  if (parsed === undefined || !Array.isArray(parsed.generations) || typeof parsed.claims_live !== "number") {
     return { readable: false }
   }
   return { readable: true, report: parsed }
@@ -90,23 +85,29 @@ export function runRollbackPrepare({
 }) {
   const discovered = collectStores(agentDir, explicitStores)
   const endpointSweep = readAllEndpoints(engine, agentDir, env)
-  const endpointEvidence = endpointSweep.kind === "all" && endpointSweep.endpoints.some((endpoint) => {
-    if (typeof endpoint.socket !== "string") return true
-    return basename(endpoint.socket) !== "rpc.sock"
-  })
+  const endpointEvidence =
+    endpointSweep.kind === "all" &&
+    endpointSweep.endpoints.some((endpoint) => {
+      if (typeof endpoint.socket !== "string") return true
+      return basename(endpoint.socket) !== "rpc.sock"
+    })
   if (
     !discovered.index.present &&
     (discovered.metadata.length > 0 || endpointEvidence) &&
     !allowMissingIndex &&
     explicitStores.length === 0
   ) {
-    stderr.write("store index missing: pass --store <dir> for every project that ran task children, or --allow-missing-index\n")
+    stderr.write(
+      "store index missing: pass --store <dir> for every project that ran task children, or --allow-missing-index\n",
+    )
     return 3
   }
 
   const missing = discovered.stores.filter((store) => !existsSync(store))
   const present = discovered.stores.filter((store) => existsSync(store))
-  const plans = present.map((storeDir) => migration.run({ storeDir, to: join(agentDir, "rpc", "rpc.sock"), planOnly: true }))
+  const plans = present.map((storeDir) =>
+    migration.run({ storeDir, to: join(agentDir, "rpc", "rpc.sock"), planOnly: true }),
+  )
   const sockets = [...new Set(plans.flatMap((plan) => plan.sockets))].toSorted()
   const deadEndpoints = []
   for (const socket of sockets) {
@@ -124,12 +125,14 @@ export function runRollbackPrepare({
     deadEndpoints.push(socket)
   }
 
-  const results = present.map((storeDir) => migration.run({
-    storeDir,
-    to: join(agentDir, "rpc", "rpc.sock"),
-    deadEndpoints,
-    dryRun,
-  }))
+  const results = present.map((storeDir) =>
+    migration.run({
+      storeDir,
+      to: join(agentDir, "rpc", "rpc.sock"),
+      deadEndpoints,
+      dryRun,
+    }),
+  )
   for (const result of results) {
     for (const warning of result.warnings ?? []) {
       stderr.write(`WARNING ${warning.code} [${warning.task_ids.join(", ")}]: ${warning.message}\n`)
@@ -153,7 +156,9 @@ export function runRollbackPrepare({
   if (json) stdout.write(`${JSON.stringify(payload)}\n`)
   else {
     for (const result of results) {
-      stdout.write(`${result.store_dir}: migrated: ${dryRun ? result.migrate : result.migrated}, skipped: ${result.skipped}\n`)
+      stdout.write(
+        `${result.store_dir}: migrated: ${dryRun ? result.migrate : result.migrated}, skipped: ${result.skipped}\n`,
+      )
     }
     stdout.write(
       `stores: ${payload.coverage.discovered} discovered (${payload.coverage.from_sidecars} from sidecars, ${payload.coverage.from_store} from --store), ${missing.length} missing, endpoints without a store map: ${storesWithoutMap.join(", ") || "none"}\n`,

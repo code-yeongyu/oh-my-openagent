@@ -1,0 +1,452 @@
+{
+  "description": "computer-use v2 epoch (row 14), reportMode object: engine.hello lists epoch; ref e1 is read, window 101 captured, then the scripted display reconfiguration lands on the next backend call: the click on the old frameId is refused InvalidCoordinateFrame reason superseded, not_delivered/safe (nothing sent), with epoch.changed reason display; the ref read before the move is StaleRef; a fresh capture takes input again.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/v2-epoch-display.json",
+  "env": {
+    "SENPI_DESKTOP_FAKE_CLOCK": "1"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "engine.hello",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "protocolVersion": "1",
+              "engineVersion": "0.0.0",
+              "buildSha": "unknown",
+              "abi": "senpi-desktop/1",
+              "features": [
+                "action-report",
+                "frame-identity",
+                "frame-consume",
+                "ax-partial",
+                "trace",
+                "key-priming",
+                "epoch",
+                "interaction-lock",
+                "intervention-policy",
+                "dangerous-chord-force"
+              ]
+            }
+          },
+          "variable": [
+            "/result/engineVersion",
+            "/result/buildSha"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session.open",
+        "params": {
+          "allowHostRelayOnlyStop": true,
+          "showCursor": false,
+          "reportMode": "object"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 1,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": "no-global-listener",
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "stopPath.start",
+        "params": {
+          "chord": "ctrl+alt+shift+escape"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/heartbeatFresh",
+            "/result/reason"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "stopPath.heartbeat",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "stopPath.changed",
+            "params": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/params/heartbeatFresh",
+            "/params/reason"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": null
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "ax.focused",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": {
+              "ref": "e1",
+              "role": "textarea",
+              "nativeRole": "AXTextArea",
+              "title": null,
+              "value": "",
+              "description": null,
+              "enabled": true,
+              "focused": true,
+              "x": 110.0,
+              "y": 160.0,
+              "width": 780.0,
+              "height": 500.0,
+              "actions": [
+                "focus"
+              ],
+              "childCount": 0,
+              "evidence": {
+                "title": "absent",
+                "value": "known",
+                "description": "absent",
+                "enabled": "known",
+                "focused": "known",
+                "bounds": "known"
+              }
+            }
+          },
+          "variable": [],
+          "bind": {
+            "ref": "/result/ref"
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "capture",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "result": {
+              "mode": "inline-png",
+              "data": "iVBORw0KGgoAAAANSUhEUgAAAyAAAAJYCAYAAACadoJwAAAqu0lEQVR4Ae3AA6AkWZbG8f937o3IzKdyS2Oubdu2bdu2bdu2bWmMnpZKr54yMyLu+Xa3anqmhztr1a8++L2/21x11VVXXXXVVVddddVVV/3nI7jqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5r8I+vhwbSKOXQ+wAAAABJRU5ErkJggg==",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 800,
+              "height": 600,
+              "sourceWidth": 800,
+              "sourceHeight": 600,
+              "coordinateWidth": 800,
+              "coordinateHeight": 600,
+              "region": null,
+              "scale": 1.0,
+              "target": "101",
+              "frameId": "frame-01m6nst4c74csdjnsaxm5rx5p5-1",
+              "note": null
+            }
+          },
+          "variable": [
+            "/result/data",
+            "/result/frameId"
+          ],
+          "bind": {
+            "frame": "/result/frameId"
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 20.0,
+          "y": 20.0,
+          "frameId": "{{frame}}"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "error": {
+              "code": -32007,
+              "message": "the frame is not the target's latest capture; capture it again before coordinate input",
+              "data": {
+                "code": "InvalidCoordinateFrame",
+                "hint": null,
+                "reason": "superseded",
+                "disposition": {
+                  "delivery": "not_delivered",
+                  "retry": "safe"
+                },
+                "focusRestoration": "not_needed"
+              }
+            }
+          },
+          "variable": []
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "click",
+              "target": "101",
+              "delivery": "background",
+              "frameId": "frame-01m6nst4c74csdjnsaxm5rx5p5-1",
+              "code": "InvalidCoordinateFrame",
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null,
+              "id": "01M6NST4QX6A0R1HN17402Y80Q"
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored",
+            "/params/id",
+            "/params/frameId"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "epoch.changed",
+            "params": {
+              "reason": "display"
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "ax.node",
+        "params": {
+          "ref": "{{ref}}"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "error": {
+              "code": -32008,
+              "message": "e1 expired; re-run ax()/find()",
+              "data": {
+                "code": "StaleRef",
+                "hint": null
+              }
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "method": "capture",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 9,
+            "result": {
+              "mode": "inline-png",
+              "data": "iVBORw0KGgoAAAANSUhEUgAAAyAAAAJYCAYAAACadoJwAAAqu0lEQVR4Ae3AA6AkWZbG8f937o3IzKdyS2Oubdu2bdu2bdu2bWmMnpZKr54yMyLu+Xa3anqmhztr1a8++L2/21x11VVXXXXVVVddddVVV/3nI7jqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5rEFx11VVXXXXVVVddddVVV/3XILjqqquuuuqqq6666qqrrvqvQXDVVVddddVVV1111VVXXfVfg+Cqq6666qqrrrrqqquuuuq/BsFVV1111VVXXXXVVVddddV/DYKrrrrqqquuuuqqq6666qr/GgRXXXXVVVddddVVV1111VX/NQiuuuqqq6666qqrrrrqqqv+axBcddVVV1111VVXXXXVVVf91yC46qqrrrrqqquuuuqqq676r0Fw1VVXXXXVVVddddVVV131X4Pgqquuuuqqq6666qqrrrrqvwbBVVddddVVV1111VVXXXXVfw2Cq6666qqrrrrqqquuuuqq/xoEV1111VVXXXXVVVddddVV/zUIrrrqqquuuuqqq6666qqr/msQXHXVVVddddVVV1111VVX/dcguOqqq6666qqrrrrqqquu+q9BcNVVV1111VVXXXXVVVdd9V+D4Kqrrrrqqquuuuqqq6666r8GwVVXXXXVVVddddVVV1111X8Ngquuuuqqq6666qqrrrrqqv8aBFddddVVV1111VVXXXXVVf81CK666qqrrrrqqquuuuqqq/5r8I+vhwbSKOXQ+wAAAABJRU5ErkJggg==",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 800,
+              "height": 600,
+              "sourceWidth": 800,
+              "sourceHeight": 600,
+              "coordinateWidth": 800,
+              "coordinateHeight": 600,
+              "region": null,
+              "scale": 1.0,
+              "target": "101",
+              "frameId": "frame-01m6nst4c74csdjnsaxm5rx5p5-2",
+              "note": null
+            }
+          },
+          "variable": [
+            "/result/data",
+            "/result/frameId"
+          ],
+          "bind": {
+            "fresh": "/result/frameId"
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "click",
+        "params": {
+          "target": "101",
+          "x": 20.0,
+          "y": 20.0,
+          "frameId": "{{fresh}}"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 10,
+            "result": {
+              "disposition": {
+                "delivery": "delivered_unverified",
+                "retry": "unsafe"
+              },
+              "effect": "unverifiable",
+              "route": "background_window",
+              "focusRestoration": "not_needed",
+              "auditIds": [
+                "01M6NST5W81FVK98065S245QBE"
+              ]
+            }
+          },
+          "variable": [
+            "/result/auditIds/0"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "click",
+              "target": "101",
+              "delivery": "background",
+              "frameId": "frame-01m6nst4c74csdjnsaxm5rx5p5-2",
+              "code": null,
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null,
+              "id": "01M6NST5W81FVK98065S245QBE"
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored",
+            "/params/id",
+            "/params/frameId"
+          ]
+        }
+      ]
+    }
+  ]
+}

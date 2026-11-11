@@ -2,10 +2,7 @@ import { beforeEach, describe, expect, it } from "bun:test"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { OMO_INTERNAL_INITIATOR_MARKER } from "../../shared/internal-initiator-marker"
 import { ContextCollector } from "./collector"
-import {
-  createContextInjectorHook,
-  createContextInjectorMessagesTransformHook,
-} from "./injector"
+import { createContextInjectorHook, createContextInjectorMessagesTransformHook } from "./injector"
 
 describe("createContextInjectorMessagesTransformHook", () => {
   let collector: ContextCollector
@@ -18,7 +15,7 @@ describe("createContextInjectorMessagesTransformHook", () => {
     role: "user" | "assistant",
     text: string,
     sessionID: string,
-    options?: { synthetic?: boolean }
+    options?: { synthetic?: boolean },
   ) => ({
     info: {
       id: `msg_${Date.now()}_${Math.random()}`,
@@ -89,9 +86,7 @@ describe("createContextInjectorMessagesTransformHook", () => {
 
     // then
     const firstSyntheticPart = firstOutput.messages[0].parts[0]
-    expect(
-      "synthetic" in firstSyntheticPart && firstSyntheticPart.synthetic === true
-    ).toBe(true)
+    expect("synthetic" in firstSyntheticPart && firstSyntheticPart.synthetic === true).toBe(true)
 
     // given
     collector.register(sessionID, {
@@ -108,9 +103,7 @@ describe("createContextInjectorMessagesTransformHook", () => {
 
     // then
     const secondSyntheticPart = secondOutput.messages[0].parts[0]
-    expect(
-      "synthetic" in secondSyntheticPart && secondSyntheticPart.synthetic === true
-    ).toBe(true)
+    expect("synthetic" in secondSyntheticPart && secondSyntheticPart.synthetic === true).toBe(true)
     expect(typeof secondSyntheticPart.id).toBe("string")
     expect(secondSyntheticPart.id.startsWith("prt_")).toBe(true)
     expect(secondSyntheticPart.id).toBe(firstSyntheticPart.id)
@@ -209,11 +202,7 @@ describe("createContextInjectorMessagesTransformHook", () => {
     })
     const messages = [
       createMockMessage("user", "Real user message", sessionID),
-      createMockMessage(
-        "user",
-        `Internal prompt\n${OMO_INTERNAL_INITIATOR_MARKER}`,
-        sessionID,
-      ),
+      createMockMessage("user", `Internal prompt\n${OMO_INTERNAL_INITIATOR_MARKER}`, sessionID),
     ]
     const originalMessages = structuredClone(messages)
     const output = unsafeTestValue({ messages })

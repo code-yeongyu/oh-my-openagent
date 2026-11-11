@@ -14,9 +14,13 @@ export function formatStatus(result: DoctorResult): string {
     const packageVersion = result.codex.packageVersion ?? result.codex.installerVersion
     lines.push(`  Codex      ${codex}`)
     lines.push(`  CLI        oh-my-openagent@${result.codex.installerVersion}`)
-    lines.push(`  Plugin     ${result.codex.pluginName}@${pluginVersion}${result.codex.pluginVersionStamped ? "" : " (placeholder)"}`)
+    lines.push(
+      `  Plugin     ${result.codex.pluginName}@${pluginVersion}${result.codex.pluginVersionStamped ? "" : " (placeholder)"}`,
+    )
     lines.push(`  Package    ${packageName}@${packageVersion}`)
-    lines.push(`  Config     ${result.codex.configPath} ${result.codex.config.pluginEnabled ? color.green("(enabled)") : color.red("(disabled)")}`)
+    lines.push(
+      `  Config     ${result.codex.configPath} ${result.codex.config.pluginEnabled ? color.green("(enabled)") : color.red("(disabled)")}`,
+    )
     lines.push(`  Bins       ${result.codex.linkedBins.length > 0 ? result.codex.linkedBins.join(" · ") : "none"}`)
     lines.push(`  Agents     ${result.codex.agents.length > 0 ? result.codex.agents.join(" · ") : "none"}`)
     return lines.join("\n")
@@ -40,7 +44,9 @@ export function formatStatus(result: DoctorResult): string {
   const astGrepMark = formatStatusMark(tools.astGrepCli)
   const ghMark = formatStatusMark(tools.ghCli.installed && tools.ghCli.authenticated)
   const ghUser = tools.ghCli.username ?? ""
-  lines.push(` ${padding}Tools      LSP ${lspMark} ${lspText} · AST-Grep ${astGrepMark} · gh ${ghMark}${ghUser ? ` (${ghUser})` : ""}`)
+  lines.push(
+    ` ${padding}Tools      LSP ${lspMark} ${lspText} · AST-Grep ${astGrepMark} · gh ${ghMark}${ghUser ? ` (${ghUser})` : ""}`,
+  )
 
   const builtinCount = tools.mcpBuiltin.length
   const userCount = tools.mcpUser.length

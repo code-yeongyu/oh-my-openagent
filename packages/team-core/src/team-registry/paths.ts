@@ -219,10 +219,12 @@ export async function ensureBaseDirs(baseDir: string, deps: PathDeps = defaultPa
     await safeChmod(directoryPath, 0o700, deps)
   }
 
-  await Promise.all(directories.map(async (directoryPath) => {
-    const directoryStat = await deps.stat(directoryPath)
-    if ((directoryStat.mode & 0o777) !== 0o700) {
-      await safeChmod(directoryPath, 0o700, deps)
-    }
-  }))
+  await Promise.all(
+    directories.map(async (directoryPath) => {
+      const directoryStat = await deps.stat(directoryPath)
+      if ((directoryStat.mode & 0o777) !== 0o700) {
+        await safeChmod(directoryPath, 0o700, deps)
+      }
+    }),
+  )
 }

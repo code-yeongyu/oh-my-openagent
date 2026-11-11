@@ -4,7 +4,9 @@ import { BUILTIN_CATEGORY_DEFAULTS } from "@oh-my-opencode/senpi-task/category-b
 const NUMBER_PROPERTY = Object.freeze({ type: "number" } as const)
 const STRING_PROPERTY = Object.freeze({ type: "string" } as const)
 
-function enumProperty<const Values extends readonly string[]>(values: Values): Readonly<{
+function enumProperty<const Values extends readonly string[]>(
+  values: Values,
+): Readonly<{
   type: "string"
   values: Values
 }> {
@@ -41,7 +43,15 @@ export const DELEGATION_BACKGROUND_MODES = ["foreground", "background", "promote
 
 /** Canonical reasoning levels; harness-native presets collapse to `other`, absent reads `none`. */
 export const DELEGATION_REASONING_EFFORTS = [
-  "off", "minimal", "low", "medium", "high", "xhigh", "max", "other", "none",
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+  "other",
+  "none",
 ] as const
 
 export const DELEGATION_MODEL_SOURCES = ["category", "explicit", "agent", "none"] as const
@@ -66,7 +76,7 @@ export function buildDelegationCompletedSchema(masked: {
   readonly models: readonly string[]
 }) {
   return Object.freeze({
-    "$session_id": STRING_PROPERTY,
+    $session_id: STRING_PROPERTY,
     agent_type: enumProperty([...CURATED_READONLY_AGENT_NAMES, "custom", "none"] as const),
     background_mode: enumProperty(DELEGATION_BACKGROUND_MODES),
     cache_read_tokens: NUMBER_PROPERTY,

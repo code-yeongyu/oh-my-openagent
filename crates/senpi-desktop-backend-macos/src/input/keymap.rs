@@ -39,6 +39,10 @@ const KEY_ACTION_DOWN: u16 = 0;
 const NO_LAYOUT_DATA: i32 = 3;
 const HELPER_TIMEOUT: Duration = Duration::from_secs(5);
 const HELPER_POLL: Duration = Duration::from_millis(2);
+/// Test seam: a helper started with it set prints `stalled` and parks after
+/// arming its parent-death watch, so a test can kill its parent mid-read.
+/// The engine strips it from the helper it spawns.
+pub(crate) const STALL_ENV: &str = "SENPI_DESKTOP_KEYMAP_HELPER_TEST_STALL";
 /// How long a read keyboard layout is reused: typing in quick succession
 /// skips the helper, and a layout switch takes effect within this.
 const KEYMAP_TTL: Duration = Duration::from_secs(10);
@@ -164,6 +168,7 @@ fn current_layout() -> CoreResult<Option<(u32, Vec<u32>)>> {
     let mut child = Command::new(executable)
         .arg("--keymap-helper")
         .arg(&output)
+        .env_remove(STALL_ENV)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -203,8 +208,18 @@ fn current_layout() -> CoreResult<Option<(u32, Vec<u32>)>> {
 /// The helper side (`--keymap-helper <file>`), on this process's main thread:
 /// writes the keyboard type as 4 little-endian bytes, then the layout's
 /// `uchr` data. Exit status `NO_LAYOUT_DATA` means the layout has none.
+/// Its stdin is null, so the engine's death ends it through the parent watch.
 pub(crate) fn run_helper(path: &Path) -> Result<(), i32> {
     use objc2_core_foundation::{CFData, CFRetained};
+    if let Err(error) = crate::parent_death::exit_with_parent() {
+        eprintln!("keymap helper: no parent-death watch: {error}");
+    }
+    if std::env::var_os(STALL_ENV).is_some() {
+        println!("stalled");
+        loop {
+            std::thread::park();
+        }
+    }
     // SAFETY: [FFI] TIS runs on the main thread of this helper process; the
     // returned source is a create-rule object released by `CFRetained`.
     let source = unsafe { TISCopyCurrentKeyboardLayoutInputSource() };

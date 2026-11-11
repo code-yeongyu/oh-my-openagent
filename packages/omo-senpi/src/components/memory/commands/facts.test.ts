@@ -16,9 +16,7 @@ import { removeTree } from "../../../../../../test-support/remove-tree"
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(
-    tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })),
-  )
+  await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
 const NOW = new Date("2026-08-16T12:00:00.000Z")

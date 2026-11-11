@@ -1,1 +1,1 @@
-export { createImmediateSender, TelemetryDeliveryError } from "./index";
+export { createImmediateSender, TelemetryDeliveryError } from "./index"

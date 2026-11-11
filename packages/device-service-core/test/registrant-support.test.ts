@@ -37,7 +37,7 @@ function slowHost() {
   }
 }
 
-const settle = <T,>(waited: Promise<T>) =>
+const settle = <T>(waited: Promise<T>) =>
   waited.then(
     (value) => ({ status: "resolved" as const, value }),
     (error: unknown) => ({ status: "rejected" as const, message: error instanceof Error ? "error" : String(error) }),
@@ -81,16 +81,20 @@ test("#given an event that never comes #when the test budget runs out #then with
   expect(await waited).toEqual({ status: "rejected", message: "error" })
 })
 
-test("#given a registrant that gave up #when a recorder wait runs out #then the error lists the events it saw (#12733)", async () => {
+test("#given a registrant that gave up #when a recorder wait runs out #then the error lists the events it saw and when (#12733)", async () => {
   // given
   const host = slowHost()
   const seen = recorder()
-  const waited = seen.next((event) => event.kind === "registered", "the register after the restart").then(
-    () => "resolved",
-    (error: unknown) => (error instanceof Error ? error.message : String(error)),
-  )
+  const waited = seen
+    .next((event) => event.kind === "registered", "the register after the restart")
+    .then(
+      () => "resolved",
+      (error: unknown) => (error instanceof Error ? error.message : String(error)),
+    )
   seen.onEvent({ kind: "disconnected" })
+  host.elapse(250)
   seen.onEvent({ kind: "connect_failed", reason: "ECONNREFUSED" })
+  host.elapse(5_000)
   seen.onEvent({ kind: "gave_up" })
 
   // when
@@ -99,7 +103,9 @@ test("#given a registrant that gave up #when a recorder wait runs out #then the 
   // then
   const message = await waited
   expect(message).toContain("for the register after the restart")
-  expect(message).toContain('{"kind":"connect_failed","reason":"ECONNREFUSED"},{"kind":"gave_up"}')
+  expect(message).toContain(
+    '0ms {"kind":"disconnected"}, 250ms {"kind":"connect_failed","reason":"ECONNREFUSED"}, 5250ms {"kind":"gave_up"}',
+  )
 })
 
 test("#given the tests above replaced the timers #when a later test runs #then it sees the real setTimeout and clearTimeout again", () => {
