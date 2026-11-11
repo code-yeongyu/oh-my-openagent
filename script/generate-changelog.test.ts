@@ -96,3 +96,31 @@ describe("isCommunityContributor", () => {
     expect(isCommunityContributor("minpeter")).toBe(true)
   })
 })
+
+import { formatCommitNotes, formatContributorNotes, neutralizeCrossRepoReferences } from "./generate-changelog"
+
+describe("neutralizeCrossRepoReferences", () => {
+  test("#given a reference to a non-public repo #when neutralized #then it reads tracked internally", () => {
+    expect(neutralizeCrossRepoReferences("fix: handle x (x-y#12)")).toBe("fix: handle x (tracked internally)")
+  })
+
+  test("#given public, bare and PR references #when neutralized #then they are unchanged", () => {
+    for (const text of ["senpi#6412", "code-yeongyu/senpi#1", "#123", "PR #123", "fix: thing (#123)"]) {
+      expect(neutralizeCrossRepoReferences(text)).toBe(text)
+    }
+  })
+})
+
+describe("release note builders", () => {
+  test("#given a commit subject citing a private-shaped reference #when notes are built #then it is neutralized", () => {
+    const notes = formatCommitNotes("abc1234 fix: tighten gate (acme-svc#9, omo#6412)\ndef5678 chore: skip me")
+    expect(notes).toEqual(["- abc1234 fix: tighten gate (tracked internally, omo#6412)"])
+  })
+
+  test("#given a contributor title citing a private-shaped reference #when notes are built #then it is neutralized", () => {
+    const compare = JSON.stringify({ login: "minpeter", message: "fix: thing (acme-svc#9)\n\nbody" })
+    const notes = formatContributorNotes(compare)
+    expect(notes).toContain("  - fix: thing (tracked internally)")
+    expect(notes.join("\n")).not.toContain("acme-svc")
+  })
+})

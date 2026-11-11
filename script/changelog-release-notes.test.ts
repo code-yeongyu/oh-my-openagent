@@ -92,3 +92,17 @@ describe("installFooter", () => {
     expect(installFooter("5.0.0-beta.91")).toContain("bun add -g omo-ai@beta")
   })
 })
+
+describe("composeReleaseBody", () => {
+  test("#given fragment text citing a private-shaped reference #when composed #then it is neutralized and public ones stay", () => {
+    const body = composeReleaseBody(
+      "- fixed (acme-svc#9, senpi#6412)",
+      "- @a: thanks (acme-svc#9)",
+      "```bash\nbun add -g omo-ai\n```",
+    )
+    expect(body).toContain("- fixed (tracked internally, senpi#6412)")
+    expect(body).toContain("- @a: thanks (tracked internally)")
+    expect(body).not.toContain("acme-svc")
+    expect(body).toContain("bun add -g omo-ai")
+  })
+})

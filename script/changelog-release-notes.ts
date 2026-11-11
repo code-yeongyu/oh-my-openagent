@@ -1,3 +1,5 @@
+import { neutralizeCrossRepoReferences } from "./generate-changelog"
+
 /**
  * Release-note source of truth.
  *
@@ -70,8 +72,8 @@ export function extractReleaseNotes(changelog: string, version: string): string 
 
 /** Release body = authored notes, then the contributor block, then the install footer. */
 export function composeReleaseBody(notes: string, contributors: string, installFooter: string): string {
-  const parts = [notes.trim()]
-  if (contributors.trim()) parts.push(contributors.trim())
+  const parts = [neutralizeCrossRepoReferences(notes.trim())]
+  if (contributors.trim()) parts.push(neutralizeCrossRepoReferences(contributors.trim()))
   if (installFooter.trim()) parts.push(installFooter.trim())
   return `${parts.join("\n\n")}\n`
 }

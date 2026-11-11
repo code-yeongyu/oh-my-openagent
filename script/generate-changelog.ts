@@ -11,6 +11,17 @@ export function isCommunityContributor(login: string): boolean {
   return !TEAM.includes(login) && !login.endsWith("[bot]")
 }
 
+// Release notes are published the moment the release is created, so a reference to a repository that is
+// not public must never reach them. References to these repositories stay clickable.
+const PUBLIC_REFERENCE_REPOS = new Set(["senpi", "omo", "oh-my-openagent", "oh-my-opencode", "doriterm", "lazycodex"])
+const CROSS_REPO_REFERENCE = /\b(?:[\w.-]+\/)?([A-Za-z][\w.-]*)#\d+\b/g
+
+export function neutralizeCrossRepoReferences(text: string): string {
+  return text.replace(CROSS_REPO_REFERENCE, (reference, repo: string) =>
+    PUBLIC_REFERENCE_REPOS.has(repo.toLowerCase()) ? reference : "tracked internally",
+  )
+}
+
 const EXCLUDED_PREFIX_PATTERN = /^(ignore:|test:|chore:|ci:|release:)/i
 const CONTAINED_SURFACE_PATTERN = /\bsenpi\b/i
 
@@ -64,20 +75,48 @@ async function getLatestReleasedTag(currentVersion: string): Promise<string | nu
   }
 }
 
+export function formatCommitNotes(log: string): string[] {
+  const commits = log.split("\n").filter((line) => line && !isExcludedReleaseNoteSubject(line.replace(/^\w+ /, "")))
+  return commits.map((commit) => `- ${neutralizeCrossRepoReferences(commit)}`)
+}
+
 async function generateChangelog(previousTag: string): Promise<string[]> {
   const notes: string[] = []
 
   try {
     const log = await $`git log ${previousTag}..HEAD --oneline --format="%h %s"`.text()
-    const commits = log.split("\n").filter((line) => line && !isExcludedReleaseNoteSubject(line.replace(/^\w+ /, "")))
-
-    if (commits.length > 0) {
-      for (const commit of commits) {
-        notes.push(`- ${commit}`)
-      }
-    }
+    notes.push(...formatCommitNotes(log))
   } catch {
     // No previous tags found
+  }
+
+  return notes
+}
+
+export function formatContributorNotes(compare: string): string[] {
+  const notes: string[] = []
+  const contributors = new Map<string, string[]>()
+
+  for (const line of compare.split("\n").filter(Boolean)) {
+    const { login, message } = JSON.parse(line) as { login: string | null; message: string }
+    const title = message.split("\n")[0] ?? ""
+    if (isExcludedReleaseNoteSubject(title)) continue
+
+    if (login && isCommunityContributor(login)) {
+      if (!contributors.has(login)) contributors.set(login, [])
+      contributors.get(login)?.push(neutralizeCrossRepoReferences(title))
+    }
+  }
+
+  if (contributors.size > 0) {
+    notes.push("")
+    notes.push(`**Thank you to ${contributors.size} community contributor${contributors.size > 1 ? "s" : ""}:**`)
+    for (const [username, userCommits] of contributors) {
+      notes.push(`- @${username}:`)
+      for (const commit of userCommits) {
+        notes.push(`  - ${commit}`)
+      }
+    }
   }
 
   return notes
@@ -89,29 +128,7 @@ async function getContributors(previousTag: string): Promise<string[]> {
   try {
     const compare =
       await $`gh api "/repos/code-yeongyu/oh-my-openagent/compare/${previousTag}...HEAD" --jq '.commits[] | {login: .author.login, message: .commit.message}'`.text()
-    const contributors = new Map<string, string[]>()
-
-    for (const line of compare.split("\n").filter(Boolean)) {
-      const { login, message } = JSON.parse(line) as { login: string | null; message: string }
-      const title = message.split("\n")[0] ?? ""
-      if (isExcludedReleaseNoteSubject(title)) continue
-
-      if (login && isCommunityContributor(login)) {
-        if (!contributors.has(login)) contributors.set(login, [])
-        contributors.get(login)?.push(title)
-      }
-    }
-
-    if (contributors.size > 0) {
-      notes.push("")
-      notes.push(`**Thank you to ${contributors.size} community contributor${contributors.size > 1 ? "s" : ""}:**`)
-      for (const [username, userCommits] of contributors) {
-        notes.push(`- @${username}:`)
-        for (const commit of userCommits) {
-          notes.push(`  - ${commit}`)
-        }
-      }
-    }
+    notes.push(...formatContributorNotes(compare))
   } catch {
     // Failed to fetch contributors
   }
