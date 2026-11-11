@@ -12,7 +12,6 @@ import {
   type EmbeddedManifest,
 } from "./compile-runtime"
 import { handOffToProvisionedRuntime, planProvisionedLaunch, type ProvisionedLaunch } from "./provisioned-handoff"
-import { pruneProvisionedRuntimes, removeReplacedLauncher, type RuntimePruneResult } from "./runtime-prune"
 import { parseBuildInfo, parseEngineBuildStamp, versionLines } from "./build-info"
 import { compiledUpdate, fetchGitHubReleases, probePackageOwner, releaseAssetName, RELEASES_URL } from "./compiled-update"
 import { migrateLegacyBunGlobalManifest } from "./bin/lib/legacy-bun-global-migration.js"
@@ -47,6 +46,9 @@ import { ExtraCaCertificatesError, parseExtraCaCertificates } from "./compiled-c
 import { adoptedEngineTrust, buildTrustLaunchEnvironment } from "@code-yeongyu/senpi/engine-trust"
 import { runTrustStage } from "./trust-stage"
 import { resolveEngineTrustHelperPath } from "./engine-trust-helper-path"
+import { extractUpdateGeneration, selectCompiledRuntime, UPDATE_HANDOFF_ENV, type CompiledSelection } from "./compiled-selection"
+import { runUpdateWorker, runBootstrapMaintenance, updateRoot, refreshInstallReceipt, updateDiagnosticLines } from "./update-lifecycle"
+import { UpdateStore } from "./update-store"
 import { claimMemorySyncAtBoot } from "./memory-sync-boot"
 
 // The engine is imported via a RELATIVE string LITERAL, inlined at both import
@@ -289,13 +291,6 @@ export function launchPrunesRuntimes(args: readonly string[], launch: Pick<Provi
   return trustLaunchKind(args) !== "static" && !isSelfUpdate([...args])
 }
 
-// Pruning old runtimes never blocks a launch, but a runtime that could not be removed is reported.
-function reportRuntimePrune(result: RuntimePruneResult): void {
-  for (const { version, reason } of result.failed) {
-    process.stderr.write(`omo: could not remove the old runtime ${version}: ${reason}\n`)
-  }
-}
-
 /** A refusal is 78 (5.2) and a malformed `trust` argv the launcher's usage status 2; an exec keeps the status it propagated. */
 function setTrustExitCode(action: "static" | "import-exec" | "ensure" | "usage" | "refuse"): void {
   if (action === "refuse") process.exitCode = 78
@@ -337,6 +332,23 @@ async function answerUnderRefusedTrust(args: string[]): Promise<boolean> {
 }
 
 async function main(): Promise<void> {
+  // Runtime selection precedes trust/helper resolution and every static answer.
+  // A generation entry is pinned; only the external standalone bootstrap selects.
+  const embedded = (globalThis as typeof globalThis & { Bun?: { embeddedFiles?: EmbeddedFile[] } }).Bun?.embeddedFiles as EmbeddedFile[] | undefined
+  let selection: CompiledSelection = { dispatched: false }
+  if (embedded?.length) {
+    const file = await selectRuntimeManifest(embedded)
+    if (!file) throw new Error("embedded runtime-manifest.json is missing")
+    const manifest = JSON.parse(await embeddedText(file)) as EmbeddedManifest
+    const args = process.argv.slice(2)
+    if (args[0] === "--omo-update-extract" && args.length === 2) {
+      await extractUpdateGeneration(manifest, embedded, args[1])
+      console.log(JSON.stringify(manifest))
+      return
+    }
+    selection = await selectCompiledRuntime(manifest, embedded, args)
+    if (selection.dispatched) return
+  }
   // The #10697 plaintext file goes before ANY command, including the answers below that return early.
   removeLegacyServiceCredentials()
   // Before anything opens TLS, and on every start: `host ensure`, the host daemon and the
@@ -356,7 +368,6 @@ async function main(): Promise<void> {
     process.stderr.write(`omo: ${error.message}; not starting with a trust set the caller did not intend\n`)
     process.exit(78)
   }
-  const embedded = (globalThis as typeof globalThis & { Bun?: { embeddedFiles?: EmbeddedFile[] } }).Bun?.embeddedFiles as EmbeddedFile[] | undefined
   if (!embedded?.length) {
     const execDir = dirname(fileURLToPath(import.meta.url))
     const args = process.argv.slice(2)
@@ -386,8 +397,10 @@ async function main(): Promise<void> {
   if (!manifestFile) throw new Error("embedded runtime-manifest.json is missing")
   const manifest = JSON.parse(await embeddedText(manifestFile)) as EmbeddedManifest
   const runningExecutable = runningExecutablePath()
-  const expected = join(homedir(), ".omo", "binary-runtime", manifest.omoAiVersion, process.platform === "win32" ? "omo.exe" : "omo")
-  const launch = planProvisionedLaunch(runningExecutable, expected)
+  const expected = selection.runtime ?? join(homedir(), ".omo", "binary-runtime", manifest.omoAiVersion, process.platform === "win32" ? "omo.exe" : "omo")
+  const launch = selection.runtime
+    ? { provision: false, handOff: false, execDir: dirname(expected), launcher: selection.launcher }
+    : planProvisionedLaunch(runningExecutable, expected)
   // Materialize the provisioned runtime BEFORE answering the informational fast-path.
   // First-run provisioning must happen even for `--version`/`-v`: the release smoke test
   // asserts the provisioned binary exists after `--version`, and provisioning used to be a
@@ -415,10 +428,22 @@ async function main(): Promise<void> {
     helper: helperPath !== null && helperEntry !== undefined ? { path: helperPath, sha256: helperEntry.sha256 } : undefined,
     ...(launch.handOff
       ? { exec: (file: string, argv: string[], env: NodeJS.ProcessEnv) => handOffToProvisionedRuntime(file, { argv, env, launcher: launch.launcher }) }
-      : {}),
+      : selection.runtime ? {
+        exec: (file: string, argv: string[], env: NodeJS.ProcessEnv) => handOffToProvisionedRuntime(file, {
+          argv, env: { ...env, ...(selection.handoff ? { [UPDATE_HANDOFF_ENV]: selection.handoff } : {}) },
+        }),
+      } : {}),
   })
   if (trust.action !== "adopt") {
     setTrustExitCode(trust.action)
+    return
+  }
+  if (args[0] === "--omo-update-worker" && args.length === 3 && selection.runtime) {
+    await runUpdateWorker(new UpdateStore(updateRoot(), args[1]), args[2])
+    return
+  }
+  if (args[0] === "--omo-update-bootstrap" && args.length === 4 && selection.runtime) {
+    await runBootstrapMaintenance(new UpdateStore(updateRoot(), args[1]), args[2], args[3])
     return
   }
   if (isSelfUpdate(process.argv.slice(2)) && parseBuildInfo(manifest.buildInfo) === undefined) {
@@ -433,16 +458,16 @@ async function main(): Promise<void> {
       fetchReleases: fetchGitHubReleases,
       args: process.argv.slice(2),
       probeOwner: probePackageOwner,
+      store: selection.store,
     })
     ;(result.stream === "stderr" ? console.error : console.log)(result.output)
     process.exitCode = result.exitCode
+    if (result.exitCode === 0 && selection.store) await refreshInstallReceipt(selection.store, manifest.omoAiVersion)
     return
   }
   if (answerCompiledFastPath(process.argv.slice(2), manifest)) return
-  if (launchPrunesRuntimes(process.argv.slice(2), launch) && launch.launcher !== undefined) {
-    reportRuntimePrune(pruneProvisionedRuntimes({ root: dirname(dirname(expected)), current: manifest.omoAiVersion }))
-    removeReplacedLauncher(launch.launcher)
-  }
+  // Managed generations are collected by the lease-aware update transaction.
+  // Legacy version directories lack leases and are retained, never renamed under lazy imports.
   if (launch.handOff) {
     const marker = adoptedEngineTrust()
     if (marker === undefined) throw new Error("trust stage did not record its adopted generation")
@@ -455,7 +480,9 @@ async function main(): Promise<void> {
   const execDir = launch.execDir
   // Inspector and custom execArgv isolation is unsupported in compiled binaries; the provisioned
   // executable delegates to the engine in-process as required by the native startup contract.
-  if (await runCompiledLauncher(process.argv.slice(2), execDir, manifest.enginePin, execDir)) return
+  if (await runCompiledLauncher(process.argv.slice(2), execDir, manifest.enginePin, execDir, {
+    updateLines: () => updateDiagnosticLines(selection.store, launch.launcher),
+  })) return
   if (shouldPrintCompiledBanner(process.argv.slice(2), process.stderr.isTTY === true)) {
     // Not console.error: Bun renders that red, and the banner is not an error (#8442).
     for (const line of compiledBannerLines(manifest)) process.stderr.write(`${line}\n`)

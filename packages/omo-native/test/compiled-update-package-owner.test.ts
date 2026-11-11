@@ -53,14 +53,14 @@ describe("compiled omo update on a package-manager install", () => {
     expect(lookups).toBe(0)
   })
 
-  test("#given no manager owns the binary #when omo update runs #then it keeps today's replace command", async () => {
+  test("#given inconclusive provenance #when omo update runs #then it refuses mutation before release lookup", async () => {
     // given / when
     const { result, lookups } = await updateWith(undefined)
 
     // then
-    expect(result.exitCode).toBe(0)
-    expect(result.output).toStartWith("omo 9.9.10 is available (running 9.9.9). Replace this binary with:\ncurl ")
-    expect(lookups).toBe(1)
+    expect(result.exitCode).toBe(1)
+    expect(result.output).toContain("installation was not changed")
+    expect(lookups).toBe(0)
   })
 
   test("#given update --help on an owned binary #then usage still wins over the ownership refusal", async () => {

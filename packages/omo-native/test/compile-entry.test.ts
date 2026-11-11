@@ -237,10 +237,10 @@ describe("compiled omo entry launcher parity", () => {
     })
   })
 
-  test("a release build's update notice points at omo update instead of a fixed download", () => {
+  test("a compiled release leaves update checks to its launcher", () => {
     const env = remapSenpiEnvironment({ PATH: "/bin" }, temp())
     const brand = JSON.parse(env.SENPI_BRAND ?? "{}") as { update?: { command?: string } }
-    expect(brand.update?.command).toBe("omo update")
+    expect(brand.update).toBeUndefined()
   })
 
   test("package-root environment values point into the provisioned runtime", () => {
@@ -593,7 +593,7 @@ describe("omob branded build labels", () => {
     const brand = JSON.parse(env.SENPI_BRAND ?? "{}") as { command?: string; displayVersion?: string; update?: { command?: string } }
     expect(brand.command).toBe("omob")
     expect(brand.displayVersion).toBe("omo@c6e7dd7 2026-09-04 10:17 +09:00 · senpi@7fd18df 2026-09-04 10:49 +09:00")
-    expect(brand.update?.command).toContain("omob")
+    expect(brand.update).toBeUndefined()
   })
 })
 
@@ -675,7 +675,7 @@ describe("compiled release self-update", () => {
     expect(command).toContain("Move-Item -Force -LiteralPath 'C:\\Users\\me\\bin\\omo.exe' -Destination 'C:\\Users\\me\\bin\\omo.exe.old'")
   })
 
-  test("omo update pins the version and replaces the binary the user ran", async () => {
+  test("omo update --dry-run pins the release asset without changing an installation", async () => {
     const result = await compiledUpdate({
       omoAiVersion: "5.0.0",
       releaseTarget: "linux-x64-musl",
@@ -683,15 +683,17 @@ describe("compiled release self-update", () => {
       platform: "linux",
       arch: "x64",
       fetchReleases: async () => releases,
+      args: ["update", "--dry-run"],
     })
     expect(result.exitCode).toBe(0)
     expect(result.output).toContain("https://github.com/code-yeongyu/oh-my-openagent/releases/download/v5.0.1/omo-linux-x64-musl")
-    expect(result.output).toContain("mv -f '/opt/omo/omo.new' '/opt/omo/omo'")
+    expect(result.output).toContain("Run omo update to verify and select this runtime for /opt/omo/omo")
+    expect(result.output).not.toContain("mv -f")
     expect(result.output).not.toContain("releases/latest")
   })
 
   test("an up-to-date binary says so and a failed lookup exits non-zero with the releases page", async () => {
-    const base = { releaseTarget: "darwin-arm64", destination: "/omo", platform: "darwin" as const, arch: "arm64" }
+    const base = { releaseTarget: "darwin-arm64", destination: "/omo", platform: "darwin" as const, arch: "arm64", args: ["update", "--dry-run"] }
     const current = await compiledUpdate({ ...base, omoAiVersion: "5.0.1", fetchReleases: async () => releases })
     expect(current).toEqual({ output: "omo 5.0.1 is the newest stable release", exitCode: 0 })
     const failed = await compiledUpdate({ ...base, omoAiVersion: "5.0.0", fetchReleases: async () => { throw new Error("GitHub answered 503") } })

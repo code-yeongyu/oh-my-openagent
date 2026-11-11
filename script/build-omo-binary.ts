@@ -302,7 +302,13 @@ export async function buildRuntimeManifest(
  * (musl / baseline included) so `omo update` fetches the same flavor; it is outside the payload digest.
  */
 export function runtimeManifestFileContent(manifest: RuntimeManifest, releaseTarget: string): string {
-  return `${JSON.stringify({ marker: "OMO_RUNTIME_MANIFEST_V1", ...manifest, releaseTarget })}\n`
+  return `${JSON.stringify({
+    marker: "OMO_RUNTIME_MANIFEST_V1", ...manifest, releaseTarget,
+    updateProtocol: 1,
+    // A release must opt in after its shared-state rollback gate passes. Protocol
+    // support alone is not permission to downgrade state written by this release.
+    updateBackwardCompatible: process.env.OMO_RELEASE_ROLLBACK_COMPATIBLE === "1",
+  })}\n`
 }
 
 /** Fails loud when a compiled binary exceeds the per-binary size budget. */

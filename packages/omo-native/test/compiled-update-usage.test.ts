@@ -1,30 +1,59 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { answerCompiledFastPath } from "../compile-entry"
 import { compiledUpdate, installCommand, releaseAssetName, RELEASES_URL, replaceCommand } from "../compiled-update"
+import { mkdtemp, writeFile, realpath, rm } from "node:fs/promises"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
+import { UpdateStore, type Generation } from "../update-store"
+import { createHash } from "node:crypto"
 
-afterEach(() => {
+const roots: string[] = []
+afterEach(async () => {
   process.exitCode = 0
+  for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
 })
 
 const ASSET = releaseAssetName(undefined, "linux", "x64")
 const DESTINATION = "/opt/omo-release/omo"
-const AVAILABLE = `omo 9.9.10 is available (running 9.9.9). Replace this binary with:\n${replaceCommand(`${RELEASES_URL}/download/v9.9.10/${ASSET}`, DESTINATION, "linux")}`
+const AVAILABLE = `omo 9.9.10 is available (running 9.9.9).\nSource: ${RELEASES_URL}/download/v9.9.10/${ASSET}\nRun omo update to verify and select this runtime for ${DESTINATION}.`
 
 async function releaseUpdate(args: string[] | undefined) {
   let lookups = 0
+  const printOnly = args?.includes("--dry-run") || args?.includes("--print")
+  const root = await realpath(await mkdtemp(join(tmpdir(), "compiled-update-usage-")))
+  roots.push(root)
+  const destination = printOnly ? DESTINATION : join(root, "omo")
+  if (!printOnly) await writeFile(destination, "bootstrap", { mode: 0o700 })
+  const store = new UpdateStore(join(root, "updates"), destination)
+  if (!printOnly) await store.transaction(async (tx) => {
+    await tx.initialize({ asset: ASSET, channel: "stable", ownership: "standalone" })
+    const staging = await store.createStaging()
+    await writeFile(join(staging, "omo"), "current")
+    await tx.publish(staging, { version: "9.9.9", asset: ASSET, digest: createHash("sha256").update("current").digest("hex"), protocol: 1, backwardCompatible: true })
+    await tx.select(async () => {})
+  })
   const result = await compiledUpdate({
     omoAiVersion: "9.9.9",
-    releaseTarget: undefined,
-    destination: DESTINATION,
-    platform: "linux",
+    releaseTarget: "linux-x64",
+    destination,
+    store,
+    env: {},
+    platform: process.platform,
     arch: "x64",
     fetchReleases: async () => {
       lookups += 1
       return [{ tag_name: "v9.9.10", assets: [{ name: ASSET }] }]
     },
+    download: async () => {
+      const staging = await store.createStaging()
+      await writeFile(join(staging, "omo"), "candidate")
+      const generation: Generation = { version: "9.9.10", asset: ASSET, digest: createHash("sha256").update("candidate").digest("hex"), protocol: 1, backwardCompatible: true }
+      return { staging, generation }
+    },
+    preflight: async () => {},
     ...(args === undefined ? {} : { args }),
   })
-  return { result, lookups }
+  return { result, lookups, store }
 }
 
 describe("compiled omo update argument handling", () => {
@@ -45,13 +74,23 @@ describe("compiled omo update argument handling", () => {
     expect(lookups).toBe(0)
   })
 
-  const printed = [undefined, ["update"], ["update", "self"], ["update", "--self"], ["update", "--dry-run"], ["update", "--print"]]
+  const printed = [["update", "--dry-run"], ["update", "--print"]]
   for (const args of printed) {
-    test(`#given ${args?.join(" ") ?? "no arguments"} #then it prints the newer release and its replace command, unchanged`, async () => {
+    test(`#given ${args.join(" ")} #then it prints the verified selection plan without mutation`, async () => {
       const { result, lookups } = await releaseUpdate(args)
       expect(result.exitCode).toBe(0)
       expect(result.output).toBe(AVAILABLE)
       expect(result.stream ?? "stdout").toBe("stdout")
+      expect(lookups).toBe(1)
+    })
+  }
+  for (const args of [undefined, ["update"], ["update", "self"], ["update", "--self"]]) {
+    test(`ordinary ${args?.join(" ") ?? "update"} commits the same effective selection record`, async () => {
+      const { result, store, lookups } = await releaseUpdate(args)
+      expect(result.exitCode).toBe(0)
+      expect(result.output).toContain("omo updated 9.9.9 -> 9.9.10")
+      expect((await store.read())?.selected).toStartWith("9.9.10-")
+      expect((await store.read())?.previous).toStartWith("9.9.9-")
       expect(lookups).toBe(1)
     })
   }
@@ -69,11 +108,11 @@ describe("compiled omo update destination", () => {
       platform,
       arch: "x64",
       fetchReleases: async () => [{ tag_name: "v9.9.10", assets: [{ name: releaseAssetName(undefined, platform, "x64") }] }],
-      args: ["update"],
+      args: ["update", "--dry-run"],
     })
   }
 
-  test("#given the installed launcher as destination #then the replace command targets it, unchanged", async () => {
+  test("#given the installed launcher as destination #then the selection plan identifies that installation", async () => {
     const result = await updateAt(DESTINATION, "linux")
     expect(result.exitCode).toBe(0)
     expect(result.output).toBe(AVAILABLE)

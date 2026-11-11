@@ -29,6 +29,7 @@ export type CompiledDoctorOptions = {
   readonly keychainHelperLines?: () => string[]
   readonly trustLines?: () => Promise<string[]>
   readonly memoryRuntimeLines?: () => Promise<string[]>
+  readonly updateLines?: () => Promise<string[]>
   readonly list?: () => { pid: number; ppid: number; elapsed: string; tty: string; command: string }[]
   readonly kill?: (pid: number, signal: NodeJS.Signals) => void
 }
@@ -127,6 +128,7 @@ export async function runCompiledDoctor(input: CompiledDoctorInput): Promise<voi
   }
   for (const line of input.versionText.split("\n")) lines.push(`INFO ${line}`)
   lines.push(`INFO Update: ${input.updateCommand}`)
+  if (options.updateLines) lines.push(...await options.updateLines())
   const launchSpec = launchSpecDoctorLines(join(input.execDir, "plugin"))
   if (launchSpec.some((line) => line.startsWith("FAIL "))) failed = true
   lines.push(...launchSpec)
