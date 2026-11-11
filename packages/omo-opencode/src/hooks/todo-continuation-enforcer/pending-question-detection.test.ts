@@ -18,9 +18,7 @@ describe("hasUnansweredQuestion", () => {
       { info: { role: "user" } },
       {
         info: { role: "assistant" },
-        parts: [
-          { type: "tool_use", name: "question" },
-        ],
+        parts: [{ type: "tool_use", name: "question" }],
       },
     ]
     expect(hasUnansweredQuestion(messages)).toBe(true)
@@ -31,9 +29,7 @@ describe("hasUnansweredQuestion", () => {
       { info: { role: "user" } },
       {
         info: { role: "assistant" },
-        parts: [
-          { type: "tool-invocation", toolName: "question" },
-        ],
+        parts: [{ type: "tool-invocation", toolName: "question" }],
       },
     ]
     expect(hasUnansweredQuestion(messages)).toBe(true)
@@ -44,9 +40,7 @@ describe("hasUnansweredQuestion", () => {
       { info: { role: "user" } },
       {
         info: { role: "assistant" },
-        parts: [
-          { type: "tool", tool: "question" },
-        ],
+        parts: [{ type: "tool", tool: "question" }],
       },
     ]
     expect(hasUnansweredQuestion(messages)).toBe(true)
@@ -57,9 +51,7 @@ describe("hasUnansweredQuestion", () => {
       { info: { role: "user" } },
       {
         info: { role: "assistant" },
-        parts: [
-          { type: "tool", tool: "ask_user_question" },
-        ],
+        parts: [{ type: "tool", tool: "ask_user_question" }],
       },
     ]
     expect(hasUnansweredQuestion(messages)).toBe(true)
@@ -69,9 +61,7 @@ describe("hasUnansweredQuestion", () => {
     const messages = [
       {
         info: { role: "assistant" },
-        parts: [
-          { type: "tool", tool: "question", state: { status: "completed" } },
-        ],
+        parts: [{ type: "tool", tool: "question", state: { status: "completed" } }],
       },
     ]
     expect(hasUnansweredQuestion(messages)).toBe(false)
@@ -81,9 +71,7 @@ describe("hasUnansweredQuestion", () => {
     const messages = [
       {
         info: { role: "assistant" },
-        parts: [
-          { type: "tool_use", name: "question" },
-        ],
+        parts: [{ type: "tool_use", name: "question" }],
       },
       { info: { role: "user" } },
     ]
@@ -94,15 +82,11 @@ describe("hasUnansweredQuestion", () => {
     const messages = [
       {
         info: { role: "assistant" },
-        parts: [
-          { type: "tool_use", name: "question" },
-        ],
+        parts: [{ type: "tool_use", name: "question" }],
       },
       {
         info: { role: "user" },
-        parts: [
-          { type: "text", text: "internal continuation", synthetic: true },
-        ],
+        parts: [{ type: "text", text: "internal continuation", synthetic: true }],
       },
     ]
     expect(hasUnansweredQuestion(messages)).toBe(true)
@@ -112,15 +96,11 @@ describe("hasUnansweredQuestion", () => {
     const messages = [
       {
         info: { role: "assistant" },
-        parts: [
-          { type: "tool_use", name: "question" },
-        ],
+        parts: [{ type: "tool_use", name: "question" }],
       },
       {
         info: { role: "user" },
-        parts: [
-          { type: "text", text: `internal continuation\n${OMO_INTERNAL_INITIATOR_MARKER}` },
-        ],
+        parts: [{ type: "text", text: `internal continuation\n${OMO_INTERNAL_INITIATOR_MARKER}` }],
       },
     ]
     expect(hasUnansweredQuestion(messages)).toBe(true)
@@ -131,19 +111,14 @@ describe("hasUnansweredQuestion", () => {
       { info: { role: "user" } },
       {
         info: { role: "assistant" },
-        parts: [
-          { type: "tool_use", name: "bash" },
-        ],
+        parts: [{ type: "tool_use", name: "bash" }],
       },
     ]
     expect(hasUnansweredQuestion(messages)).toBe(false)
   })
 
   test("given assistant message with no parts, returns false", () => {
-    const messages = [
-      { info: { role: "user" } },
-      { info: { role: "assistant" } },
-    ]
+    const messages = [{ info: { role: "user" } }, { info: { role: "assistant" } }]
     expect(hasUnansweredQuestion(messages)).toBe(false)
   })
 
@@ -152,9 +127,7 @@ describe("hasUnansweredQuestion", () => {
       { role: "user" },
       {
         role: "assistant",
-        parts: [
-          { type: "tool_use", name: "question" },
-        ],
+        parts: [{ type: "tool_use", name: "question" }],
       },
     ]
     expect(hasUnansweredQuestion(messages)).toBe(true)

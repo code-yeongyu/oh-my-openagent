@@ -54,7 +54,10 @@ export class MutationError extends Error {
 
 const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex")
 
-async function runCaptured(command: readonly string[], cwd: string): Promise<{ readonly exitCode: number; readonly outputTail: string }> {
+async function runCaptured(
+  command: readonly string[],
+  cwd: string,
+): Promise<{ readonly exitCode: number; readonly outputTail: string }> {
   const child = Bun.spawn([...command], { cwd, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
   const [stdout, stderr, exitCode] = await Promise.all([
     new Response(child.stdout).text(),
@@ -89,7 +92,10 @@ export async function runMutation(options: {
   process.on("SIGINT", restoreOnSignal)
   process.on("SIGTERM", restoreOnSignal)
   try {
-    writeFileSync(full, text.replace(options.find, () => options.replace))
+    writeFileSync(
+      full,
+      text.replace(options.find, () => options.replace),
+    )
     for (const test of options.tests) {
       const run = await runCaptured(test.command, options.cwd)
       outcomes.push({
@@ -143,7 +149,12 @@ async function main(argv: readonly string[]): Promise<number> {
     },
     strict: true,
   })
-  if (values.file === undefined || values.find === undefined || values.replace === undefined || values.test === undefined) {
+  if (
+    values.file === undefined ||
+    values.find === undefined ||
+    values.replace === undefined ||
+    values.test === undefined
+  ) {
     return usage()
   }
   const tests: MutationTest[] = []
@@ -163,7 +174,8 @@ async function main(argv: readonly string[]): Promise<number> {
     if (values.json) {
       console.log(JSON.stringify(result, null, 2))
     } else {
-      for (const outcome of result.outcomes) console.log(`${outcome.label}: ${outcome.verdict} (exit ${outcome.exitCode})`)
+      for (const outcome of result.outcomes)
+        console.log(`${outcome.label}: ${outcome.verdict} (exit ${outcome.exitCode})`)
       console.log(`restored ${result.file} (sha256 ${result.restoredSha256.slice(0, 12)})`)
     }
     return 0

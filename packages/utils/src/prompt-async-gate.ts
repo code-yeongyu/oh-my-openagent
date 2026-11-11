@@ -74,22 +74,26 @@ type ObjectPathPromptInput = {
   readonly [key: string]: unknown
 }
 
-function hasObjectSessionPath(input: unknown): input is ObjectPathPromptInput & { readonly path: { readonly id: string } } {
-  return typeof input === "object"
-    && input !== null
-    && "path" in input
-    && typeof input.path === "object"
-    && input.path !== null
-    && "id" in input.path
-    && typeof input.path.id === "string"
+function hasObjectSessionPath(
+  input: unknown,
+): input is ObjectPathPromptInput & { readonly path: { readonly id: string } } {
+  return (
+    typeof input === "object" &&
+    input !== null &&
+    "path" in input &&
+    typeof input.path === "object" &&
+    input.path !== null &&
+    "id" in input.path &&
+    typeof input.path.id === "string"
+  )
 }
 
 function isObjectPathTypeError(error: unknown): boolean {
-  const message = error instanceof Error
-    ? error.message
-    : typeof error === "string" ? error : ""
-  return message.includes('The "path" property must be of type string')
-    && (message.includes("got object") || message.includes("got undefined"))
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : ""
+  return (
+    message.includes('The "path" property must be of type string') &&
+    (message.includes("got object") || message.includes("got undefined"))
+  )
 }
 
 async function dispatchWithPathCompatibility<TInput>(
@@ -114,22 +118,16 @@ async function dispatchWithPathCompatibility<TInput>(
 export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
   args: InternalPromptDispatchArgs<TInput>,
 ): Promise<InternalPromptDispatchResult> {
-  const {
-    client,
-    sessionID,
-    input,
-    source,
-    settleMs = DEFAULT_SESSION_IDLE_SETTLE_MS,
-  } = args
+  const { client, sessionID, input, source, settleMs = DEFAULT_SESSION_IDLE_SETTLE_MS } = args
   const dedupeKey = args.dedupeKey ?? createSemanticPromptDedupeKey(input)
   const queueRetryMs = args.queueRetryMs ?? DEFAULT_PROMPT_QUEUE_RETRY_MS
   const postDispatchHoldMs = args.postDispatchHoldMs ?? DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS
-  const semanticDedupeHoldMs = args.semanticDedupeHoldMs
-    ?? (postDispatchHoldMs > 0 ? DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS : 0)
+  const semanticDedupeHoldMs =
+    args.semanticDedupeHoldMs ?? (postDispatchHoldMs > 0 ? DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS : 0)
   const dispatchTimeoutMs = args.dispatchTimeoutMs ?? DEFAULT_PROMPT_DISPATCH_TIMEOUT_MS
   const sessionName = args.mode === "async" ? "promptAsync" : "prompt"
-  const resolved = tryResolveDispatchClientSync(args.client, sessionID)
-    ?? await resolveDispatchClient(args.client, sessionID)
+  const resolved =
+    tryResolveDispatchClientSync(args.client, sessionID) ?? (await resolveDispatchClient(args.client, sessionID))
   const dispatch = (() => {
     if (args.mode === "async") {
       const resolvedAsAsync = resolved.client as PromptAsyncClient<TInput>
@@ -236,10 +234,10 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
       dispatch: (dispatchInput) => dispatchWithPathCompatibility(dispatch, dispatchInput),
     })
     if (
-      deferResult.status === "failed"
-      && resolved.route === "live"
-      && deferResult.error instanceof Error
-      && deferResult.error.message.startsWith(dispatchTimeoutPrefix)
+      deferResult.status === "failed" &&
+      resolved.route === "live" &&
+      deferResult.error instanceof Error &&
+      deferResult.error.message.startsWith(dispatchTimeoutPrefix)
     ) {
       markLiveRouteUnavailable("timeout")
     }
@@ -297,10 +295,10 @@ export async function dispatchInternalPrompt<TInput = PromptAsyncInput>(
     dispatch: (dispatchInput) => dispatchWithPathCompatibility(dispatch, dispatchInput),
   })
   if (
-    directResult.status === "failed"
-    && resolved.route === "live"
-    && directResult.error instanceof Error
-    && directResult.error.message.startsWith(dispatchTimeoutPrefix)
+    directResult.status === "failed" &&
+    resolved.route === "live" &&
+    directResult.error instanceof Error &&
+    directResult.error.message.startsWith(dispatchTimeoutPrefix)
   ) {
     markLiveRouteUnavailable("timeout")
   }
@@ -329,7 +327,14 @@ export function releasePromptAsyncReservation(
   }
 
   const expectedSource = options?.reservedBy ?? source
-  if (!reservationSourceMatches(existing.source, expectedSource, options?.reservedByPrefix, options?.supersedeTransientRetryOwners)) {
+  if (
+    !reservationSourceMatches(
+      existing.source,
+      expectedSource,
+      options?.reservedByPrefix,
+      options?.supersedeTransientRetryOwners,
+    )
+  ) {
     log("[prompt-async-gate] promptAsync reservation release skipped for different source", {
       sessionID,
       source,

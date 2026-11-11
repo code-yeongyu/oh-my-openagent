@@ -22,7 +22,9 @@ export function toHookInput(event: ToolResultEventLike, ctx: ToolResultContextLi
 }
 
 export function toApplyPatchHookInputs(event: ToolResultEventLike, ctx: ToolResultContextLike): HookInput[] {
-  return extractApplyPatchEdits(event.details, event.input).map((edit) => toHookInput(event, ctx, resolve(ctx.cwd, edit.filePath)))
+  return extractApplyPatchEdits(event.details, event.input).map((edit) =>
+    toHookInput(event, ctx, resolve(ctx.cwd, edit.filePath)),
+  )
 }
 
 function toCoreToolInput(input: Record<string, unknown>, absolutePath: string): HookInput["tool_input"] {

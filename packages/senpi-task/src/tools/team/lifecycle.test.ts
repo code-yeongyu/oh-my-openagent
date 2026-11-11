@@ -2,7 +2,12 @@ import { describe, expect, test } from "bun:test"
 import { Value } from "typebox/value"
 
 import { SenpiTeamRuntimeError, SenpiTeamSpecError } from "../../team"
-import { createFakeTeamService, fakeCreateResult, fakeCreatedMember, fakeDeleteResult } from "./__fixtures__/team-tool-fakes"
+import {
+  createFakeTeamService,
+  fakeCreateResult,
+  fakeCreatedMember,
+  fakeDeleteResult,
+} from "./__fixtures__/team-tool-fakes"
 import { TeamCreateParams, createTeamCreateTool, createTeamDeleteTool, runTeamCreate, runTeamDelete } from "./lifecycle"
 
 describe("team_create tool", () => {
@@ -23,7 +28,10 @@ describe("team_create tool", () => {
     expect(result.isError).toBeUndefined()
     if (result.details.kind !== "created") throw new Error("expected created")
     expect(result.details.members.map((member) => member.name).sort()).toEqual(["alpha", "beta"])
-    expect(service.calls[0]).toMatchObject({ method: "createTeam", args: [{ inlineSpec: { name: "demo", members: [] } }] })
+    expect(service.calls[0]).toMatchObject({
+      method: "createTeam",
+      args: [{ inlineSpec: { name: "demo", members: [] } }],
+    })
   })
 
   test("#given members with roles, models, and prompts #when team_create runs #then the text lists every member informatively and keeps the first line stable", async () => {
@@ -45,7 +53,12 @@ describe("team_create tool", () => {
               },
               promptExcerpt: "Refactor the auth module",
             }),
-            fakeCreatedMember({ name: "beta", status: "idle", taskId: "st_b", role: { kind: "subagent_type", subagentType: "sisyphus" } }),
+            fakeCreatedMember({
+              name: "beta",
+              status: "idle",
+              taskId: "st_b",
+              role: { kind: "subagent_type", subagentType: "sisyphus" },
+            }),
           ],
         }),
     })
@@ -103,7 +116,10 @@ describe("team_create tool", () => {
 
     // then
     if (result.details.kind !== "created") throw new Error("expected created")
-    expect(result.details.members[0]).toMatchObject({ name: "alpha", task_summary: "Refactor the auth module boundary" })
+    expect(result.details.members[0]).toMatchObject({
+      name: "alpha",
+      task_summary: "Refactor the auth module boundary",
+    })
   })
 
   test("#given member model metadata variants and reasoning efforts #when team_create runs #then reasoning is labeled and reasoning effort wins over variant", async () => {
@@ -188,7 +204,8 @@ describe("team_create tool", () => {
 
   test("#given a member start rejection #when team_create runs #then the result is a tool error carrying the runtime code and reason", async () => {
     // given
-    const reason = "member 'bench-landscape' failed to start: No available model for category \"deep\" (attempted mock/model)"
+    const reason =
+      "member 'bench-landscape' failed to start: No available model for category \"deep\" (attempted mock/model)"
     const service = createFakeTeamService({
       createTeam: async () => {
         throw new SenpiTeamRuntimeError(reason, "member_start_rejected", "demo")
@@ -196,7 +213,9 @@ describe("team_create tool", () => {
     })
 
     // when
-    const result = await runTeamCreate(service, { inline_spec: { name: "bench", members: [{ name: "bench-landscape", category: "deep" }] } })
+    const result = await runTeamCreate(service, {
+      inline_spec: { name: "bench", members: [{ name: "bench-landscape", category: "deep" }] },
+    })
 
     // then
     expect(result.isError).toBe(true)
@@ -226,7 +245,9 @@ describe("team_delete tool", () => {
 
   test("#given cancelled member tasks #when team_delete runs #then the text names the cancelled task ids", async () => {
     // given
-    const service = createFakeTeamService({ deleteTeam: async () => fakeDeleteResult({ cancelledTaskIds: ["st_a", "st_b"] }) })
+    const service = createFakeTeamService({
+      deleteTeam: async () => fakeDeleteResult({ cancelledTaskIds: ["st_a", "st_b"] }),
+    })
 
     // when
     const result = await runTeamDelete(service, { team_run_id: "run-1" })

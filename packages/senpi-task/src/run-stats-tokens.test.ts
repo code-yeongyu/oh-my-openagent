@@ -21,7 +21,13 @@ describe("run stats token totals and data-quality statuses", () => {
       message: {
         role: "assistant",
         content: [],
-        usage: { input: 80, output: 10, cache_read_input_tokens: 100, cache_creation_input_tokens: 0, totalTokens: 190 },
+        usage: {
+          input: 80,
+          output: 10,
+          cache_read_input_tokens: 100,
+          cache_creation_input_tokens: 0,
+          totalTokens: 190,
+        },
       },
     })
 
@@ -108,7 +114,12 @@ describe("run stats token totals and data-quality statuses", () => {
   test("#given turns on a model with no known price (senpi#3844 costUnknown) #when snapshot is taken #then the run reports no cost instead of $0", () => {
     // given
     const tracker = createRunStatsTracker(1_000, () => 2_000)
-    const unpriced = { input: 10, output: 5, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }, costUnknown: true }
+    const unpriced = {
+      input: 10,
+      output: 5,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      costUnknown: true,
+    }
 
     // when
     tracker.accept({ type: "message_end", message: { role: "assistant", content: [], usage: unpriced } })
@@ -132,7 +143,11 @@ describe("run stats token totals and data-quality statuses", () => {
     })
     tracker.accept({
       type: "message_end",
-      message: { role: "assistant", content: [], usage: { input: 10, output: 5, cost: { total: 0 }, costUnknown: true } },
+      message: {
+        role: "assistant",
+        content: [],
+        usage: { input: 10, output: 5, cost: { total: 0 }, costUnknown: true },
+      },
     })
 
     // then

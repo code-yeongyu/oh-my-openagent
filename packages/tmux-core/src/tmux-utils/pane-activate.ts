@@ -40,16 +40,14 @@ export async function activateTmuxPane(
   }
 
   const opencodeCmd = buildTmuxAttachCommand(serverUrl, sessionId, directory)
-  const result = await deps.runTmuxCommand(tmux, [
-    "respawn-pane",
-    "-k",
-    ...authEnvArgs,
-    "-t",
-    paneId,
-    opencodeCmd,
-  ])
+  const result = await deps.runTmuxCommand(tmux, ["respawn-pane", "-k", ...authEnvArgs, "-t", paneId, opencodeCmd])
   if (result.exitCode !== 0) {
-    deps.log("[activateTmuxPane] FAILED", { paneId, sessionId, exitCode: result.exitCode, stderr: result.stderr.trim() })
+    deps.log("[activateTmuxPane] FAILED", {
+      paneId,
+      sessionId,
+      exitCode: result.exitCode,
+      stderr: result.stderr.trim(),
+    })
     return false
   }
 

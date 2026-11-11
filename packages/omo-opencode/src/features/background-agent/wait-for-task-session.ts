@@ -19,7 +19,7 @@ function isTerminalStatus(status: BackgroundTaskStatus | undefined): status is S
 }
 
 function waitForInterval(intervalMs: number): Promise<void> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const scheduler = globalThis as { setTimeout: (handler: () => void, timeout?: number) => unknown }
     scheduler.setTimeout(resolve, intervalMs)
   })
@@ -28,7 +28,7 @@ function waitForInterval(intervalMs: number): Promise<void> {
 export async function waitForTaskSessionID(
   manager: TaskReader,
   taskID: string,
-  options: WaitForTaskSessionIDOptions = {}
+  options: WaitForTaskSessionIDOptions = {},
 ): Promise<string | undefined> {
   const timing = getTimingConfig()
   const timeoutMs = options.timeoutMs ?? timing.WAIT_FOR_SESSION_TIMEOUT_MS

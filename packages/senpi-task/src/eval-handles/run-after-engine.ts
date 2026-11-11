@@ -43,7 +43,10 @@ class RunAfterEngine {
       if (error instanceof EvalHandleHostError) return error
       throw error
     }
-    return new EvalHandleHostError("eval_handle_stale", `${ref.id} moved to epoch ${this.#record.notification.run_epoch}; fetch its current handle`)
+    return new EvalHandleHostError(
+      "eval_handle_stale",
+      `${ref.id} moved to epoch ${this.#record.notification.run_epoch}; fetch its current handle`,
+    )
   }
 
   /** An acknowledgement loss leaves the live task unresolved, not delivered. */
@@ -72,7 +75,10 @@ class RunAfterEngine {
   /** Refuses a rolled-back run, names a moved run by its newer ref, else yields the ref at the epoch the engine acted on. */
   #settledRun(ref: HandleRef): HandleRef | HandleSnapshot {
     if (this.verdict === "rolledBack") {
-      throw new EvalHandleHostError("eval_handle_send_refused", `${ref.id}: the run the message started was rolled back; fetch its current handle and send again`)
+      throw new EvalHandleHostError(
+        "eval_handle_send_refused",
+        `${ref.id}: the run the message started was rolled back; fetch its current handle and send again`,
+      )
     }
     if (this.verdict === "moved") {
       // A newer run started before this read: hand back its ref, as a revive does, rather than its state under this one.
@@ -97,7 +103,8 @@ class PriorRun {
    */
   reread(tasks: TaskReader, ifMissing: "prior" | "not_found"): (epoch: number) => RunAfterEngine {
     const fresh = tasks.get(this.#record.task_id)
-    if (fresh === undefined && ifMissing === "not_found") throw new EvalHandleHostError("eval_handle_not_found", `no task ${this.#record.task_id}`)
+    if (fresh === undefined && ifMissing === "not_found")
+      throw new EvalHandleHostError("eval_handle_not_found", `no task ${this.#record.task_id}`)
     const record = fresh ?? this.#record
     return (epoch) => new RunAfterEngine(record, epoch)
   }

@@ -41,7 +41,10 @@ export async function getSessionActivityFromClient(
     })
     if (isRecord(response) && response.error !== undefined && response.error !== null) {
       if (isTransportUnreachableError(response.error)) {
-        log("[background-agent] Session server is unreachable while reading activity:", { sessionID, error: response.error })
+        log("[background-agent] Session server is unreachable while reading activity:", {
+          sessionID,
+          error: response.error,
+        })
         return { type: "missing" }
       }
       log("[background-agent] Failed to read session activity:", { sessionID, error: response.error })
