@@ -20,7 +20,7 @@ fn excerpt() -> BTreeMap<u32, String> {
     let mut lines = BTreeMap::new();
     let mut body = String::new();
     for line in EXCERPT.lines().filter(|line| !line.starts_with('#')) {
-        let (number, text) = line.split_once('\t').expect("<line><TAB><text>");
+        let (number, text) = line.split_once('\t').unwrap_or((line, ""));
         lines.insert(
             number.parse().expect("a line number"),
             text.replace('`', ""),

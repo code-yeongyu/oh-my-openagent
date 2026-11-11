@@ -1,5 +1,5 @@
 # Lines 381-407 of design-pin/design/d-safety.md ('### The shipped table': the JSON block and the
-# per-OS table), verbatim, one per line as "<line number><TAB><text>". The citation test reads the
+# per-OS table), verbatim, one per line as "<line number><TAB><text>" (a blank line is its number alone). The citation test reads the
 # cited lines here because the pin lives outside the repository.
 # pin sha256 10c177a0fdc6ba721402cb767965342a62ac2b5befc3af72b1774c7d76abf74a
 # excerpt sha256 f2cb92fcbde12574e1cf4b0706b96d063f36d052533a0f7d4827971f48427141
@@ -22,9 +22,9 @@
 397	  "secureInputSources": ["IsSecureEventInputEnabled", "kCGSSessionSecureInputPID", "AXSecureTextField", "label:secureLabelRegex"]
 398	}
 399	```
-400	
+400
 401	Per-OS contents the table test asserts entry by entry (acceptance 60, 61):
-402	
+402
 403	| OS | protected surfaces (never an exec target, any route) | read-only surfaces (reads admitted, exec refused) | system surfaces (the OS shell: desktop-class under the foreground grant) | denied apps (`deniedApps`: refused `ControlRequired{app_scope, denied_app}` unless `consent.apps.allow` names the entry; keyed exactly as the Scope stage keys apps on that OS - round-11 fold, k-safety row 5) | protected processes (never quit) | dangerous chords (need `force`) | secure focus sources |
 404	|---|---|---|---|---|---|---|---|
 405	| macOS | SecurityAgent, loginwindow, open/save panel service, PrivacySecurity extension, System Settings Privacy pane, Control Center panes and privacy toggles, the owner process of the TCC consent alert / Keychain access sheet / `CFUserNotification` dialogs (candidate `com.apple.UserNotificationCenter`, replaced by the M-track measurement on macOS 15 and 26 - round-6 fold, k-safety N9) | Dock, Spotlight, the Control Center menu-bar items (on macOS 11+ the Wi-Fi / Bluetooth / battery / clock status items are `com.apple.controlcenter` windows) | the desktop (Finder's desktop window = the `desktop` target), Notification Center (`com.apple.notificationcenterui`), an app's own menu bar (`menubar`) | by bundle id: `com.1password.1password`, `com.bitwarden.desktop`, `com.dashlane.Dashlane`, `com.lastpass.LastPass`, `com.nordpass.macos`, `me.proton.pass.electron`, `org.keepassxc.keepassxc`, `com.apple.Passwords`, `com.apple.keychainaccess` (the JSON block above) | Finder, Dock, Control Center, Notification Center, launchd, loginwindow, WindowServer | `cmd+q`, `cmd+opt+esc`, `ctrl+cmd+q` | `IsSecureEventInputEnabled`, `kCGSSessionSecureInputPID`, `AXSecureTextField` or unreadable subrole, the table's `secureLabelRegex` |
