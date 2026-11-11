@@ -1,13 +1,19 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, isAbsolute, join, relative, resolve } from "node:path"
 import { MEMBER_EXTENSION_BUNDLE_NAME } from "../../team/member-extension/identity"
-import {
-  DaemonLaunchSpecError,
-  readDaemonLaunchSpec,
-  resolveDaemonLaunchSpecPath,
-} from "./launch-spec"
+import { DaemonLaunchSpecError, readDaemonLaunchSpec, resolveDaemonLaunchSpecPath } from "./launch-spec"
 
 const pluginRoot = join(import.meta.dir, "../../../../omo-senpi/plugin")
 const scratchRoots: string[] = []
@@ -120,13 +126,16 @@ describe("readDaemonLaunchSpec", () => {
   test("#given a spec whose extension escapes with .. #when reading #then it is rejected as launch_spec_path_escape", () => {
     // given
     const dir = scratchDir()
-    const path = writeSpec(dir, validSpec({
-      core: {
-        session_runtime: "in-process",
-        multi_session: true,
-        extensions: ["../x"],
-      },
-    }))
+    const path = writeSpec(
+      dir,
+      validSpec({
+        core: {
+          session_runtime: "in-process",
+          multi_session: true,
+          extensions: ["../x"],
+        },
+      }),
+    )
 
     // when / then
     try {
@@ -139,32 +148,38 @@ describe("readDaemonLaunchSpec", () => {
     }
   })
 
-  test.skipIf(process.platform === "win32")("#given a 0666 spec #when reading #then it is rejected as launch_spec_insecure", () => {
-    // given
-    const dir = scratchDir()
-    const path = writeSpec(dir, validSpec(), 0o666)
+  test.skipIf(process.platform === "win32")(
+    "#given a 0666 spec #when reading #then it is rejected as launch_spec_insecure",
+    () => {
+      // given
+      const dir = scratchDir()
+      const path = writeSpec(dir, validSpec(), 0o666)
 
-    // when / then
-    try {
-      readDaemonLaunchSpec(path)
-      throw new Error("expected readDaemonLaunchSpec to throw")
-    } catch (error) {
-      expect(error).toBeInstanceOf(DaemonLaunchSpecError)
-      if (!(error instanceof DaemonLaunchSpecError)) throw error
-      expect(error.code).toBe("launch_spec_insecure")
-    }
-  })
+      // when / then
+      try {
+        readDaemonLaunchSpec(path)
+        throw new Error("expected readDaemonLaunchSpec to throw")
+      } catch (error) {
+        expect(error).toBeInstanceOf(DaemonLaunchSpecError)
+        if (!(error instanceof DaemonLaunchSpecError)) throw error
+        expect(error.code).toBe("launch_spec_insecure")
+      }
+    },
+  )
 
   test("#given a spec whose extension is an absolute path #when reading #then it is rejected as launch_spec_path_escape", () => {
     // given
     const dir = scratchDir()
-    const path = writeSpec(dir, validSpec({
-      core: {
-        session_runtime: "in-process",
-        multi_session: true,
-        extensions: ["/tmp/outside.js"],
-      },
-    }))
+    const path = writeSpec(
+      dir,
+      validSpec({
+        core: {
+          session_runtime: "in-process",
+          multi_session: true,
+          extensions: ["/tmp/outside.js"],
+        },
+      }),
+    )
 
     // when / then
     try {

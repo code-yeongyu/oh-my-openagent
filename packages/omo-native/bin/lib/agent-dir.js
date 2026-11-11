@@ -22,7 +22,14 @@ export const ADOPTION_MARKER = ".adopted-from-omo-flat"
  * configuration files: sessions, caches and logs stay where they are, so startup never turns into
  * an unbounded copy.
  */
-export const ADOPTED_STATE_FILES = ["settings.json", "auth.json", "models.json", "models-store.json", "mcp.json", "trust.json"]
+export const ADOPTED_STATE_FILES = [
+  "settings.json",
+  "auth.json",
+  "models.json",
+  "models-store.json",
+  "mcp.json",
+  "trust.json",
+]
 
 /** Windows launches carry the runtime home in the environment, which must outrank os.homedir. */
 export function runtimeHome(env = process.env) {

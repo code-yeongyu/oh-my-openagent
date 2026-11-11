@@ -2,7 +2,15 @@ import type { AgentToolResult } from "@code-yeongyu/senpi"
 import type { IsolationDetails } from "../../isolation/details"
 
 import type { TaskManager } from "../../manager"
-import type { StartQueued, EffectiveModelRecord, ResolvedModelRecord, ResidencyState, TaskRunStats, TaskStatus, AwaitingInputReason } from "../../state"
+import type {
+  StartQueued,
+  EffectiveModelRecord,
+  ResolvedModelRecord,
+  ResidencyState,
+  TaskRunStats,
+  TaskStatus,
+  AwaitingInputReason,
+} from "../../state"
 import type { CallerSessionResolver } from "../control"
 
 export type OutputManager = Pick<TaskManager, "get" | "list" | "concurrency">

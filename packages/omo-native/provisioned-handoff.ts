@@ -45,10 +45,20 @@ export function planProvisionedLaunch(
   delete env[PROVISIONED_HANDOFF_ENV]
   delete env[PROVISIONED_LAUNCHER_ENV]
   if (handedOff) {
-    return { provision: false, handOff: false, execDir: dirname(expected), launcher: handedOffLauncher(parentLauncher, expected) }
+    return {
+      provision: false,
+      handOff: false,
+      execDir: dirname(expected),
+      launcher: handedOffLauncher(parentLauncher, expected),
+    }
   }
   const provision = !isProvisionedExecutable(runningExecutable, expected)
-  return { provision, handOff: provision, execDir: dirname(runningExecutable), launcher: provision ? runningExecutable : undefined }
+  return {
+    provision,
+    handOff: provision,
+    execDir: dirname(runningExecutable),
+    launcher: provision ? runningExecutable : undefined,
+  }
 }
 
 // Only an absolute path that is not the runtime copy itself can name the installed binary.

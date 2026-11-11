@@ -3,11 +3,15 @@ import type { RespawnResult } from "../lifecycle/port"
 import type { TaskRecord } from "../state"
 
 class RespawnHeld extends Error {
-  constructor() { super("run admission is held") }
+  constructor() {
+    super("run admission is held")
+  }
 }
 
 const runPaused = (record: TaskRecord): RespawnResult => ({
-  ok: false, disposition: "retryable", code: "run_paused",
+  ok: false,
+  disposition: "retryable",
+  code: "run_paused",
   reason: `Task ${record.task_id} belongs to a stopped run; it is not launched until the run resumes.`,
 })
 
@@ -25,8 +29,15 @@ export async function admitRespawn(
 ): Promise<RespawnResult> {
   // A child restored paused starts nothing: it is the barrier's own "launch already paused" commit.
   if (startsPaused) return respawn(() => undefined)
-  const runRef = record.owner === undefined ? { kind: "task" as const, id: record.task_id } : { kind: "dag" as const, id: record.owner.runId }
-  const entered = barrier.enter(record.root_session_id ?? record.parent_session_id, { key: record.task_id, runRef }, credential)
+  const runRef =
+    record.owner === undefined
+      ? { kind: "task" as const, id: record.task_id }
+      : { kind: "dag" as const, id: record.owner.runId }
+  const entered = barrier.enter(
+    record.root_session_id ?? record.parent_session_id,
+    { key: record.task_id, runRef },
+    credential,
+  )
   if (entered.kind === "held") return runPaused(record)
   let held = false
   try {

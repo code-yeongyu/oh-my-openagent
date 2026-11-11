@@ -7,9 +7,7 @@ import type { HookHttp } from "./types"
 import * as sharedModule from "../../shared"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
-const mockFetch = mock(() =>
-  Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
-)
+const mockFetch = mock(() => Promise.resolve(new Response(JSON.stringify({}), { status: 200 })))
 const originalFetch = globalThis.fetch
 const originalEnv = { ...process.env }
 
@@ -36,9 +34,7 @@ describe("executeHttpHook TLS security", () => {
   beforeEach(() => {
     globalThis.fetch = unsafeTestValue<typeof fetch>(mockFetch)
     mockFetch.mockReset()
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
-    )
+    mockFetch.mockImplementation(() => Promise.resolve(new Response(JSON.stringify({}), { status: 200 })))
     logCalls = []
   })
 
@@ -112,8 +108,10 @@ describe("executeHttpHook TLS security", () => {
 
       // then
       const matchingCalls = logCalls.filter(({ message, data }) => {
-        return message === "HTTP hook URL uses insecure protocol"
-          && JSON.stringify(data) === JSON.stringify({ url: hook.url })
+        return (
+          message === "HTTP hook URL uses insecure protocol" &&
+          JSON.stringify(data) === JSON.stringify({ url: hook.url })
+        )
       })
 
       expect(result.exitCode).toBe(0)
@@ -228,7 +226,7 @@ describe("executeHttpHook TLS security", () => {
 
     it("#when hook uses https:// URL #then fetch rejects redirects manually", async () => {
       mockFetch.mockImplementation(() =>
-        Promise.resolve(new Response("redirect", { status: 302, statusText: "Found" }))
+        Promise.resolve(new Response("redirect", { status: 302, statusText: "Found" })),
       )
       const { executeHttpHook } = await import("./execute-http-hook")
       const hook: HookHttp = { type: "http", url: "https://example.com/hooks" }
@@ -241,7 +239,7 @@ describe("executeHttpHook TLS security", () => {
         "https://example.com/hooks",
         expect.objectContaining({
           redirect: "manual",
-        })
+        }),
       )
     })
   })

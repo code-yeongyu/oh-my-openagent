@@ -55,14 +55,18 @@ function parseJournal(value: unknown): MigrationJournal {
     throw new Error("Migration journal completion state is invalid")
   }
   const diagnostics = value["diagnostics"]
-  if (diagnostics !== undefined && (!Array.isArray(diagnostics) || !diagnostics.every((entry) => typeof entry === "string"))) {
+  if (
+    diagnostics !== undefined &&
+    (!Array.isArray(diagnostics) || !diagnostics.every((entry) => typeof entry === "string"))
+  ) {
     throw new Error("Migration journal diagnostics are invalid")
   }
   if (!value["completedMoves"].every((path) => typeof path === "string")) {
     throw new Error("Migration journal completed moves are invalid")
   }
   const targetBackupPath = value["targetBackupPath"]
-  if (targetBackupPath !== undefined && typeof targetBackupPath !== "string") throw new Error("Migration journal target backup is invalid")
+  if (targetBackupPath !== undefined && typeof targetBackupPath !== "string")
+    throw new Error("Migration journal target backup is invalid")
   if (!Array.isArray(value["backupMoves"])) throw new Error("Migration journal backup plan is invalid")
 
   const backupMoves: MigrationBackupMove[] = []

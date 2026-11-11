@@ -19,7 +19,12 @@ afterEach(() => {
 function harness(): { readonly agentDir: string; readonly child: EventEmitter; readonly terminate: () => void } {
   const agentDir = mkdtempSync(join(tmpdir(), "senpi-task-crash-"))
   dirs.push(agentDir)
-  const child = Object.assign(new EventEmitter(), { pid: undefined, exitCode: null, signalCode: null, kill: () => true })
+  const child = Object.assign(new EventEmitter(), {
+    pid: undefined,
+    exitCode: null,
+    signalCode: null,
+    kill: () => true,
+  })
   const client = {
     extensionEvents: createChildExtensionEvents(),
     stderrTail: "",
@@ -42,7 +47,10 @@ function harness(): { readonly agentDir: string; readonly child: EventEmitter; r
 function records(agentDir: string): readonly Record<string, unknown>[] {
   const file = join(agentDir, "process-crashes", "crashes.jsonl")
   if (!existsSync(file)) return []
-  return readFileSync(file, "utf8").trim().split("\n").map((line) => JSON.parse(line) as Record<string, unknown>)
+  return readFileSync(file, "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line) as Record<string, unknown>)
 }
 
 describe("process-mode task child crash records", () => {

@@ -19,10 +19,13 @@ export type SummaryRuntime = Pick<
 export type LoadSummaryRuntime = () => Promise<SummaryRuntime>
 export const loadSummaryRuntime: LoadSummaryRuntime = () => import("#omo-telemetry-recovery-runtime")
 
-
 /** What the component's transport facade shares with every registration of one loaded extension. */
 export type NativeCaptureState = {
-  capture?: (name: OmoNativeEventName, properties: EventTelemetryProperties, options?: EventTelemetryCaptureOptions) => void
+  capture?: (
+    name: OmoNativeEventName,
+    properties: EventTelemetryProperties,
+    options?: EventTelemetryCaptureOptions,
+  ) => void
   flush?: () => Promise<void>
   sessionHash?: string
   /** Event uuids the privacy client actually handed to the transport (rejected events never get here). */
@@ -42,7 +45,10 @@ export const SUMMARY_SHUTDOWN_WAIT_MS = 1_000
 
 export function createNativeSummaryRecorder(input: {
   readonly state: NativeCaptureState
-  readonly consent: Pick<SessionSummaryOptions, "isConsented" | "consentScope" | "isScopeConsented" | "scheduleConsentCheck">
+  readonly consent: Pick<
+    SessionSummaryOptions,
+    "isConsented" | "consentScope" | "isScopeConsented" | "scheduleConsentCheck"
+  >
   readonly stateDir: string
   readonly env: TelemetryEnv
   readonly cwd: string | undefined
@@ -57,7 +63,11 @@ export function createNativeSummaryRecorder(input: {
   let configuredRate = input.rawTurnSampleRate
   // The sink is fixed to PostHog until `telemetry.sink` exists; the collector sink forces 1.
   const sampleRate = (): number =>
-    (configuredRate ??= resolveRawTurnSampleRate({ sink: "posthog", configured: configuredSampleRate(input.cwd, env), env }))
+    (configuredRate ??= resolveRawTurnSampleRate({
+      sink: "posthog",
+      configured: configuredSampleRate(input.cwd, env),
+      env,
+    }))
   // The recorder, its storage and its publisher live in the sidecar: a session loads them on its first turn,
   // recovery or shutdown, so starting the extension costs only this facade. Nothing reaches the disk before that.
   let loading: Promise<SessionSummaryRecorder | undefined> | undefined
@@ -80,7 +90,12 @@ export function createNativeSummaryRecorder(input: {
         })),
       (error: unknown) => {
         loading = undefined
-        input.diagnostics?.({ event: "telemetry_capture_failed", source: "omo-native-summary", error, errorKind: error instanceof Error ? "error" : "non_error" })
+        input.diagnostics?.({
+          event: "telemetry_capture_failed",
+          source: "omo-native-summary",
+          error,
+          errorKind: error instanceof Error ? "error" : "non_error",
+        })
         return undefined
       },
     ))
@@ -95,9 +110,13 @@ export function createNativeSummaryRecorder(input: {
     },
     // Once loaded, calls go straight through, so a turn's window is written before recordTurn returns.
     recordTurn: (sessionHash, turn) =>
-      loaded !== undefined ? loaded.recordTurn(sessionHash, turn) : recorder().then((late) => late?.recordTurn(sessionHash, turn)),
+      loaded !== undefined
+        ? loaded.recordTurn(sessionHash, turn)
+        : recorder().then((late) => late?.recordTurn(sessionHash, turn)),
     finish: (sessionHash, reason) =>
-      loaded !== undefined ? loaded.finish(sessionHash, reason) : recorder().then((late) => late?.finish(sessionHash, reason)),
+      loaded !== undefined
+        ? loaded.finish(sessionHash, reason)
+        : recorder().then((late) => late?.finish(sessionHash, reason)),
     prepare: async () => {
       await recorder()
     },
@@ -112,7 +131,8 @@ export function createNativeSummaryRecorder(input: {
 // `telemetry.rawTurnSampleRate` from omo.json; an unreadable config leaves the documented default.
 function configuredSampleRate(cwd: string | undefined, env: TelemetryEnv): number | undefined {
   try {
-    return loadSenpiOmoConfig({ env: { ...env }, ...(cwd === undefined ? {} : { cwd }) }).config.telemetry?.rawTurnSampleRate
+    return loadSenpiOmoConfig({ env: { ...env }, ...(cwd === undefined ? {} : { cwd }) }).config.telemetry
+      ?.rawTurnSampleRate
   } catch {
     return undefined
   }
@@ -120,8 +140,11 @@ function configuredSampleRate(cwd: string | undefined, env: TelemetryEnv): numbe
 
 export async function settleWithin(work: Promise<void>, ms: number): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined
-  await Promise.race([work, new Promise<void>((resolve) => {
-    timer = setTimeout(resolve, ms)
-  })])
+  await Promise.race([
+    work,
+    new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, ms)
+    }),
+  ])
   clearTimeout(timer)
 }

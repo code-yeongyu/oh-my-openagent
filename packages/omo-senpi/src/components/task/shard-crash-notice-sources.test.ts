@@ -16,7 +16,12 @@ import {
 import { buildProcessChildRunner, buildRespawnRunner, type RunnerBuildContext } from "./engine-runners"
 import { createEngineHostRuntime } from "./host-execution-mode"
 import { TaskRuntimeContext } from "./runtime-context"
-import { createShardCrashNotices, readNewestHostCrash, SHARD_CRASH_DONE_TOKEN, SHARD_CRASH_TOKEN } from "./shard-crash-notice"
+import {
+  createShardCrashNotices,
+  readNewestHostCrash,
+  SHARD_CRASH_DONE_TOKEN,
+  SHARD_CRASH_TOKEN,
+} from "./shard-crash-notice"
 import { SOCKET_A, uiRecorder } from "./shard-crash-notice.test-support"
 
 // Where the crash notice's facts come from: the session's host runtime, the real host runner's
@@ -29,12 +34,24 @@ describe("session host runtime", () => {
     const runtime = new TaskRuntimeContext("/tmp/dh-t10-project")
     runtime.captureFrom({ ui, sessionManager: { getSessionId: () => "01a0e4ae-parent" } })
     const logs: string[] = []
-    const host = createEngineHostRuntime(OmoTaskSettingsSchema.parse({}), runtime, {}, {
-      agentDir: "/tmp/dh-t10-agent", env: {}, crashLog: (event) => logs.push(event),
-    })
+    const host = createEngineHostRuntime(
+      OmoTaskSettingsSchema.parse({}),
+      runtime,
+      {},
+      {
+        agentDir: "/tmp/dh-t10-agent",
+        env: {},
+        crashLog: (event) => logs.push(event),
+      },
+    )
 
     // when
-    host.routing.shardEvents.onTransportLost?.({ taskId: "st_a", socket: SOCKET_A, instanceId: "gen-1", turnWasInFlight: true })
+    host.routing.shardEvents.onTransportLost?.({
+      taskId: "st_a",
+      socket: SOCKET_A,
+      instanceId: "gen-1",
+      turnWasInFlight: true,
+    })
 
     // then
     expect(host.notices.list()).toEqual([])
@@ -94,16 +111,21 @@ describe("host runner feeding the crash notice", () => {
     const runtime = new TaskRuntimeContext(agentDir)
     runtime.captureFrom({ ui, sessionManager: { getSessionId: () => "01a0e4ae-parent" } })
     const settings = OmoTaskSettingsSchema.parse({})
-    const session = createEngineHostRuntime(settings, runtime, {}, {
-      agentDir,
-      env: {},
-      ensureDaemon: () => Promise.resolve({ ...ensuredDaemon(host.socketPath), instanceId: host.instanceId }),
-      probeHost: () => host.probeProtocolInfo(),
-      crashLog: (event, facts) => {
-        logs.push({ event, facts })
-        if (event === SHARD_CRASH_DONE_TOKEN) closed.resolve()
+    const session = createEngineHostRuntime(
+      settings,
+      runtime,
+      {},
+      {
+        agentDir,
+        env: {},
+        ensureDaemon: () => Promise.resolve({ ...ensuredDaemon(host.socketPath), instanceId: host.instanceId }),
+        probeHost: () => host.probeProtocolInfo(),
+        crashLog: (event, facts) => {
+          logs.push({ event, facts })
+          if (event === SHARD_CRASH_DONE_TOKEN) closed.resolve()
+        },
       },
-    })
+    )
     const build: RunnerBuildContext = {
       runtime,
       sharedParentTools: () => [],
@@ -111,11 +133,19 @@ describe("host runner feeding the crash notice", () => {
       platform: "darwin",
       agentDir,
       env: {},
-      hostRouting: { ...session.routing, shardResolver: () => rootResolution(host.socketPath), storeDir: CHILD_STATE_DIR },
+      hostRouting: {
+        ...session.routing,
+        shardResolver: () => rootResolution(host.socketPath),
+        storeDir: CHILD_STATE_DIR,
+      },
     }
     // No model: admission (a real catalog probe) is not what this case is about.
-    const spawned = await buildProcessChildRunner(build).start(childSpec({ task_id: "st_spawned", model: undefined, extensions: [] }))
-    const revived = await buildRespawnRunner(build).start(childSpec({ task_id: "st_revived", model: undefined, extensions: [] }))
+    const spawned = await buildProcessChildRunner(build).start(
+      childSpec({ task_id: "st_spawned", model: undefined, extensions: [] }),
+    )
+    const revived = await buildRespawnRunner(build).start(
+      childSpec({ task_id: "st_revived", model: undefined, extensions: [] }),
+    )
 
     // when
     await host.restart()
@@ -177,7 +207,10 @@ describe("readNewestHostCrash", () => {
   test("#given only an old record and no generation file #when read #then nothing is attributed to this crash", () => {
     // given
     const { agentDir, dir } = engineDaemonDir()
-    writeFileSync(join(dir, "crashes.jsonl"), `${JSON.stringify({ at: "2026-09-20T12:00:00.000Z", signal: "SIGBUS", uptimeMs: 1 })}\n`)
+    writeFileSync(
+      join(dir, "crashes.jsonl"),
+      `${JSON.stringify({ at: "2026-09-20T12:00:00.000Z", signal: "SIGBUS", uptimeMs: 1 })}\n`,
+    )
 
     // when
     const facts = readNewestHostCrash(agentDir, SOCKET_A, "gen-1", Date.parse("2026-09-27T12:00:00.000Z"))

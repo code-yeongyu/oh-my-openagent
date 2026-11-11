@@ -16,7 +16,9 @@ export function exitClock() {
   const timers = new Map<() => void, number>()
   const schedule = (callback: () => void, ms: number): (() => void) => {
     timers.set(callback, time + ms)
-    return () => { timers.delete(callback) }
+    return () => {
+      timers.delete(callback)
+    }
   }
   return {
     now: () => time,
@@ -63,13 +65,17 @@ export async function exitedTask(
   runner.childPid = 900
   const config = settings({ reattach_on_reconcile: true })
   const manager = createTaskManager({
-    store, config, cwd: project, now: clock.now,
+    store,
+    config,
+    cwd: project,
+    now: clock.now,
     scheduleExitConfirmation: (callback, ms) => {
       const cancel = clock.schedule(callback, ms)
       observed.resolve()
       return cancel
     },
-    runners: { "in-process": new FakeRunner(), process: runner }, planner: categoryPlanner(),
+    runners: { "in-process": new FakeRunner(), process: runner },
+    planner: categoryPlanner(),
   })
   const started = await manager.start(baseSpec({ execution_mode: "process", run_in_background: true }))
   if (started.kind !== "started") throw new Error(`start refused: ${started.kind}`)
@@ -79,21 +85,47 @@ export async function exitedTask(
   const sessionDir = resolveChildSessionDir(join(store.stateDir, "children", taskId), taskId)
   mkdirSync(sessionDir, { recursive: true })
   writeFileSync(join(sessionDir, "transcript.jsonl"), "{}\n")
-  child.settle(exitTurnOutcome(classifyChildExit({
-    code: 1, signal: null, pid: 900, stderr: "", terminatedByRunner: false,
-  }), undefined))
+  child.settle(
+    exitTurnOutcome(
+      classifyChildExit({
+        code: 1,
+        signal: null,
+        pid: 900,
+        stderr: "",
+        terminatedByRunner: false,
+      }),
+      undefined,
+    ),
+  )
   await observed.promise
 
   let respawns = 0
   const lifecycle = createTaskLifecycle({
-    store, registry: new FakeRegistry(), config, now: clock.now, hostPid: process.pid + 100000,
-    hostEndpoint: NO_HOST_ENDPOINT, signaller: { isAlive: () => false, signal: () => {} },
-    respawn: async (record) => { respawns += 1; return { ok: true, handle: makeHandle(record.task_id, 901).handle } },
+    store,
+    registry: new FakeRegistry(),
+    config,
+    now: clock.now,
+    hostPid: process.pid + 100000,
+    hostEndpoint: NO_HOST_ENDPOINT,
+    signaller: { isAlive: () => false, signal: () => {} },
+    respawn: async (record) => {
+      respawns += 1
+      return { ok: true, handle: makeHandle(record.task_id, 901).handle }
+    },
     reattach: async () => ({ ok: true }),
   })
   return {
-    manager, store, backing, taskId, clock, lifecycle, respawns: () => respawns,
+    manager,
+    store,
+    backing,
+    taskId,
+    clock,
+    lifecycle,
+    respawns: () => respawns,
     events: () => readEvents(store, taskId),
-    dispose: () => { manager.forget(taskId, { path: "end" }); lifecycle.dispose?.() },
+    dispose: () => {
+      manager.forget(taskId, { path: "end" })
+      lifecycle.dispose?.()
+    },
   }
 }

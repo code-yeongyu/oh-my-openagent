@@ -15,7 +15,11 @@ export function toolCall(callId: string, name: string, args: Record<string, unkn
   return {
     type: "message",
     id: nextId(),
-    message: { role: "assistant", stopReason: "toolUse", content: [{ type: "toolCall", id: callId, name, arguments: args }] },
+    message: {
+      role: "assistant",
+      stopReason: "toolUse",
+      content: [{ type: "toolCall", id: callId, name, arguments: args }],
+    },
   }
 }
 
@@ -55,19 +59,38 @@ export function evalRun(
       text: cell.output ?? "",
       isError: cell.status === "error",
       details: {
-        cells: [{ index: 0, code: cell.code, output: cell.output ?? "", status: cell.status === undefined ? "complete" : cell.status }],
+        cells: [
+          {
+            index: 0,
+            code: cell.code,
+            output: cell.output ?? "",
+            status: cell.status === undefined ? "complete" : cell.status,
+          },
+        ],
         toolCalls: hostCalls,
       },
     }),
   ]
 }
 
-export function hostBash(command: string, resultPreview: string, ok = true, extraArgs: Record<string, unknown> = {}): Record<string, unknown> {
+export function hostBash(
+  command: string,
+  resultPreview: string,
+  ok = true,
+  extraArgs: Record<string, unknown> = {},
+): Record<string, unknown> {
   return { name: "bash", ok, args: { command, ...extraArgs }, resultPreview }
 }
 
 export function customMessage(customType: string, content: string, details?: unknown): FixtureEntry {
-  return { type: "custom_message", id: nextId(), customType, content, display: false, ...(details === undefined ? {} : { details }) }
+  return {
+    type: "custom_message",
+    id: nextId(),
+    customType,
+    content,
+    display: false,
+    ...(details === undefined ? {} : { details }),
+  }
 }
 
 export function editResult(callId: string, path: string): FixtureEntry[] {
@@ -79,5 +102,7 @@ export function passingTest(callId: string): FixtureEntry[] {
 }
 
 export function failingTest(callId: string): FixtureEntry[] {
-  return evalRun(callId, { code: "await tool.bash({ command: 'bun test src' })" }, [hostBash("bun test src", " 11 pass\n 1 fail")])
+  return evalRun(callId, { code: "await tool.bash({ command: 'bun test src' })" }, [
+    hostBash("bun test src", " 11 pass\n 1 fail"),
+  ])
 }

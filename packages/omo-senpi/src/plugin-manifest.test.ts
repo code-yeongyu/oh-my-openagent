@@ -75,12 +75,13 @@ describe("OMO Senpi plugin manifest", () => {
     const manifest = readJsonObject(pluginManifestPath)
     const dependencies = manifest.dependencies
 
-    expect(dependencies === undefined || (
-      typeof dependencies === "object"
-      && dependencies !== null
-      && !Array.isArray(dependencies)
-      && Object.keys(dependencies).length === 0
-    )).toBe(true)
+    expect(
+      dependencies === undefined ||
+        (typeof dependencies === "object" &&
+          dependencies !== null &&
+          !Array.isArray(dependencies) &&
+          Object.keys(dependencies).length === 0),
+    ).toBe(true)
     expect(Reflect.has(manifest, "workspaces")).toBe(false)
   })
 

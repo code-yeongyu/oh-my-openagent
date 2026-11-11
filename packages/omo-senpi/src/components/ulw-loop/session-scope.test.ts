@@ -58,7 +58,11 @@ describe("omo-senpi ulw-loop status probe session scope", () => {
   it("#given NO session id available #when agent_end fires on an active unscoped run #then no continuation is delivered", async () => {
     const { pi, calls, logger } = await registerScoped()
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, { cwd: "/repo" })
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      { cwd: "/repo" },
+    )
 
     expect(pi.messages).toEqual([])
     expect(pi.userMessages).toEqual([])
@@ -86,7 +90,11 @@ describe("omo-senpi ulw-loop status probe session scope", () => {
   it("#given a session id but no .omo/ulw-loop directory #when agent_end fires #then the perf guard short-circuits with no status read", async () => {
     const { pi, calls } = await registerScoped({ planExists: () => false })
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionCtx("/repo", "sess-guard"))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      sessionCtx("/repo", "sess-guard"),
+    )
 
     expect(calls).toEqual([])
     expect(pi.messages).toEqual([])
