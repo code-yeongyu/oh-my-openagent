@@ -19,7 +19,7 @@ type TestPart = {
   content?: string
   text?: string
   synthetic?: boolean
-  metadata?: { compaction_continue?: boolean }
+  metadata?: { compaction_continue?: boolean; providerExecuted?: boolean }
 }
 
 type TestMessage = {
@@ -801,6 +801,77 @@ describe("createMessagesTransformHandler", () => {
     expect(messages.at(-1)?.info).toMatchObject({ role: "user" })
     expect(messages.at(-1)?.parts[0]).toMatchObject({
       type: "text",
+      text: "[internal] Continue from the previous assistant state.",
+      synthetic: true,
+    })
+  })
+
+  // #10208: a continuation turn's tool loop ends every request with the tail assistant's tool results, so the
+  // request already ends on a user tool_result turn; appending the recovery text there rewrites the newest
+  // tool_result on every step and invalidates the provider prompt cache.
+  it.each(["completed", "error"] as const)("#given a compaction continuation whose assistant tail has a %s client-side tool #when messages transform runs #then it appends no recovery turn", async (status) => {
+    //#given
+    const messages: TestMessage[] = [
+      {
+        info: { role: "user", model: { providerID: "anthropic", modelID: "claude-opus-5-5" } },
+        parts: [{
+          type: "text",
+          text: `[todo continuation]\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+          synthetic: true,
+          metadata: { compaction_continue: true },
+        }],
+      },
+      {
+        info: { role: "assistant", model: { providerID: "anthropic", modelID: "claude-opus-5-5" } },
+        parts: [{
+          id: "prt_call_1",
+          type: "tool",
+          callID: "call_1",
+          tool: "bash",
+          state: { status, input: {}, time: { start: 1_700_000_000_000, end: 1_700_000_000_500 } },
+        }],
+      },
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages).toHaveLength(2)
+    expect(messages.at(-1)?.info.role).toBe("assistant")
+  })
+
+  it("#given a compaction continuation whose assistant tail only has a provider-executed tool #when messages transform runs #then it still appends the recovery turn", async () => {
+    //#given
+    const messages: TestMessage[] = [
+      {
+        info: { role: "user" },
+        parts: [{
+          type: "text",
+          text: `[todo continuation]\n${OMO_INTERNAL_INITIATOR_MARKER}`,
+          synthetic: true,
+          metadata: { compaction_continue: true },
+        }],
+      },
+      {
+        info: { role: "assistant" },
+        parts: [{
+          id: "prt_search_1",
+          type: "tool",
+          callID: "search_1",
+          tool: "web_search",
+          state: { status: "completed", input: {}, time: { start: 1_700_000_000_000, end: 1_700_000_000_500 } },
+          metadata: { providerExecuted: true },
+        }],
+      },
+    ]
+
+    //#when
+    await runHandler(makeHooks({}), messages)
+
+    //#then
+    expect(messages.at(-1)?.info).toMatchObject({ role: "user" })
+    expect(messages.at(-1)?.parts[0]).toMatchObject({
       text: "[internal] Continue from the previous assistant state.",
       synthetic: true,
     })
