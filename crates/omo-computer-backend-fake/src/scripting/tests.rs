@@ -3,6 +3,8 @@
 use omo_computer_core::backend::{AxBackend, Backend, CaptureOptions, Target};
 use omo_computer_core::listing::Rect;
 
+use omo_computer_core::error::EngineCode;
+
 use crate::{
     fixtures_dir, ClipboardRead, FakeBackend, FakeScenario, FrameAxis, LoadingState, Persona,
 };
@@ -119,8 +121,8 @@ fn v3_fields_change_behaviour_against_their_null_control() {
     assert_eq!(
         set.capture(&window, &NO_CROSSHAIR)
             .map(|_| ())
-            .map_err(|r| r.reason),
-        Err("target_gone")
+            .map_err(|r| (r.code, r.reason)),
+        Err((EngineCode::CaptureUnavailable, "unmapped"))
     );
     assert!(
         null.capture(&window, &NO_CROSSHAIR).is_ok()

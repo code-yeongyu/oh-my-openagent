@@ -5,6 +5,9 @@ use std::collections::BTreeMap;
 use omo_computer_core::listing::Rect;
 use serde::Deserialize;
 
+use omo_computer_core::error::{EngineCode, Reason};
+
+use super::closed;
 use crate::method::FakeMethod;
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -114,14 +117,16 @@ impl DelayMs {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ScriptedFailure {
     pub method: FakeMethod,
-    /// The engine code the failure names.
-    pub code: String,
-    #[serde(default)]
-    pub reason: Option<String>,
+    /// One of the closed engine codes.
+    #[serde(deserialize_with = "closed::engine_code")]
+    pub code: EngineCode,
+    /// A token of the closed reason vocabulary; absent keys the code's bare row.
+    #[serde(default, deserialize_with = "closed::reason")]
+    pub reason: Option<Reason>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize)]

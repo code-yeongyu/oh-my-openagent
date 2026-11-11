@@ -1,12 +1,14 @@
 //! The imported scripting fields drive the `Backend` half as their scenarios say.
 
 use omo_computer_core::backend::{
-    Backend, CaptureOptions, InputEvent, RefusalCode, Route, TaggedInput, Target, WindowFilter,
+    Backend, CaptureOptions, InputEvent, Route, TaggedInput, Target, WindowFilter,
 };
 use omo_computer_core::params::Point;
 
+use omo_computer_core::error::{ComputerCode, EngineCode};
+
 use crate::{
-    fixtures_dir, FakeBackend, FakeMethod, FakeScenario, FocusRecordKind, FocusRecordOutcome,
+    fixtures_dir, refusal_row, FakeBackend, FakeScenario, FocusRecordKind, FocusRecordOutcome,
     UserInputKind,
 };
 
@@ -74,11 +76,12 @@ fn faults_delays_and_presses_run_before_the_call() {
         .expect_err("scripted");
     assert_eq!(
         (refused.code, refused.reason),
-        (RefusalCode::CaptureUnavailable, "minimized")
+        (EngineCode::CaptureUnavailable, "minimized")
     );
     assert_eq!(
-        fake.last_fault().map(|f| (f.method, f.code)),
-        Some((FakeMethod::Capture, "CaptureUnavailable".to_owned()))
+        refusal_row(&refused).map(|row| row.computer),
+        Ok(ComputerCode::CaptureUnavailable),
+        "the scripted pair is typed through the table"
     );
     assert!(
         fake.capture(&Target::Window("101".to_owned()), &OPTIONS)
@@ -160,4 +163,24 @@ fn scripted_reads_follow_their_lists() {
         "a disabled menu refuses"
     );
     assert_eq!(menus.sink().len(), 1);
+}
+
+#[test]
+fn imported_error_code_faults_keep_their_exact_code_and_row() {
+    for name in ["error-codes-amend-1.json", "error-codes-amend-2.json"] {
+        let scenario = FakeScenario::load(&fixtures_dir().join(name)).expect("loads");
+        let scripted: Vec<EngineCode> = scenario.fail_next.iter().map(|f| f.code).collect();
+        let mut fake = FakeBackend::new(scenario);
+        for code in scripted {
+            let refused = fake.displays().expect_err("scripted");
+            assert_eq!(refused.code, code, "{name}");
+            let row = refusal_row(&refused).unwrap_or_else(|e| panic!("{name} {code:?}: {e}"));
+            assert_eq!(
+                row.key.reason, None,
+                "{name}: the imported faults are bare codes"
+            );
+        }
+        assert!(fake.displays().is_ok(), "{name}: the queue drains");
+        assert!(fake.sink().is_empty());
+    }
 }

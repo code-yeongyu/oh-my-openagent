@@ -15,6 +15,7 @@ mod frame;
 mod handles;
 mod method;
 mod persona;
+mod refusals;
 mod scenario;
 mod scripting;
 mod seams;
@@ -28,9 +29,10 @@ pub use ax_tree::{NODES_PER_MS, PAD_ROLE};
 pub use backend::{FakeBackend, StopPathScript};
 pub use capabilities::BACKEND_NAME;
 pub use clock::{ClockSeamInvalid, FakeClock, CLOCK_SEAM};
-pub use faults::{Fault, SCRIPTED_REASON};
+pub use faults::Fault;
 pub use method::FakeMethod;
 pub use persona::Persona;
+pub use refusals::{bare, refusal_row, BARE_REASON};
 pub use scenario::{
     field_names, fixtures_dir, AxNotification, BusyMark, ClipboardScript, DelayMs, DisplaysChange,
     EpochEvent, EpochReason, FakeAxNode, FakeDisplay, FakeMenuNode, FakeScenario, FakeWindow,

@@ -2,15 +2,14 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use omo_computer_core::backend::{EpochChange, Refusal, RefusalCode};
+use omo_computer_core::backend::{EpochChange, Refusal};
+use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::params::Point;
 
 use crate::clock::FakeClock;
-use crate::faults::{self, Fault, FaultQueue};
+use crate::faults::{Fault, FaultQueue};
 use crate::method::{CallCounter, FakeMethod};
-use crate::scenario::{
-    FakeDisplay, FakeScenario, FakeWindow, FocusRecordKind, ScriptedFailure, UserPress,
-};
+use crate::scenario::{FakeDisplay, FakeScenario, FakeWindow, FocusRecordKind, UserPress};
 use crate::timeline::{self, UserInput};
 
 /// What the call body runs after the fault check.
@@ -42,7 +41,6 @@ pub struct FakeState {
     /// Snapshot generation -> the window it walked.
     pub snapshots: BTreeMap<u64, String>,
     pub ax_event_pos: usize,
-    pub last_fault: Option<ScriptedFailure>,
     pub stop_pressed: bool,
 }
 
@@ -56,8 +54,8 @@ impl FakeState {
             faults.push(
                 failure.method,
                 Fault::Fail {
-                    code: failure.code.clone(),
-                    reason: failure.reason.clone(),
+                    code: failure.code,
+                    reason: failure.reason,
                 },
             );
         }
@@ -87,7 +85,6 @@ impl FakeState {
             focus_record_pos: BTreeMap::new(),
             snapshots: BTreeMap::new(),
             ax_event_pos: 0,
-            last_fault: None,
             stop_pressed: false,
             scenario,
         }
@@ -121,16 +118,11 @@ impl FakeState {
             Fault::Pass => Ok(CallOutcome::Proceed),
             Fault::CannotComplete if method.is_ax_write() => Ok(CallOutcome::CannotComplete),
             Fault::CannotComplete => Ok(CallOutcome::Proceed),
-            Fault::Fail { code, reason } => {
-                let refusal = faults::refusal(method, &code, reason.as_deref());
-                self.last_fault = Some(ScriptedFailure {
-                    method,
-                    code,
-                    reason,
-                });
-                Err(refusal)
-            }
-            Fault::RefuseFocus => Err(Refusal::new(RefusalCode::Unavailable, "focus_refused")),
+            Fault::Fail { code, reason } => Err(Fault::refusal(code, reason)),
+            Fault::RefuseFocus => Err(Refusal::new(
+                EngineCode::InputFailed,
+                Reason::ActivationRefused.wire(),
+            )),
             Fault::Panic => panic!("scripted fault: the fake panics in {}", method.as_str()),
         }
     }

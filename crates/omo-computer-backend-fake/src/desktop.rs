@@ -2,10 +2,11 @@
 
 use omo_computer_core::backend::{
     Backend, BackendResult, CaptureOptions, Delivered, EpochSource, FrameBytes, InputEvent,
-    PermissionProbe, Presence, Refusal, RefusalCode, Route, StopListener, TaggedInput, Target,
-    WindowFilter, WindowList,
+    PermissionProbe, Presence, Refusal, Route, StopListener, TaggedInput, Target, WindowFilter,
+    WindowList,
 };
 use omo_computer_core::capabilities::Capabilities;
+use omo_computer_core::error::{EngineCode, Reason};
 use omo_computer_core::listing::{Rect, WindowInfo};
 use omo_computer_core::observation::ImageMime;
 use omo_computer_core::results::{DisplayInfo, PermissionState};
@@ -16,6 +17,7 @@ use crate::capabilities::fake_capabilities;
 use crate::frame::{pixels, solid_png};
 use crate::handles::{FakeEpochSource, FakePresence, FakeStopListener};
 use crate::method::FakeMethod;
+use crate::refusals::bare;
 use crate::scenario::{FakeDisplay, FakeWindow};
 use crate::sink::quoted;
 use crate::state::FakeState;
@@ -98,13 +100,15 @@ impl FakeBackend {
 }
 
 fn capture_rect(state: &FakeState, target: &Target) -> BackendResult<(Rect, f64)> {
-    let gone = |reason| Refusal::new(RefusalCode::CaptureUnavailable, reason);
     match target {
-        Target::Window(id) if state.exited.contains(id) => Err(gone("target_gone")),
+        Target::Window(id) if state.exited.contains(id) => Err(Refusal::new(
+            EngineCode::CaptureUnavailable,
+            Reason::Unmapped.wire(),
+        )),
         Target::Window(id) => {
             let window = state
                 .live_window(id)
-                .ok_or_else(|| gone("window_not_found"))?;
+                .ok_or(bare(EngineCode::WindowNotFound))?;
             Ok((
                 window.bounds(),
                 display_of(state, window).map_or(1.0, |d| d.scale),
@@ -115,11 +119,14 @@ fn capture_rect(state: &FakeState, target: &Target) -> BackendResult<(Rect, f64)
                 .displays
                 .iter()
                 .find(|d| &d.id == id)
-                .ok_or_else(|| gone("display_not_found"))?;
+                .ok_or(bare(EngineCode::InvalidTarget))?;
             Ok((display_info(display).bounds, display.scale))
         }
         Target::Desktop => {
-            let display = state.displays.first().ok_or_else(|| gone("no_display"))?;
+            let display = state
+                .displays
+                .first()
+                .ok_or(bare(EngineCode::CaptureUnavailable))?;
             Ok((display_info(display).bounds, display.scale))
         }
     }
@@ -196,8 +203,8 @@ impl Backend for FakeBackend {
     fn stop_listener(&mut self) -> BackendResult<Box<dyn StopListener>> {
         match self.stop_path {
             StopPathScript::None => Err(Refusal::new(
-                RefusalCode::StopPathUnavailable,
-                "no_listener",
+                EngineCode::StopPathUnavailable,
+                Reason::NoListener.wire(),
             )),
             script => Ok(Box::new(FakeStopListener::new(self.shared.clone(), script))),
         }

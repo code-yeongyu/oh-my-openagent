@@ -1,5 +1,7 @@
 //! Cross-member checks: every window a member names is listed, and every count starts at 1.
 
+use omo_computer_core::error::{self, FailureKey, Source};
+
 use super::invalid::escape;
 use super::{FakeScenario, InvalidKind, ScenarioInvalid};
 
@@ -122,6 +124,18 @@ fn counts(scenario: &FakeScenario) -> Vec<(String, u32)> {
 }
 
 pub(super) fn check(scenario: &FakeScenario) -> Result<(), ScenarioInvalid> {
+    if let Some((index, failure)) = scenario.fail_next.iter().enumerate().find(|(_, failure)| {
+        error::lookup(FailureKey {
+            source: Source::Engine(failure.code),
+            reason: failure.reason,
+        })
+        .is_err()
+    }) {
+        return Err(reference(
+            format!("/fail_next/{index}"),
+            format!("{failure:?} has no row in the COMPUTER_* table"),
+        ));
+    }
     let listed = |id: &str| scenario.windows.iter().any(|window| window.id == id);
     if let Some((pointer, id)) = named_windows(scenario)
         .into_iter()

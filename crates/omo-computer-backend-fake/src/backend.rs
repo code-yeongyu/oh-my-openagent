@@ -8,7 +8,7 @@ use crate::clock::FakeClock;
 use crate::faults::Fault;
 use crate::method::FakeMethod;
 use crate::persona::Persona;
-use crate::scenario::{FakeScenario, ScenarioInvalid, ScriptedFailure};
+use crate::scenario::{FakeScenario, ScenarioInvalid};
 use crate::sink::RecordingSink;
 use crate::state::{CallOutcome, FakeState};
 use crate::timeline::{self, LoadingState};
@@ -94,12 +94,6 @@ impl FakeBackend {
     /// Queues `fault` for the next call of `method`, behind any already queued.
     pub fn inject(&mut self, method: FakeMethod, fault: Fault) {
         self.lock().faults.push(method, fault);
-    }
-
-    /// The engine code and reason of the last scripted failure that refused a call.
-    #[must_use]
-    pub fn last_fault(&self) -> Option<ScriptedFailure> {
-        self.lock().last_fault.clone()
     }
 
     /// How often `method` ran.
