@@ -99,7 +99,12 @@ export async function resolveCategoryExecution(
     }
   }
 
-  const availableModels = await getAvailableModelsForDelegateTask(client)
+  const requestedConfig = userCategories?.[categoryName]
+  const requestedModels = requestedConfig?.disable
+    ? []
+    : requestedConfig?.models?.map(getConfiguredModel) ?? [requestedConfig?.model ?? sisyphusJuniorModel]
+  // Confirm before resolveCategoryConfig filters/rejects configured chains, and reuse this one live read.
+  const availableModels = await confirmRequestedModels(client, await getAvailableModelsForDelegateTask(client), requestedModels)
 
   const resolved = resolveCategoryConfig(categoryName, {
     userCategories,
@@ -188,8 +193,7 @@ Available categories: ${allCategoryNames}`)
         ? configuredPrimaryModel !== undefined
         : resolved.isUserConfiguredModel,
       fallbackChain: requirement.fallbackChain,
-      // A partial cached catalog must not demote the user's explicit model: confirm a miss against the live list.
-      availableModels: await confirmRequestedModels(client, availableModels, [explicitCategoryModel ?? overrideModel]),
+      availableModels,
       systemDefaultModel,
     })
 

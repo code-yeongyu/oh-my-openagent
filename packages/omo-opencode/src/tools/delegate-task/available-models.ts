@@ -1,6 +1,7 @@
 import type { OpencodeClient } from "./types"
 import { log } from "../../shared/logger"
 import { isRecord } from "../../shared/record-type-guard"
+import { parseModelString } from "../../shared/model-string-parser"
 import * as connectedProvidersCache from "../../shared/connected-providers-cache"
 
 type ModelListClient = OpencodeClient & {
@@ -33,6 +34,30 @@ function addFromProviderModels(
   }
 }
 
+// model.list supplies IDs, not the provider cache's richer metadata. Merge only exact confirmed
+// requests into the latest cache; do not replace provider catalogs or change connection state.
+function rememberConfirmedModels(confirmed: readonly string[]): void {
+  if (confirmed.length === 0) return
+  const cached = connectedProvidersCache.readProviderModelsCache()
+  if (!cached) return
+  const models = { ...cached.models }
+  const connected = new Set(cached.connected)
+  let changed = false
+  for (const fullModel of confirmed) {
+    const slash = fullModel.indexOf("/")
+    const provider = fullModel.slice(0, slash)
+    const id = fullModel.slice(slash + 1)
+    const entries = models[provider]
+    if (!connected.has(provider) || !entries || entries.some((entry) => (typeof entry === "string" ? entry : entry.id) === id)) continue
+    const strings = entries.filter((entry): entry is string => typeof entry === "string")
+    models[provider] = strings.length === entries.length
+      ? [...strings, id]
+      : [...entries.map((entry) => typeof entry === "string" ? { id: entry } : entry), { id }]
+    changed = true
+  }
+  if (changed) connectedProvidersCache.writeProviderModelsCache({ models, connected: cached.connected })
+}
+
 /**
  * A cached catalog can be partial: it was written before a model was registered. Before an explicitly requested
  * model on a provider the catalog already serves is treated as unreachable (and silently replaced by a
@@ -45,19 +70,27 @@ export async function confirmRequestedModels(
 ): Promise<Set<string>> {
   const providers = new Set([...available].map((model) => model.split("/")[0]))
   const known = new Set([...available].map((model) => model.toLowerCase()))
-  const missing = requested.filter((model): model is string => {
-    if (!model || !model.includes("/")) return false
-    return providers.has(model.split("/")[0]!) && !known.has(model.toLowerCase())
+  const requestedModels = requested.flatMap((model) => {
+    const parsed = model ? parseModelString(model) : null
+    return parsed ? [`${parsed.providerID}/${parsed.modelID}`] : []
   })
+  const missing = requestedModels.filter((model) => providers.has(model.split("/")[0]!) && !known.has(model.toLowerCase()))
   if (missing.length === 0 || !hasModelList(client)) return available
   try {
     const rows = extractModelRows(await client.model.list())
     const out = new Set(available)
     for (const row of rows) if (providers.has(row.provider)) out.add(`${row.provider}/${row.id}`)
-    const live = new Set([...out].map((model) => model.toLowerCase()))
+    const live = new Map([...out].map((model) => [model.toLowerCase(), model]))
+    const confirmed = missing.map((model) => live.get(model.toLowerCase())).filter((model): model is string => model !== undefined)
+    try {
+      rememberConfirmedModels(confirmed)
+    } catch (err) {
+      // A cache I/O failure must not discard the model Core just confirmed live.
+      log("[delegate-task] confirmed model cache refresh failed", { error: err instanceof Error ? err.message : String(err) })
+    }
     log("[delegate-task] requested model missing from the cached catalog; checked the live catalog", {
       missing,
-      confirmed: missing.filter((model) => live.has(model.toLowerCase())),
+      confirmed,
     })
     return out
   } catch (err) {
