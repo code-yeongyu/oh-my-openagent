@@ -21,9 +21,7 @@ export async function requestShutdownOfMember(
   getRuntimeMember(runtimeState, requesterName)
 
   const existingRequestIndex = findLatestShutdownRequestIndex(runtimeState, targetMemberName, requesterName)
-  const existingRequest = existingRequestIndex >= 0
-    ? runtimeState.shutdownRequests[existingRequestIndex]
-    : undefined
+  const existingRequest = existingRequestIndex >= 0 ? runtimeState.shutdownRequests[existingRequestIndex] : undefined
   if (existingRequest && existingRequest.approvedAt === undefined && existingRequest.rejectedAt === undefined) {
     return
   }
@@ -35,23 +33,26 @@ export async function requestShutdownOfMember(
     createSendContext(runtimeState, requesterName),
   )
 
-  await transitionRuntimeState(teamRunId, (currentRuntimeState) => {
-    const duplicateRequestIndex = findLatestShutdownRequestIndex(currentRuntimeState, targetMemberName, requesterName)
-    const duplicateRequest = duplicateRequestIndex >= 0
-      ? currentRuntimeState.shutdownRequests[duplicateRequestIndex]
-      : undefined
-    if (duplicateRequest && duplicateRequest.approvedAt === undefined && duplicateRequest.rejectedAt === undefined) {
-      return currentRuntimeState
-    }
+  await transitionRuntimeState(
+    teamRunId,
+    (currentRuntimeState) => {
+      const duplicateRequestIndex = findLatestShutdownRequestIndex(currentRuntimeState, targetMemberName, requesterName)
+      const duplicateRequest =
+        duplicateRequestIndex >= 0 ? currentRuntimeState.shutdownRequests[duplicateRequestIndex] : undefined
+      if (duplicateRequest && duplicateRequest.approvedAt === undefined && duplicateRequest.rejectedAt === undefined) {
+        return currentRuntimeState
+      }
 
-    return {
-      ...currentRuntimeState,
-      shutdownRequests: [
-        ...currentRuntimeState.shutdownRequests,
-        { memberId: targetMemberName, requesterName, requestedAt: Date.now() },
-      ],
-    }
-  }, config)
+      return {
+        ...currentRuntimeState,
+        shutdownRequests: [
+          ...currentRuntimeState.shutdownRequests,
+          { memberId: targetMemberName, requesterName, requestedAt: Date.now() },
+        ],
+      }
+    },
+    config,
+  )
 }
 
 export async function approveShutdown(
@@ -72,31 +73,35 @@ export async function approveShutdown(
     return
   }
 
-  const updatedRuntimeState = await transitionRuntimeState(teamRunId, (currentRuntimeState) => {
-    const currentRequestIndex = findLatestShutdownRequestIndex(currentRuntimeState, memberName)
-    if (currentRequestIndex < 0) {
-      throw new Error(`shutdown request missing for '${memberName}'`)
-    }
+  const updatedRuntimeState = await transitionRuntimeState(
+    teamRunId,
+    (currentRuntimeState) => {
+      const currentRequestIndex = findLatestShutdownRequestIndex(currentRuntimeState, memberName)
+      if (currentRequestIndex < 0) {
+        throw new Error(`shutdown request missing for '${memberName}'`)
+      }
 
-    const currentRequest = currentRuntimeState.shutdownRequests[currentRequestIndex]
-    if (!currentRequest || currentRequest.approvedAt !== undefined) {
-      return currentRuntimeState
-    }
+      const currentRequest = currentRuntimeState.shutdownRequests[currentRequestIndex]
+      if (!currentRequest || currentRequest.approvedAt !== undefined) {
+        return currentRuntimeState
+      }
 
-    return {
-      ...currentRuntimeState,
-      members: currentRuntimeState.members.map((member) => {
-        if (member.name !== memberName || member.status === "completed" || member.status === "errored") {
-          return member
-        }
+      return {
+        ...currentRuntimeState,
+        members: currentRuntimeState.members.map((member) => {
+          if (member.name !== memberName || member.status === "completed" || member.status === "errored") {
+            return member
+          }
 
-        return { ...member, status: "shutdown_approved" }
-      }),
-      shutdownRequests: currentRuntimeState.shutdownRequests.map((shutdownRequest, index) => index === currentRequestIndex
-        ? { ...shutdownRequest, approvedAt: Date.now() }
-        : shutdownRequest),
-    }
-  }, config)
+          return { ...member, status: "shutdown_approved" }
+        }),
+        shutdownRequests: currentRuntimeState.shutdownRequests.map((shutdownRequest, index) =>
+          index === currentRequestIndex ? { ...shutdownRequest, approvedAt: Date.now() } : shutdownRequest,
+        ),
+      }
+    },
+    config,
+  )
 
   await sendMessage(
     createShutdownMessage(approverName, getLeadMemberName(updatedRuntimeState), "shutdown_approved", memberName),
@@ -132,17 +137,23 @@ export async function rejectShutdown(
     createSendContext(runtimeState, rejectorName),
   )
 
-  await transitionRuntimeState(teamRunId, (currentRuntimeState) => {
-    const currentRequestIndex = findLatestShutdownRequestIndex(currentRuntimeState, memberName)
-    if (currentRequestIndex < 0) {
-      throw new Error(`shutdown request missing for '${memberName}'`)
-    }
+  await transitionRuntimeState(
+    teamRunId,
+    (currentRuntimeState) => {
+      const currentRequestIndex = findLatestShutdownRequestIndex(currentRuntimeState, memberName)
+      if (currentRequestIndex < 0) {
+        throw new Error(`shutdown request missing for '${memberName}'`)
+      }
 
-    return {
-      ...currentRuntimeState,
-      shutdownRequests: currentRuntimeState.shutdownRequests.map((currentRequest, index) => index === currentRequestIndex
-        ? { ...currentRequest, rejectedAt: Date.now(), rejectedReason: reason }
-        : currentRequest),
-    }
-  }, config)
+      return {
+        ...currentRuntimeState,
+        shutdownRequests: currentRuntimeState.shutdownRequests.map((currentRequest, index) =>
+          index === currentRequestIndex
+            ? { ...currentRequest, rejectedAt: Date.now(), rejectedReason: reason }
+            : currentRequest,
+        ),
+      }
+    },
+    config,
+  )
 }

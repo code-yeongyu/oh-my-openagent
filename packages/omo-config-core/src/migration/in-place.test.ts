@@ -19,12 +19,14 @@ describe("runMigration replace-target mode", () => {
     }
 
     // when
-    expect(() => runMigration({
-      ...options,
-      onBoundary: (boundary) => {
-        if (boundary === "journal-written") throw new Error("crash")
-      },
-    })).toThrow("crash")
+    expect(() =>
+      runMigration({
+        ...options,
+        onBoundary: (boundary) => {
+          if (boundary === "journal-written") throw new Error("crash")
+        },
+      }),
+    ).toThrow("crash")
     const resumed = runMigration(options)
 
     // then

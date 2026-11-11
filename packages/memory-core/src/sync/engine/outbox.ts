@@ -74,11 +74,14 @@ interface StoredPending {
 const EMPTY: PendingOps = { items: [], outgoing: null }
 
 const isInline = (item: StoredItem): item is InlineItem => "ops" in item && typeof item.ops === "string"
-const isIndexed = (item: StoredItem): item is PendingItem => "digest" in item && typeof item.digest === "string" && "segment" in item && typeof item.segment === "string"
+const isIndexed = (item: StoredItem): item is PendingItem =>
+  "digest" in item && typeof item.digest === "string" && "segment" in item && typeof item.segment === "string"
 const needsConversion = (stored: StoredPending): boolean =>
-  stored.items.some(isInline) || (stored.outgoing !== null && (stored.outgoing.bytes !== undefined || stored.outgoing.items.some(isInline)))
+  stored.items.some(isInline) ||
+  (stored.outgoing !== null && (stored.outgoing.bytes !== undefined || stored.outgoing.items.some(isInline)))
 
-const itemDigest = (key: string, ops: Uint8Array): string => createHash("sha256").update(key).update("\u0000").update(ops).digest("hex")
+const itemDigest = (key: string, ops: Uint8Array): string =>
+  createHash("sha256").update(key).update("\u0000").update(ops).digest("hex")
 const sha256Hex = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex")
 
 export class Outbox {
@@ -139,7 +142,7 @@ export class Outbox {
     const ops = new Uint8Array(item.bytes)
     const handle = await open(join(this.dir, item.segment), "r")
     try {
-      for (let done = 0; done < item.bytes; ) {
+      for (let done = 0; done < item.bytes;) {
         const { bytesRead } = await handle.read(ops, done, item.bytes - done, item.offset + done)
         if (bytesRead === 0) throw new Error(`the pending ops of ${item.key} end early in ${item.segment}`)
         done += bytesRead
@@ -147,7 +150,8 @@ export class Outbox {
     } finally {
       await handle.close()
     }
-    if (itemDigest(item.key, ops) !== item.digest) throw new Error(`the pending ops of ${item.key} in ${item.segment} do not match their digest`)
+    if (itemDigest(item.key, ops) !== item.digest)
+      throw new Error(`the pending ops of ${item.key} in ${item.segment} do not match their digest`)
     return ops
   }
 
@@ -158,7 +162,8 @@ export class Outbox {
   /** A sealed batch's bytes, checked against its digest: a damaged journal fails here, never on the wire. */
   async readBatch(batch: Pick<OutgoingBatch, "batchId" | "digest">): Promise<Uint8Array> {
     const bytes = new Uint8Array(await readFile(this.batchPath(batch.batchId)))
-    if (sha256Hex(bytes) !== batch.digest) throw new Error(`the sealed bytes of batch ${batch.batchId} do not match their digest`)
+    if (sha256Hex(bytes) !== batch.digest)
+      throw new Error(`the sealed bytes of batch ${batch.batchId} do not match their digest`)
     return bytes
   }
 

@@ -23,7 +23,9 @@ export function createPalaceRuntimeLoader(importRuntime: () => Promise<PalaceRun
   }
 }
 
-export const loadPalaceRuntime: PalaceRuntimeLoader = createPalaceRuntimeLoader(() => import("#omo-memory-palace-runtime"))
+export const loadPalaceRuntime: PalaceRuntimeLoader = createPalaceRuntimeLoader(
+  () => import("#omo-memory-palace-runtime"),
+)
 
 export function palaceRuntimeLoadFailure(command: "palace" | "people", error: unknown): string {
   const cause = error instanceof Error ? error.message : String(error)

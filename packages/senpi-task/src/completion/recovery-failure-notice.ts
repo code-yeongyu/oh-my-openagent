@@ -19,7 +19,8 @@ const ACTIONS: Readonly<Record<string, string>> = {
   transcript_unavailable: "Submit a new task with the remaining work and any saved findings you still have.",
   host_incompatible: "Update OmO to a compatible version and restart it, then submit the remaining work.",
   store_index_unavailable: "Restore access and permissions to the task data directory, then submit the remaining work.",
-  isolated_not_revivable: "Inspect the retained checkout and its changes before submitting the remaining work in a new task.",
+  isolated_not_revivable:
+    "Inspect the retained checkout and its changes before submitting the remaining work in a new task.",
 }
 
 /** Plain recovery failure shared by the record and its one terminal completion. Raw causes stay in events. */
@@ -29,8 +30,7 @@ export function recoveryFailureNotice(
 ): string {
   const task = record.description ?? record.task_summary ?? "Background task"
   const cause = record.revival_deferred_reason ?? record.suspension_reason ?? ""
-  const reason = REASONS[cause]
-    ?? "its interrupted session could not be reopened after automatic retries"
+  const reason = REASONS[cause] ?? "its interrupted session could not be reopened after automatic retries"
   const action = ACTIONS[cause] ?? `Retry "${task}" with the task tool using its original request.`
   return userActionNotice(
     confirmedStop

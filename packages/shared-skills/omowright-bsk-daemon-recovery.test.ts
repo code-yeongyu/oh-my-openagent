@@ -45,7 +45,10 @@ async function fakeDaemonWithoutDaemonJson(handlers: Record<string, (frame: Fram
   })
   // The daemon's default IPC endpoint is a Unix socket at $BSK_HOME/run/daemon.sock. Windows has no such socket: there the
   // daemon is reached over a named pipe passed as `sockPath` (omowright skills/omowright/references/browserskill.md).
-  const sockPath = process.platform === "win32" ? `\\\\.\\pipe\\omo-bsk-test-${randomBytes(6).toString("hex")}` : join(home, "run", "daemon.sock")
+  const sockPath =
+    process.platform === "win32"
+      ? `\\\\.\\pipe\\omo-bsk-test-${randomBytes(6).toString("hex")}`
+      : join(home, "run", "daemon.sock")
   await new Promise<void>((resolve) => server.listen(sockPath, resolve))
   cleanups.push(async () => {
     for (const socket of sockets) socket.destroy()
@@ -59,19 +62,22 @@ async function fakeDaemonWithoutDaemonJson(handlers: Record<string, (frame: Fram
 // socket, and its probe returns false on win32 (src/bsk/ipc-client.js probeSocket: `process.platform === "win32"`),
 // because Windows named pipes are not discovered automatically (skills/omowright/references/browserskill.md, "Remote
 // browsers"). On Windows a caller passes `sockPath` instead, so there is no orphan-by-default-path case to re-adopt.
-test.skipIf(process.platform === "win32")("a live BrowserSkill daemon without daemon.json is re-adopted, never restarted (#10216)", async () => {
-  // Given a daemon still serving $BSK_HOME/run/daemon.sock after daemon.json disappeared
-  const daemon = await fakeDaemonWithoutDaemonJson({})
-  let starts = 0
-  const client = new BskIpcClient({ home: daemon.home, autoStart: true, startDaemon: async () => void starts++ })
+test.skipIf(process.platform === "win32")(
+  "a live BrowserSkill daemon without daemon.json is re-adopted, never restarted (#10216)",
+  async () => {
+    // Given a daemon still serving $BSK_HOME/run/daemon.sock after daemon.json disappeared
+    const daemon = await fakeDaemonWithoutDaemonJson({})
+    let starts = 0
+    const client = new BskIpcClient({ home: daemon.home, autoStart: true, startDaemon: async () => void starts++ })
 
-  // When the doctor or any call asks for it
-  const result = await client.call("system.ping", {})
+    // When the doctor or any call asks for it
+    const result = await client.call("system.ping", {})
 
-  // Then the live daemon answers and no second daemon is started on the held port
-  expect(result).toEqual({ pong: true })
-  expect(starts).toBe(0)
-})
+    // Then the live daemon answers and no second daemon is started on the held port
+    expect(result).toEqual({ pong: true })
+    expect(starts).toBe(0)
+  },
+)
 
 test("a call the client gives up on is cancelled at the daemon, so the session stays usable (#10217)", async () => {
   // Given an evaluate that never answers

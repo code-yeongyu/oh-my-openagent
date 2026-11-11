@@ -15,7 +15,10 @@ function enclosingArray(source: string, at: number): string | null {
     const char = source[index]
     if (char === "]") depth += 1
     if (char === "[") {
-      if (depth === 0) { start = index; break }
+      if (depth === 0) {
+        start = index
+        break
+      }
       depth -= 1
     }
   }
@@ -38,7 +41,11 @@ function parsedGitReads(source: string): { readonly line: number; readonly argv:
     const argv = enclosingArray(source, match.index)
     if (argv === null) continue
     if (match[1] === "show" && !SHOW_PARSES_HEADERS.test(argv)) continue
-    reads.push({ line: source.slice(0, match.index).split("\n").length, argv, pinned: argv.includes("...STABLE_LOG_OUTPUT") })
+    reads.push({
+      line: source.slice(0, match.index).split("\n").length,
+      argv,
+      pinned: argv.includes("...STABLE_LOG_OUTPUT"),
+    })
   }
   return reads
 }
@@ -47,7 +54,7 @@ async function productionSources(dir: string): Promise<string[]> {
   const files: string[] = []
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name)
-    if (entry.isDirectory()) files.push(...await productionSources(path))
+    if (entry.isDirectory()) files.push(...(await productionSources(path)))
     else if (/\.(ts|mts)$/.test(entry.name) && !/\.test\.|test-support|\.d\.ts$/.test(entry.name)) files.push(path)
   }
   return files
@@ -66,7 +73,10 @@ describe("STABLE_LOG_OUTPUT coverage", () => {
     const reads = parsedGitReads(source)
 
     // then
-    expect(reads.map((read) => [read.line, read.pinned])).toEqual([[1, false], [2, true]])
+    expect(reads.map((read) => [read.line, read.pinned])).toEqual([
+      [1, false],
+      [2, true],
+    ])
   })
 
   it("#given memory-core production sources #when every parsed log/show/diff-tree read is found #then each one spreads STABLE_LOG_OUTPUT", async () => {
@@ -74,12 +84,21 @@ describe("STABLE_LOG_OUTPUT coverage", () => {
     const files = await productionSources(SOURCE_ROOT)
 
     // when
-    const reads = (await Promise.all(files.map(async (file) =>
-      parsedGitReads(await readFile(file, "utf8")).map((read) => ({ ...read, file: relative(SOURCE_ROOT, file).split(sep).join("/") })),
-    ))).flat()
+    const reads = (
+      await Promise.all(
+        files.map(async (file) =>
+          parsedGitReads(await readFile(file, "utf8")).map((read) => ({
+            ...read,
+            file: relative(SOURCE_ROOT, file).split(sep).join("/"),
+          })),
+        ),
+      )
+    ).flat()
 
     // then
-    expect(reads.map((read) => read.file)).toEqual(expect.arrayContaining(["git/repo-commit-times.ts", "git/repo-revision-reads.ts", "git/commit-outcome.ts"]))
+    expect(reads.map((read) => read.file)).toEqual(
+      expect.arrayContaining(["git/repo-commit-times.ts", "git/repo-revision-reads.ts", "git/commit-outcome.ts"]),
+    )
     expect(reads.filter((read) => !read.pinned).map((read) => `${read.file}:${read.line} ${read.argv}`)).toEqual([])
   })
 })

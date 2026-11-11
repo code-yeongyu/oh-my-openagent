@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { spawnSync } from "node:child_process"
@@ -37,7 +46,9 @@ describe("install.sh POSIX preamble", () => {
 
       expect(result.status).toBe(1)
       expect(result.stdout).toBe("")
-      expect(result.stderr).toBe("omo installer: bash is required; run with: curl -fsSL https://get.omo.dev/install.sh | bash\n")
+      expect(result.stderr).toBe(
+        "omo installer: bash is required; run with: curl -fsSL https://get.omo.dev/install.sh | bash\n",
+      )
       expect(result.stderr).not.toContain("syntax error")
     })
   }
@@ -50,7 +61,10 @@ describe("install.sh POSIX preamble", () => {
     const captured = join(root, "captured.sh")
     const args = join(root, "args")
     const fakeBash = join(bin, "bash")
-    writeFileSync(fakeBash, `#!/bin/sh\ncp "$1" ${JSON.stringify(captured)}\nshift\nprintf '%s\\n' "$@" >${JSON.stringify(args)}\n`)
+    writeFileSync(
+      fakeBash,
+      `#!/bin/sh\ncp "$1" ${JSON.stringify(captured)}\nshift\nprintf '%s\\n' "$@" >${JSON.stringify(args)}\n`,
+    )
     chmodSync(fakeBash, 0o755)
     linkCommand(bin, "cp")
 

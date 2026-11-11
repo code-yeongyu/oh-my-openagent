@@ -19,10 +19,21 @@ miss has another cause and you climb the ladder instead.
 
 ## Dialogs never block
 
-`alert`, `confirm`, `prompt`, and `beforeunload` are answered by the `dialogPolicy` passed to
-`connectPipe` (or `browser.setDialogPolicy`), at the protocol layer, before the page sees them.
-Default to accepting (`{ accept: true }`; a function receives `{ type, message }` and returns
-`{ accept, promptText }`). `page.on("dialog")` still fires for observability. A run that hangs on
+`alert`, `confirm`, `prompt`, and `beforeunload` are answered at the protocol layer, before the
+page sees them: by a `dialog` listener that answers, otherwise by the `dialogPolicy` passed to
+`connectPipe` (or `browser.setDialogPolicy`). Default to accepting (`{ accept: true }`; a policy
+function receives a plain `{ type, message, defaultPrompt, url }` and returns `{ accept, promptText }`).
+
+`page.on("dialog", (dialog) => ...)` hands each listener a Playwright-style `Dialog` object, not a
+plain object: read it through methods (`dialog.type()`, `dialog.message()`, `dialog.defaultValue()`,
+and the `dialog.url` getter). A listener can answer it itself, which replaces the policy for that
+dialog; a listener that only observes leaves it to the policy:
+
+```js
+page.on("dialog", (dialog) => dialog.type() === "prompt" ? dialog.accept("42") : dialog.dismiss())
+```
+
+A dialog is answered once; a second `accept()` / `dismiss()` throws. A run that hangs on
 an unhandled dialog looks exactly like a hang with no cause, which is the most expensive kind to
 diagnose.
 

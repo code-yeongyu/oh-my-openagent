@@ -65,7 +65,11 @@ describe("rankRecallDocumentsBm25 with English suffixes", () => {
   it("#given a note that says rollbacks #when the query says rollback #then bm25 finds it", () => {
     // given
     const documents = [
-      { path: "reference/ko/english-mixed.md", description: "카나리 배포 정책", body: "rollbacks가 잦으면 canary 비율을 낮춘다" },
+      {
+        path: "reference/ko/english-mixed.md",
+        description: "카나리 배포 정책",
+        body: "rollbacks가 잦으면 canary 비율을 낮춘다",
+      },
       { path: "reference/ko/coffee.md", description: "커피 원두", body: "원두는 금요일에 채운다" },
     ]
 

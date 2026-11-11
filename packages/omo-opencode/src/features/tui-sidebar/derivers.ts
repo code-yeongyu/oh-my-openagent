@@ -1,14 +1,6 @@
 import { MAX_AGENTS, MAX_JOBS } from "./constants"
 import type { TuiRuntimeSnapshot } from "./snapshot-schema"
-import type {
-  AgentsState,
-  ConfigState,
-  JobBoardState,
-  JobRow,
-  LoopState,
-  RosterRow,
-  RosterState,
-} from "./state-types"
+import type { AgentsState, ConfigState, JobBoardState, JobRow, LoopState, RosterRow, RosterState } from "./state-types"
 import type { BackgroundTaskStatus } from "../background-agent/types"
 
 const JOB_STATUS_PRIORITY: Record<BackgroundTaskStatus, number> = {
@@ -20,10 +12,7 @@ const JOB_STATUS_PRIORITY: Record<BackgroundTaskStatus, number> = {
   completed: 5,
 }
 
-export function deriveConfig(v: {
-  readonly valid: boolean
-  readonly messages: readonly string[]
-}): ConfigState {
+export function deriveConfig(v: { readonly valid: boolean; readonly messages: readonly string[] }): ConfigState {
   if (v.valid) {
     return { kind: "valid" }
   }

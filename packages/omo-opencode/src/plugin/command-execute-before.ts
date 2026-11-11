@@ -16,9 +16,7 @@ type CommandExecuteBeforeOutput = {
 
 const NATIVE_GOAL_COMMAND_MARKER = "<omo-native-goal-command>"
 
-export function markNativeGoalCommand(
-  parts: CommandExecuteBeforeOutput["parts"],
-): void {
+export function markNativeGoalCommand(parts: CommandExecuteBeforeOutput["parts"]): void {
   parts.push({
     type: "text",
     text: NATIVE_GOAL_COMMAND_MARKER,
@@ -26,15 +24,9 @@ export function markNativeGoalCommand(
   })
 }
 
-export function consumeNativeGoalCommandMarker(
-  parts: CommandExecuteBeforeOutput["parts"],
-): boolean {
+export function consumeNativeGoalCommandMarker(parts: CommandExecuteBeforeOutput["parts"]): boolean {
   const markerIndex = parts.findIndex(
-    (part) => (
-      part.type === "text"
-      && part.text === NATIVE_GOAL_COMMAND_MARKER
-      && part["synthetic"] === true
-    ),
+    (part) => part.type === "text" && part.text === NATIVE_GOAL_COMMAND_MARKER && part["synthetic"] === true,
   )
   if (markerIndex === -1) {
     return false
@@ -55,10 +47,7 @@ export function createCommandExecuteBeforeHandler(args: {
   hooks: CreatedHooks
   mcpManager?: SkillMcpManager
   notify?: (message: string) => void
-}): (
-  input: CommandExecuteBeforeInput,
-  output: CommandExecuteBeforeOutput,
-) => Promise<void> {
+}): (input: CommandExecuteBeforeInput, output: CommandExecuteBeforeOutput) => Promise<void> {
   const { directory, hooks } = args
 
   return async (input, output): Promise<void> => {
@@ -103,11 +92,7 @@ export function createCommandExecuteBeforeHandler(args: {
       markNativeGoalCommand(output.parts)
     }
 
-    if (
-      hooks.ulwExecute
-      && normalizedCommand === "ulw-execute"
-      && hasPartsOutput(output)
-    ) {
+    if (hooks.ulwExecute && normalizedCommand === "ulw-execute" && hasPartsOutput(output)) {
       await hooks.ulwExecute["command.execute.before"]?.(input, output)
       if (hooks.stopContinuationGuard?.isStopped(sessionID)) {
         hooks.stopContinuationGuard.clear(sessionID)

@@ -42,7 +42,10 @@ test("#given a canonical reasoning level #when the Codex installer runs #then co
       scripts: { build: "exit 42" },
     }),
   )
-  await writeFile(join(pluginRoot, "components", "ulw-loop", "package.json"), JSON.stringify({ name: "@code-yeongyu/codex-ulw-loop", version: "0.1.0" }))
+  await writeFile(
+    join(pluginRoot, "components", "ulw-loop", "package.json"),
+    JSON.stringify({ name: "@code-yeongyu/codex-ulw-loop", version: "0.1.0" }),
+  )
   await writeFile(
     join(pluginRoot, "components", "ulw-loop", "hooks", "hooks.json"),
     JSON.stringify({
@@ -82,7 +85,9 @@ test("#given a canonical reasoning level #when the Codex installer runs #then co
   )
   await writeFile(
     join(pluginRoot, ".mcp.json"),
-    JSON.stringify({ mcpServers: { lsp: { command: "node", args: ["../../lsp-daemon/dist/cli.js", "mcp"], cwd: "." } } }),
+    JSON.stringify({
+      mcpServers: { lsp: { command: "node", args: ["../../lsp-daemon/dist/cli.js", "mcp"], cwd: "." } },
+    }),
   )
   await writeFile(join(pluginRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
   await writeFile(join(pluginRoot, "components", "comment-checker", "dist", "cli.js"), "#!/usr/bin/env node\n")

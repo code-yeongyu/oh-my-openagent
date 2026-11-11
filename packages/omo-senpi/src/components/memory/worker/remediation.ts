@@ -30,10 +30,10 @@ export function reflectionRemediation(
   // The senpi child prints `Error: Model "<selector>" not found. Use --list-models ...`, so the quoted
   // selector has to be matched too, otherwise a repeating model miss degrades to the generic child-log hint.
   if (
-    combined.includes("model-not-found")
-    || combined.includes("model_not_visible")
-    || combined.includes("model not found")
-    || /model\s+"[^"]+"\s+not found/.test(combined)
+    combined.includes("model-not-found") ||
+    combined.includes("model_not_visible") ||
+    combined.includes("model not found") ||
+    /model\s+"[^"]+"\s+not found/.test(combined)
   ) {
     return "the reflection child cannot see the configured category model; adjust memory.reflection category/model in your omo config"
   }
@@ -41,7 +41,9 @@ export function reflectionRemediation(
   // directory is pruned by the time this hint renders - so child-stderr.log is a dead pointer.
   // Only a real user-namespace refusal gets the namespace remedy; any other bwrap error keeps the
   // sandbox on, because telling users to disable isolation for an unrelated failure is wrong (#10317).
-  const missingBindSource = /can't find source path (.+?):? no such file or directory/i.exec(`${reason ?? ""} ${detail ?? ""}`)
+  const missingBindSource = /can't find source path (.+?):? no such file or directory/i.exec(
+    `${reason ?? ""} ${detail ?? ""}`,
+  )
   if (missingBindSource) {
     const path = missingBindSource[1]
     return `the sandbox could not bind ${path} because that directory does not exist yet; create it with mkdir -p ${shellQuote(path)} and run /reflect again (the sandbox itself is working)`

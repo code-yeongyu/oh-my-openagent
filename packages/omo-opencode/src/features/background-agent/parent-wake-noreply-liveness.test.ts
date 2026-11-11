@@ -627,7 +627,9 @@ describe("BackgroundManager parent wake recent-activity admission liveness", () 
     const pendingByParent = Reflect.get(manager, "pendingByParent") as Map<string, Set<string>>
     pendingByParent.set(task.parentSessionId, new Set([task.id]))
     const notifyParentSession = Reflect.get(manager, "notifyParentSession") as (task: BackgroundTask) => Promise<void>
-    const flushPendingParentWake = Reflect.get(manager, "flushPendingParentWake") as (sessionID: string) => Promise<void>
+    const flushPendingParentWake = Reflect.get(manager, "flushPendingParentWake") as (
+      sessionID: string,
+    ) => Promise<void>
     const parentWakeNotifier = Reflect.get(manager, "parentWakeNotifier") as ParentWakeNotifier
 
     try {
