@@ -37,41 +37,39 @@ function sharedState(): SenpiBarrelSharedState {
 
 export function loadSenpiBarrel(): Promise<SenpiBarrelModule> {
   const state = sharedState()
-  state.promise ??= import("@code-yeongyu/senpi").then(
-    (loaded) => {
-      state.module = loaded
-      return loaded
-    },
-    (error: unknown) => {
-      throw senpiBarrelLoadFailure(error)
-    },
-  )
+  state.promise ??= import("@code-yeongyu/senpi").then((loaded) => {
+    state.module = loaded
+    return loaded
+  })
   return state.promise
 }
 
-/** The engine's own refusal code when its process-wide redaction registry slot is foreign or incompatible (#12965). */
-const REDACTION_SLOT_REFUSAL = "SENPI_REDACTION_SLOT_INCOMPATIBLE"
-
 /**
- * The engine refuses to load next to a redaction registry it did not pin, and the refusal is permanent for the
- * process (a failed module evaluation is cached), so the only remedy is a restart. Child starts await this load and
- * fail with this error, naming that remedy.
+ * Makes the barrel the engine this extension is running in (#12965). On Node the plugin's own import of the engine
+ * index evaluates a second copy next to the bundled CLI, so a seeded barrel never imports it: every loader and
+ * reader, in every bundle copy, gets the running engine. It wins over an earlier import result, and the host
+ * accessors read their exports again.
  */
-export class SenpiEngineRestartRequiredError extends Error {
-  override readonly name = "SenpiEngineRestartRequiredError"
-  readonly code = REDACTION_SLOT_REFUSAL
-
-  constructor(cause: unknown) {
-    super(
-      "The @code-yeongyu/senpi engine refused to load because an incompatible engine copy is already loaded in this process. Restart omo to start task children again.",
-      { cause },
-    )
-  }
+export function seedSenpiBarrel(engine: SenpiBarrelModule): void {
+  const state = sharedState()
+  state.module = engine
+  state.promise = Promise.resolve(engine)
+  state.exports = undefined
 }
 
-function senpiBarrelLoadFailure(error: unknown): unknown {
-  const code = typeof error === "object" && error !== null ? Reflect.get(error, "code") : undefined
-  return code === REDACTION_SLOT_REFUSAL ? new SenpiEngineRestartRequiredError(error) : error
+/** The duck-type at the engine-pin boundary: an engine namespace carries the session factory. */
+function isSenpiBarrelModule(value: unknown): value is SenpiBarrelModule {
+  return typeof value === "object" && value !== null && typeof Reflect.get(value, "createAgentSession") === "function"
+}
+
+/**
+ * Seeds the barrel from `pi.engine`, the engine namespace the extension API carries. Engines that predate it have
+ * no such property, and the barrel keeps importing the engine index as before. Every extension factory that ships
+ * the barrel calls this first.
+ */
+export function seedSenpiBarrelFromExtensionApi(pi: unknown): void {
+  const engine: unknown = typeof pi === "object" && pi !== null ? Reflect.get(pi, "engine") : undefined
+  if (isSenpiBarrelModule(engine)) seedSenpiBarrel(engine)
 }
 
 /**

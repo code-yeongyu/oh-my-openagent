@@ -1,7 +1,9 @@
 // The slice of senpi's job-widget host API (root export of `@code-yeongyu/senpi`, senpi#4677) omo uses,
 // declared structurally and read off the loaded module at runtime: a senpi that predates the API
 // simply has no such exports, and omo then registers nothing (no author route, no task widgets).
-// Inside senpi the module import resolves to the host's own loaded module.
+// It is read through the senpi barrel, which inside senpi is the engine that loaded the plugin (#12965).
+
+import { loadSenpiBarrel } from "../../../../senpi-task/src/lazy/senpi-barrel"
 
 export interface JobWidgetTextChunk {
   readonly start: number
@@ -101,5 +103,5 @@ function buildJobWidgetHost(module: object): JobWidgetHostApi {
 }
 
 export async function loadJobWidgetHost(): Promise<JobWidgetHostApi> {
-  return readJobWidgetHost(await import("@code-yeongyu/senpi"))
+  return readJobWidgetHost(await loadSenpiBarrel())
 }
