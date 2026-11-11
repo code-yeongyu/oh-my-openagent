@@ -4,7 +4,6 @@ on:
   push:
     branches: [master, dev]
   pull_request:
-    branches: [master, dev]
     types: [opened, synchronize, reopened]
   merge_group:
     types: [checks_requested]
