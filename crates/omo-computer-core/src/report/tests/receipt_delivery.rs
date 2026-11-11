@@ -1,7 +1,7 @@
 //! A receipt is never under `not_delivered/*` (whose retry claims nothing reached the target)
 //! or `delivered_unverified` (defined as having no receipt). A landed unit's receipt stays under
-//! `delivery_uncertain/*` (LEAD ruling 2026-11-11); `unknown/unknown` is pinned as accepted
-//! pending a design ruling (#13147).
+//! `delivery_uncertain/*` (LEAD ruling 2026-11-11), and never under `unknown/unknown` (LEAD
+//! ruling 2026-11-11 (R13, #13147)): a proven landed unit makes the report `delivery_uncertain`.
 
 use serde_json::json;
 
@@ -158,11 +158,11 @@ fn landed_unit_receipts_stay_under_an_uncertain_partial_report() {
     }
 }
 
-/// PROVISIONAL: pins the CURRENT behaviour, pending a design ruling tracked by #13147. Neither
-/// LEAD ruling 2026-11-11 nor #13118 covers a receipt under `unknown/unknown`, so it is accepted
-/// as today; when #13147 is ruled, this test changes with the rule.
+/// LEAD ruling 2026-11-11 (R13, #13147): a receipt under `unknown/unknown` is refused. A
+/// proven landed unit makes the report `delivery_uncertain`; `unknown` means nothing was
+/// observed, so a receipt contradicts it.
 #[test]
-fn receipt_under_unknown_delivery_is_accepted_pending_13147() {
+fn receipt_under_unknown_delivery_is_refused() {
     let windows = ReportContext::new(VerbClass::Action, Some(Platform::Windows));
     let receipted = || {
         counted(
@@ -171,9 +171,25 @@ fn receipt_under_unknown_delivery_is_accepted_pending_13147() {
             vec![Evidence::barrier_consumed()],
         )
     };
+    let rejection = ReportRejection::ReceiptWithoutVerifiedDelivery {
+        delivery: Delivery::Unknown,
+    };
     let built = ActionReport::new(windows, receipted());
     println!("unknown/unknown partial with a barrier: {built:?}");
-    assert!(built.is_ok(), "the constructor: {built:?}");
+    assert_eq!(built.err(), Some(rejection), "the constructor");
     let parsed = build(None, receipted());
-    assert!(parsed.is_ok(), "the wire parse: {parsed:?}");
+    assert!(
+        parsed
+            .as_ref()
+            .is_err_and(|why| why.contains(&format!("{rejection:?}"))),
+        "the wire parse refuses with {rejection:?}: {parsed:?}"
+    );
+    let bare = build(
+        None,
+        counted(Disposition::UNKNOWN, Effect::Partial, Vec::new()),
+    );
+    assert!(
+        bare.is_ok(),
+        "the same report without the receipt is valid: {bare:?}"
+    );
 }
