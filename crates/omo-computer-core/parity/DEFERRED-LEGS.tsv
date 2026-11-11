@@ -3,4 +3,3 @@ C1	`trace_full_literal_accepted_true_is_jsonl_only` on the fake	12	14	owed
 C2	`hello_generation_quarantines_stale_reply` (restart-mid-call: 1 quarantined reply, `delivery_uncertain/unsafe`); AC-39 quarantine leg	12	15	owed
 C17	the `admissionKeys` set K8 fingerprints equals the rows the table marks (k-safety N5)	12	37	owed
 T1	`conformance_replay` byte-equal modulo variable pointers on the three CI legs (AC-1 replay leg)	14	15	owed
-C1	`trace_full_literal_accepted_true_is_jsonl_only` on the fake (needs the session trace writer)	14	20	owed
