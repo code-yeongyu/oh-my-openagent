@@ -1,20 +1,11 @@
 import { join } from "node:path"
 
 import type { ReflectionSpawnArgs } from "./worker/spawn"
-import {
-  SandboxUnavailableError,
-  type SandboxPolicy,
-  type SandboxTransform,
-} from "./sandbox-contracts"
+import { SandboxUnavailableError, type SandboxPolicy, type SandboxTransform } from "./sandbox-contracts"
 import { buildPathSandboxTransform, type SandboxUsability } from "./sandbox-platform"
 
-export {
-  SandboxUnavailableError,
-  type SandboxPolicy,
-  type SandboxTransform,
-} from "./sandbox-contracts"
+export { SandboxUnavailableError, type SandboxPolicy, type SandboxTransform } from "./sandbox-contracts"
 export type { SandboxUsability } from "./sandbox-platform"
-
 
 export function buildSandboxTransform(input: {
   readonly policy: SandboxPolicy
@@ -37,11 +28,7 @@ export function buildSandboxTransform(input: {
   return buildPathSandboxTransform({
     surface: "reflection",
     policy: input.policy,
-    writableDirs: [
-      input.worktreeDir,
-      input.gitCommonDir,
-      ...(input.runtimeWrites ?? []),
-    ],
+    writableDirs: [input.worktreeDir, input.gitCommonDir, ...(input.runtimeWrites ?? [])],
     payloadPaths: input.payloadPaths,
     fallbackDir: input.worktreeDir,
     foreignRoots: input.foreignRoots,

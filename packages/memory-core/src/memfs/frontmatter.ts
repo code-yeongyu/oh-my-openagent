@@ -69,7 +69,6 @@ export function parseMemoryFile(content: string): ParsedMemoryFile {
   const extra: Record<string, string> = {}
 
   for (const { key, value, line } of frontmatterEntries(frontmatterText)) {
-
     if (key === "description") {
       description = decodeScalarSource(value)
     } else if (key === "read_only") {
@@ -147,7 +146,8 @@ function assertStrictRoundTrip(headerText: string, rendered: string, frontmatter
   const mismatches: string[] = []
   if (reparsed.description !== frontmatter.description) mismatches.push("description")
   if (reparsed.read_only !== frontmatter.read_only) mismatches.push("read_only")
-  if (frontmatter.kind !== undefined && reparsed.kind !== sanitizeFrontmatterValue(frontmatter.kind)) mismatches.push("kind")
+  if (frontmatter.kind !== undefined && reparsed.kind !== sanitizeFrontmatterValue(frontmatter.kind))
+    mismatches.push("kind")
   if (JSON.stringify(reparsed.aliases) !== JSON.stringify(frontmatter.aliases)) mismatches.push("aliases")
   for (const key of Object.keys(frontmatter.extra ?? {})) {
     if (reparsed.extra?.[key] === undefined) mismatches.push(key)
@@ -164,9 +164,7 @@ function sanitizeFrontmatterValue(value: string): string {
 function parseAliases(value: string, rawLine: string): readonly string[] {
   const trimmed = value.trim()
   if (!trimmed.startsWith("[")) {
-    throw new FrontmatterError(
-      `frontmatter: 'aliases' must be a JSON array of non-empty strings (line: ${rawLine})`,
-    )
+    throw new FrontmatterError(`frontmatter: 'aliases' must be a JSON array of non-empty strings (line: ${rawLine})`)
   }
 
   let parsed: unknown
@@ -177,16 +175,12 @@ function parseAliases(value: string, rawLine: string): readonly string[] {
   }
 
   if (!Array.isArray(parsed)) {
-    throw new FrontmatterError(
-      `frontmatter: 'aliases' must be a JSON array, not ${typeof parsed} (line: ${rawLine})`,
-    )
+    throw new FrontmatterError(`frontmatter: 'aliases' must be a JSON array, not ${typeof parsed} (line: ${rawLine})`)
   }
 
   for (const item of parsed) {
     if (typeof item !== "string" || item.trim() === "") {
-      throw new FrontmatterError(
-        `frontmatter: 'aliases' array must contain only non-empty strings (line: ${rawLine})`,
-      )
+      throw new FrontmatterError(`frontmatter: 'aliases' array must contain only non-empty strings (line: ${rawLine})`)
     }
   }
 

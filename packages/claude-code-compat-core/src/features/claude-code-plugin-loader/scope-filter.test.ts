@@ -190,9 +190,7 @@ describe("shouldLoadPluginForCwd", () => {
 
     it("#when the expanded home matches cwd #then it loads", async () => {
       //#given
-      const { shouldLoadPluginForCwd: freshShouldLoad } = await import(
-        `./scope-filter?t=${Date.now()}-tilde-match`
-      )
+      const { shouldLoadPluginForCwd: freshShouldLoad } = await import(`./scope-filter?t=${Date.now()}-tilde-match`)
       const installation = {
         scope: "project" as const,
         projectPath: "~/workspace/proj-a",
@@ -208,9 +206,7 @@ describe("shouldLoadPluginForCwd", () => {
 
     it("#when the expanded home does not match cwd #then it is skipped", async () => {
       //#given
-      const { shouldLoadPluginForCwd: freshShouldLoad } = await import(
-        `./scope-filter?t=${Date.now()}-tilde-mismatch`
-      )
+      const { shouldLoadPluginForCwd: freshShouldLoad } = await import(`./scope-filter?t=${Date.now()}-tilde-mismatch`)
       const installation = {
         scope: "project" as const,
         projectPath: "~/workspace/proj-a",
@@ -226,9 +222,7 @@ describe("shouldLoadPluginForCwd", () => {
 
     it("#when projectPath is exactly ~ and cwd equals fake home #then it loads", async () => {
       //#given
-      const { shouldLoadPluginForCwd: freshShouldLoad } = await import(
-        `./scope-filter?t=${Date.now()}-tilde-root`
-      )
+      const { shouldLoadPluginForCwd: freshShouldLoad } = await import(`./scope-filter?t=${Date.now()}-tilde-root`)
       const installation = {
         scope: "project" as const,
         projectPath: "~",

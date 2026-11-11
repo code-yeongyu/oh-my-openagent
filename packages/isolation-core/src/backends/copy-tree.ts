@@ -2,7 +2,9 @@ import { chmod, lstat, lutimes, mkdir, readdir, readlink, statfs, symlink, utime
 import { isAbsolute, join, relative, resolve } from "node:path"
 import { IsolationUnavailableError } from "../backend"
 
-export async function copyBudget(base: string, max = 2 * 1024 ** 3,
+export async function copyBudget(
+  base: string,
+  max = 2 * 1024 ** 3,
   space: (path: string) => Promise<{ bavail: number; bsize: number }> = statfs,
 ): Promise<(size: number) => void> {
   const { bavail, bsize } = await space(base)
@@ -15,7 +17,9 @@ export async function copyBudget(base: string, max = 2 * 1024 ** 3,
   }
 }
 
-export async function copyTree(source: string, destination: string,
+export async function copyTree(
+  source: string,
+  destination: string,
   clone: (source: string, destination: string, size: number) => Promise<void>,
   consume: (size: number) => void,
 ): Promise<void> {
@@ -25,7 +29,9 @@ export async function copyTree(source: string, destination: string,
   return copyTreeSkipping(source, destination, clone, consume, resolve(destination))
 }
 
-async function copyTreeSkipping(source: string, destination: string,
+async function copyTreeSkipping(
+  source: string,
+  destination: string,
   clone: (source: string, destination: string, size: number) => Promise<void>,
   consume: (size: number) => void,
   skipRoot: string,

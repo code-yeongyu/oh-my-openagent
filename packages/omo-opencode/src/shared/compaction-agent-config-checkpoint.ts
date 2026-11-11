@@ -6,9 +6,7 @@ export type CompactionAgentConfigCheckpoint = {
 
 const checkpoints = new Map<string, CompactionAgentConfigCheckpoint>()
 
-function cloneCheckpoint(
-  checkpoint: CompactionAgentConfigCheckpoint,
-): CompactionAgentConfigCheckpoint {
+function cloneCheckpoint(checkpoint: CompactionAgentConfigCheckpoint): CompactionAgentConfigCheckpoint {
   return {
     ...(checkpoint.agent ? { agent: checkpoint.agent } : {}),
     ...(checkpoint.model
@@ -31,9 +29,7 @@ export function setCompactionAgentConfigCheckpoint(
   checkpoints.set(sessionID, cloneCheckpoint(checkpoint))
 }
 
-export function getCompactionAgentConfigCheckpoint(
-  sessionID: string,
-): CompactionAgentConfigCheckpoint | undefined {
+export function getCompactionAgentConfigCheckpoint(sessionID: string): CompactionAgentConfigCheckpoint | undefined {
   const checkpoint = checkpoints.get(sessionID)
   return checkpoint ? cloneCheckpoint(checkpoint) : undefined
 }

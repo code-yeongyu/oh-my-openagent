@@ -29,8 +29,7 @@ const { dirname, join } = process.getBuiltinModule<PathModule>("path")
 const { fileURLToPath, pathToFileURL } = process.getBuiltinModule<UrlModule>("url")
 
 export type MockStep =
-  | { type: "text"; text: string }
-  | { type: "tool_call"; name: string; arguments: Record<string, unknown>; id?: string }
+  { type: "text"; text: string } | { type: "tool_call"; name: string; arguments: Record<string, unknown>; id?: string }
 
 interface MockScript {
   steps: MockStep[]
@@ -67,8 +66,7 @@ interface SimpleStreamOptions {
 }
 
 type AssistantContent =
-  | { type: "text"; text: string }
-  | { type: "toolCall"; id: string; name: string; arguments: Record<string, unknown> }
+  { type: "text"; text: string } | { type: "toolCall"; id: string; name: string; arguments: Record<string, unknown> }
 
 interface AssistantMessage {
   role: "assistant"
@@ -95,7 +93,11 @@ interface MockProvider {
     contextWindow: number
     maxTokens: number
   }>
-  streamSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AsyncIterable<LocalStreamEvent> & {
+  streamSimple(
+    model: Model<Api>,
+    context: Context,
+    options?: SimpleStreamOptions,
+  ): AsyncIterable<LocalStreamEvent> & {
     result(): Promise<AssistantMessage>
   }
 }
@@ -187,8 +189,11 @@ let callCount = 0
  * `getCurrentTools`. `null` means the request carried no declaration source at all, which is not "no tools".
  */
 export function declaredToolNames(context: Context): string[] | null {
-  if (Array.isArray(context.tools)) return context.tools.map((tool) => tool.name).filter((name): name is string => typeof name === "string")
-  const systemMessages = (Array.isArray(context.messages) ? (context.messages as TranscriptMessage[]) : []).filter((message) => message?.role === "system")
+  if (Array.isArray(context.tools))
+    return context.tools.map((tool) => tool.name).filter((name): name is string => typeof name === "string")
+  const systemMessages = (Array.isArray(context.messages) ? (context.messages as TranscriptMessage[]) : []).filter(
+    (message) => message?.role === "system",
+  )
   if (systemMessages.length === 0) return null
   const current = new Set<string>()
   for (const message of systemMessages) {
@@ -312,7 +317,9 @@ function isTerminalAssistantMessageEvent(
   return false
 }
 
-function extractAssistantMessageResult(event: { type: "done"; message: AssistantMessage } | { type: "error"; error: AssistantMessage }) {
+function extractAssistantMessageResult(
+  event: { type: "done"; message: AssistantMessage } | { type: "error"; error: AssistantMessage },
+) {
   return event.type === "done" ? event.message : event.error
 }
 

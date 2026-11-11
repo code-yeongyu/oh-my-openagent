@@ -19,8 +19,7 @@ import { createChainVerifier } from "./verifier.ts"
 export type AccountSessionIdle = "no_pin" | "corrupt_pin" | "not_member"
 
 export type AccountSessionOutcome =
-  | { readonly ok: true; readonly session: SyncSession }
-  | { readonly ok: false; readonly reason: AccountSessionIdle }
+  { readonly ok: true; readonly session: SyncSession } | { readonly ok: false; readonly reason: AccountSessionIdle }
 
 interface AccountSessionShared {
   readonly account: string
@@ -40,34 +39,84 @@ interface AccountSessionShared {
   readonly revocationView?: (() => Promise<RevocationView>) | undefined
 }
 
-export type AccountSessionOptions = AccountSessionShared & (
-  | { readonly baseUrl: string; readonly token: () => string | Promise<string>; readonly fetch?: typeof fetch; readonly chain?: never; readonly transport?: never }
-  | { readonly chain: AccountHttp; readonly transport: Transport; readonly baseUrl?: never; readonly token?: never; readonly fetch?: never }
-)
+export type AccountSessionOptions = AccountSessionShared &
+  (
+    | {
+        readonly baseUrl: string
+        readonly token: () => string | Promise<string>
+        readonly fetch?: typeof fetch
+        readonly chain?: never
+        readonly transport?: never
+      }
+    | {
+        readonly chain: AccountHttp
+        readonly transport: Transport
+        readonly baseUrl?: never
+        readonly token?: never
+        readonly fetch?: never
+      }
+  )
 
 export async function openAccountSession(options: AccountSessionOptions): Promise<AccountSessionOutcome> {
   if (options.spaceId.length !== 16) throw new TypeError("openAccountSession: a space id is 16 bytes")
   const pin = await loadTrustAnchor(options.pinDir, options.account)
   if (!pin.ok) return { ok: false, reason: pin.reason }
-  const http = options.chain ?? createAccountHttp({ baseUrl: options.baseUrl, token: options.token, ...(options.fetch === undefined ? {} : { fetch: options.fetch }) })
+  const http =
+    options.chain ??
+    createAccountHttp({
+      baseUrl: options.baseUrl,
+      token: options.token,
+      ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+    })
   const rejections = createRejectionCounter(options.log)
-  const chain = await openAccountChain({ account: options.account, anchor: pin.anchor, keyring: options.keyring, http, rejections })
-  if (!chain.isMember()) return { ok: false, reason: "not_member" }
-  const revocationView = options.revocationView ??
-    (options.baseUrl === undefined ? undefined : createRevocationView({ baseUrl: options.baseUrl, token: options.token, ...(options.fetch === undefined ? {} : { fetch: options.fetch }) }))
-  const log = options.log
-  const freeze = revocationView === undefined ? undefined : createFreezeSettler({
-    chain, http, keyring: options.keyring, revocationView,
-    scope: JSON.stringify([options.pinDir, options.account, options.keyring.principal().id]),
-    ...(log === undefined ? {} : { onEvent: (event: string) => log(`memory sync: ${event}`) }),
+  const chain = await openAccountChain({
+    account: options.account,
+    anchor: pin.anchor,
+    keyring: options.keyring,
+    http,
+    rejections,
   })
+  if (!chain.isMember()) return { ok: false, reason: "not_member" }
+  const revocationView =
+    options.revocationView ??
+    (options.baseUrl === undefined
+      ? undefined
+      : createRevocationView({
+          baseUrl: options.baseUrl,
+          token: options.token,
+          ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+        }))
+  const log = options.log
+  const freeze =
+    revocationView === undefined
+      ? undefined
+      : createFreezeSettler({
+          chain,
+          http,
+          keyring: options.keyring,
+          revocationView,
+          scope: JSON.stringify([options.pinDir, options.account, options.keyring.principal().id]),
+          ...(log === undefined ? {} : { onEvent: (event: string) => log(`memory sync: ${event}`) }),
+        })
   return {
     ok: true,
     session: {
       ...(freeze === undefined ? {} : { freeze }),
-      transport: options.transport ?? createHttpTransport({ baseUrl: options.baseUrl, token: options.token, ...(options.fetch === undefined ? {} : { fetch: options.fetch }) }),
+      transport:
+        options.transport ??
+        createHttpTransport({
+          baseUrl: options.baseUrl,
+          token: options.token,
+          ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+        }),
       verifier: createChainVerifier({ chain, spaceId: options.spaceId, rejections }),
-      sealer: createChainSealer({ chain, keyring: options.keyring, spaceId: options.spaceId, ...(options.peer === undefined ? {} : { peer: options.peer }), ...(options.now === undefined ? {} : { now: options.now }) }),
+      sealer: createChainSealer({
+        chain,
+        keyring: options.keyring,
+        spaceId: options.spaceId,
+        ...(options.peer === undefined ? {} : { peer: options.peer }),
+        ...(options.now === undefined ? {} : { now: options.now }),
+      }),
     },
   }
 }

@@ -50,7 +50,10 @@ function sameOwner(left: ExpungeOwner | undefined, right: ExpungeOwner | undefin
 // Each operation below runs under the record's lock, the same lock phase 1 tombstones under.
 
 export function holdsTombstone(recordPath: string, tombstonePath: string, owner: ExpungeOwner): boolean {
-  return withTaskRecordLock(recordPath, () => existsSync(tombstonePath) && sameOwner(readExpungeOwnerFile(tombstonePath), owner))
+  return withTaskRecordLock(
+    recordPath,
+    () => existsSync(tombstonePath) && sameOwner(readExpungeOwnerFile(tombstonePath), owner),
+  )
 }
 
 /** Put a tombstoned record back. True when it moved; never over a record that exists again. */
@@ -65,7 +68,12 @@ export function restoreTombstone(recordPath: string, tombstonePath: string, owne
 }
 
 /** Hand a tombstone from `from` (undefined: written without an owner) to `to`; false when another owns it. */
-export function takeOverTombstone(recordPath: string, tombstonePath: string, from: ExpungeOwner | undefined, to: ExpungeOwner): boolean {
+export function takeOverTombstone(
+  recordPath: string,
+  tombstonePath: string,
+  from: ExpungeOwner | undefined,
+  to: ExpungeOwner,
+): boolean {
   return withTaskRecordLock(recordPath, () => {
     if (!existsSync(tombstonePath)) return false
     const current = readExpungeOwnerFile(tombstonePath)

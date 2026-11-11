@@ -1,19 +1,10 @@
-import type {
-  TuiPluginApi,
-  TuiPromptRef,
-} from "@opencode-ai/plugin/tui"
+import type { TuiPluginApi, TuiPromptRef } from "@opencode-ai/plugin/tui"
 
 import { log } from "../../shared/logger"
 import type { createBtwSideController } from "./tui-controller"
-import {
-  buildBtwPickerOptions,
-  parseBtwPickerValue,
-} from "./tui-picker-options"
+import { buildBtwPickerOptions, parseBtwPickerValue } from "./tui-picker-options"
 import { loadBtwSessionCatalog } from "./tui-session-catalog"
-import {
-  adaptTuiPromptRef,
-  currentTuiSessionID,
-} from "./tui-session-bridge"
+import { adaptTuiPromptRef, currentTuiSessionID } from "./tui-session-bridge"
 
 type BtwSideController = ReturnType<typeof createBtwSideController>
 
@@ -72,10 +63,7 @@ export async function openBtwPicker(args: {
   for (const [index, side] of loaded.catalog.sides.entries()) {
     args.controller.adopt(loaded.catalog.main.id, side.id, index + 1)
   }
-  const picker = buildBtwPickerOptions(
-    loaded.catalog,
-    currentSessionID,
-  )
+  const picker = buildBtwPickerOptions(loaded.catalog, currentSessionID)
 
   async function refreshStaleSelection(sessionID: string): Promise<void> {
     args.api.ui.toast({
@@ -90,10 +78,7 @@ export async function openBtwPicker(args: {
     if (!selection) return
     if (selection.type === "new") {
       const currentSessionID = currentTuiSessionID(args.api)
-      const promptRef =
-        currentSessionID === selection.parentSessionID
-          ? args.activePromptRef()
-          : undefined
+      const promptRef = currentSessionID === selection.parentSessionID ? args.activePromptRef() : undefined
       if (!promptRef) {
         args.api.ui.toast({
           variant: "warning",
@@ -101,10 +86,7 @@ export async function openBtwPicker(args: {
         })
         return
       }
-      const started = await args.controller.startFromPrompt(
-        adaptTuiPromptRef(promptRef),
-        selection.parentSessionID,
-      )
+      const started = await args.controller.startFromPrompt(adaptTuiPromptRef(promptRef), selection.parentSessionID)
       if (started) args.api.ui.dialog.clear()
       return
     }

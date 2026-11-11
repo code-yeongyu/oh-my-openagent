@@ -12,12 +12,22 @@
 
 import { sqlTokens } from "./sql-tokens"
 
-export type SqlAuthorizer = (action: number, arg1: string | null, arg2: string | null, database: string | null, source: string | null) => number
+export type SqlAuthorizer = (
+  action: number,
+  arg1: string | null,
+  arg2: string | null,
+  database: string | null,
+  source: string | null,
+) => number
 
 export type SqliteConnection = {
   exec(sql: string): void
   setAuthorizer(authorizer: SqlAuthorizer | null): void
-  function(name: string, options: { readonly varargs?: boolean; readonly deterministic?: boolean }, fn: (...args: never[]) => unknown): void
+  function(
+    name: string,
+    options: { readonly varargs?: boolean; readonly deterministic?: boolean },
+    fn: (...args: never[]) => unknown,
+  ): void
   close(): void
 }
 
@@ -65,7 +75,12 @@ export class Sql {
     return this.authorized(null, () => {
       this.db.exec(`CREATE TEMP VIEW gw_result_columns AS ${bind(sql)}\n`)
       try {
-        return this.all(["name"], "SELECT cid, name FROM pragma_table_info('gw_result_columns', 'temp')", [], "cid").map((row) => String(row.name))
+        return this.all(
+          ["name"],
+          "SELECT cid, name FROM pragma_table_info('gw_result_columns', 'temp')",
+          [],
+          "cid",
+        ).map((row) => String(row.name))
       } finally {
         this.db.exec("DROP VIEW temp.gw_result_columns")
       }
@@ -87,9 +102,16 @@ export class Sql {
     this.sinkRows = []
     try {
       const ordinal = orderBy === undefined ? "0" : `row_number() OVER (ORDER BY ${orderBy})`
-      this.db.exec(`SELECT gw_sink(${ordinal}, ${columns.join(", ")}) FROM (${bind(sql)}\n)${orderBy === undefined ? "" : ` ORDER BY ${orderBy}`}`)
-      const rows = orderBy === undefined ? this.sinkRows : this.sinkRows.toSorted((left, right) => Number(left[0]) - Number(right[0]))
-      return rows.map((values) => Object.fromEntries(columns.map((column, index) => [column, values[index + 1] ?? null])))
+      this.db.exec(
+        `SELECT gw_sink(${ordinal}, ${columns.join(", ")}) FROM (${bind(sql)}\n)${orderBy === undefined ? "" : ` ORDER BY ${orderBy}`}`,
+      )
+      const rows =
+        orderBy === undefined
+          ? this.sinkRows
+          : this.sinkRows.toSorted((left, right) => Number(left[0]) - Number(right[0]))
+      return rows.map((values) =>
+        Object.fromEntries(columns.map((column, index) => [column, values[index + 1] ?? null])),
+      )
     } finally {
       this.params = []
       this.sinkRows = []
@@ -111,5 +133,9 @@ function bind(sql: string): string {
 export function isBusyError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false
   const record = error as { readonly errcode?: unknown; readonly message?: unknown }
-  return record.errcode === 5 || record.errcode === 6 || (typeof record.message === "string" && /database is (locked|busy)/i.test(record.message))
+  return (
+    record.errcode === 5 ||
+    record.errcode === 6 ||
+    (typeof record.message === "string" && /database is (locked|busy)/i.test(record.message))
+  )
 }

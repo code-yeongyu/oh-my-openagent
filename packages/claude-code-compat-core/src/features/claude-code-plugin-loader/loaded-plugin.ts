@@ -1,23 +1,13 @@
 import { existsSync } from "fs"
 import { join } from "path"
 import { derivePluginNameFromKey } from "./plugin-key"
-import type {
-  LoadedPlugin,
-  PluginInstallation,
-  PluginManifest,
-} from "./types"
+import type { LoadedPlugin, PluginInstallation, PluginManifest } from "./types"
 
-function resolveVersion(
-  installationVersionValue: string,
-  manifestVersionValue: string | undefined,
-): string {
+function resolveVersion(installationVersionValue: string, manifestVersionValue: string | undefined): string {
   const installationVersionTrim = installationVersionValue.trim()
   const installationVersion =
-    installationVersionTrim !== "" && installationVersionTrim !== "unknown"
-      ? installationVersionValue
-      : null
-  const manifestVersionTrim =
-    typeof manifestVersionValue === "string" ? manifestVersionValue.trim() : ""
+    installationVersionTrim !== "" && installationVersionTrim !== "unknown" ? installationVersionValue : null
+  const manifestVersionTrim = typeof manifestVersionValue === "string" ? manifestVersionValue.trim() : ""
   const manifestVersion = manifestVersionTrim !== "" ? manifestVersionValue : null
   const rawVersion = installationVersionTrim !== "" ? installationVersionValue : null
   return installationVersion ?? manifestVersion ?? rawVersion ?? "unknown"
