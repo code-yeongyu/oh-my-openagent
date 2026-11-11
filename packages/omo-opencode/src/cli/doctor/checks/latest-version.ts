@@ -14,7 +14,7 @@ export interface LatestVersionInput {
 
 export function gatherEditionDistTags(
   target: DoctorTarget,
-  fetchDistTags: FetchDistTags = fetchNpmDistTags
+  fetchDistTags: FetchDistTags = fetchNpmDistTags,
 ): Promise<NpmDistTags | null> {
   return fetchDistTags(EDITION_PACKAGE_NAMES[target])
 }

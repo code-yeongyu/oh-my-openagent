@@ -191,7 +191,11 @@ describe("runtime retention: reflection run directories", () => {
     await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
     let clock = NOW
 
-    await runRuntimeRetention({ paths, policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 }, now: () => (clock += 600) })
+    await runRuntimeRetention({
+      paths,
+      policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 },
+      now: () => (clock += 600),
+    })
 
     const left = (await tombstones(runsDir(paths))).length
     expect(left).toBeGreaterThan(0)
@@ -265,7 +269,11 @@ describe("runtime retention: transcript journals", () => {
     expect(state.reflected_through_message_id).toBe("a1")
     expect(state.reflected_completed_steps).toBe(1)
     expect(state.reflected_through_byte_offset).toBeUndefined()
-    const sweep = await sweepEmptyTranscriptJournals({ transcriptsDir: paths.transcripts, now: () => Date.now() + 60_000, minIdleMs: 0 })
+    const sweep = await sweepEmptyTranscriptJournals({
+      transcriptsDir: paths.transcripts,
+      now: () => Date.now() + 60_000,
+      minIdleMs: 0,
+    })
     expect(sweep.removed).toEqual([])
     expect(sweep.kept["state-content"]).toBe(1)
   })
@@ -379,7 +387,10 @@ describe("runtime retention: recall stores", () => {
     await mkdir(paths.locks, { recursive: true })
     const encode = (id: string) => Buffer.from(id, "utf8").toString("base64url")
     const deadLock = join(paths.locks, `recall-sidecar.${encode("dead-owner")}.lock`)
-    await writeFile(deadLock, `${JSON.stringify({ ...(await createLockRecord("recall-sidecar")), pid: exitedPid(), process_start: "unavailable" })}\n`)
+    await writeFile(
+      deadLock,
+      `${JSON.stringify({ ...(await createLockRecord("recall-sidecar")), pid: exitedPid(), process_start: "unavailable" })}\n`,
+    )
     const liveLock = join(paths.locks, `recall-sidecar.${encode("live-owner")}.lock`)
     const liveRecord = await createLockRecord("recall-sidecar")
     await acquireLock(liveLock, liveRecord)
@@ -477,7 +488,11 @@ describe("runtime retention: discard_unreflected_journals (LEAD D1: off by defau
     const report = await runRuntimeRetention({ paths, policy: DEFAULT_RUNTIME_RETENTION, now })
 
     expect(DEFAULT_RUNTIME_RETENTION.discardUnreflectedJournals).toBe(false)
-    expect(report.journals.kept).toEqual({ "s-never": "unreflected-retention-off", "s-nosteps": "unreflected-retention-off", "s-partly": "unreflected-retention-off" })
+    expect(report.journals.kept).toEqual({
+      "s-never": "unreflected-retention-off",
+      "s-nosteps": "unreflected-retention-off",
+      "s-partly": "unreflected-retention-off",
+    })
     expect(report.journals.removed).toEqual(["s-full"])
     for (const dir of [never, partly, noSteps]) expect(existsSync(join(dir, "transcript.jsonl"))).toBe(true)
     expect(existsSync(join(fully, "transcript.jsonl"))).toBe(false)
@@ -486,7 +501,11 @@ describe("runtime retention: discard_unreflected_journals (LEAD D1: off by defau
   test("#given discard_unreflected_journals switched on #when the same journals are swept on a healthy identity #then the never-reflected and no-steps journals go and the partly-reflected one is truncated", async () => {
     const { paths, never, partly, noSteps, fully } = await fixture()
 
-    const report = await runRuntimeRetention({ paths, policy: { ...DEFAULT_RUNTIME_RETENTION, discardUnreflectedJournals: true }, now })
+    const report = await runRuntimeRetention({
+      paths,
+      policy: { ...DEFAULT_RUNTIME_RETENTION, discardUnreflectedJournals: true },
+      now,
+    })
 
     expect(report.journals.removed).toEqual(["s-full", "s-never", "s-nosteps", "s-partly"])
     expect(existsSync(never)).toBe(false)
@@ -517,7 +536,12 @@ describe("runtime retention: journals of an in-flight reservation (J0, A32)", ()
     const reserve = async (id: string) => {
       const snapshot = await (await journalFor(id)).captureReflectionSnapshot()
       if (snapshot === null) throw new Error(`expected a snapshot for ${id}`)
-      return store.tryReserve({ trigger: "dream", origin: "shutdown", conversationIds: [id], snapshots: [{ conversationId: id, snapshot }] })
+      return store.tryReserve({
+        trigger: "dream",
+        origin: "shutdown",
+        conversationIds: [id],
+        snapshots: [{ conversationId: id, snapshot }],
+      })
     }
     return { store, reserve }
   }
@@ -545,7 +569,10 @@ describe("runtime retention: journals of an in-flight reservation (J0, A32)", ()
     expect(report.journals.removed).toEqual(["Z"])
     if (active.status !== "active") throw new Error("expected an active dream")
     await store.complete(active.run.runId, "merged")
-    const state = JSON.parse(await readFile(join(paths.transcripts, "X", "state.json"), "utf8")) as Record<string, unknown>
+    const state = JSON.parse(await readFile(join(paths.transcripts, "X", "state.json"), "utf8")) as Record<
+      string,
+      unknown
+    >
     expect(state.reflected_through_message_id).toBe("a1")
     expect(state.reflected_completed_steps).toBe(1)
     expect(existsSync(join(paths.transcripts, "X", "transcript.jsonl"))).toBe(true)
@@ -572,26 +599,52 @@ describe("runtime retention: journals of an in-flight reservation (J0, A32)", ()
 })
 
 describe("runtime retention: unclassified journal states (L1, A30)", () => {
-  async function rawJournal(paths: MemoryIdentityPaths, sessionId: string, state: Record<string, unknown>): Promise<string> {
+  async function rawJournal(
+    paths: MemoryIdentityPaths,
+    sessionId: string,
+    state: Record<string, unknown>,
+  ): Promise<string> {
     const dir = join(paths.transcripts, sessionId)
     await writeJson(join(dir, "state.json"), { schema_version: "v3_assistant_steps", ...state })
-    await writeFile(join(dir, "transcript.jsonl"), `${JSON.stringify({ kind: "assistant", text: "a", captured_at: "2026-10-01T00:00:00.000Z", source_line_id: "a1:assistant", source_message_id: "a1" })}\n`)
+    await writeFile(
+      join(dir, "transcript.jsonl"),
+      `${JSON.stringify({ kind: "assistant", text: "a", captured_at: "2026-10-01T00:00:00.000Z", source_line_id: "a1:assistant", source_message_id: "a1" })}\n`,
+    )
     await ageTree(dir, daysAgo(60))
     return dir
   }
 
   test("#given three journals in shapes no rule names and a never-reflected sibling #when the pass runs #then the three are kept as unclassified and the sibling is removed", async () => {
     const paths = await identity()
-    const anchoredZero = await rawJournal(paths, "anchored-zero", { total_completed_steps: 1, reflected_completed_steps: 0, steps_since_last_successful_reflection: 1, reflected_through_message_id: "a1" })
-    const countedNoAnchor = await rawJournal(paths, "counted-no-anchor", { total_completed_steps: 1, reflected_completed_steps: 1, steps_since_last_successful_reflection: 0 })
-    const negative = await rawJournal(paths, "negative", { total_completed_steps: 2, reflected_completed_steps: -1, steps_since_last_successful_reflection: 3, reflected_through_message_id: "a1" })
+    const anchoredZero = await rawJournal(paths, "anchored-zero", {
+      total_completed_steps: 1,
+      reflected_completed_steps: 0,
+      steps_since_last_successful_reflection: 1,
+      reflected_through_message_id: "a1",
+    })
+    const countedNoAnchor = await rawJournal(paths, "counted-no-anchor", {
+      total_completed_steps: 1,
+      reflected_completed_steps: 1,
+      steps_since_last_successful_reflection: 0,
+    })
+    const negative = await rawJournal(paths, "negative", {
+      total_completed_steps: 2,
+      reflected_completed_steps: -1,
+      steps_since_last_successful_reflection: 3,
+      reflected_through_message_id: "a1",
+    })
     const sibling = await journal(paths, "sibling", "never", daysAgo(15))
 
     const report = await retention(paths)
 
-    expect(report.journals.kept).toEqual({ "anchored-zero": "unclassified", "counted-no-anchor": "unclassified", negative: "unclassified" })
+    expect(report.journals.kept).toEqual({
+      "anchored-zero": "unclassified",
+      "counted-no-anchor": "unclassified",
+      negative: "unclassified",
+    })
     expect(report.journals.removed).toEqual(["sibling"])
-    for (const dir of [anchoredZero, countedNoAnchor, negative]) expect(existsSync(join(dir, "transcript.jsonl"))).toBe(true)
+    for (const dir of [anchoredZero, countedNoAnchor, negative])
+      expect(existsSync(join(dir, "transcript.jsonl"))).toBe(true)
     expect(existsSync(sibling)).toBe(false)
   })
 })
@@ -599,14 +652,35 @@ describe("runtime retention: unclassified journal states (L1, A30)", () => {
 describe("runtime retention: reflection-health gate for unreflected input (N4, A27)", () => {
   async function completionWith(paths: MemoryIdentityPaths, runId: string, outcome: string, at: number): Promise<void> {
     await writeJson(join(completionsDir(paths), `${runId}.json`), {
-      schemaVersion: 1, runId, identity: "agent-test", category: "quick", conversationIds: [], trigger: "manual",
-      outcome, startedAt: iso(at - 60_000), finishedAt: iso(at), delivery: { status: "consumed" },
+      schemaVersion: 1,
+      runId,
+      identity: "agent-test",
+      category: "quick",
+      conversationIds: [],
+      trigger: "manual",
+      outcome,
+      startedAt: iso(at - 60_000),
+      finishedAt: iso(at),
+      delivery: { status: "consumed" },
     })
   }
 
-  const shapes: Record<string, { readonly open: boolean; readonly enabled?: boolean; readonly write: (paths: MemoryIdentityPaths) => Promise<void> }> = {
-    "(i) newest failed 2 d ago, no success": { open: false, write: (paths) => completionWith(paths, "reflection-run-1", "failed", daysAgo(2)) },
-    "(ii) newest failed 20 d ago, no success": { open: false, write: (paths) => completionWith(paths, "reflection-run-1", "failed", daysAgo(20)) },
+  const shapes: Record<
+    string,
+    {
+      readonly open: boolean
+      readonly enabled?: boolean
+      readonly write: (paths: MemoryIdentityPaths) => Promise<void>
+    }
+  > = {
+    "(i) newest failed 2 d ago, no success": {
+      open: false,
+      write: (paths) => completionWith(paths, "reflection-run-1", "failed", daysAgo(2)),
+    },
+    "(ii) newest failed 20 d ago, no success": {
+      open: false,
+      write: (paths) => completionWith(paths, "reflection-run-1", "failed", daysAgo(20)),
+    },
     "(iii) only abandoned and quarantined run dirs": {
       open: false,
       write: async (paths) => {
@@ -634,10 +708,18 @@ describe("runtime retention: reflection-health gate for unreflected input (N4, A
       open: true,
       write: async (paths) => {
         await completionWith(paths, "reflection-run-1", "merged", daysAgo(10))
-        await reflectionRun(paths, "reflection-run-2", { sentinel: "quarantined", finishedAt: daysAgo(30), sentinelWrittenAt: daysAgo(0) })
+        await reflectionRun(paths, "reflection-run-2", {
+          sentinel: "quarantined",
+          finishedAt: daysAgo(30),
+          sentinelWrittenAt: daysAgo(0),
+        })
       },
     },
-    "(vii) reflection disabled, newest failed": { open: true, enabled: false, write: (paths) => completionWith(paths, "reflection-run-1", "failed", daysAgo(2)) },
+    "(vii) reflection disabled, newest failed": {
+      open: true,
+      enabled: false,
+      write: (paths) => completionWith(paths, "reflection-run-1", "failed", daysAgo(2)),
+    },
   }
 
   for (const [shape, setup] of Object.entries(shapes)) {
@@ -682,7 +764,8 @@ describe("runtime retention: a refused claim rename (L3, A31)", () => {
     const dir = await reflectionRun(paths, "reflection-run-5", { readOnlyPayload: true })
     await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
     const refuse = async (from: string) => {
-      if (from.endsWith("reflection-run-5")) throw Object.assign(new Error("EPERM: operation not permitted, rename"), { code: "EPERM" })
+      if (from.endsWith("reflection-run-5"))
+        throw Object.assign(new Error("EPERM: operation not permitted, rename"), { code: "EPERM" })
     }
 
     const first = await retention(paths, { beforeClaimRename: refuse })
@@ -730,17 +813,28 @@ describe("runtime retention: a capture racing a journal claim (N1, A35)", () => 
 
     const report = await retention(paths, {
       beforeJournalClaim: async (sessionId) => {
-        if (sessionId === "X") captured = await new TranscriptJournal({ journalDir: join(paths.transcripts, "X") }).captureReflectionSnapshot()
+        if (sessionId === "X")
+          captured = await new TranscriptJournal({
+            journalDir: join(paths.transcripts, "X"),
+          }).captureReflectionSnapshot()
       },
     })
 
     expect(captured).not.toBeNull()
     if (captured === null) throw new Error("expected the claim hook to capture a snapshot")
     expect(report.journals.kept["X"]).toBe("recent")
-    const reserved = await store.tryReserve({ trigger: "dream", origin: "shutdown", conversationIds: ["X"], snapshots: [{ conversationId: "X", snapshot: captured }] })
+    const reserved = await store.tryReserve({
+      trigger: "dream",
+      origin: "shutdown",
+      conversationIds: ["X"],
+      snapshots: [{ conversationId: "X", snapshot: captured }],
+    })
     if (reserved.status !== "active") throw new Error("expected an active dream")
     await store.complete(reserved.run.runId, "merged")
-    const state = JSON.parse(await readFile(join(paths.transcripts, "X", "state.json"), "utf8")) as Record<string, unknown>
+    const state = JSON.parse(await readFile(join(paths.transcripts, "X", "state.json"), "utf8")) as Record<
+      string,
+      unknown
+    >
     expect(state.reflected_through_message_id).toBe("a1")
     expect(state.reflected_completed_steps).toBe(1)
   })
@@ -753,8 +847,12 @@ describe("runtime retention: a capture racing a journal claim (N1, A35)", () => 
     const report = await retention(paths)
 
     expect(report.journals.removed).toEqual(["P", "X"])
-    expect(await new TranscriptJournal({ journalDir: join(paths.transcripts, "X") }).captureReflectionSnapshot()).toBeNull()
-    expect(await new TranscriptJournal({ journalDir: join(paths.transcripts, "P") }).captureReflectionSnapshot()).toBeNull()
+    expect(
+      await new TranscriptJournal({ journalDir: join(paths.transcripts, "X") }).captureReflectionSnapshot(),
+    ).toBeNull()
+    expect(
+      await new TranscriptJournal({ journalDir: join(paths.transcripts, "P") }).captureReflectionSnapshot(),
+    ).toBeNull()
   })
 
   test("#given a journal whose last capture started inside the window though its files look old #when the pass re-checks under the lock #then it is kept recent", async () => {
@@ -775,14 +873,19 @@ describe("runtime retention: a capture racing a journal claim (N1, A35)", () => 
 describe("runtime retention: pass budget and resume cursor (H4, N3, A33)", () => {
   test("#given 30 folded runs and a budget that admits 12 #when two passes run #then pass 1 persists a cursor and pass 2 resumes, finishes and deletes it", async () => {
     const paths = await identity()
-    for (let index = 1; index <= 30; index += 1) await reflectionRun(paths, `reflection-run-${index}`, { finishedAt: daysAgo(10) })
+    for (let index = 1; index <= 30; index += 1)
+      await reflectionRun(paths, `reflection-run-${index}`, { finishedAt: daysAgo(10) })
     await reflectionRun(paths, "reflection-run-99", { finishedAt: daysAgo(1) })
     let clock = NOW
     const cursorPath = join(paths.runtime, "retention.json")
 
     const first = await runRuntimeRetention({
-      paths, policy: { ...UNREFLECTED_ON, passBudgetMs: 60_000 }, now: () => clock,
-      beforeTombstoneDelete: async () => { clock += 5_000 },
+      paths,
+      policy: { ...UNREFLECTED_ON, passBudgetMs: 60_000 },
+      now: () => clock,
+      beforeTombstoneDelete: async () => {
+        clock += 5_000
+      },
     })
 
     expect(first.runs.removed).toHaveLength(12)
@@ -801,17 +904,28 @@ describe("runtime retention: pass budget and resume cursor (H4, N3, A33)", () =>
 
   test("#given an abort between items #when the pass stops #then the cursor is persisted and the pass rejects", async () => {
     const paths = await identity()
-    for (let index = 1; index <= 5; index += 1) await reflectionRun(paths, `reflection-run-${index}`, { finishedAt: daysAgo(10) })
+    for (let index = 1; index <= 5; index += 1)
+      await reflectionRun(paths, `reflection-run-${index}`, { finishedAt: daysAgo(10) })
     await reflectionRun(paths, "reflection-run-99", { finishedAt: daysAgo(1) })
     const controller = new AbortController()
     let removed = 0
 
-    await expect(runRuntimeRetention({
-      paths, policy: UNREFLECTED_ON, now, signal: controller.signal,
-      beforeTombstoneDelete: async () => { removed += 1; if (removed === 2) controller.abort() },
-    })).rejects.toThrow()
+    await expect(
+      runRuntimeRetention({
+        paths,
+        policy: UNREFLECTED_ON,
+        now,
+        signal: controller.signal,
+        beforeTombstoneDelete: async () => {
+          removed += 1
+          if (removed === 2) controller.abort()
+        },
+      }),
+    ).rejects.toThrow()
 
-    const persisted = JSON.parse(await readFile(join(paths.runtime, "retention.json"), "utf8")) as { cursor: { store: string; lastName: string } }
+    const persisted = JSON.parse(await readFile(join(paths.runtime, "retention.json"), "utf8")) as {
+      cursor: { store: string; lastName: string }
+    }
     expect(persisted.cursor.store).toBe("runs")
     expect(existsSync(join(runsDir(paths), persisted.cursor.lastName))).toBe(false)
     expect((await readdir(runsDir(paths))).filter((name) => !name.startsWith(".prune-"))).toHaveLength(4)
@@ -862,7 +976,9 @@ describe("runtime retention: a state.json behind its transcript (REVIEW-6 M1)", 
     const refusing = new TranscriptJournal({
       journalDir: dir,
       now: () => new Date(idleSince),
-      renameFile: async () => { throw Object.assign(new Error("rename refused"), { code: "EPERM" }) },
+      renameFile: async () => {
+        throw Object.assign(new Error("rename refused"), { code: "EPERM" })
+      },
     })
     await expect(refusing.reconcile(FOUR_ROWS)).rejects.toThrow("rename refused")
     await ageTree(dir, idleSince)
@@ -888,9 +1004,13 @@ describe("runtime retention: a state.json behind its transcript (REVIEW-6 M1)", 
     // A third step lands past the partly-reflected state while the state rename is refused.
     const refusing = new TranscriptJournal({
       journalDir: dir,
-      renameFile: async () => { throw Object.assign(new Error("rename refused"), { code: "EPERM" }) },
+      renameFile: async () => {
+        throw Object.assign(new Error("rename refused"), { code: "EPERM" })
+      },
     })
-    await expect(refusing.reconcile([...FOUR_ROWS, { kind: "assistant", messageId: "a5", textBlocks: ["third answer"] }])).rejects.toThrow("rename refused")
+    await expect(
+      refusing.reconcile([...FOUR_ROWS, { kind: "assistant", messageId: "a5", textBlocks: ["third answer"] }]),
+    ).rejects.toThrow("rename refused")
     await ageTree(dir, daysAgo(15))
 
     const report = await retention(paths)
@@ -904,7 +1024,9 @@ describe("runtime retention: a state.json behind its transcript (REVIEW-6 M1)", 
     const dir = await journal(paths, "s-race", "fully", daysAgo(8))
 
     const report = await runRuntimeRetention({
-      paths, policy: DEFAULT_RUNTIME_RETENTION, now,
+      paths,
+      policy: DEFAULT_RUNTIME_RETENTION,
+      now,
       beforeJournalClaim: async (sessionId) => {
         if (sessionId === "s-race") await appendBehindState(dir, daysAgo(8))
       },
@@ -932,17 +1054,25 @@ function abortedFromCheck(limit: number): AbortSignal {
   return signal as unknown as AbortSignal
 }
 
-async function resumeAt(paths: MemoryIdentityPaths, cursor: { readonly store: string; readonly lastName?: string }): Promise<void> {
+async function resumeAt(
+  paths: MemoryIdentityPaths,
+  cursor: { readonly store: string; readonly lastName?: string },
+): Promise<void> {
   await writeJson(join(paths.runtime, "retention.json"), { version: 1, cursor })
 }
 
 describe("runtime retention: classify loops and the health gate are bounded (REVIEW-6 L)", () => {
   test("#given more unfolded runs than the time budget would cover #when the pass classifies them #then classification is not stopped by the budget and the pass finishes without a cursor", async () => {
     const paths = await identity()
-    for (let index = 1; index <= 10; index += 1) await reflectionRun(paths, `reflection-run-${index}`, { outcome: "failed", finishedAt: daysAgo(60) })
+    for (let index = 1; index <= 10; index += 1)
+      await reflectionRun(paths, `reflection-run-${index}`, { outcome: "failed", finishedAt: daysAgo(60) })
     let clock = NOW
 
-    const report = await runRuntimeRetention({ paths, policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 }, now: () => (clock += 400) })
+    const report = await runRuntimeRetention({
+      paths,
+      policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 },
+      now: () => (clock += 400),
+    })
 
     expect(Object.keys(report.runs.kept)).toHaveLength(10)
     expect(report.cursor).toBeUndefined()
@@ -951,10 +1081,15 @@ describe("runtime retention: classify loops and the health gate are bounded (REV
 
   test("#given more unreadable completion records than the time budget would cover #when the pass classifies them #then every record is classified in one pass", async () => {
     const paths = await identity()
-    for (let index = 1; index <= 10; index += 1) await writeJson(join(completionsDir(paths), `reflection-run-${index}.json`), {})
+    for (let index = 1; index <= 10; index += 1)
+      await writeJson(join(completionsDir(paths), `reflection-run-${index}.json`), {})
     let clock = NOW
 
-    const report = await runRuntimeRetention({ paths, policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 }, now: () => (clock += 400) })
+    const report = await runRuntimeRetention({
+      paths,
+      policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 },
+      now: () => (clock += 400),
+    })
 
     expect(Object.keys(report.completions.kept)).toHaveLength(10)
     expect(report.cursor).toBeUndefined()
@@ -962,10 +1097,13 @@ describe("runtime retention: classify loops and the health gate are bounded (REV
 
   test("#given a pass resumed at journals #when an abort lands while the runs are classified #then the pass rejects and the persisted cursor stays at the journals resume point", async () => {
     const paths = await identity()
-    for (let index = 1; index <= 10; index += 1) await reflectionRun(paths, `reflection-run-${index}`, { outcome: "failed", finishedAt: daysAgo(60) })
+    for (let index = 1; index <= 10; index += 1)
+      await reflectionRun(paths, `reflection-run-${index}`, { outcome: "failed", finishedAt: daysAgo(60) })
     await resumeAt(paths, { store: "journals", lastName: "s-05" })
 
-    await expect(runRuntimeRetention({ paths, policy: DEFAULT_RUNTIME_RETENTION, now, signal: abortedFromCheck(4) })).rejects.toThrow("retention aborted by the test")
+    await expect(
+      runRuntimeRetention({ paths, policy: DEFAULT_RUNTIME_RETENTION, now, signal: abortedFromCheck(4) }),
+    ).rejects.toThrow("retention aborted by the test")
 
     const persisted = JSON.parse(await readFile(join(paths.runtime, "retention.json"), "utf8")) as { cursor: unknown }
     expect(persisted.cursor).toEqual({ store: "journals", lastName: "s-05" })
@@ -987,12 +1125,17 @@ describe("runtime retention: classify loops and the health gate are bounded (REV
 describe("runtime retention: a resumed or oversized pass always moves forward (REVIEW-7 L1)", () => {
   test("#given a pass resumed at {journals, s-05} #when the budget is spent while the runs are classified #then the journals resume point is kept and the next journal is processed", async () => {
     const paths = await identity()
-    for (let index = 1; index <= 10; index += 1) await reflectionRun(paths, `reflection-run-${index}`, { outcome: "failed", finishedAt: daysAgo(60) })
+    for (let index = 1; index <= 10; index += 1)
+      await reflectionRun(paths, `reflection-run-${index}`, { outcome: "failed", finishedAt: daysAgo(60) })
     for (let index = 1; index <= 8; index += 1) await journal(paths, `s-0${index}`, "fully", daysAgo(10))
     await resumeAt(paths, { store: "journals", lastName: "s-05" })
     let clock = NOW
 
-    const report = await runRuntimeRetention({ paths, policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 }, now: () => (clock += 400) })
+    const report = await runRuntimeRetention({
+      paths,
+      policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 },
+      now: () => (clock += 400),
+    })
 
     expect(report.cursor).toEqual({ store: "journals", lastName: "s-06" })
     expect(report.journals.removed).toEqual(["s-06"])
@@ -1003,18 +1146,26 @@ describe("runtime retention: a resumed or oversized pass always moves forward (R
 
   test("#given 40 folded runs and a budget smaller than one pass's work #when passes repeat #then every removable run is gone within a bounded number of passes", async () => {
     const paths = await identity()
-    for (let index = 1; index <= 40; index += 1) await reflectionRun(paths, `reflection-run-${index}`, { finishedAt: daysAgo(10) })
+    for (let index = 1; index <= 40; index += 1)
+      await reflectionRun(paths, `reflection-run-${index}`, { finishedAt: daysAgo(10) })
     let clock = NOW
     let passes = 0
 
     for (; passes < 40; passes += 1) {
-      const report = await runRuntimeRetention({ paths, policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 }, now: () => (clock += 400) })
+      const report = await runRuntimeRetention({
+        paths,
+        policy: { ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 1_000 },
+        now: () => (clock += 400),
+      })
       if (report.cursor === undefined) break
     }
 
     expect(passes).toBeLessThan(40)
     // The newest folded run (name order breaks the finishedAt tie) and the run-id high water stay as anchors.
-    expect((await readdir(runsDir(paths))).filter((name) => !name.startsWith(".prune-")).sort()).toEqual(["reflection-run-40", "reflection-run-9"])
+    expect((await readdir(runsDir(paths))).filter((name) => !name.startsWith(".prune-")).sort()).toEqual([
+      "reflection-run-40",
+      "reflection-run-9",
+    ])
   })
 })
 
@@ -1041,21 +1192,26 @@ describe("runtime retention: run-id high water under the scheduler lock (M9, A29
     expect(first.highWater).toBe(40)
     expect(first.runs.removed).toEqual(["reflection-run-1"])
     expect(first.reflectionSessions.removed).toEqual(["reflection-run-2"])
-    expect((JSON.parse(await readFile(join(paths.reflection, "run-id.json"), "utf8")) as { highWater: number }).highWater).toBe(41)
+    expect(
+      (JSON.parse(await readFile(join(paths.reflection, "run-id.json"), "utf8")) as { highWater: number }).highWater,
+    ).toBe(41)
 
     await reflectionRun(paths, "reflection-run-3", { finishedAt: daysAgo(10) })
     const second = await retention(paths)
 
     expect(second.highWater).toBe(40)
     expect(second.runs.removed).toEqual(["reflection-run-3"])
-    expect((JSON.parse(await readFile(join(paths.reflection, "run-id.json"), "utf8")) as { highWater: number }).highWater).toBe(41)
+    expect(
+      (JSON.parse(await readFile(join(paths.reflection, "run-id.json"), "utf8")) as { highWater: number }).highWater,
+    ).toBe(41)
   })
 
   test("A29 #given a mint in progress holds the scheduler lock #when retention runs #then every reflection-store rule is skipped and the pass reports reflection-scheduler-busy", async () => {
     const paths = await identity()
     await reflectionRun(paths, "reflection-run-1", { finishedAt: daysAgo(10) })
     await reflectionRun(paths, "reflection-run-5", { finishedAt: daysAgo(9) })
-    for (let index = 100; index <= 150; index += 1) await completion(paths, `reflection-run-${index}`, { status: "consumed", finishedAt: daysAgo(31 + 150 - index) })
+    for (let index = 100; index <= 150; index += 1)
+      await completion(paths, `reflection-run-${index}`, { status: "consumed", finishedAt: daysAgo(31 + 150 - index) })
     await writeJson(join(paths.reflectionSessions, "reflection-run-3", "session.json"), {})
     await ageTree(paths.reflectionSessions, daysAgo(8))
     await mkdir(paths.locks, { recursive: true })

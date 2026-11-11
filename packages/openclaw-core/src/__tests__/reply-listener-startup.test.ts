@@ -38,8 +38,7 @@ const daemonPids = new Set<number>()
 
 let spawnImplementation: SpawnImplementation = () => ({
   pid: 0,
-  unref() {
-  },
+  unref() {},
 })
 
 let replyListenerModule: typeof import("../reply-listener")
@@ -170,8 +169,7 @@ describe("startReplyListener", () => {
 
       return {
         pid: 4321,
-        unref() {
-        },
+        unref() {},
       }
     }
 
@@ -200,8 +198,7 @@ describe("startReplyListener", () => {
   test("does not report success or leave stale running state when detached child never becomes ready", async () => {
     spawnImplementation = () => ({
       pid: 9876,
-      unref() {
-      },
+      unref() {},
     })
 
     const result = await replyListenerModule.startReplyListener(createConfig())
@@ -226,15 +223,21 @@ describe("startReplyListener", () => {
       stateFilePath,
       JSON.stringify({ isRunning: true, pid: existingPid, startupToken: "existing", errors: 0 }, null, 2),
     )
-    writeFileSync(configFilePath, JSON.stringify({ ...createConfig(), replyListener: { ...createConfig().replyListener, pollIntervalMs: 500 } }, null, 2))
+    writeFileSync(
+      configFilePath,
+      JSON.stringify(
+        { ...createConfig(), replyListener: { ...createConfig().replyListener, pollIntervalMs: 500 } },
+        null,
+        2,
+      ),
+    )
 
     let spawnCalls = 0
     spawnImplementation = () => {
       spawnCalls += 1
       return {
         pid: 9999,
-        unref() {
-        },
+        unref() {},
       }
     }
 
@@ -251,5 +254,4 @@ describe("startReplyListener", () => {
       killSpy.mockRestore()
     }
   })
-
 })

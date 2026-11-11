@@ -16,13 +16,18 @@ export async function reconcileDeferredDeadChildren(
   outcomes: readonly ReconcileOutcome[],
   parentSessionId?: string,
 ): Promise<readonly ReconcileOutcome[]> {
-  return Promise.all(outcomes.map(async (outcome) => {
-    const observed = legacyOwnerRecord(context, outcome, parentSessionId)
-    if (observed === null || observed.pid === undefined || context.signaller.isAlive(observed.pid)) return outcome
-    return await retryOwner(context, observed, {
-      parentSessionId, backoffMs: context.hostRetry.daemonLossBackoffMs,
-    }) ?? outcome
-  }))
+  return Promise.all(
+    outcomes.map(async (outcome) => {
+      const observed = legacyOwnerRecord(context, outcome, parentSessionId)
+      if (observed === null || observed.pid === undefined || context.signaller.isAlive(observed.pid)) return outcome
+      return (
+        (await retryOwner(context, observed, {
+          parentSessionId,
+          backoffMs: context.hostRetry.daemonLossBackoffMs,
+        })) ?? outcome
+      )
+    }),
+  )
 }
 
 /**
@@ -42,9 +47,12 @@ export function retryDeferredLegacyOwners(
     if (observed === null || active.has(observed.task_id)) continue
     active.add(observed.task_id)
     void retryOwner(context, observed, { parentSessionId, backoffMs: context.hostRetry.deferredRetryBackoffMs })
-      .catch((error: unknown) => log("senpi-task deferred owner reconcile failed", {
-        taskId: observed.task_id, error: String(error),
-      }))
+      .catch((error: unknown) =>
+        log("senpi-task deferred owner reconcile failed", {
+          taskId: observed.task_id,
+          error: String(error),
+        }),
+      )
       .finally(() => active.delete(observed.task_id))
   }
 }
@@ -54,15 +62,24 @@ function legacyOwnerRecord(
   outcome: ReconcileOutcome,
   parentSessionId: string | undefined,
 ): TaskRecord | null {
-  if (outcome.kind !== "foreign_live_owner"
-    && !(outcome.kind === "deferred" && outcome.reason === "foreign_live_owner")) return null
+  if (
+    outcome.kind !== "foreign_live_owner" &&
+    !(outcome.kind === "deferred" && outcome.reason === "foreign_live_owner")
+  )
+    return null
   const observed = context.store.load(outcome.task_id)
   // The existing scoped retry owns this session's children; daemon sessions have their own
   // recovery authority. Same-process claims can belong to a live sibling engine.
-  if (observed === null || observed.parent_session_id === parentSessionId
-    || isHostSessionRecord(observed) || observed.residency_state !== "resident"
-    || TERMINAL_STATUSES.has(observed.status)
-    || observed.host_pid === undefined || observed.host_pid === context.hostPid) return null
+  if (
+    observed === null ||
+    observed.parent_session_id === parentSessionId ||
+    isHostSessionRecord(observed) ||
+    observed.residency_state !== "resident" ||
+    TERMINAL_STATUSES.has(observed.status) ||
+    observed.host_pid === undefined ||
+    observed.host_pid === context.hostPid
+  )
+    return null
   return observed
 }
 
@@ -73,12 +90,22 @@ async function retryOwner(
 ): Promise<ReconcileOutcome | undefined> {
   for (const backoffMs of options.backoffMs) {
     await context.hostRetry.wait(backoffMs)
-    if (!reconciliationActive(context) || retriesStopped(context, options.parentSessionId ?? observed.parent_session_id)) return
+    if (
+      !reconciliationActive(context) ||
+      retriesStopped(context, options.parentSessionId ?? observed.parent_session_id)
+    )
+      return
     const fresh = context.store.load(observed.task_id)
-    if (fresh === null || TERMINAL_STATUSES.has(fresh.status) || fresh.residency_state !== "resident"
-      || fresh.host_pid !== observed.host_pid || fresh.residency_claim !== observed.residency_claim
-      || fresh.notification.run_epoch !== observed.notification.run_epoch
-      || context.registry.get(fresh.task_id) !== undefined) return
+    if (
+      fresh === null ||
+      TERMINAL_STATUSES.has(fresh.status) ||
+      fresh.residency_state !== "resident" ||
+      fresh.host_pid !== observed.host_pid ||
+      fresh.residency_claim !== observed.residency_claim ||
+      fresh.notification.run_epoch !== observed.notification.run_epoch ||
+      context.registry.get(fresh.task_id) !== undefined
+    )
+      return
     if (fresh.host_pid !== undefined && context.signaller.isAlive(fresh.host_pid)) continue
     // Reclamation revalidates the owner under the record lock. Terminal writes that win before
     // that claim or while destruction awaits are preserved by the normal reconciliation reducer.

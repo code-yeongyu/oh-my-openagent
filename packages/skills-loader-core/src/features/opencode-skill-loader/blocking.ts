@@ -60,6 +60,8 @@ export function discoverAllSkillsBlocking(dirs: string[], scopes: SkillScope[]):
 
   return output.skills.map((skill) => {
     const content = skill.definition.template
-    return content === undefined ? skill : { ...skill, lazyContent: { loaded: true, content, load: async () => content } }
+    return content === undefined
+      ? skill
+      : { ...skill, lazyContent: { loaded: true, content, load: async () => content } }
   })
 }

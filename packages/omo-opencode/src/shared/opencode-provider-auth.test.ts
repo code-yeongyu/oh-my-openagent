@@ -3,11 +3,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import * as path from "node:path"
 
-import {
-  _resetProviderAuthCacheForTesting,
-  getProviderAuthType,
-  isProviderUsingOAuth,
-} from "./opencode-provider-auth"
+import { _resetProviderAuthCacheForTesting, getProviderAuthType, isProviderUsingOAuth } from "./opencode-provider-auth"
 
 describe("opencode-provider-auth", () => {
   let tempDataDir: string
@@ -42,10 +38,12 @@ describe("opencode-provider-auth", () => {
 
   it("#given auth.json with oauth entry #then detects OAuth for that provider", () => {
     // given auth.json where anthropic is OAuth
-    writeAuthFile(JSON.stringify({
-      anthropic: { type: "oauth", refresh: "r", access: "a", expires: 1 },
-      opencode: { type: "api", key: "sk-x" },
-    }))
+    writeAuthFile(
+      JSON.stringify({
+        anthropic: { type: "oauth", refresh: "r", access: "a", expires: 1 },
+        opencode: { type: "api", key: "sk-x" },
+      }),
+    )
 
     // when isProviderUsingOAuth queries each provider
     const anthropicOauth = isProviderUsingOAuth("anthropic")

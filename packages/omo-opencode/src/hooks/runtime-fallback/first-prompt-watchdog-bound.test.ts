@@ -15,12 +15,16 @@ const context: RuntimeFallbackPluginInput = {
 
 function boundUsedBy(config: RuntimeFallbackConfig): number | undefined {
   let captured: number | undefined
-  const hook = createRuntimeFallbackHook(context, { config }, {
-    createFirstPromptWatchdog: (deps: HookDeps, helpers: AutoRetryHelpers, watchdogMs?: number) => {
-      captured = watchdogMs
-      return createFirstPromptWatchdog(deps, helpers, watchdogMs)
+  const hook = createRuntimeFallbackHook(
+    context,
+    { config },
+    {
+      createFirstPromptWatchdog: (deps: HookDeps, helpers: AutoRetryHelpers, watchdogMs?: number) => {
+        captured = watchdogMs
+        return createFirstPromptWatchdog(deps, helpers, watchdogMs)
+      },
     },
-  })
+  )
   hook.dispose?.()
   return captured
 }
@@ -33,5 +37,4 @@ describe("first-prompt watchdog bound (#11887)", () => {
   test("#given first_prompt_timeout_seconds #when the hook starts #then the watchdog uses that bound", () => {
     expect(boundUsedBy({ enabled: true, first_prompt_timeout_seconds: 600 })).toBe(600_000)
   })
-
 })

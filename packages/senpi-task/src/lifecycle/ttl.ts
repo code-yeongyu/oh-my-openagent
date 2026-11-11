@@ -55,8 +55,12 @@ export async function cleanupExpiredRecords(context: LifecycleContext): Promise<
   }
 }
 
-async function sweepExpired(context: LifecycleContext, owner: ExpungeOwner, deleted: string[], retained: string[]): Promise<CleanupResult> {
-
+async function sweepExpired(
+  context: LifecycleContext,
+  owner: ExpungeOwner,
+  deleted: string[],
+  retained: string[],
+): Promise<CleanupResult> {
   // Crash recovery before anything else: finish the expunges of attempts whose process is gone. A
   // tombstone owned by a live attempt (another sweep, possibly still waiting on its close) is its own.
   // One close attempt per record per sweep: a record recovery just restored waits for the next sweep.
@@ -69,7 +73,8 @@ async function sweepExpired(context: LifecycleContext, owner: ExpungeOwner, dele
     // Only a daemon session is safely identifiable after a crash: a process pid in an arbitrarily old
     // tombstone may have been reused, and the sweep that wrote it already ended its process.
     const pending = loadTombstone(context, taskId)
-    const ended = pending !== null && isHostSessionRecord(pending) ? await endOwnedChild(context, taskId, pending, owner) : true
+    const ended =
+      pending !== null && isHostSessionRecord(pending) ? await endOwnedChild(context, taskId, pending, owner) : true
     await finishExpunge(context, taskId, ended, owner, { deleted, retained })
   }
 
@@ -81,7 +86,7 @@ async function sweepExpired(context: LifecycleContext, owner: ExpungeOwner, dele
         await expireSuspendedChild(context, record, () => true)
       } else {
         let claimed = false
-        context.store.mutate(record.task_id, fresh => {
+        context.store.mutate(record.task_id, (fresh) => {
           if ((fresh.pending_steering?.length ?? 0) === 0 || shouldRetain(context, fresh, cutoff, true)) return fresh
           claimed = true
           // Fence revival before close I/O; forget(end) records the drop and its terminal notice.
@@ -104,14 +109,24 @@ async function sweepExpired(context: LifecycleContext, owner: ExpungeOwner, dele
     }
     // Phase 1: atomic re-validate + tombstone. A revival claim that landed after the scan is seen
     // by the locked re-read and the record is retained instead of deleted underneath its new owner.
-    const outcome = context.store.tombstoneIfExpired(record.task_id, (fresh) => shouldRetain(context, fresh, cutoff), owner)
+    const outcome = context.store.tombstoneIfExpired(
+      record.task_id,
+      (fresh) => shouldRetain(context, fresh, cutoff),
+      owner,
+    )
     if (outcome.kind !== "tombstoned") {
       retained.push(record.task_id)
       continue
     }
     // The record is now invisible to every claim. A live orphan must not outlive its record (no-orphan
     // law): its child is ended BEFORE phase 2, and a close that is not confirmed restores the record.
-    await finishExpunge(context, record.task_id, await endOwnedChild(context, record.task_id, outcome.record, owner), owner, { deleted, retained })
+    await finishExpunge(
+      context,
+      record.task_id,
+      await endOwnedChild(context, record.task_id, outcome.record, owner),
+      owner,
+      { deleted, retained },
+    )
   }
   return { deleted, retained }
 }
@@ -153,7 +168,12 @@ async function finishExpunge(
   void settleDeferred(context, taskId, ended.pending, owner).finally(release)
 }
 
-async function settleDeferred(context: LifecycleContext, taskId: string, pending: Promise<boolean>, owner: ExpungeOwner): Promise<void> {
+async function settleDeferred(
+  context: LifecycleContext,
+  taskId: string,
+  pending: Promise<boolean>,
+  owner: ExpungeOwner,
+): Promise<void> {
   try {
     if (!(await pending)) {
       context.store.restoreExpunging(taskId, owner)
@@ -161,7 +181,10 @@ async function settleDeferred(context: LifecycleContext, taskId: string, pending
     }
     if (context.store.completeExpunge(taskId, owner)) context.kernelToolBindings?.release(taskId)
   } catch (error) {
-    log("senpi-task TTL expunge could not settle after a late close; the next sweep retries", { taskId, error: String(error) })
+    log("senpi-task TTL expunge could not settle after a late close; the next sweep retries", {
+      taskId,
+      error: String(error),
+    })
   } finally {
     clearHostSessionEnd(context, taskId)
   }
@@ -169,7 +192,12 @@ async function settleDeferred(context: LifecycleContext, taskId: string, pending
 
 // A throw while ending the child must not strand a tombstone this still-running process owns: no later
 // sweep in this process would take it over. The record goes back and the error propagates.
-async function endOwnedChild(context: LifecycleContext, taskId: string, record: TaskRecord, owner: ExpungeOwner): Promise<ChildEnd> {
+async function endOwnedChild(
+  context: LifecycleContext,
+  taskId: string,
+  record: TaskRecord,
+  owner: ExpungeOwner,
+): Promise<ChildEnd> {
   try {
     return await endExpiredChild(context, record)
   } catch (error) {
@@ -236,9 +264,7 @@ function shouldRetain(context: LifecycleContext, record: TaskRecord, cutoff: num
 // yet, but the claim is no less real). Deleting either would orphan a live owner.
 function hasLiveHostClaim(context: LifecycleContext, record: TaskRecord): boolean {
   return (
-    record.residency_state === "resident" &&
-    record.host_pid !== undefined &&
-    context.signaller.isAlive(record.host_pid)
+    record.residency_state === "resident" && record.host_pid !== undefined && context.signaller.isAlive(record.host_pid)
   )
 }
 

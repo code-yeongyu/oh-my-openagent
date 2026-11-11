@@ -23,26 +23,46 @@ const CHILD_PATH = "/tmp/stopped-owner-child.jsonl"
 // its parent task: the cancel closes the parent's session, whose session_shutdown runs this.
 // ownerSessionRecorded=false is the live hosted shape: the host reports the durable session id only
 // later, so the owner record has no child_session_id and the session knows itself by its task id.
-async function world(ownerStatus: TaskStatus, ownerKilled = false, cancelRequested = false, ownerSessionRecorded = true) {
+async function world(
+  ownerStatus: TaskStatus,
+  ownerKilled = false,
+  cancelRequested = false,
+  ownerSessionRecorded = true,
+) {
   const host = await harness.fakeHost()
   const handle = await openHostSessionHandle({ client: harness.hostClient(host), sessionPath: CHILD_PATH })
   await handle.startInitialPrompt("keep working")
   const store = tempStore()
   seedRecord(store, {
-    task_id: "st_000000b0", parent_session_id: "root-1", status: ownerStatus, killed: ownerKilled,
-    execution_mode: "process", runner_kind: "host-session", host_pid: process.pid,
+    task_id: "st_000000b0",
+    parent_session_id: "root-1",
+    status: ownerStatus,
+    killed: ownerKilled,
+    execution_mode: "process",
+    runner_kind: "host-session",
+    host_pid: process.pid,
     ...(ownerSessionRecorded ? { child_session_id: PARENT_SESSION } : {}),
   })
-  if (cancelRequested) store.mutate("st_000000b0", (owner) => ({ ...owner, cancel_requested: { requested_at: new Date().toISOString() } }))
+  if (cancelRequested)
+    store.mutate("st_000000b0", (owner) => ({ ...owner, cancel_requested: { requested_at: new Date().toISOString() } }))
   seedRecord(store, {
-    task_id: CHILD_TASK, parent_session_id: PARENT_SESSION, status: "running", execution_mode: "process",
-    runner_kind: "host-session", residency_state: "resident", host_pid: process.pid,
+    task_id: CHILD_TASK,
+    parent_session_id: PARENT_SESSION,
+    status: "running",
+    execution_mode: "process",
+    runner_kind: "host-session",
+    residency_state: "resident",
+    host_pid: process.pid,
   })
   const order: CallLog = []
   const registry = new OrderRegistry(order)
   registry.add({
-    task_id: CHILD_TASK, kind: "host-session", pid: undefined,
-    abort: () => handle.abort(), dispose: () => handle.dispose(), terminate: () => handle.terminate(),
+    task_id: CHILD_TASK,
+    kind: "host-session",
+    pid: undefined,
+    abort: () => handle.abort(),
+    dispose: () => handle.dispose(),
+    terminate: () => handle.terminate(),
     markStopping: () => order.push(`markStopping:${CHILD_TASK}`),
   })
   const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings() })
@@ -51,7 +71,9 @@ async function world(ownerStatus: TaskStatus, ownerKilled = false, cancelRequest
 
 describe("session shutdown of a deliberately stopped task's session", () => {
   for (const [label, status, killed, requested, recorded] of [
-    ["cancelled", "cancelled", false, false, true], ["lost", "lost", false, false, true], ["killed", "error", true, false, true],
+    ["cancelled", "cancelled", false, false, true],
+    ["lost", "lost", false, false, true],
+    ["killed", "error", true, false, true],
     // The unreachable-child stop and the revival's pending cancel close the session while the owner
     // still reads running with only cancel_requested set.
     ["still running with a cancel requested", "running", false, true, true],
@@ -62,7 +84,9 @@ describe("session shutdown of a deliberately stopped task's session", () => {
       const { host, store, registry, lifecycle, order } = await world(status, killed, requested, recorded)
 
       const summary = await lifecycle.suspendOnSessionShutdown({
-        parentSessionId: PARENT_SESSION, reason: "quit", ...(recorded ? {} : { ownTaskId: "st_000000b0" }),
+        parentSessionId: PARENT_SESSION,
+        reason: "quit",
+        ...(recorded ? {} : { ownTaskId: "st_000000b0" }),
       })
 
       const sent = host.commands.map((command) => command.type)

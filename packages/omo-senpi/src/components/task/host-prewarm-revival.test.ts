@@ -31,8 +31,12 @@ describe("revival pre-warm ensures the recorded hosts of suspended host-session 
     const w = world({ prewarm: "off", ownShard: "p-aaaaaaaaaaaaaaaa" })
     const pA = w.shard("p-aaaaaaaaaaaaaaaa")
     w.records.push(
-      suspendedChild("child-1", pA, { host_session: { socket: pA, routing_id: "r-x", session_path: "/tmp/x.jsonl", instance_id: "H1" } }),
-      suspendedChild("child-1", pA, { host_session: { socket: pA, routing_id: "r-y", session_path: "/tmp/y.jsonl", instance_id: "H2" } }),
+      suspendedChild("child-1", pA, {
+        host_session: { socket: pA, routing_id: "r-x", session_path: "/tmp/x.jsonl", instance_id: "H1" },
+      }),
+      suspendedChild("child-1", pA, {
+        host_session: { socket: pA, routing_id: "r-y", session_path: "/tmp/y.jsonl", instance_id: "H2" },
+      }),
       suspendedChild("child-1", w.legacy),
     )
 

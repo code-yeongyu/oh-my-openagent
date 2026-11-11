@@ -17,7 +17,9 @@ export class ExtensionTransactionEndedError extends Error {
 export class ExtensionTransactionBusyError extends Error {
   readonly code = "extension_operation_failed"
   constructor(readonly extension: string) {
-    super(`The ${extension} extension ran a statement while a tx helper (enqueue, bind, ...) was still in flight; await the helper first.`)
+    super(
+      `The ${extension} extension ran a statement while a tx helper (enqueue, bind, ...) was still in flight; await the helper first.`,
+    )
   }
 }
 
@@ -26,7 +28,13 @@ export class ExtensionArgumentError extends Error {
   readonly code = "invalid_arguments"
 }
 
-export function extensionTransaction(ctx: ops.StoreContext, name: string, now: number, resolveTarget: GatewayResolve, senderProvenance: GatewayEngineOptions["senderProvenance"]) {
+export function extensionTransaction(
+  ctx: ops.StoreContext,
+  name: string,
+  now: number,
+  resolveTarget: GatewayResolve,
+  senderProvenance: GatewayEngineOptions["senderProvenance"],
+) {
   let active = true
   // Helpers that are running right now. A joined helper can hold a savepoint open across an await,
   // so a statement run in that gap would land inside it and vanish with a data refusal's rollback.
@@ -49,7 +57,15 @@ export function extensionTransaction(ctx: ops.StoreContext, name: string, now: n
     running++
     const next = tail.then(() => joined(body))
     // Registered before the caller can await `next`, so the count drops before the caller resumes.
-    tail = next.then(() => { running-- }, (error: unknown) => { running--; failure = error })
+    tail = next.then(
+      () => {
+        running--
+      },
+      (error: unknown) => {
+        running--
+        failure = error
+      },
+    )
     return next
   }
   function sql<T>(statement: string, body: () => T): T {
@@ -93,31 +109,39 @@ export function extensionTransaction(ctx: ops.StoreContext, name: string, now: n
     emitCompletions: (request) => joined(() => relay.emitCompletions(ctx, request)),
   }
   // Resolve through the relay's address book, but never wake a receiver before COMMIT.
-  const endpoints = { wake: async (): Promise<never> => { throw new Error("An extension enqueue cannot contact a live endpoint.") } }
+  const endpoints = {
+    wake: async (): Promise<never> => {
+      throw new Error("An extension enqueue cannot contact a live endpoint.")
+    },
+  }
   const engine = createGatewayEngine({
     store,
     endpoints,
     senderProvenance,
     resolve: async (address, request) => {
       const result = await resolveTarget(address, request)
-      return result.kind === "error" ? result : { kind: "ok", target: { ...result.target, endpoint: null, liveness: "dead" } }
+      return result.kind === "error"
+        ? result
+        : { kind: "ok", target: { ...result.target, endpoint: null, liveness: "dead" } }
     },
   })
   const api = createGatewayRelay({ store, engine, endpoints, locate: async () => null })
   const tx: StoreExtensionTransaction = {
-    all: (columns, statement, params, orderBy) => sql(statement, () => {
-      for (const column of columns) singleExtensionStatement(column)
-      if (orderBy === undefined) return ctx.sql.all(columns, statement, params)
-      const terms = orderByTerms(orderBy)
-      // Pass the statement through the extension's authorizer (WHERE 0, so no rows) before its output columns are read
-      // without one, so an unknown-column refusal cannot reveal the shape of a table the extension may not read.
-      ctx.sql.all(["0"], `SELECT 0 FROM (${statement}\n) WHERE 0`, params)
-      return ctx.sql.all(columns, statement, params, orderByClause(terms, ctx.sql.resultColumns(statement)))
-    }),
-    one: (columns, statement, params) => sql(statement, () => {
-      for (const column of columns) singleExtensionStatement(column)
-      return ctx.sql.one(columns, statement, params)
-    }),
+    all: (columns, statement, params, orderBy) =>
+      sql(statement, () => {
+        for (const column of columns) singleExtensionStatement(column)
+        if (orderBy === undefined) return ctx.sql.all(columns, statement, params)
+        const terms = orderByTerms(orderBy)
+        // Pass the statement through the extension's authorizer (WHERE 0, so no rows) before its output columns are read
+        // without one, so an unknown-column refusal cannot reveal the shape of a table the extension may not read.
+        ctx.sql.all(["0"], `SELECT 0 FROM (${statement}\n) WHERE 0`, params)
+        return ctx.sql.all(columns, statement, params, orderByClause(terms, ctx.sql.resultColumns(statement)))
+      }),
+    one: (columns, statement, params) =>
+      sql(statement, () => {
+        for (const column of columns) singleExtensionStatement(column)
+        return ctx.sql.one(columns, statement, params)
+      }),
     exec: (statement, params) => sql(statement, () => ctx.sql.run(statement, params)),
     enqueue: (request) => schedule(() => api.inbound(request)),
     outboxAck: (request) => schedule(() => api.ack(request)),
@@ -126,11 +150,19 @@ export function extensionTransaction(ctx: ops.StoreContext, name: string, now: n
     rebind: (request) => schedule(() => api.rebind(request)),
     bindingFor: (request) => schedule(() => relay.bindingFor(ctx, { ...request, now })),
     // Read-only: "active" is exactly bindingFor's (status active, not expired at the transaction's now), without its expiry write.
-    bindingsForSession: (sessionDurableId) => schedule(async () => {
-      if (typeof sessionDurableId !== "string" || sessionDurableId.length === 0) throw new ExtensionArgumentError("bindingsForSession needs a non-empty session durable id.")
-      const active = relay.selectBindings(ctx, "session_durable_id = ? AND status = 'active' AND (expires_at IS NULL OR expires_at > ?)", [sessionDurableId, rfc3339(now)])
-      return active.toSorted((left, right) => (left.binding_id < right.binding_id ? -1 : left.binding_id > right.binding_id ? 1 : 0))
-    }),
+    bindingsForSession: (sessionDurableId) =>
+      schedule(async () => {
+        if (typeof sessionDurableId !== "string" || sessionDurableId.length === 0)
+          throw new ExtensionArgumentError("bindingsForSession needs a non-empty session durable id.")
+        const active = relay.selectBindings(
+          ctx,
+          "session_durable_id = ? AND status = 'active' AND (expires_at IS NULL OR expires_at > ?)",
+          [sessionDurableId, rfc3339(now)],
+        )
+        return active.toSorted((left, right) =>
+          left.binding_id < right.binding_id ? -1 : left.binding_id > right.binding_id ? 1 : 0,
+        )
+      }),
     outboxPending: (request) => schedule(() => api.outbox(request)),
   }
   return {

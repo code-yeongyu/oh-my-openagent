@@ -1,7 +1,4 @@
-import type {
-  AvailableCategory,
-  AvailableSkill,
-} from "./dynamic-agent-prompt-types"
+import type { AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-types"
 
 function buildSkillsSection(skills: AvailableSkill[]): string {
   const builtinSkills = skills.filter((skill) => skill.location === "plugin")
@@ -45,10 +42,7 @@ function buildSkillsSection(skills: AvailableSkill[]): string {
   return ""
 }
 
-export function buildCategorySkillsDelegationGuide(
-  categories: AvailableCategory[],
-  skills: AvailableSkill[],
-): string {
+export function buildCategorySkillsDelegationGuide(categories: AvailableCategory[], skills: AvailableSkill[]): string {
   if (categories.length === 0 && skills.length === 0) {
     return ""
   }

@@ -145,12 +145,19 @@ class LongRunningTaskManager implements TaskManager {
     const record = taskRecord(owner, "running")
     this.add(record)
     queueMicrotask(() => this.complete(record.task_id))
-    return { kind: "started", reused: false, task_id: record.task_id, status: "running", name: record.name ?? record.task_id }
+    return {
+      kind: "started",
+      reused: false,
+      task_id: record.task_id,
+      status: "running",
+      name: record.name ?? record.task_id,
+    }
   }
 
   findOwnedTask(owner: Pick<DagTaskOwner, "kind" | "runId" | "nodeId">): TaskRecord | undefined {
-    return [...this.#tasks.values()].find(({ record }) =>
-      record.owner?.kind === owner.kind && record.owner.runId === owner.runId && record.owner.nodeId === owner.nodeId,
+    return [...this.#tasks.values()].find(
+      ({ record }) =>
+        record.owner?.kind === owner.kind && record.owner.runId === owner.runId && record.owner.nodeId === owner.nodeId,
     )?.record
   }
 
@@ -164,12 +171,24 @@ class LongRunningTaskManager implements TaskManager {
     return task.completion.promise
   }
 
-  start(): Promise<never> { throw new Error("not implemented") }
-  continueTask(): Promise<never> { throw new Error("not implemented") }
-  sendToTask(): Promise<never> { throw new Error("not implemented") }
-  interruptTask(): Promise<never> { throw new Error("not implemented") }
-  cancelTask(): Promise<never> { throw new Error("not implemented") }
-  list(): readonly [] { return [] }
+  start(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  continueTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  sendToTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  interruptTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  cancelTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  list(): readonly [] {
+    return []
+  }
   forget(_taskId: string, _options: Parameters<TaskManager["forget"]>[1]): void {}
   // The real manager settles `waitFor` only for a child it holds resident, so this fake answers
   // "held" from the same map its completions come from: a task it can still complete is held here.
@@ -178,11 +197,21 @@ class LongRunningTaskManager implements TaskManager {
     if (record === undefined || (record.status !== "pending" && record.status !== "running")) return undefined
     return makeHandle(taskId).handle
   }
-  subscribeChild(): () => void { return () => undefined }
-  residentTaskIds(): readonly string[] { return [] }
-  residencyChanged(): Promise<void> { return new Promise<void>(() => undefined) }
-  promoteToBackground(): boolean { return false }
-  wasBackground(): boolean { return true }
+  subscribeChild(): () => void {
+    return () => undefined
+  }
+  residentTaskIds(): readonly string[] {
+    return []
+  }
+  residencyChanged(): Promise<void> {
+    return new Promise<void>(() => undefined)
+  }
+  promoteToBackground(): boolean {
+    return false
+  }
+  wasBackground(): boolean {
+    return true
+  }
 }
 
 function owner(nodeId: string): DagTaskOwner {
@@ -231,11 +260,14 @@ describe("DAG resume without blocking on a reattached child", () => {
       name: "nonblocking resume",
       nodes: [node("slow"), node("done"), node("next", ["done"])],
     }
-    store.writeCheckpoint(runId, pausedRecord(input, {
-      slow: { state: "running", taskId: "task-slow", attempt: 1 },
-      done: { state: "completed", taskId: "task-done", attempt: 1 },
-      next: { state: "pending" },
-    }))
+    store.writeCheckpoint(
+      runId,
+      pausedRecord(input, {
+        slow: { state: "running", taskId: "task-slow", attempt: 1 },
+        done: { state: "completed", taskId: "task-done", attempt: 1 },
+        next: { state: "pending" },
+      }),
+    )
     store.writeResult(runId, "done", "durable done output")
     manager.add(taskRecord(owner("slow"), "running", "task-slow"))
     const reattached: string[] = []
@@ -268,8 +300,11 @@ describe("DAG resume without blocking on a reattached child", () => {
     expect(outcome?.kind).toBe("resumed")
     expect(outcome?.reusedOutputs?.get("done" as DagNodeId)).toBe("durable done output")
     expect(outcome?.record?.status).toBe("completed")
-    expect(outcome?.record?.nodes.map((entry) => `${entry.id}:${entry.state}`))
-      .toEqual(["slow:completed", "done:completed", "next:completed"])
+    expect(outcome?.record?.nodes.map((entry) => `${entry.id}:${entry.state}`)).toEqual([
+      "slow:completed",
+      "done:completed",
+      "next:completed",
+    ])
     expect(manager.startOwnedCalls).toEqual(["next"])
   }, 30_000)
 
@@ -285,7 +320,12 @@ describe("DAG resume without blocking on a reattached child", () => {
     }
     const initialRecord = {
       ...pausedRecord(input, {
-        reattached: { state: "completed", taskId: "task-reattached", attempt: 1, completedAt: "2026-08-25T00:00:02.000Z" },
+        reattached: {
+          state: "completed",
+          taskId: "task-reattached",
+          attempt: 1,
+          completedAt: "2026-08-25T00:00:02.000Z",
+        },
         broken: { state: "failed", taskId: "task-broken", attempt: 1, completedAt: "2026-08-25T00:00:02.000Z" },
       }),
       status: "failed" as const,
@@ -306,10 +346,13 @@ describe("DAG resume without blocking on a reattached child", () => {
 
     // then - only the retried node is re-dispatched and the reattached node keeps ONE completion
     expect(manager.startOwnedCalls).toEqual(["broken"])
-    expect(record.nodes.map((entry) => `${entry.id}:${entry.state}`))
-      .toEqual(["reattached:completed", "broken:completed"])
-    const reattachedTransitions = store.readEvents(runId, 0, { limit: 500 }).events
-      .filter((event) => event.type === "dag.node.transitioned" && event.nodeId === "reattached")
+    expect(record.nodes.map((entry) => `${entry.id}:${entry.state}`)).toEqual([
+      "reattached:completed",
+      "broken:completed",
+    ])
+    const reattachedTransitions = store
+      .readEvents(runId, 0, { limit: 500 })
+      .events.filter((event) => event.type === "dag.node.transitioned" && event.nodeId === "reattached")
     expect(reattachedTransitions).toEqual([])
   }, 30_000)
 })
