@@ -152,7 +152,8 @@ describe("verified standalone binary installation", () => {
       ...f.options,
       run: async (file, args) => {
         const result = await f.options.run(file, args)
-        const previous = (await readdir(f.root)).find((name) => name.includes(".old-"))!
+        const previous = (await readdir(f.root)).find((name) => name.includes(".old-"))
+        if (previous === undefined) throw new Error("rollback fixture is missing")
         await unlink(join(f.root, previous))
         await mkdir(join(f.root, previous))
         return result
