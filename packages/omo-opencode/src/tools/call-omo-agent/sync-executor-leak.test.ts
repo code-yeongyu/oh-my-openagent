@@ -33,6 +33,7 @@ function createContext(promptAsync: ReturnType<typeof mock>) {
   return {
     client: {
       session: {
+        messages: mock(async () => ({ data: [] })),
         prompt: promptAsync,
         promptAsync,
       },
