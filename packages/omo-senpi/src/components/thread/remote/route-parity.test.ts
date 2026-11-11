@@ -74,11 +74,17 @@ describe("#13012 route parity", () => {
     expect(a.sent).toEqual([])
   })
 
-  test("#given a configured relay is disconnected #when a remote name is resolved #then the connection failure stays typed", async () => {
-    const a = account({ plan: "disconnected" })
+  test.each(["offline", "connecting", "activation_pending", "keychain_locked", "authorization_stale", "service_degraded", "update_required"])("#given a configured relay reports %s #when a remote name is resolved #then the failure stays typed host_unavailable", async (plan) => {
+    const a = account({ plan })
     expect(await surface(a.remote).run("thread_read", { thread: B_ROW.title })).toMatchObject({
-      kind: "error", error: { code: "host_unavailable", details: { state: "disconnected" } },
+      kind: "error", error: { code: "host_unavailable", details: { state: plan } },
     })
+    expect(a.sent).toEqual([])
+  })
+
+  test.each(["not_configured", "sign_in_required"])("#given remote sessions are %s #when a local name misses #then lookup stays local (the relay is not set up)", async (plan) => {
+    const a = account({ plan })
+    expect(await surface(a.remote).run("thread_read", { thread: "local peeer" })).toMatchObject({ kind: "error", error: { code: "not_found" } })
     expect(a.sent).toEqual([])
   })
 

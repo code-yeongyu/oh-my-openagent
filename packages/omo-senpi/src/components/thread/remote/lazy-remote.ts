@@ -13,7 +13,8 @@ export type LazyRemoteOptions = {
 /**
  * A remote surface whose device-service client loads on the first call that needs another device. A failed load is not
  * cached. A missing service, signed-out account or disabled relay leaves a local address miss as not_found; an explicit
- * device operation, a configured relay's disconnected transport or a failed account lookup surfaces typed unavailability.
+ * device operation, a configured relay in any failing state (offline, connecting, keychain locked, authorization stale, degraded, update
+ * required) or a failed account lookup surfaces typed unavailability.
  * The alias registry loads the same way on its first use; a load that fails answers alias_registry_unavailable and is
  * retried on the next call. `sessions.close` ends the device-service connection a short-lived caller opened.
  */

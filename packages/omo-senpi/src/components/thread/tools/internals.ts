@@ -179,8 +179,8 @@ export function targetSession(view: ThreadHostView, durableId: string): ThreadHo
 
 /**
  * Decision 0027: ONE resolver over this device's entries and the relay transport's address book. A local hit never needs
- * the relay. Absent remote setup leaves a local miss unchanged; a configured relay's failed lookup, disconnected
- * transport, plan refusal or alias holder's typed failure answers before not_found. An alias or entry on another
+ * the relay. Absent remote setup leaves a local miss unchanged; a configured relay's failed lookup, failing
+ * transport state (anything but connected once set up), plan refusal or alias holder's typed failure answers before not_found. An alias or entry on another
  * device is account-wide: the local scope no longer applies to it.
  */
 export async function resolveAcross(options: ThreadToolSurfaceOptions, local: readonly ThreadAddressEntry[], address: string, callerId: string, allScope: boolean | undefined, match: "exact" | "fuzzy" = "exact"): Promise<ThreadResolveResult & { readonly all_scope?: boolean | undefined }> {
