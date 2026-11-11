@@ -1,9 +1,9 @@
-import type { EventKind, LocalEvent } from "../../src/local-api/protocol.ts";
-import { PEER, defaultWorld } from "./conformance/world.ts";
+import type { EventKind, LocalEvent } from "../../src/local-api/protocol.ts"
+import { PEER, defaultWorld } from "./conformance/world.ts"
 
-const world = defaultWorld();
-const row = world.listing.revisions[1]?.rows[0];
-const sha = "ab".repeat(32);
+const world = defaultWorld()
+const row = world.listing.revisions[1]?.rows[0]
+const sha = "ab".repeat(32)
 // One example per event kind; a new kind without an example fails typecheck here.
 export const eventExamples: { readonly [K in EventKind]: Extract<LocalEvent, { kind: K }> } = {
   "status.changed": { type: "event", kind: "status.changed", status: world.status },
@@ -142,4 +142,4 @@ export const eventExamples: { readonly [K in EventKind]: Extract<LocalEvent, { k
     upload_id: "u1",
     reason: "parts_conflict",
   },
-};
+}

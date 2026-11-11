@@ -41,7 +41,13 @@ const VERIFY_PATTERNS = [
 ] as const
 export type VerifyPattern = (typeof VERIFY_PATTERNS)[number]
 
-const REFUSAL_CODES = ["trust-load-mismatch", "trust-exec-loop", "trust-user-extras-unrecoverable", "trust-path-unrepresentable", "trust-userns-unattested"] as const
+const REFUSAL_CODES = [
+  "trust-load-mismatch",
+  "trust-exec-loop",
+  "trust-user-extras-unrecoverable",
+  "trust-path-unrepresentable",
+  "trust-userns-unattested",
+] as const
 
 /** The section 4 importer modules own the codes they emit; their exported types are the source of truth. */
 type ModuleCode =
@@ -119,11 +125,15 @@ type Common = {
   readonly codes: readonly TrustDiagnosticEntry[]
 }
 export type TrustDiagnosticInput =
-  | Common & { readonly action: "adopt" | "import-exec" | "ensure" }
-  | Common & { readonly action: "refuse"; readonly check: (typeof LOAD_CHECKS)[number] | null }
+  | (Common & { readonly action: "adopt" | "import-exec" | "ensure" })
+  | (Common & { readonly action: "refuse"; readonly check: (typeof LOAD_CHECKS)[number] | null })
 
 export interface TrustDiagnosticsFs {
-  open(path: string, flags: number, mode: number): Promise<{
+  open(
+    path: string,
+    flags: number,
+    mode: number,
+  ): Promise<{
     stat(): Promise<{ readonly size: number; readonly mode: number; readonly uid: number; isFile(): boolean }>
     chmod(mode: number): Promise<void>
     write(buffer: Uint8Array, offset: number, length: number): Promise<{ readonly bytesWritten: number }>
@@ -157,7 +167,8 @@ function keys(value: object, allowed: readonly string[], field: string): void {
 
 /** Rebuilds every entry from closed-set values, so nothing a caller attaches can reach the file. */
 function entry(value: unknown): TrustDiagnosticEntry {
-  if (typeof value !== "object" || value === null) throw new TrustDiagnosticRecordError("trust diagnostic code is not an object")
+  if (typeof value !== "object" || value === null)
+    throw new TrustDiagnosticRecordError("trust diagnostic code is not an object")
   const code = (value as { code?: unknown }).code
   switch (code) {
     case "trust-tls-failed-under-fallback":
@@ -165,7 +176,8 @@ function entry(value: unknown): TrustDiagnosticEntry {
       keys(value, ["code", "reason", "action"], "status")
       const { reason, action } = value as { reason?: unknown; action?: unknown }
       const known = oneOf(Object.keys(FALLBACK_ACTIONS) as FallbackReason[], reason, "reason")
-      if (action !== FALLBACK_ACTIONS[known]) throw new TrustDiagnosticRecordError("trust diagnostic action is not the reason's catalog action")
+      if (action !== FALLBACK_ACTIONS[known])
+        throw new TrustDiagnosticRecordError("trust diagnostic action is not the reason's catalog action")
       return { code, reason: known, action: FALLBACK_ACTIONS[known] } as FallbackStatus
     }
     case "tls-verify-text-in-output": {
@@ -178,13 +190,20 @@ function entry(value: unknown): TrustDiagnosticEntry {
       // The plain form stays: a default file that could not be read has no cause or block.
       if (Object.keys(value).length === 1) return { code }
       keys(value, ["code", "file", "cause", "blockIndex", "narrowing"], "default-file drop")
-      const { file, cause, blockIndex, narrowing } = value as { file?: unknown; cause?: unknown; blockIndex?: unknown; narrowing?: unknown }
-      if (file !== "/etc/ssl/cert.pem") throw new TrustDiagnosticRecordError("trust diagnostic default-file drop names another file")
+      const { file, cause, blockIndex, narrowing } = value as {
+        file?: unknown
+        cause?: unknown
+        blockIndex?: unknown
+        narrowing?: unknown
+      }
+      if (file !== "/etc/ssl/cert.pem")
+        throw new TrustDiagnosticRecordError("trust diagnostic default-file drop names another file")
       const known = oneOf(Object.keys(DROP_CAUSE_NARROWING) as DefaultFileDropCause[], cause, "cause")
       if (typeof blockIndex !== "number" || !Number.isSafeInteger(blockIndex) || blockIndex < 0) {
         throw new TrustDiagnosticRecordError("trust diagnostic block index is not a block index")
       }
-      if (narrowing !== DROP_CAUSE_NARROWING[known]) throw new TrustDiagnosticRecordError("trust diagnostic narrowing is not the cause's")
+      if (narrowing !== DROP_CAUSE_NARROWING[known])
+        throw new TrustDiagnosticRecordError("trust diagnostic narrowing is not the cause's")
       return { code, file, cause: known, blockIndex, narrowing: DROP_CAUSE_NARROWING[known] }
     }
     default:
@@ -195,7 +214,11 @@ function entry(value: unknown): TrustDiagnosticEntry {
 
 function serialize(input: TrustDiagnosticInput, at: Date, pid: number): string {
   const refuse = input.action === "refuse"
-  keys(input, refuse ? ["kind", "action", "generation", "codes", "check"] : ["kind", "action", "generation", "codes"], "record")
+  keys(
+    input,
+    refuse ? ["kind", "action", "generation", "codes", "check"] : ["kind", "action", "generation", "codes"],
+    "record",
+  )
   const kind = oneOf(KINDS, input.kind, "kind")
   const action = oneOf(ACTIONS, input.action, "action")
   if (input.generation !== null && (typeof input.generation !== "string" || !/^[0-9a-f]{64}$/.test(input.generation))) {
@@ -203,13 +226,23 @@ function serialize(input: TrustDiagnosticInput, at: Date, pid: number): string {
   }
   if (!Array.isArray(input.codes)) throw new TrustDiagnosticRecordError("trust diagnostic codes is not an array")
   const codes = input.codes.map(entry)
-  if (!Number.isSafeInteger(pid) || pid <= 0) throw new TrustDiagnosticRecordError("trust diagnostic pid is not a process id")
+  if (!Number.isSafeInteger(pid) || pid <= 0)
+    throw new TrustDiagnosticRecordError("trust diagnostic pid is not a process id")
   const refusals = codes.filter((item) => (REFUSAL_CODES as readonly string[]).includes(item.code))
-  const record: Record<string, unknown> = { v: 1, at: at.toISOString(), pid, kind, action, generation: input.generation, codes }
+  const record: Record<string, unknown> = {
+    v: 1,
+    at: at.toISOString(),
+    pid,
+    kind,
+    action,
+    generation: input.generation,
+    codes,
+  }
   if (refuse) {
     // 5.2: each refusal writes one record, and only a load mismatch names the failed adoption check.
     const [refusal, ...extra] = refusals
-    if (refusal === undefined || extra.length > 0) throw new TrustDiagnosticRecordError("a refusal record carries exactly one refusal code")
+    if (refusal === undefined || extra.length > 0)
+      throw new TrustDiagnosticRecordError("a refusal record carries exactly one refusal code")
     const check = input.check === null ? null : oneOf(LOAD_CHECKS, input.check, "check")
     if ((refusal.code === "trust-load-mismatch") !== (check !== null)) {
       throw new TrustDiagnosticRecordError("only trust-load-mismatch carries an adoption check")
@@ -258,11 +291,13 @@ export async function appendTrustDiagnostic(
   try {
     if (!stat.isFile()) throw new TrustDiagnosticsFileError("diagnostics.jsonl is not a regular file")
     if (process.platform !== "win32") {
-      if (stat.uid !== process.getuid?.()) throw new TrustDiagnosticsFileError("diagnostics.jsonl is not owned by this user")
+      if (stat.uid !== process.getuid?.())
+        throw new TrustDiagnosticsFileError("diagnostics.jsonl is not owned by this user")
       if ((stat.mode & 0o777) !== 0o600) await handle.chmod(0o600)
     }
     const { bytesWritten } = await handle.write(bytes, 0, bytes.length)
-    if (bytesWritten !== bytes.length) throw new TrustDiagnosticsFileError("diagnostics.jsonl record was written partially")
+    if (bytesWritten !== bytes.length)
+      throw new TrustDiagnosticsFileError("diagnostics.jsonl record was written partially")
   } finally {
     await handle.close()
   }

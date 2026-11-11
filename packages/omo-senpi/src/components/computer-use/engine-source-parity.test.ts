@@ -26,49 +26,73 @@ test.each([
       }
     }
     mkdirSync(join(root, ".omo"))
-    writeFileSync(join(root, ".omo", "omo.jsonc"), JSON.stringify({
-      "[native]": { computer: { enabled: true, engine_path: engine } },
-    }))
+    writeFileSync(
+      join(root, ".omo", "omo.jsonc"),
+      JSON.stringify({
+        "[native]": { computer: { enabled: true, engine_path: engine } },
+      }),
+    )
     const platform = kind === "quarantined" ? "darwin" : kind === "windows non-exe" ? "win32" : "linux"
     const report = await computerUseDoctorReport({
-      cwd: root, env: { HOME: root }, version: "5.1.7",
-      packageRoot: join(root, "packages", "omo-native"), platform, arch: "x64",
-      launchEngine: () => { throw new Error("invalid explicit path must not spawn") },
+      cwd: root,
+      env: { HOME: root },
+      version: "5.1.7",
+      packageRoot: join(root, "packages", "omo-native"),
+      platform,
+      arch: "x64",
+      launchEngine: () => {
+        throw new Error("invalid explicit path must not spawn")
+      },
     })
     expect(report.kind).toBe("unavailable")
     if (report.kind !== "unavailable") throw new Error("expected unavailable")
-    expect(describeEngineSource(engine, { HOME: root }, { platform, arch: "x64" }))
-      .toContain(report.diagnostic.cause)
+    expect(describeEngineSource(engine, { HOME: root }, { platform, arch: "x64" })).toContain(report.diagnostic.cause)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
 })
 
-test.each(["linux-riscv64", "win32-ia32", "linux-x64", "linux-arm64", "win32-arm64"])("absent %s status agrees with doctor", async (host) => {
-  const root = mkdtempSync(join(tmpdir(), "cu-absence-parity-"))
-  const [platform, arch] = host.split("-")
-  const stamped = join(root, "runtime")
-  const version = "5.1.7"
-  try {
-    mkdirSync(stamped)
-    writeFileSync(join(stamped, "package.json"), JSON.stringify({ name: "omo", version }))
-    const env = { HOME: root, OMO_PACKAGE_DIR: stamped }
-    const report = await computerUseDoctorReport({
-      cwd: root, env, version, packageRoot: join(root, "packages", "omo-native"),
-      platform, arch, launchEngine: () => { throw new Error("absence must not spawn") },
-    })
-    const status = describeEngineSource(undefined, env, {
-      platform, arch, execDir: root, packageDir: join(root, "packages", "senpi-desktop-engine"), repoRoot: root,
-    })
-    if (arch === "riscv64" || arch === "ia32") {
-      expect(report.kind).toBe("unavailable")
-      if (report.kind !== "unavailable") throw new Error("expected unsupported host")
-      expect(status).toBe(report.diagnostic.message)
-    } else {
-      expect(report.kind).toBe("not-installed")
-      expect(status).toBe(`would download senpi-desktop-engine-${host}${platform === "win32" ? ".exe" : ""} from omo v${version} on first use`)
+test.each(["linux-riscv64", "win32-ia32", "linux-x64", "linux-arm64", "win32-arm64"])(
+  "absent %s status agrees with doctor",
+  async (host) => {
+    const root = mkdtempSync(join(tmpdir(), "cu-absence-parity-"))
+    const [platform, arch] = host.split("-")
+    const stamped = join(root, "runtime")
+    const version = "5.1.7"
+    try {
+      mkdirSync(stamped)
+      writeFileSync(join(stamped, "package.json"), JSON.stringify({ name: "omo", version }))
+      const env = { HOME: root, OMO_PACKAGE_DIR: stamped }
+      const report = await computerUseDoctorReport({
+        cwd: root,
+        env,
+        version,
+        packageRoot: join(root, "packages", "omo-native"),
+        platform,
+        arch,
+        launchEngine: () => {
+          throw new Error("absence must not spawn")
+        },
+      })
+      const status = describeEngineSource(undefined, env, {
+        platform,
+        arch,
+        execDir: root,
+        packageDir: join(root, "packages", "senpi-desktop-engine"),
+        repoRoot: root,
+      })
+      if (arch === "riscv64" || arch === "ia32") {
+        expect(report.kind).toBe("unavailable")
+        if (report.kind !== "unavailable") throw new Error("expected unsupported host")
+        expect(status).toBe(report.diagnostic.message)
+      } else {
+        expect(report.kind).toBe("not-installed")
+        expect(status).toBe(
+          `would download senpi-desktop-engine-${host}${platform === "win32" ? ".exe" : ""} from omo v${version} on first use`,
+        )
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
     }
-  } finally {
-    rmSync(root, { recursive: true, force: true })
-  }
-})
+  },
+)

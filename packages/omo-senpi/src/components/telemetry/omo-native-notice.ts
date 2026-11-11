@@ -10,9 +10,10 @@ import { getOmoNativeStateDir } from "./product-identity"
 const SOURCE = "omo-native-notice"
 const MARKER_FILE_NAME = "notice-shown"
 const PRIVACY_POLICY_URL = "https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md"
-const NOTICE = "OmO Native sends anonymous usage telemetry (no prompts, code, file paths, or account data) to PostHog in the United States to improve the product. "
-  + "Turn it off with DO_NOT_TRACK=1, or set \"telemetry\": { \"enabled\": false } in ~/.omo/omo.jsonc. "
-  + `Details: ${PRIVACY_POLICY_URL}`
+const NOTICE =
+  "OmO Native sends anonymous usage telemetry (no prompts, code, file paths, or account data) to PostHog in the United States to improve the product. " +
+  'Turn it off with DO_NOT_TRACK=1, or set "telemetry": { "enabled": false } in ~/.omo/omo.jsonc. ' +
+  `Details: ${PRIVACY_POLICY_URL}`
 
 type NotificationUi = {
   notify(message: string, type?: "info" | "warning" | "error"): void
@@ -29,9 +30,7 @@ export type OmoNativeNoticeRegistration = {
   register(pi: SenpiExtensionAPI, ctx: ComponentContext): void
 }
 
-export function createOmoNativeNoticeRegistration(
-  options: OmoNativeNoticeOptions = {},
-): OmoNativeNoticeRegistration {
+export function createOmoNativeNoticeRegistration(options: OmoNativeNoticeOptions = {}): OmoNativeNoticeRegistration {
   const env = options.env ?? process.env
   const stateDir = options.stateDir ?? getOmoNativeStateDir(env)
   let diagnosticEmitted = false
@@ -51,10 +50,14 @@ export function createOmoNativeNoticeRegistration(
     register(pi, _ctx) {
       pi.on("session_start", (_payload, eventCtx) => {
         // The single consent gate: a notice marker is a telemetry file, so it is written only when telemetry is on.
-        const consented = isOmoNativeTelemetryEnabled({
-          isConfigEnabled: options.isConfigEnabled,
-          diagnostics: (input) => reportOnce(isRecord(input) && "error" in input ? input.error : input),
-        }, eventCtx, env)
+        const consented = isOmoNativeTelemetryEnabled(
+          {
+            isConfigEnabled: options.isConfigEnabled,
+            diagnostics: (input) => reportOnce(isRecord(input) && "error" in input ? input.error : input),
+          },
+          eventCtx,
+          env,
+        )
         if (!consented) return
         const ui = notificationUi(eventCtx)
         if (ui === undefined || !claimNotice(stateDir, reportOnce)) return
@@ -88,7 +91,7 @@ function claimNotice(stateDir: string, diagnostics: (error: unknown) => void): b
 function notificationUi(value: unknown): NotificationUi | undefined {
   if (!isRecord(value)) return undefined
   const ui = value["ui"]
-  return isRecord(ui) && typeof ui["notify"] === "function" ? ui as NotificationUi : undefined
+  return isRecord(ui) && typeof ui["notify"] === "function" ? (ui as NotificationUi) : undefined
 }
 
 function errorCode(error: unknown): string | undefined {

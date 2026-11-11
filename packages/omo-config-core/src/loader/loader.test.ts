@@ -196,7 +196,9 @@ describe("loadOmoConfig", () => {
     expect(result.config.task?.default_concurrency).toBe(5)
     expect(result.diagnostics.map((diagnostic: { readonly kind: string }) => diagnostic.kind)).toContain("validation")
     expect(result.diagnostics.map((diagnostic: { readonly kind: string }) => diagnostic.kind)).toContain("read")
-    expect(result.diagnostics.some((diagnostic: { readonly path: string }) => diagnostic.path === unreadablePath)).toBe(true)
+    expect(result.diagnostics.some((diagnostic: { readonly path: string }) => diagnostic.path === unreadablePath)).toBe(
+      true,
+    )
   })
 
   test("#given only user omo json #when loading #then user json is read and jsonc takes precedence when both exist", () => {

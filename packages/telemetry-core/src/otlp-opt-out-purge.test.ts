@@ -13,7 +13,10 @@ import {
   recordingFetch,
   spoolNames,
   TEST_SCOPE,
-  testResource, testWireProjection, TEST_SPANS } from "./otlp-test-support"
+  testResource,
+  testWireProjection,
+  TEST_SPANS,
+} from "./otlp-test-support"
 import type { CreateOtlpTelemetryTransportInput } from "./otlp-transport-types"
 import type { TelemetryDiagnosticInput } from "./types"
 
@@ -45,7 +48,9 @@ async function optOut(spoolDir: string, spoolRoot: string, diagnostics: Telemetr
     spoolDir,
     spoolRoot,
     resource: testResource(),
-    scope: TEST_SCOPE, project: testWireProjection, spans: TEST_SPANS,
+    scope: TEST_SCOPE,
+    project: testWireProjection,
+    spans: TEST_SPANS,
     env: { DO_NOT_TRACK: "1" },
     diagnostics: (input) => diagnostics.push(input),
     autoStart: false,
@@ -80,7 +85,9 @@ describe("the opt-out purge skips every spool-named entry that is not a regular 
     // then
     expect(spoolNames(dir)).toEqual([named.slice(dir.length + 1)])
     expect(readdirSync(named)).toEqual(["inside.txt"])
-    expect(skipped(diagnostics)).toEqual([{ event: "telemetry_spool_purge_skipped", source: "otlp", entryKind: "directory" }])
+    expect(skipped(diagnostics)).toEqual([
+      { event: "telemetry_spool_purge_skipped", source: "otlp", entryKind: "directory" },
+    ])
     expect(diagnostics.filter((d) => d.event === "telemetry_spool_sweep_failed")).toEqual([])
   })
 
@@ -104,44 +111,50 @@ describe("the opt-out purge skips every spool-named entry that is not a regular 
     expect(skipped(diagnostics).map((d) => d.entryKind)).toEqual(["symlink"])
   })
 
-  test.skipIf(currentUid !== 0)("#given a spool-named file owned by another user (needs root to chown) #when the purge runs #then it survives and the skip is reported as foreign_owner", async () => {
-    // given
-    const dir = root()
-    seedSpool(dir)
-    const foreign = `active-logs-1-${"c".repeat(32)}.otlp`
-    writeFileSync(join(dir, foreign), "theirs")
-    chownSync(join(dir, foreign), 65534, 65534)
-    const diagnostics: TelemetryDiagnosticInput[] = []
+  test.skipIf(currentUid !== 0)(
+    "#given a spool-named file owned by another user (needs root to chown) #when the purge runs #then it survives and the skip is reported as foreign_owner",
+    async () => {
+      // given
+      const dir = root()
+      seedSpool(dir)
+      const foreign = `active-logs-1-${"c".repeat(32)}.otlp`
+      writeFileSync(join(dir, foreign), "theirs")
+      chownSync(join(dir, foreign), 65534, 65534)
+      const diagnostics: TelemetryDiagnosticInput[] = []
 
-    // when
-    await optOut(dir, dirname(dir), diagnostics)
+      // when
+      await optOut(dir, dirname(dir), diagnostics)
 
-    // then
-    expect(spoolNames(dir)).toEqual([foreign])
-    expect(skipped(diagnostics).map((d) => d.entryKind)).toEqual(["foreign_owner"])
-  })
+      // then
+      expect(spoolNames(dir)).toEqual([foreign])
+      expect(skipped(diagnostics).map((d) => d.entryKind)).toEqual(["foreign_owner"])
+    },
+  )
 })
 
 describe("the opt-out purge refuses a spool directory it does not own or that lies outside the caller's spool root", () => {
-  test.skipIf(currentUid === undefined)("#given the spool directory belongs to another user #when the purge runs #then it is refused, counted, and nothing is deleted", async () => {
-    // given
-    const dir = root()
-    seedSpool(dir)
-    const before = spoolNames(dir)
-    const diagnostics: TelemetryDiagnosticInput[] = []
-    const uid = spyOn(process, "getuid").mockImplementation(() => (currentUid ?? 0) + 1)
+  test.skipIf(currentUid === undefined)(
+    "#given the spool directory belongs to another user #when the purge runs #then it is refused, counted, and nothing is deleted",
+    async () => {
+      // given
+      const dir = root()
+      seedSpool(dir)
+      const before = spoolNames(dir)
+      const diagnostics: TelemetryDiagnosticInput[] = []
+      const uid = spyOn(process, "getuid").mockImplementation(() => (currentUid ?? 0) + 1)
 
-    // when
-    try {
-      await optOut(dir, dirname(dir), diagnostics)
-    } finally {
-      uid.mockRestore()
-    }
+      // when
+      try {
+        await optOut(dir, dirname(dir), diagnostics)
+      } finally {
+        uid.mockRestore()
+      }
 
-    // then
-    expect(spoolNames(dir)).toEqual(before)
-    expect(refusals(diagnostics)).toBe(1)
-  })
+      // then
+      expect(spoolNames(dir)).toEqual(before)
+      expect(refusals(diagnostics)).toBe(1)
+    },
+  )
 
   test("#given a plain spool directory that is not below the spool root the caller passed #when the process starts opted out or consent is withdrawn mid-run #then both purges are refused, counted, and the spool is untouched", async () => {
     // given
@@ -152,7 +165,11 @@ describe("the opt-out purge refuses a spool directory it does not own or that li
     mkdirSync(spoolRoot)
     const atStart: TelemetryDiagnosticInput[] = []
     const midRun: TelemetryDiagnosticInput[] = []
-    const transport = makeTransport(dir, { spoolRoot, consent: () => false, diagnostics: (input) => midRun.push(input) })
+    const transport = makeTransport(dir, {
+      spoolRoot,
+      consent: () => false,
+      diagnostics: (input) => midRun.push(input),
+    })
 
     // when
     await optOut(dir, spoolRoot, atStart)
@@ -228,7 +245,11 @@ describe("the opt-out purge deletes only what the spool created, only inside a v
 })
 
 describe("opt-out purges the spool", () => {
-  for (const env of [{ DO_NOT_TRACK: "1" }, { OTEL_SDK_DISABLED: "true" }, { OMO_TEST_SEND_ANONYMOUS_TELEMETRY: "0" }]) {
+  for (const env of [
+    { DO_NOT_TRACK: "1" },
+    { OTEL_SDK_DISABLED: "true" },
+    { OMO_TEST_SEND_ANONYMOUS_TELEMETRY: "0" },
+  ]) {
     test(`#given a spool left by earlier runs #when the process starts opted out (${Object.keys(env)[0]}) #then every batch, claim, WAL and quarantined file is deleted`, async () => {
       // given
       const dir = root()
@@ -241,7 +262,9 @@ describe("opt-out purges the spool", () => {
         spoolDir: dir,
         spoolRoot: dirname(dir),
         resource: testResource(),
-        scope: TEST_SCOPE, project: testWireProjection, spans: TEST_SPANS,
+        scope: TEST_SCOPE,
+        project: testWireProjection,
+        spans: TEST_SPANS,
         env,
         autoStart: false,
       })
@@ -277,7 +300,12 @@ describe("opt-out purges the spool", () => {
     const diagnostics: TelemetryDiagnosticInput[] = []
     const a = makeTransport(dir, { consent: () => consentA, pid: 11, bootId: "1".repeat(32) })
     const { calls, fetch } = recordingFetch()
-    const b = makeTransport(dir, { fetch, pid: 12, bootId: "2".repeat(32), diagnostics: (input) => diagnostics.push(input) })
+    const b = makeTransport(dir, {
+      fetch,
+      pid: 12,
+      bootId: "2".repeat(32),
+      diagnostics: (input) => diagnostics.push(input),
+    })
     capture(b, "feature_used", { feature: "before-purge" })
     consentA = false
 
@@ -288,7 +316,9 @@ describe("opt-out purges the spool", () => {
     await b.flush()
 
     // then
-    const features = calls.flatMap((c) => logRecordsOf(decodeLogs(c.body))).map((r) => r.attributes.find((kv) => kv.key === "omo.feature")?.value?.value)
+    const features = calls
+      .flatMap((c) => logRecordsOf(decodeLogs(c.body)))
+      .map((r) => r.attributes.find((kv) => kv.key === "omo.feature")?.value?.value)
     expect(features).toContainEqual({ case: "stringValue", value: "after-purge" })
     expect(diagnostics.filter((d) => d.event === "telemetry_spool_write_failed")).toEqual([])
     expect(spoolNames(dir)).toEqual([])

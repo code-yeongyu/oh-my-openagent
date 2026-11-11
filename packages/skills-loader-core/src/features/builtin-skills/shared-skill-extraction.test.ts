@@ -43,33 +43,33 @@ async function readSkillSource(name: TargetSkill): Promise<SkillSource> {
     case "review-work":
       skill = (await import("./skills/review-work")).reviewWorkSkill
       break
-		case "frontend":
-			skill = (await import("./skills/frontend")).frontendSkill
-			break
-		case "init-deep":
-			skill = (await import("./skills/init-deep")).initDeepSkill
-			break
-		case "debugging":
-			skill = (await import("./skills/debugging")).debuggingSkill
-			break
-		case "visual-qa":
-			skill = (await import("./skills/visual-qa")).visualQaSkill
-			break
-	}
+    case "frontend":
+      skill = (await import("./skills/frontend")).frontendSkill
+      break
+    case "init-deep":
+      skill = (await import("./skills/init-deep")).initDeepSkill
+      break
+    case "debugging":
+      skill = (await import("./skills/debugging")).debuggingSkill
+      break
+    case "visual-qa":
+      skill = (await import("./skills/visual-qa")).visualQaSkill
+      break
+  }
   return { name, description: skill.description, template: skill.template }
 }
 
 function findSkillFiles(directory = "packages/shared-skills/skills"): string[] {
-	const skillFiles: string[] = []
-	for (const name of readdirSync(directory)) {
-		const path = join(directory, name)
-		if (statSync(path).isDirectory()) {
-			skillFiles.push(...findSkillFiles(path))
-		} else if (name === "SKILL.md") {
-			skillFiles.push(path)
-		}
-	}
-	return skillFiles
+  const skillFiles: string[] = []
+  for (const name of readdirSync(directory)) {
+    const path = join(directory, name)
+    if (statSync(path).isDirectory()) {
+      skillFiles.push(...findSkillFiles(path))
+    } else if (name === "SKILL.md") {
+      skillFiles.push(path)
+    }
+  }
+  return skillFiles
 }
 
 async function readSharedSkill(name: TargetSkill): Promise<{ readonly frontmatter: string; readonly body: string }> {
@@ -97,33 +97,35 @@ describe("shared builtin skill extraction", () => {
 
   test("#given checked-in frontend builtin skill artifact #when compared to shared source #then it stays byte-equivalent", async () => {
     const sharedSkill = await Bun.file("packages/shared-skills/skills/frontend/SKILL.md").text()
-    const checkedInArtifact = await Bun.file("packages/skills-loader-core/src/features/builtin-skills/frontend/SKILL.md").text()
+    const checkedInArtifact = await Bun.file(
+      "packages/skills-loader-core/src/features/builtin-skills/frontend/SKILL.md",
+    ).text()
 
     expect(checkedInArtifact).toBe(sharedSkill)
   })
 
-	test("#given shared skill frontmatter #when parsed for Codex #then metadata is valid and budgeted", async () => {
-		const failures: string[] = []
+  test("#given shared skill frontmatter #when parsed for Codex #then metadata is valid and budgeted", async () => {
+    const failures: string[] = []
 
-		for (const path of findSkillFiles()) {
-			const content = await Bun.file(path).text()
-			const parsed = parseFrontmatter<SkillFrontmatter>(content)
-			if (!parsed.hadFrontmatter || parsed.parseError) {
-				failures.push(`${path}: invalid frontmatter`)
-				continue
-			}
-			if (typeof parsed.data.name !== "string" || parsed.data.name.length === 0) {
-				failures.push(`${path}: missing name`)
-			}
-			if (typeof parsed.data.description !== "string" || parsed.data.description.length === 0) {
-				failures.push(`${path}: missing description`)
-				continue
-			}
-			if (parsed.data.description.length > CODEX_SKILL_DESCRIPTION_MAX_LENGTH) {
-				failures.push(`${path}: description length ${parsed.data.description.length}`)
-			}
-		}
+    for (const path of findSkillFiles()) {
+      const content = await Bun.file(path).text()
+      const parsed = parseFrontmatter<SkillFrontmatter>(content)
+      if (!parsed.hadFrontmatter || parsed.parseError) {
+        failures.push(`${path}: invalid frontmatter`)
+        continue
+      }
+      if (typeof parsed.data.name !== "string" || parsed.data.name.length === 0) {
+        failures.push(`${path}: missing name`)
+      }
+      if (typeof parsed.data.description !== "string" || parsed.data.description.length === 0) {
+        failures.push(`${path}: missing description`)
+        continue
+      }
+      if (parsed.data.description.length > CODEX_SKILL_DESCRIPTION_MAX_LENGTH) {
+        failures.push(`${path}: description length ${parsed.data.description.length}`)
+      }
+    }
 
-		expect(failures).toEqual([])
-	})
+    expect(failures).toEqual([])
+  })
 })

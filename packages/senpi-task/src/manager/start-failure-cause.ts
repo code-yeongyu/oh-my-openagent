@@ -7,7 +7,8 @@
 import { RPC_RESPONSE_TIMEOUT_PREFIX as TIMEOUT_PREFIX } from "../runners/rpc-host/reattach"
 import { ERROR_CODE_SHAPE, PROVIDER_SHAPE } from "../runners/rpc/errors"
 
-export type StartCauseClass = "request_timeout" | "host_refused" | "transport_lost" | "credentials_missing" | "chain_not_held"
+export type StartCauseClass =
+  "request_timeout" | "host_refused" | "transport_lost" | "credentials_missing" | "chain_not_held"
 
 export type StartCause = {
   readonly cause_class: StartCauseClass
@@ -57,7 +58,8 @@ function chainNotHeld(cause: Error): StartCause {
 
 function hostRefusal(errorCode: unknown, errorData: unknown): StartCause {
   if (typeof errorCode === "string" && CREDENTIAL_CODES.has(errorCode)) {
-    const provider = typeof errorData === "object" && errorData !== null && "provider" in errorData ? errorData.provider : undefined
+    const provider =
+      typeof errorData === "object" && errorData !== null && "provider" in errorData ? errorData.provider : undefined
     return {
       cause_class: "credentials_missing",
       cause_code: errorCode,

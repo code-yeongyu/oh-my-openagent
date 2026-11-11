@@ -72,7 +72,9 @@ describe("getModelCapabilities", () => {
   }
 
   test("uses runtime metadata before snapshot data", () => {
-    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(
+      undefined,
+    )
     const result = getModelCapabilities({
       providerID: "anthropic",
       modelID: "claude-opus-4-7",
@@ -104,7 +106,9 @@ describe("getModelCapabilities", () => {
   })
 
   test("reads structured runtime capabilities from the SDK v2 shape", () => {
-    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(
+      undefined,
+    )
     const result = getModelCapabilities({
       providerID: "openai",
       modelID: "gpt-5.4",
@@ -145,7 +149,9 @@ describe("getModelCapabilities", () => {
   })
 
   test("respects root-level thinking flags when providers do not nest them under capabilities", () => {
-    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(
+      undefined,
+    )
     const result = getModelCapabilities({
       providerID: "custom-proxy",
       modelID: "gpt-5.4",
@@ -165,7 +171,9 @@ describe("getModelCapabilities", () => {
   })
 
   test("accepts runtime variant arrays without corrupting them into numeric keys", () => {
-    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(
+      undefined,
+    )
     const result = getModelCapabilities({
       providerID: "openai",
       modelID: "gpt-5.4",
@@ -179,7 +187,9 @@ describe("getModelCapabilities", () => {
   })
 
   test("normalizes the legacy Claude Opus thinking alias before snapshot lookup", () => {
-    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(
+      undefined,
+    )
     const result = getModelCapabilities({
       providerID: "anthropic",
       modelID: "claude-opus-4-7-thinking",
@@ -204,7 +214,9 @@ describe("getModelCapabilities", () => {
   })
 
   test("maps local gemini aliases to canonical models.dev entries", () => {
-    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(
+      undefined,
+    )
     const result = getModelCapabilities({
       providerID: "google",
       modelID: "gemini-3.1-pro-high",
@@ -279,7 +291,9 @@ describe("getModelCapabilities", () => {
   })
 
   test("prefers runtime models.dev cache over bundled snapshot", () => {
-    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(undefined)
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(
+      undefined,
+    )
     const runtimeSnapshot: ModelCapabilitiesSnapshot = {
       ...bundledSnapshot,
       models: {
@@ -481,10 +495,9 @@ describe("getModelCapabilities", () => {
 
   test("prefers runtime thinking over heuristic supportsThinking: false", () => {
     // given: a model matching the kimi heuristic but runtime reports thinking
-    findProviderModelMetadataSpy = spyOn(
-      connectedProvidersCache,
-      "findProviderModelMetadata",
-    ).mockReturnValue(undefined)
+    findProviderModelMetadataSpy = spyOn(connectedProvidersCache, "findProviderModelMetadata").mockReturnValue(
+      undefined,
+    )
 
     const capabilities = getModelCapabilities({
       providerID: "moonshotai",
