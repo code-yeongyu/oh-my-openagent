@@ -144,6 +144,22 @@ describe("omo doctor memory runtime sizes (B11)", () => {
     expect(report.totalBytes).toBe(report.identities.reduce((sum, entry) => sum + entry.bytes, 0))
   })
 
+  test("#given one identity whose runtime logged a cleanup and one that never did #when the report runs #then each listed line says when it was last cleaned (#12932)", async () => {
+    const root = memoryHome()
+    const cleaned = identity(root, "agent-a", 2_000)
+    identity(root, "agent-b", 1_000)
+    writeFileSync(join(cleaned, "retention-log.jsonl"), `${JSON.stringify({ v: 1, at: "2026-11-05T00:00:00.000Z", total: 3, removed: { runs: ["reflection-run-1", "reflection-run-2", "reflection-run-3"] } })}\n`)
+
+    const report = await memoryRuntimeReport({ env: { OMO_MEMORY_HOME: root }, maxBytesFor: () => 0 })
+
+    expect(report.identities.map((entry) => [entry.identity, entry.lastCleanup])).toEqual([
+      ["agent-a", { at: "2026-11-05T00:00:00.000Z", total: 3 }],
+      ["agent-b", undefined],
+    ])
+    expect(report.lines.find((line) => line.startsWith("INFO memory runtime: agent-a "))).toEndWith("; last cleanup 2026-11-05T00:00:00.000Z removed 3")
+    expect(report.lines.find((line) => line.startsWith("INFO memory runtime: agent-b "))).toEndWith("; no cleanup recorded")
+  })
+
   test("#given no memory home on disk #when the report runs #then it prints nothing", async () => {
     const report = await memoryRuntimeReport({ env: { OMO_MEMORY_HOME: join(memoryHome(), "missing") } })
     expect(report.lines).toEqual([])

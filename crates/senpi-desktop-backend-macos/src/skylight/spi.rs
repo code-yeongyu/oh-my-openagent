@@ -35,6 +35,16 @@ pub(super) type AuthenticationFactoryFn = unsafe extern "C" fn(
     std::ffi::c_uint,
 ) -> *mut c_void;
 
+/// `SLSHWCaptureWindowList(cid, windows, count, options)`: a +1 `CFArray` of
+/// `CGImage`, one per captured window, or null.
+pub(crate) type SLSHWCaptureWindowListFn = unsafe extern "C" fn(u32, *const u32, i32, u32) -> *const c_void;
+/// `SLSCopySpacesForWindows(cid, mask, windows)`: a +1 `CFArray` of space ids
+/// (`CFNumber`) holding any of the `CFNumber` window ids in `windows`.
+pub(crate) type SLSCopySpacesForWindowsFn = unsafe extern "C" fn(u32, i32, *const c_void) -> *const c_void;
+/// `SLSGetActiveSpace(cid)` / `CGSGetActiveSpace(cid)`: the active space id.
+pub(crate) type SLSGetActiveSpaceFn = unsafe extern "C" fn(u32) -> u64;
+pub(crate) type SLSMainConnectionIDFn = unsafe extern "C" fn() -> u32;
+
 use core_graphics::geometry::CGPoint;
 
 /// The SPI needed for every background event post.
@@ -81,6 +91,17 @@ impl PsnLookup {
     }
 }
 
+/// The window-capture SPI. Every member past the connection is optional: a
+/// missing capture symbol keeps window capture on the public chain, and a
+/// missing space symbol leaves the window's Space unknown.
+pub(crate) struct CaptureSpi {
+    pub(crate) main_connection: SLSMainConnectionIDFn,
+    pub(crate) hw_capture: Option<SLSHWCaptureWindowListFn>,
+    pub(crate) copy_spaces: Option<SLSCopySpacesForWindowsFn>,
+    pub(crate) active_space: Option<SLSGetActiveSpaceFn>,
+}
+
+static CAPTURE: LazyLock<Option<CaptureSpi>> = LazyLock::new(resolve_capture);
 static REQUIRED: LazyLock<Option<RequiredSpi>> = LazyLock::new(resolve_required);
 static FOREGROUND: LazyLock<Option<ForegroundSpi>> = LazyLock::new(resolve_foreground);
 pub(super) static AUTHENTICATION: LazyLock<Option<AuthenticationSpi>> = LazyLock::new(resolve_authentication);
@@ -168,6 +189,25 @@ fn resolve_required() -> Option<RequiredSpi> {
         get_front: symbol(c"_SLPSGetFrontProcess")?,
         set_window_location: symbol(c"CGEventSetWindowLocation")?,
         psn: lookup()?,
+    })
+}
+
+/// The window-capture SPI, or `None` when SkyLight is disabled, did not load,
+/// or has no main connection.
+pub(crate) fn capture_spi() -> Option<&'static CaptureSpi> {
+    CAPTURE.as_ref()
+}
+
+fn resolve_capture() -> Option<CaptureSpi> {
+    if disabled_by_env() {
+        return None;
+    }
+    ensure_skylight_loaded()?;
+    Some(CaptureSpi {
+        main_connection: symbol(c"SLSMainConnectionID").or_else(|| symbol(c"CGSMainConnectionID"))?,
+        hw_capture: symbol(c"SLSHWCaptureWindowList"),
+        copy_spaces: symbol(c"SLSCopySpacesForWindows"),
+        active_space: symbol(c"SLSGetActiveSpace").or_else(|| symbol(c"CGSGetActiveSpace")),
     })
 }
 

@@ -24,6 +24,15 @@ import { deviceId, deviceRef, sessionId } from "./validate-shapes.ts";
 import { FILTER_KEYS, SESSION_ROW_STATES } from "./vocabulary.ts";
 
 const ENVIRONMENTS_MAX = 1024;
+// omo-service#1016: the account's machine salt, canonical unpadded base64url of 16 to 64 bytes.
+const machineSalt = (v: unknown): string => {
+  const salt = text(v, 86, "machine_salt");
+  if (!/^[A-Za-z0-9_-]+$/.test(salt)) return fail("machine_salt");
+  const bytes = Buffer.from(salt, "base64url");
+  return bytes.length >= 16 && bytes.length <= 64 && bytes.toString("base64url") === salt
+    ? salt
+    : fail("machine_salt");
+};
 const PKCS8_KEY_BYTES = 48;
 // PKCS#8 v1 DER of a raw 32-byte private key: SEQUENCE { version 0, AlgorithmIdentifier { OID }, OCTET STRING {
 // OCTET STRING (32) } }; the OID is 1.3.101.112 for Ed25519 and 1.3.101.110 for X25519.
@@ -124,6 +133,11 @@ const VALIDATORS: RequestValidators<RequestType> = {
     bare(v);
     return { id, type: "device.forget" };
   },
+  "device.machine_binding": (v, id) => ({
+    id,
+    type: "device.machine_binding",
+    machine_salt: machineSalt(requestFields(v, ["machine_salt"])["machine_salt"]),
+  }),
   "device.info": (v, id) => {
     bare(v);
     return { id, type: "device.info" };
@@ -136,7 +150,7 @@ const VALIDATORS: RequestValidators<RequestType> = {
   },
   "sessions.list": (v, id) => {
     const { filter, rows } = requestFields(v, [], ["filter", "rows"]);
-    if (rows !== undefined && rows !== 2) return fail("rows");
+    if (rows !== undefined && rows !== 2 && rows !== 3) return fail("rows");
     return {
       id,
       type: "sessions.list",

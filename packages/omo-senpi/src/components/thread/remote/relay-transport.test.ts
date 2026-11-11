@@ -129,6 +129,38 @@ describe("a delivery the receiver's open draft holds is queued at once, like a s
     relay.dispose()
   })
 
+  // #12927: an explicit steer the draft holds is answered queued; when its turn is over by the re-send, the sender can read the refusal.
+  const steer = (key: string): OutboundDelivery => ({ ...delivery("steer me", key), mode: "steer", expected_turn_id: "3" })
+
+  test("#given b streams turn 3 and its user's draft holds one admission #when a steer of turn 3 is sent and turn 3 ends before the re-send #then the send answered queued, and a retry under the same key replays turn_conflict naming the delivery", async () => {
+    const engine = { ...ENGINE, streaming: true, currentTurnId: "3", pending: 0 }
+    const a = account({ heldDraft: 1, engine })
+    // Subscribed before the send: the re-send's failure line is written after the receipt is revised.
+    const log: string[] = []
+    let failed: () => void = () => undefined
+    const failure = new Promise<void>((resolve) => { failed = resolve })
+    // Turn 3 ends while the draft holds the steer: the wait before the re-send is where it ends.
+    const { relay } = transport(a.remote, { retryDelay: async () => { engine.streaming = false }, log: (line) => { log.push(line); if (line.startsWith("relay_delivery_failed:")) failed() } })
+    expect(await relay.deliver(steer("s1"))).toMatchObject({ kind: "ok", device: "b", delivery: { kind: "queued", queue_position: 1 }, effective_mode: "steer" })
+    let breaker: ReturnType<typeof setTimeout> | undefined
+    await Promise.race([failure, new Promise<never>((_, reject) => { breaker = setTimeout(() => reject(new Error(`waited 5 s for the re-send's failure line; log: ${log.join(" | ")}`)), 5_000) })]).finally(() => clearTimeout(breaker))
+    expect(admits(a.sent)).toHaveLength(2)
+    const deliveryId = String(admits(a.sent)[0]?.["deliveryId"])
+    expect(await relay.deliver(steer("s1"))).toMatchObject({ kind: "error", error: { code: "turn_conflict", details: { device: "b", delivery_id: deliveryId } } })
+    expect(admits(a.sent)).toHaveLength(2)
+    expect(log.filter((line) => line.startsWith("relay_receipt_unrevised:"))).toEqual([])
+  })
+
+  test("#given a held steer whose turn still runs at the re-send #when b takes it #then a retry under the same key still replays the queued answer", async () => {
+    const a = account({ heldDraft: 1, engine: { ...ENGINE, streaming: true, currentTurnId: "3", pending: 0 } })
+    const { relay, log } = transport(a.remote)
+    expect(await relay.deliver(steer("s2"))).toMatchObject({ kind: "ok", delivery: { kind: "queued" }, effective_mode: "steer" })
+    await admitted(a.sent, 2)
+    expect(await relay.deliver(steer("s2"))).toMatchObject({ kind: "ok", deduplicated: true, delivery: { kind: "queued", queue_position: 1 } })
+    expect(log.filter((line) => line.startsWith("relay_delivery_failed:"))).toEqual([])
+  })
+
+
   test("#12886: #given b is parked on a tool PERMISSION prompt (get_state has an open dialog, streaming, pendingMessageCount 0) #when a default-mode message is sent #then it is queued behind the approval with waiting_on, not steered into the parked turn", async () => {
     const a = account({ engine: { ...ENGINE, streaming: true, pending: 0, currentTurnId: "7", pendingDialogs: [{ id: "perm-1", kind: "permission" }] } })
     const { relay } = transport(a.remote)

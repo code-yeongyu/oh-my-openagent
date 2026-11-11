@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { spawn } from "node:child_process"
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises"
+import { spawn, spawnSync } from "node:child_process"
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -76,4 +76,44 @@ describe("recordGitTimeout snapshot contract (#12145)", () => {
     expect(record.timeoutMs).toBe(2_000)
     expect(record.processes).toBe(expected)
   })
+})
+
+// A `ps` whose table is far past the 1 MiB pipe cap spawnSync applies by default (#12801): 80,000
+// filler rows (about 9.7 MB), then the timed-out git's row last, so a capped or truncated capture
+// cannot contain it.
+const STALLED_GIT_ROW = "   4242      1 Ss   -        05:00 /stalled/bin/git add -A -- n000.md"
+const LARGE_PS = `#!/bin/sh
+[ "$1" = warm ] && exit 0
+awk 'BEGIN { for (i = 0; i < 80000; i++) printf "%7d %7d S    -        00:01 /usr/libexec/filler-%07d --role worker --padding ................................\\n", 100000 + i, 1, i }'
+echo '${STALLED_GIT_ROW}'
+`
+
+describe("process snapshot on a large process table (#12801)", () => {
+  test.skipIf(process.platform === "win32")("#given ps prints a table far past the default pipe buffer #when a git timeout is recorded #then the whole table, with the timed-out git's row, is in the record", async () => {
+    // #given
+    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "git-timeout-large-ps-")))
+    roots.push(root)
+    const bin = join(root, "bin")
+    await mkdir(bin)
+    await writeFile(join(bin, "ps"), LARGE_PS, "utf8")
+    await chmod(join(bin, "ps"), 0o755)
+    // The first exec of a fresh executable can stall while the OS vets it; pay that before the timed snapshot.
+    expect(spawnSync(join(bin, "ps"), ["warm"], { stdio: "ignore", timeout: 60_000 }).status).toBe(0)
+    const diagnostics = join(root, "diagnostics")
+    // The snapshot resolves `ps` on its own process's PATH, so it runs in a child whose PATH leads with the fake.
+    const script = [
+      `const { GIT_TIMEOUT_DIAGNOSTICS_ENV, recordGitTimeout } = require(${JSON.stringify(join(import.meta.dir, "timeout-diagnostics.ts"))})`,
+      `recordGitTimeout({ [GIT_TIMEOUT_DIAGNOSTICS_ENV]: ${JSON.stringify(diagnostics)} }, 4242, ["add", "-A", "--", "n000.md"], ${JSON.stringify(root)}, 2_000)`,
+    ].join("\n")
+
+    // #when
+    const child = spawnSync(process.execPath, ["-e", script], { env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}` }, encoding: "utf8", timeout: 60_000 })
+
+    // #then
+    expect(child.error).toBeUndefined()
+    expect(child.status).toBe(0)
+    const record = await readRecord(diagnostics)
+    expect(record.processes).toContain(STALLED_GIT_ROW)
+    expect(record.processes.length).toBeGreaterThan(8 * 1024 * 1024)
+  }, 90_000)
 })

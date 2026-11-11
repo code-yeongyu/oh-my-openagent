@@ -15,6 +15,7 @@ import {
   measureRuntimeCapEvictableBytes,
   measureRuntimeSizeWithinBudget,
   measureUnreflectedJournalBytes,
+  readLastRetentionLogEntry,
   runtimeSizeStanding,
 } from "./reflection-lock.generated.js"
 
@@ -73,14 +74,18 @@ function capText(maxBytes) {
   return maxBytes > 0 ? `${formatRuntimeBytes(maxBytes)} cap` : "no cap"
 }
 
+function lastCleanupText(entry) {
+  return entry.lastCleanup === undefined ? "; no cleanup recorded" : `; last cleanup ${entry.lastCleanup.at} removed ${entry.lastCleanup.total}`
+}
+
 function formatMemoryRuntimeLines(identities, totalBytes) {
   if (identities.length === 0) return []
   const bySize = [...identities].sort((left, right) => right.bytes - left.bytes || left.identity.localeCompare(right.identity))
   const lines = bySize.slice(0, LISTED_IDENTITIES).map((entry) => {
-    if (entry.sizeUnknown !== undefined) return `INFO memory runtime: ${entry.identity} size unknown (${capText(entry.maxBytes)})`
+    if (entry.sizeUnknown !== undefined) return `INFO memory runtime: ${entry.identity} size unknown (${capText(entry.maxBytes)})${lastCleanupText(entry)}`
     const standing = runtimeSizeStanding(entry.bytes, entry.maxBytes)
     const share = standing.percent === undefined ? "" : `, ${standing.percent}%`
-    return `INFO memory runtime: ${entry.identity} ${formatRuntimeBytes(entry.bytes)} (${capText(entry.maxBytes)}${share})`
+    return `INFO memory runtime: ${entry.identity} ${formatRuntimeBytes(entry.bytes)} (${capText(entry.maxBytes)}${share})${lastCleanupText(entry)}`
   })
   const rest = bySize.slice(LISTED_IDENTITIES)
   if (rest.length > 0) {
@@ -118,7 +123,7 @@ function formatMemoryRuntimeLines(identities, totalBytes) {
  * @param options.discardFor the resolved `memory.runtime.discard_unreflected_journals` for one identity (default: the shipped false)
  * @param options.measureBudgetMs each identity's measurement deadline, the one `/doctor` uses (default: the shipped pass_budget_ms)
  * @param options.measureSignal a caller deadline that replaces the per-identity timer
- * @returns {Promise<{ identities: { identity: string, bytes: number, maxBytes: number, unreflectedBytes?: number, discardUnreflectedJournals: boolean, evictableBytes?: number, sizeUnknown?: { budgetMs: number, at: string } }[], totalBytes: number, lines: string[] }>}
+ * @returns {Promise<{ identities: { identity: string, bytes: number, maxBytes: number, unreflectedBytes?: number, discardUnreflectedJournals: boolean, evictableBytes?: number, sizeUnknown?: { budgetMs: number, at: string }, lastCleanup?: { at: string, total: number } }[], totalBytes: number, lines: string[] }>}
  */
 export async function memoryRuntimeReport(options = {}) {
   const root = memoryRoot(options.env ?? process.env)
@@ -131,12 +136,15 @@ export async function memoryRuntimeReport(options = {}) {
     const paths = buildIdentityPaths(root, identity)
     const maxBytes = maxBytesFor(identity)
     const discardUnreflectedJournals = discardFor(identity)
+    // The removal log a retention pass appends (#12932); an unreadable log reads as none recorded.
+    const lastCleanup = await readLastRetentionLogEntry(paths.runtime).catch(() => undefined)
+    const cleaned = lastCleanup === undefined ? {} : { lastCleanup }
     // One deadline per identity bounds the size walk and the journal scans that read whole transcripts.
     const signal = options.measureSignal ?? AbortSignal.timeout(budgetMs)
     const startedAt = Date.now()
     const measured = await measureRuntimeSizeWithinBudget(paths.runtime, { budgetMs, now: startedAt, signal })
     if ("sizeUnknown" in measured) {
-      identities.push({ identity, bytes: 0, maxBytes, discardUnreflectedJournals, sizeUnknown: measured.sizeUnknown })
+      identities.push({ identity, bytes: 0, maxBytes, discardUnreflectedJournals, sizeUnknown: measured.sizeUnknown, ...cleaned })
       continue
     }
     const bytes = measured.size.bytes
@@ -150,7 +158,7 @@ export async function memoryRuntimeReport(options = {}) {
       evictableBytes = overCap ? await measureRuntimeCapEvictableBytes({ paths, policy, now: Date.now, signal }) : undefined
     } catch (error) {
       if (!signal.aborted) throw error
-      identities.push({ identity, bytes: 0, maxBytes, discardUnreflectedJournals, sizeUnknown: { budgetMs, at: new Date(startedAt).toISOString() } })
+      identities.push({ identity, bytes: 0, maxBytes, discardUnreflectedJournals, sizeUnknown: { budgetMs, at: new Date(startedAt).toISOString() }, ...cleaned })
       continue
     }
     identities.push({
@@ -160,6 +168,7 @@ export async function memoryRuntimeReport(options = {}) {
       discardUnreflectedJournals,
       ...(unreflectedBytes === undefined ? {} : { unreflectedBytes }),
       ...(evictableBytes === undefined ? {} : { evictableBytes }),
+      ...cleaned,
     })
   }
   const totalBytes = identities.reduce((sum, entry) => sum + entry.bytes, 0)

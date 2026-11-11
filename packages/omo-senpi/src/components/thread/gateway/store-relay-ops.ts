@@ -242,6 +242,19 @@ export async function toolReceiptSettle(
   })
 }
 
+/**
+ * Replaces a completed receipt's answer with what later became of the same call, so a retry under its key replays
+ * that: a relayed steer the receiver held behind its open draft until the steered turn ended was answered `queued`,
+ * and its receipt then answers the `turn_conflict` refusal. Only the instance that settled the receipt revises it.
+ */
+export async function toolReceiptRevise(ctx: StoreContext, request: Omit<ReceiptKey, "args_hash"> & { readonly now: number; readonly result: unknown }): Promise<boolean> {
+  return await transaction(ctx, "tool_receipt_revise", () => write(
+    ctx,
+    "UPDATE receipts SET result = ?, updated_at = ? WHERE principal = ? AND operation = ? AND idempotency_key = ? AND status = 'completed' AND owner_instance = ?",
+    [JSON.stringify(request.result), request.now, request.principal, request.operation, request.idempotency_key, ctx.config.instance_id],
+  ) === 1)
+}
+
 export type BindOpRequest = { readonly now: number; readonly receipt: ReceiptKey | null; readonly binding: BindRequest }
 
 export async function bindThread(ctx: StoreContext, request: BindOpRequest): Promise<RelayOutcome<{ readonly binding: BindingRecord }>> {
