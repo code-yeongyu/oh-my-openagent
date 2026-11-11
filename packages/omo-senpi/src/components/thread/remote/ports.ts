@@ -1,3 +1,5 @@
+import type { DeviceService } from "@oh-my-opencode/device-service-core"
+
 export type JsonObject = { readonly [key: string]: unknown }
 
 /** One row of the account-scoped session list (the device service's `sessions.list` listing). */
@@ -32,6 +34,12 @@ export type RemoteCommandOutcome =
 
 export type RemoteServiceState = { readonly state: string }
 
+/**
+ * A dialer of one device-service connection, naming whether the caller owns it: an owned connection is closed
+ * once its work settles, a borrowed one stays open for its owner to close.
+ */
+export type DeviceServiceDial = () => Promise<{ readonly conn: DeviceService; readonly owned: boolean }>
+
 export type RemoteLocateOutcome =
   | { readonly kind: "ok"; readonly sessionId: string }
   | { readonly kind: "refused"; readonly reason: string }
@@ -55,9 +63,10 @@ export type RemoteSessionsPort = {
    * A session-less engine record (`open_session`, `list_sessions`) on `device`'s engine endpoint, with no
    * attach: the attach-less `session.command {device, endpoint, rpc}` shape (relay daemon #393). `locate` asks a
    * create or fork for its new session's listing key on the reply (`located`), so no session.locate follows it.
-   * Each call opens its own short-lived connection and closes it once the record settles (#12777): an `open_session`
-   * sent on the long-lived connection would attach the host's delegated engine connection to it as well, and the
-   * engine would write each streamed delta twice.
+   * Each call rides the endpoint dialer: a fresh owned connection per call by default, closed once the record
+   * settles (#12777). An `open_session` sent on the long-lived connection would attach the host's delegated
+   * engine connection to it as well, and the engine would write each streamed delta twice; the attach that
+   * follows rides the long-lived connection, which then carries one copy per delta.
    */
   readonly endpointCommand: (device: string, rpc: JsonObject, options?: { readonly locate?: boolean }) => Promise<RemoteCommandOutcome>
   /**

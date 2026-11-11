@@ -1,11 +1,13 @@
 import { outcomeOf } from "./outcome"
 import { connectDeviceService, LocalApiError, type CommandResult, type DeviceService, type RemoteAttach } from "@oh-my-opencode/device-service-core"
-import type { JsonObject, RemoteCommandOutcome, RemoteSessionsPort } from "./ports"
+import type { DeviceServiceDial, JsonObject, RemoteCommandOutcome, RemoteSessionsPort } from "./ports"
 
 export type DeviceServiceSessionsOptions = {
   readonly version: string
-  /** Test seam: the proven local API connection (the device service SDK by default). */
-  readonly connect?: () => Promise<DeviceService>
+  /** Test seam: the dialer of the long-lived connection (the device service SDK by default, owned). */
+  readonly connect?: DeviceServiceDial
+  /** Test seam: the dialer endpoint commands ride on; the connect dialer by default. */
+  readonly dialEndpoint?: DeviceServiceDial
   /** Test seam: the wait between attaches of a just-created session while its device's listing catches up. */
   readonly retryDelay?: (ms: number) => Promise<void>
 }
@@ -95,17 +97,18 @@ function durableIdOf(row: object): { readonly durable_id?: string } {
 }
 
 export function createDeviceServiceSessions(options: DeviceServiceSessionsOptions): RemoteSessionsPort {
-  let service: Promise<DeviceService> | undefined
+  let service: Promise<{ readonly conn: DeviceService; readonly owned: boolean }> | undefined
   const attaches = new Map<string, Promise<Session>>()
-  const connect = options.connect ?? (() => connectDeviceService({ version: options.version }))
+  const connect = options.connect ?? (async () => ({ conn: await connectDeviceService({ version: options.version }), owned: true as const }))
+  const dialEndpoint = options.dialEndpoint ?? connect
   const retryDelay = options.retryDelay ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
-  const svc = (): Promise<DeviceService> => service ??= connect().then(
-    (connected) => {
-      void connected.closed.then(() => { service = undefined; attaches.clear() })
-      return connected
+  const svc = (): Promise<DeviceService> => (service ??= connect().then(
+    (dialed) => {
+      void dialed.conn.closed.then(() => { service = undefined; attaches.clear() })
+      return dialed
     },
     (error: unknown) => { service = undefined; throw error },
-  )
+  )).then((dialed) => dialed.conn)
   const attach = (device: string, sessionId: string): Promise<Session> => {
     const key = `${device}\u0000${sessionId}`
     const known = attaches.get(key)
@@ -127,10 +130,11 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     sessions: async () => (await (await svc()).sessions()).rows.map((row) => ({ device: row.device, session_id: row.session_id, ...durableIdOf(row), title: row.title, project: row.project, path: row.path, state: row.state, updated_ms: row.updated_ms })),
     // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
     // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
-    // The record goes on its own short-lived connection, closed once it settles (#12777): opening the session on the
-    // long-lived connection attaches the host's delegated engine connection to it as well, so the engine writes each
-    // streamed delta twice, once to the attach stream and once to the delegated connection. The attach that follows
-    // still rides the long-lived connection, which then carries one copy per delta.
+    // The record goes on the endpoint dialer (a fresh owned connection per call by default), closed once it settles
+    // if owned (#12777): opening the session on the long-lived connection attaches the host's delegated engine
+    // connection to it as well, so the engine writes each streamed delta twice, once to the attach stream and once
+    // to the delegated connection. The attach that follows still rides the long-lived connection, which then
+    // carries one copy per delta.
     endpointCommand: async (device, rpc, endpointOptions) => {
       let record: WireRpc
       try {
@@ -138,12 +142,13 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       } catch {
         return { kind: "refused", reason: "invalid_record" }
       }
-      let connected: DeviceService
+      let dialed: { readonly conn: DeviceService; readonly owned: boolean }
       try {
-        connected = await connect()
+        dialed = await dialEndpoint()
       } catch (error) {
         return { kind: "refused", reason: notSentReason(error) }
       }
+      const connected = dialed.conn
       try {
         return outcomeOf(await connected.endpointCommand(device, record, endpointOptions))
       } catch (error) {
@@ -153,7 +158,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         if (error instanceof LocalApiError && error.command_id === undefined && REFUSED_BEFORE_SENDING.has(error.code)) return { kind: "refused", reason: error.code }
         return { kind: "uncertain", reason: "reply_lost" }
       } finally {
-        connected.close()
+        // Only a connection this call owns is closed here: a borrowed one stays open for its owner.
+        if (dialed.owned) connected.close()
       }
     },
     sessionCommand: async (device, sessionId, rpc, commandOptions) => {
@@ -223,7 +229,11 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       const open = service
       service = undefined
       attaches.clear()
-      if (open !== undefined) (await open.catch(() => undefined))?.close()
+      // Only a connection this port owns is closed here: a borrowed one (the CLI's) stays open for its owner.
+      if (open !== undefined) {
+        const dialed = await open.catch(() => undefined)
+        if (dialed !== undefined && dialed.owned) dialed.conn.close()
+      }
     },
     locate: async (device, engineId, knownKey) => {
       let connected: DeviceService
