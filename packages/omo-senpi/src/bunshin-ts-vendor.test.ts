@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { copyVendored, DEPENDENCY_IMPORT_PREFIX, digestTree, pinDependencyImports } from "../scripts/sync-bunshin-ts.ts"
+import { archiveExtractCommand, copyVendored, DEPENDENCY_IMPORT_PREFIX, digestTree, pinDependencyImports } from "../scripts/sync-bunshin-ts.ts"
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url))
 const vendorRoot = join(packageRoot, "vendor")
@@ -107,5 +107,32 @@ describe("vendored bunshin-ts packages", () => {
     expect(files.length).toBeGreaterThan(0)
     const offenders = files.flatMap(path => importsVendoredName(readFileSync(join(packageRoot, path), "utf8")).map(specifier => `${path}: ${specifier}`))
     expect(offenders).toEqual([])
+  })
+})
+
+describe("sync-bunshin-ts archive extraction (#12498)", () => {
+  it.skipIf(process.platform === "win32")("#given a temp tree path holding a quote, a dollar sign and a backtick #when the archive command runs #then the commit's files land in exactly that directory", () => {
+    // given: a one-commit checkout, and a work dir like a TMPDIR that carries shell metacharacters
+    const root = mkdtempSync(join(tmpdir(), "sync-bunshin-archive-"))
+    try {
+      const checkout = join(root, "checkout")
+      mkdirSync(checkout)
+      const git = (...args: string[]) => execFileSync("git", ["-C", checkout, ...args], { encoding: "utf8" }).trim()
+      git("init", "--quiet")
+      writeFileSync(join(checkout, "probe.txt"), "archived\n")
+      git("add", "probe.txt")
+      git("-c", "user.email=s@example.invalid", "-c", "user.name=s", "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "probe")
+      const commit = git("rev-parse", "HEAD")
+      const tree = join(root, `odd"dir$HOME\`x\``, "tree")
+
+      // when
+      const [command, ...args] = archiveExtractCommand(checkout, commit, tree)
+      execFileSync(command ?? "sh", args, { cwd: root, stdio: "pipe" })
+
+      // then
+      expect(readFileSync(join(tree, "probe.txt"), "utf8")).toBe("archived\n")
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })

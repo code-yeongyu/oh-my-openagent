@@ -1,12 +1,15 @@
 //! The single choke point of every mutating request: admission to the
-//! process-wide transaction lock, the fail-closed [`gate`], then one input
+//! process-wide transaction lock, the fail-closed
+//! [`gate`](senpi_desktop_safety::gate), then one input
 //! transaction (focus/cursor capture, the action under `catch_unwind`,
 //! `release_all` on failure or suspension, the focus/cursor restore), then
 //! exactly one [`AuditEvent`]. Read-only requests never pass here.
 //!
 //! The machine-wide [`crate::lock::InteractionLock`] is taken after every
-//! admission wait: a foreground transaction holds it from the capture through
-//! the restore, background exec only around the dispatch.
+//! admission wait and after the actionability wait (nothing is sent while an
+//! element is awaited): a foreground transaction holds it from the capture
+//! through the restore, background exec only around the dispatch, where the
+//! element is checked once more without waiting.
 //!
 //! A stop or a cancellation observed at admission or just before the action
 //! sends no input; suspension always wins over cancellation (gajae
@@ -16,24 +19,21 @@ use std::cell::Cell;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use parking_lot::{Mutex, MutexGuard};
+use parking_lot::Mutex;
 use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode, ErrorReport, TccPermission};
 use senpi_desktop_core::protocol_results::AuditEvent;
 use senpi_desktop_core::report::{ActionRoute, Disposition, ReportMode};
 use senpi_desktop_core::types::Target;
 use senpi_desktop_safety::{
-    gate, FrameContext, FrameId, FrameRefusal, GateError, LockState, MonotonicClock, MutatingAction, PermissionGate,
-    StopPathReason, StopPolicy, Supervisor,
+    GateError, MonotonicClock, MutatingAction, StopPathReason, StopPolicy, Supervisor,
 };
 
 use crate::audit::audit_event;
 use crate::grant::ControlSlot;
-use crate::lock::Held;
 use crate::report::{error_report, ReportExtras, Stage};
-use crate::restore::{Guard, TransactionError};
-use crate::session::guarded;
-use crate::timings::{StageClock, TimedStage};
+use crate::restore::TransactionError;
+use crate::timings::StageClock;
 use crate::worker::Worker;
 
 /// Serializes input transactions across every session of the process
@@ -85,6 +85,8 @@ pub(crate) struct Mutation<'a> {
     /// backend call while this single transaction owns the input lock.
     pub(crate) text_delivered: Cell<u32>,
     pub(crate) keys: Option<&'a [String]>,
+    /// AX reference and optional offered action, waited on before the lock.
+    pub(crate) ax_actionability: Option<(&'a str, Option<&'a str>)>,
     /// How far the transaction got; decides the object-mode disposition.
     pub(crate) stage: Cell<Stage>,
     /// Stage durations, reported only in `trace: true` sessions.
@@ -105,6 +107,7 @@ impl Mutation<'_> {
             text: None,
             text_delivered: Cell::new(0),
             keys: None,
+            ax_actionability: None,
             stage: Cell::new(Stage::Admission),
             timings: StageClock::new(),
             fake_backend: Cell::new(false),
@@ -112,60 +115,32 @@ impl Mutation<'_> {
     }
 }
 
-/// The gate's view of the session, probed once per request.
-struct GateView {
-    lock: LockState,
-    input_granted: bool,
-    latest_frame: Option<String>,
-    refusal: Option<FrameRefusal>,
-    identity_changed: bool,
-}
-
-impl PermissionGate for GateView {
-    fn input_granted(&self) -> bool {
-        self.input_granted
-    }
-}
-
-impl FrameContext for GateView {
-    fn screen_locked(&self) -> LockState {
-        self.lock
-    }
-
-    fn is_latest(&self, frame: &FrameId) -> bool {
-        self.latest_frame.as_deref() == Some(frame.as_str())
-    }
-
-    fn frame_refusal(&self, _frame: Option<&FrameId>) -> Option<FrameRefusal> {
-        self.refusal
-    }
-
-    fn identity_changed(&self) -> bool {
-        self.identity_changed
-    }
-}
-
-/// A foreground transaction holds the machine-wide lock from its capture
-/// through its restore; background exec only around its dispatch.
-fn locks_whole_transaction(mutation: &Mutation<'_>) -> bool {
-    mutation.delivery == DeliveryMode::Foreground || matches!(route(mutation), Some(ActionRoute::ForegroundHid))
-}
-
 /// The channel a mutating request's input takes; `None` for a request that
-/// sends no input event (`clipboard.write`).
+/// sends no input event (`clipboard.write`, a window raise). `ax.typeText`
+/// reports `ax` here, for an inserted value; the keys path names its own.
 fn route(mutation: &Mutation<'_>) -> Option<ActionRoute> {
     match mutation.action {
         MutatingAction::AxPerform
         | MutatingAction::AxSetValue
         | MutatingAction::AxFocus
-        | MutatingAction::AxClick
         | MutatingAction::AxTypeText
         | MutatingAction::MenuSelect => Some(ActionRoute::Ax),
-        MutatingAction::ClipboardWrite => None,
-        _ => match (Target::parse(&mutation.target), mutation.delivery) {
-            (Target::Window(_), DeliveryMode::Background) => Some(ActionRoute::BackgroundWindow),
-            _ => Some(ActionRoute::ForegroundHid),
-        },
+        // A pointer click posted to the window that owns the element.
+        MutatingAction::AxClick => Some(event_route(true, mutation.delivery)),
+        MutatingAction::ClipboardWrite | MutatingAction::RaiseWindow => None,
+        _ => Some(event_route(
+            matches!(Target::parse(&mutation.target), Target::Window(_)),
+            mutation.delivery,
+        )),
+    }
+}
+
+/// The channel of input events sent in `delivery` mode, `to_window` when
+/// they are addressed to one window.
+pub(crate) const fn event_route(to_window: bool, delivery: DeliveryMode) -> ActionRoute {
+    match (to_window, delivery) {
+        (true, DeliveryMode::Background) => ActionRoute::BackgroundWindow,
+        _ => ActionRoute::ForegroundHid,
     }
 }
 
@@ -180,6 +155,7 @@ fn settled_report(
     let mut report = error_report(primary, stage, event);
     if let Some(preset) = preset {
         report.reason = preset.reason;
+        report.next_call = preset.next_call;
         report.disposition = preset.disposition.or(report.disposition);
     }
     report
@@ -236,214 +212,19 @@ impl Worker {
         }
         match (result, report) {
             (Ok(value), _) => {
-                let hit = self.report_extras.take().and_then(|extras| extras.hit);
+                let extras = self.report_extras.take().unwrap_or_default();
                 let traced = self.options.as_ref().is_some_and(|options| options.trace);
                 self.report_extras.set(Some(ReportExtras {
-                    route: route(mutation),
-                    hit,
+                    route: extras.route.or_else(|| route(mutation)),
+                    hit: extras.hit,
                     timings: traced.then(|| mutation.timings.take()),
+                    opened_surfaces: Vec::new(),
                 }));
                 Ok((value, event))
             }
             (Err(error), Some(report)) if object => Err(error.with_report(report)),
             (Err(error), _) => Err(error),
         }
-    }
-
-    /// The gate and the transaction proper; `focus_restored` is `None` when
-    /// nothing was captured to restore.
-    pub(crate) fn transaction<T>(
-        &mut self,
-        mutation: &Mutation<'_>,
-        cancelled: &dyn Fn() -> bool,
-        act: impl FnOnce(&mut Self) -> CoreResult<T>,
-    ) -> (Result<T, TransactionError>, Option<bool>) {
-        // The fail-closed gate (stop path, lock, permissions) answers first:
-        // asking the human for a grant is pointless while input cannot run.
-        if let Err(refused) = self.gate(mutation) {
-            return (Err(TransactionError::Primary(refused)), None);
-        }
-        if let Err(refused) = self.admit_control(mutation) {
-            return (Err(TransactionError::Primary(refused)), None);
-        }
-        let _watch = match self.admit_intervention(mutation, cancelled) {
-            Ok(watch) => watch,
-            Err(refused) => return (Err(TransactionError::Primary(refused)), None),
-        };
-        let whole = locks_whole_transaction(mutation);
-        // Dropped after the restore below: the tail expression runs first.
-        let _interaction = match whole.then(|| self.take_interaction(mutation, cancelled)).transpose() {
-            Ok(held) => held.flatten(),
-            Err(refused) => return (Err(TransactionError::Primary(refused)), None),
-        };
-        let begun = mutation
-            .timings
-            .time(TimedStage::Capture, || Guard::begin(self, mutation.action, mutation.delivery));
-        let guard = match begun {
-            Ok(guard) => guard,
-            Err(error) => return (Err(TransactionError::Primary(error)), None),
-        };
-        let mut result = match self.stop_observed(cancelled) {
-            Some(stopped) => Err(stopped),
-            None => match (!whole).then(|| self.take_interaction(mutation, cancelled)).transpose() {
-                Err(refused) => Err(refused),
-                Ok(dispatch) => {
-                    mutation.stage.set(Stage::Acting);
-                    let acted = mutation.timings.time(TimedStage::Dispatch, || guarded(|| act(self)));
-                    drop(dispatch);
-                    acted
-                }
-            },
-        };
-        if result.is_ok() {
-            mutation.stage.set(Stage::Acted);
-            result = mutation
-                .timings
-                .time(TimedStage::Verify, || self.after_action(mutation, result));
-        }
-        if let Err(primary) = &mut result {
-            // Recorded on the primary error, never in place of it.
-            if let Err(release) = guarded(|| self.backend()?.release_all()) {
-                primary.message = format!("{}; releasing held input also failed: {release}", primary.message);
-            }
-        }
-        mutation.timings.time(TimedStage::Restore, || guard.restore(self, result))
-    }
-
-    /// Takes the slot's machine-wide lock, giving up on a stop, a
-    /// cancellation, or another process holding it past the wait budget.
-    fn take_interaction(&self, mutation: &Mutation<'_>, cancelled: &dyn Fn() -> bool) -> CoreResult<Option<Held>> {
-        self.safety
-            .control_slot
-            .interaction()
-            .acquire(mutation.fake_backend.get(), &|| self.stop_observed(cancelled))
-    }
-
-    /// Waits for the transaction lock, giving up when a stop or a
-    /// cancellation is observed first.
-    fn admit(&self, cancelled: &dyn Fn() -> bool) -> CoreResult<MutexGuard<'static, ()>> {
-        loop {
-            // Before the gate: only a stop or a cancellation ends the wait;
-            // the gate itself reports (and enriches) a stop path that is down.
-            let is_cancelled = cancelled();
-            if self.safety.supervisor.is_suspended() {
-                return Err(DesktopError::from(GateError::Suspended));
-            }
-            if is_cancelled {
-                return Err(DesktopError::new(
-                    ErrorCode::Cancelled,
-                    "the request was cancelled before any input was sent",
-                ));
-            }
-            if let Some(transaction) = INPUT_TRANSACTION.try_lock_for(ADMISSION_POLL) {
-                return Ok(transaction);
-            }
-        }
-    }
-
-    /// After the gate passed: `Suspended`, then a stop path that stopped
-    /// authorizing input, then `Cancelled`; the probe runs first because a
-    /// stop may race it.
-    fn stop_observed(&self, cancelled: &dyn Fn() -> bool) -> Option<DesktopError> {
-        let cancelled = cancelled();
-        interruption(&self.safety.supervisor, &self.stop_policy())
-            .or_else(|| cancelled.then(|| DesktopError::new(
-                ErrorCode::Cancelled,
-                "the request was cancelled before any input was sent",
-            )))
-    }
-
-    pub(crate) fn stop_policy(&self) -> StopPolicy {
-        StopPolicy {
-            allow_host_relay_only: self
-                .options
-                .as_ref()
-                .is_some_and(|options| options.allow_host_relay_only_stop),
-        }
-    }
-
-    /// A key chord re-checks the whole gate after its last key (gajae
-    /// `keypress_checks_liveness_after_the_final_key`): a stop path that died
-    /// mid-chord fails the request. Any other action fails only on a stop.
-    fn after_action<T>(&mut self, mutation: &Mutation<'_>, result: CoreResult<T>) -> CoreResult<T> {
-        let stopped = if mutation.action == MutatingAction::KeyChord {
-            self.gate(mutation).err()
-        } else {
-            self.safety.supervisor.is_suspended().then(|| {
-                DesktopError::new(
-                    ErrorCode::Suspended,
-                    "input was suspended while the action ran; held input was released",
-                )
-            })
-        };
-        stopped.map_or(result, Err)
-    }
-
-    fn gate(&mut self, mutation: &Mutation<'_>) -> CoreResult<()> {
-        let policy = self.stop_policy();
-        let capabilities = self.refresh_capabilities();
-        mutation.fake_backend.set(capabilities.backend == "fake");
-        let input_granted = input_may_proceed(&capabilities.input_permission);
-        let lock = match self.backend().and_then(|backend| backend.screen_locked()) {
-            Ok(true) => LockState::Locked,
-            Ok(false) => LockState::Unlocked,
-            Err(_) => LockState::Unknown,
-        };
-        let object = self.registry.report_mode() == ReportMode::Object;
-        let refusal = if !mutation.action.is_coordinate() {
-            None
-        } else if object {
-            self.frames.refusal(&mutation.target, mutation.frame_id)
-        } else {
-            self.frames
-                .consumed(&mutation.target, mutation.frame_id)
-                .then_some(FrameRefusal::Consumed)
-        };
-        let identity_changed = object
-            && mutation.action.is_coordinate()
-            && refusal.is_none()
-            && self.identity_changed(&mutation.target);
-        let view = GateView {
-            lock,
-            input_granted,
-            latest_frame: self.frames.latest_id(&mutation.target).map(str::to_owned),
-            refusal,
-            identity_changed,
-        };
-        let result = gate(
-            &mutation.action,
-            &self.safety.supervisor,
-            &policy,
-            &view,
-            &view,
-            mutation.frame_id.map(FrameId::new),
-        );
-        match result {
-            Err(GateError::PermissionDenied { permission }) => Err(self.backend()?.permission_denied(permission)),
-            other => other.map_err(DesktopError::from),
-        }
-    }
-}
-
-impl Worker {
-    /// Whether the window the target's latest capture recorded an identity
-    /// for now belongs to another process. A window that is gone is not a
-    /// change here: mapping the point reports it.
-    fn identity_changed(&mut self, target_key: &str) -> bool {
-        let Some(captured) = self
-            .frames
-            .latest_geometry(target_key)
-            .and_then(|geometry| geometry.identity())
-            .cloned()
-        else {
-            return false;
-        };
-        let target = Target::parse(target_key);
-        if !matches!(target, Target::Window(_)) {
-            return false;
-        }
-        self.window(&target)
-            .is_ok_and(|current| current.identity.as_ref() != Some(&captured))
     }
 }
 
@@ -466,12 +247,8 @@ pub(crate) fn interruption(supervisor: &Supervisor, policy: &StopPolicy) -> Opti
     })
 }
 
-/// `prompt-or-granted` (Wayland before the first input) lets the action
-/// through: the RemoteDesktop portal asks the user when the first input
-/// connects libei, and a refusal there fails the action itself.
-fn input_may_proceed(input_permission: &str) -> bool {
-    matches!(input_permission, "granted" | "prompt-or-granted")
-}
+mod admission;
+mod transaction;
 
 #[cfg(test)]
 mod desktop_grant_tests;

@@ -66,7 +66,7 @@ describe("resolveComputerSettings", () => {
 			enginePath: undefined,
 			cuaAdapter: false,
 			runSandbox: "vm",
-			intervention: "pause",
+			intervention: "continue",
 			macosKeyPriming: "off",
 			trace: false,
 		});
