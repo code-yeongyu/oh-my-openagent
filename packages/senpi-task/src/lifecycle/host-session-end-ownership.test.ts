@@ -15,16 +15,26 @@ const drainMicrotasks = (): Promise<void> => new Promise((resolve) => setImmedia
 function runNWithPendingClose(taskId: string) {
   let opens = 0
   const answer = Promise.withResolvers<void>()
-  const harness = cancelHarness({ taskId, deferredRetryBackoffMs: [10], deps: { hostCloseTimeoutMs: 0, hostSessionClose: () => {
-    opens += 1
-    return answer.promise
-  } } })
+  const harness = cancelHarness({
+    taskId,
+    deferredRetryBackoffMs: [10],
+    deps: {
+      hostCloseTimeoutMs: 0,
+      hostSessionClose: () => {
+        opens += 1
+        return answer.promise
+      },
+    },
+  })
   harness.fixture.daemon.hold(harness.record.host_session?.session_path ?? "missing session path")
   return { harness, answer, opens: () => opens }
 }
 
 function bumpRun(harness: ReturnType<typeof cancelHarness>): void {
-  harness.store.mutate(harness.record.task_id, (fresh) => ({ ...fresh, notification: { ...fresh.notification, run_epoch: fresh.notification.run_epoch + 1 } }))
+  harness.store.mutate(harness.record.task_id, (fresh) => ({
+    ...fresh,
+    notification: { ...fresh.notification, run_epoch: fresh.notification.run_epoch + 1 },
+  }))
 }
 
 describe("an end check is never shared across runs of one task", () => {
@@ -51,11 +61,19 @@ describe("an end check is never shared across runs of one task", () => {
     const backoff = Promise.withResolvers<void>()
     let opens = 0
     const answer = Promise.withResolvers<void>()
-    const harness = cancelHarness({ taskId: "st_0e000002", deferredRetryBackoffMs: [10], onWait: () => reachedWait.resolve(), gateWait: () => backoff.promise,
-      deps: { hostCloseTimeoutMs: 0, hostSessionClose: () => {
-        opens += 1
-        return answer.promise
-      } } })
+    const harness = cancelHarness({
+      taskId: "st_0e000002",
+      deferredRetryBackoffMs: [10],
+      onWait: () => reachedWait.resolve(),
+      gateWait: () => backoff.promise,
+      deps: {
+        hostCloseTimeoutMs: 0,
+        hostSessionClose: () => {
+          opens += 1
+          return answer.promise
+        },
+      },
+    })
     harness.fixture.daemon.hold(harness.record.host_session?.session_path ?? "missing session path")
     const port = harness.lifecycle.hostSessionCancel
     if (port === undefined) throw new Error("the lifecycle exposes no host-session cancel")

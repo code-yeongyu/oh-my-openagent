@@ -46,10 +46,14 @@ export async function readRetentionResumePoints(runtimeDir: string): Promise<Ret
   // A file written before the cap had its own field holds the cap's resume point as the cursor.
   if (parsed.cursor?.store === "cap") return capResumePoint(parsed.cursor)
   const resumed = capResumePoint(parsed.cap)
-  const cap = resumed.cap !== undefined && parsed.capStalled === true ? { ...resumed, capStalled: true as const } : resumed
+  const cap =
+    resumed.cap !== undefined && parsed.capStalled === true ? { ...resumed, capStalled: true as const } : resumed
   const cursor = parsed.cursor
   if (typeof cursor?.store !== "string") return cap
-  return { cursor: { store: cursor.store, ...(typeof cursor.lastName === "string" ? { lastName: cursor.lastName } : {}) }, ...cap }
+  return {
+    cursor: { store: cursor.store, ...(typeof cursor.lastName === "string" ? { lastName: cursor.lastName } : {}) },
+    ...cap,
+  }
 }
 
 function capResumePoint(cursor: StoredCursor | undefined): RetentionResumePoints {

@@ -55,7 +55,13 @@ const rows: readonly Row[] = [
   { engine: "a custom SENPI_BIN at an older version", running: PINNED, bin: OLDER, host: OLDER, accepts: false },
   { engine: "a custom SENPI_BIN at the pinned version", running: OLDER, bin: PINNED, host: PINNED, accepts: true },
   { engine: "an unreadable running version", running: undefined, host: "dev-build", accepts: false },
-  { engine: "a custom SENPI_BIN with no readable manifest", running: PINNED, bin: "no-manifest", host: "", accepts: false },
+  {
+    engine: "a custom SENPI_BIN with no readable manifest",
+    running: PINNED,
+    bin: "no-manifest",
+    host: "",
+    accepts: false,
+  },
 ]
 
 test.each(rows)("CLI spawn on $engine sends --spawned-by only when the launched engine accepts it", (row) => {
@@ -63,7 +69,10 @@ test.each(rows)("CLI spawn on $engine sends --spawned-by only when the launched 
   const bin = row.bin === undefined ? undefined : senpiBin(row.bin)
   // when the child descriptor is built
   const descriptor = buildRpcSpawn(spec, {
-    isBunBinary: false, isCompiledEngine: false, execPath: "/synthetic/bun", platform: "linux",
+    isBunBinary: false,
+    isCompiledEngine: false,
+    execPath: "/synthetic/bun",
+    platform: "linux",
     parentEnv: bin === undefined ? {} : { SENPI_BIN: bin },
     resolveRpcEntry: () => "/synthetic/rpc-entry.js",
     engineVersion: row.running,

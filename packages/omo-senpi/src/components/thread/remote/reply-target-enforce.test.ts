@@ -10,12 +10,21 @@ describe("a reply approved from a consumed delivery delivers only to that sender
   test("#given the delivery stated sender dur-on-b named 'on b' #when the run replies by that name #then it resolves to b's row and is delivered there", async () => {
     const a = fixture.account({ rows: [B_ROW] })
     const { run } = fixture.surface(a.remote, { callerReplySenders: () => [{ session_id: "dur-on-b", name: "on b" }] })
-    expect(await run("thread_send", { thread: "on b", message: "reply" })).toMatchObject({ kind: "ok", thread_id: "dur-on-b", device: "b" })
+    expect(await run("thread_send", { thread: "on b", message: "reply" })).toMatchObject({
+      kind: "ok",
+      thread_id: "dur-on-b",
+      device: "b",
+    })
   })
   test("#given the delivery stated sender dur-on-b named 'local peer' (a name a local thread also carries) #when the run replies by that name #then the resolved local thread is not the sender: reply_target_mismatch, nothing sent", async () => {
     const a = fixture.account({ rows: [B_ROW] })
-    const { run } = fixture.surface(a.remote, { callerReplySenders: () => [{ session_id: "dur-on-b", name: "local peer" }] })
-    expect(await run("thread_send", { thread: "local peer", message: "reply" })).toMatchObject({ kind: "error", error: { code: "reply_target_mismatch", details: { resolved_thread_id: "dur-local" } } })
+    const { run } = fixture.surface(a.remote, {
+      callerReplySenders: () => [{ session_id: "dur-on-b", name: "local peer" }],
+    })
+    expect(await run("thread_send", { thread: "local peer", message: "reply" })).toMatchObject({
+      kind: "error",
+      error: { code: "reply_target_mismatch", details: { resolved_thread_id: "dur-local" } },
+    })
     expect(a.sent).toHaveLength(0)
   })
 })

@@ -33,7 +33,10 @@ export function refusingProcessRunner(refusals: Readonly<Record<string, object>>
   return { runner, launched }
 }
 
-export function taskEvents(stateDir: string, taskId: string): Array<{ type: string; payload: Record<string, unknown> }> {
+export function taskEvents(
+  stateDir: string,
+  taskId: string,
+): Array<{ type: string; payload: Record<string, unknown> }> {
   return readFileSync(join(stateDir, "logs", `${taskId}.jsonl`), "utf8")
     .split("\n")
     .filter((line) => line.length > 0)

@@ -4,13 +4,7 @@ import { join } from "node:path"
 import type { TaskRecord } from "../state"
 import { createTaskRecordStore } from "../store"
 import type { TaskRecordStore } from "../store"
-import {
-  baseSpec,
-  cleanupProjects,
-  flush,
-  makeManager,
-  tempProject,
-} from "./__fixtures__/manager-fakes"
+import { baseSpec, cleanupProjects, flush, makeManager, tempProject } from "./__fixtures__/manager-fakes"
 
 afterEach(cleanupProjects)
 

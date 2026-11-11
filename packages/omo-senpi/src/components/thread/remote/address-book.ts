@@ -9,10 +9,37 @@ import { holderTarget, remoteAvailable } from "./remote-ops"
 // alias, then the name ladder across every entry (two devices sharing a name are ambiguous_target naming each device).
 const statusOf = (state: string): ThreadStatus => (state === "ended" ? "resumable" : "live")
 
-
 export function relayAddressEntry(row: RemoteSessionRow, aliases?: readonly string[]): ThreadAddressEntry {
   const updated = new Date(row.updated_ms).toISOString()
-  return { thread_id: rowThreadId(row), name: row.title, status: statusOf(row.state), cwd: row.project, created_at: updated, updated_at: updated, device: row.device, ...(aliases === undefined ? {} : { aliases }), transport: { kind: "relay", row } }
+  return {
+    thread_id: rowThreadId(row),
+    name: row.title,
+    status: statusOf(row.state),
+    cwd: row.project,
+    created_at: updated,
+    updated_at: updated,
+    device: row.device,
+    ...(aliases === undefined ? {} : { aliases }),
+    transport: { kind: "relay", row },
+  }
+}
+
+/**
+ * The relay's transport reference for an address that names its device (`<device>/<durable id>`, as `omo remote` takes
+ * it), read without the account listing: the listing settles only with the slowest device and lags a session just opened
+ * (#12709). The device service resolves the durable id to its own key (decision 0027 D2).
+ */
+export function namedDeviceRow(device: string, durableId: string): RemoteSessionRow {
+  return {
+    device,
+    session_id: durableId,
+    durable_id: durableId,
+    title: "",
+    project: "",
+    path: "",
+    state: "idle",
+    updated_ms: 0,
+  }
 }
 
 export type RelayAddressBook = {
@@ -39,7 +66,21 @@ export async function relayAddressBook(remote: RemoteThreadSurface, address: str
   if (alias === undefined || alias.kind === "error") return { entries }
   const holder = await holderTarget(remote, alias.value, here, rows)
   if (!("where" in holder)) return { entries, aliasFailure: holder.error }
-  if (holder.where === "here") return { entries: [...entries, { thread_id: holder.session_id, name: address, status: "live", cwd: "", created_at: "", updated_at: null, aliases: [address] }] }
+  if (holder.where === "here")
+    return {
+      entries: [
+        ...entries,
+        {
+          thread_id: holder.session_id,
+          name: address,
+          status: "live",
+          cwd: "",
+          created_at: "",
+          updated_at: null,
+          aliases: [address],
+        },
+      ],
+    }
   if (holder.where !== "remote") return { entries }
   const row = holder.row
   return { entries: [...entries.filter((entry) => entry.transport?.row !== row), relayAddressEntry(row, [address])] }

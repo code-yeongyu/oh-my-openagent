@@ -11,7 +11,11 @@ export class MemorySecretError extends Error {
   readonly patternClass: SecretPatternClass
   readonly where: "content" | "path"
 
-  constructor(options: { readonly path: string; readonly patternClass: SecretPatternClass; readonly where: "content" | "path" }) {
+  constructor(options: {
+    readonly path: string
+    readonly patternClass: SecretPatternClass
+    readonly where: "content" | "path"
+  }) {
     super(
       options.where === "path"
         ? `refused: ${redactSecretLikeMaterial(options.path)} is a secret-like file name (${options.patternClass})`

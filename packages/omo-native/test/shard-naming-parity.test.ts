@@ -1,13 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  shardKey as engineShardKey,
-  shardSocketPath as engineShardSocketPath,
-} from "@code-yeongyu/senpi"
-import {
-  shardKey as omoShardKey,
-  shardSocketPath as omoShardSocketPath,
-} from "@oh-my-opencode/senpi-task"
+import { shardKey as engineShardKey, shardSocketPath as engineShardSocketPath } from "@code-yeongyu/senpi"
+import { shardKey as omoShardKey, shardSocketPath as omoShardSocketPath } from "@oh-my-opencode/senpi-task"
 
 describe("omo and adopted engine shard naming", () => {
   for (const owner of ["parent-session", "thread/with spaces", "유니코드-session"]) {
