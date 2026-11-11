@@ -2,7 +2,8 @@
 //! `d-safety.md:<line>[-<line>] <text>` segments joined by `; `: a segment's quoted strings must
 //! appear on its cited lines, and a segment without quotes must carry the row's entry there
 //! (backticks of the design text ignored). The lines come from `design-excerpt.txt`, a verbatim
-//! copy whose sha256 the test checks against its header.
+//! copy whose sha256 the test checks against its header and whose line numbers must run
+//! 381..=407 in order (the hash covers the text, not the numbering).
 
 use std::collections::BTreeMap;
 
@@ -10,6 +11,10 @@ use sha2::{Digest, Sha256};
 
 const DESIGN: &str = include_str!("design.tsv");
 const EXCERPT: &str = include_str!("design-excerpt.txt");
+
+/// The pinned lines the excerpt copies: '### The shipped table' from the JSON block to the
+/// Windows row.
+const EXCERPT_LINES: std::ops::RangeInclusive<u32> = 381..=407;
 
 /// The excerpt's lines by number, after its body hash is checked.
 fn excerpt() -> BTreeMap<u32, String> {
@@ -32,6 +37,14 @@ fn parse(excerpt: &str) -> Result<BTreeMap<u32, String>, String> {
         lines.insert(number, text.replace('`', ""));
         body.push_str(text);
         body.push('\n');
+    }
+    let numbers: Vec<u32> = excerpt
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+        .map(|line| line.split('\t').next().unwrap_or(line).parse().unwrap_or(0))
+        .collect();
+    if numbers != EXCERPT_LINES.collect::<Vec<u32>>() {
+        return Err(format!("line numbers must run {EXCERPT_LINES:?} in order"));
     }
     let digest = format!("{:x}", Sha256::digest(body.as_bytes()));
     if digest != header.trim() {
