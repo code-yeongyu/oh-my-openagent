@@ -8,7 +8,9 @@
 //!   `TransactionFailed{recovery_required, callId}`, the marker kept;
 //! - an outstanding marker of the same `callId` (a re-drive after a crash, a restart or a
 //!   lock pause): the act is refused, the interrupted send reads `delivery_uncertain/unsafe`,
-//!   and the refusal's audit line clears the marker. Nothing is ever resent.
+//!   the callId is recorded as poisoned, and only then does the refusal's audit line clear
+//!   the marker;
+//! - a poisoned callId, checked first: refused the same way, every time. Nothing is ever resent.
 
 use omo_computer_core::report::Disposition;
 
@@ -29,6 +31,13 @@ pub(super) enum Verdict {
 impl Funnel {
     pub(super) fn recover(&mut self, call_id: &str) -> Result<Verdict, Refused> {
         let (issuer, scope) = (self.binding.issuer.clone(), self.binding.scope.clone());
+        if self.poisoned.contains(&issuer, &scope, call_id) {
+            return Ok(Verdict::Refuse {
+                refused: uncertain(call_id),
+                clear: false,
+                warnings: Vec::new(),
+            });
+        }
         let marker = match self.markers.read(&issuer, &scope) {
             MarkerRead::Absent => return Ok(Verdict::Proceed),
             MarkerRead::Unreadable => {
@@ -72,12 +81,24 @@ impl Funnel {
                 if marker.binding.generation != self.generation {
                     warnings.push(Warning::QuarantinedReply);
                 }
+                // The marker may go only once the callId stays refused without it.
+                let clear = self.poisoned.insert(&issuer, &scope, call_id).is_ok();
                 Verdict::Refuse {
-                    refused: refused(RECOVERY_REQUIRED, Some(Disposition::UNCERTAIN_UNSAFE)),
-                    clear: true,
+                    refused: uncertain(call_id),
+                    clear,
                     warnings,
                 }
             }
         })
+    }
+}
+
+/// The answer to every re-drive of a crashed callId.
+fn uncertain(call_id: &str) -> Refused {
+    Refused {
+        refusal: RECOVERY_REQUIRED,
+        call_id: Some(call_id.to_owned()),
+        receipt: None,
+        interrupted: Some(Disposition::UNCERTAIN_UNSAFE),
     }
 }

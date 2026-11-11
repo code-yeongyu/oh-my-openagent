@@ -112,8 +112,10 @@ fn refused(refusal: &Refusal) -> Failure {
     failure(refusal.code.number(), refusal.code.wire(), Some(data))
 }
 
-/// A funnel refusal: the refusal's members plus the `callId` it concerns and, for a replay,
-/// the stored `receipt` (`TransactionFailed{reason:"replayed", callId, receipt}`).
+/// A funnel refusal: the refusal's members plus the `callId` it concerns, for a replay the
+/// stored `receipt` (`TransactionFailed{reason:"replayed", callId, receipt}`), and for a call
+/// whose send was interrupted its `disposition` (`delivery_uncertain/unsafe`): without it
+/// the code's own row would read `not_delivered/safe` and invite a resend.
 fn refused_call(refused: &Refused) -> Failure {
     let mut failure = self::refused(&refused.refusal);
     if let Some(data) = failure.data.as_mut() {
@@ -122,6 +124,9 @@ fn refused_call(refused: &Refused) -> Failure {
         }
         if let Some(receipt) = &refused.receipt {
             data["receipt"] = (**receipt).clone();
+        }
+        if let Some(disposition) = refused.interrupted {
+            data["disposition"] = json!(disposition);
         }
     }
     failure

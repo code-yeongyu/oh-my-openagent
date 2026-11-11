@@ -116,11 +116,21 @@ fn crashed_call_id_stays_poisoned_and_is_delivered_exactly_once() {
     die_after_input(&run, "c-crash", 1);
     assert_eq!(run.sink.len(), 3, "the crashed call's one delivery");
     let assert_poisoned = |session: &mut Session, expected_sink: usize| {
-        let redrive = session.click(click("c-crash")).expect_err("a crashed callId is never resent");
-        assert_eq!(wire(&redrive), ("TransactionFailed", Some("recovery_required")));
+        let redrive = session
+            .click(click("c-crash"))
+            .expect_err("a crashed callId is never resent");
+        assert_eq!(
+            wire(&redrive),
+            ("TransactionFailed", Some("recovery_required"))
+        );
         assert_eq!(redrive.call_id.as_deref(), Some("c-crash"));
         assert_eq!(redrive.interrupted, Some(Disposition::UNCERTAIN_UNSAFE));
-        assert_eq!(run.sink.len(), expected_sink, "nothing resent: {:?}", run.sink.lines());
+        assert_eq!(
+            run.sink.len(),
+            expected_sink,
+            "nothing resent: {:?}",
+            run.sink.lines()
+        );
     };
     let mut first = run.session(Box::new(run.fake()));
     assert_poisoned(&mut first, 3);
@@ -128,7 +138,9 @@ fn crashed_call_id_stays_poisoned_and_is_delivered_exactly_once() {
     drop(first);
     let mut restarted = run.session(Box::new(run.fake()));
     assert_poisoned(&mut restarted, 3);
-    restarted.click(click("c-other")).expect("another callId is delivered once the scope is free");
+    restarted
+        .click(click("c-other"))
+        .expect("another callId is delivered once the scope is free");
     assert_eq!(run.sink.len(), 6);
     assert_poisoned(&mut restarted, 6);
     assert_poisoned(&mut restarted, 6);

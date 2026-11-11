@@ -211,7 +211,7 @@ impl MarkerStore for MemoryMarkers {
 }
 
 /// A plain file-name component: 1-64 of `[A-Za-z0-9._-]`, never `.` or `..`.
-fn component(name: &str) -> io::Result<&str> {
+pub(crate) fn component(name: &str) -> io::Result<&str> {
     let plain = !name.is_empty()
         && name.len() <= 64
         && name != "."

@@ -5,7 +5,9 @@
 //! There is no retry anywhere in it.
 
 mod binding;
+mod call;
 mod funnel;
+mod poison;
 mod record;
 mod recovery;
 mod report;
@@ -14,16 +16,14 @@ mod report;
 mod tests;
 
 pub use binding::{Binding, SecureInputProbe, SecureProbe};
+pub use call::Mutation;
 
 use std::path::{Path, PathBuf};
 
-use omo_computer_core::backend::{InputEvent, Refusal, Route};
+use omo_computer_core::backend::Refusal;
 use omo_computer_core::error::{EngineCode, Reason};
-use omo_computer_core::methods::Method;
 use omo_computer_core::paths::Roots;
 use omo_computer_core::report::Disposition;
-use omo_computer_core::requests::CallAuthority;
-use omo_computer_safety::Call;
 use serde_json::Value;
 
 use crate::audit::gc::{ArtifactStore, GcLimits};
@@ -32,6 +32,7 @@ use crate::budget::Permits;
 use crate::lock::InteractionLock;
 use crate::marker::{MarkerDir, MarkerStore, MemoryMarkers};
 use crate::Session;
+use poison::Poisoned;
 
 /// A marker that cannot be persisted: the input is not sent.
 pub const MARKER_UNAVAILABLE: Refusal = Refusal::new(
@@ -72,72 +73,6 @@ impl From<Refusal> for Refused {
     }
 }
 
-/// One mutating call as the funnel takes it.
-pub struct Mutation<'a> {
-    pub method: Method,
-    pub call: Call<'a>,
-    pub events: Vec<InputEvent>,
-    pub route: Route,
-    pub call_id: Option<String>,
-    pub run_generation: Option<u64>,
-    pub frame_id: Option<String>,
-    /// Typed text: the marker and the audit keep its length (and digest outside a secure focus).
-    pub text: Option<String>,
-    pub keys: Vec<String>,
-}
-
-impl<'a> Mutation<'a> {
-    /// An exec request's call, bound to its `callId` and `runGeneration`.
-    #[must_use]
-    pub fn exec(
-        method: Method,
-        call: Call<'a>,
-        events: Vec<InputEvent>,
-        route: Route,
-        authority: &CallAuthority,
-    ) -> Self {
-        Self {
-            method,
-            call,
-            events,
-            route,
-            call_id: authority.call_id.clone(),
-            run_generation: authority.run_generation,
-            frame_id: None,
-            text: None,
-            keys: Vec::new(),
-        }
-    }
-
-    /// A v1 text call: no `callId` on the wire, so the funnel mints one.
-    #[must_use]
-    pub fn typed(method: Method, call: Call<'a>, route: Route, text: String) -> Self {
-        Self {
-            method,
-            call,
-            events: vec![InputEvent::Text(text.clone())],
-            route,
-            call_id: None,
-            run_generation: None,
-            frame_id: None,
-            text: Some(text),
-            keys: Vec::new(),
-        }
-    }
-
-    #[must_use]
-    pub fn with_frame(mut self, frame_id: Option<String>) -> Self {
-        self.frame_id = frame_id;
-        self
-    }
-
-    #[must_use]
-    pub fn with_keys(mut self, keys: Vec<String>) -> Self {
-        self.keys = keys;
-        self
-    }
-}
-
 enum AuditSpec {
     Memory,
     Dir(PathBuf),
@@ -149,6 +84,7 @@ pub(crate) struct Funnel {
     generation: u64,
     session_id: String,
     markers: Box<dyn MarkerStore>,
+    poisoned: Poisoned,
     audit_spec: AuditSpec,
     audit: Option<Box<dyn AuditSink>>,
     lock: Option<InteractionLock>,
@@ -160,7 +96,7 @@ pub(crate) struct Funnel {
 impl Funnel {
     pub(crate) fn in_memory() -> Self {
         Self::with(
-            Box::new(MemoryMarkers::default()),
+            (Box::new(MemoryMarkers::default()), Poisoned::default()),
             AuditSpec::Memory,
             None,
             None,
@@ -172,7 +108,10 @@ impl Funnel {
     pub(crate) fn for_roots(roots: &Roots) -> Self {
         let artifacts = ArtifactStore::new(roots.state.join("artifacts"), GcLimits::default());
         Self::with(
-            Box::new(MarkerDir::under(&roots.runtime)),
+            (
+                Box::new(MarkerDir::under(&roots.runtime)),
+                Poisoned::under(&roots.runtime),
+            ),
             AuditSpec::Dir(roots.state.join("audit")),
             Some(InteractionLock::under(&roots.runtime)),
             Some(artifacts),
@@ -180,7 +119,7 @@ impl Funnel {
     }
 
     fn with(
-        markers: Box<dyn MarkerStore>,
+        (markers, poisoned): (Box<dyn MarkerStore>, Poisoned),
         audit_spec: AuditSpec,
         lock: Option<InteractionLock>,
         artifacts: Option<ArtifactStore>,
@@ -190,6 +129,7 @@ impl Funnel {
             generation: 1,
             session_id: String::new(),
             markers,
+            poisoned,
             audit_spec,
             audit: None,
             lock,
