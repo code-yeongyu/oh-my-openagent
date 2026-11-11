@@ -1,6 +1,8 @@
 import type { AgentSession } from "@code-yeongyu/senpi"
 import type { CreateChildSession } from "@oh-my-opencode/senpi-task"
 
+import { loadSenpiBarrel } from "../../../../senpi-task/src/lazy/senpi-barrel"
+
 import { FACTS_OUTPUT_TOKENS, FACTS_REQUEST_LIMIT, factsContextFits, type FactsModelCapacity } from "./facts-oversized-budget"
 
 type GuardedSession = Awaited<ReturnType<CreateChildSession>> & Pick<AgentSession, "agent" | "abortCompaction" | "setAutoCompactionEnabled">
@@ -24,7 +26,7 @@ export function createOversizedFactsGuard(input: {
   }
   const createSession: CreateChildSession = async (options) => {
     const child = input.createSession === undefined
-      ? (await (await import("@code-yeongyu/senpi")).createAgentSession(options)).session
+      ? (await (await loadSenpiBarrel()).createAgentSession(options)).session
       : await input.createSession(options)
     const candidate = child as Partial<GuardedSession>
     if (typeof candidate.agent?.streamFunction !== "function" || typeof candidate.abortCompaction !== "function"

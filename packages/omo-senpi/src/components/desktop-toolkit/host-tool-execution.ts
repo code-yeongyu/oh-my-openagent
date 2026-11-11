@@ -1,7 +1,9 @@
+import { loadSenpiBarrel } from "../../../../senpi-task/src/lazy/senpi-barrel"
+
 import type { ExtensionRpcRequestContext, SenpiExtensionAPI } from "../../extension/types"
 
 export type LoadSdk = () => Promise<unknown>
-const defaultLoadSdk: LoadSdk = () => import("@code-yeongyu/senpi")
+const defaultLoadSdk: LoadSdk = () => loadSenpiBarrel()
 
 interface HtmlPageArgs {
   readonly html: string

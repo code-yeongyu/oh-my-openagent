@@ -24,6 +24,7 @@ import {
 
 import type { IdleInjectionCoordinator } from "../../extension/idle-injection-coordinator"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import { seedSenpiBarrelFromExtensionApi } from "../../../../senpi-task/src/lazy/senpi-barrel"
 import { createLateSendOutcomeDeliverer } from "./late-send-outcome"
 import { CATEGORY_UNAVAILABLE_MESSAGE_TYPE } from "./category-unavailable-warning"
 import { registerTaskCommands } from "./commands"
@@ -72,6 +73,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
   return {
     name: "task",
     async register(pi: SenpiExtensionAPI, ctx: ComponentContext): Promise<void> {
+      seedSenpiBarrelFromExtensionApi(pi)
       // One extension set serves every session of the shared daemon, so the component gates itself
       // on what THIS session is. A DAG child never boots a task engine (parity with the per-child
       // launch, which drops omo's own `-e` entry for DAG-owned children) and a team member gets the

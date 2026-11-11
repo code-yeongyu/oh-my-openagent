@@ -2,6 +2,8 @@ import { join } from "node:path"
 
 import { loadPiTui } from "@oh-my-opencode/senpi-task"
 
+import { seedSenpiBarrelFromExtensionApi } from "../../../senpi-task/src/lazy/senpi-barrel"
+
 import { defaultCommentCheckerCacheDir } from "../components/comment-checker/resolver"
 
 import { createDagSdkRootProvisioning } from "./dag-sdk-root-provisioning"
@@ -85,6 +87,7 @@ export function composeOmoSenpiExtension(
   const provisionBunshinTsSdkRoot = runtimeSdkRoot(BUNSHIN_TS_SDK_ROOT_ENV, "bunshin-ts", "bunshin-ts")
 
   return async (pi: unknown): Promise<void> => {
+    seedSenpiBarrelFromExtensionApi(pi)
     releaseHerdrAgentHint()
     // Shell children inherit process.env: a bundled skill's Python must not write __pycache__ into a signed app (#11373),
     // so bytecode goes to <user cache>/omo-senpi/pycache unless the user set either variable, even to an empty string.

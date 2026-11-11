@@ -4,6 +4,7 @@ import type { ExtensionAPI } from "@code-yeongyu/senpi"
 import { TeamModeConfigSchema, type TeamModeConfig } from "@oh-my-opencode/team-core/config"
 import { log } from "@oh-my-opencode/utils/logger"
 
+import { seedSenpiBarrelFromExtensionApi } from "../../lazy/senpi-barrel"
 import { createTaskRecordStore } from "../../store"
 import { MEMBER_EXTENSION_BUNDLE_NAME, WORKPOOL_STATE_DIR_ENV, WORKPOOL_TASK_ID_ENV } from "./identity"
 import { createMemberWakeSource, resolveMemberExtensionConfig, type MemberWakeSource } from "./member-session"
@@ -43,6 +44,7 @@ export function resolveMemberExtensionEntryPath(extensionUrl = import.meta.url):
 }
 
 export default async function registerMemberExtension(pi: ExtensionAPI): Promise<void> {
+  seedSenpiBarrelFromExtensionApi(pi)
   // The shared extension boots before RPC switch_session can acknowledge. Ordinary team
   // members must not evaluate the workpool host-policy graph just to reject absent identity.
   if (process.env[WORKPOOL_STATE_DIR_ENV] !== undefined || process.env[WORKPOOL_TASK_ID_ENV] !== undefined) {

@@ -2,6 +2,7 @@ import { isAbsolute } from "node:path"
 
 import { deferUntilAfterFirstPaint } from "../../extension/startup-deferral"
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import { seedSenpiBarrelFromExtensionApi } from "../../../../senpi-task/src/lazy/senpi-barrel"
 import { DESKTOP_TOOLKIT_TOOL_NAME, TOOLKIT_REQUEST_EVENT, TOOLKIT_GRANT_RPC, TOOLKITS_CONTEXT_KEY, type ToolkitGrant } from "./index"
 import { callThreadTool, listThreadTools } from "./thread-tools"
 import { callingSessionId, createHostToolRoutes } from "./host-tool-routes"
@@ -84,6 +85,7 @@ export function createDesktopToolkitRuntime(options: { readonly timeoutMs?: numb
   return {
     name: "desktop-toolkit",
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
+      seedSenpiBarrelFromExtensionApi(pi)
       if (typeof pi.registerTool !== "function") return
       const pending = new Map<string, (settled: Settled) => void>()
       const sessions = new Map<string, SessionDiscovery>()
