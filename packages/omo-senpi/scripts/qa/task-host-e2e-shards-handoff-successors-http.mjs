@@ -42,15 +42,17 @@ function waitForRelease(path, timeoutMs = 600_000) {
 
 function toolDelta(step) {
   return {
-    tool_calls: [{
-      index: 0,
-      id: step.id ?? `t14-tool-${++toolSequence}`,
-      type: "function",
-      function: {
-        name: step.name,
-        arguments: JSON.stringify(step.arguments ?? {}),
+    tool_calls: [
+      {
+        index: 0,
+        id: step.id ?? `t14-tool-${++toolSequence}`,
+        type: "function",
+        function: {
+          name: step.name,
+          arguments: JSON.stringify(step.arguments ?? {}),
+        },
       },
-    }],
+    ],
   }
 }
 
@@ -85,11 +87,14 @@ export function startRoutedCompletionsServer({ route, requestLogPath, classify }
       void (async () => {
         const body = JSON.parse(Buffer.concat(chunks).toString("utf8"))
         const lane = classify(body)
-        appendFileSync(requestLogPath, `${JSON.stringify({
-          arrivalOrder: ++arrivalOrder,
-          lane,
-          timestamp: new Date().toISOString(),
-        })}\n`)
+        appendFileSync(
+          requestLogPath,
+          `${JSON.stringify({
+            arrivalOrder: ++arrivalOrder,
+            lane,
+            timestamp: new Date().toISOString(),
+          })}\n`,
+        )
         try {
           await streamStep(response, route(body))
         } catch (error) {

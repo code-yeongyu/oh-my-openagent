@@ -35,7 +35,8 @@ function canonicalProjectPath(projectDir: string): string {
   try {
     return realpathSync.native(absolute)
   } catch (error) {
-    if (error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR")) return absolute
+    if (error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR"))
+      return absolute
     throw error
   }
 }
@@ -94,8 +95,12 @@ export function resolveProjectStateDirectory(
   name: ProjectStateName,
   options: ProjectStateDirectoryOptions = {},
 ): string {
-  const { env = process.env, exists = existsSync, hasRecords = holdsRecords, markAdopted = markInProjectStoreAdopted } =
-    options
+  const {
+    env = process.env,
+    exists = existsSync,
+    hasRecords = holdsRecords,
+    markAdopted = markInProjectStoreAdopted,
+  } = options
   const inProject = join(resolve(projectDir), ".omo", name)
   if (exists(inProject) && hasRecords(inProject)) {
     markAdopted(inProject)

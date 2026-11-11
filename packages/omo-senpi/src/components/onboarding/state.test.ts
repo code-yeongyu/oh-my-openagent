@@ -19,6 +19,7 @@ import {
   writeGlobalDecline,
   writeProjectDecline,
 } from "./state"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const tempDirs: string[] = []
 
@@ -86,14 +87,18 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
   })
 }
 
-async function stopChildren(children: ReadonlyArray<{
-  readonly child: ChildProcess
-  readonly exit: Promise<number>
-}>): Promise<void> {
-  const results = await Promise.allSettled(children.map(async ({ child, exit }) => {
-    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL")
-    await withTimeout(exit, 10_000, "child did not exit during cleanup")
-  }))
+async function stopChildren(
+  children: ReadonlyArray<{
+    readonly child: ChildProcess
+    readonly exit: Promise<number>
+  }>,
+): Promise<void> {
+  const results = await Promise.allSettled(
+    children.map(async ({ child, exit }) => {
+      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL")
+      await withTimeout(exit, 10_000, "child did not exit during cleanup")
+    }),
+  )
   const failure = results.find((result): result is PromiseRejectedResult => result.status === "rejected")
   if (failure !== undefined) throw failure.reason
 }
@@ -153,7 +158,7 @@ describe("claimOnboarding", () => {
         })
         children.push({
           child,
-          ready: waitForReady(child, 5_000),
+          ready: waitForReady(child, remainingTestTime()),
           exit: observeExit(child),
         })
       }
@@ -162,9 +167,9 @@ describe("claimOnboarding", () => {
 
       for (const { child } of children) child.send("release")
 
-      const exitCodes = await Promise.all(children.map(({ exit }) => (
-        withTimeout(exit, 10_000, "child did not exit in time")
-      )))
+      const exitCodes = await Promise.all(
+        children.map(({ exit }) => withTimeout(exit, remainingTestTime(), "child did not exit in time")),
+      )
 
       // then
       const winners = exitCodes.filter((code) => code === 0)
@@ -182,7 +187,7 @@ describe("claimOnboarding", () => {
     const child = fork(raceChildPath, [dir], {
       stdio: ["ignore", "ignore", "ignore", "ipc"],
     })
-    const ready = waitForReady(child, 5_000)
+    const ready = waitForReady(child, remainingTestTime())
     const exit = observeExit(child)
 
     try {
@@ -341,10 +346,7 @@ describe("writeCooldown / isCoolingDown", () => {
     const now = 5_000_000
     const cooldownDir = join(dir, "onboarding-cooldowns")
     mkdirSync(cooldownDir, { recursive: true })
-    writeFileSync(
-      join(cooldownDir, repoHash),
-      JSON.stringify({ until: now + 100_000, extra: "ignored" }),
-    )
+    writeFileSync(join(cooldownDir, repoHash), JSON.stringify({ until: now + 100_000, extra: "ignored" }))
 
     // when
     const result = isCoolingDown(dir, repoHash, now)

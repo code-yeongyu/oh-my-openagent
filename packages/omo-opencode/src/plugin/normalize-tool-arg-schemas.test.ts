@@ -31,10 +31,7 @@ async function loadSeparateHostZodModule(): Promise<typeof import("zod")> {
   return await import(pathToFileURL(join(copiedZodDirectory, "index.js")).href)
 }
 
-function serializeWithHostZod(
-  hostZod: typeof import("zod"),
-  args: Record<string, object>,
-): Record<string, unknown> {
+function serializeWithHostZod(hostZod: typeof import("zod"), args: Record<string, object>): Record<string, unknown> {
   return hostZod.z.toJSONSchema(Reflect.apply(hostZod.z.object, hostZod.z, [args]))
 }
 

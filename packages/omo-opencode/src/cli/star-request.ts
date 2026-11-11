@@ -2,10 +2,7 @@ import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import type { InstallPlatform } from "./types"
 
-export const STAR_REPOSITORIES = [
-  "code-yeongyu/oh-my-openagent",
-  "code-yeongyu/lazycodex",
-] as const
+export const STAR_REPOSITORIES = ["code-yeongyu/oh-my-openagent", "code-yeongyu/lazycodex"] as const
 
 const PLATFORM_REPOSITORIES = {
   opencode: ["code-yeongyu/oh-my-openagent"],

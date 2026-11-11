@@ -84,7 +84,10 @@ describe("two parents on one daemon", () => {
     const parkedPaths = new Set(a.sessionPaths())
 
     // when
-    const summary = await a.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-a", reason: "session_shutdown" })
+    const summary = await a.lifecycle.suspendOnSessionShutdown({
+      parentSessionId: "parent-a",
+      reason: "session_shutdown",
+    })
     // The daemon's own view settles when the 16 detached connections are gone - parent B keeps 16.
     await world.host.waitForConnections(16)
 
@@ -205,7 +208,11 @@ describe("two parents on one daemon", () => {
     expect(distinct(b2.records().map((record) => record.host_session?.instance_id))).toEqual([world.host.instanceId])
     expect(distinct(b2.records().map((record) => record.suspension_reason))).toEqual([undefined])
     expect(world.prompts()).toHaveLength(32)
-    expect(world.host.commands.filter(command => command.type === "prompt" && command.payload.streamingBehavior === "followUp")).toHaveLength(16)
+    expect(
+      world.host.commands.filter(
+        (command) => command.type === "prompt" && command.payload.streamingBehavior === "followUp",
+      ),
+    ).toHaveLength(16)
   })
 })
 
@@ -262,7 +269,12 @@ describe("daemon refusals", () => {
 
     // when
     world.host.stall(1_200)
-    world.host.requestUi(session?.routingId ?? "", { id: "ui-1", method: "confirm", title: "Delete?", message: "really?" })
+    world.host.requestUi(session?.routingId ?? "", {
+      id: "ui-1",
+      method: "confirm",
+      title: "Delete?",
+      message: "really?",
+    })
 
     // then
     expect((await answered).payload.id).toBe("ui-1")

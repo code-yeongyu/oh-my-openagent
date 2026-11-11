@@ -22,10 +22,16 @@ import { createDeviceSessionResolver } from "./resolver"
 const ACCOUNT = "acct_revoked"
 
 const refusal = (code: string, onContract: boolean) =>
-  Response.json({ error: { code, message: code, retryable: false, ...(onContract ? { requestId: "req_r_b1" } : {}) } }, { status: 401 })
+  Response.json(
+    { error: { code, message: code, retryable: false, ...(onContract ? { requestId: "req_r_b1" } : {}) } },
+    { status: 401 },
+  )
 
 /** A bound device whose next token read meets `code` at refresh; returns what it kept afterwards. */
-async function revokedDevice(code: string, options: { readonly onContract?: boolean; readonly lockPinRoot?: boolean } = {}) {
+async function revokedDevice(
+  code: string,
+  options: { readonly onContract?: boolean; readonly lockPinRoot?: boolean } = {},
+) {
   const root = await mkdtemp(join(tmpdir(), "r-b1-"))
   const signing = generateKeyPairSync("ed25519")
   const sealing = generateKeyPairSync("x25519")
@@ -40,11 +46,16 @@ async function revokedDevice(code: string, options: { readonly onContract?: bool
   const store: CredentialStore = {
     read: async () => value,
     readAuthoritative: async () => value,
-    write: async (next) => { value = next },
-    clear: async () => { value = null },
+    write: async (next) => {
+      value = next
+    },
+    clear: async () => {
+      value = null
+    },
   }
   const http = Bun.serve({
-    hostname: "127.0.0.1", port: 0,
+    hostname: "127.0.0.1",
+    port: 0,
     fetch(req) {
       const path = new URL(req.url).pathname
       if (path === "/v1/me") return Response.json({ user: { id: "u" }, account: { id: ACCOUNT } })
@@ -57,23 +68,40 @@ async function revokedDevice(code: string, options: { readonly onContract?: bool
   const pinParent = join(pinDir, "trust-anchor")
   const pinFile = join(pinParent, createHash("sha256").update(ACCOUNT, "utf8").digest("base64url"), "pin.json")
   await mkdir(join(pinFile, ".."), { recursive: true })
-  await writeFile(pinFile, `${JSON.stringify({ version: 1, account: ACCOUNT, genesis_digest: "x", pinned_by: "pairing", pinned_at: { seq: 2, keyring_link: "y" } })}\n`)
+  await writeFile(
+    pinFile,
+    `${JSON.stringify({ version: 1, account: ACCOUNT, genesis_digest: "x", pinned_by: "pairing", pinned_at: { seq: 2, keyring_link: "y" } })}\n`,
+  )
   const logs: string[] = []
   const source = createCliAccountSource({
-    api: `http://127.0.0.1:${http.port}`, store, home: join(root, "home"), pinDir, logger: { warn: (line) => logs.push(line) },
-    fetch: Object.assign((input: Parameters<typeof fetch>[0], init?: RequestInit) => fetch(input, init), { preconnect: fetch.preconnect }),
+    api: `http://127.0.0.1:${http.port}`,
+    store,
+    home: join(root, "home"),
+    pinDir,
+    logger: { warn: (line) => logs.push(line) },
+    fetch: Object.assign((input: Parameters<typeof fetch>[0], init?: RequestInit) => fetch(input, init), {
+      preconnect: fetch.preconnect,
+    }),
   })
   let tokenFn: (() => Promise<string>) | undefined
   const closed = Promise.withResolvers<void>()
   const runner = createSyncRunner({
     logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
     resolveSession: createDeviceSessionResolver({
-      source, pinDir,
-      loadRuntime: async () => ({ ...syncRuntime, openAccountSession: async (o) => ({ ok: true, session: { token: o.token } as unknown as SyncSession }) }),
+      source,
+      pinDir,
+      loadRuntime: async () => ({
+        ...syncRuntime,
+        openAccountSession: async (o) => ({ ok: true, session: { token: o.token } as unknown as SyncSession }),
+      }),
     }),
     open: async (o) => {
       tokenFn = (o.session as unknown as { token: () => Promise<string> }).token
-      return { engine: { start: () => undefined }, notifyLocalCommit: () => undefined, close: async () => closed.resolve() } as never
+      return {
+        engine: { start: () => undefined },
+        notifyLocalCommit: () => undefined,
+        close: async () => closed.resolve(),
+      } as never
     },
     watchHead: () => () => undefined,
   })
@@ -91,12 +119,18 @@ async function revokedDevice(code: string, options: { readonly onContract?: bool
       if (process.platform === "win32") held = await open(pinFile, "r")
       else await chmod(pinParent, 0o500)
     }
-    const token = await tokenFn?.().then(() => "token", (error: unknown) => (error instanceof Error ? error.name : "thrown"))
+    const token = await tokenFn?.().then(
+      () => "token",
+      (error: unknown) => (error instanceof Error ? error.name : "thrown"),
+    )
     if (options.lockPinRoot === true) {
       if (held !== undefined) await held.close()
       else await chmod(pinParent, 0o700)
     }
-    const pinKept = await readFile(pinFile, "utf8").then(() => true, () => false)
+    const pinKept = await readFile(pinFile, "utf8").then(
+      () => true,
+      () => false,
+    )
     const retired = (await readdir(pinParent)).filter((name) => name.includes(".retired-"))
     return { token, keysKept: value !== null, pinKept, retired: retired.length, logs }
   } finally {
@@ -112,7 +146,11 @@ for (const code of ["device_revoked", "account_deleted", "reauth_required", "una
 }
 
 test("#given an off-contract 401 without a requestId #when the refresh meets it #then keys and pin are both kept", async () => {
-  expect(await revokedDevice("device_revoked", { onContract: false })).toMatchObject({ keysKept: true, pinKept: true, retired: 0 })
+  expect(await revokedDevice("device_revoked", { onContract: false })).toMatchObject({
+    keysKept: true,
+    pinKept: true,
+    retired: 0,
+  })
 }, 30_000)
 
 test("#given a pin that cannot be renamed #when the refresh is refused #then the sign-in still ends and the keys are still discarded, with one log line", async () => {

@@ -36,9 +36,7 @@ export function parseVariantFromModelID(
   return { modelID: trimmedModelID }
 }
 
-export function parseModelString(
-  model: string,
-): { providerID: string; modelID: string; variant?: string } | undefined {
+export function parseModelString(model: string): { providerID: string; modelID: string; variant?: string } | undefined {
   if (typeof model !== "string") return undefined
   const trimmedModel = model.trim()
   if (!trimmedModel) return undefined

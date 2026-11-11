@@ -86,9 +86,19 @@ export async function reflectionRun(paths: MemoryIdentityPaths, runId: string, s
       finishedAt: iso(finishedAt),
     })
   } else if (sentinel === "abandoned") {
-    await writeJson(join(dir, "abandoned.json"), { runId, reason: "launch_interrupted", generation: iso(finishedAt), abandonedAt: iso(shape.sentinelWrittenAt ?? finishedAt) })
+    await writeJson(join(dir, "abandoned.json"), {
+      runId,
+      reason: "launch_interrupted",
+      generation: iso(finishedAt),
+      abandonedAt: iso(shape.sentinelWrittenAt ?? finishedAt),
+    })
   } else if (sentinel === "quarantined") {
-    await writeJson(join(dir, "quarantined.json"), { runId, reason: "ledger_unreadable", generation: iso(finishedAt), quarantinedAt: iso(shape.sentinelWrittenAt ?? finishedAt) })
+    await writeJson(join(dir, "quarantined.json"), {
+      runId,
+      reason: "ledger_unreadable",
+      generation: iso(finishedAt),
+      quarantinedAt: iso(shape.sentinelWrittenAt ?? finishedAt),
+    })
   }
   if (shape.readOnlyPayload === true) await readOnlyPayload(dir)
   await ageTree(dir, shape.mtime ?? finishedAt)
@@ -129,8 +139,16 @@ export async function completion(
   return path
 }
 
-export async function reservation(paths: MemoryIdentityPaths, file: "active.lock" | "pending.json", runId: string): Promise<void> {
-  await writeJson(join(paths.reflection, file), { runId, reservedAt: iso(daysAgo(1)), request: { trigger: "manual", conversationIds: [] } })
+export async function reservation(
+  paths: MemoryIdentityPaths,
+  file: "active.lock" | "pending.json",
+  runId: string,
+): Promise<void> {
+  await writeJson(join(paths.reflection, file), {
+    runId,
+    reservedAt: iso(daysAgo(1)),
+    request: { trigger: "manual", conversationIds: [] },
+  })
 }
 
 export async function runIdMark(paths: MemoryIdentityPaths, highWater: number): Promise<void> {

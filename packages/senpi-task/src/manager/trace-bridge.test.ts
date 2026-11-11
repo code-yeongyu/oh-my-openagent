@@ -57,7 +57,9 @@ describe("delegating turn trace context across the task bridge", () => {
     })
     const env = await Promise.race([
       spawned,
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("waited 10s for the child spawn, it never happened")), 10_000)),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("waited 10s for the child spawn, it never happened")), 10_000),
+      ),
     ])
 
     // then

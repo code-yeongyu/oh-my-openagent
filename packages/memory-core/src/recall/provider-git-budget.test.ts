@@ -61,62 +61,76 @@ afterEach(async () => {
 })
 
 describe("recall corpus git process budget", () => {
-  it("#given a repo of many memory files #when the corpus loads #then git runs a constant number of processes, not one per file", async () => {
-    // given
-    const { repo, runs } = await createRepo()
+  it(
+    "#given a repo of many memory files #when the corpus loads #then git runs a constant number of processes, not one per file",
+    async () => {
+      // given
+      const { repo, runs } = await createRepo()
 
-    // when
-    const corpus = await loadRecallCorpus(repo)
+      // when
+      const corpus = await loadRecallCorpus(repo)
 
-    // then
-    expect(runs.map((run) => run.argv[0])).toEqual(["ls-tree", "cat-file"])
-    expect(corpus.documents).toHaveLength(FILE_COUNT)
-    const note = corpus.documents.find((document) => document.path === "reference/note-07.md")
-    expect(note?.description).toBe("Note 7 메모리 노트 🧠")
-    expect(note?.body).toBe("본문 7: 한국어와 emoji 🚀 bytes.\n")
-    expect(corpus.documents.map((document) => document.path)).not.toContain("notes/broken.md")
-  }, GIT_INTEGRATION_TEST_TIMEOUT)
+      // then
+      expect(runs.map((run) => run.argv[0])).toEqual(["ls-tree", "cat-file"])
+      expect(corpus.documents).toHaveLength(FILE_COUNT)
+      const note = corpus.documents.find((document) => document.path === "reference/note-07.md")
+      expect(note?.description).toBe("Note 7 메모리 노트 🧠")
+      expect(note?.body).toBe("본문 7: 한국어와 emoji 🚀 bytes.\n")
+      expect(corpus.documents.map((document) => document.path)).not.toContain("notes/broken.md")
+    },
+    GIT_INTEGRATION_TEST_TIMEOUT,
+  )
 
-  it("#given a cached corpus #when HEAD moves with one edit and one delete #then only the edited blob is read and unchanged documents are reused", async () => {
-    // given
-    const { dir, repo, runs } = await createRepo()
-    const cache = new RecallCorpusCache()
-    const first = await cache.load(repo)
-    const unchanged = first.documents.find((document) => document.path === "reference/note-01.md")
-    await writeFile(join(dir, "reference/note-02.md"), "---\ndescription: Edited note\n---\nnew body\n")
-    await rm(join(dir, "reference/note-03.md"))
-    await repo.commitWrite(["reference/note-02.md", "reference/note-03.md"], "edit and delete", AUTHOR)
-    const editedOid = (await repo.lsTreeBlobs("HEAD")).find((entry) => entry.path === "reference/note-02.md")?.oid
-    runs.length = 0
+  it(
+    "#given a cached corpus #when HEAD moves with one edit and one delete #then only the edited blob is read and unchanged documents are reused",
+    async () => {
+      // given
+      const { dir, repo, runs } = await createRepo()
+      const cache = new RecallCorpusCache()
+      const first = await cache.load(repo)
+      const unchanged = first.documents.find((document) => document.path === "reference/note-01.md")
+      await writeFile(join(dir, "reference/note-02.md"), "---\ndescription: Edited note\n---\nnew body\n")
+      await rm(join(dir, "reference/note-03.md"))
+      await repo.commitWrite(["reference/note-02.md", "reference/note-03.md"], "edit and delete", AUTHOR)
+      const editedOid = (await repo.lsTreeBlobs("HEAD")).find((entry) => entry.path === "reference/note-02.md")?.oid
+      runs.length = 0
 
-    // when
-    const second = await cache.load(repo)
+      // when
+      const second = await cache.load(repo)
 
-    // then
-    const catFiles = runs.filter((run) => run.argv[0] === "cat-file")
-    expect(catFiles.map((run) => run.stdin)).toEqual([`${editedOid}\n`])
-    expect(runs.map((run) => run.argv[0])).toEqual(["ls-tree", "cat-file"])
-    expect(second.documents.find((document) => document.path === "reference/note-01.md")).toBe(unchanged)
-    expect(second.documents.find((document) => document.path === "reference/note-02.md")?.description).toBe("Edited note")
-    expect(second.documents.map((document) => document.path)).not.toContain("reference/note-03.md")
-    expect(second.documents).toHaveLength(FILE_COUNT - 1)
-  }, GIT_INTEGRATION_TEST_TIMEOUT)
+      // then
+      const catFiles = runs.filter((run) => run.argv[0] === "cat-file")
+      expect(catFiles.map((run) => run.stdin)).toEqual([`${editedOid}\n`])
+      expect(runs.map((run) => run.argv[0])).toEqual(["ls-tree", "cat-file"])
+      expect(second.documents.find((document) => document.path === "reference/note-01.md")).toBe(unchanged)
+      expect(second.documents.find((document) => document.path === "reference/note-02.md")?.description).toBe(
+        "Edited note",
+      )
+      expect(second.documents.map((document) => document.path)).not.toContain("reference/note-03.md")
+      expect(second.documents).toHaveLength(FILE_COUNT - 1)
+    },
+    GIT_INTEGRATION_TEST_TIMEOUT,
+  )
 
-  it("#given a cached corpus #when HEAD moves without touching recall files #then no blob is read at all", async () => {
-    // given
-    const { dir, repo, runs } = await createRepo()
-    const cache = new RecallCorpusCache()
-    const first = await cache.load(repo)
-    await writeFile(join(dir, "system/persona.md"), "---\ndescription: persona\n---\nedited system body\n")
-    await repo.commitWrite(["system/persona.md"], "edit system block", AUTHOR)
-    runs.length = 0
+  it(
+    "#given a cached corpus #when HEAD moves without touching recall files #then no blob is read at all",
+    async () => {
+      // given
+      const { dir, repo, runs } = await createRepo()
+      const cache = new RecallCorpusCache()
+      const first = await cache.load(repo)
+      await writeFile(join(dir, "system/persona.md"), "---\ndescription: persona\n---\nedited system body\n")
+      await repo.commitWrite(["system/persona.md"], "edit system block", AUTHOR)
+      runs.length = 0
 
-    // when
-    const second = await cache.load(repo)
+      // when
+      const second = await cache.load(repo)
 
-    // then
-    expect(runs.map((run) => run.argv[0])).toEqual(["ls-tree"])
-    expect(second.revision).not.toBe(first.revision)
-    expect(second.documents).toEqual(first.documents)
-  }, GIT_INTEGRATION_TEST_TIMEOUT)
+      // then
+      expect(runs.map((run) => run.argv[0])).toEqual(["ls-tree"])
+      expect(second.revision).not.toBe(first.revision)
+      expect(second.documents).toEqual(first.documents)
+    },
+    GIT_INTEGRATION_TEST_TIMEOUT,
+  )
 })

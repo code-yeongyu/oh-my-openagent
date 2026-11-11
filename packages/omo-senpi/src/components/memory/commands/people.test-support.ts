@@ -58,7 +58,12 @@ function observationsFile(count: number): string {
     const day = String(index + 1).padStart(2, "0")
     lines.push(`- [2026-03-${day}] explicit note ${index + 1} <!-- src: s-${index + 1} -->`)
   }
-  lines.push("", "## Inductive", "", "- [2026-01-05] tends to review in the morning <!-- pattern: cadence; confidence: low -->")
+  lines.push(
+    "",
+    "## Inductive",
+    "",
+    "- [2026-01-05] tends to review in the morning <!-- pattern: cadence; confidence: low -->",
+  )
   return `${lines.join("\n")}\n`
 }
 

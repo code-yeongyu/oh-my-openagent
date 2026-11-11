@@ -55,7 +55,7 @@ describe("skill tool - agent restriction", () => {
     const context = { ...mockContext, agent: "oracle" }
 
     return expect(tool.execute({ name: "sisyphus-only-skill" }, context)).rejects.toThrow(
-      'Skill "sisyphus-only-skill" is restricted to agent "sisyphus"'
+      'Skill "sisyphus-only-skill" is restricted to agent "sisyphus"',
     )
   })
 
@@ -65,7 +65,7 @@ describe("skill tool - agent restriction", () => {
     const contextWithoutAgent = { ...mockContext, agent: unsafeTestValue<string>(undefined) }
 
     return expect(tool.execute({ name: "sisyphus-only-skill" }, contextWithoutAgent)).rejects.toThrow(
-      'Skill "sisyphus-only-skill" is restricted to agent "sisyphus"'
+      'Skill "sisyphus-only-skill" is restricted to agent "sisyphus"',
     )
   })
 })
