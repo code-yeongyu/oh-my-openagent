@@ -1,6 +1,8 @@
 //! Flattened scripted accessibility trees addressed by numeric node id.
 
+use std::cell::Cell;
 use std::collections::BTreeMap;
+use std::time::{Duration, Instant};
 
 use senpi_desktop_core::ax::{AxBounds, AxHandle, AxProps};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
@@ -10,11 +12,16 @@ use crate::scenario::FakeAxNode;
 
 struct AxEntry {
     props: AxProps,
+    identifier: Option<String>,
+    secure: bool,
     parent: Option<u64>,
     children: Vec<u64>,
     /// The selected range of a text value, in UTF-16 units; `None` is a caret
     /// at the end of the value.
     selection: Option<Utf16Range>,
+    ready_after: Option<Duration>,
+    first_read: Cell<Option<Instant>>,
+    moving_reads: Cell<u32>,
 }
 
 #[derive(Default)]
@@ -47,7 +54,10 @@ impl AxTree {
             .collect();
         let props = AxProps {
             role: node.role.clone(),
-            native_role: node.native_role.clone().unwrap_or_else(|| node.role.clone()),
+            native_role: node
+                .native_role
+                .clone()
+                .unwrap_or_else(|| node.role.clone()),
             title: node.title.clone(),
             value: node.value.clone(),
             description: node.description.clone(),
@@ -66,9 +76,14 @@ impl AxTree {
             id,
             AxEntry {
                 props,
+                identifier: node.identifier.clone(),
+                secure: node.secure,
                 parent,
                 children,
                 selection: None,
+                ready_after: node.ready_after_ms.map(Duration::from_millis),
+                first_read: Cell::new(None),
+                moving_reads: Cell::new(node.moving_reads),
             },
         );
         id
@@ -77,12 +92,19 @@ impl AxTree {
     /// Appends leaf nodes under `window_id`'s root until its tree holds
     /// `total` nodes; a tree already that large is left as scripted.
     pub(crate) fn pad(&mut self, window_id: &str, total: u32) {
-        let Some(root) = self.roots.get(window_id).copied() else { return };
+        let Some(root) = self.roots.get(window_id).copied() else {
+            return;
+        };
         let mut count: u64 = 0;
         let mut stack = vec![root];
         while let Some(id) = stack.pop() {
             count += 1;
-            stack.extend(self.nodes.get(&id).map(|entry| entry.children.clone()).unwrap_or_default());
+            stack.extend(
+                self.nodes
+                    .get(&id)
+                    .map(|entry| entry.children.clone())
+                    .unwrap_or_default(),
+            );
         }
         for index in count..u64::from(total) {
             let leaf = FakeAxNode {
@@ -91,11 +113,15 @@ impl AxTree {
                 title: Some(format!("filler {index}")),
                 value: None,
                 description: None,
+                identifier: None,
                 enabled: true,
                 focused: false,
+                secure: false,
                 bounds: None,
                 actions: Vec::new(),
                 children: Vec::new(),
+                ready_after_ms: None,
+                moving_reads: 0,
             };
             let id = self.insert(&leaf, Some(root));
             if let Some(entry) = self.nodes.get_mut(&root) {
@@ -107,7 +133,9 @@ impl AxTree {
 
     pub(crate) fn root(&self, window_id: &str) -> CoreResult<u64> {
         self.roots.get(window_id).copied().ok_or_else(|| {
-            DesktopError::ax_failed(format!("no accessibility tree scripted for window {window_id}"))
+            DesktopError::ax_failed(format!(
+                "no accessibility tree scripted for window {window_id}"
+            ))
         })
     }
 
@@ -117,8 +145,37 @@ impl AxTree {
             .ok_or_else(|| DesktopError::ax_failed(format!("unknown fake AX node {id}")))
     }
 
+    /// The node's props as read now: hidden and disabled before its
+    /// `ready_after_ms`, shifted while it has `moving_reads` left.
     pub(crate) fn props(&self, id: u64) -> CoreResult<AxProps> {
-        self.entry(id).map(|entry| entry.props.clone())
+        let entry = self.entry(id)?;
+        let mut props = entry.props.clone();
+        if let Some(ready_after) = entry.ready_after {
+            let first = *entry.first_read.get().get_or_insert_with(Instant::now);
+            entry.first_read.set(Some(first));
+            if first.elapsed() < ready_after {
+                props.bounds = None;
+                props.enabled = false;
+            }
+        }
+        let moving = entry.moving_reads.get();
+        if moving > 0 {
+            entry.moving_reads.set(moving - 1);
+            if let Some(bounds) = props.bounds.as_mut() {
+                bounds.x += f64::from(moving);
+            }
+        }
+        Ok(props)
+    }
+
+    /// Adds `node` as the accessibility tree of a window that opened later.
+    pub(crate) fn add_window(&mut self, window_id: &str, node: &FakeAxNode) {
+        let id = self.insert(node, None);
+        self.roots.insert(window_id.to_owned(), id);
+    }
+
+    pub(crate) fn identifier(&self, id: u64) -> CoreResult<Option<String>> {
+        self.entry(id).map(|entry| entry.identifier.clone())
     }
 
     pub(crate) fn children(&self, id: u64) -> CoreResult<Vec<u64>> {
@@ -131,7 +188,13 @@ impl AxTree {
 
     /// Fails with `AxFailed` unless the node advertises `action`.
     pub(crate) fn check_action(&self, id: u64, action: &str) -> CoreResult<()> {
-        if self.entry(id)?.props.actions.iter().any(|known| known == action) {
+        if self
+            .entry(id)?
+            .props
+            .actions
+            .iter()
+            .any(|known| known == action)
+        {
             Ok(())
         } else {
             Err(DesktopError::ax_failed(format!(
@@ -175,7 +238,9 @@ impl AxTree {
 
     /// Selects the node's whole value, as `cmd+a` does in a text field.
     pub(crate) fn select_all(&mut self, id: u64) -> CoreResult<()> {
-        let length = self.value(id)?.map_or(0, |value| value.encode_utf16().count());
+        let length = self
+            .value(id)?
+            .map_or(0, |value| value.encode_utf16().count());
         self.select(id, Utf16Range { start: 0, length })
     }
 
@@ -215,6 +280,25 @@ impl AxTree {
             .iter()
             .find(|(_, entry)| entry.props.focused)
             .map(|(id, _)| *id)
+    }
+
+    /// The first focused node inside the trees of `windows`: one app's own
+    /// focus, which stays put while another app is frontmost.
+    pub(crate) fn focused_in(&self, windows: &[&str]) -> Option<u64> {
+        self.nodes
+            .iter()
+            .filter(|(_, entry)| entry.props.focused)
+            .map(|(id, _)| *id)
+            .find(|id| {
+                self.window_of(*id)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|window| windows.contains(&window.as_str()))
+            })
+    }
+
+    pub(crate) fn secure(&self, id: u64) -> CoreResult<bool> {
+        self.entry(id).map(|entry| entry.secure)
     }
 
     /// Deepest node whose bounds contain the global logical point.
@@ -262,7 +346,11 @@ impl AxTree {
             ("nativeRole", Some(&props.native_role)),
         ]
         .into_iter()
-        .chain(optional.into_iter().map(|(name, value)| (name, value.as_ref())))
+        .chain(
+            optional
+                .into_iter()
+                .map(|(name, value)| (name, value.as_ref())),
+        )
         .filter_map(|(name, value)| value.map(|value| (name.to_string(), value.clone())))
         .collect())
     }

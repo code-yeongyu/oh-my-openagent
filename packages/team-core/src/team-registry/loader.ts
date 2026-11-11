@@ -167,20 +167,22 @@ export async function loadAllTeamSpecs(
 ): Promise<Array<{ name: string; scope: "project" | "user"; spec?: TeamSpec; error?: Error }>> {
   const discoveredTeamSpecs = await discoverTeamSpecs(config, projectRoot)
 
-  return Promise.all(discoveredTeamSpecs.map(async (entry) => {
-    try {
-      const spec = await loadTeamSpecFromEntry(entry)
-      return { name: entry.name, scope: entry.scope, spec }
-    } catch (error) {
-      const normalizedError = normalizeError(error)
-      log("team-spec load failed", {
-        event: "team-spec-load-failed",
-        teamName: entry.name,
-        scope: entry.scope,
-        path: entry.path,
-        error: normalizedError.message,
-      })
-      return { name: entry.name, scope: entry.scope, error: normalizedError }
-    }
-  }))
+  return Promise.all(
+    discoveredTeamSpecs.map(async (entry) => {
+      try {
+        const spec = await loadTeamSpecFromEntry(entry)
+        return { name: entry.name, scope: entry.scope, spec }
+      } catch (error) {
+        const normalizedError = normalizeError(error)
+        log("team-spec load failed", {
+          event: "team-spec-load-failed",
+          teamName: entry.name,
+          scope: entry.scope,
+          path: entry.path,
+          error: normalizedError.message,
+        })
+        return { name: entry.name, scope: entry.scope, error: normalizedError }
+      }
+    }),
+  )
 }

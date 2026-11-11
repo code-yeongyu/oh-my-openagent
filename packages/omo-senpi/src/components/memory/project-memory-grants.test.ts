@@ -14,7 +14,8 @@ import { AUTOMOUNT_TRIGGER_CASES, withAutomountTrap } from "../../automount-trap
 const roots: string[] = []
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 // Windows creates directory junctions without privileges; POSIX gets a plain directory symlink.
@@ -46,7 +47,8 @@ describe("project memory read grants (#10044)", () => {
     await grantProjectMemoryRead(setup.own, foreignRepo)
 
     // when / then
-    expect(await decide("read", setup.foreignFile),
+    expect(
+      await decide("read", setup.foreignFile),
       `grant comparison: child=${realpathSync.native(setup.foreignFile)}; parent=${realpathSync.native(foreignRepo)}`,
     ).toEqual({ allow: true })
   })
@@ -103,7 +105,8 @@ describe("project memory read grants (#10044)", () => {
     const write = await call("write", { path: setup.foreignFile, content: "x" })
 
     // then
-    expect(read.some((result) => result !== undefined),
+    expect(
+      read.some((result) => result !== undefined),
       `grant comparison: child=${realpathSync.native(setup.foreignFile)}; parent=${realpathSync.native(foreignRepo)}`,
     ).toBe(false)
     expect(write).toContainEqual(expect.objectContaining({ block: true }))
@@ -183,11 +186,16 @@ describe("project memory read grants (#10044)", () => {
     // when / then
     expect(isGrantedProjectMemoryRead(setup.own, join(foreignRepo, "note.md"))).toBe(true)
     const remainders = ["missing/../note.md", "a/./b", "a//b", "new/dir/"]
-    const granted = remainders.map((remainder) => [remainder, isGrantedProjectMemoryRead(setup.own, `${foreignRepo}/${remainder}`)])
+    const granted = remainders.map((remainder) => [
+      remainder,
+      isGrantedProjectMemoryRead(setup.own, `${foreignRepo}/${remainder}`),
+    ])
     // Win32 collapses `missing/..` lexically before the kernel sees the path, so the raw opener reads the same
     // note.md and granting it is correct there; POSIX keeps `missing/..` a real lookup, which fails.
     const expected = (remainder: string) => process.platform === "win32" && remainder === "missing/../note.md"
-    expect(Object.fromEntries(granted)).toEqual(Object.fromEntries(remainders.map((remainder) => [remainder, expected(remainder)])))
+    expect(Object.fromEntries(granted)).toEqual(
+      Object.fromEntries(remainders.map((remainder) => [remainder, expected(remainder)])),
+    )
   })
 
   test("#given a dangling link in a granted repo #when a read names it #then it is not treated as a missing note", async () => {
@@ -206,12 +214,14 @@ describe("project memory read grants (#10044)", () => {
     await grantProjectMemoryRead(setup.own, foreignRepo)
 
     expect(isGrantedProjectMemoryRead(setup.own, `${setup.foreignFile}/missing.md`)).toBe(false)
-    expect(isGrantedProjectMemoryRead(setup.own, setup.foreignFile, {
-      realpath: (input) => {
-        if (input === setup.foreignFile) throw Object.assign(new Error("permission denied"), { code: "EACCES" })
-        return realpathSync.native(input)
-      },
-    })).toBe(false)
+    expect(
+      isGrantedProjectMemoryRead(setup.own, setup.foreignFile, {
+        realpath: (input) => {
+          if (input === setup.foreignFile) throw Object.assign(new Error("permission denied"), { code: "EACCES" })
+          return realpathSync.native(input)
+        },
+      }),
+    ).toBe(false)
   })
 
   test("#given a granted repo #when a missing remainder sits under a FILE and resolution reports ENOENT (as Windows does) #then no read is granted", async () => {
@@ -219,12 +229,14 @@ describe("project memory read grants (#10044)", () => {
     await grantProjectMemoryRead(setup.own, foreignRepo)
     const below = `${setup.foreignFile}/missing.md`
 
-    expect(isGrantedProjectMemoryRead(setup.own, below, {
-      realpath: (input) => {
-        if (input === below) throw Object.assign(new Error("no such file"), { code: "ENOENT" })
-        return realpathSync.native(input)
-      },
-    })).toBe(false)
+    expect(
+      isGrantedProjectMemoryRead(setup.own, below, {
+        realpath: (input) => {
+          if (input === below) throw Object.assign(new Error("no such file"), { code: "ENOENT" })
+          return realpathSync.native(input)
+        },
+      }),
+    ).toBe(false)
   })
 
   test("#given dot-dot after a link out of a granted repo #when raw and built-in reads are checked #then each verdict agrees with its opener", async () => {
@@ -255,8 +267,12 @@ describe("project memory read grants (#10044)", () => {
       const results = await call("vendor_read", raw)
       expect(results.some((result) => result !== undefined)).toBe(process.platform !== "win32")
     }
-    expect(isGrantedProjectMemoryRead(setup.own, `${foreignRepo}/jump/../reference/missing.md`)).toBe(process.platform === "win32")
-    expect(isGrantedProjectMemoryRead(setup.own, `${foreignRepo}/jump/../draft/missing.md`)).toBe(process.platform === "win32")
+    expect(isGrantedProjectMemoryRead(setup.own, `${foreignRepo}/jump/../reference/missing.md`)).toBe(
+      process.platform === "win32",
+    )
+    expect(isGrantedProjectMemoryRead(setup.own, `${foreignRepo}/jump/../draft/missing.md`)).toBe(
+      process.platform === "win32",
+    )
   })
 
   test("#given a granted project repo #when the grants are revoked #then its notes are denied again", async () => {
@@ -273,12 +289,15 @@ describe("project memory read grants (#10044)", () => {
 })
 
 describe("project memory read grants never resolve a macOS automount trigger (#11545)", () => {
-  test.each([...AUTOMOUNT_TRIGGER_CASES])("#given a granted project and a read of %s on darwin #when the grant is checked #then it is not granted and the trigger is never resolved", async (path) => {
-    const { setup, foreignRepo } = projectGrantFixture()
-    await grantProjectMemoryRead(setup.own, foreignRepo)
-    const touched = await withAutomountTrap(() => {
-      expect(isGrantedProjectMemoryRead(setup.own, path)).toBe(false)
-    })
-    expect(touched).toEqual([])
-  })
+  test.each([...AUTOMOUNT_TRIGGER_CASES])(
+    "#given a granted project and a read of %s on darwin #when the grant is checked #then it is not granted and the trigger is never resolved",
+    async (path) => {
+      const { setup, foreignRepo } = projectGrantFixture()
+      await grantProjectMemoryRead(setup.own, foreignRepo)
+      const touched = await withAutomountTrap(() => {
+        expect(isGrantedProjectMemoryRead(setup.own, path)).toBe(false)
+      })
+      expect(touched).toEqual([])
+    },
+  )
 })

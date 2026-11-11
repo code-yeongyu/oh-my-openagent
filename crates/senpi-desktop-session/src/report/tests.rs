@@ -157,7 +157,10 @@ fn a_null_mode_click_stays_unit_with_an_unnumbered_audit() {
     // A press answers its menu outcome: with no menu, `null` on the wire as
     // protocol 1 first shipped it.
     assert_eq!(reply, Response::MenuOutcome(None));
-    assert_eq!(serde_json::to_value(&reply).expect("serializes"), json!(null));
+    assert_eq!(
+        serde_json::to_value(&reply).expect("serializes"),
+        json!(null)
+    );
     assert_eq!(
         harness.audits().last().and_then(|event| event.id.clone()),
         None

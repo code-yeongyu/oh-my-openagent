@@ -25,14 +25,21 @@ async function fixture(kind: "agreements" | "soul") {
   await mkdir(join(repo.dir, "system"), { recursive: true })
   const warnings: unknown[][] = []
   const options = { noticesDir: join(root, "notices"), locksDir: join(root, "locks") }
-  const withWarn = { ...options, onWarn: (...args: unknown[]) => { warnings.push(args) } }
-  const consume = async () => kind === "agreements"
-    ? (await consumeAgreementsNoticeDelta(repo, withWarn)).map((item) => item.id)
-    : (await consumeSoulNoticeDelta(repo, withWarn))?.sha
+  const withWarn = {
+    ...options,
+    onWarn: (...args: unknown[]) => {
+      warnings.push(args)
+    },
+  }
+  const consume = async () =>
+    kind === "agreements"
+      ? (await consumeAgreementsNoticeDelta(repo, withWarn)).map((item) => item.id)
+      : (await consumeSoulNoticeDelta(repo, withWarn))?.sha
   const path = kind === "agreements" ? "system/agreements.md" : "system/persona.md"
-  const body = kind === "agreements"
-    ? "- [global] Keep notices <!-- id: 3f9a1c0b2e; by: agent; n: 3; status: needs-human -->"
-    : "changed persona"
+  const body =
+    kind === "agreements"
+      ? "- [global] Keep notices <!-- id: 3f9a1c0b2e; by: agent; n: 3; status: needs-human -->"
+      : "changed persona"
   if (kind === "soul") await consume()
   await writeFile(join(repo.dir, path), `---\ndescription: Notice fixture\n---\n\n${body}\n`)
   await repo.commitWrite([path], "fresh notice", AUTHOR)
@@ -52,20 +59,25 @@ for (const kind of ["agreements", "soul"] as const) {
         const failure = Object.assign(new Error("injected publication failure"), { code: "EIO" })
         const write = fs.writeFile
         const rename = fs.rename
-        const intercepted = operation === "write"
-          ? spyOn(fs, "writeFile").mockImplementation(async (path, data, options) => {
-            if (typeof path !== "string" || dirname(path) !== f.noticesDir) return write(path, data, options)
-            await write(path, "{", options)
-            throw failure
-          })
-          : spyOn(fs, "rename").mockImplementation(async (from, to) => {
-            if (dirname(String(to)) !== f.noticesDir) return rename(from, to)
-            throw failure
-          })
+        const intercepted =
+          operation === "write"
+            ? spyOn(fs, "writeFile").mockImplementation(async (path, data, options) => {
+                if (typeof path !== "string" || dirname(path) !== f.noticesDir) return write(path, data, options)
+                await write(path, "{", options)
+                throw failure
+              })
+            : spyOn(fs, "rename").mockImplementation(async (from, to) => {
+                if (dirname(String(to)) !== f.noticesDir) return rename(from, to)
+                throw failure
+              })
         let caught: unknown
         try {
           // when
-          try { await f.consume() } catch (error) { caught = error }
+          try {
+            await f.consume()
+          } catch (error) {
+            caught = error
+          }
         } finally {
           intercepted.mockRestore()
         }
@@ -94,7 +106,11 @@ for (const kind of ["agreements", "soul"] as const) {
       let caught: unknown
       try {
         // when
-        try { await f.consume() } catch (error) { caught = error }
+        try {
+          await f.consume()
+        } catch (error) {
+          caught = error
+        }
       } finally {
         renameSpy.mockRestore()
         rmSpy.mockRestore()
@@ -140,7 +156,11 @@ for (const kind of ["agreements", "soul"] as const) {
       let caught: unknown
       try {
         // when
-        try { fresh = await f.consume() } catch (error) { caught = error }
+        try {
+          fresh = await f.consume()
+        } catch (error) {
+          caught = error
+        }
       } finally {
         intercepted.mockRestore()
       }

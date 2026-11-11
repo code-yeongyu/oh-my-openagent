@@ -39,10 +39,22 @@ impl Worker {
             }
             let mode = delivery(params.opts.as_ref())?;
             let handle = worker.registry.resolve(&params.ref_)?;
-            let check_stop = || interrupted(&supervisor, &policy, cancelled, "pressing keys in the element");
-            match worker.backend()?.ax_key_chord(&handle, &keys, mode, &check_stop)? {
+            let check_stop = || {
+                interrupted(
+                    &supervisor,
+                    &policy,
+                    cancelled,
+                    "pressing keys in the element",
+                )
+            };
+            match worker
+                .backend()?
+                .ax_key_chord(&handle, &keys, mode, &check_stop)?
+            {
                 ElementDelivery::Delivered(_) => Ok(Response::Unit),
-                ElementDelivery::Unfocused(focus) => Err(worker.element_focus_refusal(&params.ref_, focus, mode)),
+                ElementDelivery::Unfocused(focus) => {
+                    Err(worker.element_focus_refusal(&params.ref_, focus, mode))
+                }
             }
         })
     }

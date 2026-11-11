@@ -13,8 +13,9 @@ export function runBlock(workflow: string, startMarker: string, endMarker: strin
   const section = sliceWorkflowSection(workflow, startMarker, endMarker)
   const run = section.indexOf("        run: |\n")
   if (run < 0) throw new Error(`missing run block in ${startMarker}`)
-  return section.slice(run + "        run: |\n".length)
+  return section
+    .slice(run + "        run: |\n".length)
     .split("\n")
-    .map((line) => line.startsWith("          ") ? line.slice(10) : line)
+    .map((line) => (line.startsWith("          ") ? line.slice(10) : line))
     .join("\n")
 }

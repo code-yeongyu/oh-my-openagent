@@ -118,10 +118,12 @@ export const inProcessLock = (): WriterLock & { held: boolean } => {
 
 /** The transport refuses every network call made while the writer lock is held (sync-design §5). */
 function lockGuarded(transport: Transport, lock: { readonly held: boolean }): Transport {
-  const guard = <A extends unknown[], R>(name: string, fn: (...args: A) => R) => (...args: A): R => {
-    if (lock.held) throw new Error(`network call ${name} while the writer lock is held`)
-    return fn(...args)
-  }
+  const guard =
+    <A extends unknown[], R>(name: string, fn: (...args: A) => R) =>
+    (...args: A): R => {
+      if (lock.held) throw new Error(`network call ${name} while the writer lock is held`)
+      return fn(...args)
+    }
   return {
     pull: guard("pull", transport.pull),
     download: guard("download", transport.download),
@@ -165,7 +167,12 @@ export interface DeviceOptions {
   readonly freeze?: FreezeSettler
 }
 
-export async function makeDevice(server: FakeSyncServer, name: string, fault?: EngineFault, options: DeviceOptions = {}): Promise<Device> {
+export async function makeDevice(
+  server: FakeSyncServer,
+  name: string,
+  fault?: EngineFault,
+  options: DeviceOptions = {},
+): Promise<Device> {
   const base = await mkdtemp(join(tmpdir(), `omo-sync-${name}-`))
   const root = join(base, "memory")
   const stateDir = join(base, "device")
@@ -176,9 +183,15 @@ export async function makeDevice(server: FakeSyncServer, name: string, fault?: E
   const clock = new ManualClock()
   const verifier = new FakeVerifier(ACCOUNT)
   const build = (f?: EngineFault) => {
-    const store: ItemStore = options.realStore === true
-      ? createDeviceItemStore({ stateDir, memoryRoot: root, syncDir: join(root, ".git", "omo-sync"), machineId: `machine-${name}` })
-      : new FakeItemStore(stateDir, name)
+    const store: ItemStore =
+      options.realStore === true
+        ? createDeviceItemStore({
+            stateDir,
+            memoryRoot: root,
+            syncDir: join(root, ".git", "omo-sync"),
+            machineId: `machine-${name}`,
+          })
+        : new FakeItemStore(stateDir, name)
     const lock = inProcessLock()
     const engine = new SyncEngine({
       repo,

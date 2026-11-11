@@ -9,12 +9,13 @@ use senpi_desktop_core::ax::register_node;
 use senpi_desktop_core::backend::{DeliveryMode, ElementDelivery, KeyboardFocus};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::protocol_params::AxTypeTextParams;
-use senpi_desktop_core::protocol_results::AxInputResult;
-use senpi_desktop_core::types::AxNode;
+use senpi_desktop_core::protocol_results::{AxInputMethod, AxInputResult};
+use senpi_desktop_core::types::{AxNode, Target};
 use senpi_desktop_safety::MutatingAction;
 
-use crate::mutate::Mutation;
+use crate::mutate::{event_route, Mutation};
 use crate::pointer::ParsedPointerOptions;
+use crate::report::ReportExtras;
 use crate::request::Response;
 use crate::worker::{Audited, Worker};
 use crate::worker_input::{delivery, interrupted};
@@ -38,17 +39,37 @@ impl Worker {
         self.mutate(&mutation, cancelled, |worker| {
             let mode = delivery(params.opts.as_ref())?;
             let handle = worker.registry.resolve(&params.ref_)?;
-            let check_stop = || interrupted(&supervisor, &policy, cancelled, "typing into the element");
+            let check_stop =
+                || interrupted(&supervisor, &policy, cancelled, "typing into the element");
             let delivered = worker.backend()?.ax_type_text(
                 &handle,
                 &params.text,
                 mode,
                 &check_stop,
-                &mut || mutation.text_delivered.set(mutation.text_delivered.get().saturating_add(1)),
+                &mut || {
+                    mutation
+                        .text_delivered
+                        .set(mutation.text_delivered.get().saturating_add(1))
+                },
             )?;
             match delivered {
-                ElementDelivery::Delivered(method) => Ok(Response::AxInput(AxInputResult { method, report: None })),
-                ElementDelivery::Unfocused(focus) => Err(worker.element_focus_refusal(&params.ref_, focus, mode)),
+                ElementDelivery::Delivered(method) => {
+                    if method == AxInputMethod::Keys {
+                        let to_window =
+                            matches!(Target::parse(&mutation.target), Target::Window(_));
+                        worker.report_extras.set(Some(ReportExtras {
+                            route: Some(event_route(to_window, mode)),
+                            ..ReportExtras::default()
+                        }));
+                    }
+                    Ok(Response::AxInput(AxInputResult {
+                        method,
+                        report: None,
+                    }))
+                }
+                ElementDelivery::Unfocused(focus) => {
+                    Err(worker.element_focus_refusal(&params.ref_, focus, mode))
+                }
             }
         })
     }
@@ -56,7 +77,12 @@ impl Worker {
     /// The error for keys addressed to `reference` that were never sent
     /// because the element did not take keyboard focus: where focus is now,
     /// with the focused element's node line and a ref for it.
-    pub(super) fn element_focus_refusal(&mut self, reference: &str, focus: KeyboardFocus, mode: DeliveryMode) -> DesktopError {
+    pub(super) fn element_focus_refusal(
+        &mut self,
+        reference: &str,
+        focus: KeyboardFocus,
+        mode: DeliveryMode,
+    ) -> DesktopError {
         let window = match focus.window.as_deref() {
             None => "an unidentified window".to_owned(),
             Some(id) => {
@@ -82,7 +108,10 @@ impl Worker {
             Some(handle) => self
                 .ax_parts()
                 .and_then(|(backend, registry)| register_node(backend, registry, &target, handle))
-                .map_or_else(|_| "an element that could not be read".to_owned(), |node| node_line(&node)),
+                .map_or_else(
+                    |_| "an element that could not be read".to_owned(),
+                    |node| node_line(&node),
+                ),
         };
         let message = format!(
             "{reference} did not take keyboard focus when asked to, so no keys were sent; its application's \

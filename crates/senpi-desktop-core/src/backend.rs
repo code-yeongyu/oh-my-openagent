@@ -6,17 +6,17 @@
 
 use image::RgbaImage;
 
-use crate::ax::{AxHandle, AxProps};
+use crate::ax::{AxHandle, AxObserved, AxProps};
 use crate::error::{CoreResult, DesktopError, TccPermission};
 use crate::frame::FrameGeometry;
 use crate::keys::KeyName;
 pub use crate::protocol_results::AxInputMethod;
-use crate::protocol_results::AxTextSelection;
-use crate::protocol_results::MenuReport;
+use crate::protocol_results::{AxTextSelection, EpochReason, MenuReport};
+use crate::report::ReportMode;
 use crate::text_range::TextSelectRequest;
 use crate::types::{
-    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector, FrontWindow,
-    ScreenState, Target,
+    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector,
+    FrontWindow, KeyPriming, ScreenState, Target,
 };
 use crate::user_input::{UserInputFeed, UserPresses};
 
@@ -56,7 +56,9 @@ impl MouseButton {
             Some(value) if value.eq_ignore_ascii_case("left") => Ok(Self::Left),
             Some(value) if value.eq_ignore_ascii_case("right") => Ok(Self::Right),
             Some(value) if value.eq_ignore_ascii_case("middle") => Ok(Self::Middle),
-            Some(value) => Err(DesktopError::input_failed(format!("unknown button '{value}'"))),
+            Some(value) => Err(DesktopError::input_failed(format!(
+                "unknown button '{value}'"
+            ))),
         }
     }
 }
@@ -138,8 +140,23 @@ pub trait Backend: Send {
 
     fn capabilities(&mut self) -> DesktopCapabilities;
 
+    /// The accessibility element at a global logical point, read just before
+    /// coordinate input (the object-mode `hit`); `None` where the backend
+    /// cannot tell.
+    fn hit_at(&mut self, _x: f64, _y: f64) -> CoreResult<Option<crate::frame::PointHit>> {
+        Ok(None)
+    }
+
     /// Updates the display-only virtual cursor without changing admission.
     fn set_show_cursor(&mut self, _enabled: bool) {}
+
+    /// The session's `macosKeyPriming` option; backends without key priming
+    /// ignore it.
+    fn set_key_priming(&mut self, _mode: KeyPriming) {}
+
+    /// The session's `reportMode`; backends whose input does not depend on it
+    /// ignore it.
+    fn set_report_mode(&mut self, _mode: ReportMode) {}
 
     fn displays(&mut self) -> CoreResult<Vec<DesktopDisplay>>;
     fn windows(&mut self) -> CoreResult<Vec<DesktopWindow>>;
@@ -181,12 +198,16 @@ pub trait Backend: Send {
     /// The system clipboard's text. Backends without clipboard access keep
     /// this default and refuse instead of pretending.
     fn clipboard_read(&mut self) -> CoreResult<String> {
-        Err(DesktopError::internal("this desktop backend has no clipboard access"))
+        Err(DesktopError::internal(
+            "this desktop backend has no clipboard access",
+        ))
     }
 
     /// Replaces the system clipboard's text.
     fn clipboard_write(&mut self, _text: &str) -> CoreResult<()> {
-        Err(DesktopError::internal("this desktop backend has no clipboard access"))
+        Err(DesktopError::internal(
+            "this desktop backend has no clipboard access",
+        ))
     }
     /// Backends with incremental text delivery check between Unicode scalars
     /// and report each fully delivered scalar. The default preserves the
@@ -235,7 +256,12 @@ pub trait Backend: Send {
     ) -> CoreResult<ElementDelivery> {
         Err(DesktopError::ax_unsupported())
     }
-    fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()>;
+    fn key_chord(
+        &mut self,
+        target: &Target,
+        keys: &[KeyName],
+        mode: DeliveryMode,
+    ) -> CoreResult<()>;
     /// [`Self::key_chord`] with `check_stop` before every key press, so a stop
     /// or a cancellation lands between presses. The default checks once,
     /// before the chord, for backends that press a chord in one call.
@@ -258,7 +284,9 @@ pub trait Backend: Send {
         _mode: DeliveryMode,
         _control: &crate::holds::HoldControl<'_>,
     ) -> CoreResult<()> {
-        Err(DesktopError::input_failed("bounded key holds are unavailable on this backend"))
+        Err(DesktopError::input_failed(
+            "bounded key holds are unavailable on this backend",
+        ))
     }
 
     fn hold_mouse(
@@ -268,7 +296,9 @@ pub trait Backend: Send {
         _mode: DeliveryMode,
         _control: &crate::holds::HoldControl<'_>,
     ) -> CoreResult<()> {
-        Err(DesktopError::input_failed("bounded mouse holds are unavailable on this backend"))
+        Err(DesktopError::input_failed(
+            "bounded mouse holds are unavailable on this backend",
+        ))
     }
     fn raise_window(&mut self, id: &str) -> CoreResult<()>;
 
@@ -276,7 +306,11 @@ pub trait Backend: Send {
     /// Spaces or activating anything; a window already there is left alone.
     /// Backends call `check_stop` before the move and while verifying it.
     /// Backends without Spaces refuse with `SpaceUnsupported`.
-    fn bring_to_current_space(&mut self, _id: &str, _check_stop: &dyn Fn() -> CoreResult<()>) -> CoreResult<()> {
+    fn bring_to_current_space(
+        &mut self,
+        _id: &str,
+        _check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
         Err(DesktopError::space_unsupported(
             "moving a window to the current Space is not available on this backend",
         ))
@@ -284,7 +318,11 @@ pub trait Backend: Send {
 
     /// The immediate children of `window`'s menu at `path` (empty = the menu
     /// bar). Backends without menus yet refuse with `AxUnsupported`.
-    fn menu_items(&mut self, _window: &DesktopWindow, _path: &[String]) -> CoreResult<Vec<crate::menus::MenuItem>> {
+    fn menu_items(
+        &mut self,
+        _window: &DesktopWindow,
+        _path: &[String],
+    ) -> CoreResult<Vec<crate::menus::MenuItem>> {
         Err(DesktopError::ax_unsupported())
     }
 
@@ -370,6 +408,20 @@ pub trait Backend: Send {
     fn user_input_feed(&mut self) -> Option<std::sync::Arc<dyn UserInputFeed>> {
         None
     }
+
+    /// Host events that move the session's coordinate epoch, readable while
+    /// the backend is busy; `None` where the backend observes none.
+    fn epoch_source(&self) -> Option<std::sync::Arc<dyn EpochSource>> {
+        None
+    }
+}
+
+/// Host events that invalidate every frame and ref (display reconfiguration,
+/// sleep, a Space switch), safe to read from any thread.
+pub trait EpochSource: Send + Sync {
+    /// Why the epoch moved, for every move since this source was built from
+    /// the `seen`-th on. A source that samples the host samples here.
+    fn moves_since(&self, seen: usize) -> Vec<EpochReason>;
 }
 
 /// Live lock and display-sleep state, safe to read from any thread.
@@ -405,7 +457,12 @@ pub trait AxBackend {
     /// closed before the call returns. Backends without menu handling perform
     /// an action without a path plainly and refuse a path before anything is
     /// performed.
-    fn perform_menu(&mut self, h: &AxHandle, action: &str, choice: MenuChoice<'_>) -> CoreResult<Option<MenuReport>> {
+    fn perform_menu(
+        &mut self,
+        h: &AxHandle,
+        action: &str,
+        choice: MenuChoice<'_>,
+    ) -> CoreResult<Option<MenuReport>> {
         if choice.path.is_some() {
             return Err(DesktopError::ax_unsupported());
         }
@@ -415,7 +472,35 @@ pub trait AxBackend {
     fn focus(&mut self, h: &AxHandle) -> CoreResult<()>;
     fn element_at(&mut self, x: f64, y: f64) -> CoreResult<Option<AxHandle>>;
     fn focused_element(&mut self) -> CoreResult<Option<AxHandle>>;
+
+    /// The element with keyboard focus inside the app `pid`, read from that
+    /// app itself: where background keys sent to it land. The system-wide
+    /// [`Self::focused_element`] names only the frontmost app's. Backends
+    /// without a per-app read keep this default, the system-wide focus.
+    fn app_focused_element(&mut self, _pid: u32) -> CoreResult<Option<AxHandle>> {
+        self.focused_element()
+    }
+
+    /// Whether `h` is itself a secure text field, read from its role and
+    /// subrole. Backends that cannot tell keep this default, `false`.
+    fn is_secure_text_field(&mut self, _h: &AxHandle) -> CoreResult<bool> {
+        Ok(false)
+    }
+
     fn attributes(&mut self, h: &AxHandle) -> CoreResult<Vec<(String, String)>>;
+
+    /// [`Self::props`] for object-mode sessions, with how each field was read
+    /// and whether the element is a secure text field. Backends that cannot
+    /// tell keep this default: no evidence, never secure.
+    fn observe(&mut self, h: &AxHandle) -> CoreResult<AxObserved> {
+        self.props(h).map(AxObserved::plain)
+    }
+
+    /// The element's stable developer identifier (`AXIdentifier`, UIA
+    /// `AutomationId`). Backends that cannot read one keep this default.
+    fn identifier(&mut self, _h: &AxHandle) -> CoreResult<Option<String>> {
+        Ok(None)
+    }
 
     /// The window that owns `h`, read live from the platform and named as
     /// `windows` (the live [`Backend::windows`]) lists it. Backends that
@@ -427,7 +512,11 @@ pub trait AxBackend {
     /// Selects the range `request` names in `h`'s value (`ax.selectText`) by
     /// writing the element's selected text range: no key is sent and no
     /// focus moves. Backends without text selection keep this default.
-    fn select_text(&mut self, _h: &AxHandle, _request: &TextSelectRequest) -> CoreResult<AxTextSelection> {
+    fn select_text(
+        &mut self,
+        _h: &AxHandle,
+        _request: &TextSelectRequest,
+    ) -> CoreResult<AxTextSelection> {
         Err(DesktopError::ax_unsupported())
     }
 }
@@ -439,7 +528,10 @@ mod tests {
     #[test]
     fn delivery_only_escalates_explicit_foreground() {
         assert_eq!(DeliveryMode::parse(None), DeliveryMode::Background);
-        assert_eq!(DeliveryMode::parse(Some("garbage")), DeliveryMode::Background);
+        assert_eq!(
+            DeliveryMode::parse(Some("garbage")),
+            DeliveryMode::Background
+        );
         assert_eq!(
             DeliveryMode::parse(Some(" FoReGrOuNd ")),
             DeliveryMode::Foreground

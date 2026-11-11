@@ -23,12 +23,17 @@ mod keys;
 mod menu;
 mod menu_key;
 mod post;
+mod priming;
 mod remote;
+mod user_feed_raw;
 mod window_text;
+
+pub(crate) use user_feed_raw::RawFeed;
 
 pub(crate) use keymap::run_helper as run_keymap_helper;
 mod release;
 mod user_monitor;
+pub(crate) use user_monitor::process_started;
 
 #[cfg(test)]
 mod tests;
@@ -59,6 +64,7 @@ use crate::skylight;
 use held::Held;
 
 pub(crate) use self::canary::CANARY_STOP_REASON;
+pub(crate) use self::guard::{set_key_priming, set_key_report_mode};
 pub use self::canary::{CanaryMode, CanaryResult};
 pub(crate) use self::cgevent::{modifier_flags, mouse_event, probe_event};
 pub(crate) use self::keys::{key_code, update_modifier};
@@ -74,6 +80,8 @@ pub(crate) struct MacInput {
     /// `(pid, wid)` of the last window made key without raising, so key focus
     /// can be handed back afterwards.
     last_activated: Option<(libc::pid_t, u32)>,
+    /// The user's unfiltered presses, for key priming's takeover re-check.
+    raw_feed: Option<std::sync::Arc<RawFeed>>,
 }
 
 // SAFETY: Core Graphics event sources are immutable CF objects after setup,
@@ -89,7 +97,13 @@ impl MacInput {
             canary: canary::CanaryState::new(canary),
             overlay: crate::overlay::Overlay::default(),
             last_activated: None,
+            raw_feed: None,
         })
+    }
+
+    /// Gives key priming the user-input watch's raw feed.
+    pub(crate) fn set_raw_feed(&mut self, feed: std::sync::Arc<RawFeed>) {
+        self.raw_feed = Some(feed);
     }
 
     pub(crate) fn with_overlay(mut self, overlay: crate::overlay::Overlay) -> Self {

@@ -1,18 +1,9 @@
 import { createHash } from "node:crypto"
 import { spawnSync } from "node:child_process"
-import {
-  existsSync,
-  realpathSync,
-  watch,
-  type FSWatcher,
-} from "node:fs"
+import { existsSync, realpathSync, watch, type FSWatcher } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, dirname, join } from "node:path"
-import {
-  isProcessAlive,
-  readLockPid,
-  tryAcquireLock,
-} from "../packages/lsp-daemon/src/lock"
+import { isProcessAlive, readLockPid, tryAcquireLock } from "../packages/lsp-daemon/src/lock"
 
 export type RunVendoredLspCommand = (
   command: string,
@@ -63,12 +54,9 @@ const defaultRunCommand: RunVendoredLspCommand = async (command, args, options) 
   }
 }
 
-const defaultWatchDirectory: WatchBuildLockDirectory = (path, listener) =>
-  watch(path, { persistent: false }, listener)
+const defaultWatchDirectory: WatchBuildLockDirectory = (path, listener) => watch(path, { persistent: false }, listener)
 
-export async function ensureVendoredLspDaemonBuilt(
-  options: EnsureVendoredLspDaemonOptions,
-): Promise<void> {
+export async function ensureVendoredLspDaemonBuilt(options: EnsureVendoredLspDaemonOptions): Promise<void> {
   const outputPath = options.outputPath ?? join(options.packageDir, "dist", "cli.js")
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const pathExists = options.exists ?? existsSync
@@ -86,13 +74,7 @@ export async function ensureVendoredLspDaemonBuilt(
   while (!pathExists(outputPath)) {
     const lock = tryAcquireLock(lockPath)
     if (!lock) {
-      await waitForBuildTurn(
-        lockPath,
-        outputPath,
-        deadline,
-        pathExists,
-        watchDirectory,
-      )
+      await waitForBuildTurn(lockPath, outputPath, deadline, pathExists, watchDirectory)
       continue
     }
 
@@ -101,9 +83,7 @@ export async function ensureVendoredLspDaemonBuilt(
         return
       }
 
-      log(
-        "[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...",
-      )
+      log("[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...")
 
       const installResult = await runCommand("npm", ["ci"], {
         cwd: options.packageDir,
@@ -117,9 +97,7 @@ export async function ensureVendoredLspDaemonBuilt(
       })
       assertCommandSucceeded(buildResult, "build")
       if (!pathExists(outputPath)) {
-        throw new Error(
-          `[test-setup] lsp-daemon build completed without ${outputPath}`,
-        )
+        throw new Error(`[test-setup] lsp-daemon build completed without ${outputPath}`)
       }
       return
     } finally {
@@ -194,11 +172,7 @@ async function waitForBuildTurn(
   })
 }
 
-function buildTurnChanged(
-  lockPath: string,
-  outputPath: string,
-  pathExists: (path: string) => boolean,
-): boolean {
+function buildTurnChanged(lockPath: string, outputPath: string, pathExists: (path: string) => boolean): boolean {
   if (pathExists(outputPath) || !pathExists(lockPath)) {
     return true
   }
@@ -214,28 +188,18 @@ function remainingMs(deadline: number, stage: string): number {
   return remaining
 }
 
-function assertCommandSucceeded(
-  result: number | VendoredLspCommandResult,
-  stage: string,
-): void {
+function assertCommandSucceeded(result: number | VendoredLspCommandResult, stage: string): void {
   if (typeof result === "number") {
     if (result !== 0) {
-      throw new Error(
-        `[test-setup] lsp-daemon ${stage} failed with exit code ${result}`,
-      )
+      throw new Error(`[test-setup] lsp-daemon ${stage} failed with exit code ${result}`)
     }
     return
   }
   if (result.error) {
-    throw new Error(
-      `[test-setup] lsp-daemon ${stage} failed: ${result.error.message}`,
-      { cause: result.error },
-    )
+    throw new Error(`[test-setup] lsp-daemon ${stage} failed: ${result.error.message}`, { cause: result.error })
   }
   if (result.status !== 0) {
-    const detail = result.signal
-      ? `signal ${result.signal}`
-      : `exit code ${String(result.status)}`
+    const detail = result.signal ? `signal ${result.signal}` : `exit code ${String(result.status)}`
     throw new Error(`[test-setup] lsp-daemon ${stage} failed with ${detail}`)
   }
 }

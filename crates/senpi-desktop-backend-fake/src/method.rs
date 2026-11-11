@@ -44,6 +44,7 @@ pub enum FakeMethod {
     AxKeyChord,
     AxElementAt,
     AxFocusedElement,
+    AxAppFocusedElement,
     AxAttributes,
     AxOwner,
     MenuItems,

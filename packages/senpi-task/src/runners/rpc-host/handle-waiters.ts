@@ -30,8 +30,7 @@ export function createHandleWaiters(): HandleWaiters {
     settleExit: (outcome) => {
       for (const waiter of exitWaiters.splice(0)) waiter(outcome)
     },
-    waitForIdle: (settled) =>
-      settled ? Promise.resolve() : new Promise<void>((resolve) => idleWaiters.push(resolve)),
+    waitForIdle: (settled) => (settled ? Promise.resolve() : new Promise<void>((resolve) => idleWaiters.push(resolve))),
     waitForOutcome: (turnOutcome, exitOutcome, finalText) =>
       turnOutcome !== undefined
         ? Promise.resolve(turnOutcome)

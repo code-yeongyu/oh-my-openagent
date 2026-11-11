@@ -27,7 +27,9 @@ async function hookedRepo(): Promise<GitMemoryRepo> {
   tempDirs.push(dir)
   const memory = new GitMemoryRepo({ dir, agentId: AUTHOR.agentId })
   await memory.init({ seedFiles: buildDefaultSeedFiles() })
-  installHooks(dir, { checker: { execPath: process.execPath, script: join(import.meta.dir, "../memfs/memory-hook-cli.ts") } })
+  installHooks(dir, {
+    checker: { execPath: process.execPath, script: join(import.meta.dir, "../memfs/memory-hook-cli.ts") },
+  })
   return memory
 }
 
@@ -37,12 +39,22 @@ const personFact = (batchId: string, text: string) =>
 describe("facts writer and the commit hook share one header rule (lead decision C on #10498)", () => {
   test("#given a person file carrying a legacy user header #when the facts extractor appends an observation #then the commit lands with the header dropped and the drop recorded", async () => {
     const memory = await hookedRepo()
-    await applyFactsBatch(memory, personFact("4b0f6f0e-6a55-4a43-9a8c-2f0d5f7d3c21", "Mina prefers Bun."), AUTHOR, PEOPLE)
+    await applyFactsBatch(
+      memory,
+      personFact("4b0f6f0e-6a55-4a43-9a8c-2f0d5f7d3c21", "Mina prefers Bun."),
+      AUTHOR,
+      PEOPLE,
+    )
     const seeded = await readFile(join(memory.dir, OBSERVATIONS), "utf8")
     await writeFile(join(memory.dir, OBSERVATIONS), seeded.replace("\n---\n", `\nprovenance: ${LEGACY}\n---\n`))
     await memory.commitWrite([OBSERVATIONS], "legacy approval\n\nOmo-Writer: memory-tool", AUTHOR)
 
-    const result = await applyFactsBatch(memory, personFact("4b0f6f0e-6a55-4a43-9a8c-2f0d5f7d3c22", "Mina reviews on Fridays."), AUTHOR, PEOPLE)
+    const result = await applyFactsBatch(
+      memory,
+      personFact("4b0f6f0e-6a55-4a43-9a8c-2f0d5f7d3c22", "Mina reviews on Fridays."),
+      AUTHOR,
+      PEOPLE,
+    )
 
     const note = parseMemoryFile(await readFile(join(memory.dir, OBSERVATIONS), "utf8"))
     expect(note.body).toContain("Mina reviews on Fridays.")
@@ -56,7 +68,10 @@ describe("facts writer and the commit hook share one header rule (lead decision 
   test("#given a note with a legacy user header and a frontmatter grammar violation #when normalization rewrites it #then the commit lands with the header dropped and the drop recorded", async () => {
     const memory = await hookedRepo()
     // An older build wrote this note; seeding it bypasses the hooks, and normalization's own commit runs through them.
-    await writeFile(join(memory.dir, "reference/legacy.md"), `---\ndescription: Run the chain: verify, merge\nprovenance: ${LEGACY}\n---\n\nnote body\n`)
+    await writeFile(
+      join(memory.dir, "reference/legacy.md"),
+      `---\ndescription: Run the chain: verify, merge\nprovenance: ${LEGACY}\n---\n\nnote body\n`,
+    )
     await Bun.$`git -C ${memory.dir} add reference/legacy.md && git -C ${memory.dir} -c user.name=seed -c user.email=seed@omo.local commit --no-verify -q -m seed`.quiet()
 
     const result = await normalizeMemoryFrontmatter(memory, AUTHOR)

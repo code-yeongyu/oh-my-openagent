@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::protocol::RequestId;
 pub use crate::protocol_holds::{HoldKeysParams, HoldMouseParams};
-use crate::types::{AxQuery, AxSnapshotOptions, CaptureCaps, CaptureRegion, DesktopPoint, PointerOptions};
+use crate::types::{
+    AxQuery, AxSnapshotOptions, CaptureCaps, CaptureRegion, DesktopPoint, PointerOptions,
+};
 
 /// Parameters of a method that takes none: `{}`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]

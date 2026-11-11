@@ -7,13 +7,21 @@ import type { Server, Socket } from "node:net"
 
 import { preflightMemoryModels, resetModelPreflightCacheForTests } from "./model-preflight"
 import type { MemoryModelChain } from "./memory-model-attempts"
-import { identityMatches, killIfAlive, pidAlive, pidTerminalWithin, readPidFileWhenWritten, readPidOnce, readPidWhenWritten, waitForFileToExist } from "./process-liveness.test-support"
+import {
+  identityMatches,
+  killIfAlive,
+  pidAlive,
+  pidTerminalWithin,
+  readPidFileWhenWritten,
+  readPidOnce,
+  readPidWhenWritten,
+  waitForFileToExist,
+} from "./process-liveness.test-support"
 import { remainingTestTime, useTestTimeout } from "../../../../../../test-support/test-deadline"
 
 const roots: string[] = []
 /** Fail-safe wait in finally for a leaked grandchild: fixed, because the test budget may already be spent there. */
 const HELPER_FAILSAFE_BOUND_MS = 5_000
-
 
 afterEach(async () => {
   resetModelPreflightCacheForTests()
@@ -27,7 +35,10 @@ const candidates: MemoryModelChain = [
 
 function withExtensions(chain: MemoryModelChain): MemoryModelChain {
   const [first, ...rest] = chain
-  return [{ ...first, loadExtensions: true }, ...rest.map((candidate) => ({ ...candidate, loadExtensions: true as const }))]
+  return [
+    { ...first, loadExtensions: true },
+    ...rest.map((candidate) => ({ ...candidate, loadExtensions: true as const })),
+  ]
 }
 
 async function fixture(body: string): Promise<{
@@ -220,7 +231,9 @@ process.stdout.write("builtin/fallback\\n")
     const wrapperPidPath = join(item.root, "wrapper.pid")
     const grandchildPidPath = join(item.root, "grandchild.pid")
     const grandchildConnectedPath = join(item.root, "grandchild.connected")
-    await writeFile(wrapper, `
+    await writeFile(
+      wrapper,
+      `
 import { spawn } from "node:child_process"
 import { connect } from "node:net"
 import { writeFileSync } from "node:fs"
@@ -230,8 +243,12 @@ writeFileSync(process.env.GRANDCHILD_PID_PATH, String(child.pid))
 const control = connect({ host: "127.0.0.1", port: Number(process.env.CONTROL_PORT) })
 control.once("close", () => process.exit(0))
 control.once("error", () => process.exit(0))
-`, "utf8")
-    await writeFile(grandchildScript, `
+`,
+      "utf8",
+    )
+    await writeFile(
+      grandchildScript,
+      `
 import { connect } from "node:net"
 import { writeFileSync } from "node:fs"
 writeFileSync(process.env.GRANDCHILD_PID_PATH, String(process.pid))
@@ -239,7 +256,9 @@ const control = connect({ host: "127.0.0.1", port: Number(process.env.CONTROL_PO
 control.once("connect", () => writeFileSync(process.env.GRANDCHILD_CONNECTED_PATH, "connected\\n"))
 control.once("close", () => process.exit(0))
 control.once("error", () => process.exit(0))
-`, "utf8")
+`,
+      "utf8",
+    )
     const control = createServer()
     const connections = new Set<Socket>()
     control.on("connection", (socket) => connections.add(socket))
@@ -302,20 +321,27 @@ control.once("error", () => process.exit(0))
         expect(identityMatches(grandchildIdentity) && pidAlive(grandchildIdentity.pid)).toBe(true)
         // The grandchild writes its pid file BEFORE connect(); awaiting its explicit connected
         // marker guarantees the control snapshot below contains its socket on every runner.
-        expect({ "grandchild connected marker written": await waitForFileToExist(grandchildConnectedPath, remainingTestTime()) }).toEqual({ "grandchild connected marker written": true })
-        const helperClosures = [...connections].map((socket) => new Promise<void>((resolve) => {
-          if (socket.destroyed) return resolve()
-          socket.once("close", () => resolve())
-        }))
+        expect({
+          "grandchild connected marker written": await waitForFileToExist(grandchildConnectedPath, remainingTestTime()),
+        }).toEqual({ "grandchild connected marker written": true })
+        const helperClosures = [...connections].map(
+          (socket) =>
+            new Promise<void>((resolve) => {
+              if (socket.destroyed) return resolve()
+              socket.once("close", () => resolve())
+            }),
+        )
         closeControlChannel(control, connections)
         await Promise.all(helperClosures)
-        expect({ "grandchild exited": await pidTerminalWithin(grandchildIdentity, remainingTestTime()) }).toEqual({ "grandchild exited": true })
+        expect({ "grandchild exited": await pidTerminalWithin(grandchildIdentity, remainingTestTime()) }).toEqual({
+          "grandchild exited": true,
+        })
       }
     } finally {
       // Fail-safe: even when an assertion above failed - or when the win32 branch never captured an
       // identity at all - nothing this test spawned may survive it.
       closeControlChannel(control, connections)
-      const leaked = grandchildIdentityForCleanup ?? await readPidOnce(grandchildPidPath, "grandchild.mjs")
+      const leaked = grandchildIdentityForCleanup ?? (await readPidOnce(grandchildPidPath, "grandchild.mjs"))
       if (leaked !== null) {
         killIfAlive(leaked)
         await pidTerminalWithin(leaked, HELPER_FAILSAFE_BOUND_MS)
@@ -417,5 +443,4 @@ control.once("error", () => process.exit(0))
     // then
     expect(result).toEqual({ kind: "filtered", candidates: headerless, rejected: [] })
   })
-
 })

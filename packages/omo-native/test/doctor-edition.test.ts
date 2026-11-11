@@ -27,28 +27,35 @@ function writeFile(path: string, content = "fixture\n"): void {
 function createFixture(installLayout: InstallLayout = "npm"): Fixture {
   const root = mkdtempSync(join(tmpdir(), "omo-doctor-edition-"))
   roots.push(root)
-  const packagePath = installLayout === "bun"
-    ? join(root, "custom-bun", "install", "global", "node_modules", "omo-ai")
-    : join(root, "prefix", "lib", "node_modules", "omo-ai")
+  const packagePath =
+    installLayout === "bun"
+      ? join(root, "custom-bun", "install", "global", "node_modules", "omo-ai")
+      : join(root, "prefix", "lib", "node_modules", "omo-ai")
   mkdirSync(packagePath, { recursive: true })
   // realpathSync.native returns the long canonical name on Windows (GetFinalPathNameByHandle); the JS
   // realpath keeps 8.3 aliases such as RUNNER~1, while the child resolves its own import.meta.url to the
   // long form, so the two spellings of one directory would disagree in the Update: line.
   const packageRoot = realpathSync.native(packagePath)
   cpSync(join(SOURCE_ROOT, "bin"), join(packageRoot, "bin"), { recursive: true })
-  writeFile(join(packageRoot, "package.json"), JSON.stringify({
-    name: "omo-ai",
-    version: "5.0.0-0.beta.51",
-    type: "module",
-    dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
-  }))
+  writeFile(
+    join(packageRoot, "package.json"),
+    JSON.stringify({
+      name: "omo-ai",
+      version: "5.0.0-0.beta.51",
+      type: "module",
+      dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
+    }),
+  )
   const senpiRoot = join(packageRoot, "node_modules", "@code-yeongyu", "senpi")
-  writeFile(join(senpiRoot, "package.json"), JSON.stringify({
-    name: "@code-yeongyu/senpi",
-    version: "2026.8.9",
-    type: "module",
-    exports: { ".": "./dist/index.js" },
-  }))
+  writeFile(
+    join(senpiRoot, "package.json"),
+    JSON.stringify({
+      name: "@code-yeongyu/senpi",
+      version: "2026.8.9",
+      type: "module",
+      exports: { ".": "./dist/index.js" },
+    }),
+  )
   writeFile(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
   writeFile(join(senpiRoot, "dist", "cli.js"), "process.exit(0)\n")
   writeFile(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
@@ -75,7 +82,9 @@ function captureDoctor(options: Record<string, unknown> = {}): { stdout: string;
   const output: string[] = []
   const originalLog = console.log
   const originalExitCode = process.exitCode
-  console.log = (value?: unknown) => { output.push(String(value)) }
+  console.log = (value?: unknown) => {
+    output.push(String(value))
+  }
   process.exitCode = undefined
   try {
     runDoctor({ harnesses: [] }, [], {
@@ -116,7 +125,9 @@ describe("omo doctor edition summary", () => {
         const expectedLatest = latestFromDistTags(distTags, version)
 
         expect(editionLine(captured.stdout)).toMatch(
-          new RegExp(`^INFO omo · Edition: Native · Installed: ${version.replaceAll(".", "\\.")} \\(engine: senpi .+\\) · Latest: ${expectedLatest.replaceAll(".", "\\.")}$`),
+          new RegExp(
+            `^INFO omo · Edition: Native · Installed: ${version.replaceAll(".", "\\.")} \\(engine: senpi .+\\) · Latest: ${expectedLatest.replaceAll(".", "\\.")}$`,
+          ),
         )
       })
 
@@ -134,7 +145,9 @@ describe("omo doctor edition summary", () => {
       const result = run(fixture)
       expect(result.status).toBe(0)
       const summary = editionLine(result.stdout)
-      expect(summary).toMatch(/^INFO omo · Edition: Native · Installed: 5\.0\.0-0\.beta\.51 \(engine: senpi 2026\.8\.9\) · Latest: /)
+      expect(summary).toMatch(
+        /^INFO omo · Edition: Native · Installed: 5\.0\.0-0\.beta\.51 \(engine: senpi 2026\.8\.9\) · Latest: /,
+      )
       expect(lineAfter(result.stdout, summary)).toBe("INFO Update: npm i -g omo-ai@beta")
       expect(updateTarget(fixture.packageRoot).command).toBe("npm i -g omo-ai@beta")
     })
@@ -151,7 +164,9 @@ describe("omo doctor edition summary", () => {
 
   describe("#given the installed channel", () => {
     test("#then a beta install reads the beta dist-tag", () => {
-      expect(latestFromDistTags({ beta: "5.0.0-0.beta.99", latest: "4.9.0" }, "5.0.0-0.beta.51")).toBe("5.0.0-0.beta.99")
+      expect(latestFromDistTags({ beta: "5.0.0-0.beta.99", latest: "4.9.0" }, "5.0.0-0.beta.51")).toBe(
+        "5.0.0-0.beta.99",
+      )
     })
 
     test("#then a stable install reads the latest dist-tag", () => {

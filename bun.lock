@@ -11,7 +11,7 @@
       },
       "devDependencies": {
         "@clack/prompts": "^1.8.1",
-        "@code-yeongyu/senpi": "2026.11.10",
+        "@code-yeongyu/senpi": "2026.11.10-2",
         "@modelcontextprotocol/sdk": "^1.30.0",
         "@oh-my-opencode/agents-md-core": "workspace:*",
         "@oh-my-opencode/ast-grep-mcp": "workspace:*",
@@ -29,6 +29,13 @@
         "@oh-my-opencode/memory-core": "workspace:*",
         "@oh-my-opencode/model-core": "workspace:*",
         "@oh-my-opencode/omo-codex": "workspace:*",
+        "@oh-my-opencode/omo-computer-carriers": "workspace:*",
+        "@oh-my-opencode/omo-computer-engine": "workspace:*",
+        "@oh-my-opencode/omo-computer-hand": "workspace:*",
+        "@oh-my-opencode/omo-computer-prelude": "workspace:*",
+        "@oh-my-opencode/omo-computer-protocol": "workspace:*",
+        "@oh-my-opencode/omo-computer-sdk": "workspace:*",
+        "@oh-my-opencode/omo-computer-tool": "workspace:*",
         "@oh-my-opencode/omo-config-core": "workspace:*",
         "@oh-my-opencode/omo-opencode": "workspace:*",
         "@oh-my-opencode/omo-senpi": "workspace:*",
@@ -38,6 +45,7 @@
         "@oh-my-opencode/senpi-desktop-engine": "workspace:*",
         "@oh-my-opencode/senpi-desktop-prelude": "workspace:*",
         "@oh-my-opencode/senpi-desktop-protocol": "workspace:*",
+        "@oh-my-opencode/senpi-desktop-sdk": "workspace:*",
         "@oh-my-opencode/senpi-desktop-service": "workspace:*",
         "@oh-my-opencode/senpi-desktop-tool": "workspace:*",
         "@oh-my-opencode/senpi-task": "workspace:*",
@@ -76,18 +84,18 @@
         "typescript": "^7.0.2",
       },
       "optionalDependencies": {
-        "oh-my-opencode-darwin-arm64": "5.1.66",
-        "oh-my-opencode-darwin-x64": "5.1.66",
-        "oh-my-opencode-darwin-x64-baseline": "5.1.66",
-        "oh-my-opencode-linux-arm64": "5.1.66",
-        "oh-my-opencode-linux-arm64-musl": "5.1.66",
-        "oh-my-opencode-linux-x64": "5.1.66",
-        "oh-my-opencode-linux-x64-baseline": "5.1.66",
-        "oh-my-opencode-linux-x64-musl": "5.1.66",
-        "oh-my-opencode-linux-x64-musl-baseline": "5.1.66",
-        "oh-my-opencode-windows-arm64": "5.1.66",
-        "oh-my-opencode-windows-x64": "5.1.66",
-        "oh-my-opencode-windows-x64-baseline": "5.1.66",
+        "oh-my-opencode-darwin-arm64": "5.1.69",
+        "oh-my-opencode-darwin-x64": "5.1.69",
+        "oh-my-opencode-darwin-x64-baseline": "5.1.69",
+        "oh-my-opencode-linux-arm64": "5.1.69",
+        "oh-my-opencode-linux-arm64-musl": "5.1.69",
+        "oh-my-opencode-linux-x64": "5.1.69",
+        "oh-my-opencode-linux-x64-baseline": "5.1.69",
+        "oh-my-opencode-linux-x64-musl": "5.1.69",
+        "oh-my-opencode-linux-x64-musl-baseline": "5.1.69",
+        "oh-my-opencode-windows-arm64": "5.1.69",
+        "oh-my-opencode-windows-x64": "5.1.69",
+        "oh-my-opencode-windows-x64-baseline": "5.1.69",
       },
     },
     "packages/agents-md-core": {
@@ -213,7 +221,7 @@
     },
     "packages/omo-codex": {
       "name": "@oh-my-opencode/omo-codex",
-      "version": "5.1.66",
+      "version": "5.1.69",
       "dependencies": {
         "@oh-my-opencode/model-core": "workspace:*",
         "@oh-my-opencode/shared-skills": "workspace:*",
@@ -221,6 +229,86 @@
       },
       "devDependencies": {
         "bun-types": "1.4.4",
+      },
+    },
+    "packages/omo-computer-carriers": {
+      "name": "@oh-my-opencode/omo-computer-carriers",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/device-service-core": "workspace:*",
+        "@oh-my-opencode/omo-computer-sdk": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "26.6.2",
+        "vitest": "5.0.1",
+      },
+      "peerDependencies": {
+        "@bunshin/machine-sdk": "*",
+      },
+      "optionalPeers": [
+        "@bunshin/machine-sdk",
+      ],
+    },
+    "packages/omo-computer-engine": {
+      "name": "@oh-my-opencode/omo-computer-engine",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/omo-computer-protocol": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "26.6.2",
+        "vitest": "5.0.1",
+      },
+    },
+    "packages/omo-computer-hand": {
+      "name": "@oh-my-opencode/omo-computer-hand",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/omo-computer-engine": "workspace:*",
+        "@oh-my-opencode/omo-computer-sdk": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "26.6.2",
+        "vitest": "5.0.1",
+      },
+    },
+    "packages/omo-computer-prelude": {
+      "name": "@oh-my-opencode/omo-computer-prelude",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/node": "26.6.2",
+        "vitest": "5.0.1",
+      },
+    },
+    "packages/omo-computer-protocol": {
+      "name": "@oh-my-opencode/omo-computer-protocol",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/node": "26.6.2",
+        "vitest": "5.0.1",
+      },
+    },
+    "packages/omo-computer-sdk": {
+      "name": "@oh-my-opencode/omo-computer-sdk",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/omo-computer-protocol": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "26.6.2",
+        "vitest": "5.0.1",
+      },
+    },
+    "packages/omo-computer-tool": {
+      "name": "@oh-my-opencode/omo-computer-tool",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/omo-computer-protocol": "workspace:*",
+        "@oh-my-opencode/omo-computer-sdk": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "26.6.2",
+        "vitest": "5.0.1",
       },
     },
     "packages/omo-config-core": {
@@ -233,12 +321,12 @@
     },
     "packages/omo-native": {
       "name": "omo-ai",
-      "version": "5.1.66",
+      "version": "5.1.69",
       "bin": {
         "omo": "bin/omo.js",
       },
       "dependencies": {
-        "@code-yeongyu/senpi": "2026.11.10",
+        "@code-yeongyu/senpi": "2026.11.10-2",
       },
     },
     "packages/omo-opencode": {
@@ -246,8 +334,8 @@
       "version": "0.1.0",
       "dependencies": {
         "@clack/prompts": "^1.8.1",
-        "@code-yeongyu/senpi": "2026.11.10",
-        "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10",
+        "@code-yeongyu/senpi": "2026.11.10-2",
+        "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10-2",
         "@modelcontextprotocol/sdk": "^1.30.0",
         "@oh-my-opencode/agents-md-core": "workspace:*",
         "@oh-my-opencode/boulder-state": "workspace:*",
@@ -279,10 +367,10 @@
     },
     "packages/omo-senpi": {
       "name": "@oh-my-opencode/omo-senpi",
-      "version": "5.1.66",
+      "version": "5.1.69",
       "dependencies": {
         "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
-        "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.11.10",
+        "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.11.10-2",
         "@oh-my-opencode/ast-grep-mcp": "workspace:*",
         "@oh-my-opencode/boulder-state": "workspace:*",
         "@oh-my-opencode/comment-checker-core": "workspace:*",
@@ -306,15 +394,15 @@
         "typebox": "1.3.34",
       },
       "devDependencies": {
-        "@code-yeongyu/senpi": "2026.11.10",
-        "@code-yeongyu/senpi-agent-core": "2026.11.10",
-        "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10",
+        "@code-yeongyu/senpi": "2026.11.10-2",
+        "@code-yeongyu/senpi-agent-core": "2026.11.10-2",
+        "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10-2",
         "@types/node": "26.6.2",
         "bun-types": "1.4.4",
         "terser": "5.51.2",
       },
       "peerDependencies": {
-        "@code-yeongyu/senpi": "2026.11.10",
+        "@code-yeongyu/senpi": "2026.11.10-2",
       },
       "optionalPeers": [
         "@code-yeongyu/senpi",
@@ -372,12 +460,25 @@
         "vitest": "5.0.1",
       },
     },
+    "packages/senpi-desktop-sdk": {
+      "name": "@oh-my-opencode/senpi-desktop-sdk",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/senpi-desktop-protocol": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "26.6.2",
+        "vitest": "5.0.1",
+      },
+    },
     "packages/senpi-desktop-service": {
       "name": "@oh-my-opencode/senpi-desktop-service",
       "version": "0.1.0",
       "dependencies": {
         "@oh-my-opencode/senpi-desktop-engine": "workspace:*",
         "@oh-my-opencode/senpi-desktop-protocol": "workspace:*",
+        "@oh-my-opencode/senpi-desktop-sdk": "workspace:*",
+        "quickjs-wasi": "3.6.2",
       },
       "devDependencies": {
         "@types/node": "26.6.2",
@@ -390,6 +491,7 @@
       "dependencies": {
         "@oh-my-opencode/senpi-desktop-prelude": "workspace:*",
         "@oh-my-opencode/senpi-desktop-protocol": "workspace:*",
+        "@oh-my-opencode/senpi-desktop-sdk": "workspace:*",
         "@oh-my-opencode/senpi-desktop-service": "workspace:*",
         "typebox": "1.3.34",
       },
@@ -412,13 +514,13 @@
         "typebox": "1.3.34",
       },
       "devDependencies": {
-        "@code-yeongyu/senpi": "2026.11.10",
-        "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.11.10",
+        "@code-yeongyu/senpi": "2026.11.10-2",
+        "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.11.10-2",
         "typebox": "1.3.34",
       },
       "peerDependencies": {
-        "@code-yeongyu/senpi": "2026.11.10",
-        "@earendil-works/pi-tui": "2026.11.10",
+        "@code-yeongyu/senpi": "2026.11.10-2",
+        "@earendil-works/pi-tui": "2026.11.10-2",
         "typebox": "*",
       },
       "optionalPeers": [
@@ -661,23 +763,23 @@
 
     "@clack/prompts": ["@clack/prompts@1.8.1", "", { "dependencies": { "@clack/core": "1.5.1", "fast-string-width": "^3.0.2", "fast-wrap-ansi": "^0.2.0", "sisteransi": "^1.0.5" } }, "sha512-dlT1m5e/0yUL0kRNcQn7yGLVThkgbB0Ga/1AmfDDC/8ik6AIiSf2QLQO2zPYvefsHP0aFgxO93cVLCCfDp7kzQ=="],
 
-    "@code-yeongyu/senpi": ["@code-yeongyu/senpi@2026.11.10", "", { "dependencies": { "@anthropic-ai/claude-agent-sdk": "0.3.321", "@anthropic-ai/sdk": "0.127.0", "@code-yeongyu/senpi-codemode": "2026.11.10", "@earendil-works/chord": "0.99.1", "@earendil-works/pi-agent-core": "npm:@code-yeongyu/senpi-agent-core@2026.11.10", "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10", "@earendil-works/pi-pty": "npm:@code-yeongyu/senpi-pty@2026.11.10", "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.11.10", "@modelcontextprotocol/sdk": "1.32.1", "@mozilla/readability": "0.6.0", "@silvia-odwyer/photon-node": "0.3.4", "ajv": "8.20.0", "chalk": "6.0.0", "cross-spawn": "7.0.6", "diff": "9.0.0", "es-module-lexer": "3.0.2", "grok-mermaid": "0.2.3", "highlight.js": "11.12.0", "hosted-git-info": "10.1.1", "ignore": "7.0.9", "jiti": "2.7.0", "linkedom": "0.18.13", "marked": "18.0.13", "minimatch": "10.2.6", "picomatch": "4.0.7", "proper-lockfile": "4.1.2", "re2js": "2.8.6", "semver": "7.8.5", "signal-exit": "3.0.7", "turndown": "7.2.4", "typebox": "1.3.34", "undici": "8.10.2", "yaml": "2.9.1", "zod": "4.6.5" }, "bin": { "pi": "dist/bundle/cli.js", "senpi": "dist/bundle/cli.js" } }, "sha512-skVATiiIWEnDrxQ9yWs9Sb0IJ36rs8xzaHoKfqVOWqefw1ex3JeNAhPBUjWttrA/gdiGoXH/AcwWTSoKMiqrkg=="],
+    "@code-yeongyu/senpi": ["@code-yeongyu/senpi@2026.11.10-2", "", { "dependencies": { "@anthropic-ai/claude-agent-sdk": "0.3.321", "@anthropic-ai/sdk": "0.127.0", "@code-yeongyu/senpi-codemode": "2026.11.10-2", "@earendil-works/chord": "0.99.1", "@earendil-works/pi-agent-core": "npm:@code-yeongyu/senpi-agent-core@2026.11.10-2", "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10-2", "@earendil-works/pi-pty": "npm:@code-yeongyu/senpi-pty@2026.11.10-2", "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.11.10-2", "@modelcontextprotocol/sdk": "1.32.1", "@mozilla/readability": "0.6.0", "@silvia-odwyer/photon-node": "0.3.4", "ajv": "8.20.0", "chalk": "6.0.0", "cross-spawn": "7.0.6", "diff": "9.0.0", "es-module-lexer": "3.0.2", "grok-mermaid": "0.2.3", "highlight.js": "11.12.0", "hosted-git-info": "10.1.1", "ignore": "7.0.9", "jiti": "2.7.0", "linkedom": "0.18.13", "marked": "18.0.13", "minimatch": "10.2.6", "picomatch": "4.0.7", "proper-lockfile": "4.1.2", "re2js": "2.8.6", "semver": "7.8.5", "signal-exit": "3.0.7", "turndown": "7.2.4", "typebox": "1.3.34", "undici": "8.10.2", "yaml": "2.9.1", "zod": "4.6.5" }, "bin": { "pi": "dist/bundle/cli.js", "senpi": "dist/bundle/cli.js" } }, "sha512-7OgYVI3gy0vlkgpIkUMHGp1yVa0MX76tAPEf6DxDGCJFMPkoLEvNrgNPZdrvEFelPragBgufgsNyNi0pUvAe4Q=="],
 
-    "@code-yeongyu/senpi-agent-core": ["@code-yeongyu/senpi-agent-core@2026.11.10", "", { "dependencies": { "@earendil-works/chord": "0.99.1", "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10", "@earendil-works/pi-telemetry": "npm:@code-yeongyu/senpi-telemetry@2026.11.10", "diff": "9.0.0", "ignore": "7.0.9", "typebox": "1.3.34", "web-tree-sitter": "0.27.0", "yaml": "2.9.1" } }, "sha512-OUHMiNgl1orQesEl42tkID7ZCRXTZBlkFnzeAqrFiFSDUt52k5WqGGRa+iSn+f2MMyJPKjNDBh0zHksBSPOuoA=="],
+    "@code-yeongyu/senpi-agent-core": ["@code-yeongyu/senpi-agent-core@2026.11.10-2", "", { "dependencies": { "@earendil-works/chord": "0.99.1", "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10-2", "@earendil-works/pi-telemetry": "npm:@code-yeongyu/senpi-telemetry@2026.11.10-2", "diff": "9.0.0", "ignore": "7.0.9", "typebox": "1.3.34", "web-tree-sitter": "0.27.0", "yaml": "2.9.1" } }, "sha512-koC3Fz2RNBfeQBsQRUbO3BPhPPJX6tG7+zDnFkHFI412KX/ECohE2VV/rDWU1Cjq0YbNe74DxSH88rbhxRiN1A=="],
 
-    "@code-yeongyu/senpi-codemode": ["@code-yeongyu/senpi-codemode@2026.11.10", "", { "dependencies": { "@babel/parser": "8.0.4", "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10", "quickjs-wasi": "3.6.2", "typebox": "1.3.34" }, "peerDependencies": { "@code-yeongyu/senpi": "2026.11.10" } }, "sha512-C8Fdqiy6sIk/TBeVnthD+jGQoAJA1q5wQsVFnVN2BF9tw87Om6HVCZcV0AJZEHChaudfrboDsp4mlAHQUwezyw=="],
+    "@code-yeongyu/senpi-codemode": ["@code-yeongyu/senpi-codemode@2026.11.10-2", "", { "dependencies": { "@babel/parser": "8.0.4", "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10-2", "quickjs-wasi": "3.6.2", "typebox": "1.3.34" }, "peerDependencies": { "@code-yeongyu/senpi": "2026.11.10-2" } }, "sha512-j+HP9n1Qb21uFess9EhQq0syKoSanf1kmeUeXA477gG2JYhq6WDCYY2myUjogDQTeVtFb67QqawtYQbdaHY+Nw=="],
 
     "@earendil-works/chord": ["@earendil-works/chord@0.99.1", "", { "dependencies": { "esbuild": "0.28.2" } }, "sha512-4xyn0IBzJ+Xu/iOGi2hjXJGAR61QEhEWZsIqTDqr+GmItdquYwBO5jYFnqGiBaTqlY12/EpM7QHoEKSHbyvOug=="],
 
-    "@earendil-works/pi-agent-core": ["@code-yeongyu/senpi-agent-core@2026.11.10", "", { "dependencies": { "@earendil-works/chord": "0.99.1", "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10", "@earendil-works/pi-telemetry": "npm:@code-yeongyu/senpi-telemetry@2026.11.10", "diff": "9.0.0", "ignore": "7.0.9", "typebox": "1.3.34", "web-tree-sitter": "0.27.0", "yaml": "2.9.1" } }, "sha512-OUHMiNgl1orQesEl42tkID7ZCRXTZBlkFnzeAqrFiFSDUt52k5WqGGRa+iSn+f2MMyJPKjNDBh0zHksBSPOuoA=="],
+    "@earendil-works/pi-agent-core": ["@code-yeongyu/senpi-agent-core@2026.11.10-2", "", { "dependencies": { "@earendil-works/chord": "0.99.1", "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10-2", "@earendil-works/pi-telemetry": "npm:@code-yeongyu/senpi-telemetry@2026.11.10-2", "diff": "9.0.0", "ignore": "7.0.9", "typebox": "1.3.34", "web-tree-sitter": "0.27.0", "yaml": "2.9.1" } }, "sha512-koC3Fz2RNBfeQBsQRUbO3BPhPPJX6tG7+zDnFkHFI412KX/ECohE2VV/rDWU1Cjq0YbNe74DxSH88rbhxRiN1A=="],
 
-    "@earendil-works/pi-ai": ["@code-yeongyu/senpi-ai@2026.11.10", "", { "dependencies": { "@anthropic-ai/sdk": "0.127.0", "@aws-sdk/client-bedrock-runtime": "3.1136.0", "@bufbuild/protobuf": "2.15.0", "@earendil-works/pi-telemetry": "npm:@code-yeongyu/senpi-telemetry@2026.11.10", "@google/genai": "2.23.0", "@smithy/node-http-handler": "4.12.1", "@smithy/types": "4.18.0", "google-auth-library": "10.6.2", "http-proxy-agent": "9.1.0", "https-proxy-agent": "9.1.0", "openai": "6.26.0", "partial-json": "0.1.7", "typebox": "1.3.34", "yaml": "2.9.1" }, "bin": { "pi-ai": "dist/cli.js" } }, "sha512-5n7Pw87GvQDjk0+xEPbJXnLV7vYf4VrWVvBa3WIY/IYyKhZyceMJM6NUzZ8HDXYQQ/i9og3VCRJ9x52LeCK14Q=="],
+    "@earendil-works/pi-ai": ["@code-yeongyu/senpi-ai@2026.11.10-2", "", { "dependencies": { "@anthropic-ai/sdk": "0.127.0", "@aws-sdk/client-bedrock-runtime": "3.1136.0", "@bufbuild/protobuf": "2.15.0", "@earendil-works/pi-telemetry": "npm:@code-yeongyu/senpi-telemetry@2026.11.10-2", "@google/genai": "2.23.0", "@smithy/node-http-handler": "4.12.1", "@smithy/types": "4.18.0", "google-auth-library": "10.6.2", "http-proxy-agent": "9.1.0", "https-proxy-agent": "9.1.0", "openai": "6.26.0", "partial-json": "0.1.7", "typebox": "1.3.34", "yaml": "2.9.1" }, "bin": { "pi-ai": "dist/cli.js" } }, "sha512-rRrIkHxDaV8ut+FLetEXEMMM+Yn5iYwY/yKHpDiiaLzO8L0wdSc2dPU5bZg8Hk0lDoHHFOgNrB9NuMvo/l/ApA=="],
 
-    "@earendil-works/pi-pty": ["@code-yeongyu/senpi-pty@2026.11.10", "", { "dependencies": { "@xterm/headless": "6.0.0" } }, "sha512-sIgwbS50NAwxT4vLeO9VJrXGSuELI9FIRbScpkDwDBN0r/OemBakJ3lMb65+ZducK66uoW7GbWakh0EItkLZVQ=="],
+    "@earendil-works/pi-pty": ["@code-yeongyu/senpi-pty@2026.11.10-2", "", { "dependencies": { "@xterm/headless": "6.0.0" } }, "sha512-Ok3BEsRDkk/oFdpO+LiQyRbt4GFpS6HKZG/gAXt2z8KoC+qawlUVgribrtyRURYB2yh4352tphbOcxoWqPbqIA=="],
 
-    "@earendil-works/pi-telemetry": ["@code-yeongyu/senpi-telemetry@2026.11.10", "", {}, "sha512-RAfhFvBK1Viope2TtID2K0tvZNXBpIc65TcoQTAs6bv1Cfr2gQO4ggVaFJx/9cBnt2i2lO3Q4gaBR7EE/QAYFg=="],
+    "@earendil-works/pi-telemetry": ["@code-yeongyu/senpi-telemetry@2026.11.10-2", "", {}, "sha512-EZjbxk9mxbxVBNVOHm2z1QmcVso3U6l2fRmc/AOFPvXTi+X5m/E9akQ+gQdg/l0CYVKyEYOACVkuPO3zaQdX2Q=="],
 
-    "@earendil-works/pi-tui": ["@code-yeongyu/senpi-tui@2026.11.10", "", { "dependencies": { "get-east-asian-width": "1.7.0", "marked": "18.0.13" } }, "sha512-TNrB9QooruxFe/sazoJ2hu0aPI+1PDyDL0p9k9g07eBfvxlsp7V3JeIXtQDWxPq6ZMJBJY0tpxuC5Wn8PpyueQ=="],
+    "@earendil-works/pi-tui": ["@code-yeongyu/senpi-tui@2026.11.10-2", "", { "dependencies": { "get-east-asian-width": "1.7.0", "marked": "18.0.13" } }, "sha512-w4sJmbwOBah9naHN6ZXv+EYFSVExqE+zfVc43QNQ6vIT9AtyF3UpSS2hViahXz+cHIym1LDJ8zOSAW6Aa+2VSw=="],
 
     "@emnapi/core": ["@emnapi/core@1.11.2", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.2", "tslib": "^2.4.0" } }, "sha512-TC8MkTuZUtcTSiFeuC0ksCh9QIJ5+F21MvZ4Wn4ORfYaFJ/0dsiudv5tVkejgwZlwQ39jL9WWDe2lz8x0WglOA=="],
 
@@ -839,6 +941,20 @@
 
     "@oh-my-opencode/omo-codex": ["@oh-my-opencode/omo-codex@workspace:packages/omo-codex"],
 
+    "@oh-my-opencode/omo-computer-carriers": ["@oh-my-opencode/omo-computer-carriers@workspace:packages/omo-computer-carriers"],
+
+    "@oh-my-opencode/omo-computer-engine": ["@oh-my-opencode/omo-computer-engine@workspace:packages/omo-computer-engine"],
+
+    "@oh-my-opencode/omo-computer-hand": ["@oh-my-opencode/omo-computer-hand@workspace:packages/omo-computer-hand"],
+
+    "@oh-my-opencode/omo-computer-prelude": ["@oh-my-opencode/omo-computer-prelude@workspace:packages/omo-computer-prelude"],
+
+    "@oh-my-opencode/omo-computer-protocol": ["@oh-my-opencode/omo-computer-protocol@workspace:packages/omo-computer-protocol"],
+
+    "@oh-my-opencode/omo-computer-sdk": ["@oh-my-opencode/omo-computer-sdk@workspace:packages/omo-computer-sdk"],
+
+    "@oh-my-opencode/omo-computer-tool": ["@oh-my-opencode/omo-computer-tool@workspace:packages/omo-computer-tool"],
+
     "@oh-my-opencode/omo-config-core": ["@oh-my-opencode/omo-config-core@workspace:packages/omo-config-core"],
 
     "@oh-my-opencode/omo-opencode": ["@oh-my-opencode/omo-opencode@workspace:packages/omo-opencode"],
@@ -856,6 +972,8 @@
     "@oh-my-opencode/senpi-desktop-prelude": ["@oh-my-opencode/senpi-desktop-prelude@workspace:packages/senpi-desktop-prelude"],
 
     "@oh-my-opencode/senpi-desktop-protocol": ["@oh-my-opencode/senpi-desktop-protocol@workspace:packages/senpi-desktop-protocol"],
+
+    "@oh-my-opencode/senpi-desktop-sdk": ["@oh-my-opencode/senpi-desktop-sdk@workspace:packages/senpi-desktop-sdk"],
 
     "@oh-my-opencode/senpi-desktop-service": ["@oh-my-opencode/senpi-desktop-service@workspace:packages/senpi-desktop-service"],
 

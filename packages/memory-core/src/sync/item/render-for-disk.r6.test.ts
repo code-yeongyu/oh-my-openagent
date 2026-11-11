@@ -127,7 +127,9 @@ describe("renderForDisk with YAML anchors and aliases (delta review 0bde9bc01e H
 
   test("an untouched anchor and alias survive a patch of another key", async () => {
     const a = await syncedEdit(ANCHORED, (r) => r.replace("n: 2", "n: 3"))
-    expect(renderForDisk(a, ANCHORED)).toBe("---\nbase: &x hello\n# about other\nother: *x # alias note\nn: 3\n---\nbody\n")
+    expect(renderForDisk(a, ANCHORED)).toBe(
+      "---\nbase: &x hello\n# about other\nother: *x # alias note\nn: 3\n---\nbody\n",
+    )
     a.free()
   })
 
@@ -166,7 +168,9 @@ describe("renderForDisk keeps untouched source exactly (delta review 0bde9bc01e 
 
   test("a new key is added after the last key, before a trailing comment", async () => {
     const a = await syncedEdit(DISK, (r) => r.replace("n: 2", "n: 2\nadded: yes-new"))
-    expect(renderForDisk(a, DISK)).toBe(DISK.replace("flow: {a: 1,   b: 2}\n", "flow: {a: 1,   b: 2}\nadded: yes-new\n"))
+    expect(renderForDisk(a, DISK)).toBe(
+      DISK.replace("flow: {a: 1,   b: 2}\n", "flow: {a: 1,   b: 2}\nadded: yes-new\n"),
+    )
     a.free()
   })
 })
@@ -180,7 +184,6 @@ describe("renderForDisk keeps the file's own line-ending style on every written 
     "delete the last key": (r) => r.replace("z: 1\n", ""),
     "anchor rewrite": (r) => r.replace("base: v", "base: w"),
   }
-
 
   test("the fences are written in the file's style on the splice path and on the canonical path (a key added to a file without frontmatter)", async () => {
     const spliced = LF.replaceAll("\n", "\r\n")
@@ -201,7 +204,10 @@ describe("renderForDisk keeps the file's own line-ending style on every written 
     }
   })
 
-  for (const [style, disk] of [["lf", LF], ["crlf", LF.replaceAll("\n", "\r\n")]] as const) {
+  for (const [style, disk] of [
+    ["lf", LF],
+    ["crlf", LF.replaceAll("\n", "\r\n")],
+  ] as const) {
     for (const [name, edit] of Object.entries(EDITS)) {
       test(`${style} file, ${name}: one line-ending style equal to the input's, re-capture is a no-op`, async () => {
         const a = await syncedEdit(disk, edit)
@@ -227,7 +233,10 @@ describe("renderForDisk keeps a leading UTF-8 BOM (t05 r7 probe, lead)", () => {
     expect(splitItem("\ufeff---\nn: 2\n---\nbody\n").fm).not.toBeNull()
   })
 
-  for (const [style, eol] of [["lf", "\n"], ["crlf", "\r\n"]] as const) {
+  for (const [style, eol] of [
+    ["lf", "\n"],
+    ["crlf", "\r\n"],
+  ] as const) {
     const disk = `\ufeff${BASE.replaceAll("\n", eol)}`
     for (const [name, edit] of Object.entries(EDITS)) {
       test(`bom + ${style} file, ${name}: the BOM and the file's line endings are kept, re-capture is a no-op`, async () => {
@@ -252,8 +261,16 @@ describe("renderForDisk writes exactly one BOM for files without valid frontmatt
 
   const CASES: [string, string, (rendered: string) => string][] = [
     ["a BOM file with no frontmatter", "\ufeffbody\r\n", (r) => `${r}x\r\n`],
-    ["a BOM file with unparseable frontmatter", "\ufeff---\r\nn: [\r\n---\r\nbody\r\n", (r) => r.replace("body", "body2")],
-    ["a key added to a BOM file with no frontmatter", "\ufeffbody\r\n", (r) => `---\r\nadded: y\r\n---\r\n${r.replace(/^\ufeff/, "")}`],
+    [
+      "a BOM file with unparseable frontmatter",
+      "\ufeff---\r\nn: [\r\n---\r\nbody\r\n",
+      (r) => r.replace("body", "body2"),
+    ],
+    [
+      "a key added to a BOM file with no frontmatter",
+      "\ufeffbody\r\n",
+      (r) => `---\r\nadded: y\r\n---\r\n${r.replace(/^\ufeff/, "")}`,
+    ],
   ]
 
   for (const [name, disk, edit] of CASES) {

@@ -34,7 +34,9 @@ fn typed(harness: &Harness) -> Vec<(String, AxInputMethod)> {
 }
 
 fn value_of(harness: &mut Harness, reference: &str) -> Option<String> {
-    match harness.process(Op::AxNode(AxRefParams { ref_: reference.to_owned() })) {
+    match harness.process(Op::AxNode(AxRefParams {
+        ref_: reference.to_owned(),
+    })) {
         Ok(Response::Node(node)) => node.value,
         other => panic!("ax.node failed: {other:?}"),
     }
@@ -50,7 +52,13 @@ fn element_ref(harness: &mut Harness, role: &str) -> String {
         target: "101".to_owned(),
         query,
     })) {
-        Ok(Response::Nodes(nodes)) => nodes.into_iter().next().unwrap_or_else(|| panic!("a {role}")).ref_,
+        Ok(Response::Nodes(nodes)) => {
+            nodes
+                .into_iter()
+                .next()
+                .unwrap_or_else(|| panic!("a {role}"))
+                .ref_
+        }
         other => panic!("ax.query failed: {other:?}"),
     }
 }
@@ -71,7 +79,10 @@ fn text_is_inserted_into_a_native_text_field_and_audited_as_delivered() {
             method: AxInputMethod::Inserted
         })
     );
-    assert_eq!(typed(&harness), [("hello".to_owned(), AxInputMethod::Inserted)]);
+    assert_eq!(
+        typed(&harness),
+        [("hello".to_owned(), AxInputMethod::Inserted)]
+    );
     assert_eq!(value_of(&mut harness, &reference).as_deref(), Some("hello"));
     let audits = harness.audits();
     assert_eq!(audits.len(), 1);
@@ -81,7 +92,13 @@ fn text_is_inserted_into_a_native_text_field_and_audited_as_delivered() {
     assert_eq!(audits[0].code, None);
     assert_eq!(audits[0].text_length, Some(5));
     assert_eq!(audits[0].text_delivered, Some(5));
-    assert_eq!(op_names(&harness).iter().filter(|&&name| name == "restore-key-focus").count(), 1);
+    assert_eq!(
+        op_names(&harness)
+            .iter()
+            .filter(|&&name| name == "restore-key-focus")
+            .count(),
+        1
+    );
 }
 
 #[test]
@@ -117,7 +134,10 @@ fn foreground_element_typing_needs_the_grant() {
     // When: foreground without a grant.
     let refused = harness.process(type_into(&reference, "hello", delivery("foreground")));
     // Then: refused before anything was typed, and audited.
-    assert_eq!(refused.map_err(|error| error.code), Err(ErrorCode::ControlRequired));
+    assert_eq!(
+        refused.map_err(|error| error.code),
+        Err(ErrorCode::ControlRequired)
+    );
     assert!(typed(&harness).is_empty());
     assert_eq!(harness.audits()[0].code, Some(ErrorCode::ControlRequired));
     // When: the grant is live.
@@ -128,7 +148,13 @@ fn foreground_element_typing_needs_the_grant() {
     let last = harness.audits().pop().expect("an audit");
     assert_eq!(last.action, Method::AxTypeText);
     assert_eq!(last.delivery, "foreground");
-    assert_eq!(op_names(&harness).iter().filter(|&&name| name == "restore-front").count(), 1);
+    assert_eq!(
+        op_names(&harness)
+            .iter()
+            .filter(|&&name| name == "restore-front")
+            .count(),
+        1
+    );
     let modes: Vec<DeliveryMode> = harness
         .sink
         .ops()
@@ -148,7 +174,9 @@ fn an_element_that_never_takes_focus_gets_no_keys_and_the_refusal_names_the_focu
     let reference = element_ref(&mut harness, "button");
     harness.faults.refuse_focus_next(FakeMethod::AxTypeText);
     // When: background, then foreground under the grant.
-    let refused = harness.process(type_into(&reference, "ok", None)).expect_err("refused");
+    let refused = harness
+        .process(type_into(&reference, "ok", None))
+        .expect_err("refused");
     harness.grant("retry in front");
     harness.faults.refuse_focus_next(FakeMethod::AxTypeText);
     let front = harness
@@ -160,13 +188,24 @@ fn an_element_that_never_takes_focus_gets_no_keys_and_the_refusal_names_the_focu
     assert_eq!(refused.code, ErrorCode::BackgroundUnavailable);
     assert_eq!(front.code, ErrorCode::InputFailed);
     for error in [&refused, &front] {
-        assert!(error.message.contains("no keys were sent"), "{}", error.message);
+        assert!(
+            error.message.contains("no keys were sent"),
+            "{}",
+            error.message
+        );
         assert!(error.message.contains("window 101"), "{}", error.message);
-        assert!(error.message.contains("textarea") && error.message.contains("[ref=e"), "{}", error.message);
+        assert!(
+            error.message.contains("textarea") && error.message.contains("[ref=e"),
+            "{}",
+            error.message
+        );
     }
     let audits = harness.audits();
     assert_eq!(audits[0].code, Some(ErrorCode::BackgroundUnavailable));
-    assert_eq!(audits.last().expect("an audit").code, Some(ErrorCode::InputFailed));
+    assert_eq!(
+        audits.last().expect("an audit").code,
+        Some(ErrorCode::InputFailed)
+    );
 }
 
 #[test]
@@ -178,7 +217,10 @@ fn an_unanswered_insertion_is_unconfirmed_after_it_landed() {
     // When
     let reply = harness.process(type_into(&reference, "draft", None));
     // Then: the write landed, the call says the outcome is unknown.
-    assert_eq!(reply.map_err(|error| error.code), Err(ErrorCode::AxUnconfirmed));
+    assert_eq!(
+        reply.map_err(|error| error.code),
+        Err(ErrorCode::AxUnconfirmed)
+    );
     assert_eq!(value_of(&mut harness, &reference).as_deref(), Some("draft"));
     assert_eq!(harness.audits()[0].code, Some(ErrorCode::AxUnconfirmed));
 }

@@ -8,7 +8,9 @@ use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::ErrorCode;
 use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::methods::Method;
-use senpi_desktop_core::protocol_params::{AxKeyChordParams, AxQueryParams, AxRefParams, AxTypeTextParams};
+use senpi_desktop_core::protocol_params::{
+    AxKeyChordParams, AxQueryParams, AxRefParams, AxTypeTextParams,
+};
 use senpi_desktop_core::types::{AxQuery, PointerOptions};
 use serde_json::json;
 
@@ -36,7 +38,9 @@ fn chords(harness: &Harness) -> Vec<(Vec<KeyName>, DeliveryMode)> {
 }
 
 fn value_of(harness: &mut Harness, reference: &str) -> Option<String> {
-    match harness.process(Op::AxNode(AxRefParams { ref_: reference.to_owned() })) {
+    match harness.process(Op::AxNode(AxRefParams {
+        ref_: reference.to_owned(),
+    })) {
         Ok(Response::Node(node)) => node.value,
         other => panic!("ax.node failed: {other:?}"),
     }
@@ -52,7 +56,13 @@ fn element_ref(harness: &mut Harness, role: &str) -> String {
         target: "101".to_owned(),
         query,
     })) {
-        Ok(Response::Nodes(nodes)) => nodes.into_iter().next().unwrap_or_else(|| panic!("a {role}")).ref_,
+        Ok(Response::Nodes(nodes)) => {
+            nodes
+                .into_iter()
+                .next()
+                .unwrap_or_else(|| panic!("a {role}"))
+                .ref_
+        }
         other => panic!("ax.query failed: {other:?}"),
     }
 }
@@ -67,10 +77,22 @@ fn a_chord_goes_to_the_element_once_it_is_focused_and_is_audited_by_its_keys() {
     // Then: the fake focused the element, pressed the chord there, one
     // truthful audit naming the keys, and the key-focus guard handed focus back.
     assert_eq!(reply.expect("pressed"), Response::Unit);
-    assert_eq!(chords(&harness), [(vec![KeyName::Meta, KeyName::Char('a')], DeliveryMode::Background)]);
+    assert_eq!(
+        chords(&harness),
+        [(
+            vec![KeyName::Meta, KeyName::Char('a')],
+            DeliveryMode::Background
+        )]
+    );
     let ops = harness.sink.ops();
-    let focus = ops.iter().position(|op| matches!(op, SinkOp::AxFocus { .. })).expect("focused");
-    let chord = ops.iter().position(|op| matches!(op, SinkOp::AxKeyChord { .. })).expect("chord");
+    let focus = ops
+        .iter()
+        .position(|op| matches!(op, SinkOp::AxFocus { .. }))
+        .expect("focused");
+    let chord = ops
+        .iter()
+        .position(|op| matches!(op, SinkOp::AxKeyChord { .. }))
+        .expect("chord");
     assert!(focus < chord, "{ops:?}");
     let audits = harness.audits();
     assert_eq!(audits.len(), 1);
@@ -78,9 +100,18 @@ fn a_chord_goes_to_the_element_once_it_is_focused_and_is_audited_by_its_keys() {
     assert_eq!(audits[0].target, "101");
     assert_eq!(audits[0].delivery, "background");
     assert_eq!(audits[0].code, None);
-    assert_eq!(audits[0].keys.as_deref(), Some(&["cmd".to_owned(), "a".to_owned()][..]));
+    assert_eq!(
+        audits[0].keys.as_deref(),
+        Some(&["cmd".to_owned(), "a".to_owned()][..])
+    );
     assert_eq!(audits[0].text_length, None);
-    assert_eq!(op_names(&harness).iter().filter(|&&name| name == "restore-key-focus").count(), 1);
+    assert_eq!(
+        op_names(&harness)
+            .iter()
+            .filter(|&&name| name == "restore-key-focus")
+            .count(),
+        1
+    );
 }
 
 #[test]
@@ -96,7 +127,9 @@ fn select_all_then_type_replaces_the_value() {
         }))
         .expect("typed");
     // When
-    harness.process(press(&reference, &["cmd", "a"], None)).expect("selected all");
+    harness
+        .process(press(&reference, &["cmd", "a"], None))
+        .expect("selected all");
     harness
         .process(Op::AxTypeText(AxTypeTextParams {
             ref_: reference.clone(),
@@ -116,7 +149,10 @@ fn foreground_element_chords_need_the_grant() {
     // When: foreground without a grant.
     let refused = harness.process(press(&reference, &["enter"], delivery("foreground")));
     // Then: refused before anything was pressed, and audited.
-    assert_eq!(refused.map_err(|error| error.code), Err(ErrorCode::ControlRequired));
+    assert_eq!(
+        refused.map_err(|error| error.code),
+        Err(ErrorCode::ControlRequired)
+    );
     assert!(chords(&harness).is_empty());
     assert_eq!(harness.audits()[0].code, Some(ErrorCode::ControlRequired));
     // When: the grant is live.
@@ -124,11 +160,20 @@ fn foreground_element_chords_need_the_grant() {
     let reply = harness.process(press(&reference, &["enter"], delivery("foreground")));
     // Then: pressed in the foreground, and the front window was restored.
     assert_eq!(reply.expect("pressed"), Response::Unit);
-    assert_eq!(chords(&harness), [(vec![KeyName::Enter], DeliveryMode::Foreground)]);
+    assert_eq!(
+        chords(&harness),
+        [(vec![KeyName::Enter], DeliveryMode::Foreground)]
+    );
     let last = harness.audits().pop().expect("an audit");
     assert_eq!(last.action, Method::AxKeyChord);
     assert_eq!(last.delivery, "foreground");
-    assert_eq!(op_names(&harness).iter().filter(|&&name| name == "restore-front").count(), 1);
+    assert_eq!(
+        op_names(&harness)
+            .iter()
+            .filter(|&&name| name == "restore-front")
+            .count(),
+        1
+    );
 }
 
 #[test]
@@ -138,7 +183,9 @@ fn an_element_that_never_takes_focus_gets_no_chord_and_the_refusal_names_the_foc
     let reference = element_ref(&mut harness, "button");
     harness.faults.refuse_focus_next(FakeMethod::AxKeyChord);
     // When: background, then foreground under the grant.
-    let refused = harness.process(press(&reference, &["enter"], None)).expect_err("refused");
+    let refused = harness
+        .process(press(&reference, &["enter"], None))
+        .expect_err("refused");
     harness.grant("retry in front");
     harness.faults.refuse_focus_next(FakeMethod::AxKeyChord);
     let front = harness
@@ -150,13 +197,24 @@ fn an_element_that_never_takes_focus_gets_no_chord_and_the_refusal_names_the_foc
     assert_eq!(refused.code, ErrorCode::BackgroundUnavailable);
     assert_eq!(front.code, ErrorCode::InputFailed);
     for error in [&refused, &front] {
-        assert!(error.message.contains("no keys were sent"), "{}", error.message);
+        assert!(
+            error.message.contains("no keys were sent"),
+            "{}",
+            error.message
+        );
         assert!(error.message.contains("window 101"), "{}", error.message);
-        assert!(error.message.contains("textarea") && error.message.contains("[ref=e"), "{}", error.message);
+        assert!(
+            error.message.contains("textarea") && error.message.contains("[ref=e"),
+            "{}",
+            error.message
+        );
     }
     let audits = harness.audits();
     assert_eq!(audits[0].code, Some(ErrorCode::BackgroundUnavailable));
-    assert_eq!(audits.last().expect("an audit").code, Some(ErrorCode::InputFailed));
+    assert_eq!(
+        audits.last().expect("an audit").code,
+        Some(ErrorCode::InputFailed)
+    );
 }
 
 #[test]
@@ -167,9 +225,16 @@ fn an_invalid_chord_is_refused_before_anything_is_sent() {
     // When: "cmd+" parses to an empty key name.
     let reply = harness.process(press(&reference, &["cmd", ""], None));
     // Then
-    assert_eq!(reply.map_err(|error| error.code), Err(ErrorCode::InvalidKey));
+    assert_eq!(
+        reply.map_err(|error| error.code),
+        Err(ErrorCode::InvalidKey)
+    );
     assert!(chords(&harness).is_empty());
-    assert!(!harness.sink.ops().iter().any(|op| matches!(op, SinkOp::AxFocus { .. })));
+    assert!(!harness
+        .sink
+        .ops()
+        .iter()
+        .any(|op| matches!(op, SinkOp::AxFocus { .. })));
     assert_eq!(harness.audits()[0].code, Some(ErrorCode::InvalidKey));
 }
 
@@ -214,10 +279,12 @@ fn the_fakes_set_value_moves_the_caret_to_the_end_of_the_new_value() {
         }))
         .expect("typed");
     harness
-        .process(Op::AxSetValue(senpi_desktop_core::protocol_params::AxSetValueParams {
-            ref_: reference.clone(),
-            value: "1".to_owned(),
-        }))
+        .process(Op::AxSetValue(
+            senpi_desktop_core::protocol_params::AxSetValueParams {
+                ref_: reference.clone(),
+                value: "1".to_owned(),
+            },
+        ))
         .expect("set");
     // When: typing again lands after the new value, not at the old caret.
     harness

@@ -1,0 +1,455 @@
+{
+  "description": "computer-use v2 P11 (row 29), reportMode object: engine.hello lists dangerous-chord-force; ax.perform on a button that reads hidden and disabled until 500 ms after its first read is delivered once the actionability battery's auto-wait sees it visible, still and enabled, and the report lists the sheet the press opened (kind sheet, its title, window id and ref); ax.perform on a visible, still, disabled button is refused at once with AxUnsupported reason disabled, not_delivered/safe; keyChord cmd+q without force is refused InvalidKey reason dangerous_chord, not_delivered/safe, and with force: true is delivered.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/v2-actionability.json",
+  "env": {
+    "SENPI_DESKTOP_FAKE_CLOCK": "1"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "engine.hello",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "protocolVersion": "1",
+              "engineVersion": "0.0.0",
+              "buildSha": "unknown",
+              "abi": "senpi-desktop/1",
+              "features": [
+                "action-report",
+                "frame-identity",
+                "frame-consume",
+                "ax-partial",
+                "trace",
+                "key-priming",
+                "epoch",
+                "interaction-lock",
+                "intervention-policy",
+                "dangerous-chord-force"
+              ]
+            }
+          },
+          "variable": [
+            "/result/engineVersion",
+            "/result/buildSha"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session.open",
+        "params": {
+          "allowHostRelayOnlyStop": true,
+          "showCursor": false,
+          "reportMode": "object",
+          "trace": true
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 1,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": "no-global-listener",
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "stopPath.start",
+        "params": {
+          "chord": "ctrl+alt+shift+escape"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/heartbeatFresh",
+            "/result/reason"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "stopPath.changed",
+            "params": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/params/heartbeatFresh",
+            "/params/reason"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "stopPath.heartbeat",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": null
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": {
+              "text": "- window \"Untitled - Notes\" [ref=e1] app=Notes (focused)\n  - button \"Save\" [ref=e2] (disabled)\n  - button \"Delete\" [ref=e3] (disabled)",
+              "nodeCount": 3,
+              "truncated": false,
+              "generation": 1,
+              "complete": true,
+              "nodesObserved": 3
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "ax.perform",
+        "params": {
+          "ref": "e2",
+          "action": "press"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "result": {
+              "disposition": {
+                "delivery": "delivered_unverified",
+                "retry": "unsafe"
+              },
+              "effect": "unverifiable",
+              "route": "ax",
+              "focusRestoration": "not_needed",
+              "openedSurfaces": [
+                {
+                  "kind": "sheet",
+                  "title": "Do you want to save?",
+                  "windowId": "202",
+                  "ref": "e4"
+                }
+              ],
+              "timings": {
+                "axResolve": 201200,
+                "capture": 0,
+                "dispatch": 201314,
+                "verify": 4,
+                "restore": 0
+              },
+              "auditIds": [
+                "01M6NWC2DS0ZPR9097RD8P4BXV"
+              ]
+            }
+          },
+          "variable": [
+            "/result/auditIds/0",
+            "/result/timings"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "ax.perform",
+              "target": "101",
+              "delivery": "background",
+              "frameId": null,
+              "code": null,
+              "durationMs": 201,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null,
+              "id": "01M6NWC2DS0ZPR9097RD8P4BXV"
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored",
+            "/params/id"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "ax.perform",
+        "params": {
+          "ref": "e3",
+          "action": "press"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "error": {
+              "code": -32009,
+              "message": "e3 is disabled; nothing was sent; read it again once the app enables it",
+              "data": {
+                "code": "AxUnsupported",
+                "hint": null,
+                "reason": "disabled",
+                "disposition": {
+                  "delivery": "not_delivered",
+                  "retry": "safe"
+                },
+                "focusRestoration": "not_needed"
+              }
+            }
+          },
+          "variable": []
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "ax.perform",
+              "target": "101",
+              "delivery": "background",
+              "frameId": null,
+              "code": "AxUnsupported",
+              "durationMs": 0,
+              "focusRestored": null,
+              "textLength": null,
+              "textSha256": null,
+              "keys": null,
+              "id": "01M6NWC2QA3P74G57A5VBB1BE4"
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored",
+            "/params/id"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "keyChord",
+        "params": {
+          "target": "101",
+          "keys": [
+            "cmd+q"
+          ]
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "error": {
+              "code": -32006,
+              "message": "cmd+q quits an app, closes a window or locks the screen, so it is sent only with force: true; nothing was sent",
+              "data": {
+                "code": "InvalidKey",
+                "hint": null,
+                "reason": "dangerous_chord",
+                "disposition": {
+                  "delivery": "not_delivered",
+                  "retry": "safe"
+                },
+                "focusRestoration": "restored"
+              }
+            }
+          },
+          "variable": []
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "keyChord",
+              "target": "101",
+              "delivery": "background",
+              "frameId": null,
+              "code": "InvalidKey",
+              "durationMs": 0,
+              "focusRestored": true,
+              "textLength": null,
+              "textSha256": null,
+              "keys": [
+                "cmd+q"
+              ],
+              "id": "01M6NWC30R7VHESYVPBFWRQAB5"
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored",
+            "/params/id"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "method": "keyChord",
+        "params": {
+          "target": "101",
+          "keys": [
+            "cmd+q"
+          ],
+          "force": true
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 9,
+            "result": {
+              "disposition": {
+                "delivery": "delivered_unverified",
+                "retry": "unsafe"
+              },
+              "effect": "unverifiable",
+              "route": "background_window",
+              "focusRestoration": "restored",
+              "timings": {
+                "capture": 5,
+                "dispatch": 351,
+                "verify": 11,
+                "restore": 5
+              },
+              "auditIds": [
+                "01M6NWC3A5RRENCQENX49MST7B"
+              ]
+            }
+          },
+          "variable": [
+            "/result/auditIds/0",
+            "/result/timings"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "keyChord",
+              "target": "101",
+              "delivery": "background",
+              "frameId": null,
+              "code": null,
+              "durationMs": 0,
+              "focusRestored": true,
+              "textLength": null,
+              "textSha256": null,
+              "keys": [
+                "cmd+q"
+              ],
+              "id": "01M6NWC3A5RRENCQENX49MST7B"
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored",
+            "/params/id"
+          ]
+        }
+      ]
+    }
+  ]
+}

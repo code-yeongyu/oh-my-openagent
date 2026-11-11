@@ -6,7 +6,9 @@
 use senpi_desktop_backend_fake::{AxWrite, SinkOp};
 use senpi_desktop_core::error::ErrorCode;
 use senpi_desktop_core::methods::Method;
-use senpi_desktop_core::protocol_params::{AxQueryParams, AxRefParams, AxSelectTextParams, AxSetValueParams, AxTypeTextParams};
+use senpi_desktop_core::protocol_params::{
+    AxQueryParams, AxRefParams, AxSelectTextParams, AxSetValueParams, AxTypeTextParams,
+};
 use senpi_desktop_core::protocol_results::AxTextSelection;
 use senpi_desktop_core::report::{Disposition, ReportMode};
 use senpi_desktop_core::types::{AxQuery, DesktopSessionOptions};
@@ -26,7 +28,9 @@ fn select(reference: &str, text: &str, prefix: Option<&str>, suffix: Option<&str
 }
 
 fn value_of(harness: &mut Harness, reference: &str) -> Option<String> {
-    match harness.process(Op::AxNode(AxRefParams { ref_: reference.to_owned() })) {
+    match harness.process(Op::AxNode(AxRefParams {
+        ref_: reference.to_owned(),
+    })) {
         Ok(Response::Node(node)) => node.value,
         other => panic!("ax.node failed: {other:?}"),
     }
@@ -100,7 +104,10 @@ fn the_located_range_is_selected_and_a_following_type_replaces_it() {
         }))
         .expect("typed");
     // Then
-    assert_eq!(value_of(&mut harness, &reference).as_deref(), Some("alpha BETA gamma"));
+    assert_eq!(
+        value_of(&mut harness, &reference).as_deref(),
+        Some("alpha BETA gamma")
+    );
 }
 
 #[test]
@@ -171,9 +178,16 @@ fn an_ambiguous_match_is_refused_before_anything_is_selected() {
     let reply = harness.process(select(&reference, "a", None, None));
     let error = reply.expect_err("ambiguous");
     assert_eq!(error.code, ErrorCode::AxFailed);
-    assert!(error.message.contains("nothing was selected"), "{}", error.message);
+    assert!(
+        error.message.contains("nothing was selected"),
+        "{}",
+        error.message
+    );
     assert!(selections(&harness).is_empty());
-    assert_eq!(harness.audits().pop().expect("an audit").code, Some(ErrorCode::AxFailed));
+    assert_eq!(
+        harness.audits().pop().expect("an audit").code,
+        Some(ErrorCode::AxFailed)
+    );
 }
 
 #[test]
@@ -182,6 +196,9 @@ fn an_unanswered_selection_write_is_unconfirmed() {
     let reference = textarea(&mut harness);
     harness.faults.cannot_complete_next(AxWrite::AxSelectText);
     let reply = harness.process(select(&reference, "gamma", None, None));
-    assert_eq!(reply.map_err(|error| error.code), Err(ErrorCode::AxUnconfirmed));
+    assert_eq!(
+        reply.map_err(|error| error.code),
+        Err(ErrorCode::AxUnconfirmed)
+    );
     assert_eq!(selections(&harness), [(11, 5)]);
 }

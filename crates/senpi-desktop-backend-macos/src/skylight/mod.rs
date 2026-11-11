@@ -8,6 +8,7 @@
 
 mod activation;
 mod authentication;
+mod focus_records;
 mod partial;
 mod psn;
 mod public_route;
@@ -29,9 +30,10 @@ use self::psn::{
     SET_FRONT_NO_WINDOWS,
 };
 pub(crate) use self::activation::{post_activation, sender_connection, set_fields, set_window_location};
+pub(crate) use self::focus_records::post_key_records;
 pub(crate) use self::partial::{mark_sent, reporting_partial};
+pub(crate) use self::spi::{capture_spi, front_pid, is_available, spaces, spaces_if_available, SpaceSpi};
 pub(crate) use self::window_query::window_parent;
-pub(crate) use self::spi::{front_pid, is_available, spaces, spaces_if_available, SpaceSpi};
 use self::spi::required;
 
 /// Ensures the required background SPI resolved; the error names the missing

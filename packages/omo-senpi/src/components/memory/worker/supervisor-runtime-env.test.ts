@@ -19,42 +19,45 @@ test("#given no inherited runtime switch #when launching a supervisor #then the 
   delete process.env.BUN_BE_BUN
   try {
     // when
-    const run = runReflectionChild({
-      runId: "runtime-probe",
-      kind: "reflection",
-      trigger: "step-count",
-      origin: "manual",
-      attempt: 1,
-      hardDeadlineAt: Date.now() + 10_000,
-      category: "quick",
-      conversationIds: ["conversation"],
-      model: "fixture/model",
-      command: process.execPath,
-      args: [],
-      cwd: root,
-      env: {},
-      detached: true,
-      paths: {
-        sessionDir: root,
-        worktree: root,
-        gitCommonDir: root,
-        transcript: join(root, "transcript"),
-        persona: join(root, "persona"),
-        prompt: join(root, "prompt"),
+    const run = runReflectionChild(
+      {
+        runId: "runtime-probe",
+        kind: "reflection",
+        trigger: "step-count",
+        origin: "manual",
+        attempt: 1,
+        hardDeadlineAt: Date.now() + 10_000,
+        category: "quick",
+        conversationIds: ["conversation"],
+        model: "fixture/model",
+        command: process.execPath,
+        args: [],
+        cwd: root,
+        env: {},
+        detached: true,
+        paths: {
+          sessionDir: root,
+          worktree: root,
+          gitCommonDir: root,
+          transcript: join(root, "transcript"),
+          persona: join(root, "persona"),
+          prompt: join(root, "prompt"),
+        },
+        mergePolicy: "auto",
+        worktree: {
+          parent: new GitMemoryRepo({ dir: root, agentId: "agent-test", exec }),
+          dir: root,
+          branch: "reflection/runtime-probe",
+          baseSha: "base",
+          gitFilePath: join(root, ".git"),
+          gitFileSnapshot: "gitdir: original\n",
+          commonConfigPath: join(root, "config"),
+          commonConfigSnapshot: null,
+          exec,
+        },
       },
-      mergePolicy: "auto",
-      worktree: {
-        parent: new GitMemoryRepo({ dir: root, agentId: "agent-test", exec }),
-        dir: root,
-        branch: "reflection/runtime-probe",
-        baseSha: "base",
-        gitFilePath: join(root, ".git"),
-        gitFileSnapshot: "gitdir: original\n",
-        commonConfigPath: join(root, "config"),
-        commonConfigSnapshot: null,
-        exec,
-      },
-    }, { supervisorPath: join(import.meta.dir, "__fixtures__", "supervisor-runtime-env.mjs") })
+      { supervisorPath: join(import.meta.dir, "__fixtures__", "supervisor-runtime-env.mjs") },
+    )
     // then
     await expect(run).rejects.toThrow("memory run supervisor exited with 0")
     expect(await readFile(join(root, "runtime-mode"), "utf8")).toBe("1")

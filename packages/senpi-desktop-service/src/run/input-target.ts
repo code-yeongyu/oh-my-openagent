@@ -1,12 +1,12 @@
-import type { EngineMethod } from "@oh-my-opencode/senpi-desktop-protocol";
-import { ComputerRunError, type FacadeMethod, facadeMethod, type MethodTiers, type RunScope } from "./context";
-import { type CaptureRegion, expectResult, isMenuReport, type MenuReport, optional } from "./engine-results";
-import { callHold } from "./hold-call";
-import { captureScreenshot, type ScreenshotOptions, type ScreenshotResult } from "./screenshot";
+import type { EngineMethod } from "@oh-my-opencode/senpi-desktop-protocol"
+import { ComputerRunError, type FacadeMethod, facadeMethod, type MethodTiers, type RunScope } from "./context"
+import { type CaptureRegion, expectResult, isExecResult, isMenuReport, type MenuReport } from "./engine-results"
+import { callHold } from "./hold-call"
+import { captureScreenshot, type ScreenshotOptions, type ScreenshotResult } from "./screenshot"
 
 export interface DeliveryOptions {
-	/** `background` targets the window without focusing it; `foreground` briefly activates it. */
-	readonly delivery?: string;
+  /** `background` targets the window without focusing it; `foreground` briefly activates it. */
+  readonly delivery?: string
 }
 
 /**
@@ -15,78 +15,80 @@ export interface DeliveryOptions {
  * `win.menu.select`: case-insensitively, a trailing ellipsis ignored, each label naming exactly one item.
  */
 export interface MenuOptions {
-	readonly menu?: readonly string[];
+  readonly menu?: readonly string[]
 }
 
 export interface ClickOptions extends DeliveryOptions, MenuOptions {
-	readonly button?: string;
-	readonly count?: number;
-	readonly modifiers?: readonly string[];
+  readonly button?: string
+  readonly count?: number
+  readonly modifiers?: readonly string[]
 }
 
 export interface ScrollOptions extends DeliveryOptions {
-	readonly dx?: number;
-	readonly dy?: number;
+  readonly dx?: number
+  readonly dy?: number
 }
 
 export interface HoldOptions extends DeliveryOptions {
-	/** Finite seconds in 0..=100. Input is released when the call ends. */
-	readonly duration: number;
+  /** Finite seconds in 0..=100. Input is released when the call ends. */
+  readonly duration: number
 }
 
 export interface HoldMouseOptions extends HoldOptions {
-	readonly button?: string;
-	readonly keys?: readonly string[];
-	readonly frameId?: string;
+  readonly button?: string
+  readonly keys?: readonly string[]
+  readonly frameId?: string
 }
 
 function validateHoldDuration(duration: number): void {
-	if (!Number.isFinite(duration) || duration < 0 || duration > 100) {
-		throw new ComputerRunError("assertion", "hold duration must be finite seconds in 0..=100");
-	}
+  if (!Number.isFinite(duration) || duration < 0 || duration > 100) {
+    throw new ComputerRunError("assertion", "hold duration must be finite seconds in 0..=100")
+  }
 }
 
 /** The engine `PointerOptions`; `undefined` fields are dropped on the wire. */
 export function pointerOptions(options: ClickOptions = {}): object {
-	const { button, count, modifiers, delivery } = options;
-	return { button, count, modifiers, deliveryMode: delivery };
+  const { button, count, modifiers, delivery } = options
+  return { button, count, modifiers, deliveryMode: delivery }
 }
 
 /** The engine `menu` param of a press that opens a menu; absent when no path was given. */
 export function menuParam(options: MenuOptions = {}): { readonly menu?: readonly string[] } {
-	return options.menu === undefined ? {} : { menu: [...options.menu] };
+  return options.menu === undefined ? {} : { menu: [...options.menu] }
 }
 
 /** True for a key chord (`"cmd+a"` or `["cmd", "a"]`), false for an options object or nothing. */
 export function isChord(value: string | readonly string[] | object | undefined): value is string | readonly string[] {
-	return typeof value === "string" || Array.isArray(value);
+  return typeof value === "string" || Array.isArray(value)
 }
 
 export function chordKeys(chord: string | readonly string[]): readonly string[] {
-	if (typeof chord !== "string") return chord;
-	return chord
-		.split("+")
-		.map((key) => key.trim())
-		.filter((key) => key.length > 0);
+  if (typeof chord !== "string") return chord
+  return chord
+    .split("+")
+    .map((key) => key.trim())
+    .filter((key) => key.length > 0)
 }
 
-/** Facade `method` sending one engine request whose result carries nothing. */
-export function send(method: FacadeMethod, name: string, engineMethod: EngineMethod, params: object): Promise<void> {
-	return method(name, async ({ call }) => {
-		await call(engineMethod, params);
-	});
+/** Facade `method` sending one exec request; its reply must be `null` or an `ActionReport`. */
+function send(method: FacadeMethod, name: string, engineMethod: EngineMethod, params: object): Promise<void> {
+  return method(name, async ({ call }) => {
+    expectResult(engineMethod, await call(engineMethod, params), isExecResult)
+  })
 }
 
-/** Facade `method` sending one press that may open a menu; the engine answers with the menu's items or null. */
 function sendPress(
-	method: FacadeMethod,
-	name: string,
-	engineMethod: EngineMethod,
-	params: object,
+  method: FacadeMethod,
+  name: string,
+  engineMethod: EngineMethod,
+  params: object,
 ): Promise<MenuReport | null> {
-	return method(name, async ({ call }) =>
-		expectResult(engineMethod, (await call(engineMethod, params)) ?? null, optional(isMenuReport)),
-	);
+  return method(name, async ({ call }) => {
+    const value = (await call(engineMethod, params)) ?? null
+    // Null mode and an object-mode action with no menu both mean "no menu report".
+    if (isExecResult(value)) return null
+    return expectResult(engineMethod, value, isMenuReport)
+  })
 }
 
 /**
@@ -96,85 +98,103 @@ function sendPress(
  * helpers and never send an arbitrary engine method such as `control.grant` (#9967).
  */
 export class InputTarget {
-	readonly #target: string;
-	readonly #method: FacadeMethod;
+  readonly #target: string
+  readonly #method: FacadeMethod
 
-	constructor(scope: RunScope, target: string, tiers: MethodTiers) {
-		this.#target = target;
-		this.#method = facadeMethod(scope, tiers);
-	}
+  constructor(scope: RunScope, target: string, tiers: MethodTiers) {
+    this.#target = target
+    this.#method = facadeMethod(scope, tiers)
+  }
 
-	screenshot(options?: ScreenshotOptions): Promise<ScreenshotResult> {
-		return this.#method("screenshot", (scope) => captureScreenshot(scope, this.#target, options));
-	}
+  screenshot(options?: ScreenshotOptions): Promise<ScreenshotResult> {
+    return this.#method("screenshot", (scope) => captureScreenshot(scope, this.#target, options))
+  }
 
-	/** Recaptures native detail; zoom pixels never replace the full input frame. */
-	zoom(region: CaptureRegion, options?: ScreenshotOptions): Promise<ScreenshotResult> {
-		return this.#method("zoom", (scope) => captureScreenshot(scope, this.#target, options, region));
-	}
+  /** Recaptures native detail; zoom pixels never replace the full input frame. */
+  zoom(region: CaptureRegion, options?: ScreenshotOptions): Promise<ScreenshotResult> {
+    return this.#method("zoom", (scope) => captureScreenshot(scope, this.#target, options, region))
+  }
 
-	click(x: number, y: number, options?: ClickOptions): Promise<MenuReport | null> {
-		const params = { target: this.#target, x, y, opts: pointerOptions(options), ...menuParam(options) };
-		return sendPress(this.#method, "click", "click", params);
-	}
+  click(x: number, y: number, options?: ClickOptions): Promise<MenuReport | null> {
+    return sendPress(this.#method, "click", "click", {
+      target: this.#target,
+      x,
+      y,
+      opts: pointerOptions(options),
+      ...menuParam(options),
+    })
+  }
 
-	doubleClick(x: number, y: number, options?: ClickOptions): Promise<MenuReport | null> {
-		const opts = pointerOptions({ ...options, count: 2 });
-		const params = { target: this.#target, x, y, opts, ...menuParam(options) };
-		return sendPress(this.#method, "doubleClick", "click", params);
-	}
+  doubleClick(x: number, y: number, options?: ClickOptions): Promise<MenuReport | null> {
+    const opts = pointerOptions({ ...options, count: 2 })
+    return sendPress(this.#method, "doubleClick", "click", {
+      target: this.#target,
+      x,
+      y,
+      opts,
+      ...menuParam(options),
+    })
+  }
 
-	move(x: number, y: number): Promise<void> {
-		return send(this.#method, "move", "moveMouse", { target: this.#target, x, y });
-	}
+  move(x: number, y: number): Promise<void> {
+    return send(this.#method, "move", "moveMouse", { target: this.#target, x, y })
+  }
 
-	drag(points: readonly (readonly [number, number])[], options?: ClickOptions): Promise<MenuReport | null> {
-		const path = points.map(([x, y]) => ({ x, y }));
-		return sendPress(this.#method, "drag", "drag", { target: this.#target, path, opts: pointerOptions(options) });
-	}
+  drag(points: readonly (readonly [number, number])[], options?: ClickOptions): Promise<MenuReport | null> {
+    const path = points.map(([x, y]) => ({ x, y }))
+    return sendPress(this.#method, "drag", "drag", {
+      target: this.#target,
+      path,
+      opts: pointerOptions(options),
+      ...menuParam(options),
+    })
+  }
 
-	scroll(x: number, y: number, options: ScrollOptions = {}): Promise<void> {
-		const { dx = 0, dy = 0 } = options;
-		const params = { target: this.#target, x, y, dx, dy, opts: pointerOptions(options) };
-		return send(this.#method, "scroll", "scroll", params);
-	}
+  scroll(x: number, y: number, options: ScrollOptions = {}): Promise<void> {
+    const { dx = 0, dy = 0 } = options
+    const params = { target: this.#target, x, y, dx, dy, opts: pointerOptions(options) }
+    return send(this.#method, "scroll", "scroll", params)
+  }
 
-	type(text: string, options?: DeliveryOptions): Promise<void> {
-		return send(this.#method, "type", "typeText", { target: this.#target, text, opts: pointerOptions(options) });
-	}
+  type(text: string, options?: DeliveryOptions): Promise<void> {
+    return send(this.#method, "type", "typeText", { target: this.#target, text, opts: pointerOptions(options) })
+  }
 
-	press(chord: string | readonly string[], options?: DeliveryOptions): Promise<void> {
-		const params = { target: this.#target, keys: chordKeys(chord), opts: pointerOptions(options) };
-		return send(this.#method, "press", "keyChord", params);
-	}
+  press(chord: string | readonly string[], options?: DeliveryOptions): Promise<void> {
+    const params = { target: this.#target, keys: chordKeys(chord), opts: pointerOptions(options) }
+    return send(this.#method, "press", "keyChord", params)
+  }
 
-	/** Presses in order and releases in reverse, including after interruption. */
-	holdKeys(keys: readonly string[], options: HoldOptions): Promise<void> {
-		return this.#method("holdKeys", async (scope) => {
-			validateHoldDuration(options?.duration);
-			if (!Array.isArray(keys) || keys.length === 0) {
-				throw new ComputerRunError("assertion", "held keys must not be empty");
-			}
-			await callHold(scope, "holdKeys", {
-				target: this.#target, keys, duration: options.duration, opts: pointerOptions(options),
-			});
-		});
-	}
+  /** Presses in order and releases in reverse, including after interruption. */
+  holdKeys(keys: readonly string[], options: HoldOptions): Promise<void> {
+    return this.#method("holdKeys", async (scope) => {
+      validateHoldDuration(options?.duration)
+      if (!Array.isArray(keys) || keys.length === 0) {
+        throw new ComputerRunError("assertion", "held keys must not be empty")
+      }
+      await callHold(scope, "holdKeys", {
+        target: this.#target,
+        keys,
+        duration: options.duration,
+        opts: pointerOptions(options),
+      })
+    })
+  }
 
-	/** The point is in the latest full screenshot, never a zoom's pixels. */
-	holdMouse(x: number, y: number, options: HoldMouseOptions): Promise<void> {
-		return this.#method("holdMouse", async (scope) => {
-			validateHoldDuration(options?.duration);
-			await callHold(scope, "holdMouse", {
-				target: this.#target,
-				x,
-				y,
-				duration: options.duration,
-				button: options.button,
-				keys: options.keys,
-				frameId: options.frameId,
-				opts: pointerOptions(options),
-			});
-		});
-	}
+  /** The point is in the latest full screenshot, never a zoom's pixels. */
+  holdMouse(x: number, y: number, options: HoldMouseOptions): Promise<void> {
+    return this.#method("holdMouse", async (scope) => {
+      validateHoldDuration(options?.duration)
+      await callHold(scope, "holdMouse", {
+        target: this.#target,
+        x,
+        y,
+        duration: options.duration,
+        button: options.button,
+        keys: options.keys,
+        frameId: options.frameId,
+        opts: pointerOptions(options),
+      })
+    })
+  }
 }
