@@ -1,17 +1,20 @@
-//! Acceptance 2 and design rows C1 / C17: every params member and every settings key has
-//! a reader, and no reader names a member the schema does not have.
+//! Acceptance 2 and design rows C1 / C17: the reader test enumerates the schema's params
+//! members against reader CALL SITES. The read set is derived from the reader functions in
+//! `src/requests` (see `read_sites`), never from a list: a member is read only when a reader
+//! destructures its type, names the field and moves the value into its output.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
 
-use crate::readers::PARAM_READERS;
+use super::crate_path;
+use super::read_sites::{reader_sites, sites_by_member, Site};
+use crate::requests::READER_SOURCES;
 use crate::schema::engine_schema;
 use crate::settings::{GROUPED_KEYS, SETTINGS_TABLE};
 
-fn definition_name(reference: &str) -> Option<&str> {
-    reference.strip_prefix("#/$defs/")
-}
+/// The types whose serde names are their Rust field names (the `computer.*` keys).
+const SNAKE_CASE_TYPES: &[&str] = &["Settings", "McpSettings"];
 
 fn references(value: &Value, found: &mut BTreeSet<String>) {
     match value {
@@ -19,7 +22,7 @@ fn references(value: &Value, found: &mut BTreeSet<String>) {
             if let Some(name) = object
                 .get("$ref")
                 .and_then(Value::as_str)
-                .and_then(definition_name)
+                .and_then(|reference| reference.strip_prefix("#/$defs/"))
             {
                 found.insert(name.to_owned());
             }
@@ -30,126 +33,171 @@ fn references(value: &Value, found: &mut BTreeSet<String>) {
     }
 }
 
-fn members(definition: &Value) -> Vec<String> {
-    let mut names: Vec<String> = Vec::new();
+fn members(definition: &Value) -> BTreeSet<String> {
     let alternatives = ["anyOf", "oneOf"]
         .iter()
         .flat_map(|key| definition[*key].as_array().cloned().unwrap_or_default());
-    for object in std::iter::once(definition.clone()).chain(alternatives) {
-        for name in object["properties"]
-            .as_object()
-            .map(|properties| properties.keys().cloned().collect::<Vec<_>>())
-            .unwrap_or_default()
-        {
-            if !names.contains(&name) {
-                names.push(name);
-            }
-        }
-    }
-    names
+    std::iter::once(definition.clone())
+        .chain(alternatives)
+        .flat_map(|object| {
+            object["properties"]
+                .as_object()
+                .map(|properties| properties.keys().cloned().collect::<Vec<_>>())
+                .unwrap_or_default()
+        })
+        .collect()
 }
 
-/// `(definition, member)` pairs reachable from every method's params, the settings tree aside.
-fn param_members(schema: &Value) -> BTreeSet<(String, String)> {
+/// The serde name of a Rust field: `reference` is `ref`; params are camelCase; the settings
+/// table keeps its snake_case keys.
+fn wire_name(ty: &str, field: &str) -> String {
+    if field == "reference" {
+        return "ref".to_owned();
+    }
+    if SNAKE_CASE_TYPES.contains(&ty) {
+        return field.to_owned();
+    }
+    let mut name = String::new();
+    let mut upper = false;
+    for character in field.chars() {
+        if character == '_' {
+            upper = true;
+        } else if upper {
+            name.extend(character.to_uppercase());
+            upper = false;
+        } else {
+            name.push(character);
+        }
+    }
+    name
+}
+
+/// Every definition reachable from the methods' params with its members. Under `Settings`
+/// the unit is the table row: its keys, and the members of the grouped keys.
+fn param_definitions(schema: &Value) -> BTreeMap<String, BTreeSet<String>> {
     let mut pending = BTreeSet::new();
     for row in schema["methods"].as_object().expect("methods").values() {
         references(&row["params"], &mut pending);
     }
-    let mut visited = BTreeSet::new();
+    let mut found = BTreeMap::new();
     while let Some(name) = pending.pop_first() {
-        if name == "Settings" || !visited.insert(name.clone()) {
+        if found.contains_key(&name) {
             continue;
         }
-        references(&schema["$defs"][&name], &mut pending);
-    }
-    visited
-        .iter()
-        .flat_map(|name| {
-            members(&schema["$defs"][name])
-                .into_iter()
-                .map(move |member| (name.clone(), member))
-        })
-        .collect()
-}
-
-fn declared_readers() -> BTreeSet<(String, String)> {
-    PARAM_READERS
-        .iter()
-        .flat_map(|table| table.iter())
-        .flat_map(|(definition, _, fields)| {
-            fields
-                .iter()
-                .map(move |field| ((*definition).to_owned(), (*field).to_owned()))
-        })
-        .collect()
-}
-
-fn settings_keys(schema: &Value) -> BTreeSet<String> {
-    let settings = &schema["$defs"]["Settings"]["properties"];
-    let mut keys = BTreeSet::new();
-    for (key, property) in settings.as_object().expect("settings properties") {
-        if GROUPED_KEYS.contains(&key.as_str()) {
-            let mut group = BTreeSet::new();
-            references(property, &mut group);
-            for name in group {
-                keys.extend(
-                    members(&schema["$defs"][&name])
-                        .into_iter()
-                        .map(|member| format!("{key}.{member}")),
-                );
+        let definition = &schema["$defs"][&name];
+        if name == "Settings" {
+            for key in GROUPED_KEYS {
+                references(&definition["properties"][*key], &mut pending);
             }
         } else {
-            keys.insert(key.clone());
+            references(definition, &mut pending);
+        }
+        let names = members(definition);
+        if !names.is_empty() {
+            found.insert(name, names);
         }
     }
-    keys
+    found
 }
 
-fn unread_params(schema: &Value) -> (usize, Vec<String>) {
-    let members = param_members(schema);
-    let readers = declared_readers();
-    let mut problems: Vec<String> = members
-        .difference(&readers)
-        .map(|(definition, member)| format!("unread: {definition}.{member}"))
-        .collect();
-    problems.extend(
-        readers.difference(&members).map(|(definition, member)| {
-            format!("reader of a missing member: {definition}.{member}")
-        }),
-    );
-    (members.len(), problems)
+fn describe(sites: &[Site]) -> String {
+    sites
+        .iter()
+        .map(|site| {
+            format!(
+                "{}::{} ({}): {}",
+                site.file, site.function, site.field, site.why_unread
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
+/// `(members checked, problems)`: every schema member must have a reading site, and every
+/// reading site must name a schema member.
+fn unread_members(schema: &Value) -> (usize, Vec<String>) {
+    let definitions = param_definitions(schema);
+    let sites = reader_sites(&crate_path(READER_SOURCES));
+    let by_member = sites_by_member(&sites, wire_name);
+    let mut problems = Vec::new();
+    let mut checked = 0;
+    for (definition, wire_members) in &definitions {
+        let read_sites = by_member.get(definition).cloned().unwrap_or_default();
+        for member in wire_members {
+            checked += 1;
+            let at = read_sites.get(member).cloned().unwrap_or_default();
+            if !at.iter().any(|site| site.read) {
+                let reason = if at.is_empty() {
+                    "no reader names it".to_owned()
+                } else {
+                    describe(&at)
+                };
+                problems.push(format!("unread: {definition}.{member} - {reason}"));
+            }
+        }
+        for (member, at) in &read_sites {
+            let positional = member.chars().all(|character| character.is_ascii_digit());
+            if positional && !at.iter().all(|site| site.read) {
+                problems.push(format!(
+                    "unread: {definition} variant value {member} - {}",
+                    describe(at)
+                ));
+            } else if !positional && !wire_members.contains(member) {
+                problems.push(format!(
+                    "reader of a member the schema does not have: {definition}.{member} ({})",
+                    describe(at)
+                ));
+            }
+        }
+    }
+    (checked, problems)
 }
 
 #[test]
 fn schema_fields_have_readers() {
-    let (count, problems) = unread_params(&engine_schema());
-    println!("params members: {count}, unread: {}", problems.len());
-    assert!(count > 200, "the params walk found only {count} members");
+    let (checked, problems) = unread_members(&engine_schema());
+    println!("members checked: {checked}, unread: {}", problems.len());
+    for problem in &problems {
+        println!("{problem}");
+    }
+    assert!(
+        checked > 250,
+        "the params walk found only {checked} members"
+    );
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }
 
 #[test]
 fn reader_test_reports_zero_unread_fields() {
     let schema = engine_schema();
-    let (params, mut problems) = unread_params(&schema);
-    let keys = settings_keys(&schema);
+    let (checked, mut problems) = unread_members(&schema);
+    let settings = &schema["$defs"]["Settings"]["properties"];
+    let mut keys = BTreeSet::new();
+    for (key, property) in settings.as_object().expect("settings properties") {
+        if GROUPED_KEYS.contains(&key.as_str()) {
+            let mut group = BTreeSet::new();
+            references(property, &mut group);
+            keys.extend(
+                group
+                    .iter()
+                    .flat_map(|name| members(&schema["$defs"][name]))
+                    .map(|member| format!("{key}.{member}")),
+            );
+        } else {
+            keys.insert(key.clone());
+        }
+    }
     let rows: BTreeSet<String> = SETTINGS_TABLE
         .iter()
         .map(|row| row.key.to_owned())
         .collect();
     problems.extend(
         keys.difference(&rows)
-            .map(|key| format!("unread setting: computer.{key}")),
+            .map(|key| format!("settings key without a table row: computer.{key}")),
     );
     problems.extend(
         rows.difference(&keys)
             .map(|key| format!("table row without a schema key: computer.{key}")),
-    );
-    problems.extend(
-        SETTINGS_TABLE
-            .iter()
-            .filter(|row| row.reader.trim().is_empty())
-            .map(|row| format!("no reader: computer.{}", row.key)),
     );
     for round_four in [
         "url_policy",
@@ -166,7 +214,7 @@ fn reader_test_reports_zero_unread_fields() {
         );
     }
     println!(
-        "unread fields: {} (params members {params}, settings keys {})",
+        "unread fields: {} (members checked {checked}, settings keys {})",
         problems.len(),
         keys.len()
     );
