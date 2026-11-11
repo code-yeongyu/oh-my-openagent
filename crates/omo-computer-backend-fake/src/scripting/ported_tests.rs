@@ -142,6 +142,7 @@ fn oversized_composite_refuses_before_allocating() {
     let mut huge = FakeBackend::from_json(&display(20_000)).expect("the scenario loads");
     let refused = huge
         .capture(&Target::Desktop, &options)
+        .map(|frame| (frame.width, frame.height))
         .expect_err("over the composite cap");
     assert_eq!(
         refused,
