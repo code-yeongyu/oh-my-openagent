@@ -66,6 +66,7 @@ describe("OmoMemorySettingsSchema defaults", () => {
       projection: { max_entries_per_directory: 12, max_bytes: 4096 },
       runtime: { retention_days: 10, abandoned_journal_days: 21, completions_days: 45, pass_budget_ms: 30000, discard_unreflected_journals: true, max_bytes: 1024 * 1024 * 1024 },
       compile_warn_tokens: 50000,
+      facts_note_max_bytes: 0,
       agents: {
         "backend-lead": {
           enabled: true,

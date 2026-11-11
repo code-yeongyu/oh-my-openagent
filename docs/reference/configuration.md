@@ -565,6 +565,7 @@ Configured under `memory` in `omo.json`, with per-agent overrides under `memory.
 | `agent`              | `"auto"`   | Which agent identity owns the memory repository                                  |
 | `auto_identity`      | `"git"`    | How `agent: "auto"` picks the identity: `"git"` (one per repository) or `"path"` (see below); root only, not per agent |
 | `compile_warn_tokens`| `30000`    | Warn when the compiled memory block exceeds this many tokens                     |
+| `facts_note_max_bytes`| `49152`   | A committed `notes/facts/<YYYY-MM>.md` over this many bytes starts a memory pressure dream that consolidates it (retires superseded and day-only facts into `ARCHIVE.md`); `/doctor` lists notes over it; `0` turns the budget off |
 | `agents`             | `{}`       | Per-agent overrides; any block below may be overridden field by field            |
 
 #### One memory per repository

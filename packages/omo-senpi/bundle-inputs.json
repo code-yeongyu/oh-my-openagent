@@ -169,6 +169,7 @@
     "packages/memory-core/src/facts/failures-store.ts",
     "packages/memory-core/src/facts/index.ts",
     "packages/memory-core/src/facts/mutation-plan.ts",
+    "packages/memory-core/src/facts/note-budget.ts",
     "packages/memory-core/src/facts/parked.ts",
     "packages/memory-core/src/facts/payload-cap.ts",
     "packages/memory-core/src/facts/person-index.ts",

@@ -34,6 +34,13 @@ describe("dream persona asset", () => {
 
     expect(markdown).toContain("$MEMORY_USAGE_PATH")
   })
+
+  it("#given the dream persona #when parsed as sections #then it names the facts note budget inputs the spawn sets (#10884)", () => {
+    const { markdown } = loadDreamPersona()
+
+    expect(markdown).toContain("$FACTS_NOTES_PATH")
+    expect(markdown).toContain("$FACTS_NOTE_MAX_BYTES")
+  })
 })
 
 describe("reflection persona asset", () => {

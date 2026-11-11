@@ -52,6 +52,7 @@ export function prepareReflectionCandidateSpawn(input: ReflectionSpawnInput) {
     mergePolicy: input.mergePolicy,
     skillsUsageSource: join(input.identity.paths.runtime, "skills-usage.json"),
     memoryUsageSource: join(input.identity.paths.runtime, "memory-usage.json"),
+    ...(input.config.memory?.facts_note_max_bytes === undefined ? {} : { factsNoteMaxBytes: input.config.memory.facts_note_max_bytes }),
     dreamStateSource: join(input.identity.paths.runtime, "dream", "state.json"),
     peoplePolicy: {
       enabled: input.config.memory?.agents[input.identity.id]?.people?.enabled
