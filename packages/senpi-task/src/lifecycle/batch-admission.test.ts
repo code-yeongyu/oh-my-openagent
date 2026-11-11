@@ -11,6 +11,7 @@ import {
   seedRecord,
   settings,
   tempStore,
+  unreachablePid,
 } from "./__fixtures__/lifecycle-fakes"
 import { NO_HOST_ENDPOINT } from "./host-session"
 
@@ -201,7 +202,7 @@ describe("reclaimOrphanedResident (reclamation bypasses admission)", () => {
     const store = tempStore()
     seedRecord(store, { task_id: "st_00000070", status: "running", residency_state: "resident", host_pid: process.pid })
     seedRecord(store, { task_id: "st_00000071", status: "running", residency_state: "resident", host_pid: process.pid })
-    const orphan = seedRecord(store, { task_id: "st_00000072", status: "completed", residency_state: "resident", host_pid: 999_999 })
+    const orphan = seedRecord(store, { task_id: "st_00000072", status: "completed", residency_state: "resident", host_pid: unreachablePid() })
     const context = contextFor(store, 2)
 
     // when
@@ -218,7 +219,7 @@ describe("reclaimOrphanedResident (reclamation bypasses admission)", () => {
   test("#given a reclaim raced and lost the expected-owner CAS #when retrying with the stale observation #then it reports not_claimable and touches nothing", () => {
     // given
     const store = tempStore()
-    const orphan = seedRecord(store, { task_id: "st_00000080", status: "completed", residency_state: "resident", host_pid: 999_999 })
+    const orphan = seedRecord(store, { task_id: "st_00000080", status: "completed", residency_state: "resident", host_pid: unreachablePid() })
     const context = contextFor(store, 2)
 
     // when: a winner claims first, then the loser retries with its stale observation
