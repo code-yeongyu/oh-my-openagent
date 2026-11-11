@@ -158,6 +158,21 @@ function readInput(absolute: string, label: string): string | undefined {
 
 const readText = (cwd: string, path: string): string | undefined => readInput(join(cwd, path), path)
 
+/**
+ * Whether a path's own entry exists (lstat: an empty directory or a dangling symlink counts). A parent component that is
+ * a file means the path cannot exist (ENOTDIR); any other failure (no permission, a symlink loop) is an input finding,
+ * never a crash of the whole guard.
+ */
+function entryExists(absolute: string, label: string): boolean {
+  try {
+    return lstatSync(absolute, { throwIfNoEntry: false }) !== undefined
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === "ENOTDIR") return false
+    throw new GuardInputError(`${label} cannot be checked (${code ?? String(error)})`)
+  }
+}
+
 // ---------------------------------------------------------------------------------------------------------
 // --residue, --no-legacy-edge, --copy, --old-frozen, --stubs
 
@@ -165,8 +180,8 @@ function residue(git: Git, cwd: string): string[] {
   const findings = grepOldName(git, ["."]).map((line) => `residue: ${line}`)
   // Absent means absent on disk: an empty directory, one holding only ignored files, or a dangling symlink is still
   // there. lstat sees the entry itself; existsSync follows a symlink and calls a dangling one absent.
-  const remaining = [...nameMap.removal.classA, ...nameMap.removal.classB.map((entry) => entry.path)].filter(
-    (path) => lstatSync(join(cwd, path), { throwIfNoEntry: false }) !== undefined,
+  const remaining = [...nameMap.removal.classA, ...nameMap.removal.classB.map((entry) => entry.path)].filter((path) =>
+    entryExists(join(cwd, path), path),
   )
   findings.push(...remaining.map((path) => `residue: ${path} still exists`))
   // Path names: every tracked file and every untracked one on disk, ignored included; a remaining removal path is reported once above.

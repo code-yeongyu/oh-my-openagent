@@ -111,6 +111,17 @@ function expectFindings(
 }
 
 describe("computer-v3-guards --residue", () => {
+  test("residue_treats_a_removal_path_under_a_file_parent_as_absent_instead_of_crashing", () => {
+    withRepo((repo) => {
+      // given a file where a removal path expects a directory: lstat('crates/<old crate>') fails with ENOTDIR
+      repo.write({ crates: "not a directory\n", "README.md": "the computer module\n" })
+      repo.commit("file at a parent path")
+
+      // then the removal path is absent and the guard reports nothing (it used to throw out of --residue)
+      expectPass(repo.guard("--residue"))
+    })
+  })
+
   test("residue_refuses_an_old_name_outside_the_exclusions_and_a_remaining_class_a_or_b_path", () => {
     withRepo((repo) => {
       // given a tree where the old name survives only in the legacy-name exclusions
