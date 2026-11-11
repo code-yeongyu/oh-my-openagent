@@ -141,6 +141,41 @@ export async function readBack(computer, win, specs) {
   return out
 }
 
+/** The caller's session variables never reach the engine or senpi (they redirect children to installed runtimes). */
+export function scrubbedEnv() {
+  return Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^(OMO|SENPI|PI)_/.test(key)))
+}
+
+function expectOf(surface, mismatch) {
+  return mismatch ? mismatched(surface.expect) : surface.expect
+}
+
+/** The oracle judges what the plan left; the post-check judges the restored readback, audit, windows and files. */
+export function oracleRow({ task, arm, surface, mismatch, outcome }) {
+  const checks = surface.oracle({ ...outcome, expect: expectOf(surface, mismatch) }).map(normalizeCheck)
+  const restored = { readback: outcome.restoredReadback, audit: outcome.restoreAudit, windows: outcome.restoredWindows, files: outcome.restoredFiles }
+  const restoreChecks = (surface.postcheck({ ...outcome, ...restored }) ?? []).map(normalizeCheck)
+  return {
+    task: task.id,
+    title: task.title,
+    arm,
+    status: judge(checks),
+    mismatchInjected: mismatch,
+    checks,
+    restore: { status: judge(restoreChecks), checks: restoreChecks },
+    steps: outcome.steps,
+    harnessCalls: outcome.harnessCalls ?? 0,
+    tokens: outcome.tokens,
+    wallMs: Math.round(outcome.wallMs),
+    dispositions: dispositionHistogram(outcome.reports),
+    readback: outcome.readback,
+  }
+}
+
+function normalizeCheck(check) {
+  return { check: check.check, kind: check.kind, ok: check.ok, ...(check.why === undefined ? {} : { why: check.why }) }
+}
+
 /** Every task row's status counts plus the merged disposition histogram. */
 export function summarize(rows) {
   const counts = { pass: 0, fail: 0, unverified: 0, error: 0, skipped: 0 }
