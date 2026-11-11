@@ -55,7 +55,7 @@ const adopted = (status: Status): boolean => status.device !== null && status.st
  * Hands a held credential's account and keys to a RUNNING device service (design D r9 sections 3-4). It never installs
  * or starts one and never reads a credential store: the caller already holds `credential` in memory.
  * `when: "always"` is a fresh sign-in; `when: "not_adopted"` is the re-adopt, sent only while the service reports no
- * adopted device.
+ * adopted device. `held_other`: the service already holds another live device of the account and kept it.
  */
 export const handDeviceKeys = async (options: {
   readonly stateDir: string
@@ -64,13 +64,21 @@ export const handDeviceKeys = async (options: {
   readonly when: "always" | "not_adopted"
   /** One line when an endpoint file is there but no service answers it. */
   readonly log?: (line: string) => void
-}): Promise<"adopted" | "already_adopted" | "not_running"> => {
+}): Promise<"adopted" | "already_adopted" | "held_other" | "not_running"> => {
   if (!existsSync(deviceServiceEndpointPath(options.stateDir))) return "not_running"
   const service = await connectOrNotRunning(options.connect, options.log)
   if (service === "not_running") return "not_running"
   try {
     if (options.when === "not_adopted" && adopted(await service.status())) return "already_adopted"
-    await service.adopt(options.credential)
+    const answered = await service.adopt(options.credential)
+    // relayd #983: a service holding another live device of the account attaches to it and adopts nothing. This sign-in's
+    // keys are NOT the machine's device then; the caller must not treat them as adopted.
+    if (answered.id !== options.credential.device.id) {
+      options.log?.(
+        `OmO device service: it holds this computer's device ${answered.id} (${answered.name}) and kept it; the keys handed over were not adopted.`,
+      )
+      return "held_other"
+    }
     return "adopted"
   } finally {
     service.close()

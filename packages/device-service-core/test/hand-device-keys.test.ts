@@ -198,4 +198,17 @@ describe("handing held device keys to the device service", () => {
     ).toBe("adopted")
     expect(owner.state.adoptions).toBe(1)
   })
+
+  // relayd #983 answers an adopt for another device id with the device it holds and adopts nothing: that is not "adopted".
+  test("a service holding another live device answers with it, and the hand-off reports held_other", async () => {
+    const stateDir = stateDirOf()
+    const owner = await ownerAt(stateDir, true)
+    const lines: string[] = []
+    const credential = { ...held(), device: { id: "dev-other", name: "Other sign-in" } }
+    expect(
+      await handDeviceKeys({ stateDir, connect: connector(stateDir).connect, credential, when: "always", log: line => lines.push(line) }),
+    ).toBe("held_other")
+    expect(owner.state.adoptions).toBe(0)
+    expect(lines).toEqual([expect.stringContaining("dev-self")])
+  })
 })
