@@ -1,6 +1,9 @@
 //! Rows of the permission, capture, input, target, key, coordinate and accessibility codes.
 
-use super::{make, ComputerCode, EngineCode, ErrorRow, NothingSent, Reason, Source};
+use super::{
+    make, ComputerCode, EngineCode, ErrorRow, NextCall, NothingSent, Reason, Source,
+    NOTHING_FOLLOWS,
+};
 use super::{ASK, DUU, INNER, INSPECT, NDAU, NDS, REFRESH};
 
 pub(super) static ROWS: &[ErrorRow] = &[
@@ -28,7 +31,7 @@ pub(super) static ROWS: &[ErrorRow] = &[
     e!(BackgroundUnavailable, NoFocusTarget => BackgroundUnavailable, NDS, Yes, INSPECT, "el.setValue()"),
     e!(BackgroundUnavailable, ModalLoop => BackgroundUnavailable, NDS, Yes, INSPECT, "el.setValue()"),
     e!(BackgroundUnavailable, WaylandWindowTargeting => BackgroundUnavailable, NDS, Yes, INSPECT, "el.setValue()"),
-    e!(BackgroundUnavailable, UserModifierHeld => BackgroundUnavailable, NDAU, Yes, ASK, _),
+    e!(BackgroundUnavailable, UserModifierHeld => BackgroundUnavailable, NDAU, Yes, ASK, "wait, then retry"),
     e!(BackgroundUnavailable, PostedModifierChord => BackgroundUnavailable, NDS, Yes, INSPECT, "win.menu.select(path)"),
     e!(BackgroundUnavailable, CanvasGl => BackgroundUnavailable, NDS, Yes, INSPECT, "win.click(x, y, { delivery: \"foreground\" })"),
     e!(BackgroundUnavailable, ChromiumElectron => BackgroundUnavailable, NDS, Yes, INSPECT, "win.click(x, y, { button: \"right\", delivery: \"foreground\" })"),
@@ -54,11 +57,11 @@ pub(super) static ROWS: &[ErrorRow] = &[
     e!(InvalidTarget, Ambiguous => AmbiguousTarget, NDS, Yes, INSPECT, "computer.windows()"),
     e!(InvalidTarget, IdentityChanged => InvalidTarget, NDAU, Yes, ASK, "computer.hands()"),
     e!(InvalidTarget, RefForeignHand => InvalidTarget, NDS, Yes, INSPECT, "win.observe()"),
-    e!(InvalidKey, _ => InvalidKey, NDS, Yes, INSPECT, _),
-    e!(InvalidKey, DangerousChord => InvalidKey, NDAU, Yes, ASK, _),
+    e!(InvalidKey, _ => InvalidKey, NDS, Yes, INSPECT, "win.press(chord)"),
+    e!(InvalidKey, DangerousChord => InvalidKey, NDAU, Yes, ASK, none),
     e!(InvalidKey, Unresolvable => InvalidKey, NDS, Yes, INSPECT, "win.paste(text)"),
     e!(InvalidKey, UnknownKey => InvalidKey, NDS, Yes, INSPECT, "win.paste(text)"),
-    e!(InvalidKey, Unknown => InvalidKey, NDS, Yes, INSPECT, _),
+    e!(InvalidKey, Unknown => InvalidKey, NDS, Yes, INSPECT, "win.press(chord)"),
     e!(InvalidKey, TextUnsupported => InvalidKey, NDS, Yes, INSPECT, "win.paste(text)"),
     e!(InvalidCoordinateFrame, _ => DisplayStale, NDS, Yes, REFRESH, "win.screenshot()"),
     e!(InvalidCoordinateFrame, FrameRequired => DisplayStale, NDS, Yes, REFRESH, "win.screenshot()"),

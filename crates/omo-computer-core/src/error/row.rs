@@ -72,6 +72,16 @@ pub enum Recovery {
     AskUser,
 }
 
+/// What the model calls next after this failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NextCall {
+    /// The call to make next (an example string; the real one names the exact handle).
+    Call(&'static str),
+    /// Nothing to call: allowed only where the design says nothing follows; `cite` names the
+    /// design file and section that says so.
+    Nothing { cite: &'static str },
+}
+
 /// One row of the table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ErrorRow {
@@ -81,7 +91,7 @@ pub struct ErrorRow {
     pub nothing_sent: NothingSent,
     pub retryable: bool,
     pub recovery: Option<Recovery>,
-    pub next_call: Option<&'static str>,
+    pub next_call: NextCall,
 }
 
 /// A failure the table has no row for: a typed result, never a fallthrough code.
