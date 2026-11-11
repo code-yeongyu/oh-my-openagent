@@ -1,0 +1,114 @@
+/* ---------- 2. Base ---------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: clip;
+  transition:
+    background-color var(--dur-ui) var(--ease-standard),
+    color var(--dur-ui) var(--ease-standard);
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: inherit;
+}
+
+pre {
+  font-family: var(--font-term);
+}
+
+/* Inline commands read as text in Timeless Sans, set off by weight and a wash; mono stays inside terminal panes. */
+code,
+kbd {
+  font-family: var(--font-sans);
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Code inside a block stays in the block's terminal face, so space-aligned columns line up. */
+pre code,
+pre kbd {
+  font-family: inherit;
+  font-weight: inherit;
+}
+
+::selection {
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.skip {
+  position: absolute;
+  left: var(--space-4);
+  top: -100px;
+  z-index: 100;
+  padding: var(--space-2) var(--space-4);
+  background: var(--primary);
+  color: var(--primary-ink);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+}
+
+.skip:focus {
+  top: var(--space-4);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+main:focus {
+  outline: none;
+}
+.caption {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+.caption a {
+  color: var(--ink);
+  text-underline-offset: 3px;
+  text-decoration-color: var(--line-strong);
+}
+.caption a:hover {
+  text-decoration-color: currentColor;
+}
+
+figure {
+  margin: 0;
+}

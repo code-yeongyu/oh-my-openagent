@@ -7,7 +7,28 @@ import { readdir, readFile } from "@oh-my-opencode/memory-core/fs"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { V1_PERSONA_SEED_SHA256, auditMemoryRepo, isMemoryContentPath, parseLockRecord, readReflectionParkFile, type MemoryAuditReport } from "@oh-my-opencode/memory-core"
+import {
+  V1_PERSONA_SEED_SHA256,
+  auditMemoryRepo,
+  countRuntimePastRetention,
+  describeRuntimeCapExcess,
+  formatRuntimeBytes,
+  isMemoryContentPath,
+  measureRuntimeCapEvictableBytes,
+  measureRuntimeSizeWithinBudget,
+  measureUnreflectedJournalBytes,
+  parseLockRecord,
+  readLastRetentionLogEntry,
+  readUnreflectedRetentionGate,
+  readReflectionParkFile,
+  runtimeSizeStanding,
+  type MemoryAuditReport,
+  type MemoryIdentityPaths,
+  type RuntimePastRetention,
+  type RuntimeRetentionPolicy,
+  type RuntimeSize,
+  type RuntimeStoreSize,
+} from "@oh-my-opencode/memory-core"
 
 import {
   locateReflectionChildLog,
@@ -64,17 +85,22 @@ export async function checkFrontmatter(repoDir: string, audit?: MemoryAuditRepor
   // Only the frontmatter contract (the set the pre-commit hook validates); root files such as
   // ARCHIVE.md and notes/ are outside it.
   const paths = (await listMarkdown(repoDir, "")).filter(isMemoryContentPath)
-  const failures = (audit ?? await auditMemoryRepo(repoDir)).issues
+  const failures = (audit ?? (await auditMemoryRepo(repoDir))).issues
     .filter((issue) => issue.code === "frontmatter_invalid")
     .map((issue) => `${issue.path} (${issue.detail})`)
 
-  const frontmatter: DoctorCheck = failures.length === 0
-    ? { name: "frontmatter", level: "ok", detail: `${paths.length} memory file${paths.length === 1 ? "" : "s"} valid` }
-    : {
-        name: "frontmatter",
-        level: "fail",
-        detail: `${failures.length} invalid file${failures.length === 1 ? "" : "s"}: ${failures.join("; ")}; fix the frontmatter or remove the file`,
-      }
+  const frontmatter: DoctorCheck =
+    failures.length === 0
+      ? {
+          name: "frontmatter",
+          level: "ok",
+          detail: `${paths.length} memory file${paths.length === 1 ? "" : "s"} valid`,
+        }
+      : {
+          name: "frontmatter",
+          level: "fail",
+          detail: `${failures.length} invalid file${failures.length === 1 ? "" : "s"}: ${failures.join("; ")}; fix the frontmatter or remove the file`,
+        }
 
   const persona: DoctorCheck = paths.includes(PERSONA_PATH)
     ? { name: "persona", level: "ok", detail: `${PERSONA_PATH} present` }
@@ -136,10 +162,7 @@ export async function checkLocks(deps: MemoryCommandDeps, locksDir: string): Pro
   }
 }
 
-export async function checkWorktrees(
-  deps: MemoryCommandDeps,
-  identity: MemoryCommandIdentity,
-): Promise<DoctorCheck> {
+export async function checkWorktrees(deps: MemoryCommandDeps, identity: MemoryCommandIdentity): Promise<DoctorCheck> {
   const { repo, worktrees } = identity.identityPaths
   if (!existsSync(join(repo, ".git"))) {
     return { name: "worktrees", level: "ok", detail: "no repository to inspect" }
@@ -203,7 +226,8 @@ export async function checkAbandonedRuns(reflectionDir: string): Promise<DoctorC
   const abandoned: string[] = []
   for (const entry of entries) {
     const sentinel = join(runsDir, entry.name, "abandoned.json")
-    if (entry.isDirectory() && existsSync(sentinel) && !(await isInterruptedLaunch(sentinel))) abandoned.push(join(runsDir, entry.name))
+    if (entry.isDirectory() && existsSync(sentinel) && !(await isInterruptedLaunch(sentinel)))
+      abandoned.push(join(runsDir, entry.name))
   }
   abandoned.sort()
   if (abandoned.length === 0) return { name: "abandoned-runs", level: "ok", detail: "no abandoned runs" }
@@ -238,7 +262,11 @@ export async function checkReflectionHealth(
     }
   }
   const failure = health.lastFailure
-  const hint = reflectionRemediation(failure?.reason, failure?.detail, await locateReflectionChildLog(reflectionDir, failure?.runId))
+  const hint = reflectionRemediation(
+    failure?.reason,
+    failure?.detail,
+    await locateReflectionChildLog(reflectionDir, failure?.runId),
+  )
   const paused = await describeReflectionPark(reflectionDir)
   return {
     name: "reflection-health",
@@ -257,7 +285,11 @@ async function describeReflectionPark(reflectionDir: string): Promise<string> {
   }
 }
 
-export async function checkTokens(repoDir: string, warnTokens: number, estimate?: SystemTokenEstimate): Promise<DoctorCheck> {
+export async function checkTokens(
+  repoDir: string,
+  warnTokens: number,
+  estimate?: SystemTokenEstimate,
+): Promise<DoctorCheck> {
   estimate ??= await estimateSystemTokens(repoDir)
   if (estimate.totalTokens < warnTokens) {
     return {
@@ -271,4 +303,178 @@ export async function checkTokens(repoDir: string, warnTokens: number, estimate?
     level: "warn",
     detail: `~${estimate.totalTokens} tokens in system/ reached the ${warnTokens} warning threshold; trim system/ and move detail into external memory`,
   }
+}
+
+export interface RuntimeSizeReport {
+  readonly bytes: number
+  /** Set when the walk passed its budget: no size is reported, only when and what budget it exceeded. */
+  readonly sizeUnknown?: { readonly budgetMs: number; readonly at: string }
+  /** `memory.runtime.max_bytes` for this identity; `0` means unbounded. */
+  readonly maxBytes: number
+  readonly percent?: number
+  /** The three largest stores. */
+  readonly stores: readonly RuntimeStoreSize[]
+  readonly pastRetention: RuntimePastRetention
+  readonly unclassifiedJournals: number
+  /**
+   * Bytes in never/partly-reflected journals, which only `discard_unreflected_journals` lets the cap evict.
+   * Measured only where the over-cap line prints it: over the cap with the switch off.
+   */
+  readonly unreflectedBytes?: number
+  readonly discardUnreflectedJournals: boolean
+  /** Over the cap only: bytes the next cap pass could evict now (memory-core measureRuntimeCapEvictableBytes). */
+  readonly evictableBytes?: number
+  /** Abandoned-journal retention is suspended by the health gate since this failed completion. */
+  readonly suspendedSince?: string
+  /** The newest entry of the runtime's removal log (#12932); absent when no cleanup is recorded. */
+  readonly lastCleanup?: { readonly at: string; readonly total: number }
+}
+
+/** The number the size cap acts on (memory-core measureRuntimeSize), with what retention would still free. */
+export async function checkRuntimeSize(
+  identityPaths: MemoryIdentityPaths,
+  input: {
+    readonly maxBytes: number
+    readonly policy: RuntimeRetentionPolicy
+    readonly now: number
+    readonly reflectionEnabled: boolean
+    readonly discardUnreflectedJournals: boolean
+    readonly measureBudgetMs?: number
+    readonly measureSignal?: AbortSignal
+  },
+): Promise<{ readonly check: DoctorCheck; readonly report: RuntimeSizeReport }> {
+  // One deadline bounds the whole measurement: the size walk and the journal scans that read transcripts.
+  const signal =
+    input.measureSignal ??
+    (input.measureBudgetMs === undefined ? undefined : AbortSignal.timeout(input.measureBudgetMs))
+  const measured = await measureRuntimeSizeWithinBudget(identityPaths.runtime, {
+    now: input.now,
+    ...(input.measureBudgetMs === undefined ? {} : { budgetMs: input.measureBudgetMs }),
+    ...(signal === undefined ? {} : { signal }),
+  })
+  const result = await (async () => {
+    if ("sizeUnknown" in measured) return sizeUnknownResult(measured.sizeUnknown, input)
+    try {
+      return await measuredRuntimeSize(identityPaths, measured.size, input, signal)
+    } catch (error) {
+      if (signal?.aborted !== true) throw error
+      return sizeUnknownResult({ budgetMs: input.measureBudgetMs ?? 0, at: new Date(input.now).toISOString() }, input)
+    }
+  })()
+  // An unreadable removal log reads as none recorded; it never hides the size check.
+  const lastCleanup = await readLastRetentionLogEntry(identityPaths.runtime).catch(() => undefined)
+  const cleanup =
+    lastCleanup === undefined ? "no cleanup recorded" : `last cleanup ${lastCleanup.at} removed ${lastCleanup.total}`
+  return {
+    check: { ...result.check, detail: `${result.check.detail}; ${cleanup}` },
+    report: lastCleanup === undefined ? result.report : { ...result.report, lastCleanup },
+  }
+}
+
+function sizeUnknownResult(
+  sizeUnknown: { readonly budgetMs: number; readonly at: string },
+  input: { readonly maxBytes: number; readonly discardUnreflectedJournals: boolean },
+): { readonly check: DoctorCheck; readonly report: RuntimeSizeReport } {
+  const { budgetMs, at } = sizeUnknown
+  return {
+    check: {
+      name: "runtime-size",
+      level: "warn",
+      detail: `size unknown: measurement exceeded ${budgetMs} ms on ${at}`,
+    },
+    report: {
+      bytes: 0,
+      sizeUnknown: { budgetMs, at },
+      maxBytes: input.maxBytes,
+      stores: [],
+      pastRetention: { runs: 0, journals: 0, sidecars: 0, unclassifiedJournals: 0 },
+      unclassifiedJournals: 0,
+      discardUnreflectedJournals: input.discardUnreflectedJournals,
+    },
+  }
+}
+
+async function measuredRuntimeSize(
+  identityPaths: MemoryIdentityPaths,
+  size: RuntimeSize,
+  input: {
+    readonly maxBytes: number
+    readonly policy: RuntimeRetentionPolicy
+    readonly now: number
+    readonly reflectionEnabled: boolean
+    readonly discardUnreflectedJournals: boolean
+  },
+  signal: AbortSignal | undefined,
+): Promise<{ readonly check: DoctorCheck; readonly report: RuntimeSizeReport }> {
+  const deadline = signal === undefined ? {} : { signal }
+  const pastRetention = await countRuntimePastRetention({
+    paths: identityPaths,
+    policy: input.policy,
+    now: () => input.now,
+    reflectionEnabled: input.reflectionEnabled,
+    ...deadline,
+  })
+  const gate = input.discardUnreflectedJournals
+    ? await readUnreflectedRetentionGate(identityPaths.reflection, input.reflectionEnabled)
+    : undefined
+  const suspendedSince = gate?.open === false ? gate.newest?.at : undefined
+  const standing = runtimeSizeStanding(size.bytes, input.maxBytes)
+  const overCap = input.maxBytes > 0 ? size.bytes - input.maxBytes : 0
+  // The over-cap line is the only place the unreflected bytes are printed, and only with the switch off.
+  const unreflectedBytes =
+    overCap > 0 && !input.discardUnreflectedJournals
+      ? await measureUnreflectedJournalBytes({ paths: identityPaths, policy: input.policy, ...deadline })
+      : undefined
+  const evictableBytes =
+    overCap > 0
+      ? await measureRuntimeCapEvictableBytes({
+          paths: identityPaths,
+          policy: { ...input.policy, discardUnreflectedJournals: input.discardUnreflectedJournals },
+          now: () => input.now,
+          reflectionEnabled: input.reflectionEnabled,
+          ...deadline,
+        })
+      : undefined
+  const excess = describeRuntimeCapExcess({
+    overCapBytes: overCap,
+    evictableBytes: evictableBytes ?? 0,
+    unreflectedBytes: unreflectedBytes ?? 0,
+    discardUnreflectedJournals: input.discardUnreflectedJournals,
+  })
+  const stores = size.stores.slice(0, 3)
+  const report: RuntimeSizeReport = {
+    bytes: size.bytes,
+    maxBytes: input.maxBytes,
+    ...(standing.percent === undefined ? {} : { percent: standing.percent }),
+    stores,
+    pastRetention,
+    unclassifiedJournals: pastRetention.unclassifiedJournals,
+    ...(unreflectedBytes === undefined ? {} : { unreflectedBytes }),
+    discardUnreflectedJournals: input.discardUnreflectedJournals,
+    ...(evictableBytes === undefined ? {} : { evictableBytes }),
+    ...(suspendedSince === undefined ? {} : { suspendedSince }),
+  }
+  const cap = input.maxBytes > 0 ? `${standing.percent}% of the ${formatRuntimeBytes(input.maxBytes)} cap` : "no cap"
+  const largest = stores.map((store) => `${store.store} ${formatRuntimeBytes(store.bytes)}`).join(", ")
+  const past = pastRetention.runs + pastRetention.journals + pastRetention.sidecars
+  const detail = [
+    `${formatRuntimeBytes(size.bytes)} (${cap})`,
+    ...(largest === "" ? [] : [`largest: ${largest}`]),
+    `past retention: ${pastRetention.runs} runs, ${pastRetention.journals} journals, ${pastRetention.sidecars} sidecars`,
+    ...(pastRetention.unclassifiedJournals > 0
+      ? [`${pastRetention.unclassifiedJournals} unclassified journals kept`]
+      : []),
+    ...(excess === undefined ? [] : [excess]),
+    ...(suspendedSince === undefined
+      ? []
+      : [`abandoned-journal retention suspended since ${suspendedSince} (reflection is failing)`]),
+    // Over the cap the excess line already says what the next pass evicts; this one is for 80-100 %.
+    ...(standing.level === "warn" && excess === undefined
+      ? [
+          `the next maintenance pass evicts the oldest runtime data down to the cap${past > 0 ? " after retention frees what is past its window" : ""}`,
+        ]
+      : []),
+    ...(standing.level === "warn" ? ["raise memory.runtime.max_bytes, or set it to 0, to keep more"] : []),
+  ].join("; ")
+  return { check: { name: "runtime-size", level: standing.level, detail }, report }
 }

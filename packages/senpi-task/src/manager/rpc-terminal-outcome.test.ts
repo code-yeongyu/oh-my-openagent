@@ -66,7 +66,8 @@ describe("RPC terminal outcomes", () => {
     // then
     expect(record.status).toBe("error")
     expect(record.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
-    if (result.kind === "start_failed") expect(result.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
+    if (result.kind === "start_failed")
+      expect(result.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
     expect(rejections).toEqual([])
   })
 
@@ -97,7 +98,7 @@ describe("RPC terminal outcomes", () => {
       failure: { kind: "child-turn-failed", message: "provider unavailable" },
     })
     expect(terminal.status).toBe("error")
-    expect(terminal.error_message).toBe("provider unavailable")
+    expect(terminal.error_message?.split("\n")[0]).toBe("provider unavailable")
     expect(store.load(started.task_id)?.status).toBe("error")
   })
 })

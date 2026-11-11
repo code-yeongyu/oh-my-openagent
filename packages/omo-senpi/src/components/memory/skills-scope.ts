@@ -78,7 +78,9 @@ export function createMemorySkillsScopeHandler(
     if (context === undefined) return undefined
     const skillsDir = memorySkillsDir(context)
     if (!existsSync(skillsDir)) return undefined
-    const entry: MemorySkillsDiscoverEntry = acceptsScopedEntries(payload) ? { path: skillsDir, scope: "user" } : skillsDir
+    const entry: MemorySkillsDiscoverEntry = acceptsScopedEntries(payload)
+      ? { path: skillsDir, scope: "user" }
+      : skillsDir
     return { skillPaths: [entry] }
   }
 }

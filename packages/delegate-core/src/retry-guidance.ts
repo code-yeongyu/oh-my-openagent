@@ -6,9 +6,7 @@ function extractAvailableList(output: string): string | null {
 }
 
 export function buildRetryGuidance(errorInfo: DetectedError): string {
-  const pattern = DELEGATE_TASK_ERROR_PATTERNS.find(
-    (entry) => entry.errorType === errorInfo.errorType
-  )
+  const pattern = DELEGATE_TASK_ERROR_PATTERNS.find((entry) => entry.errorType === errorInfo.errorType)
 
   if (!pattern) {
     return `[task ERROR] Fix the error and retry with correct parameters.`

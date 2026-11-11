@@ -24,7 +24,7 @@ function resetTestCache(): void {
   mkdirSync(join(TEST_OPENCODE_CACHE_DIR, "node_modules", "oh-my-opencode"), { recursive: true })
   writeFileSync(
     join(TEST_OPENCODE_CACHE_DIR, "package.json"),
-    JSON.stringify({ dependencies: { "oh-my-opencode": "latest", other: "1.0.0" } }, null, 2)
+    JSON.stringify({ dependencies: { "oh-my-opencode": "latest", other: "1.0.0" } }, null, 2),
   )
   writeFileSync(
     join(TEST_OPENCODE_CACHE_DIR, "bun.lock"),
@@ -43,12 +43,12 @@ function resetTestCache(): void {
         },
       },
       null,
-      2
-    )
+      2,
+    ),
   )
   writeFileSync(
     join(TEST_OPENCODE_CACHE_DIR, "node_modules", "oh-my-opencode", "package.json"),
-    '{"name":"oh-my-opencode"}'
+    '{"name":"oh-my-opencode"}',
   )
 }
 

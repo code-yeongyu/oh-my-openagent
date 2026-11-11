@@ -12,7 +12,8 @@ const CENTRAL_SIGNATURE = 0x02014b50
 const LOCAL_SIGNATURE = 0x04034b50
 const ZIP64_SENTINEL = 0xffffffff
 
-export type SgProvisionErrorCode = "bad_checksum" | "download_failed" | "extract_failed" | "unsupported_platform" | "write_failed"
+export type SgProvisionErrorCode =
+  "bad_checksum" | "download_failed" | "extract_failed" | "unsupported_platform" | "write_failed"
 
 export class SgProvisionError extends Error {
   readonly code: SgProvisionErrorCode
@@ -45,21 +46,36 @@ function timeoutSignal(signal: AbortSignal | undefined): AbortSignal {
   return signal === undefined ? timeout : AbortSignal.any([signal, timeout])
 }
 
-async function downloadAsset(url: string, fetchImpl: SgProvisionOptions["fetchImpl"], signal: AbortSignal): Promise<Buffer> {
+async function downloadAsset(
+  url: string,
+  fetchImpl: SgProvisionOptions["fetchImpl"],
+  signal: AbortSignal,
+): Promise<Buffer> {
   const activeFetch = fetchImpl ?? globalThis.fetch
   let response: Response
   try {
     response = await activeFetch(url, { signal })
   } catch (error) {
-    throw new SgProvisionError("download_failed", `failed to download ast-grep ${SG_PINNED_VERSION} from ${url}: ${describeFailure(error)}`, { cause: error })
+    throw new SgProvisionError(
+      "download_failed",
+      `failed to download ast-grep ${SG_PINNED_VERSION} from ${url}: ${describeFailure(error)}`,
+      { cause: error },
+    )
   }
   if (!response.ok) {
-    throw new SgProvisionError("download_failed", `failed to download ast-grep ${SG_PINNED_VERSION} from ${url}: HTTP ${response.status}`)
+    throw new SgProvisionError(
+      "download_failed",
+      `failed to download ast-grep ${SG_PINNED_VERSION} from ${url}: HTTP ${response.status}`,
+    )
   }
   try {
     return Buffer.from(await response.arrayBuffer())
   } catch (error) {
-    throw new SgProvisionError("download_failed", `failed to read ast-grep ${SG_PINNED_VERSION} download from ${url}: ${describeFailure(error)}`, { cause: error })
+    throw new SgProvisionError(
+      "download_failed",
+      `failed to read ast-grep ${SG_PINNED_VERSION} download from ${url}: ${describeFailure(error)}`,
+      { cause: error },
+    )
   }
 }
 
@@ -103,11 +119,18 @@ function listZipEntries(zip: Buffer): readonly ZipCentralEntry[] {
 function decompressZipEntry(raw: Buffer, entry: ZipCentralEntry): Buffer {
   if (entry.method === 0) return Buffer.from(raw)
   if (entry.method === 8) return inflateRawSync(raw)
-  throw new SgProvisionError("extract_failed", `ast-grep zip entry ${entry.name} uses unsupported compression method ${entry.method}`)
+  throw new SgProvisionError(
+    "extract_failed",
+    `ast-grep zip entry ${entry.name} uses unsupported compression method ${entry.method}`,
+  )
 }
 
 function readZipEntryBytes(zip: Buffer, entry: ZipCentralEntry): Buffer {
-  if (entry.compressedSize === ZIP64_SENTINEL || entry.uncompressedSize === ZIP64_SENTINEL || entry.localHeaderOffset === ZIP64_SENTINEL) {
+  if (
+    entry.compressedSize === ZIP64_SENTINEL ||
+    entry.uncompressedSize === ZIP64_SENTINEL ||
+    entry.localHeaderOffset === ZIP64_SENTINEL
+  ) {
     throw new SgProvisionError("extract_failed", `ast-grep zip entry ${entry.name} uses unsupported zip64 extensions`)
   }
   if (zip.readUInt32LE(entry.localHeaderOffset) !== LOCAL_SIGNATURE) {
@@ -118,7 +141,10 @@ function readZipEntryBytes(zip: Buffer, entry: ZipCentralEntry): Buffer {
   const dataStart = entry.localHeaderOffset + 30 + nameLength + extraLength
   const bytes = decompressZipEntry(zip.subarray(dataStart, dataStart + entry.compressedSize), entry)
   if (bytes.length !== entry.uncompressedSize) {
-    throw new SgProvisionError("extract_failed", `ast-grep zip entry ${entry.name} inflated to ${bytes.length} bytes, expected ${entry.uncompressedSize}`)
+    throw new SgProvisionError(
+      "extract_failed",
+      `ast-grep zip entry ${entry.name} inflated to ${bytes.length} bytes, expected ${entry.uncompressedSize}`,
+    )
   }
   return bytes
 }
@@ -131,7 +157,10 @@ function extractStandaloneSgBinary(zip: Buffer, platform: NodeJS.Platform): Buff
     const entry = entries.find((candidate) => zipEntryBaseName(candidate.name) === preferred)
     if (entry !== undefined) return readZipEntryBytes(zip, entry)
   }
-  throw new SgProvisionError("extract_failed", `ast-grep release zip has no standalone ${preferredNames.join(" or ")} binary`)
+  throw new SgProvisionError(
+    "extract_failed",
+    `ast-grep release zip has no standalone ${preferredNames.join(" or ")} binary`,
+  )
 }
 
 function assertInsideTarget(targetDir: string, filePath: string): void {
@@ -159,7 +188,10 @@ export async function provisionSgBinary(options: SgProvisionOptions): Promise<st
     const archive = await downloadAsset(asset.url, options.fetchImpl, timeoutSignal(options.signal))
     const actualSha256 = sha256(archive)
     if (actualSha256 !== asset.sha256) {
-      throw new SgProvisionError("bad_checksum", `checksum mismatch for ${basename(asset.url)}: expected ${asset.sha256}, got ${actualSha256}`)
+      throw new SgProvisionError(
+        "bad_checksum",
+        `checksum mismatch for ${basename(asset.url)}: expected ${asset.sha256}, got ${actualSha256}`,
+      )
     }
     await writeFile(tempPath, extractStandaloneSgBinary(archive, platform))
     await chmod(tempPath, 0o755)
@@ -168,6 +200,10 @@ export async function provisionSgBinary(options: SgProvisionOptions): Promise<st
   } catch (error) {
     await rm(tempPath, { force: true })
     if (error instanceof SgProvisionError) throw error
-    throw new SgProvisionError("write_failed", `failed to provision ast-grep ${SG_PINNED_VERSION} into ${targetDir}: ${describeFailure(error)}`, { cause: error })
+    throw new SgProvisionError(
+      "write_failed",
+      `failed to provision ast-grep ${SG_PINNED_VERSION} into ${targetDir}: ${describeFailure(error)}`,
+      { cause: error },
+    )
   }
 }

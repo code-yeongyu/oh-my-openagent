@@ -12,7 +12,11 @@ export type FakeTeamService = TeamToolsService & { readonly calls: ServiceCall[]
 
 export function createFakeTeamService(overrides: Partial<TeamToolsService> = {}): FakeTeamService {
   const calls: ServiceCall[] = []
-  const record = <T>(method: string, args: readonly unknown[], impl: (() => T | Promise<T>) | undefined): Promise<T> => {
+  const record = <T>(
+    method: string,
+    args: readonly unknown[],
+    impl: (() => T | Promise<T>) | undefined,
+  ): Promise<T> => {
     calls.push({ method, args })
     if (impl === undefined) return Promise.reject(new Error(`fake team service: ${method} not stubbed`))
     return Promise.resolve(impl())
@@ -22,7 +26,11 @@ export function createFakeTeamService(overrides: Partial<TeamToolsService> = {})
     createTeam: (input) => record("createTeam", [input], overrides.createTeam && (() => overrides.createTeam!(input))),
     deleteTeam: (input) => record("deleteTeam", [input], overrides.deleteTeam && (() => overrides.deleteTeam!(input))),
     sendMessage: (teamRunId, input) =>
-      record("sendMessage", [teamRunId, input], overrides.sendMessage && (() => overrides.sendMessage!(teamRunId, input))),
+      record(
+        "sendMessage",
+        [teamRunId, input],
+        overrides.sendMessage && (() => overrides.sendMessage!(teamRunId, input)),
+      ),
     status: (teamRunId) => record("status", [teamRunId], overrides.status && (() => overrides.status!(teamRunId))),
     listTeams: () => record("listTeams", [], overrides.listTeams && (() => overrides.listTeams!())),
     createTask: (teamRunId, input) =>
@@ -33,11 +41,23 @@ export function createFakeTeamService(overrides: Partial<TeamToolsService> = {})
     getTask: (teamRunId, taskId) =>
       record("getTask", [teamRunId, taskId], overrides.getTask && (() => overrides.getTask!(teamRunId, taskId))),
     requestShutdown: (teamRunId, member) =>
-      record("requestShutdown", [teamRunId, member], overrides.requestShutdown && (() => overrides.requestShutdown!(teamRunId, member))),
+      record(
+        "requestShutdown",
+        [teamRunId, member],
+        overrides.requestShutdown && (() => overrides.requestShutdown!(teamRunId, member)),
+      ),
     approveShutdown: (teamRunId, member) =>
-      record("approveShutdown", [teamRunId, member], overrides.approveShutdown && (() => overrides.approveShutdown!(teamRunId, member))),
+      record(
+        "approveShutdown",
+        [teamRunId, member],
+        overrides.approveShutdown && (() => overrides.approveShutdown!(teamRunId, member)),
+      ),
     rejectShutdown: (teamRunId, member, reason) =>
-      record("rejectShutdown", [teamRunId, member, reason], overrides.rejectShutdown && (() => overrides.rejectShutdown!(teamRunId, member, reason))),
+      record(
+        "rejectShutdown",
+        [teamRunId, member, reason],
+        overrides.rejectShutdown && (() => overrides.rejectShutdown!(teamRunId, member, reason)),
+      ),
   }
 }
 
@@ -54,7 +74,13 @@ export function fakeRuntimeState(overrides: Partial<RuntimeState> = {}): Runtime
       { name: "beta", agentType: "general-purpose", status: "idle", pendingInjectedMessageIds: [] },
     ],
     shutdownRequests: [],
-    bounds: { maxMembers: 8, maxParallelMembers: 4, maxMessagesPerRun: 10000, maxWallClockMinutes: 120, maxMemberTurns: 500 },
+    bounds: {
+      maxMembers: 8,
+      maxParallelMembers: 4,
+      maxMessagesPerRun: 10000,
+      maxWallClockMinutes: 120,
+      maxMemberTurns: 500,
+    },
     ...overrides,
   }
 }
@@ -90,7 +116,12 @@ export function fakeCreateResult(overrides: Partial<CreateTeamResult> = {}): Cre
     memberTaskIds: { alpha: "st_a", beta: "st_b" },
     members: [
       fakeCreatedMember(),
-      fakeCreatedMember({ name: "beta", taskId: "st_b", status: "idle", role: { kind: "subagent_type", subagentType: "writer" } }),
+      fakeCreatedMember({
+        name: "beta",
+        taskId: "st_b",
+        status: "idle",
+        role: { kind: "subagent_type", subagentType: "writer" },
+      }),
     ],
     ...overrides,
   }

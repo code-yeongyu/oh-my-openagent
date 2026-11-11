@@ -1,6 +1,5 @@
 import type { AgentToolResult, Theme, ThemeColor, ToolRenderResultOptions } from "@code-yeongyu/senpi"
 
-import { describeParentModelFallback } from "../../parent-model-fallback-text"
 import { formatStatusTarget, taskIdentityLabel } from "../../status-line"
 import {
   excerptRendererText,
@@ -31,7 +30,8 @@ const TARGET_EXCERPT_MAX = 56
 
 export function renderTaskOutputCall(args: TaskOutputInput, theme: OutputRenderTheme): RenderComponent {
   return {
-    render: (width: number): string[] => linesComponent([theme.fg("toolTitle", taskOutputCallLine(args, width))]).render(width),
+    render: (width: number): string[] =>
+      linesComponent([theme.fg("toolTitle", taskOutputCallLine(args, width))]).render(width),
     invalidate: (): void => {},
   }
 }
@@ -50,7 +50,10 @@ function taskOutputCallLine(args: TaskOutputInput, width: number): string {
   const tail = mode === "tail" ? `tail_lines:${args.tail_lines ?? DEFAULT_TAIL_LINES}` : undefined
   const beforeTarget = "task_output target:"
   const afterTarget = joinRendererTokens([`mode:${mode}`, "peek", tail])
-  const available = Math.min(TARGET_EXCERPT_MAX, Math.max(0, width - rendererVisibleWidth(beforeTarget) - rendererVisibleWidth(afterTarget) - 1))
+  const available = Math.min(
+    TARGET_EXCERPT_MAX,
+    Math.max(0, width - rendererVisibleWidth(beforeTarget) - rendererVisibleWidth(afterTarget) - 1),
+  )
   const target = excerptRendererText(args.task_id ?? args.name ?? "<missing>", available)
   return joinRendererTokens([`${beforeTarget}${target}`, afterTarget])
 }
@@ -66,7 +69,6 @@ function taskOutputResultRow(details: TaskOutputDetails): ResultRow {
           agentType: details.snapshot.agent_type,
           resolvedModel: details.snapshot.resolved_model,
           effectiveModel: details.snapshot.effective_model,
-          parentModelFallback: details.snapshot.parent_model_fallback,
         }) ?? `model:${normalizeRendererText(details.snapshot.model)}`
       const statusLabel = details.snapshot.suspended?.explanation ?? normalizeRendererText(details.snapshot.status)
       return {
@@ -74,6 +76,11 @@ function taskOutputResultRow(details: TaskOutputDetails): ResultRow {
         text: `${joinRendererTokens([`task_output ${identity}`, idSuffix, statusLabel])} · ${target}${runStatsSuffix(details.snapshot.run_stats)}`,
       }
     }
+    case "no_progress":
+      return {
+        color: statusThemeColor(details.status),
+        text: `task_output ${normalizeRendererText(details.task_id)} ${normalizeRendererText(details.status)} · ${normalizeRendererText(details.reason)}`,
+      }
     case "transcript":
       return {
         color: statusThemeColor(details.snapshot.status),
@@ -94,7 +101,8 @@ function taskOutputResultRow(details: TaskOutputDetails): ResultRow {
 }
 
 function notFoundRow(details: Extract<TaskOutputDetails, { readonly kind: "not_found" }>): string {
-  const known = details.known_tasks.length > 0 ? `known:${excerptRendererText(details.known_tasks.join(","))}` : undefined
+  const known =
+    details.known_tasks.length > 0 ? `known:${excerptRendererText(details.known_tasks.join(","))}` : undefined
   return joinRendererTokens([`task_output not found: ${details.reason}`, known])
 }
 
@@ -118,11 +126,9 @@ export function taskOutputModelText(snapshot: TaskSnapshot): string {
     snapshot.effective_model.provider === snapshot.resolved_model.provider &&
     snapshot.effective_model.model_id === snapshot.resolved_model.model_id
   const operatorMark = snapshot.effective_model?.switched_by_operator === true ? " (switched by operator)" : ""
-  const parentFallback = describeParentModelFallback(snapshot.parent_model_fallback, snapshot.parent_model)
-  const route = effective === undefined || sameModel
+  return effective === undefined || sameModel
     ? `model ${planned}${operatorMark}`
     : `model ${effective}${operatorMark} (planned ${planned})`
-  return parentFallback === undefined ? route : `${route}; ${parentFallback}`
 }
 
 function nonEmpty(value: string | undefined): string | undefined {

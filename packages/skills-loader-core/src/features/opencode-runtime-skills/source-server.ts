@@ -45,10 +45,7 @@ async function writeResponse(
   response: Response,
   output: { writeHead(statusCode: number, headers: Record<string, string>): unknown; end(chunk: Uint8Array): unknown },
 ): Promise<void> {
-  output.writeHead(
-    response.status,
-    Object.fromEntries(response.headers.entries()),
-  )
+  output.writeHead(response.status, Object.fromEntries(response.headers.entries()))
   output.end(new Uint8Array(await response.arrayBuffer()))
 }
 
@@ -58,9 +55,7 @@ export async function createRuntimeSkillSourceServer(
   },
   runtimeEnv: Pick<RuntimeSkillSourceRuntime, "Bun"> = runtime,
 ): Promise<RuntimeSkillSourceServer> {
-  const skillMarkdownByPath = new Map(
-    options.skills.map((skill) => [`/${skill.name}/SKILL.md`, skill.markdown]),
-  )
+  const skillMarkdownByPath = new Map(options.skills.map((skill) => [`/${skill.name}/SKILL.md`, skill.markdown]))
   const index = {
     skills: options.skills.map((skill) => ({
       name: skill.name,

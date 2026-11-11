@@ -23,7 +23,10 @@ export async function locateReflectionChildLog(
   const id = runId?.trim() ?? ""
   if (id === "" || id === "." || id === ".." || basename(id) !== id) return undefined
   const path = join(reflectionDir, "runs", id, "child-stderr.log")
-  const present = await stat(path).then((info) => info.isFile(), () => false)
+  const present = await stat(path).then(
+    (info) => info.isFile(),
+    () => false,
+  )
   return { path, present }
 }
 

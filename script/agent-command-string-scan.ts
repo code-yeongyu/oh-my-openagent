@@ -13,16 +13,20 @@ export const SCAN_MODULE_RELATIVE_PATH = "script/agent-command-string-scan.ts"
 export const SCAN_TEST_RELATIVE_PATH = "script/agent-command-string-scan.test.ts"
 
 export function isExcluded(filePath: string): boolean {
-  return filePath === ALLOWLIST_RELATIVE_PATH
-    || filePath === AUDIT_TEST_RELATIVE_PATH
-    || filePath === SCAN_MODULE_RELATIVE_PATH
-    || filePath === SCAN_TEST_RELATIVE_PATH
-    || filePath === "CHANGELOG.md"
-    || filePath.endsWith("/CHANGELOG.md")
-    || filePath.startsWith("changes/unreleased/")
-    || filePath === ".omo"
-    || filePath.startsWith(".omo/")
-    || filePath.split("/").some((part) => part === "node_modules" || part === "install-dist" || part === "dist")
+  return (
+    filePath === ALLOWLIST_RELATIVE_PATH ||
+    filePath === AUDIT_TEST_RELATIVE_PATH ||
+    filePath === SCAN_MODULE_RELATIVE_PATH ||
+    filePath === SCAN_TEST_RELATIVE_PATH ||
+    filePath === "CHANGELOG.md" ||
+    filePath.endsWith("/CHANGELOG.md") ||
+    filePath === "changes.md" ||
+    filePath.endsWith("/changes.md") ||
+    filePath.startsWith("changes/unreleased/") ||
+    filePath === ".omo" ||
+    filePath.startsWith(".omo/") ||
+    filePath.split("/").some((part) => part === "node_modules" || part === "install-dist" || part === "dist")
+  )
 }
 
 /**
@@ -50,13 +54,16 @@ export function trackedSourceFiles(workspaceRoot: string): string[] {
   if (result.exitCode !== 0) {
     throw new Error(`git ls-files failed: ${result.stderr.toString("utf8")}`)
   }
-  return result.stdout.toString("utf8").split("\0").filter((filePath) => {
-    if (!filePath || isExcluded(filePath)) {
-      return false
-    }
-    const absolutePath = resolve(workspaceRoot, filePath)
-    return existsSync(absolutePath) && statSync(absolutePath).isFile()
-  })
+  return result.stdout
+    .toString("utf8")
+    .split("\0")
+    .filter((filePath) => {
+      if (!filePath || isExcluded(filePath)) {
+        return false
+      }
+      const absolutePath = resolve(workspaceRoot, filePath)
+      return existsSync(absolutePath) && statSync(absolutePath).isFile()
+    })
 }
 
 export function collectHits(workspaceRoot: string): string[] {

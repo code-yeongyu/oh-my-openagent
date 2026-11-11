@@ -84,9 +84,7 @@ export function parseTaskSend(
 
 export function parseTaskCancel(
   value: unknown,
-):
-  | { readonly value: { readonly task_id: string; readonly reason?: string } }
-  | { readonly error: string } {
+): { readonly value: { readonly task_id: string; readonly reason?: string } } | { readonly error: string } {
   if (!isRecord(value)) return { error: "Request must be an object." }
   if (typeof value.task_id !== "string" || value.task_id.trim().length === 0) {
     return { error: "task_id is required." }
@@ -106,9 +104,7 @@ export function parseTaskCancel(
   }
 }
 
-export function parseTaskOutput(
-  value: unknown,
-):
+export function parseTaskOutput(value: unknown):
   | {
       readonly value: {
         readonly task_id: string
@@ -160,6 +156,13 @@ export function invalidArguments(reason: string) {
 export function boundedTaskOutput(details: TaskOutputDetails) {
   if (details.kind === "not_found") return { kind: "not_found", reason: "Task not found." } as const
   if (details.kind === "invalid_arguments") return details
+  if (details.kind === "no_progress") {
+    return {
+      ...details,
+      task_id: boundedRequired(details.task_id, MAX_TASK_ID_LENGTH),
+      reason: boundedRequired(details.reason, MAX_CONTROL_REASON_LENGTH),
+    }
+  }
   const snapshot = boundedOutputSnapshot(details.snapshot)
   if (details.kind === "status") return { ...details, snapshot }
   const transcript = bounded(details.transcript, MAX_SNAPSHOT_TEXT_LENGTH)
@@ -210,10 +213,7 @@ function boundedOutputSnapshot(snapshot: TaskOutputSnapshot) {
             model_id: boundedRequired(snapshot.resolved_model.model_id, MAX_SNAPSHOT_TEXT_LENGTH),
             display: boundedRequired(snapshot.resolved_model.display, MAX_SNAPSHOT_TEXT_LENGTH),
             variant: bounded(snapshot.resolved_model.variant, MAX_SNAPSHOT_TEXT_LENGTH).value,
-            reasoning_effort: bounded(
-              snapshot.resolved_model.reasoning_effort,
-              MAX_SNAPSHOT_TEXT_LENGTH,
-            ).value,
+            reasoning_effort: bounded(snapshot.resolved_model.reasoning_effort, MAX_SNAPSHOT_TEXT_LENGTH).value,
             reasoning: bounded(snapshot.resolved_model.reasoning, MAX_SNAPSHOT_TEXT_LENGTH).value,
           },
         }),

@@ -2,6 +2,7 @@ import { spawn } from "node:child_process"
 import { existsSync } from "../fs/resilient"
 import { win32 } from "node:path"
 import { GitAbortedError, GitNotFoundError, GitTimeoutError } from "./errors"
+import { memoryGitEnvironment } from "./exec-environment"
 import { holdGitActivityShared } from "./git-activity-lock"
 import { recordGitTimeout } from "./timeout-diagnostics"
 
@@ -34,6 +35,13 @@ export interface GitExecResult {
   stderr: string
   /** Raw stdout for byte-framed output (`git cat-file --batch`); injected execs may omit it. */
   stdoutBytes?: Buffer
+  /** How the child ended, so a silent non-zero exit can be told apart from an external kill (#11943). */
+  termination?: GitTermination
+}
+
+export interface GitTermination {
+  readonly signal: NodeJS.Signals | null
+  readonly elapsedMs: number
 }
 
 export interface GitExec {
@@ -111,6 +119,7 @@ function spawnGitCommand(
   activityFd: number | undefined,
 ): Promise<GitExecResult> {
   return new Promise((resolve, reject) => {
+    const startedAt = Date.now()
     const hasStdin = options.stdin !== undefined
     // git.exe is a console-subsystem binary: without windowsHide every memory auto-commit and
     // sync allocates a fresh console window that Windows foregrounds, stealing the user's focus
@@ -181,7 +190,7 @@ function spawnGitCommand(
         reject(new GitNotFoundError({ cause: error }))
       } else reject(error)
     })
-    const settleWithResult = (code: number | null) => {
+    const settleWithResult = (code: number | null, signal: NodeJS.Signals | null) => {
       if (settled) return
       settled = true
       clearTimeout(timer)
@@ -202,12 +211,13 @@ function spawnGitCommand(
         stdout: stdoutBytes.toString("utf8"),
         stderr: Buffer.concat(stderr).toString("utf8") + describeStdinError(stdinError),
         stdoutBytes,
+        termination: { signal, elapsedMs: Date.now() - startedAt },
       })
     }
     // Git has exited even while a hook it started still holds its stdout/stderr open, so `close`
     // may never come. A stopped git (timeout or abort) settles at once; a git that finished
     // normally settles on `close`, or with what it wrote once the bounded drain runs out.
-    child.on("exit", (code) => {
+    child.on("exit", (code, signal) => {
       if (settled) return
       if (timedOut || aborted) {
         settled = true
@@ -222,20 +232,27 @@ function spawnGitCommand(
         // Still open past the drain: a hook child holds them. Destroy them so it cannot keep us.
         child.stdout!.destroy()
         child.stderr!.destroy()
-        settleWithResult(code)
+        settleWithResult(code, signal)
       }, options.exitDrainMs ?? GIT_EXIT_DRAIN_MS)
     })
-    child.on("close", (code) => settleWithResult(code))
+    child.on("close", (code, signal) => settleWithResult(code, signal))
   })
 }
+
+// Any index-reading command (`status`, `add`, `diff`), not only commit, starts the builtin fsmonitor
+// daemon when a user's config enables it; the daemon then outlives git, holds the activity fd and
+// keeps the repo busy (#10391). Command-line `-c` outranks every config file and reaches hooks too.
+const NO_FSMONITOR = ["-c", "core.fsmonitor=false"] as const
 
 export function createNodeGitExec(runtime: NodeGitExecRuntime = {}): GitExec {
   const platform = runtime.platform ?? process.platform
   const runCommand = runtime.runCommand ?? runGitCommand
 
   return {
-    async run(argv, options) {
-      const environment = options.env ?? process.env
+    async run(callerArgv, options) {
+      const argv = [...NO_FSMONITOR, ...callerArgv]
+      // Never the caller's raw environment: an inherited GIT_CONFIG_* or GIT_DIR would redirect this git (#12354).
+      const environment = memoryGitEnvironment(options.env ?? process.env, platform)
       try {
         return await runCommand("git", argv, options, environment)
       } catch (error) {

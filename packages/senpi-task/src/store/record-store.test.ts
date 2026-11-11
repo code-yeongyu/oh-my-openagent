@@ -1,6 +1,16 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import * as fs from "node:fs"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -83,8 +93,14 @@ describe("createTaskRecordStore caching", () => {
     for (const taskId of ids) store.save(baseRecord(taskId))
 
     // when
-    const first = store.list().records.map((record) => record.task_id).sort()
-    const second = store.list().records.map((record) => record.task_id).sort()
+    const first = store
+      .list()
+      .records.map((record) => record.task_id)
+      .sort()
+    const second = store
+      .list()
+      .records.map((record) => record.task_id)
+      .sort()
 
     // then
     expect(second).toEqual(first)
@@ -111,6 +127,29 @@ describe("createTaskRecordStore caching", () => {
     // then
     expect(result.records.find((record) => record.task_id === idA)?.name).toBe("mutated-A")
     expect(result.records.find((record) => record.task_id === idB)?.name).not.toBe("mutated-A")
+  })
+
+  test("#given another store rewriting a record to the same size within one mtime tick #when load() runs #then it returns the new record", () => {
+    // given
+    const project = tempProject()
+    const reader = createTaskRecordStore({ project_dir: project })
+    const writer = createTaskRecordStore({ project_dir: project })
+    const taskId = "st_00000003"
+    reader.save({ ...baseRecord(taskId), name: "name-1" })
+    const path = join(resolveStateDir({ project_dir: project }), "tasks", `${taskId}.json`)
+    const tick = 1_700_000_000 // whole seconds, so the restored mtime is bit-identical to the cached one
+    utimesSync(path, tick, tick)
+    expect(reader.load(taskId)?.name).toBe("name-1") // warm the reader's cache
+    const cached = statSync(path)
+
+    // when: the rewrite keeps the byte length, and a coarse filesystem clock gives it the same mtime (#10708)
+    writer.mutate(taskId, (record) => ({ ...record, name: "name-2" }))
+    utimesSync(path, tick, tick)
+    expect(statSync(path).size).toBe(cached.size)
+    expect(statSync(path).mtimeMs).toBe(cached.mtimeMs)
+
+    // then
+    expect(reader.load(taskId)?.name).toBe("name-2")
   })
 
   test("#given a record removed by another process #when list() runs #then it disappears from results", () => {
@@ -272,7 +311,7 @@ describe("createTaskRecordStore remove artifacts", () => {
     // children/<taskId>/sessions/<taskId>/x.jsonl
     const childDir = join(stateDir, "children", TASK_ID, "sessions", TASK_ID)
     mkdirSync(childDir, { recursive: true })
-    writeFileSync(join(childDir, "x.jsonl"), "{\"role\":\"user\",\"content\":\"hi\"}\n", "utf8")
+    writeFileSync(join(childDir, "x.jsonl"), '{"role":"user","content":"hi"}\n', "utf8")
 
     // completion-results/<taskId>.txt
     const spillDir = join(stateDir, "completion-results")
@@ -364,7 +403,10 @@ describe("createTaskRecordStore remove artifacts", () => {
 describe("createTaskRecordStore tombstone expunge", () => {
   const TASK_ID = "st_00000030"
 
-  function seedTombstoneCandidate(project: string): { store: ReturnType<typeof createTaskRecordStore>; stateDir: string } {
+  function seedTombstoneCandidate(project: string): {
+    store: ReturnType<typeof createTaskRecordStore>
+    stateDir: string
+  } {
     const store = createTaskRecordStore({ project_dir: project })
     store.save(baseRecord(TASK_ID))
     store.appendEvent(TASK_ID, { type: "created", payload: {} })

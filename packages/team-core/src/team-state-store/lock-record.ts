@@ -1,9 +1,18 @@
 import { randomUUID } from "node:crypto"
 import { readFile, stat } from "node:fs/promises"
-import { getPidLiveness, getProcessStartIdentity, startIdentitiesConflict } from "@oh-my-opencode/memory-core/process-identity"
+import {
+  getPidLiveness,
+  getProcessStartIdentity,
+  startIdentitiesConflict,
+} from "@oh-my-opencode/memory-core/process-identity"
 
 import { isWorkerLockReleased, lockOwnerInstanceId, registerLockWorker } from "./lock-worker-lifetime"
-export { lockOwnerInstanceId, markLockRecordHeld, markLockRecordReleased, forgetLockRecord } from "./lock-worker-lifetime"
+export {
+  lockOwnerInstanceId,
+  markLockRecordHeld,
+  markLockRecordReleased,
+  forgetLockRecord,
+} from "./lock-worker-lifetime"
 
 export type ObservedLockRecord = {
   readonly content: string
@@ -19,8 +28,17 @@ type LockOwner = {
 
 export async function buildLockRecord(ownerTag: string): Promise<string> {
   await registerLockWorker()
-  const processStart = await getProcessStartIdentity(process.pid)
-  return `${ownerTag} ${randomUUID()}\n${process.pid}\n${Date.now()}\n${lockOwnerInstanceId}\n${processStart ?? "unavailable"}\n`
+  const processStart = await lockProcessStartLine(process.pid)
+  return `${ownerTag} ${randomUUID()}\n${process.pid}\n${Date.now()}\n${lockOwnerInstanceId}\n${processStart}\n`
+}
+
+/**
+ * Line 5 of a lock record: the owner's process-start identity, or `unavailable` when this host cannot
+ * read it. Every writer of a record builds that line here, so `isLockRecordStale` can tell a live owner
+ * from a process that merely inherited its pid.
+ */
+export async function lockProcessStartLine(pid: number): Promise<string> {
+  return (await getProcessStartIdentity(pid)) ?? "unavailable"
 }
 
 export function errorCode(error: unknown): string | null {

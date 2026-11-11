@@ -64,14 +64,25 @@ async function observed(view: Surface, result: unknown): Promise<unknown> {
   const opened = view.execCalls[0]?.args.at(-1)
   return {
     result: typeof result === "string" ? result : null,
-    notifications: view.notifications.map((entry) => ({ ...entry, message: entry.message.replace(TIMESTAMP, "palace-<ts>.html") })),
+    notifications: view.notifications.map((entry) => ({
+      ...entry,
+      message: entry.message.replace(TIMESTAMP, "palace-<ts>.html"),
+    })),
     outputs: view.outputs.map((entry) => entry.replace(TIMESTAMP, "palace-<ts>.html")),
-    execCalls: view.execCalls.map((call) => ({ command: call.command, args: call.args.map((arg) => arg.replace(TIMESTAMP, "palace-<ts>.html")) })),
+    execCalls: view.execCalls.map((call) => ({
+      command: call.command,
+      args: call.args.map((arg) => arg.replace(TIMESTAMP, "palace-<ts>.html")),
+    })),
     html: opened === undefined ? null : (await readFile(opened, "utf8")).replace(RECOMPILED_AT, '"recompiledAt":"<t>"'),
   }
 }
 
-async function invokeCommand(pi: { commands: Array<{ name: string; options: { handler?: unknown } }> }, name: string, args: string, ctx: unknown): Promise<unknown> {
+async function invokeCommand(
+  pi: { commands: Array<{ name: string; options: { handler?: unknown } }> },
+  name: string,
+  args: string,
+  ctx: unknown,
+): Promise<unknown> {
   const registration = pi.commands.find((entry) => entry.name === name)
   const handler = registration?.options.handler
   if (typeof handler !== "function") throw new Error(`${name} command was not registered`)
@@ -152,7 +163,8 @@ async function peopleScenario(): Promise<unknown> {
 }
 
 async function startupScenario(): Promise<unknown> {
-  const { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } = await import("../memory.test-support")
+  const { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } =
+    await import("../memory.test-support")
   const { dispatchRunEnd } = await import("../../../../test-support/fake-extension-api")
   const { IdleInjectionCoordinator } = await import("../../../extension/idle-injection-coordinator")
   const { cleanupPalaceFixtures, createPalaceFixture, seedPalacePeople } = await import("./palace.test-support")
@@ -165,7 +177,10 @@ async function startupScenario(): Promise<unknown> {
     const pi = new MemoryFakeExtensionAPI()
     const wiring = createMemoryWiring({
       sessions: new Map([[sessionId, { context: fixture.context }]]),
-      loadConfig: () => ({ ...loadedMemoryConfig(memory), config: { memory, categories: { quick: { model: "omo-mock/mock-1" } } } }),
+      loadConfig: () => ({
+        ...loadedMemoryConfig(memory),
+        config: { memory, categories: { quick: { model: "omo-mock/mock-1" } } },
+      }),
       cwd: () => fixture.root,
       env: {},
       kibitzerChildStarter: {
@@ -185,7 +200,11 @@ async function startupScenario(): Promise<unknown> {
     const loadsAfterStartup = runtimeLoads.length
     await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, eventCtx)
     await pi.dispatch("input", { type: "input", source: "interactive", text: "hello" }, eventCtx)
-    await pi.dispatch("before_agent_start", { type: "before_agent_start", prompt: "hello", systemPrompt: "base" }, eventCtx)
+    await pi.dispatch(
+      "before_agent_start",
+      { type: "before_agent_start", prompt: "hello", systemPrompt: "base" },
+      eventCtx,
+    )
     await pi.dispatch("turn_end", { type: "turn_end" }, eventCtx)
     await dispatchRunEnd(pi, { type: "agent_end", messages: [] }, eventCtx)
     const loadsAfterTurn = runtimeLoads.length

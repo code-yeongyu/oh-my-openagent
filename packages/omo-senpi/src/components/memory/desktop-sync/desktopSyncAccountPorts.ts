@@ -1,5 +1,6 @@
 import { z } from "zod"
-import type { AccountHttp, PairingHttp } from "@oh-my-opencode/memory-core/sync-engine"
+import type { AccountHttp, PairingHttp, RevocationView } from "@oh-my-opencode/memory-core/sync-engine"
+import { parseRevocationView } from "@oh-my-opencode/memory-core/sync-account-ports"
 import type { SyncDevice } from "@oh-my-opencode/memory-core/sync-engine"
 import {
   decodeRecoveryWraps,
@@ -26,10 +27,14 @@ const stateReply = z.object({
 type AppendRequest = Parameters<AccountHttp["appendKeys"]>[0]
 
 /** Native chain/pairing values, not a fake HTTP adapter or a fabricated bearer. */
-export function desktopSyncAccountPorts(call: SyncServiceCall, descriptor: SyncDescriptor): {
+export function desktopSyncAccountPorts(
+  call: SyncServiceCall,
+  descriptor: SyncDescriptor,
+): {
   readonly chain: AccountHttp
   readonly pairing: PairingHttp
   readonly devices: () => Promise<readonly SyncDevice[]>
+  readonly revocationView: () => Promise<RevocationView>
 } {
   const json = async (request: Readonly<Record<string, unknown>>) => syncJson(await call(request))
   const append = async (op: "appendKeys" | "recoveryJoin", request: AppendRequest) => {
@@ -51,14 +56,15 @@ export function desktopSyncAccountPorts(call: SyncServiceCall, descriptor: SyncD
     chain: {
       listKeys: async () => decodeSyncKeys(await json({ op: "listKeys" })),
       listEntries: async () => decodeSyncEntries(await json({ op: "listEntries" })).entries,
-      listEntriesAfter: async (after: number) => decodeSyncEntries(await json({ op: "listEntriesAfter", after })).entries,
+      listEntriesAfter: async (after: number) =>
+        decodeSyncEntries(await json({ op: "listEntriesAfter", after })).entries,
       listRecoveryWraps: async () => decodeRecoveryWraps(await json({ op: "listRecoveryWraps" })).wraps,
       async state() {
         const state = stateReply.parse(await json({ op: "state" }))
         return { head: state.head, currentEpoch: state.current_epoch, rotationPending: state.rotation_pending }
       },
-      appendKeys: request => append("appendKeys", request),
-      recoveryJoin: request => append("recoveryJoin", request),
+      appendKeys: (request) => append("appendKeys", request),
+      recoveryJoin: (request) => append("recoveryJoin", request),
     },
     pairing: {
       async openPending(account: string, commitment: string) {
@@ -77,8 +83,10 @@ export function desktopSyncAccountPorts(call: SyncServiceCall, descriptor: SyncD
         const { pending } = pendingList.parse(await json({ op: "listPending" }))
         return pending.map(decodeSyncPending)
       },
-      answerPending: async (id, principal, nonce) => decodeSyncPending(await json({ op: "answerPending", id, principal, nonce })),
-      revealPending: async (id, principal, nonce) => decodeSyncPending(await json({ op: "revealPending", id, principal, nonce })),
+      answerPending: async (id, principal, nonce) =>
+        decodeSyncPending(await json({ op: "answerPending", id, principal, nonce })),
+      revealPending: async (id, principal, nonce) =>
+        decodeSyncPending(await json({ op: "revealPending", id, principal, nonce })),
       async setAccountSync(enabled: boolean) {
         await json({ op: "setAccountSync", enabled })
       },
@@ -88,5 +96,7 @@ export function desktopSyncAccountPorts(call: SyncServiceCall, descriptor: SyncD
       },
     },
     devices: async () => SyncDevices.parse(await json({ op: "devices" })).devices,
+    // The rotator reads the raw reply: the strict SyncDevices schema refuses a row of an unknown kind or platform.
+    revocationView: async () => parseRevocationView(await json({ op: "devices" })),
   }
 }

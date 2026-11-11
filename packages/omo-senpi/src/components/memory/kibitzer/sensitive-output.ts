@@ -1,4 +1,4 @@
-// Mirror of senpi `core/sensitive-output` (2026.10.30-1). senpi does not export that module from its
+// Mirror of senpi `core/sensitive-output` (2026.10.31-2). senpi does not export that module from its
 // package entry and omo-senpi may only import senpi types, so the sidecar carries the same rules verbatim:
 // the environment-assignment and bearer patterns here, and senpi-ai's `redactCredentialShapes` in
 // `sensitive-output-shapes.ts`. senpi also replaces the config reference values it resolved in its own process
@@ -14,10 +14,14 @@ const ENV_ASSIGNMENT = /\b([A-Z][A-Z0-9_]*)=([^\s'"]+)/g
 const ENV_SECRET_WORD = /API_KEY|SECRET|TOKEN|PASSWORD|AUTH/
 
 export function redactSensitiveOutput(text: string): string {
-  return redactSensitiveTokenValues(text
-    .replace(ENV_ASSIGNMENT, (all, name: string) => ENV_SECRET_WORD.test(name.slice(1)) ? `${name}=[REDACTED]` : all)
-    .replace(/\b(Authorization:\s*Bearer\s+)([^\s'"]+)/gi, "$1[REDACTED]")
-    .replace(/\b(Bearer\s+)(sk-[A-Za-z0-9._-]+)/g, "$1[REDACTED]"))
+  return redactSensitiveTokenValues(
+    text
+      .replace(ENV_ASSIGNMENT, (all, name: string) =>
+        ENV_SECRET_WORD.test(name.slice(1)) ? `${name}=[REDACTED]` : all,
+      )
+      .replace(/\b(Authorization:\s*Bearer\s+)([^\s'"]+)/gi, "$1[REDACTED]")
+      .replace(/\b(Bearer\s+)(sk-[A-Za-z0-9._-]+)/g, "$1[REDACTED]"),
+  )
 }
 
 export function redactSensitiveTokenValues(text: string, replacement = "[REDACTED]"): string {

@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { AgentSessionEvent } from "@code-yeongyu/senpi"
+import { createLogger } from "@oh-my-opencode/utils"
 import { adaptRpcHandle } from "../manager/child-handle"
 import { createOutcomeTracker } from "../manager/manager-outcome"
 import { createTaskRecordStore } from "../store"
@@ -25,26 +26,54 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
-function harness(kind: "stdio" | "host", intervalMs = 10_000) {
+function harness(
+  kind: "stdio" | "host",
+  intervalMs = 10_000,
+  onMalformedLine?: (line: string, error: unknown) => void,
+) {
   const fake = silentChild()
-  const client = new RpcProtocolClient({ child: fake.child })
+  const client = new RpcProtocolClient({ child: fake.child, onMalformedLine })
   const port = fakeSessionPort()
   const reads: Array<ReturnType<typeof Promise.withResolvers<HostSessionLiveness>>> = []
   let terminated = 0
-  const handle = kind === "stdio"
-    ? createRpcChildHandle({
-        client, child: fake.child, taskId: "st_00000001", heartbeatIntervalMs: intervalMs, now: clock.now,
-        terminateChild: async () => { terminated++; fake.child.emit("close", null, "SIGKILL") },
-      })
-    : createHostSessionHandle({
-        client: { ...port, getState: () => { const read = Promise.withResolvers<HostSessionLiveness>(); reads.push(read); return read.promise } },
-        session: FAKE_SESSION, taskId: "st_00000001", heartbeatIntervalMs: intervalMs, now: clock.now,
-        closeGraceMs: 10, openDisposition: "attached",
-      })
+  const handle =
+    kind === "stdio"
+      ? createRpcChildHandle({
+          client,
+          child: fake.child,
+          taskId: "st_00000001",
+          heartbeatIntervalMs: intervalMs,
+          now: clock.now,
+          terminateChild: async () => {
+            terminated++
+            fake.child.emit("close", null, "SIGKILL")
+          },
+        })
+      : createHostSessionHandle({
+          client: {
+            ...port,
+            getState: () => {
+              const read = Promise.withResolvers<HostSessionLiveness>()
+              reads.push(read)
+              return read.promise
+            },
+          },
+          session: FAKE_SESSION,
+          taskId: "st_00000001",
+          heartbeatIntervalMs: intervalMs,
+          now: clock.now,
+          closeGraceMs: 10,
+          openDisposition: "attached",
+        })
   return {
-    handle, port,
+    handle,
+    port,
+    malformed() {
+      fake.child.stdout?.emit("data", "not-json\n")
+    },
     terminated: () => terminated,
-    count: () => kind === "stdio" ? fake.commands.filter((command) => command.type === "get_state").length : reads.length,
+    count: () =>
+      kind === "stdio" ? fake.commands.filter((command) => command.type === "get_state").length : reads.length,
     answer() {
       if (kind === "stdio") fake.respond()
       else reads.at(-1)!.resolve({ sessionId: "durable-child" })
@@ -83,7 +112,47 @@ for (const kind of ["stdio", "host"] as const) {
     await clock.advance(0)
     expect(h.handle.lastSeen()).toBe(9_000)
     await h.handle.dispose()
-    expect(clock.pending()).toBe(0)
+    clock.assertNoPendingTimers()
+  })
+
+  test(`#given ${kind} disposed heartbeat #when foreign work arms a timer #then only the handle's timers are counted`, async () => {
+    // Register before fakeClock(): this continuation belongs to another test's work.
+    const foreign = Promise.withResolvers<void>()
+    const armed = foreign.promise.then(() => setTimeout(() => {}, 10))
+    clock = fakeClock()
+    const h = harness(kind, 1_000)
+    await clock.advance(9_000)
+    h.answer()
+    await clock.advance(0)
+    expect(h.handle.lastSeen()).toBe(9_000)
+    await h.handle.dispose()
+    foreign.resolve()
+    const timer = await armed
+    try {
+      clock.assertNoPendingTimers()
+    } finally {
+      clearTimeout(timer)
+    }
+  })
+
+  test(`#given ${kind} heartbeat and malformed RPC output #when disposed #then the logger flush is not a heartbeat timer`, async () => {
+    const root = mkdtempSync(join(tmpdir(), "heartbeat-logger-"))
+    roots.push(root)
+    const logger = createLogger({ logFileName: "rpc.log", resolveLogFilePath: () => join(root, "rpc.log") })
+    clock = fakeClock()
+    const h = harness(kind, 1_000, (line, error) => logger.log("malformed RPC", { line, error: String(error) }))
+    try {
+      await clock.advance(9_000)
+      h.answer()
+      await clock.advance(0)
+      h.malformed()
+      await h.handle.dispose()
+      clock.assertNoPendingTimers()
+      logger._flushForTesting()
+      expect(existsSync(join(root, "rpc.log"))).toBe(true)
+    } finally {
+      logger._resetLoggerForTesting()
+    }
   })
 
   test(`#given ${kind} three heartbeat misses #when the bound expires #then the record errors with transcript and action and cannot resurrect`, async () => {
@@ -100,29 +169,43 @@ for (const kind of ["stdio", "host"] as const) {
     const managed = adaptRpcHandle(h.handle)
     const persisted = Promise.withResolvers<void>()
     const tracker = createOutcomeTracker({
-      store, now: clock.now, liveHandle: () => managed, tryLoad: (id) => store.load(id),
-      runStatsSnapshot: () => undefined, releaseSlot: () => {}, forget: () => {},
-      settleWaiters: () => persisted.resolve(), tryRuntimeFallback: async () => false,
+      store,
+      now: clock.now,
+      liveHandle: () => managed,
+      tryLoad: (id) => store.load(id),
+      runStatsSnapshot: () => undefined,
+      releaseSlot: () => {},
+      forget: () => {},
+      settleWaiters: () => persisted.resolve(),
+      tryRuntimeFallback: async () => false,
     })
     tracker.trackOutcome(record.task_id, managed, record.model, record.notification.run_epoch)
     await clock.advance(kind === "host" ? 170_000 : 40_000)
     const waitForOutcome = h.handle.waitForOutcome
     if (waitForOutcome === undefined) throw new Error("the child handle did not expose its outcome wait")
-    expect(await Promise.race([waitForOutcome(), Promise.resolve("still pending")]))
-      .toMatchObject({ status: "error", failure: { kind: "child-unresponsive" } })
+    expect(await Promise.race([waitForOutcome(), Promise.resolve("still pending")])).toMatchObject({
+      status: "error",
+      failure: { kind: "child-unresponsive" },
+    })
     await persisted.promise
     expect(store.load(record.task_id)).toMatchObject({ status: "error", failure_kind: "child-unresponsive" })
     expect(existsSync(transcript)).toBe(true)
-    const output = await runTaskOutput({
-      manager: { get: (id) => store.load(id) ?? undefined, list: () => store.list().records.map((record) => ({ record })) },
-      stateDir: root,
-    }, { task_id: record.task_id }, record.parent_session_id)
+    const output = await runTaskOutput(
+      {
+        manager: {
+          get: (id) => store.load(id) ?? undefined,
+          list: () => store.list().records.map((record) => ({ record })),
+        },
+        stateDir: root,
+      },
+      { task_id: record.task_id },
+      record.parent_session_id,
+    )
     expect(output.details).toMatchObject({ kind: "status", snapshot: { status: "error" } })
     if (kind === "stdio") {
       expect(h.terminated()).toBe(1)
       expect(store.load(record.task_id)?.error_message).toContain("Action:")
-    }
-    else {
+    } else {
       expect(h.port.detaches).toBe(0)
       expect(h.port.closes).toBe(1)
       expect(h.port.sent).toEqual([{ type: "abort" }])

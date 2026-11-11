@@ -2,7 +2,7 @@ use image::RgbaImage;
 use senpi_desktop_core::ax::AxHandle;
 use senpi_desktop_core::backend::{AxBackend, Backend, DeliveryMode, ElementDelivery, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
-use senpi_desktop_core::frame::{FrameGeometry, MAX_COMPOSITE_PIXELS};
+use senpi_desktop_core::frame::{FrameGeometry, PointHit, MAX_COMPOSITE_PIXELS};
 use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
@@ -24,7 +24,15 @@ impl Backend for FakeBackend {
 
     fn windows(&mut self) -> CoreResult<Vec<DesktopWindow>> {
         self.begin(FakeMethod::Windows)?;
-        Ok(self.windows.clone())
+        Ok(self.windows.iter().map(|window| self.identified(window)).collect())
+    }
+
+    fn hit_at(&mut self, x: f64, y: f64) -> CoreResult<Option<PointHit>> {
+        Ok(self.hit_read(DesktopPoint { x, y })?.map(|hit| PointHit {
+            role: hit.role,
+            label: hit.label,
+            secure: hit.secure,
+        }))
     }
 
     /// Returns the native-size solid image; the session applies `caps`.
@@ -84,17 +92,24 @@ impl Backend for FakeBackend {
             self.cursor = self.cursor.and(event.end_point());
         }
         self.deliver_focus(target, mode);
+        let opens = matches!(event, RecordedPointer::Click { .. });
         self.record(SinkOp::Pointer {
             target: target.clone(),
             event,
             mode,
         });
+        if opens {
+            self.open_next_surface();
+        }
         Ok(())
     }
 
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
         self.begin(FakeMethod::TypeText)?;
         self.input_gate(target, mode)?;
+        if let Some((window, remote)) = self.remote_window(target) {
+            crate::remote_impl::admit_remote_text(&window, remote, text, mode)?;
+        }
         self.press_check(FakeMethod::TypeText)?;
         self.deliver_focus(target, mode);
         self.record(SinkOp::TypeText {
@@ -128,6 +143,11 @@ impl Backend for FakeBackend {
         check_stop: &dyn Fn() -> CoreResult<()>,
         delivered: &mut dyn FnMut(),
     ) -> CoreResult<()> {
+        // The whole text is admitted before any chunk goes out, as the macOS
+        // port maps every character before posting.
+        if let Some((window, remote)) = self.remote_window(target) {
+            crate::remote_impl::admit_remote_text(&window, remote, text, mode)?;
+        }
         let mut start = 0;
         for end in text
             .char_indices()
@@ -283,5 +303,9 @@ impl Backend for FakeBackend {
             return None;
         }
         Some(self.user_input())
+    }
+
+    fn epoch_source(&self) -> Option<std::sync::Arc<dyn senpi_desktop_core::backend::EpochSource>> {
+        Some(self.recorded_epochs())
     }
 }

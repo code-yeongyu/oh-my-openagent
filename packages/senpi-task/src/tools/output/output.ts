@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto"
 import type { ToolDefinition } from "@code-yeongyu/senpi"
 import { Type } from "typebox"
 import type { Static } from "typebox"
 
+import { shouldNotifyStatus } from "../../completion/routing"
 import type { ListScope, ListedTask } from "../../manager"
 import type { TaskRecord } from "../../state"
 import { hostLivenessText } from "../../state/host-liveness"
@@ -14,27 +16,33 @@ import { defaultTranscriptReader } from "./transcript"
 import type { TaskOutputDeps, TaskOutputDetails, TaskOutputToolResult, TaskSnapshot, TranscriptReader } from "./types"
 
 export const TaskOutputParams = Type.Object({
-  task_id: Type.Optional(Type.String({ description: "Task id (st_...) of the child to read. Provide exactly one of task_id or name." })),
+  task_id: Type.Optional(
+    Type.String({
+      description:
+        "Task id (st_...) of the child to read. Pass task_id or name; when both are given, task_id wins and name is ignored.",
+    }),
+  ),
   name: Type.Optional(Type.String({ description: "Canonical task name; required if task_id is omitted." })),
   mode: Type.Optional(
     Type.Union([Type.Literal("status"), Type.Literal("tail"), Type.Literal("full")], {
-      description: "status (default) = record snapshot + final result; tail = last lines of the transcript; full = whole transcript.",
+      description:
+        "status (default) = record snapshot + final result; tail = last lines of the transcript; full = whole transcript.",
     }),
   ),
-  tail_lines: Type.Optional(
-    Type.Integer({ minimum: 1, description: "Lines to keep in tail mode. Defaults to 60." }),
-  ),
+  tail_lines: Type.Optional(Type.Integer({ minimum: 1, description: "Lines to keep in tail mode. Defaults to 60." })),
 })
 
 export type TaskOutputInput = Static<typeof TaskOutputParams>
 
 const DEFAULT_TAIL_LINES = 60
-const STOP_PENDING_EXPLANATION = "cancel requested, child unreachable: it is stopped on its host before it runs anything else"
+const STOP_PENDING_EXPLANATION =
+  "cancel requested, child unreachable: it is stopped on its host before it runs anything else"
+const MAX_STATUS_READS = 1024
 const BLOCKING_REMOVED_GUIDANCE = 'blocking removed - completion arrives as a notification; use mode:"tail" to peek.'
 
 const DESCRIPTION = [
-  "Read one child task, keyed by task_id or name. task_output always returns immediately: mode='status' (default) returns the record snapshot plus the final response once terminal.",
-  "mode='tail' returns the last tail_lines of the recorded transcript; mode='full' returns the whole transcript (capped, with a head/tail elision marker). Completion notifications already include the final result.",
+  "Read one child task, keyed by task_id or name. task_output always returns immediately: mode='status' (default) returns one record snapshot per observed progress state, then a short no_progress result until the task changes.",
+  "mode='tail' returns the last tail_lines of the recorded transcript, cut to the same 30,000-character cap as full; mode='full' returns the whole transcript (capped, with a head/tail elision marker). These explicit transcript modes do not consume the status peek. Completion notifications already include the final result.",
   "READ-ONLY: this never revives, steers, or otherwise touches the child. A lost task returns a status view with a lost explanation and pid/session-dir breadcrumbs.",
   "Only the current session's children are visible.",
 ].join(" ")
@@ -43,17 +51,48 @@ export function runTaskOutput(
   deps: TaskOutputDeps,
   params: TaskOutputInput,
   callerSessionId: string | undefined,
+  statusReads?: Map<string, string>,
 ): Promise<TaskOutputToolResult> {
   if (hasLegacyBlockingParam(params)) return Promise.resolve(invalidArguments(BLOCKING_REMOVED_GUIDANCE))
 
   const idOrName = params.task_id ?? params.name
-  if (idOrName === undefined) return Promise.resolve(invalidArguments("Provide task_id or name to identify the child task."))
+  if (idOrName === undefined)
+    return Promise.resolve(invalidArguments("Provide task_id or name to identify the child task."))
 
   const candidates = scopedCandidates(deps.manager.list.bind(deps.manager), callerSessionId)
   const record = resolveTarget(candidates, idOrName)
   if (record === undefined) return Promise.resolve(notFound(candidates, idOrName))
 
+  const mode = params.mode ?? "status"
+  if (statusReads !== undefined && callerSessionId !== undefined && mode === "status") {
+    const key = JSON.stringify([callerSessionId, record.task_id])
+    const fingerprint = JSON.stringify([
+      record.status,
+      record.residency_state,
+      record.updated_at,
+      record.notification.run_epoch,
+      record.pid ?? null,
+      record.host_pid ?? null,
+      record.child_session_id ?? null,
+      digestField(record.final_response),
+      digestField(record.error_message),
+      record.killed ?? null,
+      digestField(record.run_stats),
+    ])
+    if (statusReads.get(key) === fingerprint) return Promise.resolve(noProgress(record))
+    rememberStatusRead(statusReads, key, fingerprint)
+  }
+
   return Promise.resolve(outputForRecord(deps, record, params))
+}
+
+function rememberStatusRead(statusReads: Map<string, string>, key: string, fingerprint: string): void {
+  statusReads.delete(key)
+  statusReads.set(key, fingerprint)
+  if (statusReads.size <= MAX_STATUS_READS) return
+
+  const oldestKey = statusReads.keys().next().value
+  if (oldestKey !== undefined) statusReads.delete(oldestKey)
 }
 
 function hasLegacyBlockingParam(params: object): boolean {
@@ -64,8 +103,13 @@ function outputForRecord(deps: TaskOutputDeps, record: TaskRecord, params: TaskO
   const now = (deps.now ?? Date.now)()
   const lease = deps.manager.concurrency?.leaseState(record.task_id, record.notification.run_epoch)
   // Only a still-running child can be waiting on its cancel; a cancelled record says so itself.
-  const stop = record.status === "running" && record.cancel_requested !== undefined ? { stop: STOP_PENDING_EXPLANATION } : {}
-  const snapshot = { ...buildTaskSnapshot(record, deps.stateDir, now), ...(lease === undefined ? {} : { lease }), ...stop }
+  const stop =
+    record.status === "running" && record.cancel_requested !== undefined ? { stop: STOP_PENDING_EXPLANATION } : {}
+  const snapshot = {
+    ...buildTaskSnapshot(record, deps.stateDir, now),
+    ...(lease === undefined ? {} : { lease }),
+    ...stop,
+  }
   const mode = params.mode ?? "status"
 
   if (mode === "status" || record.status === "lost") {
@@ -83,7 +127,11 @@ function transcriptResult(
   tailLines: number,
 ): TaskOutputToolResult {
   const reader: TranscriptReader = deps.transcriptReader ?? defaultTranscriptReader
-  const { entries, source, truncated: sourceTruncated } = reader({
+  const {
+    entries,
+    source,
+    truncated: sourceTruncated,
+  } = reader({
     taskId: record.task_id,
     stateDir: deps.stateDir,
   })
@@ -110,7 +158,9 @@ function scopedCandidates(
 }
 
 function resolveTarget(candidates: readonly TaskRecord[], idOrName: string): TaskRecord | undefined {
-  return candidates.find((record) => record.task_id === idOrName) ?? candidates.find((record) => record.name === idOrName)
+  return (
+    candidates.find((record) => record.task_id === idOrName) ?? candidates.find((record) => record.name === idOrName)
+  )
 }
 
 // Session-level runner notices ride the status view: one line each, after the record facts, so a
@@ -122,7 +172,8 @@ function withNotices(text: string, deps: TaskOutputDeps): string {
 
 function statusText(snapshot: TaskSnapshot): string {
   const parts = [`${snapshot.task_id} [${snapshot.status}] ${taskOutputModelText(snapshot)}`]
-  if (snapshot.host_liveness !== undefined && snapshot.host_liveness.state !== "running") parts.push(hostLivenessText(snapshot.host_liveness))
+  if (snapshot.host_liveness !== undefined && snapshot.host_liveness.state !== "running")
+    parts.push(hostLivenessText(snapshot.host_liveness))
   if (snapshot.lease !== undefined) parts.push(`lease: ${snapshot.lease}`)
   if (snapshot.suspended !== undefined) parts.push(snapshot.suspended.explanation)
   if (snapshot.awaiting_input !== undefined) parts.push(snapshot.awaiting_input.explanation)
@@ -138,22 +189,61 @@ function statusText(snapshot: TaskSnapshot): string {
 function notFound(candidates: readonly TaskRecord[], idOrName: string): TaskOutputToolResult {
   const known = candidates.map((record) => record.name ?? record.task_id)
   const listText = known.length > 0 ? ` Known tasks in this session: ${known.join(", ")}.` : ""
-  return toolResult(`No task '${idOrName}' in this session.${listText}`, { kind: "not_found", reason: `No task '${idOrName}' in this session.`, known_tasks: known })
+  return toolResult(`No task '${idOrName}' in this session.${listText}`, {
+    kind: "not_found",
+    reason: `No task '${idOrName}' in this session.`,
+    known_tasks: known,
+  })
 }
 
 function invalidArguments(reason: string): TaskOutputToolResult {
   return toolResult(reason, { kind: "invalid_arguments", reason })
 }
 
-export function createTaskOutputTool(deps: TaskOutputDeps): ToolDefinition<typeof TaskOutputParams, TaskOutputDetails> {
+function noProgress(record: TaskRecord): TaskOutputToolResult {
+  const notificationPending =
+    (record.notify_on_terminal && (record.status === "pending" || record.status === "running")) ||
+    (shouldNotifyStatus(record.status) &&
+      record.notification.notified_epoch < record.notification.run_epoch &&
+      (record.notify_on_terminal || record.notification.notification_failed_epoch !== undefined))
+  const reason = !notificationPending
+    ? `Task ${record.task_id} is ${record.status}. It will not send a completion notification; use mode:"tail" only for explicit transcript diagnosis.`
+    : `Task ${record.task_id} has not changed since the last status read. Await its completion notification; use mode:"tail" only for explicit transcript diagnosis.`
+  return toolResult(reason, {
+    kind: "no_progress",
+    task_id: record.task_id,
+    status: record.status,
+    reason,
+  })
+}
+
+export type TaskOutputTool = ToolDefinition<typeof TaskOutputParams, TaskOutputDetails> & {
+  forgetSession: (sessionId: string) => void
+}
+
+function digestField(value: unknown): string {
+  return createHash("sha256")
+    .update(JSON.stringify(value ?? null))
+    .digest("hex")
+}
+
+export function createTaskOutputTool(deps: TaskOutputDeps): TaskOutputTool {
   const resolveCaller = deps.resolveCallerSessionId ?? defaultResolveCallerSessionId
+  const statusReads = new Map<string, string>()
   return {
     name: "task_output",
     label: "Task Output",
     description: DESCRIPTION,
     parameters: TaskOutputParams,
-    execute: (_toolCallId, params, _signal, _onUpdate, ctx) => runTaskOutput(deps, params, resolveCaller(ctx)),
+    execute: (_toolCallId, params, _signal, _onUpdate, ctx) =>
+      runTaskOutput(deps, params, resolveCaller(ctx), statusReads),
     renderCall: (args, theme) => renderTaskOutputCall(args, theme),
     renderResult: (result, options, theme) => renderTaskOutputResult(result, options, theme),
+    forgetSession: (sessionId: string) => {
+      for (const key of statusReads.keys()) {
+        const parsed: unknown = JSON.parse(key)
+        if (Array.isArray(parsed) && parsed[0] === sessionId) statusReads.delete(key)
+      }
+    },
   }
 }

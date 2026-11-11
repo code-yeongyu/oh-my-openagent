@@ -8,11 +8,7 @@ import { fileURLToPath } from "node:url"
 import { shouldDisableTelemetry } from "../../../telemetry-core/src/env.ts"
 import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 import { SPAWN_BYPASSES } from "./telemetry-opt-out-env.bypasses.mjs"
-import {
-  TELEMETRY_OPT_OUT_NAMES,
-  telemetryLocalSinkEnv,
-  withTelemetryOptOut,
-} from "./telemetry-opt-out-env.mjs"
+import { TELEMETRY_OPT_OUT_NAMES, telemetryLocalSinkEnv, withTelemetryOptOut } from "./telemetry-opt-out-env.mjs"
 import { auditDriverSpawns, findUnroutedSpawns } from "./telemetry-opt-out-env.scan.mjs"
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../../..")
@@ -22,7 +18,10 @@ const SPAWN_IMPORT = `import { spawn } from "node:child_process"\n`
 const unrouted = (source) => findUnroutedSpawns([{ path: "script/qa/new-driver.mjs", source }]).map((site) => site.call)
 
 function qaSources() {
-  const listed = execFileSync("git", ["ls-files", "script/qa/**", "packages/*/scripts/qa/**"], { cwd: repoRoot, encoding: "utf8" })
+  const listed = execFileSync("git", ["ls-files", "script/qa/**", "packages/*/scripts/qa/**"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  })
   return listed.split("\n").filter((path) => /\.(?:mjs|cjs|js|ts|mts)$/u.test(path) && !/\.test\./u.test(path))
 }
 
@@ -40,7 +39,10 @@ describe("withTelemetryOptOut", () => {
   })
 
   test("#given a telemetry driver #when it opts in toward a loopback sink #then every opt-out is cleared and the host is local", () => {
-    const env = { ...withTelemetryOptOut({ PATH: "/bin", OMO_DISABLE_POSTHOG: "1" }), ...telemetryLocalSinkEnv("http://127.0.0.1:4318") }
+    const env = {
+      ...withTelemetryOptOut({ PATH: "/bin", OMO_DISABLE_POSTHOG: "1" }),
+      ...telemetryLocalSinkEnv("http://127.0.0.1:4318"),
+    }
 
     expect(disabled(env)).toBe(false)
     expect(env.POSTHOG_HOST).toBe("http://127.0.0.1:4318")
@@ -61,20 +63,37 @@ describe("QA drivers opt out of telemetry", () => {
 
   test("#given a reviewed bypass that no longer matches #when the tree is scanned #then it is reported as stale", () => {
     const ghost = { file: "script/qa/gone.mjs", function: "main", call: "spawn(senpi)", reason: "removed driver" }
-    expect(auditDriverSpawns(files, [...SPAWN_BYPASSES, ghost])).toEqual(["stale bypass script/qa/gone.mjs main spawn(senpi) x0 (reviewed x1)"])
+    expect(auditDriverSpawns(files, [...SPAWN_BYPASSES, ghost])).toEqual([
+      "stale bypass script/qa/gone.mjs main spawn(senpi) x0 (reviewed x1)",
+    ])
   })
 
   test("#given a new driver that launches senpi with the caller's env #when the scan runs #then it is rejected", () => {
-    const driver = { path: "script/qa/new-driver.mjs", source: `${SPAWN_IMPORT}spawn("senpi", ["-p"], { env: { ...process.env } })\n` }
-    expect(auditDriverSpawns([...files, driver], SPAWN_BYPASSES)).toEqual(["unrouted script/qa/new-driver.mjs:2 <module> spawn(\"senpi\")"])
+    const driver = {
+      path: "script/qa/new-driver.mjs",
+      source: `${SPAWN_IMPORT}spawn("senpi", ["-p"], { env: { ...process.env } })\n`,
+    }
+    expect(auditDriverSpawns([...files, driver], SPAWN_BYPASSES)).toEqual([
+      'unrouted script/qa/new-driver.mjs:2 <module> spawn("senpi")',
+    ])
   })
 
   test("#given a bypassed function #when a second spawn with the same call text appears #then the recount is rejected", () => {
     const path = "packages/omo-senpi/scripts/qa/probe-continuation.mjs"
-    const grown = files.map((file) => file.path === path
-      ? { ...file, source: file.source.replace("function main() {", "function main() {\n  spawnSync(tmuxBin, [\"new-session\", \"senpi\"])") }
-      : file)
-    expect(auditDriverSpawns(grown, SPAWN_BYPASSES)).toEqual([`recount bypass ${path} main spawnSync(tmuxBin) x3 (reviewed x2)`])
+    const grown = files.map((file) =>
+      file.path === path
+        ? {
+            ...file,
+            source: file.source.replace(
+              "function main() {",
+              'function main() {\n  spawnSync(tmuxBin, ["new-session", "senpi"])',
+            ),
+          }
+        : file,
+    )
+    expect(auditDriverSpawns(grown, SPAWN_BYPASSES)).toEqual([
+      `recount bypass ${path} main spawnSync(tmuxBin) x3 (reviewed x2)`,
+    ])
   })
 })
 
@@ -89,7 +108,9 @@ function shippedHelperReferences(pluginRoot) {
   const shipped = readdirSync(pluginRoot, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile() && !join(entry.parentPath, entry.name).includes("node_modules"))
     .map((entry) => join(entry.parentPath, entry.name))
-  const leaking = shipped.filter((path) => /telemetry-opt-out-env|withTelemetryOptOut|telemetryLocalSinkEnv/u.test(readFileSync(path, "latin1")))
+  const leaking = shipped.filter((path) =>
+    /telemetry-opt-out-env|withTelemetryOptOut|telemetryLocalSinkEnv/u.test(readFileSync(path, "latin1")),
+  )
   return { scanned: shipped.length, leaking: leaking.map((path) => shippedName(pluginRoot, path)).sort() }
 }
 
@@ -115,7 +136,10 @@ describe("the QA helper never ships", () => {
       writeFileSync(join(root, "extensions", "omo.js"), `export const ok = 1\nimport "./telemetry-opt-out-env.mjs"\n`)
       writeFileSync(join(root, "scripts", "install-local.mjs"), `const env = withTelemetryOptOut(process.env)\n`)
       writeFileSync(join(root, "extensions", "omo-task.js"), `export const clean = true\n`)
-      expect(shippedHelperReferences(root)).toEqual({ scanned: 3, leaking: ["extensions/omo.js", "scripts/install-local.mjs"] })
+      expect(shippedHelperReferences(root)).toEqual({
+        scanned: 3,
+        leaking: ["extensions/omo.js", "scripts/install-local.mjs"],
+      })
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -128,22 +152,28 @@ describe("spawn tracing (#10226 delta-review probes)", () => {
   })
 
   test("#given the helper named only in a comment #when the env is process.env #then it is unrouted", () => {
-    expect(unrouted(`// withTelemetryOptOut\n${SPAWN_IMPORT}spawn("senpi", [], { env: process.env })\n`)).toEqual([`spawn("senpi")`])
+    expect(unrouted(`// withTelemetryOptOut\n${SPAWN_IMPORT}spawn("senpi", [], { env: process.env })\n`)).toEqual([
+      `spawn("senpi")`,
+    ])
   })
 
   test("#given the helper imported but never called #when the env spreads process.env #then it is unrouted", () => {
-    expect(unrouted(`${HELPER_IMPORT}${SPAWN_IMPORT}spawn("senpi", [], { env: { ...process.env } })\n`)).toEqual([`spawn("senpi")`])
+    expect(unrouted(`${HELPER_IMPORT}${SPAWN_IMPORT}spawn("senpi", [], { env: { ...process.env } })\n`)).toEqual([
+      `spawn("senpi")`,
+    ])
   })
 
   test("#given a helper call that reaches the env through a local binding #when the scan runs #then the site is routed", () => {
-    const source = `${HELPER_IMPORT}${SPAWN_IMPORT}function childEnv(dir) { return { ...withTelemetryOptOut(process.env), HOME: dir } }\n`
-      + `export function run(senpiBin) { let env\n  env = childEnv("/tmp/h")\n  return spawn(senpiBin, ["-p"], { cwd: "/tmp", env })\n}\n`
+    const source =
+      `${HELPER_IMPORT}${SPAWN_IMPORT}function childEnv(dir) { return { ...withTelemetryOptOut(process.env), HOME: dir } }\n` +
+      `export function run(senpiBin) { let env\n  env = childEnv("/tmp/h")\n  return spawn(senpiBin, ["-p"], { cwd: "/tmp", env })\n}\n`
     expect(unrouted(source)).toEqual([])
   })
 
   test("#given an env parameter #when one caller passes the helper result and another passes process.env #then the site is unrouted", () => {
-    const source = `${HELPER_IMPORT}${SPAWN_IMPORT}function launch(env) { return spawn("senpi", ["-p"], { env }) }\n`
-      + `launch(withTelemetryOptOut(process.env))\nlaunch(process.env)\n`
+    const source =
+      `${HELPER_IMPORT}${SPAWN_IMPORT}function launch(env) { return spawn("senpi", ["-p"], { env }) }\n` +
+      `launch(withTelemetryOptOut(process.env))\nlaunch(process.env)\n`
     expect(unrouted(source)).toEqual([`spawn("senpi")`])
   })
 
@@ -175,8 +205,9 @@ describe("spawn tracing (#10226 delta-3 opt-out overrides)", () => {
   })
 
   test("#given a parameter env mutated inside the launcher #when every caller passes the helper result #then the site is unrouted", () => {
-    const source = `${HELPER_IMPORT}${SPAWN_IMPORT}function boot(env) { delete env.OMO_DISABLE_TELEMETRY\n  return spawn("senpi", [], { env }) }\n`
-      + `boot(withTelemetryOptOut(process.env))\n`
+    const source =
+      `${HELPER_IMPORT}${SPAWN_IMPORT}function boot(env) { delete env.OMO_DISABLE_TELEMETRY\n  return spawn("senpi", [], { env }) }\n` +
+      `boot(withTelemetryOptOut(process.env))\n`
     expect(unrouted(source)).toEqual([`spawn("senpi")`])
   })
 
@@ -186,7 +217,9 @@ describe("spawn tracing (#10226 delta-3 opt-out overrides)", () => {
     ["a later spread of the caller's env", `{ ...withTelemetryOptOut({}), ...process.env }`],
   ]) {
     test(`#given a spread of the helper result followed by ${label} #when it is spawned #then the site is unrouted`, () => {
-      expect(unrouted(`${HELPER_IMPORT}${SPAWN_IMPORT}spawn("senpi", [], { env: ${literal} })\n`)).toEqual([`spawn("senpi")`])
+      expect(unrouted(`${HELPER_IMPORT}${SPAWN_IMPORT}spawn("senpi", [], { env: ${literal} })\n`)).toEqual([
+        `spawn("senpi")`,
+      ])
     })
   }
 
@@ -197,9 +230,18 @@ describe("spawn tracing (#10226 delta-3 opt-out overrides)", () => {
   })
 
   for (const [label, source] of [
-    ["process.execPath on the root CLI bundle", `import { execFileSync } from "node:child_process"\nexecFileSync(process.execPath, ["dist/cli/index.js"], { env: process.env })\n`],
-    ["process.argv0 on the root launcher", `import { spawnSync } from "node:child_process"\nspawnSync(process.argv0, ["bin/oh-my-opencode.js", "run"], { env: process.env })\n`],
-    ["node on the native launcher entry", `import { spawn } from "node:child_process"\nspawn("node", ["bin/omo.js"], { env: process.env })\n`],
+    [
+      "process.execPath on the root CLI bundle",
+      `import { execFileSync } from "node:child_process"\nexecFileSync(process.execPath, ["dist/cli/index.js"], { env: process.env })\n`,
+    ],
+    [
+      "process.argv0 on the root launcher",
+      `import { spawnSync } from "node:child_process"\nspawnSync(process.argv0, ["bin/oh-my-opencode.js", "run"], { env: process.env })\n`,
+    ],
+    [
+      "node on the native launcher entry",
+      `import { spawn } from "node:child_process"\nspawn("node", ["bin/omo.js"], { env: process.env })\n`,
+    ],
   ]) {
     test(`#given a file that never names the runtime #when it spawns ${label} with the caller's env #then the site is unrouted`, () => {
       expect(findUnroutedSpawns([{ path: "script/qa/entry-driver.mjs", source }])).toHaveLength(1)

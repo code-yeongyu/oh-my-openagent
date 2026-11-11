@@ -73,15 +73,13 @@ function requireRunId(params: DagToolInput): string | undefined {
   return runId !== undefined && runId.trim().length > 0 ? runId.trim() : undefined
 }
 
-// The slice of senpi's tool context the workflow tool reads: the model the parent session runs now.
-export type DagToolContext = {
-  readonly model?: { readonly provider: string; readonly id: string } | undefined
-}
-
-async function startAction(deps: DagToolDeps, params: DagToolInput, context: DagToolContext | undefined): Promise<DagToolResult> {
+async function startAction(deps: DagToolDeps, params: DagToolInput): Promise<DagToolResult> {
   const input = params.definition
   if (input === undefined) {
-    return failure("invalid_definition", "action=start requires a definition. Provide definition.key, definition.name, and definition.nodes.")
+    return failure(
+      "invalid_definition",
+      "action=start requires a definition. Provide definition.key, definition.name, and definition.nodes.",
+    )
   }
   const nodeErrors = validateNodeTargets(input.nodes)
   if (nodeErrors.length > 0) return invalidNodeTargets(nodeErrors)
@@ -93,7 +91,6 @@ async function startAction(deps: DagToolDeps, params: DagToolInput, context: Dag
     definition: toDefinition(input),
     parentSessionId: deps.parentSessionId(),
     rootSessionId: deps.rootSessionId(),
-    ...(context?.model === undefined ? {} : { parentModel: `${context.model.provider}/${context.model.id}` }),
   })
   const verb = result.reused ? "Reused" : "Started"
   const warningText =
@@ -160,9 +157,9 @@ async function cancelAction(deps: DagToolDeps, runId: string, reason?: string): 
   })
 }
 
-export async function runDagTool(deps: DagToolDeps, params: DagToolInput, context?: DagToolContext): Promise<DagToolResult> {
+export async function runDagTool(deps: DagToolDeps, params: DagToolInput): Promise<DagToolResult> {
   try {
-    if (params.action === "start") return await startAction(deps, params, context)
+    if (params.action === "start") return await startAction(deps, params)
 
     const runId = requireRunId(params)
     if (runId === undefined) {
@@ -180,11 +177,14 @@ export async function runDagTool(deps: DagToolDeps, params: DagToolInput, contex
       }
       case "snapshot": {
         const snapshot = deps.manager.snapshot(runId as DagRunId, deps.parentSessionId())
-        return toolResult(`Dag run ${runId} is ${snapshot.status} (${snapshot.counts.completed}/${snapshot.counts.total} nodes complete).${quietNodesNotice(snapshot.nodes, Date.now())}`, {
-          kind: "snapshot",
-          run_id: runId,
-          snapshot,
-        })
+        return toolResult(
+          `Dag run ${runId} is ${snapshot.status} (${snapshot.counts.completed}/${snapshot.counts.total} nodes complete).${quietNodesNotice(snapshot.nodes, Date.now())}`,
+          {
+            kind: "snapshot",
+            run_id: runId,
+            snapshot,
+          },
+        )
       }
       case "wait":
         return await waitAction(deps, params, runId)
@@ -192,12 +192,17 @@ export async function runDagTool(deps: DagToolDeps, params: DagToolInput, contex
         return await cancelAction(deps, runId, params.reason)
       case "cancel_node": {
         deps.manager.snapshot(runId as DagRunId, deps.parentSessionId())
-        if (params.node_id === undefined || params.node_id.trim().length === 0) return failure("invalid_arguments", "cancel_node requires node_id.")
-        if (deps.cancelNode === undefined) return failure("node_not_continuable", "Paused child cancellation is not available in this session.")
+        if (params.node_id === undefined || params.node_id.trim().length === 0)
+          return failure("invalid_arguments", "cancel_node requires node_id.")
+        if (deps.cancelNode === undefined)
+          return failure("node_not_continuable", "Paused child cancellation is not available in this session.")
         const nodeId = params.node_id.trim()
         await deps.cancelNode(runId as DagRunId, nodeId)
         return toolResult(`Cancelled dag node ${nodeId}.`, {
-          kind: "node_cancelled", run_id: runId, node_id: nodeId, snapshot: deps.manager.snapshot(runId as DagRunId, deps.parentSessionId()),
+          kind: "node_cancelled",
+          run_id: runId,
+          node_id: nodeId,
+          snapshot: deps.manager.snapshot(runId as DagRunId, deps.parentSessionId()),
         })
       }
       case "retry":
@@ -228,6 +233,6 @@ export function createDagTool(deps: DagToolDeps): ToolDefinition<typeof DagToolP
     label: "Workflow",
     description: DESCRIPTION,
     parameters: DagToolParams,
-    execute: (_toolCallId, params, _signal, _onUpdate, ctx) => runDagTool(deps, params, ctx),
+    execute: (_toolCallId, params) => runDagTool(deps, params),
   }
 }

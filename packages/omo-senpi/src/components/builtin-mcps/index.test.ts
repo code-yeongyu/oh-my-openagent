@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "bun:test"
 
-import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+import { FakeExtensionAPI, withInertSenpiSeams } from "../../../test-support/fake-extension-api"
 import { composeOmoSenpiExtension } from "../../extension/compose"
 import type { ComponentLogger } from "../../extension/types"
 import { createBuiltinMcpsComponent } from "./index"
@@ -25,7 +25,9 @@ const ANONYMOUS_CONTEXT7_DECLARATION = {
   exposure: "search",
 }
 
-function recordingLogger(): ComponentLogger & { readonly entries: Array<{ level: string; message: string; details?: unknown }> } {
+function recordingLogger(): ComponentLogger & {
+  readonly entries: Array<{ level: string; message: string; details?: unknown }>
+} {
   const entries: Array<{ level: string; message: string; details?: unknown }> = []
   return {
     entries,
@@ -97,17 +99,20 @@ describe("createBuiltinMcpsComponent", () => {
     { label: "angle-bracketed", value: "<YOUR_API_KEY>" },
     { label: "hyphenated", value: "your-api-key" },
     { label: "spaced and quoted", value: '"Your API Key"' },
-  ])("#given a $label placeholder CONTEXT7_API_KEY #when registered #then context7 stays anonymous", async ({ value }) => {
-    // given
-    const pi = new FakeExtensionAPI()
-    const component = createBuiltinMcpsComponent({ env: { CONTEXT7_API_KEY: value } })
+  ])(
+    "#given a $label placeholder CONTEXT7_API_KEY #when registered #then context7 stays anonymous",
+    async ({ value }) => {
+      // given
+      const pi = new FakeExtensionAPI()
+      const component = createBuiltinMcpsComponent({ env: { CONTEXT7_API_KEY: value } })
 
-    // when
-    await component.register(pi, fakeContext())
+      // when
+      await component.register(pi, fakeContext())
 
-    // then
-    expect(pi.mcpServers[0]).toEqual({ name: "context7", config: ANONYMOUS_CONTEXT7_DECLARATION })
-  })
+      // then
+      expect(pi.mcpServers[0]).toEqual({ name: "context7", config: ANONYMOUS_CONTEXT7_DECLARATION })
+    },
+  )
 
   it("#given a host without registerMcpServer #when registered #then skips cleanly and logs once", async () => {
     // given
@@ -134,7 +139,7 @@ describe("createBuiltinMcpsComponent", () => {
 
   it("#given omo-senpi-builtin-mcps-disabled #when composed #then no builtin MCP server is declared", async () => {
     // given
-    const pi = new FakeExtensionAPI()
+    const pi = withInertSenpiSeams(new FakeExtensionAPI())
     const logger = recordingLogger()
     pi.setFlag("omo-senpi-builtin-mcps-disabled", true)
 
@@ -142,10 +147,7 @@ describe("createBuiltinMcpsComponent", () => {
     await composeOmoSenpiExtension([createBuiltinMcpsComponent({ env: {} })], { logger })(pi)
 
     // then
-    expect(pi.flags.map((flag) => flag.name)).toEqual([
-      "omo-senpi-disabled",
-      "omo-senpi-builtin-mcps-disabled",
-    ])
+    expect(pi.flags.map((flag) => flag.name)).toEqual(["omo-senpi-disabled", "omo-senpi-builtin-mcps-disabled"])
     expect(pi.mcpServers).toEqual([])
     expect(logger.entries).toEqual([
       {

@@ -10,9 +10,16 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 
 use crate::method::{AxWrite, FakeMethod};
-pub use crate::scenario_nodes::{FakeAxNode, FakeBounds, FakeMenuNode};
+pub use crate::scenario_nodes::{FakeAxNode, FakeBounds, FakeMenuNode, FakeOpening};
+use crate::scripting::{
+    DisplaysChange, EpochEvent, FakeFocusRead, FakeHit, FakeWindowIdentity, FocusRecordKind, FocusRecordOutcome,
+    IdentityChange, TimedUserPress,
+};
 
 const DEFAULT_CAPTURE_COLOR: [u8; 4] = [32, 96, 160, 255];
+
+/// The farthest a `user_input_timeline` press may sit from backend creation.
+pub const MAX_TIMELINE_MS: u64 = 3_600_000;
 
 /// A parsed scenario. Loaded from JSON, whose top-level keys are snake_case
 /// while embedded core types (`displays`, `windows`, `capabilities`) keep their
@@ -50,6 +57,33 @@ pub struct FakeScenario {
     /// Marks every capture's frame geometry `legacyCapture` (B9 fallback
     /// shape), so the wire carries the flag.
     pub legacy_capture: bool,
+    /// Processes (by pid) whose windows show a remote screen, and how the
+    /// client forwards input (plan todo 22).
+    pub remote_screens: BTreeMap<u32, crate::remote_impl::FakeRemoteScreen>,
+    /// Owning-process identity per window id; absent means unknown.
+    pub identity: BTreeMap<String, FakeWindowIdentity>,
+    pub identity_changes: Vec<IdentityChange>,
+    /// Key-priming focus reads, served per window in order; once a window's
+    /// reads run out, a read reports the focused window for both.
+    pub focus_reads: Vec<FakeFocusRead>,
+    /// Outcomes of successive focus records per kind; once a kind's list
+    /// runs out, its records take effect.
+    pub focus_record_effects: BTreeMap<FocusRecordKind, Vec<FocusRecordOutcome>>,
+    pub hit_at: Vec<FakeHit>,
+    pub user_input_timeline: Vec<TimedUserPress>,
+    /// The frontmost app's pid; `None` reports the focused window's pid.
+    pub frontmost_pid: Option<u32>,
+    /// The observation deadline a partial accessibility walk honors.
+    pub ax_deadline_ms: Option<u64>,
+    /// Pads a window's accessibility tree with leaf nodes up to this many
+    /// nodes in total, for dense-tree scenarios.
+    pub ax_node_count: BTreeMap<String, u32>,
+    pub epoch_events: Vec<EpochEvent>,
+    pub displays_change: Option<DisplaysChange>,
+    /// A stop marker file present at engine start, by path.
+    pub stop_marker: Option<String>,
+    /// Windows the next AX actions and pointer clicks open, in order.
+    pub opens_on_write: Vec<FakeOpening>,
 }
 
 impl Default for FakeScenario {
@@ -70,6 +104,20 @@ impl Default for FakeScenario {
             user_presses: Vec::new(),
             ax_cannot_complete: Vec::new(),
             legacy_capture: false,
+            remote_screens: BTreeMap::new(),
+            identity: BTreeMap::new(),
+            identity_changes: Vec::new(),
+            focus_reads: Vec::new(),
+            focus_record_effects: BTreeMap::new(),
+            hit_at: Vec::new(),
+            user_input_timeline: Vec::new(),
+            frontmost_pid: None,
+            ax_deadline_ms: None,
+            ax_node_count: BTreeMap::new(),
+            epoch_events: Vec::new(),
+            displays_change: None,
+            stop_marker: None,
+            opens_on_write: Vec::new(),
         }
     }
 }
@@ -162,6 +210,12 @@ pub enum ScenarioError {
     UnknownCapability(String),
     #[error("fake scenario references unknown window '{0}'")]
     UnknownWindow(String),
+    #[error("ax_node_count names window '{0}', which has no scripted accessibility tree")]
+    UnknownAxTree(String),
+    #[error("{0}: nth counts calls from 1, so nth 0 would never fire")]
+    ZeroNth(&'static str),
+    #[error("user_input_timeline t_ms {0} is outside +/-{MAX_TIMELINE_MS} ms")]
+    TimelineOutOfRange(i64),
 }
 
 #[derive(Deserialize)]
@@ -197,6 +251,34 @@ struct RawScenario {
     ax_cannot_complete: Vec<AxWrite>,
     #[serde(default)]
     legacy_capture: bool,
+    #[serde(default)]
+    remote_screens: BTreeMap<u32, crate::remote_impl::FakeRemoteScreen>,
+    #[serde(default)]
+    identity: BTreeMap<String, FakeWindowIdentity>,
+    #[serde(default)]
+    identity_changes: Vec<IdentityChange>,
+    #[serde(default)]
+    focus_reads: Vec<FakeFocusRead>,
+    #[serde(default)]
+    focus_record_effects: BTreeMap<FocusRecordKind, Vec<FocusRecordOutcome>>,
+    #[serde(default)]
+    hit_at: Vec<FakeHit>,
+    #[serde(default)]
+    user_input_timeline: Vec<TimedUserPress>,
+    #[serde(default)]
+    frontmost_pid: Option<u32>,
+    #[serde(default)]
+    ax_deadline_ms: Option<u64>,
+    #[serde(default)]
+    ax_node_count: BTreeMap<String, u32>,
+    #[serde(default)]
+    epoch_events: Vec<EpochEvent>,
+    #[serde(default)]
+    displays_change: Option<DisplaysChange>,
+    #[serde(default)]
+    stop_marker: Option<String>,
+    #[serde(default)]
+    opens_on_write: Vec<FakeOpening>,
 }
 
 impl TryFrom<RawScenario> for FakeScenario {
@@ -208,9 +290,28 @@ impl TryFrom<RawScenario> for FakeScenario {
             .ax
             .keys()
             .chain(raw.menus.keys())
-            .chain(raw.resize_window.iter().map(|resize| &resize.id));
+            .chain(raw.resize_window.iter().map(|resize| &resize.id))
+            .chain(raw.identity.keys())
+            .chain(raw.identity_changes.iter().map(|change| &change.window))
+            .chain(raw.focus_reads.iter().map(|read| &read.window));
         if let Some(unknown) = referenced.find(|id| !known(id)) {
             return Err(ScenarioError::UnknownWindow(unknown.clone()));
+        }
+        if let Some(unscripted) = raw.ax_node_count.keys().find(|id| !raw.ax.contains_key(*id)) {
+            return Err(ScenarioError::UnknownAxTree(unscripted.clone()));
+        }
+        let zero_nth = raw
+            .identity_changes
+            .iter()
+            .map(|change| ("identity_changes", change.nth))
+            .chain(raw.epoch_events.iter().map(|event| ("epoch_events", event.nth)))
+            .chain(raw.displays_change.iter().map(|change| ("displays_change", change.nth)))
+            .find(|(_, nth)| *nth == 0);
+        if let Some((field, _)) = zero_nth {
+            return Err(ScenarioError::ZeroNth(field));
+        }
+        if let Some(press) = raw.user_input_timeline.iter().find(|press| press.t_ms.unsigned_abs() > MAX_TIMELINE_MS) {
+            return Err(ScenarioError::TimelineOutOfRange(press.t_ms));
         }
         let display_count = u32::try_from(raw.displays.len()).unwrap_or(u32::MAX);
         let capabilities = overlay_capabilities(fake_capabilities(display_count), raw.capabilities)?;
@@ -230,6 +331,20 @@ impl TryFrom<RawScenario> for FakeScenario {
             user_input_feed: raw.user_input_feed,
             ax_cannot_complete: raw.ax_cannot_complete,
             legacy_capture: raw.legacy_capture,
+            remote_screens: raw.remote_screens,
+            identity: raw.identity,
+            identity_changes: raw.identity_changes,
+            focus_reads: raw.focus_reads,
+            focus_record_effects: raw.focus_record_effects,
+            hit_at: raw.hit_at,
+            user_input_timeline: raw.user_input_timeline,
+            frontmost_pid: raw.frontmost_pid,
+            ax_deadline_ms: raw.ax_deadline_ms,
+            ax_node_count: raw.ax_node_count,
+            epoch_events: raw.epoch_events,
+            displays_change: raw.displays_change,
+            stop_marker: raw.stop_marker,
+            opens_on_write: raw.opens_on_write,
         })
     }
 }

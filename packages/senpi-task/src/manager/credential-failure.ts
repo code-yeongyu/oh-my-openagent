@@ -1,5 +1,4 @@
 import type { ResolvedModelRecord, TaskRecord } from "../state"
-import { isParentModelRung } from "./parent-model-rung"
 
 // A provider answer that no other model on the SAME provider can fix: the stored credential is
 // rejected (401, an invalid key, a lapsed subscription), has expired with only a fresh /login to renew it
@@ -23,7 +22,8 @@ const CREDENTIAL_MISSING =
 // provider, unless the text scopes the requirement to a model ("Authentication required for this model", or the
 // failed model's id), which a sibling may not share. The absence phrasings above stay provider-wide even when they
 // name a model: a key or an account belongs to the provider.
-const CREDENTIAL_REQUIRED = /\b(?:access token|(?<!proxy[ _-])authentication) is required\b|(?<!proxy[ _-])authentication[_ ]required/i
+const CREDENTIAL_REQUIRED =
+  /\b(?:access token|(?<!proxy[ _-])authentication) is required\b|(?<!proxy[ _-])authentication[_ ]required/i
 // A 403 is ambiguous: a provider also answers it for ONE model the key may not use (tier, region,
 // preview access, an organization that must be verified for that model), which a sibling model on
 // the same provider does not share. A 403 counts as a credential rejection only when it names the
@@ -94,9 +94,10 @@ export function terminalFailureMessage(record: TaskRecord | null | undefined, fa
   }
   if (usageLimitScope(failureMessage) === undefined) return failureMessage
   const model = record.resolved_model === undefined ? record.model : `${provider}/${record.resolved_model.model_id}`
-  const exhausted = runtimeFallbackCandidates(record, failureMessage).remaining.length === 0
-    ? " No other model in its fallback chain could take over."
-    : ""
+  const exhausted =
+    runtimeFallbackCandidates(record, failureMessage).remaining.length === 0
+      ? " No other model in its fallback chain could take over."
+      : ""
   return `${failureMessage}\n${model} reached its usage limit, so this task stopped.${exhausted} Retry once the limit resets, or point this category at another provider or model in omo.json.`
 }
 
@@ -104,24 +105,14 @@ export type RuntimeFallbackCandidates = {
   readonly remaining: readonly ResolvedModelRecord[]
   readonly skipped: readonly ResolvedModelRecord[]
   readonly limit?: UsageLimitScope
-  // Not a remedy for THIS failure, but kept at the end of the chain for a later spent or signed-out rung.
-  readonly retained?: readonly ResolvedModelRecord[]
-}
-
-/** The chain a hop onto `remaining[0]` leaves on the record: the rest of the walk, then the rungs kept for later. */
-export function chainAfterHop(candidates: RuntimeFallbackCandidates): readonly ResolvedModelRecord[] {
-  return [...candidates.remaining.slice(1), ...(candidates.retained ?? [])]
 }
 
 /**
- * The fallback list to walk after a failed turn: a dead credential drops the failed provider's rungs, an
- * account-wide usage limit moves them last. The parent session's model (#10750) is only a remedy for a
- * spent or signed-out rung, so any other failure walks the category rungs alone.
+ * The designated fallback list to walk after a failed turn: a dead credential drops the failed provider's
+ * rungs, an account-wide usage limit moves them last. Only the record's own chain is ever walked.
  */
 export function runtimeFallbackCandidates(record: TaskRecord, failureMessage: string): RuntimeFallbackCandidates {
-  const unusable = usageLimitScope(failureMessage) !== undefined || isCredentialFailure(failureMessage, modelIdOf(record))
-  const all = record.fallback_models ?? []
-  const fallbacks = all.filter((model) => unusable || !isParentModelRung(record, model))
+  const fallbacks = record.fallback_models ?? []
   const provider = providerOf(record)
   if (provider !== undefined && isCredentialFailure(failureMessage, modelIdOf(record))) {
     return {
@@ -130,18 +121,14 @@ export function runtimeFallbackCandidates(record: TaskRecord, failureMessage: st
     }
   }
   const limit = usageLimitScope(failureMessage)
-  if (limit === undefined) {
-    const retained = all.filter((model) => isParentModelRung(record, model))
-    return { remaining: fallbacks, skipped: [], ...(retained.length === 0 ? {} : { retained }) }
-  }
+  if (limit === undefined) return { remaining: fallbacks, skipped: [] }
   if (limit === "model" || provider === undefined) return { remaining: fallbacks, skipped: [], limit }
-  const spentParent = fallbacks.filter((model) => model.provider === provider && isParentModelRung(record, model))
   return {
     remaining: [
       ...fallbacks.filter((model) => model.provider !== provider),
-      ...fallbacks.filter((model) => model.provider === provider && !spentParent.includes(model)),
+      ...fallbacks.filter((model) => model.provider === provider),
     ],
-    skipped: spentParent,
+    skipped: [],
     limit,
   }
 }

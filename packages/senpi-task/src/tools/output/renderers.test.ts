@@ -41,24 +41,6 @@ function snapshot(overrides: Partial<TaskSnapshot> = {}): TaskSnapshot {
 }
 
 describe("task_output model text (#9722)", () => {
-  test("#given a child that moved onto its parent's model #when rendered #then the text names the parent model, the model that gave out, and the interrupted call (#10750)", () => {
-    const text = taskOutputModelText(snapshot({
-      parent_model: "chatgpt-subscription/gpt-6.1-sol",
-      parent_model_fallback: {
-        from_model: "anthropic-subscription/claude-opus-5-5",
-        reason: "usage_limit",
-        resets: "3:20am",
-        interrupted_tools: ["bash"],
-        at: "2026-10-21T01:00:00.000Z",
-      },
-    }))
-
-    for (const fact of ["chatgpt-subscription/gpt-6.1-sol", "anthropic-subscription/claude-opus-5-5", "3:20am", "bash"]) {
-      expect(text).toContain(fact)
-    }
-    expect(taskOutputModelText(snapshot())).not.toContain("chatgpt-subscription/gpt-6.1-sol")
-  })
-
   test("#given an honoured pin whose resolved display carries the suffix #when rendered #then it shows one model, never a false mismatch", () => {
     // given: the plan's display is the raw pin; the child's effective model is its canonical base
     const snap = snapshot({
@@ -163,10 +145,7 @@ describe("task_output renderers", () => {
 
   test("#given a width smaller than the fixed call tokens #when rendering task_output #then the complete ANSI row is clamped", () => {
     // given / when
-    const line = firstLine(
-      renderTaskOutputCall({ name: "abcdef", mode: "status" }, ANSI_THEME),
-      20,
-    )
+    const line = firstLine(renderTaskOutputCall({ name: "abcdef", mode: "status" }, ANSI_THEME), 20)
 
     // then
     expect(line).toContain("...")
@@ -190,7 +169,9 @@ describe("task_output renderers", () => {
     ]
 
     // when
-    const lines = details.map((detail) => firstLine(renderTaskOutputResult(toolResult("ignored", detail), RESULT_OPTIONS, TEST_THEME), 120))
+    const lines = details.map((detail) =>
+      firstLine(renderTaskOutputResult(toolResult("ignored", detail), RESULT_OPTIONS, TEST_THEME), 120),
+    )
 
     // then
     expect(lines).toHaveLength(details.length)
@@ -226,7 +207,10 @@ describe("task_output renderers", () => {
     // given / when
     const line = firstLine(
       renderTaskOutputResult(
-        toolResult("ignored", { kind: "status", snapshot: snapshot({ name: "task-1", description: "Audit the waiting line" }) }),
+        toolResult("ignored", {
+          kind: "status",
+          snapshot: snapshot({ name: "task-1", description: "Audit the waiting line" }),
+        }),
         RESULT_OPTIONS,
         TEST_THEME,
       ),
@@ -412,13 +396,31 @@ describe("task_output run stats rendering", () => {
   test("#given a snapshot without run stats #when the status row renders #then no runtime tokens appear", () => {
     // when
     const line = firstLine(
-      renderTaskOutputResult(toolResult("ignored", { kind: "status", snapshot: snapshot() }), RESULT_OPTIONS, TEST_THEME),
+      renderTaskOutputResult(
+        toolResult("ignored", { kind: "status", snapshot: snapshot() }),
+        RESULT_OPTIONS,
+        TEST_THEME,
+      ),
       200,
     )
 
     // then
     expect(line).not.toContain("ran ")
     expect(line).not.toContain("tok/s")
+  })
+
+  test("#given no-progress output without a pending notification #when the row renders #then it shows the factual reason", () => {
+    const detail: TaskOutputDetails = {
+      kind: "no_progress",
+      task_id: "st_done",
+      status: "completed",
+      reason: "Task st_done is completed. It will not send a completion notification.",
+    }
+
+    const line = firstLine(renderTaskOutputResult(toolResult("ignored", detail), RESULT_OPTIONS, TEST_THEME), 200)
+
+    expect(line).toContain("It will not send a completion notification.")
+    expect(line).not.toContain("await notification")
   })
 })
 
@@ -427,7 +429,11 @@ describe("task_output suspended residency rendering", () => {
     // given
     const detail: TaskOutputDetails = {
       kind: "status",
-      snapshot: snapshot({ status: "running", residency_state: "persisted_only", suspended: { explanation: "suspended (resumes with session)" } }),
+      snapshot: snapshot({
+        status: "running",
+        residency_state: "persisted_only",
+        suspended: { explanation: "suspended (resumes with session)" },
+      }),
     }
 
     // when
@@ -442,7 +448,11 @@ describe("task_output suspended residency rendering", () => {
     // given
     const detail: TaskOutputDetails = {
       kind: "status",
-      snapshot: snapshot({ status: "running", residency_state: "rpc_detached", suspended: { explanation: "suspended (resumes with session)" } }),
+      snapshot: snapshot({
+        status: "running",
+        residency_state: "rpc_detached",
+        suspended: { explanation: "suspended (resumes with session)" },
+      }),
     }
 
     // when

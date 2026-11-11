@@ -83,6 +83,15 @@ The `agents` block of the OpenCode edition quick start, with the per-agent overr
 
 #### Fallback Models with Per-Model Settings
 
+Categories and agents accept `models_distribution: "sequential" | "round_robin"`
+next to their canonical `models` array. The default `sequential` keeps the
+existing order. With `round_robin`, new task children start at successive
+entries and fallback wraps through the remaining entries in order without
+repeating a model. Each category and agent has an independent in-memory cursor
+in the plugin process, reset on restart. Concurrent spawns receive separate
+turns; continuations keep their existing model. Availability, cooldowns and error
+fallback still apply. This option does not rotate accounts within one provider.
+
 `fallback_models` accepts either a single model string or an array. Array entries can be plain strings or objects with individual model settings:
 
 ```jsonc
@@ -326,8 +335,8 @@ The `agents` block of the OpenCode edition quick start, with the per-agent overr
 | **Librarian** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `anthropic\|github-copilot/claude-haiku-5-5 (medium)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7`
 | **Explore** | `kimi-for-coding-highspeed` | `kimi-coding\|kimi-for-coding/kimi-for-coding-highspeed (off)` → `openai\|chatgpt-subscription/gpt-6-luna-fast (low)` → `anthropic\|github-copilot/claude-haiku-5-5 (medium)` → `deepseek/deepseek-flash (max)` → `opencode-go\|bailian-coding-plan/qwen3.7-plus` → `opencode-go/minimax-m2.7`
 | **Multimodal Looker** | `gpt-5.6-sol` | `openai\|chatgpt-subscription\|opencode/gpt-5.6-sol (low)` → `opencode-go/kimi-k3.1-pro` → `zai-coding-plan/glm-4.6v` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5-nano`
-| **Prometheus** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (xhigh)` → `opencode-go\|kimi-for-coding\|moonshotai/kimi-k3.1-pro (max)` → `opencode/kimi-k3 (max)`
-| **Metis** | `claude-fable-5-1` | `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai/kimi-k3.1-pro (max)` → `opencode/kimi-k3 (max)`
+| **Prometheus** | `claude-fable-5-2` | `anthropic\|github-copilot\|opencode/claude-fable-5-2 (xhigh)` → `anthropic\|github-copilot\|opencode/claude-fable-5-1 (xhigh)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai/kimi-k3.1-pro (max)` → `opencode/kimi-k3 (max)`
+| **Metis** | `claude-fable-5-2` | `anthropic\|github-copilot\|opencode/claude-fable-5-2 (max)` → `anthropic\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `opencode-go\|kimi-for-coding\|moonshotai/kimi-k3.1-pro (max)` → `opencode/kimi-k3 (max)`
 | **Momus** | `gpt-6-astra` | `openai\|chatgpt-subscription/gpt-6-astra (xhigh)` → `github-copilot/gpt-6-astra (high)` → `openai\|chatgpt-subscription\|opencode/gpt-6-astra (high)` → `anthropic\|github-copilot\|opencode/claude-opus-5-5 (max)` → `google\|google-vertex\|opencode/gemini-4-argon (high)` → `google\|github-copilot\|opencode/gemini-3.1-pro (high)` → `opencode-go/glm-5.2`
 | **Atlas** | `claude-sonnet-5` | `anthropic\|github-copilot\|opencode/claude-sonnet-5` → `opencode-go/kimi-k3.1-pro` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7`
 | **Sisyphus Junior** | `claude-sonnet-5` | `anthropic\|github-copilot\|opencode/claude-sonnet-5` → `opencode-go/kimi-k3.1-pro` → `openai\|chatgpt-subscription\|github-copilot\|opencode/gpt-5.6-sol (medium)` → `opencode-go/minimax-m3` → `minimax-coding-plan\|minimax-cn-coding-plan/MiniMax-M3` → `opencode-go/minimax-m2.7` → `opencode/big-pickle`

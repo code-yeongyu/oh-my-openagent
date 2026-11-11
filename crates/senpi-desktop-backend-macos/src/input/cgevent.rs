@@ -27,6 +27,27 @@ fn tagged(event: CGEvent) -> CGEvent {
     event
 }
 
+#[link(name = "CoreGraphics", kind = "framework")]
+unsafe extern "C" {
+    fn CGEventCreateKeyboardEvent(source: CGEventSourceRef, code: u16, down: bool) -> *mut core_graphics::sys::CGEvent;
+}
+
+/// A bare key transition for a remote screen: a NULL event source and no
+/// flag override, so CoreGraphics derives the modifier state from the
+/// transitions exactly as for a hardware keyboard. It still carries the
+/// engine tag: with a null source the event's source pid is 0, and the
+/// user-input watch (D3) tells the engine's events apart by the tag.
+pub(crate) fn bare_keyboard_event(code: u16, down: bool) -> CoreResult<CGEvent> {
+    // SAFETY: [FFI] a NULL source is documented as valid for keyboard events;
+    // the returned create-rule event's ownership moves into `CGEvent`.
+    let raw = unsafe { CGEventCreateKeyboardEvent(std::ptr::null_mut(), code, down) };
+    if raw.is_null() {
+        return Err(DesktopError::input_failed("failed to create a Quartz keyboard event"));
+    }
+    // SAFETY: [FFI] `raw` is a non-null create-rule event owned here.
+    Ok(tagged(unsafe { CGEvent::from_ptr(raw) }))
+}
+
 pub(crate) fn keyboard_event(source: &CGEventSource, code: u16, down: bool) -> CoreResult<CGEvent> {
     CGEvent::new_keyboard_event(source.clone(), code, down)
         .map(tagged)

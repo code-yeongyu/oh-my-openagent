@@ -1,19 +1,17 @@
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  rmSync,
-  statSync,
-  type Stats,
-} from "node:fs"
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, type Stats } from "node:fs"
 import { join } from "node:path"
 
 import { parseTaskId, transitionTaskRecord } from "../state"
 import type { TaskId, TaskRecord } from "../state"
 import { appendTaskEvent, closeAppendFd, taskEventLogPath, type AppendFdCache } from "./event-log"
-import { holdsTombstone, removeExpungeOwner, readExpungeOwnerFile, restoreTombstone, takeOverTombstone, writeExpungeOwner } from "./expunge-owner"
+import {
+  holdsTombstone,
+  removeExpungeOwner,
+  readExpungeOwnerFile,
+  restoreTombstone,
+  takeOverTombstone,
+  writeExpungeOwner,
+} from "./expunge-owner"
 import { withTaskRecordLock } from "./record-lock"
 import { parseTaskRecord } from "./record-parse"
 import { writeRecord } from "./record-write"
@@ -36,6 +34,9 @@ export type TaskRecordStoreOptions = {
 
 type CacheEntry = {
   readonly record: TaskRecord
+  // Every rewrite is an atomic rename (record-write.ts), so a new inode marks it even when the size and a
+  // coarse filesystem mtime both stay the same: a same-length effect_seq bump read stale without it (#10708).
+  readonly ino: number
   readonly mtimeMs: number
   readonly size: number
   readonly warnings: readonly string[]
@@ -53,7 +54,10 @@ export type ResidentTaskRecordStore = TaskRecordStore & {
   residentFigures(): TaskRecordStoreResidentFigures
 }
 
-export function createTaskRecordStore(config: StateDirConfig, options: TaskRecordStoreOptions = {}): ResidentTaskRecordStore {
+export function createTaskRecordStore(
+  config: StateDirConfig,
+  options: TaskRecordStoreOptions = {},
+): ResidentTaskRecordStore {
   const stateDir = resolveStateDir(config)
   const platform = options.platform ?? process.platform
   const cache = new Map<string, CacheEntry>()
@@ -64,7 +68,7 @@ export function createTaskRecordStore(config: StateDirConfig, options: TaskRecor
     const record = readRecord(path, warnings)
     if (record === null) return
     const stat = statSync(path)
-    cache.set(path, { record, mtimeMs: stat.mtimeMs, size: stat.size, warnings })
+    cache.set(path, { record, ino: stat.ino, mtimeMs: stat.mtimeMs, size: stat.size, warnings })
   }
 
   return {
@@ -208,7 +212,9 @@ function listRecords(stateDir: string, cache: Map<string, CacheEntry>): ListTask
   const diagnostics: TaskRecordDiagnostic[] = []
   const seen = new Set<string>()
 
-  for (const file of readDirectoryNames(tasksDir).filter((entry) => entry.endsWith(".json")).toSorted()) {
+  for (const file of readDirectoryNames(tasksDir)
+    .filter((entry) => entry.endsWith(".json"))
+    .toSorted()) {
     const path = join(tasksDir, file)
     seen.add(path)
     try {
@@ -258,13 +264,13 @@ function readCached(path: string, cache: Map<string, CacheEntry>): TaskRecord | 
   }
 
   const hit = cache.get(path)
-  if (hit !== undefined && hit.mtimeMs === stat.mtimeMs && hit.size === stat.size) {
+  if (hit !== undefined && hit.ino === stat.ino && hit.mtimeMs === stat.mtimeMs && hit.size === stat.size) {
     return hit.record
   }
 
   const warnings: string[] = []
   const record = readRecord(path, warnings)
-  if (record !== null) cache.set(path, { record, mtimeMs: stat.mtimeMs, size: stat.size, warnings })
+  if (record !== null) cache.set(path, { record, ino: stat.ino, mtimeMs: stat.mtimeMs, size: stat.size, warnings })
   return record
 }
 

@@ -17,7 +17,7 @@ const BACKGROUND_WRAPPERS: [&str; 3] = [
 
 /// The background arms that exist today, as `file: count`.
 const BACKGROUND_ARMS: [(&str, usize); 4] =
-    [("input/mod.rs", 3), ("input/element.rs", 1), ("input/holds.rs", 1), ("backend.rs", 1)];
+    [("input/mod.rs", 4), ("input/element.rs", 1), ("input/holds.rs", 1), ("backend.rs", 1)];
 
 /// The AX requests the model makes, each a background call of its own.
 const AX_ENTRY_POINTS: [(&str, &str); 4] = [

@@ -1,8 +1,20 @@
 import { spawn } from "node:child_process"
-import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { telemetryLocalSinkEnv, withTelemetryOptOut } from "../../packages/omo-senpi/scripts/qa/telemetry-opt-out-env.mjs"
+import {
+  telemetryLocalSinkEnv,
+  withTelemetryOptOut,
+} from "../../packages/omo-senpi/scripts/qa/telemetry-opt-out-env.mjs"
 import { mockProviderSource, pluginRoot, prompts } from "./omo-native-telemetry-provider.mjs"
 
 export function createSandbox(label, configEnabled) {
@@ -39,10 +51,17 @@ export function createSandbox(label, configEnabled) {
   writeFileSync(join(agentDir, "trust.json"), `${JSON.stringify({ [canonicalCwd]: true }, null, 2)}\n`)
   const omoDir = join(cwd, ".omo")
   mkdirSync(omoDir, { recursive: true })
-  writeFileSync(join(omoDir, "omo.json"), `${JSON.stringify({
-    telemetry: { enabled: configEnabled },
-    categories: { quick: { description: "QA quick category", model: "openai/gpt-5.6-sol" } },
-  }, null, 2)}\n`)
+  writeFileSync(
+    join(omoDir, "omo.json"),
+    `${JSON.stringify(
+      {
+        telemetry: { enabled: configEnabled },
+        categories: { quick: { description: "QA quick category", model: "openai/gpt-5.6-sol" } },
+      },
+      null,
+      2,
+    )}\n`,
+  )
   const providerPath = join(root, "telemetry-mock-provider.ts")
   writeFileSync(providerPath, mockProviderSource())
   chmodSync(providerPath, 0o700)
@@ -54,7 +73,8 @@ function cleanEnvironment(sandbox, port, extraEnv) {
   for (const [key, value] of Object.entries(process.env)) {
     if (value === undefined) continue
     if (/TOKEN|SECRET|PASSWORD|COOKIE|CREDENTIAL|API_KEY/i.test(key)) continue
-    if (key === "SENPI_CODING_AGENT_DIR" || key === "SENPI_CODING_AGENT_SESSION_DIR" || key === "XDG_CONFIG_HOME") continue
+    if (key === "SENPI_CODING_AGENT_DIR" || key === "SENPI_CODING_AGENT_SESSION_DIR" || key === "XDG_CONFIG_HOME")
+      continue
     if (key === "DO_NOT_TRACK" || key.startsWith("OMO_") || key === "POSTHOG_HOST") continue
     env[key] = value
   }
@@ -76,8 +96,19 @@ function cleanEnvironment(sandbox, port, extraEnv) {
 export async function driveCli({ senpiBin, port, label, evidenceDir, configEnabled = true, extraEnv = {} }) {
   const sandbox = createSandbox(label, configEnabled)
   const commandArgs = [
-    "--mode", "rpc", "--offline", "--approve", "--no-context-files", "--session-dir", sandbox.sessionDir,
-    "-e", sandbox.providerPath, "--provider", "openai", "--model", "gpt-5.6-sol",
+    "--mode",
+    "rpc",
+    "--offline",
+    "--approve",
+    "--no-context-files",
+    "--session-dir",
+    sandbox.sessionDir,
+    "-e",
+    sandbox.providerPath,
+    "--provider",
+    "openai",
+    "--model",
+    "gpt-5.6-sol",
   ]
   const child = spawn(senpiBin, commandArgs, {
     cwd: sandbox.cwd,
@@ -93,7 +124,10 @@ export async function driveCli({ senpiBin, port, label, evidenceDir, configEnabl
     try {
       if (evidenceDir) {
         const sessions = readdirSync(sandbox.sessionDir).filter((name) => name.endsWith(".jsonl"))
-        writeFileSync(join(evidenceDir, `${label}-session.jsonl`), sessions.map((name) => readFileSync(join(sandbox.sessionDir, name), "utf8")).join(""))
+        writeFileSync(
+          join(evidenceDir, `${label}-session.jsonl`),
+          sessions.map((name) => readFileSync(join(sandbox.sessionDir, name), "utf8")).join(""),
+        )
       }
     } finally {
       if (!succeeded) rmSync(sandbox.root, { recursive: true, force: true })
@@ -114,9 +148,14 @@ export async function driveRpc(child, label) {
   let shutdownHandle
   const completed = new Promise((resolveRun, rejectRun) => {
     // Reserve termination time inside the overall budget, not after it.
-    timeoutHandle = setTimeout(() => rejectRun(new Error(`${label} Senpi RPC drive timed out within its 120000ms total budget`)), 120_000 - shutdownGraceMs)
+    timeoutHandle = setTimeout(
+      () => rejectRun(new Error(`${label} Senpi RPC drive timed out within its 120000ms total budget`)),
+      120_000 - shutdownGraceMs,
+    )
     child.on("error", rejectRun)
-    child.stderr.on("data", (chunk) => { stderr += chunk.toString("utf8") })
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString("utf8")
+    })
     child.stdout.on("data", (chunk) => {
       stdoutBuffer += chunk.toString("utf8")
       let newline = stdoutBuffer.indexOf("\n")
@@ -125,8 +164,13 @@ export async function driveRpc(child, label) {
         stdoutBuffer = stdoutBuffer.slice(newline + 1)
         if (line.trim() !== "") {
           let event
-          try { event = JSON.parse(line) } catch (error) {
-            if (!(error instanceof SyntaxError) || line.trimStart().startsWith("{")) { rejectRun(error); return }
+          try {
+            event = JSON.parse(line)
+          } catch (error) {
+            if (!(error instanceof SyntaxError) || line.trimStart().startsWith("{")) {
+              rejectRun(error)
+              return
+            }
             stderr += `${line}\n`
           }
           if (event) transcript.push(line)
@@ -151,7 +195,12 @@ export async function driveRpc(child, label) {
       settled = true
       clearTimeout(timeoutHandle)
       if (code === 0 && settledCount === prompts.length) resolveRun({ code, signal })
-      else rejectRun(new Error(`${label} Senpi RPC exited code=${code} signal=${signal} agent_settled=${settledCount}\n${stderr.slice(-4000)}`))
+      else
+        rejectRun(
+          new Error(
+            `${label} Senpi RPC exited code=${code} signal=${signal} agent_settled=${settledCount}\n${stderr.slice(-4000)}`,
+          ),
+        )
     })
     child.stdin.write(`${JSON.stringify({ type: "prompt", message: prompts[0] })}\n`)
   })
@@ -161,13 +210,16 @@ export async function driveRpc(child, label) {
   } catch (error) {
     if (child.exitCode === null) child.kill("SIGTERM")
     const forced = new Promise((resolveForce) => {
-      shutdownHandle = setTimeout(() => {
-        child.kill("SIGKILL")
-        child.stdin.destroy()
-        child.stdout.destroy()
-        child.stderr.destroy()
-        resolveForce()
-      }, Math.max(0, Math.min(shutdownGraceMs, deadlineAt - performance.now())))
+      shutdownHandle = setTimeout(
+        () => {
+          child.kill("SIGKILL")
+          child.stdin.destroy()
+          child.stdout.destroy()
+          child.stderr.destroy()
+          resolveForce()
+        },
+        Math.max(0, Math.min(shutdownGraceMs, deadlineAt - performance.now())),
+      )
     })
     await Promise.race([closed, forced])
     throw error

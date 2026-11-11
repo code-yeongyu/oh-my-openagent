@@ -10,20 +10,48 @@ import type { WorkpoolAggregateMessage, WorkpoolAggregatePort } from "./aggregat
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
 
 function acking(messages: WorkpoolAggregateMessage[]): WorkpoolAggregatePort {
-  return { enqueue: (message, receipts) => { messages.push(message); receipts.ack() } }
+  return {
+    enqueue: (message, receipts) => {
+      messages.push(message)
+      receipts.ack()
+    },
+  }
 }
 function hanging(messages: WorkpoolAggregateMessage[]): WorkpoolAggregatePort {
-  return { enqueue: message => { messages.push(message) } }
+  return {
+    enqueue: (message) => {
+      messages.push(message)
+    },
+  }
 }
 function reopen(root: string) {
-  const config = OmoTaskSettingsSchema.parse({ default_concurrency: 1, global_concurrency: 1, residency_max_children: 4 })
+  const config = OmoTaskSettingsSchema.parse({
+    default_concurrency: 1,
+    global_concurrency: 1,
+    residency_max_children: 4,
+  })
   const store = createTaskRecordStore({ project_dir: root })
   const concurrency = new TaskConcurrency(config)
   const runner = { start: async (spec: { taskId: string }) => fixtureHandle(spec.taskId).handle }
-  const registry: ResidencyRegistry = { get: () => undefined, entries: () => [], forget: (_taskId, _options) => undefined, hasPendingSends: () => false, tryClaimEviction: () => false, releaseEviction: () => undefined }
+  const registry: ResidencyRegistry = {
+    get: () => undefined,
+    entries: () => [],
+    forget: (_taskId, _options) => undefined,
+    hasPendingSends: () => false,
+    tryClaimEviction: () => false,
+    releaseEviction: () => undefined,
+  }
   const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config })
-  const manager = createTaskManager({ store, concurrency, runners: { "in-process": runner, process: runner }, config, cwd: root,
-    planner: spec => ({ kind: "resolved", plan: { model: spec.model ?? "test/model" } }), destruction: lifecycle, admit: async () => ({ kind: "admitted" }) })
+  const manager = createTaskManager({
+    store,
+    concurrency,
+    runners: { "in-process": runner, process: runner },
+    config,
+    cwd: root,
+    planner: (spec) => ({ kind: "resolved", plan: { model: spec.model ?? "test/model" } }),
+    destruction: lifecycle,
+    admit: async () => ({ kind: "admitted" }),
+  })
   return { manager, lifecycle }
 }
 
@@ -57,18 +85,32 @@ test("#given keyed yields then close #when results are terminal #then one input-
   f.manager.workpools.push(f.caller, pool.pool_id, [{ key: "b", input: 2 }])
   const event = await bounded(dispatched)
   expect(event.task_id).toBeDefined()
-  expect(f.manager.workpools.yieldResults(event.task_id!, event.run_epoch ?? 0, { op: "yield", results: [{ key: "b", data: 2 }] }).results[0]?.status).toBe("accepted")
+  expect(
+    f.manager.workpools.yieldResults(event.task_id!, event.run_epoch ?? 0, {
+      op: "yield",
+      results: [{ key: "b", data: 2 }],
+    }).results[0]?.status,
+  ).toBe("accepted")
   f.manager.workpools.close(f.caller, pool.pool_id)
   expect(messages).toEqual([{ pool_id: pool.pool_id, generation: 1, results: [{ key: "b", data: 2 }] }])
-  f.manager.workpools.yieldResults(event.task_id!, event.run_epoch ?? 0, { op: "yield", results: [{ key: "b", data: 2 }] })
+  f.manager.workpools.yieldResults(event.task_id!, event.run_epoch ?? 0, {
+    op: "yield",
+    results: [{ key: "b", data: 2 }],
+  })
   expect(messages).toHaveLength(1)
 })
 
 test("#given notifier throw #when close is empty #then aggregate stays pending, emits, and recovers", () => {
   const f = fixture()
   const failures: string[] = []
-  f.manager.workpools.subscribe(event => { if (event.kind === "aggregate_failed") failures.push(event.error?.message ?? "") })
-  f.manager.workpools.bindAggregate({ enqueue: () => { throw new Error("notifier down") } })
+  f.manager.workpools.subscribe((event) => {
+    if (event.kind === "aggregate_failed") failures.push(event.error?.message ?? "")
+  })
+  f.manager.workpools.bindAggregate({
+    enqueue: () => {
+      throw new Error("notifier down")
+    },
+  })
   const pool = f.manager.workpools.create(f.caller, poolInput)
   f.manager.workpools.close(f.caller, pool.pool_id)
   expect(f.manager.workpools.inspect(f.caller, pool.pool_id).aggregate?.delivered).not.toBe(true)
@@ -98,7 +140,11 @@ test("#given an accepted-then-lost aggregate #when attach runs on a fresh engine
   const pool = f.manager.workpools.create(f.caller, poolInput)
   f.manager.workpools.close(f.caller, pool.pool_id)
   expect(lost).toEqual([{ pool_id: pool.pool_id, generation: 1, results: [] }])
-  expect(f.manager.workpools.inspect(f.caller, pool.pool_id).aggregate).toEqual({ generation: 1, delivered: false, accepted: true })
+  expect(f.manager.workpools.inspect(f.caller, pool.pool_id).aggregate).toEqual({
+    generation: 1,
+    delivered: false,
+    accepted: true,
+  })
   f.manager.workpools.dispose()
   const recovered: WorkpoolAggregateMessage[] = []
   const restarted = reopen(f.root)
@@ -108,8 +154,14 @@ test("#given an accepted-then-lost aggregate #when attach runs on a fresh engine
     expect(recovered).toEqual(lost)
     restarted.manager.workpools.attach(f.caller)
     expect(recovered).toHaveLength(1)
-    expect(restarted.manager.workpools.inspect(f.caller, pool.pool_id).aggregate).toEqual({ generation: 1, delivered: true })
-  } finally { restarted.manager.workpools.dispose(); restarted.lifecycle.dispose?.() }
+    expect(restarted.manager.workpools.inspect(f.caller, pool.pool_id).aggregate).toEqual({
+      generation: 1,
+      delivered: true,
+    })
+  } finally {
+    restarted.manager.workpools.dispose()
+    restarted.lifecycle.dispose?.()
+  }
 })
 
 test("#given an accepted aggregate in the same process #when noteAggregateFailure runs #then accepted clears and a later bind redelivers once", () => {
@@ -118,7 +170,11 @@ test("#given an accepted aggregate in the same process #when noteAggregateFailur
   f.manager.workpools.bindAggregate(hanging(lost))
   const pool = f.manager.workpools.create(f.caller, poolInput)
   f.manager.workpools.close(f.caller, pool.pool_id)
-  expect(f.manager.workpools.inspect(f.caller, pool.pool_id).aggregate).toEqual({ generation: 1, delivered: false, accepted: true })
+  expect(f.manager.workpools.inspect(f.caller, pool.pool_id).aggregate).toEqual({
+    generation: 1,
+    delivered: false,
+    accepted: true,
+  })
   f.manager.workpools.noteAggregateFailure(pool.pool_id, 1)
   expect(f.manager.workpools.inspect(f.caller, pool.pool_id).aggregate).toEqual({ generation: 1, delivered: false })
   const recovered: WorkpoolAggregateMessage[] = []
@@ -142,7 +198,10 @@ test("#given a delivered aggregate #when attach runs on a fresh engine #then it 
     after.manager.workpools.bindAggregate(acking(delivered))
     after.manager.workpools.attach(g.caller)
     expect(delivered).toHaveLength(1)
-  } finally { after.manager.workpools.dispose(); after.lifecycle.dispose?.() }
+  } finally {
+    after.manager.workpools.dispose()
+    after.lifecycle.dispose?.()
+  }
 })
 
 test("#given a persisted pool #when a fresh engine inspects #then the same pool is observed", () => {
@@ -151,6 +210,12 @@ test("#given a persisted pool #when a fresh engine inspects #then the same pool 
   f.manager.workpools.push(f.caller, pool.pool_id, [{ key: "a", input: 1 }])
   const restarted = reopen(f.root)
   try {
-    expect(restarted.manager.workpools.inspect(f.caller, pool.pool_id)).toMatchObject({ pool_id: pool.pool_id, items: [{ key: "a" }] })
-  } finally { restarted.manager.workpools.dispose(); restarted.lifecycle.dispose?.() }
+    expect(restarted.manager.workpools.inspect(f.caller, pool.pool_id)).toMatchObject({
+      pool_id: pool.pool_id,
+      items: [{ key: "a" }],
+    })
+  } finally {
+    restarted.manager.workpools.dispose()
+    restarted.lifecycle.dispose?.()
+  }
 })

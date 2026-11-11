@@ -9,8 +9,10 @@ import { RETIRED_PROVIDER_IDS } from "./session-inventory"
  * (senpi `getCredentialAccounts`, the listing the app's account list shows), counts only. senpi does not export that
  * function, so its rules are mirrored here and `account-inventory.test.ts` asserts parity against the real engine
  * function from the installed dist on every fixture, so an engine rule change fails the test:
- * - Claude (`anthropic-subscription`): the stored `accounts` list (no list, the managed sign-in sentinel, is zero; an
- *   empty list is the flat credential, one), plus every env slot (`CLAUDE_CODE_OAUTH_TOKEN`, `_2` .. `_16`);
+ * - Claude (`anthropic-subscription`): the stored Claude CLI accounts (`store: "claude-cli"`, one per `claude auth
+ *   login` account dir, signed in or waiting to sign in again) when `accounts` is a list; no list, an empty list (the
+ *   flat sentinel) and any slot still holding a token from the retired senpi sign-in count zero (senpi
+ *   `isListedStoredSlot`); plus every env slot (`CLAUDE_CODE_OAUTH_TOKEN`, `_2` .. `_16`);
  * - any other provider: the stored `accounts` list when it is non-empty, else the flat credential as one account;
  *   env slots only when nothing is stored.
  * Rendered as a `kind:count` list over the shipped provider kinds, unknown kinds summed into `custom`, each count
@@ -45,10 +47,16 @@ export function loadEngineTables(load: () => Promise<unknown> = () => import("@e
 
 function isEngineTables(value: unknown): value is EngineTables {
   if (value === null || typeof value !== "object") return false
-  return ["normalizeProviderId", "getApiKeyEnvVars", "apiKeyEnvProviders"].every((name) => typeof Reflect.get(value, name) === "function")
+  return ["normalizeProviderId", "getApiKeyEnvVars", "apiKeyEnvProviders"].every(
+    (name) => typeof Reflect.get(value, name) === "function",
+  )
 }
 
-export function readConnectedAccounts(agentDir: string, env: Env, tables: EngineTables | undefined = loadedTables): string {
+export function readConnectedAccounts(
+  agentDir: string,
+  env: Env,
+  tables: EngineTables | undefined = loadedTables,
+): string {
   if (tables === undefined) return ""
   const kinds = new Map<string, number>()
   for (const [provider, count] of connectedAccountCounts(readAuth(join(agentDir, "auth.json")), env, tables)) {
@@ -61,7 +69,11 @@ export function readConnectedAccounts(agentDir: string, env: Env, tables: Engine
     .join(",")
 }
 
-export function connectedAccountCounts(auth: Readonly<Record<string, unknown>>, env: Env, piAi: EngineTables): Map<string, number> {
+export function connectedAccountCounts(
+  auth: Readonly<Record<string, unknown>>,
+  env: Env,
+  piAi: EngineTables,
+): Map<string, number> {
   const stored = new Map<string, unknown>()
   for (const [key, value] of Object.entries(auth)) {
     const canonical = piAi.normalizeProviderId(key)
@@ -77,13 +89,23 @@ export function connectedAccountCounts(auth: Readonly<Record<string, unknown>>, 
 
 function engineAccountCount(provider: string, credential: unknown, env: Env, piAi: EngineTables): number {
   const claude = piAi.normalizeProviderId(provider) === CLAUDE
-  if (credential !== undefined && credential !== null && credential !== false && credential !== "" && credential !== 0) {
+  if (
+    credential !== undefined &&
+    credential !== null &&
+    credential !== false &&
+    credential !== "" &&
+    credential !== 0
+  ) {
     const accounts = typeof credential === "object" ? Reflect.get(credential, "accounts") : undefined
-    const listed = Array.isArray(accounts) && accounts.length > 0 ? accounts.length : 1
-    if (!claude) return listed
-    return (Array.isArray(accounts) ? listed : 0) + envSlotCount(provider, env, piAi)
+    if (!claude) return Array.isArray(accounts) && accounts.length > 0 ? accounts.length : 1
+    const cliAccounts = Array.isArray(accounts) ? accounts.filter(isClaudeCliSlot).length : 0
+    return cliAccounts + envSlotCount(provider, env, piAi)
   }
   return envSlotCount(provider, env, piAi)
+}
+
+function isClaudeCliSlot(slot: unknown): boolean {
+  return slot !== null && typeof slot === "object" && Reflect.get(slot, "store") === "claude-cli"
 }
 
 function envSlotCount(provider: string, env: Env, piAi: EngineTables): number {
@@ -110,7 +132,9 @@ function kindOf(provider: string): string {
 function readAuth(path: string): Readonly<Record<string, unknown>> {
   try {
     const parsed: unknown = JSON.parse(readFileSync(path, "utf8"))
-    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {}
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {}
   } catch {
     return {}
   }
