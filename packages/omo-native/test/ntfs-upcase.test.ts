@@ -26,6 +26,20 @@ describe("frozen NTFS upcase table (#12809)", () => {
     const folded = foldNtfsCase(ascii)
 
     // then
-    expect(folded).toBe(ascii.replace(/[a-z]/g, letter => letter.toUpperCase()))
+    expect(folded).toBe(ascii.replace(/[a-z]/g, (letter) => letter.toUpperCase()))
+  })
+
+  test("#given case pairs added after Unicode 3.2 #when folded #then each unit stays itself", () => {
+    // given: JS toUpperCase still folds the first three. U+212A stays itself under toUpperCase, and toLowerCase maps it to "k".
+    const foldedByJs = ["\u10D0", "\uAB70", "\u0282"]
+    const kelvin = "\u212A"
+
+    // when / then
+    for (const unit of foldedByJs) {
+      expect(foldNtfsCase(unit)).toBe(unit)
+      expect(unit.toUpperCase()).not.toBe(unit)
+    }
+    expect(foldNtfsCase(kelvin)).toBe(kelvin)
+    expect(kelvin.toLowerCase()).toBe("k")
   })
 })
