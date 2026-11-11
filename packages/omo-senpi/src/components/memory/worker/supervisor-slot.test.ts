@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test"
 import { slotHarness } from "./supervisor-slot.test-support"
 import { readRunJson, writeRunJsonAtomic, type RunLaunchManifest } from "./run-artifacts"
+import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { advanceTestClock } from "./supervisor-test-signals"
@@ -119,10 +120,30 @@ test("a configured cap of two admits two children across identities", async () =
     const launched = runs.map((run) => harness.launch(run))
     await accounted
     harness.flow()
-    expect(await Promise.all(launched.map(({ exit }) => exit))).toEqual([0, 0, 0, 0, 0])
+    expect(await Promise.all(launched.map(async ({ exit, diagnostic }) => await exit === 0 ? 0 : diagnostic())))
+      .toEqual([0, 0, 0, 0, 0])
     expect(harness.peak()).toBe(2)
     expect((await Promise.all(runs.map(({ runDir }) => harness.outcome(runDir))))
       .every((outcome) => outcome.childExit.code === 0 && !outcome.timedOut)).toBe(true)
+  } finally {
+    await harness.cleanup()
+  }
+}, TEST_TIMEOUT_MS)
+
+test("#given a retained slot whose child exited #when its supervisor releases it during the queue head's reclaim #then the head is admitted instead of exiting with ENOENT", async () => {
+  const harness = await slotHarness(TEST_TIMEOUT_MS)
+  try {
+    const exitedChild = Bun.spawnSync([process.execPath, "-e", ""])
+    if (!exitedChild.success) throw new Error("fixture process failed")
+    const retained = { ...(await createLockRecord("reflection-run")), pid: exitedChild.pid, process_start: "unavailable" }
+    await writeFile(join(harness.locks, "reflection-run.slot-1.lock"), `${JSON.stringify(retained)}\n`, { mode: 0o600 })
+    const run = await harness.makeRun("head", 2)
+    const started = harness.waitStarted(run.id)
+    const supervisor = harness.launch(run, fileURLToPath(new URL("./__fixtures__/supervisor-slot-release-race.ts", import.meta.url)))
+    await started
+    harness.release(run.id)
+    expect(await supervisor.exit === 0 ? 0 : await supervisor.diagnostic()).toBe(0)
+    expect(await harness.outcome(run.runDir)).toMatchObject({ childExit: { code: 0 }, timedOut: false })
   } finally {
     await harness.cleanup()
   }
