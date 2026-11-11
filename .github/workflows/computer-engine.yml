@@ -10,6 +10,10 @@ on:
       - "Cargo.lock"
       - "rust-toolchain.toml"
       - "script/qa/computer/**"
+      - ".github/workflows/computer-engine.yml"
+      - "package.json"
+      - "bun.lock"
+      - "script/check-cargo-pinned-deps.mjs"
   pull_request:
     branches: [master, dev]
     paths:
@@ -19,6 +23,10 @@ on:
       - "Cargo.lock"
       - "rust-toolchain.toml"
       - "script/qa/computer/**"
+      - ".github/workflows/computer-engine.yml"
+      - "package.json"
+      - "bun.lock"
+      - "script/check-cargo-pinned-deps.mjs"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -31,7 +39,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: macos-14, rust_target: aarch64-apple-darwin }
+          - { os: macos-26, rust_target: aarch64-apple-darwin }
           - { os: macos-15, rust_target: aarch64-apple-darwin }
           - { os: ubuntu-22.04, rust_target: x86_64-unknown-linux-gnu }
           - { os: ubuntu-22.04-arm, rust_target: aarch64-unknown-linux-gnu }
