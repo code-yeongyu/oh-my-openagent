@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { existsSync, realpathSync } from "node:fs"
-import { mkdtemp, readFile, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
 import { removeTree } from "../../../../test-support/remove-tree"
@@ -237,6 +237,41 @@ describe("GitMemoryRepo.head filesystem fast path", () => {
       }
       // when
       const head = await new GitMemoryRepo({ dir: f.dir, agentId: "head-test", exec }).head()
+      // then
+      expect(head).toBe(f.second)
+      expect(calls).toBe(1)
+    },
+    GIT_INTEGRATION_TEST_TIMEOUT,
+  )
+
+  it(
+    "#given a reftable directory and no local refstorage key #when read #then delegates to git",
+    async () => {
+      // given a fast-path config and a stale loose ref
+      const f = await fixture()
+      expect(f.first).not.toBe(f.second)
+      await writeFile(join(f.dir, ".git/HEAD"), "ref: refs/heads/main\n")
+      await writeFile(join(f.dir, ".git/refs/heads/main"), `${f.first}\n`)
+      await writeFile(join(f.dir, ".git/config"), "[core]\n\trepositoryformatversion = 0\n\tbare = false\n")
+      let calls = 0
+      const exec: GitExec = {
+        async run(argv, options) {
+          calls += 1
+          expect(argv).toEqual(["rev-parse", "--verify", "HEAD"])
+          expect(options.cwd).toBe(f.dir)
+          return { code: 0, stdout: `${f.second}\n`, stderr: "" }
+        },
+      }
+      const repo = new GitMemoryRepo({ dir: f.dir, agentId: "head-test", exec })
+      // when the directory that marks reftable storage is absent
+      const loose = await repo.head()
+      // then the loose ref stays authoritative
+      expect(loose).toBe(f.first)
+      expect(calls).toBe(0)
+
+      // when reftable storage is selected outside the local config
+      await mkdir(join(f.dir, ".git/reftable"))
+      const head = await repo.head()
       // then
       expect(head).toBe(f.second)
       expect(calls).toBe(1)
