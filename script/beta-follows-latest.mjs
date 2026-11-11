@@ -86,11 +86,8 @@ function parseDistTags(distTagsJson) {
 }
 
 /**
- * Re-checks beta after our own "npm dist-tag add omo-ai@<written> beta" (#13149), from the raw dist-tags JSON of the
- * read before the write and the read after it. status is "lookup-failed" when the second read is unusable, "ahead" when
- * beta is newer than what we wrote (someone moved it forward: leave it), "ok" when beta is at least the floor, and
- * "behind" otherwise, with the floor (the newest of latest and every prerelease tag seen in either read) and the exact
- * command that repairs it.
+ * The newest version across the given raw dist-tags objects (null entries are skipped): the latest tag and every
+ * prerelease-tagged version, or null when none is usable.
  */
 function newestFloor(tagObjects) {
   let floor = null
