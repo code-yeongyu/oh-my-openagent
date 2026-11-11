@@ -3,9 +3,12 @@ import {
 	type ComputerCallStep,
 	type ComputerDisplay,
 	type ComputerScreenshot,
+	type EngineMethod,
 	isReadOnlyComputerCall,
 } from "@oh-my-opencode/senpi-desktop-protocol";
+import type { ActionReport } from "@oh-my-opencode/senpi-desktop-sdk";
 import {
+	type ComputerRunHost,
 	type ComputerRunSandbox,
 	DesktopEngineRpcError,
 	DesktopLaunchContextError,
@@ -50,6 +53,13 @@ export interface ComputerToolDetails {
 	readonly audit?: readonly AuditRecord[];
 	/** Where the run executed: `quickjs` only for model-written `run` code under `computer.run_sandbox: "quickjs"`. */
 	readonly sandbox?: ComputerRunSandbox;
+	/**
+	 * The SDK `ActionReport` of the run's last input action; absent when the run sent none. `legacy: true` when the
+	 * engine replied `null` (it does not advertise `action-report`).
+	 */
+	readonly report?: ActionReport;
+	/** Every input action's report in send order, when the run sent more than one. */
+	readonly reports?: readonly ActionReport[];
 	/** Mirrors the top-level `isError` so a code-mode marshal (which reads `details`) reports the failure. */
 	readonly isError?: boolean;
 }
@@ -98,6 +108,78 @@ function valueResult(value: unknown, fallback: string): ComputerToolResult {
 	return { content: [{ type: "text", text }], details: { value } };
 }
 
+/** Engine methods whose reply is `null` or an `ActionReport` (`ax.typeText`: the reply's `report` member). */
+const EXEC_REPLY_METHODS: ReadonlySet<EngineMethod> = new Set<EngineMethod>([
+	"click", "moveMouse", "drag", "scroll", "typeText", "keyChord", "holdKeys", "holdMouse", "raiseWindow",
+	"menus.select", "clipboard.write", "ax.perform", "ax.setValue", "ax.focus", "ax.click", "ax.typeText",
+]);
+
+/** The SDK report of an engine that replied `null`: sent, unverified, never safe to resend (SDK `legacyReport`). */
+const LEGACY_REPORT: ActionReport = {
+	disposition: { delivery: "delivered_unverified", retry: "unsafe" },
+	delivered: null,
+	effect: "unverifiable",
+	route: null,
+	hit: null,
+	focusRestoration: "not_confirmed",
+	openedSurfaces: [],
+	nextCall: null,
+	note: null,
+	warning: null,
+	auditIds: [],
+	timings: null,
+	legacy: true,
+};
+
+/** An engine `ActionReport` as the wire carries it: the four required members, the rest optional. */
+type EngineReport = Pick<ActionReport, "disposition" | "effect" | "focusRestoration" | "auditIds"> &
+	Partial<Pick<ActionReport, "delivered" | "route" | "openedSurfaces" | "nextCall" | "note" | "warning">> & {
+		readonly hit?: { readonly role: NonNullable<ActionReport["hit"]>["role"]; readonly label?: string | null } | null;
+	};
+
+/**
+ * An exec reply in the SDK's `ActionReport` shape, member for member as the SDK maps it. Nothing has checked the
+ * reply yet: `reportingService` sits under the run facade and records each reply as the engine sent it, before the
+ * facade validates it (`expectResult` with `isExecResult`). A malformed reply is recorded here and only then fails
+ * that check, and even a reply that passes it carries `effect`, `route` and `focusRestoration` checked only as strings,
+ * not as members of the SDK's unions.
+ */
+function actionReportOf(reply: unknown): ActionReport {
+	if (reply === null || reply === undefined) return LEGACY_REPORT;
+	const report = reply as EngineReport;
+	return {
+		disposition: report.disposition,
+		delivered: report.delivered ?? null,
+		effect: report.effect,
+		route: report.route ?? null,
+		hit: report.hit == null ? null : { role: report.hit.role, label: report.hit.label ?? null },
+		focusRestoration: report.focusRestoration,
+		openedSurfaces: report.openedSurfaces ?? [],
+		nextCall: report.nextCall ?? null,
+		note: report.note ?? null,
+		warning: report.warning ?? null,
+		auditIds: report.auditIds,
+		timings: null,
+		legacy: false,
+	};
+}
+
+/** The run's engine channel, recording the report of every input action it carries. */
+function reportingService(service: ComputerHandle["service"], reports: ActionReport[]): ComputerRunHost["service"] {
+	return {
+		call: async (method, params, options) => {
+			const reply = await service.call(method, params, options);
+			if (EXEC_REPLY_METHODS.has(method)) {
+				reports.push(actionReportOf(method === "ax.typeText" ? Reflect.get(Object(reply), "report") : reply));
+			}
+			return reply;
+		},
+		onAudit: (listener) => service.onAudit(listener),
+		revokeControl: () => service.revokeControl(),
+		reportError: (error) => service.reportError(error),
+	};
+}
+
 function assertNever(value: never): never {
 	throw new TypeError(`unhandled computer action ${JSON.stringify(value)}`);
 }
@@ -121,6 +203,7 @@ export async function runComputer(
 	const snapshot = runSnapshot(settings, context, request.readOnly);
 	const timeoutMs = request.timeoutSeconds * 1000;
 	const confirmControl = deps.confirmControl;
+	const reports: ActionReport[] = [];
 	const outcome = await runComputerCode(
 		{
 			code: request.code,
@@ -131,7 +214,7 @@ export async function runComputer(
 			...(signal === undefined ? {} : { signal }),
 		},
 		{
-			service: handle.service,
+			service: reportingService(handle.service, reports),
 			executeTool,
 			...(confirmControl === undefined
 				? {}
@@ -153,6 +236,8 @@ export async function runComputer(
 			screenshots: outcome.screenshots,
 			audit: outcome.audit,
 			sandbox: outcome.sandbox,
+			...(reports.length === 0 ? {} : { report: reports[reports.length - 1] }),
+			...(reports.length > 1 ? { reports } : {}),
 		},
 	};
 }
