@@ -87,7 +87,10 @@ describe("spool claims across real processes", () => {
     })
     for (const name of spoolNames(dir).filter((n) => n.startsWith("active-"))) utimesSync(join(dir, name), idle, idle)
     const server = stub("ok")
-    const racers = [spawnChild(["race", dir, server.endpoint, String(pid)]), spawnChild(["race", dir, server.endpoint, String(pid)])]
+    const racers = [
+      spawnChild(["race", dir, server.endpoint, String(pid)]),
+      spawnChild(["race", dir, server.endpoint, String(pid)]),
+    ]
 
     // when
     for (const racer of racers) racer.child.stdin.write("g")
@@ -117,7 +120,12 @@ describe("spool claims across real processes", () => {
     server.reply = "ok"
 
     // when
-    const later = makeTransport(dir, { endpoint: server.endpoint, fetch, autoStart: true, nowMs: () => Date.now() + CLAIM_LEASE_MS + 1 })
+    const later = makeTransport(dir, {
+      endpoint: server.endpoint,
+      fetch,
+      autoStart: true,
+      nowMs: () => Date.now() + CLAIM_LEASE_MS + 1,
+    })
     await later.ready
     await later.shutdown()
 
@@ -137,7 +145,12 @@ describe("spool claims across real processes", () => {
     server.reply = "ok"
 
     // when
-    const other = makeTransport(dir, { endpoint: server.endpoint, fetch, autoStart: true, nowMs: () => Date.now() + CLAIM_LEASE_MS + 1 })
+    const other = makeTransport(dir, {
+      endpoint: server.endpoint,
+      fetch,
+      autoStart: true,
+      nowMs: () => Date.now() + CLAIM_LEASE_MS + 1,
+    })
     await other.ready
     await other.shutdown()
     child.stdin.write("r")

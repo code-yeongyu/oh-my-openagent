@@ -24,7 +24,9 @@ export function resolveLatestFlag(version: string, releasedTags: readonly string
 async function main(): Promise<void> {
   const version = process.argv[2]
   if (version === undefined) {
-    console.error("usage: gh release list --exclude-drafts --json tagName --jq '.[].tagName' | bun script/release-latest-flag.ts <version>")
+    console.error(
+      "usage: gh release list --exclude-drafts --json tagName --jq '.[].tagName' | bun script/release-latest-flag.ts <version>",
+    )
     process.exit(2)
   }
   const releasedTags = (await Bun.stdin.text()).split("\n").filter((line) => line.trim().length > 0)

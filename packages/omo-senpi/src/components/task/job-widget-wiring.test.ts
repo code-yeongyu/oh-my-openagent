@@ -23,7 +23,14 @@ function tempProject(): string {
 
 function logger(): ComponentLogger & { warnings: string[] } {
   const warnings: string[] = []
-  return { warnings, info: () => {}, warn: (message) => { warnings.push(message) }, error: () => {} }
+  return {
+    warnings,
+    info: () => {},
+    warn: (message) => {
+      warnings.push(message)
+    },
+    error: () => {},
+  }
 }
 
 function ctxFor(pi: FakeExtensionAPI, log: ComponentLogger): ComponentContext {
@@ -47,9 +54,20 @@ describe("task component job widget wiring", () => {
     const host: JobWidgetHostApi = {
       setAuthorResolver: (resolver) => {
         route = resolver
-        return () => { if (route === resolver) route = undefined }
+        return () => {
+          if (route === resolver) route = undefined
+        }
       },
-      sources: { register: () => undefined, createTap: () => ({ id: "tools", label: "", append: () => {}, close: () => {}, read: (from) => ({ start: from, end: from, text: "", open: true }) }) },
+      sources: {
+        register: () => undefined,
+        createTap: () => ({
+          id: "tools",
+          label: "",
+          append: () => {},
+          close: () => {},
+          read: (from) => ({ start: from, end: from, text: "", open: true }),
+        }),
+      },
     }
 
     // when
@@ -76,7 +94,9 @@ describe("task component job widget wiring", () => {
     // when
     await createTaskComponent({
       resolveCwd: () => tempProject(),
-      loadJobWidgetHost: async () => { throw new Error("module not found") },
+      loadJobWidgetHost: async () => {
+        throw new Error("module not found")
+      },
     }).register(pi, ctxFor(pi, log))
 
     // then

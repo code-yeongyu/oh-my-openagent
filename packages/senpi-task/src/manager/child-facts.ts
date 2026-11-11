@@ -44,18 +44,27 @@ export function subscribeChildFacts(input: {
     if (notice.kind === "adopted") {
       input.store.mutate(taskId, (fresh) => ({
         ...fresh,
-        ...(fresh.host_session === undefined ? {} : { host_session: { ...fresh.host_session, adopted_entry_id: notice.entryId } }),
+        ...(fresh.host_session === undefined
+          ? {}
+          : { host_session: { ...fresh.host_session, adopted_entry_id: notice.entryId } }),
       }))
     } else {
       const action = notice.kind === "interrupted" ? notice.action : undefined
       const needsAction = notice.kind === "idle_queued" || notice.deadline !== undefined || action !== undefined
       const reason = action === undefined ? notice.reason : `${notice.reason} Action: ${action}`
-      input.store.transition(taskId, { type: "interrupt", timestamp, ...(needsAction ? { error_message: reason } : {}) })
+      input.store.transition(taskId, {
+        type: "interrupt",
+        timestamp,
+        ...(needsAction ? { error_message: reason } : {}),
+      })
       if (notice.kind === "interrupted" && notice.deadline !== undefined) {
         input.store.mutate(taskId, (fresh) => ({ ...fresh, stop_reason: "deadline", deadline: notice.deadline }))
       }
     }
-    input.store.appendEvent(taskId, { type: notice.kind === "idle_queued" ? "idle_queued" : "host_turn_reconciled", payload: notice })
+    input.store.appendEvent(taskId, {
+      type: notice.kind === "idle_queued" ? "idle_queued" : "host_turn_reconciled",
+      payload: notice,
+    })
   })
   const extension = handle.subscribeExtensionEvents?.(input.onExtensionEvent)
   let noticeTimer: ReturnType<typeof setTimeout> | undefined
@@ -74,7 +83,10 @@ export function subscribeChildFacts(input: {
         input.onLivenessNotice(current, status)
         noticedState = status.state
       } catch (error) {
-        log("senpi-task host liveness notice failed", { taskId, error: error instanceof Error ? error.message : String(error) })
+        log("senpi-task host liveness notice failed", {
+          taskId,
+          error: error instanceof Error ? error.message : String(error),
+        })
       }
     }
     if (status.state === "terminal-pending") notify()
@@ -87,8 +99,9 @@ export function subscribeChildFacts(input: {
     // The resumed turn is the run the reopen is about to start (buildRevived's nextRunEpoch).
     const fresh = input.store.load(taskId)
     runStats.set(taskId, createRunStatsTracker(now(), now, fresh === null ? undefined : nextRunEpoch(fresh)))
-    void input.reopen().catch((error: unknown) =>
-      log("senpi-task self-resumed turn reopen failed", { taskId, error: String(error) }))
+    void input
+      .reopen()
+      .catch((error: unknown) => log("senpi-task self-resumed turn reopen failed", { taskId, error: String(error) }))
   })
   return () => {
     transcript()

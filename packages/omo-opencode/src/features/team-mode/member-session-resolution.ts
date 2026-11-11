@@ -18,8 +18,9 @@ export async function findResolvedMemberSession(
     try {
       const runtimeState = await loadRuntimeState(registryEntry.teamRunId, config)
       const memberEntry = runtimeState.members.find(
-        (member) => member.name === registryEntry.memberName
-          && (member.sessionId === undefined || member.sessionId === sessionID),
+        (member) =>
+          member.name === registryEntry.memberName &&
+          (member.sessionId === undefined || member.sessionId === sessionID),
       )
 
       if (memberEntry !== undefined) {

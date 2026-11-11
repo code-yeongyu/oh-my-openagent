@@ -36,11 +36,18 @@ class UnionPathSet extends Set<string> {
  * surfaced/system rejection, maxItems termination) re-bound at call time to the lifetime allowed set
  * `offered ∪ searched` and to the current wake's accepted list, and charged to the wake budget.
  */
-export function createKibitzerSidecarNudgeTool(input: KibitzerSidecarNudgeInput): KibitzerSidecarTool<typeof KibitzerNudgeParams> {
+export function createKibitzerSidecarNudgeTool(
+  input: KibitzerSidecarNudgeInput,
+): KibitzerSidecarTool<typeof KibitzerNudgeParams> {
   const candidates = new UnionPathSet([input.offered, input.searched])
   // The metadata (name, label, description, parameters) comes from the existing tool; only the
   // execute closure is replaced so the per-wake accepted list and budget are read at call time.
-  const template = createKibitzerNudgeTool({ candidates, surfaced: input.surfaced, maxItems: input.maxItems, accepted: [] })
+  const template = createKibitzerNudgeTool({
+    candidates,
+    surfaced: input.surfaced,
+    maxItems: input.maxItems,
+    accepted: [],
+  })
   return {
     ...template,
     execute: budgeted(input.budget, async (params) =>
@@ -49,6 +56,7 @@ export function createKibitzerSidecarNudgeTool(input: KibitzerSidecarNudgeInput)
         surfaced: input.surfaced,
         maxItems: input.maxItems,
         accepted: input.accepted(),
-      }).execute("", params)),
+      }).execute("", params),
+    ),
   }
 }

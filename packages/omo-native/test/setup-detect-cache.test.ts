@@ -47,27 +47,44 @@ function createFixture(): Fixture {
   mkdirSync(home, { recursive: true })
   const packageRoot = join(root, "app")
   cpSync(join(SOURCE_ROOT, "bin"), join(packageRoot, "bin"), { recursive: true })
-  write(join(packageRoot, "package.json"), JSON.stringify({
-    name: "omo-ai", version: "1.2.3-test.0", type: "module",
-    dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
-  }))
+  write(
+    join(packageRoot, "package.json"),
+    JSON.stringify({
+      name: "omo-ai",
+      version: "1.2.3-test.0",
+      type: "module",
+      dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
+    }),
+  )
   const senpiRoot = join(packageRoot, "node_modules", "@code-yeongyu", "senpi")
-  write(join(senpiRoot, "package.json"), JSON.stringify({
-    name: "@code-yeongyu/senpi", version: "2026.8.9", type: "module", exports: { ".": "./dist/index.js" },
-  }))
+  write(
+    join(senpiRoot, "package.json"),
+    JSON.stringify({
+      name: "@code-yeongyu/senpi",
+      version: "2026.8.9",
+      type: "module",
+      exports: { ".": "./dist/index.js" },
+    }),
+  )
   write(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
   // The fake engine records its spawn, so a launch that never blocked on detection can still prove
   // the engine ran.
-  write(join(senpiRoot, "dist", "cli.js"), `
+  write(
+    join(senpiRoot, "dist", "cli.js"),
+    `
 import { writeFileSync } from "node:fs"
 writeFileSync(process.env.CAPTURE_FILE, "spawned")
 process.exit(0)
-`)
+`,
+  )
   write(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
   for (const artifact of [
-    "plugin/package.json", "plugin/extensions/omo.js", "plugin/runtime/lsp-daemon/dist/cli.js",
+    "plugin/package.json",
+    "plugin/extensions/omo.js",
+    "plugin/runtime/lsp-daemon/dist/cli.js",
     "plugin/runtime/agent-toolkit/cli.js",
-  ]) write(join(packageRoot, artifact), "fixture\n")
+  ])
+    write(join(packageRoot, artifact), "fixture\n")
   const env = { HOME: home, SENPI_CODING_AGENT_DIR: agentDir, XDG_DATA_HOME: xdg }
   return {
     root,
@@ -170,10 +187,14 @@ describe("setup suggestion cache", () => {
       write(fixture.cachePath, `${JSON.stringify(freshEntry(fixture, false, writtenAt))}\n`)
       // An explicit clock pins the boundary: age exactly equal to the TTL is still fresh, one
       // millisecond past it is stale.
-      expect(readSetupSuggestionCache(fixture.env, fixture.home, writtenAt + SETUP_SUGGESTION_TTL_MS))
-        .toEqual({ suggestion: false, fresh: true })
-      expect(readSetupSuggestionCache(fixture.env, fixture.home, writtenAt + SETUP_SUGGESTION_TTL_MS + 1))
-        .toEqual({ suggestion: false, fresh: false })
+      expect(readSetupSuggestionCache(fixture.env, fixture.home, writtenAt + SETUP_SUGGESTION_TTL_MS)).toEqual({
+        suggestion: false,
+        fresh: true,
+      })
+      expect(readSetupSuggestionCache(fixture.env, fixture.home, writtenAt + SETUP_SUGGESTION_TTL_MS + 1)).toEqual({
+        suggestion: false,
+        fresh: false,
+      })
     })
   })
 
@@ -195,42 +216,51 @@ describe("setup suggestion cache", () => {
   })
 
   describe("#given a fresh cache", () => {
-    test.skipIf(process.platform === "win32")("#when an interactive launch runs #then the hint appears and the launcher never rewrites the cache", () => {
-      const fixture = createFixture()
-      installSibling(fixture)
-      write(fixture.cachePath, `${JSON.stringify(freshEntry(fixture, true))}\n`)
-      const before = readFileSync(fixture.cachePath, "utf8")
+    test.skipIf(process.platform === "win32")(
+      "#when an interactive launch runs #then the hint appears and the launcher never rewrites the cache",
+      () => {
+        const fixture = createFixture()
+        installSibling(fixture)
+        write(fixture.cachePath, `${JSON.stringify(freshEntry(fixture, true))}\n`)
+        const before = readFileSync(fixture.cachePath, "utf8")
 
-      const result = runLauncher(fixture, [], true)
+        const result = runLauncher(fixture, [], true)
 
-      expect(result.status).toBe(0)
-      const output = `${result.stdout}${result.stderr}`
-      expect(output.match(/sibling credentials detected; run `omo setup`/g)?.length).toBe(1)
-      expect(readFileSync(fixture.cachePath, "utf8")).toBe(before)
-      expect(readFileSync(fixture.captureFile, "utf8")).toBe("spawned")
-      expect(readdirSync(fixture.agentDir).sort()).toEqual([CACHE_FILENAME])
-    })
+        expect(result.status).toBe(0)
+        const output = `${result.stdout}${result.stderr}`
+        expect(output.match(/sibling credentials detected; run `omo setup`/g)?.length).toBe(1)
+        expect(readFileSync(fixture.cachePath, "utf8")).toBe(before)
+        expect(readFileSync(fixture.captureFile, "utf8")).toBe("spawned")
+        expect(readdirSync(fixture.agentDir).sort()).toEqual([CACHE_FILENAME])
+      },
+    )
   })
 
   describe("#given no cache at all", () => {
-    test.skipIf(process.platform === "win32")("#when an interactive launch runs #then it never blocks, prints no hint, and the detached refresh writes the cache", async () => {
-      const fixture = createFixture()
-      installSibling(fixture)
+    test.skipIf(process.platform === "win32")(
+      "#when an interactive launch runs #then it never blocks, prints no hint, and the detached refresh writes the cache",
+      async () => {
+        const fixture = createFixture()
+        installSibling(fixture)
 
-      const cold = runLauncher(fixture, [], true)
+        const cold = runLauncher(fixture, [], true)
 
-      expect(cold.status).toBe(0)
-      expect(`${cold.stdout}${cold.stderr}`).not.toContain("sibling credentials detected")
-      expect(readFileSync(fixture.captureFile, "utf8")).toBe("spawned")
-      await waitForCache(fixture, (entry) => entry.version === CACHE_VERSION && entry.suggestion === true,
-        "the detached refresh child to write the cache")
+        expect(cold.status).toBe(0)
+        expect(`${cold.stdout}${cold.stderr}`).not.toContain("sibling credentials detected")
+        expect(readFileSync(fixture.captureFile, "utf8")).toBe("spawned")
+        await waitForCache(
+          fixture,
+          (entry) => entry.version === CACHE_VERSION && entry.suggestion === true,
+          "the detached refresh child to write the cache",
+        )
 
-      const warm = runLauncher(fixture, [], true)
-      const output = `${warm.stdout}${warm.stderr}`
-      expect(warm.status).toBe(0)
-      expect(output.match(/sibling credentials detected; run `omo setup`/g)?.length).toBe(1)
-      expect(readdirSync(fixture.agentDir).sort()).toEqual([CACHE_FILENAME])
-    })
+        const warm = runLauncher(fixture, [], true)
+        const output = `${warm.stdout}${warm.stderr}`
+        expect(warm.status).toBe(0)
+        expect(output.match(/sibling credentials detected; run `omo setup`/g)?.length).toBe(1)
+        expect(readdirSync(fixture.agentDir).sort()).toEqual([CACHE_FILENAME])
+      },
+    )
 
     test("#when a non-interactive launch runs #then no cache is created", () => {
       const fixture = createFixture()
@@ -243,24 +273,30 @@ describe("setup suggestion cache", () => {
   })
 
   describe("#given a cache whose fingerprint no longer matches", () => {
-    test.skipIf(process.platform === "win32")("#when an interactive launch runs #then this launch answers from the cache and the refresh child rewrites it", async () => {
-      const fixture = createFixture()
-      installSibling(fixture)
-      write(fixture.cachePath, `${JSON.stringify(freshEntry(fixture, true))}\n`)
-      installSibling(fixture, '{"changed":true}')
-      const before = readFileSync(fixture.cachePath, "utf8")
+    test.skipIf(process.platform === "win32")(
+      "#when an interactive launch runs #then this launch answers from the cache and the refresh child rewrites it",
+      async () => {
+        const fixture = createFixture()
+        installSibling(fixture)
+        write(fixture.cachePath, `${JSON.stringify(freshEntry(fixture, true))}\n`)
+        installSibling(fixture, '{"changed":true}')
+        const before = readFileSync(fixture.cachePath, "utf8")
 
-      const stale = runLauncher(fixture, [], true)
+        const stale = runLauncher(fixture, [], true)
 
-      expect(stale.status).toBe(0)
-      const output = `${stale.stdout}${stale.stderr}`
-      expect(output.match(/sibling credentials detected; run `omo setup`/g)?.length).toBe(1)
-      expect(readFileSync(fixture.captureFile, "utf8")).toBe("spawned")
-      const current = JSON.stringify(setupDetectInputStats(fixture.env, fixture.home))
-      await waitForCache(fixture, (entry) => JSON.stringify(entry.inputs) === current && entry.suggestion === true,
-        "the detached refresh child to rewrite the cache for the changed inputs")
-      expect(readFileSync(fixture.cachePath, "utf8")).not.toBe(before)
-    })
+        expect(stale.status).toBe(0)
+        const output = `${stale.stdout}${stale.stderr}`
+        expect(output.match(/sibling credentials detected; run `omo setup`/g)?.length).toBe(1)
+        expect(readFileSync(fixture.captureFile, "utf8")).toBe("spawned")
+        const current = JSON.stringify(setupDetectInputStats(fixture.env, fixture.home))
+        await waitForCache(
+          fixture,
+          (entry) => JSON.stringify(entry.inputs) === current && entry.suggestion === true,
+          "the detached refresh child to rewrite the cache for the changed inputs",
+        )
+        expect(readFileSync(fixture.cachePath, "utf8")).not.toBe(before)
+      },
+    )
   })
 
   describe("#given a warm cache that disagrees with live state", () => {

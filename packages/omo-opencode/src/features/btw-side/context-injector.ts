@@ -3,18 +3,12 @@ import { isRecord } from "@oh-my-opencode/utils"
 
 import type { PluginContext } from "../../plugin/types"
 import { log, normalizeSDKResponse } from "../../shared"
-import {
-  getBtwSideMetadata,
-  type BtwSideMetadata,
-} from "./metadata"
+import { getBtwSideMetadata, type BtwSideMetadata } from "./metadata"
 import { boundBtwParentContext } from "./parent-context-budget"
 import { markBtwSideSession } from "./server-session-registry"
 
 export const BTW_BOUNDARY_SENTINEL = "<omo-btw-boundary>"
-export {
-  BTW_PARENT_CONTEXT_MAX_BYTES,
-  BTW_PARENT_CONTEXT_MAX_MESSAGES,
-} from "./parent-context-budget"
+export { BTW_PARENT_CONTEXT_MAX_BYTES, BTW_PARENT_CONTEXT_MAX_MESSAGES } from "./parent-context-budget"
 
 const MAX_METADATA_LOOKUP_ATTEMPTS = 2
 
@@ -43,11 +37,7 @@ function cloneMessages(messages: MessageWithParts[]): MessageWithParts[] {
 }
 
 function prependBoundaryPart(message: MessageWithParts): void {
-  if (
-    message.parts.some(
-      (part) => part.type === "text" && part.text.includes(BTW_BOUNDARY_SENTINEL),
-    )
-  ) {
+  if (message.parts.some((part) => part.type === "text" && part.text.includes(BTW_BOUNDARY_SENTINEL))) {
     return
   }
 
@@ -61,20 +51,13 @@ function prependBoundaryPart(message: MessageWithParts): void {
   })
 }
 
-export function createBtwSideContextInjectorHook(args: {
-  client: PluginContext["client"]
-}) {
+export function createBtwSideContextInjectorHook(args: { client: PluginContext["client"] }) {
   const MAX_METADATA_CACHE_ENTRIES = 512
   const MAX_PARENT_CONTEXT_CACHE_ENTRIES = 32
   const metadataCache = new Map<string, SideMetadataCacheEntry>()
   const parentContextCache = new Map<string, MessageWithParts[]>()
 
-  function rememberBounded<K, V>(
-    cache: Map<K, V>,
-    key: K,
-    value: V,
-    maxEntries: number,
-  ): void {
+  function rememberBounded<K, V>(cache: Map<K, V>, key: K, value: V, maxEntries: number): void {
     if (!cache.has(key) && cache.size >= maxEntries) {
       const oldestKey = cache.keys().next().value
       if (oldestKey !== undefined) cache.delete(oldestKey)
@@ -87,11 +70,7 @@ export function createBtwSideContextInjectorHook(args: {
     if (cached !== undefined) return cached ?? undefined
 
     let lastError: unknown
-    for (
-      let attempt = 1;
-      attempt <= MAX_METADATA_LOOKUP_ATTEMPTS;
-      attempt += 1
-    ) {
+    for (let attempt = 1; attempt <= MAX_METADATA_LOOKUP_ATTEMPTS; attempt += 1) {
       try {
         const response = await args.client.session.get({
           path: { id: sessionID },
@@ -101,19 +80,12 @@ export function createBtwSideContextInjectorHook(args: {
             cause: response["error"],
           })
         }
-        const session = normalizeSDKResponse<SessionWithMetadata | undefined>(
-          response,
-          undefined,
-          { preferResponseOnMissingData: true },
-        )
+        const session = normalizeSDKResponse<SessionWithMetadata | undefined>(response, undefined, {
+          preferResponseOnMissingData: true,
+        })
         const metadata = getBtwSideMetadata(session)
         if (metadata) markBtwSideSession(sessionID)
-        rememberBounded(
-          metadataCache,
-          sessionID,
-          metadata ?? null,
-          MAX_METADATA_CACHE_ENTRIES,
-        )
+        rememberBounded(metadataCache, sessionID, metadata ?? null, MAX_METADATA_CACHE_ENTRIES)
         return metadata
       } catch (error) {
         lastError = error
@@ -141,9 +113,7 @@ export function createBtwSideContextInjectorHook(args: {
         path: { id: metadata.parent_session_id },
       })
       const parentMessages = normalizeSDKResponse<MessageWithParts[]>(response, [])
-      const boundaryIndex = parentMessages.findIndex(
-        (message) => message.info.id === metadata.boundary_message_id,
-      )
+      const boundaryIndex = parentMessages.findIndex((message) => message.info.id === metadata.boundary_message_id)
       if (boundaryIndex === -1) {
         log("[btw-side] Parent boundary message is unavailable", {
           sideSessionID,
@@ -152,15 +122,8 @@ export function createBtwSideContextInjectorHook(args: {
         })
         return undefined
       }
-      const bounded = boundBtwParentContext(
-        parentMessages.slice(0, boundaryIndex + 1),
-      )
-      rememberBounded(
-        parentContextCache,
-        sideSessionID,
-        bounded,
-        MAX_PARENT_CONTEXT_CACHE_ENTRIES,
-      )
+      const bounded = boundBtwParentContext(parentMessages.slice(0, boundaryIndex + 1))
+      rememberBounded(parentContextCache, sideSessionID, bounded, MAX_PARENT_CONTEXT_CACHE_ENTRIES)
       return cloneMessages(bounded)
     } catch (error) {
       log("[btw-side] Failed to load parent context", {
@@ -182,18 +145,12 @@ export function createBtwSideContextInjectorHook(args: {
 
       const metadata = await resolveMetadata(sideSessionID)
       if (!metadata) return
-      if (
-        output.messages.some(
-          (message) => message.info.sessionID === metadata.parent_session_id,
-        )
-      ) {
+      if (output.messages.some((message) => message.info.sessionID === metadata.parent_session_id)) {
         return
       }
 
       const firstSideUserMessage = output.messages.find(
-        (message) =>
-          message.info.sessionID === sideSessionID &&
-          message.info.role === "user",
+        (message) => message.info.sessionID === sideSessionID && message.info.role === "user",
       )
       if (!firstSideUserMessage) return
 
