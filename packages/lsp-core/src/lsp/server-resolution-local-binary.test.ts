@@ -167,4 +167,20 @@ describe("not-installed message repo-local guidance", () => {
 		expect(message).toContain("bun add -d @biomejs/biome");
 		expect(message).toContain("npm install -g @biomejs/biome");
 	});
+
+	test("#given no server anywhere #when the lookup fails #then the result and message name where it searched (#12522)", () => {
+		// given
+		const root = makeTempRoot("lsp-searched-from-");
+		process.env["PATH"] = join(root, "definitely-empty");
+		const context = contextFor(root);
+
+		// when
+		const result = runWithRequestContext(context, () => findServerForExtension(".css"));
+		if (result.status !== "not_installed") throw new Error("expected not_installed");
+		const message = runWithRequestContext(context, () => formatServerLookupError(result));
+
+		// then
+		expect(result.searchedFrom).toBe(root);
+		expect(message).toContain(`Searched project tool directories from ${root} up to its repository root, then PATH.`);
+	});
 });
