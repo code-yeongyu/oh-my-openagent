@@ -10,7 +10,13 @@ import {
 import type { HostParkReason, HostSessionCommand } from "./session-client"
 import { log } from "@oh-my-opencode/utils"
 import type { HostTurnReconciliation } from "./reconcile-turn"
-import { armRecoveryBound, isTransportRecoveryExpired, withinBound, type RecoveryBound, type TransportRecoveryOptions } from "./transport-recovery"
+import {
+  armRecoveryBound,
+  isTransportRecoveryExpired,
+  withinBound,
+  type RecoveryBound,
+  type TransportRecoveryOptions,
+} from "./transport-recovery"
 import { InputUncertainError } from "../input-effects"
 
 export interface HandleRecoveryHost {
@@ -91,20 +97,22 @@ export function createHandleRecovery(host: HandleRecoveryHost): HandleRecovery {
 
   // The runner's reattach, raced against the bound. A connection that arrives after the child stopped
   // waiting for it (the bound ran out, or a stop was asked for) is never adopted: it ends the session.
-  const boundedReattach = (reattach: HostSessionReattach, bound: RecoveryBound): HostSessionReattach => async (lost) => {
-    const attempt = reattach(lost, bound.isExpired)
-    const winner = await Promise.race([attempt, bound.expired])
-    if (winner === "expired" || bound.isExpired()) {
-      void attempt.then(endLate, () => undefined)
-      if (host.stopRequested()) host.stopUnreached()
-      return undefined
+  const boundedReattach =
+    (reattach: HostSessionReattach, bound: RecoveryBound): HostSessionReattach =>
+    async (lost) => {
+      const attempt = reattach(lost, bound.isExpired)
+      const winner = await Promise.race([attempt, bound.expired])
+      if (winner === "expired" || bound.isExpired()) {
+        void attempt.then(endLate, () => undefined)
+        if (host.stopRequested()) host.stopUnreached()
+        return undefined
+      }
+      if (host.stopRequested() && winner !== undefined && !("refused" in winner)) {
+        await host.endOnHost(winner.client)
+        return undefined
+      }
+      return winner
     }
-    if (host.stopRequested() && winner !== undefined && !("refused" in winner)) {
-      await host.endOnHost(winner.client)
-      return undefined
-    }
-    return winner
-  }
 
   // A lost transport is recoverable while this child still owns a running session and the runner
   // gave it a way back (omo#8563).
@@ -140,7 +148,10 @@ export function createHandleRecovery(host: HandleRecoveryHost): HandleRecovery {
           host.beginContinuation()
           const command = { type: "prompt", message: prompt, streamingBehavior: "steer" } as const
           try {
-            await withinBound(bound, host.continueInput === undefined ? host.port().send(command) : host.continueInput(command))
+            await withinBound(
+              bound,
+              host.continueInput === undefined ? host.port().send(command) : host.continueInput(command),
+            )
           } catch (error) {
             throw error instanceof InputUncertainError ? error.cause : error
           }
@@ -153,8 +164,7 @@ export function createHandleRecovery(host: HandleRecoveryHost): HandleRecovery {
     )
       .catch((error: unknown) => {
         log("senpi-task host session reattach continuation failed", { taskId: host.taskId, error: String(error) })
-        if (isTransportLossError(error) || isTransportRecoveryExpired(error)
-          || isRpcResponseTimeout(error)) {
+        if (isTransportLossError(error) || isTransportRecoveryExpired(error) || isRpcResponseTimeout(error)) {
           if (host.alive() && !host.stopRequested()) host.park("daemon_unavailable")
         } else host.continuationFailed(error)
       })
@@ -165,9 +175,13 @@ export function createHandleRecovery(host: HandleRecoveryHost): HandleRecovery {
         // contextual revival, but release this connection before another handle reattaches.
         if (adopted && !host.alive() && !host.stopRequested()) {
           const cleanupBound = armRecoveryBound({ ...host.bound, boundMs: host.closeGraceMs })
-          try { await withinBound(cleanupBound, host.port().detach()) }
-          catch (error) { log("senpi-task parked recovery detach failed", { taskId: host.taskId, error: String(error) }) }
-          finally { cleanupBound.settle() }
+          try {
+            await withinBound(cleanupBound, host.port().detach())
+          } catch (error) {
+            log("senpi-task parked recovery detach failed", { taskId: host.taskId, error: String(error) })
+          } finally {
+            cleanupBound.settle()
+          }
         }
         reattaching = undefined
       })

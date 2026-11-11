@@ -7,10 +7,7 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { createSandbox, credentialDigest, seedSandbox } from "./drive.mjs"
-import {
-  analyzeParallelismRequests,
-  verdict,
-} from "./parallelism-eval-e2e-analysis.mjs"
+import { analyzeParallelismRequests, verdict } from "./parallelism-eval-e2e-analysis.mjs"
 import { createOwnedProcessRegistry, startSenpiRun } from "./team-e2e-runtime.mjs"
 import { findResults, parseEvents } from "./team-e2e-support.mjs"
 import { resolveSenpi } from "./team-e2e.mjs"
@@ -39,7 +36,7 @@ const EVAL_SCRIPT = {
         language: "js",
         summary: "read one file and run one shell command",
         code: [
-          'const [note, shell] = await Promise.all([',
+          "const [note, shell] = await Promise.all([",
           '  tool.read({ path: "qa-note.txt" }),',
           '  tool.bash({ command: "printf qa-eval-e2e" }),',
           "])",
@@ -143,7 +140,10 @@ function startPosthogSink() {
     waitForSummary(timeoutMs) {
       if (requests.some((request) => containsSummary(request.body))) return Promise.resolve()
       return new Promise((resolveSummary, rejectSummary) => {
-        const timer = setTimeout(() => rejectSummary(new Error("local sink did not receive parallelism_summary")), timeoutMs)
+        const timer = setTimeout(
+          () => rejectSummary(new Error("local sink did not receive parallelism_summary")),
+          timeoutMs,
+        )
         summaryWaiters.push(() => {
           clearTimeout(timer)
           resolveSummary()
@@ -204,7 +204,10 @@ async function selfTest() {
   if (sink.requests.length !== 1 || sink.requests[0]?.body?.batch?.length !== 1) {
     throw new Error("self-test local gzip sink did not record one event")
   }
-  if (!EVAL_SCRIPT.lead[0]?.arguments?.code.includes("tool.read") || !EVAL_SCRIPT.lead[0]?.arguments?.code.includes("tool.bash")) {
+  if (
+    !EVAL_SCRIPT.lead[0]?.arguments?.code.includes("tool.read") ||
+    !EVAL_SCRIPT.lead[0]?.arguments?.code.includes("tool.bash")
+  ) {
     throw new Error("self-test eval script must exercise read and bash")
   }
   await sink.close()

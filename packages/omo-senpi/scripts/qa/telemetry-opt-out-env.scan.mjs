@@ -11,7 +11,8 @@ import { createTracer, unwrap } from "./telemetry-opt-out-env.trace.mjs"
 export const RUNTIME = /senpi|omo-native|binary-runtime|plugin\/extensions|omo-ai/iu
 // A source can start the runtime without naming it: the current executable, or one of its entry files
 // (the root launcher and CLI bundles, the native launcher).
-export const RUNTIME_ENTRY = /process\.(?:execPath|argv0)|\bdist\/cli(?:-node)?\b|\bbin\/(?:omo|oh-my-opencode)\.js\b|oh-my-openagent|lazycodex/u
+export const RUNTIME_ENTRY =
+  /process\.(?:execPath|argv0)|\bdist\/cli(?:-node)?\b|\bbin\/(?:omo|oh-my-opencode)\.js\b|oh-my-openagent|lazycodex/u
 const SPAWNERS = new Set(["spawn", "spawnSync", "execFile", "execFileSync", "exec", "execSync", "fork"])
 const LAUNCHERS = /^(?:node|bun|bunx|npx|deno|sh|bash|zsh|cmd|cmd\.exe|pwsh|powershell|tmux|env|script|expect)$/u
 
@@ -24,7 +25,8 @@ function childProcessNames(file) {
   const names = new Map()
   const namespaces = new Set()
   for (const statement of file.statements) {
-    if (!ts.isImportDeclaration(statement) || !/^(?:node:)?child_process$/u.test(statement.moduleSpecifier.text)) continue
+    if (!ts.isImportDeclaration(statement) || !/^(?:node:)?child_process$/u.test(statement.moduleSpecifier.text))
+      continue
     const clause = statement.importClause
     if (clause?.name !== undefined) namespaces.add(clause.name.text)
     const bindings = clause?.namedBindings
@@ -38,7 +40,8 @@ function childProcessNames(file) {
 
 function spawnerOf(call, processNames) {
   const callee = call.expression
-  if (ts.isIdentifier(callee)) return processNames.names.has(callee.text) ? processNames.names.get(callee.text) : undefined
+  if (ts.isIdentifier(callee))
+    return processNames.names.has(callee.text) ? processNames.names.get(callee.text) : undefined
   if (!ts.isPropertyAccessExpression(callee)) return undefined
   const owner = callee.expression.getText()
   if (owner === "Bun" && /^spawn(?:Sync)?$/u.test(callee.name.text)) return "Bun.spawn"
@@ -51,23 +54,37 @@ function commandAndOptions(call, spawner) {
   if (spawner === "Bun.spawn" && first !== undefined && ts.isObjectLiteralExpression(first)) {
     const cmd = first.properties.find((p) => ts.isPropertyAssignment(p) && p.name.getText() === "cmd")
     const list = cmd === undefined ? undefined : unwrap(cmd.initializer)
-    return { command: list !== undefined && ts.isArrayLiteralExpression(list) ? unwrap(list.elements[0]) : list, words: [list], options: first }
+    return {
+      command: list !== undefined && ts.isArrayLiteralExpression(list) ? unwrap(list.elements[0]) : list,
+      words: [list],
+      options: first,
+    }
   }
   if (spawner === "Bun.spawn") {
-    return { command: first !== undefined && ts.isArrayLiteralExpression(first) ? unwrap(first.elements[0]) : first, words: [first], options: args[1] }
+    return {
+      command: first !== undefined && ts.isArrayLiteralExpression(first) ? unwrap(first.elements[0]) : first,
+      words: [first],
+      options: args[1],
+    }
   }
   if (spawner === "exec" || spawner === "execSync") return { command: first, words: [first], options: args[1] }
   const second = args[1]
-  const options = args.length >= 3 ? args[2] : second !== undefined && ts.isObjectLiteralExpression(second) ? second : undefined
+  const options =
+    args.length >= 3 ? args[2] : second !== undefined && ts.isObjectLiteralExpression(second) ? second : undefined
   return { command: first, words: [first, second], options }
 }
 
-const literal = (node) => node !== undefined && (ts.isStringLiteralLike(node) || ts.isNoSubstitutionTemplateLiteral(node))
+const literal = (node) =>
+  node !== undefined && (ts.isStringLiteralLike(node) || ts.isNoSubstitutionTemplateLiteral(node))
 
 function launchesRuntime({ command, words }) {
   if (!literal(command)) return true
   const name = posix.basename(command.text.trim().split(/\s+/u)[0] ?? "")
-  return LAUNCHERS.test(name) || RUNTIME.test(command.text) || words.some((word) => word !== undefined && RUNTIME.test(word.getText()))
+  return (
+    LAUNCHERS.test(name) ||
+    RUNTIME.test(command.text) ||
+    words.some((word) => word !== undefined && RUNTIME.test(word.getText()))
+  )
 }
 
 function envOf(options, tracer) {
@@ -81,8 +98,10 @@ function enclosingFunction(node) {
   for (let current = node.parent; current !== undefined; current = current.parent) {
     if (!ts.isFunctionLike(current)) continue
     const parent = current.parent
-    const name = ts.isConstructorDeclaration(current) ? "constructor" : current.name?.getText()
-      ?? (ts.isVariableDeclaration(parent) || ts.isPropertyAssignment(parent) ? parent.name.getText() : undefined)
+    const name = ts.isConstructorDeclaration(current)
+      ? "constructor"
+      : (current.name?.getText() ??
+        (ts.isVariableDeclaration(parent) || ts.isPropertyAssignment(parent) ? parent.name.getText() : undefined))
     if (name !== undefined) names.unshift(name)
   }
   return names.length === 0 ? "<module>" : names.join(">")
@@ -98,7 +117,10 @@ export function findUnroutedSpawns(files) {
     }
     return parsed.get(path)
   }
-  const tracer = createTracer(parseFile, files.map((file) => file.path))
+  const tracer = createTracer(
+    parseFile,
+    files.map((file) => file.path),
+  )
   const sites = []
   for (const { path, source } of files) {
     if (!RUNTIME.test(source) && !RUNTIME_ENTRY.test(source)) continue
@@ -110,7 +132,12 @@ export function findUnroutedSpawns(files) {
         const shape = commandAndOptions(node, spawner)
         if (launchesRuntime(shape) && !envOf(shape.options, tracer)) {
           const line = file.getLineAndCharacterOfPosition(node.getStart()).line + 1
-          sites.push({ path, fn: enclosingFunction(node), call: `${node.expression.getText()}(${node.arguments[0]?.getText().slice(0, 40) ?? ""})`, line })
+          sites.push({
+            path,
+            fn: enclosingFunction(node),
+            call: `${node.expression.getText()}(${node.arguments[0]?.getText().slice(0, 40) ?? ""})`,
+            line,
+          })
         }
       }
       ts.forEachChild(node, visit)
@@ -135,6 +162,9 @@ export function auditDriverSpawns(files, bypasses) {
   const drifted = bypasses
     .map((entry) => ({ entry, found: sites.filter((site) => matches(entry, site)).length }))
     .filter(({ entry, found }) => entry.reason.trim() === "" || found !== expected(entry))
-    .map(({ entry, found }) => `${found === 0 ? "stale" : "recount"} bypass ${entry.file} ${entry.function} ${entry.call} x${found} (reviewed x${expected(entry)})`)
+    .map(
+      ({ entry, found }) =>
+        `${found === 0 ? "stale" : "recount"} bypass ${entry.file} ${entry.function} ${entry.call} x${found} (reviewed x${expected(entry)})`,
+    )
   return [...unrouted, ...drifted]
 }

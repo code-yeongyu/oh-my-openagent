@@ -72,9 +72,7 @@ export function dagRunStartedEvent(input: { generation: number }): DagRunEventPa
 }
 
 export function dagRunPausedEvent(input: { reason?: string } = {}): DagRunEventPayload {
-  return input.reason === undefined
-    ? { type: "dag.run.paused" }
-    : { type: "dag.run.paused", reason: input.reason }
+  return input.reason === undefined ? { type: "dag.run.paused" } : { type: "dag.run.paused", reason: input.reason }
 }
 
 export function dagRunResumedEvent(input: { generation: number }): DagRunEventPayload {
@@ -85,33 +83,21 @@ export function dagRunCompletedEvent(input: { counts: DagNodeCounts }): DagRunEv
   return { type: "dag.run.completed", counts: input.counts }
 }
 
-export function dagRunFailedEvent(input: {
-  error: DagNodeError
-  counts: DagNodeCounts
-}): DagRunEventPayload {
+export function dagRunFailedEvent(input: { error: DagNodeError; counts: DagNodeCounts }): DagRunEventPayload {
   return { type: "dag.run.failed", error: input.error, counts: input.counts }
 }
 
-export function dagRunCancelledEvent(input: {
-  reason?: string
-  counts: DagNodeCounts
-}): DagRunEventPayload {
+export function dagRunCancelledEvent(input: { reason?: string; counts: DagNodeCounts }): DagRunEventPayload {
   return input.reason === undefined
     ? { type: "dag.run.cancelled", counts: input.counts }
     : { type: "dag.run.cancelled", reason: input.reason, counts: input.counts }
 }
 
-export function dagWaveStartedEvent(input: {
-  waveIndex: number
-  nodeIds: readonly DagNodeId[]
-}): DagRunEventPayload {
+export function dagWaveStartedEvent(input: { waveIndex: number; nodeIds: readonly DagNodeId[] }): DagRunEventPayload {
   return { type: "dag.wave.started", waveIndex: input.waveIndex, nodeIds: input.nodeIds }
 }
 
-export function dagWaveCompletedEvent(input: {
-  waveIndex: number
-  nodeIds: readonly DagNodeId[]
-}): DagRunEventPayload {
+export function dagWaveCompletedEvent(input: { waveIndex: number; nodeIds: readonly DagNodeId[] }): DagRunEventPayload {
   return { type: "dag.wave.completed", waveIndex: input.waveIndex, nodeIds: input.nodeIds }
 }
 
@@ -206,16 +192,11 @@ export function dagDefinitionAmendedEvent(input: {
   }
 }
 
-export function dagDiagnosticAddedEvent(input: {
-  diagnostic: DagDiagnostic
-}): DagRunEventPayload {
+export function dagDiagnosticAddedEvent(input: { diagnostic: DagDiagnostic }): DagRunEventPayload {
   return { type: "dag.diagnostic.added", diagnostic: input.diagnostic }
 }
 
-export function dagStreamOverflowEvent(input: {
-  droppedCount: number
-  recoverAfterSeq: number
-}): DagRunEventPayload {
+export function dagStreamOverflowEvent(input: { droppedCount: number; recoverAfterSeq: number }): DagRunEventPayload {
   return {
     type: "dag.stream.overflow",
     droppedCount: input.droppedCount,

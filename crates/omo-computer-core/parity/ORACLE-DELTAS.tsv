@@ -1,0 +1,14 @@
+file	pointer	kind	source	row	imported value	v3 value
+crates/omo-computer-core/fixtures/conformance/hello.json	/result/generation	additive	design row C2 (d-arch Version and ABI handshake): hello.generation	12		
+crates/omo-computer-core/fixtures/conformance/hello.json	/result/limits	additive	design row C2 (d-arch Version and ABI handshake): hello.limits	12		
+crates/omo-computer-core/fixtures/conformance/hello.json	/result/machineId	additive	d-arch Version and ABI handshake: hello.machineId (AC-32 hello leg)	12		
+crates/omo-computer-core/fixtures/conformance/action-report-legacy.json	/result/generation	additive	design row C2 (d-arch Version and ABI handshake): hello.generation	12		
+crates/omo-computer-core/fixtures/conformance/action-report-legacy.json	/result/limits	additive	design row C2 (d-arch Version and ABI handshake): hello.limits	12		
+crates/omo-computer-core/fixtures/conformance/action-report-legacy.json	/result/machineId	additive	d-arch Version and ABI handshake: hello.machineId (AC-32 hello leg)	12		
+crates/omo-computer-core/fixtures/conformance/action-report-object.json	/result/generation	additive	design row C2 (d-arch Version and ABI handshake): hello.generation	12		
+crates/omo-computer-core/fixtures/conformance/action-report-object.json	/result/limits	additive	design row C2 (d-arch Version and ABI handshake): hello.limits	12		
+crates/omo-computer-core/fixtures/conformance/action-report-object.json	/result/machineId	additive	d-arch Version and ABI handshake: hello.machineId (AC-32 hello leg)	12		
+crates/omo-computer-core/fixtures/conformance/action-report-object.json	/result/focusRestoration	replaced	contract ActionReport declaration: focusRestoration is untouched | restored | user_moved_on | failed, and a background click touches no focus (AC-53, AC-75)	13	"not_needed"	"untouched"
+crates/omo-computer-core/fixtures/conformance/action-report-object.json	/result/route	additive	contract ActionReport declaration: route is a required member of every report	13		
+crates/omo-computer-core/fixtures/conformance/action-report-object.json	/result/evidence	additive	contract ActionReport declaration: evidence[] is a required member of every report (AC-5)	13		
+crates/omo-computer-core/fixtures/conformance/action-report-object.json	/result/observation	additive	contract ActionReport declaration: observation {untrustedText: true} on every report (AC-79)	13		
