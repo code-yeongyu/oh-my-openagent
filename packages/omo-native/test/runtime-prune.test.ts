@@ -207,6 +207,17 @@ describe("pruneProvisionedRuntimes", () => {
 })
 
 describe("removeReplacedLauncher", () => {
+  test("#given unique rollback executables from completed Windows updates #then the next launch removes them while preserving unrelated files", () => {
+    const launcher = join(root, "omo.exe")
+    const rollback = `${launcher}.old-12345678-1234-1234-1234-123456789abc`
+    const unrelated = `${launcher}.old-user-backup`
+    writeFileSync(rollback, "released old image")
+    writeFileSync(unrelated, "user file")
+    removeReplacedLauncher(launcher, "win32")
+    expect(existsSync(rollback)).toBe(false)
+    expect(existsSync(unrelated)).toBe(true)
+  })
+
   test("#given the launcher a Windows replace command moved aside #when the new version first runs #then the .old file is removed", () => {
     // given
     const launcher = join(root, "omo.exe")

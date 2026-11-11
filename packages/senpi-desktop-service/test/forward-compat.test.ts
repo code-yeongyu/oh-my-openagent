@@ -147,7 +147,7 @@ afterEach(async () => {
 })
 
 // An engine rejects session.open keys it does not know (additionalProperties false), so a newer key goes out only when
-// engine.hello advertises its feature; reportMode goes out only when the caller asked for it.
+// engine.hello advertises its feature; reportMode then goes out as "object" unless the caller asked for "null".
 describe("feature-gated session.open", () => {
   it(
     "sends no new key to an engine without features and still runs a click whose reply is null",
@@ -173,10 +173,10 @@ describe("feature-gated session.open", () => {
   )
 
   it(
-    "sends the asked reportMode and the resolved intervention default when both are advertised",
+    "sends the object reportMode default and the resolved intervention default when both are advertised",
     HANG_GUARD,
     async () => {
-      const { service, log } = await openWith(openCases.reportAndIntervention.env, { reportMode: "object" })
+      const { service, log } = await openWith(openCases.reportAndIntervention.env, {})
 
       const result = await clickRun(service)
       const open = await log.nthRequest("session.open", 1)
@@ -194,18 +194,27 @@ describe("feature-gated session.open", () => {
     },
   )
 
-  it(
-    "always sends each advertised option with the caller's value, and no reportMode it was not asked for",
+  it.each([
+    [{ intervention: "continue" }, "object"],
+    [{ intervention: "continue", reportMode: "null" }, "null"],
+  ] as const)(
+    "always sends each advertised option with the caller's value or its default (%o)",
     HANG_GUARD,
-    async () => {
+    async (params, reportMode) => {
       const { log } = await openWith(
         { FAKE_ENGINE_FEATURES: '["action-report","intervention-policy","key-priming","trace"]' },
-        { intervention: "continue" },
+        params,
       )
 
       const open = await log.nthRequest("session.open", 1)
 
-      expect(open.params).toEqual({ showCursor: true, intervention: "continue", macosKeyPriming: "off", trace: false })
+      expect(open.params).toEqual({
+        showCursor: true,
+        reportMode,
+        intervention: "continue",
+        macosKeyPriming: "off",
+        trace: false,
+      })
     },
   )
 

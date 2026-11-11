@@ -155,7 +155,11 @@ async function fetchContextWindowUsage(
 
     if (!actualLimit) return null
 
-    const usedTokens = (lastTokens?.input ?? 0) + (lastTokens?.cache?.read ?? 0) + (lastTokens?.output ?? 0)
+    const usedTokens =
+      (lastTokens?.input ?? 0) +
+      (lastTokens?.cache?.read ?? 0) +
+      (lastTokens?.cache?.write ?? 0) +
+      (lastTokens?.output ?? 0)
     const remainingTokens = actualLimit - usedTokens
 
     return {

@@ -71,6 +71,7 @@ const envelopeSchema = z.object({
     detail: z.unknown().optional(),
   }),
 })
+const machineSaltSchema = z.object({ reason: z.literal("machine_hash_required"), machineSalt: nonempty })
 const limitSchema = z.object({
   reason: z.literal("device_limit"),
   managementToken: nonempty,
@@ -115,6 +116,8 @@ const REFUSAL_CODES = [
   "writer_floor_mismatch",
   "service_upgrade_required",
   "refresh_recovery_expired",
+  "machine_hash_required",
+  "machine_mismatch",
 ] as const
 export type RefusalCode = (typeof REFUSAL_CODES)[number] | "unknown"
 const isKnownRefusal = (code: string): code is (typeof REFUSAL_CODES)[number] =>
@@ -152,6 +155,8 @@ export function refusalGuidance(code: RefusalCode, status: number): RefusalGuida
     case "writer_floor_mismatch":
     case "service_upgrade_required":
     case "refresh_recovery_expired":
+    case "machine_hash_required":
+    case "machine_mismatch":
     case "unknown":
       if (status === 401) return "sign_in_again"
       if (status === 429) return "wait"
@@ -181,11 +186,14 @@ export class ApiRefusal extends SignInError {
   readonly code: RefusalCode
   readonly #detail: z.infer<typeof limitSchema> | undefined
   readonly #retryAfter: string | null
+  /** The account's machine salt a machine_hash_required refusal carries (omo-service#1016). */
+  readonly machineSalt: string | undefined
   constructor(
     code: string,
     readonly status: number,
     detail?: z.infer<typeof limitSchema>,
     retryAfter: string | null = null,
+    machineSalt?: string,
   ) {
     const known: RefusalCode = isKnownRefusal(code) ? code : "unknown"
     // Server messages and unknown codes can contain credentials; never echo either.
@@ -193,6 +201,7 @@ export class ApiRefusal extends SignInError {
     this.code = known
     this.#detail = detail
     this.#retryAfter = retryAfter
+    this.machineSalt = machineSalt
   }
   get detail() {
     return this.#detail
@@ -284,11 +293,13 @@ export async function requestApi(api: string, path: string, init: RequestInit, s
   if (!envelope.success) throw new InvalidApiResponse(response.status)
   const error = envelope.data.error
   const detail = limitSchema.safeParse(error.detail)
+  const salt = machineSaltSchema.safeParse(error.detail)
   throw new ApiRefusal(
     error.code,
     response.status,
     error.code === "entitlement_required" && detail.success ? detail.data : undefined,
     response.headers.get("retry-after"),
+    error.code === "machine_hash_required" && salt.success ? salt.data.machineSalt : undefined,
   )
 }
 

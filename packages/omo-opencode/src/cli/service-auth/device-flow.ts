@@ -1,5 +1,5 @@
 import { setTimeout } from "node:timers/promises"
-import { generateDeviceKeys } from "./device-keys"
+import { type MachineSignIn, prepareMachineSignIn } from "./machine-binding"
 import {
   ApiRefusal,
   type ChooseDevice,
@@ -12,6 +12,9 @@ import {
 } from "./protocol"
 import type { Session } from "./session"
 
+const unbound = async (): Promise<MachineSignIn> =>
+  prepareMachineSignIn({ stored: null, local: undefined, deviceService: undefined })
+
 export type DisplayCode = { readonly verificationUri: string; readonly userCode: string; readonly matchingCode: string }
 export async function loginDevice(
   session: Session,
@@ -20,17 +23,22 @@ export async function loginDevice(
     readonly platform: Platform
     readonly show: (code: DisplayCode) => void
     readonly chooseDevice: ChooseDevice
+    /** The machine binding (omo-service#1016); absent, the sign-in registers unbound as before. */
+    readonly machine?: (session: Session) => Promise<MachineSignIn>
     readonly now?: () => number
     readonly sleep?: (ms: number) => Promise<void>
   },
 ): Promise<void> {
   await session.ready()
-  const keys = generateDeviceKeys()
+  const machine = await (options.machine ?? unbound)(session)
+  const keys = machine.keys
   const minted = parseReply(
     deviceCodeSchema,
     await session.request(
       "/v1/device/code",
-      jsonRequest({ client: { name: options.name, platform: options.platform } }),
+      jsonRequest({
+        client: { name: options.name, platform: options.platform, ...(machine.advertise ? { machineBinding: 1 } : {}) },
+      }),
     ),
   )
   const uri = new URL(minted.verificationUri)
@@ -58,13 +66,15 @@ export async function loginDevice(
           jsonRequest({
             deviceCode: minted.deviceCode,
             ...keys.public,
+            ...machine.fields(),
           }),
         ),
       )
-      await session.save({ ...grant, ...keys.private })
+      await session.save({ ...grant, ...keys.private }, { adopt: machine.adopt() })
       return
     } catch (error) {
       if (!(error instanceof ApiRefusal)) throw error
+      if (await machine.retry(error)) continue
       if (error.status === 400 && error.code === "authorization_pending") continue
       if (error.status === 400 && error.code === "slow_down") {
         interval += 5000

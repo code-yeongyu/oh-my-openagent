@@ -798,6 +798,7 @@ describe("compiled release self-update", () => {
   })
 
   test("omo update pins the version and replaces the binary the user ran", async () => {
+    const installed: Array<{ asset: string; destination: string; platform: NodeJS.Platform; version: string }> = []
     const result = await compiledUpdate({
       omoAiVersion: "5.0.0",
       releaseTarget: "linux-x64-musl",
@@ -805,13 +806,15 @@ describe("compiled release self-update", () => {
       platform: "linux",
       arch: "x64",
       fetchReleases: async () => releases,
+      install: async (request) => {
+        installed.push(request)
+      },
     })
     expect(result.exitCode).toBe(0)
-    expect(result.output).toContain(
-      "https://github.com/code-yeongyu/oh-my-openagent/releases/download/v5.0.1/omo-linux-x64-musl",
-    )
-    expect(result.output).toContain("mv -f '/opt/omo/omo.new' '/opt/omo/omo'")
-    expect(result.output).not.toContain("releases/latest")
+    expect(result.output).toBe("omo updated 5.0.0 -> 5.0.1")
+    expect(installed).toEqual([
+      { destination: "/opt/omo/omo", asset: "omo-linux-x64-musl", version: "5.0.1", platform: "linux" },
+    ])
   })
 
   test("an up-to-date binary says so and a failed lookup exits non-zero with the releases page", async () => {

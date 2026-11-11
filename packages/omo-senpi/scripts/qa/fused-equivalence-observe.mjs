@@ -6,7 +6,8 @@ import { collectPluginState } from "./fused-equivalence-plugin-state.mjs"
  * Id namespaces the plugin generates per run, by the key that carries them (plan §6.2: one-to-one first-occurrence token
  * maps per id namespace). The harness normalizer maps its own id keys; these are the plugin's: task ids are
  * time-derived, a memory identity and its binding hash are derived from the sandbox path, and a memory commit sha
- * hashes its date. A short sha (a 7+ character prefix of a mapped sha) maps to the same token with `:short`.
+ * hashes its date, and the desktop engine mints an `ActionReport`'s audit ids as ULIDs. A short sha (a 7+ character
+ * prefix of a mapped sha) maps to the same token with `:short`.
  */
 const PLUGIN_ID_KEYS = {
   task_id: ["task", /^st_[0-9a-f]{8}$/],
@@ -15,6 +16,7 @@ const PLUGIN_ID_KEYS = {
   repoPathHash: ["repo-path-hash", /^[0-9a-f]{64}$/],
   headSha: ["sha", /^[0-9a-f]{40}$/],
   sha: ["sha", /^[0-9a-f]{40}$/],
+  auditIds: ["audit", /^[0-9A-HJKMNP-TV-Z]{26}$/],
 }
 
 /** Literal roots for every plugin id the raw observations carry under a PLUGIN_ID_KEYS key, in first-occurrence order. */

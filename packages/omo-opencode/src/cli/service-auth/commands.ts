@@ -7,6 +7,7 @@ import { deviceName, devicePlatform } from "./device-name"
 import { loginDevice } from "./device-flow"
 import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
 import { BrowserUnavailable, loginLoopback } from "./loopback"
+import { localMachineHash, type MachineDeviceService, prepareMachineSignIn } from "./machine-binding"
 import { type ChooseDevice, type ListedDevice, RequestFailure, serviceOrigin, SignInError } from "./protocol"
 import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
 
@@ -40,7 +41,11 @@ type Options = {
 }
 
 /** What the host adds to the account commands: its device service for an API origin (design D r9 sections 4-5). */
-export type ServiceAuthHooks = { readonly deviceService?: (api: string) => DeviceServiceHandoff }
+export type ServiceAuthHooks = {
+  readonly deviceService?: (api: string) => DeviceServiceHandoff
+  /** This machine's device service as a sign-in binds to it (omo-service#1016): one machine, one device. */
+  readonly machineDevice?: () => MachineDeviceService
+}
 
 export function deviceChoices(devices: readonly ListedDevice[]) {
   return devices.map((device) => ({ value: device.id, label: terminalText(device.name) }))
@@ -107,6 +112,13 @@ async function run(
       return
     }
     await ensureServiceAvailable(session, api)
+    const machineDevice = hooks.machineDevice?.()
+    const machine = async (current: Session) =>
+      prepareMachineSignIn({
+        stored: await current.stored(),
+        local: localMachineHash(process.env),
+        deviceService: machineDevice,
+      })
     const name = deviceName()
     const platform = devicePlatform()
     if (!options.device && options.browser !== false) {
@@ -117,6 +129,7 @@ async function run(
           platform,
           open: openSignInBrowser,
           chooseDevice,
+          machine,
         })
         console.log("Signed in to OmO.")
         return
@@ -128,6 +141,7 @@ async function run(
       name,
       platform,
       chooseDevice,
+      machine,
       show: (code) => {
         console.log(`Open ${code.verificationUri}`)
         console.log(`User code: ${code.userCode}`)

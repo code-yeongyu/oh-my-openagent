@@ -280,21 +280,29 @@ export class DesktopService {
   }
 }
 
-/** Engine defaults of the feature-gated `session.open` keys; the engine never moves them. */
-const GATED_OPTION_DEFAULTS = { intervention: "pause", macosKeyPriming: "off", trace: false } as const
+/**
+ * Defaults of the feature-gated `session.open` keys. `reportMode` is the omo default (every omo session asks for an
+ * `ActionReport` per exec); the others are the engine's own defaults, which the engine never moves.
+ */
+const GATED_OPTION_DEFAULTS = {
+  reportMode: "object",
+  intervention: "pause",
+  macosKeyPriming: "off",
+  trace: false,
+} as const
 
 /**
  * The `session.open` params this engine accepts. An engine rejects keys it does not know
  * (`additionalProperties: false`), so each newer key goes out only when hello advertises its feature:
- * `intervention`, `macosKeyPriming` and `trace` always (the caller's value, else the engine default),
- * `reportMode` only when the caller asked for it.
+ * each always, with the caller's value or else the default (`reportMode: "object"` unless the caller asked for
+ * `"null"`).
  */
 function sessionOpenWire(params: DesktopSessionOpenParams, features: readonly string[]): DesktopSessionOpenParams {
   const { reportMode, intervention, macosKeyPriming, trace, ...base } = params
   const has = (feature: string) => features.includes(feature)
   return {
     ...base,
-    ...(reportMode !== undefined && has("action-report") ? { reportMode } : {}),
+    ...(has("action-report") ? { reportMode: reportMode ?? GATED_OPTION_DEFAULTS.reportMode } : {}),
     ...(has("intervention-policy") ? { intervention: intervention ?? GATED_OPTION_DEFAULTS.intervention } : {}),
     ...(has("key-priming") ? { macosKeyPriming: macosKeyPriming ?? GATED_OPTION_DEFAULTS.macosKeyPriming } : {}),
     ...(has("trace") ? { trace: trace ?? GATED_OPTION_DEFAULTS.trace } : {}),

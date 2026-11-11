@@ -1,7 +1,15 @@
 import { spawnSync } from "node:child_process"
 import { realpathSync } from "node:fs"
-import { updateUsageAnswer } from "./bin/lib/update-args.js"
+import { isPrintOnlyUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 import { isProvisionedExecutable } from "./compile-runtime"
+import {
+  BinaryUpdateError,
+  installReleaseBinary,
+  releaseVersionOf,
+  type BinaryInstallRequest,
+  type BinaryUpdateCode,
+} from "./compiled-update-install"
+export { releaseVersionOf } from "./compiled-update-install"
 
 export const RELEASES_URL = "https://github.com/code-yeongyu/oh-my-openagent/releases"
 const RELEASES_API = "https://api.github.com/repos/code-yeongyu/oh-my-openagent/releases?per_page=100"
@@ -17,11 +25,7 @@ export type CompiledUpdateResult = {
   readonly output: string
   readonly exitCode: number
   readonly stream?: "stdout" | "stderr"
-}
-
-// omo-ai publishes betas as `5.0.0-0.beta.90` while the GitHub release is tagged `v5.0.0-beta.90`.
-export function releaseVersionOf(omoAiVersion: string): string {
-  return omoAiVersion.replace(/^(\d+\.\d+\.\d+)-0\.(.+)$/, "$1-$2")
+  readonly errorCode?: BinaryUpdateCode
 }
 
 export function releaseAssetName(releaseTarget: unknown, platform: NodeJS.Platform, arch: string): string {
@@ -153,6 +157,7 @@ export async function compiledUpdate(options: {
   readonly fetchReleases: FetchReleases
   readonly args?: readonly string[]
   readonly probeOwner?: ProbeOwner
+  readonly install?: (request: BinaryInstallRequest) => Promise<void>
 }): Promise<CompiledUpdateResult> {
   const usage = options.args === undefined ? undefined : updateUsageAnswer(options.args)
   if (usage !== undefined) return { output: usage.text, exitCode: usage.exitCode, stream: usage.stream }
@@ -184,8 +189,25 @@ export async function compiledUpdate(options: {
     }
   }
   const command = replaceCommand(`${RELEASES_URL}/download/v${target}/${asset}`, options.destination, options.platform)
-  return {
-    output: `omo ${target} is available (running ${current}). Replace this binary with:\n${command}`,
-    exitCode: 0,
+  if (isPrintOnlyUpdate(options.args ?? [])) {
+    return {
+      output: `omo ${target} is available (running ${current}). Replace this binary with:\n${command}`,
+      exitCode: 0,
+    }
+  }
+  try {
+    await (options.install ?? installReleaseBinary)({
+      destination: options.destination,
+      asset,
+      version: target,
+      platform: options.platform,
+    })
+    return { output: `omo updated ${current} -> ${target}`, exitCode: 0 }
+  } catch (error) {
+    const errorCode = error instanceof BinaryUpdateError ? error.code : "install_failed"
+    const reason = (error instanceof Error ? error.message : String(error))
+      .replace(/[\r\n\x00-\x1f\x7f-\x9f]/g, " ")
+      .slice(0, 500)
+    return { output: `omo update: ${errorCode}: ${reason}`, exitCode: 1, stream: "stderr", errorCode }
   }
 }
