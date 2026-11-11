@@ -12,6 +12,7 @@ const AVAILABLE = `omo 9.9.10 is available (running 9.9.9). Replace this binary 
 
 async function releaseUpdate(args: string[] | undefined) {
   let lookups = 0
+  const installed: string[] = []
   const result = await compiledUpdate({
     omoAiVersion: "9.9.9",
     releaseTarget: undefined,
@@ -22,9 +23,10 @@ async function releaseUpdate(args: string[] | undefined) {
       lookups += 1
       return [{ tag_name: "v9.9.10", assets: [{ name: ASSET }] }]
     },
+    install: async (request) => { installed.push(request.destination) },
     ...(args === undefined ? {} : { args }),
   })
-  return { result, lookups }
+  return { result, lookups, installed }
 }
 
 describe("compiled omo update argument handling", () => {
@@ -45,14 +47,22 @@ describe("compiled omo update argument handling", () => {
     expect(lookups).toBe(0)
   })
 
-  const printed = [undefined, ["update"], ["update", "self"], ["update", "--self"], ["update", "--dry-run"], ["update", "--print"]]
+  const printed = [["update", "--dry-run"], ["update", "--print"]]
   for (const args of printed) {
     test(`#given ${args?.join(" ") ?? "no arguments"} #then it prints the newer release and its replace command, unchanged`, async () => {
-      const { result, lookups } = await releaseUpdate(args)
+      const { result, lookups, installed } = await releaseUpdate(args)
       expect(result.exitCode).toBe(0)
       expect(result.output).toBe(AVAILABLE)
       expect(result.stream ?? "stdout").toBe("stdout")
       expect(lookups).toBe(1)
+      expect(installed).toEqual([])
+    })
+  }
+  for (const args of [undefined, ["update"], ["update", "self"], ["update", "--self"]]) {
+    test(`#given ${args?.join(" ") ?? "default arguments"} #then the compiled release is installed`, async () => {
+      const { result, installed } = await releaseUpdate(args)
+      expect(result).toEqual({ exitCode: 0, output: "omo updated 9.9.9 -> 9.9.10" })
+      expect(installed).toEqual([DESTINATION])
     })
   }
 })
@@ -69,7 +79,7 @@ describe("compiled omo update destination", () => {
       platform,
       arch: "x64",
       fetchReleases: async () => [{ tag_name: "v9.9.10", assets: [{ name: releaseAssetName(undefined, platform, "x64") }] }],
-      args: ["update"],
+      args: ["update", "--dry-run"],
     })
   }
 

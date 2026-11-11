@@ -15,7 +15,10 @@ export interface DesktopSessionOpenParams {
 		readonly coordinateSafe?: boolean;
 		readonly maxBytes?: number;
 	};
-	/** `object` asks for an `ActionReport` per exec; sent only when asked and the engine advertises `action-report`. */
+	/**
+	 * `object` (the default) asks for an `ActionReport` per exec, `null` for today's `null` reply; sent whenever the
+	 * engine advertises `action-report`, so an engine without it keeps replying `null`.
+	 */
 	readonly reportMode?: "null" | "object";
 	/** Sent whenever the engine advertises `intervention-policy`; omitted means the engine default `pause`. */
 	readonly intervention?: "continue" | "pause";
