@@ -308,3 +308,36 @@ for (const [status, kind] of [
     expect(f.counts().closes).toBe(1)
   })
 }
+
+test("#given no sync account #when status is read twice #then it names no_account and warns once", async () => {
+  const warnings: { message: string; fields: Record<string, unknown> }[] = []
+  const f = await setup({
+    source: async () => null,
+    warn: (message, fields) => warnings.push({ message, fields }),
+  })
+  const a = owner("a")
+  expect(await f.call("status", a.context)).toMatchObject({ kind: "unavailable", code: "no_account" })
+  expect(await f.call("status", a.context)).toMatchObject({ kind: "unavailable", code: "no_account" })
+  expect(warnings).toHaveLength(1)
+  expect(warnings[0]?.fields).toMatchObject({ code: "no_account" })
+})
+
+test("#given the sync status read throws #when status is read #then it names status_read_failed with the error", async () => {
+  const warnings: { message: string; fields: Record<string, unknown> }[] = []
+  const f = await setup({
+    syncStatus: async () => {
+      throw new Error("status store unreadable")
+    },
+    warn: (message, fields) => warnings.push({ message, fields }),
+  })
+  expect(await f.call("status", owner("a").context)).toMatchObject({ kind: "unavailable", code: "status_read_failed" })
+  expect(warnings).toHaveLength(1)
+  expect(JSON.stringify(warnings[0]?.fields)).toContain("status store unreadable")
+})
+
+test("#given a working account #when status is read #then no unavailable warning is logged", async () => {
+  const warnings: unknown[] = []
+  const f = await setup({ warn: (_message, fields) => warnings.push(fields) })
+  expect(await f.call("status", owner("a").context)).not.toMatchObject({ kind: "unavailable" })
+  expect(warnings).toHaveLength(0)
+})
