@@ -2,6 +2,10 @@
 // Chain parsing is not cryptographic verification; memory-core still verifies every record.
 import { z } from "zod"
 
+// listEntries is not paged and returns the whole chain, so the cap sits far above any real chain while still bounding
+// the memory an oversized reply can cost to validate (GHSA-mrhx-c7xc-m3w5: zod collects one issue per failing element).
+export const SYNC_REPLY_MAX_ITEMS = 100_000
+
 export const SyncInteger = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER)
 const SyncPrincipal = z.object({
   kind: z.literal("device"),
@@ -29,27 +33,30 @@ const keyringRow = z.object({
   kind: z.literal("keyring"),
   keyring_link: z.string(),
   body: z.record(z.string(), z.json()),
-  wraps: z.array(SyncWrap),
+  wraps: z.array(SyncWrap).max(SYNC_REPLY_MAX_ITEMS),
 })
 const bodyFields = z.object({ kind: z.string(), account: z.string(), epoch: SyncInteger })
 export const decodeSyncKeys = (input: unknown) =>
   z
-    .object({ entries: z.array(keyringRow) })
+    .object({ entries: z.array(keyringRow).max(SYNC_REPLY_MAX_ITEMS) })
     .parse(input)
     .entries.map((entry) => ({
       ...entry,
       body: { ...entry.body, ...bodyFields.parse(entry.body) },
     }))
-export const decodeSyncEntries = (input: unknown) => z.object({ entries: z.array(SyncChainRow) }).parse(input)
+export const decodeSyncEntries = (input: unknown) =>
+  z.object({ entries: z.array(SyncChainRow).max(SYNC_REPLY_MAX_ITEMS) }).parse(input)
 export const decodeRecoveryWraps = (input: unknown) =>
   z
     .object({
-      wraps: z.array(
-        z.object({
-          record: z.object({ seq: SyncInteger, digest: z.string(), keyring_link: z.string() }),
-          entry: SyncWrap,
-        }),
-      ),
+      wraps: z
+        .array(
+          z.object({
+            record: z.object({ seq: SyncInteger, digest: z.string(), keyring_link: z.string() }),
+            entry: SyncWrap,
+          }),
+        )
+        .max(SYNC_REPLY_MAX_ITEMS),
     })
     .parse(input)
 export const SyncPending = z.object({
