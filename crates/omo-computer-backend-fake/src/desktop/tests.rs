@@ -3,6 +3,7 @@
 use omo_computer_core::backend::{
     Backend, CaptureOptions, InputEvent, Route, TaggedInput, Target, WindowFilter,
 };
+use omo_computer_core::listing::Rect;
 use omo_computer_core::params::Point;
 
 use omo_computer_core::error::{ComputerCode, EngineCode};
@@ -184,4 +185,53 @@ fn imported_error_code_faults_keep_their_exact_code_and_row() {
         assert!(fake.displays().is_ok(), "{name}: the queue drains");
         assert!(fake.sink().is_empty());
     }
+}
+
+#[test]
+fn an_empty_or_negative_extent_refuses_instead_of_a_zero_size_frame() {
+    let display = |width: i32, height: i32, scale: f64| {
+        format!(
+            r#"{{"displays":[{{"id":"1","name":"d","x":0,"y":0,"width":{width},"height":{height},"scale":{scale},"pixelX":0,"pixelY":0,"pixelWidth":1,"pixelHeight":1,"isPrimary":true}}]}}"#
+        )
+    };
+    let region = |width: f64, height: f64| CaptureOptions {
+        region: Some(Rect {
+            x: 0.0,
+            y: 0.0,
+            width,
+            height,
+        }),
+        ..OPTIONS
+    };
+    let cases = [
+        ("scale 0", display(100, 100, 0.0), OPTIONS),
+        ("zero width", display(0, 100, 1.0), OPTIONS),
+        ("negative height", display(100, -5, 1.0), OPTIONS),
+        ("zero region", display(100, 100, 1.0), region(0.0, 10.0)),
+        (
+            "negative region",
+            display(100, 100, 1.0),
+            region(10.0, -10.0),
+        ),
+    ];
+    for (case, json, options) in cases {
+        let mut fake = FakeBackend::from_json(&json).unwrap_or_else(|e| panic!("{case}: {e}"));
+        assert_eq!(
+            fake.capture(&Target::Desktop, &options)
+                .map(|frame| (frame.width, frame.height)),
+            Err(omo_computer_core::backend::Refusal::bare(
+                EngineCode::CaptureFailed
+            )),
+            "{case}"
+        );
+        assert!(
+            fake.sink().is_empty(),
+            "{case}: a refused capture writes nothing"
+        );
+    }
+    let mut control = FakeBackend::from_json(&display(100, 100, 1.0)).expect("loads");
+    let frame = control
+        .capture(&Target::Desktop, &region(10.0, 10.0))
+        .expect("a positive extent captures");
+    assert_eq!((frame.width, frame.height), (10, 10));
 }
