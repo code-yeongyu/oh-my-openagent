@@ -92,12 +92,14 @@ describe("the omo CLI device service hand-off", () => {
   })
 
   // #6503: the machine's device service holds its one account device; omo login reads it instead of minting another.
-  test("machineDevice names the device a running service holds, and nothing when no service runs", async () => {
+  test("machineDevice names the device a running service holds, parked included, and absent when no service runs", async () => {
     const s = await runningService()
     const handoff = cliDeviceServiceHandoff({ api: "http://127.0.0.1:9", stateDir: s.stateDir, connect: s.connect, fetch: me, log: () => {} })
-    expect(await handoff.machineDevice?.()).toEqual({ id: "dev-self", name: "This Mac" })
+    expect(await handoff.machineDevice?.()).toEqual({ kind: "held", device: { id: "dev-self", name: "This Mac" } })
+    s.owner.state.status = { ...s.owner.state.status, state: "sign_in_required" }
+    expect(await handoff.machineDevice?.()).toEqual({ kind: "held", device: { id: "dev-self", name: "This Mac" } })
     const none = cliDeviceServiceHandoff({ api: "http://127.0.0.1:9", stateDir: join(temp(), "ds"), fetch: me, log: () => {} })
-    expect(await none.machineDevice?.()).toBeNull()
+    expect(await none.machineDevice?.()).toEqual({ kind: "absent" })
   })
 
   test("a failure is reported on the log and never fails the sign-in or sign-out", async () => {

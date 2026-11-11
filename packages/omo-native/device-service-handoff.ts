@@ -64,19 +64,20 @@ export function cliDeviceServiceHandoff(options: {
       }
     },
     machineDevice: async () => {
-      if (!existsSync(deviceServiceEndpointPath(stateDir))) return null
+      if (!existsSync(deviceServiceEndpointPath(stateDir))) return { kind: "absent" }
+      let unreadable: string | undefined
+      const service = await connectOrNotRunning(connect, line => { unreadable = line; options.log(line) })
+      if (service === "not_running") {
+        // A dead endpoint is a service that is gone; any other connect failure is a service we could not read.
+        return unreadable === undefined || unreadable.startsWith("OmO device service: dead_endpoint") ? { kind: "absent" } : { kind: "unknown", reason: unreadable }
+      }
       try {
-        const service = await connectOrNotRunning(connect, options.log)
-        if (service === "not_running") return null
-        try {
-          const status = await service.status()
-          return status.state === "sign_in_required" ? null : status.device
-        } finally {
-          service.close()
-        }
+        const status = await service.status()
+        return status.device === null ? { kind: "absent" } : { kind: "held", device: status.device }
       } catch (error) {
-        report("reading this computer's device")(error)
-        return null
+        return { kind: "unknown", reason: error instanceof Error ? error.message : String(error) }
+      } finally {
+        service.close()
       }
     },
     forget: async () => {

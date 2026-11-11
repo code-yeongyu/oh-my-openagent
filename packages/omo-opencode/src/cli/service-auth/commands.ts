@@ -5,6 +5,7 @@ import { isClosedDeviceLogin, withClosedDeviceLoginOptions } from "./closed-devi
 import { openSignInBrowser } from "./browser"
 import { deviceName, devicePlatform } from "./device-name"
 import { loginDevice } from "./device-flow"
+import { advertisesMachineIdentity, readMachineDigest } from "./machine-digest"
 import { refuseSecondMachineDevice } from "./machine-device"
 import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
 import { BrowserUnavailable, loginLoopback } from "./loopback"
@@ -17,9 +18,9 @@ import { terminalText } from "./terminal-text"
 
 // Probe the service before anything user-visible (a browser tab, a device code) so an
 // unreachable or unhealthy service fails at once instead of after a dead page and a wait.
-async function ensureServiceAvailable(session: Pick<Session, "request">, api: string): Promise<void> {
+async function ensureServiceAvailable(session: Pick<Session, "request">, api: string): Promise<unknown> {
   try {
-    await session.request("/v1/health", { method: "GET" })
+    return await session.request("/v1/health", { method: "GET" })
   } catch (error) {
     if (!(error instanceof SignInError)) throw error
     // No usable HTTP answer (DNS, refused, TLS, timeout, non-JSON body): the client can't tell a
@@ -87,16 +88,18 @@ async function run(action: "login" | "logout" | "whoami", options: Options, hook
       console.log(saved ? `Signed in to ${api} as ${terminalText(saved.device.name)}.` : "Not signed in.")
       return
     }
-    await ensureServiceAvailable(session, api)
+    const health = await ensureServiceAvailable(session, api)
     // #6503: one device per machine; never mint a second one for a machine that already has its device.
     await refuseSecondMachineDevice(session, deviceService)
+    const machineDigest = advertisesMachineIdentity(health) ? await readMachineDigest() : undefined
+    const digest = machineDigest === undefined ? {} : { machineDigest }
     const name = deviceName()
     const platform = devicePlatform()
     if (!options.device && options.browser !== false) {
       try {
         await loginLoopback(session, {
           accounts: accountsOrigin(options, process.env),
-          name, platform, open: openSignInBrowser, chooseDevice,
+          name, platform, open: openSignInBrowser, chooseDevice, ...digest,
         })
         console.log("Signed in to OmO.")
         return
@@ -105,7 +108,7 @@ async function run(action: "login" | "logout" | "whoami", options: Options, hook
       }
     }
     await loginDevice(session, {
-      name, platform, chooseDevice,
+      name, platform, chooseDevice, ...digest,
       show: code => {
         console.log(`Open ${code.verificationUri}`)
         console.log(`User code: ${code.userCode}`)

@@ -1,7 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 import { createServer } from "node:http"
 import { generateDeviceKeys } from "./device-keys"
-import { type ChooseDevice, grantSchema, jsonRequest, parseReply, type Platform, serviceOrigin, SignInError } from "./protocol"
+import { ApiRefusal, type ChooseDevice, grantSchema, jsonRequest, parseReply, type Platform, serviceOrigin, SignInError } from "./protocol"
 import type { Session } from "./session"
 
 export class BrowserUnavailable extends SignInError {}
@@ -84,6 +84,8 @@ export async function loginLoopback(session: Session, options: {
   readonly platform: Platform
   readonly open: (url: string) => Promise<boolean>
   readonly chooseDevice: ChooseDevice
+  /** This machine's hardware digest (#6503), sent only when the service advertises machine identity. */
+  readonly machineDigest?: string
 }): Promise<void> {
   await session.ready()
   const keys = generateDeviceKeys()
@@ -92,10 +94,13 @@ export async function loginLoopback(session: Session, options: {
     try {
       const grant = parseReply(grantSchema, await session.request("/v1/session/exchange", jsonRequest({
         ...authorization, kind: "cli", deviceName: options.name, platform: options.platform, ...keys.public,
+        ...(options.machineDigest === undefined ? {} : { machineDigest: options.machineDigest }),
       })))
       await session.save({ ...grant, ...keys.private })
       return
     } catch (error) {
+      // #6503: this machine already has its device. Terminal: never retried, never a reason to remove or inherit that device.
+      if (error instanceof ApiRefusal && error.code === "machine_exists") throw error
       if (await session.removeForLimit(error, options.chooseDevice)) continue
       throw new SignInError("Sign-in cancelled. No device was removed.")
     }

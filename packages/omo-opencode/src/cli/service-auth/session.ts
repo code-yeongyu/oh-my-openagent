@@ -41,11 +41,19 @@ export type BeforeKeysDiscarded = ((discarded: DiscardedCredential) => Promise<v
  * every path, forget, a session the service ended). Neither ever reads the credential store, and neither throws: a
  * device service that is down or refuses never fails a sign-in or a sign-out.
  */
+export type MachineDeviceState =
+  | { readonly kind: "absent" }
+  | { readonly kind: "held"; readonly device: { readonly id: string; readonly name: string } }
+  | { readonly kind: "unknown"; readonly reason: string }
+
 export type DeviceServiceHandoff = {
   readonly adopt: (credentials: Credentials) => Promise<void>
   readonly forget: () => Promise<void>
-  /** The device this machine's running device service holds (#6503), or null when none is held or no service answers. */
-  readonly machineDevice?: () => Promise<{ readonly id: string; readonly name: string } | null>
+  /**
+   * What this machine's device service holds (#6503): `absent` only when no service runs or it holds no device;
+   * `held` includes a parked device (sign_in_required); `unknown` is a service that exists but could not be read.
+   */
+  readonly machineDevice?: () => Promise<MachineDeviceState>
 }
 
 export const discardedOf = (credentials: Credentials, cause: "refused" | "forget" | "logout" | "replaced"): DiscardedCredential => ({

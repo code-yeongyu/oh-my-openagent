@@ -81,12 +81,13 @@ const REFUSAL_CODES = [
   "authorization_pending", "slow_down", "access_denied", "expired_token", "rate_limited",
   "internal", "unavailable", "forbidden", "invalid_request", "not_found",
   "client_upgrade_required", "writer_floor_mismatch", "service_upgrade_required", "refresh_recovery_expired",
+  "machine_exists",
 ] as const
 export type RefusalCode = (typeof REFUSAL_CODES)[number] | "unknown"
 const isKnownRefusal = (code: string): code is (typeof REFUSAL_CODES)[number] => (REFUSAL_CODES as readonly string[]).includes(code)
 
 /** What a refused request asks of the person; the message keys on this, never on the server's text. */
-export type RefusalGuidance = "sign_in_again" | "wait" | "service_trouble" | "update_omo" | "account_deleted" | "account_refused"
+export type RefusalGuidance = "sign_in_again" | "wait" | "service_trouble" | "update_omo" | "account_deleted" | "account_refused" | "machine_exists"
 
 export function refusalGuidance(code: RefusalCode, status: number): RefusalGuidance {
   switch (code) {
@@ -100,6 +101,8 @@ export function refusalGuidance(code: RefusalCode, status: number): RefusalGuida
       return "update_omo"
     case "account_deleted":
       return "account_deleted"
+    case "machine_exists":
+      return "machine_exists"
     case "entitlement_required": case "forbidden": case "access_denied": case "authorization_pending":
       return "account_refused"
     case "client_upgrade_required": case "writer_floor_mismatch": case "service_upgrade_required": case "refresh_recovery_expired":
@@ -119,6 +122,7 @@ export function refusalMessage(guidance: RefusalGuidance): string {
     case "update_omo": return "This version of omo can't complete that request. Update omo with omo update, then try again."
     case "account_deleted": return "This OmO account was deleted. Sign in with another account to keep using OmO."
     case "account_refused": return "OmO accounts refused this request for your account. Check your account and its devices, then try again."
+    case "machine_exists": return "This computer already has an OmO device. Use its existing sign-in, or remove or replace that device on the Devices page of your OmO account, then try again."
   }
 }
 

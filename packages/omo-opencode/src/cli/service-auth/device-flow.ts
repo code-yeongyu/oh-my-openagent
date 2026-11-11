@@ -9,6 +9,8 @@ export async function loginDevice(session: Session, options: {
   readonly platform: Platform
   readonly show: (code: DisplayCode) => void
   readonly chooseDevice: ChooseDevice
+  /** This machine's hardware digest (#6503), sent only when the service advertises machine identity. */
+  readonly machineDigest?: string
   readonly now?: () => number
   readonly sleep?: (ms: number) => Promise<void>
 }): Promise<void> {
@@ -32,11 +34,14 @@ export async function loginDevice(session: Session, options: {
     try {
       const grant = parseReply(grantSchema, await session.request("/v1/device/token", jsonRequest({
         deviceCode: minted.deviceCode, ...keys.public,
+        ...(options.machineDigest === undefined ? {} : { machineDigest: options.machineDigest }),
       })))
       await session.save({ ...grant, ...keys.private })
       return
     } catch (error) {
       if (!(error instanceof ApiRefusal)) throw error
+      // #6503: this machine already has its device. Terminal: never retried, never a reason to remove or inherit that device.
+      if (error.code === "machine_exists") throw error
       if (error.status === 400 && error.code === "authorization_pending") continue
       if (error.status === 400 && error.code === "slow_down") { interval += 5000; continue }
       if (error.status === 429) {
