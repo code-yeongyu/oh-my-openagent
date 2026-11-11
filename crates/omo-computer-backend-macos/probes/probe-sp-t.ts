@@ -6,7 +6,7 @@
 // A spike instrument, not engine code. It writes the ledger `macos-tcc.tsv` beside it (one row per question per
 // condition) and re-measures it with --verify. See README.md in this directory for the host procedure.
 //
-//   --print-skeleton             print every ledger row (no host needed; rows not measured yet read PENDING)
+//   --print-skeleton             print every ledger row unmeasured, each with its awaiting reason (no host needed)
 //   --setup                      build the spawner, the probe bundle generations and the prompt-probe bundle
 //   --request-grant              launch the current generation by path with the prompt flag (the H3 dialog)
 //   --check-grant                launch the current generation by path and print its three preflights
@@ -891,12 +891,15 @@ function evidencePath(id: string): string {
 }
 
 function skeletonLine(def: RowDef): string[] {
-  const awaiting = def.needs === "h4" ? "awaiting H4" : def.needs === "h2" ? "awaiting H2" : ""
-  const person = def.person ? PERSON_REASON[def.person] : ""
-  const verdict = awaiting ? "UNMEASURED" : person ? "WAITING-PERSON" : "PENDING"
-  const note = awaiting
-    ? `${awaiting}: the host is not confirmed${person ? `; then ${person}` : ""}`
-    : person || "measured on the QA host in phase B"
+  const awaiting =
+    def.needs === "h4"
+      ? "awaiting H4: the host is not confirmed"
+      : def.needs === "h2"
+        ? "awaiting H2: the host is not confirmed"
+        : "awaiting H1: the named host has no QA account"
+  const person = def.person ? `; then WAITING-PERSON: ${PERSON_REASON[def.person]}` : ""
+  const verdict = "UNMEASURED"
+  const note = `${awaiting}${person}`
   return [
     def.id,
     def.question,
@@ -904,7 +907,7 @@ function skeletonLine(def: RowDef): string[] {
     HOSTS[def.host] + (def.host === "h1" || def.host === "h2" ? ` (macOS ${def.os})` : ""),
     verdict,
     rerun(def.id),
-    awaiting ? `none: ${awaiting}` : person ? "none: waiting for a person" : "none: not measured yet",
+    `none: ${awaiting.split(":")[0]}`,
     "-",
     evidencePath(def.id),
     note,
