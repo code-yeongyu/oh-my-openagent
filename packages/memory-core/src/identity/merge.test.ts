@@ -625,42 +625,50 @@ describe("identity merge (#10070)", () => {
     expect(await readIdentityRecord(source.paths.root)).toMatchObject({ mergedHead: newHead })
   }, 30_000)
 
-  it("#given a source path whose backslashes decode to a climb out of the repository #when the merge applies #then it is refused and nothing is written outside", async () => {
-    const root = await memoryRoot()
-    const target = await identity(root, "project-aaaa1111", { "notes/base.md": note("base") }, ["/work/project"])
-    const source = await identity(root, "project-feature-bbbb2222", { "notes/ok.md": note("ok") }, [
-      "/work/project-feature",
-    ])
-    const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], {
-      cwd: source.paths.repo,
-      input: note("escaped"),
-    })
-      .toString()
-      .trim()
-    execFileSync("git", ["update-index", "--add", "--cacheinfo", `100644,${blob},notes\\..\\..\\outside.md`], {
-      cwd: source.paths.repo,
-      stdio: "ignore",
-    })
-    execFileSync(
-      "git",
-      ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", "commit", "-q", "--no-verify", "-m", "escape"],
-      { cwd: source.paths.repo, stdio: "ignore" },
-    )
-    const before = await target.repo.head()
-    const escaped = join(target.paths.repo, "..", "outside.md")
+  // Skipped on Windows because the fixture cannot be built there: Windows git refuses a backslash index path
+  // (git update-index --cacheinfo ...\\..\\outside.md fails), a setup limit, not a gap in the guard. The same
+  // escape is still covered on Windows by the table row "notes\\..\\..\\outside.md" in
+  // "#given a source tree entry named %j ... both refuse it" below, whose tree is built with git mktree.
+  it.skipIf(process.platform === "win32")(
+    "#given a source path whose backslashes decode to a climb out of the repository #when the merge applies #then it is refused and nothing is written outside",
+    async () => {
+      const root = await memoryRoot()
+      const target = await identity(root, "project-aaaa1111", { "notes/base.md": note("base") }, ["/work/project"])
+      const source = await identity(root, "project-feature-bbbb2222", { "notes/ok.md": note("ok") }, [
+        "/work/project-feature",
+      ])
+      const blob = execFileSync("git", ["hash-object", "-w", "--stdin"], {
+        cwd: source.paths.repo,
+        input: note("escaped"),
+      })
+        .toString()
+        .trim()
+      execFileSync("git", ["update-index", "--add", "--cacheinfo", `100644,${blob},notes\\..\\..\\outside.md`], {
+        cwd: source.paths.repo,
+        stdio: "ignore",
+      })
+      execFileSync(
+        "git",
+        ["-c", "user.name=qa", "-c", "user.email=qa@example.invalid", "commit", "-q", "--no-verify", "-m", "escape"],
+        { cwd: source.paths.repo, stdio: "ignore" },
+      )
+      const before = await target.repo.head()
+      const escaped = join(target.paths.repo, "..", "outside.md")
 
-    const outcome = await applyIdentityMerge({
-      source: source.paths,
-      target: target.paths,
-      lock,
-      author: AUTHOR,
-    }).catch((error: unknown) => error)
+      const outcome = await applyIdentityMerge({
+        source: source.paths,
+        target: target.paths,
+        lock,
+        author: AUTHOR,
+      }).catch((error: unknown) => error)
 
-    expect(outcome).toBeInstanceOf(Error)
-    expect(String(outcome)).toContain("outside the memory repository")
-    expect(await target.repo.head()).toBe(before)
-    expect(existsSync(escaped)).toBe(false)
-  }, 30_000)
+      expect(outcome).toBeInstanceOf(Error)
+      expect(String(outcome)).toContain("outside the memory repository")
+      expect(await target.repo.head()).toBe(before)
+      expect(existsSync(escaped)).toBe(false)
+    },
+    30_000,
+  )
 
   it("#given the target notes directory is a symlink to outside the repository #when the merge applies #then the write is refused and the outside directory stays empty", async () => {
     const root = await memoryRoot()
