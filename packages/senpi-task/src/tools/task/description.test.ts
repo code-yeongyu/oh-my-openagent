@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
+import { OmoConfigSchema, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 
 import type { AgentDefinition } from "../../agents"
 import { TASK_PROMPT_GUIDELINES, buildTaskToolDescription } from "./description"
@@ -64,5 +64,41 @@ describe("buildTaskToolDescription", () => {
     // then
     expect(description).toContain("<Selection_Gate>")
     expect(description).toContain("<Caller_Warning>")
+  })
+
+  test("#given no task.max_depth #when the description is built #then it states the default nesting limit of 1", () => {
+    // given
+    const config: OmoConfig = { categories: {}, agents: {} }
+
+    // when
+    const description = buildTaskToolDescription({ omoConfig: config, agents })
+
+    // then
+    expect(description).toContain("max_depth is 1")
+    expect(description).toContain("a child cannot spawn children of its own")
+  })
+
+  test("#given task.max_depth 0 #when the description is built #then it states that spawns are refused", () => {
+    // given
+    const config = OmoConfigSchema.parse({ categories: {}, agents: {}, task: { max_depth: 0 } })
+
+    // when
+    const description = buildTaskToolDescription({ omoConfig: config, agents })
+
+    // then
+    expect(description).toContain("max_depth is 0")
+    expect(description).not.toContain("max_depth is 1")
+  })
+
+  test("#given task.max_depth above 1 #when the description is built #then it states that deeper spawns are refused", () => {
+    // given
+    const config = OmoConfigSchema.parse({ categories: {}, agents: {}, task: { max_depth: 3 } })
+
+    // when
+    const description = buildTaskToolDescription({ omoConfig: config, agents })
+
+    // then
+    expect(description).toContain("max_depth is 3")
+    expect(description).toContain("a spawn that would run deeper is refused")
   })
 })
