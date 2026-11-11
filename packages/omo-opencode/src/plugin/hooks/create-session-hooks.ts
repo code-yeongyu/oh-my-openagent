@@ -33,7 +33,10 @@ import { createGoalHook } from "../../hooks/goal"
 import {
   detectExternalNotificationPlugin,
   getNotificationConflictWarning,
+  getOpenCodeVersion,
+  isOpenCodeVersionAtLeast,
   log,
+  OPENCODE_NATIVE_AGENTS_INJECTION_VERSION,
 } from "../../shared"
 import { safeCreateHook } from "../../shared/safe-create-hook"
 import { sessionExists } from "../../tools"
@@ -202,7 +205,9 @@ export function createSessionHooks(args: {
       }))
     : null
 
-  const hephaestusAgentsMdInjector = isHookEnabled("hephaestus-agents-md-injector")
+  const hasNativeAgentsSupport =
+    getOpenCodeVersion() !== null && isOpenCodeVersionAtLeast(OPENCODE_NATIVE_AGENTS_INJECTION_VERSION)
+  const hephaestusAgentsMdInjector = isHookEnabled("hephaestus-agents-md-injector") && !hasNativeAgentsSupport
     ? safeHook("hephaestus-agents-md-injector", () =>
       createHephaestusAgentsMdInjectorHook(ctx, modelCacheState))
     : null
