@@ -114,6 +114,18 @@ describe("OhMyOpenCodeConfigSchema tui", () => {
     // then
     expect(result.tui?.sidebar.enabled).toBe(false)
   })
+
+  it("leaves the BTW session prompt claim on unless it is turned off", () => {
+    // given
+    const defaults = OhMyOpenCodeConfigSchema.parse({})
+    const turnedOff = OhMyOpenCodeConfigSchema.parse({ tui: { btw: { session_prompt: false } } })
+    const btwWithoutKey = OhMyOpenCodeConfigSchema.parse({ tui: { btw: {} } })
+
+    // then
+    expect(defaults.tui?.btw?.session_prompt).toBeUndefined()
+    expect(turnedOff.tui?.btw?.session_prompt).toBe(false)
+    expect(btwWithoutKey.tui?.btw?.session_prompt).toBe(true)
+  })
 })
 
 describe("OhMyOpenCodeConfigSchema agent_order", () => {

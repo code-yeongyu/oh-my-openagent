@@ -79,6 +79,9 @@ type PluginValidation = {
       readonly sidebar?: {
         readonly enabled?: boolean
       }
+      readonly btw?: {
+        readonly session_prompt?: boolean
+      }
     }
   }
 }
@@ -130,8 +133,13 @@ const module: TuiPluginModule = {
       return
     }
 
+    const directory = api.state.path.directory
+    const validation = await loadPluginValidation(directory)
+
     try {
-      await registerBtwSideTui(api, solid)
+      await registerBtwSideTui(api, solid, {
+        claimSessionPrompt: validation.config.tui?.btw?.session_prompt !== false,
+      })
     } catch (error) {
       log("[btw-side] TUI registration failed", { error })
     }
@@ -142,8 +150,7 @@ const module: TuiPluginModule = {
       log("[native-edition-nudge] TUI registration failed", { error })
     }
 
-    const directory = api.state.path.directory
-    if ((await loadPluginValidation(directory)).config.tui?.sidebar?.enabled === false) {
+    if (validation.config.tui?.sidebar?.enabled === false) {
       return
     }
 
