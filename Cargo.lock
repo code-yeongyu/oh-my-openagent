@@ -2015,6 +2015,12 @@ dependencies = [
 [[package]]
 name = "omo-computer-core"
 version = "0.0.0"
+dependencies = [
+ "schemars",
+ "serde",
+ "serde_json",
+ "sha2",
+]
 
 [[package]]
 name = "omo-computer-engine"
