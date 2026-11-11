@@ -681,13 +681,13 @@ describe("the computer bridge in the QuickJS run cell", HANG_GUARD, () => {
     expect(methods(log)).not.toContain("click")
   })
 
-  it("keeps the call limit across bridged calls and leaves tool and wait absent", async () => {
+  it("keeps the call limit across bridged calls and leaves tool and wait absent", HANG_GUARD, async () => {
     // Given
     const { service } = await openDesktop()
 
     // When
     const absent = await quickjs(service, "return [typeof tool, typeof wait, typeof computer.clipboard.read];")
-    const flood = await rejectionOf(quickjs(service, "for (;;) await computer.capabilities();"))
+    const flood = await rejectionOf(quickjs(service, "for (;;) await computer.capabilities();", { timeoutMs: 60_000 }))
 
     // Then
     expect(absent.returnValue).toEqual(["undefined", "undefined", "function"])
