@@ -25,9 +25,7 @@ describe("provider exhaustion fallback policy", () => {
     const modelRetryResults = errors.map((error) => shouldRetryError(error))
 
     //#then
-    expect(providerExhaustionResults).toEqual(
-      errors.map(() => ({ signal: "quota_exceeded", eligible: true })),
-    )
+    expect(providerExhaustionResults).toEqual(errors.map(() => ({ signal: "quota_exceeded", eligible: true })))
     expect(modelRetryResults).toEqual(errors.map(() => true))
   })
 
@@ -50,8 +48,6 @@ describe("provider exhaustion fallback policy", () => {
     }))
 
     //#then
-    expect(results).toEqual(
-      hardStopErrors.map(() => ({ signal: undefined, eligible: false })),
-    )
+    expect(results).toEqual(hardStopErrors.map(() => ({ signal: undefined, eligible: false })))
   })
 })

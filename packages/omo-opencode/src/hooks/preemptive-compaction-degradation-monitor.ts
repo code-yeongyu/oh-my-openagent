@@ -23,10 +23,7 @@ interface ClientLike {
       body: { providerID: string; modelID: string }
       query: { directory: string }
     }) => Promise<unknown>
-    messages: (input: {
-      path: { id: string }
-      query?: { directory: string }
-    }) => Promise<unknown>
+    messages: (input: { path: { id: string }; query?: { directory: string } }) => Promise<unknown>
   }
   tui: {
     showToast: (input: {
@@ -46,11 +43,7 @@ export interface AssistantCompactionMessageInfo {
   parts?: unknown
 }
 
-async function withTimeout<TValue>(
-  promise: Promise<TValue>,
-  timeoutMs: number,
-  errorMessage: string,
-): Promise<TValue> {
+async function withTimeout<TValue>(promise: Promise<TValue>, timeoutMs: number, errorMessage: string): Promise<TValue> {
   let timeoutID: unknown
 
   const timeoutPromise = new Promise<never>((_, reject) => {

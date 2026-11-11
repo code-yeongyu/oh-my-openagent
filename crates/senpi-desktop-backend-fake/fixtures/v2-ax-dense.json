@@ -1,0 +1,95 @@
+{
+  "displays": [
+    {
+      "id": "1",
+      "name": "Built-in Display",
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 1080,
+      "scale": 1,
+      "pixelX": 0,
+      "pixelY": 0,
+      "pixelWidth": 1920,
+      "pixelHeight": 1080,
+      "isPrimary": true
+    }
+  ],
+  "windows": [
+    {
+      "id": "101",
+      "title": "Dense - Notes",
+      "app": "Notes",
+      "pid": 4242,
+      "x": 100,
+      "y": 120,
+      "width": 800,
+      "height": 600,
+      "focused": true,
+      "elevated": null
+    }
+  ],
+  "ax": {
+    "101": {
+      "role": "window",
+      "native_role": "AXWindow",
+      "title": "Dense - Notes",
+      "bounds": {
+        "x": 100,
+        "y": 120,
+        "width": 800,
+        "height": 600
+      },
+      "children": [
+        {
+          "role": "toolbar",
+          "native_role": "AXToolbar",
+          "children": [
+            {
+              "role": "button",
+              "native_role": "AXButton",
+              "title": "Back",
+              "actions": [
+                "press"
+              ],
+              "bounds": {
+                "x": 110,
+                "y": 130,
+                "width": 40,
+                "height": 24
+              }
+            }
+          ]
+        },
+        {
+          "role": "textfield",
+          "native_role": "AXSecureTextField",
+          "title": "Password",
+          "value": "secret",
+          "bounds": {
+            "x": 110,
+            "y": 170,
+            "width": 300,
+            "height": 24
+          }
+        },
+        {
+          "role": "textfield",
+          "native_role": "AXTextField",
+          "title": "Name",
+          "value": "Q",
+          "bounds": {
+            "x": 110,
+            "y": 200,
+            "width": 300,
+            "height": 24
+          }
+        }
+      ]
+    }
+  },
+  "ax_deadline_ms": 50,
+  "ax_node_count": {
+    "101": 10000
+  }
+}

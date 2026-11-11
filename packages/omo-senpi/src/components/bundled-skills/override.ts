@@ -35,7 +35,8 @@ export function resolveBundledSkillsOverride(
     }
   }
   const message = `OMO_BUNDLED_SKILLS_DIR=${value} ignored (${problem}); needs a readable absolute dir`
-  const seen = ((globalThis as Record<symbol, unknown>)[Symbol.for("omo.skillsDir")] ??= new Set<string>()) as Set<string>
+  const seen = ((globalThis as Record<symbol, unknown>)[Symbol.for("omo.skillsDir")] ??=
+    new Set<string>()) as Set<string>
   const once = (key: string) => seen.size < seen.add(key + message).size
   if (once("log")) logger.error(message)
   if (ui?.notify && once("ui")) ui.notify(message, "error")

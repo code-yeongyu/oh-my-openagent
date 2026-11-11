@@ -6,7 +6,7 @@ import omoOpenCodeManifest from "../../omo-opencode/package.json"
 import senpiTaskManifest from "../../senpi-task/package.json"
 import rootManifest from "../../../package.json"
 
-const SENPI_PIN = "2026.11.9-2"
+const SENPI_PIN = "2026.11.10-2"
 const EXACT_PIN = /^\d/
 
 describe("senpi dependency pin", () => {
@@ -28,7 +28,9 @@ describe("senpi dependency pin", () => {
 
       test("#then OpenCode uses the same engine and catalog as Native", () => {
         expect(omoOpenCodeManifest.dependencies["@code-yeongyu/senpi"]).toBe(SENPI_PIN)
-        expect(omoOpenCodeManifest.dependencies["@earendil-works/pi-ai"]).toBe(`npm:@code-yeongyu/senpi-ai@${SENPI_PIN}`)
+        expect(omoOpenCodeManifest.dependencies["@earendil-works/pi-ai"]).toBe(
+          `npm:@code-yeongyu/senpi-ai@${SENPI_PIN}`,
+        )
       })
 
       test("#then senpi-task pins match", () => {

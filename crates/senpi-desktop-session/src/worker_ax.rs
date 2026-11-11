@@ -1,11 +1,15 @@
 //! Accessibility requests. Refs (`eN`) resolve through the session's
-//! registry; a ref older than the previous snapshot fails `StaleRef`.
+//! registry; a ref older than the previous snapshot fails `StaleRef`. In an
+//! object-mode session every action first passes the actionability battery
+//! ([`crate::actionability`]).
+
+use std::cell::Cell;
 
 use senpi_desktop_core::ax::{self, register_node};
 use senpi_desktop_core::backend::DeliveryMode;
 use senpi_desktop_core::error::CoreResult;
 use senpi_desktop_core::protocol_params::{AxElementAtParams, AxQueryParams, AxSnapshotParams};
-use senpi_desktop_core::types::{AxNode, Target};
+use senpi_desktop_core::types::Target;
 
 use senpi_desktop_safety::MutatingAction;
 
@@ -46,36 +50,14 @@ impl Worker {
         Ok(Response::MaybeNode(node))
     }
 
+    /// In object mode the node carries evidence, `secure`, and whether the
+    /// snapshot that registered it cut its children.
     pub(crate) fn ax_node(&mut self, reference: &str) -> CoreResult<Response> {
         let handle = self.registry.resolve(reference)?;
-        let props = self.ax_parts()?.0.props(&handle)?;
-        let (x, y, width, height) = props.bounds.map_or((None, None, None, None), |bounds| {
-            (
-                Some(bounds.x),
-                Some(bounds.y),
-                Some(bounds.width),
-                Some(bounds.height),
-            )
-        });
-        Ok(Response::Node(AxNode {
-            evidence: None,
-            subtree_truncated: false,
-            secure: false,
-            ref_: reference.to_owned(),
-            role: props.role,
-            native_role: props.native_role,
-            title: props.title,
-            value: props.value,
-            description: props.description,
-            enabled: props.enabled,
-            focused: props.focused,
-            x,
-            y,
-            width,
-            height,
-            actions: (!props.actions.is_empty()).then_some(props.actions),
-            child_count: props.child_count,
-        }))
+        let subtree_truncated = self.registry.subtree_truncated(reference);
+        let (backend, registry) = self.ax_parts()?;
+        let observed = ax::observe(backend, registry, &handle)?;
+        Ok(Response::Node(ax::node_to_wire(reference.to_owned(), observed, subtree_truncated)))
     }
 
     pub(crate) fn ax_attributes(&mut self, reference: &str) -> CoreResult<Response> {
@@ -125,13 +107,16 @@ impl Worker {
         action: &str,
         cancelled: &dyn Fn() -> bool,
     ) -> CoreResult<Audited> {
-        let mutation = Mutation::new(
+        let mut mutation = Mutation::new(
             MutatingAction::AxPerform,
             self.ref_target(reference),
             DeliveryMode::Background,
         );
-        self.mutate(&mutation, cancelled, |worker| {
+        mutation.ax_actionability = Some((reference, Some(action)));
+        let baseline = Cell::new(None);
+        let audited = self.mutate(&mutation, cancelled, |worker| {
             let handle = worker.registry.resolve(reference)?;
+            baseline.set(worker.element_surface_baseline(&handle));
             let backend = worker.ax_parts()?.0;
             if action.eq_ignore_ascii_case("press") {
                 ax::ax_press(backend, &handle)?;
@@ -139,7 +124,9 @@ impl Worker {
                 backend.perform(&handle, action)?;
             }
             Ok(Response::Unit)
-        })
+        })?;
+        self.report_opened_surfaces(baseline.take());
+        Ok(audited)
     }
 
     pub(crate) fn ax_set_value(
@@ -150,6 +137,7 @@ impl Worker {
     ) -> CoreResult<Audited> {
         let mutation = Mutation {
             text: Some(value),
+            ax_actionability: Some((reference, None)),
             ..Mutation::new(
                 MutatingAction::AxSetValue,
                 self.ref_target(reference),
@@ -164,11 +152,12 @@ impl Worker {
     }
 
     pub(crate) fn ax_focus(&mut self, reference: &str, cancelled: &dyn Fn() -> bool) -> CoreResult<Audited> {
-        let mutation = Mutation::new(
+        let mut mutation = Mutation::new(
             MutatingAction::AxFocus,
             self.ref_target(reference),
             DeliveryMode::Background,
         );
+        mutation.ax_actionability = Some((reference, None));
         self.mutate(&mutation, cancelled, |worker| {
             let handle = worker.registry.resolve(reference)?;
             worker.ax_parts()?.0.focus(&handle)?;

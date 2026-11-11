@@ -3,11 +3,23 @@
 // memory module supervisor and the end-to-end encrypted sync runner for durable sessions.
 
 import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
-import { isAutoAgentValue, recordIdentityBind, resolveAutoIdentity, resolveMemoryIdentity, resolveMemoryRoot, type InFlightReads } from "@oh-my-opencode/memory-core"
+import {
+  isAutoAgentValue,
+  recordIdentityBind,
+  resolveAutoIdentity,
+  resolveMemoryIdentity,
+  resolveMemoryRoot,
+  type InFlightReads,
+} from "@oh-my-opencode/memory-core"
 
 import type { ComponentContext } from "../../extension/types"
 import type { SenpiOmoConfigResult } from "../config-resolution"
-import { MEMORY_BINDING_CUSTOM_TYPE, createMemoryBinding, findLatestMemoryBinding, type SessionEntryLike } from "./binding"
+import {
+  MEMORY_BINDING_CUSTOM_TYPE,
+  createMemoryBinding,
+  findLatestMemoryBinding,
+  type SessionEntryLike,
+} from "./binding"
 import { logBindReconcileFailure } from "./bind-reconcile-log"
 import type { MemoryExtensionAPI } from "./capabilities"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
@@ -158,7 +170,10 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
     memoryModuleSupervisor.acquire()
     if (!oneShot) {
       state.syncRepo = identity.paths.repo
-      void syncRunner.acquire(identity.id, identity.paths, sessionConfig.sync, { profile: sessionConfig.agent, projectDir: sessionCwd })
+      void syncRunner.acquire(identity.id, identity.paths, sessionConfig.sync, {
+        profile: sessionConfig.agent,
+        projectDir: sessionCwd,
+      })
     }
     // `identity.json` is what `/memory-merge` maps old identities from (#10070), so it records only binds
     // whose identity this config actually derived; a rebind to a recorded identity says nothing new about
@@ -177,9 +192,11 @@ export function createSessionBinder(deps: SessionBinderDeps): SessionBinder {
     // Bind-time reconcile floats past the bind by design, but its rejection must not
     // float: an unhandled rejection is attributed to whatever code is running when it lands.
     const context = state.context
-    void deps.work.track(() => wiring.afterBind(pi, surface.id, context, eventCtx)).catch((error: unknown) => {
-      logBindReconcileFailure(ctx.logger, error)
-    })
+    void deps.work
+      .track(() => wiring.afterBind(pi, surface.id, context, eventCtx))
+      .catch((error: unknown) => {
+        logBindReconcileFailure(ctx.logger, error)
+      })
   }
 }
 

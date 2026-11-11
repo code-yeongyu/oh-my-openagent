@@ -24,9 +24,7 @@ function formatCurrentTask(work: BoulderCliWork): string {
     return "-"
   }
 
-  const elapsed = work.current_task.elapsed_human
-    ? ` (${work.current_task.elapsed_human})`
-    : ""
+  const elapsed = work.current_task.elapsed_human ? ` (${work.current_task.elapsed_human})` : ""
   return `${work.current_task.task_title}${elapsed}`
 }
 

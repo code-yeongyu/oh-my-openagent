@@ -37,12 +37,14 @@ describe("pressure dream origin", () => {
     })
 
     expect(outcome).toEqual({ fired: true, runId: "run-pressure", status: "active" })
-    expect(reservations).toEqual([{
-      trigger: "dream",
-      origin: "pressure",
-      conversationIds: [],
-      snapshots: [],
-    }])
+    expect(reservations).toEqual([
+      {
+        trigger: "dream",
+        origin: "pressure",
+        conversationIds: [],
+        snapshots: [],
+      },
+    ])
     expect(f.launches).toEqual([run])
   })
 })

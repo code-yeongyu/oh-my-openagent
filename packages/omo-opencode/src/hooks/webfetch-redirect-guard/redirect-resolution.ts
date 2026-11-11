@@ -14,8 +14,7 @@ type RedirectResolutionParams = {
 }
 
 export type RedirectResolutionResult =
-  | { type: "resolved"; url: string }
-  | { type: "exceeded"; url: string; maxRedirects: number }
+  { type: "resolved"; url: string } | { type: "exceeded"; url: string; maxRedirects: number }
 
 function buildAcceptHeader(format: WebFetchFormat): string {
   switch (format) {
@@ -49,9 +48,7 @@ function resolveRedirectLocation(currentUrl: string, location: string): string {
   return new URL(location, currentUrl).toString()
 }
 
-export async function resolveWebFetchRedirects(
-  params: RedirectResolutionParams,
-): Promise<RedirectResolutionResult> {
+export async function resolveWebFetchRedirects(params: RedirectResolutionParams): Promise<RedirectResolutionResult> {
   const timeoutMs = normalizeTimeoutMs(params.timeoutSeconds)
   const signal = AbortSignal.timeout(timeoutMs)
   const headers = buildWebFetchHeaders(params.format)

@@ -12,7 +12,10 @@ const BUILTIN_CATEGORY_NAMES: readonly string[] = BUILTIN_CATEGORY_DEFAULTS.map(
 
 /** Masking seam for the canonical map. Defaults to identity; the telemetry component injects the
  * provider/model allowlist mask so a generation only changes when the EXPORTABLE map changes. */
-export type MaskCategoryModel = (provider: string, modelId: string) => {
+export type MaskCategoryModel = (
+  provider: string,
+  modelId: string,
+) => {
   readonly provider: string
   readonly model_id: string
 }
@@ -125,7 +128,8 @@ function encodeCategory(
   switch (resolution.kind) {
     case "resolved": {
       const masked = mask(resolution.spec.provider, resolution.spec.modelId)
-      const reasoning = resolution.spec.reasoning ?? resolution.spec.reasoningEffort ?? resolution.spec.variant ?? "none"
+      const reasoning =
+        resolution.spec.reasoning ?? resolution.spec.reasoningEffort ?? resolution.spec.variant ?? "none"
       return `${masked.provider}/${masked.model_id}/${reasoning}`
     }
     case "disabled":

@@ -5,25 +5,37 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { copyVendored, DEPENDENCY_IMPORT_PREFIX, digestTree, pinDependencyImports } from "../scripts/sync-bunshin-ts.ts"
+import {
+  archiveExtractCommand,
+  copyVendored,
+  DEPENDENCY_IMPORT_PREFIX,
+  digestTree,
+  pinDependencyImports,
+} from "../scripts/sync-bunshin-ts.ts"
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url))
 const vendorRoot = join(packageRoot, "vendor")
 const VENDORED_NAMES = ["@sisyphuslabs/bunshin-ts", "@sisyphuslabs/bunshin-ts-relay"]
 
-type Pin = { packages: Record<string, { name: string; dependencies: Record<string, string>; files: Record<string, string> }> }
+type Pin = {
+  packages: Record<string, { name: string; dependencies: Record<string, string>; files: Record<string, string> }>
+}
 
 const pin = (): Pin => JSON.parse(readFileSync(join(vendorRoot, "PIN.json"), "utf8")) as Pin
 
 const importsVendoredName = (source: string): string[] =>
   [...source.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*)["']([^"']+)["']/g)]
-    .map(match => match[1] ?? "")
-    .filter(specifier => VENDORED_NAMES.some(name => specifier === name || specifier.startsWith(`${name}/`)))
+    .map((match) => match[1] ?? "")
+    .filter((specifier) => VENDORED_NAMES.some((name) => specifier === name || specifier.startsWith(`${name}/`)))
 
 describe("vendored bunshin-ts packages", () => {
   it("#given vendor/PIN.json #when every vendored file is hashed #then the bytes and the file set equal the PIN", () => {
     const packages = pin().packages
-    expect(Object.values(packages).map(entry => entry.name).sort()).toEqual(VENDORED_NAMES)
+    expect(
+      Object.values(packages)
+        .map((entry) => entry.name)
+        .sort(),
+    ).toEqual(VENDORED_NAMES)
     for (const [key, entry] of Object.entries(packages)) {
       expect(Object.keys(entry.files)).toContain("LICENSE")
       expect(digestTree(join(vendorRoot, key))).toEqual(entry.files)
@@ -58,34 +70,49 @@ describe("vendored bunshin-ts packages", () => {
       `import { join } from "node:path";`,
       `const name = "@sinclair/typebox";`,
     ].join("\n")
-    expect(pinDependencyImports(source, ["@sinclair/typebox"])).toBe([
-      `import { Type } from "${DEPENDENCY_IMPORT_PREFIX}@sinclair/typebox";`,
-      `import { Value } from '${DEPENDENCY_IMPORT_PREFIX}@sinclair/typebox/value';`,
-      `export { Errors } from "${DEPENDENCY_IMPORT_PREFIX}@sinclair/typebox/errors";`,
-      `import "${DEPENDENCY_IMPORT_PREFIX}@sinclair/typebox";`,
-      `import { other } from "@sinclair/typeboxx";`,
-      `import { join } from "node:path";`,
-      `const name = "@sinclair/typebox";`,
-    ].join("\n"))
-    expect(() => pinDependencyImports(`await import("@sinclair/typebox")`, ["@sinclair/typebox"])).toThrow("bare dependency imports left")
+    expect(pinDependencyImports(source, ["@sinclair/typebox"])).toBe(
+      [
+        `import { Type } from "${DEPENDENCY_IMPORT_PREFIX}@sinclair/typebox";`,
+        `import { Value } from '${DEPENDENCY_IMPORT_PREFIX}@sinclair/typebox/value';`,
+        `export { Errors } from "${DEPENDENCY_IMPORT_PREFIX}@sinclair/typebox/errors";`,
+        `import "${DEPENDENCY_IMPORT_PREFIX}@sinclair/typebox";`,
+        `import { other } from "@sinclair/typeboxx";`,
+        `import { join } from "node:path";`,
+        `const name = "@sinclair/typebox";`,
+      ].join("\n"),
+    )
+    expect(() => pinDependencyImports(`await import("@sinclair/typebox")`, ["@sinclair/typebox"])).toThrow(
+      "bare dependency imports left",
+    )
   })
 
   // Package contract: senpi's extension registry claims bare package names (`@sinclair/typebox` is its typebox 1.x) for
   // every importer in the process, so the vendored runtime reaches its npm dependencies only through omo-senpi's own
   // `imports` entries, which resolve to the exactly pinned install.
   it("#given the vendored runtime JS #when its imports are scanned #then every npm dependency comes through an omo-senpi imports entry at a version the package accepts", () => {
-    const manifest = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")) as { imports: Record<string, string>; dependencies: Record<string, string> }
+    const manifest = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")) as {
+      imports: Record<string, string>
+      dependencies: Record<string, string>
+    }
     const scanner = new Bun.Transpiler({ loader: "js" })
     for (const [key, entry] of Object.entries(pin().packages)) {
       const names = Object.keys(entry.dependencies)
       const specifiers = Object.keys(entry.files)
-        .filter(path => /\.[cm]?js$/.test(path))
-        .flatMap(path => scanner.scanImports(readFileSync(join(vendorRoot, key, path), "utf8")).map(found => found.path))
-      expect(specifiers.filter(specifier => !specifier.startsWith("node:") && !specifier.startsWith(DEPENDENCY_IMPORT_PREFIX))).toEqual([])
+        .filter((path) => /\.[cm]?js$/.test(path))
+        .flatMap((path) =>
+          scanner.scanImports(readFileSync(join(vendorRoot, key, path), "utf8")).map((found) => found.path),
+        )
+      expect(
+        specifiers.filter(
+          (specifier) => !specifier.startsWith("node:") && !specifier.startsWith(DEPENDENCY_IMPORT_PREFIX),
+        ),
+      ).toEqual([])
       const reached = specifiers
-        .filter(specifier => specifier.startsWith(DEPENDENCY_IMPORT_PREFIX))
-        .map(specifier => specifier.slice(DEPENDENCY_IMPORT_PREFIX.length))
-      expect(reached.filter(target => !names.some(name => target === name || target.startsWith(`${name}/`)))).toEqual([])
+        .filter((specifier) => specifier.startsWith(DEPENDENCY_IMPORT_PREFIX))
+        .map((specifier) => specifier.slice(DEPENDENCY_IMPORT_PREFIX.length))
+      expect(
+        reached.filter((target) => !names.some((name) => target === name || target.startsWith(`${name}/`))),
+      ).toEqual([])
       for (const name of names) {
         expect(manifest.imports[`${DEPENDENCY_IMPORT_PREFIX}${name}`]).toBe(name)
         expect(manifest.imports[`${DEPENDENCY_IMPORT_PREFIX}${name}/*`]).toBe(`${name}/*`)
@@ -99,13 +126,59 @@ describe("vendored bunshin-ts packages", () => {
     const manifest = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")) as Record<string, unknown>
     for (const field of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
       const declared = Object.keys((manifest[field] as Record<string, string> | undefined) ?? {})
-      expect(declared.filter(name => VENDORED_NAMES.includes(name))).toEqual([])
+      expect(declared.filter((name) => VENDORED_NAMES.includes(name))).toEqual([])
     }
-    const files = execFileSync("git", ["ls-files", "-co", "--exclude-standard", "--", "."], { cwd: packageRoot, encoding: "utf8" })
+    const files = execFileSync("git", ["ls-files", "-co", "--exclude-standard", "--", "."], {
+      cwd: packageRoot,
+      encoding: "utf8",
+    })
       .split("\n")
-      .filter(path => /\.(?:[cm]?[jt]s|tsx)$/.test(path) && !path.startsWith("vendor/"))
+      .filter((path) => /\.(?:[cm]?[jt]s|tsx)$/.test(path) && !path.startsWith("vendor/"))
     expect(files.length).toBeGreaterThan(0)
-    const offenders = files.flatMap(path => importsVendoredName(readFileSync(join(packageRoot, path), "utf8")).map(specifier => `${path}: ${specifier}`))
+    const offenders = files.flatMap((path) =>
+      importsVendoredName(readFileSync(join(packageRoot, path), "utf8")).map((specifier) => `${path}: ${specifier}`),
+    )
     expect(offenders).toEqual([])
   })
+})
+
+describe("sync-bunshin-ts archive extraction (#12498)", () => {
+  it.skipIf(process.platform === "win32")(
+    "#given a temp tree path holding a quote, a dollar sign and a backtick #when the archive command runs #then the commit's files land in exactly that directory",
+    () => {
+      // given: a one-commit checkout, and a work dir like a TMPDIR that carries shell metacharacters
+      const root = mkdtempSync(join(tmpdir(), "sync-bunshin-archive-"))
+      try {
+        const checkout = join(root, "checkout")
+        mkdirSync(checkout)
+        const git = (...args: string[]) => execFileSync("git", ["-C", checkout, ...args], { encoding: "utf8" }).trim()
+        git("init", "--quiet")
+        writeFileSync(join(checkout, "probe.txt"), "archived\n")
+        git("add", "probe.txt")
+        git(
+          "-c",
+          "user.email=s@example.invalid",
+          "-c",
+          "user.name=s",
+          "-c",
+          "commit.gpgsign=false",
+          "commit",
+          "--quiet",
+          "-m",
+          "probe",
+        )
+        const commit = git("rev-parse", "HEAD")
+        const tree = join(root, `odd"dir$HOME\`x\``, "tree")
+
+        // when
+        const [command, ...args] = archiveExtractCommand(checkout, commit, tree)
+        execFileSync(command ?? "sh", args, { cwd: root, stdio: "pipe" })
+
+        // then
+        expect(readFileSync(join(tree, "probe.txt"), "utf8")).toBe("archived\n")
+      } finally {
+        rmSync(root, { recursive: true, force: true })
+      }
+    },
+  )
 })

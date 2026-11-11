@@ -1,9 +1,5 @@
 import type { ModelCapabilitiesSnapshot } from "./model-capabilities"
-import {
-  getExactModelIDAliasRules,
-  getPatternModelIDAliasRules,
-  resolveModelIDAlias,
-} from "./model-capability-aliases"
+import { getExactModelIDAliasRules, getPatternModelIDAliasRules, resolveModelIDAlias } from "./model-capability-aliases"
 import { AGENT_MODEL_REQUIREMENTS, CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
 
 export type ModelCapabilityGuardrailIssue =
@@ -77,9 +73,7 @@ export function collectModelCapabilityGuardrailIssues(
   if (!snapshot) {
     return []
   }
-  const snapshotModelIDs = new Set(
-    Object.keys(snapshot.models).map((modelID) => normalizeLookupModelID(modelID)),
-  )
+  const snapshotModelIDs = new Set(Object.keys(snapshot.models).map((modelID) => normalizeLookupModelID(modelID)))
   const requirementModelIDs = input.requirementModelIDs ?? getBuiltInRequirementModelIDs()
   const issues: ModelCapabilityGuardrailIssue[] = []
 

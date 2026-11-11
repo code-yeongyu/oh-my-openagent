@@ -39,14 +39,15 @@ export function createColdReviveTrace(collectModules = false) {
     console.error(`COLD_REVIVE_STAGE ${JSON.stringify(entry)}`)
     for (const listener of onStage) listener(entry)
   }
-  const failure = (reason: string, cause?: unknown): Error => new Error(
-    `${reason}; cold-revive stages=${JSON.stringify(stages)}`, { cause },
-  )
+  const failure = (reason: string, cause?: unknown): Error =>
+    new Error(`${reason}; cold-revive stages=${JSON.stringify(stages)}`, { cause })
   /** Rejects once no stage has been marked for `windowMs`, naming the last stage and the stall length. */
   const watchProgress = (windowMs: number) => {
     let timer: ReturnType<typeof setTimeout> | undefined
     let reject: (error: Error) => void = () => undefined
-    const stalled = new Promise<never>((_, rejectStall) => { reject = rejectStall })
+    const stalled = new Promise<never>((_, rejectStall) => {
+      reject = rejectStall
+    })
     // A heartbeat probe is the product checking liveness, not progress: it never restarts the clock.
     const arm = (stage?: Stage): void => {
       if (stage?.stage === HEARTBEAT_PROBE) return
@@ -55,21 +56,33 @@ export function createColdReviveTrace(collectModules = false) {
       timer = setTimeout(() => {
         const last = stages.findLast((entry) => entry.stage !== HEARTBEAT_PROBE)
         const stallMs = Math.round(performance.now() - armedAt)
-        reject(failure(`Cold revival stalled: no stage for ${stallMs} ms (liveness window ${windowMs} ms) after "${stageName(last)}" at ${last?.elapsed_ms ?? 0} ms`))
+        reject(
+          failure(
+            `Cold revival stalled: no stage for ${stallMs} ms (liveness window ${windowMs} ms) after "${stageName(last)}" at ${last?.elapsed_ms ?? 0} ms`,
+          ),
+        )
       }, windowMs)
     }
     onStage.add(arm)
     arm()
-    return { stalled, dispose: (): void => { onStage.delete(arm); clearTimeout(timer) } }
+    return {
+      stalled,
+      dispose: (): void => {
+        onStage.delete(arm)
+        clearTimeout(timer)
+      },
+    }
   }
   const spawnProcess = (command: string, args: readonly string[], options: SpawnOptions): ChildProcess => {
     const launch = ++launches
     mark("connect", { launch })
-    const child = spawn(command, [...args], collectModules
-      ? { ...options, env: { ...options.env, OMO_QA_MEMBER_BOOT_MODULES: "1" } }
-      : options)
+    const child = spawn(
+      command,
+      [...args],
+      collectModules ? { ...options, env: { ...options.env, OMO_QA_MEMBER_BOOT_MODULES: "1" } } : options,
+    )
     child.once("spawn", () => mark("process_spawned", { launch }))
-    child.once("error", error => mark("process_error", { launch, message: error.message }))
+    child.once("error", (error) => mark("process_error", { launch, message: error.message }))
     child.once("close", (code, signal) => mark("process_closed", { launch, code, signal }))
     // The protocol client arms a request's deadline and then writes it, so a stage marked on the write
     // restarts the watchdog no earlier than the product's own clock for that request.
@@ -83,28 +96,41 @@ export function createColdReviveTrace(collectModules = false) {
         return write(chunk, ...rest)
       }) as typeof stdin.write
     }
-    if (child.stdout) createInterface({ input: child.stdout }).on("line", line => {
-      let value: { type?: string; command?: string; success?: boolean }
-      try { value = JSON.parse(line) } catch { return } // Protocol client reports malformed lines.
-      if (value.type === "response") mark(`${value.command}_ack`, { launch, success: value.success })
-      if (value.type === "agent_start") mark("turn_start", { launch })
-      if (value.type === "agent_end") mark("turn_settle", { launch })
-    })
+    if (child.stdout)
+      createInterface({ input: child.stdout }).on("line", (line) => {
+        let value: { type?: string; command?: string; success?: boolean }
+        try {
+          value = JSON.parse(line)
+        } catch {
+          return
+        } // Protocol client reports malformed lines.
+        if (value.type === "response") mark(`${value.command}_ack`, { launch, success: value.success })
+        if (value.type === "agent_start") mark("turn_start", { launch })
+        if (value.type === "agent_end") mark("turn_settle", { launch })
+      })
     let timings: Record<string, number> | undefined
-    if (child.stderr) createInterface({ input: child.stderr }).on("line", line => {
-      // senpi's phase timer (TIMING=1) prints one block per namespace; relay it as one stage.
-      if (/^--- Startup Timings: .+ ---$/.test(line)) { timings = {}; return }
-      const phase = /^\s+(.+): (\d+)ms$/.exec(line)
-      if (timings !== undefined && phase !== null) {
-        timings[phase[1] ?? ""] = Number(phase[2])
-        if (phase[1] === "TOTAL") { mark("child_timings", { launch, phases: timings }); timings = undefined }
-        return
-      }
-      if (!line.startsWith("COLD_REVIVE_CHILD ")) return
-      const { module_paths, ...event } = JSON.parse(line.slice(18))
-      if (module_paths) graphs.push({ launch, stage: event.stage, elapsed_ms: event.elapsed_ms, modules: module_paths })
-      mark("child_stage", { launch, event })
-    })
+    if (child.stderr)
+      createInterface({ input: child.stderr }).on("line", (line) => {
+        // senpi's phase timer (TIMING=1) prints one block per namespace; relay it as one stage.
+        if (/^--- Startup Timings: .+ ---$/.test(line)) {
+          timings = {}
+          return
+        }
+        const phase = /^\s+(.+): (\d+)ms$/.exec(line)
+        if (timings !== undefined && phase !== null) {
+          timings[phase[1] ?? ""] = Number(phase[2])
+          if (phase[1] === "TOTAL") {
+            mark("child_timings", { launch, phases: timings })
+            timings = undefined
+          }
+          return
+        }
+        if (!line.startsWith("COLD_REVIVE_CHILD ")) return
+        const { module_paths, ...event } = JSON.parse(line.slice(18))
+        if (module_paths)
+          graphs.push({ launch, stage: event.stage, elapsed_ms: event.elapsed_ms, modules: module_paths })
+        mark("child_stage", { launch, event })
+      })
     return child
   }
   return { mark, failure, watchProgress, spawnProcess, stages, graphs }

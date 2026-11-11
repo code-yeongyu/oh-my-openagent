@@ -8,7 +8,7 @@ function createClient(agentNames: readonly string[]): RunAgentListClient {
       agents: mock(() =>
         Promise.resolve({
           data: agentNames.map((name) => ({ name })),
-        })
+        }),
       ),
     },
   })

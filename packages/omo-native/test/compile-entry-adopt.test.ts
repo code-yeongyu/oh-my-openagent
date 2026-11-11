@@ -27,9 +27,26 @@ function releasingSdk(cwd: string, userMessages: readonly string[]) {
   return {
     locate: async () => ({
       kind: "ok",
-      thread: { thread_id: "dur-host", title: "host lane", cwd, status: "live", session_path: "/sessions/dur-host.jsonl", endpoint: { kind: "rpc_host", socket: "/agent/rpc/shards/i-0123456789abcdef.sock", routing_id: "rpc-1" }, surface: "desktop", alive: true },
+      thread: {
+        thread_id: "dur-host",
+        title: "host lane",
+        cwd,
+        status: "live",
+        session_path: "/sessions/dur-host.jsonl",
+        endpoint: { kind: "rpc_host", socket: "/agent/rpc/shards/i-0123456789abcdef.sock", routing_id: "rpc-1" },
+        surface: "desktop",
+        alive: true,
+      },
     }),
-    release: async () => ({ success: true, data: { released: true, session_path: "/sessions/dur-host.jsonl", attachments: 0, dropped: { deliveries: [], user_messages: userMessages } } }),
+    release: async () => ({
+      success: true,
+      data: {
+        released: true,
+        session_path: "/sessions/dur-host.jsonl",
+        attachments: 0,
+        dropped: { deliveries: [], user_messages: userMessages },
+      },
+    }),
     dispose: async () => undefined,
   }
 }
@@ -46,17 +63,37 @@ describe("compiled omo daemon adopt", () => {
     const savedExitCode = process.exitCode
     try {
       // when
-      const handled = await runCompiledLauncher(["daemon", "adopt", "dur-host"], execDir, "2026.9.29", undefined, {}, { threadSdk: async () => ({ sdk }) })
+      const handled = await runCompiledLauncher(
+        ["daemon", "adopt", "dur-host"],
+        execDir,
+        "2026.9.29",
+        undefined,
+        {},
+        { threadSdk: async () => ({ sdk }) },
+      )
       const launch = process.argv.slice(2)
       const cwd = process.cwd()
       // then
       if (process.platform === "win32") {
         // win32 has no task host to adopt from: `omo daemon` answers unsupported (exit 4) and launches nothing
-        expect({ handled, exitCode: process.exitCode, launch, cwd: realpathSync(cwd) }).toEqual({ handled: true, exitCode: 4, launch: savedArgv.slice(2), cwd: realpathSync(savedCwd) })
+        expect({ handled, exitCode: process.exitCode, launch, cwd: realpathSync(cwd) }).toEqual({
+          handled: true,
+          exitCode: 4,
+          launch: savedArgv.slice(2),
+          cwd: realpathSync(savedCwd),
+        })
         return
       }
       expect(handled).toBe(false)
-      expect(launch).toEqual(["--session", "/sessions/dur-host.jsonl", "--", "--no-extensions", INTERNAL_SUPERVISOR_FLAG, "--mode", "rpc"])
+      expect(launch).toEqual([
+        "--session",
+        "/sessions/dur-host.jsonl",
+        "--",
+        "--no-extensions",
+        INTERNAL_SUPERVISOR_FLAG,
+        "--mode",
+        "rpc",
+      ])
       expect(realpathSync(cwd)).toBe(sessionCwd)
       expect(buildSenpiArgs(launch, execDir)).toEqual(["--extension", join(execDir, "plugin"), ...launch])
       expect(shouldPrintCompiledBanner(launch, true)).toBe(true)
@@ -70,8 +107,21 @@ describe("compiled omo daemon adopt", () => {
 
   test("#given the launch's own flags before -- #when scanned #then they still decide the extension list, the banner and the supervisor route", () => {
     expect(buildSenpiArgs(["--no-extensions", "--", "hi"], "/provisioned")).toEqual(["--no-extensions", "--", "hi"])
-    expect(buildSenpiArgs(["--mode", "rpc", "--no-extensions", "--", "x"], "/provisioned")).toEqual(["--mode", "rpc", "--no-extensions", "--", "x"])
-    expect(buildSenpiArgs(["-p", "hi", "--", "--no-extensions"], "/provisioned")).toEqual(["--extension", join("/provisioned", "plugin"), "-p", "hi", "--", "--no-extensions"])
+    expect(buildSenpiArgs(["--mode", "rpc", "--no-extensions", "--", "x"], "/provisioned")).toEqual([
+      "--mode",
+      "rpc",
+      "--no-extensions",
+      "--",
+      "x",
+    ])
+    expect(buildSenpiArgs(["-p", "hi", "--", "--no-extensions"], "/provisioned")).toEqual([
+      "--extension",
+      join("/provisioned", "plugin"),
+      "-p",
+      "hi",
+      "--",
+      "--no-extensions",
+    ])
     expect(shouldPrintCompiledBanner(["--mode", "rpc", "--", "hi"], true)).toBe(false)
     expect(isInternalSupervisorLaunch(["--extension", "/p", INTERNAL_SUPERVISOR_FLAG, "--", "hi"])).toBe(true)
   })

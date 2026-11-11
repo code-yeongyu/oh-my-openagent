@@ -20,7 +20,8 @@ export function createToolExecuteAfterHandler(input: {
   formatFileChanges?: typeof formatFileChanges
 }): (toolInput: ToolExecuteAfterInput, toolOutput: ToolExecuteAfterOutput | undefined) => Promise<void> {
   const { ctx, pendingFilePaths, pendingTaskRefs, pendingPlanSnapshots, autoCommit, getState } = input
-  const resolveIsCallerOrchestrator = input.isCallerOrchestrator ?? ((sessionID) => isCallerOrchestrator(sessionID, ctx.client))
+  const resolveIsCallerOrchestrator =
+    input.isCallerOrchestrator ?? ((sessionID) => isCallerOrchestrator(sessionID, ctx.client))
   const collectGitDiffStatsImpl = input.collectGitDiffStats ?? collectGitDiffStats
   const formatFileChangesImpl = input.formatFileChanges ?? formatFileChanges
   return async (toolInput, toolOutput): Promise<void> => {
@@ -46,13 +47,15 @@ export function createToolExecuteAfterHandler(input: {
       return
     }
 
-    if (await handleDirectWorkToolAfter({
-      ctx,
-      pendingFilePaths,
-      pendingPlanSnapshots,
-      toolInput,
-      toolOutput,
-    })) {
+    if (
+      await handleDirectWorkToolAfter({
+        ctx,
+        pendingFilePaths,
+        pendingPlanSnapshots,
+        toolInput,
+        toolOutput,
+      })
+    ) {
       return
     }
 
