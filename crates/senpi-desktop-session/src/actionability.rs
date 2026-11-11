@@ -192,8 +192,12 @@ impl Worker {
 
 /// Whether the element offers `action`; an element that lists no actions
 /// cannot say, and passes. `AXPress` and `press` name the same action.
+/// `press` names the element's default (first) action, so any non-empty
+/// list offers it, as the backends perform it; any other action must be
+/// listed by name.
 fn supports(actions: &[String], action: &str) -> bool {
-    actions.is_empty() || actions.iter().any(|offered| action_name(offered) == action_name(action))
+    let wanted = action_name(action);
+    wanted == "press" || actions.is_empty() || actions.iter().any(|offered| action_name(offered) == wanted)
 }
 
 fn action_name(action: &str) -> String {

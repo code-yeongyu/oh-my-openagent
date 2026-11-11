@@ -89,15 +89,34 @@ fn the_battery_refuses_a_disabled_element_at_once_and_sends_nothing() {
 
 #[test]
 fn the_battery_refuses_an_action_the_element_does_not_offer_at_once() {
-    // Given
-    let mut harness = opened(&scene(button(&json!({"actions": ["focus"]})), &[]), ReportMode::Object);
+    // Given: a button that offers only `click`.
+    let mut harness = opened(&scene(button(&json!({"actions": ["click"]})), &[]), ReportMode::Object);
     let reference = harness.focused_ref();
     // When
     let started = Instant::now();
-    let error = press(&mut harness, reference).expect_err("refused");
+    let error = harness
+        .process(Op::AxPerform(AxPerformParams { ref_: reference, action: "increment".to_owned() }))
+        .expect_err("refused");
     // Then
     refused_fast(&error, started, "action_unsupported");
     assert_eq!(pressed(&harness), 0);
+}
+
+#[test]
+fn press_is_supported_by_any_listed_action_and_other_actions_need_their_name() {
+    // Given: (offered actions, requested action, supported).
+    let cases: [(&[&str], &str, bool); 5] = [
+        (&["click"], "press", true),
+        (&["click"], "AXPress", true),
+        (&[], "press", true),
+        (&["click"], "increment", false),
+        (&["AXPress"], "press", true),
+    ];
+    for (offered, action, expected) in cases {
+        let offered: Vec<String> = offered.iter().map(|name| (*name).to_owned()).collect();
+        // When / Then
+        assert_eq!(super::supports(&offered, action), expected, "{offered:?} + {action}");
+    }
 }
 
 #[test]
