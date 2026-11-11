@@ -1,7 +1,10 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun"
+import { neutralizeCrossRepoReferences } from "./changelog-release-notes"
 import { RELEASE_VERSION_PATTERN } from "./release-latest-flag"
+
+export { neutralizeCrossRepoReferences }
 
 const TEAM = ["actions-user", "github-actions[bot]", "code-yeongyu", "sisyphus-dev-ai"]
 
@@ -9,17 +12,6 @@ const TEAM = ["actions-user", "github-actions[bot]", "code-yeongyu", "sisyphus-d
 // release range. Crediting it as a community contributor misreports who wrote the release.
 export function isCommunityContributor(login: string): boolean {
   return !TEAM.includes(login) && !login.endsWith("[bot]")
-}
-
-// Release notes are published the moment the release is created, so a reference to a repository that is
-// not public must never reach them. References to these repositories stay clickable.
-const PUBLIC_REFERENCE_REPOS = new Set(["senpi", "omo", "oh-my-openagent", "oh-my-opencode", "doriterm", "lazycodex"])
-const CROSS_REPO_REFERENCE = /\b(?:[\w.-]+\/)?([A-Za-z][\w.-]*)#\d+\b/g
-
-export function neutralizeCrossRepoReferences(text: string): string {
-  return text.replace(CROSS_REPO_REFERENCE, (reference, repo: string) =>
-    PUBLIC_REFERENCE_REPOS.has(repo.toLowerCase()) ? reference : "tracked internally",
-  )
 }
 
 const EXCLUDED_PREFIX_PATTERN = /^(ignore:|test:|chore:|ci:|release:)/i

@@ -1,5 +1,3 @@
-import { neutralizeCrossRepoReferences } from "./generate-changelog"
-
 /**
  * Release-note source of truth.
  *
@@ -68,6 +66,17 @@ export function extractReleaseNotes(changelog: string, version: string): string 
   const body = sectionBodyAt(changelog, found.index + found[0].length).trim()
   if (!body) throw new Error(`release section for ${version} is empty`)
   return body
+}
+
+// Release notes are published the moment the release is created, so a reference to a repository that is
+// not public must never reach them. References to these repositories stay clickable.
+const PUBLIC_REFERENCE_REPOS = new Set(["senpi", "omo", "oh-my-openagent", "oh-my-opencode", "doriterm", "lazycodex"])
+const CROSS_REPO_REFERENCE = /\b(?:[\w.-]+\/)?([A-Za-z][\w.-]*)#\d+\b/g
+
+export function neutralizeCrossRepoReferences(text: string): string {
+  return text.replace(CROSS_REPO_REFERENCE, (reference, repo: string) =>
+    PUBLIC_REFERENCE_REPOS.has(repo.toLowerCase()) ? reference : "tracked internally",
+  )
 }
 
 /** Release body = authored notes, then the contributor block, then the install footer. */
