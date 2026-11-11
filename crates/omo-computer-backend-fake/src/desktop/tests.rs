@@ -235,3 +235,41 @@ fn an_empty_or_negative_extent_refuses_instead_of_a_zero_size_frame() {
         .expect("a positive extent captures");
     assert_eq!((frame.width, frame.height), (10, 10));
 }
+
+#[test]
+fn non_finite_composite_refuses_before_allocating() {
+    // given a display whose scaled extent is not a finite pixel count
+    let json = r#"{"displays":[{"id":"1","name":"huge","x":0,"y":0,"width":1e308,"height":1e308,"scale":1e308,"pixelX":0,"pixelY":0,"pixelWidth":1,"pixelHeight":1,"isPrimary":true}]}"#;
+    let mut fake = FakeBackend::from_json(json).expect("the scenario loads");
+    let options = CaptureOptions {
+        cursor: true,
+        crosshair: None,
+        region: None,
+    };
+    // when capture asks for that display
+    let refused = fake
+        .capture(&Target::Desktop, &options)
+        .map(|frame| (frame.width, frame.height))
+        .expect_err("a non-finite frame is over the cap");
+    // then the fake refuses and writes nothing
+    assert_eq!(
+        refused,
+        omo_computer_core::backend::Refusal::bare(EngineCode::CaptureFailed)
+    );
+    assert!(fake.sink().is_empty());
+}
+
+#[test]
+fn focus_record_sink_keeps_the_window_id_case() {
+    // given a window whose id is not already lowercase
+    let json = r#"{"windows":[{"id":"Main","title":"wMain","app":"a","pid":1,"x":0,"y":0,"width":10,"height":10,"focused":true,"elevated":null}]}"#;
+    let mut fake = FakeBackend::from_json(json).expect("the scenario loads");
+    // when the focus record is written
+    fake.focus_record(FocusRecordKind::Short, "Main")
+        .expect("recorded");
+    // then the sink line keeps the id and still folds the enum names
+    assert_eq!(
+        fake.sink().lines(),
+        ["focus_record kind=short window=Main outcome=tookeffect"]
+    );
+}
