@@ -1,18 +1,18 @@
-import { describe, it, expect, mock, beforeEach, afterAll } from "bun:test"
+import { describe, it, expect, mock, beforeEach } from "bun:test"
+import { createCommentCheckerHooks } from "./hook"
 
 const processApplyPatchEditsWithCli = mock(async () => {})
 
-mock.module("./cli-runner", () => ({
+const cliRunner = {
   initializeCommentCheckerCli: () => {},
   getCommentCheckerCliPathPromise: () => Promise.resolve("/tmp/fake-comment-checker"),
   isCliPathUsable: () => true,
   processWithCli: async () => {},
   processApplyPatchEditsWithCli,
-}))
+}
 
-afterAll(() => { mock.restore() })
-
-const { createCommentCheckerHooks } = await import("./hook")
+const createHooks = () =>
+  createCommentCheckerHooks(undefined, cliRunner, { startPendingCallCleanup: () => {} })
 
 describe("comment-checker apply_patch integration", () => {
   beforeEach(() => {
@@ -21,7 +21,7 @@ describe("comment-checker apply_patch integration", () => {
 
   it("runs comment checker using apply_patch metadata.files", async () => {
     // given
-    const hooks = createCommentCheckerHooks()
+    const hooks = createHooks()
 
     const input = { tool: "apply_patch", sessionID: "ses_test", callID: "call_test" }
     const output = {
@@ -72,7 +72,7 @@ describe("comment-checker apply_patch integration", () => {
 
   it("skips when apply_patch metadata.files is missing", async () => {
     // given
-    const hooks = createCommentCheckerHooks()
+    const hooks = createHooks()
     const input = { tool: "apply_patch", sessionID: "ses_test", callID: "call_test" }
     const output = { title: "ok", output: "ok", metadata: {} }
 
@@ -85,7 +85,7 @@ describe("comment-checker apply_patch integration", () => {
 
   it("#given apply_patch metadata nested under result #when hook runs #then checks edited files", async () => {
     // given
-    const hooks = createCommentCheckerHooks()
+    const hooks = createHooks()
     const input = { tool: "apply_patch", sessionID: "ses_test", callID: "call_test" }
     const output = {
       title: "ok",
@@ -127,7 +127,7 @@ describe("comment-checker apply_patch integration", () => {
 
   it("#given apply_patch metadata nested under metadata #when hook runs #then checks edited files", async () => {
     // given
-    const hooks = createCommentCheckerHooks()
+    const hooks = createHooks()
     const input = { tool: "apply_patch", sessionID: "ses_test", callID: "call_test" }
     const output = {
       title: "ok",
@@ -169,7 +169,7 @@ describe("comment-checker apply_patch integration", () => {
 
   it("#given apply_patch patchText args without metadata #when hook runs #then parses patch edits", async () => {
     // given
-    const hooks = createCommentCheckerHooks()
+    const hooks = createHooks()
     const input = {
       tool: "apply_patch",
       sessionID: "ses_test",
