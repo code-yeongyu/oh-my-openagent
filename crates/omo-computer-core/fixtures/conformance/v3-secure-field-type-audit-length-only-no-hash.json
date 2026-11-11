@@ -1,0 +1,78 @@
+{
+  "description": "A focused secure field on the fake: typeText into it is delivered and replies null; the hand's audit, trace and pre-input marker keep the text as {length} only with warnings [redacted_secure] and no sha256_16, so a grep for the secret and for the sha256_16 prefix of it over audit, trace and markers finds 0. The audit half is asserted in-process on the macOS, X11 and Wayland fakes by omo-computer-session's secure_field_type_audit_keeps_length_only_and_no_digest.",
+  "transport": "stdio",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/v3-secure-focus.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {},
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "stopPath.start",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {}
+          },
+          "variable": [
+            "/result"
+          ]
+        }
+      ],
+      "sink": 0
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "typeText",
+        "params": {
+          "target": "101",
+          "text": "hunter2"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": null
+          },
+          "variable": []
+        }
+      ],
+      "sink": 1
+    }
+  ]
+}

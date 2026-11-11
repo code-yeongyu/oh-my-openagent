@@ -70,7 +70,7 @@ fn every_refused_exec_leaves_the_recording_sink_empty() {
         let text = session.type_text(params(json!({ "target": "101", "text": "hi" })));
         for refused in [click, text] {
             let refused = refused.expect_err("refused");
-            assert_eq!(wire(refused), (code, Some(reason)), "{script:?}");
+            assert_eq!(wire(refused.refusal), (code, Some(reason)), "{script:?}");
         }
         assert!(
             sink.is_empty(),

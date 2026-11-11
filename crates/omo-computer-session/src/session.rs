@@ -1,14 +1,11 @@
 //! One engine session over one backend: `session.open`, `capabilities`, `session.close` and
-//! the thinnest `click` and `typeText` - the backend call and the reply shape. Both verbs
-//! pass the safety gate before any backend call; the mutate funnel, consent, receipts and
-//! settle are put around them by later rows.
+//! the thinnest `click` and `typeText`. Both verbs reach the backend only through the mutate
+//! funnel (`crate::mutate`); consent, receipts and settle policy are added there by later rows.
 
 use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hasher};
 
-use omo_computer_core::backend::{
-    Backend, InputEvent, PermissionProbe, Refusal, Route, TaggedInput,
-};
+use omo_computer_core::backend::{Backend, InputEvent, PermissionProbe, Refusal, Route};
 use omo_computer_core::error::EngineCode;
 use omo_computer_core::capabilities::{Capabilities, InputMode, LegacyCapabilities};
 use omo_computer_core::params::{
@@ -17,11 +14,15 @@ use omo_computer_core::params::{
 use omo_computer_core::params::{StopPathStartParams, StopPathStopParams};
 use omo_computer_core::paths::Roots;
 use omo_computer_core::requests::{read_click, read_session_open, read_type_text, V1Request, Verb};
+use omo_computer_core::methods::Method;
 use omo_computer_core::results::{
     CapabilitiesReply, ExecReply, PermissionState, SessionOpened, StopPathStatus,
 };
 use omo_computer_core::session_state::Tristate;
 use omo_computer_safety::{Call, Guard, HostAdditions, NoHolds, StopPolicy, TargetRef, Transport, VerbKind};
+
+use crate::audit::gc::SweepTrigger;
+use crate::mutate::{Funnel, Mutation, Refused};
 
 /// `stopReason` while no stop path is armed: `session.open` arms none (`stopPath.start` does).
 pub const NO_GLOBAL_LISTENER: &str = "no-global-listener";
@@ -33,16 +34,17 @@ pub const NOT_OPEN: Refusal = Refusal::bare(EngineCode::Closed);
 /// `InvalidTarget` row.
 pub const POINT_REQUIRED: Refusal = Refusal::bare(EngineCode::InvalidTarget);
 
-struct Opened {
-    report_mode: ReportMode,
-    tag: u64,
+pub(crate) struct Opened {
+    pub(crate) report_mode: ReportMode,
+    pub(crate) tag: u64,
 }
 
 /// The session state of one engine process.
 pub struct Session {
-    backend: Box<dyn Backend>,
-    guard: Guard,
-    opened: Option<Opened>,
+    pub(crate) backend: Box<dyn Backend>,
+    pub(crate) guard: Guard,
+    pub(crate) opened: Option<Opened>,
+    pub(crate) funnel: Funnel,
 }
 
 impl Session {
@@ -52,10 +54,13 @@ impl Session {
         Self::with_guard(backend, Guard::in_memory())
     }
 
-    /// The engine's session: the stop marker under the per-uid STATE root of `roots`.
+    /// The engine's session: the stop marker under the per-uid STATE root of `roots`, the
+    /// pre-input markers and the interaction lock under its RUNTIME root.
     #[must_use]
     pub fn for_roots(backend: Box<dyn Backend>, roots: &Roots) -> Self {
-        Self::with_guard(backend, Guard::for_roots(roots))
+        let mut session = Self::with_guard(backend, Guard::for_roots(roots));
+        session.funnel = Funnel::for_roots(roots);
+        session
     }
 
     #[must_use]
@@ -64,6 +69,7 @@ impl Session {
             backend,
             guard,
             opened: None,
+            funnel: Funnel::in_memory(),
         }
     }
 
@@ -80,9 +86,12 @@ impl Session {
             report_mode: request.report_mode,
             tag: random_u64(),
         });
+        let resume_token = format!("{:016x}{:016x}", random_u64(), random_u64());
+        self.funnel.set_session_id(resume_token[..16].to_owned());
+        self.funnel.sweep(SweepTrigger::Open);
         Ok(SessionOpened {
             capabilities: self.capabilities(),
-            resume_token: format!("{:016x}{:016x}", random_u64(), random_u64()),
+            resume_token,
         })
     }
 
@@ -122,12 +131,14 @@ impl Session {
     }
 
     pub fn close(&mut self) {
-        self.opened = None;
+        if self.opened.take().is_some() {
+            self.funnel.sweep(SweepTrigger::IdleExit);
+        }
     }
 
     /// # Errors
-    /// [`NOT_OPEN`], [`POINT_REQUIRED`], or the backend's refusal; nothing is sent on any.
-    pub fn click(&mut self, params: ClickParams) -> Result<ExecReply, Refusal> {
+    /// [`NOT_OPEN`], [`POINT_REQUIRED`], or the funnel's refusal.
+    pub fn click(&mut self, params: ClickParams) -> Result<ExecReply, Refused> {
         let request = read_click(params);
         let Verb::Click {
             at,
@@ -140,13 +151,13 @@ impl Session {
             unreachable!("read_click always reads a click");
         };
         let at = at.ok_or(POINT_REQUIRED)?;
-        self.admit(Call {
+        let call = Call {
             verb: VerbKind::Pointer,
             target: TargetRef::read(request.target.as_deref()),
             points: vec![Point { x: at.x, y: at.y }],
             chord: None,
             force: false,
-        })?;
+        };
         let route = route_for(request.target.as_deref(), request.policy.delivery);
         let button = button.unwrap_or(Button::Left);
         let mut events = vec![InputEvent::PointerMove(Point { x: at.x, y: at.y })];
@@ -156,42 +167,26 @@ impl Session {
             events.push(InputEvent::Button { button, down: false });
         }
         events.extend(modifiers.iter().rev().map(|key| key_event(key, false)));
-        self.send(events, route)
+        self.mutate(Mutation::exec(Method::Click, call, events, route, &request.authority)
+            .with_frame(request.frame_id.clone())
+            .with_keys(modifiers))
     }
 
     /// # Errors
-    /// [`NOT_OPEN`] or the backend's refusal.
-    pub fn type_text(&mut self, params: TypeTextParams) -> Result<ExecReply, Refusal> {
+    /// [`NOT_OPEN`] or the funnel's refusal.
+    pub fn type_text(&mut self, params: TypeTextParams) -> Result<ExecReply, Refused> {
         let V1Request::TypeText { target, text } = read_type_text(params) else {
             unreachable!("read_type_text always reads a typeText");
         };
-        self.admit(Call {
+        let call = Call {
             verb: VerbKind::Keyboard,
             target: TargetRef::read(Some(target.as_str())),
             points: Vec::new(),
             chord: None,
             force: false,
-        })?;
+        };
         let route = route_for(Some(target.as_str()), None);
-        self.send(vec![InputEvent::Text(text)], route)
-    }
-
-    /// The safety gate, before any backend input call: an open session, then the stop
-    /// listener polled (a physical stop latches here), then the eleven gates.
-    fn admit(&mut self, call: Call<'_>) -> Result<(), Refusal> {
-        self.opened.as_ref().ok_or(NOT_OPEN)?;
-        let admitted = self.guard.admit_on(self.backend.as_mut(), &call);
-        admitted.map(drop).map_err(|refused| refused.refusal)
-    }
-
-    /// Null in both report modes for now: the object-mode `ActionReport` is built by the
-    /// rows that own receipts and dispositions.
-    fn send(&mut self, events: Vec<InputEvent>, route: Route) -> Result<ExecReply, Refusal> {
-        let tag = self.opened.as_ref().ok_or(NOT_OPEN)?.tag;
-        for event in events {
-            self.backend.post_input(&TaggedInput { event, tag }, route)?;
-        }
-        Ok(ExecReply(None))
+        self.mutate(Mutation::typed(Method::TypeText, call, route, text))
     }
 }
 
@@ -283,7 +278,7 @@ mod tests {
         let sink = RecordingSink::default();
         let mut session = session(&sink);
         let result = session.type_text(params(json!({"target": "1", "text": "hi"})));
-        assert_eq!(result, Err(NOT_OPEN));
+        assert_eq!(result, Err(NOT_OPEN.into()));
         assert!(sink.is_empty());
         assert!(NOT_OPEN.computer_code().is_ok() && POINT_REQUIRED.computer_code().is_ok());
     }
@@ -310,6 +305,6 @@ mod tests {
         session.close();
         assert!(matches!(session.capabilities(), CapabilitiesReply::Legacy(_)));
         let after = session.type_text(params(json!({"target": "1", "text": "x"})));
-        assert_eq!(after, Err(NOT_OPEN));
+        assert_eq!(after, Err(NOT_OPEN.into()));
     }
 }

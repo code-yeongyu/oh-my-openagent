@@ -5,7 +5,7 @@
 
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::methods::Method;
-use omo_computer_session::Session;
+use omo_computer_session::{Refused, Session};
 use serde::de::DeserializeOwned;
 use serde_json::{json, Map, Value};
 
@@ -90,8 +90,8 @@ fn dispatch(session: &mut Session, name: &str, params: Value) -> Result<Value, F
             parse::<omo_computer_core::params::EmptyParams>(params)?;
             json!(session.capabilities())
         }
-        Method::Click => json!(session.click(parse(params)?).map_err(|r| refused(&r))?),
-        Method::TypeText => json!(session.type_text(parse(params)?).map_err(|r| refused(&r))?),
+        Method::Click => json!(session.click(parse(params)?).map_err(|r| refused_call(&r))?),
+        Method::TypeText => json!(session.type_text(parse(params)?).map_err(|r| refused_call(&r))?),
         _ => return Err(not_found()),
     };
     Ok(value)
@@ -110,6 +110,21 @@ fn refused(refusal: &Refusal) -> Failure {
         data["reason"] = json!(reason);
     }
     failure(refusal.code.number(), refusal.code.wire(), Some(data))
+}
+
+/// A funnel refusal: the refusal's members plus the `callId` it concerns and, for a replay,
+/// the stored `receipt` (`TransactionFailed{reason:"replayed", callId, receipt}`).
+fn refused_call(refused: &Refused) -> Failure {
+    let mut failure = self::refused(&refused.refusal);
+    if let Some(data) = failure.data.as_mut() {
+        if let Some(call_id) = &refused.call_id {
+            data["callId"] = json!(call_id);
+        }
+        if let Some(receipt) = &refused.receipt {
+            data["receipt"] = (**receipt).clone();
+        }
+    }
+    failure
 }
 
 fn reply(id: &Value, outcome: Result<Value, Failure>) -> String {
