@@ -22,7 +22,7 @@ fn assert_refused<T: std::fmt::Debug>(
     reason: &str,
 ) {
     let refusal = result.expect_err("a default must refuse");
-    assert_eq!((refusal.code, refusal.reason), (code, reason));
+    assert_eq!((refusal.code, refusal.reason), (code, Some(reason)));
     assert_eq!(
         refusal.computer_code().map(ComputerCode::wire),
         Ok(computer)

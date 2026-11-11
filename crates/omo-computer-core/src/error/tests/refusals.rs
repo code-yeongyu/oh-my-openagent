@@ -1,7 +1,7 @@
 //! Row 12's backend default refusals through the table: each is a closed engine code with a
 //! reason that has a row, maps to the COMPUTER_* member the design names for it, and sent nothing.
 
-use super::super::NothingSent;
+use super::super::{lookup, EngineCode, FailureKey, NothingSent, Source, UnknownFailure};
 use crate::backend::{
     AxBackend, Backend, CaptureOptions, InputEvent, Ref, Refusal, Route, Semantic, SnapshotRequest,
     TaggedInput, Target, WindowFilter, PRESENCE_UNAVAILABLE,
@@ -68,7 +68,7 @@ fn backend_refusals_map_through_the_table() {
         println!(
             "{}{{{}}} -> {:?} -> {}",
             refusal.code.wire(),
-            refusal.reason,
+            refusal.reason.unwrap_or("-"),
             row.key,
             row.computer.wire()
         );
@@ -79,4 +79,36 @@ fn backend_refusals_map_through_the_table() {
             "{refusal:?}: a refusal sends nothing"
         );
     }
+}
+
+#[test]
+fn a_bare_refusal_resolves_to_its_codes_bare_row() {
+    for code in EngineCode::ALL {
+        let bare = Refusal::bare(code);
+        let row = bare
+            .row()
+            .unwrap_or_else(|error| panic!("{}: {error}", code.wire()));
+        let expected = lookup(FailureKey {
+            source: Source::Engine(code),
+            reason: None,
+        });
+        assert_eq!(Ok(row), expected, "{}: the bare row", code.wire());
+        assert_eq!(bare.computer_code(), Ok(row.computer));
+    }
+    for (code, computer) in [
+        (EngineCode::AmbiguousTarget, "COMPUTER_AMBIGUOUS_TARGET"),
+        (EngineCode::Closed, "COMPUTER_TRANSPORT_LOST"),
+        (EngineCode::AxUnconfirmed, "COMPUTER_AX_UNCONFIRMED"),
+    ] {
+        let resolved = Refusal::bare(code).computer_code().map(|code| code.wire());
+        println!("{}{{}} -> {resolved:?}", code.wire());
+        assert_eq!(resolved, Ok(computer));
+    }
+    let unlisted = Refusal::new(EngineCode::AmbiguousTarget, "budget");
+    assert!(
+        matches!(unlisted.row(), Err(UnknownFailure::Pair(_))),
+        "a reason the code's rows do not list stays a typed UnknownFailure"
+    );
+    let unknown = Refusal::new(EngineCode::Closed, "not_a_reason");
+    assert!(matches!(unknown.row(), Err(UnknownFailure::Reason { .. })));
 }
