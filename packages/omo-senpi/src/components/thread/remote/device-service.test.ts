@@ -80,6 +80,7 @@ function fakeService(results: CommandResult[], sent: unknown[]): DeviceService {
       ],
     }),
     attach: async () => attach,
+    close: () => {},
     closed: new Promise(() => {}),
   } as unknown as DeviceService
 }
@@ -95,8 +96,8 @@ describe("device-service adapter of the thread tools' account surface", () => {
     const sent: unknown[] = []
     const port = createDeviceServiceSessions({
       version: "0.0.0-test",
-      connect: async () =>
-        fakeService(
+      connect: async () => ({
+        conn: fakeService(
           [
             state({ state: "engine_applied" }, { turnId: "t1" }),
             state({ state: "engine_refused", reason: "capability_missing", retryable: false }),
@@ -104,6 +105,8 @@ describe("device-service adapter of the thread tools' account surface", () => {
           ],
           sent,
         ),
+        owned: true,
+      }),
     })
     expect(await port.thisDevice()).toBe("here")
     expect(await port.devices()).toEqual([{ device: "b", label: "studio", online: true }])
@@ -153,7 +156,10 @@ describe("device-service adapter of the thread tools' account surface", () => {
         return await next()
       },
     } as unknown as DeviceService
-    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => service })
+    const port = createDeviceServiceSessions({
+      version: "0.0.0-test",
+      connect: async () => ({ conn: service, owned: true }),
+    })
     expect(await port.endpointCommand("b", { type: "open_session", cwd: "/p", parent: undefined })).toEqual({
       kind: "ok",
       response: { type: "response", command: "open_session", success: true, data: { sessionId: "s-new" } },
@@ -173,19 +179,124 @@ describe("device-service adapter of the thread tools' account surface", () => {
     })
   })
 
+  test("#given the CLI views a remote session #when open_session then a command run #then the open rides a short-lived connection that is closed, and the command stays on the long-lived one", async () => {
+    const opened: Array<{ service: DeviceService; closed: boolean }> = []
+    const connect = async () => {
+      const entry = { service: undefined as unknown as DeviceService, closed: false }
+      const service = {
+        ...fakeService([state({ state: "engine_applied" }, { turnId: "t1" })], []),
+        endpointCommand: async () =>
+          state(
+            { state: "engine_applied" },
+            { type: "response", command: "open_session", success: true, data: { sessionId: "s-new" } },
+          ),
+        close: () => {
+          entry.closed = true
+        },
+        closed: new Promise(() => {}),
+      } as unknown as DeviceService
+      entry.service = service
+      opened.push(entry)
+      return { conn: service, owned: true }
+    }
+    const port = createDeviceServiceSessions({ version: "0.0.0-test", connect })
+    expect(await port.endpointCommand("b", { type: "open_session" })).toEqual({
+      kind: "ok",
+      response: { type: "response", command: "open_session", success: true, data: { sessionId: "s-new" } },
+    })
+    expect(opened).toHaveLength(1)
+    const openConnection = opened[0]
+    if (openConnection === undefined) throw new Error("expected the open to connect once")
+    expect(openConnection.closed).toBe(true)
+    expect(await port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })).toEqual({
+      kind: "ok",
+      response: { turnId: "t1" },
+    })
+    expect(opened).toHaveLength(2)
+    const liveConnection = opened[1]
+    if (liveConnection === undefined) throw new Error("expected the command to connect again")
+    expect(liveConnection.closed).toBe(false)
+    expect(openConnection.service).not.toBe(liveConnection.service)
+  })
+
+  test("#given the CLI's one shared connection #when open_session then set_model run #then the open leaves the shared connection open and the model is set", async () => {
+    // One shared fake with a real close() that marks it closed: a command on it after close is refused closed.
+    let closed = false
+    const results = [
+      state(
+        { state: "engine_applied" },
+        {
+          type: "response",
+          command: "get_available_models",
+          success: true,
+          data: { models: [{ provider: "a", id: "m1" }] },
+        },
+      ),
+      state(
+        { state: "engine_applied" },
+        { type: "response", command: "set_model", success: true, data: { provider: "a", id: "m1" } },
+      ),
+    ]
+    const attach = {
+      command: async () => {
+        if (closed) throw new LocalApiError("closed", "the connection closed")
+        const next = results.shift()
+        if (next === undefined) throw new Error("no scripted result")
+        return next
+      },
+      read: async () => ({ entries: [], next_before: null }),
+      detached: new Promise(() => {}),
+      ...quietStream,
+    } as unknown as RemoteAttach
+    const service = {
+      ...fakeService([], []),
+      attach: async () => attach,
+      endpointCommand: async () =>
+        state(
+          { state: "engine_applied" },
+          { type: "response", command: "open_session", success: true, data: { sessionId: "s-new" } },
+        ),
+      close: () => {
+        closed = true
+      },
+      closed: new Promise(() => {}),
+    } as unknown as DeviceService
+    // A borrowed connection with no per-call dialer stays open. The CLI itself dials; that wiring is pinned in remote-session-verbs.test.ts.
+    const port = createDeviceServiceSessions({
+      version: "0.0.0-test",
+      connect: async () => ({ conn: service, owned: false }),
+    })
+    expect(await port.endpointCommand("b", { type: "open_session" })).toEqual({
+      kind: "ok",
+      response: { type: "response", command: "open_session", success: true, data: { sessionId: "s-new" } },
+    })
+    expect(closed).toBe(false)
+    const surface: RemoteThreadSurface = { sessions: port, chain: { stamp: (record: JsonObject) => record } }
+    expect(
+      await setModelRemote(
+        surface,
+        { device: "b", session_id: "s1", title: "t", project: "/p", path: "/p/s1.jsonl", state: "idle", updated_ms: 2 },
+        { model: "a/m1" },
+      ),
+    ).toEqual({ kind: "ok", thread_id: "", device: "b", model: { provider: "a", id: "m1" } })
+    expect(closed).toBe(false)
+  })
+
   test("#given b's engine applied a command but its reply says success false #when the outcome maps to the port #then it is refused with the reply's errorCode, else its error, else engine_failed, never ok", async () => {
     const failed = (extra: Record<string, unknown>) =>
       state({ state: "engine_applied" }, { type: "response", command: "set_model", success: false, ...extra })
     const port = createDeviceServiceSessions({
       version: "0.0.0-test",
-      connect: async () =>
-        ({
+      connect: async () => ({
+        conn: {
           ...fakeService(
             [failed({ error: "no such model", errorCode: "x" }), failed({ error: "no such model" }), failed({})],
             [],
           ),
           endpointCommand: async () => failed({ error: "bad cwd", errorCode: "cwd_missing" }),
-        }) as unknown as DeviceService,
+        } as unknown as DeviceService,
+        owned: true,
+      }),
     })
     expect(await port.sessionCommand("b", "s1", { type: "set_model", provider: "p", modelId: "m" })).toEqual({
       kind: "refused",
@@ -214,7 +325,10 @@ describe("device-service adapter of the thread tools' account surface", () => {
         if (loads === 1) throw new Error("sidecar missing")
         return {
           createDeviceServiceSessions: () =>
-            createDeviceServiceSessions({ version: "0.0.0-test", connect: async () => fakeService([], []) }),
+            createDeviceServiceSessions({
+              version: "0.0.0-test",
+              connect: async () => ({ conn: fakeService([], []), owned: true }),
+            }),
         }
       },
     })
@@ -288,7 +402,7 @@ describe("device-service adapter: a session created on another device is address
     } as unknown as DeviceService
     const port = createDeviceServiceSessions({
       version: "0.0.0-test",
-      connect: async () => service,
+      connect: async () => ({ conn: service, owned: true }),
       retryDelay: async () => {},
     })
     const created = await createRelaySessionHost(
@@ -323,7 +437,7 @@ describe("device-service adapter: a session created on another device is address
     } as unknown as DeviceService
     const port = createDeviceServiceSessions({
       version: "0.0.0-test",
-      connect: async () => service,
+      connect: async () => ({ conn: service, owned: true }),
       retryDelay: async () => {},
     })
     const created = await createRelaySessionHost(
@@ -564,7 +678,9 @@ describe("device-service adapter: relay round trips per thread op", () => {
     const port = createDeviceServiceSessions({
       version: "0.0.0-test",
       connect: () =>
-        connectDeviceService({ version: "0.0.0-test", stateDir: "/unused", connect: async () => client as never }),
+        connectDeviceService({ version: "0.0.0-test", stateDir: "/unused", connect: async () => client as never }).then(
+          (conn) => ({ conn, owned: true }),
+        ),
     })
     const surface: RemoteThreadSurface = { sessions: port, chain: { stamp: (rpc) => rpc } }
     let seen = 0
@@ -882,7 +998,7 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     }
     return {
       calls,
-      connect: async () => service(),
+      connect: async () => ({ conn: service(), owned: true }),
       close: () => closeService(),
       detach: () => detachAttach(),
       answer: (next: () => Promise<CommandResult>) => {
