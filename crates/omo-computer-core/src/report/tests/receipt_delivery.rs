@@ -6,8 +6,8 @@ use serde_json::json;
 
 use super::{parts, wire_check};
 use crate::report::{
-    ActionReport, Delivered, Delivery, Disposition, Effect, Evidence, ReportContext, ReportParts,
-    VerbClass,
+    ActionReport, Delivered, Delivery, Disposition, Effect, Evidence, Platform, ReportContext,
+    ReportParts, ReportRejection, Retry, VerbClass,
 };
 
 fn counted(disposition: Disposition, effect: Effect, evidence: Vec<Evidence>) -> ReportParts {
@@ -86,4 +86,68 @@ fn receipt_requires_a_delivered_verified_disposition() {
         refused >= 30 && wire >= 10,
         "the case list shrank: {refused}/{wire}"
     );
+}
+
+/// The acceptance side, per LEAD ruling 2026-11-11 (receipts record observation; disposition
+/// records claim): an interrupted send's landed units keep their receipts while the report as a
+/// whole stays `delivery_uncertain`. The design pin is silent on this pairing; the ruling settles it.
+#[test]
+fn landed_unit_receipts_stay_under_an_uncertain_partial_report() {
+    let windows = ReportContext::new(VerbClass::Action, Some(Platform::Windows));
+    for retry in [Retry::Unsafe, Retry::Unknown] {
+        let Ok(uncertain) = Disposition::new(Delivery::DeliveryUncertain, retry) else {
+            panic!("delivery_uncertain/{} is one of the seven", retry.wire());
+        };
+        let landed = || {
+            counted(
+                uncertain,
+                Effect::Partial,
+                vec![Evidence::barrier_consumed(), Evidence::barrier_consumed()],
+            )
+        };
+        let built = ActionReport::new(windows, landed());
+        println!(
+            "delivery_uncertain/{} partial, 2 landed-unit barriers: {built:?}",
+            retry.wire()
+        );
+        assert!(
+            built.is_ok(),
+            "the constructor refused landed-unit receipts: {built:?}"
+        );
+        let parsed = build(None, landed());
+        assert!(
+            parsed.is_ok(),
+            "the wire parse refused landed-unit receipts: {parsed:?}"
+        );
+    }
+    for (disposition, delivery) in [
+        (Disposition::NOT_DELIVERED_SAFE, Delivery::NotDelivered),
+        (
+            Disposition::NOT_DELIVERED_AFTER_USER,
+            Delivery::NotDelivered,
+        ),
+        (
+            Disposition::DELIVERED_UNVERIFIED,
+            Delivery::DeliveredUnverified,
+        ),
+    ] {
+        let receipted = || {
+            counted(
+                disposition,
+                Effect::Partial,
+                vec![Evidence::barrier_consumed()],
+            )
+        };
+        assert_eq!(
+            ActionReport::new(windows, receipted()).err(),
+            Some(ReportRejection::ReceiptWithoutVerifiedDelivery { delivery }),
+            "{}: the rejection side still holds",
+            delivery.wire()
+        );
+        assert!(
+            build(None, receipted()).is_err(),
+            "{}: the wire parse still refuses",
+            delivery.wire()
+        );
+    }
 }
