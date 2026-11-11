@@ -1,8 +1,6 @@
-import type { Hooks } from "@opencode-ai/plugin"
-
 import { log } from "../shared"
 
-const WARNING_MESSAGE = "Prefer the Read tool over `cat`/`head`/`tail` for reading file contents. The Read tool provides line numbers and hash anchors for precise editing."
+export const WARNING_MESSAGE = "Prefer the Read tool over `cat`/`head`/`tail` for reading file contents. The Read tool provides line numbers and hash anchors for precise editing."
 
 const FILE_READ_PATTERNS = [
   /^\s*cat\s+(?!-)[^\s|&;]+\s*$/,
@@ -14,29 +12,34 @@ function isSimpleFileReadCommand(command: string): boolean {
   return FILE_READ_PATTERNS.some((pattern) => pattern.test(command))
 }
 
-export function createBashFileReadGuardHook(): Hooks {
+export function createBashFileReadGuardHook() {
   return {
-    "tool.execute.before": async (
-      input: { tool: string; sessionID: string; callID: string },
-      output: { args: Record<string, unknown>; message?: string },
+    "tool.execute.after": async (
+      input: { tool: string; sessionID: string; callID: string; args?: Record<string, unknown> },
+      output: { title: string; output: string; metadata: unknown },
     ): Promise<void> => {
       if (input.tool.toLowerCase() !== "bash") {
         return
       }
 
-      const command = output.args.command
-      if (typeof command !== "string") {
+      if (typeof output.output !== "string") {
         return
       }
 
-      if (!isSimpleFileReadCommand(command)) {
+      const command = input.args?.command
+      if (typeof command !== "string" || !isSimpleFileReadCommand(command)) {
         return
       }
 
-      output.message = WARNING_MESSAGE
+      if (output.output.includes(WARNING_MESSAGE)) {
+        return
+      }
 
-      log("[bash-file-read-guard] warned on bash file read command", {
+      output.output = `${WARNING_MESSAGE}\n\n${output.output}`
+
+      log("[bash-file-read-guard] appended warning to bash tool output", {
         sessionID: input.sessionID,
+        callID: input.callID,
         command,
       })
     },
