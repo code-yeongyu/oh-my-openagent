@@ -5,6 +5,7 @@ import { isClosedDeviceLogin, withClosedDeviceLoginOptions } from "./closed-devi
 import { openSignInBrowser } from "./browser"
 import { deviceName, devicePlatform } from "./device-name"
 import { loginDevice } from "./device-flow"
+import { refuseSecondMachineDevice } from "./machine-device"
 import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
 import { BrowserUnavailable, loginLoopback } from "./loopback"
 import { type ChooseDevice, type ListedDevice, RequestFailure, serviceOrigin, SignInError } from "./protocol"
@@ -87,6 +88,8 @@ async function run(action: "login" | "logout" | "whoami", options: Options, hook
       return
     }
     await ensureServiceAvailable(session, api)
+    // #6503: one device per machine; never mint a second one for a machine that already has its device.
+    await refuseSecondMachineDevice(session, deviceService)
     const name = deviceName()
     const platform = devicePlatform()
     if (!options.device && options.browser !== false) {

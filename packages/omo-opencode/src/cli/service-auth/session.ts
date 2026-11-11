@@ -44,6 +44,8 @@ export type BeforeKeysDiscarded = ((discarded: DiscardedCredential) => Promise<v
 export type DeviceServiceHandoff = {
   readonly adopt: (credentials: Credentials) => Promise<void>
   readonly forget: () => Promise<void>
+  /** The device this machine's running device service holds (#6503), or null when none is held or no service answers. */
+  readonly machineDevice?: () => Promise<{ readonly id: string; readonly name: string } | null>
 }
 
 export const discardedOf = (credentials: Credentials, cause: "refused" | "forget" | "logout" | "replaced"): DiscardedCredential => ({

@@ -7,6 +7,7 @@ import {
   forgetDeviceService,
   handDeviceKeys,
 } from "../device-service-core/src/index.ts"
+import { connectOrNotRunning } from "../device-service-core/src/hand-device-keys.ts"
 import type { Credentials } from "../omo-opencode/src/cli/service-auth/protocol"
 import type { DeviceServiceHandoff } from "../omo-opencode/src/cli/service-auth/session"
 import packageJson from "./package.json" with { type: "json" }
@@ -60,6 +61,22 @@ export function cliDeviceServiceHandoff(options: {
         })
       } catch (error) {
         report("handing this sign-in to it")(error)
+      }
+    },
+    machineDevice: async () => {
+      if (!existsSync(deviceServiceEndpointPath(stateDir))) return null
+      try {
+        const service = await connectOrNotRunning(connect, options.log)
+        if (service === "not_running") return null
+        try {
+          const status = await service.status()
+          return status.state === "sign_in_required" ? null : status.device
+        } finally {
+          service.close()
+        }
+      } catch (error) {
+        report("reading this computer's device")(error)
+        return null
       }
     },
     forget: async () => {
