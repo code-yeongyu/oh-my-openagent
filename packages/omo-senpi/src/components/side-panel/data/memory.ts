@@ -118,7 +118,8 @@ function countSurfaced(value: unknown): number {
  */
 function countPending(value: unknown, sessionId: string, now: number): number {
   const record = asRecord(value)
-  if (record === undefined || record["version"] !== PENDING_NUDGES_VERSION || record["sessionId"] !== sessionId) return 0
+  if (record === undefined || record["version"] !== PENDING_NUDGES_VERSION || record["sessionId"] !== sessionId)
+    return 0
   const writtenAt = typeof record["writtenAt"] === "string" ? Date.parse(record["writtenAt"]) : Number.NaN
   if (!Number.isFinite(writtenAt) || now - writtenAt > 24 * 60 * 60_000) return 0
   const nudges = asArray(record["nudges"])

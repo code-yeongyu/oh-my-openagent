@@ -48,7 +48,14 @@ export async function runTaskResumeScenarios({ senpiBin, checks, capture, pids, 
 }
 
 export function startRun(ctx, sandbox, script, sessionId) {
-  return startResumeRun({ senpiBin: ctx.senpiBin, sandbox, mockProviderEntry, script, sessionId, onPid: (pid) => ctx.pids.push(pid) })
+  return startResumeRun({
+    senpiBin: ctx.senpiBin,
+    sandbox,
+    mockProviderEntry,
+    script,
+    sessionId,
+    onPid: (pid) => ctx.pids.push(pid),
+  })
 }
 
 export function writeLaneLog(ctx, name, result) {
@@ -61,10 +68,11 @@ export function writeLaneLog(ctx, name, result) {
 // The task_send result reports the revival of exactly the finished child's task id.
 export function taskSendRevived(events, taskId) {
   return events.some(
-    (event) => event?.type === "tool_execution_end"
-      && event?.toolName === "task_send"
-      && event?.result?.details?.kind === "revived"
-      && event?.result?.details?.task_id === taskId,
+    (event) =>
+      event?.type === "tool_execution_end" &&
+      event?.toolName === "task_send" &&
+      event?.result?.details?.kind === "revived" &&
+      event?.result?.details?.task_id === taskId,
   )
 }
 
@@ -95,10 +103,15 @@ async function runHappyLane(ctx) {
   writeLaneLog(ctx, "resume-happy-run1", result1)
   const mid = findTaskByName(sandbox, "midchild")
   const fin = findTaskByName(sandbox, "finchild")
-  ctx.checks.resume_spawn_children = verdict(result1.status === 0 && seeded.midAssistant && seeded.finCompleted && mid !== undefined && fin !== undefined)
+  ctx.checks.resume_spawn_children = verdict(
+    result1.status === 0 && seeded.midAssistant && seeded.finCompleted && mid !== undefined && fin !== undefined,
+  )
   ctx.checks.resume_quit_suspends_both = verdict(
-    mid?.status === "running" && mid?.residency_state === "persisted_only" && mid?.host_pid === undefined
-    && fin?.status === "completed" && fin?.residency_state === "persisted_only",
+    mid?.status === "running" &&
+      mid?.residency_state === "persisted_only" &&
+      mid?.host_pid === undefined &&
+      fin?.status === "completed" &&
+      fin?.residency_state === "persisted_only",
   )
   const sessionId = sessionIdFromEvents(result1.events)
   const sentinel2 = join(sandbox.root, "happy-release-2")
@@ -119,24 +132,29 @@ async function runHappyLane(ctx) {
   const midSession = childSessionText(sandbox, mid?.task_id ?? "")
   const finSession = childSessionText(sandbox, fin?.task_id ?? "")
   ctx.checks.resume_revived_resident = verdict(revived.midResident && revived.finResident)
-  ctx.checks.resume_midturn_continuation = verdict(midSession.includes(CONTINUATION_MARKER) && midSession.includes(MIDTURN_CONTINUED_TOKEN))
+  ctx.checks.resume_midturn_continuation = verdict(
+    midSession.includes(CONTINUATION_MARKER) && midSession.includes(MIDTURN_CONTINUED_TOKEN),
+  )
   ctx.checks.resume_finished_no_nudge = verdict(finSession.length > 0 && !finSession.includes(CONTINUATION_MARKER))
   ctx.checks.resume_finished_steerable = verdict(
-    revived.finPong
-    && finSession.includes(PING_TOKEN)
-    && finSession.includes(PONG_TOKEN)
-    && taskSendRevived(result2.events, fin?.task_id ?? ""),
+    revived.finPong &&
+      finSession.includes(PING_TOKEN) &&
+      finSession.includes(PONG_TOKEN) &&
+      taskSendRevived(result2.events, fin?.task_id ?? ""),
   )
-  const logsBefore = { mid: taskEventText(sandbox, mid?.task_id ?? ""), fin: taskEventText(sandbox, fin?.task_id ?? "") }
+  const logsBefore = {
+    mid: taskEventText(sandbox, mid?.task_id ?? ""),
+    fin: taskEventText(sandbox, fin?.task_id ?? ""),
+  }
   const run3 = startRun(ctx, sandbox, UNRELATED_SESSION_SCRIPT)
   const result3 = await run3.completion
   writeLaneLog(ctx, "resume-happy-run3", result3)
   ctx.checks.resume_unrelated_no_revive = verdict(
-    result3.status === 0
-    && taskEventText(sandbox, mid?.task_id ?? "") === logsBefore.mid
-    && taskEventText(sandbox, fin?.task_id ?? "") === logsBefore.fin
-    && findTaskByName(sandbox, "midchild")?.residency_state === "persisted_only"
-    && findTaskByName(sandbox, "finchild")?.residency_state === "persisted_only",
+    result3.status === 0 &&
+      taskEventText(sandbox, mid?.task_id ?? "") === logsBefore.mid &&
+      taskEventText(sandbox, fin?.task_id ?? "") === logsBefore.fin &&
+      findTaskByName(sandbox, "midchild")?.residency_state === "persisted_only" &&
+      findTaskByName(sandbox, "finchild")?.residency_state === "persisted_only",
   )
   ctx.capture.resumeHappy = { sessionId, midTask: mid?.task_id, finTask: fin?.task_id }
 }

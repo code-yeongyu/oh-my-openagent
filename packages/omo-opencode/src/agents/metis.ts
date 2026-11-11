@@ -390,11 +390,7 @@ For Build and Research, run the exploration yourself before questioning. Prompt 
 **ALWAYS**: classify first; be specific ("change UserService only, or AuthService too?"); explore before asking for Build and Research intents; give Prometheus actionable directives; and include the agent-executable QA directives in every output.
 </critical_rules>`
 
-const metisRestrictions = createAgentToolRestrictions([
-  "write",
-  "edit",
-  "apply_patch",
-])
+const metisRestrictions = createAgentToolRestrictions(["write", "edit", "apply_patch"])
 
 export function createMetisAgent(model: string): AgentConfig {
   const prompt = isKimiK2CodeModel(model) ? METIS_K2_7_SYSTEM_PROMPT : METIS_SYSTEM_PROMPT
@@ -425,10 +421,7 @@ export const metisPromptMetadata: AgentPromptMetadata = {
     "When user request is ambiguous or open-ended",
     "To prevent AI over-engineering patterns",
   ],
-  avoidWhen: [
-    "Simple, well-defined tasks",
-    "User has already provided detailed requirements",
-  ],
+  avoidWhen: ["Simple, well-defined tasks", "User has already provided detailed requirements"],
   promptAlias: "Metis",
   keyTrigger: "Ambiguous or complex request → consult Metis before Prometheus",
 }

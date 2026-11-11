@@ -13,11 +13,7 @@ const { describe, test, expect } = require("bun:test") as {
   }
 }
 
-import {
-  buildSystemContentWithTokenLimit,
-  estimateTokenCount,
-  truncateToTokenBudget,
-} from "./token-limiter"
+import { buildSystemContentWithTokenLimit, estimateTokenCount, truncateToTokenBudget } from "./token-limiter"
 
 const TRUNCATION_MARKER_TOKEN_OVERHEAD = estimateTokenCount("\n[TRUNCATED]")
 
@@ -120,10 +116,7 @@ describe("token-limiter", () => {
   test("buildSystemContentWithTokenLimit truncates skills before category and agents context", () => {
     // given
     const input = {
-      skillContents: [
-        "SKILL_ALPHA:" + "a".repeat(180),
-        "SKILL_BETA:" + "b".repeat(180),
-      ],
+      skillContents: ["SKILL_ALPHA:" + "a".repeat(180), "SKILL_BETA:" + "b".repeat(180)],
       categoryPromptAppend: "CATEGORY_APPEND:keep",
       agentsContext: "AGENTS_CONTEXT:keep",
       planAgentPrepend: "",

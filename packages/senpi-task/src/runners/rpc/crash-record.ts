@@ -12,7 +12,15 @@ import type { ChildExitOutcome } from "../types"
 
 /** Signals that mean the child died, as opposed to being asked to stop by a terminal or supervisor. */
 const FATAL_SIGNALS: ReadonlySet<string> = new Set([
-  "SIGSEGV", "SIGBUS", "SIGILL", "SIGTRAP", "SIGABRT", "SIGFPE", "SIGKILL", "SIGSYS", "SIGQUIT",
+  "SIGSEGV",
+  "SIGBUS",
+  "SIGILL",
+  "SIGTRAP",
+  "SIGABRT",
+  "SIGFPE",
+  "SIGKILL",
+  "SIGSYS",
+  "SIGQUIT",
 ])
 /** Exit codes senpi's own SIGHUP / SIGINT / SIGTERM handlers finish with: a stop, not a crash. */
 const SIGNAL_SHUTDOWN_CODES: ReadonlySet<number> = new Set([129, 130, 143])
@@ -52,7 +60,9 @@ export function recordTaskChildDeath(input: RecordTaskChildDeathInput): void {
     const file = join(dir, "crashes.jsonl")
     mkdirSync(dir, { recursive: true, mode: 0o700 })
     appendFileSync(file, `${JSON.stringify(record)}\n`, { mode: 0o600 })
-    const lines = readFileSync(file, "utf8").split("\n").filter((line) => line.trim() !== "")
+    const lines = readFileSync(file, "utf8")
+      .split("\n")
+      .filter((line) => line.trim() !== "")
     if (lines.length > RECORD_LIMIT) writeFileSync(file, `${lines.slice(-RECORD_LIMIT).join("\n")}\n`, { mode: 0o600 })
   } catch {}
 }

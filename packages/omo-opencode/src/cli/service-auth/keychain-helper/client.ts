@@ -16,7 +16,9 @@ const helperReplySchema = z
     mdat: z.number(),
     partition: z.enum(["ours", "other", "none", "unknown"]),
     // oldSlots is absent from helpers released before the eight-slot retire (v5.1.52 to v5.1.60): their one slot is `.old`.
-    present: z.object({ staging: z.boolean(), old: z.boolean(), oldSlots: z.array(z.number().int().min(0).max(7)).optional() }).strict(),
+    present: z
+      .object({ staging: z.boolean(), old: z.boolean(), oldSlots: z.array(z.number().int().min(0).max(7)).optional() })
+      .strict(),
     missing: z.boolean(),
     recover: z.boolean(),
     ok: z.boolean(),
@@ -63,7 +65,7 @@ function isFlushable(stream: NodeJS.WritableStream): stream is NodeJS.WritableSt
 
 // Detached: the helper gets its own POSIX session, so a signal aimed at the client's process group never reaches it,
 // and a client killed mid-call leaves the helper to finish its native call, read EOF and exit (design 2, 3.6 R2).
-export const spawnDetachedHelper: HelperSpawner = path => {
+export const spawnDetachedHelper: HelperSpawner = (path) => {
   const child = spawn([path], {
     stdin: "pipe",
     stdout: "pipe",
@@ -76,7 +78,7 @@ export const spawnDetachedHelper: HelperSpawner = path => {
   const stdin = child.stdin
   return {
     pid,
-    send: line => {
+    send: (line) => {
       stdin.write(line)
       // Bun's pipe sink buffers until flushed; a Node stream writes through on its own.
       if (isFlushable(stdin)) stdin.flush()
@@ -99,7 +101,8 @@ export async function callHelper(
   options: { readonly lease?: HelperLease; readonly spawn?: HelperSpawner } = {},
 ): Promise<HelperReply> {
   const mutates = MUTATING.has(call.verb)
-  if (mutates && options.lease === undefined) throw new HelperProtocolError(`The ${call.verb} helper call needs the session lock.`)
+  if (mutates && options.lease === undefined)
+    throw new HelperProtocolError(`The ${call.verb} helper call needs the session lock.`)
   const helper = (options.spawn ?? spawnDetachedHelper)(path)
   let handedOver = false
   try {
@@ -107,7 +110,9 @@ export async function callHelper(
       await options.lease.handOver(helper.pid)
       handedOver = true
     }
-    helper.send(`${JSON.stringify({ v: 1, verb: call.verb, account: call.account, ...(call.value === undefined ? {} : { value: call.value }) })}\n`)
+    helper.send(
+      `${JSON.stringify({ v: 1, verb: call.verb, account: call.account, ...(call.value === undefined ? {} : { value: call.value }) })}\n`,
+    )
     const line = await helper.reply
     if (handedOver && options.lease !== undefined) {
       handedOver = false
@@ -128,7 +133,10 @@ export async function callHelper(
       try {
         await options.lease.restore()
       } catch (restoreError) {
-        throw new AggregateError([error, restoreError], `The ${call.verb} helper call failed and the session lock could not be restored.`)
+        throw new AggregateError(
+          [error, restoreError],
+          `The ${call.verb} helper call failed and the session lock could not be restored.`,
+        )
       }
     }
     throw error

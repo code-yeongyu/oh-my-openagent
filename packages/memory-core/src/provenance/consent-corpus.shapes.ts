@@ -2,4 +2,6 @@
 import { resolveClaimReceipt } from "./claim"
 
 export const source = (said: string, quote: string): string =>
-  resolveClaimReceipt({ source: "user", userQuote: quote }, [{ proposal: "Shall I delete plugins X and Y?", reply: said }]).source
+  resolveClaimReceipt({ source: "user", userQuote: quote }, [
+    { proposal: "Shall I delete plugins X and Y?", reply: said },
+  ]).source

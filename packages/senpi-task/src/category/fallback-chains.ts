@@ -1,9 +1,7 @@
-import { FABLE_55_LAUNCH, launchRungs } from "@oh-my-opencode/model-core"
 import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
 import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
 
 // Source of truth mirrored from packages/model-core/src/category-model-requirements.ts.
-// Model IDs share the launch block; chain rows remain independently mirrored for parity checks.
 // senpi-only differences (model-core/omo-opencode carry neither; the OpenCode and Codex editions have
 // no such providers):
 //   - kimi rungs carry BOTH provider ids ("kimi-coding" senpi registry id and the "kimi-for-coding"
@@ -27,7 +25,7 @@ import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models
 //     model-core lists "openai" first: it is OpenCode's single OpenAI provider id and already
 //     covers the ChatGPT login there.
 export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFallbackEntry[]>> = {
-  "visual-engineering": launchRungs([
+  "visual-engineering": [
     // Argon at its lowest accepted thinking level leads (#10187, owner decision 2026-10-15):
     // the catalog maps off/minimal to null for this model, so `low` is the floor. Copilot waits for
     // code-yeongyu/senpi#3379 (its row exposes no thinking control). A pinned engine whose catalog
@@ -35,12 +33,12 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     { providers: ["google", "google-vertex", "opencode"], model: LATEST_MODEL_BY_FAMILY.geminiPro, variant: "low" },
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: FABLE_55_LAUNCH.id,
+      model: LATEST_MODEL_BY_FAMILY.claudeFable,
       variant: "max",
     },
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: LATEST_MODEL_BY_FAMILY.claudeFable,
+      model: "claude-fable-5-1",
       variant: "max",
     },
     {
@@ -52,27 +50,31 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
       model: LATEST_MODEL_BY_FAMILY.kimi,
       variant: "max",
-    }
-  ]),
-  architect: launchRungs([
-    {
-      providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: FABLE_55_LAUNCH.id,
-      variant: "max",
     },
+  ],
+  architect: [
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: LATEST_MODEL_BY_FAMILY.claudeFable,
       variant: "max",
-    }
-  ]),
+    },
+    {
+      providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-fable-5-1",
+      variant: "max",
+    },
+  ],
   ultrabrain: [
     { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "max" },
     { providers: ["github-copilot"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "max" },
-    { providers: ["chatgpt-subscription", "openai", "opencode"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "max" },
+    {
+      providers: ["chatgpt-subscription", "openai", "opencode"],
+      model: LATEST_MODEL_BY_FAMILY.gptAstra,
+      variant: "max",
+    },
     { providers: ["chatgpt-subscription", "openai"], model: "gpt-5.6-sol", variant: "max" },
     { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "max" },
-    { providers: ["chatgpt-subscription", "openai", "opencode"], model: "gpt-5.6-sol", variant: "max" }
+    { providers: ["chatgpt-subscription", "openai", "opencode"], model: "gpt-5.6-sol", variant: "max" },
   ],
   "deep-low": [
     // GPT-6.1 Sol leads at the same medium effort: it matches GPT-6 Sol's price with near-Astra
@@ -86,24 +88,24 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       model: "gpt-5.6-sol",
       variant: "medium",
     },
-    { providers: ["chatgpt-subscription", "openai"], model: "gpt-5.6-sol-fast", variant: "medium" }
+    { providers: ["chatgpt-subscription", "openai"], model: "gpt-5.6-sol-fast", variant: "medium" },
   ],
   "deep-high": [
     {
       providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
       model: LATEST_MODEL_BY_FAMILY.gptAstra,
       variant: "high",
-    }
+    },
   ],
-  artistry: launchRungs([
+  artistry: [
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: FABLE_55_LAUNCH.id,
+      model: LATEST_MODEL_BY_FAMILY.claudeFable,
       variant: "max",
     },
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-      model: LATEST_MODEL_BY_FAMILY.claudeFable,
+      model: "claude-fable-5-1",
       variant: "max",
     },
     {
@@ -115,8 +117,8 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
       model: LATEST_MODEL_BY_FAMILY.kimi,
       variant: "max",
-    }
-  ]),
+    },
+  ],
   quick: [
     { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptLunaFast, variant: "low" },
     {
@@ -138,7 +140,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     // thinking off (glm-5.3-flash maps `off` to null, mimo-v2.6-flash refuses disabled thinking), so
     // both run at the lowest effort they accept, like qwen3.6-flash.
     { providers: ["zai", "zai-coding-cn"], model: LATEST_MODEL_BY_FAMILY.glmFlash, variant: "low" },
-    { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" }
+    { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" },
   ],
   "unspecified-low": [
     {
@@ -169,7 +171,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       variant: "high",
     },
     { providers: ["deepseek", "opencode-go"], model: "deepseek-v4-pro", variant: "max" },
-    { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.5-pro", variant: "high" }
+    { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.5-pro", variant: "high" },
   ],
   "unspecified-high": [
     {
@@ -182,7 +184,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
       model: LATEST_MODEL_BY_FAMILY.kimi,
       variant: "max",
-    }
+    },
   ],
   writing: [
     // Argon at its lowest accepted thinking level leads (#10187, owner decision 2026-10-15):
@@ -199,6 +201,6 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: "claude-opus-4-6",
       variant: "max",
-    }
+    },
   ],
 }

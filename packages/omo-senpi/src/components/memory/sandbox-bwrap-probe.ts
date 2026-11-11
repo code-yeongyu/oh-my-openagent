@@ -7,9 +7,7 @@
  */
 import { type ChildProcess, spawn } from "node:child_process"
 
-export type SandboxUsability =
-  | { readonly usable: true }
-  | { readonly usable: false; readonly reason: string }
+export type SandboxUsability = { readonly usable: true } | { readonly usable: false; readonly reason: string }
 
 export interface BwrapSmokeResult {
   readonly exitCode: number | null
@@ -29,7 +27,8 @@ const SMOKE_ARGS = ["--ro-bind", "/", "/", "--proc", "/proc", "--dev", "/dev", "
 
 export function classifyBwrapSmoke(result: BwrapSmokeResult): SandboxUsability {
   if (result.timedOut) return unusable(`smoke test timed out after ${SMOKE_TIMEOUT_MS}ms`, result.stderr)
-  if (result.errorMessage !== undefined) return unusable(`smoke test could not run: ${result.errorMessage}`, result.stderr)
+  if (result.errorMessage !== undefined)
+    return unusable(`smoke test could not run: ${result.errorMessage}`, result.stderr)
   if (result.exitCode === 0) return { usable: true }
   return unusable(`smoke test exited ${result.exitCode ?? "without an exit code"}`, result.stderr)
 }
@@ -79,7 +78,12 @@ async function runBwrapSmoke(executable: string): Promise<BwrapSmokeResult> {
     try {
       child = spawn(executable, [...SMOKE_ARGS], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true })
     } catch (error) {
-      finish({ exitCode: null, timedOut: false, errorMessage: error instanceof Error ? error.message : String(error), stderr: "" })
+      finish({
+        exitCode: null,
+        timedOut: false,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        stderr: "",
+      })
       return
     }
     const stderrChunks: Buffer[] = []
@@ -89,7 +93,9 @@ async function runBwrapSmoke(executable: string): Promise<BwrapSmokeResult> {
       finish({ exitCode: null, timedOut: true, stderr: "" })
     }, SMOKE_TIMEOUT_MS)
     child.once("error", (error) => finish({ exitCode: null, timedOut: false, errorMessage: error.message, stderr: "" }))
-    child.once("close", (code) => finish({ exitCode: code, timedOut: false, stderr: Buffer.concat(stderrChunks).toString("utf8") }))
+    child.once("close", (code) =>
+      finish({ exitCode: code, timedOut: false, stderr: Buffer.concat(stderrChunks).toString("utf8") }),
+    )
   })
 }
 
@@ -97,4 +103,3 @@ function unusable(cause: string, stderr: string): SandboxUsability {
   const tail = stderr.trim().slice(-REASON_STDERR_CHARS)
   return { usable: false, reason: tail === "" ? cause : `${cause}: ${tail}` }
 }
-

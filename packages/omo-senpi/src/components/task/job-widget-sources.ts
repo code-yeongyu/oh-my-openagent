@@ -1,7 +1,12 @@
 import { formatToolActivity, type ManagedChildEvent, type TaskRecord } from "@oh-my-opencode/senpi-task"
 
 import { redactSensitiveOutput } from "../memory/kibitzer/sensitive-output"
-import type { JobWidgetBriefText, JobWidgetSourceHandle, JobWidgetSourcesApi, JobWidgetTextTap } from "./job-widget-host"
+import type {
+  JobWidgetBriefText,
+  JobWidgetSourceHandle,
+  JobWidgetSourcesApi,
+  JobWidgetTextTap,
+} from "./job-widget-host"
 import { isTerminal } from "./status-row-format"
 import type { StoreMutation } from "./store-mutation-observer"
 
@@ -16,7 +21,10 @@ const MAX_WATCH_COMMAND_CHARS = 300
 
 export interface TaskJobWidgetManager {
   subscribeChild(taskId: string, listener: (event: ManagedChildEvent) => void): () => void
-  list(scope: { readonly scope: "parent-session"; readonly session_id: string }): readonly { readonly record: TaskRecord }[]
+  list(scope: {
+    readonly scope: "parent-session"
+    readonly session_id: string
+  }): readonly { readonly record: TaskRecord }[]
 }
 
 export interface TaskJobWidgetFeedDeps {
@@ -130,7 +138,8 @@ export function createTaskJobWidgetFeed(deps: TaskJobWidgetFeedDeps): TaskJobWid
     sync() {
       const sessionId = currentSession()
       if (sessionId === undefined) return
-      for (const { record } of deps.manager.list({ scope: "parent-session", session_id: sessionId })) accept(sessionId, record)
+      for (const { record } of deps.manager.list({ scope: "parent-session", session_id: sessionId }))
+        accept(sessionId, record)
     },
     dispose() {
       forgetAll()
@@ -174,13 +183,17 @@ function backgroundBashCommand(args: unknown): string | undefined {
 // Redacted before the cut, so a secret straddling the 300-character limit is never half shown.
 export function backgroundCommandWatch(command: string): string {
   const redacted = redactCommandSecrets(command.replace(/\s+/g, " ").trim())
-  const shown = redacted.length > MAX_WATCH_COMMAND_CHARS ? `${redacted.slice(0, MAX_WATCH_COMMAND_CHARS - 1)}…` : redacted
+  const shown =
+    redacted.length > MAX_WATCH_COMMAND_CHARS ? `${redacted.slice(0, MAX_WATCH_COMMAND_CHARS - 1)}…` : redacted
   return `background command: ${shown}`
 }
 
 function redactCommandSecrets(text: string): string {
   return redactSensitiveOutput(text)
-    .replace(/(--?(?:[a-z0-9]+[-_])*(?:token|password|passwd|secret|api[-_]?key|auth)(?:=|\s+))("[^"]*"|'[^']*'|\S+)/gi, "$1[REDACTED]")
+    .replace(
+      /(--?(?:[a-z0-9]+[-_])*(?:token|password|passwd|secret|api[-_]?key|auth)(?:=|\s+))("[^"]*"|'[^']*'|\S+)/gi,
+      "$1[REDACTED]",
+    )
     .replace(/\bsk-[A-Za-z0-9_-]{16,}/g, "[REDACTED]")
     .replace(/\bAKIA[0-9A-Z]{16}\b/g, "[REDACTED]")
     .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+/g, "[REDACTED]")
@@ -197,8 +210,10 @@ function toolResultText(result: unknown): string {
   const content: unknown = Reflect.get(result, "content")
   if (!Array.isArray(content)) return ""
   return content
-    .filter((part): part is { readonly type: "text"; readonly text: string } =>
-      typeof part === "object" && part !== null && part.type === "text" && typeof part.text === "string")
+    .filter(
+      (part): part is { readonly type: "text"; readonly text: string } =>
+        typeof part === "object" && part !== null && part.type === "text" && typeof part.text === "string",
+    )
     .map((part) => part.text)
     .join("\n")
 }
@@ -208,7 +223,9 @@ function taskBrief(record: TaskRecord): JobWidgetBriefText {
   const intent = record.description ?? record.task_summary
   const task = prompt ?? intent
   return {
-    ...(task === undefined ? {} : { task: task.length > MAX_ASSIGNMENT_CHARS ? `${task.slice(0, MAX_ASSIGNMENT_CHARS - 1)}…` : task }),
+    ...(task === undefined
+      ? {}
+      : { task: task.length > MAX_ASSIGNMENT_CHARS ? `${task.slice(0, MAX_ASSIGNMENT_CHARS - 1)}…` : task }),
     ...(intent === undefined ? {} : { intent }),
   }
 }

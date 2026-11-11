@@ -47,7 +47,11 @@ async function smallTree(): Promise<string> {
   const root = await tempRoot("omo-kibitzer-grep-")
   await mkdir(join(root, "src"), { recursive: true })
   await writeFile(join(root, "a.txt"), "alpha needle\nbeta\n", "utf8")
-  await writeFile(join(root, "src", "app.ts"), "export const token = 'value'\nexport const other = 1\nneedle here\n", "utf8")
+  await writeFile(
+    join(root, "src", "app.ts"),
+    "export const token = 'value'\nexport const other = 1\nneedle here\n",
+    "utf8",
+  )
   return root
 }
 

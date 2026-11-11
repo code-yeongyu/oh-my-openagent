@@ -1,0 +1,292 @@
+{
+  "description": "bunshin's --oneshot sidecar shape: one process per request against an auto-started --serve daemon whose own session opened with no session flags; host-only methods are refused, inputs answer null, ax.snapshot/StaleRef/capabilities match the stdio shapes, a string id is echoed, desktop.stop latches.",
+  "transport": "oneshot",
+  "scenario": "crates/omo-computer-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {
+    "OMO_COMPUTER_FAKE_STOP_PATH": "live"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "desktop.stopPath.status",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "suspended": false,
+              "globalLive": true,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/heartbeatFresh",
+            "/result/reason"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "desktop.session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "error": {
+              "code": -32601,
+              "message": "Method not found",
+              "data": {
+                "reason": "hostOnly"
+              }
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "desktop.capture",
+        "params": {
+          "target": "101",
+          "caps": {
+            "maxWidth": 64
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "mode": "inline-png",
+              "data": "png-bytes",
+              "mimeType": "image/png",
+              "artifactPath": null,
+              "width": 64,
+              "height": 48,
+              "sourceWidth": 800,
+              "sourceHeight": 600,
+              "coordinateWidth": 64,
+              "coordinateHeight": 48,
+              "region": null,
+              "scale": 0.08,
+              "target": "101",
+              "frameId": "frame-1",
+              "note": null
+            }
+          },
+          "variable": [
+            "/result/data"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "desktop.click",
+        "params": {
+          "target": "101",
+          "x": 10,
+          "y": 10
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": null
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "desktop.typeText",
+        "params": {
+          "target": "101",
+          "text": "hello"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": null
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "desktop.keyChord",
+        "params": {
+          "target": "101",
+          "keys": [
+            "cmd",
+            "q"
+          ]
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "result": null
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "desktop.ax.snapshot",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "result": {
+              "text": "- window \"Untitled - Notes\" [ref=e1] app=Notes (focused)\n  - textarea [ref=e2] (focused)\n  - button \"Save\" [ref=e3]",
+              "nodeCount": 3,
+              "truncated": false
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "desktop.ax.node",
+        "params": {
+          "ref": "e9999"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "error": {
+              "code": -32008,
+              "message": "e9999 expired; re-run ax()/find()",
+              "data": {
+                "code": "StaleRef",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message",
+            "/error/data/hint"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": "v1",
+        "method": "desktop.capabilities",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": "v1",
+            "result": {
+              "backend": "fake",
+              "displayServer": null,
+              "capture": true,
+              "input": true,
+              "ax": true,
+              "backgroundWindowInput": true,
+              "cursorOverlay": false,
+              "deliveryModes": [
+                "background",
+                "foreground"
+              ],
+              "capturePermission": "granted",
+              "inputPermission": "granted",
+              "axPermission": "granted",
+              "displayCount": 2,
+              "focusGuard": true,
+              "stopPath": "global",
+              "stopReason": null,
+              "integrityLevel": null,
+              "screenLocked": false,
+              "displayAsleep": false
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "desktop.stop",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 10,
+            "result": {
+              "suspended": true,
+              "globalLive": true,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "global",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/heartbeatFresh",
+            "/result/reason"
+          ]
+        }
+      ]
+    }
+  ]
+}

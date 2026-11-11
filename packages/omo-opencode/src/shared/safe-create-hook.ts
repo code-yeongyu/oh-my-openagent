@@ -4,11 +4,7 @@ interface SafeCreateHookOptions {
   enabled?: boolean
 }
 
-export function safeCreateHook<T>(
-  name: string,
-  factory: () => T,
-  options?: SafeCreateHookOptions,
-): T | null {
+export function safeCreateHook<T>(name: string, factory: () => T, options?: SafeCreateHookOptions): T | null {
   const enabled = options?.enabled ?? true
 
   if (!enabled) {
