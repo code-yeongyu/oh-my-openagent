@@ -10,7 +10,8 @@ import {
 import type { SendDelivery, SendOutcome, SteeringPort } from "./types"
 
 const TASK_OUTPUT_SUGGESTION = "Use tool.task_output({ task_id }) in an eval cell to read the final result."
-const NOT_FOUND_SUGGESTION = "Use /tasks to see available tasks, or tool.task_output({ task_id }) in an eval cell to read a known task."
+const NOT_FOUND_SUGGESTION =
+  "Use /tasks to see available tasks, or tool.task_output({ task_id }) in an eval cell to read a known task."
 // A drain re-reads the queue after each delivered batch, so a child whose deliveries keep queueing
 // more messages could drain forever. Each pass yields to the event loop (timers and teardown still
 // run), and a drain stops after this many passes. Nothing is stranded (#9861): a drain requested

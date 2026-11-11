@@ -62,8 +62,10 @@ export function deliveryUncertain(record: TaskRecord, runEpoch: number): SendOut
     kind: "delivery_uncertain",
     task_id: record.task_id,
     run_epoch: runEpoch,
-    reason: "Message delivery could not be confirmed durably; inspect tool.task_output({ task_id }) in an eval cell before continuing.",
-    suggestion: "Do not resend automatically; inspect tool.task_output({ task_id }) in an eval cell and explicitly resolve the recorded delivery first.",
+    reason:
+      "Message delivery could not be confirmed durably; inspect tool.task_output({ task_id }) in an eval cell before continuing.",
+    suggestion:
+      "Do not resend automatically; inspect tool.task_output({ task_id }) in an eval cell and explicitly resolve the recorded delivery first.",
   }
 }
 
