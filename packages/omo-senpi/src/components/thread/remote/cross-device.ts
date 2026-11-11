@@ -41,6 +41,12 @@ export type LocalExisting =
 /** This device's side of placement: its name ladder, what it knows of an existing thread, and its SessionHost. */
 export type LocalPlacement = {
   readonly host: SessionHost
+  /**
+   * The calling session's folder. A new thread this device creates with no `cwd` starts there, in its creator's scope
+   * (a project folder, or the desktop's own folder for a thread with no project), never in the folder the engine
+   * process happens to run in. Absent when the caller's folder is unknown.
+   */
+  readonly callerCwd?: string
   readonly resolve: (address: string) => LocalResolution
   /** Decision 0027: the ONE resolver (local + relay address books) for an existing thread or a fork source; omitted = local only. */
   readonly locate: (address: string) => Promise<CrossTarget>
@@ -71,7 +77,11 @@ export async function planCreate(
   local: LocalPlacement,
 ): Promise<CreatePlan> {
   const here = (request: OpenFields, creates: boolean): CreatePlan => ({ kind: "open", host: local.host, request, creates })
-  const create = (host: SessionHost): CreatePlan => ({ kind: "open", host, request: value.cwd === undefined ? {} : { cwd: value.cwd }, creates: true })
+  const create = (host: SessionHost): CreatePlan => {
+    // Another device never sees this caller's folder, so only a create here inherits it.
+    const cwd = value.cwd ?? (host === local.host ? local.callerCwd : undefined)
+    return { kind: "open", host, request: cwd === undefined ? {} : { cwd }, creates: true }
+  }
   const openHere = (address: string): CreatePlan => {
     const existing = local.existing(address)
     if (existing.kind === "error") return { kind: "done", result: existing.result }

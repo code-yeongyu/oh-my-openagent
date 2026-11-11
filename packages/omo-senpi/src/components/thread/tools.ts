@@ -205,8 +205,10 @@ function buildThreadTools(options: ThreadToolSurfaceOptions): { readonly tools: 
     if (skills?.kind === "invalid") return failure("invalid_arguments", `Not a skill name: ${skills.names.join(", ")}. Pass the names of installed skills, never a path or text.`, "Pass skill names as listed by the skill index.", { invalid: skills.names })
     const loaded = skills?.kind === "ok" ? skills.names : undefined
     const entries = resolveEntries(options, current)
+    const callerCwd = options.callerWorkspaceRoot()
     const plan = await planCreate(options.remote, value, {
       host: createLocalSessionHost(options.host, entries),
+      ...(callerCwd.trim() === "" ? {} : { callerCwd }),
       resolve: (address) => resolution(options, entries, address, callerId, true),
       // Decision 0027: an existing thread or a fork source is found by the same resolver every send uses, not by a second ladder.
       locate: async (address) => {
