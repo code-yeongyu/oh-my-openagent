@@ -1,5 +1,7 @@
 //! JSON-RPC 2.0 framing: parses one request line, dispatches it to the session and answers
-//! one reply line. A request without an id is a notification and gets no reply.
+//! one reply line. A well-formed request without an id is a notification: it gets no reply
+//! and never reaches the session, so it can send nothing. The one notification the protocol
+//! defines, `$/cancel`, has nothing to cancel on this serial loop.
 
 use omo_computer_core::backend::Refusal;
 use omo_computer_core::methods::Method;
@@ -26,17 +28,22 @@ fn failure(code: i64, message: &str, data: Option<Value>) -> Failure {
     }
 }
 
-/// The reply line to `line`, or `None` for a notification.
-pub fn handle_line(session: &mut Session, line: &str) -> Option<String> {
-    let Ok(message) = serde_json::from_str::<Value>(line) else {
+/// The reply line to `line` (raw bytes: a line that is not UTF-8 JSON is a parse error),
+/// or `None` for a notification.
+pub fn handle_line(session: &mut Session, line: &[u8]) -> Option<String> {
+    let Ok(message) = serde_json::from_slice::<Value>(line) else {
         return Some(reply(&Value::Null, Err(failure(PARSE_ERROR, "Parse error", None))));
     };
     let Some(object) = message.as_object() else {
         return Some(reply(&Value::Null, Err(invalid_request())));
     };
     let id = object.get("id").cloned();
-    let outcome = request(object).and_then(|(method, params)| dispatch(session, method, params));
-    id.map(|id| reply(&id, outcome))
+    let (method, params) = match request(object) {
+        Ok(request) => request,
+        Err(invalid) => return Some(reply(&id.unwrap_or(Value::Null), Err(invalid))),
+    };
+    let id = id?;
+    Some(reply(&id, dispatch(session, method, params)))
 }
 
 fn invalid_request() -> Failure {
@@ -110,7 +117,7 @@ fn reply(id: &Value, outcome: Result<Value, Failure>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use omo_computer_backend_fake::FakeBackend;
+    use omo_computer_backend_fake::{FakeBackend, FakeClock, FakeScenario, RecordingSink};
     use omo_computer_core::backend::Backend;
     use omo_computer_core::error::EngineCode;
     use serde_json::{json, Value};
@@ -123,7 +130,8 @@ mod tests {
     }
 
     fn call(session: &mut Session, line: &str) -> Value {
-        serde_json::from_str(&handle_line(session, line).expect("a reply")).expect("reply is JSON")
+        let reply = handle_line(session, line.as_bytes()).expect("a reply");
+        serde_json::from_str(&reply).expect("reply is JSON")
     }
 
     #[test]
@@ -135,7 +143,24 @@ mod tests {
         assert_eq!((unknown["id"].clone(), unknown["error"]["code"].clone()), (json!(7), json!(METHOD_NOT_FOUND)));
         let bad = call(&mut session, r#"{"jsonrpc":"2.0","id":"a","method":"click","params":{"x":"one"}}"#);
         assert_eq!((bad["id"].clone(), bad["error"]["code"].clone()), (json!("a"), json!(INVALID_PARAMS)));
-        assert_eq!(handle_line(&mut session, r#"{"jsonrpc":"2.0","method":"capabilities"}"#), None);
+        assert_eq!(handle_line(&mut session, br#"{"jsonrpc":"2.0","method":"capabilities"}"#), None);
+        assert_eq!(call(&mut session, "{}")["error"]["code"], json!(INVALID_REQUEST));
+    }
+
+    #[test]
+    fn id_less_requests_reach_nothing_and_get_no_reply() {
+        let sink = RecordingSink::default();
+        let backend = FakeBackend::with_parts(FakeScenario::default(), FakeClock::default(), sink.clone());
+        let mut session = Session::new(Box::new(backend));
+        call(&mut session, r#"{"jsonrpc":"2.0","id":1,"method":"session.open","params":{}}"#);
+        for line in [
+            r#"{"jsonrpc":"2.0","method":"click","params":{"target":"1","x":1,"y":1}}"#,
+            r#"{"jsonrpc":"2.0","method":"typeText","params":{"target":"1","text":"hi"}}"#,
+            r#"{"jsonrpc":"2.0","method":"$/cancel","params":{"id":1}}"#,
+        ] {
+            assert_eq!(handle_line(&mut session, line.as_bytes()), None, "{line}");
+        }
+        assert!(sink.is_empty(), "{:?}", sink.lines());
     }
 
     #[test]

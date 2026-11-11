@@ -23,7 +23,7 @@ fn checks() -> Vec<(String, bool)> {
     let mut results: Vec<(String, bool)> = CHECKS
         .iter()
         .map(|(name, line)| {
-            let reply = rpc::handle_line(&mut session, line)
+            let reply = rpc::handle_line(&mut session, line.as_bytes())
                 .and_then(|text| serde_json::from_str::<Value>(&text).ok());
             let ok = reply.is_some_and(|reply| reply.get("result").is_some());
             ((*name).to_owned(), ok)

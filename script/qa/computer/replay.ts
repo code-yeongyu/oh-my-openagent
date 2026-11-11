@@ -8,8 +8,11 @@
 // extra member only where its pattern matches, a member the expectation lists is always compared
 // exactly, and a `replaced` line moves the expected value at its pointer to its v3 value).
 // Prints `REPLAY_OK <case> steps=<n>` or one line per mismatch and exits 1; then the teardown
-// receipts `procs <n>` and `dir REMOVED <path>`.
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises"
+// receipts `procs <n>` and `dir REMOVED <path>`. Only a reply mismatch exits 1: every input or
+// setup error (arguments, an unreadable or malformed case or delta file, an engine that cannot
+// be spawned) prints `REPLAY_ERROR <why>` and exits 2.
+import { constants } from "node:fs"
+import { access, mkdtemp, readdir, readFile, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, relative, resolve } from "node:path"
 
@@ -29,6 +32,16 @@ type Case = { readonly transport: Transport; readonly scenario: string | undefin
 type Delta = { readonly kind: string; readonly pointer: string; readonly pattern: readonly string[]; readonly imported: unknown; readonly v3: unknown; matched: number }
 
 class InputError extends Error {}
+
+const describe = (error: unknown) => (error instanceof Error ? error.message : String(error))
+
+async function readText(file: string, what: string): Promise<string> {
+  try { return await readFile(file, "utf8") } catch (error) { throw new InputError(`cannot read the ${what} ${file}: ${describe(error)}`) }
+}
+
+function parseJson(text: string, what: string): unknown {
+  try { return JSON.parse(text) } catch (error) { throw new InputError(`the ${what} is not JSON: ${describe(error)}`) }
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -72,13 +85,13 @@ function matches(pattern: readonly string[], pointer: string): boolean {
 }
 
 async function loadDeltas(file: string, casePath: string): Promise<Delta[]> {
-  const rows = (await readFile(file, "utf8")).split("\n").slice(1).filter((line) => line.trim() !== "")
+  const rows = (await readText(file, "delta file")).split("\n").slice(1).filter((line) => line.trim() !== "")
   return rows.flatMap((line) => {
     const [target = "", pointer = "", kind = "", , , imported = "", v3 = ""] = line.split("\t")
     if (target !== "*" && resolve(ROOT, target) !== casePath) return []
     if (kind !== "additive" && kind !== "replaced") return []
     const pattern = (pointer.startsWith("/") ? pointer.slice(1) : pointer).split("/")
-    const value = (text: string) => (kind === "replaced" ? JSON.parse(text) : undefined)
+    const value = (text: string) => (kind === "replaced" ? parseJson(text, `replaced value of ${pointer}`) : undefined)
     return [{ kind, pointer, pattern, imported: value(imported), v3: value(v3), matched: 0 }]
   })
 }
@@ -119,7 +132,11 @@ class Peer {
   private readonly pumped: Promise<void>
 
   constructor(cmd: string[], env: Record<string, string>) {
-    this.proc = Bun.spawn(cmd, { cwd: ROOT, env, stdin: "pipe", stdout: "pipe", stderr: "inherit" })
+    try {
+      this.proc = Bun.spawn(cmd, { cwd: ROOT, env, stdin: "pipe", stdout: "pipe", stderr: "inherit" })
+    } catch (error) {
+      throw new InputError(`cannot spawn the engine ${cmd[0]}: ${describe(error)}`)
+    }
     this.pumped = this.pump()
   }
 
@@ -192,7 +209,10 @@ async function replay(argv: readonly string[]): Promise<number> {
   const opts = args(argv)
   const rel = relative(ROOT, opts.casePath)
   const name = rel.startsWith("..") ? opts.casePath : rel
-  const spec = parseCase(JSON.parse(await readFile(opts.casePath, "utf8")))
+  const spec = parseCase(parseJson(await readText(opts.casePath, "case file"), "case file"))
+  await access(opts.engine, constants.X_OK).catch((error: unknown) => {
+    throw new InputError(`the engine ${opts.engine} is not an executable file: ${describe(error)}`)
+  })
   const deltas = await loadDeltas(opts.deltas, opts.casePath)
   const runtime = await mkdtemp(join(tmpdir(), "omo-replay-"))
   const failures: string[] = []
@@ -244,6 +264,6 @@ async function replay(argv: readonly string[]): Promise<number> {
 try {
   process.exitCode = await replay(Bun.argv.slice(2))
 } catch (error) {
-  console.log(`REPLAY_ERROR ${error instanceof Error ? error.message : String(error)}`)
-  process.exitCode = error instanceof InputError ? 2 : 1
+  console.log(`REPLAY_ERROR ${describe(error)}`)
+  process.exitCode = 2
 }

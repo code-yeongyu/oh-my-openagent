@@ -185,6 +185,23 @@ describe("replay driver", () => {
     expect(run.code).toBe(1)
   }, 60_000)
 
+  test("every input or setup error exits 2, never 1", async () => {
+    const notJson = join(dir, "not-json.json")
+    await writeFile(notJson, "{ not json")
+    const badTransport = join(dir, "bad-transport.json")
+    await writeFile(badTransport, JSON.stringify({ transport: "carrier-pigeon", steps: [] }))
+    const runs = {
+      "case file that is not JSON": await replay(["--engine", ENGINE, "--case", notJson]),
+      "missing case file": await replay(["--engine", ENGINE, "--case", join(dir, "absent.json")]),
+      "missing engine": await replay(["--engine", join(dir, "absent-engine"), "--case", CASE_01]),
+      "malformed case": await replay(["--engine", ENGINE, "--case", badTransport]),
+      "missing --engine": await replay(["--case", CASE_01]),
+    }
+    for (const [what, run] of Object.entries(runs)) {
+      expect({ what, code: run.code, error: run.stdout.includes("REPLAY_ERROR") }).toEqual({ what, code: 2, error: true })
+    }
+  }, 60_000)
+
   test("--assert-sink-empty fails when the sink holds an entry", async () => {
     const steps = [{ send: request(1, "click"), expect: [expectation(reply(1, null))] }]
     const sent = await scriptedCase(steps, [{ replies: [reply(1, null)], sink: 1 }], [])
