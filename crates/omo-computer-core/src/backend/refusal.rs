@@ -58,12 +58,6 @@ impl Refusal {
     pub const fn new(code: RefusalCode, reason: &'static str) -> Self {
         Self { code, reason }
     }
-
-    /// A refusal is decided before the OS is touched.
-    #[must_use]
-    pub const fn nothing_sent(&self) -> bool {
-        true
-    }
 }
 
 /// The result of every fallible backend method.
