@@ -56,7 +56,7 @@ In scope (the QuickJS cell must stop these):
 | T5 | Host-object mutation / prototype pollution of shared facade objects, inside the VM or on the host side | possible (facade objects live in the host realm) | impossible in the VM: it holds stubs only, the host keeps its objects in a per-run handle table. On the host side, arguments from the VM are data: they are parsed from JSON and passed to the engine, never merged into host state (section 4) |
 | T6 | Work leaked past the run's end (pending promises, timers) resuming later | frozen by design (no drain after end) | the VM and its worker are destroyed at settle; nothing survives the run |
 | T7 | Oversized results/output exhausting host memory or the model context | `cloneSafe` copy, size unbounded | return value and output are serialized across the boundary and capped (section 6) |
-| T8 | Engine (QuickJS) memory-safety bug or trap | n/a | wasm linear memory in a worker thread: a crash or trap kills the worker, not the host, and the run settles at once with `sandbox` (section 5); the engine version is exact-pinned |
+| T8 | Engine (QuickJS) memory-safety bug or trap | n/a | wasm linear memory in a worker thread: a crash or trap kills the worker, not the host, and the run settles at once with `crashed` (section 5); the engine version is exact-pinned |
 
 Out of scope (stated so nobody relies on the sandbox for them):
 
@@ -195,7 +195,7 @@ checkpoint, and terminate still ends it. The run settles with the error. The fai
 (`runtime.ts:199`) applies unchanged.
 
 Worker crash: a worker `error` or `exit` before the run settled (a wasm trap, an engine bug, T8) settles the
-run at once with `ComputerRunError("sandbox")`, cancels the in-flight call, revokes the grant, and the next
+run at once with `ComputerRunError("crashed")`, cancels the in-flight call, revokes the grant, and the next
 run starts a fresh worker. A crash never leaves a run pending until its wall deadline.
 
 Result size, VM-ward: an engine result is checked against a per-result cap (8 MiB serialized) on the host
@@ -207,7 +207,7 @@ subtree) instead of the run dying on the 64 MiB heap.
 ## 6. Limits and structured errors
 
 All limits are per run. `ComputerRunErrorReason` (`run/context.ts:10`) gains seven values: `calls`, `memory`,
-`stack`, `payloadSize`, `resultSize`, `stalled`, `sandbox`. Existing values keep their meaning; in particular `unavailable`
+`stack`, `payloadSize`, `resultSize`, `stalled`, `crashed`. Existing values keep their meaning; in particular `unavailable`
 stays "this engine lacks the feature" (`run/observe.ts:33`, `run/hold-call.ts:10`) and is not reused for a crash.
 
 | Limit | Default | Enforced by | Error (`ComputerRunError.reason`) | Fatal to the run? |
@@ -219,7 +219,7 @@ stays "this engine lacks the feature" (`run/observe.ts:33`, `run/hold-call.ts:10
 | Bridged payload, either direction | 8 MiB serialized per result (VM-ward), 1 MiB per argument list (host-ward) | host before copying a result in; worker before posting arguments out | `resultSize` (result) or `payloadSize` (arguments), as a rejection of that one call inside the VM | no: catchable, the body can narrow its query |
 | Handles | 10,000 distinct handles per run (by engine identity) | host handle table, before a result adds one | `resultSize`, as a rejection of that one call inside the VM | no: catchable |
 | Stall | nothing in flight, nothing queued, VM job queue empty | host, after each drain | `stalled` | yes, at once |
-| Worker crash | n/a | worker `error`/`exit` handler | `sandbox` | yes, at once |
+| Worker crash | n/a | worker `error`/`exit` handler | `crashed` | yes, at once |
 | Output + return value | 1 MiB serialized per run | worker, before posting | none: truncated (see note) | no |
 
 Note on output: an oversized console stream is cut with a visible marker. An oversized return value is
@@ -326,7 +326,7 @@ Row 22 (`packages/senpi-desktop-service`, quickjs mode):
 8. A single long builtin (`/(a+)+$/.test("a".repeat(40) + "b")`) under a short `timeout` settles with `timeout`
    by `worker.terminate()`; the next run works.
 9. Worker crash: a worker that exits before the run settles (test hook) settles the run at once with
-   `sandbox`, not at the wall deadline; the next run works.
+   `crashed`, not at the wall deadline; the next run works.
 10. Output caps: a console stream past 1 MiB is cut with the marker; a return value past 1 MiB comes back as a
     string ending in the truncation marker, never as invalid JSON.
 11. Stall: `await new Promise(() => {})` settles with `stalled` well before a 30 s `timeout`.
