@@ -56,9 +56,9 @@ const fn make(
     }
 }
 
-/// `e!(EngineCode, Reason|_ => ComputerCode, rule, Yes|No|Depends, recovery, nextCall|none)`; `none` is the design's `-`.
+/// `e!(EngineCode, Reason|_ => ComputerCode, rule, Yes|No|Depends, recovery, "call" | none | nothing "cite")`: the last slot is mandatory; `none` is the design's `-`.
 macro_rules! e {
-    ($code:ident, $($reason:ident)? $(_)? => $computer:ident, $rule:expr, $sent:ident, $recovery:expr, $($next:literal)? $(none)? $(nothing $cite:literal)?) => {
+    ($code:ident, $($reason:ident)? $(_)? => $computer:ident, $rule:expr, $sent:ident, $recovery:expr, $($next:tt)+) => {
         make(
             Source::Engine(EngineCode::$code),
             e!(@reason $($reason)?),
@@ -66,19 +66,21 @@ macro_rules! e {
             $rule,
             NothingSent::$sent,
             $recovery,
-            e!(@next $($next)? $(cite $cite)?),
+            e!(@next $($next)+),
         )
     };
     (@reason) => { None };
     (@reason $reason:ident) => { Some(Reason::$reason) };
-    (@next) => { NextCall::Nothing { cite: NOTHING_FOLLOWS } };
+    // The next-call slot is mandatory: exactly one of "call", `none` (the design's `-`) or
+    // `nothing "cite"`. There is no empty arm, so a row without the slot does not build.
     (@next $next:literal) => { NextCall::Call($next) };
-    (@next cite $cite:literal) => { NextCall::Nothing { cite: $cite } };
+    (@next none) => { NextCall::Nothing { cite: NOTHING_FOLLOWS } };
+    (@next nothing $cite:literal) => { NextCall::Nothing { cite: $cite } };
 }
 
-/// `l!(LayerFailure, Reason|_ => ComputerCode, rule, Yes|No|Depends, recovery, nextCall|none)`; `none` is the design's `-`.
+/// `l!(LayerFailure, Reason|_ => ComputerCode, rule, Yes|No|Depends, recovery, "call" | none | nothing "cite")`: the last slot is mandatory; `none` is the design's `-`.
 macro_rules! l {
-    ($layer:ident, $($reason:ident)? $(_)? => $computer:ident, $rule:expr, $sent:ident, $recovery:expr, $($next:literal)? $(none)? $(nothing $cite:literal)?) => {
+    ($layer:ident, $($reason:ident)? $(_)? => $computer:ident, $rule:expr, $sent:ident, $recovery:expr, $($next:tt)+) => {
         make(
             Source::Layer(LayerFailure::$layer),
             e!(@reason $($reason)?),
@@ -86,7 +88,7 @@ macro_rules! l {
             $rule,
             NothingSent::$sent,
             $recovery,
-            e!(@next $($next)? $(cite $cite)?),
+            e!(@next $($next)+),
         )
     };
 }
