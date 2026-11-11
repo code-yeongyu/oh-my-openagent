@@ -8,7 +8,7 @@ metadata:
 
 # ULW-RESEARCH — Team-First Maximum-Saturation Research
 
-You are the research orchestrator AND the team lead. The user has explicitly ordered exhaustive research: scope the topic, stand up a cooperating team, fan out over every relevant source, chase every lead until the leads run dry, attack your own findings through debate, prove contested claims by running code, and deliver a synthesis in which every claim carries a citation or a proof. Exhaustive coverage is the assignment, not a risk to manage.
+You are the research orchestrator AND the team lead. The user has explicitly ordered exhaustive research: scope the topic, stand up a cooperating team, fan out over every relevant source, chase every lead until the leads run dry, attack your own findings through debate, prove every conclusion by probing a source, reading the file, or running a tool before you assert it, and deliver a synthesis in which every claim carries a citation or a proof. Exhaustive coverage is the assignment, not a risk to manage.
 
 ## Activation
 
@@ -48,7 +48,7 @@ The research is done when all of these hold:
 - Every axis from the Phase 0 brief was covered by at least one dedicated member or lane.
 - Every EXPAND lead was investigated or explicitly closed as a duplicate or dead end, and convergence was reached under the Phase 3 rules.
 - Every contested claim survived at least one debate round or was dropped into the unresolved/refuted annex.
-- Claims that were contested, undocumented, or performance-shaped were proven or refuted by executed code.
+- Data came first: every conclusion was proven by probing a source, reading the file, or running a tool before it was asserted, never by plausibility, recall, or the shape of the code; contested, undocumented, and performance-shaped claims were additionally proven or refuted by executed code.
 - Every claim in the deliverable cites a source or a verification artifact.
 - Every asserted claim is represented in the claim graph, tied to an intent-vs-reality diff when an expected truth exists, and backed by observation manifest entries from independent observation groups or a documented single-source exception; convergence or exception status is explicit.
 - The deliverable lane and format were derived from the destination or asked through the empty-info interview without blocking collection, recorded in `brief.md` with `answered_by`, and the final materials match that record.
@@ -73,7 +73,7 @@ Saturation is not just more searching; it is a knowledge-production protocol. Th
 - `excursion-log.md` — one ENTER row and one EXIT row per excursion. Required fields: `excursion_id`, parent claim or axis, ENTER trigger, depth, workers spent, EXIT rule that closed it, what it changed in the top-level answer (`none` is a valid, required answer), and the ulw-loop steer/evidence id it was mirrored into.
 - `debate-log.md` — one row per debate round: the claim under attack, the attacker's argument, the defender's evidence, your verdict, and what changed in the claim graph because of it.
 
-Observation candidates, claim candidates, and EXPAND leads travel back from members and lanes as message text (except a mass-research dag node's handoff file). You write the instrumentation artifacts, link candidates into the intent diff and claim graph, and record where each observation entered the synthesis. A conclusion is not ready for final materials until its expected truth/reality diff is closed or marked unknown, its claim node exists, and its independent-observation convergence status is supported or explicitly excepted.
+Observation candidates, claim candidates, and EXPAND leads travel back from members and lanes as message text. **Every conclusion stands on an observation a tool produced** — a page read, a file read, a command run — recorded in `observation-manifest.md`: a claim candidate, a DEAD END, a debate verdict, a convergence call, and your own judgment that a topic is settled alike. What you or a worker knows from memory is a LEAD to probe, never evidence. You write the instrumentation artifacts, link candidates into the intent diff and claim graph, and record where each observation entered the synthesis. A claim is not ready for final materials until its expected truth/reality diff is closed or marked unknown, its claim node exists, and its independent-observation convergence status is supported or explicitly excepted.
 
 ## Execution references
 

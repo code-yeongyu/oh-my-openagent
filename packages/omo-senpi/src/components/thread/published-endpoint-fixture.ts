@@ -10,6 +10,7 @@ import { createGatewayStore } from "./gateway/store"
 import { FakeSessionRuntime } from "./gateway/testing/fake-runtime"
 import { createThreadTools } from "./tools"
 import { createThreadSdk } from "./sdk"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 export async function publishedWorld() {
   const dir = mkdtempSync("/tmp/sgown-test-")
@@ -19,7 +20,10 @@ export async function publishedWorld() {
   let discovery = 0
   // The engine's per-endpoint liveness verdicts as `host status --all` last reported them; sockets
   // without an entry are reported answering, with no verdict.
-  const verdicts = new Map<string, { readonly alive: boolean; readonly reason: "live_unresponsive" | "dead" | null; readonly paths: readonly string[] }>()
+  const verdicts = new Map<
+    string,
+    { readonly alive: boolean; readonly reason: "live_unresponsive" | "dead" | null; readonly paths: readonly string[] }
+  >()
   const surface = createLiveThreadSurface(undefined, {
     env: { SENPI_RPC_SOCKET: join(dir, "missing.sock") },
     statusAll: async () => {
@@ -28,19 +32,34 @@ export async function publishedWorld() {
         const verdict = verdicts.get(socket)
         return verdict === undefined
           ? { socket, reachable: true, session_paths: [] }
-          : { socket, reachable: verdict.alive, session_paths: [...verdict.paths], alive: verdict.alive, reason: verdict.reason }
+          : {
+              socket,
+              reachable: verdict.alive,
+              session_paths: [...verdict.paths],
+              alive: verdict.alive,
+              reason: verdict.reason,
+            }
       })
     },
     registry: async () => [],
     connect: (path) => createConnection(path),
   })
-  const options = { host: surface, store, stateDirectory: dir, sessionsDirectory: () => join(dir, "sessions"), callerSessionId: () => "caller", callerWorkspaceRoot: () => dir }
+  const options = {
+    host: surface,
+    store,
+    stateDirectory: dir,
+    sessionsDirectory: () => join(dir, "sessions"),
+    callerSessionId: () => "caller",
+    callerWorkspaceRoot: () => dir,
+  }
   const tools = createThreadTools(options)
   let sequence = 0
   async function send(thread = "target") {
     const tool = tools.find((entry) => entry.name === "thread_send")
     if (tool === undefined) throw new Error("missing send")
-    return (await tool.execute(`send-${++sequence}`, { thread, message: "hello" }, undefined, undefined, undefined as never)).details.result
+    return (
+      await tool.execute(`send-${++sequence}`, { thread, message: "hello" }, undefined, undefined, undefined as never)
+    ).details.result
   }
   async function owner(name: string, cwd = dir, durableId = "target", terminal = false) {
     const socketPath = join(dir, terminal ? "t-0123456789abcdef.sock" : `${name}.sock`)
@@ -49,7 +68,10 @@ export async function publishedWorld() {
     const sessionDir = join(dir, "sessions", "--test--")
     mkdirSync(sessionDir, { recursive: true })
     const sessionPath = join(sessionDir, `2026-10-02_${durableId}.jsonl`)
-    writeFileSync(sessionPath, JSON.stringify({ type: "session", id: durableId, cwd, timestamp: "2026-10-02T00:00:00Z" }) + "\n")
+    writeFileSync(
+      sessionPath,
+      JSON.stringify({ type: "session", id: durableId, cwd, timestamp: "2026-10-02T00:00:00Z" }) + "\n",
+    )
     const runtime = new FakeSessionRuntime(sessionPath, durableId, cwd)
     let drain: ((event: SenpiWakeEvent) => unknown) | undefined
     const frames: string[] = []
@@ -58,37 +80,62 @@ export async function publishedWorld() {
     // A host-published owner listens on the transport its logical path names (a hashed pipe behind a raw
     // secret on win32); a terminal keeps its own secret on the logical path.
     const transport = terminal ? undefined : fakeHostTransport(socketPath)
-    const admit = (socket: Socket, accept: () => void) => (transport === undefined ? accept() : transport.authenticate(socket, accept))
-    const server = createServer((socket) => admit(socket, () => {
-      sockets.add(socket)
-      socket.once("close", () => sockets.delete(socket))
-      let buffer = ""
-      let authenticated = !terminal
-      socket.on("data", (chunk) => {
-        buffer += chunk.toString()
-        if (!authenticated) {
-          if (buffer.length < 32) return
-          buffer = buffer.slice(32)
-          authenticated = true
-        }
-        // The client negotiates protocol (and auth) before its command on the same connection: every line is a frame.
-        for (let newline = buffer.indexOf("\n"); newline >= 0; newline = buffer.indexOf("\n")) {
-          const frame = JSON.parse(buffer.slice(0, newline))
-          buffer = buffer.slice(newline + 1)
-          frames.push(frame.type)
-          if (frame.type === "get_protocol_info") { socket.write(JSON.stringify({ id: frame.id, success: true, data: {} }) + "\n"); continue }
-          if (frame.type === "list_sessions" && !listing.answer) continue
-          void (async () => {
-            if (frame.type === "list_sessions" && listing.delayMs > 0) await new Promise((done) => setTimeout(done, listing.delayMs))
-            const data = frame.type === "list_sessions"
-              ? { sessions: [{ sessionId: `route-${name}`, durableSessionId: listing.durableId, sessionPath, cwd, name, status: "open" }] }
-              : await drain?.({ type: "session_control_wake", reason: "command", reasons: ["command"], delivery_ids: frame.delivery_ids })
-            if (!socket.destroyed) socket.write(JSON.stringify({ id: frame.id, success: true, data: data ?? {} }) + "\n")
-          })()
-        }
-      })
-    }))
-    const listening = once(server, "listening", { signal: AbortSignal.timeout(5000) })
+    const admit = (socket: Socket, accept: () => void) =>
+      transport === undefined ? accept() : transport.authenticate(socket, accept)
+    const server = createServer((socket) =>
+      admit(socket, () => {
+        sockets.add(socket)
+        socket.once("close", () => sockets.delete(socket))
+        let buffer = ""
+        let authenticated = !terminal
+        socket.on("data", (chunk) => {
+          buffer += chunk.toString()
+          if (!authenticated) {
+            if (buffer.length < 32) return
+            buffer = buffer.slice(32)
+            authenticated = true
+          }
+          // The client negotiates protocol (and auth) before its command on the same connection: every line is a frame.
+          for (let newline = buffer.indexOf("\n"); newline >= 0; newline = buffer.indexOf("\n")) {
+            const frame = JSON.parse(buffer.slice(0, newline))
+            buffer = buffer.slice(newline + 1)
+            frames.push(frame.type)
+            if (frame.type === "get_protocol_info") {
+              socket.write(JSON.stringify({ id: frame.id, success: true, data: {} }) + "\n")
+              continue
+            }
+            if (frame.type === "list_sessions" && !listing.answer) continue
+            void (async () => {
+              if (frame.type === "list_sessions" && listing.delayMs > 0)
+                await new Promise((done) => setTimeout(done, listing.delayMs))
+              const data =
+                frame.type === "list_sessions"
+                  ? {
+                      sessions: [
+                        {
+                          sessionId: `route-${name}`,
+                          durableSessionId: listing.durableId,
+                          sessionPath,
+                          cwd,
+                          name,
+                          status: "open",
+                        },
+                      ],
+                    }
+                  : await drain?.({
+                      type: "session_control_wake",
+                      reason: "command",
+                      reasons: ["command"],
+                      delivery_ids: frame.delivery_ids,
+                    })
+              if (!socket.destroyed)
+                socket.write(JSON.stringify({ id: frame.id, success: true, data: data ?? {} }) + "\n")
+            })()
+          }
+        })
+      }),
+    )
+    const listening = once(server, "listening", { signal: testBudgetSignal("the published endpoint to listen") })
     server.listen(transport?.listenAddress ?? socketPath)
     await listening
     calls.push(socketPath)
@@ -102,7 +149,9 @@ export async function publishedWorld() {
       await done
     }
     const registrant = createControlEndpointRegistrant({
-      agentDir: () => dir, store, ...(terminal ? {} : { runtimeInstance: name }),
+      agentDir: () => dir,
+      store,
+      ...(terminal ? {} : { runtimeInstance: name }),
       control: {
         persistHeaderNow: async () => undefined,
         admissionGate: () => runtime.admissionGate(),
@@ -114,18 +163,43 @@ export async function publishedWorld() {
         },
       },
     })
-    const start = () => registrant.start({ durableId, sessionPath: () => sessionPath, isIdle: () => runtime.phase() === "idle" })
+    const start = () =>
+      registrant.start({ durableId, sessionPath: () => sessionPath, isIdle: () => runtime.phase() === "idle" })
     await start()
-    releases.push(async () => { await registrant.stop(); await crash() })
-    return { frames, runtime, crash, stop: registrant.stop, start, socketPath, sessionPath, listing,
-      connected: () => once(server, "connection", { signal: AbortSignal.timeout(5000) }),
+    releases.push(async () => {
+      await registrant.stop()
+      await crash()
+    })
+    return {
+      frames,
+      runtime,
+      crash,
+      stop: registrant.stop,
+      start,
+      socketPath,
+      sessionPath,
+      listing,
+      connected: () =>
+        once(server, "connection", { signal: testBudgetSignal("a connection to the published endpoint") }),
     }
   }
   const sdk = createThreadSdk({ agentDir: dir, cwd: dir, uid: 123, user: "test", host: surface, store })
   return {
-    dir, store, owner, send, sdk, discovery: () => discovery,
+    dir,
+    store,
+    owner,
+    send,
+    sdk,
+    discovery: () => discovery,
     /** The engine judged this socket `alive`/`reason` until the next enumeration; `paths` are its session files. */
-    setVerdict: (socket: string, verdict: { readonly alive: boolean; readonly reason: "live_unresponsive" | "dead" | null; readonly paths: readonly string[] }) => verdicts.set(socket, verdict),
+    setVerdict: (
+      socket: string,
+      verdict: {
+        readonly alive: boolean
+        readonly reason: "live_unresponsive" | "dead" | null
+        readonly paths: readonly string[]
+      },
+    ) => verdicts.set(socket, verdict),
     async close() {
       for (const release of releases.reverse()) await release()
       await sdk.dispose()

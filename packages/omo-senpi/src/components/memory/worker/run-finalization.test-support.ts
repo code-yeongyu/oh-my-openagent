@@ -23,8 +23,15 @@ export async function cleanupFinalizationFixtures(): Promise<void> {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 }
 
+/** A targeted dream run instead of the default reflection: extra seed notes, the model's own commits, its target. */
+export interface TargetedDreamSetup {
+  readonly seedFiles: Readonly<Record<string, string>>
+  readonly targetDoc: string
+  readonly commit: (worktreeDir: string) => Promise<void>
+}
+
 /** A settled reflection run: committed worktree, published outcome, and (by default) a landed merge. */
-export async function finalizationFixture(integrate = true) {
+export async function finalizationFixture(integrate = true, dream?: TargetedDreamSetup) {
   const root = await mkdtemp(join(tmpdir(), "run-finalization-"))
   roots.push(root)
   const identity: MemoryIdentity = {
@@ -33,7 +40,12 @@ export async function finalizationFixture(integrate = true) {
     paths: buildIdentityPaths(root, "agent-test"),
   }
   const repo = new GitMemoryRepo({ dir: identity.paths.repo, agentId: identity.id })
-  await repo.init({ seedFiles: [{ relativePath: "system/base.md", content: "---\ndescription: Base\n---\nbase\n" }] })
+  await repo.init({
+    seedFiles: [
+      { relativePath: "system/base.md", content: "---\ndescription: Base\n---\nbase\n" },
+      ...Object.entries(dream?.seedFiles ?? {}).map(([relativePath, content]) => ({ relativePath, content })),
+    ],
+  })
   const journal = new TranscriptJournal({ journalDir: join(identity.paths.transcripts, "conversation-a") })
   await journal.reconcile([{ kind: "assistant", messageId: "assistant-1", textBlocks: ["remember"] }])
   const store = new ReflectionReservationStore({
@@ -51,13 +63,17 @@ export async function finalizationFixture(integrate = true) {
   })
   if (reserved.status === "parked") throw new Error("fixture reservation was parked")
   const worktree = await createReflectionWorktree(repo, reserved.run.runId, identity.paths.worktrees)
-  await mkdir(join(worktree.dir, "system"), { recursive: true })
-  await writeFile(join(worktree.dir, "system", "learned.md"), "---\ndescription: Learned\n---\nlearned\n")
-  const childRepo = new GitMemoryRepo({ dir: worktree.dir, agentId: identity.id })
-  await childRepo.commitWrite(["system/learned.md"], "reflection learned", {
-    agentId: identity.id,
-    authorName: "Reflection Agent",
-  })
+  if (dream === undefined) {
+    await mkdir(join(worktree.dir, "system"), { recursive: true })
+    await writeFile(join(worktree.dir, "system", "learned.md"), "---\ndescription: Learned\n---\nlearned\n")
+    const childRepo = new GitMemoryRepo({ dir: worktree.dir, agentId: identity.id })
+    await childRepo.commitWrite(["system/learned.md"], "reflection learned", {
+      agentId: identity.id,
+      authorName: "Reflection Agent",
+    })
+  } else {
+    await dream.commit(worktree.dir)
+  }
   const runDir = join(identity.paths.reflection, "runs", reserved.run.runId)
   await mkdir(runDir, { recursive: true })
   const ledger: ReservationRunLedger = {
@@ -67,8 +83,9 @@ export async function finalizationFixture(integrate = true) {
     category: "quick",
     conversationIds: ["conversation-a"],
     model: "fixture/model",
-    kind: "reflection",
-    trigger: "step-count",
+    ...(dream === undefined
+      ? { kind: "reflection" as const, trigger: "step-count" as const }
+      : { kind: "dream" as const, trigger: "dream" as const, origin: "manual" as const, targetDoc: dream.targetDoc }),
     startedAt: "2026-08-11T10:00:00.000Z",
     hardDeadlineAt: 1,
     terminationGraceMs: 1,

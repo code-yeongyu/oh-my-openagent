@@ -35,14 +35,14 @@ export interface TrustedHookState {
 
 export type CodexMarketplaceSource =
   | {
-    readonly sourceType: "git"
-    readonly source: string
-    readonly ref: string
-  }
+      readonly sourceType: "git"
+      readonly source: string
+      readonly ref: string
+    }
   | {
-    readonly sourceType: "local"
-    readonly source: string
-  }
+      readonly sourceType: "local"
+      readonly source: string
+    }
 
 export interface CodexAgentConfig {
   readonly name: string
@@ -54,25 +54,22 @@ export interface CommandRunOptions {
   readonly env?: NodeJS.ProcessEnv
 }
 
-export type RunCommand = (
-  command: string,
-  args: readonly string[],
-  options: CommandRunOptions,
-) => Promise<void>
+export type RunCommand = (command: string, args: readonly string[], options: CommandRunOptions) => Promise<void>
 
-export type CodexInstallPlatform = "aix" | "android" | "darwin" | "freebsd" | "haiku" | "linux" | "openbsd" | "sunos" | "win32" | "cygwin" | "netbsd"
+export type CodexInstallPlatform =
+  "aix" | "android" | "darwin" | "freebsd" | "haiku" | "linux" | "openbsd" | "sunos" | "win32" | "cygwin" | "netbsd"
 
 export type GitBashResolution =
   | {
-    readonly found: true
-    readonly path: string | null
-    readonly source: "not-required" | "env" | "program-files" | "program-files-x86" | "path"
-  }
+      readonly found: true
+      readonly path: string | null
+      readonly source: "not-required" | "env" | "program-files" | "program-files-x86" | "path"
+    }
   | {
-    readonly found: false
-    readonly checkedPaths: readonly string[]
-    readonly installHint: string
-  }
+      readonly found: false
+      readonly checkedPaths: readonly string[]
+      readonly installHint: string
+    }
 
 export type GitBashResolver = () => GitBashResolution
 

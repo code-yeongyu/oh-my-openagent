@@ -53,9 +53,8 @@ describe("reapLspDaemons", () => {
 
     const unixEndpoint = liveLegacyEndpointFor({ codexHome, version: "0.1.0", platform: "linux" })
     const windowsEndpoint = liveLegacyEndpointFor({ codexHome, version: "0.1.0", platform: "win32" })
-    const unixSuffix = process.platform === "win32"
-      ? "\\codex-lsp\\daemon\\v0.1.0/daemon.sock"
-      : "/codex-lsp/daemon/v0.1.0/daemon.sock"
+    const unixSuffix =
+      process.platform === "win32" ? "\\codex-lsp\\daemon\\v0.1.0/daemon.sock" : "/codex-lsp/daemon/v0.1.0/daemon.sock"
 
     expect(unixEndpoint.endsWith(unixSuffix)).toBe(true)
     expect(windowsEndpoint.startsWith("\\\\.\\pipe\\omo-lsp-0.1.0-")).toBe(true)
@@ -75,7 +74,13 @@ describe("reapLspDaemons", () => {
       codexHome,
       version: "0.1.0",
       pid: "333",
-      endpoint: legacyEndpointFor({ codexHome, version: "0.1.0", kind: "hashed", platform: "linux", tempDir: tmpdir() }),
+      endpoint: legacyEndpointFor({
+        codexHome,
+        version: "0.1.0",
+        kind: "hashed",
+        platform: "linux",
+        tempDir: tmpdir(),
+      }),
     })
 
     const deps = { platform: "linux" as const, tmpDir: tmpdir() }
@@ -99,7 +104,13 @@ describe("reapLspDaemons", () => {
       codexHome,
       version: "0.1.0",
       pid: "333",
-      endpoint: legacyEndpointFor({ codexHome, version: "0.1.0", kind: "hashed", platform: "linux", tempDir: tmpdir() }),
+      endpoint: legacyEndpointFor({
+        codexHome,
+        version: "0.1.0",
+        kind: "hashed",
+        platform: "linux",
+        tempDir: tmpdir(),
+      }),
     })
 
     const reaped = await reapLspDaemons(codexHome, { platform: "win32", tmpDir: tmpdir() })
@@ -224,5 +235,4 @@ describe("reapLspDaemons", () => {
     expect(killed).toEqual([])
     expect(existsSync(version.versionDir)).toBe(true)
   })
-
 })

@@ -16,10 +16,12 @@ export function accountSourceFromSelection(options: {
   let selected: Promise<MemorySyncSelection> | undefined
   let cliSource: DeviceAccountSource | undefined
   let current: DesktopSyncAccount | undefined
-  // One open in flight per source: resolves that overlap before an account is current share it, so the claimed
-  // channel carries one descriptor request, not one per caller (#12799).
+  // Concurrent resolves with no current account share one open, so the channel sees one descriptor request (#12799).
   let opening: Promise<DesktopSyncAccount> | undefined
-  const unavailable = (reason: DesktopSyncUnavailable["reason"]): DesktopSyncUnavailable => ({ kind: "unavailable", reason })
+  const unavailable = (reason: DesktopSyncUnavailable["reason"]): DesktopSyncUnavailable => ({
+    kind: "unavailable",
+    reason,
+  })
   return async (): Promise<DeviceAccount | null> => {
     selected ??= options.selection()
     const selection = await selected
@@ -33,15 +35,20 @@ export function accountSourceFromSelection(options: {
     // Drop only the account this resolve checked: another resolve may have reopened while the check was awaited, and
     // its account is the current one (#12803 review).
     const checked = current
-    if (checked !== undefined && await checked.isCurrent()) return checked
+    if (checked !== undefined && (await checked.isCurrent())) return checked
     if (current !== undefined && current !== checked) return current
     current = undefined
     try {
       // `current` is set inside the shared open, before it stops being shared, so a resolve that resumes after the open
       // settles finds the account rather than an empty source and a cleared `opening` (#12803 review).
       opening ??= open(channel)
-        .then((account) => { current = account; return account })
-        .finally(() => { opening = undefined })
+        .then((account) => {
+          current = account
+          return account
+        })
+        .finally(() => {
+          opening = undefined
+        })
       return await opening
     } catch (error) {
       if (channel.signal.aborted) return unavailable("private_channel_unavailable")

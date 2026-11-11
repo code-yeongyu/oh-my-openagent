@@ -25,7 +25,10 @@ describe("compileMemoryBlock projection limits", () => {
       relativePath: `reference/n${String(index).padStart(2, "0")}.md`,
       content: memory(`N${index}`, "x"),
     }))
-    const { dir, repo } = await repoWith([{ relativePath: "system/human.md", content: memory("Human", "Person") }, ...notes])
+    const { dir, repo } = await repoWith([
+      { relativePath: "system/human.md", content: memory("Human", "Person") },
+      ...notes,
+    ])
     await commitAt(dir, "reference/n40.md", memory("N40", "rewritten"), "2099-01-01T00:00:00Z")
 
     // when
@@ -44,7 +47,10 @@ describe("compileMemoryBlock projection limits", () => {
     await commitAt(dir, "reference/a.md", memory("A", "x"), "2026-01-01T00:00:02Z")
 
     // when
-    const block = await compileMemoryBlock(repo, { agentId: "a", projection: { maxEntriesPerDirectory: 0, maxBytes: 0 } })
+    const block = await compileMemoryBlock(repo, {
+      agentId: "a",
+      projection: { maxEntriesPerDirectory: 0, maxBytes: 0 },
+    })
 
     // then
     expect(projectionLine(block, "reference/")).toBe("reference/: a, b")
@@ -55,10 +61,15 @@ describe("compileMemoryBlock projection limits", () => {
     const { dir, repo } = await repoWith([{ relativePath: "system/human.md", content: memory("Human", "Person") }])
     await commitAt(dir, "reference/b.md", memory("B", "x"), "2026-01-01T00:00:01Z")
     await commitAt(dir, "reference/a.md", memory("A", "x"), "2026-01-01T00:00:02Z")
-    repo.pathCommitTimes = async () => { throw new Error("git log timed out") }
+    repo.pathCommitTimes = async () => {
+      throw new Error("git log timed out")
+    }
 
     // when
-    const block = await compileMemoryBlock(repo, { agentId: "a", projection: { maxEntriesPerDirectory: 1, maxBytes: 0 } })
+    const block = await compileMemoryBlock(repo, {
+      agentId: "a",
+      projection: { maxEntriesPerDirectory: 1, maxBytes: 0 },
+    })
 
     // then
     expect(block).toContain("Person")
@@ -72,7 +83,9 @@ describe("compileMemoryBlock projection limits", () => {
     const head = await repo.head()
     if (head === null) throw new Error("expected a head")
     const readable = await externalProjectionStatsAt(repo, head, { maxEntriesPerDirectory: 1, maxBytes: 0 })
-    repo.pathCommitTimes = async () => { throw new Error("git log timed out") }
+    repo.pathCommitTimes = async () => {
+      throw new Error("git log timed out")
+    }
 
     // when
     const unreadable = await externalProjectionStatsAt(repo, head, { maxEntriesPerDirectory: 1, maxBytes: 0 })
@@ -90,9 +103,18 @@ describe("compileMemoryBlock projection limits", () => {
     const cache = new MemoryBlockCache()
 
     // when
-    const capped = await cache.compile(repo, "t", { agentId: "a", projection: { maxEntriesPerDirectory: 1, maxBytes: 0 } })
-    const open = await cache.compile(repo, "t", { agentId: "a", projection: { maxEntriesPerDirectory: 0, maxBytes: 0 } })
-    const cappedAgain = await cache.compile(repo, "t", { agentId: "a", projection: { maxEntriesPerDirectory: 1, maxBytes: 0 } })
+    const capped = await cache.compile(repo, "t", {
+      agentId: "a",
+      projection: { maxEntriesPerDirectory: 1, maxBytes: 0 },
+    })
+    const open = await cache.compile(repo, "t", {
+      agentId: "a",
+      projection: { maxEntriesPerDirectory: 0, maxBytes: 0 },
+    })
+    const cappedAgain = await cache.compile(repo, "t", {
+      agentId: "a",
+      projection: { maxEntriesPerDirectory: 1, maxBytes: 0 },
+    })
 
     // then
     expect(cache.size).toBe(2)

@@ -16,7 +16,9 @@ const leases = new Set<string>()
 const bootAtMs = Date.now() - uptime() * 1000
 
 export class TrustStorageError extends Error {
-  constructor(readonly code: "trust-user-extras-unrecoverable" | "trust-path-unrepresentable" | "trust-userns-unattested") {
+  constructor(
+    readonly code: "trust-user-extras-unrecoverable" | "trust-path-unrepresentable" | "trust-userns-unattested",
+  ) {
     super(code)
   }
 }
@@ -39,7 +41,10 @@ function serializeCertificates(pems: readonly string[]): string {
     const cert = new X509Certificate(pem)
     sorted.set(digest(cert.raw), cert.toString().trimEnd() + "\n")
   }
-  return [...sorted].sort(([a], [b]) => a.localeCompare(b)).map(([, pem]) => pem).join("")
+  return [...sorted]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, pem]) => pem)
+    .join("")
 }
 
 /** Malformed blocks stay an adoption loaded-set failure, never a partial import. */
@@ -47,7 +52,11 @@ function generationCertificates(text: string): { certificates: string[]; malform
   const certificates: string[] = []
   let malformed = false
   for (const [block] of text.matchAll(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g)) {
-    try { certificates.push(new X509Certificate(block).toString()) } catch { malformed = true }
+    try {
+      certificates.push(new X509Certificate(block).toString())
+    } catch {
+      malformed = true
+    }
   }
   return { certificates, malformed }
 }
@@ -73,8 +82,13 @@ export type AncestorVerdict = "ok" | "unsafe-directory" | "unsafe-ancestor" | "u
  * as root only when the launcher attested that exact path and inode (senpi#5334); any other unmapped owner
  * there is the named refusal, because the real owner cannot be seen.
  */
-export function judgeAncestor(view: UsernsView | null, path: string, stat: AncestorStat, selfUid: number | undefined,
-  platform: NodeJS.Platform): AncestorVerdict {
+export function judgeAncestor(
+  view: UsernsView | null,
+  path: string,
+  stat: AncestorStat,
+  selfUid: number | undefined,
+  platform: NodeJS.Platform,
+): AncestorVerdict {
   if (!stat.directory || stat.symlink) return "unsafe-directory"
   if (platform === "win32") return "ok"
   if ((stat.mode & 0o022) !== 0 && (stat.mode & 0o1000) === 0) return "unsafe-ancestor"
@@ -90,10 +104,20 @@ async function ancestors(path: string): Promise<void> {
   const view = process.platform === "linux" ? readUsernsView(process.env) : null
   for (;;) {
     const stat = await fs.lstat(current, { bigint: true })
-    const verdict = judgeAncestor(view, current, {
-      directory: stat.isDirectory(), symlink: stat.isSymbolicLink(), mode: Number(stat.mode), uid: Number(stat.uid),
-      dev: stat.dev, ino: stat.ino,
-    }, process.getuid?.(), process.platform)
+    const verdict = judgeAncestor(
+      view,
+      current,
+      {
+        directory: stat.isDirectory(),
+        symlink: stat.isSymbolicLink(),
+        mode: Number(stat.mode),
+        uid: Number(stat.uid),
+        dev: stat.dev,
+        ino: stat.ino,
+      },
+      process.getuid?.(),
+      process.platform,
+    )
     if (verdict === "unsafe-directory") throw new Error("unsafe trust directory")
     if (verdict === "unsafe-ancestor") throw new Error("unsafe trust ancestor")
     if (verdict === "unattested") throw new TrustStorageError("trust-userns-unattested")
@@ -111,7 +135,9 @@ async function privateDirectory(path: string): Promise<void> {
 async function createPrivateDirectory(path: string): Promise<void> {
   const parent = dirname(path)
   if (parent !== path) {
-    try { await ancestors(parent) } catch (error) {
+    try {
+      await ancestors(parent)
+    } catch (error) {
       if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error
       await createPrivateDirectory(parent)
     }
@@ -141,7 +167,9 @@ export async function prepareTrustDirectory(requested: string, platform: NodeJS.
     codes.push({ code: "trust-dir-unsafe" })
   }
   if (directory === requested && platform === "linux") {
-    try { await fs.access(requested, constants.W_OK) } catch {
+    try {
+      await fs.access(requested, constants.W_OK)
+    } catch {
       directory = await temporaryTrustDirectory(platform)
       codes.push({ code: "trust-dir-readonly" })
     }
@@ -157,8 +185,14 @@ async function readOwnedTrustFile(path: string): Promise<string> {
   const file = await fs.open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0))
   try {
     const stat = await file.stat()
-    if (!stat.isFile() || !owned(stat, 0o600) || stat.size > MAX_BYTES
-      || stat.dev !== before.dev || stat.ino !== before.ino) throw new Error("unsafe trust file")
+    if (
+      !stat.isFile() ||
+      !owned(stat, 0o600) ||
+      stat.size > MAX_BYTES ||
+      stat.dev !== before.dev ||
+      stat.ino !== before.ino
+    )
+      throw new Error("unsafe trust file")
     const bytes = Buffer.alloc(stat.size + 1)
     const { bytesRead } = await file.read(bytes, 0, bytes.length, 0)
     if (bytesRead !== stat.size) throw new Error("trust file changed")
@@ -177,19 +211,30 @@ async function atomicWrite(path: string, text: string): Promise<void> {
   } finally {
     await file.close()
   }
-  try { await fs.rename(temporary, path) } finally { await fs.unlink(temporary).catch(() => {}) }
+  try {
+    await fs.rename(temporary, path)
+  } finally {
+    await fs.unlink(temporary).catch(() => {})
+  }
 }
 
-async function immutableFile(directory: string, prefix: string, text: string): Promise<{ file: string; sha256: string; codes: TrustDiagnosticEntry[] }> {
+async function immutableFile(
+  directory: string,
+  prefix: string,
+  text: string,
+): Promise<{ file: string; sha256: string; codes: TrustDiagnosticEntry[] }> {
   if (Buffer.byteLength(text) > MAX_BYTES) throw new Error("trust generation exceeds 8 MiB")
   const sha256 = digest(text)
   const file = join(directory, `${prefix}${sha256}.pem`)
   try {
-    if (await readOwnedTrustFile(file) === text) {
+    if ((await readOwnedTrustFile(file)) === text) {
       // Reuse is use: retention ranks by mtime, and the caller is about to hand this path out (5.3).
       const now = new Date()
       // A failed refresh leaves this generation ranked as old, so it is reported like a failed lease.
-      const codes: TrustDiagnosticEntry[] = await fs.utimes(file, now, now).then(() => [], () => [{ code: "trust-lease-failed" }])
+      const codes: TrustDiagnosticEntry[] = await fs.utimes(file, now, now).then(
+        () => [],
+        () => [{ code: "trust-lease-failed" }],
+      )
       return { file, sha256, codes }
     }
   } catch (error) {
@@ -199,7 +244,11 @@ async function immutableFile(directory: string, prefix: string, text: string): P
   return { file, sha256, codes: [] }
 }
 
-export async function recoverUserExtras(incoming: string | undefined, loaded: () => readonly string[], knownGeneration = false) {
+export async function recoverUserExtras(
+  incoming: string | undefined,
+  loaded: () => readonly string[],
+  knownGeneration = false,
+) {
   if (incoming === undefined) return { certificates: [...loaded()], recognized: false }
   let prefix: string
   try {
@@ -209,7 +258,9 @@ export async function recoverUserExtras(incoming: string | undefined, loaded: ()
       const bytes = Buffer.alloc(256)
       const { bytesRead } = await file.read(bytes, 0, bytes.length, 0)
       prefix = bytes.subarray(0, bytesRead).toString("utf8")
-    } finally { await file.close() }
+    } finally {
+      await file.close()
+    }
   } catch {
     // A removed addressed generation must never turn its cached automatic roots into U.
     const certificates = [...loaded()]
@@ -227,34 +278,55 @@ export async function recoverUserExtras(incoming: string | undefined, loaded: ()
     const text = await readOwnedTrustFile(join(dirname(incoming), `u-${user}.pem`))
     if (!text.startsWith(USER_HEADER) || digest(text) !== user) throw new Error("wrong user file")
     const parsed = generationCertificates(text)
-    if (parsed.malformed || serializeCertificates(parsed.certificates) !== text.slice(USER_HEADER.length)) throw new Error("invalid user file")
+    if (parsed.malformed || serializeCertificates(parsed.certificates) !== text.slice(USER_HEADER.length))
+      throw new Error("invalid user file")
     return { certificates: parsed.certificates, recognized: true }
   } catch {
     throw new TrustStorageError("trust-user-extras-unrecoverable")
   }
 }
 
-export async function writeTrustGeneration(directory: string, automatic: readonly string[], extras: readonly string[], user: readonly string[]) {
-  const userFile = user.length === 0 ? null : await immutableFile(directory, "u-", USER_HEADER + serializeCertificates(user))
+export async function writeTrustGeneration(
+  directory: string,
+  automatic: readonly string[],
+  extras: readonly string[],
+  user: readonly string[],
+) {
+  const userFile =
+    user.length === 0 ? null : await immutableFile(directory, "u-", USER_HEADER + serializeCertificates(user))
   const header = `${GENERATION_PREFIX} v1 user=${userFile?.sha256 ?? "none"}\n`
-  const generation = await immutableFile(directory, "", header + serializeCertificates([...automatic, ...extras, ...user]))
+  const generation = await immutableFile(
+    directory,
+    "",
+    header + serializeCertificates([...automatic, ...extras, ...user]),
+  )
   return {
-    file: generation.file, sha256: generation.sha256, user: userFile?.sha256 ?? null,
-    codes: [...userFile?.codes ?? [], ...generation.codes],
+    file: generation.file,
+    sha256: generation.sha256,
+    user: userFile?.sha256 ?? null,
+    codes: [...(userFile?.codes ?? []), ...generation.codes],
   }
 }
 
 export async function verifyTrustGeneration(marker: EngineTrustMarker) {
   const text = await readOwnedTrustFile(marker.file)
   const user = GENERATION_HEADER.exec(text)?.[1]
-  if (basename(marker.file) !== `${marker.sha256}.pem` || digest(text) !== marker.sha256
-    || user !== (marker.user ?? "none")) throw new Error("generation mismatch")
+  if (
+    basename(marker.file) !== `${marker.sha256}.pem` ||
+    digest(text) !== marker.sha256 ||
+    user !== (marker.user ?? "none")
+  )
+    throw new Error("generation mismatch")
   return generationCertificates(text)
 }
 
-export async function verifyTrustDefaults(defaults: NonNullable<EngineTrustMarker["defaults"]>, platform: NodeJS.Platform): Promise<void> {
-  if ([defaults.file, defaults.dir].some((path) => path.includes(platform === "win32" ? ";" : ":"))) throw new Error("split closure path")
-  if (await readOwnedTrustFile(defaults.file) !== "") throw new Error("nonempty closure file")
+export async function verifyTrustDefaults(
+  defaults: NonNullable<EngineTrustMarker["defaults"]>,
+  platform: NodeJS.Platform,
+): Promise<void> {
+  if ([defaults.file, defaults.dir].some((path) => path.includes(platform === "win32" ? ";" : ":")))
+    throw new Error("split closure path")
+  if ((await readOwnedTrustFile(defaults.file)) !== "") throw new Error("nonempty closure file")
   await privateDirectory(defaults.dir)
   if ((await fs.readdir(defaults.dir)).length !== 0) throw new Error("nonempty closure directory")
 }
@@ -265,7 +337,9 @@ export async function createTrustDefaults(directory: string) {
   await createPrivateDirectory(parent)
   const defaults = { file: join(parent, "empty.pem"), dir: join(parent, "empty.d") }
   await createPrivateDirectory(defaults.dir)
-  try { await fs.writeFile(defaults.file, "", { flag: "wx", mode: 0o600 }) } catch (error) {
+  try {
+    await fs.writeFile(defaults.file, "", { flag: "wx", mode: 0o600 })
+  } catch (error) {
     if (!(error instanceof Error && "code" in error && error.code === "EEXIST")) throw error
   }
   await verifyTrustDefaults(defaults, process.platform)
@@ -284,9 +358,14 @@ export async function leaseTrustGeneration(marker: GenerationName, pid = process
     // Only this process's own leases end with it. A lease written for another pid (`trust ensure
     // --lease-pid`) must outlive this process; it dies when that pid does.
     if (pid === process.pid) {
-      if (leases.size === 0) process.once("exit", () => {
-        for (const lease of leases) { try { unlinkSync(lease) } catch {} }
-      })
+      if (leases.size === 0)
+        process.once("exit", () => {
+          for (const lease of leases) {
+            try {
+              unlinkSync(lease)
+            } catch {}
+          }
+        })
       leases.add(path)
     }
     const now = new Date()
@@ -298,5 +377,10 @@ export async function leaseTrustGeneration(marker: GenerationName, pid = process
 }
 
 export async function retainTrustGeneration(marker: GenerationName): Promise<void> {
-  await sweepTrustRetention({ directory: dirname(marker.file), current: marker.sha256, bootAtMs, isPidAlive: pidAnswersSignalZero })
+  await sweepTrustRetention({
+    directory: dirname(marker.file),
+    current: marker.sha256,
+    bootAtMs,
+    isPidAlive: pidAnswersSignalZero,
+  })
 }

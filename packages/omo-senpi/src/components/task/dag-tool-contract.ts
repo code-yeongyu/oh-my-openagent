@@ -82,7 +82,12 @@ export type DagToolDetails =
   | { readonly kind: "waited"; readonly run_id: string; readonly result: DagRunResult }
   | { readonly kind: "detached"; readonly run_id: string; readonly snapshot: DagRunSnapshot }
   | { readonly kind: "cancelled"; readonly run_id: string; readonly snapshot: DagRunSnapshot }
-  | { readonly kind: "node_cancelled"; readonly run_id: string; readonly node_id: string; readonly snapshot: DagRunSnapshot }
+  | {
+      readonly kind: "node_cancelled"
+      readonly run_id: string
+      readonly node_id: string
+      readonly snapshot: DagRunSnapshot
+    }
   | {
       readonly kind: "retried"
       readonly run_id: string
@@ -197,7 +202,11 @@ export function toDefinition(input: DagToolDefinitionInput): DagDefinition {
       // Target validation already proved exactly one of these is present.
       return node.category !== undefined
         ? { ...common, category: node.category }
-        : { ...common, subagent_type: node.subagent_type as string, ...(node.model === undefined ? {} : { model: node.model }) }
+        : {
+            ...common,
+            subagent_type: node.subagent_type as string,
+            ...(node.model === undefined ? {} : { model: node.model }),
+          }
     }),
   }
 }

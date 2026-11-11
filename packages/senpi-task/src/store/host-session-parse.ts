@@ -1,9 +1,7 @@
 import type { HostSessionIdentity, RunnerKind } from "../state"
 import { isRecord, readNumber, readOptionalNumber, readOptionalString, readString } from "./scalar-read"
 
-export function parseOptionalHostSession(
-  record: Record<string, unknown>,
-): HostSessionIdentity | undefined {
+export function parseOptionalHostSession(record: Record<string, unknown>): HostSessionIdentity | undefined {
   const value = record["host_session"]
   if (value === undefined) return undefined
   if (!isRecord(value)) throw new Error("host_session is not an object")
