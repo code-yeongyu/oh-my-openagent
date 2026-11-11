@@ -1,1 +1,10 @@
 file	pointer	kind	source	row	imported value	v3 value
+crates/omo-computer-core/fixtures/conformance/hello.json	/result/generation	additive	design row C2 (d-arch Version and ABI handshake): hello.generation	12		
+crates/omo-computer-core/fixtures/conformance/hello.json	/result/limits	additive	design row C2 (d-arch Version and ABI handshake): hello.limits	12		
+crates/omo-computer-core/fixtures/conformance/hello.json	/result/machineId	additive	d-arch Version and ABI handshake: hello.machineId (AC-32 hello leg)	12		
+crates/omo-computer-core/fixtures/conformance/action-report-legacy.json	/result/generation	additive	design row C2 (d-arch Version and ABI handshake): hello.generation	12		
+crates/omo-computer-core/fixtures/conformance/action-report-legacy.json	/result/limits	additive	design row C2 (d-arch Version and ABI handshake): hello.limits	12		
+crates/omo-computer-core/fixtures/conformance/action-report-legacy.json	/result/machineId	additive	d-arch Version and ABI handshake: hello.machineId (AC-32 hello leg)	12		
+crates/omo-computer-core/fixtures/conformance/action-report-object.json	/result/generation	additive	design row C2 (d-arch Version and ABI handshake): hello.generation	12		
+crates/omo-computer-core/fixtures/conformance/action-report-object.json	/result/limits	additive	design row C2 (d-arch Version and ABI handshake): hello.limits	12		
+crates/omo-computer-core/fixtures/conformance/action-report-object.json	/result/machineId	additive	d-arch Version and ABI handshake: hello.machineId (AC-32 hello leg)	12		
