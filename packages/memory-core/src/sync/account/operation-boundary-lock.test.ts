@@ -21,9 +21,6 @@ const landsIn = (dir: string, to: fs.PathLike): boolean => {
   const rel = relative(dir, String(to))
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel)
 }
-afterEach(async () => {
-  for (const close of cleanup.splice(0).reverse()) await close()
-})
 
 // #12036: an unbounded wait here once reached the 15 s test timeout, bun killed the writer, and the
 // leaked `expect(...).rejects` of the timed-out body held the file open for 20 minutes. Every wait is
@@ -34,6 +31,15 @@ afterEach(async () => {
 const TEST_TIMEOUT_MS = 20_000
 const STEP_BUDGET_MS = 16_000
 const REAP_BOUND_MS = 2_000
+// Cleanup waits at most once for a reap and once for a publication to settle. The hook's own timeout is
+// stated above their sum: without `--timeout 20000` the runner would give it 5 s, less than those bounds.
+const SETTLE_BOUND_MS = 5_000
+const CLEANUP_TIMEOUT_MS = 10_000
+
+const closeAll = async (): Promise<void> => {
+  for (const close of cleanup.splice(0).reverse()) await close()
+}
+afterEach(closeAll, CLEANUP_TIMEOUT_MS)
 
 class StepStalled extends Error {
   constructor(
@@ -60,6 +66,28 @@ const outcomeOf = (promise: Promise<unknown>): Promise<Outcome> =>
     (): Outcome => ({ ok: true }),
     (error: unknown): Outcome => ({ ok: false, error }),
   )
+
+// A publication still running when a step fails keeps polling the credential lock inside the fixture
+// directory, and that poll's recursive mkdir brings the directory back after the fixture is closed: an
+// empty `genesis-enable-*` entry that the run's temp-root check then reports on top of the real failure.
+// A fixture a publication writes into is therefore closed only once every such publication has settled.
+// Closers run in reverse, so this one, registered first, runs after the writer is reaped and its lock is free.
+const closedAfterPublications = (f: { readonly close: () => Promise<void> }) => {
+  const publications: Promise<Outcome>[] = []
+  cleanup.push(async () => {
+    const step = stepsWithin(SETTLE_BOUND_MS, () => "fixture closed regardless")
+    try {
+      await step("publication settled", Promise.all(publications))
+    } finally {
+      await f.close()
+    }
+  })
+  return (publication: Promise<unknown>): Promise<Outcome> => {
+    const outcome = outcomeOf(publication)
+    publications.push(outcome)
+    return outcome
+  }
+}
 
 const writerState = (child: Subprocess | undefined) => () =>
   child === undefined
@@ -119,7 +147,7 @@ for (const change of ["replacement", "aba", "refresh", "signing", "sealing"] as 
       let child: Subprocess | undefined
       const step = stepsWithin(STEP_BUDGET_MS, () => writerState(child)())
       const f = await step("fixture", fixture())
-      cleanup.push(f.close)
+      const published = closedAfterPublications(f)
       const verified = await step("bootstrap walk", walk(f.built.request, f.keyring))
       if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
       const credentials = join(f.input.pinDir, "synthetic-credentials.json")
@@ -166,7 +194,7 @@ for (const change of ["replacement", "aba", "refresh", "signing", "sealing"] as 
         original(from, to)
       })
       cleanup.push(() => spy.mockRestore())
-      const result = outcomeOf(pinTrustAnchor(f.input.pinDir, ACCOUNT, verified.state.pin, { authority }))
+      const result = published(pinTrustAnchor(f.input.pinDir, ACCOUNT, verified.state.pin, { authority }))
       const first = await step(
         "boundary entry",
         Promise.race([entered.promise.then(() => "boundary"), result.then(() => "published")]),
@@ -258,7 +286,7 @@ test(
     let child: Subprocess | undefined
     const step = stepsWithin(STEP_BUDGET_MS, () => writerState(child)())
     const f = await step("fixture", fixture())
-    cleanup.push(f.close)
+    const published = closedAfterPublications(f)
     const verified = await step("bootstrap walk", walk(f.built.request, f.keyring))
     if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
     const credentials = join(f.input.pinDir, "synthetic-credentials.json")
@@ -266,6 +294,9 @@ test(
     const order: string[] = []
     const held = Promise.withResolvers<void>()
     const trying = Promise.withResolvers<void>()
+    // The publication parks on this gate while it holds the lock; cleanup opens it, so a failed step
+    // cannot leave the publication parked when the fixture closes.
+    cleanup.push(() => trying.resolve())
     const locked = Promise.withResolvers<void>()
     const written = Promise.withResolvers<void>()
     const { authority, entries } = lockedBoundary(credentials, async () => {
@@ -284,7 +315,7 @@ test(
     cleanup.push(() => spy.mockRestore())
 
     // given: the pin boundary holds the credential lock before the sibling writer starts
-    const result = outcomeOf(pinTrustAnchor(f.input.pinDir, ACCOUNT, verified.state.pin, { authority }))
+    const result = published(pinTrustAnchor(f.input.pinDir, ACCOUNT, verified.state.pin, { authority }))
     await step("boundary entry", Promise.race([held.promise, result]))
     const writer = spawnWriter(credentials, "replacement", (message) => {
       if (message === "trying") trying.resolve()
@@ -324,7 +355,7 @@ test(
   async () => {
     const step = stepsWithin(STEP_BUDGET_MS, () => "no writer")
     const f = await step("fixture", fixture())
-    cleanup.push(f.close)
+    const published = closedAfterPublications(f)
     const verified = await step("bootstrap walk", walk(f.built.request, f.keyring))
     if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
     const credentials = join(f.input.pinDir, "synthetic-credentials.json")
@@ -344,7 +375,7 @@ test(
     // when: the publication retries the interrupted rename
     const outcome = await step(
       "pin result",
-      outcomeOf(pinTrustAnchor(f.input.pinDir, ACCOUNT, verified.state.pin, { authority })),
+      published(pinTrustAnchor(f.input.pinDir, ACCOUNT, verified.state.pin, { authority })),
     )
 
     // then: the retry re-entered the boundary, saw generation 2, and made no second rename
@@ -352,6 +383,51 @@ test(
     expect(entries).toEqual([1, 2])
     expect(renames).toBe(1)
     expect(controller.signal.aborted).toBe(false)
+  },
+  TEST_TIMEOUT_MS,
+)
+
+test(
+  "a step that fails while the pin publication waits on the credential lock leaves no fixture directory behind",
+  async () => {
+    let child: Subprocess | undefined
+    const step = stepsWithin(STEP_BUDGET_MS, () => writerState(child)())
+    const f = await step("fixture", fixture())
+    const published = closedAfterPublications(f)
+    const verified = await step("bootstrap walk", walk(f.built.request, f.keyring))
+    if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
+    const credentials = join(f.input.pinDir, "synthetic-credentials.json")
+    writeFileSync(credentials, JSON.stringify({ identity: "A", generation: 1, token: 1 }))
+    const locked = Promise.withResolvers<void>()
+    const writer = spawnWriter(credentials, "hang", (message) => {
+      if (message === "locked") locked.resolve()
+    })
+    child = writer
+    await step("writer locked", Promise.race([locked.promise, exitedEarly(writer)]))
+    const entered = Promise.withResolvers<void>()
+    const { authority } = lockedBoundary(credentials, async () => undefined)
+    const waiting = {
+      ...authority,
+      boundary<T>(dispatch: () => T): Promise<T> {
+        entered.resolve()
+        return authority.boundary(dispatch)
+      },
+    }
+
+    // given: a publication inside its boundary, polling for the credential lock a stalled writer holds
+    const result = published(pinTrustAnchor(f.input.pinDir, ACCOUNT, verified.state.pin, { authority: waiting }))
+    const first = await step(
+      "boundary entry",
+      Promise.race([entered.promise.then(() => "boundary"), result.then(() => "published")]),
+    )
+    expect(first).toBe("boundary")
+
+    // when: a step fails at this point, so the test's cleanup runs, as afterEach runs it
+    await step("cleanup", closeAll())
+
+    // then: the publication settled before its directory was removed, so nothing brought the directory back
+    await step("pin result", result)
+    expect(fs.existsSync(f.input.pinDir)).toBe(false)
   },
   TEST_TIMEOUT_MS,
 )
