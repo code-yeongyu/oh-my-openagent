@@ -2173,6 +2173,7 @@
         "test-setup.ts",
         "test-temp-leak-match.ts",
         "test-temp-root.ts",
+        "crates/omo-computer-core/src/error/tests/check-design-citations.mjs",
       ],
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -3591,6 +3592,8 @@
         "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
         "**/*.test-d.ts",
         "vitest.config.ts",
+        // row 12: the generator package.json runs by path
+        "scripts/generate-protocol.ts",
       ],
     },
     "packages/omo-computer-sdk": {
