@@ -64,7 +64,7 @@ export async function readMachineId(sources: MachineIdSources = defaultSources):
 }
 
 /** OMO_DEVICE_PROFILE: unset or empty is the default profile; a name that is not a plain token binds nothing. */
-export function deviceProfileOf(env: Readonly<Record<string, string | undefined>>): string | undefined {
+function deviceProfileOf(env: Readonly<Record<string, string | undefined>>): string | undefined {
   const profile = env.OMO_DEVICE_PROFILE ?? ""
   return profile === "" || /^[A-Za-z0-9._-]{1,64}$/.test(profile) ? profile : undefined
 }

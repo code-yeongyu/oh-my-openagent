@@ -25,6 +25,13 @@ const adapterPackagePaths: readonly string[] = [
   "packages/senpi-desktop-sdk",
   "packages/senpi-desktop-service",
   "packages/senpi-desktop-tool",
+  "packages/omo-computer-protocol",
+  "packages/omo-computer-sdk",
+  "packages/omo-computer-engine",
+  "packages/omo-computer-hand",
+  "packages/omo-computer-carriers",
+  "packages/omo-computer-tool",
+  "packages/omo-computer-prelude",
   "packages/omo-opencode",
   "packages/omo-native",
 ] as const

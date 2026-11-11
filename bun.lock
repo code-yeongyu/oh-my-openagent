@@ -29,6 +29,13 @@
         "@oh-my-opencode/memory-core": "workspace:*",
         "@oh-my-opencode/model-core": "workspace:*",
         "@oh-my-opencode/omo-codex": "workspace:*",
+        "@oh-my-opencode/omo-computer-carriers": "workspace:*",
+        "@oh-my-opencode/omo-computer-engine": "workspace:*",
+        "@oh-my-opencode/omo-computer-hand": "workspace:*",
+        "@oh-my-opencode/omo-computer-prelude": "workspace:*",
+        "@oh-my-opencode/omo-computer-protocol": "workspace:*",
+        "@oh-my-opencode/omo-computer-sdk": "workspace:*",
+        "@oh-my-opencode/omo-computer-tool": "workspace:*",
         "@oh-my-opencode/omo-config-core": "workspace:*",
         "@oh-my-opencode/omo-opencode": "workspace:*",
         "@oh-my-opencode/omo-senpi": "workspace:*",
@@ -222,6 +229,86 @@
       },
       "devDependencies": {
         "bun-types": "1.4.4",
+      },
+    },
+    "packages/omo-computer-carriers": {
+      "name": "@oh-my-opencode/omo-computer-carriers",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/device-service-core": "workspace:*",
+        "@oh-my-opencode/omo-computer-sdk": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "26.6.2",
+        "vitest": "5.0.1",
+      },
+      "peerDependencies": {
+        "@bunshin/machine-sdk": "*",
+      },
+      "optionalPeers": [
+        "@bunshin/machine-sdk",
+      ],
+    },
+    "packages/omo-computer-engine": {
+      "name": "@oh-my-opencode/omo-computer-engine",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/omo-computer-protocol": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "26.6.2",
+        "vitest": "5.0.1",
+      },
+    },
+    "packages/omo-computer-hand": {
+      "name": "@oh-my-opencode/omo-computer-hand",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/omo-computer-engine": "workspace:*",
+        "@oh-my-opencode/omo-computer-sdk": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "26.6.2",
+        "vitest": "5.0.1",
+      },
+    },
+    "packages/omo-computer-prelude": {
+      "name": "@oh-my-opencode/omo-computer-prelude",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/node": "26.6.2",
+        "vitest": "5.0.1",
+      },
+    },
+    "packages/omo-computer-protocol": {
+      "name": "@oh-my-opencode/omo-computer-protocol",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/node": "26.6.2",
+        "vitest": "5.0.1",
+      },
+    },
+    "packages/omo-computer-sdk": {
+      "name": "@oh-my-opencode/omo-computer-sdk",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/omo-computer-protocol": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "26.6.2",
+        "vitest": "5.0.1",
+      },
+    },
+    "packages/omo-computer-tool": {
+      "name": "@oh-my-opencode/omo-computer-tool",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/omo-computer-protocol": "workspace:*",
+        "@oh-my-opencode/omo-computer-sdk": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "26.6.2",
+        "vitest": "5.0.1",
       },
     },
     "packages/omo-config-core": {
@@ -853,6 +940,20 @@
     "@oh-my-opencode/model-core": ["@oh-my-opencode/model-core@workspace:packages/model-core"],
 
     "@oh-my-opencode/omo-codex": ["@oh-my-opencode/omo-codex@workspace:packages/omo-codex"],
+
+    "@oh-my-opencode/omo-computer-carriers": ["@oh-my-opencode/omo-computer-carriers@workspace:packages/omo-computer-carriers"],
+
+    "@oh-my-opencode/omo-computer-engine": ["@oh-my-opencode/omo-computer-engine@workspace:packages/omo-computer-engine"],
+
+    "@oh-my-opencode/omo-computer-hand": ["@oh-my-opencode/omo-computer-hand@workspace:packages/omo-computer-hand"],
+
+    "@oh-my-opencode/omo-computer-prelude": ["@oh-my-opencode/omo-computer-prelude@workspace:packages/omo-computer-prelude"],
+
+    "@oh-my-opencode/omo-computer-protocol": ["@oh-my-opencode/omo-computer-protocol@workspace:packages/omo-computer-protocol"],
+
+    "@oh-my-opencode/omo-computer-sdk": ["@oh-my-opencode/omo-computer-sdk@workspace:packages/omo-computer-sdk"],
+
+    "@oh-my-opencode/omo-computer-tool": ["@oh-my-opencode/omo-computer-tool@workspace:packages/omo-computer-tool"],
 
     "@oh-my-opencode/omo-config-core": ["@oh-my-opencode/omo-config-core@workspace:packages/omo-config-core"],
 
