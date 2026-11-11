@@ -99,6 +99,19 @@ export function createEmptyAssistantTurnRetryDedupeKey(wake: PendingParentWake):
   ].join("\u0000")
 }
 
+// The first dispatch of a lost wake is remembered by the semantic dedupe hold,
+// which outlives the no-output recovery window. Its retry needs a key of its own,
+// or the gate coalesces it with the dispatch that never landed.
+export function createLostDispatchRetryDedupeKey(wake: PendingParentWake): string {
+  return [
+    "background-agent-parent-wake-lost-dispatch-retry",
+    String(wake.noAssistantOutputRetryCount ?? 0),
+    ...wake.notifications,
+    JSON.stringify(wake.promptContext),
+    wake.shouldReply ? "reply" : "silent",
+  ].join("\u0000")
+}
+
 function partHasFreshToolActivity(part: unknown, now: number, maxAgeMs: number): boolean {
   if (!isRecord(part)) {
     return false
