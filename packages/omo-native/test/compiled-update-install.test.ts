@@ -170,7 +170,8 @@ describe("verified standalone binary installation", () => {
     expect(await readFile(f.destination, "utf8")).toBe("new executable")
     expect(f.urls).toEqual(["https://get.omo.dev/v/9.9.10/SHA256SUMS", "https://get.omo.dev/v/9.9.10/omo-linux-x64"])
     expect(f.probes).toEqual([f.destination])
-    expect((await stat(f.destination)).mode & 0o777).toBe(0o755)
+    // Windows has no POSIX permission bits to observe; the executable bit is a POSIX contract.
+    if (process.platform !== "win32") expect((await stat(f.destination)).mode & 0o777).toBe(0o755)
     expect(await readdir(f.root)).toEqual(["omo"])
   })
 

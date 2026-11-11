@@ -103,7 +103,7 @@ verified path, at most once per UTC day for each canonical agent directory. Conc
 share one daily scheduling marker; explicit `omo update` always bypasses this throttle.
 Background diagnostics go to `auto-update.log` in the canonical agent directory rather than
 the active terminal. Set `OMO_SKIP_VERSION_CHECK=1` or `OMO_OFFLINE=1` to disable the startup check;
-the legacy `SENPI_` and `PI_` equivalents are honored too. Maintainer builds, noninteractive
+the legacy `SENPI_*` and `PI_*` equivalents are honored too. Maintainer builds, noninteractive
 commands and directly invoked provisioned runtime copies do not auto-update. An already-running
 session keeps its provisioned runtime; the new launcher takes effect on the next launch.
 
