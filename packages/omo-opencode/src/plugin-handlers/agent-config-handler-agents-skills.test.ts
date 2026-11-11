@@ -44,10 +44,7 @@ describe("applyAgentConfig .agents skills", () => {
     createBuiltinAgentsSpy = spyOn(agents, "createBuiltinAgents").mockResolvedValue({
       sisyphus: { name: "sisyphus", prompt: "builtin", mode: "primary" } satisfies AgentConfig,
     })
-    createSisyphusJuniorAgentSpy = spyOn(
-      sisyphusJunior,
-      "createSisyphusJuniorAgentWithOverrides",
-    ).mockReturnValue({
+    createSisyphusJuniorAgentSpy = spyOn(sisyphusJunior, "createSisyphusJuniorAgentWithOverrides").mockReturnValue({
       name: "sisyphus-junior",
       prompt: "junior",
       mode: "all",
@@ -120,21 +117,19 @@ describe("applyAgentConfig .agents skills", () => {
 
     // then
     const discoveredSkills = createBuiltinAgentsSpy.mock.calls[0]?.[6] as Array<{ name: string }>
-    expect(discoveredSkills.map(skill => skill.name)).toContain("project-agent-skill")
-    expect(discoveredSkills.map(skill => skill.name)).toContain("global-agent-skill")
+    expect(discoveredSkills.map((skill) => skill.name)).toContain("project-agent-skill")
+    expect(discoveredSkills.map((skill) => skill.name)).toContain("global-agent-skill")
   })
 
   test("discovers skills from host config.skills.paths set by other plugins", async () => {
     // given - second call to discoverConfigSourceSkills returns host config skills
-    discoverConfigSourceSkillsSpy
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          name: "host-config-skill",
-          definition: { name: "host-config-skill", template: "host-template" },
-          scope: "config",
-        },
-      ])
+    discoverConfigSourceSkillsSpy.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      {
+        name: "host-config-skill",
+        definition: { name: "host-config-skill", template: "host-template" },
+        scope: "config",
+      },
+    ])
 
     // when
     await applyAgentConfig({
@@ -150,7 +145,7 @@ describe("applyAgentConfig .agents skills", () => {
 
     // then
     const discoveredSkills = createBuiltinAgentsSpy.mock.calls[0]?.[6] as Array<{ name: string }>
-    expect(discoveredSkills.map(skill => skill.name)).toContain("host-config-skill")
+    expect(discoveredSkills.map((skill) => skill.name)).toContain("host-config-skill")
   })
 
   test("calls discoverConfigSourceSkills twice when host config has skills", async () => {

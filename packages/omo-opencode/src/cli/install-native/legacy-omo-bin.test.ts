@@ -3,13 +3,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
-import {
-  firstOmoBinOnPath,
-  legacyOmoBins,
-  nativeOmoBin,
-  resolveOmoBinEnvironment,
-  scanOmoBins,
-} from "./legacy-omo-bin"
+import { firstOmoBinOnPath, legacyOmoBins, nativeOmoBin, resolveOmoBinEnvironment, scanOmoBins } from "./legacy-omo-bin"
 import { createBinFixtureRoot, writeCodexLightRuntimeWrapper, writeGlobalPackageBin } from "./omo-bin-test-fixtures"
 
 const roots: string[] = []
@@ -114,7 +108,7 @@ describe("scanOmoBins", () => {
     const binDir = join(created, "bin")
     mkdirSync(binDir, { recursive: true })
     writeFileSync(join(created, "package.json"), JSON.stringify({ name: "oh-my-opencode", version: "5.0.0-beta.89" }))
-    writeFileSync(join(binDir, "omo"), "#!/bin/sh\nexec bun run ./src/cli/index.ts \"$@\"\n", { mode: 0o755 })
+    writeFileSync(join(binDir, "omo"), '#!/bin/sh\nexec bun run ./src/cli/index.ts "$@"\n', { mode: 0o755 })
 
     // when
     const entries = scanOmoBins(environmentOf([binDir]))
@@ -151,7 +145,10 @@ describe("scanOmoBins", () => {
       join(prefix, "omo.cmd"),
       '@ECHO off\r\n"%_prog%"  "%dp0%\\node_modules\\oh-my-openagent\\bin\\oh-my-opencode.js" %*\r\n',
     )
-    writeFileSync(join(prefix, "omo.ps1"), '& "$basedir/node$exe"  "$basedir/node_modules/oh-my-openagent/bin/oh-my-opencode.js" $args\n')
+    writeFileSync(
+      join(prefix, "omo.ps1"),
+      '& "$basedir/node$exe"  "$basedir/node_modules/oh-my-openagent/bin/oh-my-opencode.js" $args\n',
+    )
 
     // when
     const entries = scanOmoBins({ pathDirectories: [prefix], extraDirectories: [], isWindows: true })
@@ -239,7 +236,10 @@ describe("resolveOmoBinEnvironment", () => {
 
   test("#given relative and project node_modules/.bin PATH entries #when resolving #then only global dirs are scanned", () => {
     // given
-    const env = { PATH: ".::node_modules/.bin:/work/app/node_modules/.bin:/usr/local/bin", BUN_INSTALL: "/home/dev/.bun" }
+    const env = {
+      PATH: ".::node_modules/.bin:/work/app/node_modules/.bin:/usr/local/bin",
+      BUN_INSTALL: "/home/dev/.bun",
+    }
 
     // when
     const environment = resolveOmoBinEnvironment({ env, platform: "linux", homeDir: "/home/dev" })
@@ -289,7 +289,11 @@ describe("scanOmoBins with a Codex Light runtime wrapper", () => {
 
   test("#given a hand-written omo script that only mentions the Light cache path #when scanning #then it stays foreign", () => {
     // given
-    const lookalike = writeCodexLightRuntimeWrapper({ root: root("light-lookalike"), version: "4.19.4", marker: "my own script" })
+    const lookalike = writeCodexLightRuntimeWrapper({
+      root: root("light-lookalike"),
+      version: "4.19.4",
+      marker: "my own script",
+    })
 
     // when
     const entries = scanOmoBins(environmentOf([lookalike.binDir]))

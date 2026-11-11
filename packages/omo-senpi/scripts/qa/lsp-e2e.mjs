@@ -2,7 +2,16 @@
 // allow: SIZE_OK - one live Senpi LSP QA driver keeps pack/install/daemon/harness evidence in one executable.
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { mkdir } from "node:fs/promises"
 import { homedir, tmpdir } from "node:os"
 import { delimiter, dirname, join, relative, resolve } from "node:path"
@@ -235,24 +244,23 @@ function runSenpiLoadProof(input) {
     input.sessionDir,
     "ulw runtime package proof",
   ]
-  writeFileSync(join(input.projectDir, "mock-script.json"), `${JSON.stringify({ steps: [{ type: "text", text: "runtime package loaded" }] }, null, 2)}\n`)
-  const result = spawnSync(
-    input.senpiBin,
-    argv,
-    {
-      cwd: input.projectDir,
-      env: {
-        ...isolatedChildEnv(isolatedHomeEnv(process.env, input.homeDir), input.agentDir),
-        SENPI_CODING_AGENT_DIR: input.agentDir,
-        SENPI_CODING_AGENT_SESSION_DIR: input.sessionDir,
-        OMO_SENPI_QA: "1",
-        OMO_LSP_DAEMON_DIR: input.daemonDir,
-      },
-      encoding: "utf8",
-      timeout: 120_000,
-      maxBuffer: 64 * 1024 * 1024,
-    },
+  writeFileSync(
+    join(input.projectDir, "mock-script.json"),
+    `${JSON.stringify({ steps: [{ type: "text", text: "runtime package loaded" }] }, null, 2)}\n`,
   )
+  const result = spawnSync(input.senpiBin, argv, {
+    cwd: input.projectDir,
+    env: {
+      ...isolatedChildEnv(isolatedHomeEnv(process.env, input.homeDir), input.agentDir),
+      SENPI_CODING_AGENT_DIR: input.agentDir,
+      SENPI_CODING_AGENT_SESSION_DIR: input.sessionDir,
+      OMO_SENPI_QA: "1",
+      OMO_LSP_DAEMON_DIR: input.daemonDir,
+    },
+    encoding: "utf8",
+    timeout: 120_000,
+    maxBuffer: 64 * 1024 * 1024,
+  })
   const streamText = `${result.stdout ?? ""}\n${result.stderr ?? ""}`
   return {
     exitStatus: result.status,
@@ -262,7 +270,7 @@ function runSenpiLoadProof(input) {
     extensionLoaded:
       result.status === 0 &&
       streamText.includes("<ultrawork-mode>") &&
-      streamText.includes("\"customType\":\"senpi-task.usage\""),
+      streamText.includes('"customType":"senpi-task.usage"'),
   }
 }
 
@@ -302,25 +310,21 @@ function runSenpiToolProof(input) {
       2,
     )}\n`,
   )
-  const result = spawnSync(
-    input.senpiBin,
-    argv,
-    {
-      cwd: input.projectDir,
-      env: {
-        ...isolatedChildEnv(isolatedHomeEnv(process.env, input.homeDir), input.agentDir),
-        SENPI_CODING_AGENT_DIR: input.agentDir,
-        SENPI_CODING_AGENT_SESSION_DIR: input.sessionDir,
-        OMO_SENPI_QA: "1",
-        OMO_LSP_DAEMON_DIR: input.daemonDir,
-        OMO_LSP_DAEMON_CLI: input.cliPath,
-        OMO_LSP_DAEMON_VERSION: input.version,
-      },
-      encoding: "utf8",
-      timeout: 120_000,
-      maxBuffer: 64 * 1024 * 1024,
+  const result = spawnSync(input.senpiBin, argv, {
+    cwd: input.projectDir,
+    env: {
+      ...isolatedChildEnv(isolatedHomeEnv(process.env, input.homeDir), input.agentDir),
+      SENPI_CODING_AGENT_DIR: input.agentDir,
+      SENPI_CODING_AGENT_SESSION_DIR: input.sessionDir,
+      OMO_SENPI_QA: "1",
+      OMO_LSP_DAEMON_DIR: input.daemonDir,
+      OMO_LSP_DAEMON_CLI: input.cliPath,
+      OMO_LSP_DAEMON_VERSION: input.version,
     },
-  )
+    encoding: "utf8",
+    timeout: 120_000,
+    maxBuffer: 64 * 1024 * 1024,
+  })
   const events = parseJsonEvents(result.stdout ?? "")
   const toolEvent = findToolExecution(events, "lsp_goto_definition")
   const resultText = JSON.stringify(toolEvent?.result ?? {})
@@ -361,9 +365,7 @@ const removedEngineFileNames = [
 ]
 
 function collectRemovedEngineHits(componentRoot) {
-  return removedEngineFileNames
-    .map((file) => join(componentRoot, "lsp", file))
-    .filter((path) => existsSync(path))
+  return removedEngineFileNames.map((file) => join(componentRoot, "lsp", file)).filter((path) => existsSync(path))
 }
 
 function runSeededArchitectureGuardProbe(evidenceDir) {
@@ -479,7 +481,9 @@ function describeTool(tool) {
     hasRenderCall: typeof tool.renderCall === "function",
     hasRenderResult: typeof tool.renderResult === "function",
     executionMode: tool.executionMode ?? null,
-    keys: Object.keys(tool).filter((key) => key !== "execute").sort(),
+    keys: Object.keys(tool)
+      .filter((key) => key !== "execute")
+      .sort(),
   }
 }
 
@@ -515,9 +519,7 @@ function postEditEvent(paths) {
 
 function summarizePostEditContent(result) {
   const content = Array.isArray(result?.content) ? result.content : []
-  return content
-    .filter((block) => block?.type === "text" && typeof block.text === "string")
-    .map((block) => block.text)
+  return content.filter((block) => block?.type === "text" && typeof block.text === "string").map((block) => block.text)
 }
 
 function writePostEditUserConfig(homeDir, tsServer, failingSentinel) {
@@ -546,7 +548,10 @@ function writePostEditUserConfig(homeDir, tsServer, failingSentinel) {
 }
 
 function writePostEditProject(projectDir) {
-  writeFileSync(join(projectDir, "tsconfig.json"), `${JSON.stringify({ compilerOptions: { strict: true, noEmit: true } }, null, 2)}\n`)
+  writeFileSync(
+    join(projectDir, "tsconfig.json"),
+    `${JSON.stringify({ compilerOptions: { strict: true, noEmit: true } }, null, 2)}\n`,
+  )
   writeFileSync(join(projectDir, "a.ts"), "export const a: string = 1\n")
   writeFileSync(join(projectDir, "b.ts"), "export const b: string = 2\n")
   writeFileSync(join(projectDir, "clean.ts"), "export const clean: string = 'ok'\n")
@@ -603,11 +608,13 @@ async function inspectExtractedPostEdit(input) {
       return results
     }
     await dispatch("session_start", {}, "parent-session")
-    const parentResult = (await dispatch(
-      "tool_result",
-      postEditEvent(["a.ts", "b.ts", "a.ts", "clean.ts", "unsupported.foo", "throwing.boom"]),
-      "parent-session",
-    )).find((result) => result !== undefined)
+    const parentResult = (
+      await dispatch(
+        "tool_result",
+        postEditEvent(["a.ts", "b.ts", "a.ts", "clean.ts", "unsupported.foo", "throwing.boom"]),
+        "parent-session",
+      )
+    ).find((result) => result !== undefined)
     const cleanResult = (await dispatch("tool_result", postEditEvent(["clean.ts"]), "parent-session")).find(
       (result) => result !== undefined,
     )
@@ -686,7 +693,10 @@ console.log(JSON.stringify({
     mkdirSync(evidenceDir, { recursive: true })
     writeFileSync(join(evidenceDir, "post-edit-injected-probe.log"), probe.stdout)
   }
-  const lastJson = probe.stdout.trim().split(/\r?\n/).findLast((line) => line.startsWith("{"))
+  const lastJson = probe.stdout
+    .trim()
+    .split(/\r?\n/)
+    .findLast((line) => line.startsWith("{"))
   if (lastJson === undefined) throw new Error("post-edit injected probe did not print JSON")
   return JSON.parse(lastJson)
 }
@@ -749,7 +759,9 @@ async function runPostEdit(evidenceDir) {
     const checks = {
       multiFileBlocks: inspect.hasA && inspect.hasB && inspect.blockCount >= 2,
       noCap: injected.noCap === true,
-      statusWidget: inspect.statuses.includes("(OmO) Checking LSP Diagnostics") && inspect.widgetCalls.some((call) => call.key === "omo-senpi-lsp" && call.placement === "belowEditor"),
+      statusWidget:
+        inspect.statuses.includes("(OmO) Checking LSP Diagnostics") &&
+        inspect.widgetCalls.some((call) => call.key === "omo-senpi-lsp" && call.placement === "belowEditor"),
       unsupportedIsolation: inspect.unsupportedHidden === true,
       throwingIsolation: inspect.throwingIsolated === true && existsSync(failingSentinel),
       repeatedStartNoReprobe: injected.repeatedStartNoReprobe === true,
@@ -758,8 +770,7 @@ async function runPostEdit(evidenceDir) {
       childIsolation: injected.childIsolation === true,
       realSenpiPostEdit: senpi.postEditObserved === true,
       noDaemonStop:
-        status.first.pid === status.second.pid &&
-        status.first.endpoint.path === status.second.endpoint.path,
+        status.first.pid === status.second.pid && status.first.endpoint.path === status.second.endpoint.path,
       realHomesUnchanged:
         beforeRealSenpiHash === digestDirectory(realSenpiAgentDir) &&
         beforeRealPiHash === digestDirectory(join(homedir(), ".pi")) &&
@@ -855,25 +866,21 @@ function runSenpiPostEditProof(input) {
       2,
     )}\n`,
   )
-  const result = spawnSync(
-    input.senpiBin,
-    argv,
-    {
-      cwd: input.projectDir,
-      env: {
-        ...isolatedChildEnv(isolatedHomeEnv(process.env, input.homeDir), input.agentDir),
-        SENPI_CODING_AGENT_DIR: input.agentDir,
-        SENPI_CODING_AGENT_SESSION_DIR: input.sessionDir,
-        OMO_SENPI_QA: "1",
-        OMO_LSP_DAEMON_DIR: input.daemonDir,
-        OMO_LSP_DAEMON_CLI: input.cliPath,
-        OMO_LSP_DAEMON_VERSION: input.version,
-      },
-      encoding: "utf8",
-      timeout: 120_000,
-      maxBuffer: 64 * 1024 * 1024,
+  const result = spawnSync(input.senpiBin, argv, {
+    cwd: input.projectDir,
+    env: {
+      ...isolatedChildEnv(isolatedHomeEnv(process.env, input.homeDir), input.agentDir),
+      SENPI_CODING_AGENT_DIR: input.agentDir,
+      SENPI_CODING_AGENT_SESSION_DIR: input.sessionDir,
+      OMO_SENPI_QA: "1",
+      OMO_LSP_DAEMON_DIR: input.daemonDir,
+      OMO_LSP_DAEMON_CLI: input.cliPath,
+      OMO_LSP_DAEMON_VERSION: input.version,
     },
-  )
+    encoding: "utf8",
+    timeout: 120_000,
+    maxBuffer: 64 * 1024 * 1024,
+  })
   const events = parseJsonEvents(result.stdout ?? "")
   const writeEvent = findToolExecution(events, "write")
   const writeText = JSON.stringify(writeEvent?.result ?? {})
@@ -996,7 +1003,17 @@ async function runTools(evidenceDir) {
     const emptyProjectDir = join(workRoot, "empty-project")
     const sessionDir = join(workRoot, "sessions")
     const daemonDir = join(workRoot, "daemon")
-    spawnSync("mkdir", ["-p", agentDir, homeDir, projectDir, emptyProjectDir, sessionDir, daemonDir, join(homeDir, ".pi"), join(projectDir, ".pi")])
+    spawnSync("mkdir", [
+      "-p",
+      agentDir,
+      homeDir,
+      projectDir,
+      emptyProjectDir,
+      sessionDir,
+      daemonDir,
+      join(homeDir, ".pi"),
+      join(projectDir, ".pi"),
+    ])
     writeFileSync(
       join(homeDir, ".pi", "lsp-client.json"),
       `${JSON.stringify(
@@ -1060,7 +1077,8 @@ async function runTools(evidenceDir) {
     const unavailableDetails = inspect.unavailable?.details
     const checks = {
       sixCompleteDescriptors: descriptorNames.length === 6 && descriptorNames.every((name) => name.startsWith("lsp_")),
-      sequentialRename: inspect.descriptors.find((descriptor) => descriptor.name === "lsp_rename")?.executionMode === "sequential",
+      sequentialRename:
+        inspect.descriptors.find((descriptor) => descriptor.name === "lsp_rename")?.executionMode === "sequential",
       rendererParity: inspect.descriptors.every((descriptor) => descriptor.hasRenderCall && descriptor.hasRenderResult),
       userPiGotoDefinition: senpi.toolSucceeded === true,
       projectCommandUnspawned: !existsSync(projectSentinel),
@@ -1211,7 +1229,13 @@ async function runSelfTest(evidenceDir) {
   try {
     const plugin = join(workRoot, "plugin")
     const agentDir = join(workRoot, "agent")
-    spawnSync("mkdir", ["-p", join(plugin, "extensions"), join(plugin, "skills", "ultrawork"), join(plugin, "skills", "ulw-loop"), join(plugin, "scripts")])
+    spawnSync("mkdir", [
+      "-p",
+      join(plugin, "extensions"),
+      join(plugin, "skills", "ultrawork"),
+      join(plugin, "skills", "ulw-loop"),
+      join(plugin, "scripts"),
+    ])
     writeFileSync(join(plugin, "package.json"), JSON.stringify({ name: "@code-yeongyu/omo-senpi" }))
     writeFileSync(join(plugin, "extensions", "omo.js"), "export default {}\n")
     writeFileSync(join(plugin, "skills", "ultrawork", "SKILL.md"), "# Ultrawork\n")
@@ -1247,7 +1271,8 @@ function runPostEditSelfTest(evidenceDir) {
       { type: "text", text: "\n\nLSP errors detected in a.ts, please fix:\nerror[ts] (1) at 1:1: broken" },
     ],
   })
-  if (content.length !== 2 || !content[1].includes("a.ts")) throw new Error("self-test post-edit content summary failed")
+  if (content.length !== 2 || !content[1].includes("a.ts"))
+    throw new Error("self-test post-edit content summary failed")
   const injected = runInjectedPostEditProbe(evidenceDir)
   if (
     injected.repeatedStartNoReprobe !== true ||
@@ -1331,19 +1356,27 @@ async function runVendoredRemovalSelfTest(evidenceDir) {
 }
 
 async function runAll(evidenceDir) {
-  const runtimePackage = await runRuntimePackage(evidenceDir === undefined ? undefined : join(evidenceDir, "runtime-package"))
-  const vendoredRemoval = await runVendoredRemoval(evidenceDir === undefined ? undefined : join(evidenceDir, "vendored-removal"))
+  const runtimePackage = await runRuntimePackage(
+    evidenceDir === undefined ? undefined : join(evidenceDir, "runtime-package"),
+  )
+  const vendoredRemoval = await runVendoredRemoval(
+    evidenceDir === undefined ? undefined : join(evidenceDir, "vendored-removal"),
+  )
   const checks = {
     runtimePackage: runtimePackage.result === "PASS",
     vendoredRemoval: vendoredRemoval.result === "PASS",
-    reuse: runtimePackage.directStatus?.sameOwner === true && vendoredRemoval.toolsSummary?.directStatus?.sameOwner === true,
-    auth: runtimePackage.directStatus?.authPresent === true && vendoredRemoval.toolsSummary?.directStatus?.authPresent === true,
+    reuse:
+      runtimePackage.directStatus?.sameOwner === true && vendoredRemoval.toolsSummary?.directStatus?.sameOwner === true,
+    auth:
+      runtimePackage.directStatus?.authPresent === true &&
+      vendoredRemoval.toolsSummary?.directStatus?.authPresent === true,
     exactPiRouting: vendoredRemoval.checks?.alwaysVisibleUnavailableShape === true,
     projectCommandRejected: vendoredRemoval.checks?.projectCommandRejected === true,
     sessionReset: vendoredRemoval.postEditSummary?.injectedSessionCacheProbe?.compactRetry === true,
     sixDescriptors: vendoredRemoval.checks?.sixDescriptors === true,
     unboundedOutput: vendoredRemoval.checks?.uncappedPostEdit === true,
-    noRepositoryResolution: runtimePackage.outsideRepo === true && vendoredRemoval.checks?.noRepositoryResolution === true,
+    noRepositoryResolution:
+      runtimePackage.outsideRepo === true && vendoredRemoval.checks?.noRepositoryResolution === true,
     cleanup: runtimePackage.cleanup !== undefined && vendoredRemoval.cleanup !== undefined,
     realHomesUnchanged:
       runtimePackage.realSenpiHashUnchanged === true && vendoredRemoval.checks?.realHomesUnchanged === true,
@@ -1355,14 +1388,16 @@ async function runAll(evidenceDir) {
     checks,
     scenarioResults: {
       runtimePackage: evidenceDir === undefined ? runtimePackage : join(evidenceDir, "runtime-package", "result.json"),
-      vendoredRemoval: evidenceDir === undefined ? vendoredRemoval : join(evidenceDir, "vendored-removal", "result.json"),
+      vendoredRemoval:
+        evidenceDir === undefined ? vendoredRemoval : join(evidenceDir, "vendored-removal", "result.json"),
     },
     extensionAndRuntime: {
       runtimePackageExtension: runtimePackage.extractedExtension,
       runtimePackageRuntime: runtimePackage.extractedRuntime,
-      vendoredToolsExtension: vendoredRemoval.toolsSummary?.extractedPlugin === undefined
-        ? undefined
-        : join(vendoredRemoval.toolsSummary.extractedPlugin, "extensions", "omo.js"),
+      vendoredToolsExtension:
+        vendoredRemoval.toolsSummary?.extractedPlugin === undefined
+          ? undefined
+          : join(vendoredRemoval.toolsSummary.extractedPlugin, "extensions", "omo.js"),
       vendoredToolsRuntime: vendoredRemoval.toolsSummary?.extractedRuntime,
     },
     childArgv: {
@@ -1377,8 +1412,12 @@ async function runAll(evidenceDir) {
 }
 
 async function runAllSelfTest(evidenceDir) {
-  const runtimePackage = await runSelfTest(evidenceDir === undefined ? undefined : join(evidenceDir, "runtime-package-self-test"))
-  const vendoredRemoval = await runVendoredRemovalSelfTest(evidenceDir === undefined ? undefined : join(evidenceDir, "vendored-removal-self-test"))
+  const runtimePackage = await runSelfTest(
+    evidenceDir === undefined ? undefined : join(evidenceDir, "runtime-package-self-test"),
+  )
+  const vendoredRemoval = await runVendoredRemovalSelfTest(
+    evidenceDir === undefined ? undefined : join(evidenceDir, "vendored-removal-self-test"),
+  )
   const checks = {
     runtimePackageSelfTest: runtimePackage.result === "PASS",
     vendoredRemovalSelfTest: vendoredRemoval.result === "PASS",

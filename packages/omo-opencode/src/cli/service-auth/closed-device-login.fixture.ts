@@ -13,6 +13,9 @@ Object.defineProperty(Bun, "secrets", {
       values.set(slot(key), key.value)
     },
     delete: async (key: { readonly service: string; readonly name: string }) => values.delete(slot(key)),
+    // Marked as injected, like every launcher-child stand-in: never the real macOS store (store-binding.ts), and the
+    // child takes its credential lock where the test says (account-home.ts).
+    [Symbol.for("omo.test.injectedSecrets")]: true,
   },
 })
 // On Linux the CLI asks the Secret Service over D-Bus whether the default collection is locked; answer unlocked.

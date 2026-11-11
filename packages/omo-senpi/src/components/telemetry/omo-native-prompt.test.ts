@@ -28,7 +28,11 @@ function sessionCtx(sessionId: string): { sessionManager: { getSessionId(): stri
 function seedArming(arming: SessionArming): () => void {
   const registry = globalThis as unknown as Record<symbol, unknown>
   const previous = registry[ARMING_LEDGER_KEY]
-  registry[ARMING_LEDGER_KEY] = { directive: SENPI_ULTRAWORK_DIRECTIVE, astraDirective: SENPI_ASTRA_ULTRAWORK_DIRECTIVE, arming }
+  registry[ARMING_LEDGER_KEY] = {
+    directive: SENPI_ULTRAWORK_DIRECTIVE,
+    astraDirective: SENPI_ASTRA_ULTRAWORK_DIRECTIVE,
+    arming,
+  }
   return () => {
     if (previous === undefined) delete registry[ARMING_LEDGER_KEY]
     else registry[ARMING_LEDGER_KEY] = previous
@@ -56,16 +60,24 @@ async function input(
   source: Source = "interactive",
   streamingBehavior?: StreamingBehavior,
 ): Promise<void> {
-  await pi.dispatch("input", {
-    type: "input",
-    inputId,
-    text,
-    source,
-    ...(streamingBehavior === undefined ? {} : { streamingBehavior }),
-  }, sessionCtx(sessionId))
+  await pi.dispatch(
+    "input",
+    {
+      type: "input",
+      inputId,
+      text,
+      source,
+      ...(streamingBehavior === undefined ? {} : { streamingBehavior }),
+    },
+    sessionCtx(sessionId),
+  )
 }
 
-async function disposition(pi: FakeExtensionAPI, inputId: string, value: "queued" | "started" | "handled" | "rejected"): Promise<void> {
+async function disposition(
+  pi: FakeExtensionAPI,
+  inputId: string,
+  value: "queued" | "started" | "handled" | "rejected",
+): Promise<void> {
   await pi.dispatch("input_disposition", { type: "input_disposition", inputId, disposition: value })
 }
 
@@ -77,16 +89,22 @@ describe("OmO Native prompt telemetry", () => {
       await disposition(testHarness.pi, "first", "started")
       await input(testHarness.pi, "second", "ulw continue", "session-a")
       await disposition(testHarness.pi, "second", "started")
-      await testHarness.pi.dispatch("session_compact", { type: "session_compact", accepted: true }, sessionCtx("session-a"))
+      await testHarness.pi.dispatch(
+        "session_compact",
+        { type: "session_compact", accepted: true },
+        sessionCtx("session-a"),
+      )
       await input(testHarness.pi, "third", "ulw after compact", "session-a")
       await disposition(testHarness.pi, "third", "started")
 
-      expect(testHarness.captures.map(({ properties }) => ({
-        bucket: properties["keyword_occurrence_bucket"],
-        effective: properties["is_effective_ultrawork_invocation"],
-        stage: properties["invocation_stage"],
-        variant: properties["keyword_variant"],
-      }))).toEqual([
+      expect(
+        testHarness.captures.map(({ properties }) => ({
+          bucket: properties["keyword_occurrence_bucket"],
+          effective: properties["is_effective_ultrawork_invocation"],
+          stage: properties["invocation_stage"],
+          variant: properties["keyword_variant"],
+        })),
+      ).toEqual([
         { bucket: "3_5", effective: true, stage: "first_arm", variant: "ulw" },
         { bucket: "1", effective: true, stage: "remention", variant: "ulw" },
         { bucket: "1", effective: true, stage: "post_compact_rearm", variant: "ulw" },
@@ -104,12 +122,14 @@ describe("OmO Native prompt telemetry", () => {
       await input(testHarness.pi, "extension", "ultrawork internal", "session-a", "extension")
       await disposition(testHarness.pi, "extension", "handled")
 
-      expect(testHarness.captures.map(({ properties }) => ({
-        any: properties["keyword_any"],
-        real: properties["is_real_user_prompt"],
-        stage: properties["invocation_stage"],
-        suppression: properties["suppression_reason"],
-      }))).toEqual([
+      expect(
+        testHarness.captures.map(({ properties }) => ({
+          any: properties["keyword_any"],
+          real: properties["is_real_user_prompt"],
+          stage: properties["invocation_stage"],
+          suppression: properties["suppression_reason"],
+        })),
+      ).toEqual([
         { any: false, real: true, stage: "none", suppression: "no_keyword" },
         { any: true, real: false, stage: "none", suppression: "extension_source" },
       ])
@@ -136,17 +156,21 @@ describe("OmO Native prompt telemetry", () => {
         await disposition(testHarness.pi, inputId, "started")
       }
 
-      expect(testHarness.captures.map(({ properties }) => ({
-        keyword: properties["keyword_ulw_abbrev"],
-        any: properties["keyword_any"],
-        effective: properties["is_effective_ultrawork_invocation"],
-        stage: properties["invocation_stage"],
-      }))).toEqual(texts.map((_, index) => ({
-        keyword: index === texts.length - 1,
-        any: index === texts.length - 1,
-        effective: index === texts.length - 1,
-        stage: index === texts.length - 1 ? "first_arm" : "none",
-      })))
+      expect(
+        testHarness.captures.map(({ properties }) => ({
+          keyword: properties["keyword_ulw_abbrev"],
+          any: properties["keyword_any"],
+          effective: properties["is_effective_ultrawork_invocation"],
+          stage: properties["invocation_stage"],
+        })),
+      ).toEqual(
+        texts.map((_, index) => ({
+          keyword: index === texts.length - 1,
+          any: index === texts.length - 1,
+          effective: index === texts.length - 1,
+          stage: index === texts.length - 1 ? "first_arm" : "none",
+        })),
+      )
       expect(testHarness.pi.messages).toHaveLength(1)
       expect(testHarness.pi.messages[0]?.message["content"]).toBe(SENPI_ULTRAWORK_DIRECTIVE)
     } finally {
@@ -197,9 +221,13 @@ describe("OmO Native prompt telemetry", () => {
         await disposition(testHarness.pi, inputId, value)
       }
 
-      expect(testHarness.captures.map(({ properties }) => [
-        properties["queue_mode"], properties["prompt_length_bucket"], properties["real_prompt_ordinal_bucket"],
-      ])).toEqual([
+      expect(
+        testHarness.captures.map(({ properties }) => [
+          properties["queue_mode"],
+          properties["prompt_length_bucket"],
+          properties["real_prompt_ordinal_bucket"],
+        ]),
+      ).toEqual([
         ["immediate", "lt_100", "1"],
         ["follow_up", "100_500", "2_3"],
         ["other", "500_2000", "2_3"],
@@ -233,12 +261,20 @@ describe("OmO Native prompt telemetry", () => {
         await input(testHarness.pi, `edge-${index}`, text, "session-edge")
         await disposition(testHarness.pi, `edge-${index}`, "started")
       }
-      await expect(testHarness.pi.dispatch("input", { type: "input", text: "ulw", source: "interactive" }, sessionCtx("session-edge"))).resolves.toBeDefined()
+      await expect(
+        testHarness.pi.dispatch(
+          "input",
+          { type: "input", text: "ulw", source: "interactive" },
+          sessionCtx("session-edge"),
+        ),
+      ).resolves.toBeDefined()
       await disposition(testHarness.pi, "missing", "started")
 
       expect(testHarness.captures).toHaveLength(4)
       for (const capture of testHarness.captures) {
-        expect(Object.keys(capture.properties).sort()).toEqual([...OMO_NATIVE_PROPERTY_ALLOWLISTS.prompt_submitted].sort())
+        expect(Object.keys(capture.properties).sort()).toEqual(
+          [...OMO_NATIVE_PROPERTY_ALLOWLISTS.prompt_submitted].sort(),
+        )
         expect(JSON.stringify(capture.properties)).not.toContain("100000")
         expect(capture.properties).not.toHaveProperty("text")
       }

@@ -107,7 +107,9 @@ describe("session_role on session, turn and summary events", () => {
 
   test("#given the published schemas #when session_role is declared #then all three events share the closed root/child/unknown enum", () => {
     for (const event of SESSION_EVENTS) {
-      expect(Reflect.get(OMO_NATIVE_EVENT_SCHEMAS[event], "session_role")).toMatchObject({ values: ["root", "child", "unknown"] })
+      expect(Reflect.get(OMO_NATIVE_EVENT_SCHEMAS[event], "session_role")).toMatchObject({
+        values: ["root", "child", "unknown"],
+      })
     }
   })
 })

@@ -12,7 +12,11 @@ export interface CommitOutcomeReads {
   result(argv: readonly string[]): Promise<GitExecResult>
 }
 
-async function landedAfterTimeout(reads: CommitOutcomeReads, headBefore: string | null, message: string): Promise<string | null> {
+async function landedAfterTimeout(
+  reads: CommitOutcomeReads,
+  headBefore: string | null,
+  message: string,
+): Promise<string | null> {
   const head = await reads.head()
   if (head === null || head === headBefore) return null
   const parent = await reads.result(["rev-parse", "--verify", "--quiet", `${head}^`])
@@ -24,7 +28,11 @@ async function landedAfterTimeout(reads: CommitOutcomeReads, headBefore: string 
 
 // Runs one commit and returns the SHA it produced when the commit timed out but landed anyway;
 // `undefined` means the commit returned normally. A timeout with nothing landed rethrows.
-export async function commitJudgedByOutcome(commit: () => Promise<unknown>, reads: CommitOutcomeReads, message: string): Promise<string | undefined> {
+export async function commitJudgedByOutcome(
+  commit: () => Promise<unknown>,
+  reads: CommitOutcomeReads,
+  message: string,
+): Promise<string | undefined> {
   const headBefore = await reads.head()
   try {
     await commit()

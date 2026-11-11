@@ -29,13 +29,19 @@ test("#given exhausted lanes #when push returns before grant #then IDs are durab
   const event = await dispatched
   expect(f.starts).toHaveLength(1)
   expect(f.concurrency.getRetainedKeyCounts().leases).toBe(1)
-  expect(f.events.filter(value => value.kind === "granted")).toHaveLength(1)
+  expect(f.events.filter((value) => value.kind === "granted")).toHaveLength(1)
   const idle = f.manager.workpools.waitForEvent(pool.pool_id, "worker_idle", signal())
   if (event.task_id === undefined) throw new Error("missing dispatched identity")
   f.handles.get(event.task_id)?.settle({ status: "completed", finalResponse: "DONE" })
   await idle
   expect(f.concurrency.getRetainedKeyCounts().leases).toBe(0)
-  evidence("happy", { receipt, persisted, events: f.events, starts: f.starts.map(spec => spec.taskId), leases: f.concurrency.getRetainedKeyCounts() })
+  evidence("happy", {
+    receipt,
+    persisted,
+    events: f.events,
+    starts: f.starts.map((spec) => spec.taskId),
+    leases: f.concurrency.getRetainedKeyCounts(),
+  })
 })
 
 test("#given zero capacity and acquisition races #when a queued pool is cancelled #then no late grant can spawn", async () => {
@@ -62,7 +68,11 @@ test("#given zero capacity and acquisition races #when advisory capacity loses a
   class RacingConcurrency extends TaskConcurrency {
     armed = true
     override tryAcquire(model: string, taskId: string, epoch: number): boolean {
-      if (this.armed) { this.armed = false; expect(super.tryAcquire("racer/model", "st_00000002", 0)).toBe(true); return false }
+      if (this.armed) {
+        this.armed = false
+        expect(super.tryAcquire("racer/model", "st_00000002", 0)).toBe(true)
+        return false
+      }
       return super.tryAcquire(model, taskId, epoch)
     }
   }
@@ -80,7 +90,7 @@ test("#given zero capacity and acquisition races #when advisory capacity loses a
   f.concurrency.releaseLease("st_00000002", 0)
   await dispatched
   expect(f.starts).toHaveLength(1)
-  expect(f.events.filter(event => event.kind === "waiting")).toHaveLength(1)
+  expect(f.events.filter((event) => event.kind === "waiting")).toHaveLength(1)
   expect(f.concurrency.getRetainedKeyCounts().queues).toBe(0)
   failureEvidence("atomic-acquisition-race", f.events)
 })
@@ -90,7 +100,10 @@ test("#given zero capacity and acquisition races #when cancellation wins during 
   const gate = deferred<SpawnAdmission>()
   const released = deferred<void>()
   class ObservedConcurrency extends TaskConcurrency {
-    override releaseLease(taskId: string, epoch: number): void { super.releaseLease(taskId, epoch); released.resolve() }
+    override releaseLease(taskId: string, epoch: number): void {
+      super.releaseLease(taskId, epoch)
+      released.resolve()
+    }
   }
   const f = fixture({ concurrency: new ObservedConcurrency({ global_concurrency: 1 }), admit: () => gate.promise })
   const pool = f.manager.workpools.create(f.caller, poolInput)

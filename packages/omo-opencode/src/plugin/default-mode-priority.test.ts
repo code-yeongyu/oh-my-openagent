@@ -125,10 +125,7 @@ function createHooks(goalEnabled: boolean, goalCalls: GoalCall[]): ChatMessageHo
 }
 
 async function renderSystemPrompt(defaultMode: DefaultModeConfig): Promise<string> {
-  const handler = createSystemTransformHandler(
-    defaultMode,
-    () => ULTRAWORK_INSTRUCTION_MARKER,
-  )
+  const handler = createSystemTransformHandler(defaultMode, () => ULTRAWORK_INSTRUCTION_MARKER)
   const output = { system: ["base system prompt"] }
 
   await handler(
@@ -147,13 +144,7 @@ async function collectDefaultModeToasts(
   sessionID: string,
 ): Promise<readonly ToastCall[]> {
   const toasts: ToastCall[] = []
-  const hook = createKeywordDetectorHook(
-    createPluginContext(toasts),
-    undefined,
-    undefined,
-    undefined,
-    defaultMode,
-  )
+  const hook = createKeywordDetectorHook(createPluginContext(toasts), undefined, undefined, undefined, defaultMode)
 
   await hook["chat.message"](
     { sessionID, agent: "sisyphus" },
@@ -166,10 +157,7 @@ async function collectDefaultModeToasts(
   return toasts
 }
 
-async function collectGoalCreations(
-  defaultMode: DefaultModeConfig,
-  sessionID: string,
-): Promise<readonly GoalCall[]> {
+async function collectGoalCreations(defaultMode: DefaultModeConfig, sessionID: string): Promise<readonly GoalCall[]> {
   const goalCalls: GoalCall[] = []
   const handler = createChatMessageHandler({
     ctx: createPluginContext([]),
@@ -216,12 +204,8 @@ describe("default-mode priority matrix", () => {
       const goalCalls = await collectGoalCreations(defaultMode, sessionID)
 
       // then
-      expect(systemPrompt.includes(ULTRAWORK_INSTRUCTION_MARKER)).toBe(
-        testCase.expectUltraworkSystem,
-      )
-      expect(toasts.map((toast) => toast.body.message)).toEqual(
-        testCase.expectToast ? [DEFAULT_ULTRAWORK_TOAST] : [],
-      )
+      expect(systemPrompt.includes(ULTRAWORK_INSTRUCTION_MARKER)).toBe(testCase.expectUltraworkSystem)
+      expect(toasts.map((toast) => toast.body.message)).toEqual(testCase.expectToast ? [DEFAULT_ULTRAWORK_TOAST] : [])
       expect(goalCalls.length > 0).toBe(testCase.expectGoal)
       if (testCase.expectGoal) {
         expect(goalCalls).toHaveLength(1)

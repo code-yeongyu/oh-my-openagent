@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  EMPTY_EVAL_EXECUTION_ROLLUP,
-  addEvalExecutionRollup,
-  parseEvalExecutionEvent,
-} from "./omo-native-eval"
+import { EMPTY_EVAL_EXECUTION_ROLLUP, addEvalExecutionRollup, parseEvalExecutionEvent } from "./omo-native-eval"
 
 type Aggregate = {
   readonly count: number
@@ -14,10 +10,7 @@ type Aggregate = {
   readonly pendingCount: number
 }
 
-function aggregate(
-  count: number,
-  options: Partial<Omit<Aggregate, "count">> = {},
-): Aggregate {
+function aggregate(count: number, options: Partial<Omit<Aggregate, "count">> = {}): Aggregate {
   return {
     count,
     totalDurationMs: options.totalDurationMs ?? count * 10,
@@ -154,25 +147,31 @@ describe("omo-native eval execution event parser", () => {
   })
 
   test("#given values without a usable cell id #when parsed #then they are ignored", () => {
-    expect([null, "event", 1, [], {}, payload({ cellId: "" }), payload({ cellId: 42 })].map(parseEvalExecutionEvent))
-      .toEqual(Array.from({ length: 7 }, () => ({ kind: "ignored" })))
+    expect(
+      [null, "event", 1, [], {}, payload({ cellId: "" }), payload({ cellId: 42 })].map(parseEvalExecutionEvent),
+    ).toEqual(Array.from({ length: 7 }, () => ({ kind: "ignored" })))
   })
 
   test("#given two accepted events #when rollups are added #then every scalar is summed", () => {
     // given
     const first = parseEvalExecutionEvent(payload())
-    const second = parseEvalExecutionEvent(payload({
-      cellId: "eval-2",
-      ok: false,
-      detached: true,
-      toolCallCount: 1,
-      toolAggregates: { bash: aggregate(1, { totalDurationMs: 7, okCount: 0, errorCount: 1 }) },
-    }))
+    const second = parseEvalExecutionEvent(
+      payload({
+        cellId: "eval-2",
+        ok: false,
+        detached: true,
+        toolCallCount: 1,
+        toolAggregates: { bash: aggregate(1, { totalDurationMs: 7, okCount: 0, errorCount: 1 }) },
+      }),
+    )
     expect(first.kind).toBe("accepted")
     expect(second.kind).toBe("accepted")
     if (first.kind !== "accepted" || second.kind !== "accepted") return
     // when
-    const combined = addEvalExecutionRollup(addEvalExecutionRollup(EMPTY_EVAL_EXECUTION_ROLLUP, first.rollup), second.rollup)
+    const combined = addEvalExecutionRollup(
+      addEvalExecutionRollup(EMPTY_EVAL_EXECUTION_ROLLUP, first.rollup),
+      second.rollup,
+    )
     // then
     expect(combined).toMatchObject({
       eventCount: 2,

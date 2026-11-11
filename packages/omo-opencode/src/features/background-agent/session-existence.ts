@@ -40,7 +40,7 @@ function isSessionNotFoundError(error: unknown): boolean {
 export async function checkSessionExistence(
   client: OpencodeClient,
   sessionID: string,
-  directory?: string
+  directory?: string,
 ): Promise<SessionExistenceStatus> {
   try {
     const response = await client.session.get({
@@ -63,7 +63,7 @@ export async function checkSessionExistence(
 export async function verifySessionExists(
   client: OpencodeClient,
   sessionID: string,
-  directory?: string
+  directory?: string,
 ): Promise<boolean> {
-  return await checkSessionExistence(client, sessionID, directory) !== "missing"
+  return (await checkSessionExistence(client, sessionID, directory)) !== "missing"
 }

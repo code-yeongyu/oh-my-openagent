@@ -25,11 +25,17 @@ import {
   getOmoNativeStateDir,
   hashSessionId,
   maskProviderAndModel,
-  withOmoNativeAttribution, getOmoNativeInstallIdPath } from "./product-identity"
+  withOmoNativeAttribution,
+  getOmoNativeInstallIdPath,
+} from "./product-identity"
 import { MAX_TRACKED_CALLS } from "./wave-assembler"
 import { CATEGORY_FALLBACK_CHAINS } from "../../../../senpi-task/src/category/fallback-chains"
 import { BUILTIN_CATEGORY_DEFAULTS, CURATED_READONLY_AGENT_NAMES } from "@oh-my-opencode/senpi-task"
-import { UNCONFIGURED_POSTHOG_API_KEY, getTelemetryApiKey, isConfiguredTelemetryApiKey } from "@oh-my-opencode/telemetry-core"
+import {
+  UNCONFIGURED_POSTHOG_API_KEY,
+  getTelemetryApiKey,
+  isConfiguredTelemetryApiKey,
+} from "@oh-my-opencode/telemetry-core"
 
 const originalAgentDirs = {
   OMO_CODING_AGENT_DIR: process.env.OMO_CODING_AGENT_DIR,
@@ -155,17 +161,17 @@ describe("OmO Native product identity", () => {
     })
   })
 
-  test("#given provisional Fable 5.5 #when masked #then only the exact model id is exportable", () => {
+  test("#given Fable 5.2 #when masked #then only the exact model id is exportable", () => {
     // given / when / then
-    expect(maskProviderAndModel("anthropic-subscription", "claude-fable-5-5")).toEqual({
+    expect(maskProviderAndModel("anthropic-subscription", "claude-fable-5-2")).toEqual({
       provider: "anthropic-subscription",
-      model_id: "claude-fable-5-5",
+      model_id: "claude-fable-5-2",
     })
-    expect(maskProviderAndModel("private-provider", "claude-fable-5-5")).toEqual({
+    expect(maskProviderAndModel("private-provider", "claude-fable-5-2")).toEqual({
       provider: "custom",
-      model_id: "claude-fable-5-5",
+      model_id: "claude-fable-5-2",
     })
-    expect(maskProviderAndModel("private-provider", "claude-fable-5-5-private")).toEqual({
+    expect(maskProviderAndModel("private-provider", "claude-fable-5-2-private")).toEqual({
       provider: "custom",
       model_id: "custom",
     })
@@ -249,33 +255,89 @@ describe("OmO Native product identity", () => {
     const categoryConfig = OMO_NATIVE_EVENT_SCHEMAS.category_config
 
     // then: property sets are exactly the planned ones - a stray property is a privacy defect
-    expect(Object.keys(delegation).sort()).toEqual([
-      "$session_id", "agent_type", "background_mode", "cache_read_tokens", "cache_write_tokens",
-      "category", "config_generation", "cost_status", "cost_usd", "duration_ms", "duration_status",
-      "execution_mode", "fallback_attempts", "input_tokens", "model_id", "model_source",
-      "output_tokens", "owner_kind", "provider", "reasoning_effort", "run_epoch", "start_reason",
-      "stats_status", "status", "task_send_queued_count", "task_send_running_count", "task_seq",
-      "token_status", "tool_calls", "total_tokens", "turns",
-    ].sort())
-    expect(Object.keys(categoryConfig).sort()).toEqual([
-      "$session_id", "builtin_overridden_count", "cat_architect", "cat_artistry", "cat_deep_high",
-      "cat_deep_low", "cat_quick", "cat_ultrabrain", "cat_unspecified_high", "cat_unspecified_low",
-      "cat_visual_engineering", "cat_writing", "combo_fingerprint", "config_generation", "source",
-      "user_category_count",
-    ].sort())
+    expect(Object.keys(delegation).sort()).toEqual(
+      [
+        "$session_id",
+        "agent_type",
+        "background_mode",
+        "cache_read_tokens",
+        "cache_write_tokens",
+        "category",
+        "config_generation",
+        "cost_status",
+        "cost_usd",
+        "duration_ms",
+        "duration_status",
+        "execution_mode",
+        "fallback_attempts",
+        "input_tokens",
+        "model_id",
+        "model_source",
+        "output_tokens",
+        "owner_kind",
+        "provider",
+        "reasoning_effort",
+        "run_epoch",
+        "start_reason",
+        "stats_status",
+        "status",
+        "task_send_queued_count",
+        "task_send_running_count",
+        "task_seq",
+        "token_status",
+        "tool_calls",
+        "total_tokens",
+        "turns",
+      ].sort(),
+    )
+    expect(Object.keys(categoryConfig).sort()).toEqual(
+      [
+        "$session_id",
+        "builtin_overridden_count",
+        "cat_architect",
+        "cat_artistry",
+        "cat_deep_high",
+        "cat_deep_low",
+        "cat_quick",
+        "cat_ultrabrain",
+        "cat_unspecified_high",
+        "cat_unspecified_low",
+        "cat_visual_engineering",
+        "cat_writing",
+        "combo_fingerprint",
+        "config_generation",
+        "source",
+        "user_category_count",
+      ].sort(),
+    )
 
     // and: every discriminating string is a closed vocabulary
     expect(delegation.status.values).toEqual(["completed", "error", "cancelled", "interrupted", "lost"])
     expect(delegation.start_reason.values).toEqual([
-      "initial_spawn", "runtime_fallback", "session_resume", "dag_retry", "revive_after_completed",
-      "revive_after_error", "revive_after_cancelled", "revive_after_interrupted", "revive_after_lost",
+      "initial_spawn",
+      "runtime_fallback",
+      "session_resume",
+      "dag_retry",
+      "revive_after_completed",
+      "revive_after_error",
+      "revive_after_cancelled",
+      "revive_after_interrupted",
+      "revive_after_lost",
       "unknown",
     ])
     expect(delegation.owner_kind.values).toEqual(["plain_child", "dag_node", "team_member", "unknown"])
     expect(delegation.background_mode.values).toEqual(["foreground", "background", "promoted", "unknown"])
     expect(delegation.execution_mode.values).toEqual(["in-process", "process"])
     expect(delegation.reasoning_effort.values).toEqual([
-      "off", "minimal", "low", "medium", "high", "xhigh", "max", "other", "none",
+      "off",
+      "minimal",
+      "low",
+      "medium",
+      "high",
+      "xhigh",
+      "max",
+      "other",
+      "none",
     ])
     expect(delegation.model_source.values).toEqual(["category", "explicit", "agent", "none"])
     expect(delegation.token_status.values).toEqual(["complete", "partial", "unavailable"])
@@ -303,15 +365,13 @@ describe("OmO Native product identity", () => {
     const engineError = OMO_NATIVE_EVENT_SCHEMAS.computer_use_engine_error
 
     // then
-    expect(Object.keys(activation).sort()).toEqual([
-      "$session_id", "active", "backend", "host_platform", "source",
-    ].sort())
-    expect(Object.keys(permission).sort()).toEqual([
-      "$session_id", "backend", "host_platform", "permission", "scope",
-    ].sort())
-    expect(Object.keys(engineError).sort()).toEqual([
-      "$session_id", "backend", "code", "host_platform",
-    ].sort())
+    expect(Object.keys(activation).sort()).toEqual(
+      ["$session_id", "active", "backend", "host_platform", "source"].sort(),
+    )
+    expect(Object.keys(permission).sort()).toEqual(
+      ["$session_id", "backend", "host_platform", "permission", "scope"].sort(),
+    )
+    expect(Object.keys(engineError).sort()).toEqual(["$session_id", "backend", "code", "host_platform"].sort())
     expect(activation.source.values).toEqual(COMPUTER_USE_ACTIVATION_SOURCES)
     expect(activation.host_platform.values).toEqual(COMPUTER_USE_PLATFORMS)
     expect(activation.backend.values).toEqual(COMPUTER_USE_BACKENDS)
@@ -365,7 +425,12 @@ describe("OmO Native product identity", () => {
 
   test("#given a CI env #when attribution is resolved #then ci reflects whether CI is truthy", () => {
     const agentDir = useTemporaryAgentDir()
-    const env = { OMO_CODING_AGENT_DIR: agentDir, SENPI_CODING_AGENT_DIR: agentDir, HOME: agentDir, USERPROFILE: agentDir }
+    const env = {
+      OMO_CODING_AGENT_DIR: agentDir,
+      SENPI_CODING_AGENT_DIR: agentDir,
+      HOME: agentDir,
+      USERPROFILE: agentDir,
+    }
 
     expect(getOmoNativeAttribution({ env: { ...env, CI: "true" } }).ci).toBe(true)
     expect(getOmoNativeAttribution({ env: { ...env, CI: "1" } }).ci).toBe(true)
@@ -377,7 +442,12 @@ describe("OmO Native product identity", () => {
 
   test("#given a persisted install id #when attribution is resolved #then install_hash is sha256 of it and the raw id never ships", () => {
     const agentDir = useTemporaryAgentDir()
-    const env = { OMO_CODING_AGENT_DIR: agentDir, SENPI_CODING_AGENT_DIR: agentDir, HOME: agentDir, USERPROFILE: agentDir }
+    const env = {
+      OMO_CODING_AGENT_DIR: agentDir,
+      SENPI_CODING_AGENT_DIR: agentDir,
+      HOME: agentDir,
+      USERPROFILE: agentDir,
+    }
 
     const attribution = getOmoNativeAttribution({ env })
 

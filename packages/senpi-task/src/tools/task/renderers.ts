@@ -2,11 +2,7 @@ import type { Theme, ThemeColor } from "@code-yeongyu/senpi"
 
 import { piTui } from "../../lazy/pi-tui"
 import type { TaskToolDetails, TaskToolItemDetail } from "./types"
-import {
-  formatTaskMode,
-  renderTaskCallLines,
-  taskCallLines,
-} from "./call-renderer"
+import { formatTaskMode, renderTaskCallLines, taskCallLines } from "./call-renderer"
 import { formatTargetWithModel } from "../../status-line"
 import { priorityAliasBaseId } from "../../runners/pinned-model-equivalence"
 import { splitModelDecorators } from "../../senpi/explicit-pin"
@@ -56,7 +52,8 @@ export function taskResultLines(details: TaskToolDetails): readonly string[] {
 }
 
 export function renderTaskResultLines(details: TaskToolDetails, theme: RendererTheme): readonly string[] {
-  const mode = details.run_in_background === undefined ? undefined : theme.italic(formatTaskMode(details.run_in_background))
+  const mode =
+    details.run_in_background === undefined ? undefined : theme.italic(formatTaskMode(details.run_in_background))
   return [taskResultLine(details, mode), ...(details.items ?? []).map(taskItemResultLine)]
 }
 
@@ -65,7 +62,8 @@ export function renderTaskResultComponent(details: TaskToolDetails, theme: Rende
   return {
     render: (width: number): string[] => {
       if (width <= 0) return [""]
-      const mode = details.run_in_background === undefined ? undefined : theme.italic(formatTaskMode(details.run_in_background))
+      const mode =
+        details.run_in_background === undefined ? undefined : theme.italic(formatTaskMode(details.run_in_background))
       const line = taskResultLineForWidth(details, mode, width)
       const aggregate = truncateToWidth(theme.fg(statusThemeColor(details.status), line), width, ELLIPSIS)
       const items = (details.items ?? []).map((item) =>
@@ -132,17 +130,19 @@ function taskResultLine(details: TaskToolDetails, mode: string | undefined): str
   const taskId = optionalRendererText(details.task_id)
   const reason = optionalRendererText(details.reason)
   const summary = runStatsCardSummary(details.run_stats)
-  return joinRendererTokens([
-    "task",
-    taskTargetToken(details),
-    taskDowngradeToken(details),
-    fallbackCountToken(details),
-    mode,
-    formatTaskStatus(details.status),
-    taskId === undefined ? undefined : `id:${taskId}`,
-    details.queue_position === undefined ? undefined : `queue:${details.queue_position}`,
-    reason === undefined ? undefined : `reason:${excerptRendererText(reason, TASK_REASON_EXCERPT_WIDTH)}`,
-  ]) + summary
+  return (
+    joinRendererTokens([
+      "task",
+      taskTargetToken(details),
+      taskDowngradeToken(details),
+      fallbackCountToken(details),
+      mode,
+      formatTaskStatus(details.status),
+      taskId === undefined ? undefined : `id:${taskId}`,
+      details.queue_position === undefined ? undefined : `queue:${details.queue_position}`,
+      reason === undefined ? undefined : `reason:${excerptRendererText(reason, TASK_REASON_EXCERPT_WIDTH)}`,
+    ]) + summary
+  )
 }
 
 function taskItemResultLine(item: TaskToolItemDetail): string {
@@ -218,9 +218,4 @@ export {
   normalizeRendererText,
   rendererVisibleWidth,
 } from "../../renderer-text"
-export {
-  formatTaskMode,
-  formatTaskTarget,
-  renderTaskCallLines,
-  taskCallLines,
-} from "./call-renderer"
+export { formatTaskMode, formatTaskTarget, renderTaskCallLines, taskCallLines } from "./call-renderer"
