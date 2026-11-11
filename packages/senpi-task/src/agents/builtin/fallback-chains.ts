@@ -58,7 +58,6 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
   "plan-reviewer": [
     { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "xhigh" },
     { providers: ["github-copilot"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
-    { providers: ["chatgpt-subscription", "openai", "opencode"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
     {
       providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"],
       model: LATEST_MODEL_BY_FAMILY.claudeOpus,
