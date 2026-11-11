@@ -13,14 +13,24 @@ export type DelegatedChannel = {
   readonly takeReply: (commandId: string) => JsonObject | undefined
   /** The session an endpoint open made, when its reply named it (decision 0018 amendment 2026-11-06, `located`). */
   readonly takeLocated: (commandId: string) => CommandLocated | undefined
+  /**
+   * Frames that arrived while nothing listened (before the TUI subscribed, or in a reconnect gap) are held, at most
+   * HELD_FRAMES_MAX of them, and replayed in order to the next listener before it sees any later frame (#12356).
+   */
   readonly onFrame: (listener: (frame: JsonObject) => void) => () => void
-  /** A reply or frame that could not be read, or the channel closing; the reason is the service's or the check's. */
+  /**
+   * A reply or frame that could not be read, or the channel closing; the reason is the service's or the check's. A
+   * frame dropped because the hold was full is reported here, to the listeners present then, or else to the next one.
+   */
   readonly onLoss: (listener: (reason: string) => void) => () => void
   readonly accept: (event: LocalEvent) => void
   readonly stop: () => void
 }
 
 type Blob = { readonly ref: CommandBlobRef; readonly parts: Buffer[]; received: number }
+
+/** Frames held for a listener that has not subscribed yet; past this, a frame is dropped and reported as a loss. */
+const HELD_FRAMES_MAX = 64
 
 const isObject = (value: unknown): value is JsonObject =>
   typeof value === "object" && value !== null && !Array.isArray(value)
@@ -31,16 +41,28 @@ export function followDelegatedChannel(device: string): DelegatedChannel {
   const frames = new Set<(frame: JsonObject) => void>()
   const losses = new Set<(reason: string) => void>()
   const blobs = new Map<string, Blob>()
+  const held: JsonObject[] = []
+  let unheardDrops = 0
   const lost = (reason: string): void => {
     for (const listener of [...losses]) listener(reason)
+  }
+  const frameArrived = (frame: JsonObject): void => {
+    if (frames.size > 0) {
+      for (const listener of [...frames]) listener(frame)
+      return
+    }
+    if (held.length < HELD_FRAMES_MAX) {
+      held.push(frame)
+      return
+    }
+    // A frame can carry an engine-initiated request that waits for an answer, so a drop is never silent.
+    if (losses.size === 0) unheardDrops += 1
+    else lost(`a frame arrived while nothing listened and ${HELD_FRAMES_MAX} were already held`)
   }
   const body = (value: unknown): void => {
     if (!isObject(value)) return lost("a command event that is not an object")
     const frame = value["frame"]
-    if (isObject(frame)) {
-      for (const listener of [...frames]) listener(frame)
-      return
-    }
+    if (isObject(frame)) return frameArrived(frame)
     const commandId = value["command_id"]
     const response = value["response"]
     if (typeof commandId !== "string" || !isObject(response))
@@ -111,10 +133,15 @@ export function followDelegatedChannel(device: string): DelegatedChannel {
       return located
     },
     onFrame: (listener) => {
+      for (const frame of held.splice(0)) listener(frame)
       frames.add(listener)
       return () => frames.delete(listener)
     },
     onLoss: (listener) => {
+      if (unheardDrops > 0) {
+        listener(`${unheardDrops} frame(s) arrived while nothing listened and ${HELD_FRAMES_MAX} were already held`)
+        unheardDrops = 0
+      }
       losses.add(listener)
       return () => losses.delete(listener)
     },
@@ -124,6 +151,8 @@ export function followDelegatedChannel(device: string): DelegatedChannel {
       losses.clear()
       blobs.clear()
       replies.clear()
+      held.length = 0
+      unheardDrops = 0
       locateds.clear()
     },
   }
