@@ -10,4 +10,6 @@ pub use effects::{ClipboardRead, FrameResult};
 pub use reads::FocusReadResult;
 
 #[cfg(test)]
+mod ported_tests;
+#[cfg(test)]
 mod tests;

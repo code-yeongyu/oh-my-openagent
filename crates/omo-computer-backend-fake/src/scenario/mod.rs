@@ -141,4 +141,6 @@ pub fn fixtures_dir() -> PathBuf {
 #[cfg(test)]
 mod field_lint;
 #[cfg(test)]
+mod ported_tests;
+#[cfg(test)]
 mod tests;
