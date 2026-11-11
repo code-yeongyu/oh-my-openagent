@@ -31,7 +31,9 @@ function createEnginePort(child, { onReply } = {}) {
     pending.clear()
   }
   child.on("error", (error) => failAll(`engine spawn failed: ${error.message}`))
-  void exited.then(() => failAll(`engine exited; stderr tail: ${stderrTail.trim().slice(-400)}`))
+  // A dead engine fails the port, never the process: no later heartbeat or call writes to its stdin (EPIPE).
+  child.stdin.on("error", (error) => ((closed = true), failAll(`engine stdin failed: ${error.message}`)))
+  void exited.then(() => ((closed = true), failAll(`engine exited; stderr tail: ${stderrTail.trim().slice(-400)}`)))
   createInterface({ input: child.stdout }).on("line", (line) => {
     if (line.trim() === "") return
     let message

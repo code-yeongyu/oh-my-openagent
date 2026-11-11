@@ -28,6 +28,8 @@ The model arms read the result back with a harness-owned `computer` run after th
 
 Every row carries `steps`, `tokens`, `wallMs`, `status`, the check list, a restore verdict, and a disposition histogram. sdk-direct takes dispositions from ActionReports. The model arms take them from the engine trace (`computer.trace: true`); a `null` reply from a session without report mode counts as `legacy_null`. The fake model server reports no usage, so model-arm tokens are an estimate (request characters / 4) and say so in `tokens.source`.
 
+A live sdk-direct task runs its restore steps and teardown ops on every exit path. If the task throws (a window that never appears, a refused plan step, a failed restore step), the steps it did not finish still run one by one before the engine closes and before its scratch files are removed. A step that fails there is listed in the row's optional `restoreErrors` (strings), and the row keeps its own `error` or `fail` status. An `onlyIfChanged` press whose state cannot be read back is skipped and listed there, never pressed blind.
+
 ## Bench
 
 `bench.mjs` runs 3 warm-up and 30 measured rounds of `windows`, `capture`, `observe`, `ax.query`, `click`, `ax.setValue`, `ax.typeText` and (fake only) `ax.perform`. It records wall time at the stdio port and the engine's per-stage `ActionReport.timings` (microseconds) as nearest-rank p50/p95, with the host load averages before and after. `--write-baseline` writes `baselines/<platform>-<arch>-<fake|live>.json`. `--compare <baseline>` exits 1 when an op's wall p50 rises more than 30% above the baseline and by more than 0.5 ms.

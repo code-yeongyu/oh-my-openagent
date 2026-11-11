@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { readFileSync } from "node:fs"
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { OPS, foldSamples } from "./bench.mjs"
-import { compareBench, dispositionHistogram, exitCodeFor, judge, mismatched, percentile, summarize } from "./eval-core.mjs"
-import { cuaActions, modelScript, oracleRow, parseReadback, planCode, readbackCode, restoreAndObserve, traceDisposition } from "./run.mjs"
+import { compareBench, dispositionHistogram, exitCodeFor, judge, mismatched, oracleRow, percentile, summarize } from "./eval-core.mjs"
+import { cuaActions, modelScript, parseReadback, planCode, readbackCode, traceDisposition } from "./model-arms.mjs"
+import { restoreAndObserve, runSdkTask } from "./run.mjs"
 import { TASKS, pressesReached, textLanded } from "./tasks.mjs"
 
 const byId = Object.fromEntries(TASKS.map((task) => [task.id, task]))
@@ -98,6 +100,50 @@ describe("cu-eval arms", () => {
     expect(open).toBe(false)
     expect(row.status).toBe("pass")
     expect(row.restore.status).toBe("pass")
+  })
+
+  test("#given a live task whose plan step throws #when it runs #then every restore and teardown step still runs before the scratch dir goes", async () => {
+    // The shared Mac must be left as found on every exit path: a plan error used to skip restore and teardown
+    // and delete the scratch files the still-open documents point at.
+    const calls = []
+    let taskDir
+    let dirAtTeardown
+    const win = { find: async () => [] }
+    const computer = { window: async () => win, close: async () => void calls.push("close") }
+    const liveHarness = {
+      TEARDOWN_OPS: new Set(["quit"]),
+      prepare: (_surface, dir) => void (taskDir = dir),
+      waitForWindow: async () => undefined,
+      files: () => ({}),
+      ops: {
+        reset: async () => {
+          calls.push("restore")
+          throw new Error("reset refused")
+        },
+        quit: async () => (calls.push("teardown"), (dirAtTeardown = existsSync(taskDir)), []),
+      },
+    }
+    const surface = {
+      window: { app: "Eval" },
+      plan: [{ op: "press", el: { role: "button", name: "Missing" } }],
+      readback: [],
+      restore: [{ op: "reset" }, { op: "quit", app: "Eval" }],
+      oracle: () => [],
+      postcheck: () => [],
+    }
+    const scratch = mkdtempSync(join(tmpdir(), "cu-eval-test-"))
+    try {
+      const task = { id: "t", title: "t", live: surface }
+      const row = await runSdkTask({ task, enginePath: "unused", live: true, mismatch: false, scratch, liveHarness, open: async () => computer })
+      expect(row.status).toBe("error")
+      expect(row.error).toContain('no button named "Missing"')
+      expect(calls).toEqual(["restore", "teardown", "close"])
+      expect(row.restoreErrors).toEqual(["reset: reset refused"])
+      expect(dirAtTeardown).toBe(true)
+      expect(existsSync(taskDir)).toBe(false)
+    } finally {
+      rmSync(scratch, { recursive: true, force: true })
+    }
   })
 
   test("#given trace replies #when folded into the histogram #then reports, legacy null replies and refusals are counted apart", () => {
