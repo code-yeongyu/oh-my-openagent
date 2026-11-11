@@ -18,8 +18,17 @@ fn v2_fixture_values_parse_into_every_field() {
     let ids = |list: &[crate::FakeWindow]| list.iter().map(|w| w.id.clone()).collect::<Vec<_>>();
     assert_eq!(ids(&scenario.windows), ["101", "102"]);
     assert_eq!(
+        scenario.identity.get("101").map(|i| i.process_start),
+        Some(1_700_000_000)
+    );
+    assert_eq!(
         scenario.identity.get("102").map(|i| i.process_start),
         Some(1_700_000_000)
+    );
+    assert_eq!(
+        scenario.identity.len(),
+        2,
+        "identity carries exactly 101 and 102"
     );
     let change = &scenario.identity_changes[0];
     assert_eq!(
@@ -40,6 +49,17 @@ fn v2_fixture_values_parse_into_every_field() {
             read.focused_element_window.as_str()
         ),
         ("102", "101", "101")
+    );
+    assert_eq!(
+        scenario.focus_record_effects.get(&FocusRecordKind::Short),
+        Some(&vec![FocusRecordOutcome::NoEffect])
+    );
+    assert_eq!(
+        scenario.focus_record_effects.get(&FocusRecordKind::Full),
+        Some(&vec![
+            FocusRecordOutcome::NoEffect,
+            FocusRecordOutcome::TookEffect
+        ])
     );
     assert_eq!(
         scenario.focus_record_effects.get(&FocusRecordKind::AxWrite),
