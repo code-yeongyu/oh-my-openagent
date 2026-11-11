@@ -37,19 +37,22 @@ describe("Outbox.sweep directory errors (#12506)", () => {
     await expect(outbox.sweep(nothingPending)).resolves.toBeUndefined()
   })
 
-  test.skipIf(!canDenyRead)("#given a pending directory that cannot be read #when the outbox is swept #then the error surfaces instead of skipping cleanup", async () => {
-    // given: a stray segment the sweep would remove, behind a directory it cannot list
-    const root = syncDir()
-    const pending = join(root, "pending")
-    mkdirSync(pending)
-    writeFileSync(join(pending, "seg-stray.bin"), "ops")
-    chmodSync(pending, 0o000)
-    const outbox = new Outbox(root)
+  test.skipIf(!canDenyRead)(
+    "#given a pending directory that cannot be read #when the outbox is swept #then the error surfaces instead of skipping cleanup",
+    async () => {
+      // given: a stray segment the sweep would remove, behind a directory it cannot list
+      const root = syncDir()
+      const pending = join(root, "pending")
+      mkdirSync(pending)
+      writeFileSync(join(pending, "seg-stray.bin"), "ops")
+      chmodSync(pending, 0o000)
+      const outbox = new Outbox(root)
 
-    // when
-    const swept = outbox.sweep(nothingPending)
+      // when
+      const swept = outbox.sweep(nothingPending)
 
-    // then
-    await expect(swept).rejects.toMatchObject({ code: "EACCES" })
-  })
+      // then
+      await expect(swept).rejects.toMatchObject({ code: "EACCES" })
+    },
+  )
 })
