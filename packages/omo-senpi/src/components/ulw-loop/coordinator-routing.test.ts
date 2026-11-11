@@ -8,7 +8,6 @@ import { IdleInjectionCoordinator } from "../../extension/idle-injection-coordin
 import { createUlwLoopComponent } from "./index"
 import { activeStatus, createLogger, sessionEventCtx } from "./ulw-loop.test-support"
 
-
 const CONTINUATION_PROMPT_TEXT = [
   "Continue the active ulw-loop run.",
   'In a JS eval cell run: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); print(await agentToolkit.status()). Inspect the active incomplete goals and the structured nextActions, and keep working until the run is complete or safely checkpointed.',
@@ -28,7 +27,11 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
     }).register(pi, { logger, config: { getFlag: () => false }, idleCoordinator })
 
     // when
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      sessionEventCtx("/repo"),
+    )
 
     // then the continuation was delivered through the coordinator exactly once, and NOT via sendUserMessage
     expect(delivered).toHaveLength(1)
@@ -50,7 +53,11 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
     }).register(pi, { logger, config: { getFlag: () => false }, idleCoordinator })
 
     // when
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      sessionEventCtx("/repo"),
+    )
 
     // then exactly one injection carries both, completion first
     expect(delivered).toHaveLength(1)
@@ -92,7 +99,8 @@ describe("omo-senpi ulw-loop continuation routing through the idle coordinator",
       }).register(pi, { logger, config: { getFlag: () => false }, idleCoordinator })
 
       // when
-      await dispatchRunEnd(pi,
+      await dispatchRunEnd(
+        pi,
         { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
         { cwd: root, sessionManager: { getSessionId: () => "qa-s1" } },
       )

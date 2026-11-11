@@ -25,7 +25,12 @@ export function staleBackoffMs(attempt: number, random: () => number = Math.rand
 
 const sha256Hex = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex")
 
-async function seal(deps: EngineDeps, journal: SyncJournal, items: readonly PendingItem[], batchId: string): Promise<OutgoingBatch> {
+async function seal(
+  deps: EngineDeps,
+  journal: SyncJournal,
+  items: readonly PendingItem[],
+  batchId: string,
+): Promise<OutgoingBatch> {
   const baseSeq = (await journal.state()).applied
   // Only this batch's ops are read: the rest of the backlog stays on disk.
   const payload: { key: string; ops: Uint8Array }[] = []
@@ -50,7 +55,12 @@ async function seal(deps: EngineDeps, journal: SyncJournal, items: readonly Pend
 }
 
 /** `withheld`: keys whose queued ops this device must not send (#12284); they stay pending. */
-export async function push(deps: EngineDeps, journal: SyncJournal, batchBytes = MAX_BATCH_BYTES, withheld: ReadonlySet<string> = new Set()): Promise<PushOutcome> {
+export async function push(
+  deps: EngineDeps,
+  journal: SyncJournal,
+  batchBytes = MAX_BATCH_BYTES,
+  withheld: ReadonlySet<string> = new Set(),
+): Promise<PushOutcome> {
   let outcome: PushOutcome = "idle"
   for (;;) {
     const step = await pushOne(deps, journal, batchBytes, withheld)
@@ -60,7 +70,12 @@ export async function push(deps: EngineDeps, journal: SyncJournal, batchBytes = 
   }
 }
 
-async function pushOne(deps: EngineDeps, journal: SyncJournal, batchBytes: number, withheld: ReadonlySet<string>): Promise<PushOutcome> {
+async function pushOne(
+  deps: EngineDeps,
+  journal: SyncJournal,
+  batchBytes: number,
+  withheld: ReadonlySet<string>,
+): Promise<PushOutcome> {
   const pending = await journal.pending()
   let out = pending.outgoing
   if (out !== null && deps.sealer.sealedBySelf !== undefined && !(await deps.sealer.sealedBySelf(out))) {
@@ -71,7 +86,8 @@ async function pushOne(deps: EngineDeps, journal: SyncJournal, batchBytes: numbe
   if (out === null) {
     const plan = planBatches(pending.items, batchBytes, withheld)
     // Only ops this device could not wind back are left here (#12284 review L4): never sent, always said.
-    for (const key of new Set(plan.held.map((item) => item.key))) deps.log?.(`sync.item.held side=push len=${Buffer.byteLength(key, "utf8")}`)
+    for (const key of new Set(plan.held.map((item) => item.key)))
+      deps.log?.(`sync.item.held side=push len=${Buffer.byteLength(key, "utf8")}`)
     const first = plan.batches[0]
     if (first === undefined) {
       await journal.outbox.sweep(pending)
@@ -110,11 +126,16 @@ async function pushOne(deps: EngineDeps, journal: SyncJournal, batchBytes: numbe
   }
   deps.fault?.("append-landed")
   const sent = out
-  await journal.recordApplied([{ seq: result.seq, kind: "batch", batchId: sent.batchId, digest: sent.digest, objectId: "", author: "self" }])
+  await journal.recordApplied([
+    { seq: result.seq, kind: "batch", batchId: sent.batchId, digest: sent.digest, objectId: "", author: "self" },
+  ])
   const state = await journal.state()
   if (result.seq === state.applied + 1) await journal.updateState({ applied: result.seq })
   const carried = new Set(sent.items.map((i) => i.digest))
-  const next: PendingOps = { items: (await journal.pending()).items.filter((i) => !carried.has(i.digest)), outgoing: null }
+  const next: PendingOps = {
+    items: (await journal.pending()).items.filter((i) => !carried.has(i.digest)),
+    outgoing: null,
+  }
   await journal.setPending(next)
   deps.fault?.("appended")
   await journal.outbox.sweep(next)

@@ -13,7 +13,10 @@ import type { CreateOtlpTelemetryTransportInput } from "./otlp-transport-types"
  * its marker, and that consented session sweeps its own spool when its consent ends.
  */
 export function purgeIdleOtlpSpool(
-  input: Pick<CreateOtlpTelemetryTransportInput, "diagnostics" | "source" | "spoolDir" | "spoolRoot" | "isPidAlive" | "nowMs">,
+  input: Pick<
+    CreateOtlpTelemetryTransportInput,
+    "diagnostics" | "source" | "spoolDir" | "spoolRoot" | "isPidAlive" | "nowMs"
+  >,
 ): void {
   const alive = input.isPidAlive ?? isPidAlive
   const now = (input.nowMs ?? Date.now)()
@@ -26,8 +29,10 @@ export function purgeIdleOtlpSpool(
   const owners = ownersDir(input.spoolDir)
   const live = [...names, ...listNames(owners)].some((name) => {
     const entry = parseSpoolName(name)
-    return ((entry.kind === "active" || entry.kind === "owner") && alive(entry.pid))
-      || (entry.kind === "sending" && entry.leaseExpiresMs > now)
+    return (
+      ((entry.kind === "active" || entry.kind === "owner") && alive(entry.pid)) ||
+      (entry.kind === "sending" && entry.leaseExpiresMs > now)
+    )
   })
   if (live) return
   purgeOnOptOut(input)
@@ -42,14 +47,21 @@ function listNames(dir: string): string[] {
   }
 }
 
-export function purgeOnOptOut(input: Pick<CreateOtlpTelemetryTransportInput, "diagnostics" | "source" | "spoolDir" | "spoolRoot">): void {
+export function purgeOnOptOut(
+  input: Pick<CreateOtlpTelemetryTransportInput, "diagnostics" | "source" | "spoolDir" | "spoolRoot">,
+): void {
   const source = input.source ?? "otlp"
   try {
     if (purgeSpool(input.spoolDir, input.spoolRoot, purgeReport(input.diagnostics, source)) === "refused") {
       input.diagnostics?.({ event: "telemetry_spool_purge_refused", source })
     }
   } catch (error) {
-    input.diagnostics?.({ event: "telemetry_spool_sweep_failed", source, error, errorKind: error instanceof Error ? "error" : "non_error" })
+    input.diagnostics?.({
+      event: "telemetry_spool_sweep_failed",
+      source,
+      error,
+      errorKind: error instanceof Error ? "error" : "non_error",
+    })
   }
 }
 
@@ -86,7 +98,8 @@ function hasCode(error: unknown, codes: readonly string[]): boolean {
 
 /** False only where uids exist (not on Windows) and the entry belongs to someone else. */
 function ownerCheck(ownerOf: PurgeSeams["ownerOf"]): Owner {
-  return (path, stat) => typeof process.getuid !== "function" || (ownerOf ? ownerOf(path, stat.uid) : stat.uid) === process.getuid()
+  return (path, stat) =>
+    typeof process.getuid !== "function" || (ownerOf ? ownerOf(path, stat.uid) : stat.uid) === process.getuid()
 }
 
 function realDirectory(path: string, owned: Owner): "dir" | "missing" | "other" {
@@ -209,12 +222,7 @@ function removeIfEmpty(dir: string): void {
  *   deletion itself failed (immutable flag, permissions, a busy file), reported through `onFailed`
  *   with the errno code, and the outcome becomes `incomplete`. The sweep goes on in every case.
  */
-export function purgeSpool(
-  dir: string,
-  root: string,
-  report: PurgeReport,
-  seams: PurgeSeams = {},
-): PurgeOutcome {
+export function purgeSpool(dir: string, root: string, report: PurgeReport, seams: PurgeSeams = {}): PurgeOutcome {
   const owned = ownerCheck(seams.ownerOf)
   const kind = realDirectory(dir, owned)
   if (kind === "missing") return "absent"
@@ -234,9 +242,13 @@ export function purgeSpool(
 }
 
 /** Each entry the purge leaves behind becomes one diagnostic, by kind or errno code, never by path. */
-export function purgeReport(diagnostics: ((input: TelemetryDiagnosticInput) => void) | undefined, source: string): PurgeReport {
+export function purgeReport(
+  diagnostics: ((input: TelemetryDiagnosticInput) => void) | undefined,
+  source: string,
+): PurgeReport {
   return {
-    onSkipped: (entryKind: TelemetrySpoolEntryKind) => diagnostics?.({ event: "telemetry_spool_purge_skipped", source, entryKind }),
+    onSkipped: (entryKind: TelemetrySpoolEntryKind) =>
+      diagnostics?.({ event: "telemetry_spool_purge_skipped", source, entryKind }),
     onFailed: (errorCode: string) => diagnostics?.({ event: "telemetry_spool_purge_failed", source, errorCode }),
   }
 }

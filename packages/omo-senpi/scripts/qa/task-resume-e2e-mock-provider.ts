@@ -70,7 +70,8 @@ interface SimpleStreamOptions {
   signal?: AbortSignal
 }
 
-type AssistantContent = { type: "text"; text: string } | { type: "toolCall"; id: string; name: string; arguments: Record<string, unknown> }
+type AssistantContent =
+  { type: "text"; text: string } | { type: "toolCall"; id: string; name: string; arguments: Record<string, unknown> }
 
 interface AssistantMessage {
   role: "assistant"
@@ -84,17 +85,40 @@ interface AssistantMessage {
 }
 
 interface ExtensionAPI {
-  registerProvider(id: string, provider: {
-    name: string
-    baseUrl: string
-    apiKey: string
-    api: "openai-completions"
-    models: Array<{ id: string; name: string; reasoning: boolean; input: Array<"text" | "image">; cost: { input: number; output: number; cacheRead: number; cacheWrite: number }; contextWindow: number; maxTokens: number }>
-    streamSimple(model: { id: string }, context: Context, options?: SimpleStreamOptions): AsyncIterable<unknown> & { result(): Promise<AssistantMessage> }
-  }): void
+  registerProvider(
+    id: string,
+    provider: {
+      name: string
+      baseUrl: string
+      apiKey: string
+      api: "openai-completions"
+      models: Array<{
+        id: string
+        name: string
+        reasoning: boolean
+        input: Array<"text" | "image">
+        cost: { input: number; output: number; cacheRead: number; cacheWrite: number }
+        contextWindow: number
+        maxTokens: number
+      }>
+      streamSimple(
+        model: { id: string },
+        context: Context,
+        options?: SimpleStreamOptions,
+      ): AsyncIterable<unknown> & { result(): Promise<AssistantMessage> }
+    },
+  ): void
 }
 
-const model = { id: "mock-1", name: "Mock 1", reasoning: false, input: ["text" as const], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200_000, maxTokens: 4096 }
+const model = {
+  id: "mock-1",
+  name: "Mock 1",
+  reasoning: false,
+  input: ["text" as const],
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+  contextWindow: 200_000,
+  maxTokens: 4096,
+}
 
 export default function registerMockProvider(pi: ExtensionAPI): void {
   pi.registerProvider("omo-mock", {
@@ -157,9 +181,10 @@ export function routeChildStep(context: Context): MockStep {
 let parentCallCount = 0
 
 function stepToAssistantMessage(step: Exclude<MockStep, { type: "hang" }>, callCount: number): AssistantMessage {
-  const content: AssistantContent[] = step.type === "text"
-    ? [{ type: "text", text: step.text }]
-    : [{ type: "toolCall", id: step.id ?? `omo-mock-tool-${callCount}`, name: step.name, arguments: step.arguments }]
+  const content: AssistantContent[] =
+    step.type === "text"
+      ? [{ type: "text", text: step.text }]
+      : [{ type: "toolCall", id: step.id ?? `omo-mock-tool-${callCount}`, name: step.name, arguments: step.arguments }]
   return {
     role: "assistant",
     content,
@@ -239,7 +264,9 @@ function createStream(): LocalStream {
   const waiters: Array<(value: IteratorResult<unknown>) => void> = []
   let done = false
   let settleResult: (message: AssistantMessage) => void = () => {}
-  const finalMessage = new Promise<AssistantMessage>((resolve) => { settleResult = resolve })
+  const finalMessage = new Promise<AssistantMessage>((resolve) => {
+    settleResult = resolve
+  })
   finalMessage.catch(() => {})
   return {
     push(event: unknown) {
@@ -273,7 +300,9 @@ function createStream(): LocalStream {
   }
 }
 
-function isTerminalEvent(event: unknown): event is { type: "done"; message: AssistantMessage } | { type: "error"; error: AssistantMessage } {
+function isTerminalEvent(
+  event: unknown,
+): event is { type: "done"; message: AssistantMessage } | { type: "error"; error: AssistantMessage } {
   if (typeof event !== "object" || event === null) return false
   const candidate = event as { type?: unknown; message?: unknown; error?: unknown }
   if (candidate.type === "done") return isAssistantMessage(candidate.message)

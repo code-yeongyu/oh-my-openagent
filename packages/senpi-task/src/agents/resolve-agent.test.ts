@@ -40,7 +40,9 @@ function roster(...definitions: readonly AgentDefinition[]): Readonly<Record<str
   return Object.fromEntries(definitions.map((definition) => [definition.name, definition]))
 }
 
-function expectResolved(result: ReturnType<typeof resolveAgent>): Extract<typeof result, { readonly kind: "resolved" }> {
+function expectResolved(
+  result: ReturnType<typeof resolveAgent>,
+): Extract<typeof result, { readonly kind: "resolved" }> {
   if (result.kind !== "resolved") throw new Error(`Expected resolved agent, got ${result.kind}`)
   return result
 }
@@ -124,10 +126,7 @@ describe("resolveAgent", () => {
       model: "local/primary",
       models: ["openai/secondary", "google/tertiary"],
     })
-    const models = registry([
-      model("openai", "secondary"),
-      model("google", "tertiary"),
-    ])
+    const models = registry([model("openai", "secondary"), model("google", "tertiary")])
 
     // when
     const result = expectResolved(resolveAgent("custom", agents, models))
@@ -204,10 +203,7 @@ describe("resolveAgent", () => {
 
   test("#given a disabled agent #when resolved #then it is hidden as not_found", () => {
     // given
-    const agents = roster(
-      { name: "explore", disable: true },
-      { name: "momus", model: "openai/momus" },
-    )
+    const agents = roster({ name: "explore", disable: true }, { name: "momus", model: "openai/momus" })
 
     // when
     const result = resolveAgent("explore", agents, registry([]))
@@ -218,10 +214,7 @@ describe("resolveAgent", () => {
 
   test("#given an unknown agent name #when resolved #then it returns the active sorted roster", () => {
     // given
-    const agents = roster(
-      { name: "momus", model: "openai/momus" },
-      { name: "explore", model: "openai/explore" },
-    )
+    const agents = roster({ name: "momus", model: "openai/momus" }, { name: "explore", model: "openai/explore" })
 
     // when
     const result = resolveAgent("missing", agents, registry([]))
@@ -251,20 +244,34 @@ describe("resolveAgent", () => {
   })
 
   test("#given curated tool rules #when resolved #then explicit denies become child exclusions while librarian keeps x_search", () => {
-    const explore = expectResolved(resolveAgent("explore", roster({
-      name: "explore",
-      tools: [
-        { pattern: "read", allow: true },
-        { pattern: "x_search", allow: false },
-      ],
-    }), undefined, { modelOverride: "openai/explicit" }))
-    const librarian = expectResolved(resolveAgent("librarian", roster({
-      name: "librarian",
-      tools: [
-        { pattern: "read", allow: true },
-        { pattern: "x_search", allow: true },
-      ],
-    }), undefined, { modelOverride: "openai/explicit" }))
+    const explore = expectResolved(
+      resolveAgent(
+        "explore",
+        roster({
+          name: "explore",
+          tools: [
+            { pattern: "read", allow: true },
+            { pattern: "x_search", allow: false },
+          ],
+        }),
+        undefined,
+        { modelOverride: "openai/explicit" },
+      ),
+    )
+    const librarian = expectResolved(
+      resolveAgent(
+        "librarian",
+        roster({
+          name: "librarian",
+          tools: [
+            { pattern: "read", allow: true },
+            { pattern: "x_search", allow: true },
+          ],
+        }),
+        undefined,
+        { modelOverride: "openai/explicit" },
+      ),
+    )
 
     expect(explore.toolAllowlist).toEqual(["read"])
     expect(explore.toolDenylist).toEqual(["x_search"])

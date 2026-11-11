@@ -9,7 +9,7 @@ export async function sendSessionNotification(
   ctx: PluginInput,
   platform: Platform,
   title: string,
-  message: string
+  message: string,
 ): Promise<void> {
   try {
     switch (platform) {

@@ -9,9 +9,9 @@ export function designatedChainText(model: string, fallbackModels: readonly stri
 /** The designated models a profile from {@link designatedFallbackProfile} holds, in try order. */
 export function designatedChainOf(profile: HostRetryFallbackProfile): string {
   const chains = Object.entries(profile.fallbackChains)
-  const [model, fallbacks] = chains.find(([, chain]) => chain.length > 0)
-    ?? chains.find(([key]) => !isTombstoneKey(key, chains))
-    ?? chains[0] ?? ["", []]
+  const [model, fallbacks] = chains.find(([, chain]) => chain.length > 0) ??
+    chains.find(([key]) => !isTombstoneKey(key, chains)) ??
+    chains[0] ?? ["", []]
   return designatedChainText(model, fallbacks)
 }
 

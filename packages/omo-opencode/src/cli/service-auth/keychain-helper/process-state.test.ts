@@ -6,7 +6,11 @@ import { join } from "node:path"
 import type { gatedSecrets, processApprovalCache, promptLockAt } from "./process-copy.test-support"
 
 // What each bundled copy exports; named here so the copy's entry stays statically referenced.
-type Copy = { readonly processApprovalCache: typeof processApprovalCache; readonly promptLockAt: typeof promptLockAt; readonly gatedSecrets: typeof gatedSecrets }
+type Copy = {
+  readonly processApprovalCache: typeof processApprovalCache
+  readonly promptLockAt: typeof promptLockAt
+  readonly gatedSecrets: typeof gatedSecrets
+}
 
 const root = mkdtempSync(join(tmpdir(), "keychain-process-copies-"))
 let first: Copy
@@ -14,7 +18,11 @@ let second: Copy
 
 // Two separately bundled copies of the store in one process, as the omo-device-account and omo-feedback sidecars are.
 async function bundledCopy(name: string): Promise<Copy> {
-  const built = await Bun.build({ entrypoints: [join(import.meta.dir, "process-copy.test-support.ts")], outdir: join(root, name), target: "bun" })
+  const built = await Bun.build({
+    entrypoints: [join(import.meta.dir, "process-copy.test-support.ts")],
+    outdir: join(root, name),
+    target: "bun",
+  })
   if (!built.success) throw new Error(built.logs.join("\n"))
   const [output] = built.outputs
   if (output === undefined) throw new Error("no bundle output")
@@ -47,10 +55,10 @@ describe("one keychain state per process across bundled copies (#11262 design 3.
     const path = join(root, "race", "account.keychain-prompt")
     let resume = () => {}
     let reserved = () => {}
-    const atPublish = new Promise<void>(resolve => (reserved = resolve))
+    const atPublish = new Promise<void>((resolve) => (reserved = resolve))
     const held = first.promptLockAt(path, {
       beforePublish: () =>
-        new Promise<void>(resolve => {
+        new Promise<void>((resolve) => {
           resume = resolve
           reserved()
         }),
@@ -63,13 +71,12 @@ describe("one keychain state per process across bundled copies (#11262 design 3.
     await release?.()
   })
 
-
   test("#given a secrets call running in one copy #when the other copy queues one #then it starts only after the first ends", async () => {
     const order: string[] = []
     let finish = () => {}
     const running = first.gatedSecrets(async () => {
       order.push("first-start")
-      await new Promise<void>(resolve => {
+      await new Promise<void>((resolve) => {
         finish = resolve
       })
       order.push("first-end")

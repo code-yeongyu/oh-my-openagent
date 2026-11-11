@@ -266,7 +266,11 @@ describe("updateOmoConfig", () => {
     }
 
     // when
-    const created = updateOmoConfig({ scope: "user", edits: [{ path: ["task", "default_concurrency"], value: 3 }], env })
+    const created = updateOmoConfig({
+      scope: "user",
+      edits: [{ path: ["task", "default_concurrency"], value: 3 }],
+      env,
+    })
 
     // then
     expect(created.path).toBe(join(fixture.homeDir, ".omo", "omo.jsonc"))
@@ -291,5 +295,4 @@ describe("updateOmoConfig", () => {
     expect(edited.path).toBe(jsonPath)
     expect(dirname(edited.path)).toBe(join(jsonFixture.homeDir, ".omo"))
   })
-
 })

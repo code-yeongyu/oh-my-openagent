@@ -29,10 +29,10 @@ describe("withoutCapabilities", () => {
     expect(splitAt).toBeGreaterThan(0)
 
     // when
-    const out = await runThrough(["retry_fallback_profile"], [
-      bytes.subarray(0, splitAt + 1),
-      bytes.subarray(splitAt + 1),
-    ])
+    const out = await runThrough(
+      ["retry_fallback_profile"],
+      [bytes.subarray(0, splitAt + 1), bytes.subarray(splitAt + 1)],
+    )
 
     // then: the line parsed (so the hidden capability was filtered) and no replacement character appears
     const parsed = JSON.parse(out.trim()) as { data: { capabilities: string[]; note: string } }
@@ -51,10 +51,7 @@ describe("withoutCapabilities", () => {
     const splitAt = Math.floor(bytes.length / 2)
 
     // when
-    const out = await runThrough(["retry_fallback_profile"], [
-      bytes.subarray(0, splitAt),
-      bytes.subarray(splitAt),
-    ])
+    const out = await runThrough(["retry_fallback_profile"], [bytes.subarray(0, splitAt), bytes.subarray(splitAt)])
 
     // then
     const parsed = JSON.parse(out.trim()) as { data: { capabilities: string[] } }

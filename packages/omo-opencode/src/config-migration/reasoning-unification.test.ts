@@ -6,10 +6,7 @@ import { join, posix } from "node:path"
 import fixtureExpected from "./2026-08-reasoning-unification/fixture-expected.json"
 import fixtureInput from "./2026-08-reasoning-unification/fixture-input.json"
 import { createLegacyConfigMigrationPlans, executeLegacyConfigMigrationPlan } from "./index"
-import {
-  REASONING_UNIFICATION_MIGRATION_ID,
-  transformReasoningUnification,
-} from "./reasoning-unification"
+import { REASONING_UNIFICATION_MIGRATION_ID, transformReasoningUnification } from "./reasoning-unification"
 
 describe("2026-08 reasoning unification migration", () => {
   test("#given the canonical legacy fixture #when transformed #then rules one through eight match exact expected output", () => {
@@ -22,7 +19,9 @@ describe("2026-08 reasoning unification migration", () => {
     // then
     expect(REASONING_UNIFICATION_MIGRATION_ID).toBe("2026-08-reasoning-unification")
     expect(result.document).toEqual(fixtureExpected)
-    expect(result.diagnostics).toContain('conflict: categories.conflict dropped variant="high" kept reasoningEffort="xhigh"')
+    expect(result.diagnostics).toContain(
+      'conflict: categories.conflict dropped variant="high" kept reasoningEffort="xhigh"',
+    )
   })
 
   test("#given canonical reasoning outranking legacy keys #when transformed #then the journal reports reasoning as the winner", () => {
@@ -65,7 +64,10 @@ describe("2026-08 reasoning unification migration", () => {
         env: { HOME: homeDir },
         onBoundary: (boundary) => {
           if (boundary !== "journal-written") return
-          const journal = JSON.parse(readFileSync(join(homeDir, ".omo", ".migration-journal.json"), "utf-8")) as Record<string, unknown>
+          const journal = JSON.parse(readFileSync(join(homeDir, ".omo", ".migration-journal.json"), "utf-8")) as Record<
+            string,
+            unknown
+          >
           journalDiagnostics = journal["diagnostics"]
         },
       })
@@ -76,7 +78,9 @@ describe("2026-08 reasoning unification migration", () => {
       expect(dryRun.preview?.transform).toEqual(fixtureExpected)
       expect(migrated.status).toBe("migrated")
       expect(document).toEqual({ ...fixtureExpected, _migrations: [REASONING_UNIFICATION_MIGRATION_ID] })
-      expect(journalDiagnostics).toContain('conflict: categories.conflict dropped variant="high" kept reasoningEffort="xhigh"')
+      expect(journalDiagnostics).toContain(
+        'conflict: categories.conflict dropped variant="high" kept reasoningEffort="xhigh"',
+      )
       expect(readdirSync(join(homeDir, ".omo")).some((name) => name.startsWith("omo.jsonc.bak."))).toBe(true)
     } finally {
       rmSync(root, { force: true, recursive: true })

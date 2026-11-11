@@ -28,9 +28,7 @@ export function detectShellType(): ShellType {
   // Indicators are shell-specific — no broad signals like TERM.
   if (
     process.platform === "win32" &&
-    (process.env.BASH_VERSION ||
-      process.env.MSYSTEM ||
-      process.env.WSL_DISTRO_NAME)
+    (process.env.BASH_VERSION || process.env.MSYSTEM || process.env.WSL_DISTRO_NAME)
   ) {
     return "unix"
   }
@@ -67,7 +65,7 @@ export function shellEscape(value: string, shellType: ShellType): string {
 
     case "cmd":
       // Escape % first (for environment variable expansion), then " (for quoting)
-      return `"${value.replace(/%/g, '%%').replace(/"/g, '""')}"`
+      return `"${value.replace(/%/g, "%%").replace(/"/g, '""')}"`
 
     default:
       return value
@@ -96,10 +94,7 @@ export function shellEscape(value: string, shellType: ShellType): string {
  * // => "set VAR1=\"val1\" && set VAR2=\"val2\" &&"
  * ```
  */
-export function buildEnvPrefix(
-  env: Record<string, string>,
-  shellType: ShellType
-): string {
+export function buildEnvPrefix(env: Record<string, string>, shellType: ShellType): string {
   const entries = Object.entries(env)
 
   if (entries.length === 0) {
@@ -108,30 +103,22 @@ export function buildEnvPrefix(
 
   switch (shellType) {
     case "unix": {
-      const assignments = entries
-        .map(([key, value]) => `${key}=${shellEscape(value, shellType)}`)
-        .join(" ")
+      const assignments = entries.map(([key, value]) => `${key}=${shellEscape(value, shellType)}`).join(" ")
       return `export ${assignments};`
     }
 
     case "csh": {
-      const assignments = entries
-        .map(([key, value]) => `setenv ${key} ${shellEscape(value, shellType)}`)
-        .join("; ")
+      const assignments = entries.map(([key, value]) => `setenv ${key} ${shellEscape(value, shellType)}`).join("; ")
       return `${assignments};`
     }
 
     case "powershell": {
-      const assignments = entries
-        .map(([key, value]) => `$env:${key}=${shellEscape(value, shellType)}`)
-        .join("; ")
+      const assignments = entries.map(([key, value]) => `$env:${key}=${shellEscape(value, shellType)}`).join("; ")
       return `${assignments};`
     }
 
     case "cmd": {
-      const assignments = entries
-        .map(([key, value]) => `set ${key}=${shellEscape(value, shellType)}`)
-        .join(" && ")
+      const assignments = entries.map(([key, value]) => `set ${key}=${shellEscape(value, shellType)}`).join(" && ")
       return `${assignments} &&`
     }
 

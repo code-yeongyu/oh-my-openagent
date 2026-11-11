@@ -13,16 +13,19 @@ describe("journal recovery names the backup it actually wrote (#8187)", () => {
     const planned = `${migrationFixture.targetPath}.bak.planned`
     fileSystem.files.set(migrationFixture.targetPath, original)
     fileSystem.files.set(planned, '{"unrelated":true}\n')
-    fileSystem.files.set(journalPath, JSON.stringify({
-      backupMoves: [],
-      completedMoves: [],
-      migrationId: "recovery",
-      targetBackupPath: planned,
-      targetPath: migrationFixture.targetPath,
-      targetWrite: { additions: { task: { default_concurrency: 3 } } },
-      targetWritten: false,
-      version: 1,
-    }))
+    fileSystem.files.set(
+      journalPath,
+      JSON.stringify({
+        backupMoves: [],
+        completedMoves: [],
+        migrationId: "recovery",
+        targetBackupPath: planned,
+        targetPath: migrationFixture.targetPath,
+        targetWrite: { additions: { task: { default_concurrency: 3 } } },
+        targetWritten: false,
+        version: 1,
+      }),
+    )
 
     // when
     const crash = (): void => {

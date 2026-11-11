@@ -11,15 +11,13 @@ type MockTmuxCommandResult = {
   exitCode: number
 }
 
-const runTmuxCommandMock = mock(
-  async (): Promise<MockTmuxCommandResult> => ({
-    success: true,
-    output: "",
-    stdout: "",
-    stderr: "",
-    exitCode: 0,
-  }),
-)
+const runTmuxCommandMock = mock(async (): Promise<MockTmuxCommandResult> => ({
+  success: true,
+  output: "",
+  stdout: "",
+  stderr: "",
+  exitCode: 0,
+}))
 
 const getTmuxPathMock = mock(async (): Promise<string | null> => "/mock/tmux")
 
@@ -167,13 +165,7 @@ describe("openclaw tmux helpers", () => {
     // then
     expect(result).toBe(true)
     expect(runTmuxCommandMock).toHaveBeenCalledTimes(2)
-    expect(runTmuxCommandMock.mock.calls[0]).toEqual([
-      "/mock/tmux",
-      ["send-keys", "-t", "%42", "-l", "--", "hello"],
-    ])
-    expect(runTmuxCommandMock.mock.calls[1]).toEqual([
-      "/mock/tmux",
-      ["send-keys", "-t", "%42", "Enter"],
-    ])
+    expect(runTmuxCommandMock.mock.calls[0]).toEqual(["/mock/tmux", ["send-keys", "-t", "%42", "-l", "--", "hello"]])
+    expect(runTmuxCommandMock.mock.calls[1]).toEqual(["/mock/tmux", ["send-keys", "-t", "%42", "Enter"]])
   })
 })

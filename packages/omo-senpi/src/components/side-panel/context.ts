@@ -50,4 +50,3 @@ export function panelContextFrom(value: unknown): PanelHostContext | undefined {
     hasUI: value["hasUI"] === true,
   }
 }
-

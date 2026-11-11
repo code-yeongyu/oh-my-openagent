@@ -28,9 +28,7 @@ export function resolvePromptAppend(promptAppend: string, configDir?: string): s
   try {
     const decoded = decodeURIComponent(encoded)
     const expanded = decoded.startsWith("~/") ? decoded.replace(/^~\//, `${homedir()}/`) : decoded
-    filePath = isAbsolute(expanded)
-      ? expanded
-      : resolve(configDir ?? process.cwd(), expanded)
+    filePath = isAbsolute(expanded) ? expanded : resolve(configDir ?? process.cwd(), expanded)
   } catch (error) {
     if (!(error instanceof Error)) {
       throw error
