@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { storeIndexPreconditionPassed } from "./task-host-e2e-shards-index-live-support.mjs"
+import { crossEndpointHazardPassed, crossEndpointOwnershipPolicy, storeIndexPreconditionPassed } from "./task-host-e2e-shards-index-live-support.mjs"
 
 const passing = {
   atomic_index_write_failure: { failed: true },
@@ -37,4 +37,34 @@ describe("store index registration precondition verdict", () => {
   test("#given a failed spawn that already left an endpoint #when judged #then the row fails", () => {
     expect(Boolean(storeIndexPreconditionPassed({ ...passing, endpoints_before_retry: ["p-0.sock"] }))).toBe(false)
   })
+})
+
+
+describe("cross-endpoint transcript ownership verdict", () => {
+  const guarded = { ownership_policy: "transcript-lock", shard_open_accepted: true, rpc_open_rejected: true,
+    live_holders: [{ pid: 123 }], distinct_endpoints: true, disposable_copy_removed: true }
+  test("#given a typed refusal naming the holder #when judged #then the ownership guard passes", () => {
+    expect(Boolean(crossEndpointHazardPassed(guarded))).toBe(true)
+  })
+  test("#given a duplicate admission or no holder #when judged #then the ownership guard fails", () => {
+    expect(Boolean(crossEndpointHazardPassed({ ...guarded, rpc_open_rejected: false }))).toBe(false)
+    expect(Boolean(crossEndpointHazardPassed({ ...guarded, live_holders: [] }))).toBe(false)
+  })
+})
+
+
+test("#given the documented engine lock boundary #when selected #then the exact version policy applies", () => {
+  expect(crossEndpointOwnershipPolicy("omo 5.1.16 (engine: senpi 2026.10.7; scheme nodef)")).toBe("per-endpoint")
+  expect(crossEndpointOwnershipPolicy("omo (engine: senpi 2026.10.10-10)")).toBe("per-endpoint")
+  expect(crossEndpointOwnershipPolicy("omo (engine: senpi 2026.10.10-11)")).toBe("transcript-lock")
+  expect(crossEndpointOwnershipPolicy("omo 5.1.32 (engine: senpi 2026.10.12; scheme nodef)")).toBe("transcript-lock")
+  expect(() => crossEndpointOwnershipPolicy("unknown")).toThrow("unknown Senpi engine version")
+})
+
+test("#given an old engine #when judged #then duplicate admission is required for its hazard proof", () => {
+  const old = { ownership_policy: "per-endpoint", shard_open_accepted: true, rpc_open_accepted: true,
+    distinct_endpoints: true, disposable_copy_removed: true }
+  expect(crossEndpointHazardPassed(old)).toBe(true)
+  expect(crossEndpointHazardPassed({ ...old, rpc_open_accepted: false, rpc_open_rejected: true })).toBe(false)
+  expect(crossEndpointHazardPassed({ ...old, ownership_policy: "transcript-lock" })).toBe(false)
 })
