@@ -45,9 +45,10 @@ export function createTimestampedStdoutController(stdout: NodeJS.WriteStream = p
       encodingOrCallback?: BufferEncoding | ((error?: Error | null) => void),
       callback?: (error?: Error | null) => void,
     ): boolean => {
-      const text = typeof chunk === "string"
-        ? chunk
-        : Buffer.from(chunk).toString(typeof encodingOrCallback === "string" ? encodingOrCallback : undefined)
+      const text =
+        typeof chunk === "string"
+          ? chunk
+          : Buffer.from(chunk).toString(typeof encodingOrCallback === "string" ? encodingOrCallback : undefined)
       const stamped = transform(text)
 
       if (typeof encodingOrCallback === "function") {

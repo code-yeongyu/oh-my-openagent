@@ -12,15 +12,18 @@ import { createComputerUseComponent } from "./index"
 export const capture = { action: "call", chain: [{ method: "screenshot" }] }
 export const input = { action: "call", chain: [{ method: "type", args: ["hello"] }] }
 
-export async function permissionSession(options: {
-  readonly error?: string
-  readonly permission?: string
-  readonly engineFailure?: "native-unavailable" | "quarantined"
-  readonly platform?: string
-  readonly sessionContext?: Readonly<Record<string, string>>
-  readonly components?: readonly OmoSenpiComponent[]
-} = {}) {
-  const { createAgentSession, DefaultResourceLoader, SessionManager, SettingsManager } = await import("@code-yeongyu/senpi")
+export async function permissionSession(
+  options: {
+    readonly error?: string
+    readonly permission?: string
+    readonly engineFailure?: "native-unavailable" | "quarantined"
+    readonly platform?: string
+    readonly sessionContext?: Readonly<Record<string, string>>
+    readonly components?: readonly OmoSenpiComponent[]
+  } = {},
+) {
+  const { createAgentSession, DefaultResourceLoader, SessionManager, SettingsManager } =
+    await import("@code-yeongyu/senpi")
   const home = await mkdtemp(join(tmpdir(), "computer-permission-"))
   const events: Array<{ name: string; data: unknown }> = []
   const extensionErrors: unknown[] = []
@@ -31,12 +34,21 @@ export async function permissionSession(options: {
     env: {},
     loadSettings: () => resolveComputerSettings({ cuaAdapter: true, auditLog: { enabled: false } }, "darwin"),
     engineChild: () => () => {
-      if (options.engineFailure !== undefined) throw new DesktopEngineUnavailableError({
-        code: options.engineFailure, host: "darwin-arm64", attemptedPaths: [],
-        message: "Test engine is unavailable", cause: "none",
-      })
+      if (options.engineFailure !== undefined)
+        throw new DesktopEngineUnavailableError({
+          code: options.engineFailure,
+          host: "darwin-arm64",
+          attemptedPaths: [],
+          message: "Test engine is unavailable",
+          cause: "none",
+        })
       const child = spawn(process.execPath, [join(import.meta.dir, "permission-engine.test-fixture.mjs")], {
-        env: { PATH: process.env.PATH, HOME: home, PERMISSION_TEST_ERROR: options.error, PERMISSION_TEST_PERMISSION: options.permission },
+        env: {
+          PATH: process.env.PATH,
+          HOME: home,
+          PERMISSION_TEST_ERROR: options.error,
+          PERMISSION_TEST_PERMISSION: options.permission,
+        },
         stdio: "pipe",
         windowsHide: true,
       })
@@ -56,10 +68,12 @@ export async function permissionSession(options: {
     noPromptTemplates: true,
     noContextFiles: true,
     sessionContext: options.sessionContext,
-    extensionFactories: [composeOmoSenpiExtension([component, ...options.components ?? []], {
-      env: {},
-      logger: { info() {}, warn() {}, error() {} },
-    })],
+    extensionFactories: [
+      composeOmoSenpiExtension([component, ...(options.components ?? [])], {
+        env: {},
+        logger: { info() {}, warn() {}, error() {} },
+      }),
+    ],
   })
   await resourceLoader.reload()
   const { session } = await createAgentSession({
@@ -71,13 +85,16 @@ export async function permissionSession(options: {
   })
   await session.bindExtensions({
     mode: "rpc",
-    onError: error => { extensionErrors.push(error) },
+    onError: (error) => {
+      extensionErrors.push(error)
+    },
   })
   const observe = () => {
     const runner = session.extensionRunner
     if (runner === undefined) throw new Error("The real session did not bind its extension runner")
     return runner.onRpcEvent((event) => {
-      if (event.name === "omo.computer.permission_required" || event.name === "computer.permission_required") events.push(event)
+      if (event.name === "omo.computer.permission_required" || event.name === "computer.permission_required")
+        events.push(event)
     })
   }
   let off = observe()

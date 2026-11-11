@@ -87,7 +87,7 @@ export async function runBunInstallWithDetails(options?: RunBunInstallOptions): 
     })
 
     const outputPromise = Promise.all([readProcessOutput(proc.stdout), readProcessOutput(proc.stderr)]).then(
-      ([stdout, stderr]) => ({ stdout, stderr })
+      ([stdout, stderr]) => ({ stdout, stderr }),
     )
 
     let timeoutId: ReturnType<typeof setTimeout> | undefined

@@ -11,7 +11,10 @@ export interface GateMatch {
   readonly header: string | undefined
 }
 
-const GATE_HEADERS: ReadonlySet<string> = new Set([...PINNED_GATE_HEADERS.map((header) => header.toLowerCase()), "authorise"])
+const GATE_HEADERS: ReadonlySet<string> = new Set([
+  ...PINNED_GATE_HEADERS.map((header) => header.toLowerCase()),
+  "authorise",
+])
 const GATE_LABEL = /^(?:approve|authori[sz]e)(?![a-z])/i
 
 function isRecord(value: unknown): value is Record<string, unknown> {

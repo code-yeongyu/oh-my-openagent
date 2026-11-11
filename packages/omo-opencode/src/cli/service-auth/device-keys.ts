@@ -3,7 +3,9 @@ import { SignInError } from "./protocol"
 
 const publicKeyOf = (privateKey: string): string | undefined => {
   try {
-    return createPublicKey(createPrivateKey({ key: Buffer.from(privateKey, "base64"), format: "der", type: "pkcs8" })).export({ format: "jwk" }).x
+    return createPublicKey(
+      createPrivateKey({ key: Buffer.from(privateKey, "base64"), format: "der", type: "pkcs8" }),
+    ).export({ format: "jwk" }).x
   } catch {
     return undefined
   }

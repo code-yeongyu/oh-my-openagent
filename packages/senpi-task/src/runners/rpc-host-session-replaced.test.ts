@@ -22,9 +22,16 @@ afterEach(async () => {
   for (const world of worlds.splice(0)) await world.cleanup()
 })
 
-type Child = { readonly world: HostWorld; readonly parent: ParentSession; readonly record: TaskRecord; readonly routingId: string }
+type Child = {
+  readonly world: HostWorld
+  readonly parent: ParentSession
+  readonly record: TaskRecord
+  readonly routingId: string
+}
 
-async function oneChild(options: { readonly host?: FakeHostOptions; readonly parent?: Parameters<HostWorld["connect"]>[1] } = {}): Promise<Child> {
+async function oneChild(
+  options: { readonly host?: FakeHostOptions; readonly parent?: Parameters<HostWorld["connect"]>[1] } = {},
+): Promise<Child> {
   const world = await startHostWorld({ drainRetryAfterMs: 250, ...options.host })
   worlds.push(world)
   const parent = world.connect("parent-a", { maxDrainAttempts: 1, ...options.parent })
@@ -39,7 +46,8 @@ async function oneChild(options: { readonly host?: FakeHostOptions; readonly par
 // runs after it: the re-stamp has reached the record by the time this resolves. Nothing is polled.
 function replaceSeen(child: Child): Promise<HostSessionReplaced> {
   const handle = child.parent.manager.getResidentHandle(child.record.task_id)
-  if (handle?.onReplaced === undefined) throw new Error("the child handle exposes no onReplaced seam: session_replaced is not observed")
+  if (handle?.onReplaced === undefined)
+    throw new Error("the child handle exposes no onReplaced seam: session_replaced is not observed")
   return new Promise<HostSessionReplaced>((resolve) => {
     handle.onReplaced?.((event) => resolve(event))
   })
@@ -55,7 +63,10 @@ function emitReplaced(child: Child, durableSessionId: string, sessionFile: strin
   })
 }
 
-function taskEvents(parent: ParentSession, taskId: string): readonly { readonly type: string; readonly payload: unknown }[] {
+function taskEvents(
+  parent: ParentSession,
+  taskId: string,
+): readonly { readonly type: string; readonly payload: unknown }[] {
   return readFileSync(join(parent.store.stateDir, "logs", `${taskId}.jsonl`), "utf8")
     .trim()
     .split("\n")
@@ -94,7 +105,12 @@ describe("a child whose session the host replaces", () => {
     const settled = child.parent.manager.waitFor(child.record.task_id)
 
     // when - senpi stops the turn first, naming the replacement, then announces it
-    child.world.host.abortTurn(child.routingId, "partial", { kind: "session_replaced", reason: "new", targetSessionFile: sessionFile, targetSessionId: "durable-replaced-1" })
+    child.world.host.abortTurn(child.routingId, "partial", {
+      kind: "session_replaced",
+      reason: "new",
+      targetSessionFile: sessionFile,
+      targetSessionId: "durable-replaced-1",
+    })
     emitReplaced(child, "durable-replaced-1", sessionFile)
     await seen
     await settled

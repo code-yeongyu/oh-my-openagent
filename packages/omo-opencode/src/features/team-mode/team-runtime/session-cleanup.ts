@@ -3,10 +3,7 @@ import { log } from "../../../shared/logger"
 import type { BackgroundManager } from "../../background-agent/manager"
 import type { TmuxSessionManager } from "../../tmux-subagent/manager"
 import { deleteTeam } from "./delete-team"
-import {
-  getSessionCreatedTeamRunIds,
-  unregisterTeamRunForSessionCleanup,
-} from "./session-team-run-registry"
+import { getSessionCreatedTeamRunIds, unregisterTeamRunForSessionCleanup } from "./session-team-run-registry"
 
 export {
   clearSessionTeamRunCleanupRegistry,

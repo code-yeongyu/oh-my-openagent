@@ -34,16 +34,23 @@ export function createProvisionalExitTracker(
     release(input.taskId)
     const observedAt = ports.now()
     const observed = {
-      observed_at: new Date(observedAt).toISOString(), run_epoch: input.epoch,
-      code: exit.code, signal: exit.signal,
+      observed_at: new Date(observedAt).toISOString(),
+      run_epoch: input.epoch,
+      code: exit.code,
+      signal: exit.signal,
     }
     let persisted = false
     try {
       let applied = false
       ports.store.mutate(input.taskId, (fresh) => {
-        if (fresh.status !== "running" || fresh.notification.run_epoch !== input.epoch
-          || fresh.host_pid !== owned.host_pid || fresh.residency_claim !== owned.residency_claim
-          || ports.liveHandle(input.taskId) !== input.handle) return fresh
+        if (
+          fresh.status !== "running" ||
+          fresh.notification.run_epoch !== input.epoch ||
+          fresh.host_pid !== owned.host_pid ||
+          fresh.residency_claim !== owned.residency_claim ||
+          ports.liveHandle(input.taskId) !== input.handle
+        )
+          return fresh
         applied = true
         return { ...fresh, provisional_exit: observed, updated_at: observed.observed_at }
       })
@@ -60,10 +67,14 @@ export function createProvisionalExitTracker(
     const confirm = (): void => {
       if (pending.get(input.taskId) !== timer) return
       const fresh = ports.store.load(input.taskId)
-      if (ports.liveHandle(input.taskId) !== input.handle || fresh?.status !== "running"
-        || fresh.host_pid !== owned.host_pid || fresh.residency_claim !== owned.residency_claim
-        || fresh.notification.run_epoch !== input.epoch
-        || (persisted && fresh.provisional_exit?.observed_at !== observed.observed_at)) {
+      if (
+        ports.liveHandle(input.taskId) !== input.handle ||
+        fresh?.status !== "running" ||
+        fresh.host_pid !== owned.host_pid ||
+        fresh.residency_claim !== owned.residency_claim ||
+        fresh.notification.run_epoch !== input.epoch ||
+        (persisted && fresh.provisional_exit?.observed_at !== observed.observed_at)
+      ) {
         release(input.taskId)
         return
       }
