@@ -287,7 +287,7 @@ export const OmoMemoryAutoIdentitySchema = z.enum(["path", "git"])
 export const OmoMemorySettingsSchema = z.object({
   enabled: z.boolean().default(true),
   agent: z.string().min(1).default("auto"),
-  auto_identity: OmoMemoryAutoIdentitySchema.default("path"),
+  auto_identity: OmoMemoryAutoIdentitySchema.default("git"),
   // "direct" registers the memory tools as always-on ToolDefinitions; "search" opts in to the
   // extension-declared MCP server surfaced through senpi's tool_search catalog.
   reflection: OmoMemoryReflectionSchema.default({

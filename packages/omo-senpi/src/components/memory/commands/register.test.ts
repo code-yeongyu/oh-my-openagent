@@ -33,6 +33,7 @@ describe("registerMemoryCommands", () => {
       "doctor",
       "recompile",
       "memory-repository",
+      "memory-merge",
       "sleeptime",
       "reflect",
       "dream",
