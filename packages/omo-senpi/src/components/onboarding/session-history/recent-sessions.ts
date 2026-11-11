@@ -1,6 +1,12 @@
 import { basename } from "node:path"
 
-import { DEFAULT_RECENT_WINDOW_MS, MAX_IMPORTED_TRANSCRIPT_BYTES, MAX_IMPORT_BYTES, MAX_IMPORT_RECORDS, MAX_IMPORT_TRANSCRIPTS } from "./constants"
+import {
+  DEFAULT_RECENT_WINDOW_MS,
+  MAX_IMPORTED_TRANSCRIPT_BYTES,
+  MAX_IMPORT_BYTES,
+  MAX_IMPORT_RECORDS,
+  MAX_IMPORT_TRANSCRIPTS,
+} from "./constants"
 import type { ProjectPathRules } from "./project-paths"
 import { buildSessionDigest } from "./session-digest"
 import { realPathOr, statOrNull, type SessionHistoryFs } from "./session-history-fs"
@@ -8,7 +14,14 @@ import type { CwdGroup } from "./transcript-cwd"
 import { parseAgentSessionRecords } from "./transcript-parser"
 import { readTranscriptRecords, sameTranscriptIdentity, transcriptIdentity } from "./transcript-reader"
 import { extractDecodedCwd } from "./transcript-records"
-import type { AgentSessionSource, CompletedTranscript, RecentSessionOutcome, RecentSessionsQuery, ScanCounts, TranscriptSource } from "./types"
+import type {
+  AgentSessionSource,
+  CompletedTranscript,
+  RecentSessionOutcome,
+  RecentSessionsQuery,
+  ScanCounts,
+  TranscriptSource,
+} from "./types"
 
 export type SourcedGroup = CwdGroup & { readonly source: AgentSessionSource }
 
@@ -33,7 +46,8 @@ async function eligibleTranscripts(
 ): Promise<Array<Eligible>> {
   const root = query.workspaceRoot === undefined ? null : rules.resolveRecordedPath(query.workspaceRoot)
   if (query.workspaceRoot !== undefined) {
-    if (root === null || rules.isExcludedProjectPath(root) || rules.isExcludedProjectPath(await realPathOr(fs, root))) return []
+    if (root === null || rules.isExcludedProjectPath(root) || rules.isExcludedProjectPath(await realPathOr(fs, root)))
+      return []
   }
   const rootIdentity = root === null ? null : await rules.directoryIdentity(root)
   const cutoffMs = nowMs - (query.recentWindowMs ?? DEFAULT_RECENT_WINDOW_MS)
@@ -41,7 +55,11 @@ async function eligibleTranscripts(
   for (const group of groups) {
     const resolved = rules.resolveRecordedPath(group.cwd)
     if (resolved === null) continue
-    if (rootIdentity === null && (rules.isExcludedProjectPath(resolved) || rules.isExcludedProjectPath(await realPathOr(fs, resolved)))) continue
+    if (
+      rootIdentity === null &&
+      (rules.isExcludedProjectPath(resolved) || rules.isExcludedProjectPath(await realPathOr(fs, resolved)))
+    )
+      continue
     const identity = await rules.directoryIdentity(resolved)
     if (rootIdentity !== null && identity !== rootIdentity) continue
     for (const transcript of group.transcripts) {
@@ -81,7 +99,12 @@ export function listRecentSessions(input: {
     const match = named.find((completed) => sameTranscriptIdentity(completed, identity))
     return match === undefined
       ? null
-      : { ...identity, provider: entry.group.source, homePath: entry.group.homePath, providerSessionId: match.providerSessionId }
+      : {
+          ...identity,
+          provider: entry.group.source,
+          homePath: entry.group.homePath,
+          providerSessionId: match.providerSessionId,
+        }
   }
   async function* run(): AsyncGenerator<RecentSessionOutcome> {
     const eligible = await eligibleTranscripts(fs, rules, await input.groups(), input.query, input.now())
@@ -127,14 +150,23 @@ export function listRecentSessions(input: {
         continue
       }
       const thread = parseAgentSessionRecords(
-        { source: entry.group.source, fallbackSessionId: basename(entry.filePath, ".jsonl"), lastActiveAtMs: entry.mtimeMs },
+        {
+          source: entry.group.source,
+          fallbackSessionId: basename(entry.filePath, ".jsonl"),
+          lastActiveAtMs: entry.mtimeMs,
+        },
         snapshot.records,
       )
       if (thread === null) {
         yield { _tag: "Skipped" }
         continue
       }
-      const source = { ...identity, provider: thread.source, homePath: entry.group.homePath, providerSessionId: thread.providerSessionId }
+      const source = {
+        ...identity,
+        provider: thread.source,
+        homePath: entry.group.homePath,
+        providerSessionId: thread.providerSessionId,
+      }
       const sessionKey = `${thread.source}\0${thread.providerSessionId}`
       if (importedSessions.has(sessionKey)) {
         yield { _tag: "Duplicate", source }

@@ -4,7 +4,12 @@ import { join } from "node:path"
 
 import { renderAgreementsTarget } from "./agreements-target"
 import type { AgreementEvent } from "../agreements/mutate"
-import { AGREEMENTS_PATH, DEFAULT_AGREEMENTS_POLICY, type AgreementExtractionRecord, type AgreementsPolicy } from "../agreements/types"
+import {
+  AGREEMENTS_PATH,
+  DEFAULT_AGREEMENTS_POLICY,
+  type AgreementExtractionRecord,
+  type AgreementsPolicy,
+} from "../agreements/types"
 import type { GitIndexIdentity, GitMemoryRepo, GitPathState, GitWorktreeFileIdentity } from "../git"
 import { parseMemoryFile, renderMemoryFile } from "../memfs"
 import { stampReceipt } from "../tools/claim-frontmatter"
@@ -54,11 +59,13 @@ export async function planFactsMutation(
   if (headBeforeApply === null) throw new Error("facts repository has no HEAD")
   const routing = await withLiveLedgers(repo, await planFactsRouting(repo.dir, batch.records, people, onAliasTie))
   const agreementRecords = batch.agreements ?? []
-  const ledger = agreementRecords.length === 0 ? undefined : await renderAgreementsTarget(repo.dir, agreementRecords, agreements)
+  const ledger =
+    agreementRecords.length === 0 ? undefined : await renderAgreementsTarget(repo.dir, agreementRecords, agreements)
   for (const event of ledger?.events ?? []) onAgreementEvent?.(event)
   const paths = [...factsRoutingPaths(routing), ...(ledger?.content === undefined ? [] : [AGREEMENTS_PATH])].sort()
   const pre = await repo.pathState.captureAll(paths)
-  if ((await repo.status()).trim().length > 0) throw new FactsPlanParentDirtyError("facts repository changed during planning")
+  if ((await repo.status()).trim().length > 0)
+    throw new FactsPlanParentDirtyError("facts repository changed during planning")
   const content = new Map<string, string>()
   for (const [path, records] of routing.notes) {
     content.set(path, await renderFactsNote(repo.dir, path, records))
@@ -133,13 +140,20 @@ async function renderFactsNote(
   records: readonly FactsExtractionRecord[],
 ): Promise<string> {
   const existing = await readFile(join(root, relativePath), "utf8").catch(() => undefined)
-  const parsed = existing === undefined
-    ? { frontmatter: { description: `Explicit facts for ${records[0]?.date.slice(0, 7) ?? relativePath.slice(-10, -3)}` }, body: "" }
-    : parseMemoryFile(existing)
+  const parsed =
+    existing === undefined
+      ? {
+          frontmatter: {
+            description: `Explicit facts for ${records[0]?.date.slice(0, 7) ?? relativePath.slice(-10, -3)}`,
+          },
+          body: "",
+        }
+      : parseMemoryFile(existing)
   const prefix = parsed.body.length === 0 || parsed.body.endsWith("\n") ? "" : "\n"
   const bullets = records.map((record) => `- [${record.date}] ${factDisplayText(record)}`).join("\n")
   const body = `${parsed.body}${prefix}${bullets}\n`
   // Same header rule as every writer and the commit hook: a legacy user header is dropped, a user record becomes mixed.
-  const frontmatter = existing === undefined ? parsed.frontmatter : stampReceipt(parsed, parsed.frontmatter, body, undefined)
+  const frontmatter =
+    existing === undefined ? parsed.frontmatter : stampReceipt(parsed, parsed.frontmatter, body, undefined)
   return renderMemoryFile(frontmatter, body)
 }

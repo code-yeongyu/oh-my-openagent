@@ -157,14 +157,20 @@ function writeTokenFile(filePath: string, token: OAuthTokenData): boolean {
 }
 
 export function loadToken(serverHost: string, resource: string): OAuthTokenData | null {
-  return readTokenFile(getMcpOauthStoragePath(serverHost, resource)) ?? readLegacyStore()?.[buildKey(serverHost, resource)] ?? null
+  return (
+    readTokenFile(getMcpOauthStoragePath(serverHost, resource)) ??
+    readLegacyStore()?.[buildKey(serverHost, resource)] ??
+    null
+  )
 }
 
 export function saveToken(serverHost: string, resource: string, token: OAuthTokenData): boolean {
   const key = buildKey(serverHost, resource)
   const hash = getMcpOauthServerHash(serverHost, resource)
-  return writeTokenFile(getMcpOauthStoragePath(serverHost, resource), token) &&
+  return (
+    writeTokenFile(getMcpOauthStoragePath(serverHost, resource), token) &&
     saveTokenIndexEntry(getMcpOauthStorageDir(), hash, key)
+  )
 }
 
 export function deleteToken(serverHost: string, resource: string): boolean {

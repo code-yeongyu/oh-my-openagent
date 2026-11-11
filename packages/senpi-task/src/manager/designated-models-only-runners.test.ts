@@ -5,7 +5,11 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { loadSenpiBarrel } from "../lazy/senpi-barrel"
 import { cleanupProjects } from "./__fixtures__/manager-fakes"
-import { runCategoryChild as runChild, runCategoryChildren, type DesignatedChildInput } from "./__fixtures__/designated-child"
+import {
+  runCategoryChild as runChild,
+  runCategoryChildren,
+  type DesignatedChildInput,
+} from "./__fixtures__/designated-child"
 import { chainIds } from "./__fixtures__/model-chain-ids"
 import type { ModelChainWorld } from "./__fixtures__/model-chain-world"
 
@@ -19,7 +23,10 @@ afterEach(async () => {
   cleanupProjects()
 })
 
-const runCategoryChild = (input: DesignatedChildInput) => runChild(input, (adopted) => { world = adopted })
+const runCategoryChild = (input: DesignatedChildInput) =>
+  runChild(input, (adopted) => {
+    world = adopted
+  })
 const calledModels = (adopted: ModelChainWorld) => adopted.calls.map((call) => call.model)
 const modelId = (display: string) => display.slice(display.indexOf("/") + 1)
 const sha256 = (path: string) => createHash("sha256").update(readFileSync(path)).digest("hex")
@@ -87,7 +94,12 @@ describe.each(["in-process", "process", "host"] as const)("senpi's shipped defau
     const { SettingsManager } = await loadSenpiBarrel()
     const shipped = SettingsManager.inMemory({}).getRetryFallbackSettings().chains
     expect(shipped[modelId(opus55)]?.map((rung) => rung.split(":")[0])).toContain(modelId(opus5))
-    const { record, world } = await runCategoryChild({ runner, category: "deep-high", chain: [opus55], scripts: { [opus55]: ["quota"] } })
+    const { record, world } = await runCategoryChild({
+      runner,
+      category: "deep-high",
+      chain: [opus55],
+      scripts: { [opus55]: ["quota"] },
+    })
 
     // then
     expect(calledModels(world)).toEqual([opus55])
@@ -134,10 +146,15 @@ describe("each child's designated chain on one socket host stays its own session
     const userFallbackChains = { [primary]: [parent, second], [opus55]: [parent, second] }
 
     // when
-    const { records, world: oneHost } = await runCategoryChildren([
-      { runner: "host", category: "unspecified-low", chain: [primary, second], scripts, userFallbackChains },
-      { runner: "host", category: "deep-high", chain: [opus55], scripts, userFallbackChains },
-    ], (adopted) => { world = adopted })
+    const { records, world: oneHost } = await runCategoryChildren(
+      [
+        { runner: "host", category: "unspecified-low", chain: [primary, second], scripts, userFallbackChains },
+        { runner: "host", category: "deep-high", chain: [opus55], scripts, userFallbackChains },
+      ],
+      (adopted) => {
+        world = adopted
+      },
+    )
 
     // then
     const [a, b] = records

@@ -28,7 +28,13 @@ function createHarness(): {
     },
     detach: () => listeners.clear(),
   } as unknown as RpcProtocolClient
-  const handle = createRpcChildHandle({ client, child, taskId: "st_abort_seam", heartbeatIntervalMs: 60_000, now: () => 1 }) as TrackedHandle
+  const handle = createRpcChildHandle({
+    client,
+    child,
+    taskId: "st_abort_seam",
+    heartbeatIntervalMs: 60_000,
+    now: () => 1,
+  }) as TrackedHandle
   return {
     handle,
     emit: (event) => {
@@ -67,10 +73,12 @@ describe("rpc turn outcome user abort classification", () => {
       await harness.handle.startInitialPrompt("work")
 
       // when
-      harness.emit(event({
-        type: "message_end",
-        message: { role: "assistant", content: [], stopReason: "error", errorMessage: "provider exploded" },
-      }))
+      harness.emit(
+        event({
+          type: "message_end",
+          message: { role: "assistant", content: [], stopReason: "error", errorMessage: "provider exploded" },
+        }),
+      )
       harness.emit(event({ type: "agent_end", willRetry: false, messages: [] }))
       harness.emit(event({ type: "agent_idle" }))
       const outcome = await harness.handle.waitForOutcome()
@@ -94,10 +102,12 @@ describe("rpc turn outcome user abort classification", () => {
 
       // when
       await harness.handle.followUp("second")
-      harness.emit(event({
-        type: "message_end",
-        message: { role: "assistant", content: [{ type: "text", text: "done" }], stopReason: "stop" },
-      }))
+      harness.emit(
+        event({
+          type: "message_end",
+          message: { role: "assistant", content: [{ type: "text", text: "done" }], stopReason: "stop" },
+        }),
+      )
       harness.emit(event({ type: "agent_end", willRetry: false, messages: [] }))
       harness.emit(event({ type: "agent_idle" }))
       const outcome = await harness.handle.waitForOutcome()
@@ -125,14 +135,16 @@ describe("rpc turn outcome foreign user abort classification (F10a)", () => {
 
       // when
       harness.emit(event({ type: "message_end", message: PARTIAL_ANSWER }))
-      harness.emit(event({
-        type: "agent_end",
-        willRetry: false,
-        aborted: true,
-        abortSource: "user",
-        abortedBy: "guest-client",
-        messages: [PARTIAL_ANSWER],
-      }))
+      harness.emit(
+        event({
+          type: "agent_end",
+          willRetry: false,
+          aborted: true,
+          abortSource: "user",
+          abortedBy: "guest-client",
+          messages: [PARTIAL_ANSWER],
+        }),
+      )
       harness.emit(event({ type: "agent_idle" }))
 
       // then
@@ -153,13 +165,15 @@ describe("rpc turn outcome foreign user abort classification (F10a)", () => {
 
       // when
       await harness.handle.abort()
-      harness.emit(event({
-        type: "agent_end",
-        willRetry: false,
-        aborted: true,
-        abortSource: "user",
-        messages: [PARTIAL_ANSWER],
-      }))
+      harness.emit(
+        event({
+          type: "agent_end",
+          willRetry: false,
+          aborted: true,
+          abortSource: "user",
+          messages: [PARTIAL_ANSWER],
+        }),
+      )
       harness.emit(event({ type: "agent_idle" }))
 
       // then
@@ -175,13 +189,15 @@ describe("rpc turn outcome foreign user abort classification (F10a)", () => {
       await harness.handle.startInitialPrompt("work")
 
       // when
-      harness.emit(event({
-        type: "agent_end",
-        willRetry: false,
-        aborted: true,
-        abortSource: "provider",
-        messages: [PARTIAL_ANSWER],
-      }))
+      harness.emit(
+        event({
+          type: "agent_end",
+          willRetry: false,
+          aborted: true,
+          abortSource: "provider",
+          messages: [PARTIAL_ANSWER],
+        }),
+      )
       harness.emit(event({ type: "agent_idle" }))
 
       // then

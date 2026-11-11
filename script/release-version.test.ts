@@ -8,7 +8,9 @@ import { fileURLToPath } from "node:url"
 
 test("the actual metadata step validates before npm reads and forwards channel outputs", () => {
   const root = fileURLToPath(new URL("../", import.meta.url))
-  const workflow = Bun.YAML.parse(readFileSync(join(root, ".github/workflows/publish.yml"), "utf8")) as { jobs: Record<string, { steps: Array<{ name?: string; run?: string }> }> }
+  const workflow = Bun.YAML.parse(readFileSync(join(root, ".github/workflows/publish.yml"), "utf8")) as {
+    jobs: Record<string, { steps: Array<{ name?: string; run?: string }> }>
+  }
   const run = workflow.jobs["release-metadata"].steps.find((step) => step.name === "Calculate version")?.run
   if (!run) throw new Error("Missing metadata entrypoint")
   const dir = mkdtempSync(join(tmpdir(), "release-version-"))
@@ -24,10 +26,23 @@ test("the actual metadata step validates before npm reads and forwards channel o
       const calls = join(dir, "calls")
       writeFileSync(output, "")
       writeFileSync(calls, "")
-      const result = spawnSync("bash", ["-e", "-c", `npm() { printf '%s\\n' "$*" >> "$CALLS"; printf '5.0.0-beta.60\\n'; }\n${run}`], {
-        cwd: root, encoding: "utf8", timeout: 10_000,
-        env: { ...process.env, RAW_VERSION: version, LAZYCODEX_ONLY: only, PUBLISH_LAZYCODEX: "true", GITHUB_OUTPUT: output, CALLS: calls },
-      })
+      const result = spawnSync(
+        "bash",
+        ["-e", "-c", `npm() { printf '%s\\n' "$*" >> "$CALLS"; printf '5.0.0-beta.60\\n'; }\n${run}`],
+        {
+          cwd: root,
+          encoding: "utf8",
+          timeout: 10_000,
+          env: {
+            ...process.env,
+            RAW_VERSION: version,
+            LAZYCODEX_ONLY: only,
+            PUBLISH_LAZYCODEX: "true",
+            GITHUB_OUTPUT: output,
+            CALLS: calls,
+          },
+        },
+      )
       expect(result.status, result.stderr).toBe(valid ? 0 : 1)
       const metadata = readFileSync(output, "utf8")
       if (valid) {
@@ -39,11 +54,16 @@ test("the actual metadata step validates before npm reads and forwards channel o
         expect(readFileSync(calls, "utf8")).toBe("")
       }
     }
-  } finally { rmSync(dir, { recursive: true, force: true }) }
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 test("LazyCodex-only numbers cannot consume the next omo number", () => {
-  expect(resolveReleaseVersion("5.0.0-beta.62.lazycodex.1", true)).toEqual({ version: "5.0.0-beta.62.lazycodex.1", distTag: "beta" })
+  expect(resolveReleaseVersion("5.0.0-beta.62.lazycodex.1", true)).toEqual({
+    version: "5.0.0-beta.62.lazycodex.1",
+    distTag: "beta",
+  })
   expect(resolveReleaseVersion("5.0.0-beta.63", false)).toEqual({ version: "5.0.0-beta.63", distTag: "beta" })
   expect(() => resolveReleaseVersion("5.0.0-beta.63", true)).toThrow()
   expect(() => resolveReleaseVersion("5.0.0-beta.62.lazycodex.1", false)).toThrow()
@@ -56,7 +76,17 @@ test("stable-base LazyCodex releases never advance latest; omo channel mapping s
 })
 
 test("reserved identifier cannot escape the namespace through malformed versions", () => {
-  for (const version of ["5.0.0", "5.0.0-beta.1", "5.0.0-beta.1.lazycodex", "5.0.0-beta.1.lazycodex.0", "5.0.0-beta.1.lazycodex.01", "5.0.0-beta.lazycodex.1.extra", "05.0.0-lazycodex.1", "5.0.0-beta.01.lazycodex.1", "5.0.0-latest.lazycodex.1"]) {
+  for (const version of [
+    "5.0.0",
+    "5.0.0-beta.1",
+    "5.0.0-beta.1.lazycodex",
+    "5.0.0-beta.1.lazycodex.0",
+    "5.0.0-beta.1.lazycodex.01",
+    "5.0.0-beta.lazycodex.1.extra",
+    "05.0.0-lazycodex.1",
+    "5.0.0-beta.01.lazycodex.1",
+    "5.0.0-latest.lazycodex.1",
+  ]) {
     expect(() => resolveReleaseVersion(version, true)).toThrow()
   }
   for (const version of ["5.0.0-lazycodex.1", "5.0.0-beta.lazycodex.1", "5.0.0-lazycodex"]) {

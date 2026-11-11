@@ -113,10 +113,11 @@ export function liveParentFixture(mode: "in-process" | "child-process" | "host-s
             terminate: handle.terminate ?? (async () => undefined),
           }
     },
-    entries: (): readonly ResidentHandle[] => manager.residentTaskIds().flatMap((id) => {
-      const handle = registry.get(id)
-      return handle === undefined ? [] : [handle]
-    }),
+    entries: (): readonly ResidentHandle[] =>
+      manager.residentTaskIds().flatMap((id) => {
+        const handle = registry.get(id)
+        return handle === undefined ? [] : [handle]
+      }),
     forget: (id: string, options: Parameters<typeof manager.forget>[1]) => manager.forget(id, options),
     hasPendingSends: () => false,
     ownsRecord: (record: { readonly parent_session_id: string }) =>

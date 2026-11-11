@@ -76,10 +76,16 @@ describe("createDagFileStore retention cost", () => {
       nodes: [],
     })
     const expiredKey = store.writeKey({
-      schemaVersion: 1, parentSessionId: "parent-session", runKey: `key-${expiredId}`, runId: expiredId,
+      schemaVersion: 1,
+      parentSessionId: "parent-session",
+      runKey: `key-${expiredId}`,
+      runId: expiredId,
     })
     const liveKey = store.writeKey({
-      schemaVersion: 1, parentSessionId: "parent-session", runKey: `key-${liveId}`, runId: liveId,
+      schemaVersion: 1,
+      parentSessionId: "parent-session",
+      runKey: `key-${liveId}`,
+      runId: liveId,
     })
 
     // when

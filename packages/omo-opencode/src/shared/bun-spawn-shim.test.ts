@@ -17,10 +17,7 @@ describe("bun-spawn-shim", () => {
   test("#given piped stdout #when spawn writes output #then stdout is readable", async () => {
     const proc = spawn(["bun", "--print", "'shim-ok'"], { stdout: "pipe", stderr: "pipe" })
 
-    const [exitCode, stdout] = await Promise.all([
-      proc.exited,
-      readProcessStream(proc.stdout),
-    ])
+    const [exitCode, stdout] = await Promise.all([proc.exited, readProcessStream(proc.stdout)])
 
     expect(exitCode).toBe(0)
     expect(stdout.trim()).toBe("shim-ok")

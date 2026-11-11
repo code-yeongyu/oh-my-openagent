@@ -5,16 +5,8 @@ import { observeState, stopParent } from "./task-host-e2e-events.mjs"
 import { HostClient } from "./task-host-e2e-shards-rpc.mjs"
 import { spawnParent } from "./task-host-e2e-process.mjs"
 import { jsonlLines } from "./task-host-e2e-support.mjs"
-import {
-  startParent,
-  taskRecords,
-  teardownSandbox,
-} from "./task-host-e2e-shard-cost-support.mjs"
-import {
-  crashRows,
-  endpointFacts,
-  generationNames,
-} from "./task-host-e2e-shards-support.mjs"
+import { startParent, taskRecords, teardownSandbox } from "./task-host-e2e-shard-cost-support.mjs"
+import { crashRows, endpointFacts, generationNames } from "./task-host-e2e-shards-support.mjs"
 import {
   MOCK_ENTRY,
   batchTaskStep,
@@ -49,10 +41,11 @@ function route(childRelease, grandchildRelease, state) {
       return textStep("resume grandchild held", grandchildRelease)
     }
     if (request.user.includes(RESUME_CHILD)) {
-      if (request.count("task") === 0) return batchTaskStep([
-        { name: "resume-grandchild-0", prompt: RESUME_GRANDCHILD },
-        { name: "resume-grandchild-1", prompt: RESUME_GRANDCHILD },
-      ])
+      if (request.count("task") === 0)
+        return batchTaskStep([
+          { name: "resume-grandchild-0", prompt: RESUME_GRANDCHILD },
+          { name: "resume-grandchild-1", prompt: RESUME_GRANDCHILD },
+        ])
       return textStep("resume child held", childRelease)
     }
     return textStep("unexpected request")
@@ -82,11 +75,7 @@ export async function runNestedResumeScenario(current, artifacts) {
   const childRelease = join(current.root, `resume-child-${process.pid}`)
   const grandchildRelease = join(current.root, `resume-grandchild-${process.pid}`)
   const state = { noticeTaskId: undefined }
-  const scenario = await createHttpScenario(
-    current,
-    "nested-resume",
-    route(childRelease, grandchildRelease, state),
-  )
+  const scenario = await createHttpScenario(current, "nested-resume", route(childRelease, grandchildRelease, state))
   const { sandbox, project, requestLog } = scenario
   let parent
   let resumed
@@ -95,12 +84,16 @@ export async function runNestedResumeScenario(current, artifacts) {
   let stoppedSupervisor
   try {
     writeParentScript(sandbox, [
-      { type: "tool_call", name: "task", arguments: {
-        category: "proc",
-        run_in_background: true,
-        name: "resume-child",
-        prompt: RESUME_CHILD,
-      } },
+      {
+        type: "tool_call",
+        name: "task",
+        arguments: {
+          category: "proc",
+          run_in_background: true,
+          name: "resume-child",
+          prompt: RESUME_CHILD,
+        },
+      },
       { type: "text", text: "resume parent spawned child" },
     ])
     parent = startParent(sandbox, project, "spawn nested resume tree")
@@ -133,10 +126,14 @@ export async function runNestedResumeScenario(current, artifacts) {
     await stopParent(parent)
     parent = undefined
     writeParentScript(sandbox, [
-      { type: "tool_call", name: "task_output", arguments: {
-        task_id: child.task_id,
-        mode: "status",
-      } },
+      {
+        type: "tool_call",
+        name: "task_output",
+        arguments: {
+          task_id: child.task_id,
+          mode: "status",
+        },
+      },
       { type: "text", text: "nested resume observed" },
     ])
     resumed = spawnParent(sandbox, MOCK_ENTRY, "resume nested tree", {
@@ -144,7 +141,8 @@ export async function runNestedResumeScenario(current, artifacts) {
       session: parentSession,
     })
     await observeState(sandbox.root, () =>
-      readFileSync(parentSession, "utf8").includes("nested resume observed") ? true : undefined)
+      readFileSync(parentSession, "utf8").includes("nested resume observed") ? true : undefined,
+    )
     const normal = invariant(sandbox, socket, before)
 
     const childRow = sessionRow(
@@ -177,10 +175,14 @@ export async function runNestedResumeScenario(current, artifacts) {
     // reads as BUSY, not gone (omo#9069): C1's revival of G1 waits for its own host instead of parking
     // it. Either verdict is acceptable here - parked own_host_unreachable (the pre-#9069 contract) or
     // left untouched and waiting - as long as nothing was ensured, spawned or moved (checked below).
-    const deferred = await observeState(sandbox.root, () => {
-      const record = taskRecords(project).find((entry) => entry.task_id === grandchild.task_id)
-      return record?.suspension_reason === "own_host_unreachable" ? record : undefined
-    }, { timeoutMs: 15_000 })
+    const deferred = await observeState(
+      sandbox.root,
+      () => {
+        const record = taskRecords(project).find((entry) => entry.task_id === grandchild.task_id)
+        return record?.suspension_reason === "own_host_unreachable" ? record : undefined
+      },
+      { timeoutMs: 15_000 },
+    )
     const deferredAtMs = Date.now() - stoppedAt
     const grandchildAtDeadline = taskRecords(project).find((entry) => entry.task_id === grandchild.task_id) ?? null
     const stopped = invariant(sandbox, socket, before)
@@ -189,11 +191,15 @@ export async function runNestedResumeScenario(current, artifacts) {
       sessionId: reopened.routingId,
       message: READ_NOTICE,
     })
-    const notices = await observeState(dirname(child.host_session.session_path), () => {
-      const count = readFileSync(child.host_session.session_path, "utf8")
-        .split("host_notice:own_host_unreachable").length - 1
-      return count > 0 ? count : undefined
-    }, { timeoutMs: 30_000 })
+    const notices = await observeState(
+      dirname(child.host_session.session_path),
+      () => {
+        const count =
+          readFileSync(child.host_session.session_path, "utf8").split("host_notice:own_host_unreachable").length - 1
+        return count > 0 ? count : undefined
+      },
+      { timeoutMs: 30_000 },
+    )
     process.kill(stoppedSupervisor, "SIGCONT")
     stoppedSupervisor = undefined
     publicClient = await HostClient.connect(socket, "nested-resume-public")
@@ -207,13 +213,16 @@ export async function runNestedResumeScenario(current, artifacts) {
       provider: "omo-http",
       modelId: "mock-1",
     })
-    const reattached = await observeState(sandbox.root, () => {
-      const record = taskRecords(project).find((entry) => entry.task_id === grandchild.task_id)
-      return record?.residency_state === "resident" &&
-        record.suspension_reason !== "own_host_unreachable"
-        ? record
-        : undefined
-    }, { timeoutMs: 30_000 })
+    const reattached = await observeState(
+      sandbox.root,
+      () => {
+        const record = taskRecords(project).find((entry) => entry.task_id === grandchild.task_id)
+        return record?.residency_state === "resident" && record.suspension_reason !== "own_host_unreachable"
+          ? record
+          : undefined
+      },
+      { timeoutMs: 30_000 },
+    )
     const recovered = invariant(sandbox, socket, before)
     const facts = {
       socket,
@@ -222,12 +231,15 @@ export async function runNestedResumeScenario(current, artifacts) {
       deferred_reason: deferred?.suspension_reason ?? null,
       deferred_after_stop_ms: deferredAtMs,
       stalled_own_host_verdict: deferred === undefined ? "busy_wait" : "parked_own_host_unreachable",
-      grandchild_during_stall: grandchildAtDeadline === null ? null : {
-        status: grandchildAtDeadline.status,
-        residency_state: grandchildAtDeadline.residency_state,
-        suspension_reason: grandchildAtDeadline.suspension_reason ?? null,
-        socket: grandchildAtDeadline.host_session?.socket ?? null,
-      },
+      grandchild_during_stall:
+        grandchildAtDeadline === null
+          ? null
+          : {
+              status: grandchildAtDeadline.status,
+              residency_state: grandchildAtDeadline.residency_state,
+              suspension_reason: grandchildAtDeadline.suspension_reason ?? null,
+              socket: grandchildAtDeadline.host_session?.socket ?? null,
+            },
       grandchild_log_tail: jsonlLines(join(project.stateDir, "logs", `${grandchild.task_id}.jsonl`)).slice(-6),
       notice_count: notices ?? 0,
       stopped_invariants: stopped,

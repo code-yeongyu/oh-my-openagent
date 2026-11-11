@@ -23,7 +23,9 @@ function requiredSharedSkillsPaths() {
   const manifest = JSON.parse(readFileSync("packages/shared-skills/package.json", "utf8"))
   // Runtime targets only: a missing .d.ts cannot break an install, a missing .mjs does.
   const targets = Object.values(manifest.exports ?? {}).flatMap((entry) =>
-    typeof entry === "string" ? [entry] : [entry?.import, entry?.default].filter((target) => typeof target === "string"),
+    typeof entry === "string"
+      ? [entry]
+      : [entry?.import, entry?.default].filter((target) => typeof target === "string"),
   )
   return [...new Set(targets.map((target) => `packages/shared-skills/${target.replace(/^\.\//, "")}`))]
 }

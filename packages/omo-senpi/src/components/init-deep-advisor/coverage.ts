@@ -69,8 +69,7 @@ function walk(root: string, dir: string, depth: number, candidates: DirInfo[]): 
   }
   if (depth >= 1) {
     const sourceFiles = entries.filter(
-      (entry) =>
-        !entry.isSymbolicLink() && entry.isFile() && SOURCE_EXTENSIONS.has(extname(entry.name)),
+      (entry) => !entry.isSymbolicLink() && entry.isFile() && SOURCE_EXTENSIONS.has(extname(entry.name)),
     )
     const loc = sourceFiles.reduce(
       (sum, entry) => sum + readFileSync(join(dir, entry.name), "utf8").split("\n").length,

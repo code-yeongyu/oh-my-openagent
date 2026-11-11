@@ -29,10 +29,7 @@ import { findGitRoot, readGitBranch } from "./git/repo"
 import { createPanelHostSurface } from "./host-surface"
 import type { PanelAction } from "./links"
 import { openPanelViewer } from "./popups/open"
-import {
-  claimRegularModeNotice,
-  REGULAR_MODE_NOTICE_MESSAGE,
-} from "./regular-mode-notice"
+import { claimRegularModeNotice, REGULAR_MODE_NOTICE_MESSAGE } from "./regular-mode-notice"
 import { buildAgentCardRows } from "./sections/agents"
 import { buildMemoryDetailRows } from "./sections/memory"
 import type { PanelGitStatus } from "./sections/files"
@@ -129,9 +126,7 @@ export function createSidePanelController(
   const hostExec = pi.exec
   const exec: PanelExec | undefined =
     options.exec ??
-    (hostExec === undefined
-      ? undefined
-      : (command, args, execOptions) => hostExec.call(pi, command, args, execOptions))
+    (hostExec === undefined ? undefined : (command, args, execOptions) => hostExec.call(pi, command, args, execOptions))
   let git: PanelGitStatus | undefined
   let gitRoot: string | undefined
   let branch: string | undefined
