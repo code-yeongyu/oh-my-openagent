@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:b12f214b574c4a2be330f9dc7d9bb68ccfbdb1f39e765918aaecb70139db51e4:8a87701cec59f2b230e99c49d4be76cf9f5a5c47be47f36f78313a7737500197
+// omo-codex-install:7162a62c5a52c1632006d4ab45f095d7e7a2a5a5e68d50ab9feafeff9f789dcd:83f2f4c8a79c3ee6fc9231c0dc6702fab348388f089b434cb67b070d3100d202
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -21881,6 +21881,13 @@ function resolveOmoConfigView(options) {
 }
 
 // packages/omo-config-core/src/loader/loader.ts
+function positionAt(content, offset) {
+  const before = content.slice(0, offset);
+  const lineStart = before.lastIndexOf(`
+`) + 1;
+  return { line: before.split(`
+`).length, column: offset - lineStart + 1 };
+}
 function parseJsoncSafe(content) {
   const errors = [];
   const data = parse4(content.charCodeAt(0) === 65279 ? content.slice(1) : content, errors, {
@@ -21927,12 +21934,14 @@ function readConfigSource(path, scope, fileSystem) {
     };
   }
   const parsed = parseJsoncSafe(content);
-  if (parsed.errors.length > 0) {
+  const firstError = parsed.errors[0];
+  if (firstError !== undefined) {
     return {
       diagnostics: [{
         kind: "parse",
         message: `JSONC parse error in ${path}: ${parsed.errors.map((error) => error.message).join(", ")}`,
-        path
+        path,
+        position: positionAt(content.charCodeAt(0) === 65279 ? content.slice(1) : content, firstError.offset)
       }],
       source: { exists: true, loaded: false, path, scope }
     };
