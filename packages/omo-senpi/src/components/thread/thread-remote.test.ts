@@ -16,8 +16,8 @@ describe("thread_set_model on another device", () => {
     const result = await run("thread_set_model", { thread: "dur-on-b", model: "opus" })
     expect(result).toEqual({ kind: "ok", thread_id: "dur-on-b", model: { provider: "anthropic", id: "claude-opus" }, device: "b" })
     expect(a.sent.map((entry) => [entry.via, entry.device, entry.session, entry.rpc])).toEqual([
-      ["session", "b", "dur-on-b", { type: "get_available_models", sessionId: "dur-on-b" }],
-      ["session", "b", "dur-on-b", { type: "set_model", sessionId: "dur-on-b", provider: "anthropic", modelId: "claude-opus" }],
+      ["session", "b", "rk-on-b", { type: "get_available_models", sessionId: "rk-on-b" }],
+      ["session", "b", "rk-on-b", { type: "set_model", sessionId: "rk-on-b", provider: "anthropic", modelId: "claude-opus" }],
     ])
   })
 
@@ -140,7 +140,7 @@ describe("A3: an existing thread is named by id or alias only; a device only to 
 })
 
 describe("#12833: a name reaches a thread on another device by its title", () => {
-  const titled = (device: string, session_id: string, title: string, state = "idle") => ({ ...B_ROW, device, session_id, title, state })
+  const titled = (device: string, session_id: string, title: string, state = "idle") => ({ ...B_ROW, device, session_id, durable_id: session_id, title, state })
 
   test("#given b lists a live session titled with the name #when thread_send names it from this device #then it reaches b's session; this device's own row and an ended session are never matched by title", async () => {
     const a = account({ rows: [titled("b", "dur-on-b", "Release Train"), titled("here", "dur-local", "local peer"), titled("b", "dur-old-on-b", "stale", "ended")] })

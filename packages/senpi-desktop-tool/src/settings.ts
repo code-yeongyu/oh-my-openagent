@@ -42,7 +42,7 @@ export const ComputerSettingsSchema = Type.Object(
 		),
 		intervention: Type.Optional(
 			Type.Union([Type.Literal("continue"), Type.Literal("pause")], {
-				default: "pause",
+				default: "continue",
 				description: "What a background action does while the user uses the target app; sent only to engines that support it",
 			}),
 		),
@@ -121,7 +121,7 @@ export function resolveComputerSettings(raw: unknown, platform: string = process
 		enginePath: value.enginePath,
 		cuaAdapter: value.cuaAdapter ?? false,
 		runSandbox: value.runSandbox ?? "vm",
-		intervention: value.intervention ?? "pause",
+		intervention: value.intervention ?? "continue",
 		macosKeyPriming: value.macosKeyPriming ?? "off",
 		trace: value.trace ?? false,
 	};

@@ -1,4 +1,5 @@
 import type { ThreadToolSurfaceOptions } from "./ports"
+import { normalizeThreadName } from "../addressing"
 
 type PermissionRequest = { permission: string; patterns: string[]; always: string[]; autoApproveAsk?: true }
 
@@ -11,11 +12,22 @@ const SESSION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
  * agent woke can always answer it while `allow` and `deny` rules still decide first. Every other send asks for senpi's
  * tool-named fallback.
  */
-export function threadSendPermission(options: Pick<ThreadToolSurfaceOptions, "callerReplyTargets">) {
+export function threadSendPermission(options: Pick<ThreadToolSurfaceOptions, "callerReplyTargets" | "callerReplySenders">) {
   return (input: Record<string, unknown>): PermissionRequest[] => {
     const target = input["thread"]
-    if (typeof target === "string" && SESSION_ID.test(target) && (options.callerReplyTargets?.() ?? []).includes(target))
+    if (typeof target === "string" && isReplyToConsumedSender(options, target))
       return [{ permission: "thread_send", patterns: [target], always: [target], autoApproveAsk: true }]
     return [{ permission: "thread_send", patterns: ["*"], always: ["*"] }]
   }
+}
+
+/**
+ * Decision 0027 section 6: the reply allowance is decided from the consumed delivery itself - its sender's durable id or
+ * the name it stated - never from a listing. The send step then delivers only when the address resolves to that sender
+ * (`replyTargetMismatch` in tools.ts), so a name that happens to match another session is never reached unapproved.
+ */
+export function isReplyToConsumedSender(options: Pick<ThreadToolSurfaceOptions, "callerReplyTargets" | "callerReplySenders">, target: string): boolean {
+  if (SESSION_ID.test(target) && (options.callerReplyTargets?.() ?? []).includes(target)) return true
+  const wanted = normalizeThreadName(target)
+  return (options.callerReplySenders?.() ?? []).some((sender) => sender.session_id === target || (sender.name !== undefined && wanted !== "" && normalizeThreadName(sender.name) === wanted))
 }

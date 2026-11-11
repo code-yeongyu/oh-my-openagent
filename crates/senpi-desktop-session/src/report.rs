@@ -6,8 +6,8 @@ use senpi_desktop_core::error::{ErrorCode, ErrorReport};
 use senpi_desktop_core::methods::Method;
 use senpi_desktop_core::protocol_results::{AuditEvent, AxInputResult};
 use senpi_desktop_core::report::{
-    ActionEffect, ActionHit, ActionReport, ActionRoute, End, FocusRestoration, Progress, ReportMode, Settled,
-    StageTimings,
+    ActionEffect, ActionHit, ActionReport, ActionRoute, End, FocusRestoration, OpenedSurface, Progress, ReportMode,
+    Settled, StageTimings,
 };
 
 use crate::request::Response;
@@ -20,6 +20,8 @@ pub(crate) struct ReportExtras {
     pub(crate) hit: Option<ActionHit>,
     /// `trace: true` sessions only.
     pub(crate) timings: Option<StageTimings>,
+    /// Sheets, windows and menus the action opened.
+    pub(crate) opened_surfaces: Vec<OpenedSurface>,
 }
 
 /// How far a mutating request got before it settled.
@@ -165,6 +167,7 @@ pub(crate) fn error_report(
         disposition: Some(settled.disposition()),
         delivered: settled.delivered(),
         focus_restoration: Some(FocusRestoration::from_restored(event.focus_restored)),
+        next_call: None,
     }
 }
 
@@ -178,7 +181,7 @@ pub(crate) fn success_report(event: &AuditEvent, extras: ReportExtras) -> Action
         route: extras.route,
         hit: extras.hit,
         focus_restoration: FocusRestoration::from_restored(event.focus_restored),
-        opened_surfaces: Vec::new(),
+        opened_surfaces: extras.opened_surfaces,
         next_call: None,
         note: None,
         warning: None,
