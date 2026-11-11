@@ -14,7 +14,7 @@
 // (Aqua) session. Without it the probe prints one line naming what is missing, exits 3 and writes nothing.
 
 import { CFunction, dlopen, FFIType, type Pointer, read, toArrayBuffer } from "bun:ffi"
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 
 const SUPPORTED_MAJORS = [15, 26] as const
 const PROBE_PATH = "crates/omo-computer-backend-macos/probes/probe-sp-m.ts"
@@ -62,6 +62,8 @@ interface Host {
   major: number
   build: string
   session: SessionFacts
+  // --with-capture: run the capture leg, which may raise the macOS 15.1+ capture reminder. Off by default.
+  withCapture: boolean
 }
 
 interface SessionFacts {
@@ -1175,9 +1177,14 @@ function pendingRow(q: Question, major: number, reason: string): LedgerRow {
   }
 }
 
-function buildHost(): Host {
+function buildHost(args: string[]): Host {
   const { major, build } = precondition()
-  return { major, build, session: sessionFacts() }
+  return { major, build, session: sessionFacts(), withCapture: args.includes("--with-capture") }
+}
+
+// Reads an existing ledger. A file that is not an SP-M ledger is an error value, never a thrown stack trace.
+function readLedger(path: string): { rows: LedgerRow[] } | { error: string } {
+  return { rows: parseLedger(path) }
 }
 
 function printSession(host: Host): void {
@@ -1262,7 +1269,101 @@ function writePendingOnly(args: string[]): number {
   return 0
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// Self-test (--self-test): the pure decisions of the probe, checked on any host, Linux included. No native call.
+
+function selfTest(): number {
+  const failures: string[] = []
+  const expect = (name: string, ok: () => boolean): void => {
+    let pass = false
+    try {
+      pass = ok()
+    } catch (error) {
+      failures.push(`${name} (threw: ${(error as Error).message.split("\n")[0]})`)
+      return
+    }
+    if (!pass) failures.push(name)
+  }
+  // --verify gate
+  expect("verifySummary: nothing measured is never a pass", () => !verifySummary(32, 32, 0).pass)
+  expect("verifySummary: prints the unmeasured count", () => verifySummary(32, 32, 0).line.includes("unmeasured=32"))
+  expect("verifySummary: one measured row and no diff passes", () => verifySummary(32, 31, 0).pass)
+  expect("verifySummary: a diff fails", () => !verifySummary(32, 0, 1).pass)
+  // ledger grammar
+  const rows26 = QUESTIONS.map((q) => pendingRow(q, 26, "r"))
+  expect(
+    "uncoveredMajors: nothing pending, no ledger -> 15 and 26",
+    () => uncoveredMajors(new Map(), []).join() === "15,26",
+  )
+  expect("uncoveredMajors: 15 pending -> 26", () => uncoveredMajors(new Map([[15, "r"]]), []).join() === "26")
+  expect(
+    "uncoveredMajors: a full 26 ledger covers 26",
+    () => uncoveredMajors(new Map([[15, "r"]]), rows26).length === 0,
+  )
+  expect(
+    "uncoveredMajors: a ledger missing one 26 row does not",
+    () => uncoveredMajors(new Map([[15, "r"]]), rows26.slice(1)).join() === "26",
+  )
+  expect("parsePending: empty reason refused", () => Boolean(parsePending(["--pending", "15="]).error))
+  expect("parsePending: blank reason refused", () => Boolean(parsePending(["--pending", "15=  "]).error))
+  expect("parsePending: unsupported major refused", () => Boolean(parsePending(["--pending", "14=r"]).error))
+  expect(
+    "parsePending: a reason is kept",
+    () => parsePending(["--pending", "15=awaiting H2"]).pending.get(15) === "awaiting H2",
+  )
+  // copy-spaces decision
+  expect("onCurrentSpace: on its display's current Space", () => onCurrentSpace([3, 7], 7))
+  expect("onCurrentSpace: not on it", () => !onCurrentSpace([3], 7))
+  expect("onCurrentSpace: an unread current Space (0) never matches", () => !onCurrentSpace([0], 0))
+  // a file that is not an SP-M ledger: one-line refusal, exit 2
+  const bad = `${process.env.TMPDIR ?? "/tmp"}/sp-m-self-test-${process.pid}.tsv`
+  writeFileSync(bad, "not\ta\tledger\n")
+  expect("readLedger: a bad header is an error value", () => {
+    const r = readLedger(bad)
+    return "error" in r && !r.error.includes("\n")
+  })
+  // Run as a child so a thrown stack trace or a host-precondition exit shows up as what it is.
+  const cli = (argv: string[]): { code: number; stderrLines: number } => {
+    const res = Bun.spawnSync({ cmd: [process.execPath, import.meta.path, ...argv], stdout: "pipe", stderr: "pipe" })
+    const stderr = res.stderr.toString().trim()
+    return { code: res.exitCode ?? -1, stderrLines: stderr === "" ? 0 : stderr.split("\n").length }
+  }
+  expect("--measure over a bad-header ledger: exit 2, one line", () => {
+    const r = cli(["--measure", "--out", bad, "--pending", "15=r", "--pending", "26=r"])
+    return r.code === 2 && r.stderrLines === 1
+  })
+  expect("--verify of a bad-header ledger: exit 2, one line", () => {
+    const r = cli(["--verify", bad])
+    return r.code === 2 && r.stderrLines === 1
+  })
+  rmSync(bad, { force: true })
+  // the capture leg is gated: without --with-capture it is UNMEASURED and makes no native call
+  const granted: Host = {
+    major: 26,
+    build: "self-test",
+    withCapture: false,
+    session: {
+      manager: "Aqua",
+      user: "-",
+      consoleUser: "-",
+      onConsole: "true",
+      screenLocked: "false",
+      accessibility: true,
+      screenRecording: true,
+      postEvent: true,
+    },
+  }
+  expect("qHwCapture: without --with-capture it is UNMEASURED and names the flag", () => {
+    const o = qHwCapture(granted)
+    return o.verdict === "UNMEASURED" && o.reason.includes("--with-capture")
+  })
+  for (const f of failures) console.log(`SELF-TEST FAIL ${f}`)
+  console.log(failures.length > 0 ? `SELF-TEST FAIL ${failures.length}` : "SELF-TEST PASS")
+  return failures.length > 0 ? 1 : 0
+}
+
 function main(args: string[]): number {
+  if (args.includes("--self-test")) return selfTest()
   const known = ["--measure", "--verify", "--row", "--session", "--pending-only"]
   if (!args.some((a) => known.includes(a))) {
     console.error(
@@ -1293,7 +1394,7 @@ function main(args: string[]): number {
       return 2
     }
   }
-  const host = buildHost()
+  const host = buildHost(args)
   printSession(host)
 
   if (args.includes("--session")) return 0
@@ -1375,5 +1476,4 @@ function main(args: string[]): number {
   return summary.pass ? 0 : 1
 }
 
-// Run only as a script; the exported decision helpers above stay importable without starting a probe.
 if (import.meta.main) process.exit(main(Bun.argv.slice(2)))
