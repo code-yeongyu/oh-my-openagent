@@ -7,11 +7,14 @@ import { createInboxDrain, type InboxDrain } from "../drain"
 import { createGatewayEngine, resolveFromEntries, type GatewayAddressEntry, type GatewayEngine } from "../engine"
 import { createGatewayStore, type GatewayStore, type GatewayStoreOptions } from "../store"
 import { FakeSessionRuntime } from "./fake-runtime"
+import type { RemoteThreadSurface } from "../../remote/ports"
+import { stampThisDevice } from "../../remote/this-device"
 
 // Cross-version conformance runs select a real older facade, which starts its own older worker.
-const storeFactory: typeof createGatewayStore = process.env.OMO_GATEWAY_TEST_STORE_MODULE === undefined
-  ? createGatewayStore
-  : (await import(process.env.OMO_GATEWAY_TEST_STORE_MODULE) as typeof import("../store")).createGatewayStore
+const storeFactory: typeof createGatewayStore =
+  process.env.OMO_GATEWAY_TEST_STORE_MODULE === undefined
+    ? createGatewayStore
+    : ((await import(process.env.OMO_GATEWAY_TEST_STORE_MODULE)) as typeof import("../store")).createGatewayStore
 
 export type HarnessSession = {
   readonly id: string
@@ -47,7 +50,10 @@ export type GatewayHarness = {
   readonly dispose: () => Promise<void>
 }
 
-export function createGatewayHarness(options: { readonly startAt?: number } = {}): GatewayHarness {
+/** `remote`: the account surface whose device the senders stamp, through the same `stampThisDevice` every production sender uses (#13004). */
+export function createGatewayHarness(
+  options: { readonly startAt?: number; readonly remote?: RemoteThreadSurface } = {},
+): GatewayHarness {
   const agentDir = realpathSync(mkdtempSync(join(tmpdir(), "omo-gateway-")))
   mkdirSync(join(agentDir, "sessions"), { recursive: true })
   const clock = { now: options.startAt ?? Date.UTC(2026, 8, 29, 0, 0, 0) }
@@ -66,7 +72,12 @@ export function createGatewayHarness(options: { readonly startAt?: number } = {}
   }
 
   function store(extra: Partial<GatewayStoreOptions> = {}): GatewayStore {
-    const created = storeFactory({ agentDir, now, resolveTarget: resolveFromEntries(entries, () => agentDir), ...extra })
+    const created = storeFactory({
+      agentDir,
+      now,
+      resolveTarget: resolveFromEntries(entries, () => agentDir),
+      ...extra,
+    })
     stores.push(created)
     return created
   }
@@ -82,20 +93,35 @@ export function createGatewayHarness(options: { readonly startAt?: number } = {}
       endpoint: null,
       liveness: "dead" as const,
     }))
-    return [...offline, ...[...sessions.values()].map((session) => ({
-      thread_id: session.id,
-      name: names.get(session.id) ?? session.id,
-      status: "live" as const,
-      cwd: session.cwd,
-      created_at: new Date(0).toISOString(),
-      updated_at: new Date(0).toISOString(),
-      endpoint: { kind: "tui" as const, socket: `fake:${session.id}`, routing_id: null, durable_session_id: session.id },
-      liveness: session.online ? ("routable" as const) : ("dead" as const),
-    }))]
+    return [
+      ...offline,
+      ...[...sessions.values()].map((session) => ({
+        thread_id: session.id,
+        name: names.get(session.id) ?? session.id,
+        status: "live" as const,
+        cwd: session.cwd,
+        created_at: new Date(0).toISOString(),
+        updated_at: new Date(0).toISOString(),
+        endpoint: {
+          kind: "tui" as const,
+          socket: `fake:${session.id}`,
+          routing_id: null,
+          durable_session_id: session.id,
+        },
+        liveness: session.online ? ("routable" as const) : ("dead" as const),
+      })),
+    ]
   }
 
   function engineFor(target: GatewayStore, cwd: string = agentDir): GatewayEngine {
-    return createGatewayEngine({ store: target, endpoints, resolve: resolveFromEntries(entries, () => cwd), now, senderProvenance: async () => ({ workspace: "unclassified", project: "fixture" }) })
+    return createGatewayEngine({
+      store: target,
+      endpoints,
+      resolve: resolveFromEntries(entries, () => cwd),
+      now,
+      senderProvenance: () =>
+        stampThisDevice(Promise.resolve({ workspace: "unclassified", project: "fixture" }), options.remote),
+    })
   }
 
   const endpoints: GatewayEndpointPort = {
@@ -104,7 +130,9 @@ export function createGatewayHarness(options: { readonly startAt?: number } = {}
       if (target === undefined || !target.online) throw new Error(`endpoint ${endpoint.socket} is unreachable`)
       wakes.push({ delivery_ids: deliveryIds, target: target.id })
       if (!target.drainRegistered) return { admitted: [] }
-      return toSessionControlDrainResult(await track(target.drain.drain({ reason: "command", delivery_ids: deliveryIds })))
+      return toSessionControlDrainResult(
+        await track(target.drain.drain({ reason: "command", delivery_ids: deliveryIds })),
+      )
     },
   }
 
@@ -112,9 +140,24 @@ export function createGatewayHarness(options: { readonly startAt?: number } = {}
     const cwd = sessionOptions.cwd ?? agentDir
     const runtime = new FakeSessionRuntime(join(agentDir, "sessions", `${id}.jsonl`), id, cwd)
     const sessionStore = store(sessionOptions.storeOptions)
-    const drain = createInboxDrain({ store: sessionStore, runtime, durableId: id, sessionPath: () => runtime.sessionPath, now })
+    const drain = createInboxDrain({
+      store: sessionStore,
+      runtime,
+      durableId: id,
+      sessionPath: () => runtime.sessionPath,
+      now,
+    })
     const engine = engineFor(sessionStore, cwd)
-    const created: HarnessSession = { id, cwd, runtime, store: sessionStore, drain, engine, online: sessionOptions.online ?? true, drainRegistered: sessionOptions.drainRegistered ?? true }
+    const created: HarnessSession = {
+      id,
+      cwd,
+      runtime,
+      store: sessionStore,
+      drain,
+      engine,
+      online: sessionOptions.online ?? true,
+      drainRegistered: sessionOptions.drainRegistered ?? true,
+    }
     runtime.onEmitted(() => void track(drain.drain({ reason: "emitted" })))
     runtime.onIdle(() => void track(drain.drain({ reason: "idle" })))
     if (sessionOptions.name !== undefined) names.set(id, sessionOptions.name)

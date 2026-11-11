@@ -9,7 +9,10 @@ const ci = load(readFileSync(new URL("../.github/workflows/ci.yml", import.meta.
 }
 
 // GitHub evaluates these expressions; this mirrors the two operators they use for the events CI runs on.
-function evaluate(expression: string, context: { event_name: string; sha: string; ref: string; workflow: string }): string {
+function evaluate(
+  expression: string,
+  context: { event_name: string; sha: string; ref: string; workflow: string },
+): string {
   return expression.replace(/\$\{\{ (.+?) \}\}/g, (_, body: string) => {
     const value = (name: string) => context[name.replace("github.", "") as keyof typeof context]
     const ternary = /^(github\.\w+) == '(\w+)' && (github\.\w+) \|\| (github\.\w+)$/.exec(body)

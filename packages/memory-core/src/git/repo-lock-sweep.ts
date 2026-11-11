@@ -23,11 +23,7 @@ function envSettleOverride(): number | undefined {
 export const GIT_LOCK_SETTLE_MS = envSettleOverride() ?? 300
 
 export type KeptGitLockReason =
-  | "owner-not-proven-dead"
-  | "repo-in-use"
-  | "changed-during-settle"
-  | "open-holder"
-  | "unlink-failed"
+  "owner-not-proven-dead" | "repo-in-use" | "changed-during-settle" | "open-holder" | "unlink-failed"
 
 export interface KeptGitLock {
   readonly path: string
@@ -102,9 +98,15 @@ export async function presentLockFiles(gitDir: string): Promise<LockSnapshot> {
 // After authorization, a lock is removable only if it kept its inode and mtime across the settle
 // window AND no process holds it open: belt and braces on top of the ownership proof. An open-holder
 // scan that cannot answer is overruled only when the kernel already proved no memory-core git alive.
-async function settledVerdict(candidate: string, before: { readonly ino: number; readonly mtimeMs: number }, holders: readonly number[] | null, kernelVouches: boolean): Promise<KeptGitLockReason | "removable"> {
+async function settledVerdict(
+  candidate: string,
+  before: { readonly ino: number; readonly mtimeMs: number },
+  holders: readonly number[] | null,
+  kernelVouches: boolean,
+): Promise<KeptGitLockReason | "removable"> {
   const status = await lstat(candidate).catch(() => undefined)
-  if (status === undefined || status.ino !== before.ino || status.mtimeMs !== before.mtimeMs) return "changed-during-settle"
+  if (status === undefined || status.ino !== before.ino || status.mtimeMs !== before.mtimeMs)
+    return "changed-during-settle"
   if (holders === null) return kernelVouches ? "removable" : "open-holder"
   return holders.length > 0 ? "open-holder" : "removable"
 }
@@ -144,7 +146,11 @@ function keepAll(present: LockSnapshot, reason: KeptGitLockReason): GitLockSweep
   return { removed: [], kept: [...present.keys()].map((path) => ({ path, reason })) }
 }
 
-export async function sweepStrandedGitLockFiles(dir: string, settleMs = GIT_LOCK_SETTLE_MS, scans: GitLockScans = PRODUCTION_LOCK_SCANS): Promise<GitLockSweepReport> {
+export async function sweepStrandedGitLockFiles(
+  dir: string,
+  settleMs = GIT_LOCK_SETTLE_MS,
+  scans: GitLockScans = PRODUCTION_LOCK_SCANS,
+): Promise<GitLockSweepReport> {
   const present = await presentLockFiles(join(dir, ".git"))
   if (present.size === 0) return { removed: [], kept: [] }
   const previous = await authorizedPreviousOwner(dir)
@@ -191,7 +197,11 @@ export async function sweepStrandedGitLockFiles(dir: string, settleMs = GIT_LOCK
   }
 }
 
-export async function withStrandedGitLockRecovery<T>(dir: string, run: () => Promise<T>, scans: GitLockScans = PRODUCTION_LOCK_SCANS): Promise<T> {
+export async function withStrandedGitLockRecovery<T>(
+  dir: string,
+  run: () => Promise<T>,
+  scans: GitLockScans = PRODUCTION_LOCK_SCANS,
+): Promise<T> {
   try {
     return await withGitLockRetry(run)
   } catch (error) {

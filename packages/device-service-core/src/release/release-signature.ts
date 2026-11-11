@@ -32,7 +32,8 @@ export const DEVICE_SERVICE_RELEASE_KEYS: readonly string[] = (() => {
   }
 })()
 
-export type SignatureVerdict = { readonly ok: true } | { readonly ok: false; readonly refusal: "malformed" | "signature" }
+export type SignatureVerdict =
+  { readonly ok: true } | { readonly ok: false; readonly refusal: "malformed" | "signature" }
 
 /**
  * The release check: every key of the set must pass strictEd25519Key, then the signature must pass
@@ -45,7 +46,8 @@ export const verifyReleaseSignature = async (
   signature: Uint8Array,
   checksums: Uint8Array,
 ): Promise<SignatureVerdict> => {
-  if (releaseKeys.length === 0 || !releaseKeys.every(key => strictEd25519Key(key))) return { ok: false, refusal: "malformed" }
+  if (releaseKeys.length === 0 || !releaseKeys.every((key) => strictEd25519Key(key)))
+    return { ok: false, refusal: "malformed" }
   let verdict: SignatureVerdict = { ok: false, refusal: "signature" }
   for (const key of releaseKeys) {
     verdict = await strictEd25519Verify(key, signature, checksums)
@@ -56,9 +58,10 @@ export const verifyReleaseSignature = async (
 
 /** The key set as bytes, or undefined when it is empty, repeats a key, or holds an entry that is not a strict key. */
 export const releaseKeySetBytes = (hexes: readonly string[]): readonly Uint8Array[] | undefined => {
-  if (hexes.length === 0 || new Set(hexes).size !== hexes.length || !hexes.every(hex => HEX_KEY.test(hex))) return undefined
-  const keys = hexes.map(hex => new Uint8Array(Buffer.from(hex, "hex")))
-  return keys.every(key => strictEd25519Key(key)) ? keys : undefined
+  if (hexes.length === 0 || new Set(hexes).size !== hexes.length || !hexes.every((hex) => HEX_KEY.test(hex)))
+    return undefined
+  const keys = hexes.map((hex) => new Uint8Array(Buffer.from(hex, "hex")))
+  return keys.every((key) => strictEd25519Key(key)) ? keys : undefined
 }
 
 // The macOS signing identity of the release binary. The identifier is not published yet, so no binary passes until it is.
@@ -70,6 +73,9 @@ export const codeSignaturePasses = (path: string): boolean => {
   const requirement =
     `identifier "${SIGNING_IDENTIFIER}" and anchor apple generic and certificate leaf[subject.OU] = "${SIGNING_TEAM}" ` +
     "and certificate 1[field.1.2.840.113635.100.6.2.6] exists and certificate leaf[field.1.2.840.113635.100.6.1.13] exists"
-  const result = spawnSync("/usr/bin/codesign", ["--verify", "--strict", `-R=${requirement}`, path], { stdio: "ignore", timeout: 10_000 })
+  const result = spawnSync("/usr/bin/codesign", ["--verify", "--strict", `-R=${requirement}`, path], {
+    stdio: "ignore",
+    timeout: 10_000,
+  })
   return result.error === undefined && result.status === 0
 }

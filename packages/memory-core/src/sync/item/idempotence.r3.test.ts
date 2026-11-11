@@ -43,7 +43,9 @@ function header(disk: string): Record<string, unknown> {
   if (end < 0) return {}
   try {
     const parsed: unknown = parseYaml(disk.slice(4, end))
-    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? Object.fromEntries(Object.entries(parsed)) : {}
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+      ? Object.fromEntries(Object.entries(parsed))
+      : {}
   } catch {
     return {}
   }
@@ -59,7 +61,20 @@ function bodyOf(disk: string): string {
 // values renders each component as its canonical source (spec #454).
 // Hostile string content (memory-sync r6, review r6 L3): newlines, CR, tabs, leading/trailing
 // spaces, '#', ': ', values over 80 columns, and whole values that are exactly a YAML indicator.
-const HOSTILE_PARTS = ["", " ", "\n", "\r\n", "\t", " # ", ": ", " |- ", " > ", "\n---\n", ` ${"long ".repeat(20)}`, ` ${"긴 ".repeat(45)}`]
+const HOSTILE_PARTS = [
+  "",
+  " ",
+  "\n",
+  "\r\n",
+  "\t",
+  " # ",
+  ": ",
+  " |- ",
+  " > ",
+  "\n---\n",
+  ` ${"long ".repeat(20)}`,
+  ` ${"긴 ".repeat(45)}`,
+]
 const EXACT = ["|-", ">", "#", ": x", " lead", "trail "]
 
 function markersIn(text: string): string[] {
@@ -73,7 +88,11 @@ function hostile(rand: () => number): string {
 function record(ledger: Ledger, key: string, value: unknown): void {
   const set = ledger.written.get(key) ?? new Set<string>()
   set.add(String(value))
-  set.add(Array.isArray(value) ? stringifyYaml(value, { collectionStyle: "flow", lineWidth: 0 }).trim() : renderScalar(String(value)))
+  set.add(
+    Array.isArray(value)
+      ? stringifyYaml(value, { collectionStyle: "flow", lineWidth: 0 }).trim()
+      : renderScalar(String(value)),
+  )
   if (typeof value === "number") set.add(renderScalar(value))
   ledger.written.set(key, set)
 }
@@ -90,7 +109,12 @@ function edit(rand: () => number, disk: string, ledger: Ledger, seed: number): s
   const roll = rand()
   if (roll < 0.2) {
     const roll2 = rand()
-    const value = roll2 < 0.4 ? seed * 1000 + id + 1 : roll2 < 0.55 ? (EXACT[Math.floor(rand() * EXACT.length)] ?? "|-") : `w${hostile(rand)}${token}`
+    const value =
+      roll2 < 0.4
+        ? seed * 1000 + id + 1
+        : roll2 < 0.55
+          ? (EXACT[Math.floor(rand() * EXACT.length)] ?? "|-")
+          : `w${hostile(rand)}${token}`
     record(ledger, "n", value)
     fields.n = value
   } else if (roll < 0.4) {
@@ -122,7 +146,9 @@ function edit(rand: () => number, disk: string, ledger: Ledger, seed: number): s
     ledger.markers.push(token)
     body = body === "" || body.endsWith("\n") ? `${body}${token}\n` : `${body}\n${token}\n`
   }
-  const lines = Object.entries(fields).map(([key, value]) => stringifyYaml({ [key]: value }, { blockQuote: false, lineWidth: 0 }).trimEnd())
+  const lines = Object.entries(fields).map(([key, value]) =>
+    stringifyYaml({ [key]: value }, { blockQuote: false, lineWidth: 0 }).trimEnd(),
+  )
   return lines.length === 0 ? body : `---\n${lines.join("\n")}\n---\n${body}`
 }
 
@@ -147,7 +173,6 @@ function sync(a: Node, b: Node): void {
   a.doc.import(ub)
   b.doc.import(ua)
 }
-
 
 async function runSeed(seed: number, devices: readonly ItemDevice[]): Promise<void> {
   const rand = mulberry32(seed)
@@ -190,13 +215,19 @@ async function runSeed(seed: number, devices: readonly ItemDevice[]): Promise<vo
     for (const key of ["n", "description"]) {
       if (settled[key] === undefined) continue
       for (const part of String(settled[key]).split(" / ")) {
-        expect(ledger.written.get(key)?.has(part), `seed ${seed}: ${key} holds ${JSON.stringify(part)}, never written`).toBe(true)
+        expect(
+          ledger.written.get(key)?.has(part),
+          `seed ${seed}: ${key} holds ${JSON.stringify(part)}, never written`,
+        ).toBe(true)
       }
     }
     const tags = settled.tags
     for (const element of Array.isArray(tags) ? tags : tags === undefined ? [] : String(tags).split(" / ")) {
       expect(typeof element, `seed ${seed}: tags element ${JSON.stringify(element)} is not a string`).toBe("string")
-      expect(ledger.written.get("tags")?.has(String(element)), `seed ${seed}: tags holds ${JSON.stringify(element)}, never written`).toBe(true)
+      expect(
+        ledger.written.get("tags")?.has(String(element)),
+        `seed ${seed}: tags holds ${JSON.stringify(element)}, never written`,
+      ).toBe(true)
     }
     for (const marker of ledger.markers) {
       const count = rendered.split(marker).length - 1
@@ -208,7 +239,9 @@ async function runSeed(seed: number, devices: readonly ItemDevice[]): Promise<vo
       expect(again, `seed ${seed}: settled re-capture minted ops`).toBeNull()
     }
     const devicePeers = new Set<string>(devices.map((d) => d.peer))
-    const foreign = [...(nodes[0]?.doc ?? fail()).oplogVersion().toJSON().keys()].filter((peer) => !devicePeers.has(peer))
+    const foreign = [...(nodes[0]?.doc ?? fail()).oplogVersion().toJSON().keys()].filter(
+      (peer) => !devicePeers.has(peer),
+    )
     expect(foreign, `seed ${seed}: version vector holds non-device peers`).toEqual([])
   } finally {
     for (const node of nodes) node.doc.free()
@@ -217,7 +250,9 @@ async function runSeed(seed: number, devices: readonly ItemDevice[]): Promise<vo
 
 function permutations(n: number): number[][] {
   if (n === 0) return [[]]
-  return permutations(n - 1).flatMap((rest) => Array.from({ length: n }, (_, at) => [...rest.slice(0, at), n - 1, ...rest.slice(at)]))
+  return permutations(n - 1).flatMap((rest) =>
+    Array.from({ length: n }, (_, at) => [...rest.slice(0, at), n - 1, ...rest.slice(at)]),
+  )
 }
 
 function fail(): never {

@@ -9,10 +9,7 @@ export type BtwSideMetadata = {
   boundary_message_id: string
 }
 
-export function createBtwSideMetadata(args: {
-  parentSessionID: string
-  boundaryMessageID: string
-}): BtwSideMetadata {
+export function createBtwSideMetadata(args: { parentSessionID: string; boundaryMessageID: string }): BtwSideMetadata {
   return {
     version: BTW_SIDE_METADATA_VERSION,
     parent_session_id: args.parentSessionID,
@@ -36,8 +33,12 @@ export function parseBtwSideMetadata(value: unknown): BtwSideMetadata | undefine
   }
 }
 
-export function getBtwSideMetadata(session: {
-  metadata?: Record<string, unknown>
-} | undefined): BtwSideMetadata | undefined {
+export function getBtwSideMetadata(
+  session:
+    | {
+        metadata?: Record<string, unknown>
+      }
+    | undefined,
+): BtwSideMetadata | undefined {
   return parseBtwSideMetadata(session?.metadata?.[BTW_SIDE_METADATA_KEY])
 }

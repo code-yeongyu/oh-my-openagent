@@ -77,7 +77,10 @@ function createHarness() {
     startedAt: new Date(),
     progress: { toolCalls: 0, lastUpdate: new Date() },
     concurrencyKey: CONCURRENCY_LABEL,
-    fallbackChain: [{ providers: ["anthropic"], model: "claude-opus-4-7" }, { providers: ["anthropic"], model: "gpt-5.5" }],
+    fallbackChain: [
+      { providers: ["anthropic"], model: "claude-opus-4-7" },
+      { providers: ["anthropic"], model: "gpt-5.5" },
+    ],
     attemptCount: 0,
   }
   manager["tasks"].set(task.id, task)
@@ -113,8 +116,11 @@ describe("BackgroundManager session.error arbitration with runtime-fallback", ()
     }) as typeof setTimeout)
     try {
       const handled = manager["handleSessionErrorEvent"]({
-        event, task, errorInfo: ORIGINAL_ERROR,
-        errorName: ORIGINAL_ERROR.name, errorMessage: ORIGINAL_ERROR.message,
+        event,
+        task,
+        errorInfo: ORIGINAL_ERROR,
+        errorName: ORIGINAL_ERROR.name,
+        errorMessage: ORIGINAL_ERROR.message,
       })
       fireTimeout?.()
       await handled
@@ -136,7 +142,10 @@ describe("BackgroundManager session.error arbitration with runtime-fallback", ()
     openRuntimeFallbackRecoveryClaim(event, SESSION_ID)
     let fireTimeout: (() => void) | undefined
     const realSetTimeout = globalThis.setTimeout
-    const timer = spyOn(globalThis, "setTimeout").mockImplementation(((callback: Parameters<typeof setTimeout>[0], ms?: number) => {
+    const timer = spyOn(globalThis, "setTimeout").mockImplementation(((
+      callback: Parameters<typeof setTimeout>[0],
+      ms?: number,
+    ) => {
       if (ms === 20_000) {
         fireTimeout = callback as () => void
         return 1 as unknown as ReturnType<typeof setTimeout>
@@ -145,8 +154,11 @@ describe("BackgroundManager session.error arbitration with runtime-fallback", ()
     }) as typeof setTimeout)
     try {
       const handled = manager["handleSessionErrorEvent"]({
-        event, task, errorInfo: ORIGINAL_ERROR,
-        errorName: ORIGINAL_ERROR.name, errorMessage: ORIGINAL_ERROR.message,
+        event,
+        task,
+        errorInfo: ORIGINAL_ERROR,
+        errorName: ORIGINAL_ERROR.name,
+        errorMessage: ORIGINAL_ERROR.message,
       })
       fireTimeout?.()
       await handled
@@ -174,8 +186,11 @@ describe("BackgroundManager session.error arbitration with runtime-fallback", ()
       const event = sessionError(ORIGINAL_ERROR)
       openRuntimeFallbackRecoveryClaim(event, SESSION_ID)
       const handled = manager["handleSessionErrorEvent"]({
-        event, task, errorInfo: ORIGINAL_ERROR,
-        errorName: ORIGINAL_ERROR.name, errorMessage: ORIGINAL_ERROR.message,
+        event,
+        task,
+        errorInfo: ORIGINAL_ERROR,
+        errorName: ORIGINAL_ERROR.name,
+        errorMessage: ORIGINAL_ERROR.message,
       })
       if (changed === "session") task.sessionId = "ses_new_attempt"
       else task.currentAttemptID = "attempt-new"

@@ -25,7 +25,8 @@ const completed: RunnerOutcome = { status: "completed", finalResponse: "", model
 const model: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
 const registry = {
   getAvailable: () => [model],
-  find: (provider: string, modelId: string) => (provider === model.provider && modelId === model.id ? model : undefined),
+  find: (provider: string, modelId: string) =>
+    provider === model.provider && modelId === model.id ? model : undefined,
   getProviderAuth: () => undefined,
 }
 
@@ -57,7 +58,11 @@ async function fixture(): Promise<Fixture> {
       { relativePath: ROLLOUTS, content: "---\ndescription: Rollout guidance\n---\nDrain nodes before a rollout.\n" },
     ],
   })
-  const context = createMemoryIdentityContext({ identity, identityPaths: paths, binding: createMemoryBinding({ identity, repoPath: paths.repo, boundAt: 1 }) })
+  const context = createMemoryIdentityContext({
+    identity,
+    identityPaths: paths,
+    binding: createMemoryBinding({ identity, repoPath: paths.repo, boundAt: 1 }),
+  })
   const sessionId = "tool-boundary-session"
   const specs: ChildSpec[] = []
   const waiters: Array<(child: FakeChild) => void> = []
@@ -65,7 +70,10 @@ async function fixture(): Promise<Fixture> {
   const pi = new MemoryFakeExtensionAPI()
   const wiring = createMemoryWiring({
     sessions: new Map([[sessionId, { context }]]),
-    loadConfig: () => ({ ...loadedMemoryConfig(memory), config: { memory, categories: { quick: { model: "omo-mock/mock-1" } } } }),
+    loadConfig: () => ({
+      ...loadedMemoryConfig(memory),
+      config: { memory, categories: { quick: { model: "omo-mock/mock-1" } } },
+    }),
     cwd: () => root,
     env: {},
     kibitzerChildStarter: {
@@ -93,7 +101,11 @@ async function fixture(): Promise<Fixture> {
     modelRegistry: registry,
   }
   wiring.registerStatic(pi, { ...componentContext(), idleCoordinator: new IdleInjectionCoordinator(() => {}) })
-  await pi.dispatch("input", { type: "input", source: "rpc", inputId: "real-prompt", text: "Drain nodes before rollout." }, eventCtx)
+  await pi.dispatch(
+    "input",
+    { type: "input", source: "rpc", inputId: "real-prompt", text: "Drain nodes before rollout." },
+    eventCtx,
+  )
   return {
     pi,
     wiring,
@@ -127,7 +139,11 @@ describe("kibitzer registration wiring", () => {
     const child = await childStarted
     child.settle(completed)
     await f.wiring.whenIdle()
-    await f.pi.dispatch("input_disposition", { type: "input_disposition", inputId: "real-prompt", disposition: "started" }, f.eventCtx)
+    await f.pi.dispatch(
+      "input_disposition",
+      { type: "input_disposition", inputId: "real-prompt", disposition: "started" },
+      f.eventCtx,
+    )
 
     expect(f.specs).toHaveLength(1)
     expect(f.specs[0]?.taskId).toBe(`kibitzer-${f.sessionId}-1`)
@@ -152,13 +168,19 @@ describe("kibitzer registration wiring", () => {
     const f = await fixture()
     await nudgedThroughToolCall(f)
 
-    const results = await f.pi.dispatch("before_agent_start", { type: "before_agent_start", prompt: "continue", systemPrompt: "BASE" }, f.eventCtx)
+    const results = await f.pi.dispatch(
+      "before_agent_start",
+      { type: "before_agent_start", prompt: "continue", systemPrompt: "BASE" },
+      f.eventCtx,
+    )
 
     const beforeAgentStartHandlers = f.pi.handlers.filter((registration) => registration.event === "before_agent_start")
     expect(beforeAgentStartHandlers).toHaveLength(3)
     expect(beforeAgentStartHandlers.every((registration) => registration.options?.previewSafe === true)).toBe(true)
     expect(results).toHaveLength(3)
-    const [projection, recall, kibitzer] = results as Array<{ systemPrompt?: string; message?: { customType?: string; content?: string } } | undefined>
+    const [projection, recall, kibitzer] = results as Array<
+      { systemPrompt?: string; message?: { customType?: string; content?: string } } | undefined
+    >
     // Projection first: it is the only writer of systemPrompt. Its memory notice is session-volatile,
     // and this branch never compacted, so it has nothing to say and injects no message.
     expect(projection?.systemPrompt).toContain("persona")

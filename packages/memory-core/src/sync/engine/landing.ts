@@ -31,7 +31,11 @@ const MINGW_MAX_PATH = 260
  * long is not one a person typed, and dropping it with a receipt is recoverable where a wedged
  * device is not. POSIX decides through its own probe (PATH_MAX surfaces there as ENAMETOOLONG).
  */
-export function commitPathProblem(root: string, path: string, platform: NodeJS.Platform = process.platform): string | null {
+export function commitPathProblem(
+  root: string,
+  path: string,
+  platform: NodeJS.Platform = process.platform,
+): string | null {
   if (platform !== "win32") return null
   const base = root.replace(/[\\/]+$/, "")
   return base.length + 1 + path.length >= MINGW_MAX_PATH ? "git-path-too-long" : null
@@ -51,7 +55,8 @@ export const readWorking = (root: string, path: string): Promise<string | null> 
 
 type Landing = { readonly path: string; readonly working: string | null } | { readonly refused: string }
 
-const missing = (error: unknown): boolean => error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR")
+const missing = (error: unknown): boolean =>
+  error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR")
 
 /** Whether a component of `path` that exists under `root`, the last one included, is a symlink. */
 export async function throughSymlink(root: string, path: string): Promise<boolean> {

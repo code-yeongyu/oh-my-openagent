@@ -85,15 +85,34 @@ function capturingFactories(launches: Launches): TaskRunnerFactories {
   return { inProcess: () => inProcess, process: () => process }
 }
 
-function compose(pi: FakeExtensionAPI, cwd: string, omoConfig: OmoConfig, launches: Launches, env: NodeJS.ProcessEnv): TaskEngine {
-  return composeTaskEngine({ pi, omoConfig, cwd, sharedParentTools: () => [], runnerFactories: capturingFactories(launches), env })
+function compose(
+  pi: FakeExtensionAPI,
+  cwd: string,
+  omoConfig: OmoConfig,
+  launches: Launches,
+  env: NodeJS.ProcessEnv,
+): TaskEngine {
+  return composeTaskEngine({
+    pi,
+    omoConfig,
+    cwd,
+    sharedParentTools: () => [],
+    runnerFactories: capturingFactories(launches),
+    env,
+  })
 }
 
 async function spawnWorker(engine: TaskEngine, cwd: string, sessionId: string): Promise<TaskToolDetails> {
   const tool = createTaskTool(engine.taskToolDeps(() => ({ invokedSkills: new Set<string>() }) as never))
   const result = await tool.execute(
     "call-1",
-    { prompt: "Delegate this further.", subagent_type: "worker", model: MOCK_MODEL, run_in_background: true, load_skills: [] },
+    {
+      prompt: "Delegate this further.",
+      subagent_type: "worker",
+      model: MOCK_MODEL,
+      run_in_background: true,
+      load_skills: [],
+    },
     undefined,
     undefined,
     { cwd, sessionManager: { getSessionId: () => sessionId } } as never,
@@ -101,12 +120,17 @@ async function spawnWorker(engine: TaskEngine, cwd: string, sessionId: string): 
   return result.details
 }
 
-async function launchChild(task: Record<string, unknown> = {}): Promise<{ readonly spec: RpcRunnerSpec; readonly cwd: string; readonly config: OmoConfig }> {
+async function launchChild(
+  task: Record<string, unknown> = {},
+): Promise<{ readonly spec: RpcRunnerSpec; readonly cwd: string; readonly config: OmoConfig }> {
   const cwd = tempProject()
   const config = configFor(cwd, task)
   const launches: Launches = { rpc: [], managed: [] }
   const parent = compose(new FakeExtensionAPI(), cwd, config, launches, {})
-  parent.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "root-session" } })
+  parent.runtime.captureFrom({
+    modelRegistry: createTeamServiceTestModelRegistry(),
+    sessionManager: { getSessionId: () => "root-session" },
+  })
   await spawnWorker(parent, cwd, "root-session")
   const spec = launches.rpc[0]
   if (spec === undefined) throw new Error("the parent never launched its process child")
@@ -137,7 +161,10 @@ describe("task depth ancestry across a process launch (#9036)", () => {
     const { spec, cwd, config } = await launchChild()
     const launches: Launches = { rpc: [], managed: [] }
     const child = compose(daemonChildPi(spec), cwd, config, launches, {})
-    child.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "child-session" } })
+    child.runtime.captureFrom({
+      modelRegistry: createTeamServiceTestModelRegistry(),
+      sessionManager: { getSessionId: () => "child-session" },
+    })
 
     // when the child's own task tool spawns
     const details = await spawnWorker(child, cwd, "child-session")
@@ -153,7 +180,10 @@ describe("task depth ancestry across a process launch (#9036)", () => {
     const { spec, cwd, config } = await launchChild()
     const launches: Launches = { rpc: [], managed: [] }
     const child = compose(new FakeExtensionAPI(), cwd, config, launches, perChildEnv(spec))
-    child.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "child-session" } })
+    child.runtime.captureFrom({
+      modelRegistry: createTeamServiceTestModelRegistry(),
+      sessionManager: { getSessionId: () => "child-session" },
+    })
 
     // when
     const details = await spawnWorker(child, cwd, "child-session")
@@ -168,7 +198,10 @@ describe("task depth ancestry across a process launch (#9036)", () => {
     const { spec, cwd, config } = await launchChild({ max_depth: 2 })
     const launches: Launches = { rpc: [], managed: [] }
     const child = compose(daemonChildPi(spec), cwd, config, launches, {})
-    child.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "child-session" } })
+    child.runtime.captureFrom({
+      modelRegistry: createTeamServiceTestModelRegistry(),
+      sessionManager: { getSessionId: () => "child-session" },
+    })
 
     // when
     await spawnWorker(child, cwd, "child-session")
@@ -185,7 +218,10 @@ describe("task depth ancestry across a process launch (#9036)", () => {
     const launches: Launches = { rpc: [], managed: [] }
     const pi = daemonChildPi(spec)
     const child = compose(pi, cwd, config, launches, {})
-    child.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "child-session" } })
+    child.runtime.captureFrom({
+      modelRegistry: createTeamServiceTestModelRegistry(),
+      sessionManager: { getSessionId: () => "child-session" },
+    })
     const runtime = createDagRuntime({ pi, engine: child, logger: { info: () => {}, warn: () => {}, error: () => {} } })
     await runtime.attach()
 
@@ -193,7 +229,11 @@ describe("task depth ancestry across a process launch (#9036)", () => {
     const started = await runtime.manager.start({
       parentSessionId: "child-session",
       rootSessionId: "root-session",
-      definition: { key: "depth-9036", name: "depth 9036", nodes: [{ id: "deeper", prompt: "go deeper", subagent_type: "worker", model: MOCK_MODEL }] },
+      definition: {
+        key: "depth-9036",
+        name: "depth 9036",
+        nodes: [{ id: "deeper", prompt: "go deeper", subagent_type: "worker", model: MOCK_MODEL }],
+      },
     })
     const result = await runtime.wait(started.snapshot.runId, "child-session")
     runtime.dispose()
@@ -208,8 +248,17 @@ describe("task depth ancestry across a process launch (#9036)", () => {
     // given
     const { spec, cwd, config } = await launchChild()
     const launches: Launches = { rpc: [], managed: [] }
-    const child = compose(daemonChildPi(spec), cwd, { ...config, categories: { quick: { model: MOCK_MODEL } } }, launches, {})
-    child.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => "child-session" } })
+    const child = compose(
+      daemonChildPi(spec),
+      cwd,
+      { ...config, categories: { quick: { model: MOCK_MODEL } } },
+      launches,
+      {},
+    )
+    child.runtime.captureFrom({
+      modelRegistry: createTeamServiceTestModelRegistry(),
+      sessionManager: { getSessionId: () => "child-session" },
+    })
     const service = createTeamService({
       manager: child.manager,
       destruction: child.lifecycle,
@@ -222,9 +271,17 @@ describe("task depth ancestry across a process launch (#9036)", () => {
     })
 
     // when
-    const outcome = await service.createTeam({
-      inlineSpec: { name: "depth-9036", members: [{ name: "beta", kind: "category", category: "quick", prompt: "work" }] },
-    }).then((created) => JSON.stringify(created), (error: unknown) => String(error))
+    const outcome = await service
+      .createTeam({
+        inlineSpec: {
+          name: "depth-9036",
+          members: [{ name: "beta", kind: "category", category: "quick", prompt: "work" }],
+        },
+      })
+      .then(
+        (created) => JSON.stringify(created),
+        (error: unknown) => String(error),
+      )
 
     // then
     expect(launches.rpc).toHaveLength(0)
