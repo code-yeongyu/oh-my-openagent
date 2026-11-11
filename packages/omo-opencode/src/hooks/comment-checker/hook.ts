@@ -8,6 +8,7 @@ import {
   processWithCli,
   processApplyPatchEditsWithCli,
 } from "./cli-runner"
+import { readCheckerEdits } from "./checker-edits"
 import { extractApplyPatchEdits } from "@oh-my-opencode/comment-checker-core"
 import {
   registerPendingCall,
@@ -19,7 +20,7 @@ import { ensureCommentCheckerInitialization } from "./initialization-gate"
 
 import * as fs from "fs"
 import { tmpdir } from "os"
-import { join } from "path"
+import { join, resolve } from "path"
 
 const DEBUG = process.env.COMMENT_CHECKER_DEBUG === "1"
 const DEBUG_FILE = join(tmpdir(), "comment-checker-debug.log")
@@ -30,6 +31,17 @@ function debugLog(...args: unknown[]) {
       .map((a) => (typeof a === "object" ? JSON.stringify(a, null, 2) : String(a)))
       .join(" ")}\n`
     fs.appendFileSync(DEBUG_FILE, msg)
+  }
+}
+
+async function readExistingFile(filePath: string): Promise<string | undefined> {
+  try {
+    const resolved = resolve(filePath)
+    const stat = await fs.promises.stat(resolved)
+    if (!stat.isFile()) return undefined
+    return await fs.promises.readFile(resolved, "utf-8")
+  } catch {
+    return undefined
   }
 }
 
@@ -80,7 +92,7 @@ export function createCommentCheckerHooks(
       const content = output.args.content as string | undefined
       const oldString = (output.args.oldString ?? output.args.old_string) as string | undefined
       const newString = (output.args.newString ?? output.args.new_string) as string | undefined
-      const edits = output.args.edits as Array<{ old_string: string; new_string: string }> | undefined
+      const edits = readCheckerEdits(output.args.edits)
 
       debugLog("extracted filePath:", filePath)
 
@@ -88,6 +100,10 @@ export function createCommentCheckerHooks(
         debugLog("no filePath found")
         return
       }
+
+      const previousContent = toolLower === "write" && content !== undefined
+        ? await readExistingFile(filePath)
+        : undefined
 
       debugLog("registering pendingCall:", {
         callID: input.callID,
@@ -97,6 +113,7 @@ export function createCommentCheckerHooks(
       registerPendingCall(input.callID, {
         filePath,
         content,
+        previousContent,
         oldString: oldString as string | undefined,
         newString: newString as string | undefined,
         edits,
