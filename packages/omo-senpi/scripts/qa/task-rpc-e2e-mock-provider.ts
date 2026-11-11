@@ -101,7 +101,11 @@ interface MockProvider {
     contextWindow: number
     maxTokens: number
   }>
-  streamSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AsyncIterable<unknown> & {
+  streamSimple(
+    model: Model<Api>,
+    context: Context,
+    options?: SimpleStreamOptions,
+  ): AsyncIterable<unknown> & {
     result(): Promise<AssistantMessage>
   }
 }
@@ -177,7 +181,10 @@ function isTaskTerminal(tasksDir: string, name: string): boolean {
   return false
 }
 
-function awaitTerminalTask(step: { name: string; tasksDir: string; timeoutMs: number }, signal?: AbortSignal): Promise<boolean> {
+function awaitTerminalTask(
+  step: { name: string; tasksDir: string; timeoutMs: number },
+  signal?: AbortSignal,
+): Promise<boolean> {
   return new Promise((resolveTerminal) => {
     let settled = false
     let watcher: { close(): void } | undefined

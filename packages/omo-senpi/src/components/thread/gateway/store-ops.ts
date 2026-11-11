@@ -73,20 +73,49 @@ export type StoreContext = {
 }
 
 const DELIVERY_COLUMNS = [
-  "delivery_id", "target_durable_id", "seq", "sender", "sender_turn", "envelope", "body", "bytes", "mode_requested",
-  "mode_effective", "expected_turn_id", "state", "reason", "admitted_by", "claimed_at", "attempt", "admission_kind",
-  "turn_epoch", "root_id", "hop", "created_at", "updated_at", "expires_at", "binding_id", "binding_revision", "actor_user_id",
+  "delivery_id",
+  "target_durable_id",
+  "seq",
+  "sender",
+  "sender_turn",
+  "envelope",
+  "body",
+  "bytes",
+  "mode_requested",
+  "mode_effective",
+  "expected_turn_id",
+  "state",
+  "reason",
+  "admitted_by",
+  "claimed_at",
+  "attempt",
+  "admission_kind",
+  "wait_kind",
+  "turn_epoch",
+  "root_id",
+  "hop",
+  "created_at",
+  "updated_at",
+  "expires_at",
+  "binding_id",
+  "binding_revision",
+  "actor_user_id",
 ] as const
 
 export const OPEN_STATES = "('queued', 'admitting', 'admitted')"
 const DURABLE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/
 
-function refused(code: StoreRefusal["code"], message: string, details?: Readonly<Record<string, unknown>>): StoreRefusal {
+function refused(
+  code: StoreRefusal["code"],
+  message: string,
+  details?: Readonly<Record<string, unknown>>,
+): StoreRefusal {
   return { kind: "refused", code, message, ...(details === undefined ? {} : { details }) }
 }
 
 function rowFrom(record: SqlRow): DeliveryRow {
-  const nullableNumber = (value: unknown): number | null => (value === null || value === undefined ? null : Number(value))
+  const nullableNumber = (value: unknown): number | null =>
+    value === null || value === undefined ? null : Number(value)
   return {
     delivery_id: String(record.delivery_id),
     target_durable_id: String(record.target_durable_id),
@@ -105,6 +134,7 @@ function rowFrom(record: SqlRow): DeliveryRow {
     claimed_at: nullableNumber(record.claimed_at),
     attempt: Number(record.attempt),
     admission_kind: record.admission_kind === null ? null : String(record.admission_kind),
+    wait_kind: record.wait_kind === "approval" ? "approval" : null,
     turn_epoch: nullableNumber(record.turn_epoch),
     root_id: String(record.root_id),
     hop: Number(record.hop),
@@ -118,7 +148,9 @@ function rowFrom(record: SqlRow): DeliveryRow {
 }
 
 function selectRows(ctx: StoreContext, where: string, params: readonly SqlValue[], orderBy?: string): DeliveryRow[] {
-  return ctx.sql.all(DELIVERY_COLUMNS, `SELECT ${DELIVERY_COLUMNS.join(", ")} FROM deliveries WHERE ${where}`, params, orderBy).map(rowFrom)
+  return ctx.sql
+    .all(DELIVERY_COLUMNS, `SELECT ${DELIVERY_COLUMNS.join(", ")} FROM deliveries WHERE ${where}`, params, orderBy)
+    .map(rowFrom)
 }
 
 function selectRow(ctx: StoreContext, deliveryId: string): DeliveryRow | undefined {
@@ -133,7 +165,11 @@ export function write(ctx: StoreContext, sql: string, params: readonly SqlValue[
 
 function queuePosition(ctx: StoreContext, row: DeliveryRow): number {
   if (row.state !== "queued" && row.state !== "admitting" && row.state !== "admitted") return 0
-  const found = ctx.sql.one(["n"], `SELECT COUNT(*) AS n FROM deliveries WHERE target_durable_id = ? AND state IN ${OPEN_STATES} AND seq <= ?`, [row.target_durable_id, row.seq])
+  const found = ctx.sql.one(
+    ["n"],
+    `SELECT COUNT(*) AS n FROM deliveries WHERE target_durable_id = ? AND state IN ${OPEN_STATES} AND seq <= ?`,
+    [row.target_durable_id, row.seq],
+  )
   return Number(found?.n ?? 1)
 }
 
@@ -228,7 +264,9 @@ export function unlinkMarker(ctx: StoreContext, targetDurableId: string, deliver
 
 function markerNames(ctx: StoreContext, targetDurableId: string): string[] {
   try {
-    return readdirSync(gatewayInboxDirectory(ctx.config.agent_dir, targetDurableId)).filter((name) => !name.startsWith("."))
+    return readdirSync(gatewayInboxDirectory(ctx.config.agent_dir, targetDurableId)).filter(
+      (name) => !name.startsWith("."),
+    )
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === "ENOENT") return []
     throw error
@@ -237,10 +275,19 @@ function markerNames(ctx: StoreContext, targetDurableId: string): string[] {
 
 function allocateSeq(ctx: StoreContext, targetDurableId: string): number {
   const meta = ctx.sql.one(["next_seq"], "SELECT next_seq FROM session_meta WHERE durable_id = ?", [targetDurableId])
-  const seq = meta === undefined
-    ? Number(ctx.sql.one(["m"], "SELECT COALESCE(MAX(seq), 0) + 1 AS m FROM deliveries WHERE target_durable_id = ?", [targetDurableId])?.m ?? 1)
-    : Number(meta.next_seq)
-  write(ctx, "INSERT INTO session_meta (durable_id, next_seq) VALUES (?, ?) ON CONFLICT(durable_id) DO UPDATE SET next_seq = excluded.next_seq", [targetDurableId, seq + 1])
+  const seq =
+    meta === undefined
+      ? Number(
+          ctx.sql.one(["m"], "SELECT COALESCE(MAX(seq), 0) + 1 AS m FROM deliveries WHERE target_durable_id = ?", [
+            targetDurableId,
+          ])?.m ?? 1,
+        )
+      : Number(meta.next_seq)
+  write(
+    ctx,
+    "INSERT INTO session_meta (durable_id, next_seq) VALUES (?, ?) ON CONFLICT(durable_id) DO UPDATE SET next_seq = excluded.next_seq",
+    [targetDurableId, seq + 1],
+  )
   return seq
 }
 
@@ -249,10 +296,33 @@ function insertDelivery(ctx: StoreContext, row: DeliveryRow): void {
     ctx,
     `INSERT INTO deliveries (${DELIVERY_COLUMNS.join(", ")}) VALUES (${DELIVERY_COLUMNS.map(() => "?").join(", ")})`,
     [
-      row.delivery_id, row.target_durable_id, row.seq, row.sender, row.sender_turn, JSON.stringify(row.envelope), row.body, row.bytes,
-      row.mode_requested, row.mode_effective, row.expected_turn_id, row.state, row.reason,
-      row.admitted_by === null ? null : JSON.stringify(row.admitted_by), row.claimed_at, row.attempt, row.admission_kind,
-      row.turn_epoch, row.root_id, row.hop, row.created_at, row.updated_at, row.expires_at, row.binding_id, row.binding_revision, row.actor_user_id,
+      row.delivery_id,
+      row.target_durable_id,
+      row.seq,
+      row.sender,
+      row.sender_turn,
+      JSON.stringify(row.envelope),
+      row.body,
+      row.bytes,
+      row.mode_requested,
+      row.mode_effective,
+      row.expected_turn_id,
+      row.state,
+      row.reason,
+      row.admitted_by === null ? null : JSON.stringify(row.admitted_by),
+      row.claimed_at,
+      row.attempt,
+      row.admission_kind,
+      row.wait_kind,
+      row.turn_epoch,
+      row.root_id,
+      row.hop,
+      row.created_at,
+      row.updated_at,
+      row.expires_at,
+      row.binding_id,
+      row.binding_revision,
+      row.actor_user_id,
     ],
   )
 }
@@ -262,7 +332,9 @@ function argsHash(value: unknown): string {
 }
 
 function schemaVersion(ctx: StoreContext): number {
-  const version = Number(ctx.sql.one(["user_version"], "SELECT user_version FROM pragma_user_version()")?.user_version ?? 0)
+  const version = Number(
+    ctx.sql.one(["user_version"], "SELECT user_version FROM pragma_user_version()")?.user_version ?? 0,
+  )
   if (version > GATEWAY_MIGRATIONS.length) throw new GatewaySchemaVersionError(version, GATEWAY_MIGRATIONS.length)
   return version
 }
@@ -293,7 +365,9 @@ export async function migrate(ctx: StoreContext): Promise<void> {
     // actions from extension tables referencing `bindings`). The pragma is restored to its prior
     // value afterwards, and foreign_key_check is verified from TypeScript before the bump commits.
     const needsForeignKeysOff = GATEWAY_NEEDS_FK_OFF.has(version)
-    const priorForeignKeys = needsForeignKeysOff ? Number(ctx.sql.one(["foreign_keys"], "SELECT foreign_keys FROM pragma_foreign_keys")?.foreign_keys ?? 1) : 1
+    const priorForeignKeys = needsForeignKeysOff
+      ? Number(ctx.sql.one(["foreign_keys"], "SELECT foreign_keys FROM pragma_foreign_keys")?.foreign_keys ?? 1)
+      : 1
     if (needsForeignKeysOff) ctx.sql.exec("PRAGMA foreign_keys = OFF")
     try {
       await transaction(ctx, "migrate", () => {
@@ -304,7 +378,10 @@ export async function migrate(ctx: StoreContext): Promise<void> {
           const violations = ctx.sql.all(["parent"], "SELECT parent FROM pragma_foreign_key_check")
           const introduced = violations.filter((row) => row.parent === "bindings")
           if (introduced.length > 0) {
-            throw new GatewayMigrationError(current + 1, `gateway schema ${current + 1} would leave a foreign-key violation referencing bindings; staying at v${current}`)
+            throw new GatewayMigrationError(
+              current + 1,
+              `gateway schema ${current + 1} would leave a foreign-key violation referencing bindings; staying at v${current}`,
+            )
           }
         }
         ctx.sql.exec(`PRAGMA user_version = ${current + 1}`)
@@ -344,14 +421,17 @@ function selectReceipt(ctx: StoreContext, principal: string, key: string): Recei
   }
 }
 
-type ReceiptRetry = Pick<EnqueueRequest, "now" | "sender_principal" | "endpoint_kind"> & { readonly receipt: Pick<EnqueueRequest["receipt"], "idempotency_key" | "args_hash"> }
+type ReceiptRetry = Pick<EnqueueRequest, "now" | "sender_principal" | "endpoint_kind"> & {
+  readonly receipt: Pick<EnqueueRequest["receipt"], "idempotency_key" | "args_hash">
+}
 
 /** How a retry under an existing delivery receipt is answered: a send's retry and a closed binding's replayed event both come here. */
 function classifyReceipt(ctx: StoreContext, request: ReceiptRetry, receipt: ReceiptRecord): EnqueueOutcome {
   if (receipt.args_hash !== request.receipt.args_hash) {
     return refused("idempotency_conflict", "The idempotency key was already used with different arguments.")
   }
-  if (receipt.status === "completed" && receipt.result !== null) return { kind: "replay", result: JSON.parse(receipt.result) }
+  if (receipt.status === "completed" && receipt.result !== null)
+    return { kind: "replay", result: JSON.parse(receipt.result) }
   // The row is read before the owner: a decided row proves the outcome whoever began the receipt,
   // including this process when both of its receipt writes failed (the receipt then stays prepared).
   const row = receipt.delivery_id === null ? undefined : selectRow(ctx, receipt.delivery_id)
@@ -363,42 +443,81 @@ function classifyReceipt(ctx: StoreContext, request: ReceiptRetry, receipt: Rece
     // Lost ACK with proof: the target's row records the admission outcome, so the stored result
     // is rebuilt from it and the receipt completes - never a second send.
     const result = { ...resultFromRow(row, queuePosition(ctx, row), request.endpoint_kind, true, false) }
-    write(ctx, "UPDATE receipts SET status = 'completed', result = ?, updated_at = ? WHERE principal = ? AND operation = 'deliver' AND idempotency_key = ?", [
-      JSON.stringify(result), request.now, request.sender_principal, request.receipt.idempotency_key,
-    ])
+    write(
+      ctx,
+      "UPDATE receipts SET status = 'completed', result = ?, updated_at = ? WHERE principal = ? AND operation = 'deliver' AND idempotency_key = ?",
+      [JSON.stringify(result), request.now, request.sender_principal, request.receipt.idempotency_key],
+    )
     return { kind: "replay", result }
   }
   if (receipt.status === "prepared") {
-    write(ctx, "UPDATE receipts SET status = 'uncertain', error_note = ?, updated_at = ? WHERE principal = ? AND operation = 'deliver' AND idempotency_key = ?", [
-      "the sender lost the acknowledgement before the target admitted the delivery", request.now, request.sender_principal, request.receipt.idempotency_key,
-    ])
+    write(
+      ctx,
+      "UPDATE receipts SET status = 'uncertain', error_note = ?, updated_at = ? WHERE principal = ? AND operation = 'deliver' AND idempotency_key = ?",
+      [
+        "the sender lost the acknowledgement before the target admitted the delivery",
+        request.now,
+        request.sender_principal,
+        request.receipt.idempotency_key,
+      ],
+    )
   }
-  return refused("idempotency_uncertain", "The earlier delivery may or may not reach the target; it is never sent twice.", {
-    delivery_id: receipt.delivery_id,
-    state: row?.state ?? null,
-  })
+  return refused(
+    "idempotency_uncertain",
+    "The earlier delivery may or may not reach the target; it is never sent twice.",
+    {
+      delivery_id: receipt.delivery_id,
+      state: row?.state ?? null,
+    },
+  )
 }
 
-type CausalPlacement = { readonly root_id: string; readonly hop: number; readonly via: readonly string[]; readonly new_root: boolean }
+type CausalPlacement = {
+  readonly root_id: string
+  readonly hop: number
+  readonly via: readonly string[]
+  readonly new_root: boolean
+}
 
 function placeCausally(ctx: StoreContext, request: EnqueueRequest): CausalPlacement | StoreRefusal {
   let placement: CausalPlacement
-  if (request.cause_delivery_id !== null) {
-    const cause = selectRow(ctx, request.cause_delivery_id)
+  const cause = request.cause_delivery_id === null ? undefined : selectRow(ctx, request.cause_delivery_id)
+  if (cause !== undefined) {
     // The cause is the delivery whose message the sender's model consumed (runtime context, never a
     // model), so a row still `admitting` is one the runtime took but could not record yet (its outcome
     // write gave up at the lock-wait bound): the chain continues rather than refusing the send.
-    if (cause === undefined || cause.target_durable_id !== request.sender_node || (cause.state !== "admitting" && cause.state !== "admitted" && cause.state !== "applied")) {
-      return refused("invalid_arguments", "The delivery this send continues is not one the sender received.", { guard: "unknown_cause" })
+    if (
+      cause.target_durable_id !== request.sender_node ||
+      (cause.state !== "admitting" && cause.state !== "admitted" && cause.state !== "applied")
+    ) {
+      return refused("invalid_arguments", "The delivery this send continues is not one the sender received.", {
+        guard: "unknown_cause",
+      })
     }
     // `via` names only the session that sent this hop: with no hop cap a stored path would grow with every hop
     // (one id per row, quadratic in total), while `hop` already carries the chain's count.
-    placement = { root_id: cause.root_id, hop: cause.hop + 1, via: [request.sender_node], new_root: false }
+    placement = {
+      root_id: cause.root_id,
+      hop: Math.max(cause.hop, request.inbound_hop ?? 0) + 1,
+      via: [request.sender_node],
+      new_root: false,
+    }
   } else {
-    placement = { root_id: `root-${randomUUID()}`, hop: 1, via: [request.sender_node], new_root: true }
+    // No cause, or a cause no row here holds (a delivery another device sent, decision 0027 section 3): the chain starts a
+    // new root and keeps counting from its hop (K8). Nothing here asks where the delivery came from.
+    placement = {
+      root_id: `root-${randomUUID()}`,
+      hop: (request.inbound_hop ?? 0) + 1,
+      via: [request.sender_node],
+      new_root: true,
+    }
   }
   if (request.claimed_root_id !== null && request.claimed_root_id !== placement.root_id) {
-    return refused("invalid_arguments", "The causal root is derived by the gateway and cannot be chosen by the caller.", { guard: "forged_root" })
+    return refused(
+      "invalid_arguments",
+      "The causal root is derived by the gateway and cannot be chosen by the caller.",
+      { guard: "forged_root" },
+    )
   }
   if (request.target_durable_id === request.sender_node) {
     return refused("loop_detected", "A session cannot deliver to itself through the gateway.", { guard: "self_send" })
@@ -406,8 +525,11 @@ function placeCausally(ctx: StoreContext, request: EnqueueRequest): CausalPlacem
   // K8: a chain has no count limit unless the user sets one, and A->B->A is allowed. An expired root is
   // bookkeeping only: the chain goes on under a fresh root and keeps its hop count.
   if (!placement.new_root) {
-    const root = ctx.sql.one(["expires_at"], "SELECT expires_at FROM causal_roots WHERE root_id = ?", [placement.root_id])
-    if (root === undefined || Number(root.expires_at) <= request.now) placement = { ...placement, root_id: `root-${randomUUID()}`, new_root: true }
+    const root = ctx.sql.one(["expires_at"], "SELECT expires_at FROM causal_roots WHERE root_id = ?", [
+      placement.root_id,
+    ])
+    if (root === undefined || Number(root.expires_at) <= request.now)
+      placement = { ...placement, root_id: `root-${randomUUID()}`, new_root: true }
   }
   return placement
 }
@@ -416,7 +538,11 @@ function checkFanout(ctx: StoreContext, request: EnqueueRequest): StoreRefusal |
   if (request.sender_turn === null) return undefined
   const targets = new Set(
     ctx.sql
-      .all(["t"], "SELECT DISTINCT target_durable_id AS t FROM deliveries WHERE sender = ? AND sender_turn = ? AND state != 'refused'", [request.sender_principal, request.sender_turn])
+      .all(
+        ["t"],
+        "SELECT DISTINCT target_durable_id AS t FROM deliveries WHERE sender = ? AND sender_turn = ? AND state != 'refused'",
+        [request.sender_principal, request.sender_turn],
+      )
       .map((row) => String(row.t)),
   )
   if (targets.has(request.target_durable_id) || targets.size < MAX_FANOUT_PER_TURN) return undefined
@@ -425,30 +551,44 @@ function checkFanout(ctx: StoreContext, request: EnqueueRequest): StoreRefusal |
 
 function takePairToken(ctx: StoreContext, request: EnqueueRequest): StoreRefusal | undefined {
   const sender = request.rate_principal ?? request.sender_principal
-  const bucket = ctx.sql.one(["tokens", "updated_at"], "SELECT tokens, updated_at FROM rate_buckets WHERE sender = ? AND target_durable_id = ?", [sender, request.target_durable_id])
-  const tokens = bucket === undefined
-    ? PAIR_BUCKET_BURST
-    : Math.min(PAIR_BUCKET_BURST, Number(bucket.tokens) + Math.max(0, request.now - Number(bucket.updated_at)) / PAIR_BUCKET_REFILL_MS)
+  const bucket = ctx.sql.one(
+    ["tokens", "updated_at"],
+    "SELECT tokens, updated_at FROM rate_buckets WHERE sender = ? AND target_durable_id = ?",
+    [sender, request.target_durable_id],
+  )
+  const tokens =
+    bucket === undefined
+      ? PAIR_BUCKET_BURST
+      : Math.min(
+          PAIR_BUCKET_BURST,
+          Number(bucket.tokens) + Math.max(0, request.now - Number(bucket.updated_at)) / PAIR_BUCKET_REFILL_MS,
+        )
   if (tokens < 1) {
     return refused("overloaded", "Too many deliveries to this session; wait before sending again.", {
       budget: "pair_rate",
       retry_after_ms: Math.ceil((1 - tokens) * PAIR_BUCKET_REFILL_MS),
     })
   }
-  write(ctx, "INSERT INTO rate_buckets (sender, target_durable_id, tokens, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(sender, target_durable_id) DO UPDATE SET tokens = excluded.tokens, updated_at = excluded.updated_at", [
-    sender, request.target_durable_id, tokens - 1, request.now,
-  ])
+  write(
+    ctx,
+    "INSERT INTO rate_buckets (sender, target_durable_id, tokens, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(sender, target_durable_id) DO UPDATE SET tokens = excluded.tokens, updated_at = excluded.updated_at",
+    [sender, request.target_durable_id, tokens - 1, request.now],
+  )
   return undefined
 }
 
-function checkBinding(ctx: StoreContext, request: EnqueueRequest): { readonly expires_at: number | null } | StoreRefusal {
+function checkBinding(
+  ctx: StoreContext,
+  request: EnqueueRequest,
+): { readonly expires_at: number | null } | StoreRefusal {
   if (request.binding === null) return { expires_at: null }
   const binding = ctx.sql.one(
     ["revision", "status", "session_durable_id", "direction_inbound", "expires_at"],
     "SELECT revision, status, session_durable_id, direction_inbound, expires_at FROM bindings WHERE binding_id = ?",
     [request.binding.binding_id],
   )
-  const expiresAt = binding?.expires_at === null || binding?.expires_at === undefined ? null : Date.parse(String(binding.expires_at))
+  const expiresAt =
+    binding?.expires_at === null || binding?.expires_at === undefined ? null : Date.parse(String(binding.expires_at))
   if (
     binding === undefined ||
     binding.status !== "active" ||
@@ -457,7 +597,9 @@ function checkBinding(ctx: StoreContext, request: EnqueueRequest): { readonly ex
     Number(binding.direction_inbound) !== 1 ||
     (expiresAt !== null && expiresAt <= request.now)
   ) {
-    return refused("invalid_arguments", "The binding is not active for this session at this revision.", { binding: request.binding.binding_id })
+    return refused("invalid_arguments", "The binding is not active for this session at this revision.", {
+      binding: request.binding.binding_id,
+    })
   }
   return { expires_at: expiresAt }
 }
@@ -473,7 +615,11 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
   const effectsAtStart = ctx.afterCommit?.length ?? 0
   const commitSql = ctx.afterCommit === undefined ? "COMMIT" : "RELEASE gateway_enqueue"
   try {
-    const cleared = deleteExpiredReceipt(ctx, { principal: request.sender_principal, operation: "deliver", idempotency_key: request.receipt.idempotency_key }, request.now)
+    const cleared = deleteExpiredReceipt(
+      ctx,
+      { principal: request.sender_principal, operation: "deliver", idempotency_key: request.receipt.idempotency_key },
+      request.now,
+    )
     const receipt = selectReceipt(ctx, request.sender_principal, request.receipt.idempotency_key)
     if (receipt !== undefined) {
       const outcome = classifyReceipt(ctx, request, receipt)
@@ -486,11 +632,18 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
       rollbackQuietly(ctx)
       return binding
     }
-    const backlog = ctx.sql.one(["n", "b"], `SELECT COUNT(*) AS n, COALESCE(SUM(bytes), 0) AS b FROM deliveries WHERE target_durable_id = ? AND state IN ${OPEN_STATES}`, [request.target_durable_id])
+    const backlog = ctx.sql.one(
+      ["n", "b"],
+      `SELECT COUNT(*) AS n, COALESCE(SUM(bytes), 0) AS b FROM deliveries WHERE target_durable_id = ? AND state IN ${OPEN_STATES}`,
+      [request.target_durable_id],
+    )
     const bytes = Buffer.byteLength(request.body)
     if (Number(backlog?.n ?? 0) >= TARGET_MAX_MESSAGES || Number(backlog?.b ?? 0) + bytes > TARGET_MAX_BYTES) {
       rollbackQuietly(ctx)
-      return refused("queue_full", "The target's delivery backlog is full.", { max_messages: TARGET_MAX_MESSAGES, max_bytes: TARGET_MAX_BYTES })
+      return refused("queue_full", "The target's delivery backlog is full.", {
+        max_messages: TARGET_MAX_MESSAGES,
+        max_bytes: TARGET_MAX_BYTES,
+      })
     }
     const placement = placeCausally(ctx, request)
     if ("kind" in placement) {
@@ -504,7 +657,10 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
     }
     if (placement.new_root) {
       write(ctx, "INSERT INTO causal_roots (root_id, origin_principal, created_at, expires_at) VALUES (?, ?, ?, ?)", [
-        placement.root_id, request.sender_principal, request.now, request.now + ROOT_LIFETIME_MS,
+        placement.root_id,
+        request.sender_principal,
+        request.now,
+        request.now + ROOT_LIFETIME_MS,
       ])
     }
     const row: DeliveryRow = {
@@ -513,7 +669,15 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
       seq: allocateSeq(ctx, request.target_durable_id),
       sender: request.sender_principal,
       sender_turn: request.sender_turn,
-      envelope: { provenance: request.provenance, origin: request.origin, actor: request.actor, via: placement.via, root_id: placement.root_id, hop: placement.hop, delivery_id: request.delivery_id },
+      envelope: {
+        provenance: request.provenance,
+        origin: request.origin,
+        actor: request.actor,
+        via: placement.via,
+        root_id: placement.root_id,
+        hop: placement.hop,
+        delivery_id: request.delivery_id,
+      },
       body: request.body,
       bytes,
       mode_requested: request.mode,
@@ -525,6 +689,7 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
       claimed_at: null,
       attempt: 0,
       admission_kind: null,
+      wait_kind: null,
       turn_epoch: null,
       root_id: placement.root_id,
       hop: placement.hop,
@@ -533,13 +698,23 @@ export async function enqueue(ctx: StoreContext, request: EnqueueRequest): Promi
       expires_at: Math.min(request.now + QUEUED_TTL_MS, binding.expires_at ?? Number.POSITIVE_INFINITY),
       binding_id: request.binding?.binding_id ?? null,
       binding_revision: request.binding?.revision ?? null,
-      actor_user_id: "external" in request.origin ? request.origin.external.author?.user_id ?? null : null,
+      actor_user_id: "external" in request.origin ? (request.origin.external.author?.user_id ?? null) : null,
     }
     insertDelivery(ctx, row)
-    write(ctx, "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES (?, 'deliver', ?, ?, 'prepared', ?, ?, ?, ?, ?)", [
-      request.sender_principal, request.receipt.idempotency_key, request.receipt.args_hash, row.delivery_id, ctx.config.instance_id,
-      request.now, request.now, request.now + GATEWAY_RECEIPT_RETENTION_MS,
-    ])
+    write(
+      ctx,
+      "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, created_at, updated_at, expires_at) VALUES (?, 'deliver', ?, ?, 'prepared', ?, ?, ?, ?, ?)",
+      [
+        request.sender_principal,
+        request.receipt.idempotency_key,
+        request.receipt.args_hash,
+        row.delivery_id,
+        ctx.config.instance_id,
+        request.now,
+        request.now,
+        request.now + GATEWAY_RECEIPT_RETENTION_MS,
+      ],
+    )
     marker = createMarker(ctx, row.target_durable_id, row.delivery_id, false)
     const position = queuePosition(ctx, row)
     sweepRetentionIfDue(ctx, request.now, cleared)
@@ -590,7 +765,11 @@ function releasesByRuntime(sessionPath: string | null, cache: Map<string, string
     } catch {
       continue
     }
-    const record = entry as { type?: unknown; customType?: unknown; data?: { host_instance?: unknown; released_at?: unknown } }
+    const record = entry as {
+      type?: unknown
+      customType?: unknown
+      data?: { host_instance?: unknown; released_at?: unknown }
+    }
     if (record.type !== "custom" || record.customType !== SESSION_RELEASED_ENTRY_TYPE) continue
     const instance = record.data?.host_instance
     const at = typeof record.data?.released_at === "string" ? Date.parse(record.data.released_at) : Number.NaN
@@ -600,7 +779,11 @@ function releasesByRuntime(sessionPath: string | null, cache: Map<string, string
   return latest
 }
 
-function releasedByClaimant(claimant: ProcessIdentity, claimedAt: number | null, releases: () => ReadonlyMap<string, number>): boolean {
+function releasedByClaimant(
+  claimant: ProcessIdentity,
+  claimedAt: number | null,
+  releases: () => ReadonlyMap<string, number>,
+): boolean {
   if (claimant.runtime_instance === null || claimedAt === null) return false
   const releasedAt = releases().get(claimant.runtime_instance)
   return releasedAt !== undefined && claimedAt <= releasedAt
@@ -617,7 +800,12 @@ function sessionHasToken(sessionPath: string | null, deliveryId: string, cache: 
     }
     if (typeof entry !== "object" || entry === null) continue
     const record = entry as { type?: unknown; customType?: unknown; details?: { delivery_id?: unknown } }
-    if (record.type === "custom_message" && record.customType === SESSION_CONTROL_DELIVERY_TYPE && record.details?.delivery_id === deliveryId) return true
+    if (
+      record.type === "custom_message" &&
+      record.customType === SESSION_CONTROL_DELIVERY_TYPE &&
+      record.details?.delivery_id === deliveryId
+    )
+      return true
   }
   return false
 }
@@ -626,20 +814,37 @@ function claimFingerprint(row: DeliveryRow): string {
   return `${JSON.stringify(row.admitted_by)}#${row.attempt}`
 }
 
-const CLEARED_CLAIM = "admitted_by = NULL, claimed_at = NULL, mode_effective = NULL, admission_kind = NULL, turn_epoch = NULL"
+const CLEARED_CLAIM =
+  "admitted_by = NULL, claimed_at = NULL, mode_effective = NULL, admission_kind = NULL, wait_kind = NULL, turn_epoch = NULL"
 
-function transition(ctx: StoreContext, row: DeliveryRow, to: DeliveryState, now: number, extra: { readonly reason?: RefusalReason } = {}): void {
+function transition(
+  ctx: StoreContext,
+  row: DeliveryRow,
+  to: DeliveryState,
+  now: number,
+  extra: { readonly reason?: RefusalReason } = {},
+): void {
   if (to === "queued") {
-    write(ctx, `UPDATE deliveries SET state = 'queued', ${CLEARED_CLAIM}, updated_at = ? WHERE delivery_id = ?`, [now, row.delivery_id])
+    write(ctx, `UPDATE deliveries SET state = 'queued', ${CLEARED_CLAIM}, updated_at = ? WHERE delivery_id = ?`, [
+      now,
+      row.delivery_id,
+    ])
     return
   }
   if (to === "refused") {
-    write(ctx, "UPDATE deliveries SET state = 'refused', reason = ?, updated_at = ? WHERE delivery_id = ?", [extra.reason ?? null, now, row.delivery_id])
+    write(ctx, "UPDATE deliveries SET state = 'refused', reason = ?, updated_at = ? WHERE delivery_id = ?", [
+      extra.reason ?? null,
+      now,
+      row.delivery_id,
+    ])
     return
   }
   write(ctx, "UPDATE deliveries SET state = ?, updated_at = ? WHERE delivery_id = ?", [to, now, row.delivery_id])
   if (to === "applied") {
-    write(ctx, "UPDATE session_meta SET applied_seq = MAX(applied_seq, ?) WHERE durable_id = ?", [row.seq, row.target_durable_id])
+    write(ctx, "UPDATE session_meta SET applied_seq = MAX(applied_seq, ?) WHERE durable_id = ?", [
+      row.seq,
+      row.target_durable_id,
+    ])
   }
 }
 
@@ -667,7 +872,11 @@ export async function reconcile(ctx: StoreContext, request: ReconcileRequest): P
       deadClaimants.set(key, dead)
     }
     const letGo = dead || releasedByClaimant(row.admitted_by, row.claimed_at, releaseIndex)
-    const to = !letGo ? "dual" : sessionHasToken(request.session_path, row.delivery_id, transcripts) ? "applied" : "queued"
+    const to = !letGo
+      ? "dual"
+      : sessionHasToken(request.session_path, row.delivery_id, transcripts)
+        ? "applied"
+        : "queued"
     verdicts.set(row.delivery_id, { fingerprint: claimFingerprint(row), to })
   }
 
@@ -720,9 +929,11 @@ export async function claim(ctx: StoreContext, request: ClaimRequest): Promise<C
       unlinkMarker(ctx, row.target_durable_id, row.delivery_id)
       return { kind: "lost", state: "refused" }
     }
-    write(ctx, "UPDATE deliveries SET state = 'admitting', admitted_by = ?, claimed_at = ?, attempt = attempt + 1, mode_effective = ?, updated_at = ? WHERE delivery_id = ? AND state = 'queued'", [
-      JSON.stringify(request.self), request.now, request.lane, request.now, request.delivery_id,
-    ])
+    write(
+      ctx,
+      "UPDATE deliveries SET state = 'admitting', admitted_by = ?, claimed_at = ?, attempt = attempt + 1, mode_effective = ?, updated_at = ? WHERE delivery_id = ? AND state = 'queued'",
+      [JSON.stringify(request.self), request.now, request.lane, request.now, request.delivery_id],
+    )
     unlinkMarker(ctx, row.target_durable_id, row.delivery_id)
     return { kind: "claimed", row: selectRow(ctx, request.delivery_id) as DeliveryRow }
   })
@@ -731,21 +942,33 @@ export async function claim(ctx: StoreContext, request: ClaimRequest): Promise<C
 export async function recordOutcome(ctx: StoreContext, request: RecordOutcomeRequest): Promise<ClaimOutcome> {
   return await transaction(ctx, "record_outcome", (): ClaimOutcome => {
     const row = selectRow(ctx, request.delivery_id)
-    if (row === undefined || (row.state !== "admitting" && row.state !== "admitted") || row.admitted_by === null || !sameProcess(row.admitted_by, request.self)) {
+    if (
+      row === undefined ||
+      (row.state !== "admitting" && row.state !== "admitted") ||
+      row.admitted_by === null ||
+      !sameProcess(row.admitted_by, request.self)
+    ) {
       return { kind: "lost", state: row?.state ?? null }
     }
     const outcome = request.outcome
     if (outcome.kind === "requeue") transition(ctx, row, "queued", request.now)
     else if (outcome.kind === "refused") transition(ctx, row, "refused", request.now, { reason: outcome.reason })
     else {
-      write(ctx, "UPDATE deliveries SET admission_kind = ?, turn_epoch = ?, updated_at = ? WHERE delivery_id = ?", [outcome.admission_kind, outcome.turn_epoch, request.now, row.delivery_id])
+      write(
+        ctx,
+        "UPDATE deliveries SET admission_kind = ?, wait_kind = ?, turn_epoch = ?, updated_at = ? WHERE delivery_id = ?",
+        [outcome.admission_kind, outcome.wait_kind ?? null, outcome.turn_epoch, request.now, row.delivery_id],
+      )
       if (row.state !== outcome.kind) transition(ctx, row, outcome.kind, request.now)
     }
     return { kind: "claimed", row: selectRow(ctx, request.delivery_id) as DeliveryRow }
   })
 }
 
-export async function refuseQueued(ctx: StoreContext, request: { readonly now: number; readonly delivery_id: string; readonly reason: RefusalReason }): Promise<boolean> {
+export async function refuseQueued(
+  ctx: StoreContext,
+  request: { readonly now: number; readonly delivery_id: string; readonly reason: RefusalReason },
+): Promise<boolean> {
   return await transaction(ctx, "refuse", () => {
     const row = selectRow(ctx, request.delivery_id)
     if (row === undefined || row.state !== "queued") return false
@@ -755,24 +978,62 @@ export async function refuseQueued(ctx: StoreContext, request: { readonly now: n
   })
 }
 
-export async function completeReceipt(ctx: StoreContext, request: { readonly now: number; readonly principal: string; readonly idempotency_key: string; readonly result: unknown }): Promise<boolean> {
-  return await transaction(ctx, "complete_receipt", () => write(
+export async function completeReceipt(
+  ctx: StoreContext,
+  request: {
+    readonly now: number
+    readonly principal: string
+    readonly idempotency_key: string
+    readonly result: unknown
+  },
+): Promise<boolean> {
+  return await transaction(
     ctx,
-    "UPDATE receipts SET status = 'completed', result = ?, updated_at = ? WHERE principal = ? AND operation = 'deliver' AND idempotency_key = ? AND status = 'prepared' AND owner_instance = ?",
-    [JSON.stringify(request.result), request.now, request.principal, request.idempotency_key, ctx.config.instance_id],
-  ) === 1)
+    "complete_receipt",
+    () =>
+      write(
+        ctx,
+        "UPDATE receipts SET status = 'completed', result = ?, updated_at = ? WHERE principal = ? AND operation = 'deliver' AND idempotency_key = ? AND status = 'prepared' AND owner_instance = ?",
+        [
+          JSON.stringify(request.result),
+          request.now,
+          request.principal,
+          request.idempotency_key,
+          ctx.config.instance_id,
+        ],
+      ) === 1,
+  )
 }
 
-export async function abandonReceipt(ctx: StoreContext, request: { readonly now: number; readonly principal: string; readonly idempotency_key: string; readonly error_note: string }): Promise<boolean> {
-  return await transaction(ctx, "abandon_receipt", () => write(
+export async function abandonReceipt(
+  ctx: StoreContext,
+  request: {
+    readonly now: number
+    readonly principal: string
+    readonly idempotency_key: string
+    readonly error_note: string
+  },
+): Promise<boolean> {
+  return await transaction(
     ctx,
-    "UPDATE receipts SET status = 'uncertain', error_note = ?, updated_at = ? WHERE principal = ? AND operation = 'deliver' AND idempotency_key = ? AND status = 'prepared' AND owner_instance = ?",
-    [request.error_note, request.now, request.principal, request.idempotency_key, ctx.config.instance_id],
-  ) === 1)
+    "abandon_receipt",
+    () =>
+      write(
+        ctx,
+        "UPDATE receipts SET status = 'uncertain', error_note = ?, updated_at = ? WHERE principal = ? AND operation = 'deliver' AND idempotency_key = ? AND status = 'prepared' AND owner_instance = ?",
+        [request.error_note, request.now, request.principal, request.idempotency_key, ctx.config.instance_id],
+      ) === 1,
+  )
 }
 
 /** `result` is the stored result of a completed receipt, null for one that has not recorded it. */
-export type DeliveryReceipt = { readonly args_hash: string; readonly completed: boolean; readonly result: unknown; readonly target_durable_id: string; readonly binding_revision: number | null }
+export type DeliveryReceipt = {
+  readonly args_hash: string
+  readonly completed: boolean
+  readonly result: unknown
+  readonly target_durable_id: string
+  readonly binding_revision: number | null
+}
 
 /**
  * An unexpired delivery receipt with the facts of its row the receipt's arguments hash was taken
@@ -780,13 +1041,22 @@ export type DeliveryReceipt = { readonly args_hash: string; readonly completed: 
  * answer a retry of an event it delivered. A receipt that has not recorded its result goes through
  * `recoverDelivery`.
  */
-export function deliveryReceipt(ctx: StoreContext, request: { readonly now: number; readonly principal: string; readonly idempotency_key: string }): DeliveryReceipt | null {
+export function deliveryReceipt(
+  ctx: StoreContext,
+  request: { readonly now: number; readonly principal: string; readonly idempotency_key: string },
+): DeliveryReceipt | null {
   const receipt = selectReceipt(ctx, request.principal, request.idempotency_key)
   if (receipt === undefined || receipt.expires_at <= request.now || receipt.delivery_id === null) return null
   const row = selectRow(ctx, receipt.delivery_id)
   if (row === undefined) return null
   const completed = receipt.status === "completed" && receipt.result !== null
-  return { args_hash: receipt.args_hash, completed, result: completed ? JSON.parse(receipt.result as string) : null, target_durable_id: row.target_durable_id, binding_revision: row.binding_revision }
+  return {
+    args_hash: receipt.args_hash,
+    completed,
+    result: completed ? JSON.parse(receipt.result as string) : null,
+    target_durable_id: row.target_durable_id,
+    binding_revision: row.binding_revision,
+  }
 }
 
 /**
@@ -794,29 +1064,61 @@ export function deliveryReceipt(ctx: StoreContext, request: { readonly now: numb
  * (`classifyReceipt`): a decided row replays its outcome and completes the receipt, an undecided one
  * stays in progress or uncertain. Admits nothing; null when no unexpired receipt exists.
  */
-export async function recoverDelivery(ctx: StoreContext, request: { readonly now: number; readonly principal: string; readonly idempotency_key: string; readonly args_hash: string }): Promise<EnqueueOutcome | null> {
+export async function recoverDelivery(
+  ctx: StoreContext,
+  request: {
+    readonly now: number
+    readonly principal: string
+    readonly idempotency_key: string
+    readonly args_hash: string
+  },
+): Promise<EnqueueOutcome | null> {
   return await transaction(ctx, "recover_delivery", () => {
     const receipt = selectReceipt(ctx, request.principal, request.idempotency_key)
     if (receipt === undefined || receipt.expires_at <= request.now) return null
-    return classifyReceipt(ctx, { now: request.now, sender_principal: request.principal, endpoint_kind: null, receipt: { idempotency_key: request.idempotency_key, args_hash: request.args_hash } }, receipt)
+    return classifyReceipt(
+      ctx,
+      {
+        now: request.now,
+        sender_principal: request.principal,
+        endpoint_kind: null,
+        receipt: { idempotency_key: request.idempotency_key, args_hash: request.args_hash },
+      },
+      receipt,
+    )
   })
 }
 
-export function deliveryView(ctx: StoreContext, deliveryId: string): { readonly row: DeliveryRow; readonly queue_position: number } | null {
+export function deliveryView(
+  ctx: StoreContext,
+  deliveryId: string,
+): { readonly row: DeliveryRow; readonly queue_position: number } | null {
   const row = selectRow(ctx, deliveryId)
   return row === undefined ? null : { row, queue_position: queuePosition(ctx, row) }
 }
 
-export function listDeliveries(ctx: StoreContext, filter: { readonly target_durable_id?: string; readonly root_id?: string }): DeliveryRow[] {
-  if (filter.target_durable_id !== undefined) return selectRows(ctx, "target_durable_id = ?", [filter.target_durable_id], "seq")
+export function listDeliveries(
+  ctx: StoreContext,
+  filter: { readonly target_durable_id?: string; readonly root_id?: string },
+): DeliveryRow[] {
+  if (filter.target_durable_id !== undefined)
+    return selectRows(ctx, "target_durable_id = ?", [filter.target_durable_id], "seq")
   if (filter.root_id !== undefined) return selectRows(ctx, "root_id = ?", [filter.root_id], "created_at, seq")
   return selectRows(ctx, "1 = 1", [], "created_at, seq")
 }
 
 export function isReferenced(ctx: StoreContext, durableId: string): boolean {
-  const open = Number(ctx.sql.one(["n"], `SELECT COUNT(*) AS n FROM deliveries WHERE target_durable_id = ? AND state IN ${OPEN_STATES}`, [durableId])?.n ?? 0)
+  const open = Number(
+    ctx.sql.one(["n"], `SELECT COUNT(*) AS n FROM deliveries WHERE target_durable_id = ? AND state IN ${OPEN_STATES}`, [
+      durableId,
+    ])?.n ?? 0,
+  )
   if (open > 0) return true
-  const bindings = Number(ctx.sql.one(["n"], "SELECT COUNT(*) AS n FROM bindings WHERE session_durable_id = ? AND status = 'active'", [durableId])?.n ?? 0)
+  const bindings = Number(
+    ctx.sql.one(["n"], "SELECT COUNT(*) AS n FROM bindings WHERE session_durable_id = ? AND status = 'active'", [
+      durableId,
+    ])?.n ?? 0,
+  )
   return bindings > 0 || markerNames(ctx, durableId).length > 0
 }
 
@@ -837,7 +1139,11 @@ export async function migrateLegacyMailboxes(ctx: StoreContext, now: number): Pr
     try {
       items = readLegacyMailbox(directory)
     } catch (error) {
-      ctx.emit({ kind: "legacy_mailbox_invalid", directory, error: error instanceof Error ? error.message : String(error) })
+      ctx.emit({
+        kind: "legacy_mailbox_invalid",
+        directory,
+        error: error instanceof Error ? error.message : String(error),
+      })
       continue
     }
     if (items === null) continue
@@ -845,7 +1151,9 @@ export async function migrateLegacyMailboxes(ctx: StoreContext, now: number): Pr
     // An item whose target is not a durable id can never be delivered: it is reported and the
     // directory is still marked migrated, because a later open could do no better. A directory that
     // cannot be read is not marked, so the next open tries again (`legacy_mailbox_invalid`).
-    const skipped: readonly LegacyMailboxSkip[] = items.filter((item) => !DURABLE_ID_PATTERN.test(item.target)).map((item) => ({ message_seq: item.message_seq, target: item.target, reason: "invalid_target" }))
+    const skipped: readonly LegacyMailboxSkip[] = items
+      .filter((item) => !DURABLE_ID_PATTERN.test(item.target))
+      .map((item) => ({ message_seq: item.message_seq, target: item.target, reason: "invalid_target" }))
     const deliverable = items.filter((item) => DURABLE_ID_PATTERN.test(item.target))
     migrated += await transaction(ctx, "migrate_legacy", () => {
       let count = 0
@@ -854,7 +1162,12 @@ export async function migrateLegacyMailboxes(ctx: StoreContext, now: number): Pr
         if (selectRow(ctx, deliveryId) !== undefined) continue
         const rootId = `root-${randomUUID()}`
         const sender = `legacy:${directory}`
-        write(ctx, "INSERT INTO causal_roots (root_id, origin_principal, created_at, expires_at) VALUES (?, ?, ?, ?)", [rootId, sender, now, now + ROOT_LIFETIME_MS])
+        write(ctx, "INSERT INTO causal_roots (root_id, origin_principal, created_at, expires_at) VALUES (?, ?, ?, ?)", [
+          rootId,
+          sender,
+          now,
+          now + ROOT_LIFETIME_MS,
+        ])
         const accepted = Date.parse(item.accepted_at)
         insertDelivery(ctx, {
           delivery_id: deliveryId,
@@ -864,7 +1177,15 @@ export async function migrateLegacyMailboxes(ctx: StoreContext, now: number): Pr
           sender_turn: null,
           envelope: {
             provenance: { workspace: "unclassified", project: "legacy-mailbox" },
-            origin: { external: { platform: "legacy_mailbox", account_id: user, chat_id: directory, thread_id: "@chat", message_id: item.operation_id } },
+            origin: {
+              external: {
+                platform: "legacy_mailbox",
+                account_id: user,
+                chat_id: directory,
+                thread_id: "@chat",
+                message_id: item.operation_id,
+              },
+            },
             actor: "legacy thread mailbox",
             via: [sender],
             root_id: rootId,
@@ -882,6 +1203,7 @@ export async function migrateLegacyMailboxes(ctx: StoreContext, now: number): Pr
           claimed_at: null,
           attempt: 0,
           admission_kind: null,
+          wait_kind: null,
           turn_epoch: null,
           root_id: rootId,
           hop: 1,
@@ -895,7 +1217,10 @@ export async function migrateLegacyMailboxes(ctx: StoreContext, now: number): Pr
         createMarker(ctx, item.target, deliveryId, true)
         count++
       }
-      write(ctx, "INSERT INTO gateway_meta (key, value) VALUES (?, ?)", [key, JSON.stringify({ migrated_at: now, count, skipped })])
+      write(ctx, "INSERT INTO gateway_meta (key, value) VALUES (?, ?)", [
+        key,
+        JSON.stringify({ migrated_at: now, count, skipped }),
+      ])
       return count
     })
     if (skipped.length > 0) ctx.emit({ kind: "legacy_mailbox_skipped", directory, items: skipped })

@@ -44,7 +44,10 @@ async function machineLoggedInTo(providers: readonly string[]): Promise<Machine>
   const agentDir = join(root, "agent")
   mkdirSync(agentDir, { recursive: true })
   const authPath = join(agentDir, "auth.json")
-  writeFileSync(authPath, JSON.stringify(Object.fromEntries(providers.map((provider) => [provider, { type: "api_key", key: "test-key" }]))))
+  writeFileSync(
+    authPath,
+    JSON.stringify(Object.fromEntries(providers.map((provider) => [provider, { type: "api_key", key: "test-key" }]))),
+  )
   const modelRuntime = await senpi.ModelRuntime.create({ agentDir, authPath, allowModelNetwork: false })
   return { senpi, root, agentDir, modelRuntime, modelRegistry: new senpi.ModelRegistry(modelRuntime) }
 }
@@ -77,36 +80,74 @@ async function startCategoryChild(machine: Machine, category: string, config: Om
   return session
 }
 
-type FallbackLogLine = { readonly event: string; readonly warning?: string; readonly candidate?: string; readonly skipReason?: string }
+type FallbackLogLine = {
+  readonly event: string
+  readonly warning?: string
+  readonly candidate?: string
+  readonly skipReason?: string
+}
 
 function fallbackLog(machine: Machine): readonly FallbackLogLine[] {
   const path = join(machine.agentDir, "logs", "fallback.log")
   if (!existsSync(path)) return []
-  return readFileSync(path, "utf8").split("\n").filter((line) => line.trim() !== "").map((line) => JSON.parse(line) as FallbackLogLine)
+  return readFileSync(path, "utf8")
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line) => JSON.parse(line) as FallbackLogLine)
 }
 
 function validationWarnings(machine: Machine): readonly string[] {
-  return fallbackLog(machine).flatMap((line) => line.event === "validation_warning" && line.warning !== undefined ? [line.warning] : [])
+  return fallbackLog(machine).flatMap((line) =>
+    line.event === "validation_warning" && line.warning !== undefined ? [line.warning] : [],
+  )
 }
 
 describe("builtin category chains run at a thinking level the model accepts (#9378)", () => {
   test.each([
-    { machine: ["opencode-go"], category: "quick", model: "opencode-go/minimax-m3", effort: "low", why: "the quick lane's own level" },
-    { machine: ["xiaomi"], category: "unspecified-low", model: "xiaomi/mimo-v2.6-pro", effort: "high", why: "the level it already ran at" },
-    { machine: ["alibaba-token-plan"], category: "unspecified-low", model: "alibaba-token-plan/qwen3.8-max-preview", effort: "high", why: "the level it already ran at" },
-    { machine: ["zai"], category: "unspecified-low", model: "zai/glm-5.3", effort: "high", why: "its GLM rung's level (#10306)" },
-  ])("#given only $machine is logged in #when $category starts a child #then it runs $model at $effort, $why", async ({ machine: providers, category, model, effort }) => {
-    // given: every rung ahead of the expected one is served by a provider this machine lacks
-    const machine = await machineLoggedInTo(providers)
+    {
+      machine: ["opencode-go"],
+      category: "quick",
+      model: "opencode-go/minimax-m3",
+      effort: "low",
+      why: "the quick lane's own level",
+    },
+    {
+      machine: ["xiaomi"],
+      category: "unspecified-low",
+      model: "xiaomi/mimo-v2.6-pro",
+      effort: "high",
+      why: "the level it already ran at",
+    },
+    {
+      machine: ["alibaba-token-plan"],
+      category: "unspecified-low",
+      model: "alibaba-token-plan/qwen3.8-max-preview",
+      effort: "high",
+      why: "the level it already ran at",
+    },
+    {
+      machine: ["zai"],
+      category: "unspecified-low",
+      model: "zai/glm-5.3",
+      effort: "high",
+      why: "its GLM rung's level (#10306)",
+    },
+  ])(
+    "#given only $machine is logged in #when $category starts a child #then it runs $model at $effort, $why",
+    async ({ machine: providers, category, model, effort }) => {
+      // given: every rung ahead of the expected one is served by a provider this machine lacks
+      const machine = await machineLoggedInTo(providers)
 
-    // when
-    const session = await startCategoryChild(machine, category)
+      // when
+      const session = await startCategoryChild(machine, category)
 
-    // then: the session starts on that model at the effort the lane asks for, which the model accepts, not a silent clamp
-    expect(`${session.model?.provider}/${session.model?.id}`).toBe(model)
-    expect(session.thinkingLevel).toBe(effort)
-    expect(session.getAvailableThinkingLevels()).toContain(session.thinkingLevel)
-  }, 20_000)
+      // then: the session starts on that model at the effort the lane asks for, which the model accepts, not a silent clamp
+      expect(`${session.model?.provider}/${session.model?.id}`).toBe(model)
+      expect(session.thinkingLevel).toBe(effort)
+      expect(session.getAvailableThinkingLevels()).toContain(session.thinkingLevel)
+    },
+    20_000,
+  )
 
   test("#given a machine on opencode-go and xiaomi #when children of every category it serves start, as each config reload does #then fallback.log records no unsupported-thinking-level warning for the builtin chains", async () => {
     // given: both providers that serve the rungs that carried an unsupported level
@@ -137,18 +178,27 @@ describe("builtin category chains run at a thinking level the model accepts (#93
       contextWindow: 200_000,
       maxTokens: 4096,
     })
-    Reflect.apply(machine.modelRegistry.registerProvider, machine.modelRegistry, ["runtime-fallback-test", {
-      api: "openai-completions",
-      baseUrl: "file://runtime-fallback-test",
-      apiKey: "test-key",
-      models: [testModel("dead-primary", false), testModel("no-max-reasoner", true), testModel("healthy-fallback", false)],
-      streamSimple(model: { readonly id: string }) {
-        calls.push(model.id)
-        return streamMessage(model.id === "dead-primary"
-          ? assistant(model.id, "error", "", "429: rate limit exceeded, retry later")
-          : assistant(model.id, "stop", "fallback completed"))
+    Reflect.apply(machine.modelRegistry.registerProvider, machine.modelRegistry, [
+      "runtime-fallback-test",
+      {
+        api: "openai-completions",
+        baseUrl: "file://runtime-fallback-test",
+        apiKey: "test-key",
+        models: [
+          testModel("dead-primary", false),
+          testModel("no-max-reasoner", true),
+          testModel("healthy-fallback", false),
+        ],
+        streamSimple(model: { readonly id: string }) {
+          calls.push(model.id)
+          return streamMessage(
+            model.id === "dead-primary"
+              ? assistant(model.id, "error", "", "429: rate limit exceeded, retry later")
+              : assistant(model.id, "stop", "fallback completed"),
+          )
+        },
       },
-    }])
+    ])
     const config: OmoConfig = {
       categories: {
         "user-lane": {

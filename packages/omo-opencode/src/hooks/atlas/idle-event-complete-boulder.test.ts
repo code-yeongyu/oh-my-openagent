@@ -50,17 +50,19 @@ describe("atlas hook idle-event complete boulder", () => {
       },
     })
 
-    const hook = createAtlasHook(unsafeTestValue<Parameters<typeof createAtlasHook>[0]>({
-      directory: testDirectory,
-      client: {
-        session: {
-          get: async () => ({ data: { id: sessionID } }),
-          messages: async () => ({ data: [] }),
-          prompt: async () => ({ data: {} }),
-          promptAsync: async () => ({ data: {} }),
+    const hook = createAtlasHook(
+      unsafeTestValue<Parameters<typeof createAtlasHook>[0]>({
+        directory: testDirectory,
+        client: {
+          session: {
+            get: async () => ({ data: { id: sessionID } }),
+            messages: async () => ({ data: [] }),
+            prompt: async () => ({ data: {} }),
+            promptAsync: async () => ({ data: {} }),
+          },
         },
-      },
-    }))
+      }),
+    )
 
     // when
     await hook.handler({

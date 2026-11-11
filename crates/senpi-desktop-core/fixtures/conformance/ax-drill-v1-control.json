@@ -1,0 +1,109 @@
+{
+  "description": "computer-use v2 P9b null-mode control: without reportMode the dense web scenario keeps protocol 1 replies byte-equal: ax.snapshot ignores skeleton and root, walks under today's budgets from the window, and answers only text, nodeCount and truncated with no generation or parent.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/v2-ax-web.json",
+  "env": {},
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 1,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": "no-global-listener",
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101",
+          "opts": {
+            "maxNodes": 6
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "text": "- window \"Docs - Browser\" [ref=e1] app=Browser (focused)\n  - toolbar [ref=e2]\n    - button \"Back\" [ref=e3]\n    - button \"Forward\" [ref=e4]\n    - button \"Reload\" [ref=e5]\n  - webarea \"Docs\" [ref=e6]\n… truncated (6 nodes)",
+              "nodeCount": 6,
+              "truncated": true
+            }
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101",
+          "opts": {
+            "maxNodes": 6,
+            "skeleton": true,
+            "root": "e2"
+          }
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "text": "- window \"Docs - Browser\" [ref=e7] app=Browser (focused)\n  - toolbar [ref=e8]\n    - button \"Back\" [ref=e9]\n    - button \"Forward\" [ref=e10]\n    - button \"Reload\" [ref=e11]\n  - webarea \"Docs\" [ref=e12]\n… truncated (6 nodes)",
+              "nodeCount": 6,
+              "truncated": true
+            }
+          },
+          "variable": []
+        }
+      ]
+    }
+  ]
+}

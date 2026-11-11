@@ -103,20 +103,13 @@ export function printWarning(message: string): void {
 
 export function printBox(content: string, title?: string): void {
   const lines = content.split("\n")
-  const maxWidth =
-    Math.max(
-      ...lines.map((line) => line.replace(ANSI_COLOR_PATTERN, "").length),
-      title?.length ?? 0,
-    ) + 4
+  const maxWidth = Math.max(...lines.map((line) => line.replace(ANSI_COLOR_PATTERN, "").length), title?.length ?? 0) + 4
   const border = color.dim("─".repeat(maxWidth))
 
   console.log()
   if (title) {
     console.log(
-      color.dim("┌─") +
-        color.bold(` ${title} `) +
-        color.dim("─".repeat(maxWidth - title.length - 4)) +
-        color.dim("┐"),
+      color.dim("┌─") + color.bold(` ${title} `) + color.dim("─".repeat(maxWidth - title.length - 4)) + color.dim("┐"),
     )
   } else {
     console.log(color.dim("┌") + border + color.dim("┐"))
@@ -215,7 +208,8 @@ function collectCodexOnlyOpenCodeFlagErrors(args: InstallArgs): string[] {
   if (args.kimiForCoding !== undefined) errors.push("--kimi-for-coding cannot be used with --platform=codex")
   if (args.opencodeGo !== undefined) errors.push("--opencode-go cannot be used with --platform=codex")
   if (args.bailianCodingPlan !== undefined) errors.push("--bailian-coding-plan cannot be used with --platform=codex")
-  if (args.minimaxCnCodingPlan !== undefined) errors.push("--minimax-cn-coding-plan cannot be used with --platform=codex")
+  if (args.minimaxCnCodingPlan !== undefined)
+    errors.push("--minimax-cn-coding-plan cannot be used with --platform=codex")
   if (args.minimaxCodingPlan !== undefined) errors.push("--minimax-coding-plan cannot be used with --platform=codex")
   if (args.vercelAiGateway !== undefined) errors.push("--vercel-ai-gateway cannot be used with --platform=codex")
   return errors

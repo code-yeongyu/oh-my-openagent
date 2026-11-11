@@ -13,6 +13,7 @@ import type { FactsQueueEntry } from "@oh-my-opencode/memory-core"
 import { reserveFactsRunDir } from "./facts-run-storage"
 import { exitedWithin } from "./worker/process-liveness.test-support"
 import { writeRunJsonAtomic } from "./worker/run-artifacts"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const holdLockFixture = join(import.meta.dir, "worker", "__fixtures__", "hold-lock.ts")
 const temporaryRoots: string[] = []
@@ -71,20 +72,23 @@ export async function seedTerminalRun(options: {
     queued: [],
   })
   const sentinel = options.sentinel ?? "final.json"
-  await writeRunJsonAtomic(join(runDir, sentinel), sentinel === "final.json"
-    ? {
-        version: 1,
-        runId: options.sentinelRunId ?? options.runId,
-        outcome: "committed",
-        finishedAt: options.finishedAt,
-        sha: "deadbeef",
-      }
-    : {
-        version: 1,
-        runId: options.sentinelRunId ?? options.runId,
-        abandonedAt: options.finishedAt,
-        reason: "unknown_liveness",
-      })
+  await writeRunJsonAtomic(
+    join(runDir, sentinel),
+    sentinel === "final.json"
+      ? {
+          version: 1,
+          runId: options.sentinelRunId ?? options.runId,
+          outcome: "committed",
+          finishedAt: options.finishedAt,
+          sha: "deadbeef",
+        }
+      : {
+          version: 1,
+          runId: options.sentinelRunId ?? options.runId,
+          abandonedAt: options.finishedAt,
+          reason: "unknown_liveness",
+        },
+  )
   if (options.bytes !== undefined) {
     await writeFile(join(runDir, "child-stdout.log"), "x".repeat(options.bytes), "utf8")
   }
@@ -122,7 +126,7 @@ export async function holdLock(lockPath: string): Promise<void> {
   children.add(child)
   child.once("exit", () => children.delete(child))
   await new Promise<void>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("lock holder never reported ready")), 10_000)
+    const timeout = setTimeout(() => reject(new Error("lock holder never reported ready")), remainingTestTime())
     let output = ""
     const onData = (chunk: Buffer): void => {
       output += chunk.toString("utf8")
@@ -169,12 +173,14 @@ export async function finalizeReserved(runDir: string, at: string): Promise<void
   })
 }
 
-export const ENTRIES: readonly FactsQueueEntry[] = [{
-  version: 1,
-  identity: "facts-agent",
-  conversationId: "session-1",
-  sessionId: "session-1",
-  enqueuedAt: "2026-08-01T00:00:00.000Z",
-  range: { start_message_id: "m0", end_message_id: "m1", start_line: 1, end_snapshot_line: 1 },
-  entries: [],
-}]
+export const ENTRIES: readonly FactsQueueEntry[] = [
+  {
+    version: 1,
+    identity: "facts-agent",
+    conversationId: "session-1",
+    sessionId: "session-1",
+    enqueuedAt: "2026-08-01T00:00:00.000Z",
+    range: { start_message_id: "m0", end_message_id: "m1", start_line: 1, end_snapshot_line: 1 },
+    entries: [],
+  },
+]

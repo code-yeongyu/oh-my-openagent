@@ -17,8 +17,14 @@ type IntentOwner = {
   readonly keyring: DeviceKeyring
   readonly pinDir: string
 } & SyncOperationOptions
-const location = (owner: IntentOwner): string => join(owner.pinDir, "genesis-intent",
-  createHash("sha256").update(JSON.stringify([owner.account, owner.keyring.principal().id])).digest("hex"))
+const location = (owner: IntentOwner): string =>
+  join(
+    owner.pinDir,
+    "genesis-intent",
+    createHash("sha256")
+      .update(JSON.stringify([owner.account, owner.keyring.principal().id]))
+      .digest("hex"),
+  )
 const missing = (error: unknown): boolean => error instanceof Error && "code" in error && error.code === "ENOENT"
 
 /** One account/principal ceremony across CLI and engine processes, including native preparation. */
@@ -26,8 +32,7 @@ export const withGenesisLock = async <T>(owner: IntentOwner, run: () => Promise<
   const target = location(owner)
   await mkdir(dirname(target), { recursive: true, mode: 0o700 })
   const signal = syncOperationSignal(owner)
-  return withLock(`${target}.lock`, await createLockRecord("sync-genesis"), run,
-    signal === undefined ? {} : { signal })
+  return withLock(`${target}.lock`, await createLockRecord("sync-genesis"), run, signal === undefined ? {} : { signal })
 }
 
 export const loadGenesisIntent = async (owner: IntentOwner): Promise<GenesisIntent | null> => {
@@ -37,7 +42,9 @@ export const loadGenesisIntent = async (owner: IntentOwner): Promise<GenesisInte
     raw = await readFile(join(target, "intent.json"), "utf8")
   } catch (error) {
     if (!missing(error)) throw error
-    try { await stat(target) } catch (dirError) {
+    try {
+      await stat(target)
+    } catch (dirError) {
       if (missing(dirError)) return null
       throw dirError
     }

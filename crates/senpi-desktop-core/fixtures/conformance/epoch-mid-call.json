@@ -1,0 +1,236 @@
+{
+  "description": "computer-use v2 epoch (row 14), reportMode object: a display reconfiguration scripted after the first 8-character chunk of a 20-character typeText ends the request InvalidCoordinateFrame reason superseded with delivery unknown/unknown and delivered 16 of 20 (the move lands while the second chunk goes out, the probe before the third stops it), with epoch.changed reason display.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/v2-epoch-mid-call.json",
+  "env": {
+    "SENPI_DESKTOP_FAKE_CLOCK": "1"
+  },
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "engine.hello",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "protocolVersion": "1",
+              "engineVersion": "0.0.0",
+              "buildSha": "unknown",
+              "abi": "senpi-desktop/1",
+              "features": [
+                "action-report",
+                "frame-identity",
+                "frame-consume",
+                "ax-partial",
+                "trace",
+                "key-priming",
+                "epoch",
+                "interaction-lock",
+                "intervention-policy",
+                "dangerous-chord-force"
+              ]
+            }
+          },
+          "variable": [
+            "/result/engineVersion",
+            "/result/buildSha"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "session.open",
+        "params": {
+          "allowHostRelayOnlyStop": true,
+          "showCursor": false,
+          "reportMode": "object"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 1,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": "no-global-listener",
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "stopPath.start",
+        "params": {
+          "chord": "ctrl+alt+shift+escape"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/result/heartbeatFresh",
+            "/result/reason"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "stopPath.heartbeat",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "stopPath.changed",
+            "params": {
+              "suspended": false,
+              "globalLive": false,
+              "hostRelayLive": true,
+              "heartbeatFresh": true,
+              "stopPath": "host-relay",
+              "reason": null
+            }
+          },
+          "variable": [
+            "/params/heartbeatFresh",
+            "/params/reason"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": null
+          },
+          "variable": []
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "typeText",
+        "params": {
+          "target": "101",
+          "text": "abcdefghijklmnopqrst"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "error": {
+              "code": -32007,
+              "message": "the desktop changed (display, lock, sleep or Space) while input was being sent; capture the target again and check what arrived before sending more",
+              "data": {
+                "code": "InvalidCoordinateFrame",
+                "hint": null,
+                "reason": "superseded",
+                "disposition": {
+                  "delivery": "unknown",
+                  "retry": "unknown"
+                },
+                "delivered": {
+                  "count": 16,
+                  "of": 20
+                },
+                "focusRestoration": "restored"
+              }
+            }
+          },
+          "variable": []
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "audit",
+            "params": {
+              "action": "typeText",
+              "target": "101",
+              "delivery": "background",
+              "frameId": null,
+              "code": "InvalidCoordinateFrame",
+              "durationMs": 0,
+              "focusRestored": true,
+              "textLength": 20,
+              "textDelivered": 16,
+              "textSha256": "dd65eea0329dcb94",
+              "keys": null,
+              "id": "01M6NSTK1X1ED803T09ME1N56F"
+            }
+          },
+          "variable": [
+            "/params/durationMs",
+            "/params/focusRestored",
+            "/params/id"
+          ]
+        },
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "method": "epoch.changed",
+            "params": {
+              "reason": "display"
+            }
+          },
+          "variable": []
+        }
+      ]
+    }
+  ]
+}

@@ -40,7 +40,7 @@ try {
           return runRemoteAttachCommand(process.argv.slice(2))
         },
         runTui: runAttachTui,
-        reportError: error => {
+        reportError: (error) => {
           console.error(`omo: ${error.message}`)
           process.exitCode = 1
         },

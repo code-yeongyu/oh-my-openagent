@@ -28,12 +28,14 @@ export async function createOrGetSession(
     return { sessionID: args.session_id, isNew: false }
   } else {
     log(`[call_omo_agent] Creating new session with parent: ${toolContext.sessionID}`)
-    const parentSession = await ctx.client.session.get({
-      path: { id: toolContext.sessionID },
-    }).catch((err) => {
-      log(`[call_omo_agent] Failed to get parent session:`, err)
-      return null
-    })
+    const parentSession = await ctx.client.session
+      .get({
+        path: { id: toolContext.sessionID },
+      })
+      .catch((err) => {
+        log(`[call_omo_agent] Failed to get parent session:`, err)
+        return null
+      })
     log(`[call_omo_agent] Parent session dir: ${parentSession?.data?.directory}, fallback: ${ctx.directory}`)
     const parentDirectory = parentSession?.data?.directory ?? ctx.directory
 

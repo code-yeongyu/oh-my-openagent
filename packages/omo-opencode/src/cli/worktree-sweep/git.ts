@@ -29,24 +29,13 @@ export async function listWorktreesPorcelain(repo: string): Promise<string> {
  * `main`, then `master`. Mirrors the prototype's fallback chain.
  */
 export async function detectDefaultBranch(repo: string): Promise<string | undefined> {
-  const symbolic = await runGit(repo, [
-    "symbolic-ref",
-    "--quiet",
-    "--short",
-    "refs/remotes/origin/HEAD",
-  ])
+  const symbolic = await runGit(repo, ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"])
   if (symbolic.code === 0) {
     const value = symbolic.stdout.trim()
     if (value.length > 0) return value.replace(/^[^/]*\//, "")
   }
 
-  const local = await runGit(repo, [
-    "branch",
-    "--list",
-    "main",
-    "master",
-    "--format=%(refname:short)",
-  ])
+  const local = await runGit(repo, ["branch", "--list", "main", "master", "--format=%(refname:short)"])
   if (local.code === 0) {
     for (const candidate of ["main", "master"]) {
       if (

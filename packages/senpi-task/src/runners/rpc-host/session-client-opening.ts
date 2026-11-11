@@ -4,8 +4,12 @@ import { loadSenpiBarrel } from "../../lazy/senpi-barrel"
 import { engineAcceptsSpawnedBy } from "../engine-spawned-by"
 import { HostUnavailableError } from "./daemon"
 import {
-  assertHostUsable, RETRY_FALLBACK_PROFILE_CAPABILITY, toWireOpen,
-  type HostProtocolProbe, type HostRpcClient, type HostRpcClientFactory, type HostSessionOpenInput,
+  assertHostUsable,
+  toWireOpen,
+  type HostProtocolProbe,
+  type HostRpcClient,
+  type HostRpcClientFactory,
+  type HostSessionOpenInput,
 } from "./session-transport"
 import { toOpenFailure } from "./session-wire"
 
@@ -28,13 +32,11 @@ export async function openHostSessionConnection(input: HostSessionOpenInput, por
       detail: "the daemon accepts connections but did not answer get_protocol_info",
     })
   }
-  const identity = assertHostUsable(probed)
+  const identity = assertHostUsable(probed, input.retryFallback)
   const client = await ports.createClient({ socketPath: ports.socketPath, onDisconnect: ports.onDisconnect })
   client.onEvent(ports.onEvent)
   await client.start()
   ports.bindClient(client)
-  const profileHonored = identity.capabilities.includes(RETRY_FALLBACK_PROFILE_CAPABILITY)
-  const retryFallbackDropped = !profileHonored && input.retryFallback !== undefined
   // No capability names spawnedBy, so the host's engine version decides; an unproven host opens without it.
   const spawnedByHonored = engineAcceptsSpawnedBy(identity.engineVersion)
   if (!spawnedByHonored && input.spawnedBy !== undefined) {
@@ -43,8 +45,7 @@ export async function openHostSessionConnection(input: HostSessionOpenInput, por
       engineVersion: identity.engineVersion,
     })
   }
-  const supported = profileHonored ? input : withoutRetryFallback(input)
-  const wire = toWireOpen(spawnedByHonored ? supported : withoutSpawnedBy(supported))
+  const wire = toWireOpen(spawnedByHonored ? input : withoutSpawnedBy(input))
   const opened = await client.openSession(wire).catch(async (error: unknown) => {
     ports.bindClient(undefined)
     await client.stop()
@@ -57,12 +58,7 @@ export async function openHostSessionConnection(input: HostSessionOpenInput, por
     }
     throw toOpenFailure(error, input.sessionPath)
   })
-  return { opened, identity, retryFallbackDropped }
-}
-
-function withoutRetryFallback(input: HostSessionOpenInput): HostSessionOpenInput {
-  const { retryFallback: _retryFallback, ...rest } = input
-  return rest
+  return { opened, identity }
 }
 
 function withoutSpawnedBy(input: HostSessionOpenInput): HostSessionOpenInput {

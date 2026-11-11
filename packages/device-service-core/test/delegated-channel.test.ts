@@ -10,7 +10,8 @@ const DEVICE = "dev-b"
 // The channel holds at most this many frames for a listener that has not subscribed yet (HELD_FRAMES_MAX).
 const HELD_FRAMES_MAX = 64
 
-const frameEvent = (frame: JsonObject, device = DEVICE): LocalEvent => ({ type: "event", kind: "session.command_event", device, frame }) as LocalEvent
+const frameEvent = (frame: JsonObject, device = DEVICE): LocalEvent =>
+  ({ type: "event", kind: "session.command_event", device, frame }) as LocalEvent
 
 describe("delegated channel frames with no listener (#12356)", () => {
   test("#given frames that arrive before any listener #when a listener subscribes #then it receives them in order, then later frames", () => {
