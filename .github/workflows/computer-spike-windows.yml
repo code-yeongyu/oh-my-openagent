@@ -1,0 +1,54 @@
+name: Computer spike SP-N (Windows)
+
+# Measures the SP-N ledger rows on a hosted Windows desktop. Pull-request
+# triggered; the first step proves the job has an interactive desktop
+# (OpenInputDesktop succeeds and the session id is not 0) and the probe exits
+# naming that precondition otherwise. The ledger is uploaded as an artifact;
+# rows are committed to the repository only by the spike's own pull request.
+
+on:
+  pull_request:
+    branches: [master, dev]
+    paths:
+      - "crates/omo-computer-backend-win32/probes/**"
+      - ".github/workflows/computer-spike-windows.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  sp-n:
+    name: computer spike SP-N (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Interactive desktop precondition
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File crates/omo-computer-backend-win32/probes/sp-n.ps1 -Leg precondition
+
+      - name: Measure SP-N
+        shell: pwsh
+        run: bun crates/omo-computer-backend-win32/probes/probe-sp-n.ts --measure --out "$env:RUNNER_TEMP/win32-delivery.tsv" --host "hosted windows-latest"
+
+      - name: Verify SP-N against the fresh measurement
+        shell: pwsh
+        run: bun crates/omo-computer-backend-win32/probes/probe-sp-n.ts --verify "$env:RUNNER_TEMP/win32-delivery.tsv" --host "hosted windows-latest"
+
+      - name: Upload ledger
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sp-n-win32-delivery
+          path: ${{ runner.temp }}/win32-delivery.tsv
+          if-no-files-found: warn
