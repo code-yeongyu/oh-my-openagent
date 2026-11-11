@@ -14,8 +14,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 const HEADER = ["id", "pipe", "question", "measured", "verdict", "rerun", "host_build", "note"]
-const LAN_REASON =
-  "the same-network direct path is off in shipped builds by the relay daemon owner ruling of 2026-11-11 (see L-STATE-A/B): every envelope rides the relay; measuring it would mean switching on a dormant path on the pair, outside a read-only run"
+const LAN_REASON = "disabled by the relay owner ruling of 2026-11-11 (#953)"
 type Verdict = "CONFIRMS" | "CONTRADICTS" | "NEW-EDGE" | "UNMEASURED"
 type Row = Readonly<{
   id: string
@@ -601,7 +600,7 @@ const relay: Spec[] = [
       Promise.resolve({
         measured: "-",
         verdict: "UNMEASURED",
-        note: "needs a test account on the account service",
+        note: "needs a test account",
       }),
   },
   {
@@ -858,8 +857,7 @@ const pairSpecs: Spec[] = [
     id: "R-HOSTED-2",
     pipe: "relay",
     question: "hosted relay: when a silent ADMITTED channel closes (the hosted counterpart of R-LIVE-120-2)",
-    run: () =>
-      Promise.resolve({ measured: "-", verdict: "UNMEASURED", note: "needs a test account on the account service" }),
+    run: () => Promise.resolve({ measured: "-", verdict: "UNMEASURED", note: "needs a test account" }),
   },
 ]
 const lan: Spec[] = lanQuestions.map(([id, question]) => ({
