@@ -249,6 +249,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     pi: deps.pi,
     runtime,
     omoConfig: deps.omoConfig,
+    getOmoConfig,
     settings,
   })
   const manager = createTaskManager({
