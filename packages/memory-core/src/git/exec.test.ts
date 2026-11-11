@@ -6,6 +6,7 @@ import {
   type GitExecResult,
   type NodeGitExecRuntime,
 } from "./exec"
+import { resolveHooksDir } from "./git-dir"
 
 type CommandRunner = NonNullable<NodeGitExecRuntime["runCommand"]>
 
@@ -264,7 +265,7 @@ describe("createNodeGitExec", () => {
     expect(inputs).toEqual(["fallback-input", "fallback-input"])
   })
 
-  test("#given a Windows fallback #when bare Git is absent #then every attempt carries the fsmonitor override ahead of the caller argv", async () => {
+  test("#given a Windows fallback #when bare Git is absent #then every attempt carries the fsmonitor override and the hooksPath pin ahead of the caller argv", async () => {
     const original = missingGitError()
     const argvs: Array<readonly string[]> = []
     const exec = createHermeticExec(async (executable, argv) => {
@@ -275,7 +276,7 @@ describe("createNodeGitExec", () => {
 
     await exec.run(["-c", "user.name=fixture-writer", "status", "--porcelain"], execOptions({ ProgramFiles: "C:\\Program Files" }))
 
-    const expected = ["-c", "core.fsmonitor=false", "-c", "user.name=fixture-writer", "status", "--porcelain"]
+    const expected = ["-c", "core.fsmonitor=false", "-c", `core.hooksPath=${resolveHooksDir(process.cwd())}`, "-c", "user.name=fixture-writer", "status", "--porcelain"]
     expect(argvs).toEqual([expected, expected])
   })
 
