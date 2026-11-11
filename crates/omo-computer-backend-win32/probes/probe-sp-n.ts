@@ -36,13 +36,25 @@ type Target = {
   readonly state: string | undefined
   readonly title: string
 }
-type Ctx = { tmp: string; shared: string; facts: Json; targets: Map<string, Target>; spawned: Array<{ kill(): void }> }
+type Killable = { kill(): void }
+type Ctx = {
+  tmp: string
+  shared: string
+  facts: Json
+  targets: Map<string, Target>
+  spawned: Killable[]
+  // why a target did not start, keyed by its title
+  notes: Map<string, string>
+  // helper processes of the running group, killed when it runs out of budget
+  live: Set<Killable>
+  token: { aborted: boolean }
+}
 type Spec = { readonly question: string; readonly condition: string; readonly h6Only?: true }
 
 // ------------------------------------------------------------------ the questions
 
 const FAMILIES = [
-  ["notepad", "Notepad (Windows 11 inbox, RichEditD2DPT)"],
+  ["notepad", "Notepad (inbox; RichEditD2DPT or classic Edit)"],
   ["webview2", "a WebView2 host (WinForms + WebView2 textarea)"],
   ["wpf", "a WPF host (TextBox in HwndWrapper)"],
 ] as const
@@ -226,27 +238,25 @@ function fail(line: string): never {
   process.exit(2)
 }
 
-async function run(cmd: string[]): Promise<{ code: number; out: string }> {
+async function run(cmd: string[], live?: Set<Killable>): Promise<{ code: number; out: string }> {
   const p = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe" })
-  const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited])
-  return { code, out: `${out}${err}`.trim() }
+  live?.add(p)
+  try {
+    const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited])
+    return { code, out: `${out}${err}`.trim() }
+  } finally {
+    live?.delete(p)
+  }
 }
 
 async function leg(ctx: Ctx, name: string, arg: Json = {}): Promise<Json> {
+  if (ctx.token.aborted) throw new Error(`leg ${name} not started: the group ran out of budget`)
   const argFile = join(ctx.tmp, `${name}-${Date.now()}-${Math.random().toString(36).slice(2)}.json`)
   writeFileSync(argFile, JSON.stringify(arg))
-  const r = await run([
-    "powershell.exe",
-    "-NoProfile",
-    "-ExecutionPolicy",
-    "Bypass",
-    "-File",
-    HELPER,
-    "-Leg",
-    name,
-    "-ArgFile",
-    argFile,
-  ])
+  const r = await run(
+    ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", HELPER, "-Leg", name, "-ArgFile", argFile],
+    ctx.live,
+  )
   const line = r.out
     .split(/\r?\n/)
     .filter((l) => l.startsWith("{"))
@@ -280,13 +290,16 @@ function psCommand(ctx: Ctx, name: string, arg: Json, out: string): string {
 async function medium(ctx: Ctx, name: string, arg: Json): Promise<Json | undefined> {
   const out = join(ctx.shared, `${name}.medium.json`)
   rmSync(out, { force: true })
-  await run(["runas.exe", "/trustlevel:0x20000", psCommand(ctx, name, arg, out)])
+  await run(["runas.exe", "/trustlevel:0x20000", psCommand(ctx, name, arg, out)], ctx.live)
   return waitFile(out, 90_000)
 }
 
-// A command as SYSTEM through a one-shot scheduled task (Session 0).
-async function asSystem(task: string, command: string): Promise<{ code: number; out: string }> {
+// A command as SYSTEM through a one-shot scheduled task (Session 0). The task runs a .cmd wrapper, because
+// schtasks refuses a /TR command longer than 261 characters.
+async function asSystem(ctx: Ctx, task: string, command: string): Promise<{ code: number; out: string }> {
   const name = `omo-sp-n-${task}`
+  const wrapper = join(ctx.shared, `${name}.cmd`)
+  writeFileSync(wrapper, `@echo off\r\n${command}\r\n`)
   const created = await run([
     "schtasks.exe",
     "/Create",
@@ -301,7 +314,7 @@ async function asSystem(task: string, command: string): Promise<{ code: number; 
     "/RL",
     "HIGHEST",
     "/TR",
-    command,
+    wrapper,
     "/F",
   ])
   return created.code === 0 ? run(["schtasks.exe", "/Run", "/TN", name]) : created
@@ -332,9 +345,18 @@ async function startTarget(ctx: Ctx, kind: "edit" | "wpf" | "webview2", title: s
     "-Y",
     String(y),
   ]
-  ctx.spawned.push(Bun.spawn(cmd, { stdout: "ignore", stderr: "ignore" }))
-  const ready = await waitFile(state, 120_000)
-  if (!ready) return
+  const errFile = join(ctx.tmp, `${title}.stderr.txt`)
+  const proc = Bun.spawn(cmd, { stdout: "ignore", stderr: Bun.file(errFile) })
+  ctx.spawned.push(proc)
+  const ready = await Promise.race([waitFile(state, 120_000), proc.exited.then(() => undefined)])
+  if (!ready) {
+    const why = existsSync(errFile) ? clean(readFileSync(errFile, "utf8")).slice(-200) : ""
+    ctx.notes.set(
+      title,
+      `the ${title} target did not start${proc.exitCode !== null ? ` (exit ${proc.exitCode})` : " within 120 s"}${why ? `: ${why}` : ""}`,
+    )
+    return
+  }
   const child = kind === "webview2" ? "Chrome_RenderWidgetHostHWND" : undefined
   let found = await leg(ctx, "find", { title, child })
   for (let i = 0; i < 20 && kind === "webview2" && !num(found.edit); i++) {
@@ -349,20 +371,24 @@ async function startTarget(ctx: Ctx, kind: "edit" | "wpf" | "webview2", title: s
 
 async function startNotepad(ctx: Ctx) {
   const before = await leg(ctx, "find", { cls: "Notepad" })
-  Bun.spawn(["notepad.exe"], { stdout: "ignore", stderr: "ignore" })
+  // Tracked so it is ended with the run: an untracked live child kept the hosted --measure from exiting.
+  ctx.spawned.push(Bun.spawn(["notepad.exe"], { stdout: "ignore", stderr: "ignore" }))
+  const exclude = arr(before.all).length ? before.all : []
   for (let i = 0; i < 60; i++) {
     await Bun.sleep(250)
-    const f = await leg(ctx, "find", {
-      cls: "Notepad",
-      exclude: arr(before.all).length ? before.all : [],
-      child: "RichEditD2DPT",
-    })
-    if (num(f.top) && num(f.edit)) {
-      ctx.targets.set("Notepad", { top: num(f.top), edit: num(f.edit), state: undefined, title: "Notepad" })
-      return
+    // Windows 11's Notepad edits in RichEditD2DPT; the classic Notepad of Windows Server in Edit.
+    for (const child of ["RichEditD2DPT", "Edit"]) {
+      const f = await leg(ctx, "find", { cls: "Notepad", exclude, child })
+      if (num(f.top) && num(f.edit)) {
+        ctx.targets.set("Notepad", { top: num(f.top), edit: num(f.edit), state: undefined, title: "Notepad" })
+        return
+      }
     }
   }
+  ctx.notes.set("Notepad", "Notepad did not start: no Notepad window with a RichEditD2DPT or Edit child within 15 s")
 }
+
+const notStarted = (ctx: Ctx, title: string) => ctx.notes.get(title) ?? `the ${title} target did not start`
 
 const oracle = (t: Target): Json => ({ top: t.top, edit: t.edit, state: t.state })
 
@@ -423,7 +449,7 @@ const isSupported: Group = {
     const here = await leg(ctx, "issupported")
     const out = join(ctx.shared, "issupported.system.json")
     rmSync(out, { force: true })
-    const started = await asSystem("s0", psCommand(ctx, "issupported", {}, out))
+    const started = await asSystem(ctx, "s0", psCommand(ctx, "issupported", {}, out))
     const s0 = started.code === 0 ? await waitFile(out, 90_000) : undefined
     await dropTask("s0")
     const read = (j: Json) =>
@@ -485,7 +511,10 @@ const barriers: Group = {
       ]
       const t = ctx.targets.get(key === "notepad" ? "Notepad" : key === "wpf" ? "SPN-WPF" : "SPN-WV2")
       if (!t) {
-        Object.assign(out, all(ids, UN(`the ${key} target did not start`)))
+        Object.assign(
+          out,
+          all(ids, UN(notStarted(ctx, key === "notepad" ? "Notepad" : key === "wpf" ? "SPN-WPF" : "SPN-WV2"))),
+        )
         continue
       }
       const fg = await leg(ctx, "fg-barrier", { ...oracle(t), ch: "x", warm: WARM, n: RUNS })
@@ -542,7 +571,7 @@ const chords: Group = {
       if (!t) {
         Object.assign(
           out,
-          all([`n-fg-chord-ctrl-a-${key}-control`, `n-posted-chord-ctrl-a-${key}`], UN("target did not start")),
+          all([`n-fg-chord-ctrl-a-${key}-control`, `n-posted-chord-ctrl-a-${key}`], UN(notStarted(ctx, title))),
         )
         continue
       }
@@ -579,7 +608,7 @@ const wheel: Group = {
   async run(ctx) {
     const t = ctx.targets.get("SPN-EDIT")
     const cover = ctx.targets.get("SPN-COVER")
-    if (!t || !cover) return all(this.ids, UN("targets did not start"))
+    if (!t || !cover) return all(this.ids, UN(notStarted(ctx, t ? "SPN-COVER" : "SPN-EDIT")))
     const a = await leg(ctx, "wheel", { top: t.top, cover: cover.top, state: t.state, mode: "dwmflush", n: 18 })
     const b = await leg(ctx, "wheel", { top: t.top, cover: cover.top, state: t.state, mode: "delay", delayMs: 5, n: 6 })
     return {
@@ -606,7 +635,7 @@ const affinity: Group = {
   ],
   async run(ctx) {
     const t = ctx.targets.get("Notepad")
-    if (!t) return all(this.ids, UN("Notepad did not start"))
+    if (!t) return all(this.ids, UN(notStarted(ctx, "Notepad")))
     const control = await leg(ctx, "affinity", { top: t.top, exclude: false })
     const ex = await leg(ctx, "affinity", { top: t.top, exclude: true })
     const m = (j: Json, k: string) => num(at(j, k, "magenta"))
@@ -651,7 +680,7 @@ const elevated: Group = {
   async run(ctx) {
     const t = ctx.targets.get("SPN-ELEV")
     const state = t?.state
-    if (!t || !state) return all(this.ids, UN("elevated target did not start"))
+    if (!t || !state) return all(this.ids, UN(notStarted(ctx, "SPN-ELEV")))
     const before = str((await waitFile(state, 5000))?.text)
     const r = await medium(ctx, "uipi", { top: t.top, edit: t.edit })
     if (!r) return all(this.ids, UN("the medium-integrity helper produced no result"))
@@ -741,7 +770,7 @@ async function sessionLeg(ctx: Ctx, t: Target, state: "disconnected" | "locked")
   await Bun.sleep(1500)
   const changed = await leg(ctx, state === "disconnected" ? "disconnect" : "lock")
   const r = await waitFile(out, 60_000)
-  const started = await asSystem("tscon", `tscon.exe ${sid} /dest:console`)
+  const started = await asSystem(ctx, "tscon", `tscon.exe ${sid} /dest:console`)
   let back = `not-restored(schtasks=${started.code})`
   for (let i = 0; i < 40; i++) {
     await Bun.sleep(500)
@@ -770,7 +799,7 @@ const capture: Group = {
   ids: (Object.keys(CAPTURE_STATES) as CaptureState[]).flatMap(captureIds),
   async run(ctx) {
     const t = ctx.targets.get("Notepad")
-    if (!t) return all(this.ids, UN("Notepad did not start"))
+    if (!t) return all(this.ids, UN(notStarted(ctx, "Notepad")))
     const active = await leg(ctx, "capture", { top: t.top })
     const off = await leg(ctx, "capture", { top: t.top, displayOff: true })
     return {
@@ -798,9 +827,23 @@ export const TOTAL_BUDGET_S = SETUP_BUDGET_S + GROUPS.reduce((s, g) => s + g.bud
 export const JOB_TIMEOUT_S = 40 * 60
 export const MAX_TOTAL_BUDGET_S = 30 * 60
 
-// Runs one group within its budget.
+// Runs one group within its budget. Past it, the group's helper processes are killed, its later legs refuse
+// to start, and every row it owns is UNMEASURED "timeout after Ns" (N the seconds it actually ran): never
+// dropped, never a verdict.
 export async function runGroup(g: Group, ctx: Ctx): Promise<Record<string, Result>> {
-  return g.run(ctx).catch((e: Error) => all(g.ids, UN(`leg failed: ${clean(e.message)}`)))
+  const own: Ctx = { ...ctx, live: new Set(), token: { aborted: false } }
+  const t0 = Date.now()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const expired = new Promise<"timeout">((resolve) => {
+    timer = setTimeout(() => resolve("timeout"), g.budgetS * 1000)
+  })
+  const done = g.run(own).catch((e: Error) => all(g.ids, UN(`leg failed: ${clean(e.message)}`)))
+  const first = await Promise.race([done, expired])
+  clearTimeout(timer)
+  if (first !== "timeout") return first
+  own.token.aborted = true
+  for (const p of own.live) p.kill()
+  return all(g.ids, UN(`timeout after ${Math.round((Date.now() - t0) / 1000)}s`))
 }
 
 // ------------------------------------------------------------------ ledger io
@@ -861,7 +904,16 @@ async function setup(ctx: Ctx, ids: readonly string[]) {
 // exactly one UNMEASURED "timeout after Ns" row per id, and the total budget stays under the job timeout.
 async function selfTest(): Promise<never> {
   const failures: string[] = []
-  const ctx: Ctx = { tmp: tmpdir(), shared: tmpdir(), facts: {}, targets: new Map(), spawned: [] }
+  const ctx: Ctx = {
+    tmp: tmpdir(),
+    shared: tmpdir(),
+    facts: {},
+    targets: new Map(),
+    spawned: [],
+    notes: new Map(),
+    live: new Set(),
+    token: { aborted: false },
+  }
   const slow: Group = {
     ids: ["t-slow-a", "t-slow-b"],
     budgetS: 1,
@@ -909,6 +961,9 @@ async function main() {
     facts: {},
     targets: new Map(),
     spawned: [],
+    notes: new Map(),
+    live: new Set(),
+    token: { aborted: false },
   }
   mkdirSync(ctx.tmp, { recursive: true })
   mkdirSync(ctx.shared, { recursive: true })
@@ -939,10 +994,14 @@ async function main() {
   const groups = GROUPS.filter((g) => g.ids.some((id) => want.has(id)))
   const results: Record<string, Result> = {}
   try {
-    await setup(
-      ctx,
-      groups.flatMap((g) => g.ids),
-    )
+    const setupDone = await Promise.race([
+      setup(
+        ctx,
+        groups.flatMap((g) => g.ids),
+      ).then(() => true),
+      Bun.sleep(SETUP_BUDGET_S * 1000).then(() => false),
+    ])
+    if (!setupDone) console.log(`SP-N setup ran past ${SETUP_BUDGET_S} s; targets not started yet are UNMEASURED`)
     for (const g of groups) Object.assign(results, await runGroup(g, ctx))
   } finally {
     const notepad = ctx.targets.get("Notepad")
@@ -963,7 +1022,8 @@ async function main() {
     for (const id of ids)
       console.log(`${(results[id]?.verdict ?? "UNMEASURED").padEnd(11)} ${id}  ${clean(results[id]?.measured ?? "")}`)
     console.log(`SP-N measured ${ids.length} rows on ${host} (${build}) -> ${relative(process.cwd(), opt.file)}`)
-    return
+    // Explicit: a child the probe could not end must not keep the run alive (the hosted job hung here).
+    process.exit(0)
   }
   let diff = 0
   for (const l of ledger.filter((r) => want.has(r.id))) {

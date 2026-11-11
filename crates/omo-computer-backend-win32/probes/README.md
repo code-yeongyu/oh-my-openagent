@@ -34,6 +34,15 @@ On hosted CI the workflow `.github/workflows/computer-spike-windows.yml` runs
 the precondition, `--measure` and `--verify` on `windows-latest` and uploads the
 ledger as an artifact.
 
+## Time budget
+
+Every group of legs has its own budget (`budgetS` in `probe-sp-n.ts`), and starting the target windows has
+`SETUP_BUDGET_S`. A group past its budget has its helper processes killed, and each of its rows is written
+`UNMEASURED` with `timeout after Ns`, where N is the seconds it ran. Such a row is never dropped and never
+gets a verdict. `TOTAL_BUDGET_S` is the sum, and it is held at or below 30 minutes, under the hosted job's
+40-minute timeout. `bun crates/omo-computer-backend-win32/probes/probe-sp-n.ts --self-test` checks both on
+any OS: a fake leg past its budget must produce that exact row, and the total must stay under the limit.
+
 ## Files
 
 | file | role |
