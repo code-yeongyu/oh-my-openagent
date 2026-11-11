@@ -42,8 +42,9 @@ export async function beginLogin(
   session: Pick<Session, "accessSnapshot" | "request">,
   deviceService: DeviceServiceHandoff | undefined,
   api: string,
+  newDevice = false,
 ): Promise<unknown> {
-  await refuseSecondMachineDevice(session, deviceService)
+  await refuseSecondMachineDevice(session, deviceService, { newDevice })
   return ensureServiceAvailable(session, api)
 }
 
@@ -52,6 +53,8 @@ type Options = {
   readonly accounts?: string
   readonly device?: boolean
   readonly browser?: boolean
+  /** Register a new device even though the credential store could not be read (#6503: never silently). */
+  readonly newDevice?: boolean
 }
 
 /** What the host adds to the account commands: its device service for an API origin (design D r9 sections 4-5). */
@@ -123,7 +126,7 @@ async function run(
     }
     // Local sign-in and the device service first, so an already-signed-in computer is told to log out
     // even when accounts are unreachable. A logged-out computer then hears a health failure as itself.
-    const health = await beginLogin(session, deviceService, api)
+    const health = await beginLogin(session, deviceService, api, options.newDevice === true)
     const machineDigest = advertisesMachineIdentity(health) ? await readMachineDigest() : undefined
     const digest = machineDigest === undefined ? {} : { machineDigest }
     const name = deviceName()
@@ -234,6 +237,7 @@ export function configureServiceAuthCommands(
     .description("Sign in to OmO using the OS credential store")
     .option("--device", "Use a device code instead of a browser callback")
     .option("--no-browser", "Sign in by device code without opening a browser")
+    .option("--new-device", "Register a new device even if this computer's stored sign-in cannot be read")
     .option("--api <url>", "OmO API origin (or OMO_SERVICE_API_URL)")
     .option("--accounts <url>", "OmO sign-in page origin (or OMO_SERVICE_ACCOUNTS_URL)")
     .action((options: Options) => run("login", options, hooks))

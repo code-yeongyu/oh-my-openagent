@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import type { CredentialStore } from "./keystore"
-import { MachineAlreadySignedIn, refuseSecondMachineDevice } from "./machine-device"
+import { type CredentialStore, InvalidCredentialState, KeychainLockedError } from "./keystore"
+import { MachineAlreadySignedIn, MachineCredentialUnreadable, refuseSecondMachineDevice } from "./machine-device"
 import type { Credentials } from "./protocol"
 import { createSession, type DeviceServiceHandoff, type MachineDeviceState } from "./session"
 import { fakeApi, grant, privateKeys, refusal, temporaryHome } from "./test-support"
@@ -75,6 +75,43 @@ describe("omo login reuses this machine's device instead of registering another"
     const session = await sessionWith({ ...stored, refreshState: "uncertain" })
     await expect(refuseSecondMachineDevice(session, service(absent))).rejects.toBeInstanceOf(MachineAlreadySignedIn)
   })
+
+  // A locked or unreadable credential store is not "nothing stored": its item may be this machine's device. Same ruling as
+  // the desktop: block, and register another device only on the person's explicit --new-device.
+  for (const failure of [new KeychainLockedError("locked"), new InvalidCredentialState("unreadable")]) {
+    test(`a ${failure.constructor.name} blocks a new device and names the explicit path`, async () => {
+      const store: CredentialStore = {
+        read: async () => {
+          throw failure
+        },
+        readAuthoritative: async () => {
+          throw failure
+        },
+        write: async () => {
+          throw new Error("nothing may be written")
+        },
+        clear: async () => {
+          throw new Error("nothing may be cleared")
+        },
+      }
+      const session = createSession({
+        api: fakeApi(() => new Response(null, { status: 204 })),
+        store,
+        home: await temporaryHome(),
+        beforeKeysDiscarded: async () => undefined,
+      })
+      const refused = refuseSecondMachineDevice(session, service(absent))
+      await expect(refused).rejects.toBeInstanceOf(MachineCredentialUnreadable)
+      await expect(refused).rejects.toThrow("--new-device")
+      await expect(refuseSecondMachineDevice(session, service(absent), { newDevice: true })).resolves.toBeUndefined()
+      // The explicit path skips only the unreadable store, never a device the service holds.
+      await expect(
+        refuseSecondMachineDevice(session, service({ kind: "held", device: { id: "dev-x", name: "X" } }), {
+          newDevice: true,
+        }),
+      ).rejects.toBeInstanceOf(MachineAlreadySignedIn)
+    })
+  }
 
   test("a machine with no device anywhere may enroll", async () => {
     await expect(refuseSecondMachineDevice(await sessionWith(null), service(absent))).resolves.toBeUndefined()

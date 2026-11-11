@@ -1,9 +1,13 @@
+import { CredentialStoreError, InvalidCredentialState } from "./keystore"
 import { SignInError } from "./protocol"
 import { type DeviceServiceHandoff, type Session, SessionEnded } from "./session"
 import { terminalText } from "./terminal-text"
 
 /** Sign-in refused because this machine already has, or may have, its one account device (#6503). */
 export class MachineAlreadySignedIn extends SignInError {}
+
+/** Sign-in refused because the credential store could not be read, so this machine's device cannot be ruled out. */
+export class MachineCredentialUnreadable extends SignInError {}
 
 /**
  * Attach before mint (#6503 final contract section 5): the machine's one device service holds its account device, and
@@ -16,8 +20,17 @@ export class MachineAlreadySignedIn extends SignInError {}
 export async function refuseSecondMachineDevice(
   session: Pick<Session, "accessSnapshot">,
   deviceService: DeviceServiceHandoff | undefined,
+  options: { readonly newDevice?: boolean } = {},
 ): Promise<void> {
   const stored = await session.accessSnapshot().catch((error: unknown) => {
+    // A locked or unreadable store is not "nothing stored": its item may be this machine's device. Only the person's
+    // explicit --new-device registers another one; it never skips a device the service holds (checked below).
+    if (error instanceof CredentialStoreError || error instanceof InvalidCredentialState) {
+      if (options.newDevice === true) return null
+      throw new MachineCredentialUnreadable(
+        `omo could not read this computer's OmO sign-in (${terminalText(error.message)}), so it did not register another device. Unlock or repair the credential store and run omo login again, or run omo login --new-device to register a new device anyway.`,
+      )
+    }
     if (!(error instanceof SessionEnded)) throw error
     // An uncertain refresh keeps its credential and keys: held, not absent (#12948 recovery).
     if (error.code === "refresh_recovery_expired") {
