@@ -27,11 +27,16 @@ type BodylessMethod = "HEAD" | "GET" | "DELETE"
 
 const EMPTY_SHA256 = createHash("sha256").digest("hex")
 const hmac = (key: Buffer | string, data: string) => createHmac("sha256", key).update(data).digest()
-const encodeKey = (key: string) => key.split("/").map((part) => encodeURIComponent(part)).join("/")
+const encodeKey = (key: string) =>
+  key
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/")
 
 /** Replaces the secret before the access key, so an access key inside the secret cannot leave a fragment of it. */
 export function credentialRedactor(credentials: R2Credentials): (value: string) => string {
-  return (value) => value.replaceAll(credentials.secretAccessKey, "<redacted>").replaceAll(credentials.accessKeyId, "<redacted>")
+  return (value) =>
+    value.replaceAll(credentials.secretAccessKey, "<redacted>").replaceAll(credentials.accessKeyId, "<redacted>")
 }
 
 function signRequest(
@@ -53,7 +58,15 @@ function signRequest(
     ...Object.fromEntries(Object.entries(extraHeaders).map(([name, value]) => [name.toLowerCase(), value.trim()])),
   }
   const names = Object.keys(headers).sort()
-  const canonical = [method, path, "", ...names.map((name) => `${name}:${headers[name]}`), "", names.join(";"), sha256Hex].join("\n")
+  const canonical = [
+    method,
+    path,
+    "",
+    ...names.map((name) => `${name}:${headers[name]}`),
+    "",
+    names.join(";"),
+    sha256Hex,
+  ].join("\n")
   const scope = `${day}/auto/s3/aws4_request`
   const toSign = ["AWS4-HMAC-SHA256", amzDate, scope, createHash("sha256").update(canonical).digest("hex")].join("\n")
   const signingKey = hmac(hmac(hmac(hmac(`AWS4${credentials.secretAccessKey}`, day), "auto"), "s3"), "aws4_request")
@@ -80,13 +93,24 @@ export function signedRequest(credentials: R2Credentials, method: BodylessMethod
   return fetch(url, { method, headers })
 }
 
-async function toUploadError(credentials: R2Credentials, method: string, key: string, response: Response): Promise<R2UploadError> {
+async function toUploadError(
+  credentials: R2Credentials,
+  method: string,
+  key: string,
+  response: Response,
+): Promise<R2UploadError> {
   const body = await response.text()
   const redact = credentialRedactor(credentials)
   const code = redact(/<Code>([^<]*)<\/Code>/.exec(body)?.[1] ?? "UnknownError")
-  const id = response.headers.get("x-amz-request-id") || /<RequestId>([^<]*)<\/RequestId>/.exec(body)?.[1] || response.headers.get("cf-ray") || null
+  const id =
+    response.headers.get("x-amz-request-id") ||
+    /<RequestId>([^<]*)<\/RequestId>/.exec(body)?.[1] ||
+    response.headers.get("cf-ray") ||
+    null
   const requestId = id === null ? null : redact(id)
-  const message = redact(`${method} ${key} -> HTTP ${response.status} ${code}: ${/<Message>([^<]*)<\/Message>/.exec(body)?.[1] ?? response.statusText}; requestId=${requestId ?? "(not provided)"}`)
+  const message = redact(
+    `${method} ${key} -> HTTP ${response.status} ${code}: ${/<Message>([^<]*)<\/Message>/.exec(body)?.[1] ?? response.statusText}; requestId=${requestId ?? "(not provided)"}`,
+  )
   return new R2UploadError(message, response.status, code, requestId)
 }
 
@@ -103,6 +127,10 @@ export async function putVerified(
   metadata: Readonly<Record<string, string>>,
 ): Promise<void> {
   const { url, headers } = signPut(credentials, key, sha256Hex, metadata)
-  const response = await fetch(url, { method: "PUT", body: file, headers: { ...headers, "content-length": String(file.size) } })
+  const response = await fetch(url, {
+    method: "PUT",
+    body: file,
+    headers: { ...headers, "content-length": String(file.size) },
+  })
   if (!response.ok) throw await toUploadError(credentials, "PUT", key, response)
 }

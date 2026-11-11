@@ -34,18 +34,20 @@ export function logLegacyPluginStartupWarning(deps: LogLegacyPluginStartupWarnin
   })
 
   console.warn(
-    `[oh-my-openagent] WARNING: Your opencode.json uses the legacy package name "${LEGACY_PLUGIN_NAME}".`
-    + ` The package has been renamed to "${PLUGIN_NAME}".`
-    + ` Attempting auto-migration...`,
+    `[oh-my-openagent] WARNING: Your opencode.json uses the legacy package name "${LEGACY_PLUGIN_NAME}".` +
+      ` The package has been renamed to "${PLUGIN_NAME}".` +
+      ` Attempting auto-migration...`,
   )
 
   const migrated = migrateLegacyPluginEntryFn(result.configPath)
   if (migrated) {
-    console.warn(`[oh-my-openagent] Auto-migrated opencode.json: ${result.legacyEntries.map(describeEntry).join(", ")} -> ${suggestedEntries.map(describeEntry).join(", ")}`)
+    console.warn(
+      `[oh-my-openagent] Auto-migrated opencode.json: ${result.legacyEntries.map(describeEntry).join(", ")} -> ${suggestedEntries.map(describeEntry).join(", ")}`,
+    )
   } else {
     console.warn(
-      `[oh-my-openagent] Could not auto-migrate. Please manually update your opencode.json:`
-      + ` ${result.legacyEntries.map((entry, index) => `"${describeEntry(entry)}" -> "${describeEntry(suggestedEntries[index] ?? entry)}"`).join(", ")}`,
+      `[oh-my-openagent] Could not auto-migrate. Please manually update your opencode.json:` +
+        ` ${result.legacyEntries.map((entry, index) => `"${describeEntry(entry)}" -> "${describeEntry(suggestedEntries[index] ?? entry)}"`).join(", ")}`,
     )
   }
 }

@@ -12,7 +12,6 @@ import { createFeedbackComponent, FEEDBACK_PREPARE_RPC_METHOD, FEEDBACK_SUBMIT_R
 import { noticeFor } from "./runtime"
 import { expectUserOnly } from "./report-file.test-support"
 
-
 type Handler = (data: unknown) => unknown | Promise<unknown>
 
 const dirs: string[] = []
@@ -20,7 +19,13 @@ afterEach(() => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-function host(options: { withRedactor: boolean; extraEnv?: Record<string, string>; noStateDir?: boolean; response?: () => Response | Promise<Response>; credentialStore?: CredentialStore }) {
+function host(options: {
+  withRedactor: boolean
+  extraEnv?: Record<string, string>
+  noStateDir?: boolean
+  response?: () => Response | Promise<Response>
+  credentialStore?: CredentialStore
+}) {
   const pi = new FakeExtensionAPI()
   const handlers = new Map<string, Handler>()
   const api = pi as unknown as SenpiExtensionAPI
@@ -69,34 +74,58 @@ const sessionCtx = {
   sessionManager: {
     getSessionId: () => "ses_1",
     getBranch: () => [
-      { type: "message", timestamp: "2026-10-19T02:00:00.000Z", message: { role: "user", content: [{ type: "text", text: "deploy with key sk-abcdefghijkl" }] } },
+      {
+        type: "message",
+        timestamp: "2026-10-19T02:00:00.000Z",
+        message: { role: "user", content: [{ type: "text", text: "deploy with key sk-abcdefghijkl" }] },
+      },
       { type: "custom", customType: "omo-memory", data: { note: "private memory note" } },
     ],
   },
 }
 
 describe("feedback component", () => {
-  test.each(["description", "identity", "environment", "session", "logs", "crash", "config", undefined, "unknown"])("#given a secret refusal naming %j #when submitted over RPC #then the runtime preserves the validated section", async (sectionId) => {
-    const { api, handlers, component } = host({
-      withRedactor: true,
-      response: () => Response.json({ error: { code: "secret_detected", detail: { sectionId } } }, { status: 400 }),
-    })
-    await component.register(api, { logger: console, config: { getFlag: () => undefined } })
-    const draft = await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({}) as FeedbackDraft
-    const result = await handlers.get(FEEDBACK_SUBMIT_RPC_METHOD)?.({ draftId: draft.draftId, description: "synthetic" })
-    const valid = sectionId !== undefined && sectionId !== "unknown"
-    expect(result).toEqual({ kind: "refused", reason: "secret-detected", ...(valid ? { sectionId } : {}) })
-  })
+  test.each(["description", "identity", "environment", "session", "logs", "crash", "config", undefined, "unknown"])(
+    "#given a secret refusal naming %j #when submitted over RPC #then the runtime preserves the validated section",
+    async (sectionId) => {
+      const { api, handlers, component } = host({
+        withRedactor: true,
+        response: () => Response.json({ error: { code: "secret_detected", detail: { sectionId } } }, { status: 400 }),
+      })
+      await component.register(api, { logger: console, config: { getFlag: () => undefined } })
+      const draft = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({})) as FeedbackDraft
+      const result = await handlers.get(FEEDBACK_SUBMIT_RPC_METHOD)?.({
+        draftId: draft.draftId,
+        description: "synthetic",
+      })
+      const valid = sectionId !== undefined && sectionId !== "unknown"
+      expect(result).toEqual({ kind: "refused", reason: "secret-detected", ...(valid ? { sectionId } : {}) })
+    },
+  )
 
   test("#given no usable OS credential store #when /bug sends #then anonymous reporting remains available", async () => {
-    const { pi, api, component, requests } = host({ withRedactor: true, credentialStore: {
-      read: async () => { throw new KeychainLockedError("locked") },
-      readAuthoritative: async () => { throw new KeychainLockedError("locked") },
-      write: async () => { throw new Error("must not write") },
-      clear: async () => { throw new Error("must not clear") },
-    } })
+    const { pi, api, component, requests } = host({
+      withRedactor: true,
+      credentialStore: {
+        read: async () => {
+          throw new KeychainLockedError("locked")
+        },
+        readAuthoritative: async () => {
+          throw new KeychainLockedError("locked")
+        },
+        write: async () => {
+          throw new Error("must not write")
+        },
+        clear: async () => {
+          throw new Error("must not clear")
+        },
+      },
+    })
     await component.register(api, { logger: console, config: { getFlag: () => undefined } })
-    const ctx = { ...sessionCtx, ui: { input: async () => undefined, select: async () => "Send report", notify: () => undefined } }
+    const ctx = {
+      ...sessionCtx,
+      ui: { input: async () => undefined, select: async () => "Send report", notify: () => undefined },
+    }
     const command = pi.commands.find((entry) => entry.name === "bug")
     await (command?.options.handler as (args: string, ctx: unknown) => Promise<void>)("it broke", ctx)
     expect(requests).toHaveLength(1)
@@ -106,62 +135,123 @@ describe("feedback component", () => {
     const { pi, api, component, requests, sent, store } = host({ withRedactor: true })
     await store.write({ ...grant, ...privateKeys })
     await component.register(api, { logger: console, config: { getFlag: () => undefined } })
-    const ctx = { ...sessionCtx, ui: { input: async () => undefined, select: async () => "Send report", notify: () => undefined } }
+    const ctx = {
+      ...sessionCtx,
+      ui: { input: async () => undefined, select: async () => "Send report", notify: () => undefined },
+    }
     const command = pi.commands.find((entry) => entry.name === "bug")
     await (command?.options.handler as (args: string, ctx: unknown) => Promise<void>)("it broke", ctx)
     expect(new Headers(requests[0]?.headers).get("authorization")).toBe("Bearer synthetic-access-token")
     expect(sent[0]).not.toContain("synthetic-access-token")
   })
 
-  test.each(["expired", "uncertain"] as const)("#given a stored sign-in that is %s #when /bug sends #then the report goes anonymously with a warning and no refresh is attempted", async (state) => {
-    const refreshes: string[] = []
-    using intake = Bun.serve({ port: 0, fetch: (request) => {
-      refreshes.push(new URL(request.url).pathname)
-      return Response.json({ error: { code: "rate_limited", message: "synthetic", retryable: true, requestId: "req_refresh" } }, { status: 429 })
-    } })
-    const { pi, api, component, requests, store } = host({ withRedactor: true, extraEnv: { OMO_SERVICE_API_URL: `http://127.0.0.1:${intake.port}` } })
-    const credentials = state === "expired"
-      ? { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00.000Z" }
-      : { ...grant, ...privateKeys, refreshState: "uncertain" as const }
-    await store.write(credentials)
-    const stored = await store.read()
-    expect(stored).toMatchObject(credentials)
-    expect(typeof stored?.credentialGeneration).toBe("string")
-    await component.register(api, { logger: console, config: { getFlag: () => undefined } })
-    const levels: (string | undefined)[] = []
-    const ctx = { ...sessionCtx, ui: { input: async () => undefined, select: async () => "Send report", notify: (_message: string, level?: string) => levels.push(level) } }
-    const command = pi.commands.find((entry) => entry.name === "bug")
-    await (command?.options.handler as (args: string, ctx: unknown) => Promise<void>)("it broke", ctx)
-    expect(requests).toHaveLength(1)
-    expect(new Headers(requests[0]?.headers).has("authorization")).toBe(false)
-    expect(levels).toEqual(["warning", "info"])
-    expect(refreshes).toEqual([])
-    expect(await store.read()).toEqual(stored)
-  })
+  test.each(["expired", "uncertain"] as const)(
+    "#given a stored sign-in that is %s #when /bug sends #then the report goes anonymously with a warning and no refresh is attempted",
+    async (state) => {
+      const refreshes: string[] = []
+      using intake = Bun.serve({
+        port: 0,
+        fetch: (request) => {
+          refreshes.push(new URL(request.url).pathname)
+          return Response.json(
+            { error: { code: "rate_limited", message: "synthetic", retryable: true, requestId: "req_refresh" } },
+            { status: 429 },
+          )
+        },
+      })
+      const { pi, api, component, requests, store } = host({
+        withRedactor: true,
+        extraEnv: { OMO_SERVICE_API_URL: `http://127.0.0.1:${intake.port}` },
+      })
+      const credentials =
+        state === "expired"
+          ? { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00.000Z" }
+          : { ...grant, ...privateKeys, refreshState: "uncertain" as const }
+      await store.write(credentials)
+      const stored = await store.read()
+      expect(stored).toMatchObject(credentials)
+      expect(typeof stored?.credentialGeneration).toBe("string")
+      await component.register(api, { logger: console, config: { getFlag: () => undefined } })
+      const levels: (string | undefined)[] = []
+      const ctx = {
+        ...sessionCtx,
+        ui: {
+          input: async () => undefined,
+          select: async () => "Send report",
+          notify: (_message: string, level?: string) => levels.push(level),
+        },
+      }
+      const command = pi.commands.find((entry) => entry.name === "bug")
+      await (command?.options.handler as (args: string, ctx: unknown) => Promise<void>)("it broke", ctx)
+      expect(requests).toHaveLength(1)
+      expect(new Headers(requests[0]?.headers).has("authorization")).toBe(false)
+      expect(levels).toEqual(["warning", "info"])
+      expect(refreshes).toEqual([])
+      expect(await store.read()).toEqual(stored)
+    },
+  )
 
-  test.each([401, 403, "network"] as const)("#given a %s failure #when /bug sends #then authentication and network actions stay distinct", async (failure) => {
-    const { pi, api, component } = host({ withRedactor: true, response: async () => {
-      if (failure === "network") throw new Error("connection refused")
-      return Response.json({ error: { code: "unauthorized" } }, { status: failure })
-    } })
-    await component.register(api, { logger: console, config: { getFlag: () => undefined } })
-    const notices: string[] = []
-    const ctx = { ...sessionCtx, ui: { input: async () => undefined, select: async () => "Send report", notify: (message: string) => notices.push(message) } }
-    const command = pi.commands.find((entry) => entry.name === "bug")
-    await (command?.options.handler as (args: string, ctx: unknown) => Promise<void>)("it broke", ctx)
-    expect(notices).toEqual([failure === "network" ? "The report could not be sent right now. Check your connection and try again." : "Sign in to send a report: run omo login"])
-  })
+  test.each([401, 403, "network"] as const)(
+    "#given a %s failure #when /bug sends #then authentication and network actions stay distinct",
+    async (failure) => {
+      const { pi, api, component } = host({
+        withRedactor: true,
+        response: async () => {
+          if (failure === "network") throw new Error("connection refused")
+          return Response.json({ error: { code: "unauthorized" } }, { status: failure })
+        },
+      })
+      await component.register(api, { logger: console, config: { getFlag: () => undefined } })
+      const notices: string[] = []
+      const ctx = {
+        ...sessionCtx,
+        ui: {
+          input: async () => undefined,
+          select: async () => "Send report",
+          notify: (message: string) => notices.push(message),
+        },
+      }
+      const command = pi.commands.find((entry) => entry.name === "bug")
+      await (command?.options.handler as (args: string, ctx: unknown) => Promise<void>)("it broke", ctx)
+      expect(notices).toEqual([
+        failure === "network"
+          ? "The report could not be sent right now. Check your connection and try again."
+          : "Sign in to send a report: run omo login",
+      ])
+    },
+  )
 
   test("#given an intake contract rejection #when /bug sends #then it shows the safe code and request identifier rather than a connection failure", async () => {
-    const { pi, api, component } = host({ withRedactor: true, response: () => Response.json({ error: { code: "invalid_request", requestId: "req_contract_1", message: "private server detail" } }, { status: 400 }) })
+    const { pi, api, component } = host({
+      withRedactor: true,
+      response: () =>
+        Response.json(
+          { error: { code: "invalid_request", requestId: "req_contract_1", message: "private server detail" } },
+          { status: 400 },
+        ),
+    })
     const diagnostics: unknown[] = []
-    await component.register(api, { logger: { ...console, warn: (message, details) => diagnostics.push({ message, details }) }, config: { getFlag: () => undefined } })
+    await component.register(api, {
+      logger: { ...console, warn: (message, details) => diagnostics.push({ message, details }) },
+      config: { getFlag: () => undefined },
+    })
     const notices: string[] = []
-    const ctx = { ...sessionCtx, ui: { input: async () => undefined, select: async () => "Send report", notify: (message: string) => notices.push(message) } }
+    const ctx = {
+      ...sessionCtx,
+      ui: {
+        input: async () => undefined,
+        select: async () => "Send report",
+        notify: (message: string) => notices.push(message),
+      },
+    }
     const command = pi.commands.find((entry) => entry.name === "bug")
     await (command?.options.handler as (args: string, ctx: unknown) => Promise<void>)("it broke", ctx)
-    expect(notices).toEqual(["The report was rejected by the service (invalid_request). Request ID: req_contract_1. Update OmO and try again."])
-    expect(diagnostics).toEqual([{ message: "feedback.report_rejected", details: { code: "invalid_request", requestId: "req_contract_1" } }])
+    expect(notices).toEqual([
+      "The report was rejected by the service (invalid_request). Request ID: req_contract_1. Update OmO and try again.",
+    ])
+    expect(diagnostics).toEqual([
+      { message: "feedback.report_rejected", details: { code: "invalid_request", requestId: "req_contract_1" } },
+    ])
   })
   test("#given a host without the upload redactor #when the desktop asks for a draft #then it is told feedback is unavailable instead of sending unredacted text", async () => {
     const { api, handlers, component } = host({ withRedactor: false })
@@ -181,7 +271,12 @@ describe("feedback component", () => {
       accessToken: "at_1",
       sections: [{ id: "logs", text: "desktop-main: renderer crashed, token sk-zzzzzzzzzzzz" }],
     })) as { draftId: string; sections: { id: string; text: string }[] }
-    const result = await handlers.get(FEEDBACK_SUBMIT_RPC_METHOD)?.({ draftId: draft.draftId, kind: "bug", description: "it froze", accessToken: "at_1" })
+    const result = await handlers.get(FEEDBACK_SUBMIT_RPC_METHOD)?.({
+      draftId: draft.draftId,
+      kind: "bug",
+      description: "it froze",
+      accessToken: "at_1",
+    })
 
     expect(result).toEqual({ kind: "sent", reportId: "rpt_9" })
     expect(sent).toHaveLength(1)
@@ -210,10 +305,24 @@ describe("feedback component", () => {
     })
     await component.register(api, { logger: console, config: { getFlag: () => undefined } })
     const notices: { message: string; type?: string }[] = []
-    const ctx = { ...sessionCtx, ui: { input: async () => "x", select: async () => "Send report", notify: (message: string, type?: string) => notices.push({ message, type }) } }
+    const ctx = {
+      ...sessionCtx,
+      ui: {
+        input: async () => "x",
+        select: async () => "Send report",
+        notify: (message: string, type?: string) => notices.push({ message, type }),
+      },
+    }
 
-    await expect(Promise.resolve(handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({}))).rejects.toThrow("extensions/omo-feedback.js")
-    await (pi.commands.find((entry) => entry.name === "bug")?.options.handler as (args: string, ctx: unknown) => Promise<void>)("it broke", ctx)
+    await expect(Promise.resolve(handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({}))).rejects.toThrow(
+      "extensions/omo-feedback.js",
+    )
+    await (
+      pi.commands.find((entry) => entry.name === "bug")?.options.handler as (
+        args: string,
+        ctx: unknown,
+      ) => Promise<void>
+    )("it broke", ctx)
 
     expect(notices).toHaveLength(1)
     expect(notices[0]?.type).toBe("error")
@@ -255,12 +364,19 @@ describe("feedback component", () => {
   })
 
   test("#given uploads are off and a custom agent dir #when a report is saved #then the file lands under that agent dir, never under HOME", async () => {
-    const { pi, api, handlers, component, stateDir, homeDir } = host({ withRedactor: true, extraEnv: { OMO_DISABLE_FEEDBACK: "1" }, noStateDir: true })
+    const { pi, api, handlers, component, stateDir, homeDir } = host({
+      withRedactor: true,
+      extraEnv: { OMO_DISABLE_FEEDBACK: "1" },
+      noStateDir: true,
+    })
     await component.register(api, { logger: console, config: { getFlag: () => undefined } })
     await pi.dispatch("session_start", {}, sessionCtx)
     const draft = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({})) as { draftId: string }
 
-    const result = (await handlers.get(FEEDBACK_SUBMIT_RPC_METHOD)?.({ draftId: draft.draftId, description: "x" })) as { kind: string; path: string }
+    const result = (await handlers.get(FEEDBACK_SUBMIT_RPC_METHOD)?.({ draftId: draft.draftId, description: "x" })) as {
+      kind: string
+      path: string
+    }
 
     expect(result.kind).toBe("saved")
     expect(result.path.startsWith(join(stateDir, "agent"))).toBe(true)
@@ -273,11 +389,16 @@ describe("feedback component", () => {
     const { pi, api, handlers, component, stateDir } = host({ withRedactor: true })
     const logs = join(stateDir, "agent", "logs")
     mkdirSync(logs, { recursive: true })
-    writeFileSync(join(logs, "session.log"), `${JSON.stringify({ ts: new Date().toISOString(), level: "error", event: "turn_failed" })}\n`)
+    writeFileSync(
+      join(logs, "session.log"),
+      `${JSON.stringify({ ts: new Date().toISOString(), level: "error", event: "turn_failed" })}\n`,
+    )
     await component.register(api, { logger: console, config: { getFlag: () => undefined } })
     await pi.dispatch("session_start", {}, sessionCtx)
 
-    const draft = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({})) as { sections: { id: string; text: string }[] }
+    const draft = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({})) as {
+      sections: { id: string; text: string }[]
+    }
 
     expect(draft.sections.find((section) => section.id === "logs")?.text).toContain("turn_failed")
     expect(noticeFor(draft as unknown as FeedbackDraft)).toContain("recent logs")
@@ -302,7 +423,15 @@ describe("feedback component", () => {
     await pi.dispatch("session_start", {}, sessionCtx)
 
     const draft = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({
-      identity: { accountId: "acc_1", userId: "usr 1\ninjected", email: "dana@example.com", displayName: "Dana sk-abcdefghijklmnop", plan: "pro", deviceId: "dev_1", deviceName: "Dana's Mac" },
+      identity: {
+        accountId: "acc_1",
+        userId: "usr 1\ninjected",
+        email: "dana@example.com",
+        displayName: "Dana sk-abcdefghijklmnop",
+        plan: "pro",
+        deviceId: "dev_1",
+        deviceName: "Dana's Mac",
+      },
     })) as { sections: { id: string; text: string }[] }
 
     const identity = draft.sections.find((section) => section.id === "identity")?.text ?? ""
@@ -322,7 +451,13 @@ describe("feedback component", () => {
         getSessionId: () => id,
         getBranch: () => {
           if (disposed.value) throw new Error(`session ${id} was disposed`)
-          return [{ type: "message", timestamp: "2026-10-19T02:00:00.000Z", message: { role: "user", content: [{ type: "text", text }] } }]
+          return [
+            {
+              type: "message",
+              timestamp: "2026-10-19T02:00:00.000Z",
+              message: { role: "user", content: [{ type: "text", text }] },
+            },
+          ]
         },
       },
     })
@@ -332,12 +467,16 @@ describe("feedback component", () => {
     await pi.dispatch("session_start", {}, a)
     await pi.dispatch("session_start", {}, b)
 
-    const forA = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({ sessionId: "ses_a" })) as { sections: { id: string; text: string }[] }
+    const forA = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({ sessionId: "ses_a" })) as {
+      sections: { id: string; text: string }[]
+    }
     expect(forA.sections.find((section) => section.id === "session")?.text).toContain("message from A")
 
     await pi.dispatch("session_shutdown", {}, a)
     aDisposed.value = true
-    const afterShutdown = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({ sessionId: "ses_a" })) as { sections: { id: string; text: string }[] }
+    const afterShutdown = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({ sessionId: "ses_a" })) as {
+      sections: { id: string; text: string }[]
+    }
     expect(afterShutdown.sections.find((section) => section.id === "session")).toBeUndefined()
   })
 
@@ -357,7 +496,9 @@ describe("feedback component", () => {
       stateDir,
       transport: async () => {
         calls++
-        return calls === 1 ? new Response("{}", { status: 503 }) : new Response(JSON.stringify({ id: "rpt_retry" }), { status: 201 })
+        return calls === 1
+          ? new Response("{}", { status: 503 })
+          : new Response(JSON.stringify({ id: "rpt_retry" }), { status: 201 })
       },
     })
     await component.register(api, { logger: console, config: { getFlag: () => undefined } })
@@ -374,17 +515,28 @@ describe("feedback component", () => {
     const { api, handlers, component } = host({ withRedactor: true })
     await component.register(api, { logger: console, config: { getFlag: () => undefined } })
     const ids: string[] = []
-    for (let index = 0; index < 20; index++) ids.push(((await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({})) as { draftId: string }).draftId)
+    for (let index = 0; index < 20; index++)
+      ids.push(((await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({})) as { draftId: string }).draftId)
 
-    expect(await handlers.get(FEEDBACK_SUBMIT_RPC_METHOD)?.({ draftId: ids[0], description: "x" })).toEqual({ kind: "refused", reason: "unavailable" })
-    expect(await handlers.get(FEEDBACK_SUBMIT_RPC_METHOD)?.({ draftId: ids.at(-1), description: "x" })).toEqual({ kind: "sent", reportId: "rpt_9" })
+    expect(await handlers.get(FEEDBACK_SUBMIT_RPC_METHOD)?.({ draftId: ids[0], description: "x" })).toEqual({
+      kind: "refused",
+      reason: "unavailable",
+    })
+    expect(await handlers.get(FEEDBACK_SUBMIT_RPC_METHOD)?.({ draftId: ids.at(-1), description: "x" })).toEqual({
+      kind: "sent",
+      reportId: "rpt_9",
+    })
   })
 
   test("#given the TUI #when the user runs /bug and /feedback #then they are sent as a bug and as feedback", async () => {
     const { pi, api, component, sent } = host({ withRedactor: true })
     await component.register(api, { logger: console, config: { getFlag: () => undefined } })
-    const ctx = { ...sessionCtx, ui: { input: async () => undefined, select: async () => "Send report", notify: () => undefined } }
-    const handlerOf = (name: string) => pi.commands.find((entry) => entry.name === name)?.options.handler as (args: string, ctx: unknown) => Promise<void>
+    const ctx = {
+      ...sessionCtx,
+      ui: { input: async () => undefined, select: async () => "Send report", notify: () => undefined },
+    }
+    const handlerOf = (name: string) =>
+      pi.commands.find((entry) => entry.name === name)?.options.handler as (args: string, ctx: unknown) => Promise<void>
 
     await handlerOf("bug")("it broke", ctx)
     await handlerOf("feedback")("an idea", ctx)
@@ -397,7 +549,9 @@ describe("feedback component", () => {
     await component.register(api, { logger: console, config: { getFlag: () => undefined } })
     await pi.dispatch("session_start", {}, sessionCtx)
 
-    const draft = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({ sessionId: null })) as { sections: { id: string }[] }
+    const draft = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({ sessionId: null })) as {
+      sections: { id: string }[]
+    }
 
     expect(draft.sections.map((section) => section.id)).not.toContain("session")
   })
@@ -421,11 +575,20 @@ describe("feedback component", () => {
     })
     const stateDir = mkdtempSync(join(tmpdir(), "omo-feedback-idtok-"))
     dirs.push(stateDir)
-    const component = createFeedbackComponent({ env: { OMO_CODING_AGENT_DIR: join(stateDir, "agent"), DO_NOT_TRACK: "1" }, stateDir })
+    const component = createFeedbackComponent({
+      env: { OMO_CODING_AGENT_DIR: join(stateDir, "agent"), DO_NOT_TRACK: "1" },
+      stateDir,
+    })
     await component.register(api, { logger: console, config: { getFlag: () => undefined } })
 
     const draft = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({
-      identity: { accountId: "sk-proj-abcdefghijkl", userId: "ghp_abcdefghijklmnop", email: "ghp_abcdefghijklmnop@x.dev", deviceId: "dev_1", plan: "pro" },
+      identity: {
+        accountId: "sk-proj-abcdefghijkl",
+        userId: "ghp_abcdefghijklmnop",
+        email: "ghp_abcdefghijklmnop@x.dev",
+        deviceId: "dev_1",
+        plan: "pro",
+      },
     })) as { sections: { id: string; text: string }[] }
 
     const body = JSON.stringify(draft)
@@ -441,7 +604,13 @@ describe("feedback component", () => {
     const sessionFor = (id: string, text: string) => ({
       sessionManager: {
         getSessionId: () => id,
-        getBranch: () => [{ type: "message", timestamp: "2026-10-19T02:00:00.000Z", message: { role: "user", content: [{ type: "text", text }] } }],
+        getBranch: () => [
+          {
+            type: "message",
+            timestamp: "2026-10-19T02:00:00.000Z",
+            message: { role: "user", content: [{ type: "text", text }] },
+          },
+        ],
       },
     })
     const a = sessionFor("ses_a", "message from A")
@@ -450,7 +619,9 @@ describe("feedback component", () => {
     await pi.dispatch("session_start", {}, b)
     await pi.dispatch("session_shutdown", {}, b)
 
-    const draft = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({})) as { sections: { id: string; text: string }[] }
+    const draft = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({})) as {
+      sections: { id: string; text: string }[]
+    }
 
     expect(draft.sections.find((section) => section.id === "session")?.text).toContain("message from A")
   })
@@ -458,9 +629,23 @@ describe("feedback component", () => {
   test("#given a live session whose history cannot be read #when the report is prepared #then a draft without the conversation comes back instead of an error", async () => {
     const { pi, api, handlers, component } = host({ withRedactor: true })
     await component.register(api, { logger: console, config: { getFlag: () => undefined } })
-    await pi.dispatch("session_start", {}, { sessionManager: { getSessionId: () => "ses_x", getBranch: () => { throw new Error("broken") } } })
+    await pi.dispatch(
+      "session_start",
+      {},
+      {
+        sessionManager: {
+          getSessionId: () => "ses_x",
+          getBranch: () => {
+            throw new Error("broken")
+          },
+        },
+      },
+    )
 
-    const draft = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({})) as { draftId?: string; sections: { id: string }[] }
+    const draft = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({})) as {
+      draftId?: string
+      sections: { id: string }[]
+    }
 
     expect(typeof draft.draftId).toBe("string")
     expect(draft.sections.map((section) => section.id)).not.toContain("session")
@@ -471,9 +656,17 @@ describe("feedback component", () => {
     await component.register(api, { logger: console, config: { getFlag: () => undefined } })
 
     const first = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({})) as { draftId: string }
-    await handlers.get(FEEDBACK_SUBMIT_RPC_METHOD)?.({ draftId: first.draftId, description: "x", idempotencyKey: "feedback-drf_kept-1" })
+    await handlers.get(FEEDBACK_SUBMIT_RPC_METHOD)?.({
+      draftId: first.draftId,
+      description: "x",
+      idempotencyKey: "feedback-drf_kept-1",
+    })
     const second = (await handlers.get(FEEDBACK_PREPARE_RPC_METHOD)?.({})) as { draftId: string }
-    await handlers.get(FEEDBACK_SUBMIT_RPC_METHOD)?.({ draftId: second.draftId, description: "x", idempotencyKey: "not a key\nx" })
+    await handlers.get(FEEDBACK_SUBMIT_RPC_METHOD)?.({
+      draftId: second.draftId,
+      description: "x",
+      idempotencyKey: "not a key\nx",
+    })
 
     expect(new Headers(sent[0]?.headers).get("idempotency-key")).toBe("feedback-drf_kept-1")
     expect(new Headers(sent[1]?.headers).get("idempotency-key")).toBe(`feedback-${second.draftId}`)

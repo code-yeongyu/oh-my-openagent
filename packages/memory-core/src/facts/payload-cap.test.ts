@@ -36,13 +36,15 @@ function entry(
       end_snapshot_line: endSnapshotLine,
     },
     enqueuedAt: (options.enqueuedAt ?? T0).toISOString(),
-    entries: [{
-      kind: "user",
-      text: options.text ?? `${conversationId}/${endMessageId}`,
-      captured_at: T0.toISOString(),
-      source_line_id: `${endMessageId}:user`,
-      source_message_id: endMessageId,
-    }],
+    entries: [
+      {
+        kind: "user",
+        text: options.text ?? `${conversationId}/${endMessageId}`,
+        captured_at: T0.toISOString(),
+        source_line_id: `${endMessageId}:user`,
+        source_message_id: endMessageId,
+      },
+    ],
   }
 }
 
@@ -122,8 +124,9 @@ describe("facts capped batch selection", () => {
 
     // then
     expect(endpoints(selection.selected)).toEqual(["beta/m9"])
-    expect(measureFactsPayloadBytes({ ...ENVELOPE, entries: selection.selected }))
-      .toBeLessThanOrEqual(MAX_FACTS_PAYLOAD_BYTES - 400)
+    expect(measureFactsPayloadBytes({ ...ENVELOPE, entries: selection.selected })).toBeLessThanOrEqual(
+      MAX_FACTS_PAYLOAD_BYTES - 400,
+    )
   })
 
   test("#given a middle entry that does not fit #when a tiny entry follows it #then the follower is held back too", () => {
@@ -206,12 +209,7 @@ describe("facts capped batch selection", () => {
 
   test("#given a multi-conversation batch #when everything fits #then entries ship ascending per conversation", () => {
     // given
-    const entries = [
-      entry("beta", "m9", 2),
-      entry("alpha", "m2", 4),
-      entry("beta", "m8", 1),
-      entry("alpha", "m1", 3),
-    ]
+    const entries = [entry("beta", "m9", 2), entry("alpha", "m2", 4), entry("beta", "m8", 1), entry("alpha", "m1", 3)]
 
     // when
     const selection = selectCappedFactsBatch({ entries, envelope: ENVELOPE, now: T0 })

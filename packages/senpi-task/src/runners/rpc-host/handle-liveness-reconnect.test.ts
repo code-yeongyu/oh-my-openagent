@@ -18,10 +18,14 @@ test("a connection lost while unresponsive reattaches the same session before th
   const releaseReattach = Promise.withResolvers<void>()
   let attaches = 0
   const handle = createHostSessionHandle({
-    client: { ...first, getState: () => state.promise }, session: FAKE_SESSION,
-    taskId: "st_reconnect", heartbeatIntervalMs: 10_000, now: clock.now, closeGraceMs: 100,
+    client: { ...first, getState: () => state.promise },
+    session: FAKE_SESSION,
+    taskId: "st_reconnect",
+    heartbeatIntervalMs: 10_000,
+    now: clock.now,
+    closeGraceMs: 100,
     openDisposition: "attached",
-    reattach: async session => {
+    reattach: async (session) => {
       expect(session.sessionPath).toBe(FAKE_SESSION.sessionPath)
       attaches++
       reattachStarted.resolve()
@@ -33,7 +37,7 @@ test("a connection lost while unresponsive reattaches the same session before th
     await clock.advance(45_000)
     expect(handle.liveness().state).toBe("unresponsive")
     const running = Promise.withResolvers<void>()
-    const unsubscribe = handle.onLiveness(status => {
+    const unsubscribe = handle.onLiveness((status) => {
       if (status.state === "running") running.resolve()
     })
     first.loseTransport()
@@ -52,8 +56,8 @@ test("a connection lost while unresponsive reattaches the same session before th
     expect(handle.liveness().state).toBe("running")
     await handle.steer("same task")
     expect(attaches).toBe(1)
-    expect(recovered.sent.filter(command => command.type === "steer")).toHaveLength(1)
-    expect(recovered.sent.some(command => command.type === "prompt")).toBe(false)
+    expect(recovered.sent.filter((command) => command.type === "steer")).toHaveLength(1)
+    expect(recovered.sent.some((command) => command.type === "prompt")).toBe(false)
   } finally {
     releaseReattach.resolve()
     await handle.dispose()
@@ -70,8 +74,12 @@ test("late state and child events cannot undo an overdue session's pending close
   const closed = Promise.withResolvers<undefined>()
   const handle = createHostSessionHandle({
     client: { ...first, getState: () => state.promise, closeConfirmed: () => closed.promise },
-    session: FAKE_SESSION, taskId: "st_closing", heartbeatIntervalMs: 10_000,
-    now: clock.now, closeGraceMs: 100, openDisposition: "attached",
+    session: FAKE_SESSION,
+    taskId: "st_closing",
+    heartbeatIntervalMs: 10_000,
+    now: clock.now,
+    closeGraceMs: 100,
+    openDisposition: "attached",
   })
   try {
     await clock.advance(170_000)
@@ -84,7 +92,9 @@ test("late state and child events cannot undo an overdue session's pending close
     expect(send).toMatchObject({ code: "unresponsive", retryable: true })
     // Work already running in another session can schedule a timer during this close wait.
     // It must remain real and must not count as a timer owned by this handle.
-    ambient.runInAsyncScope(() => { ambientTimer = setTimeout(() => {}, 500) })
+    ambient.runInAsyncScope(() => {
+      ambientTimer = setTimeout(() => {}, 500)
+    })
     closed.resolve(undefined)
     await clock.advance(0)
     expect(handle.hasExited()).toBe(true)
@@ -105,8 +115,12 @@ test("a stale missing-session probe cannot confirm a later pending close", async
   const closed = Promise.withResolvers<undefined>()
   const handle = createHostSessionHandle({
     client: { ...port, getState: () => state.promise, closeConfirmed: () => closed.promise },
-    session: FAKE_SESSION, taskId: "st_stale_probe", heartbeatIntervalMs: 10_000,
-    now: clock.now, closeGraceMs: 100, openDisposition: "attached",
+    session: FAKE_SESSION,
+    taskId: "st_stale_probe",
+    heartbeatIntervalMs: 10_000,
+    now: clock.now,
+    closeGraceMs: 100,
+    openDisposition: "attached",
   })
   try {
     await clock.advance(170_000)
@@ -126,8 +140,13 @@ test("disposing during an unacknowledged abort cancels all liveness timers", asy
   const abort = Promise.withResolvers<undefined>()
   const port = fakeSessionPort(() => abort.promise)
   const handle = createHostSessionHandle({
-    client: port, session: FAKE_SESSION, taskId: "st_dispose", heartbeatIntervalMs: 10_000,
-    now: clock.now, closeGraceMs: 2_000, openDisposition: "attached",
+    client: port,
+    session: FAKE_SESSION,
+    taskId: "st_dispose",
+    heartbeatIntervalMs: 10_000,
+    now: clock.now,
+    closeGraceMs: 2_000,
+    openDisposition: "attached",
   })
   await clock.advance(160_000)
   expect(handle.liveness().state).toBe("terminal-pending")

@@ -13,12 +13,21 @@ export function requireRunMetadata(spawnArgs: ReflectionSpawnArgs): {
   readonly systemTokenTarget?: number
   readonly worktree: ReflectionWorktree
 } {
-  const { runId, kind, trigger, origin, mergePolicy, targetDoc, systemTokenBudget, systemTokenTarget, worktree } = spawnArgs
-  if (runId === undefined || kind === undefined || trigger === undefined || mergePolicy === undefined || worktree === undefined) {
+  const { runId, kind, trigger, origin, mergePolicy, targetDoc, systemTokenBudget, systemTokenTarget, worktree } =
+    spawnArgs
+  if (
+    runId === undefined ||
+    kind === undefined ||
+    trigger === undefined ||
+    mergePolicy === undefined ||
+    worktree === undefined
+  ) {
     throw new TypeError("reflection spawn metadata is required")
   }
-  if ((kind === "dream") !== (trigger === "dream")
-    || (kind === "dream" && (origin === undefined || systemTokenBudget === undefined || systemTokenTarget === undefined))) {
+  if (
+    (kind === "dream") !== (trigger === "dream") ||
+    (kind === "dream" && (origin === undefined || systemTokenBudget === undefined || systemTokenTarget === undefined))
+  ) {
     throw new TypeError("dream spawn metadata requires trigger, origin, and system token budget")
   }
   if (targetDoc !== undefined && kind !== "dream") throw new TypeError("dream target metadata requires a dream run")

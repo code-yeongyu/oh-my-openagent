@@ -36,7 +36,11 @@ function assertRemoved(path: string): void {
   throw Object.assign(new Error(`Directory not empty after recursive removal: ${path}`), { code: "ENOTEMPTY", path })
 }
 
-export async function removeTree(path: string, options: RemoveTreeOptions = {}, remove: RemoveAsync = removeRecursive): Promise<void> {
+export async function removeTree(
+  path: string,
+  options: RemoveTreeOptions = {},
+  remove: RemoveAsync = removeRecursive,
+): Promise<void> {
   const maxRetries = options.maxRetries ?? 10
   const retryDelay = options.retryDelay ?? 100
   for (let attempt = 0; ; attempt++) {
@@ -51,7 +55,11 @@ export async function removeTree(path: string, options: RemoveTreeOptions = {}, 
   }
 }
 
-export function removeTreeSync(path: string, options: RemoveTreeOptions = {}, remove: RemoveSync = removeRecursiveSync): void {
+export function removeTreeSync(
+  path: string,
+  options: RemoveTreeOptions = {},
+  remove: RemoveSync = removeRecursiveSync,
+): void {
   const maxRetries = options.maxRetries ?? 10
   const retryDelay = options.retryDelay ?? 100
   for (let attempt = 0; ; attempt++) {

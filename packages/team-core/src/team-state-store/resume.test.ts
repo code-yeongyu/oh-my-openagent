@@ -126,9 +126,11 @@ describe("resumeAllTeams", () => {
   const temporaryDirectories: string[] = []
 
   afterEach(async () => {
-    await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
-      await rm(directoryPath, { recursive: true, force: true })
-    }))
+    await Promise.all(
+      temporaryDirectories.splice(0).map(async (directoryPath) => {
+        await rm(directoryPath, { recursive: true, force: true })
+      }),
+    )
     mock.restore()
   })
 
@@ -140,13 +142,16 @@ describe("resumeAllTeams", () => {
     const runtimeState = await createRuntimeState(createSpec(), "ses_lead", "user", config)
     const worktreePath = path.join(baseDir, "worktrees", runtimeState.teamRunId, "worker")
     await mkdir(worktreePath, { recursive: true })
-    await saveRuntimeState({
-      ...runtimeState,
-      createdAt: Date.now() - 40 * 60 * 1000,
-      members: runtimeState.members.map((member) => member.name === "worker"
-        ? { ...member, worktreePath }
-        : member),
-    }, config)
+    await saveRuntimeState(
+      {
+        ...runtimeState,
+        createdAt: Date.now() - 40 * 60 * 1000,
+        members: runtimeState.members.map((member) =>
+          member.name === "worker" ? { ...member, worktreePath } : member,
+        ),
+      },
+      config,
+    )
 
     // when
     const report = await resumeAllTeams(createTeamSessionContext(baseDir), config)
@@ -198,10 +203,14 @@ describe("resumeAllTeams", () => {
     temporaryDirectories.push(baseDir)
     const config = createConfig(baseDir)
     const runtimeState = await createRuntimeState(createSpec(), "ses_dead", "project", config)
-    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-      ...currentRuntimeState,
-      status: "active",
-    }), config)
+    await transitionRuntimeState(
+      runtimeState.teamRunId,
+      (currentRuntimeState) => ({
+        ...currentRuntimeState,
+        status: "active",
+      }),
+      config,
+    )
     const sessionGet = mock(async () => {
       throw Object.assign(new Error("session not found"), { status: 404 })
     })
@@ -228,10 +237,14 @@ describe("resumeAllTeams", () => {
     temporaryDirectories.push(baseDir)
     const config = createConfig(baseDir)
     const runtimeState = await createRuntimeState(createSpec(), "ses_alive", "user", config)
-    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-      ...currentRuntimeState,
-      status: "active",
-    }), config)
+    await transitionRuntimeState(
+      runtimeState.teamRunId,
+      (currentRuntimeState) => ({
+        ...currentRuntimeState,
+        status: "active",
+      }),
+      config,
+    )
     const sessionGet = mock(async () => ({ data: { id: "ses_alive" } }))
 
     // when
@@ -256,17 +269,21 @@ describe("resumeAllTeams", () => {
     temporaryDirectories.push(baseDir)
     const config = createConfig(baseDir)
     const runtimeState = await createRuntimeState(createSpecWithTwoWorkers(), "ses_alive_lead", "user", config)
-    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-      ...currentRuntimeState,
-      status: "active",
-      leadSessionId: "ses_alive_lead",
-      members: currentRuntimeState.members.map((member) => {
-        if (member.name === "lead") return { ...member, sessionId: "ses_alive_lead", status: "running" as const }
-        if (member.name === "worker-a") return { ...member, sessionId: "ses_dead_a", status: "running" as const }
-        if (member.name === "worker-b") return { ...member, sessionId: "ses_alive_b", status: "running" as const }
-        return member
+    await transitionRuntimeState(
+      runtimeState.teamRunId,
+      (currentRuntimeState) => ({
+        ...currentRuntimeState,
+        status: "active",
+        leadSessionId: "ses_alive_lead",
+        members: currentRuntimeState.members.map((member) => {
+          if (member.name === "lead") return { ...member, sessionId: "ses_alive_lead", status: "running" as const }
+          if (member.name === "worker-a") return { ...member, sessionId: "ses_dead_a", status: "running" as const }
+          if (member.name === "worker-b") return { ...member, sessionId: "ses_alive_b", status: "running" as const }
+          return member
+        }),
       }),
-    }), config)
+      config,
+    )
     const sessionGet = mock(async ({ path }: { path: { id: string } }) => {
       if (path.id === "ses_alive_lead" || path.id === "ses_alive_b") return { data: { id: path.id } }
       throw Object.assign(new Error("session not found"), { status: 404 })
@@ -294,23 +311,30 @@ describe("resumeAllTeams", () => {
     temporaryDirectories.push(baseDir)
     const config = createConfig(baseDir)
     const runtimeState = await createRuntimeState(createSpec(), "ses_alive", "user", config)
-    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-      ...currentRuntimeState,
-      status: "active",
-    }), config)
+    await transitionRuntimeState(
+      runtimeState.teamRunId,
+      (currentRuntimeState) => ({
+        ...currentRuntimeState,
+        status: "active",
+      }),
+      config,
+    )
     const workerInbox = getInboxDir(resolveBaseDir(config), runtimeState.teamRunId, "worker")
     await mkdir(workerInbox, { recursive: true, mode: 0o700 })
     const strandedMessageId = randomUUID()
     const strandedPath = path.join(workerInbox, `.delivering-${strandedMessageId}.json`)
-    await writeFile(strandedPath, JSON.stringify({
-      version: 1,
-      messageId: strandedMessageId,
-      from: "lead",
-      to: "worker",
-      kind: "message",
-      body: "stranded",
-      timestamp: Date.now(),
-    }))
+    await writeFile(
+      strandedPath,
+      JSON.stringify({
+        version: 1,
+        messageId: strandedMessageId,
+        from: "lead",
+        to: "worker",
+        kind: "message",
+        body: "stranded",
+        timestamp: Date.now(),
+      }),
+    )
     const ancientMtime = new Date(Date.now() - 60 * 60 * 1000)
     await utimes(strandedPath, ancientMtime, ancientMtime)
     const sessionGet = mock(async () => ({ data: { id: "ses_alive" } }))
@@ -331,32 +355,39 @@ describe("resumeAllTeams", () => {
     const config = createConfig(baseDir)
     const runtimeState = await createRuntimeState(createSpec(), "ses_alive_lead", "user", config)
     const workerMessageId = randomUUID()
-    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-      ...currentRuntimeState,
-      status: "active",
-      leadSessionId: "ses_alive_lead",
-      members: currentRuntimeState.members.map((member) => {
-        if (member.name === "lead") return { ...member, sessionId: "ses_alive_lead", status: "running" as const }
-        return {
-          ...member,
-          sessionId: "ses_worker",
-          status: "running" as const,
-          pendingInjectedMessageIds: [workerMessageId],
-        }
+    await transitionRuntimeState(
+      runtimeState.teamRunId,
+      (currentRuntimeState) => ({
+        ...currentRuntimeState,
+        status: "active",
+        leadSessionId: "ses_alive_lead",
+        members: currentRuntimeState.members.map((member) => {
+          if (member.name === "lead") return { ...member, sessionId: "ses_alive_lead", status: "running" as const }
+          return {
+            ...member,
+            sessionId: "ses_worker",
+            status: "running" as const,
+            pendingInjectedMessageIds: [workerMessageId],
+          }
+        }),
       }),
-    }), config)
+      config,
+    )
     const workerInbox = getInboxDir(resolveBaseDir(config), runtimeState.teamRunId, "worker")
     await mkdir(workerInbox, { recursive: true, mode: 0o700 })
     const reservedPath = path.join(workerInbox, `.delivering-${workerMessageId}.json`)
-    await writeFile(reservedPath, JSON.stringify({
-      version: 1,
-      messageId: workerMessageId,
-      from: "lead",
-      to: "worker",
-      kind: "message",
-      body: "retry after restart",
-      timestamp: Date.now(),
-    }))
+    await writeFile(
+      reservedPath,
+      JSON.stringify({
+        version: 1,
+        messageId: workerMessageId,
+        from: "lead",
+        to: "worker",
+        kind: "message",
+        body: "retry after restart",
+        timestamp: Date.now(),
+      }),
+    )
     const ancientMtime = new Date(Date.now() - 60 * 60 * 1000)
     await utimes(reservedPath, ancientMtime, ancientMtime)
     const sessionGet = mock(async () => ({ data: { id: "alive" } }))
@@ -382,32 +413,39 @@ describe("resumeAllTeams", () => {
     const config = createConfig(baseDir)
     const runtimeState = await createRuntimeState(createSpec(), "ses_alive_lead", "user", config)
     const workerMessageId = randomUUID()
-    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-      ...currentRuntimeState,
-      status: "active",
-      leadSessionId: "ses_alive_lead",
-      members: currentRuntimeState.members.map((member) => {
-        if (member.name === "lead") return { ...member, sessionId: "ses_alive_lead", status: "running" as const }
-        return {
-          ...member,
-          sessionId: "ses_worker",
-          status: "running" as const,
-          pendingInjectedMessageIds: [],
-        }
+    await transitionRuntimeState(
+      runtimeState.teamRunId,
+      (currentRuntimeState) => ({
+        ...currentRuntimeState,
+        status: "active",
+        leadSessionId: "ses_alive_lead",
+        members: currentRuntimeState.members.map((member) => {
+          if (member.name === "lead") return { ...member, sessionId: "ses_alive_lead", status: "running" as const }
+          return {
+            ...member,
+            sessionId: "ses_worker",
+            status: "running" as const,
+            pendingInjectedMessageIds: [],
+          }
+        }),
       }),
-    }), config)
+      config,
+    )
     const workerInbox = getInboxDir(resolveBaseDir(config), runtimeState.teamRunId, "worker")
     await mkdir(workerInbox, { recursive: true, mode: 0o700 })
     const reservedPath = path.join(workerInbox, `.delivering-${workerMessageId}.json`)
-    await writeFile(reservedPath, JSON.stringify({
-      version: 1,
-      messageId: workerMessageId,
-      from: "lead",
-      to: "worker",
-      kind: "message",
-      body: "already accepted",
-      timestamp: Date.now(),
-    }))
+    await writeFile(
+      reservedPath,
+      JSON.stringify({
+        version: 1,
+        messageId: workerMessageId,
+        from: "lead",
+        to: "worker",
+        kind: "message",
+        body: "already accepted",
+        timestamp: Date.now(),
+      }),
+    )
     const ancientMtime = new Date(Date.now() - 60 * 60 * 1000)
     await utimes(reservedPath, ancientMtime, ancientMtime)
     const sessionGet: SessionGetMock = async () => ({ data: { id: "alive" } })
@@ -445,10 +483,14 @@ describe("resumeAllTeams", () => {
     temporaryDirectories.push(baseDir)
     const config = createConfig(baseDir)
     const runtimeState = await createRuntimeState(createSpec(), "ses_alive", "user", config)
-    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-      ...currentRuntimeState,
-      status: "active",
-    }), config)
+    await transitionRuntimeState(
+      runtimeState.teamRunId,
+      (currentRuntimeState) => ({
+        ...currentRuntimeState,
+        status: "active",
+      }),
+      config,
+    )
     const workerInbox = getInboxDir(resolveBaseDir(config), runtimeState.teamRunId, "worker")
     await mkdir(workerInbox, { recursive: true, mode: 0o700 })
     const freshMessageId = randomUUID()
@@ -471,15 +513,19 @@ describe("resumeAllTeams", () => {
     temporaryDirectories.push(baseDir)
     const config = createConfig(baseDir)
     const runtimeState = await createRuntimeState(createSpec(), "ses_alive_lead", "user", config)
-    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-      ...currentRuntimeState,
-      status: "active",
-      leadSessionId: "ses_alive_lead",
-      members: currentRuntimeState.members.map((member) => {
-        if (member.name === "lead") return { ...member, sessionId: "ses_alive_lead", status: "running" as const }
-        return { ...member, sessionId: "ses_dead_worker", status: "running" as const }
+    await transitionRuntimeState(
+      runtimeState.teamRunId,
+      (currentRuntimeState) => ({
+        ...currentRuntimeState,
+        status: "active",
+        leadSessionId: "ses_alive_lead",
+        members: currentRuntimeState.members.map((member) => {
+          if (member.name === "lead") return { ...member, sessionId: "ses_alive_lead", status: "running" as const }
+          return { ...member, sessionId: "ses_dead_worker", status: "running" as const }
+        }),
       }),
-    }), config)
+      config,
+    )
     const sessionGet = mock(async ({ path }: { path: { id: string } }) => {
       if (path.id === "ses_alive_lead") return { data: { id: path.id } }
       throw Object.assign(new Error("session not found"), { status: 404 })
@@ -504,16 +550,20 @@ describe("resumeAllTeams", () => {
     temporaryDirectories.push(baseDir)
     const config = createConfig(baseDir)
     const runtimeState = await createRuntimeState(createSpecWithTwoWorkers(), "ses_alive_lead", "user", config)
-    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-      ...currentRuntimeState,
-      status: "active",
-      leadSessionId: "ses_alive_lead",
-      members: currentRuntimeState.members.map((member) => {
-        if (member.name === "lead") return { ...member, sessionId: "ses_alive_lead", status: "running" as const }
-        if (member.name === "worker-a") return { ...member, sessionId: undefined, status: "errored" as const }
-        return { ...member, sessionId: "ses_dead_b", status: "running" as const }
+    await transitionRuntimeState(
+      runtimeState.teamRunId,
+      (currentRuntimeState) => ({
+        ...currentRuntimeState,
+        status: "active",
+        leadSessionId: "ses_alive_lead",
+        members: currentRuntimeState.members.map((member) => {
+          if (member.name === "lead") return { ...member, sessionId: "ses_alive_lead", status: "running" as const }
+          if (member.name === "worker-a") return { ...member, sessionId: undefined, status: "errored" as const }
+          return { ...member, sessionId: "ses_dead_b", status: "running" as const }
+        }),
       }),
-    }), config)
+      config,
+    )
     const sessionGet = mock(async ({ path }: { path: { id: string } }) => {
       if (path.id === "ses_alive_lead") return { data: { id: path.id } }
       throw Object.assign(new Error("session not found"), { status: 404 })
@@ -540,22 +590,33 @@ describe("resumeAllTeams", () => {
     temporaryDirectories.push(baseDir)
     const config = createConfig(baseDir)
     const runtimeState = await createRuntimeState(createSpec(), "ses_lead", "user", config)
-    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-      ...currentRuntimeState,
-      status: "active",
-    }), config)
-    await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-      ...currentRuntimeState,
-      status: "deleting",
-    }), config)
+    await transitionRuntimeState(
+      runtimeState.teamRunId,
+      (currentRuntimeState) => ({
+        ...currentRuntimeState,
+        status: "active",
+      }),
+      config,
+    )
+    await transitionRuntimeState(
+      runtimeState.teamRunId,
+      (currentRuntimeState) => ({
+        ...currentRuntimeState,
+        status: "deleting",
+      }),
+      config,
+    )
     const worktreePath = path.join(baseDir, "worktrees", runtimeState.teamRunId, "worker")
     await mkdir(worktreePath, { recursive: true })
-    await saveRuntimeState({
-      ...await loadRuntimeState(runtimeState.teamRunId, config),
-      members: runtimeState.members.map((member) => member.name === "worker"
-        ? { ...member, worktreePath }
-        : member),
-    }, config)
+    await saveRuntimeState(
+      {
+        ...(await loadRuntimeState(runtimeState.teamRunId, config)),
+        members: runtimeState.members.map((member) =>
+          member.name === "worker" ? { ...member, worktreePath } : member,
+        ),
+      },
+      config,
+    )
 
     // when
     const report = await resumeAllTeams(createTeamSessionContext(baseDir), config)

@@ -26,8 +26,15 @@ function root(): string {
  * A real local collector, in its own process like a real one, that accepts every request and never
  * answers it. The request count is read from the lines it prints, so it is exact once the client is done.
  */
-async function silentServer(): Promise<{ readonly url: string; readonly requests: () => number; readonly reached: (count: number) => Promise<void> }> {
-  const server = Bun.spawn([process.execPath, join(import.meta.dir, "otlp-silent-server.ts")], { stdout: "pipe", stderr: "inherit" })
+async function silentServer(): Promise<{
+  readonly url: string
+  readonly requests: () => number
+  readonly reached: (count: number) => Promise<void>
+}> {
+  const server = Bun.spawn([process.execPath, join(import.meta.dir, "otlp-silent-server.ts")], {
+    stdout: "pipe",
+    stderr: "inherit",
+  })
   cleanups.push(() => server.kill("SIGKILL"))
   const reader = server.stdout.getReader()
   const decoder = new TextDecoder()
@@ -143,12 +150,13 @@ describe("request timeout", () => {
       onNow?.()
       return now
     }
-    const nextClockRead = (): Promise<void> => new Promise((resolve) => {
-      onNow = () => {
-        onNow = undefined
-        resolve()
-      }
-    })
+    const nextClockRead = (): Promise<void> =>
+      new Promise((resolve) => {
+        onNow = () => {
+          onNow = undefined
+          resolve()
+        }
+      })
     let markAsleep: () => void = () => undefined
     const asleep = new Promise<void>((resolve) => {
       markAsleep = resolve
@@ -214,7 +222,9 @@ describe("real local collector", () => {
     expect(bodies.length).toBe(1)
     expect(headers[0]?.get("content-type")).toBe("application/x-protobuf")
     expect(headers[0]?.get("x-omo-ingest-key")).toBe("test-ingest-key")
-    expect(logRecordsOf(decodeLogs(bodies[0] ?? new Uint8Array())).map((r) => r.eventName)).toEqual(["omo.feature_used"])
+    expect(logRecordsOf(decodeLogs(bodies[0] ?? new Uint8Array())).map((r) => r.eventName)).toEqual([
+      "omo.feature_used",
+    ])
     expect(spoolNames(dir)).toEqual([])
   })
 })

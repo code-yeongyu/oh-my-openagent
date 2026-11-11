@@ -28,7 +28,7 @@ type ParsedGlobValue = {
 
 export function parseFrontmatter<T = Record<string, unknown>>(
   content: string,
-  options: ParseFrontmatterOptions = {}
+  options: ParseFrontmatterOptions = {},
 ): FrontmatterResult<T> {
   if (options.mode === "rule") return parseRuleFrontmatter<T>(content)
 
@@ -111,11 +111,21 @@ function parseGlobValue(rawValue: string, lines: readonly string[], currentIndex
     return parsed.values.length > 0 ? { value: parsed.values, consumed: parsed.consumed } : { value: "", consumed: 1 }
   }
   const value = parseString(rawValue)
-  if (value.includes(",")) return { value: value.split(",").map((item) => item.trim()).filter(Boolean), consumed: 1 }
+  if (value.includes(","))
+    return {
+      value: value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+      consumed: 1,
+    }
   return { value, consumed: 1 }
 }
 
-function parseMultilineArray(lines: readonly string[], currentIndex: number): { readonly values: readonly string[]; readonly consumed: number } {
+function parseMultilineArray(
+  lines: readonly string[],
+  currentIndex: number,
+): { readonly values: readonly string[]; readonly consumed: number } {
   const values: string[] = []
   let consumed = 1
   for (let index = currentIndex + 1; index < lines.length; index += 1) {
@@ -211,7 +221,10 @@ function openingDelimiterLength(content: string): number {
   return 0
 }
 
-function findClosingDelimiter(content: string, openingLength: number): { readonly start: number; readonly bodyStart: number } | null {
+function findClosingDelimiter(
+  content: string,
+  openingLength: number,
+): { readonly start: number; readonly bodyStart: number } | null {
   let lineStart = openingLength
   while (lineStart <= content.length) {
     const nextNewline = content.indexOf("\n", lineStart)

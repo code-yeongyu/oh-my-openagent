@@ -33,13 +33,21 @@ async function finalizedRuns(count: number) {
   }
   const appended: string[] = []
   const passes: number[] = []
-  const pass = () => reconcileReflectionRuns({
-    identity: item.identity,
-    reservation: item.store,
-    deferOnSchedulerContention: true,
-    receipts: { append: async (_runtimeDir: string, input: MemoryReceiptInput) => { appended.push(input.kind === "facts" ? input.batchId : input.runId); return true } },
-    onPassComplete: ({ unsettledRuns }) => { passes.push(unsettledRuns) },
-  })
+  const pass = () =>
+    reconcileReflectionRuns({
+      identity: item.identity,
+      reservation: item.store,
+      deferOnSchedulerContention: true,
+      receipts: {
+        append: async (_runtimeDir: string, input: MemoryReceiptInput) => {
+          appended.push(input.kind === "facts" ? input.batchId : input.runId)
+          return true
+        },
+      },
+      onPassComplete: ({ unsettledRuns }) => {
+        passes.push(unsettledRuns)
+      },
+    })
   return { item, runsDir, runIds, appended, passes, pass }
 }
 

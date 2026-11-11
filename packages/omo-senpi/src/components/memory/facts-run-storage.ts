@@ -42,14 +42,16 @@ export async function reserveFactsRunDir(options: {
   readonly warn?: ReceiptWarn
 }): Promise<string | undefined> {
   const record = await createLockRecord("facts-runs", { runId: options.batchId })
-  const runDir = await withLock(
-    factsRunsLockPath(options.locksDir),
-    record,
-    () => claimFactsRunDir(options),
-    { waitTimeoutMs: options.lockWaitMs ?? RUNS_LOCK_WAIT_MS },
-  )
+  const runDir = await withLock(factsRunsLockPath(options.locksDir), record, () => claimFactsRunDir(options), {
+    waitTimeoutMs: options.lockWaitMs ?? RUNS_LOCK_WAIT_MS,
+  })
   if (runDir !== undefined && options.receiptsDir !== undefined) {
-    await emitMemoryReceipt(options.receiptsDir, factsReceipt(options.batchId, "launched"), options.receipts, options.warn)
+    await emitMemoryReceipt(
+      options.receiptsDir,
+      factsReceipt(options.batchId, "launched"),
+      options.receipts,
+      options.warn,
+    )
   }
   return runDir
 }
@@ -64,7 +66,10 @@ async function claimFactsRunDir(options: {
 }): Promise<string | undefined> {
   const runsDir = join(options.factsDir, "runs")
   await mkdir(runsDir, { recursive: true, mode: 0o700 })
-  const digest = createHash("sha256").update(JSON.stringify(queueKeys(options.entries))).digest("hex").slice(0, 12)
+  const digest = createHash("sha256")
+    .update(JSON.stringify(queueKeys(options.entries)))
+    .digest("hex")
+    .slice(0, 12)
   const start = await nextAttempt(runsDir, digest)
   for (let attempt = start; attempt < 10_000; attempt += 1) {
     const runDir = join(runsDir, `facts-${digest}-${attempt}`)
@@ -192,7 +197,6 @@ export function finalResult(record: FactsFinalRecord): FactsLaunchResult {
   }
   return { status: "failed", runId: record.runId }
 }
-
 
 export function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error)

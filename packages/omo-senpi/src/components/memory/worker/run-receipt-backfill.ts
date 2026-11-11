@@ -7,11 +7,26 @@ import { join } from "node:path"
 
 import type { MemoryReceiptInput, ReflectionOutcome } from "@oh-my-opencode/memory-core"
 
-import { emitMemoryReceipt, runOutcomeReceipt, runReceipt, type MemoryReceiptsPort, type ReceiptWarn, type RunReceiptLedger } from "../receipts-port"
+import {
+  emitMemoryReceipt,
+  runOutcomeReceipt,
+  runReceipt,
+  type MemoryReceiptsPort,
+  type ReceiptWarn,
+  type RunReceiptLedger,
+} from "../receipts-port"
 import { readRunJson } from "./run-artifacts"
 import { parseReservationRunLedger } from "./reservation-run-ledger"
 
-const OUTCOMES = new Set<string>(["merged", "no_changes", "parent_dirty", "merge_conflict", "dirty_uncommitted", "failed", "timed_out"])
+const OUTCOMES = new Set<string>([
+  "merged",
+  "no_changes",
+  "parent_dirty",
+  "merge_conflict",
+  "dirty_uncommitted",
+  "failed",
+  "timed_out",
+])
 
 interface TerminalSentinel {
   readonly runId?: unknown
@@ -32,7 +47,7 @@ export async function backfillRunReceipt(
 ): Promise<boolean> {
   // False only when a receipt exists and its write failed; artifacts that yield no receipt never will.
   const receipt = await terminalReceipt(runDir)
-  return receipt === undefined || await emitMemoryReceipt(runtimeDir, receipt, port, warn)
+  return receipt === undefined || (await emitMemoryReceipt(runtimeDir, receipt, port, warn))
 }
 
 async function terminalReceipt(runDir: string): Promise<MemoryReceiptInput | undefined> {
@@ -46,12 +61,20 @@ async function terminalReceipt(runDir: string): Promise<MemoryReceiptInput | und
       ...(typeof final.reason === "string" ? { reason: final.reason } : {}),
     })
   }
-  for (const [file, event] of [["quarantined.json", "quarantined"], ["abandoned.json", "abandoned"]] as const) {
+  for (const [file, event] of [
+    ["quarantined.json", "quarantined"],
+    ["abandoned.json", "abandoned"],
+  ] as const) {
     if (!existsSync(join(runDir, file))) continue
     const sentinel = await readSentinel(join(runDir, file))
     const source = sentinelLedger(sentinel) ?? ledger
     if (source === undefined) return undefined
-    const reason = typeof sentinel?.reason === "string" ? sentinel.reason : typeof sentinel?.outcome === "string" ? sentinel.outcome : undefined
+    const reason =
+      typeof sentinel?.reason === "string"
+        ? sentinel.reason
+        : typeof sentinel?.outcome === "string"
+          ? sentinel.outcome
+          : undefined
     return runReceipt(source, event, reason === undefined ? {} : { reason })
   }
   return undefined
@@ -59,7 +82,8 @@ async function terminalReceipt(runDir: string): Promise<MemoryReceiptInput | und
 
 /** A sentinel written by reconciliation carries its own generation, and wins for the event it records. */
 function sentinelLedger(sentinel: TerminalSentinel | undefined): RunReceiptLedger | undefined {
-  if (sentinel === undefined || typeof sentinel.runId !== "string" || typeof sentinel.generation !== "string") return undefined
+  if (sentinel === undefined || typeof sentinel.runId !== "string" || typeof sentinel.generation !== "string")
+    return undefined
   if (sentinel.kind !== "reflection" && sentinel.kind !== "dream") return undefined
   if (typeof sentinel.trigger !== "string") return undefined
   return {
@@ -83,7 +107,7 @@ async function readLedger(runDir: string): Promise<RunReceiptLedger | undefined>
 async function readSentinel(path: string): Promise<TerminalSentinel | undefined> {
   try {
     const value = await readRunJson<unknown>(path)
-    return typeof value === "object" && value !== null ? value as TerminalSentinel : undefined
+    return typeof value === "object" && value !== null ? (value as TerminalSentinel) : undefined
   } catch {
     return undefined
   }

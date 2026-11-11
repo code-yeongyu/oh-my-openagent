@@ -24,11 +24,16 @@ export async function sweepStrandedRunTemporaries(
   let kept = 0
   for (const entry of entries) {
     if (!entry.isFile()) continue
-    const temporary = /\.json\.tmp-(?:(\d+)-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.exec(entry.name)
+    const temporary = /\.json\.tmp-(?:(\d+)-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.exec(
+      entry.name,
+    )
     if (temporary === null) continue
     const path = join(directory, entry.name)
     try {
-      if ((await stat(path)).mtimeMs > now - STRANDED_TEMP_MIN_AGE_MS || (temporary[1] !== undefined && pidLiveness(Number(temporary[1])) !== "dead")) {
+      if (
+        (await stat(path)).mtimeMs > now - STRANDED_TEMP_MIN_AGE_MS ||
+        (temporary[1] !== undefined && pidLiveness(Number(temporary[1])) !== "dead")
+      ) {
         kept += 1
         continue
       }

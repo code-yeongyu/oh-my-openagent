@@ -68,9 +68,7 @@ export class FactsQueue {
     if (abortedNow()) return { enqueued: false, reason: "no-new-entries" }
     return this.locked(async () => {
       const anchor = await this.effectiveAnchor(request.conversationId, request.entries)
-      const startIndex = request.entries.findIndex(
-        (entry, index) => index > anchor && isCanonicalEntry(entry),
-      )
+      const startIndex = request.entries.findIndex((entry, index) => index > anchor && isCanonicalEntry(entry))
       if (startIndex < 0) return { enqueued: false, reason: "no-new-entries" }
 
       let endIndex = -1
@@ -127,7 +125,11 @@ export class FactsQueue {
         if (selected.has(key)) continue
         const claim = claims[key]
         if (claim !== undefined && Date.parse(claim.claimedAt) >= reclaimBefore) continue
-        const filePath = this.layout.entryPath(entry.conversationId, entry.range.end_message_id, new Date(entry.enqueuedAt))
+        const filePath = this.layout.entryPath(
+          entry.conversationId,
+          entry.range.end_message_id,
+          new Date(entry.enqueuedAt),
+        )
         const raw = await readFile(filePath, "utf8").catch(() => undefined)
         const current = raw === undefined ? undefined : parseQueueEntry(raw)
         if (current === undefined || this.entryKey(current) !== this.entryKey(entry)) continue
@@ -164,9 +166,7 @@ export class FactsQueue {
     if (entries.length === 0) return
     await this.locked(async () => {
       const pending = await this.listPendingUnlocked()
-      const consumedKeys = new Set(
-        entries.map((entry) => `${entry.conversationId}\u0000${entry.range.end_message_id}`),
-      )
+      const consumedKeys = new Set(entries.map((entry) => `${entry.conversationId}\u0000${entry.range.end_message_id}`))
       for (const candidate of pending) {
         const key = `${candidate.conversationId}\u0000${candidate.range.end_message_id}`
         if (consumedKeys.has(key)) await rm(candidate.filePath, { force: true })
@@ -187,16 +187,18 @@ export class FactsQueue {
     await mkdir(this.layout.queueDir, { recursive: true })
     await mkdir(join(this.lockPath, ".."), { recursive: true })
     const record = await createLockRecord("facts-queue")
-    return withLock(this.lockPath, record, async () => {
-      await migrateParkedEntries(this.layout)
-      return task()
-    }, { waitTimeoutMs: LOCK_WAIT_MS })
+    return withLock(
+      this.lockPath,
+      record,
+      async () => {
+        await migrateParkedEntries(this.layout)
+        return task()
+      },
+      { waitTimeoutMs: LOCK_WAIT_MS },
+    )
   }
 
-  private async effectiveAnchor(
-    conversationId: string,
-    entries: readonly TranscriptEntry[],
-  ): Promise<number> {
+  private async effectiveAnchor(conversationId: string, entries: readonly TranscriptEntry[]): Promise<number> {
     const cursor = await this.readCursorUnlocked(conversationId)
     const consumed = await this.readConsumedUnlocked()
     const candidates: (string | null)[] = [
@@ -251,11 +253,19 @@ export class FactsQueue {
         if (value === null || typeof value !== "object" || Array.isArray(value)) continue
         const claimId = Reflect.get(value, "claimId")
         const claimedAt = Reflect.get(value, "claimedAt")
-        if (typeof claimId !== "string" || claimId.length === 0 || typeof claimedAt !== "string" || Number.isNaN(Date.parse(claimedAt))) continue
+        if (
+          typeof claimId !== "string" ||
+          claimId.length === 0 ||
+          typeof claimedAt !== "string" ||
+          Number.isNaN(Date.parse(claimedAt))
+        )
+          continue
         claims[key] = { claimId, claimedAt }
       }
       return claims
-    } catch { return {} }
+    } catch {
+      return {}
+    }
   }
 
   private async writeClaims(claims: Record<string, { claimId: string; claimedAt: string }>): Promise<void> {

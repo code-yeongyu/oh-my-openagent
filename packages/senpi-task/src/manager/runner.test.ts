@@ -5,7 +5,12 @@ import type { ChildHandle as InProcessChildHandle, RunnerOutcome } from "../runn
 import type { ChildSpec } from "../runners/in-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { resolveChildSessionDir } from "../runners/rpc/spawn"
-import { createInProcessManagedRunner, createRpcManagedRunner, type InProcessRunnerLike, type RpcRunnerLike } from "./runner"
+import {
+  createInProcessManagedRunner,
+  createRpcManagedRunner,
+  type InProcessRunnerLike,
+  type RpcRunnerLike,
+} from "./runner"
 import type { ManagedStartSpec } from "./types"
 
 function managedSpec(): ManagedStartSpec {
@@ -146,12 +151,15 @@ describe("createInProcessManagedRunner", () => {
     } as const
 
     // when
-    await managed.resume?.({
-      ...managedSpec(),
-      resolvedModel,
-      toolDenylist: ["write"],
-      memberScopedToolNames: ["team_ping"],
-    }, "/tmp/session.jsonl")
+    await managed.resume?.(
+      {
+        ...managedSpec(),
+        resolvedModel,
+        toolDenylist: ["write"],
+        memberScopedToolNames: ["team_ping"],
+      },
+      "/tmp/session.jsonl",
+    )
 
     // then
     expect(capturedPath).toBe("/tmp/session.jsonl")

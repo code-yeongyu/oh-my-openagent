@@ -11,10 +11,7 @@ const RATE_LIMIT_ERROR = {
 describe("getStoppedSessionError", () => {
   test("#given the latest message is an errored assistant turn #when read #then returns the error name and message", () => {
     // given
-    const messages = [
-      { info: { role: "user" } },
-      { info: { role: "assistant", error: RATE_LIMIT_ERROR } },
-    ]
+    const messages = [{ info: { role: "user" } }, { info: { role: "assistant", error: RATE_LIMIT_ERROR } }]
 
     // when
     const result = getStoppedSessionError(messages)
@@ -40,10 +37,7 @@ describe("getStoppedSessionError", () => {
 
   test("#given the latest assistant turn has no error #when read #then the session is not stopped", () => {
     // given
-    const messages = [
-      { info: { role: "user" } },
-      { info: { role: "assistant" } },
-    ]
+    const messages = [{ info: { role: "user" } }, { info: { role: "assistant" } }]
 
     // when
     const result = getStoppedSessionError(messages)
