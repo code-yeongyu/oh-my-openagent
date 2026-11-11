@@ -43,10 +43,18 @@ async function deadOwnerWithStrandedIndexLock(): Promise<ReturnType<typeof build
   await git(paths.repo, ["init", "-b", "main"])
   const dead = spawn(process.execPath, ["-e", ""], { stdio: "ignore" })
   expect(await exitedWithin(dead, 5_000)).toBe(true)
-  await writeFile(memoryWriterLockPath(paths.locks), JSON.stringify({
-    pid: dead.pid, process_start: "unavailable", hostname: hostname(), nonce: randomUUID(),
-    created_at: new Date().toISOString(), purpose: "memory-write",
-  }), "utf8")
+  await writeFile(
+    memoryWriterLockPath(paths.locks),
+    JSON.stringify({
+      pid: dead.pid,
+      process_start: "unavailable",
+      hostname: hostname(),
+      nonce: randomUUID(),
+      created_at: new Date().toISOString(),
+      purpose: "memory-write",
+    }),
+    "utf8",
+  )
   const holder = spawn("git", ["-C", paths.repo, "update-index", "--stdin"], { stdio: ["pipe", "ignore", "ignore"] })
   const indexLock = join(paths.repo, ".git", "index.lock")
   expect(await probeUntil(() => existsSync(indexLock), 10_000)).toBe(true)
@@ -56,87 +64,101 @@ async function deadOwnerWithStrandedIndexLock(): Promise<ReturnType<typeof build
 }
 
 describe("the dead-owner proof goes only to the dead owner's immediate successor (omo #10199 r5 delta LOW)", () => {
-  for (const { path: takeoverPath, acquire } of takeoverPaths) test.skipIf(process.platform === "win32")(`#given a live writer takes the lock between the dead owner's reclamation by ${takeoverPath} and this acquisition #when this acquisition sweeps #then the stranded lock is kept`, async () => {
-    // #given: a dead recorded owner A, and a killed git holder's stranded index.lock
-    const paths = await deadOwnerWithStrandedIndexLock()
-    const writerLockPath = memoryWriterLockPath(paths.locks)
-    const indexLock = join(paths.repo, ".git", "index.lock")
+  for (const { path: takeoverPath, acquire } of takeoverPaths)
+    test.skipIf(process.platform === "win32")(
+      `#given a live writer takes the lock between the dead owner's reclamation by ${takeoverPath} and this acquisition #when this acquisition sweeps #then the stranded lock is kept`,
+      async () => {
+        // #given: a dead recorded owner A, and a killed git holder's stranded index.lock
+        const paths = await deadOwnerWithStrandedIndexLock()
+        const writerLockPath = memoryWriterLockPath(paths.locks)
+        const indexLock = join(paths.repo, ".git", "index.lock")
 
-    // A live writer B publishes the moment THIS acquisition tries to: B is this process (alive).
-    const mine = await createLockRecord("memory-write")
-    const writerB = await createLockRecord("memory-write")
-    // B may finish only after this acquisition's link has run into B's record (#12338): releasing B
-    // while that link is still in flight lets the link land on an empty path, so B's whole tenure
-    // happens before the publish, invisible to it, and the case under test never occurs.
-    let injected = false
-    let injectedLinkError: string | undefined
-    let markInjectedLinkSettled!: () => void
-    const injectedLinkSettled = new Promise<void>((resolve) => { markInjectedLinkSettled = resolve })
-    restoreFs = setLockCandidateFsForTests({
-      link: async (candidate, target) => {
-        if (injected || target !== writerLockPath || !readFileSync(candidate, "utf8").includes(mine.nonce)) return link(candidate, target)
-        injected = true
-        writeFileSync(target, JSON.stringify(writerB), "utf8")
+        // A live writer B publishes the moment THIS acquisition tries to: B is this process (alive).
+        const mine = await createLockRecord("memory-write")
+        const writerB = await createLockRecord("memory-write")
+        // B may finish only after this acquisition's link has run into B's record (#12338): releasing B
+        // while that link is still in flight lets the link land on an empty path, so B's whole tenure
+        // happens before the publish, invisible to it, and the case under test never occurs.
+        let injected = false
+        let injectedLinkError: string | undefined
+        let markInjectedLinkSettled!: () => void
+        const injectedLinkSettled = new Promise<void>((resolve) => {
+          markInjectedLinkSettled = resolve
+        })
+        restoreFs = setLockCandidateFsForTests({
+          link: async (candidate, target) => {
+            if (injected || target !== writerLockPath || !readFileSync(candidate, "utf8").includes(mine.nonce))
+              return link(candidate, target)
+            injected = true
+            writeFileSync(target, JSON.stringify(writerB), "utf8")
+            try {
+              return await link(candidate, target)
+            } catch (error) {
+              injectedLinkError = error instanceof Error && "code" in error ? String(error.code) : String(error)
+              throw error
+            } finally {
+              markInjectedLinkSettled()
+            }
+          },
+        })
+
+        // #when: this acquisition loses its publish to B, B finishes, then this acquisition holds the lock
+        const acquired = acquire(writerLockPath, mine, { waitTimeoutMs: 10_000, retryDelayMs: 5 })
+        expect(await settlesWithin(injectedLinkSettled, 10_000)).toEqual({ kind: "settled", value: undefined })
+        expect(injectedLinkError).toBe("EEXIST")
+        expect(await releaseLock(writerLockPath, writerB)).toBe(true)
+        await acquired
         try {
-          return await link(candidate, target)
-        } catch (error) {
-          injectedLinkError = error instanceof Error && "code" in error ? String(error.code) : String(error)
-          throw error
+          const report = await sweepStrandedGitLockFiles(paths.repo, 50)
+
+          // #then
+          expect(report.removed).toEqual([])
+          expect(report.kept).toEqual([{ path: indexLock, reason: "owner-not-proven-dead" }])
         } finally {
-          markInjectedLinkSettled()
+          await releaseLock(writerLockPath, mine)
         }
       },
-    })
+      30_000,
+    )
 
-    // #when: this acquisition loses its publish to B, B finishes, then this acquisition holds the lock
-    const acquired = acquire(writerLockPath, mine, { waitTimeoutMs: 10_000, retryDelayMs: 5 })
-    expect(await settlesWithin(injectedLinkSettled, 10_000)).toEqual({ kind: "settled", value: undefined })
-    expect(injectedLinkError).toBe("EEXIST")
-    expect(await releaseLock(writerLockPath, writerB)).toBe(true)
-    await acquired
-    try {
-      const report = await sweepStrandedGitLockFiles(paths.repo, 50)
+  for (const { path: takeoverPath, acquire } of takeoverPaths)
+    test.skipIf(process.platform === "win32")(
+      `#given a live writer publishes and releases between this acquisition's lost publish and its re-read, after ${takeoverPath} #when this acquisition sweeps #then the stranded lock is kept`,
+      async () => {
+        // #given
+        const paths = await deadOwnerWithStrandedIndexLock()
+        const writerLockPath = memoryWriterLockPath(paths.locks)
+        const indexLock = join(paths.repo, ".git", "index.lock")
+        const mine = await createLockRecord("memory-write")
+        const writerB = await createLockRecord("memory-write")
+        let cameAndWent = false
+        restoreFs = setLockCandidateFsForTests({
+          link: async (candidate, target) => {
+            if (cameAndWent || target !== writerLockPath || !readFileSync(candidate, "utf8").includes(mine.nonce))
+              return link(candidate, target)
+            cameAndWent = true
+            writeFileSync(target, JSON.stringify(writerB), "utf8")
+            try {
+              return await link(candidate, target)
+            } finally {
+              expect(await releaseLock(writerLockPath, writerB)).toBe(true)
+            }
+          },
+        })
 
-      // #then
-      expect(report.removed).toEqual([])
-      expect(report.kept).toEqual([{ path: indexLock, reason: "owner-not-proven-dead" }])
-    } finally {
-      await releaseLock(writerLockPath, mine)
-    }
-  }, 30_000)
-
-  for (const { path: takeoverPath, acquire } of takeoverPaths) test.skipIf(process.platform === "win32")(`#given a live writer publishes and releases between this acquisition's lost publish and its re-read, after ${takeoverPath} #when this acquisition sweeps #then the stranded lock is kept`, async () => {
-    // #given
-    const paths = await deadOwnerWithStrandedIndexLock()
-    const writerLockPath = memoryWriterLockPath(paths.locks)
-    const indexLock = join(paths.repo, ".git", "index.lock")
-    const mine = await createLockRecord("memory-write")
-    const writerB = await createLockRecord("memory-write")
-    let cameAndWent = false
-    restoreFs = setLockCandidateFsForTests({
-      link: async (candidate, target) => {
-        if (cameAndWent || target !== writerLockPath || !readFileSync(candidate, "utf8").includes(mine.nonce)) return link(candidate, target)
-        cameAndWent = true
-        writeFileSync(target, JSON.stringify(writerB), "utf8")
+        // #when
+        await acquire(writerLockPath, mine, { waitTimeoutMs: 10_000, retryDelayMs: 5 })
         try {
-          return await link(candidate, target)
+          const report = await sweepStrandedGitLockFiles(paths.repo, 50)
+
+          // #then
+          expect(cameAndWent).toBe(true)
+          expect(report.removed).toEqual([])
+          expect(report.kept).toEqual([{ path: indexLock, reason: "owner-not-proven-dead" }])
         } finally {
-          expect(await releaseLock(writerLockPath, writerB)).toBe(true)
+          await releaseLock(writerLockPath, mine)
         }
       },
-    })
-
-    // #when
-    await acquire(writerLockPath, mine, { waitTimeoutMs: 10_000, retryDelayMs: 5 })
-    try {
-      const report = await sweepStrandedGitLockFiles(paths.repo, 50)
-
-      // #then
-      expect(cameAndWent).toBe(true)
-      expect(report.removed).toEqual([])
-      expect(report.kept).toEqual([{ path: indexLock, reason: "owner-not-proven-dead" }])
-    } finally {
-      await releaseLock(writerLockPath, mine)
-    }
-  }, 30_000)
+      30_000,
+    )
 })

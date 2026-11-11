@@ -17,6 +17,7 @@ import {
   createSilentLogger,
   type RecordedTransport,
 } from "./telemetry.test-support"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 // No process can hold this pid, so the real liveness probe reports its owner dead.
 export const DEAD_PID = 0x7fff_fff0
@@ -28,8 +29,14 @@ export function inProject(sessionId: string, cwd?: string): Record<string, unkno
 
 export function writeInventory(agentDir: string): void {
   mkdirSync(agentDir, { recursive: true })
-  writeFileSync(join(agentDir, "models.json"), JSON.stringify({ providers: { openai: { models: [{ id: "gpt-5.6-sol" }] } } }))
-  writeFileSync(join(agentDir, "settings.json"), JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-5.6-sol" }))
+  writeFileSync(
+    join(agentDir, "models.json"),
+    JSON.stringify({ providers: { openai: { models: [{ id: "gpt-5.6-sol" }] } } }),
+  )
+  writeFileSync(
+    join(agentDir, "settings.json"),
+    JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-5.6-sol" }),
+  )
 }
 
 export function turnEnd(): Record<string, unknown> {
@@ -37,12 +44,22 @@ export function turnEnd(): Record<string, unknown> {
     type: "turn_end",
     turnIndex: 1,
     message: {
-      role: "assistant", content: [], api: "openai-responses", provider: "openai", model: "gpt-5.6-sol",
+      role: "assistant",
+      content: [],
+      api: "openai-responses",
+      provider: "openai",
+      model: "gpt-5.6-sol",
       usage: {
-        input: 11, output: 22, cacheRead: 3, cacheWrite: 4, reasoning: 5, totalTokens: 40,
+        input: 11,
+        output: 22,
+        cacheRead: 3,
+        cacheWrite: 4,
+        reasoning: 5,
+        totalTokens: 40,
         cost: { input: 0.1, output: 0.2, cacheRead: 0.03, cacheWrite: 0.04, total: 0.123456 },
       },
-      stopReason: "stop", timestamp: 1,
+      stopReason: "stop",
+      timestamp: 1,
     },
     toolResults: [],
   }
@@ -59,7 +76,10 @@ export function summaryFiles(stateDir: string): string[] {
 
 /** A file's name under the summary dir with "/" separators on every platform, as every assertion writes it. */
 export function summaryFileName(root: string, file: string, separator: string = sep): string {
-  return file.slice(root.length + 1).split(separator).join("/")
+  return file
+    .slice(root.length + 1)
+    .split(separator)
+    .join("/")
 }
 
 export function readSummaryFile(stateDir: string, name: string): Record<string, unknown> {
@@ -76,20 +96,42 @@ export function contentFiles(stateDir: string): string[] {
   })
 }
 
-export function seedDeadOwnerQueue(stateDir: string, input: { readonly sessionHash: string; readonly scope: ConsentScope; readonly claimed?: boolean; readonly ownerPid?: number }): void {
+export function seedDeadOwnerQueue(
+  stateDir: string,
+  input: {
+    readonly sessionHash: string
+    readonly scope: ConsentScope
+    readonly claimed?: boolean
+    readonly ownerPid?: number
+  },
+): void {
   const owner = { pid: input.ownerPid ?? DEAD_PID, bootId: "killed" }
   const storage = createSummaryStorage({ stateDir, owner, isPidAlive: () => false })
   const window = openWindow(FIXED_NOW.getTime(), 0)
   addTurn(window, summaryTurn(), FIXED_NOW.getTime())
   const record = {
-    consent: "enabled" as const, scope: input.scope, sessionHash: input.sessionHash, sessionRole: "root" as const,
-    owner, heartbeatAt: Date.now() - OWNER_STALE_MS - 60_000, epoch: "0123456789abcdef", seq: 3, sampleRate: 0, windowId: randomUUID(), window,
+    consent: "enabled" as const,
+    scope: input.scope,
+    sessionHash: input.sessionHash,
+    sessionRole: "root" as const,
+    owner,
+    heartbeatAt: Date.now() - OWNER_STALE_MS - 60_000,
+    epoch: "0123456789abcdef",
+    seq: 3,
+    sampleRate: 0,
+    windowId: randomUUID(),
+    window,
   }
   const key = storage.windowKey(input.sessionHash)
   storage.writeWindow(key, record)
   storage.writePending({
-    consent: "enabled", scope: input.scope, uuid: randomUUID(), sessionHash: input.sessionHash, owner,
-    createdAt: Date.now(), properties: { summary_seq: 2 },
+    consent: "enabled",
+    scope: input.scope,
+    uuid: randomUUID(),
+    sessionHash: input.sessionHash,
+    owner,
+    createdAt: Date.now(),
+    properties: { summary_seq: 2 },
   })
   if (input.claimed === true) {
     const path = join(summaryDir(stateDir), `${key}.json`)
@@ -101,7 +143,10 @@ export function killWithoutShutdown(stateDir: string): void {
   for (const name of summaryFiles(stateDir).filter((entry) => !entry.includes("/") && entry.endsWith(".json"))) {
     const path = join(summaryDir(stateDir), name)
     const record: Record<string, unknown> = JSON.parse(readFileSync(path, "utf8"))
-    writeFileSync(path, JSON.stringify({ ...record, owner: DEAD_OWNER, heartbeatAt: Date.now() - OWNER_STALE_MS - 60_000 }))
+    writeFileSync(
+      path,
+      JSON.stringify({ ...record, owner: DEAD_OWNER, heartbeatAt: Date.now() - OWNER_STALE_MS - 60_000 }),
+    )
   }
 }
 
@@ -167,20 +212,25 @@ export function createWatchedTransport(): WatchedTransport {
   }
   return {
     ...recorded,
-    summariesSent: (sessionHash, count, timeoutMs = 2_000) => new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        waiters.delete(check)
-        reject(new Error(`expected ${count} session_summary rows for ${sessionHash}, saw ${sentSeqs(recorded, sessionHash).length}`))
-      }, timeoutMs)
-      function check(): void {
-        if (sentSeqs(recorded, sessionHash).length < count) return
-        clearTimeout(timer)
-        waiters.delete(check)
-        resolve()
-      }
-      waiters.add(check)
-      check()
-    }),
+    summariesSent: (sessionHash, count, timeoutMs = remainingTestTime()) =>
+      new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          waiters.delete(check)
+          reject(
+            new Error(
+              `expected ${count} session_summary rows for ${sessionHash}, saw ${sentSeqs(recorded, sessionHash).length}`,
+            ),
+          )
+        }, timeoutMs)
+        function check(): void {
+          if (sentSeqs(recorded, sessionHash).length < count) return
+          clearTimeout(timer)
+          waiters.delete(check)
+          resolve()
+        }
+        waiters.add(check)
+        check()
+      }),
   }
 }
 
@@ -188,14 +238,15 @@ export function createWatchedTransport(): WatchedTransport {
 // the real sidecar through this wrapper and await the very send promises it started.
 export function trackedSidecar(): { readonly load: LoadSummaryRecovery; readonly sendsSettled: () => Promise<void> } {
   const sends: Promise<void>[] = []
-  const load: LoadSummaryRecovery = () => import("./session-summary-recovery").then((sidecar) => ({
-    ...sidecar,
-    sendSummaryRecord: (...args: Parameters<typeof sidecar.sendSummaryRecord>) => {
-      const send = sidecar.sendSummaryRecord(...args)
-      sends.push(send)
-      return send
-    },
-  }))
+  const load: LoadSummaryRecovery = () =>
+    import("./session-summary-recovery").then((sidecar) => ({
+      ...sidecar,
+      sendSummaryRecord: (...args: Parameters<typeof sidecar.sendSummaryRecord>) => {
+        const send = sidecar.sendSummaryRecord(...args)
+        sends.push(send)
+        return send
+      },
+    }))
   return {
     load,
     sendsSettled: async () => {

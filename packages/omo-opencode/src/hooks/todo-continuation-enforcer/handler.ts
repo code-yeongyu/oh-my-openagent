@@ -2,9 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
 import { handedBackSyncSessions } from "../../features/claude-code-session-state"
-import {
-  clearContinuationMarker,
-} from "../../features/run-continuation-state"
+import { clearContinuationMarker } from "../../features/run-continuation-state"
 import { log } from "../../shared/logger"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 
@@ -17,7 +15,7 @@ import { isTokenLimitError } from "./token-limit-detection"
 import { isUnrecoverableRequestError } from "./unrecoverable-request-error"
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === "object" && value !== null ? value as Record<string, unknown> : undefined
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : undefined
 }
 
 function getStringField(record: Record<string, unknown> | undefined, key: string): string | undefined {
@@ -37,10 +35,11 @@ function extractSessionErrorInfo(error: unknown): { name?: string; message?: str
   const nestedError = asRecord(root.error)
   const dataError = asRecord(data?.error)
 
-  const name = getStringField(root, "name")
-    ?? getStringField(data, "name")
-    ?? getStringField(nestedError, "name")
-    ?? getStringField(dataError, "name")
+  const name =
+    getStringField(root, "name") ??
+    getStringField(data, "name") ??
+    getStringField(nestedError, "name") ??
+    getStringField(dataError, "name")
 
   const messageParts = [
     getStringField(root, "message"),
@@ -62,13 +61,7 @@ export function createTodoContinuationHandler(args: {
   skipAgents?: string[]
   isContinuationStopped?: (sessionID: string) => boolean
 }): (input: { event: { type: string; properties?: unknown } }) => Promise<void> {
-  const {
-    ctx,
-    sessionStateStore,
-    backgroundManager,
-    skipAgents = DEFAULT_SKIP_AGENTS,
-    isContinuationStopped,
-  } = args
+  const { ctx, sessionStateStore, backgroundManager, skipAgents = DEFAULT_SKIP_AGENTS, isContinuationStopped } = args
 
   return async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
     const props = event.properties as Record<string, unknown> | undefined
@@ -97,7 +90,11 @@ export function createTodoContinuationHandler(args: {
         const state = sessionStateStore.getState(sessionID)
         state.tokenLimitDetected = true
         shouldCancelCountdown = true
-        log(`[${HOOK_NAME}] Token limit error detected via session.error`, { sessionID, errorName: error?.name, errorMessage: error?.message })
+        log(`[${HOOK_NAME}] Token limit error detected via session.error`, {
+          sessionID,
+          errorName: error?.name,
+          errorMessage: error?.message,
+        })
       } else if (isUnrecoverableRequestError(props?.error)) {
         const state = sessionStateStore.getState(sessionID)
         state.unrecoverableErrorDetected = true

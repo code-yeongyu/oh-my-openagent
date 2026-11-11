@@ -1,8 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import {
-  getHighVariant,
-  isAlreadyHighVariant,
-} from "./switcher"
+import { getHighVariant, isAlreadyHighVariant } from "./switcher"
 
 /**
  * DEPRECATION NOTICE:
@@ -65,12 +62,8 @@ describe("think-mode switcher", () => {
 
       it("should handle Gemini preview variants", () => {
         // given Gemini preview model IDs
-        expect(getHighVariant("gemini-3.1-pro")).toBe(
-          "gemini-3-1-pro-high"
-        )
-        expect(getHighVariant("gemini-3-flash")).toBe(
-          "gemini-3-flash-high"
-        )
+        expect(getHighVariant("gemini-3.1-pro")).toBe("gemini-3-1-pro-high")
+        expect(getHighVariant("gemini-3-flash")).toBe("gemini-3-flash-high")
       })
 
       it("should return null for already-high variants", () => {
@@ -197,5 +190,5 @@ describe("think-mode switcher", () => {
         expect(isAlreadyHighVariant("vertex_ai/gpt-5.4-high")).toBe(true)
       })
     })
-})
+  })
 })

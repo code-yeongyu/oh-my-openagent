@@ -39,7 +39,8 @@ export function loadAgents(options: LoadAgentsOptions = {}): LoadAgentsResult {
       const loaded = loadMarkdownAgent(path)
       if (loaded.ok) {
         overlayAgent(agents, loaded.agent)
-        if (loaded.agent.model !== undefined || loaded.agent.models !== undefined) markdownAgentsWithOwnModel.add(loaded.agent.name)
+        if (loaded.agent.model !== undefined || loaded.agent.models !== undefined)
+          markdownAgentsWithOwnModel.add(loaded.agent.name)
       } else diagnostics.push(loaded.diagnostic)
     }
   }

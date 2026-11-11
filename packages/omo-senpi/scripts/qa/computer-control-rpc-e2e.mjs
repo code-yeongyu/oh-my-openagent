@@ -118,26 +118,30 @@ function runScenario({ name, answer, senpiArgs = [] }) {
   writeFileSync(join(sandbox.cwd, "mock-script.json"), `${JSON.stringify({ steps }, null, 2)}\n`)
   return new Promise((resolvePromise) => {
     const started = Date.now()
-    const child = spawn(senpiBin, ["-e", mockProviderEntry, "--mode", "rpc", "--provider", "omo-mock", "--model", "mock-1", ...senpiArgs], {
-      cwd: sandbox.cwd,
-      env: {
-        ...isolatedChildEnv(scrubbedEnv(), sandbox.agentDir),
-        OMO_CODING_AGENT_DIR: sandbox.agentDir,
-        SENPI_CODING_AGENT_DIR: sandbox.agentDir,
-        PI_CODING_AGENT_DIR: sandbox.agentDir,
-        HOME: sandbox.homeDir,
-        USERPROFILE: sandbox.homeDir,
-        XDG_CONFIG_HOME: sandbox.xdgConfigHome,
-        XDG_DATA_HOME: sandbox.xdgDataHome,
-        XDG_CACHE_HOME: sandbox.xdgCacheHome,
-        PI_OFFLINE: "1",
-        OMO_SENPI_QA: "1",
-        SENPI_DESKTOP_BACKEND: `fake:${fakeDesktop}`,
+    const child = spawn(
+      senpiBin,
+      ["-e", mockProviderEntry, "--mode", "rpc", "--provider", "omo-mock", "--model", "mock-1", ...senpiArgs],
+      {
+        cwd: sandbox.cwd,
+        env: {
+          ...isolatedChildEnv(scrubbedEnv(), sandbox.agentDir),
+          OMO_CODING_AGENT_DIR: sandbox.agentDir,
+          SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+          PI_CODING_AGENT_DIR: sandbox.agentDir,
+          HOME: sandbox.homeDir,
+          USERPROFILE: sandbox.homeDir,
+          XDG_CONFIG_HOME: sandbox.xdgConfigHome,
+          XDG_DATA_HOME: sandbox.xdgDataHome,
+          XDG_CACHE_HOME: sandbox.xdgCacheHome,
+          PI_OFFLINE: "1",
+          OMO_SENPI_QA: "1",
+          SENPI_DESKTOP_BACKEND: `fake:${fakeDesktop}`,
+        },
+        stdio: ["pipe", "pipe", "pipe"],
+        // Own process group: the launcher re-execs under bun, so the kill must reach the whole group.
+        detached: true,
       },
-      stdio: ["pipe", "pipe", "pipe"],
-      // Own process group: the launcher re-execs under bun, so the kill must reach the whole group.
-      detached: true,
-    })
+    )
     let stdout = ""
     let stderr = ""
     let buffered = ""
@@ -184,7 +188,12 @@ function runScenario({ name, answer, senpiArgs = [] }) {
       buffered = lines.pop() ?? ""
       for (const event of jsonLines(lines.join("\n"))) {
         if (event.type === "extension_ui_request" && event.method === "confirm") {
-          confirms.push({ title: event.title, message: event.message, timeout: event.timeout, atMs: Date.now() - started })
+          confirms.push({
+            title: event.title,
+            message: event.message,
+            timeout: event.timeout,
+            atMs: Date.now() - started,
+          })
           if (answer !== undefined) {
             child.stdin.write(`${JSON.stringify({ type: "extension_ui_response", id: event.id, confirmed: answer })}\n`)
           }
@@ -268,7 +277,12 @@ if (!senpiBin) {
   process.exit(1)
 }
 if (!existsSync(enginePath)) {
-  console.log(JSON.stringify({ verdict: "FAIL", reason: `no engine at ${enginePath}; run cargo build --release -p senpi-desktop-engine` }))
+  console.log(
+    JSON.stringify({
+      verdict: "FAIL",
+      reason: `no engine at ${enginePath}; run cargo build --release -p senpi-desktop-engine`,
+    }),
+  )
   process.exit(1)
 }
 if (evidenceDir !== undefined) mkdirSync(evidenceDir, { recursive: true })
@@ -278,9 +292,17 @@ const report = []
 for (const scenario of scenarios.filter((candidate) => only === undefined || only.includes(candidate.name))) {
   const outcome = await runScenario(scenario)
   const checks = scenario.verify(outcome).map(([check, ok]) => ({ check, ok }))
-  report.push({ scenario: scenario.name, reason: outcome.reason, elapsedMs: outcome.elapsedMs, audits: outcome.audits, checks })
+  report.push({
+    scenario: scenario.name,
+    reason: outcome.reason,
+    elapsedMs: outcome.elapsedMs,
+    audits: outcome.audits,
+    checks,
+  })
 }
 const realStateUntouched = protectedFiles.map(fileDigest).every((digest, index) => digest === before[index])
 const passed = realStateUntouched && report.length > 0 && report.every(({ checks }) => checks.every(({ ok }) => ok))
-console.log(JSON.stringify({ verdict: passed ? "PASS" : "FAIL", senpiBin, enginePath, realStateUntouched, report }, null, 2))
+console.log(
+  JSON.stringify({ verdict: passed ? "PASS" : "FAIL", senpiBin, enginePath, realStateUntouched, report }, null, 2),
+)
 process.exit(passed ? 0 : 1)

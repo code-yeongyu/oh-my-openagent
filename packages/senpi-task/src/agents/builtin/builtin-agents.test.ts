@@ -29,7 +29,6 @@ const EXPECTED_LIBRARIAN_TOOL_ALLOWLIST = [...EXPECTED_TOOL_ALLOWLIST, "x_search
 
 const EXPECTED_REVIEWER_TOOL_ALLOWLIST = [...EXPECTED_TOOL_ALLOWLIST, "write"] as const
 
-
 describe("builtin curated agents", () => {
   test("#given the builtin defaults #when listing names sorted #then the 4 curated and 3 reviewer agents are present", () => {
     const names = BUILTIN_AGENT_DEFAULTS.map((definition) => definition.name).sort()
@@ -68,7 +67,6 @@ describe("builtin curated agents", () => {
       expect(definition.executionMode).toBe("in-process")
     }
   })
-
 
   test("#given every curated definition #when inspecting tool rules #then the expected literal allow-true rules are present", () => {
     for (const definition of CURATED_READONLY_AGENT_DEFAULTS) {

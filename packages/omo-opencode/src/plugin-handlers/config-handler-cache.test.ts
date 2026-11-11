@@ -85,7 +85,9 @@ beforeEach(async () => {
     packageJson: "/tmp/.config/opencode/package.json",
     omoConfig: "/tmp/.config/opencode/omo.jsonc",
   })
-  spyOn(permissionCompat, unsafeTestValue("migrateAgentConfig")).mockImplementation((config: Record<string, unknown>) => config)
+  spyOn(permissionCompat, unsafeTestValue("migrateAgentConfig")).mockImplementation(
+    (config: Record<string, unknown>) => config,
+  )
 
   spyOn(modelResolver, unsafeTestValue("resolveModelWithFallback")).mockReturnValue({
     model: "anthropic/claude-opus-4-7",
@@ -201,7 +203,9 @@ describe("Config handler hot path caching", () => {
       { name: getAgentListDisplayName("sisyphus") },
       { name: getAgentListDisplayName("prometheus") },
       { name: getAgentListDisplayName("hephaestus") },
-    ].toSorted((left, right) => left.name.localeCompare(right.name)).map((agent) => agent.name)
+    ]
+      .toSorted((left, right) => left.name.localeCompare(right.name))
+      .map((agent) => agent.name)
 
     // #then
     expect(sortedNames).toEqual([

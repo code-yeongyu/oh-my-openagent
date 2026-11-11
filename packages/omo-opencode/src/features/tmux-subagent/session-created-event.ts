@@ -1,8 +1,6 @@
 import { isRecord } from "@oh-my-opencode/utils"
 type UnknownRecord = Record<string, unknown>
 
-
-
 function getNestedRecord(value: unknown, key: string): UnknownRecord | undefined {
   if (!isRecord(value)) return undefined
   const nested = value[key]
@@ -20,10 +18,7 @@ export interface SessionCreatedEvent {
   properties?: { info?: { id?: string; parentID?: string; title?: string } }
 }
 
-export function coerceSessionCreatedEvent(input: {
-  type: string
-  properties?: unknown
-}): SessionCreatedEvent {
+export function coerceSessionCreatedEvent(input: { type: string; properties?: unknown }): SessionCreatedEvent {
   const properties = isRecord(input.properties) ? input.properties : undefined
   const info = getNestedRecord(properties, "info")
 

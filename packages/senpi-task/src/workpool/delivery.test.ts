@@ -19,8 +19,13 @@ test("#given parked worker #when drains queued items into one revive turn #then 
   await f.park(first.taskId)
   const captured = deferred<string>()
   const ack = deferred<void>()
-  f.followUp(async message => { captured.resolve(message); await ack.promise })
-  f.manager.workpools.subscribe(event => { if (event.kind === "admission_failed") captured.reject(new Error(event.error?.code)) })
+  f.followUp(async (message) => {
+    captured.resolve(message)
+    await ack.promise
+  })
+  f.manager.workpools.subscribe((event) => {
+    if (event.kind === "admission_failed") captured.reject(new Error(event.error?.code))
+  })
   // when
   const a = f.push("a", 2)
   const b = f.push("b", 3)
@@ -32,16 +37,27 @@ test("#given parked worker #when drains queued items into one revive turn #then 
   const turn = await dispatched
   // then
   expect(before?.pending_steering).toHaveLength(2)
-  expect(before?.pending_steering?.map(entry => entry.id)).toEqual([a.item_ids[0]?.item_id, b.item_ids[0]?.item_id])
+  expect(before?.pending_steering?.map((entry) => entry.id)).toEqual([a.item_ids[0]?.item_id, b.item_ids[0]?.item_id])
   expect(before?.notification.run_epoch).toBe(first.epoch + 1)
   expect(f.children.get(first.taskId)?.followUps).toEqual([message])
   expect(f.resumes).toHaveLength(1)
-  expect(f.resumes[0]?.memberScopedTools?.map(tool => tool.name)).toEqual(["workpool"])
+  expect(f.resumes[0]?.memberScopedTools?.map((tool) => tool.name)).toEqual(["workpool"])
   expect(f.store.load(first.taskId)?.pending_steering ?? []).toEqual([])
-  expect(f.inspect().items.find(item => item.key === "later")?.status).toBe("queued")
-  const yielded = f.yieldResults(first.taskId, turn.run_epoch ?? -1, [{ key: "a", data: { n: 2 } }, { key: "b", data: { n: 3 } }])
-  expect(yielded).toMatchObject({ results: [{ key: "a", status: "accepted" }, { key: "b", status: "accepted" }] })
-  expect(f.inspect().items.filter(item => item.key === "a" || item.key === "b")).toMatchObject([{ status: "completed", data: { n: 2 } }, { status: "completed", data: { n: 3 } }])
+  expect(f.inspect().items.find((item) => item.key === "later")?.status).toBe("queued")
+  const yielded = f.yieldResults(first.taskId, turn.run_epoch ?? -1, [
+    { key: "a", data: { n: 2 } },
+    { key: "b", data: { n: 3 } },
+  ])
+  expect(yielded).toMatchObject({
+    results: [
+      { key: "a", status: "accepted" },
+      { key: "b", status: "accepted" },
+    ],
+  })
+  expect(f.inspect().items.filter((item) => item.key === "a" || item.key === "b")).toMatchObject([
+    { status: "completed", data: { n: 2 } },
+    { status: "completed", data: { n: 3 } },
+  ])
   evidence("happy", { before, after: f.store.load(first.taskId), first, turn, yielded, pool: f.inspect() })
 })
 
@@ -69,12 +85,25 @@ test("#given a curated worker #when the engine grants its yield wrapper #then re
   const { SessionManager } = await loadSenpiBarrel()
   const tool = createWorkpoolWorkerTool({ workpools: f.manager.workpools, taskId: "st_00000001", runEpoch: () => 0 })
   // when
-  const options = buildChildSessionOptions({ spec: {
-    taskId: "st_00000001", parentSessionId: "parent", rootSessionId: "root", depth: 1,
-    cwd: f.root, sessionDir: f.root, prompt: "fixture", agentType: "explore", toolAllowlist: ["read"], memberScopedTools: [tool],
-  }, sessionManager: SessionManager.inMemory(f.root), sharedParentTools: [], uiOnlyToolNames: [] })
+  const options = buildChildSessionOptions({
+    spec: {
+      taskId: "st_00000001",
+      parentSessionId: "parent",
+      rootSessionId: "root",
+      depth: 1,
+      cwd: f.root,
+      sessionDir: f.root,
+      prompt: "fixture",
+      agentType: "explore",
+      toolAllowlist: ["read"],
+      memberScopedTools: [tool],
+    },
+    sessionManager: SessionManager.inMemory(f.root),
+    sharedParentTools: [],
+    uiOnlyToolNames: [],
+  })
   // then
-  expect(options.customTools?.map(tool => tool.name)).toEqual(["workpool", "bash"])
+  expect(options.customTools?.map((tool) => tool.name)).toEqual(["workpool", "bash"])
   expect(options.tools).toEqual(["read", "workpool"])
 })
 
@@ -89,7 +118,10 @@ test("#given malformed yield siblings #when the actual worker tool schema admits
   expect(Value.Check(tool.parameters, input)).toBe(true)
   expect(Value.Check(tool.parameters, { ...input, op: "create" })).toBe(false)
   const result = f.manager.workpools.yieldResults(worker.taskId, worker.epoch, input)
-  expect(result.results).toMatchObject([{ status: "refused", error: { code: "invalid_input" } }, { key: "a", status: "accepted" }])
+  expect(result.results).toMatchObject([
+    { status: "refused", error: { code: "invalid_input" } },
+    { key: "a", status: "accepted" },
+  ])
 })
 
 test("#given a crash before steering append #when a new manager attaches #then one recovered batched turn runs without replaying the original prompt", async () => {
@@ -100,9 +132,19 @@ test("#given a crash before steering append #when a new manager attaches #then o
   await f.park(worker.taskId)
   f.manager.workpools.dispose()
   f.push("recovered")
-  createWorkpoolStore(f.store.stateDir).mutate(f.pool.pool_id, pool => ({ ...pool,
-    items: pool.items.map(item => item.key === "recovered" ? { ...item, status: "assigned", binding: { task_id: worker.taskId, run_epoch: 1, generation: 1 }, delivery: { phase: "queued" } } : item),
-    workers: pool.workers.map(item => ({ ...item, status: "busy", run_epoch: 1 })),
+  createWorkpoolStore(f.store.stateDir).mutate(f.pool.pool_id, (pool) => ({
+    ...pool,
+    items: pool.items.map((item) =>
+      item.key === "recovered"
+        ? {
+            ...item,
+            status: "assigned",
+            binding: { task_id: worker.taskId, run_epoch: 1, generation: 1 },
+            delivery: { phase: "queued" },
+          }
+        : item,
+    ),
+    workers: pool.workers.map((item) => ({ ...item, status: "busy", run_epoch: 1 })),
   }))
   const restarted = restartedFixture(f.root)
   try {
@@ -116,12 +158,22 @@ test("#given a crash before steering append #when a new manager attaches #then o
     expect(restarted.queues[0]).toHaveLength(1)
     expect(restarted.children.get(worker.taskId)?.followUps).toHaveLength(1)
     expect(restarted.store.load(worker.taskId)?.pending_steering ?? []).toEqual([])
-    expect(restarted.manager.workpools.yieldResults(worker.taskId, 1, { op: "yield", results: [{ key: "recovered", data: 42 }] }).results[0]?.status).toBe("accepted")
+    expect(
+      restarted.manager.workpools.yieldResults(worker.taskId, 1, {
+        op: "yield",
+        results: [{ key: "recovered", data: 42 }],
+      }).results[0]?.status,
+    ).toBe("accepted")
     const idle = restarted.manager.workpools.waitForEvent(f.pool.pool_id, "worker_idle", signal())
     restarted.children.get(worker.taskId)?.settle({ status: "completed", finalResponse: "fixture" })
     await idle
-    expect(restarted.manager.workpools.inspect(f.caller, f.pool.pool_id).items[1]).toMatchObject({ status: "completed", data: 42 })
-  } finally { await restarted.cleanup() }
+    expect(restarted.manager.workpools.inspect(f.caller, f.pool.pool_id).items[1]).toMatchObject({
+      status: "completed",
+      data: 42,
+    })
+  } finally {
+    await restarted.cleanup()
+  }
 })
 
 test("#given a rollback burnt the worker's next epoch #when a crashed turn bound above the burn is recovered #then it is dispatched instead of refused (#9562)", async () => {
@@ -135,9 +187,19 @@ test("#given a rollback burnt the worker's next epoch #when a crashed turn bound
   f.store.mutate(worker.taskId, (task) => ({ ...task, burnt_epoch: 1 }))
   f.push("recovered")
   // The next pool turn was bound at epoch 2 (above the burn), and the host died before dispatch.
-  createWorkpoolStore(f.store.stateDir).mutate(f.pool.pool_id, pool => ({ ...pool,
-    items: pool.items.map(item => item.key === "recovered" ? { ...item, status: "assigned", binding: { task_id: worker.taskId, run_epoch: 2, generation: 1 }, delivery: { phase: "queued" } } : item),
-    workers: pool.workers.map(item => ({ ...item, status: "busy", run_epoch: 2 })),
+  createWorkpoolStore(f.store.stateDir).mutate(f.pool.pool_id, (pool) => ({
+    ...pool,
+    items: pool.items.map((item) =>
+      item.key === "recovered"
+        ? {
+            ...item,
+            status: "assigned",
+            binding: { task_id: worker.taskId, run_epoch: 2, generation: 1 },
+            delivery: { phase: "queued" },
+          }
+        : item,
+    ),
+    workers: pool.workers.map((item) => ({ ...item, status: "busy", run_epoch: 2 })),
   }))
   const restarted = restartedFixture(f.root)
   try {
@@ -147,10 +209,20 @@ test("#given a rollback burnt the worker's next epoch #when a crashed turn bound
     const turn = await dispatched
     // then
     expect(turn).toMatchObject({ task_id: worker.taskId, run_epoch: 2 })
-    expect(restarted.manager.workpools.yieldResults(worker.taskId, 2, { op: "yield", results: [{ key: "recovered", data: 7 }] }).results[0]?.status).toBe("accepted")
+    expect(
+      restarted.manager.workpools.yieldResults(worker.taskId, 2, {
+        op: "yield",
+        results: [{ key: "recovered", data: 7 }],
+      }).results[0]?.status,
+    ).toBe("accepted")
     const idle = restarted.manager.workpools.waitForEvent(f.pool.pool_id, "worker_idle", signal())
     restarted.children.get(worker.taskId)?.settle({ status: "completed", finalResponse: "fixture" })
     await idle
-    expect(restarted.manager.workpools.inspect(f.caller, f.pool.pool_id).items[1]).toMatchObject({ status: "completed", data: 7 })
-  } finally { await restarted.cleanup() }
+    expect(restarted.manager.workpools.inspect(f.caller, f.pool.pool_id).items[1]).toMatchObject({
+      status: "completed",
+      data: 7,
+    })
+  } finally {
+    await restarted.cleanup()
+  }
 })

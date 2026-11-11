@@ -37,11 +37,13 @@ export function claudeCodePinFor(target: string, repoRoot: string): string | und
   if (name === undefined) return undefined
   const sdkDir = resolvePackageDir("@anthropic-ai/claude-agent-sdk")
   if (sdkDir === undefined) throw new Error("@anthropic-ai/claude-agent-sdk is not resolvable from the engine")
-  const sdk = JSON.parse(readFileSync(join(sdkDir, "package.json"), "utf8")) as { optionalDependencies?: Record<string, string>; claudeCodeVersion?: string }
+  const sdk = JSON.parse(readFileSync(join(sdkDir, "package.json"), "utf8")) as {
+    optionalDependencies?: Record<string, string>
+    claudeCodeVersion?: string
+  }
   const version = sdk.optionalDependencies?.[name]
   if (version === undefined) throw new Error(`the engine's claude-agent-sdk pins no ${name}`)
   const integrity = lockfileIntegrity(readFileSync(join(repoRoot, "bun.lock"), "utf8"), name, version)
   if (integrity === undefined) throw new Error(`bun.lock has no sha512 integrity for ${name}@${version}`)
   return `${JSON.stringify({ name, version, integrity, claudeCodeVersion: sdk.claudeCodeVersion }, null, 2)}\n`
 }
-

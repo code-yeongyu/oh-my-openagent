@@ -190,10 +190,7 @@ function isTranscriptEntry(value: unknown): value is TranscriptEntry {
   }
   if (value.kind === "tool_call") return true
   return (
-    (value.kind === "user" ||
-      value.kind === "assistant" ||
-      value.kind === "reasoning" ||
-      value.kind === "error") &&
+    (value.kind === "user" || value.kind === "assistant" || value.kind === "reasoning" || value.kind === "error") &&
     typeof value.text === "string"
   )
 }
@@ -246,10 +243,7 @@ export function parseConsumed(raw: string): FactsConsumedWatermark {
  * `captureCursorSnapshot` derives ranges. Message ids are opaque and carry no
  * lexical ordering, so every watermark comparison goes through this function.
  */
-export function canonicalPosition(
-  entries: readonly TranscriptEntry[],
-  messageId: string | null,
-): number {
+export function canonicalPosition(entries: readonly TranscriptEntry[], messageId: string | null): number {
   if (messageId === null) return -1
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index]
