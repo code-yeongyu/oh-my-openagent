@@ -203,16 +203,23 @@ pub(super) fn reader_sites(directory: &std::path::Path) -> Vec<Site> {
     let mut sites = Vec::new();
     for path in paths {
         let source = std::fs::read_to_string(&path).expect("read reader source");
-        let parsed = syn::parse_file(&source).expect("reader source parses");
         let file = path
             .strip_prefix(directory)
             .unwrap_or(&path)
             .to_string_lossy()
             .into_owned();
-        for item in &parsed.items {
-            if let syn::Item::Fn(function) = item {
-                walk_function(function, &file, &mut sites);
-            }
+        sites.extend(source_sites(&source, &file));
+    }
+    sites
+}
+
+/// Every field site of every reader function in one source file.
+pub(super) fn source_sites(source: &str, file: &str) -> Vec<Site> {
+    let parsed = syn::parse_file(source).expect("reader source parses");
+    let mut sites = Vec::new();
+    for item in &parsed.items {
+        if let syn::Item::Fn(function) = item {
+            walk_function(function, file, &mut sites);
         }
     }
     sites
