@@ -22,7 +22,8 @@ export const PLAN_EFFORT_BANDS = ["Quick", "Short", "Medium", "Large", "XL"] as 
 export type PlanEffortBand = (typeof PLAN_EFFORT_BANDS)[number]
 
 const EFFORT_LINE = /^(\*\*Effort:\*\*[ \t]*)(.*)$/
-const DURATION_VALUE = /(\d+(?:[.,]\d+)?)\s*(?:-|–|to)?\s*(\d+(?:[.,]\d+)?)?\s*(min(?:ute)?s?|h(?:ou)?rs?|d(?:ay)?s?|w(?:ee)?ks?|mo(?:nth)?s?)\b/i
+const DURATION_VALUE =
+  /(\d+(?:[.,]\d+)?)\s*(?:-|–|to)?\s*(\d+(?:[.,]\d+)?)?\s*(min(?:ute)?s?|h(?:ou)?rs?|d(?:ay)?s?|w(?:ee)?ks?|mo(?:nth)?s?)\b/i
 
 const HOURS_PER_UNIT: Readonly<Record<string, number>> = {
   min: 1 / 60,

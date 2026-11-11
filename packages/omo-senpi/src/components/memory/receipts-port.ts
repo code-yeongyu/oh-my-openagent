@@ -36,20 +36,26 @@ export async function emitMemoryReceipt(
   input: MemoryReceiptInput,
   port: MemoryReceiptsPort = DEFAULT_RECEIPTS_PORT,
   warn?: ReceiptWarn,
-): Promise<void> {
+): Promise<boolean> {
   try {
     await port.append(runtimeDir, input)
+    return true
   } catch (error) {
     warn?.("memory receipt write failed; the run's own artifact still records its outcome", {
       kind: input.kind,
       event: input.event,
       error: error instanceof Error ? error.message : String(error),
     })
+    return false
   }
 }
 
 /** Generation is `ledger.startedAt`, the one value both a live emitter and a later backfill can read. */
-export function runReceipt(ledger: RunReceiptLedger, event: MemoryReceiptEvent, extra: ReceiptExtra = {}): MemoryReceiptInput {
+export function runReceipt(
+  ledger: RunReceiptLedger,
+  event: MemoryReceiptEvent,
+  extra: ReceiptExtra = {},
+): MemoryReceiptInput {
   return {
     kind: ledger.kind,
     runId: ledger.runId,

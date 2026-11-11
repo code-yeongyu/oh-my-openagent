@@ -8,6 +8,11 @@
 
 mod backend;
 mod capture;
+mod compositor {
+    pub mod gnome;
+    pub mod hyprland;
+    pub mod kwin;
+}
 mod input;
 #[cfg(test)]
 mod live_tests;

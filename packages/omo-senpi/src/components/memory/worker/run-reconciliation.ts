@@ -1,5 +1,5 @@
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
-import { readdir } from "@oh-my-opencode/memory-core/fs"
+import { readdir, stat } from "@oh-my-opencode/memory-core/fs"
 import { hostname as readHostname } from "node:os"
 import { join } from "node:path"
 
@@ -13,11 +13,7 @@ import {
   type ReservedRun,
 } from "@oh-my-opencode/memory-core"
 
-import {
-  readRunJson,
-  runOutcomeMatchesLedger,
-  type RunOutcome,
-} from "./run-artifacts"
+import { readRunJson, runOutcomeMatchesLedger, writeRunJsonAtomic, type RunOutcome } from "./run-artifacts"
 import {
   abandonReservationRun,
   failReservationRun,
@@ -25,7 +21,7 @@ import {
   type ReservationRunResult,
   type ReservationStatePort,
 } from "./run-finalization"
-import { backfillRunReceipt } from "./run-receipt-backfill"
+import { backfillRunReceipt, runReceiptStamp } from "./run-receipt-backfill"
 import { classifyRunProcess, signalRecordedProcessGroup, waitUntil as waitForTime } from "./run-liveness"
 import { quarantineRun, reconcilePrelaunch } from "./run-reconciliation-prelaunch"
 import { RunTerminalClaimUnrecoverableError } from "./run-terminal-claim"
@@ -61,10 +57,22 @@ export interface ReflectionRunReconciliationOptions {
   readonly waitPolicy?: "deadline" | "none"
   readonly receipts?: MemoryReceiptsPort
   readonly warn?: ReceiptWarn
+  /** Called when a pass completes, with how many run directories it could not mark reconciled. */
+  readonly onPassComplete?: (state: { readonly unsettledRuns: number }) => void
 }
 
-export type ReconcileContext = Required<Pick<ReflectionRunReconciliationOptions, "now" | "hostname">>
-  & ReflectionRunReconciliationOptions
+/**
+ * Marks a terminal run directory whose receipt is backfilled and which holds no temporary, so later
+ * passes skip it. A terminal run never changes again; re-reading every one of them on every pass made
+ * a pass grow with every run the identity ever kept (#12355). The marker is honoured only while it is
+ * newer than the run's ledger and terminal sentinels. A rewrite that lands on the marker's own
+ * timestamp is caught by the receipt identity stored in the marker.
+ */
+const RUN_RECONCILED_MARKER = "reconciled.json"
+const RUN_STATE_FILES = ["ledger.json", "final.json", "abandoned.json", "quarantined.json"] as const
+
+export type ReconcileContext = Required<Pick<ReflectionRunReconciliationOptions, "now" | "hostname">> &
+  ReflectionRunReconciliationOptions
 
 export async function reconcileReflectionRuns(
   options: ReflectionRunReconciliationOptions,
@@ -81,26 +89,49 @@ export async function reconcileReflectionRuns(
     context.signal?.throwIfAborted()
     if (prelaunch.result !== undefined) results.push(prelaunch.result)
     await sweepStrandedRunTemporaries(
-      join(options.identity.paths.reflection, "completions"), context.now(), context.getPidLiveness,
+      join(options.identity.paths.reflection, "completions"),
+      context.now(),
+      context.getPidLiveness,
     )
     const runsDir = join(options.identity.paths.reflection, "runs")
+    let unsettledRuns = 0
     let reservation: ReservationState | undefined
     const reserved = async (): Promise<ReservationState> => {
-      reservation ??= await context.reservation.readState(context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined)
+      reservation ??= await context.reservation.readState(
+        context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined,
+      )
       return reservation
     }
     for (const name of await directoryNames(runsDir)) {
       context.signal?.throwIfAborted()
       // A retired-generation dir shares the active reservation's id; settling it through the
       // normal path would complete the live reservation, so it waits for a later pass.
-      if (name === prelaunch.retiredRunId) continue
-      const runDir = join(runsDir, name)
-      await sweepStrandedRunTemporaries(runDir, context.now(), context.getPidLiveness)
-      context.signal?.throwIfAborted()
-      if (["final.json", "abandoned.json", "quarantined.json"].some((file) => existsSync(join(runDir, file)))) {
-        await backfillRunReceipt(options.identity.paths.runtime, runDir, options.receipts, options.warn)
+      if (name === prelaunch.retiredRunId) {
+        unsettledRuns += 1
         continue
       }
+      const runDir = join(runsDir, name)
+      if (await isReconciledRun(runDir)) continue
+      const keptTemporaries = await sweepStrandedRunTemporaries(runDir, context.now(), context.getPidLiveness)
+      context.signal?.throwIfAborted()
+      if (["final.json", "abandoned.json", "quarantined.json"].some((file) => existsSync(join(runDir, file)))) {
+        const backfilled = await backfillRunReceipt(
+          options.identity.paths.runtime,
+          runDir,
+          options.receipts,
+          options.warn,
+        )
+        if (backfilled && keptTemporaries === 0) {
+          const receipt = await runReceiptStamp(runDir)
+          await writeRunJsonAtomic(join(runDir, RUN_RECONCILED_MARKER), {
+            version: 1,
+            runId: name,
+            ...(receipt === undefined ? {} : { receipt }),
+          })
+        } else unsettledRuns += 1
+        continue
+      }
+      unsettledRuns += 1
       const ledger = existsSync(join(runDir, "ledger.json")) ? await readLedgerOrUndefined(runDir) : undefined
       context.signal?.throwIfAborted()
       if (ledger === undefined) {
@@ -117,6 +148,7 @@ export async function reconcileReflectionRuns(
     }
     context.signal?.throwIfAborted()
     await sweepReflectionRunOrphans(context)
+    options.onPassComplete?.({ unsettledRuns })
     return results
   } catch (error) {
     if (context.deferOnSchedulerContention && error instanceof LockContentionError) return []
@@ -133,15 +165,26 @@ async function reconcileRunOrQuarantine(
     return await reconcileRun(context, runDir, ledger)
   } catch (error) {
     if (!(error instanceof RunTerminalClaimUnrecoverableError)) throw error
-    const active = (await context.reservation.readState(
-      context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined,
-    )).active
+    const active = (
+      await context.reservation.readState(context.deferOnSchedulerContention ? { waitTimeoutMs: 0 } : undefined)
+    ).active
     context.signal?.throwIfAborted()
-    return quarantineRun(context, runDir, ledger.runId, "terminal_claim_unrecoverable", ledger, active?.runId === ledger.runId ? active : undefined)
+    return quarantineRun(
+      context,
+      runDir,
+      ledger.runId,
+      "terminal_claim_unrecoverable",
+      ledger,
+      active?.runId === ledger.runId ? active : undefined,
+    )
   }
 }
 
-async function settleStrandedRun(context: ReconcileContext, runDir: string, runId: string): Promise<ReflectionRunReconcileResult | undefined> {
+async function settleStrandedRun(
+  context: ReconcileContext,
+  runDir: string,
+  runId: string,
+): Promise<ReflectionRunReconcileResult | undefined> {
   const decision = await decideStrandedRun(runDir, context)
   context.signal?.throwIfAborted()
   // A valid ledger never reaches here: reconcileRun settles it with worktree-tip recovery.
@@ -182,7 +225,9 @@ async function reconcileRun(
   if (ledger.queued === true && (supervisor === "alive" || supervisor === "unknown")) return undefined
   if (supervisor === "alive" || supervisor === "unknown") {
     if (context.waitPolicy === "none") return undefined
-    const wait = context.waitForOutcome ?? ((path, deadlineAt, signal) => waitForRunSentinel(path, deadlineAt, context.now, signal))
+    const wait =
+      context.waitForOutcome ??
+      ((path, deadlineAt, signal) => waitForRunSentinel(path, deadlineAt, context.now, signal))
     await wait(outcomePath, ledger.deadlineAt, context.signal)
     // The sentinel's abort result is also "timeout". It is NOT evidence the run timed out:
     // leave its artifacts and reservation intact for the next observer before any terminal claim.
@@ -205,10 +250,7 @@ async function reconcileRun(
   return await reconcileDeadSupervisor(context, runDir, ledger)
 }
 
-async function hasMatchingOutcome(
-  outcomePath: string,
-  ledger: ReservationRunLedger,
-): Promise<boolean> {
+async function hasMatchingOutcome(outcomePath: string, ledger: ReservationRunLedger): Promise<boolean> {
   if (!existsSync(outcomePath)) return false
   const outcome = await readRunJson<RunOutcome>(outcomePath)
   return runOutcomeMatchesLedger(ledger, outcome)
@@ -217,7 +259,8 @@ async function hasMatchingOutcome(
 // The child exited on its own after the supervisor died, so a tip it committed may be complete.
 const RECOVER_TIP = { recoverWorktreeTip: true } as const
 const SUPERVISOR_DIED_DETAIL = "reflection supervisor died before publishing an outcome"
-const CHILD_KILLED_AFTER_DEADLINE_DETAIL = "reflection child outlived its deadline after the supervisor died and was killed"
+const CHILD_KILLED_AFTER_DEADLINE_DETAIL =
+  "reflection child outlived its deadline after the supervisor died and was killed"
 
 async function reconcileDeadSupervisor(
   context: ReconcileContext,
@@ -236,7 +279,8 @@ async function reconcileDeadSupervisor(
   context.signal?.throwIfAborted()
   child = await classifyRunProcess(ledger.childPid, ledger.childProcessStart, context)
   context.signal?.throwIfAborted()
-  if (child === "dead") return await failReservationRun(context, runDir, ledger, "failed", deadRunDetail(ledger, child), RECOVER_TIP)
+  if (child === "dead")
+    return await failReservationRun(context, runDir, ledger, "failed", deadRunDetail(ledger, child), RECOVER_TIP)
   if (child === "unknown") return await abandonReservationRun(context, runDir, ledger)
   const signal = context.signalProcessGroup ?? signalRecordedProcessGroup
   if (ledger.childPid !== undefined) signal(ledger.childPid, "SIGTERM")
@@ -251,7 +295,13 @@ async function reconcileDeadSupervisor(
     context.signal?.throwIfAborted()
   }
   return child === "dead"
-    ? await failReservationRun(context, runDir, ledger, "timed_out", `${CHILD_KILLED_AFTER_DEADLINE_DETAIL}\n${deadProcesses(ledger)}`)
+    ? await failReservationRun(
+        context,
+        runDir,
+        ledger,
+        "timed_out",
+        `${CHILD_KILLED_AFTER_DEADLINE_DETAIL}\n${deadProcesses(ledger)}`,
+      )
     : undefined
 }
 
@@ -262,6 +312,36 @@ function deadRunDetail(ledger: ReservationRunLedger, child: "dead" | "absent"): 
 
 function deadProcesses(ledger: ReservationRunLedger): string {
   return `supervisor pid ${ledger.pid ?? "unknown"}, child pid ${ledger.childPid ?? "unknown"}`
+}
+
+async function isReconciledRun(runDir: string): Promise<boolean> {
+  const markerPath = join(runDir, RUN_RECONCILED_MARKER)
+  const marked = await modifiedAt(markerPath)
+  if (marked === undefined) return false
+  let tied = false
+  for (const file of RUN_STATE_FILES) {
+    const changed = await modifiedAt(join(runDir, file))
+    if (changed === undefined) continue
+    if (changed > marked) return false
+    if (changed === marked) tied = true
+  }
+  if (!tied) return true
+  let recorded: { readonly receipt?: unknown }
+  try {
+    recorded = await readRunJson(markerPath)
+  } catch {
+    return false
+  }
+  return recorded.receipt === (await runReceiptStamp(runDir))
+}
+
+async function modifiedAt(path: string): Promise<number | undefined> {
+  try {
+    return (await stat(path)).mtimeMs
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined
+    throw error
+  }
 }
 
 async function directoryNames(path: string): Promise<readonly string[]> {

@@ -3,7 +3,13 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { bunFormatter, createFormatterStep, detectFormatter, formatOnMutationDefaults, resolveFormatMode } from "./formatter"
+import {
+  bunFormatter,
+  createFormatterStep,
+  detectFormatter,
+  formatOnMutationDefaults,
+  resolveFormatMode,
+} from "./formatter"
 import { AUTOMOUNT_TRIGGER_CASES, withAutomountTrap } from "../../automount-trap.test-support"
 
 describe("format-on-mutation policy", () => {
@@ -24,7 +30,8 @@ describe("format-on-mutation policy", () => {
   })
 
   it("contains machine-readable change notice tokens", () => {
-    const notice = "(OmO) auto-formatted src/a.ts with biome (+1/-2 lines). File content changed; re-read before exact-text edits."
+    const notice =
+      "(OmO) auto-formatted src/a.ts with biome (+1/-2 lines). File content changed; re-read before exact-text edits."
     expect(notice).toContain("auto-formatted")
     expect(notice).toContain("re-read before exact-text edits")
   })
@@ -87,12 +94,15 @@ describe("bun format in place of prettier", () => {
     const filePath = join(cwd, "a.ts")
     writeFileSync(filePath, "const a=1\n")
     const script = join(cwd, "fake-bun.mjs")
-    writeFileSync(script, [
-      'import { appendFileSync, writeFileSync } from "node:fs";',
-      `appendFileSync(${JSON.stringify(join(cwd, "calls.log"))}, process.argv.slice(2).join(" ") + "\\n");`,
-      'const args = process.argv.slice(2);',
-      'if (args[0] === "format" && args.includes("--write")) writeFileSync(args[args.length - 1], "const a = 1;\\n");',
-    ].join("\n"))
+    writeFileSync(
+      script,
+      [
+        'import { appendFileSync, writeFileSync } from "node:fs";',
+        `appendFileSync(${JSON.stringify(join(cwd, "calls.log"))}, process.argv.slice(2).join(" ") + "\\n");`,
+        "const args = process.argv.slice(2);",
+        'if (args[0] === "format" && args.includes("--write")) writeFileSync(args[args.length - 1], "const a = 1;\\n");',
+      ].join("\n"),
+    )
     const bin = process.platform === "win32" ? join(cwd, "bun.cmd") : join(cwd, "bun")
     if (process.platform === "win32") writeFileSync(bin, `@"${process.execPath}" "${script}" %*\r\n`)
     else {
@@ -108,7 +118,11 @@ describe("bun format in place of prettier", () => {
       resolveBunFormat: async () => (probes++, bunHasFormat ? bin : undefined),
     })
     const calls = () => {
-      try { return readFileSync(join(cwd, "calls.log"), "utf8").trim().split("\n").filter(Boolean) } catch { return [] }
+      try {
+        return readFileSync(join(cwd, "calls.log"), "utf8").trim().split("\n").filter(Boolean)
+      } catch {
+        return []
+      }
     }
     return { cwd, filePath, step, calls, probes: () => probes }
   }
@@ -142,7 +156,10 @@ describe("bun format in place of prettier", () => {
   })
 
   it("#given biome or no formatter config #when a file is written #then bun format is never probed", async () => {
-    for (const markers of [["biome.json", ".prettierrc"], ["package.json", "bun.lock"]]) {
+    for (const markers of [
+      ["biome.json", ".prettierrc"],
+      ["package.json", "bun.lock"],
+    ]) {
       const { cwd, filePath, step, calls, probes } = arrange(markers, true)
 
       await step({ toolName: "write", input: { filePath } }, cwd)
@@ -154,13 +171,20 @@ describe("bun format in place of prettier", () => {
 })
 
 describe("format-on-mutation never probes a macOS automount trigger (#11545)", () => {
-  test.each([...AUTOMOUNT_TRIGGER_CASES])("#given a mutation of %s on darwin #when the formatter step runs #then the file is skipped without touching the trigger", async (filePath) => {
-    const step = createFormatterStep({ markers: () => ["biome.json"], resolveBinary: () => null, daemonFormat: async () => ({ isError: true }) })
-    let result: unknown
-    const touched = await withAutomountTrap(async () => {
-      result = await step({ toolName: "write", input: { filePath } }, "/tmp")
-    })
-    expect(touched).toEqual([])
-    expect(result).toEqual({ content: undefined, error: undefined })
-  })
+  test.each([...AUTOMOUNT_TRIGGER_CASES])(
+    "#given a mutation of %s on darwin #when the formatter step runs #then the file is skipped without touching the trigger",
+    async (filePath) => {
+      const step = createFormatterStep({
+        markers: () => ["biome.json"],
+        resolveBinary: () => null,
+        daemonFormat: async () => ({ isError: true }),
+      })
+      let result: unknown
+      const touched = await withAutomountTrap(async () => {
+        result = await step({ toolName: "write", input: { filePath } }, "/tmp")
+      })
+      expect(touched).toEqual([])
+      expect(result).toEqual({ content: undefined, error: undefined })
+    },
+  )
 })

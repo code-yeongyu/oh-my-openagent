@@ -91,7 +91,14 @@ function mentionsPath(text, path) {
   return forms.some((form) => text.includes(form))
 }
 
-import { APPLIED_TYPE, UNKNOWN_TYPE, UNAVAILABLE_TYPE, PROFILE_TYPES, KNOWN_PROFILES, SCENARIOS } from "./model-profile-e2e-scenarios.mjs"
+import {
+  APPLIED_TYPE,
+  UNKNOWN_TYPE,
+  UNAVAILABLE_TYPE,
+  PROFILE_TYPES,
+  KNOWN_PROFILES,
+  SCENARIOS,
+} from "./model-profile-e2e-scenarios.mjs"
 
 function parseArgs(argv) {
   const args = { bundle: defaultPluginRoot, scenarios: Object.keys(SCENARIOS) }
@@ -183,7 +190,6 @@ function spawnEnv(sandbox, sessionDir, scenario) {
   }
 }
 
-
 function runScenario(name, scenario, args, senpiBin) {
   const { sandbox, sessionDir, settingsPath } = seedScenario(args.bundle, scenario)
   const settingsBefore = sha256File(settingsPath)
@@ -192,13 +198,17 @@ function runScenario(name, scenario, args, senpiBin) {
   const thinkingArgs = scenario.cliThinking === undefined ? [] : ["--thinking", scenario.cliThinking]
   try {
     const spawnSenpi = (extraArgs, prompt) =>
-      spawnSync(senpiBin, ["-e", mockProviderEntry, "-p", "--mode", "json", ...extraArgs, "--session-dir", sessionDir, prompt], {
-        cwd: sandbox.cwd,
-        env: spawnEnv(sandbox, sessionDir, scenario),
-        encoding: "utf8",
-        timeout: 120_000,
-        maxBuffer: 64 * 1024 * 1024,
-      })
+      spawnSync(
+        senpiBin,
+        ["-e", mockProviderEntry, "-p", "--mode", "json", ...extraArgs, "--session-dir", sessionDir, prompt],
+        {
+          cwd: sandbox.cwd,
+          env: spawnEnv(sandbox, sessionDir, scenario),
+          encoding: "utf8",
+          timeout: 120_000,
+          maxBuffer: 64 * 1024 * 1024,
+        },
+      )
     // A resume scenario first runs a turn on the CLI model, then continues that session with the
     // lane configured: the continued session must keep its own model and get no profile notice.
     const runs = [spawnSenpi([...modelArgs, ...thinkingArgs], "run the scripted scenario")]
@@ -214,7 +224,11 @@ function runScenario(name, scenario, args, senpiBin) {
     // reach the model as user text.
     const profileNotices = entries
       .filter((entry) => entry.type === "custom" && PROFILE_TYPES.includes(entry.customType))
-      .map((entry) => ({ customType: entry.customType, content: entry.data?.content ?? "", details: entry.data?.details ?? null }))
+      .map((entry) => ({
+        customType: entry.customType,
+        content: entry.data?.content ?? "",
+        details: entry.data?.details ?? null,
+      }))
     const lastAssistant = assistantMessages.at(-1) ?? null
 
     const checks = {
@@ -223,20 +237,33 @@ function runScenario(name, scenario, args, senpiBin) {
       settings_json_unchanged:
         scenario.cliThinking === undefined
           ? settingsBefore === settingsAfter
-          : onlyCliThinkingPersisted(settingsBeforeJson, settingsAfterJson, `omo-mock/${scenario.cliModel}`, scenario.cliThinking),
+          : onlyCliThinkingPersisted(
+              settingsBeforeJson,
+              settingsAfterJson,
+              `omo-mock/${scenario.cliModel}`,
+              scenario.cliThinking,
+            ),
       turn_model: lastAssistant?.model === scenario.expect.model,
       notice:
         scenario.expect.notice === null
           ? profileNotices.length === 0
           : profileNotices.length === 1 && profileNotices[0].customType === scenario.expect.notice,
-      notice_not_in_conversation: entries.every((entry) => !(entry.type === "custom_message" && PROFILE_TYPES.includes(entry.customType))),
+      notice_not_in_conversation: entries.every(
+        (entry) => !(entry.type === "custom_message" && PROFILE_TYPES.includes(entry.customType)),
+      ),
     }
-    checks.memory_root_in_sandbox = isInside(sandbox.root, resolveMemoryRoot(spawnEnv(sandbox, sessionDir, scenario), sandbox.cwd))
-    checks.real_memory_root_unseen = runs.every((each) => !mentionsPath(`${each.stdout ?? ""}\n${each.stderr ?? ""}`, realMemoryRoot))
+    checks.memory_root_in_sandbox = isInside(
+      sandbox.root,
+      resolveMemoryRoot(spawnEnv(sandbox, sessionDir, scenario), sandbox.cwd),
+    )
+    checks.real_memory_root_unseen = runs.every(
+      (each) => !mentionsPath(`${each.stdout ?? ""}\n${each.stderr ?? ""}`, realMemoryRoot),
+    )
     const provider = scenario.expect.provider ?? "omo-mock"
     const engine = observeEngineThinking(entries, loadStreamCaptures(sandbox.cwd))
     checks.stream_model = engine.captures.some((capture) => capture.model === scenario.expect.model)
-    checks.notice_not_in_request = engine.captures.length > 0 && engine.captures.every((capture) => capture.profileNoticeInRequest === false)
+    checks.notice_not_in_request =
+      engine.captures.length > 0 && engine.captures.every((capture) => capture.profileNoticeInRequest === false)
     if (scenario.expect.notice === APPLIED_TYPE) {
       const applied = profileNotices[0]
       checks.notice_names_model = applied?.content.includes(`selected ${provider}/${scenario.expect.model}`) === true
@@ -251,16 +278,20 @@ function runScenario(name, scenario, args, senpiBin) {
       checks.notice_names_lane = profileNotices[0]?.content.includes(scenario.expect.label) === true
     }
     if (scenario.expect.authFailed !== undefined) {
-      checks.auth_failed_details = JSON.stringify(profileNotices[0]?.details?.authFailed ?? null) === JSON.stringify(scenario.expect.authFailed)
+      checks.auth_failed_details =
+        JSON.stringify(profileNotices[0]?.details?.authFailed ?? null) === JSON.stringify(scenario.expect.authFailed)
     }
     if (scenario.expect.authFailedAbsent === true) {
-      checks.auth_failed_absent = profileNotices[0]?.details !== null && !("authFailed" in (profileNotices[0]?.details ?? {}))
+      checks.auth_failed_absent =
+        profileNotices[0]?.details !== null && !("authFailed" in (profileNotices[0]?.details ?? {}))
     }
     if (scenario.oauthProviders !== undefined) {
       // The fixture exchange error carries the provider's response body; neither the notice nor the
       // engine's stderr may repeat it.
       const rawError = "invalid_grant"
-      checks.notice_no_raw_error = profileNotices.every((notice) => !notice.content.includes(rawError) && !JSON.stringify(notice.details).includes(rawError))
+      checks.notice_no_raw_error = profileNotices.every(
+        (notice) => !notice.content.includes(rawError) && !JSON.stringify(notice.details).includes(rawError),
+      )
       checks.stderr_no_raw_error = runs.every((each) => !(each.stderr ?? "").includes(rawError))
       checks.no_retry_fallback_turns = assistantMessages.every((message) => message.model === scenario.expect.model)
     }
@@ -288,23 +319,31 @@ function runScenario(name, scenario, args, senpiBin) {
     }
     if (name === "unknown-profile") {
       checks.notice_lists_known_profiles =
-        profileNotices[0]?.content.includes(`model_profile "nope" is not defined; known profiles: ${KNOWN_PROFILES}`) === true
+        profileNotices[0]?.content.includes(
+          `model_profile "nope" is not defined; known profiles: ${KNOWN_PROFILES}`,
+        ) === true
     }
     if (name === "capable-removed" || name === "deep-work-removed" || name === "simple-work-removed") {
       const retired = name.replace("-removed", "")
       checks.notice_lists_remaining_profiles =
-        profileNotices[0]?.content.includes(`model_profile "${retired}" is not defined; known profiles: ${KNOWN_PROFILES}`) === true
+        profileNotices[0]?.content.includes(
+          `model_profile "${retired}" is not defined; known profiles: ${KNOWN_PROFILES}`,
+        ) === true
     }
     if (name === "lane-beats-recommended-models") {
       // The first model_change is the engine's record of the session's initial model, never a switch.
-      const changes = entries.filter((entry) => entry.type === "model_change").map((entry) => `${entry.provider}/${entry.modelId}`)
+      const changes = entries
+        .filter((entry) => entry.type === "model_change")
+        .map((entry) => `${entry.provider}/${entry.modelId}`)
       const switched = changes.indexOf(scenario.expect.recommendedSwitch)
       checks.started_off_recommended_ladder = changes[0]?.endsWith(`/${scenario.expect.initialModel}`) === true
-      checks.recommended_models_switched_first = switched > 0 && switched < changes.lastIndexOf(`${provider}/${scenario.expect.model}`)
+      checks.recommended_models_switched_first =
+        switched > 0 && switched < changes.lastIndexOf(`${provider}/${scenario.expect.model}`)
     }
     if (scenario.resumeRun === true) {
       checks.resumed_one_session = entries.filter((entry) => entry.type === "session").length === 1
-      checks.resumed_turns = assistantMessages.length === 2 && assistantMessages.every((message) => message.model === scenario.expect.model)
+      checks.resumed_turns =
+        assistantMessages.length === 2 && assistantMessages.every((message) => message.model === scenario.expect.model)
     }
     if (name === "cli-model-wins") {
       checks.cli_model_kept = lastAssistant?.provider === "omo-mock" && lastAssistant?.model === "mock-1"
@@ -319,8 +358,13 @@ function runScenario(name, scenario, args, senpiBin) {
       turnModel: lastAssistant,
       profileNotices,
       engineThinking: engine,
-      modelChanges: entries.filter((entry) => entry.type === "model_change").map((entry) => `${entry.provider}/${entry.modelId}`),
-      stderrTail: (run.stderr ?? "").split("\n").filter((line) => line.trim().length > 0).slice(-4),
+      modelChanges: entries
+        .filter((entry) => entry.type === "model_change")
+        .map((entry) => `${entry.provider}/${entry.modelId}`),
+      stderrTail: (run.stderr ?? "")
+        .split("\n")
+        .filter((line) => line.trim().length > 0)
+        .slice(-4),
     }
   } finally {
     rmSync(sandbox.root, { recursive: true, force: true })
@@ -344,7 +388,13 @@ function main() {
   const afterCredentials = isolationDigest(realSenpiAgentDir)
   const realSenpiCredentialsUntouched = beforeCredentials === afterCredentials
   const passed = scenarios.every((scenario) => scenario.result === "PASS") && realSenpiCredentialsUntouched
-  console.log(JSON.stringify({ result: passed ? "PASS" : "FAIL", bundle: args.bundle, realSenpiCredentialsUntouched, scenarios }, null, 2))
+  console.log(
+    JSON.stringify(
+      { result: passed ? "PASS" : "FAIL", bundle: args.bundle, realSenpiCredentialsUntouched, scenarios },
+      null,
+      2,
+    ),
+  )
   process.exitCode = passed ? 0 : 1
 }
 

@@ -5,7 +5,14 @@ import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { createDagFileStore, createDagManager, DagManagerError, type DagManager, type DagNodeId, type DagRunId } from "@oh-my-opencode/senpi-task/dag"
+import {
+  createDagFileStore,
+  createDagManager,
+  DagManagerError,
+  type DagManager,
+  type DagNodeId,
+  type DagRunId,
+} from "@oh-my-opencode/senpi-task/dag"
 import { DagNodeControlError } from "../../../../senpi-task/src/dag/scheduler"
 import type { DagRunRecordV1 } from "../../../../senpi-task/src/dag/manager"
 
@@ -46,9 +53,10 @@ function fixture(): {
   return {
     manager,
     store,
-    runFileCount: () => fs.existsSync(store.paths.runs)
-      ? fs.readdirSync(store.paths.runs).filter((entry) => entry.endsWith(".json")).length
-      : 0,
+    runFileCount: () =>
+      fs.existsSync(store.paths.runs)
+        ? fs.readdirSync(store.paths.runs).filter((entry) => entry.endsWith(".json")).length
+        : 0,
   }
 }
 
@@ -97,7 +105,9 @@ describe("dag tool start action", () => {
     expect(result.details.snapshot.nodes.map((node) => String(node.id))).toEqual(["plan", "build"])
     expect(runFileCount()).toBe(1)
     // the manager is the single source of truth: the tool never fabricates its own snapshot
-    expect(String(manager.snapshot(result.details.run_id as DagRunId, parentSessionId).runId)).toBe(result.details.run_id)
+    expect(String(manager.snapshot(result.details.run_id as DagRunId, parentSessionId).runId)).toBe(
+      result.details.run_id,
+    )
   })
 
   test("#given an identical definition #when start runs twice #then the second call reuses the same run", async () => {
@@ -461,7 +471,9 @@ describe("dag tool start warnings", () => {
     expect(result.details.kind).toBe("started")
     if (result.details.kind !== "started") throw new Error("Expected start to succeed with warnings")
     expect(result.details.warnings).toBeDefined()
-    expect(result.details.warnings?.some((warning) => warning.includes('"plan"') && warning.includes("TASK:"))).toBe(true)
+    expect(result.details.warnings?.some((warning) => warning.includes('"plan"') && warning.includes("TASK:"))).toBe(
+      true,
+    )
     expect(result.details.warnings?.some((warning) => warning.includes("verification"))).toBe(true)
     const text = result.content[0]
     if (text?.type !== "text") throw new Error("Expected text content")
@@ -475,12 +487,14 @@ describe("dag tool start warnings", () => {
       nodes: [
         {
           id: "plan",
-          prompt: "TASK: draft the plan. DELIVERABLE: plan.md. SCOPE: write plan.md only. VERIFY: test -f plan.md. STOP WHEN: plan.md exists.",
+          prompt:
+            "TASK: draft the plan. DELIVERABLE: plan.md. SCOPE: write plan.md only. VERIFY: test -f plan.md. STOP WHEN: plan.md exists.",
           category: "quick",
         },
         {
           id: "verify",
-          prompt: "TASK: verify the plan. DELIVERABLE: verification transcript. SCOPE: read-only. VERIFY: bun test. STOP WHEN: tests pass.",
+          prompt:
+            "TASK: verify the plan. DELIVERABLE: verification transcript. SCOPE: read-only. VERIFY: bun test. STOP WHEN: tests pass.",
           category: "quick",
           dependsOn: ["plan"],
         },
@@ -503,7 +517,8 @@ describe("dag tool start warnings", () => {
       nodes: [
         {
           id: "review",
-          prompt: "TASK: review the plan. DELIVERABLE: findings. SCOPE: read-only. VERIFY: findings listed. STOP WHEN: findings are written.",
+          prompt:
+            "TASK: review the plan. DELIVERABLE: findings. SCOPE: read-only. VERIFY: findings listed. STOP WHEN: findings are written.",
           subagent_type: "momus",
           model: "anthropic/claude-opus-4",
         },
@@ -516,7 +531,11 @@ describe("dag tool start warnings", () => {
     // then
     expect(result.details.kind).toBe("started")
     if (result.details.kind !== "started") throw new Error("Expected the retired id to start as an ordinary agent name")
-    expect(result.details.snapshot.nodes[0]?.route).toEqual({ kind: "agent", agent: "momus", model: "anthropic/claude-opus-4" })
+    expect(result.details.snapshot.nodes[0]?.route).toEqual({
+      kind: "agent",
+      agent: "momus",
+      model: "anthropic/claude-opus-4",
+    })
     expect(result.details.warnings).toEqual([])
   })
 })
@@ -529,7 +548,13 @@ describe("dag tool argument validation for the control verbs", () => {
 
     // when
     const result = await runDagTool(
-      { ...deps(manager), retry: (runId: DagRunId) => { retried.push(runId); return Promise.resolve(manager.snapshot(runId, parentSessionId)) } },
+      {
+        ...deps(manager),
+        retry: (runId: DagRunId) => {
+          retried.push(runId)
+          return Promise.resolve(manager.snapshot(runId, parentSessionId))
+        },
+      },
       { action: "retry" },
     )
 
@@ -549,7 +574,13 @@ describe("dag tool argument validation for the control verbs", () => {
 
     // when
     const result = await runDagTool(
-      { ...deps(manager), retry: (runId: DagRunId) => { retried.push(runId); return Promise.resolve(manager.snapshot(runId, parentSessionId)) } },
+      {
+        ...deps(manager),
+        retry: (runId: DagRunId) => {
+          retried.push(runId)
+          return Promise.resolve(manager.snapshot(runId, parentSessionId))
+        },
+      },
       { action: "retry", run_id: started.details.run_id, node_id: "plan", node_ids: ["build"] },
     )
 
@@ -672,7 +703,9 @@ describe("dag tool argument validation for the control verbs", () => {
       {
         action: "amend",
         run_id: started.details.run_id,
-        definition: definition({ nodes: [{ id: "plan", prompt: "draft", category: "quick", model: "anthropic/claude-opus-4" }] }),
+        definition: definition({
+          nodes: [{ id: "plan", prompt: "draft", category: "quick", model: "anthropic/claude-opus-4" }],
+        }),
       },
     )
 
@@ -698,7 +731,11 @@ describe("dag tool control verb dispatch", () => {
       {
         ...deps(manager),
         retry: (runId: DagRunId, nodeIds?: readonly string[], options?: { readonly prompt?: string }) => {
-          calls.push({ runId, ...(nodeIds === undefined ? {} : { nodeIds }), ...(options?.prompt === undefined ? {} : { prompt: options.prompt }) })
+          calls.push({
+            runId,
+            ...(nodeIds === undefined ? {} : { nodeIds }),
+            ...(options?.prompt === undefined ? {} : { prompt: options.prompt }),
+          })
           return Promise.resolve(manager.snapshot(runId, parentSessionId))
         },
       },
@@ -818,7 +855,10 @@ describe("dag tool control verb refusal vocabulary", () => {
       const result = await runDagTool(
         {
           ...deps(manager),
-          retry: () => Promise.reject(new DagNodeControlError({ code: refusal.code, message: refusal.message, nodeIds: ["plan" as DagNodeId] })),
+          retry: () =>
+            Promise.reject(
+              new DagNodeControlError({ code: refusal.code, message: refusal.message, nodeIds: ["plan" as DagNodeId] }),
+            ),
         },
         { action: "retry", run_id: started.details.run_id },
       )
@@ -842,7 +882,10 @@ describe("dag tool control verb refusal vocabulary", () => {
     const result = await runDagTool(
       {
         ...deps(manager),
-        amend: () => Promise.reject(new DagManagerError({ code: "invalid_amendment", message: "removed node still has dependents" })),
+        amend: () =>
+          Promise.reject(
+            new DagManagerError({ code: "invalid_amendment", message: "removed node still has dependents" }),
+          ),
       },
       { action: "amend", run_id: started.details.run_id, definition: definition() },
     )
@@ -863,7 +906,13 @@ describe("dag tool control verb refusal vocabulary", () => {
     const result = await runDagTool(
       {
         ...deps(manager),
-        amend: () => Promise.reject(new DagManagerError({ code: "amend_running_node", message: "cannot amend scheduled or running nodes: plan" })),
+        amend: () =>
+          Promise.reject(
+            new DagManagerError({
+              code: "amend_running_node",
+              message: "cannot amend scheduled or running nodes: plan",
+            }),
+          ),
       },
       { action: "amend", run_id: started.details.run_id, definition: definition() },
     )
@@ -910,7 +959,11 @@ describe("dag tool control verb schema", () => {
 
     // when
     const tool = createDagTool(deps(manager))
-    const action = (tool.parameters as unknown as { properties: { action: { anyOf: readonly { const: string }[]; description: string } } }).properties.action
+    const action = (
+      tool.parameters as unknown as {
+        properties: { action: { anyOf: readonly { const: string }[]; description: string } }
+      }
+    ).properties.action
 
     // then
     expect(action.anyOf.map((member) => member.const)).toEqual([

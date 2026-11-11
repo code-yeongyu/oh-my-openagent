@@ -125,7 +125,10 @@ describe("computer-use component telemetry", () => {
     let starts = 0
     createComputerUseComponent({
       platform: "linux",
-      engineChild: () => () => { starts += 1; throw new Error("status must not spawn") },
+      engineChild: () => () => {
+        starts += 1
+        throw new Error("status must not spawn")
+      },
       loadSettings: (_cwd, platform) => resolveComputerSettings({ enginePath: "/task-3/engine" }, platform),
     }).register(pi, { logger: { info() {}, warn() {}, error() {} }, config: { getFlag: () => undefined } })
     const messages: string[] = []
@@ -138,7 +141,9 @@ describe("computer-use component telemetry", () => {
     })
     try {
       await (registration.options.handler as (args: string, ctx: unknown) => Promise<void>)("status", {
-        ...context(), hasUI: false, ui: { notify: (text: string) => messages.push(text) },
+        ...context(),
+        hasUI: false,
+        ui: { notify: (text: string) => messages.push(text) },
       })
     } finally {
       write.mockRestore()
@@ -166,13 +171,15 @@ describe("computer-use component telemetry", () => {
       pi.dispatch("tool_activated", { type: "tool_activated", toolNames: ["computer"] }, context()),
     ).rejects.toThrow("native-unavailable")
 
-    expect(telemetry.observations).toEqual([{
-      kind: "engine_error",
-      sessionId: "session-1",
-      code: "native-unavailable",
-      platform: "linux",
-      backend: "unavailable",
-    }])
+    expect(telemetry.observations).toEqual([
+      {
+        kind: "engine_error",
+        sessionId: "session-1",
+        code: "native-unavailable",
+        platform: "linux",
+        backend: "unavailable",
+      },
+    ])
   })
 
   test("#given telemetry observers #when a tool activates and the command disables it #then both transitions fire once", async () => {
@@ -237,30 +244,41 @@ describe("computer-use component telemetry", () => {
     const pi = register(engine.factory, telemetry.observers)
 
     await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, context())
-    await pi.dispatch("tool_execution_start", {
-      type: "tool_execution_start",
-      toolCallId: "call-1",
-      toolName: "computer",
-      args: { action: "run", code: "private typed text" },
-    }, context())
+    await pi.dispatch(
+      "tool_execution_start",
+      {
+        type: "tool_execution_start",
+        toolCallId: "call-1",
+        toolName: "computer",
+        args: { action: "run", code: "private typed text" },
+      },
+      context(),
+    )
     await pi.dispatch("tool_execution_end", {
       type: "tool_execution_end",
       toolCallId: "call-1",
       toolName: "computer",
       isError: true,
       result: {
-        content: [{ type: "text", text: "The user has specified a rule which prevents you from using this specific tool call." }],
+        content: [
+          {
+            type: "text",
+            text: "The user has specified a rule which prevents you from using this specific tool call.",
+          },
+        ],
       },
     })
 
-    expect(telemetry.observations).toEqual([{
-      kind: "permission_denied",
-      sessionId: "session-1",
-      scope: "tier",
-      permission: "exec",
-      platform: "linux",
-      backend: "unavailable",
-    }])
+    expect(telemetry.observations).toEqual([
+      {
+        kind: "permission_denied",
+        sessionId: "session-1",
+        scope: "tier",
+        permission: "exec",
+        platform: "linux",
+        backend: "unavailable",
+      },
+    ])
     expect(JSON.stringify(telemetry.observations)).not.toContain("private typed text")
   })
 })

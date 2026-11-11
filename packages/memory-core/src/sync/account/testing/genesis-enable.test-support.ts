@@ -14,21 +14,38 @@ export const fixture = async (serverOptions: { readonly stream?: boolean } = {})
   const v = await vector()
   const pinDir = await mkdtemp(join(tmpdir(), "genesis-enable-"))
   const entries: SyncEntry[] = []
-  const server = startChainWireServer(ACCOUNT, entries, { requireConsent: true, ...(serverOptions.stream === undefined ? {} : { stream: serverOptions.stream }) })
+  const server = startChainWireServer(ACCOUNT, entries, {
+    requireConsent: true,
+    ...(serverOptions.stream === undefined ? {} : { stream: serverOptions.stream }),
+  })
   const token = server.tokenFor(v.prepared.body.bootstrap.first_device, "service-first")
   let ceremonies = 0
   const options = { baseUrl: server.url, token: () => token }
   const input = {
-    account: ACCOUNT, serviceDeviceId: "service-first", serviceOrigin: server.url,
-    keyring: v.keyring, pinDir, chain: createAccountHttp(options), pairing: createPairingHttp(options),
-    rpId: "recovery.omo.dev", userName: "synthetic-user", roaming: false,
+    account: ACCOUNT,
+    serviceDeviceId: "service-first",
+    serviceOrigin: server.url,
+    keyring: v.keyring,
+    pinDir,
+    chain: createAccountHttp(options),
+    pairing: createPairingHttp(options),
+    rpId: "recovery.omo.dev",
+    userName: "synthetic-user",
+    roaming: false,
     genesis: {
       prfSupported: true,
-      createGenesis: async () => { ceremonies += 1; return { ok: true as const, prepared: v.prepared } },
+      createGenesis: async () => {
+        ceremonies += 1
+        return { ok: true as const, prepared: v.prepared }
+      },
     },
   }
   return {
-    ...v, input, entries, server, options,
+    ...v,
+    input,
+    entries,
+    server,
+    options,
     ceremonies: () => ceremonies,
     async close() {
       disposeRecoveryKeys(v.recovery)

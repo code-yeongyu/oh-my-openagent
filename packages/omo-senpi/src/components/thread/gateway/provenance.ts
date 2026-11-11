@@ -1,4 +1,4 @@
-import { GATEWAY_PROVENANCE_SENTENCE } from "./constants"
+import { GATEWAY_PEER_REPLY_SENTENCE, GATEWAY_PROVENANCE_SENTENCE } from "./constants"
 import type { DeliverySender } from "./adapter"
 import type { DeliveryRow, Provenance } from "./types"
 
@@ -9,7 +9,10 @@ function headerValue(value: string): string {
 
 /** A JSON string whose brackets are escaped too, so a quoted value can never close the `[...]` header. */
 function quotedHeaderValue(value: string): string {
-  return JSON.stringify(value).replace(/\[/g, "\\u005b").replace(/\]/g, "\\u005d").replace(/[\u0080-\u009f\u2028\u2029]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`)
+  return JSON.stringify(value)
+    .replace(/\[/g, "\\u005b")
+    .replace(/\]/g, "\\u005d")
+    .replace(/[\u0080-\u009f\u2028\u2029]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`)
 }
 
 export function deliveryProvenanceLine(provenance: Provenance | undefined): string {
@@ -19,7 +22,11 @@ export function deliveryProvenanceLine(provenance: Provenance | undefined): stri
 }
 
 /** The fields a delivery's text is rendered from: a stored row, or the delivery a send to another device makes (remote-ops.ts). */
-export type RenderedDelivery = Pick<DeliveryRow, "delivery_id" | "envelope" | "body" | "mode_requested" | "mode_effective" | "binding_id" | "binding_revision"> & Partial<DeliveryRow>
+export type RenderedDelivery = Pick<
+  DeliveryRow,
+  "delivery_id" | "envelope" | "body" | "mode_requested" | "mode_effective" | "binding_id" | "binding_revision"
+> &
+  Partial<DeliveryRow>
 
 function authorFields(row: RenderedDelivery): string[] {
   const author = "external" in row.envelope.origin ? row.envelope.origin.external.author : undefined
@@ -51,13 +58,19 @@ export function renderDeliveryText(row: RenderedDelivery): string {
   const header = [
     "OMO_GATEWAY v=1",
     `source=${source}`,
-    ...(envelope.provenance === undefined ? [] : [
-      `workspace=${quotedHeaderValue(envelope.provenance.workspace)}`,
-      `project=${quotedHeaderValue(envelope.provenance.project)}`,
-      ...(envelope.provenance.lane === undefined ? [] : [`lane=${quotedHeaderValue(envelope.provenance.lane)}`]),
-      ...(envelope.provenance.session === undefined ? [] : [`session=${quotedHeaderValue(envelope.provenance.session)}`]),
-      ...(envelope.provenance.device === undefined ? [] : [`device=${quotedHeaderValue(envelope.provenance.device)}`]),
-    ]),
+    ...(envelope.provenance === undefined
+      ? []
+      : [
+          `workspace=${quotedHeaderValue(envelope.provenance.workspace)}`,
+          `project=${quotedHeaderValue(envelope.provenance.project)}`,
+          ...(envelope.provenance.lane === undefined ? [] : [`lane=${quotedHeaderValue(envelope.provenance.lane)}`]),
+          ...(envelope.provenance.session === undefined
+            ? []
+            : [`session=${quotedHeaderValue(envelope.provenance.session)}`]),
+          ...(envelope.provenance.device === undefined
+            ? []
+            : [`device=${quotedHeaderValue(envelope.provenance.device)}`]),
+        ]),
     `actor=${headerValue(envelope.actor)}`,
     ...authorFields(row),
     `sender_session=${headerValue(senderSession)}`,
@@ -70,5 +83,5 @@ export function renderDeliveryText(row: RenderedDelivery): string {
   ].join(" ")
   // One header line, workspace and project first: readers split the text as header, sentence, body. Every label is
   // quoted with its brackets escaped, so the line still ends at the header's own `]`.
-  return `${deliveryProvenanceLine(envelope.provenance)} [${header}]\n${GATEWAY_PROVENANCE_SENTENCE}\n${JSON.stringify(row.body)}`
+  return `${deliveryProvenanceLine(envelope.provenance)} [${header}]\n${source === "peer_agent" ? `${GATEWAY_PROVENANCE_SENTENCE} ${GATEWAY_PEER_REPLY_SENTENCE}` : GATEWAY_PROVENANCE_SENTENCE}\n${JSON.stringify(row.body)}`
 }

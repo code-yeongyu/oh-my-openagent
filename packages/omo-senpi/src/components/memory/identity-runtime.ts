@@ -1,5 +1,7 @@
 import { dirname, join } from "node:path"
 
+import { stat } from "@oh-my-opencode/memory-core/fs"
+
 import {
   ReflectionReservationStore,
   TranscriptJournal,
@@ -16,10 +18,7 @@ import { ensureIdentityRuntimeDirs, type MemoryIdentityContext } from "./context
 import { currentLaunchScope, withLaunchScope } from "./launch-facts"
 import { createReflectionRunIdFactory } from "./reflection-run-id"
 import { buildSandboxTransform, type SandboxPolicy, type SandboxTransform } from "./sandbox"
-import {
-  resolveAgentReflectionSettings,
-  resolveMemorySettings,
-} from "./reflection-settings"
+import { resolveAgentReflectionSettings, resolveMemorySettings } from "./reflection-settings"
 import { resolveReflectionTriggerConfig } from "./trigger-wiring"
 import {
   SenpiSubprocessRunner,
@@ -51,7 +50,15 @@ export interface MemoryIdentityRuntime {
   readonly reservationPort: ReflectionReservationPort
   readonly runner: SenpiSubprocessRunner
   launch(run: ReservedRun): Promise<void>
-  reconcile(signal?: AbortSignal, options?: { readonly waitPolicy?: "deadline" | "none" }): Promise<void>
+  /**
+   * One identity-wide recovery pass. `skipUnchanged` returns at once when the last pass left every run
+   * directory reconciled and no run directory was added or removed since. `waitPolicy: "none"` (the
+   * per-turn pass) never waits on a run's deadline.
+   */
+  reconcile(
+    signal?: AbortSignal,
+    options?: { readonly skipUnchanged?: boolean; readonly waitPolicy?: "deadline" | "none" },
+  ): Promise<void>
   /** Resolves once every launch started in this process has returned (a detached child may still be running). */
   settled(): Promise<void>
 }
@@ -126,9 +133,13 @@ export function createIdentityRuntime(
     logger: deps.logger,
     resolveModelRegistry: deps.resolveModelRegistry,
     ...(deps.resolveSessionModel === undefined ? {} : { resolveSessionModel: deps.resolveSessionModel }),
-    ...(deps.resolveParentContextTokens === undefined ? {} : { resolveParentContextTokens: deps.resolveParentContextTokens }),
+    ...(deps.resolveParentContextTokens === undefined
+      ? {}
+      : { resolveParentContextTokens: deps.resolveParentContextTokens }),
     ...(deps.resolveParentSessionFile === undefined ? {} : { resolveParentSessionFile: deps.resolveParentSessionFile }),
-    ...(deps.resolveParentCacheReusable === undefined ? {} : { resolveParentCacheReusable: deps.resolveParentCacheReusable }),
+    ...(deps.resolveParentCacheReusable === undefined
+      ? {}
+      : { resolveParentCacheReusable: deps.resolveParentCacheReusable }),
     loadConfig: (options) => deps.loadConfig(options ?? {}),
     cwd: deps.cwd(),
     sandbox: lazySandbox,
@@ -159,7 +170,9 @@ export function createIdentityRuntime(
   const launch = (run: ReservedRun): Promise<void> => {
     const scope = currentLaunchScope()
     const owned = scope !== undefined && sameConversations(scope.conversationIds, run.request.conversationIds)
-    return owned ? launchInScope(run) : withLaunchScope({ conversationIds: run.request.conversationIds }, () => launchInScope(run))
+    return owned
+      ? launchInScope(run)
+      : withLaunchScope({ conversationIds: run.request.conversationIds }, () => launchInScope(run))
   }
   const launchInScope = (run: ReservedRun): Promise<void> => {
     const tracked: Promise<void> = ensureRuntimeDirsOnce()
@@ -176,6 +189,34 @@ export function createIdentityRuntime(
   }
 
   let reconciliation: { readonly promise: Promise<void>; readonly signal: AbortSignal | undefined } | undefined
+  // Taken before a pass that then left nothing to reconcile and no reservation held. A reservation write
+  // replaces active.lock or pending.json, and adding or removing a run directory changes runs/, so an equal
+  // stamp means no state a new pass would act on has changed (#12355). The reflection directory's own mtime
+  // is not used: the scheduler lock is created and removed there by every pass.
+  let settledRunsStamp: string | undefined
+  const reflectionDir = identity.identityPaths.reflection
+  const runsDir = join(reflectionDir, "runs")
+  const reservationPaths = [join(reflectionDir, "active.lock"), join(reflectionDir, "pending.json")]
+  const runsStamp = async (): Promise<string> =>
+    (await Promise.all([runsDir, ...reservationPaths].map(modifiedAt))).join(":")
+  const startReconciliation = (signal: AbortSignal | undefined): Promise<void> => {
+    let unsettledRuns: number | undefined
+    return runsStamp().then(async (stamp) => {
+      settledRunsStamp = undefined
+      await reconcileReflectionRuns({
+        identity: asMemoryIdentity(identity),
+        reservation: store,
+        launch,
+        deferOnSchedulerContention: true,
+        onPassComplete: (state) => {
+          unsettledRuns = state.unsettledRuns
+        },
+        ...(signal === undefined ? {} : { signal }),
+      })
+      const reserved = (await Promise.all(reservationPaths.map(modifiedAt))).some((mtime) => mtime !== -1)
+      if (unsettledRuns === 0 && !reserved) settledRunsStamp = stamp
+    })
+  }
   const runtime: MemoryIdentityRuntime = {
     identity,
     store,
@@ -185,34 +226,41 @@ export function createIdentityRuntime(
     async settled(): Promise<void> {
       while (inFlight.size > 0) await Promise.all([...inFlight])
     },
-    async reconcile(signal?: AbortSignal, options?: { readonly waitPolicy?: "deadline" | "none" }): Promise<void> {
+    async reconcile(
+      signal?: AbortSignal,
+      options: { readonly skipUnchanged?: boolean; readonly waitPolicy?: "deadline" | "none" } = {},
+    ): Promise<void> {
       // The per-turn pass never waits on a run's deadline, so it does not join or start the shared flight.
-      if (options?.waitPolicy === "none") {
+      if (options.waitPolicy === "none") {
         await reconcileReflectionRuns({
-          identity: asMemoryIdentity(identity), reservation: store, launch,
-          deferOnSchedulerContention: true, waitPolicy: "none",
+          identity: asMemoryIdentity(identity),
+          reservation: store,
+          launch,
+          deferOnSchedulerContention: true,
+          waitPolicy: "none",
           ...(signal === undefined ? {} : { signal }),
         })
         return
       }
+      if (options.skipUnchanged === true && settledRunsStamp !== undefined && (await runsStamp()) === settledRunsStamp)
+        return
       // One identity-wide pass, including any already-admitted durable transition. Its first
       // observer owns cancellation; an independent caller retries a foreign abort once.
       // Never clear the flight on timeout alone: a committed transition may still be finishing.
       for (let attempt = 0; ; attempt += 1) {
         signal?.throwIfAborted()
-        const flight = reconciliation ??= {
+        const flight = (reconciliation ??= {
           signal,
-          promise: reconcileReflectionRuns({
-            identity: asMemoryIdentity(identity), reservation: store, launch,
-            deferOnSchedulerContention: true,
-            ...(signal === undefined ? {} : { signal }),
-          }).then(() => undefined).finally(() => { reconciliation = undefined }),
-        }
+          promise: startReconciliation(signal).finally(() => {
+            reconciliation = undefined
+          }),
+        })
         try {
           await flight.promise
         } catch (error) {
           if (signal !== flight.signal) signal?.throwIfAborted()
-          if (attempt !== 0 || flight.signal === signal || !flight.signal?.aborted || error !== flight.signal.reason) throw error
+          if (attempt !== 0 || flight.signal === signal || !flight.signal?.aborted || error !== flight.signal.reason)
+            throw error
           continue
         }
         signal?.throwIfAborted()
@@ -232,6 +280,15 @@ export function createIdentityRuntime(
  */
 function pinnedAgentDirEnv(agentDir: string): NodeJS.ProcessEnv {
   return Object.fromEntries(AGENT_DIR_ENV_NAMES.map((name) => [name, agentDir]))
+}
+
+async function modifiedAt(path: string): Promise<number> {
+  try {
+    return (await stat(path)).mtimeMs
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return -1
+    throw error
+  }
 }
 
 function sameConversations(a: readonly string[], b: readonly string[]): boolean {
