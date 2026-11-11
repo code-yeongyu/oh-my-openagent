@@ -299,7 +299,7 @@ async function waitFile(path: string, ms: number): Promise<Json | undefined> {
 export function psCommand(dir: string, name: string, arg: Json, out: string): string {
   const argFile = join(dir, `${name}.arg.json`)
   writeFileSync(argFile, JSON.stringify(arg))
-  return `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ${HELPER} -Leg ${name} -ArgFile ${argFile} -Out ${out}`
+  return `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${HELPER}" -Leg ${name} -ArgFile "${argFile}" -Out "${out}"`
 }
 
 // A leg as a medium-integrity process (basic-user trust level of this account). It cannot write the
@@ -431,23 +431,36 @@ const UN = (reason: string): Result => ({ measured: `UNMEASURED: ${reason}`, ver
 // back-to-back runs (--measure then --verify) do not flip between CONFIRMS and CONTRADICTS.
 export const TIMING_BAND = 0.1
 export function timingVerdict(p95: number, limit: number, measured: string): Result {
-  return { measured, verdict: pick(p95 <= limit, "CONFIRMS", "CONTRADICTS") }
+  if (!Number.isFinite(p95)) return UN(`no samples; ${measured}`)
+  if (p95 <= limit * (1 - TIMING_BAND)) return { measured, verdict: "CONFIRMS" }
+  if (p95 > limit * (1 + TIMING_BAND)) return { measured, verdict: "CONTRADICTS" }
+  return UN(`p95 ${p95} ms within ${TIMING_BAND * 100} % of the ${Number(limit.toFixed(3))} ms limit; ${measured}`)
 }
 
 // The wheel rows count only when the settled-foreground control delivered every wheel: without that, a 0 could
 // be an oracle that cannot see a wheel.
 type Tally = { readonly delivered: number; readonly runs: number; readonly acquire?: string }
 export function wheelResults(control: Tally, flush: Tally, delay: Tally): Record<string, Result> {
+  const c = `control delivered ${control.delivered}/${control.runs}`
+  const proven = control.runs > 0 && control.delivered === control.runs
+  const why = `the settled-foreground ${c}, so the wheel oracle is not proven`
   return {
-    "n-wheel-control-settled": UN(`control not measured (${control.delivered}/${control.runs})`),
-    "n-wheel-after-raise-dwmflush": {
-      measured: `delivered ${flush.delivered}/${flush.runs}`,
-      verdict: pick(flush.delivered === flush.runs, "CONFIRMS", "CONTRADICTS"),
+    "n-wheel-control-settled": {
+      measured: `${c} foreground by ${control.acquire ?? "-"}`,
+      verdict: pick(proven, "CONFIRMS", "CONTRADICTS"),
     },
-    "n-wheel-after-raise-5ms": {
-      measured: `lost ${delay.runs - delay.delivered}/${delay.runs}`,
-      verdict: pick(delay.delivered === 0, "CONFIRMS", "CONTRADICTS"),
-    },
+    "n-wheel-after-raise-dwmflush": proven
+      ? {
+          measured: `delivered ${flush.delivered}/${flush.runs}; ${c}; foreground by ${flush.acquire ?? "-"}`,
+          verdict: pick(flush.runs > 0 && flush.delivered === flush.runs, "CONFIRMS", "CONTRADICTS"),
+        }
+      : UN(`${why}; delivered ${flush.delivered}/${flush.runs}`),
+    "n-wheel-after-raise-5ms": proven
+      ? {
+          measured: `lost ${delay.runs - delay.delivered}/${delay.runs}; ${c}; foreground by ${delay.acquire ?? "-"}`,
+          verdict: pick(delay.runs > 0 && delay.delivered === 0, "CONFIRMS", "CONTRADICTS"),
+        }
+      : UN(`${why}; lost ${delay.runs - delay.delivered}/${delay.runs}`),
   }
 }
 const tail = (v: unknown) => {
@@ -468,7 +481,7 @@ type Group = {
 }
 
 const hostFacts: Group = {
-  budgetS: 30,
+  budgetS: 15,
   ids: ["n-host-admin", "n-host-second-monitor", "n-affinity-wgc-monitor-secondary"],
   async run(ctx) {
     const f = ctx.facts
@@ -494,7 +507,7 @@ const hostFacts: Group = {
 }
 
 const isSupported: Group = {
-  budgetS: 120,
+  budgetS: 60,
   cleanupS: 15,
   ids: ["n-wgc-issupported-session0", "n-wgc-issupported-interactive"],
   async run(ctx) {
@@ -525,7 +538,7 @@ const isSupported: Group = {
 }
 
 const timers: Group = {
-  budgetS: 60,
+  budgetS: 30,
   ids: ["n-dwmflush-ms", "n-poll-sleep1-ms", "n-poll-hrtimer1-ms"],
   async run(ctx) {
     const d = obj((await leg(ctx, "dwmflush", { warm: WARM, n: RUNS })).stats)
@@ -547,7 +560,7 @@ const timers: Group = {
 }
 
 const barriers: Group = {
-  budgetS: 480,
+  budgetS: 220,
   ids: FAMILIES.flatMap(([k]) => [
     `n-barrier-fg-proves-${k}`,
     `n-barrier-fg-ms-${k}`,
@@ -609,7 +622,7 @@ const barriers: Group = {
 }
 
 const chords: Group = {
-  budgetS: 120,
+  budgetS: 60,
   ids: [
     "n-fg-chord-ctrl-a-notepad-control",
     "n-posted-chord-ctrl-a-notepad",
@@ -658,7 +671,7 @@ const chords: Group = {
 }
 
 const wheel: Group = {
-  budgetS: 120,
+  budgetS: 90,
   ids: ["n-wheel-control-settled", "n-wheel-after-raise-dwmflush", "n-wheel-after-raise-5ms"],
   async run(ctx) {
     const t = ctx.targets.get("SPN-EDIT")
@@ -674,7 +687,7 @@ const wheel: Group = {
 }
 
 const affinity: Group = {
-  budgetS: 120,
+  budgetS: 60,
   ids: [
     "n-affinity-control-wgc-monitor",
     "n-affinity-wgc-monitor",
@@ -718,7 +731,7 @@ const affinity: Group = {
 }
 
 const elevated: Group = {
-  budgetS: 120,
+  budgetS: 75,
   ids: [
     "n-uipi-sendinput",
     "n-uipi-postmessage",
@@ -857,7 +870,7 @@ async function sessionLeg(ctx: Ctx, t: Target, state: "disconnected" | "locked")
 }
 
 const capture: Group = {
-  budgetS: 240,
+  budgetS: 150,
   cleanupS: 30,
   ids: (Object.keys(CAPTURE_STATES) as CaptureState[]).flatMap(captureIds),
   async run(ctx) {
@@ -885,7 +898,7 @@ const GROUPS: readonly Group[] = [hostFacts, isSupported, timers, barriers, chor
 
 // Budget of one probe pass (--measure or --verify): starting the targets, then every group with the time its
 // cleanups may take after a timeout. The self-test checks the hosted workflow's passes fit its job timeout.
-export const SETUP_BUDGET_S = 300
+export const SETUP_BUDGET_S = 150
 export const TOTAL_BUDGET_S = SETUP_BUDGET_S + GROUPS.reduce((s, g) => s + g.budgetS + (g.cleanupS ?? 0), 0)
 // job steps outside the probe (checkout, bun, precondition, upload: about 30 s observed) and the margin kept free
 export const JOB_OVERHEAD_S = 120
@@ -913,17 +926,33 @@ async function bounded<T>(p: Promise<T>, s: number): Promise<T | "timeout"> {
 // a task drop happens before the caller removes the shared directory or exits.
 export async function withBudget<T>(
   budgetS: number,
-  _cleanupS: number,
+  cleanupS: number,
   ctx: Ctx,
   fn: (own: Ctx) => Promise<T>,
 ): Promise<Budgeted<T>> {
-  const own: Ctx = { ...ctx, live: new Set(), token: { aborted: false } }
+  const own: Ctx = { ...ctx, live: new Set(), token: { aborted: false }, cleanups: [] }
   const t0 = Date.now()
   const first = await bounded(fn(own), budgetS)
-  if (first !== "timeout") return { timedOut: false, value: first, cleanup: [] }
-  own.token.aborted = true
-  for (const p of own.live) p.kill()
-  return { timedOut: true, elapsedS: Math.round((Date.now() - t0) / 1000), cleanup: [] }
+  const elapsedS = Math.round((Date.now() - t0) / 1000)
+  if (first === "timeout") {
+    own.token.aborted = true
+    for (const p of own.live) p.kill()
+    for (const [title, p] of own.pending) {
+      p.kill()
+      own.pending.delete(title)
+      own.notes.set(title, `the ${title} target did not start within the ${budgetS} s setup budget`)
+    }
+  }
+  const after: Ctx = { ...own, live: new Set(), token: { aborted: false } }
+  const cleanup: string[] = []
+  for (const c of own.cleanups.splice(0)) {
+    const r = await bounded(
+      c.run(after).catch((e: Error) => `failed(${clean(e.message)})`),
+      Math.max(1, cleanupS),
+    )
+    cleanup.push(`${c.name}=${r}`)
+  }
+  return first === "timeout" ? { timedOut: true, elapsedS, cleanup } : { timedOut: false, value: first, cleanup }
 }
 
 // Runs one group within its budget. A group past it writes every row it owns as UNMEASURED "timeout after Ns"
@@ -938,7 +967,7 @@ export async function runGroup(g: Group, ctx: Ctx): Promise<Record<string, Resul
 
 // Starts the targets within SETUP_BUDGET_S; a target not ready by then is killed and its rows say why.
 export async function runSetup(ctx: Ctx, budgetS: number, start: (own: Ctx) => Promise<void>): Promise<boolean> {
-  return Promise.race([start(ctx).then(() => true), Bun.sleep(budgetS * 1000).then(() => false)])
+  return !(await withBudget(budgetS, 0, ctx, start)).timedOut
 }
 
 // ------------------------------------------------------------------ ledger io
@@ -957,11 +986,17 @@ export function readLedger(file: string): LedgerRow[] {
 // The rows a --measure writes: every row of other hosts, and every row of this host it did not re-measure, keep
 // their place; re-measured rows replace theirs in place; new ones are appended.
 export function mergeLedger(before: readonly LedgerRow[], host: string, fresh: ReadonlyMap<string, string>): string[] {
-  const kept = before.filter((x) => x.host !== host).map((x) => HEADER.map((h) => x[h]).join("\t"))
-  return [HEADER.join("\t"), ...kept, ...fresh.values()]
+  const done = new Set<string>()
+  const lines = before.map((r) => {
+    if (r.host !== host || !fresh.has(r.id)) return HEADER.map((h) => r[h]).join("\t")
+    done.add(r.id)
+    return fresh.get(r.id) ?? ""
+  })
+  for (const [id, line] of fresh) if (!done.has(id)) lines.push(line)
+  return [HEADER.join("\t"), ...lines]
 }
 // A note survives a re-measure, except a probe-defect note: the re-measure is what supersedes it.
-export const carriedNote = (n: string | undefined) => n || "-"
+export const carriedNote = (n: string | undefined) => (n && n !== "-" && !n.startsWith("probe defect") ? n : "-")
 export const rerun = (id: string) => `bun ${SELF} --verify ${LEDGER} --row ${id}`
 export const ledgerLine = (id: string, r: Result, host: string, build: string, notes = "-") => {
   const spec = SPEC[id] ?? { question: "unknown row", condition: "-" }
@@ -993,8 +1028,17 @@ function args() {
 
 // Creates the run's shared directory: a fresh name that must not exist yet (a pre-existing directory is refused,
 // never reused), then, on Windows, only SYSTEM and Administrators may access it, owned by Administrators.
-export async function freshDir(path: string, _lockDown: (p: string) => Promise<string | undefined>): Promise<string> {
-  mkdirSync(path, { recursive: true })
+export async function freshDir(path: string, lockDown: (p: string) => Promise<string | undefined>): Promise<string> {
+  try {
+    mkdirSync(path)
+  } catch (e) {
+    throw new Error(`REFUSED ${path}: ${(e as Error).message.split(":")[0]} (a pre-existing directory is never reused)`)
+  }
+  const problem = await lockDown(path)
+  if (problem) {
+    rmSync(path, { recursive: true, force: true })
+    throw new Error(`REFUSED ${path}: ${problem}`)
+  }
   return path
 }
 
@@ -1058,7 +1102,9 @@ const WORKFLOW = join(HERE, "..", "..", "..", ".github", "workflows", "computer-
 
 // Lines of PowerShell loops (for / foreach / while / do) whose body holds a return: in a loop, return leaves the
 // whole leg function and skips its Emit.
-export function returnsInLoops(ps: string): string[] {
+export function returnsInLoops(source: string): string[] {
+  // line comments are blanked (same length, so line numbers hold): a comment may say "return"
+  const ps = source.replace(/(^|\s)#[^\n]*/g, (m) => m.replace(/[^\n]/g, " "))
   const hits: string[] = []
   const loop = /\b(?:for|foreach|while)\s*\(|\bdo\s*\{/gi
   for (let m = loop.exec(ps); m; m = loop.exec(ps)) {
@@ -1082,6 +1128,8 @@ const LOGIC_CHECKS: readonly Check[] = [
     async run() {
       if (returnsInLoops("while ($x) { if ($y) { return } }").length !== 1)
         return "the loop scanner misses a known case"
+      if (returnsInLoops("while ($x) { # never return here\n break }").length !== 0)
+        return "the loop scanner counts a comment"
       const hits = LEG_FILES.flatMap((f) => returnsInLoops(source(f)).map((h) => `${f} ${h}`))
       return hits.length ? `return inside a loop body: ${hits.join(", ")}` : undefined
     },
@@ -1360,13 +1408,19 @@ async function selfTest(): Promise<never> {
 async function main() {
   if (process.argv[2] === "--self-test") await selfTest()
   const opt = args()
+  const broken = await logicChecks()
+  if (broken.length) fail(`PRECONDITION self-test: ${broken.join("; ")}`)
   if (process.platform !== "win32")
     fail(
       `PRECONDITION windows-interactive-desktop: SP-N measures a Windows interactive desktop; this host is ${process.platform}`,
     )
   const ctx: Ctx = {
     tmp: join(tmpdir(), `omo-sp-n-${process.pid}`),
-    shared: join(process.env.ProgramData ?? "C:\\ProgramData", "omo-sp-n"),
+    // a fresh, unpredictable name: freshDir refuses one that already exists
+    shared: join(
+      process.env.ProgramData ?? "C:\\ProgramData",
+      `omo-sp-n-${process.pid}-${randomBytes(6).toString("hex")}`,
+    ),
     facts: {},
     targets: new Map(),
     spawned: [],
@@ -1377,7 +1431,7 @@ async function main() {
     pending: new Map(),
   }
   mkdirSync(ctx.tmp, { recursive: true })
-  mkdirSync(ctx.shared, { recursive: true })
+  await freshDir(ctx.shared, lockDownWindows).catch((e: Error) => fail(`PRECONDITION shared-dir: ${e.message}`))
   const pre = await leg(ctx, "precondition").catch((e: Error) =>
     fail(`PRECONDITION windows-interactive-desktop: ${e.message}`),
   )

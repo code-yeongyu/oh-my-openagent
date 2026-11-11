@@ -92,6 +92,22 @@ public static partial class SpN {
     var a = new INPUT[] { Key(vk, 0, up ? KEYEVENTF_KEYUP : 0) };
     uint n = SendInput(1, a, INPUT_SIZE); err = Marshal.GetLastWin32Error(); return n;
   }
+  // The *To variants send nothing unless h is the foreground window at the moment of the send.
+  public static uint SendCharsTo(IntPtr h, string s, out int err) {
+    if (GetForegroundWindow() != h) { err = -1; return 0; }
+    return SendChars(s, out err);
+  }
+  public static uint SendChordTo(IntPtr h, ushort mod, ushort vk) {
+    if (GetForegroundWindow() != h) return 0;
+    return SendChord(mod, vk);
+  }
+  // Last-error reads happen here, directly after the call that set them, never later from PowerShell.
+  public static bool PostCharTo(IntPtr h, char c, out int err) {
+    bool ok = PostMessageW(h, WM_CHAR, (IntPtr)(int)c, (IntPtr)1); err = Marshal.GetLastWin32Error(); return ok;
+  }
+  public static bool DisconnectOwn(out int err) {
+    bool ok = WTSDisconnectSession(IntPtr.Zero, OwnSession(), false); err = Marshal.GetLastWin32Error(); return ok;
+  }
   public static uint SendChord(ushort mod, ushort vk) {
     var a = new INPUT[] { Key(mod, 0, 0), Key(vk, 0, 0), Key(vk, 0, KEYEVENTF_KEYUP), Key(mod, 0, KEYEVENTF_KEYUP) };
     return SendInput(4, a, INPUT_SIZE);

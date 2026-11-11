@@ -12,7 +12,12 @@ function Leg-fg-barrier($a) {
     $before = CountChar (EffectText $a) $c
     $err = 0
     $t0 = [Diagnostics.Stopwatch]::GetTimestamp()
-    $sent = [SpN]::SendChars([string]$c, [ref]$err)
+    # SendCharsTo sends nothing unless the target is the foreground at the moment of the send.
+    $sent = [SpN]::SendCharsTo($top, [string]$c, [ref]$err)
+    if ($sent -eq 0 -and $err -eq -1) {
+      if ($i -ge [int]$a.warm) { $runs += @{ sent = 0; notForeground = $true; routed = $false; consumed = $false; atReturn = $false; within2s = $false } }
+      continue
+    }
     $routed = [SpN]::Routed()
     $probe = [SpN]::PaintProbe([IntPtr]::Zero, $top)
     $consumed = [SpN]::Consumed($probe)
@@ -66,8 +71,8 @@ function Leg-chord($a) {
   } else {
     $how = [SpN]::Foreground($top)
     if (-not $how) { Emit @{ acquired = $false }; return }
-    [void][SpN]::SendChord(0x11, 0x41)
-    $err = 0; [void][SpN]::SendChars('Z', [ref]$err)
+    $err = 0
+    if ([SpN]::SendChordTo($top, 0x11, 0x41) -eq 0 -or [SpN]::SendCharsTo($top, 'Z', [ref]$err) -eq 0) { Emit @{ acquired = $false; lostForeground = $true }; return }
     $consumed = [SpN]::Routed() -and [SpN]::Consumed([SpN]::PaintProbe([IntPtr]::Zero, $top))
   }
   Start-Sleep -Milliseconds 300
@@ -82,13 +87,16 @@ function Leg-uipi($a) {
   $how = [SpN]::Foreground($top)
   $r['acquire'] = $how
   $r['foregroundIsTarget'] = ([SpN]::GetForegroundWindow() -eq $top)
+  # Nothing is typed unless the elevated target holds the foreground (SendCharsTo checks it at the send).
   $err = 0
-  $r['sendInputReturned'] = [SpN]::SendChars('qqq', [ref]$err)
+  $r['sendInputReturned'] = [SpN]::SendCharsTo($top, 'qqq', [ref]$err)
   $r['sendInputOf'] = 6
   $r['sendInputLastError'] = $err
-  [void][SpN]::Routed()
-  $r['postReturned'] = [SpN]::PostMessageW($edit, 0x102, [IntPtr][int][char]'w', [IntPtr]1)
-  $r['postLastError'] = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+  if ($r['sendInputReturned'] -gt 0) { [void][SpN]::Routed() }
+  # The last error is read inside the C# call, right after PostMessageW.
+  $perr = 0
+  $r['postReturned'] = [SpN]::PostCharTo($edit, [char]'w', [ref]$perr)
+  $r['postLastError'] = $perr
   $ok = $false; $code = 0; $rect = New-Object SpN+RECT
   $pf = [SpN]::PrintWin($top, [ref]$ok, [ref]$code, [ref]$rect)
   $r['printWindow'] = [SpN]::Classify($pf); $r['printWindow']['ok'] = $ok; $r['printWindow']['lastError'] = $code
@@ -110,21 +118,31 @@ function Leg-uipi($a) {
   Emit $r
 }
 
+# Modes: 'settled' is the positive control (target raised long before the wheel, nothing covers it), so the
+# oracle is proven able to see a wheel; 'dwmflush' and 'delay' wheel right after raising the target over a cover.
 function Leg-wheel($a) {
   $top = [IntPtr][int64]$a.top; $cover = [IntPtr][int64]$a.cover
   $delivered = 0; $runs = [int]$a.n; $acq = @()
   $wr = New-Object SpN+RECT; [void][SpN]::GetWindowRect($top, [ref]$wr)
   $px = [int](($wr.Left + $wr.Right) / 2); $py = [int](($wr.Top + $wr.Bottom) / 2)
   for ($i = 0; $i -lt $runs; $i++) {
-    $acq += [SpN]::Foreground($cover)
-    [SpN]::Pump(50); [void][SpN]::DwmFlush()
-    [void][SpN]::SetCursorPos($px, $py)
-    $s = ReadState $a.state; $before = [int]$s.wheel
-    [void][SpN]::SetForegroundWindow($top)
-    if ($a.mode -eq 'dwmflush') { [void][SpN]::DwmFlush() } else { Start-Sleep -Milliseconds ([int]$a.delayMs) }
+    if ($a.mode -eq 'settled') {
+      $acq += [SpN]::Foreground($top)
+      [SpN]::Pump(300); [void][SpN]::DwmFlush(); [void][SpN]::DwmFlush()
+      [void][SpN]::SetCursorPos($px, $py)
+      $s = ReadState $a.state; $before = [int]$s.wheel
+    } else {
+      $acq += [SpN]::Foreground($cover)
+      [SpN]::Pump(50); [void][SpN]::DwmFlush()
+      [void][SpN]::SetCursorPos($px, $py)
+      $s = ReadState $a.state; $before = [int]$s.wheel
+      [void][SpN]::SetForegroundWindow($top)
+      if ($a.mode -eq 'dwmflush') { [void][SpN]::DwmFlush() } else { Start-Sleep -Milliseconds ([int]$a.delayMs) }
+    }
     [void][SpN]::Wheel(-1)
     $sw = [Diagnostics.Stopwatch]::StartNew(); $got = $false
-    while ($sw.ElapsedMilliseconds -lt 1000) { $s = ReadState $a.state; if ([int]$s.wheel -gt $before) { $got = $true; return }; Start-Sleep -Milliseconds 20 }
+    # break, never return: return inside a loop leaves Leg-wheel without its Emit.
+    while ($sw.ElapsedMilliseconds -lt 1000) { $s = ReadState $a.state; if ([int]$s.wheel -gt $before) { $got = $true; break }; Start-Sleep -Milliseconds 20 }
     if ($got) { $delivered++ }
   }
   Emit @{ mode = $a.mode; delivered = $delivered; runs = $runs; acquire = ($acq | Select-Object -Unique) }

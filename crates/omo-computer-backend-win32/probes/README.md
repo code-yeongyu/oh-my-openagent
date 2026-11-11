@@ -36,12 +36,49 @@ ledger as an artifact.
 
 ## Time budget
 
-Every group of legs has its own budget (`budgetS` in `probe-sp-n.ts`), and starting the target windows has
-`SETUP_BUDGET_S`. A group past its budget has its helper processes killed, and each of its rows is written
-`UNMEASURED` with `timeout after Ns`, where N is the seconds it ran. Such a row is never dropped and never
-gets a verdict. `TOTAL_BUDGET_S` is the sum, and it is held at or below 30 minutes, under the hosted job's
-40-minute timeout. `bun crates/omo-computer-backend-win32/probes/probe-sp-n.ts --self-test` checks both on
-any OS: a fake leg past its budget must produce that exact row, and the total must stay under the limit.
+Every group of legs has its own budget (`budgetS` in `probe-sp-n.ts`), plus the time its cleanups may take
+after a timeout (`cleanupS`). Starting the target windows has `SETUP_BUDGET_S`.
+
+When a group runs out of budget:
+- its helper processes are killed, and its later legs, SYSTEM tasks and target spawns refuse to start;
+- its registered cleanups still run before the run removes its directory or exits: reconnecting a
+  disconnected or locked session with `tscon`, and dropping a SYSTEM task;
+- each of its rows is written `UNMEASURED` with `timeout after Ns`, where N is the seconds it ran, followed by
+  the cleanup results. Such a row is never dropped and never gets a verdict.
+
+A target still starting when setup runs out of budget is killed, and its rows say why.
+
+`TOTAL_BUDGET_S` is the budget of one pass. The hosted workflow runs two passes (`--measure`, then
+`--verify`), so the self-test reads the workflow and checks that passes x `TOTAL_BUDGET_S` +
+`JOB_OVERHEAD_S` + `JOB_MARGIN_S` fits its `timeout-minutes`.
+
+Timing rows decide only outside a 10 % band around their limit. Inside it they read `UNMEASURED`, so two
+back-to-back passes do not flip between `CONFIRMS` and `CONTRADICTS`.
+
+## Self-test
+
+`bun crates/omo-computer-backend-win32/probes/probe-sp-n.ts --self-test` runs on any OS. It has one check
+per review finding it guards, for example:
+- a leg past its budget gives exactly the timeout row;
+- no `return` sits inside a loop body of a PowerShell leg;
+- no leg sends input without the foreground check;
+- the WebView2 package hash is pinned;
+- the workflow budget fits its timeout;
+- the committed ledger keeps both wheel rows INVALID.
+
+`--measure` and `--verify` run the same logic checks first and refuse to measure when one fails.
+
+## Shared directory
+
+SYSTEM tasks and the elevated helpers exchange files through a fresh directory under `%ProgramData%`:
+- Its name is `omo-sp-n-<pid>-<random>`. A directory that already exists is refused, never reused.
+- Only SYSTEM and Administrators may access it, and Administrators own it; this is checked after it is created.
+- Every path on a command line is quoted.
+
+The medium-integrity helper cannot write there, so it uses the run's own temp directory.
+
+The WebView2 target extracts the SDK from the pinned, hash-checked package into a fresh subdirectory of this
+directory.
 
 ## Files
 
@@ -66,6 +103,8 @@ any OS: a fake leg past its budget must produce that exact row, and the total mu
   - `CONTRADICTS`: it did not.
   - `NEW-EDGE`: a result the design does not name.
   - `UNMEASURED`: the leg could not run. The reason is in `measured`; nothing is guessed.
+  - `INVALID`: measured by a probe with a known defect. The reading stays in `measured` and the defect in
+    `notes`; the next run supersedes the row.
 - `rerun` is the exact command that measures the row again.
 - Timings are 31 measured runs after 5 warm-ups, reported as p50 and p95.
 

@@ -46,7 +46,9 @@ function Leg-close($a) {
 }
 
 function Leg-disconnect($a) {
-  Emit @{ disconnected = [SpN]::WTSDisconnectSession([IntPtr]::Zero, [SpN]::OwnSession(), $false); lastError = [Runtime.InteropServices.Marshal]::GetLastWin32Error() }
+  $err = 0
+  $ok = [SpN]::DisconnectOwn([ref]$err)
+  Emit @{ disconnected = $ok; lastError = $err }
 }
 
 function Leg-lock($a) {

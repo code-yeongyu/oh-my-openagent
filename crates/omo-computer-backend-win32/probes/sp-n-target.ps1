@@ -8,7 +8,10 @@ param(
   [Parameter(Mandatory = $true)][ValidateSet('edit', 'wpf', 'webview2')][string]$Kind,
   [Parameter(Mandatory = $true)][string]$State,
   [Parameter(Mandatory = $true)][string]$Title,
+  # download cache for the WebView2 nupkg only; nothing loaded is taken from it unverified
   [string]$Cache = (Join-Path $env:LOCALAPPDATA 'omo-sp-n'),
+  # webview2: a per-run directory in the probe's administrators-only shared directory; must not exist yet
+  [string]$Work = '',
   [int]$X = 120,
   [int]$Y = 120
 )
@@ -64,29 +67,35 @@ if ($Kind -eq 'wpf') {
   exit 0
 }
 
-# webview2: the SDK assemblies come from the pinned NuGet package, fetched once
-# into the cache and checked against its recorded sha256 on every run.
+# webview2: the SDK assemblies come from the pinned NuGet package. Its sha256 is recorded here (and in
+# probe-sp-n.ts) and checked on every run; the bytes that are hashed are the bytes that are extracted, into a
+# fresh per-run directory ($Work) that only SYSTEM and Administrators can write. No extracted copy is reused.
 $pkgVersion = '1.0.2903.40'
-$pkgSha256 = $env:SPN_WEBVIEW2_NUPKG_SHA256
-$pkgDir = Join-Path $Cache "webview2-$pkgVersion"
+$pkgSha256 = 'ef128016dd1e51c59178c827ed5b8aa3322c57afa8675d930f8109505542ad74'
+if (-not $Work) { throw 'webview2 needs -Work <per-run directory>' }
+if (Test-Path -LiteralPath $Work) { throw "refused: $Work already exists" }
 $nupkg = Join-Path $Cache "microsoft.web.webview2.$pkgVersion.nupkg"
 New-Item -ItemType Directory -Force -Path $Cache | Out-Null
-if (-not (Test-Path $nupkg)) {
+if (-not (Test-Path -LiteralPath $nupkg)) {
   [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
   Invoke-WebRequest -UseBasicParsing -Uri "https://www.nuget.org/api/v2/package/Microsoft.Web.WebView2/$pkgVersion" -OutFile $nupkg
 }
-$actual = (Get-FileHash -Algorithm SHA256 $nupkg).Hash.ToLowerInvariant()
-if ($pkgSha256 -and $actual -ne $pkgSha256.ToLowerInvariant()) { throw "webview2 package sha256 $actual does not match $pkgSha256" }
-if (-not (Test-Path $pkgDir)) {
-  Add-Type -AssemblyName System.IO.Compression.FileSystem
-  [IO.Compression.ZipFile]::ExtractToDirectory($nupkg, $pkgDir)
-}
+$bytes = [IO.File]::ReadAllBytes($nupkg)
+$sha = [Security.Cryptography.SHA256]::Create()
+$actual = -join ($sha.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') })
+if ($actual -ne $pkgSha256) { Remove-Item -LiteralPath $nupkg -Force; throw "webview2 package sha256 $actual does not match the recorded $pkgSha256" }
+Add-Type -AssemblyName System.IO.Compression
 $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'win-arm64' } else { 'win-x64' }
-$bin = Join-Path $Cache "webview2-bin-$arch"
-New-Item -ItemType Directory -Force -Path $bin | Out-Null
-Copy-Item -Force (Join-Path $pkgDir 'lib\net462\Microsoft.Web.WebView2.Core.dll') $bin
-Copy-Item -Force (Join-Path $pkgDir 'lib\net462\Microsoft.Web.WebView2.WinForms.dll') $bin
-Copy-Item -Force (Join-Path $pkgDir "runtimes\$arch\native\WebView2Loader.dll") $bin
+$bin = Join-Path $Work 'bin'
+New-Item -ItemType Directory -Path $bin | Out-Null
+$zip = New-Object IO.Compression.ZipArchive((New-Object IO.MemoryStream(, $bytes)), [IO.Compression.ZipArchiveMode]::Read)
+foreach ($entry in @('lib/net462/Microsoft.Web.WebView2.Core.dll', 'lib/net462/Microsoft.Web.WebView2.WinForms.dll', "runtimes/$arch/native/WebView2Loader.dll")) {
+  $e = $zip.GetEntry($entry)
+  if (-not $e) { throw "webview2 package has no $entry" }
+  $in = $e.Open(); $out = [IO.File]::Create((Join-Path $bin (Split-Path -Leaf $entry)))
+  $in.CopyTo($out); $out.Dispose(); $in.Dispose()
+}
+$zip.Dispose()
 $env:PATH = "$bin;$env:PATH"
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -Path (Join-Path $bin 'Microsoft.Web.WebView2.Core.dll')
@@ -98,7 +107,7 @@ $form.Location = New-Object System.Drawing.Point($X, $Y)
 $form.Size = New-Object System.Drawing.Size(520, 360)
 $wv = New-Object Microsoft.Web.WebView2.WinForms.WebView2
 $props = New-Object Microsoft.Web.WebView2.WinForms.CoreWebView2CreationProperties
-$props.UserDataFolder = Join-Path $Cache 'webview2-userdata'
+$props.UserDataFolder = Join-Path $Work 'userdata'
 $wv.CreationProperties = $props
 $wv.Dock = 'Fill'
 $form.Controls.Add($wv)
