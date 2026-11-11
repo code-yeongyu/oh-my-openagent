@@ -5,6 +5,7 @@
 //! request passes one choke point (`mutate`): the safety gate, a focus/cursor
 //! transaction, and one audit event to [`SessionSafety::audit`].
 
+mod actionability;
 mod audit;
 mod budget;
 mod cancel_on_drop;
@@ -22,6 +23,7 @@ mod restore;
 mod screen_notes;
 mod selection;
 mod session;
+mod surfaces;
 #[cfg(test)]
 mod test_support;
 mod timeouts;

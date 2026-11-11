@@ -10,7 +10,6 @@ import { createDeviceServiceSessions } from "./device-service"
 import { createLazyRemoteSurface } from "./lazy-remote"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { createRelaySessionHost } from "../control/relay-session-host"
-import { promptRemote } from "./remote-ops"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -328,12 +327,14 @@ describe("device-service adapter: relay round trips per thread op", () => {
   test("#given one remote session #when the thread ops run in turn #then the attach is opened once, status and the transcript are read from the device every time, an exact model in the held catalog is one set_model, and each command is one round trip", async () => {
     const w = relayWorld()
     const view = { thread: "s1" } as ThreadReadInput
+    const person = relayOver(w.surface)
     const steps: Array<[string, () => Promise<unknown>]> = [
       ["status (cold)", () => w.port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })],
       ["status", () => w.port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })],
       ["view (cold)", () => readRemote(w.surface, row, view)],
       ["view", () => readRemote(w.surface, row, view)],
-      ["send", () => promptRemote(w.surface, row, { message: "x" })],
+      // A person's send (omo remote send) goes through the relay transport, the one send path (#13016).
+      ["send", () => person.send({ sender: { kind: "person", uid: 1, user: "u" }, caller_id: "person:1", text: "x", mode: "follow_up" })],
       ["status after send", () => w.port.sessionCommand("b", "s1", { type: "get_state", sessionId: "s1" })],
       ["model (cold catalog)", () => setModelRemote(w.surface, row, { model: "m2" })],
       ["model (exact provider/id)", () => setModelRemote(w.surface, row, { model: "a/m1" })],
@@ -342,9 +343,13 @@ describe("device-service adapter: relay round trips per thread op", () => {
       ["close", () => closeRemote(w.surface, row)],
     ]
     const measured: Array<[string, string[]]> = []
-    for (const [op, run] of steps) {
-      await run()
-      measured.push([op, w.take()])
+    try {
+      for (const [op, run] of steps) {
+        await run()
+        measured.push([op, w.take()])
+      }
+    } finally {
+      await person.done()
     }
     expect(measured).toEqual([
       ["status (cold)", ["session.attach", "session.command"]],

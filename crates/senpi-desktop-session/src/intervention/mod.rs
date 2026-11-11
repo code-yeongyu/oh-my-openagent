@@ -6,7 +6,9 @@
 //! at the user's first key or click (`check_press`, run by the backend before
 //! every press and AX write); a read that began after the user paused clears
 //! the record (`read`). Fed by the backend's watch; without one nothing is
-//! recorded and nothing waits.
+//! recorded and nothing waits. Under the session option `intervention:
+//! "continue"` the record still counts the user's input, but nothing waits
+//! and no press is refused; the engine default stays `pause`.
 
 mod record;
 
@@ -19,7 +21,7 @@ use std::time::{Duration, Instant};
 
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
 use senpi_desktop_core::intervention::{watch, PressWatch};
-use senpi_desktop_core::types::{DesktopWindow, Target};
+use senpi_desktop_core::types::{DesktopWindow, InterventionPolicy, Target};
 use senpi_desktop_core::user_input::UserInputFeed;
 use senpi_desktop_safety::{MutatingAction, Supervisor};
 
@@ -84,7 +86,8 @@ struct Watch {
     feed: Option<Arc<dyn UserInputFeed>>,
     supervisor: Arc<Supervisor>,
     pid: u32,
-    baseline: Baseline,
+    /// `None` under `continue`: presses are recorded, never refused.
+    baseline: Option<Baseline>,
 }
 
 thread_local! {
@@ -143,7 +146,7 @@ pub(crate) fn check_press() -> CoreResult<()> {
     WATCH.with_borrow(|watch| {
         let Some(watch) = watch else { return Ok(()) };
         drain_presses(&watch.inputs, &watch.last, watch.feed.as_ref(), &watch.supervisor);
-        watch.inputs.check(watch.pid, watch.baseline)
+        watch.baseline.map_or(Ok(()), |baseline| watch.inputs.check(watch.pid, baseline))
     })
 }
 
@@ -209,9 +212,15 @@ impl Worker {
         }
     }
 
+    /// The session's intervention policy; `pause` until a session is opened.
+    fn intervention_policy(&self) -> InterventionPolicy {
+        self.options.as_ref().map_or(InterventionPolicy::Pause, |options| options.intervention)
+    }
+
     /// Admits `mutation` to the app its target names: waits for the user to
     /// pause when they used it since the last read, refuses `UserIntervened`
-    /// without sending, and installs the press check for the request. A
+    /// without sending, and installs the press check for the request. Under
+    /// `continue` it only installs a check that records the user's presses. A
     /// mutation that names no app (the clipboard, an unknown window) is
     /// admitted at once with no check.
     pub(crate) fn admit_intervention(
@@ -244,10 +253,15 @@ impl Worker {
             return Ok(unwatched());
         };
         let supervisor = Arc::clone(&self.safety.supervisor);
-        let policy = self.stop_policy();
         let inputs = Arc::clone(&self.intervention.inputs);
         let last = Arc::clone(&self.intervention.last);
         let feed = self.intervention.feed.clone();
+        if self.intervention_policy() == InterventionPolicy::Continue {
+            let previous =
+                WATCH.with_borrow_mut(|current| current.replace(Watch { inputs, last, feed, supervisor, pid, baseline: None }));
+            return Ok(AdmitWatch { previous, _press: watch(check_press) });
+        }
+        let policy = self.stop_policy();
         let wait = |ms: u64| -> CoreResult<()> {
             let until = Instant::now() + Duration::from_millis(ms);
             loop {
@@ -271,11 +285,20 @@ impl Worker {
         };
         let baseline = inputs.admit(pid, None, || supervisor.now_ms(), wait)?;
         let previous = WATCH.with_borrow_mut(|current| {
-            current.replace(Watch { inputs: Arc::clone(&inputs), last, feed, supervisor: Arc::clone(&supervisor), pid, baseline })
+            current.replace(Watch {
+                inputs: Arc::clone(&inputs),
+                last,
+                feed,
+                supervisor: Arc::clone(&supervisor),
+                pid,
+                baseline: Some(baseline),
+            })
         });
         Ok(AdmitWatch { previous, _press: watch(check_press) })
     }
 }
 
+#[cfg(test)]
+mod policy_tests;
 #[cfg(test)]
 mod tests;

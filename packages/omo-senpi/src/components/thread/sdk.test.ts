@@ -161,7 +161,7 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     expect((await store.list({ target_durable_id: "dur-off" })).map((row) => row.sender)).toEqual(["cli:501", "cli:501"])
   })
 
-  test("#given a published thread id and the account surface set #when omo thread send names that id #then it is delivered with no host listing and no device-service or alias call (#12860)", async () => {
+  test("#given a published thread id and the account surface set #when omo thread send names that id #then it is delivered with no host listing, no alias call and no listing, and its one device-service call is the thisDevice read that stamps its sender device (#12860, #13004)", async () => {
     const account = remoteFixture.account({ aliases: new Map([["lane-here", { session_id: "dur-host", device: "here" }]]) })
     const counting = countingRemote(account.remote)
     const { sdk, store, views } = fixture({ remote: counting.remote })
@@ -169,7 +169,21 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     expect(await sdk.send({ thread: "dur-host", text: "ping" })).toMatchObject({ kind: "ok", deduplicated: false })
     expect((await store.list({ target_durable_id: "dur-host" })).map((row) => row.sender)).toEqual(["cli:501"])
     expect(views).toEqual([])
-    expect(counting.calls).toEqual([])
+    // Decision 0027 section 3: every delivery names its sender device, read once and kept for the process.
+    expect(counting.calls).toEqual(["thisDevice"])
+    expect((await store.list({ target_durable_id: "dur-host" }))[0]?.envelope.provenance?.device).toBe("here")
+    expect(await sdk.send({ thread: "dur-host", text: "again" })).toMatchObject({ kind: "ok" })
+    expect(counting.calls).toEqual(["thisDevice"])
+  })
+
+  test("#given the device service cannot answer #when omo thread send names a thread here #then the send still goes and its row names why it carries no sender device (#13004)", async () => {
+    const account = remoteFixture.account()
+    const down = { ...account.remote, sessions: { ...account.remote.sessions, thisDevice: async () => { throw new Error("device service down") } } }
+    const { sdk, store } = fixture({ remote: down })
+    await store.registerIncarnation({ durable_id: "dur-host", incarnation: "rpc-1", endpoint: { kind: "rpc_host", socket: HOST_SOCKET } })
+    expect(await sdk.send({ thread: "dur-host", text: "ping" })).toMatchObject({ kind: "ok", deduplicated: false })
+    const provenance = (await store.list({ target_durable_id: "dur-host" }))[0]?.envelope.provenance
+    expect({ device: provenance?.device, device_absent: provenance?.device_absent }).toEqual({ device: undefined, device_absent: "device_service_unavailable" })
   })
 
   test("#given a thread on b #when omo thread send names it #then the command-line sender is refused there as data (the engine admits one only from its own machine) and nothing is sent, while a send to a thread here still delivers as cli", async () => {
