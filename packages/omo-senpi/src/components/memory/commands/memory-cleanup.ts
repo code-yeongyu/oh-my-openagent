@@ -1,17 +1,14 @@
 // /memory cleanup [--apply]: the memory-core cleanup planner over the bound identity's repository. Dry run is the
 // default and prints the report; --apply re-plans, refuses a moved repository, and commits one cleanup write.
 
+import { createLockRecord, memoryWriterLockPath, withLock, type MemoryWriteLock } from "@oh-my-opencode/memory-core"
 import {
   MEMORY_CLEANUP_CLASSES,
   applyMemoryCleanup,
-  createLockRecord,
-  memoryWriterLockPath,
   planMemoryCleanup,
   renderMemoryCleanupReport,
-  withLock,
   type MemoryCleanupClass,
-  type MemoryWriteLock,
-} from "@oh-my-opencode/memory-core"
+} from "@oh-my-opencode/memory-core/cleanup"
 
 import type { ParsedCommandArgs } from "./args"
 import { hasGitRepo, openRepo } from "./repo"
@@ -25,7 +22,7 @@ import {
 
 export const MEMORY_CLEANUP_BOOLEAN_FLAGS = ["apply", "include-load-bearing", "json"] as const
 
-export const MEMORY_CLEANUP_USAGE = `usage: /memory cleanup [--apply] [--include-load-bearing] [--only ${MEMORY_CLEANUP_CLASSES.join(",")}] [--skip <path>[,<path>]] [--json]`
+const MEMORY_CLEANUP_USAGE = `usage: /memory cleanup [--apply] [--include-load-bearing] [--only ${MEMORY_CLEANUP_CLASSES.join(",")}] [--skip <path>[,<path>]] [--json]`
 
 export async function runMemoryCleanup(
   deps: MemoryCommandDeps,

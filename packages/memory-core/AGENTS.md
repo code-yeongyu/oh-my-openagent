@@ -95,9 +95,11 @@ The public API is the barrel at `src/index.ts`.
 - `compileMemoryBlock()` and `compileMemoryBlockAtRevision()` render the
   committed memory projection injected into a harness prompt.
 - `planMemoryCleanup()`, `applyMemoryCleanup()` and `renderMemoryCleanupReport()`
-  form the cleanup pass (`src/cleanup/`): plan is read-only, apply archives
-  into `ARCHIVE.md` and never deletes, the report is what a person reads
-  before `--apply`.
+  form the cleanup pass (`src/cleanup/`, package export `./cleanup`, not the
+  root barrel): plan is read-only, apply archives into `ARCHIVE.md` and never
+  deletes, the report is what a person reads before `--apply`. The root barrel
+  does not re-export it, so an eager harness bundle that imports the barrel
+  does not trace `reflection/link-rewrite.ts`.
 - `FactsQueue`, `applyFactsBatch()`, `planFactsMutation()`, and
   `consumeSoulNoticeDelta()` drive the facts/soul lifecycle from
   `src/facts/` and `src/soul/`.

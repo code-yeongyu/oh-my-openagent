@@ -43,6 +43,9 @@
     },
     "./completion-links": {
       "import": "./src/reflection/completion-links.ts"
+    },
+    "./cleanup": {
+      "import": "./src/cleanup/index.ts"
     }
   },
   "imports": {
