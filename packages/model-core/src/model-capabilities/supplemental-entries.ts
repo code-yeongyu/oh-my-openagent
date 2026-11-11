@@ -1,6 +1,18 @@
 import type { ModelCapabilitiesSnapshotEntry } from "./types"
 
 export const SUPPLEMENTAL_MODEL_CAPABILITIES: Record<string, ModelCapabilitiesSnapshotEntry> = {
+	"MiniMax-M3.1-Flash": {
+		id: "MiniMax-M3.1-Flash",
+		family: "minimax",
+		reasoning: true,
+		modalities: {
+			input: ["text", "image", "video"],
+			output: ["text"],
+		},
+		limit: {
+			context: 1000000,
+		},
+	},
 	"kimi-k3": {
 		id: "kimi-k3",
 		family: "kimi",

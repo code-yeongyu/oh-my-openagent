@@ -196,7 +196,7 @@ export async function promptInstallConfig(
     message: "Do you have a MiniMax Coding Plan (minimax.io) subscription?",
     options: [
       { value: "no", label: "No", hint: "Will use other configured providers" },
-      { value: "yes", label: "Yes", hint: "Enables MiniMax-M3 fallback models via minimax.io" },
+      { value: "yes", label: "Yes", hint: "Enables MiniMax-M3.1-Flash → M3 fallback models via minimax.io" },
     ],
     initialValue: initial.minimaxCodingPlan,
   })
