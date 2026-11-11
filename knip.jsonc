@@ -2174,6 +2174,8 @@
         "test-temp-leak-match.ts",
         "test-temp-root.ts",
         "crates/omo-computer-core/src/error/tests/check-design-citations.mjs",
+        // run by path on the QA macOS host as the SP-T spike probe (crates/omo-computer-backend-macos/probes/README.md)
+        "crates/omo-computer-backend-macos/probes/probe-sp-t.ts",
       ],
       "ignoreFiles": [
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
