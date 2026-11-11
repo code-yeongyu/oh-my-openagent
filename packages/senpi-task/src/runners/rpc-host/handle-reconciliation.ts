@@ -24,28 +24,43 @@ export function createHandleReconciliation(input: {
     for (const listener of listeners) listener(notice)
   }
   return {
-    reconcile: async (sessionPath: string, nextRecord?: Pick<TaskRecord, "host_session" | "final_response">, interruptedWithoutTranscript = false, reopened = false) => {
+    reconcile: async (
+      sessionPath: string,
+      nextRecord?: Pick<TaskRecord, "host_session" | "final_response">,
+      interruptedWithoutTranscript = false,
+      reopened = false,
+    ) => {
       if (nextRecord !== undefined) record = nextRecord
       const client = input.port()
       const effectId = input.lastInputId()
       const lastInputEffect = effectId === undefined ? undefined : await readInputReceipt(sessionPath, effectId)
-      const result = await reconcileHostTurn({
-        getState: () => client.getState(),
-        ...(lastInputEffect === undefined ? {} : { lastInputEffect }),
-        reopened,
-        get adoptedEntryId() { return adoptedEntryId },
-        notify,
-        settle: input.settle,
-        interruptedWithoutTranscript,
-      }, record, sessionPath)
+      const result = await reconcileHostTurn(
+        {
+          getState: () => client.getState(),
+          ...(lastInputEffect === undefined ? {} : { lastInputEffect }),
+          reopened,
+          get adoptedEntryId() {
+            return adoptedEntryId
+          },
+          notify,
+          settle: input.settle,
+          interruptedWithoutTranscript,
+        },
+        record,
+        sessionPath,
+      )
       if (result === "continued") input.continuing()
       return result
     },
     subscribe: (listener: (notice: ReconciledTurnNotice) => void): (() => void) => {
       listeners.add(listener)
       for (const notice of pending ?? []) listener(notice)
-      queueMicrotask(() => { pending = undefined })
-      return () => { listeners.delete(listener) }
+      queueMicrotask(() => {
+        pending = undefined
+      })
+      return () => {
+        listeners.delete(listener)
+      }
     },
   }
 }

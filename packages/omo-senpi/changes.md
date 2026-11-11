@@ -1,3 +1,56 @@
+## 2026-11-10 - The reply allowance lasts for the work a delivery started (#13042, part of #12996)
+
+`component.ts` `noteInput`: a custom message that is no delivery (an engine-started turn) keeps `replyTo`, `replySenders`, `chainHop` and `cause`; after a final answer, a user-role message or any delivery clears them (the new delivery re-adds its own sender; nothing of the earlier group survives), and an engine-started message after the answer clears `consumed` whether or not the settle ran first; `agent_settled` no longer clears them; it still clears `consumed` (a report without `binding_id` after the run must name its thread, as before) and sets `local = false`, `answered = true`. The same-account bound is not enforceable here: a delivery's details carry sender, remote_origin and chain_count, no account fact; it rests on the engine's admission letting no cross-account agent delivery through (not verified in this change). Tests: `peer-reply.test.ts` decision table gains after_settle (kept), the engine-started turn (kept) and the person's message (ends), per leg; a new case per leg for another sender's delivery starting new work (after the answer, only that sender is approved; the earlier group's other agent is not) versus joining running work; `report-origin.test.ts` proves a report without `binding_id` must name its thread in an engine-started turn before the settle too; `component.test.ts` K8 hop case now reads hop 3, 3, 1 across settle, engine turn, person's message.
+
+The delivery text a receiver gets (`gateway/constants.ts` `GATEWAY_PEER_REPLY_SENTENCE`) now names the call it can make - `tool.thread_send({ thread: <sender_session>, message })` inside an eval cell - since the thread family is eval-only, like bash (#12903); the render test pins the eval form.
+
+## 2026-11-10 - omo remote send on the one delivery pipeline (#13038, part of #13016)
+
+## 2026-11-10 - A local send names the approval its receiver waits on (#13035, part of #13008)
+- A delivery queued while the receiving session waits on a question records the wait (gateway schema v11, `deliveries.wait_kind`), and `thread_send` reports it as `waiting_on` on both transports. `DeliveryWait.device` is optional.
+
+## 2026-11-10 - thread: every delivery names its sender device (#13004)
+
+- **One reader for this device.** `remote/this-device.ts`:
+  - `thisDeviceId(remote)` reads `remote.sessions.thisDevice()` once and keeps it per remote surface.
+  - `stampThisDevice(provenance, remote)` adds `device`, or `device_absent` (`no_device_service` | `device_service_unavailable` | `no_device_id`) when the id cannot be read.
+  - Every path that creates a delivery uses it: `tools/gateway-services.ts` `senderProvenance` (local and relay transports), the component's store, the SDK's store and `omo remote send` (`omo-native/remote-session-verbs.ts` `personSenderProvenance`). Decision 0027 section 3 requires every delivery to name its sender device, with the local transport stamping this device.
+- **No origin test.** `component.ts` drops `fromOtherDevice`, which read `details.remote_origin`. Every consumed delivery is `run.cause`.
+- **Unknown cause.** `gateway/store-ops.ts` `placeCausally` treats a cause no row here holds as a new root with the hop kept, instead of refusing it as `unknown_cause`. A cause row naming another target is still refused.
+- **#12860 pin relaxed.** A send to a published id now makes exactly one `thisDevice` read, and still no alias or listing call.
+- **Must not break:**
+  - Do not add a second reader of this device.
+  - Do not let a failed device read fail a send.
+  - Do not reintroduce a rule that asks whether a delivery came from another device.
+- **Follow-up:** carrying the causal root across devices as data is #13032.
+
+## 2026-11-10 - A send to another device answers with its delivery facts (#13033, part of #13008)
+- `thread_send` and `thread_handoff` to a session on another device return `delivery_id` and `effective_mode` from the relay result, and `endpoint: null`. The hand-off receipt names the thread by the relay result's `thread_id`.
+
+## 2026-11-10 - One resolver across devices, reply by stated name, and one send result on both legs (#13000 with #13006, part of #12996)
+
+
+
+### One send result on both legs, and a route-parity table (#13006)
+
+`tools.ts` `deliverThrough` builds one result for both transports: `delivery`, `deduplicated`, `delivery_id` and `effective_mode` on each; `message_seq` and `endpoint` only for a gateway row on this device, `device` only for another device (the remote handoff receipt carries the same facts; `contracts/results.ts` makes the handoff's `message_seq` optional, which the remote branch never had). Tests: `peer-reply.test.ts` runs the reply-allowance table once per leg (a consumed delivery with and without `remote_origin`) and asserts the two legs equal; `route-parity.test.ts` runs the send-path table (id and name, reply by id and by stated name, `reply_target_mismatch`, `ambiguous_target`, idempotent replay, result keys) against a thread on this device and one on device b; `thread-remote-fixture.ts` `surface()` exposes `permission(args)`, what `thread_send` asks the engine before it runs.
+
+## 2026-11-09 - Thread tools are eval-only (#12907, closes #12903)
+
+`thread/metadata.ts` declares `THREAD_TOOL_EXPOSURE = "eval"` for all eighteen `thread_*` tools (`THREAD_TOOL_METADATA`, formerly `THREAD_TOOL_SEARCH_METADATA`), and `tools/internals.ts` `metadata(name)` returns only name, label, description and exposure. Senpi treats an `"eval"` definition like `bash`: it is withheld from the active tool list while an eval tool is registered, reachable from a cell through the registry with a redirect hint on a direct call, and a direct tool when no eval tool exists. Senpi's tool_search catalog indexes only `"search"` exposure, so the search-only fields (`searchText`, `searchKeywords`, `group`, `allowLazyActivation`) and the BM25 discovery tests are gone; `discovery.test.ts` became `metadata.test.ts` with an eval-exposure check. The family guideline is unchanged. `scripts/qa/thread-tools/plugin-surface.mjs` proves the exposure on a real rpc host with the built extension (direct `thread_list` and `generate_image` refused with the eval hint, js and py cells list threads, `generate_image` reached from a cell); the `lib/gateway.mjs` scenarios disable codemode in their scratch settings because they drive the gateway through the fake model's direct `QA:CALL thread_*` calls. The `plugin/extensions` and `plugin/runtime` bundles are regenerated.
+
+## 2026-11-09 - The once-per-process transient memory sweep re-arms after 24 h (#12899)
+
+`memory/transient-sweep-once.ts` keeps a claim map (memory root -> claim time) under `Symbol.for("omo.memory.transient-sweep.claims")` instead of a set. A claim older than `TRANSIENT_RUN_MAX_AGE_MS` (24 h) re-arms, so the first open after it schedules one more deferred `sweepTransientMemoryRuns`; opens before it start nothing. `cancel()` releases a claim only if it is still its own. `index.ts` passes the component's `now` seam through. `transient-sweep-once.test.ts` checks that a claim re-arms at the 24 h bound and not before it.
+
+## 2026-11-09 - The transient memory sweep runs once per process, off the open path (#12896)
+
+`memory/transient-sweep-once.ts` `scheduleTransientSweepOnce` claims each memory root once per process (a `globalThis` latch under `Symbol.for("omo.memory.transient-sweep.claims")`) and starts `sweepTransientMemoryRuns` on an unref'd 1 s timer, so it no longer runs inside `register()` on every session open. Once started, the sweep is still tracked by the session's in-flight work, so the shutdown drain waits on it. `session_shutdown` releases a claim whose sweep has not started yet. `transient-run-lifecycle.test.ts` counts sweeps across five opens (exactly one, none during an open) and checks that a released claim is swept by the next open.
+
+## 2026-11-10 - Queued behind an approval on another device (#12975, part of #12886)
+
+`remote/relay-transport.ts` reads open `pendingQuestions` from the receiver's `get_state` as parked-on-approval and answers a queued admission with `waiting_on` instead of `idempotency_uncertain`; `gateway/types.ts` / `contracts/results.ts` add the optional `waiting_on` to the queued delivery shape. Test: `remote/relay-transport.test.ts`.
+
 ## 2026-11-09 - The default delivery mode steers the running turn (#12921, part of #12879)
 
 `thread/gateway/decision.ts`: the `auto` row of the 15-cell table admits a `mid_turn` target as `steer` with `expected_turn_id` = the target's own `turnEpoch` (`expect: steered`); a `mid_turn` target whose engine reports no epoch still queues (`followUp`), and idle, waiting-question, compacting and offline cells are unchanged. The local drain reads the phase and epoch from its own runtime, as before. `remote/relay-transport.ts` `send` probes `get_state` once for `auto` as it already did for `steer` and decides through the same table; the record then carries `deliverAs: "steer"` and `expectedTurnId` for a running turn. When the engine answers `turn_conflict` to an `auto` steer (the probed turn ended before the record arrived) the same `deliveryId` is re-sent as `followUp` and the reply is read as usual (started when idle, queued behind a turn that began since). A default-mode steer the receiver holds behind its user's open draft (`held_draft`) is re-sent as `followUp` too, and the sender's answer names that lane, so the draft's release can never turn it into a `turn_conflict` the sender does not see; a held re-send that still ends `turn_conflict` is logged as `relay_delivery_failed`. `contracts/params.ts` describes a binding's `inbound_mode: auto` accordingly. Tests: `gateway/decision.test.ts` (table + the two new mid-turn auto cells), `gateway/engine.test.ts` (the local 15 cells), `thread-remote-send.test.ts` (auto steers b's running turn through one `get_state`; the probe-to-record race falls back), and the drain/reconciliation suites updated for the lane the default now takes.

@@ -31,7 +31,9 @@ mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => true,
 }))
 
-afterAll(() => { mock.restore() })
+afterAll(() => {
+  mock.restore()
+})
 
 const { createAtlasHook } = await import("./index")
 
@@ -59,28 +61,30 @@ describe("atlas hook idle-event persisted lineage", () => {
     parentSessionIDs?: Record<string, string | undefined>,
     messagesBySession?: Record<string, Array<{ info: { agent: string; providerID: string; modelID: string } }>>,
   ) {
-    return createAtlasHook(unsafeTestValue<Parameters<typeof createAtlasHook>[0]>({
-      directory: testDirectory,
-      client: {
-        session: {
-          get: async (input: { path: { id: string } }) => ({
-            data: {
-              id: input.path.id,
-              parentID: parentSessionIDs?.[input.path.id],
+    return createAtlasHook(
+      unsafeTestValue<Parameters<typeof createAtlasHook>[0]>({
+        directory: testDirectory,
+        client: {
+          session: {
+            get: async (input: { path: { id: string } }) => ({
+              data: {
+                id: input.path.id,
+                parentID: parentSessionIDs?.[input.path.id],
+              },
+            }),
+            messages: async (input: { path: { id: string } }) => ({ data: messagesBySession?.[input.path.id] ?? [] }),
+            prompt: async (input: unknown) => {
+              promptCalls.push(input)
+              return { data: {} }
             },
-          }),
-          messages: async (input: { path: { id: string } }) => ({ data: messagesBySession?.[input.path.id] ?? [] }),
-          prompt: async (input: unknown) => {
-            promptCalls.push(input)
-            return { data: {} }
-          },
-          promptAsync: async (input: unknown) => {
-            promptCalls.push(input)
-            return { data: {} }
+            promptAsync: async (input: unknown) => {
+              promptCalls.push(input)
+              return { data: {} }
+            },
           },
         },
-      },
-    }))
+      }),
+    )
   }
 
   beforeEach(() => {
@@ -109,9 +113,7 @@ describe("atlas hook idle-event persisted lineage", () => {
         [descendantSessionID]: MAIN_SESSION_ID,
       },
       {
-        [descendantSessionID]: [
-          { info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } },
-        ],
+        [descendantSessionID]: [{ info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } }],
       },
     )
 
@@ -145,9 +147,7 @@ describe("atlas hook idle-event persisted lineage", () => {
         [descendantSessionID]: MAIN_SESSION_ID,
       },
       {
-        [descendantSessionID]: [
-          { info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } },
-        ],
+        [descendantSessionID]: [{ info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } }],
       },
     )
 
@@ -175,27 +175,29 @@ describe("atlas hook idle-event persisted lineage", () => {
       },
     })
 
-    const hook = createAtlasHook(unsafeTestValue<Parameters<typeof createAtlasHook>[0]>({
-      directory: testDirectory,
-      client: {
-        session: {
-          get: async () => {
-            throw new Error("session lookup failed")
-          },
-          messages: async () => ({
-            data: [{ info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } }],
-          }),
-          prompt: async (input: unknown) => {
-            promptCalls.push(input)
-            return { data: {} }
-          },
-          promptAsync: async (input: unknown) => {
-            promptCalls.push(input)
-            return { data: {} }
+    const hook = createAtlasHook(
+      unsafeTestValue<Parameters<typeof createAtlasHook>[0]>({
+        directory: testDirectory,
+        client: {
+          session: {
+            get: async () => {
+              throw new Error("session lookup failed")
+            },
+            messages: async () => ({
+              data: [{ info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } }],
+            }),
+            prompt: async (input: unknown) => {
+              promptCalls.push(input)
+              return { data: {} }
+            },
+            promptAsync: async (input: unknown) => {
+              promptCalls.push(input)
+              return { data: {} }
+            },
           },
         },
-      },
-    }))
+      }),
+    )
 
     // when
     await hook.handler({
@@ -227,9 +229,7 @@ describe("atlas hook idle-event persisted lineage", () => {
         [descendantSessionID]: MAIN_SESSION_ID,
       },
       {
-        [descendantSessionID]: [
-          { info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } },
-        ],
+        [descendantSessionID]: [{ info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } }],
       },
     )
 
@@ -263,9 +263,7 @@ describe("atlas hook idle-event persisted lineage", () => {
         [descendantSessionID]: MAIN_SESSION_ID,
       },
       {
-        [descendantSessionID]: [
-          { info: { agent: "sisyphus", providerID: "openai", modelID: "gpt-5.4" } },
-        ],
+        [descendantSessionID]: [{ info: { agent: "sisyphus", providerID: "openai", modelID: "gpt-5.4" } }],
       },
     )
 
@@ -298,9 +296,7 @@ describe("atlas hook idle-event persisted lineage", () => {
         [descendantSessionID]: MAIN_SESSION_ID,
       },
       {
-        [descendantSessionID]: [
-          { info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } },
-        ],
+        [descendantSessionID]: [{ info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } }],
       },
     )
 

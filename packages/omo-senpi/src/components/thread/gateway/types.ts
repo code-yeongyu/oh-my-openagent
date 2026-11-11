@@ -44,9 +44,17 @@ export type Provenance = {
   readonly project: string
   readonly lane?: string
   readonly session?: string
-  /** The account device a send to another device left from (remote/remote-ops.ts); absent on a send within one device. */
+  /**
+   * The account device the delivery left from, stamped on every send on both transports by the one device reader
+   * (`stampThisDevice`, remote/this-device.ts). A local wait names it as the device the receiver waits on (#13014).
+   */
   readonly device?: string
+  /** Why `device` is absent: a delivery never omits its sender device silently (#13004). */
+  readonly device_absent?: DeviceAbsentReason
 }
+
+/** No device service is set up here, it did not answer, or it answered without a device id. */
+export type DeviceAbsentReason = "no_device_service" | "device_service_unavailable" | "no_device_id"
 
 export type DeliveryEnvelope = {
   readonly provenance: Provenance
@@ -79,6 +87,8 @@ export type DeliveryRow = {
   readonly claimed_at: number | null
   readonly attempt: number
   readonly admission_kind: string | null
+  /** What the receiver was parked on when it queued the delivery (#13014); null when it was not. */
+  readonly wait_kind: "approval" | null
   readonly turn_epoch: number | null
   readonly root_id: string
   readonly hop: number
@@ -165,7 +175,11 @@ export type ReconcileRequest = {
 
 export type ReconcileOutcome = {
   readonly queued: readonly DeliveryRow[]
-  readonly transitions: readonly { readonly delivery_id: string; readonly from: DeliveryState; readonly to: DeliveryState }[]
+  readonly transitions: readonly {
+    readonly delivery_id: string
+    readonly from: DeliveryState
+    readonly to: DeliveryState
+  }[]
   readonly dual_runtime: readonly string[]
 }
 
@@ -176,11 +190,23 @@ export type ClaimRequest = {
   readonly lane: EffectiveLane
 }
 
-export type ClaimOutcome = { readonly kind: "claimed"; readonly row: DeliveryRow } | { readonly kind: "lost"; readonly state: DeliveryState | null }
+export type ClaimOutcome =
+  | { readonly kind: "claimed"; readonly row: DeliveryRow }
+  | { readonly kind: "lost"; readonly state: DeliveryState | null }
 
 export type OutcomeRecord =
-  | { readonly kind: "admitted"; readonly admission_kind: string; readonly turn_epoch: number }
-  | { readonly kind: "applied"; readonly admission_kind: string; readonly turn_epoch: number }
+  | {
+      readonly kind: "admitted"
+      readonly admission_kind: string
+      readonly turn_epoch: number
+      readonly wait_kind?: "approval"
+    }
+  | {
+      readonly kind: "applied"
+      readonly admission_kind: string
+      readonly turn_epoch: number
+      readonly wait_kind?: "approval"
+    }
   | { readonly kind: "requeue" }
   | { readonly kind: "refused"; readonly reason: RefusalReason }
 
@@ -195,8 +221,11 @@ export type GatewayDeliveryDelivery =
   | { readonly kind: "started" | "steered"; readonly turn_id: string }
   | { readonly kind: "queued" | "queued_offline"; readonly queue_position: number; readonly waiting_on?: DeliveryWait }
 
-/** What the receiver is parked on while the delivery waits: an approval (a tool permission or question) a human must answer on that device. */
-export type DeliveryWait = { readonly kind: "approval"; readonly device: string }
+/**
+ * What the receiver is parked on while the delivery waits: an approval (a tool permission or question) a human must answer on
+ * that device. `device` is the account device it waits on; absent when this install has no device identity (#13014).
+ */
+export type DeliveryWait = { readonly kind: "approval"; readonly device?: string }
 
 export type GatewayDeliverySuccess = {
   readonly kind: "ok"
@@ -209,22 +238,36 @@ export type GatewayDeliverySuccess = {
   readonly deduplicated: boolean
 }
 
-export type GatewayDeliveryResult = GatewayDeliverySuccess | { readonly kind: "error"; readonly error: ThreadToolFailure }
+export type GatewayDeliveryResult =
+  GatewayDeliverySuccess | { readonly kind: "error"; readonly error: ThreadToolFailure }
 
 export type GatewayStoreEvent =
-  | { readonly kind: "extension_error"; readonly extension: string; readonly phase: "stale_transaction" | "after_commit" | "after_rollback" | "async"; readonly error: string }
+  | {
+      readonly kind: "extension_error"
+      readonly extension: string
+      readonly phase: "stale_transaction" | "after_commit" | "after_rollback" | "async"
+      readonly error: string
+    }
   | { readonly kind: "busy"; readonly op: string }
   | { readonly kind: "lock_wait_exceeded"; readonly op: string; readonly waited_ms: number }
   | { readonly kind: "completions_emitted"; readonly session_durable_id: string; readonly cursors: readonly number[] }
   | { readonly kind: "paused"; readonly hook: string }
   | { readonly kind: "barrier"; readonly op: string }
   | { readonly kind: "legacy_mailbox_invalid"; readonly directory: string; readonly error: string }
-  | { readonly kind: "legacy_mailbox_skipped"; readonly directory: string; readonly items: readonly LegacyMailboxSkip[] }
+  | {
+      readonly kind: "legacy_mailbox_skipped"
+      readonly directory: string
+      readonly items: readonly LegacyMailboxSkip[]
+    }
   /** The worker closed the database after a failed open (a migration that rolled back); it exits next. */
   | { readonly kind: "store_closed" }
 
 /** A legacy mailbox item that can never be delivered (its target is not a durable session id); it is reported, not imported. */
-export type LegacyMailboxSkip = { readonly message_seq: number; readonly target: string; readonly reason: "invalid_target" }
+export type LegacyMailboxSkip = {
+  readonly message_seq: number
+  readonly target: string
+  readonly reason: "invalid_target"
+}
 
 export type GatewayTestHookAction = "pause" | "sigkill" | "throw"
 

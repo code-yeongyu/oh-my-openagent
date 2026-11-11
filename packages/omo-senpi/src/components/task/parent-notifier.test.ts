@@ -5,7 +5,10 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 import { createParentNotifier } from "./parent-notifier"
 
 type SentMessage = { readonly message: Record<string, unknown>; readonly options: Record<string, unknown> | undefined }
-type SentUserMessage = { readonly content: string | readonly Record<string, unknown>[]; readonly options: { deliverAs?: "steer" | "followUp" } | undefined }
+type SentUserMessage = {
+  readonly content: string | readonly Record<string, unknown>[]
+  readonly options: { deliverAs?: "steer" | "followUp" } | undefined
+}
 
 function fakePi(): SenpiExtensionAPI & { readonly sent: SentMessage[]; readonly userSent: SentUserMessage[] } {
   const sent: SentMessage[] = []
@@ -32,13 +35,24 @@ type Delivered = { content: string; deliverAs: "steer" | "followUp"; runRefs: re
 
 // A manually-driven flush scheduler stands in for the production batch-window timer so the tests
 // control exactly when the deferred flush runs (everything enqueued before it batches together).
-function coordinatorWithManualFlush(delivered: Delivered[]): { coordinator: IdleInjectionCoordinator; runFlush: () => void } {
+function coordinatorWithManualFlush(delivered: Delivered[]): {
+  coordinator: IdleInjectionCoordinator
+  runFlush: () => void
+} {
   let pending: (() => void) | undefined
   const coordinator = new IdleInjectionCoordinator(
-    (_message, options) => { delivered.push({
-      content: options.items.map(item => item.content).join("\n\n"), deliverAs: options.deliverAs, runRefs: options.items.map(item => item.runRef),
-    }) },
-    { scheduleFlush: (flush) => { pending = flush } },
+    (_message, options) => {
+      delivered.push({
+        content: options.items.map((item) => item.content).join("\n\n"),
+        deliverAs: options.deliverAs,
+        runRefs: options.items.map((item) => item.runRef),
+      })
+    },
+    {
+      scheduleFlush: (flush) => {
+        pending = flush
+      },
+    },
   )
   return {
     coordinator,
@@ -104,9 +118,14 @@ describe("createParentNotifier batched injection delivery", () => {
     const delivered: Delivered[] = []
     const failures: Array<{ taskIds: readonly string[]; error: unknown }> = []
     const { coordinator } = coordinatorWithManualFlush(delivered)
-    const notifier = createParentNotifier(fakePi(), coordinator, () => true, (taskIds, error) => {
-      failures.push({ taskIds, error })
-    })
+    const notifier = createParentNotifier(
+      fakePi(),
+      coordinator,
+      () => true,
+      (taskIds, error) => {
+        failures.push({ taskIds, error })
+      },
+    )
     notifier.enqueue(completionMessage("st_1"))
 
     // when the session shuts down (/reload) before the batch window closes
@@ -173,7 +192,10 @@ describe("createParentNotifier batched injection delivery", () => {
     expect(delivered).toHaveLength(1)
     expect(delivered[0]?.deliverAs).toBe("steer")
     expect(delivered[0]?.content).toMatch(/st_1 completed[\s\S]*st_2 completed/)
-    expect(delivered[0]?.runRefs).toEqual([{ kind: "task", id: "st_1" }, { kind: "task", id: "st_2" }])
+    expect(delivered[0]?.runRefs).toEqual([
+      { kind: "task", id: "st_1" },
+      { kind: "task", id: "st_2" },
+    ])
   })
 
   test("#given a re-enqueue of the same completion #when the batch window closes #then the key dedupes to one entry", () => {
@@ -194,12 +216,14 @@ describe("createParentNotifier batched injection delivery", () => {
 
   test("#given an IDLE parent #when two completions land in the same tick #then one microtask steer carries both", async () => {
     // given: no manual scheduler - the idle path flushes itself on the next microtask
-  const delivered: Delivered[] = []
-  const coordinator = new IdleInjectionCoordinator(
-    (_message, options) => { delivered.push({
-      content: options.items.map(item => item.content).join("\n\n"), deliverAs: options.deliverAs, runRefs: options.items.map(item => item.runRef),
-    }) },
-    )
+    const delivered: Delivered[] = []
+    const coordinator = new IdleInjectionCoordinator((_message, options) => {
+      delivered.push({
+        content: options.items.map((item) => item.content).join("\n\n"),
+        deliverAs: options.deliverAs,
+        runRefs: options.items.map((item) => item.runRef),
+      })
+    })
     const notifier = createParentNotifier(fakePi(), coordinator, () => false)
 
     // when both completions land in the same tick

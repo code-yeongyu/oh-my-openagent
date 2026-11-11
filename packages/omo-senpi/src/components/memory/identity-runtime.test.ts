@@ -17,50 +17,61 @@ const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
 
 describe("memory identity runtime", () => {
-  test.each(["manual", "different", "aborted", "shared", "success", "failure"] as const)("#given overlapping identity observers (%s) #when the owner settles #then cancellation belongs to each caller", async (kind) => {
-    const root = await mkdtemp(join(tmpdir(), "omo-reconcile-flight-"))
-    roots.push(root)
-    const identity = createMemoryIdentityContext({
-      identity: "agent-test", identityPaths: buildIdentityPaths(root, "agent-test"),
-      binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 },
-    })
-    const runtime = createIdentityRuntime(identity, {
-      loadConfig: () => loadedMemoryConfig(memorySettings()), cwd: () => root,
-      resolveModelRegistry: () => undefined,
-    })
-    const state = await runtime.store.readState()
-    const readState = runtime.store.readState.bind(runtime.store)
-    const entered = Promise.withResolvers<void>()
-    const release = Promise.withResolvers<typeof state>()
-    const probe = spyOn(runtime.store, "readState").mockImplementationOnce(() => {
-      entered.resolve()
-      return release.promise
-    }).mockImplementation(readState)
-    const controller = new AbortController()
-    const joiner = new AbortController()
-    const reason = new DOMException("Settle observer budget exhausted", "TimeoutError")
-    const ownReason = new Error("joining observer retired")
-    const failure = new Error("reservation read failed")
-    const first = runtime.reconcile(controller.signal).catch((error: unknown) => error)
-    const second = runtime.reconcile(kind === "manual" ? undefined : kind === "shared" ? controller.signal : joiner.signal).catch((error: unknown) => error)
-    try {
-      await entered.promise
-      expect(probe).toHaveBeenCalledTimes(1)
-      if (kind === "aborted") joiner.abort(ownReason)
-      if (kind !== "success") controller.abort(reason)
-      if (kind === "failure") release.reject(failure)
-      else release.resolve(state)
-      expect(await first).toBe(kind === "success" ? undefined : kind === "failure" ? failure : reason)
-      expect(await second).toBe(kind === "shared" ? reason : kind === "aborted" ? ownReason : kind === "failure" ? failure : undefined)
-      expect(probe).toHaveBeenCalledTimes(kind === "manual" || kind === "different" ? 3 : kind === "success" ? 2 : 1)
-      probe.mockRestore()
-      await runtime.reconcile()
-    } finally {
-      release.resolve(state)
-      await Promise.all([first, second])
-      probe.mockRestore()
-    }
-  })
+  test.each(["manual", "different", "aborted", "shared", "success", "failure"] as const)(
+    "#given overlapping identity observers (%s) #when the owner settles #then cancellation belongs to each caller",
+    async (kind) => {
+      const root = await mkdtemp(join(tmpdir(), "omo-reconcile-flight-"))
+      roots.push(root)
+      const identity = createMemoryIdentityContext({
+        identity: "agent-test",
+        identityPaths: buildIdentityPaths(root, "agent-test"),
+        binding: { identity: "agent-test", repoPathHash: "hash", boundAt: 1 },
+      })
+      const runtime = createIdentityRuntime(identity, {
+        loadConfig: () => loadedMemoryConfig(memorySettings()),
+        cwd: () => root,
+        resolveModelRegistry: () => undefined,
+      })
+      const state = await runtime.store.readState()
+      const readState = runtime.store.readState.bind(runtime.store)
+      const entered = Promise.withResolvers<void>()
+      const release = Promise.withResolvers<typeof state>()
+      const probe = spyOn(runtime.store, "readState")
+        .mockImplementationOnce(() => {
+          entered.resolve()
+          return release.promise
+        })
+        .mockImplementation(readState)
+      const controller = new AbortController()
+      const joiner = new AbortController()
+      const reason = new DOMException("Settle observer budget exhausted", "TimeoutError")
+      const ownReason = new Error("joining observer retired")
+      const failure = new Error("reservation read failed")
+      const first = runtime.reconcile(controller.signal).catch((error: unknown) => error)
+      const second = runtime
+        .reconcile(kind === "manual" ? undefined : kind === "shared" ? controller.signal : joiner.signal)
+        .catch((error: unknown) => error)
+      try {
+        await entered.promise
+        expect(probe).toHaveBeenCalledTimes(1)
+        if (kind === "aborted") joiner.abort(ownReason)
+        if (kind !== "success") controller.abort(reason)
+        if (kind === "failure") release.reject(failure)
+        else release.resolve(state)
+        expect(await first).toBe(kind === "success" ? undefined : kind === "failure" ? failure : reason)
+        expect(await second).toBe(
+          kind === "shared" ? reason : kind === "aborted" ? ownReason : kind === "failure" ? failure : undefined,
+        )
+        expect(probe).toHaveBeenCalledTimes(kind === "manual" || kind === "different" ? 3 : kind === "success" ? 2 : 1)
+        probe.mockRestore()
+        await runtime.reconcile()
+      } finally {
+        release.resolve(state)
+        await Promise.all([first, second])
+        probe.mockRestore()
+      }
+    },
+  )
 
   test.skipIf(process.platform !== "darwin" && process.platform !== "linux")(
     "#given an unresolved reflection child command #when the real lazy sandbox is constructed #then the unsandboxed escape reaches the injected logger",
@@ -69,13 +80,11 @@ describe("memory identity runtime", () => {
       const root = await mkdtemp(join(tmpdir(), "omo-memory-identity-runtime-"))
       roots.push(root)
       const paths = buildIdentityPaths(root, "agent-test")
-      await Promise.all([
-        paths.repo,
-        paths.transcripts,
-        paths.reflection,
-        paths.reflectionSessions,
-        paths.worktrees,
-      ].map((path) => mkdir(path, { recursive: true })))
+      await Promise.all(
+        [paths.repo, paths.transcripts, paths.reflection, paths.reflectionSessions, paths.worktrees].map((path) =>
+          mkdir(path, { recursive: true }),
+        ),
+      )
       const binDir = join(root, "bin")
       await mkdir(binDir)
       const sandboxExecutable = join(binDir, process.platform === "darwin" ? "sandbox-exec" : "bwrap")
@@ -132,7 +141,8 @@ describe("memory identity runtime", () => {
           details: {
             identity: "agent-test",
             runId: "reflection-run-visible",
-            warning: 'reflection sandbox unavailable: inner command "missing-senpi" is not absolute and could not be resolved; running unsandboxed',
+            warning:
+              'reflection sandbox unavailable: inner command "missing-senpi" is not absolute and could not be resolved; running unsandboxed',
           },
         })
       } finally {
@@ -152,13 +162,11 @@ describe("memory identity runtime", () => {
       const root = await mkdtemp(join(tmpdir(), "omo-memory-identity-runtime-deferred-"))
       roots.push(root)
       const paths = buildIdentityPaths(root, "agent-test")
-      await Promise.all([
-        paths.repo,
-        paths.transcripts,
-        paths.reflection,
-        paths.reflectionSessions,
-        paths.worktrees,
-      ].map((path) => mkdir(path, { recursive: true })))
+      await Promise.all(
+        [paths.repo, paths.transcripts, paths.reflection, paths.reflectionSessions, paths.worktrees].map((path) =>
+          mkdir(path, { recursive: true }),
+        ),
+      )
       const binDir = join(root, "bin")
       await mkdir(binDir)
       const bwrap = join(binDir, "bwrap")
@@ -331,7 +339,9 @@ async function renderReflectionSandboxAgentDir(envShape: {
 function sandboxGrantsAgentDir(renderedArgs: readonly string[], agentDirReal: string): boolean {
   if (process.platform === "darwin") {
     const profile = renderedArgs[1]
-    return typeof profile === "string" && profile.includes(`(allow file-write* (subpath ${JSON.stringify(agentDirReal)}))`)
+    return (
+      typeof profile === "string" && profile.includes(`(allow file-write* (subpath ${JSON.stringify(agentDirReal)}))`)
+    )
   }
   for (let i = 0; i + 2 < renderedArgs.length; i++) {
     if (renderedArgs[i] === "--bind" && renderedArgs[i + 1] === agentDirReal && renderedArgs[i + 2] === agentDirReal) {
@@ -369,7 +379,11 @@ describe("memory identity runtime backfills runtime dirs of existing identities 
       resolveModelRegistry: () => undefined,
       logger: ctx.logger,
     })
-    const reserved = await runtime.store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+    const reserved = await runtime.store.tryReserve({
+      trigger: "manual",
+      conversationIds: ["conversation-a"],
+      snapshots: [],
+    })
     if (reserved.status !== "active") throw new Error("expected an active manual reservation")
 
     // when
@@ -400,10 +414,16 @@ describe("memory identity runtime backfills runtime dirs of existing identities 
       resolveModelRegistry: () => undefined,
       logger: ctx.logger,
     })
-    const first = await runtime.store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+    const first = await runtime.store.tryReserve({
+      trigger: "manual",
+      conversationIds: ["conversation-a"],
+      snapshots: [],
+    })
     if (first.status !== "active") throw new Error("expected an active manual reservation")
     await runtime.launch(first.run)
-    const warning = ctx.logs.find((log) => log.level === "warn" && log.message.includes("could not create its runtime directories"))
+    const warning = ctx.logs.find(
+      (log) => log.level === "warn" && log.message.includes("could not create its runtime directories"),
+    )
     expect(warning?.message).toContain("retries on the next run")
     expect(existsSync(paths.viewers)).toBe(true)
 
@@ -415,34 +435,42 @@ describe("memory identity runtime backfills runtime dirs of existing identities 
     expect(statSync(paths.reflectionSessions).isDirectory()).toBe(true)
   }, 30_000)
 
-  test.skipIf(process.platform === "win32")("#given a fresh identity #when the backfill creates its runtime dirs #then they are owner-only (0700)", async () => {
-    // given
-    const root = await mkdtemp(join(tmpdir(), "omo-memory-identity-runtime-backfill-mode-"))
-    roots.push(root)
-    const paths = buildIdentityPaths(root, "agent-mode")
-    const identity = createMemoryIdentityContext({
-      identity: "agent-mode",
-      identityPaths: paths,
-      binding: { identity: "agent-mode", repoPathHash: "hash", boundAt: 1 },
-    })
-    const ctx = componentContext()
-    const runtime = createIdentityRuntime(identity, {
-      loadConfig: () => loadedMemoryConfig(memorySettings()),
-      cwd: () => root,
-      resolveModelRegistry: () => undefined,
-      logger: ctx.logger,
-    })
-    const reserved = await runtime.store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
-    if (reserved.status !== "active") throw new Error("expected an active manual reservation")
+  test.skipIf(process.platform === "win32")(
+    "#given a fresh identity #when the backfill creates its runtime dirs #then they are owner-only (0700)",
+    async () => {
+      // given
+      const root = await mkdtemp(join(tmpdir(), "omo-memory-identity-runtime-backfill-mode-"))
+      roots.push(root)
+      const paths = buildIdentityPaths(root, "agent-mode")
+      const identity = createMemoryIdentityContext({
+        identity: "agent-mode",
+        identityPaths: paths,
+        binding: { identity: "agent-mode", repoPathHash: "hash", boundAt: 1 },
+      })
+      const ctx = componentContext()
+      const runtime = createIdentityRuntime(identity, {
+        loadConfig: () => loadedMemoryConfig(memorySettings()),
+        cwd: () => root,
+        resolveModelRegistry: () => undefined,
+        logger: ctx.logger,
+      })
+      const reserved = await runtime.store.tryReserve({
+        trigger: "manual",
+        conversationIds: ["conversation-a"],
+        snapshots: [],
+      })
+      if (reserved.status !== "active") throw new Error("expected an active manual reservation")
 
-    // when
-    await runtime.launch(reserved.run)
+      // when
+      await runtime.launch(reserved.run)
 
-    // then
-    for (const dir of [paths.reflectionSessions, paths.viewers, paths.pushQueue]) {
-      expect(statSync(dir).mode & 0o777).toBe(0o700)
-    }
-  }, 30_000)
+      // then
+      for (const dir of [paths.reflectionSessions, paths.viewers, paths.pushQueue]) {
+        expect(statSync(dir).mode & 0o777).toBe(0o700)
+      }
+    },
+    30_000,
+  )
 })
 
 describe("memory identity runtime agent-dir resolution", () => {
@@ -541,7 +569,9 @@ describe("memory identity runtime agent-dir resolution", () => {
 })
 
 describe("memory identity runtime binds every launch to its own run (#10339)", () => {
-  async function runtimeSeeingScopes(name: string): Promise<{ runtime: ReturnType<typeof createIdentityRuntime>; seen: (LaunchScope | undefined)[] }> {
+  async function runtimeSeeingScopes(
+    name: string,
+  ): Promise<{ runtime: ReturnType<typeof createIdentityRuntime>; seen: (LaunchScope | undefined)[] }> {
     const root = await mkdtemp(join(tmpdir(), `omo-memory-identity-runtime-scope-${name}-`))
     roots.push(root)
     const identity = createMemoryIdentityContext({
@@ -567,7 +597,11 @@ describe("memory identity runtime binds every launch to its own run (#10339)", (
   test("#given a reconcile-style launch with no trigger snapshot #when the runner resolves its facts #then it runs in a scope of its own run's conversations", async () => {
     // given
     const { runtime, seen } = await runtimeSeeingScopes("agent-scope-plain")
-    const reserved = await runtime.store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+    const reserved = await runtime.store.tryReserve({
+      trigger: "manual",
+      conversationIds: ["conversation-a"],
+      snapshots: [],
+    })
     if (reserved.status !== "active") throw new Error("expected an active manual reservation")
 
     // when
@@ -580,7 +614,11 @@ describe("memory identity runtime binds every launch to its own run (#10339)", (
   test("#given a launch for conversation A started inside session B's trigger scope #when the runner resolves its facts #then it never sees B's snapshot", async () => {
     // given: B's trigger scope carries B's snapshot (a queued follow-up for A is launched from inside it)
     const { runtime, seen } = await runtimeSeeingScopes("agent-scope-nested")
-    const reserved = await runtime.store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
+    const reserved = await runtime.store.tryReserve({
+      trigger: "manual",
+      conversationIds: ["conversation-a"],
+      snapshots: [],
+    })
     if (reserved.status !== "active") throw new Error("expected an active manual reservation")
     const sessionB = {
       conversationIds: ["conversation-b"],

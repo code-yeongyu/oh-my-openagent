@@ -9,7 +9,7 @@ describe("default device name", () => {
     const name = deviceName("host\u200D\u202E\u00AD\u2060\u{E0001}\u3164\u115F\u1160\uFFA0\n\u2028\u2029")
     expect(name).toBe("omo CLI on host")
     let sent = false
-    const api = fakeApi(async request => {
+    const api = fakeApi(async (request) => {
       if (request.url.endsWith("/code")) {
         const body = await request.json()
         expect(body.client.name).toBe(name)
@@ -19,16 +19,31 @@ describe("default device name", () => {
       }
       return Response.json(grant)
     })
-    await loginDevice(createSession({ beforeKeysDiscarded: async () => undefined, api, store: memorySecrets().store(api), home: await temporaryHome() }), {
-      name, platform: "linux", ...clock(), show: () => {}, chooseDevice: async () => null,
-    })
+    await loginDevice(
+      createSession({
+        beforeKeysDiscarded: async () => undefined,
+        api,
+        store: memorySecrets().store(api),
+        home: await temporaryHome(),
+      }),
+      {
+        name,
+        platform: "linux",
+        ...clock(),
+        show: () => {},
+        chooseDevice: async () => null,
+      },
+    )
     expect(sent).toBe(true)
   })
 
-  test.each(["", " \u200D\u3164 ", "a".repeat(100), "😀".repeat(100)])("always yields a nonempty bounded valid name", input => {
-    const name = deviceName(input)
-    expect(name).toBe(name.trim())
-    expect([...name].length).toBeLessThanOrEqual(64)
-    expect(name).toMatch(/^(?=.*\S)[^\p{Cc}\p{Zl}\p{Zp}\p{Cf}\u3164\u115F\u1160\uFFA0]{1,64}$/u)
-  })
+  test.each(["", " \u200D\u3164 ", "a".repeat(100), "😀".repeat(100)])(
+    "always yields a nonempty bounded valid name",
+    (input) => {
+      const name = deviceName(input)
+      expect(name).toBe(name.trim())
+      expect([...name].length).toBeLessThanOrEqual(64)
+      expect(name).toMatch(/^(?=.*\S)[^\p{Cc}\p{Zl}\p{Zp}\p{Cf}\u3164\u115F\u1160\uFFA0]{1,64}$/u)
+    },
+  )
 })

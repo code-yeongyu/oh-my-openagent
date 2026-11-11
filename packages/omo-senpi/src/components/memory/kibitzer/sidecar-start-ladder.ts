@@ -23,7 +23,10 @@ export interface KibitzerStartResolution {
   readonly fallbacks: readonly ReflectionModelCandidate[]
 }
 
-export function kibitzerStartLadder(resolution: KibitzerStartResolution, refused: ReadonlySet<string>): readonly KibitzerStartCandidate[] {
+export function kibitzerStartLadder(
+  resolution: KibitzerStartResolution,
+  refused: ReadonlySet<string>,
+): readonly KibitzerStartCandidate[] {
   const head: ReflectionModelCandidate = {
     model: resolution.model,
     ...(resolution.thinking === undefined ? {} : { thinking: resolution.thinking }),

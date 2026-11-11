@@ -11,7 +11,11 @@ const expired = { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00
 // states it before logout instead of reading the expected value back out of the object under assertion.
 const generationBeforeLogout = "generation-before-logout"
 
-async function logoutHarness(reply: () => Response | Promise<Response>, overrideApi?: string, initial: Credentials = expired) {
+async function logoutHarness(
+  reply: () => Response | Promise<Response>,
+  overrideApi?: string,
+  initial: Credentials = expired,
+) {
   const home = await temporaryHome()
   let stored: string | null = JSON.stringify(initial)
   const writes: Credentials[] = []
@@ -19,8 +23,8 @@ async function logoutHarness(reply: () => Response | Promise<Response>, override
   const atRefresh: (Credentials | null)[] = []
   const atRevoke: (Credentials | null)[] = []
   const entered = Promise.withResolvers<Credentials | null>()
-  const readStored = () => stored === null ? null : credentialSchema.parse(JSON.parse(stored))
-  const api = fakeApi(async request => {
+  const readStored = () => (stored === null ? null : credentialSchema.parse(JSON.parse(stored)))
+  const api = fakeApi(async (request) => {
     const path = new URL(request.url).pathname
     if (path === "/fake-keystore") {
       if (request.method === "PUT") {
@@ -49,12 +53,19 @@ async function logoutHarness(reply: () => Response | Promise<Response>, override
   })
   function launch(action: "logout" | "whoami", failure = "") {
     const command = [
-      process.execPath, "--preload", join(import.meta.dir, "cli-keystore.fixture.ts"),
-      join(resolve(import.meta.dir, "../../../../.."), "packages", "omo-native", "bin", "omo.js"), action,
+      process.execPath,
+      "--preload",
+      join(import.meta.dir, "cli-keystore.fixture.ts"),
+      join(resolve(import.meta.dir, "../../../../.."), "packages", "omo-native", "bin", "omo.js"),
+      action,
     ]
     const env = {
-      PATH: process.env.PATH, HOME: home, USERPROFILE: home, OMO_RUNTIME: "bun",
-      OMO_SERVICE_API_URL: overrideApi ?? api, OMO_TEST_KEYSTORE_URL: `${api}/fake-keystore`,
+      PATH: process.env.PATH,
+      HOME: home,
+      USERPROFILE: home,
+      OMO_RUNTIME: "bun",
+      OMO_SERVICE_API_URL: overrideApi ?? api,
+      OMO_TEST_KEYSTORE_URL: `${api}/fake-keystore`,
       // The child's own lock home: the test preload's account seam does not reach a child process (#12978).
       OMO_TEST_CREDENTIAL_LOCK_HOME: home,
       OMO_TEST_FETCH_FAILURE: failure,
@@ -62,7 +73,9 @@ async function logoutHarness(reply: () => Response | Promise<Response>, override
     const child = Bun.spawn(command, { cwd: home, env, stdout: "pipe", stderr: "pipe" })
     children.push(child)
     const result = Promise.all([
-      new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
+      child.exited,
     ]).then(([stdout, stderr, code]) => {
       for (const secret of [grant.accessToken, grant.refreshToken, ...Object.values(privateKeys)]) {
         expect(JSON.stringify({ command, env, stdout, stderr })).not.toContain(secret)
@@ -75,7 +88,9 @@ async function logoutHarness(reply: () => Response | Promise<Response>, override
 }
 
 test("native logout journals before refresh and persists rotated credentials before revoke", async () => {
-  const h = await logoutHarness(() => Response.json({ ...grant, accessToken: "rotated-access", refreshToken: "rotated-refresh" }))
+  const h = await logoutHarness(() =>
+    Response.json({ ...grant, accessToken: "rotated-access", refreshToken: "rotated-refresh" }),
+  )
   const result = await h.launch("logout").result
   expect(result.code).toBe(0)
   expect(result.stdout.length).toBeGreaterThan(0)
@@ -92,27 +107,50 @@ test("native logout journals before refresh and persists rotated credentials bef
 test("logout waits for journal persistence acknowledgment before dispatching refresh", async () => {
   const entered = Promise.withResolvers<void>()
   const permit = Promise.withResolvers<void>()
-  const api = fakeApi(request => request.method === "DELETE" ? new Response(null, { status: 204 }) : Response.json(grant))
+  const api = fakeApi((request) =>
+    request.method === "DELETE" ? new Response(null, { status: 204 }) : Response.json(grant),
+  )
   const base = memorySecrets().store(api)
   await base.write(expired)
   const persisted = await base.read()
-  const store = { ...base, write: async (value: Credentials) => {
-    if (value.refreshState === "uncertain") {
-      entered.resolve()
-      await permit.promise
-    }
-    await base.write(value)
-  } }
+  const store = {
+    ...base,
+    write: async (value: Credentials) => {
+      if (value.refreshState === "uncertain") {
+        entered.resolve()
+        await permit.promise
+      }
+      await base.write(value)
+    },
+  }
   const original = globalThis.fetch
   let dispatched = 0
-  const fetcher = spyOn(globalThis, "fetch").mockImplementation(Object.assign(
-    (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
-      dispatched++
-      return original(input, init)
-    }, { preconnect: original.preconnect }))
-  const logout = createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome() }).logout()
-  onTestFinished(async () => { permit.resolve(); await logout; fetcher.mockRestore() })
-  await Promise.race([entered.promise, logout.then(() => { throw new Error("logout skipped its journal") })])
+  const fetcher = spyOn(globalThis, "fetch").mockImplementation(
+    Object.assign(
+      (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+        dispatched++
+        return original(input, init)
+      },
+      { preconnect: original.preconnect },
+    ),
+  )
+  const logout = createSession({
+    beforeKeysDiscarded: async () => undefined,
+    api,
+    store,
+    home: await temporaryHome(),
+  }).logout()
+  onTestFinished(async () => {
+    permit.resolve()
+    await logout
+    fetcher.mockRestore()
+  })
+  await Promise.race([
+    entered.promise,
+    logout.then(() => {
+      throw new Error("logout skipped its journal")
+    }),
+  ])
   expect(dispatched).toBe(0)
   expect(await base.read()).toEqual(persisted)
   permit.resolve()
@@ -121,22 +159,51 @@ test("logout waits for journal persistence acknowledgment before dispatching ref
   expect(await base.read()).toBeNull()
 })
 
-for (const outcome of ["500", "500-terminal", "lost-response", "timeout", "network", "tls",
-  "unauthorized", "account_deleted", "reauth_required", "invalid_grant"]) {
+for (const outcome of [
+  "500",
+  "500-terminal",
+  "lost-response",
+  "timeout",
+  "network",
+  "tls",
+  "unauthorized",
+  "account_deleted",
+  "reauth_required",
+  "invalid_grant",
+]) {
   test(`native logout refresh ${outcome} fully clears with the correct warning and successful exit`, async () => {
     const terminal = ["unauthorized", "account_deleted", "reauth_required", "invalid_grant"].includes(outcome)
     let tlsRequests = 0
-    const tlsServer = outcome === "tls" ? Bun.serve({
-      hostname: "127.0.0.1", port: 0, tls: tlsTestCertificate(),
-      fetch() { tlsRequests++; return Response.json(grant) },
-    }) : null
+    const tlsServer =
+      outcome === "tls"
+        ? Bun.serve({
+            hostname: "127.0.0.1",
+            port: 0,
+            tls: tlsTestCertificate(),
+            fetch() {
+              tlsRequests++
+              return Response.json(grant)
+            },
+          })
+        : null
     if (tlsServer) onTestFinished(() => tlsServer.stop(true))
-    const h = await logoutHarness(() => {
-      if (outcome === "500" || outcome === "500-terminal") return refusal(outcome === "500" ? "internal" : "unauthorized", undefined, 500)
-      if (terminal) return refusal(outcome, undefined, outcome === "account_deleted" ? 410 : outcome === "invalid_grant" ? 400 : 401)
-      return Response.json({ ...grant, refreshToken: "rotated" })
-    }, tlsServer?.url.origin, { ...expired, credentialGeneration: generationBeforeLogout })
-    const fault = outcome === "network" ? "offline" : outcome === "lost-response" || outcome === "timeout" ? outcome : ""
+    const h = await logoutHarness(
+      () => {
+        if (outcome === "500" || outcome === "500-terminal")
+          return refusal(outcome === "500" ? "internal" : "unauthorized", undefined, 500)
+        if (terminal)
+          return refusal(
+            outcome,
+            undefined,
+            outcome === "account_deleted" ? 410 : outcome === "invalid_grant" ? 400 : 401,
+          )
+        return Response.json({ ...grant, refreshToken: "rotated" })
+      },
+      tlsServer?.url.origin,
+      { ...expired, credentialGeneration: generationBeforeLogout },
+    )
+    const fault =
+      outcome === "network" ? "offline" : outcome === "lost-response" || outcome === "timeout" ? outcome : ""
     const result = await h.launch("logout", fault).result
     expect(result.code).toBe(0)
     expect(result.stdout.length).toBeGreaterThan(0)
@@ -151,7 +218,15 @@ for (const outcome of ["500", "500-terminal", "lost-response", "timeout", "netwo
     expect(after.code).toBe(1)
     expect(after.stderr).toContain("Not signed in")
     expect(h.readStored()).toBeNull()
-    console.log(JSON.stringify({ outcome, exit: result.code, warning: result.stderr.trim(), cleared: true, whoami: after.stderr.trim() }))
+    console.log(
+      JSON.stringify({
+        outcome,
+        exit: result.code,
+        warning: result.stderr.trim(),
+        cleared: true,
+        whoami: after.stderr.trim(),
+      }),
+    )
   }, 15_000)
 }
 
@@ -162,7 +237,9 @@ test("crashed logout refresh is cleared by a fresh logout without replay, then w
   const first = h.launch("logout")
   const journal = await Promise.race([
     h.entered,
-    first.result.then(() => { throw new Error("logout exited before its refresh was observed") }),
+    first.result.then(() => {
+      throw new Error("logout exited before its refresh was observed")
+    }),
   ])
   const credentialGeneration = h.writes[0]?.credentialGeneration
   expect(typeof credentialGeneration).toBe("string")
@@ -182,5 +259,14 @@ test("crashed logout refresh is cleared by a fresh logout without replay, then w
   expect(whoami.code).toBe(1)
   expect(whoami.stderr).toContain("Not signed in")
   expect(h.calls).toEqual(["POST /v1/session/refresh"])
-  console.log(JSON.stringify({ outcome: "crash", exit: recovered.code, warning: recovered.stderr.trim(), cleared: true, refreshes: 1, whoami: whoami.stderr.trim() }))
+  console.log(
+    JSON.stringify({
+      outcome: "crash",
+      exit: recovered.code,
+      warning: recovered.stderr.trim(),
+      cleared: true,
+      refreshes: 1,
+      whoami: whoami.stderr.trim(),
+    }),
+  )
 }, 15_000)
