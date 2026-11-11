@@ -17,7 +17,12 @@ bun crates/omo-computer-backend-macos/probes/probe-sp-m.ts --verify crates/omo-c
 bun crates/omo-computer-backend-macos/probes/probe-sp-m.ts --row <id> --macos <major> # one row, as the rerun column says
 bun crates/omo-computer-backend-macos/probes/probe-sp-m.ts --pending-only --out <tsv> \
     --pending 15="awaiting H2" --pending 26="awaiting H1: ..."                  # no host: every row UNMEASURED
+bun crates/omo-computer-backend-macos/probes/probe-sp-m.ts --self-test              # any host: the pure decisions
 ```
+
+`--self-test` runs on any host, Linux included, and makes no native call: it checks the `--verify` gate, the
+ledger grammar, the `--pending` refusals, the copy-spaces decision, the one-line refusal of a file that is not an
+SP-M ledger (exit 2), and that the capture leg stays off without `--with-capture`.
 
 `--pending-only` measures nothing and needs no host; it is how the ledger is written while neither host exists.
 
@@ -26,10 +31,15 @@ bun crates/omo-computer-backend-macos/probes/probe-sp-m.ts --pending-only --out 
 refuses a `--pending` with an empty reason. `--verify` measures every row of the host's major again and exits 0 only
 when the verdict column is identical on every row AND at least one row was measured (its summary prints the
 `unmeasured` count); other columns may differ (rects are bucketed to 8 px, timings vary). A symbol found only in
-another loaded image than the one the design names reads `elsewhere` in `measured`, not `no`.
+another loaded image than the one the design names reads `elsewhere` in `measured`, not `no`, on every row that
+reports a C symbol (the Objective-C class and selector of the auth-message row read `yes` / `no`). An existing `--out`
+or `--verify` file that is not an SP-M ledger is refused with one line and exit 2.
 
-The probe raises no dialog, posts no input, moves no window and adds no Space. A question that needs one of those, a
-grant the host does not have, or a fixture a later row builds is recorded `UNMEASURED` with the reason.
+By default the probe raises no dialog, posts no input, moves no window and adds no Space. A question that needs one of
+those, a grant the host does not have, or a fixture a later row builds is recorded `UNMEASURED` with the reason. The
+one exception is opt-in: `--with-capture` (with `--measure`, `--verify` or `--row`) runs the `hwcapture` leg, a legacy
+window capture that may raise the macOS 15.1+ capture reminder on a host holding the Screen Recording grant; without
+the flag that row is `UNMEASURED` and the probe makes no capture call.
 
 ## Columns
 

@@ -365,6 +365,11 @@ const unmeasured = (reason: string, resolves = "-", measured = "-"): Outcome => 
 })
 const yesNo = (v: unknown): string => (v ? "yes" : "no")
 
+// `<name>=yes|elsewhere|no` for the measured column: every row that reports a C symbol uses this form.
+function located(path: string, name: string): string {
+  return `${name}=${native().locate(path, name)}`
+}
+
 function resolveAll(path: string, names: string[]): { all: boolean; detail: string } {
   const n = native()
   const found = names.map((name) => [name, n.locate(path, name)] as const)
@@ -382,6 +387,12 @@ function grantReason(missing: string[]): string {
 // Questions. One entry per question per condition; the same list is measured on every macOS major.
 
 function qHwCapture(host: Host): Outcome {
+  // Gated like the consent rows: a legacy capture may raise the macOS 15.1+ capture reminder on a granted host, so
+  // the probe runs it only when asked, and makes no native call otherwise.
+  if (!host.withCapture)
+    return unmeasured(
+      "capture leg not run: it may raise the macOS 15.1+ capture reminder; rerun with --with-capture on a host where that is acceptable",
+    )
   const n = native()
   const r = resolveAll(PATHS.skylight, [
     "SLSHWCaptureWindowList",
@@ -443,7 +454,7 @@ function qPostToPidResolve(): Outcome {
   const cgPub = n.sym(PATHS.cg, "CGEventPostToPid")
   const distinct = sl !== null && cgPub !== null && sl !== cgPub
   const resolves = sl !== null || sls !== null
-  const measured = `SLEventPostToPid=${yesNo(sl)},SLSEventPostToPid=${yesNo(sls)},CGEventPostToPid=${yesNo(cgPub)},public_distinct=${yesNo(distinct)}`
+  const measured = `${located(PATHS.skylight, "SLEventPostToPid")},${located(PATHS.skylight, "SLSEventPostToPid")},${located(PATHS.cg, "CGEventPostToPid")},public_distinct=${yesNo(distinct)}`
   if (!resolves)
     return {
       verdict: "CONTRADICTS",
@@ -465,13 +476,15 @@ function qPostToPidDistinct(): Outcome {
   const n = native()
   const sl = n.sym(PATHS.skylight, "SLEventPostToPid")
   const cgPub = n.sym(PATHS.cg, "CGEventPostToPid")
-  if (!sl || !cgPub) return unmeasured("one of SLEventPostToPid / CGEventPostToPid is absent", yesNo(sl && cgPub))
+  const where = `${located(PATHS.skylight, "SLEventPostToPid")},${located(PATHS.cg, "CGEventPostToPid")}`
+  if (!sl || !cgPub)
+    return unmeasured("one of SLEventPostToPid / CGEventPostToPid is absent", yesNo(sl && cgPub), where)
   const distinct = sl !== cgPub
   return {
     verdict: distinct ? "CONFIRMS" : "NEW-EDGE",
     resolves: "yes",
     behaves: distinct ? "distinct entry points" : "same entry point",
-    measured: `public_distinct=${yesNo(distinct)}`,
+    measured: `${where};public_distinct=${yesNo(distinct)}`,
     reason: distinct ? "-" : "CGEventPostToPid is the SkyLight entry point: a dual post double-delivers, post once",
   }
 }
@@ -516,7 +529,7 @@ function qRemoteToken(host: Host): Outcome {
   const n = native()
   const createTok = n.sym(PATHS.ax, "_AXUIElementRemoteTokenCreate")
   const fromTok = n.sym(PATHS.ax, "_AXUIElementCreateWithRemoteToken")
-  const measuredNames = `_AXUIElementRemoteTokenCreate=${yesNo(createTok)},_AXUIElementCreateWithRemoteToken=${yesNo(fromTok)}`
+  const measuredNames = `${located(PATHS.ax, "_AXUIElementRemoteTokenCreate")},${located(PATHS.ax, "_AXUIElementCreateWithRemoteToken")}`
   if (!createTok || !fromTok)
     return {
       verdict: "CONTRADICTS",
@@ -722,7 +735,8 @@ function qAuthSymbol(): Outcome {
   const cls = n.objc.objc_getClass(cstr("SLSEventAuthenticationMessage")) as Pointer | null
   const sel = n.objc.sel_registerName(cstr("messageWithEventRecord:pid:version:")) as Pointer | null
   const factory = cls && sel ? (n.objc.class_getClassMethod(cls, sel) as Pointer | null) : null
-  const measured = `SLEventSetAuthenticationMessage=${yesNo(setMsg)},SLSEventAuthenticationMessage_class=${yesNo(cls)},factory_selector=${yesNo(factory)}`
+  // The class and selector come from the Objective-C runtime, which has no per-image answer: yes / no only.
+  const measured = `${located(PATHS.skylight, "SLEventSetAuthenticationMessage")},SLSEventAuthenticationMessage_class=${yesNo(cls)},factory_selector=${yesNo(factory)}`
   const ok = Boolean(setMsg && cls && factory)
   return {
     verdict: ok ? "CONFIRMS" : "CONTRADICTS",
@@ -1184,7 +1198,11 @@ function buildHost(args: string[]): Host {
 
 // Reads an existing ledger. A file that is not an SP-M ledger is an error value, never a thrown stack trace.
 function readLedger(path: string): { rows: LedgerRow[] } | { error: string } {
-  return { rows: parseLedger(path) }
+  try {
+    return { rows: parseLedger(path) }
+  } catch (error) {
+    return { error: (error as Error).message.split("\n")[0] ?? "unreadable ledger" }
+  }
 }
 
 function printSession(host: Host): void {
@@ -1380,7 +1398,17 @@ function main(args: string[]): number {
   // --measure arguments are checked before the host: at most ONE major (the host's own) may be left uncovered.
   const measureOut = argValue(args, "--out")
   const { pending, error } = parsePending(args)
-  const existing = measureOut && existsSync(measureOut) ? parseLedger(measureOut) : []
+  const existingRead = measureOut && existsSync(measureOut) ? readLedger(measureOut) : { rows: [] }
+  if ("error" in existingRead) {
+    console.error(`SP-M: ${existingRead.error}`)
+    return 2
+  }
+  const existing = existingRead.rows
+  const verifyRead = verifyPath ? readLedger(verifyPath) : { rows: [] }
+  if ("error" in verifyRead) {
+    console.error(`SP-M: ${verifyRead.error}`)
+    return 2
+  }
   if (args.includes("--measure")) {
     if (!measureOut || error) {
       console.error(`SP-M: ${error ?? "--measure needs --out <tsv>"}`)
@@ -1440,7 +1468,7 @@ function main(args: string[]): number {
   }
 
   // --verify: re-measure every row the ledger records for this host's macOS major; the verdict column must match.
-  const ledger = parseLedger(verifyPath as string)
+  const ledger = verifyRead.rows
   let compared = 0
   let unmeasuredNow = 0
   let differ = 0
