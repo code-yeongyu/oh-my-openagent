@@ -21,6 +21,7 @@ import type {
 import { MESSAGE_LIMIT_CHARS } from "../../../src/local-api/upload.ts";
 import { assertNever, jsonObject } from "../../../src/local-api/validate-fields.ts";
 import { readPage } from "./fake-owner-history.ts";
+import { rowsAs, rowsRefused } from "./fake-owner-rows.ts";
 import {
   type Conn,
   eventOf,
@@ -49,13 +50,16 @@ const matches = (row: ListingRow, filter: SessionFilter | undefined): boolean =>
   (filter?.state === undefined || row.state === filter.state);
 
 const list = (state: OwnerState, conn: Conn, request: SessionsList): Outcome => {
+  if (rowsRefused(request, state.world.listing.rowsNewest ?? 3)) return refuse("invalid_request", "rows");
   const query_id = state.mint();
   const { revisions, devices } = state.world.listing;
   const pending = Object.fromEntries(Object.keys(devices).map((d) => [d, "pending"]));
   return ok({ query_id }, () => {
     conn.send(eventOf("sessions.round", { query_id, state: "open", devices: pending }));
     revisions.forEach((revision, i) => {
-      const rows = revision.rows.filter((r) => matches(r, request.filter));
+      const rows = revision.rows
+        .filter((r) => matches(r, request.filter))
+        .map((r) => rowsAs(r, request.rows));
       const head = { query_id, revision: i + 1, incomplete: revision.incomplete };
       for (const event of pageListing(rows, LOCAL_INLINE_MAX, head)) conn.send(event);
     });

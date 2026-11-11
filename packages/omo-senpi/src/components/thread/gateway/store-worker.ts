@@ -183,6 +183,7 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     case "stats": return ops.stats(ctx)
     case "tool_receipt_begin": return await relay.toolReceiptBegin(ctx, args as Parameters<typeof relay.toolReceiptBegin>[1])
     case "tool_receipt_settle": return await relay.toolReceiptSettle(ctx, args as Parameters<typeof relay.toolReceiptSettle>[1])
+    case "tool_receipt_revise": return await relay.toolReceiptRevise(ctx, args as Parameters<typeof relay.toolReceiptRevise>[1])
     case "bind": return await relay.bindThread(ctx, args as Parameters<typeof relay.bindThread>[1])
     case "unbind": return await relay.unbindThread(ctx, args as Parameters<typeof relay.unbindThread>[1])
     case "rebind": return await relay.rebindThread(ctx, args as Parameters<typeof relay.rebindThread>[1])

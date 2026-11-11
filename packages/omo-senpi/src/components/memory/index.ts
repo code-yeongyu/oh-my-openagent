@@ -22,6 +22,7 @@ import { createSyncRunner, type SyncRunner } from "./sync-runner"
 import { readMemoryRpcSync } from "./memory-rpc-sync"
 import { wireSyncRpc } from "./sync-rpc-wiring"
 import { sweepTransientMemoryRuns, type TransientSweep } from "./transient-sweep"
+import { scheduleTransientSweepOnce } from "./transient-sweep-once"
 import { registerRecallMemoryReporter } from "./memory-reporter"
 import { createMemoryWiring, type MemoryWiringOptions } from "./wiring"
 
@@ -41,6 +42,8 @@ export interface MemoryComponentOptions {
   readonly refreshStatus?: MemoryWiringOptions["refreshStatus"]
   /** Seam for the registration-time transient sweep (transient-sweep.ts). */
   readonly sweepTransientRuns?: TransientSweep
+  /** Delay before the once-per-process sweep starts (transient-sweep-once.ts). */
+  readonly transientSweepDeferMs?: number
   /** Seam for the end-to-end encrypted sync runner (sync-runner.ts). */
   readonly syncRunner?: SyncRunner
   /** The host's signed-in device; the default reads the credentials `omo login` keeps. */
@@ -102,13 +105,20 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         },
       })
       primeMemoryPersonaAssets({ logger: ctx.logger })
-      // Reclaim runs an abnormal exit left behind (#7765). Detached from registration on purpose:
-      // it is pure maintenance, and a slow or failing sweep must never delay or break binding.
-      void work.track(() => sweepTransientRuns({
-        memoryRoot: resolveMemoryRoot(env, cwd),
-        warn: (message, fields) => ctx.logger.warn(message, fields),
-      })).catch((error: unknown) => {
-        ctx.logger.warn("omo-senpi memory transient sweep failed", { error: describeError(error) })
+      // Reclaim runs an abnormal exit left behind (#7765): once per memory root per day in this
+      // process, after the open, never inside it. A slow or failing sweep must never delay or break binding.
+      const transientSweep = scheduleTransientSweepOnce({
+        memoryRoot,
+        now,
+        ...(options.transientSweepDeferMs === undefined ? {} : { deferMs: options.transientSweepDeferMs }),
+        start: () => {
+          void work.track(() => sweepTransientRuns({
+            memoryRoot,
+            warn: (message, fields) => ctx.logger.warn(message, fields),
+          })).catch((error: unknown) => {
+            ctx.logger.warn("omo-senpi memory transient sweep failed", { error: describeError(error) })
+          })
+        },
       })
 
       const wiring = createMemoryWiring({
@@ -193,6 +203,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
       })
 
       pi.on("session_shutdown", async (payload, eventCtx) => {
+        transientSweep?.cancel()
         const sessionId = readSessionSurface(eventCtx).id
         if (syncSessionId === sessionId) {
           syncRpc?.retireBinding()

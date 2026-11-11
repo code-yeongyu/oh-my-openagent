@@ -18,7 +18,7 @@ function delivery(): DeliveryRow {
     sender: "session:sender", sender_turn: null, envelope, body: "Review this change.",
     bytes: 19, mode_requested: "auto", mode_effective: null, expected_turn_id: null,
     state: "queued", reason: null, admitted_by: null, claimed_at: null, attempt: 0,
-    admission_kind: null, turn_epoch: null, root_id: "root-1", hop: 1,
+    admission_kind: null, wait_kind: null, turn_epoch: null, root_id: "root-1", hop: 1,
     created_at: 1, updated_at: 1, expires_at: 2,
     binding_id: null, binding_revision: null, actor_user_id: null,
   }

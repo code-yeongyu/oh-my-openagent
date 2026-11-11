@@ -11,7 +11,7 @@
       },
       "devDependencies": {
         "@clack/prompts": "^1.8.1",
-        "@code-yeongyu/senpi": "2026.11.9-2",
+        "@code-yeongyu/senpi": "2026.11.10-2",
         "@modelcontextprotocol/sdk": "^1.30.0",
         "@oh-my-opencode/agents-md-core": "workspace:*",
         "@oh-my-opencode/ast-grep-mcp": "workspace:*",
@@ -38,6 +38,7 @@
         "@oh-my-opencode/senpi-desktop-engine": "workspace:*",
         "@oh-my-opencode/senpi-desktop-prelude": "workspace:*",
         "@oh-my-opencode/senpi-desktop-protocol": "workspace:*",
+        "@oh-my-opencode/senpi-desktop-sdk": "workspace:*",
         "@oh-my-opencode/senpi-desktop-service": "workspace:*",
         "@oh-my-opencode/senpi-desktop-tool": "workspace:*",
         "@oh-my-opencode/senpi-task": "workspace:*",
@@ -76,18 +77,18 @@
         "typescript": "^7.0.2",
       },
       "optionalDependencies": {
-        "oh-my-opencode-darwin-arm64": "5.1.66",
-        "oh-my-opencode-darwin-x64": "5.1.66",
-        "oh-my-opencode-darwin-x64-baseline": "5.1.66",
-        "oh-my-opencode-linux-arm64": "5.1.66",
-        "oh-my-opencode-linux-arm64-musl": "5.1.66",
-        "oh-my-opencode-linux-x64": "5.1.66",
-        "oh-my-opencode-linux-x64-baseline": "5.1.66",
-        "oh-my-opencode-linux-x64-musl": "5.1.66",
-        "oh-my-opencode-linux-x64-musl-baseline": "5.1.66",
-        "oh-my-opencode-windows-arm64": "5.1.66",
-        "oh-my-opencode-windows-x64": "5.1.66",
-        "oh-my-opencode-windows-x64-baseline": "5.1.66",
+        "oh-my-opencode-darwin-arm64": "5.1.69",
+        "oh-my-opencode-darwin-x64": "5.1.69",
+        "oh-my-opencode-darwin-x64-baseline": "5.1.69",
+        "oh-my-opencode-linux-arm64": "5.1.69",
+        "oh-my-opencode-linux-arm64-musl": "5.1.69",
+        "oh-my-opencode-linux-x64": "5.1.69",
+        "oh-my-opencode-linux-x64-baseline": "5.1.69",
+        "oh-my-opencode-linux-x64-musl": "5.1.69",
+        "oh-my-opencode-linux-x64-musl-baseline": "5.1.69",
+        "oh-my-opencode-windows-arm64": "5.1.69",
+        "oh-my-opencode-windows-x64": "5.1.69",
+        "oh-my-opencode-windows-x64-baseline": "5.1.69",
       },
     },
     "packages/agents-md-core": {
@@ -213,7 +214,7 @@
     },
     "packages/omo-codex": {
       "name": "@oh-my-opencode/omo-codex",
-      "version": "5.1.66",
+      "version": "5.1.69",
       "dependencies": {
         "@oh-my-opencode/model-core": "workspace:*",
         "@oh-my-opencode/shared-skills": "workspace:*",
@@ -233,12 +234,12 @@
     },
     "packages/omo-native": {
       "name": "omo-ai",
-      "version": "5.1.66",
+      "version": "5.1.69",
       "bin": {
         "omo": "bin/omo.js",
       },
       "dependencies": {
-        "@code-yeongyu/senpi": "2026.11.9-2",
+        "@code-yeongyu/senpi": "2026.11.10-2",
       },
     },
     "packages/omo-opencode": {
@@ -246,8 +247,8 @@
       "version": "0.1.0",
       "dependencies": {
         "@clack/prompts": "^1.8.1",
-        "@code-yeongyu/senpi": "2026.11.9-2",
-        "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.9-2",
+        "@code-yeongyu/senpi": "2026.11.10-2",
+        "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10-2",
         "@modelcontextprotocol/sdk": "^1.30.0",
         "@oh-my-opencode/agents-md-core": "workspace:*",
         "@oh-my-opencode/boulder-state": "workspace:*",
@@ -279,10 +280,10 @@
     },
     "packages/omo-senpi": {
       "name": "@oh-my-opencode/omo-senpi",
-      "version": "5.1.66",
+      "version": "5.1.69",
       "dependencies": {
         "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
-        "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.11.9-2",
+        "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.11.10-2",
         "@oh-my-opencode/ast-grep-mcp": "workspace:*",
         "@oh-my-opencode/boulder-state": "workspace:*",
         "@oh-my-opencode/comment-checker-core": "workspace:*",
@@ -306,15 +307,15 @@
         "typebox": "1.3.34",
       },
       "devDependencies": {
-        "@code-yeongyu/senpi": "2026.11.9-2",
-        "@code-yeongyu/senpi-agent-core": "2026.11.9-2",
-        "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.9-2",
+        "@code-yeongyu/senpi": "2026.11.10-2",
+        "@code-yeongyu/senpi-agent-core": "2026.11.10-2",
+        "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10-2",
         "@types/node": "26.6.2",
         "bun-types": "1.4.4",
         "terser": "5.51.2",
       },
       "peerDependencies": {
-        "@code-yeongyu/senpi": "2026.11.9-2",
+        "@code-yeongyu/senpi": "2026.11.10-2",
       },
       "optionalPeers": [
         "@code-yeongyu/senpi",
@@ -372,12 +373,25 @@
         "vitest": "5.0.1",
       },
     },
+    "packages/senpi-desktop-sdk": {
+      "name": "@oh-my-opencode/senpi-desktop-sdk",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/senpi-desktop-protocol": "workspace:*",
+      },
+      "devDependencies": {
+        "@types/node": "26.6.2",
+        "vitest": "5.0.1",
+      },
+    },
     "packages/senpi-desktop-service": {
       "name": "@oh-my-opencode/senpi-desktop-service",
       "version": "0.1.0",
       "dependencies": {
         "@oh-my-opencode/senpi-desktop-engine": "workspace:*",
         "@oh-my-opencode/senpi-desktop-protocol": "workspace:*",
+        "@oh-my-opencode/senpi-desktop-sdk": "workspace:*",
+        "quickjs-wasi": "3.6.2",
       },
       "devDependencies": {
         "@types/node": "26.6.2",
@@ -412,13 +426,13 @@
         "typebox": "1.3.34",
       },
       "devDependencies": {
-        "@code-yeongyu/senpi": "2026.11.9-2",
-        "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.11.9-2",
+        "@code-yeongyu/senpi": "2026.11.10-2",
+        "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.11.10-2",
         "typebox": "1.3.34",
       },
       "peerDependencies": {
-        "@code-yeongyu/senpi": "2026.11.9-2",
-        "@earendil-works/pi-tui": "2026.11.9-2",
+        "@code-yeongyu/senpi": "2026.11.10-2",
+        "@earendil-works/pi-tui": "2026.11.10-2",
         "typebox": "*",
       },
       "optionalPeers": [
@@ -501,23 +515,23 @@
 
     "@ampproject/remapping": ["@ampproject/remapping@2.3.0", "", { "dependencies": { "@jridgewell/gen-mapping": "^0.3.5", "@jridgewell/trace-mapping": "^0.3.24" } }, "sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw=="],
 
-    "@anthropic-ai/claude-agent-sdk": ["@anthropic-ai/claude-agent-sdk@0.3.306", "", { "optionalDependencies": { "@anthropic-ai/claude-agent-sdk-darwin-arm64": "0.3.306", "@anthropic-ai/claude-agent-sdk-darwin-x64": "0.3.306", "@anthropic-ai/claude-agent-sdk-linux-arm64": "0.3.306", "@anthropic-ai/claude-agent-sdk-linux-arm64-musl": "0.3.306", "@anthropic-ai/claude-agent-sdk-linux-x64": "0.3.306", "@anthropic-ai/claude-agent-sdk-linux-x64-musl": "0.3.306", "@anthropic-ai/claude-agent-sdk-win32-arm64": "0.3.306", "@anthropic-ai/claude-agent-sdk-win32-x64": "0.3.306" }, "peerDependencies": { "@anthropic-ai/sdk": ">=0.93.0", "@modelcontextprotocol/sdk": "^1.29.0", "zod": "^4.0.0" } }, "sha512-kmxcd+4WNhqhqnzODRPM5aOKb1EH2EdlRsf7ZeMx8uQsC1tHAHgHftQGFXGT8yMaYaYlDP9BGYJy1/aYv7IhkQ=="],
+    "@anthropic-ai/claude-agent-sdk": ["@anthropic-ai/claude-agent-sdk@0.3.321", "", { "optionalDependencies": { "@anthropic-ai/claude-agent-sdk-darwin-arm64": "0.3.321", "@anthropic-ai/claude-agent-sdk-darwin-x64": "0.3.321", "@anthropic-ai/claude-agent-sdk-linux-arm64": "0.3.321", "@anthropic-ai/claude-agent-sdk-linux-arm64-musl": "0.3.321", "@anthropic-ai/claude-agent-sdk-linux-x64": "0.3.321", "@anthropic-ai/claude-agent-sdk-linux-x64-musl": "0.3.321", "@anthropic-ai/claude-agent-sdk-win32-arm64": "0.3.321", "@anthropic-ai/claude-agent-sdk-win32-x64": "0.3.321" }, "peerDependencies": { "@anthropic-ai/sdk": ">=0.93.0", "@modelcontextprotocol/sdk": "^1.29.0", "zod": "^4.0.0" } }, "sha512-Smer/h/jQLTtT+l4sxaAUwZq7wif/9RzzuqltS5Gy+kAFo/iP89H7JHa8avhVT0xGkPBvBD/1Bbdg3pcArhQcw=="],
 
-    "@anthropic-ai/claude-agent-sdk-darwin-arm64": ["@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.306", "", { "os": "darwin", "cpu": "arm64" }, "sha512-R8WM+XIYCaWlT/4whzVgBWX2PGuFJ+/ReqSleYSCPzs7l+S4udnwayZFvyOyfIPiYC7GLhHoPiNmMDzjDdaCxw=="],
+    "@anthropic-ai/claude-agent-sdk-darwin-arm64": ["@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.321", "", { "os": "darwin", "cpu": "arm64" }, "sha512-r718mW98hvRbmCa0TtSgImHkgyPUjPXSHOsORrehn2a8Z0FU1A2RkX9gCjY7EzZgL0RNbZXsBbkuab//kUjzJw=="],
 
-    "@anthropic-ai/claude-agent-sdk-darwin-x64": ["@anthropic-ai/claude-agent-sdk-darwin-x64@0.3.306", "", { "os": "darwin", "cpu": "x64" }, "sha512-EcgDYECaPRe447QpH1vzKMJs7AE+U/KiHqflfGr6qTfzH+1SF0oHX1dMVhGzaJn7KdGrDH9N72yPZXw7rj5Qtg=="],
+    "@anthropic-ai/claude-agent-sdk-darwin-x64": ["@anthropic-ai/claude-agent-sdk-darwin-x64@0.3.321", "", { "os": "darwin", "cpu": "x64" }, "sha512-C08vEnnDylWDaFprx/B1B13RZK3la1HOqR986igkZSwhY//Yxsk5eRI+gz7sxMfhcLZX2NS8PftCOiXr3S74/Q=="],
 
-    "@anthropic-ai/claude-agent-sdk-linux-arm64": ["@anthropic-ai/claude-agent-sdk-linux-arm64@0.3.306", "", { "os": "linux", "cpu": "arm64" }, "sha512-Vee1MIEqd7I8NKF2GOLxLJOuCghf/k4poEk7E/p6zXCIt7MmmtrK7ph9/WiYqOgEpOagXm8D6fRgEJvxWYGIXg=="],
+    "@anthropic-ai/claude-agent-sdk-linux-arm64": ["@anthropic-ai/claude-agent-sdk-linux-arm64@0.3.321", "", { "os": "linux", "cpu": "arm64", "libc": "glibc" }, "sha512-vdk9tON09SnsSh/6ULzYTBgsKRat6FyIaqnh4snYl3uy3qX0jpv5UuFUWgS5tvQ1ewI0qYF2k+D78El4gi7/iQ=="],
 
-    "@anthropic-ai/claude-agent-sdk-linux-arm64-musl": ["@anthropic-ai/claude-agent-sdk-linux-arm64-musl@0.3.306", "", { "os": "linux", "cpu": "arm64" }, "sha512-ak/r1xhFJM1A/Eidjpu7LQ31GQK72spfEGb4yay0coWtcaAvHERGO2sKWeT/Tv3SyrigxdTPTveLSYS1Vb4fbg=="],
+    "@anthropic-ai/claude-agent-sdk-linux-arm64-musl": ["@anthropic-ai/claude-agent-sdk-linux-arm64-musl@0.3.321", "", { "os": "linux", "cpu": "arm64", "libc": "musl" }, "sha512-+8zFXMpJT2r+0j4E1v9BgRf+Qjtmmp4IG/3mDLT6jB6iA+9UvG9RLex+cqct09d+7xP2mDP8kL4cD1WtKUFX1w=="],
 
-    "@anthropic-ai/claude-agent-sdk-linux-x64": ["@anthropic-ai/claude-agent-sdk-linux-x64@0.3.306", "", { "os": "linux", "cpu": "x64" }, "sha512-2taDjG+UI0+VrPdxqRhl7Y9m4PPscXKxRVBDLHVSeFrA600HXGqyOIm34Pao6UVNlhCD+pKU/s7++OFGy88h2Q=="],
+    "@anthropic-ai/claude-agent-sdk-linux-x64": ["@anthropic-ai/claude-agent-sdk-linux-x64@0.3.321", "", { "os": "linux", "cpu": "x64", "libc": "glibc" }, "sha512-i/Y8Ps4q68SRwWB54yFXyItBwn5YHIOYY4R1gla6p4UwF/pM+xxrHycv+yecbC7oU30ShuBYKWN9mRIZ/BCMqw=="],
 
-    "@anthropic-ai/claude-agent-sdk-linux-x64-musl": ["@anthropic-ai/claude-agent-sdk-linux-x64-musl@0.3.306", "", { "os": "linux", "cpu": "x64" }, "sha512-jbQf6HmNIDGI4YnoBc/IqOPKT3GxUSddor8yA9tmCpfKPU4Ln+gcN2Md/u2a0jODEo1hcx1Fn33xxTdcaLmD2Q=="],
+    "@anthropic-ai/claude-agent-sdk-linux-x64-musl": ["@anthropic-ai/claude-agent-sdk-linux-x64-musl@0.3.321", "", { "os": "linux", "cpu": "x64", "libc": "musl" }, "sha512-ils3IGsNKIDiURuOgSWorLsjMOlKcMdXQCQyaygEycdtPFItPoIBIYDVjoC1I0XV4tlfXXCHfUvNrs23g4HKNw=="],
 
-    "@anthropic-ai/claude-agent-sdk-win32-arm64": ["@anthropic-ai/claude-agent-sdk-win32-arm64@0.3.306", "", { "os": "win32", "cpu": "arm64" }, "sha512-6nbxfp8hQ6Of0oVcEHBGpbf56siAishGw8DBamGiqau+ji87DBWPW06V8lbuB9C94REnGk73wNLnFJ5PgPTKSg=="],
+    "@anthropic-ai/claude-agent-sdk-win32-arm64": ["@anthropic-ai/claude-agent-sdk-win32-arm64@0.3.321", "", { "os": "win32", "cpu": "arm64" }, "sha512-v6/8ikUcYRSYhH5PSGcHq8L6+DKRq/M4I3BzFckis6kMh3degvSuUD1u3+M/oSJ/bcSOA8tXbUgTTwKrlOgvwQ=="],
 
-    "@anthropic-ai/claude-agent-sdk-win32-x64": ["@anthropic-ai/claude-agent-sdk-win32-x64@0.3.306", "", { "os": "win32", "cpu": "x64" }, "sha512-oQPai3jCeSZdTasTGSA8TGALdPxTILdcan09LaKbMCrXXYRR9njxVgmeIqvoH9h8YzKebPHW+Ks0eKKptLrtUw=="],
+    "@anthropic-ai/claude-agent-sdk-win32-x64": ["@anthropic-ai/claude-agent-sdk-win32-x64@0.3.321", "", { "os": "win32", "cpu": "x64" }, "sha512-9i7ziCR+Wg47cRhYONHnUpTGxUgxfy/+J3N3/4F8YGqz7WLSNH3hpGRj6uJzNK4EMyEhFsca532uD2we0ZMckQ=="],
 
     "@anthropic-ai/sdk": ["@anthropic-ai/sdk@0.127.0", "", { "dependencies": { "json-schema-to-ts": "^3.1.1", "standardwebhooks": "^1.0.0" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["zod"], "bin": { "anthropic-ai-sdk": "bin/cli" } }, "sha512-OKiVbG9LHCxjn4fBJZJFy/Bz3hqE1RYpwaeSEDNheQnvz0XNKmGT/Lhkz2Sf1a27Ldt3vVv+BkU81I0U/8EpoQ=="],
 
@@ -661,23 +675,23 @@
 
     "@clack/prompts": ["@clack/prompts@1.8.1", "", { "dependencies": { "@clack/core": "1.5.1", "fast-string-width": "^3.0.2", "fast-wrap-ansi": "^0.2.0", "sisteransi": "^1.0.5" } }, "sha512-dlT1m5e/0yUL0kRNcQn7yGLVThkgbB0Ga/1AmfDDC/8ik6AIiSf2QLQO2zPYvefsHP0aFgxO93cVLCCfDp7kzQ=="],
 
-    "@code-yeongyu/senpi": ["@code-yeongyu/senpi@2026.11.9-2", "", { "dependencies": { "@anthropic-ai/claude-agent-sdk": "0.3.306", "@anthropic-ai/sdk": "0.127.0", "@code-yeongyu/senpi-codemode": "2026.11.9-2", "@earendil-works/chord": "0.99.1", "@earendil-works/pi-agent-core": "npm:@code-yeongyu/senpi-agent-core@2026.11.9-2", "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.9-2", "@earendil-works/pi-pty": "npm:@code-yeongyu/senpi-pty@2026.11.9-2", "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.11.9-2", "@modelcontextprotocol/sdk": "1.32.1", "@mozilla/readability": "0.6.0", "@silvia-odwyer/photon-node": "0.3.4", "ajv": "8.20.0", "chalk": "6.0.0", "cross-spawn": "7.0.6", "diff": "9.0.0", "es-module-lexer": "3.0.2", "grok-mermaid": "0.2.3", "highlight.js": "11.12.0", "hosted-git-info": "10.1.1", "ignore": "7.0.9", "jiti": "2.7.0", "linkedom": "0.18.13", "marked": "18.0.13", "minimatch": "10.2.6", "picomatch": "4.0.7", "proper-lockfile": "4.1.2", "re2js": "2.8.6", "semver": "7.8.5", "signal-exit": "3.0.7", "turndown": "7.2.4", "typebox": "1.3.34", "undici": "8.10.2", "yaml": "2.9.1", "zod": "4.6.5" }, "bin": { "pi": "dist/bundle/cli.js", "senpi": "dist/bundle/cli.js" } }, "sha512-dDrxJAecZDsT0bMCDzQQ3CNSU/057b96z+RlpF9n8S+Krm6gmFdM0ydvde308TsHMq3NJUFnmclWz9AAez57xw=="],
+    "@code-yeongyu/senpi": ["@code-yeongyu/senpi@2026.11.10-2", "", { "dependencies": { "@anthropic-ai/claude-agent-sdk": "0.3.321", "@anthropic-ai/sdk": "0.127.0", "@code-yeongyu/senpi-codemode": "2026.11.10-2", "@earendil-works/chord": "0.99.1", "@earendil-works/pi-agent-core": "npm:@code-yeongyu/senpi-agent-core@2026.11.10-2", "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10-2", "@earendil-works/pi-pty": "npm:@code-yeongyu/senpi-pty@2026.11.10-2", "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.11.10-2", "@modelcontextprotocol/sdk": "1.32.1", "@mozilla/readability": "0.6.0", "@silvia-odwyer/photon-node": "0.3.4", "ajv": "8.20.0", "chalk": "6.0.0", "cross-spawn": "7.0.6", "diff": "9.0.0", "es-module-lexer": "3.0.2", "grok-mermaid": "0.2.3", "highlight.js": "11.12.0", "hosted-git-info": "10.1.1", "ignore": "7.0.9", "jiti": "2.7.0", "linkedom": "0.18.13", "marked": "18.0.13", "minimatch": "10.2.6", "picomatch": "4.0.7", "proper-lockfile": "4.1.2", "re2js": "2.8.6", "semver": "7.8.5", "signal-exit": "3.0.7", "turndown": "7.2.4", "typebox": "1.3.34", "undici": "8.10.2", "yaml": "2.9.1", "zod": "4.6.5" }, "bin": { "pi": "dist/bundle/cli.js", "senpi": "dist/bundle/cli.js" } }, "sha512-7OgYVI3gy0vlkgpIkUMHGp1yVa0MX76tAPEf6DxDGCJFMPkoLEvNrgNPZdrvEFelPragBgufgsNyNi0pUvAe4Q=="],
 
-    "@code-yeongyu/senpi-agent-core": ["@code-yeongyu/senpi-agent-core@2026.11.9-2", "", { "dependencies": { "@earendil-works/chord": "0.99.1", "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.9-2", "@earendil-works/pi-telemetry": "npm:@code-yeongyu/senpi-telemetry@2026.11.9-2", "diff": "9.0.0", "ignore": "7.0.9", "typebox": "1.3.34", "web-tree-sitter": "0.27.0", "yaml": "2.9.1" } }, "sha512-dYVBvypts1LUZ05XYSuU7oNZ+90H6gH4ycuTqjsHg9B+GoLUfzaE9QVvdyj/AijZuF4+RlSJaVUf7i6ElhAhAg=="],
+    "@code-yeongyu/senpi-agent-core": ["@code-yeongyu/senpi-agent-core@2026.11.10-2", "", { "dependencies": { "@earendil-works/chord": "0.99.1", "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10-2", "@earendil-works/pi-telemetry": "npm:@code-yeongyu/senpi-telemetry@2026.11.10-2", "diff": "9.0.0", "ignore": "7.0.9", "typebox": "1.3.34", "web-tree-sitter": "0.27.0", "yaml": "2.9.1" } }, "sha512-koC3Fz2RNBfeQBsQRUbO3BPhPPJX6tG7+zDnFkHFI412KX/ECohE2VV/rDWU1Cjq0YbNe74DxSH88rbhxRiN1A=="],
 
-    "@code-yeongyu/senpi-codemode": ["@code-yeongyu/senpi-codemode@2026.11.9-2", "", { "dependencies": { "@babel/parser": "8.0.4", "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.9-2", "quickjs-wasi": "3.6.2", "typebox": "1.3.34" }, "peerDependencies": { "@code-yeongyu/senpi": "2026.11.9-2" } }, "sha512-sFA2nV0GW0NNok/fIpok74nLi+XuQEE8DzetRREB/rwn0H3mAplybU4UYWRwSvlkofKJ+7S8W3pQaClfVF1xAA=="],
+    "@code-yeongyu/senpi-codemode": ["@code-yeongyu/senpi-codemode@2026.11.10-2", "", { "dependencies": { "@babel/parser": "8.0.4", "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10-2", "quickjs-wasi": "3.6.2", "typebox": "1.3.34" }, "peerDependencies": { "@code-yeongyu/senpi": "2026.11.10-2" } }, "sha512-j+HP9n1Qb21uFess9EhQq0syKoSanf1kmeUeXA477gG2JYhq6WDCYY2myUjogDQTeVtFb67QqawtYQbdaHY+Nw=="],
 
     "@earendil-works/chord": ["@earendil-works/chord@0.99.1", "", { "dependencies": { "esbuild": "0.28.2" } }, "sha512-4xyn0IBzJ+Xu/iOGi2hjXJGAR61QEhEWZsIqTDqr+GmItdquYwBO5jYFnqGiBaTqlY12/EpM7QHoEKSHbyvOug=="],
 
-    "@earendil-works/pi-agent-core": ["@code-yeongyu/senpi-agent-core@2026.11.9-2", "", { "dependencies": { "@earendil-works/chord": "0.99.1", "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.9-2", "@earendil-works/pi-telemetry": "npm:@code-yeongyu/senpi-telemetry@2026.11.9-2", "diff": "9.0.0", "ignore": "7.0.9", "typebox": "1.3.34", "web-tree-sitter": "0.27.0", "yaml": "2.9.1" } }, "sha512-dYVBvypts1LUZ05XYSuU7oNZ+90H6gH4ycuTqjsHg9B+GoLUfzaE9QVvdyj/AijZuF4+RlSJaVUf7i6ElhAhAg=="],
+    "@earendil-works/pi-agent-core": ["@code-yeongyu/senpi-agent-core@2026.11.10-2", "", { "dependencies": { "@earendil-works/chord": "0.99.1", "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.10-2", "@earendil-works/pi-telemetry": "npm:@code-yeongyu/senpi-telemetry@2026.11.10-2", "diff": "9.0.0", "ignore": "7.0.9", "typebox": "1.3.34", "web-tree-sitter": "0.27.0", "yaml": "2.9.1" } }, "sha512-koC3Fz2RNBfeQBsQRUbO3BPhPPJX6tG7+zDnFkHFI412KX/ECohE2VV/rDWU1Cjq0YbNe74DxSH88rbhxRiN1A=="],
 
-    "@earendil-works/pi-ai": ["@code-yeongyu/senpi-ai@2026.11.9-2", "", { "dependencies": { "@anthropic-ai/sdk": "0.127.0", "@aws-sdk/client-bedrock-runtime": "3.1136.0", "@bufbuild/protobuf": "2.15.0", "@earendil-works/pi-telemetry": "npm:@code-yeongyu/senpi-telemetry@2026.11.9-2", "@google/genai": "2.23.0", "@smithy/node-http-handler": "4.12.1", "@smithy/types": "4.18.0", "google-auth-library": "10.6.2", "http-proxy-agent": "9.1.0", "https-proxy-agent": "9.1.0", "openai": "6.26.0", "partial-json": "0.1.7", "typebox": "1.3.34", "yaml": "2.9.1" }, "bin": { "pi-ai": "dist/cli.js" } }, "sha512-e7BDVcmqEuN59gYaHH1Z7G6g5LW6Qu4d7tZCCU9moRy8QukHfc+pvme5bPSMsTJIzqC/aqvGCcKdkmOy3YmkIQ=="],
+    "@earendil-works/pi-ai": ["@code-yeongyu/senpi-ai@2026.11.10-2", "", { "dependencies": { "@anthropic-ai/sdk": "0.127.0", "@aws-sdk/client-bedrock-runtime": "3.1136.0", "@bufbuild/protobuf": "2.15.0", "@earendil-works/pi-telemetry": "npm:@code-yeongyu/senpi-telemetry@2026.11.10-2", "@google/genai": "2.23.0", "@smithy/node-http-handler": "4.12.1", "@smithy/types": "4.18.0", "google-auth-library": "10.6.2", "http-proxy-agent": "9.1.0", "https-proxy-agent": "9.1.0", "openai": "6.26.0", "partial-json": "0.1.7", "typebox": "1.3.34", "yaml": "2.9.1" }, "bin": { "pi-ai": "dist/cli.js" } }, "sha512-rRrIkHxDaV8ut+FLetEXEMMM+Yn5iYwY/yKHpDiiaLzO8L0wdSc2dPU5bZg8Hk0lDoHHFOgNrB9NuMvo/l/ApA=="],
 
-    "@earendil-works/pi-pty": ["@code-yeongyu/senpi-pty@2026.11.9-2", "", { "dependencies": { "@xterm/headless": "6.0.0" } }, "sha512-iAyyrNcrMbo7pz2Gw2RYQLEdyjyunOGcC2tbtepOgTYItldwIjx3uWrHL34+QP04HOhl3fXgUHOUSjlvkHwKJQ=="],
+    "@earendil-works/pi-pty": ["@code-yeongyu/senpi-pty@2026.11.10-2", "", { "dependencies": { "@xterm/headless": "6.0.0" } }, "sha512-Ok3BEsRDkk/oFdpO+LiQyRbt4GFpS6HKZG/gAXt2z8KoC+qawlUVgribrtyRURYB2yh4352tphbOcxoWqPbqIA=="],
 
-    "@earendil-works/pi-telemetry": ["@code-yeongyu/senpi-telemetry@2026.11.9-2", "", {}, "sha512-CK694n7QgwJX/fXkWA5Caae1qQevb6T04ATah2KOqUQlpG096ScPfD5qb5u9D8S38V4VXcqEkKO9jfNqmRUs1w=="],
+    "@earendil-works/pi-telemetry": ["@code-yeongyu/senpi-telemetry@2026.11.10-2", "", {}, "sha512-EZjbxk9mxbxVBNVOHm2z1QmcVso3U6l2fRmc/AOFPvXTi+X5m/E9akQ+gQdg/l0CYVKyEYOACVkuPO3zaQdX2Q=="],
 
-    "@earendil-works/pi-tui": ["@code-yeongyu/senpi-tui@2026.11.9-2", "", { "dependencies": { "get-east-asian-width": "1.7.0", "marked": "18.0.13" } }, "sha512-b65GIPJ1IYmPGeuR6/UxnxkwFg2B9kyvFDIzx3AX32WmOqpBhr247sDhGRCJRsmVXEZzN86tE1muFBTmUBGdRQ=="],
+    "@earendil-works/pi-tui": ["@code-yeongyu/senpi-tui@2026.11.10-2", "", { "dependencies": { "get-east-asian-width": "1.7.0", "marked": "18.0.13" } }, "sha512-w4sJmbwOBah9naHN6ZXv+EYFSVExqE+zfVc43QNQ6vIT9AtyF3UpSS2hViahXz+cHIym1LDJ8zOSAW6Aa+2VSw=="],
 
     "@emnapi/core": ["@emnapi/core@1.11.2", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.2", "tslib": "^2.4.0" } }, "sha512-TC8MkTuZUtcTSiFeuC0ksCh9QIJ5+F21MvZ4Wn4ORfYaFJ/0dsiudv5tVkejgwZlwQ39jL9WWDe2lz8x0WglOA=="],
 
@@ -856,6 +870,8 @@
     "@oh-my-opencode/senpi-desktop-prelude": ["@oh-my-opencode/senpi-desktop-prelude@workspace:packages/senpi-desktop-prelude"],
 
     "@oh-my-opencode/senpi-desktop-protocol": ["@oh-my-opencode/senpi-desktop-protocol@workspace:packages/senpi-desktop-protocol"],
+
+    "@oh-my-opencode/senpi-desktop-sdk": ["@oh-my-opencode/senpi-desktop-sdk@workspace:packages/senpi-desktop-sdk"],
 
     "@oh-my-opencode/senpi-desktop-service": ["@oh-my-opencode/senpi-desktop-service@workspace:packages/senpi-desktop-service"],
 

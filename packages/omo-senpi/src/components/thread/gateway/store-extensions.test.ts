@@ -31,6 +31,7 @@ describe("store extension migrations", () => {
       db.exec("DROP TABLE thread_creations")
       db.exec("DROP TABLE extension_registrations")
       db.exec("DROP TABLE toolkit_replay_receipts")
+      db.exec("ALTER TABLE deliveries DROP COLUMN wait_kind")
       db.exec("DELETE FROM extension_objects WHERE owner IS NULL AND name NOT IN (SELECT name FROM sqlite_schema)")
       db.exec("PRAGMA user_version = 6")
     } finally {
@@ -60,6 +61,7 @@ describe("store extension migrations", () => {
     try {
       db.exec("INSERT INTO thread_creations (creator_durable_id, created_durable_id, created_at) VALUES ('parent', 'child', 1)")
       db.exec(rewind as string)
+      db.exec("ALTER TABLE deliveries DROP COLUMN wait_kind")
       db.exec("DELETE FROM extension_objects WHERE owner IS NULL AND name NOT IN (SELECT name FROM sqlite_schema)")
       db.exec(`PRAGMA user_version = ${version}`)
     } finally {

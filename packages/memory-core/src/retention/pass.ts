@@ -11,7 +11,8 @@ import { pruneCompletions } from "./completions"
 import { LazyRetentionGuard } from "./guard"
 import { pruneTranscriptJournals } from "./journals"
 import { pruneLegacyRecallRuns, pruneLegacyReflectionSessions, type LegacyRecallRunsOutcome } from "./legacy"
-import { DAY_MS, type RetentionContext, type RetentionStoreResult } from "./policy"
+import { appendRetentionLog } from "./log"
+import { DAY_MS, describeError, type RetentionContext, type RetentionStoreResult } from "./policy"
 import { pruneRecallLedgers } from "./recall-ledgers"
 import { pruneReflectionRuns } from "./reflection-runs"
 import { readUnreflectedRetentionGate, type UnreflectedRetentionGate } from "./reflection-health-signal"
@@ -96,6 +97,7 @@ export async function runRuntimeRetention(options: RuntimeRetentionOptions): Pro
     })
     capResume = cap.cursor
   }
+  await logRemovals(options, { runs, completions, reflectionSessions, journals, sidecars: sidecarResult.pruned, ledgers, recallRuns, cap })
   // A cap that could not even measure hands its resume point back unchanged; marked stalled, it waits
   // for the next interval instead of re-running retention at every bind (#12538 review r5 L1).
   const capStalled = cap?.skipped.includes("measure-over-budget") === true
@@ -122,6 +124,38 @@ export async function runRuntimeRetention(options: RuntimeRetentionOptions): Pro
     ...(unreflectedGate === undefined ? {} : { unreflectedGate }),
     ...(cursor === undefined ? {} : { cursor }),
     ...(cap === undefined ? {} : { cap }),
+  }
+}
+
+async function logRemovals(
+  options: RuntimeRetentionOptions,
+  stores: {
+    readonly runs: RetentionStoreResult
+    readonly completions: RetentionStoreResult
+    readonly reflectionSessions: RetentionStoreResult
+    readonly journals: RetentionStoreResult
+    readonly sidecars: readonly string[]
+    readonly ledgers: RetentionStoreResult
+    readonly recallRuns: LegacyRecallRunsOutcome
+    readonly cap: RuntimeSizeCapReport | undefined
+  },
+): Promise<void> {
+  const removed: Record<string, string[]> = {
+    runs: [...stores.runs.removed],
+    completions: [...stores.completions.removed],
+    reflectionSessions: [...stores.reflectionSessions.removed],
+    journals: [...stores.journals.removed],
+    sidecars: [...stores.sidecars].sort(),
+    ledgers: [...stores.ledgers.removed],
+    ...(stores.recallRuns === "removed" ? { legacy: ["recall/runs"] } : {}),
+  }
+  for (const eviction of stores.cap?.evicted ?? []) (removed[`cap:${eviction.tier}`] ??= []).push(eviction.name)
+  const capEvictedBytes = stores.cap?.evicted.reduce((total, entry) => total + entry.bytes, 0)
+  try {
+    await appendRetentionLog(options.paths.runtime, { at: options.now(), removed, ...(capEvictedBytes === undefined ? {} : { capEvictedBytes }) })
+  } catch (error) {
+    // The removals already happened; a log that cannot be written must not fail the pass.
+    options.warn?.("memory runtime retention could not write its removal log", { error: describeError(error) })
   }
 }
 
