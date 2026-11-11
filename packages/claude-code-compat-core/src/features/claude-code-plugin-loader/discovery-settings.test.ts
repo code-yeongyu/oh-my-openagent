@@ -115,4 +115,42 @@ describe("discoverInstalledPlugins settings", () => {
       "malformed-settings-plugin@market",
     ])
   })
+
+  it("#given Claude settings saved with a UTF-8 BOM #when discovery runs #then the enabledPlugins flag is applied (#12731)", async () => {
+    //#given
+    const pluginsHome = process.env.CLAUDE_PLUGINS_HOME as string
+    const installPath = createTemporaryDirectory("omo-settings-bom-install-")
+    const settingsPath = join(createTemporaryDirectory("omo-claude-settings-bom-"), "settings.json")
+    process.env.CLAUDE_SETTINGS_PATH = settingsPath
+    writeFileSync(
+      settingsPath,
+      `\uFEFF${JSON.stringify({ enabledPlugins: { "bom-settings-plugin@market": false } })}`,
+      "utf-8",
+    )
+    writeDatabase(pluginsHome, {
+      version: 2,
+      plugins: {
+        "bom-settings-plugin@market": [
+          {
+            scope: "user",
+            installPath,
+            version: "1.0.0",
+            installedAt: "2026-03-26T00:00:00Z",
+            lastUpdated: "2026-03-26T00:00:00Z",
+          },
+        ],
+      },
+    })
+
+    //#when
+    const { discoverInstalledPlugins } = await import(`./discovery?t=${Date.now()}-settings-bom`)
+    const discovered = discoverInstalledPlugins({
+      pluginsHomeOverride: pluginsHome,
+      loadPluginManifestOverride: () => null,
+    })
+
+    //#then
+    expect(discovered.errors).toHaveLength(0)
+    expect(discovered.plugins).toHaveLength(0)
+  })
 })

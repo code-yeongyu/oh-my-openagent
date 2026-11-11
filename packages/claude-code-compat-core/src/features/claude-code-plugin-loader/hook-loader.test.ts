@@ -97,7 +97,11 @@ describe("loadPluginHooksConfigs pluginRoot stamping (#4458)", () => {
   test("#given a hooks.json saved with a UTF-8 BOM #when loaded #then its hooks load like the same file without one", () => {
     // given
     const plugin = makePlugin("bom-plugin", {})
-    writeFileSync(plugin.hooksPath ?? "", `\uFEFF${JSON.stringify({ hooks: { Stop: [{ matcher: "*", hooks: [{ type: "command", command: "echo done" }] }] } })}`, "utf-8")
+    writeFileSync(
+      plugin.hooksPath ?? "",
+      `\uFEFF${JSON.stringify({ hooks: { Stop: [{ matcher: "*", hooks: [{ type: "command", command: "echo done" }] }] } })}`,
+      "utf-8",
+    )
 
     // when
     const configs = loadPluginHooksConfigs([plugin])

@@ -42,7 +42,11 @@ describe("loadPluginManifest", () => {
     //#given
     const installPath = createTemporaryDirectory("omo-manifest-bom-")
     mkdirSync(join(installPath, ".claude-plugin"), { recursive: true })
-    writeFileSync(join(installPath, ".claude-plugin", "plugin.json"), `\uFEFF${JSON.stringify({ name: "bom-plugin", version: "1.2.3" })}`, "utf-8")
+    writeFileSync(
+      join(installPath, ".claude-plugin", "plugin.json"),
+      `\uFEFF${JSON.stringify({ name: "bom-plugin", version: "1.2.3" })}`,
+      "utf-8",
+    )
 
     //#when
     const { loadPluginManifest } = await import(`./discovery?t=${Date.now()}-manifest-bom`)
@@ -51,5 +55,20 @@ describe("loadPluginManifest", () => {
     //#then
     expect(manifest?.name).toBe("bom-plugin")
     expect(manifest?.version).toBe("1.2.3")
+  })
+
+  it("#given a manifest path saved with a UTF-8 BOM #when readManifestFromPath runs #then it parses (#12731)", async () => {
+    //#given
+    const installPath = createTemporaryDirectory("omo-manifest-path-bom-")
+    const manifestPath = join(installPath, "plugin.json")
+    writeFileSync(manifestPath, `\uFEFF${JSON.stringify({ name: "path-bom", version: "9.9.9" })}`, "utf-8")
+
+    //#when
+    const { readManifestFromPath } = await import(`./plugin-manifest?t=${Date.now()}-manifest-path-bom`)
+    const manifest = readManifestFromPath(manifestPath)
+
+    //#then
+    expect(manifest?.name).toBe("path-bom")
+    expect(manifest?.version).toBe("9.9.9")
   })
 })

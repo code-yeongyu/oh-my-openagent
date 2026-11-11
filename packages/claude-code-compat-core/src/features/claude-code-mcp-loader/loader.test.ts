@@ -45,7 +45,10 @@ describe("getSystemMcpServerNames", () => {
 
   it("#given a project .mcp.json saved with a UTF-8 BOM #when names are read #then its servers are listed (#12731)", async () => {
     // given
-    writeFileSync(join(TEST_DIR, ".mcp.json"), `\uFEFF${JSON.stringify({ mcpServers: { playwright: { command: "npx", args: ["@playwright/mcp@latest"] } } })}`)
+    writeFileSync(
+      join(TEST_DIR, ".mcp.json"),
+      `\uFEFF${JSON.stringify({ mcpServers: { playwright: { command: "npx", args: ["@playwright/mcp@latest"] } } })}`,
+    )
 
     // when
     const { getSystemMcpServerNames } = await import("./loader")
@@ -403,6 +406,22 @@ describe("loadMcpConfigs", () => {
       expect(result.servers).toHaveProperty("active")
     } finally {
     }
+  })
+
+  it("#given a project .mcp.json saved with a UTF-8 BOM #when configs load #then its servers are kept (#12731)", async () => {
+    //#given
+    writeFileSync(
+      join(TEST_DIR, ".mcp.json"),
+      `\uFEFF${JSON.stringify({ mcpServers: { playwright: { command: "npx", args: ["@playwright/mcp@latest"] } } })}`,
+    )
+
+    //#when
+    const { loadMcpConfigs } = await import("./loader")
+    const result = await loadMcpConfigs([], loaderOptions())
+
+    //#then
+    expect(result.servers).toHaveProperty("playwright")
+    expect(result.loadedServers.find((server) => server.name === "playwright")).toBeDefined()
   })
 
   it("should load all MCPs when disabledMcps is not provided", async () => {

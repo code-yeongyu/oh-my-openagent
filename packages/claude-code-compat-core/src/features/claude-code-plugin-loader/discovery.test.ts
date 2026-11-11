@@ -165,6 +165,42 @@ describe("discoverInstalledPlugins", () => {
     expect(discovered.plugins[0]?.name).toBe("oh-my-openagent")
   })
 
+  it("#given installed_plugins.json saved with a UTF-8 BOM #when discovering plugins #then the plugin is kept (#12731)", async () => {
+    //#given
+    const pluginsHome = process.env.CLAUDE_PLUGINS_HOME as string
+    const installPath = createTemporaryDirectory("omo-bom-db-plugin-")
+    writeFileSync(
+      join(pluginsHome, "installed_plugins.json"),
+      `\uFEFF${JSON.stringify({
+        version: 2,
+        plugins: {
+          "bom-plugin@1.0.0": [
+            {
+              scope: "user",
+              installPath,
+              version: "1.0.0",
+              installedAt: "2026-03-26T00:00:00Z",
+              lastUpdated: "2026-03-26T00:00:00Z",
+            },
+          ],
+        },
+      })}`,
+      "utf-8",
+    )
+
+    //#when
+    const { discoverInstalledPlugins } = await import(`./discovery?t=${Date.now()}-bom-db`)
+    const discovered = discoverInstalledPlugins({
+      pluginsHomeOverride: pluginsHome,
+      loadPluginManifestOverride: () => null,
+    })
+
+    //#then
+    expect(discovered.errors).toHaveLength(0)
+    expect(discovered.plugins).toHaveLength(1)
+    expect(discovered.plugins[0]?.name).toBe("bom-plugin")
+  })
+
   describe("#given project-scoped entries in v1 format", () => {
     it("#when cwd matches projectPath #then the plugin loads", async () => {
       //#given
