@@ -16,7 +16,8 @@ use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::protocol_params::{KeyChordParams, TypeTextParams};
 use senpi_desktop_core::report::{ActionReport, Delivered, Disposition, ReportMode};
 use senpi_desktop_core::types::{
-    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, FrontWindow, Target,
+    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow,
+    FrontWindow, Target,
 };
 use senpi_desktop_core::user_input::UserPressKind;
 use senpi_desktop_safety::{Clock, FakeClock, StopPathId, StopSource, Supervisor};
@@ -28,28 +29,41 @@ use crate::selection::BackendFactory;
 use crate::test_support::{harness_opened, Harness};
 use crate::worker::Worker;
 
-const USER_ACTIVE: &str = include_str!("../../../senpi-desktop-backend-fake/fixtures/v2-user-active-in-target.json");
-const INTERRUPTED: &str = include_str!("../../../senpi-desktop-backend-fake/fixtures/typetext-interrupted.json");
+const USER_ACTIVE: &str =
+    include_str!("../../../senpi-desktop-backend-fake/fixtures/v2-user-active-in-target.json");
+const INTERRUPTED: &str =
+    include_str!("../../../senpi-desktop-backend-fake/fixtures/typetext-interrupted.json");
 
 fn fixture(json: &str) -> Value {
     serde_json::from_str(json).expect("fixture is JSON")
 }
 
 fn options(report_mode: ReportMode) -> DesktopSessionOptions {
-    DesktopSessionOptions { report_mode, ..DesktopSessionOptions::default() }
+    DesktopSessionOptions {
+        report_mode,
+        ..DesktopSessionOptions::default()
+    }
 }
 
 /// A session over `overlay` whose feed has stamped every press already in
 /// the scenario's past at session time 0.
 fn opened(overlay: &Value, report_mode: ReportMode) -> Harness {
-    let mut harness = harness_opened(overlay, crate::grant::ControlSlot::new(), options(report_mode));
+    let mut harness = harness_opened(
+        overlay,
+        crate::grant::ControlSlot::new(),
+        options(report_mode),
+    );
     harness.worker.attach_user_input_feed();
     harness.worker.drain_user_input();
     harness
 }
 
 fn type_text(text: &str) -> Op {
-    Op::TypeText(TypeTextParams { target: "101".to_owned(), text: text.to_owned(), opts: None })
+    Op::TypeText(TypeTextParams {
+        target: "101".to_owned(),
+        text: text.to_owned(),
+        opts: None,
+    })
 }
 
 fn typed(sink: &RecordingSink) -> String {
@@ -63,7 +77,10 @@ fn typed(sink: &RecordingSink) -> String {
 }
 
 fn report(error: &DesktopError) -> senpi_desktop_core::error::ErrorReport {
-    *error.report.clone().expect("object-mode errors carry a report")
+    *error
+        .report
+        .clone()
+        .expect("object-mode errors carry a report")
 }
 
 fn action(response: Response) -> ActionReport {
@@ -82,10 +99,16 @@ fn frontmost_target_used_500_ms_ago_refuses_background_keys_and_sends_nothing() 
     let error = harness.process(type_text("hello")).expect_err("refused");
     // Then
     let report = report(&error);
-    println!("replay v2-user-active-in-target.json: {}", serde_json::to_string(&error).expect("serializes"));
+    println!(
+        "replay v2-user-active-in-target.json: {}",
+        serde_json::to_string(&error).expect("serializes")
+    );
     assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
     assert_eq!(report.reason.as_deref(), Some("user_active_in_target"));
-    assert_eq!(report.disposition, Some(Disposition::NOT_DELIVERED_AFTER_USER));
+    assert_eq!(
+        report.disposition,
+        Some(Disposition::NOT_DELIVERED_AFTER_USER)
+    );
     assert_eq!(report.delivered, None);
     assert_eq!(typed(&harness.sink), "");
 }
@@ -94,11 +117,23 @@ fn frontmost_target_used_500_ms_ago_refuses_background_keys_and_sends_nothing() 
 fn frontmost_target_used_500_ms_ago_refuses_a_background_key_chord() {
     let mut harness = opened(&fixture(USER_ACTIVE), ReportMode::Object);
     harness.pass_ms(500);
-    let chord = Op::KeyChord(KeyChordParams { target: "101".to_owned(), keys: vec!["enter".to_owned()], opts: None, force: false });
+    let chord = Op::KeyChord(KeyChordParams {
+        target: "101".to_owned(),
+        keys: vec!["enter".to_owned()],
+        opts: None,
+        force: false,
+    });
     let error = harness.process(chord).expect_err("refused");
     assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
-    assert_eq!(report(&error).reason.as_deref(), Some("user_active_in_target"));
-    assert!(!harness.sink.ops().iter().any(|op| matches!(op, SinkOp::KeyChord { .. })));
+    assert_eq!(
+        report(&error).reason.as_deref(),
+        Some("user_active_in_target")
+    );
+    assert!(!harness
+        .sink
+        .ops()
+        .iter()
+        .any(|op| matches!(op, SinkOp::KeyChord { .. })));
 }
 
 #[test]
@@ -149,20 +184,27 @@ fn foreground_typing_is_not_gated() {
         opts: crate::test_support::delivery("foreground"),
     });
     let error = harness.process(op).expect_err("needs control");
-    assert_ne!(report(&error).reason.as_deref(), Some("user_active_in_target"));
+    assert_ne!(
+        report(&error).reason.as_deref(),
+        Some("user_active_in_target")
+    );
 }
 
 #[test]
 fn typing_into_a_secure_field_reports_the_warning_and_an_unverifiable_effect() {
     // Given: the hit at the focused text area's center is a secure field.
     let mut overlay = fixture(INTERRUPTED);
-    overlay["hit_at"] = json!([{"x": 500.0, "y": 410.0, "role": "textfield", "label": "Password", "secure": true}]);
+    overlay["hit_at"] =
+        json!([{"x": 500.0, "y": 410.0, "role": "textfield", "label": "Password", "secure": true}]);
     let mut harness = opened(&overlay, ReportMode::Object);
     // When
     let report = action(harness.process(type_text("hunter2")).expect("typed"));
     // Then
     assert_eq!(report.warning.as_deref(), Some("secure_field"));
-    assert_eq!(report.effect, senpi_desktop_core::report::ActionEffect::Unverifiable);
+    assert_eq!(
+        report.effect,
+        senpi_desktop_core::report::ActionEffect::Unverifiable
+    );
     assert_eq!(report.disposition, Disposition::DELIVERED_UNVERIFIED);
 }
 
@@ -181,10 +223,13 @@ fn behind_terminal(secure: bool) -> Value {
     let mut overlay = fixture(INTERRUPTED);
     let bounds = json!({"x": 110, "y": 160, "width": 780, "height": 500});
     overlay["windows"][0]["focused"] = json!(false);
-    overlay["windows"].as_array_mut().expect("windows").push(json!({
-        "id": "202", "title": "Terminal", "app": "Terminal", "pid": 77, "x": 100, "y": 120,
-        "width": 800, "height": 600, "focused": true, "elevated": null
-    }));
+    overlay["windows"]
+        .as_array_mut()
+        .expect("windows")
+        .push(json!({
+            "id": "202", "title": "Terminal", "app": "Terminal", "pid": 77, "x": 100, "y": 120,
+            "width": 800, "height": 600, "focused": true, "elevated": null
+        }));
     overlay["frontmost_pid"] = json!(77);
     overlay["ax"]["101"]["children"][0] = json!({
         "role": "textfield", "native_role": "AXTextField", "title": "Password", "focused": true,
@@ -195,7 +240,8 @@ fn behind_terminal(secure: bool) -> Value {
         "bounds": {"x": 100, "y": 120, "width": 800, "height": 600},
         "children": [{"role": "textarea", "native_role": "AXTextArea", "value": "", "focused": true, "bounds": bounds}]
     });
-    overlay["hit_at"] = json!([{"x": 500.0, "y": 410.0, "role": "textarea", "label": "Terminal", "secure": false}]);
+    overlay["hit_at"] =
+        json!([{"x": 500.0, "y": 410.0, "role": "textarea", "label": "Terminal", "secure": false}]);
     overlay
 }
 
@@ -208,7 +254,10 @@ fn background_typing_into_a_secure_field_behind_another_app_reports_the_warning(
     // Then: the keys went to Notes, and the write is flagged and unverifiable
     assert_eq!(typed(&harness.sink), "hunter2");
     assert_eq!(report.warning.as_deref(), Some("secure_field"));
-    assert_eq!(report.effect, senpi_desktop_core::report::ActionEffect::Unverifiable);
+    assert_eq!(
+        report.effect,
+        senpi_desktop_core::report::ActionEffect::Unverifiable
+    );
     assert_eq!(report.disposition, Disposition::DELIVERED_UNVERIFIED);
 }
 
@@ -234,10 +283,21 @@ impl Backend for ScalarTyping {
     fn windows(&mut self) -> CoreResult<Vec<DesktopWindow>> {
         self.0.windows()
     }
-    fn capture(&mut self, target: &Target, caps: &CaptureCaps, exclude: &[String]) -> CoreResult<(RgbaImage, FrameGeometry)> {
+    fn capture(
+        &mut self,
+        target: &Target,
+        caps: &CaptureCaps,
+        exclude: &[String],
+    ) -> CoreResult<(RgbaImage, FrameGeometry)> {
         self.0.capture(target, caps, exclude)
     }
-    fn pointer(&mut self, target: &Target, ev: PointerEvent, frame: &FrameGeometry, mode: DeliveryMode) -> CoreResult<()> {
+    fn pointer(
+        &mut self,
+        target: &Target,
+        ev: PointerEvent,
+        frame: &FrameGeometry,
+        mode: DeliveryMode,
+    ) -> CoreResult<()> {
         self.0.pointer(target, ev, frame, mode)
     }
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
@@ -258,7 +318,12 @@ impl Backend for ScalarTyping {
         }
         Ok(())
     }
-    fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
+    fn key_chord(
+        &mut self,
+        target: &Target,
+        keys: &[KeyName],
+        mode: DeliveryMode,
+    ) -> CoreResult<()> {
         self.0.key_chord(target, keys, mode)
     }
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {
@@ -282,7 +347,9 @@ impl Backend for ScalarTyping {
     fn screen_locked(&mut self) -> CoreResult<bool> {
         self.0.screen_locked()
     }
-    fn user_input_feed(&mut self) -> Option<Arc<dyn senpi_desktop_core::user_input::UserInputFeed>> {
+    fn user_input_feed(
+        &mut self,
+    ) -> Option<Arc<dyn senpi_desktop_core::user_input::UserInputFeed>> {
         self.0.user_input_feed()
     }
 }
@@ -316,11 +383,20 @@ fn scalar_session() -> (Worker, RecordingSink, Arc<Supervisor>, Arc<FakeUserInpu
         audit: Box::new(|_| {}),
         control_slot: crate::grant::ControlSlot::new(),
     };
-    let factory = ScalarFactory { scenario, sink: Arc::clone(&sink) };
+    let factory = ScalarFactory {
+        scenario,
+        sink: Arc::clone(&sink),
+    };
     let capabilities = Arc::new(Mutex::new(DesktopCapabilities::unavailable()));
     let report_mode = Arc::new(Mutex::new(ReportMode::Null));
     let display = (Arc::default(), crate::screen_notes::ScreenNotes::default());
-    let mut worker = Worker::new(Box::new(factory), capabilities, report_mode, safety, display);
+    let mut worker = Worker::new(
+        Box::new(factory),
+        capabilities,
+        report_mode,
+        safety,
+        display,
+    );
     worker.open(options(ReportMode::Object));
     let (sink, feed) = sink.lock().clone().expect("open built a backend");
     (worker, sink, supervisor, feed)
@@ -333,10 +409,15 @@ fn type_text_of_10_cancelled_after_4_reports_delivered_4_of_10_unverified_unsafe
     let probe = sink.clone();
     let cancelled = move || typed(&probe).chars().count() >= 4;
     // When
-    let error = worker.process(type_text("abcdefghij"), &cancelled).expect_err("cancelled");
+    let error = worker
+        .process(type_text("abcdefghij"), &cancelled)
+        .expect_err("cancelled");
     // Then
     let report = report(&error);
-    println!("replay typetext-interrupted.json: {}", serde_json::to_string(&error).expect("serializes"));
+    println!(
+        "replay typetext-interrupted.json: {}",
+        serde_json::to_string(&error).expect("serializes")
+    );
     assert_eq!(error.code, ErrorCode::Cancelled);
     assert_eq!(report.delivered, Some(Delivered { count: 4, of: 10 }));
     assert_eq!(report.disposition, Some(Disposition::DELIVERED_UNVERIFIED));
@@ -353,7 +434,9 @@ fn type_text_of_10_stopped_after_4_reports_delivered_4_of_10_unverified_unsafe()
         }
         false
     };
-    let error = worker.process(type_text("abcdefghij"), &stop).expect_err("suspended");
+    let error = worker
+        .process(type_text("abcdefghij"), &stop)
+        .expect_err("suspended");
     let report = report(&error);
     assert_eq!(error.code, ErrorCode::Suspended);
     assert_eq!(report.delivered, Some(Delivered { count: 4, of: 10 }));
@@ -375,7 +458,9 @@ fn type_text_of_10_with_a_user_press_after_4_reports_delivered_4_of_10_unverifie
         false
     };
     // When
-    let error = worker.process(type_text("abcdefghij"), &press_after_4).expect_err("intervened");
+    let error = worker
+        .process(type_text("abcdefghij"), &press_after_4)
+        .expect_err("intervened");
     // Then: the press check refuses the 5th scalar and the report counts the 4 sent
     let report = report(&error);
     assert_eq!(error.code, ErrorCode::UserIntervened);

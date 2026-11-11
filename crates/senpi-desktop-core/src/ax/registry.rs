@@ -122,10 +122,11 @@ impl RetainedTable {
     /// Retires the least recently used object no ref holds, else the least
     /// recently used one.
     fn prune_one(&mut self) {
-        let unsaved = self
-            .by_use
-            .values()
-            .find(|token| self.live.get(token).is_some_and(|(_, binding)| binding.hold.get() == Hold::Unsaved));
+        let unsaved = self.by_use.values().find(|token| {
+            self.live
+                .get(token)
+                .is_some_and(|(_, binding)| binding.hold.get() == Hold::Unsaved)
+        });
         let Some(token) = unsaved.or_else(|| self.by_use.values().next()).copied() else {
             return;
         };
@@ -137,7 +138,9 @@ impl RetainedTable {
 }
 
 fn binding_of(handle: &AxHandle) -> Option<&Rc<Binding>> {
-    handle.downcast_native::<Retained>().map(|retained| &retained.binding)
+    handle
+        .downcast_native::<Retained>()
+        .map(|retained| &retained.binding)
 }
 
 /// One target's generations. A drill-down allocates a sub-generation that
@@ -226,7 +229,9 @@ impl AxRegistry {
             .map(Rc::as_ptr)
             .collect();
         for entry in self.entries.values() {
-            if let Some(binding) = binding_of(&entry.handle).filter(|binding| !kept.contains(&Rc::as_ptr(binding))) {
+            if let Some(binding) =
+                binding_of(&entry.handle).filter(|binding| !kept.contains(&Rc::as_ptr(binding)))
+            {
                 binding.retire();
             }
         }
@@ -337,7 +342,9 @@ impl AxRegistry {
 
     /// Records that the snapshot which registered `reference` cut its children.
     pub fn mark_subtree_truncated(&mut self, reference: &str) {
-        let id = reference.strip_prefix('e').and_then(|id| id.parse::<u64>().ok());
+        let id = reference
+            .strip_prefix('e')
+            .and_then(|id| id.parse::<u64>().ok());
         if let Some(entry) = id.and_then(|id| self.entries.get_mut(&id)) {
             entry.subtree_truncated = true;
         }
@@ -345,7 +352,8 @@ impl AxRegistry {
 
     /// Whether the snapshot that registered `reference` cut its children.
     pub fn subtree_truncated(&self, reference: &str) -> bool {
-        self.entry(reference).is_ok_and(|entry| entry.subtree_truncated)
+        self.entry(reference)
+            .is_ok_and(|entry| entry.subtree_truncated)
     }
 
     pub fn target(&self, reference: &str) -> CoreResult<String> {
@@ -357,7 +365,9 @@ impl AxRegistry {
             .strip_prefix('e')
             .and_then(|id| id.parse::<u64>().ok())
             .and_then(|id| self.entries.get(&id))
-            .ok_or_else(|| DesktopError::stale_ref(format!("{reference} expired; re-run ax()/find()")))
+            .ok_or_else(|| {
+                DesktopError::stale_ref(format!("{reference} expired; re-run ax()/find()"))
+            })
     }
 
     fn enforce_cap(&mut self) {
@@ -480,12 +490,16 @@ mod tests {
         r.register("x", nested, AxHandle::Id(3));
         // When / Then: drills evict nothing; seven newer snapshots keep the lineage.
         assert_eq!((first, drill, nested), (1, 2, 3));
-        assert!(["e1", "e2", "e3"].iter().all(|r#ref| r.resolve(r#ref).is_ok()));
+        assert!(["e1", "e2", "e3"]
+            .iter()
+            .all(|r#ref| r.resolve(r#ref).is_ok()));
         assert_eq!(r.generation_of("e3").ok(), Some(nested));
         for _ in 0..7 {
             r.begin_snapshot("x");
         }
-        assert!(["e1", "e2", "e3"].iter().all(|r#ref| r.resolve(r#ref).is_ok()));
+        assert!(["e1", "e2", "e3"]
+            .iter()
+            .all(|r#ref| r.resolve(r#ref).is_ok()));
         // The eighth ages out the whole lineage of snapshot 1.
         r.begin_snapshot("x");
         assert!(["e1", "e2", "e3"]
@@ -535,10 +549,14 @@ mod tests {
         // Then: the oldest unsaved object (1) is pruned; the older saved one stays.
         assert_eq!(stale(retained_u64(&unsaved[0])), Some(ErrorCode::StaleRef));
         assert_eq!(retained_u64(&saved).ok(), Some((0, Some(generation))));
-        assert!(unsaved[1..].iter().all(|handle| retained_u64(handle).is_ok()));
+        assert!(unsaved[1..]
+            .iter()
+            .all(|handle| retained_u64(handle).is_ok()));
         // A pruned object stays dead even when a ref registers it again.
         let reference = r.register("x", generation, unsaved[0].clone());
-        assert!(r.resolve(&reference).is_ok_and(|handle| stale(retained_u64(&handle)) == Some(ErrorCode::StaleRef)));
+        assert!(r
+            .resolve(&reference)
+            .is_ok_and(|handle| stale(retained_u64(&handle)) == Some(ErrorCode::StaleRef)));
         // Tokens only grow, so no live object carries the pruned one's token.
         let tokens: Vec<u64> = unsaved
             .iter()
@@ -597,10 +615,16 @@ mod tests {
         r.restore(delivered);
         // Then
         assert_eq!(retained_u64(&delivered_handle).ok(), Some((1, Some(first))));
-        assert_eq!(stale(retained_u64(&abandoned_handle)), Some(ErrorCode::StaleRef));
+        assert_eq!(
+            stale(retained_u64(&abandoned_handle)),
+            Some(ErrorCode::StaleRef)
+        );
         // And an epoch reset (a fresh registry) retires everything.
         r.restore(AxRegistry::default());
-        assert_eq!(stale(retained_u64(&delivered_handle)), Some(ErrorCode::StaleRef));
+        assert_eq!(
+            stale(retained_u64(&delivered_handle)),
+            Some(ErrorCode::StaleRef)
+        );
     }
 
     #[test]

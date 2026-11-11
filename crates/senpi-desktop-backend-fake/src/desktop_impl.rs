@@ -1,13 +1,18 @@
 use image::RgbaImage;
 use senpi_desktop_core::ax::AxHandle;
-use senpi_desktop_core::backend::{AxBackend, Backend, DeliveryMode, ElementDelivery, PointerEvent};
+use senpi_desktop_core::backend::{
+    AxBackend, Backend, DeliveryMode, ElementDelivery, MenuChoice, PointerEvent,
+};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::frame::{FrameGeometry, PointHit, MAX_COMPOSITE_PIXELS};
 use senpi_desktop_core::keys::KeyName;
+use senpi_desktop_core::protocol_results::MenuReport;
 use senpi_desktop_core::types::{
-    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow, Target,
+    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, FrontWindow,
+    Target,
 };
 
+use crate::drag_guard_impl::Guarded;
 use crate::fake::FakeBackend;
 use crate::method::FakeMethod;
 use crate::sink::{RecordedPointer, SinkOp};
@@ -24,7 +29,11 @@ impl Backend for FakeBackend {
 
     fn windows(&mut self) -> CoreResult<Vec<DesktopWindow>> {
         self.begin(FakeMethod::Windows)?;
-        Ok(self.windows.iter().map(|window| self.identified(window)).collect())
+        Ok(self
+            .windows
+            .iter()
+            .map(|window| self.identified(window))
+            .collect())
     }
 
     fn hit_at(&mut self, x: f64, y: f64) -> CoreResult<Option<PointHit>> {
@@ -84,11 +93,17 @@ impl Backend for FakeBackend {
         };
         self.begin(method)?;
         self.input_gate(target, mode)?;
+        let (ev, picked_up) = match self.guard_drag(target, ev, mode)? {
+            Guarded::Deliver(ev) => (ev, None),
+            Guarded::PickedUp { recorded, error } => (recorded, Some(error)),
+        };
         if matches!(ev, PointerEvent::Click { .. } | PointerEvent::Drag { .. }) {
             self.press_check(method)?;
         }
         let event = RecordedPointer::from(ev);
-        if matches!(target, Target::Desktop | Target::Display(_)) || mode == DeliveryMode::Foreground {
+        if matches!(target, Target::Desktop | Target::Display(_))
+            || mode == DeliveryMode::Foreground
+        {
             self.cursor = self.cursor.and(event.end_point());
         }
         self.deliver_focus(target, mode);
@@ -101,7 +116,18 @@ impl Backend for FakeBackend {
         if opens {
             self.open_next_surface();
         }
-        Ok(())
+        picked_up.map_or(Ok(()), Err)
+    }
+
+    fn pointer_menu(
+        &mut self,
+        target: &Target,
+        ev: PointerEvent,
+        frame: &FrameGeometry,
+        mode: DeliveryMode,
+        choice: MenuChoice<'_>,
+    ) -> CoreResult<Option<MenuReport>> {
+        self.pointer_menu_impl(target, ev, frame, mode, choice)
     }
 
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
@@ -177,7 +203,22 @@ impl Backend for FakeBackend {
         crate::element_input_impl::ax_type_text(self, h, text, mode, check_stop, delivered)
     }
 
-    fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
+    fn ax_key_chord(
+        &mut self,
+        h: &AxHandle,
+        keys: &[KeyName],
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<ElementDelivery> {
+        crate::element_input_impl::ax_key_chord(self, h, keys, mode, check_stop)
+    }
+
+    fn key_chord(
+        &mut self,
+        target: &Target,
+        keys: &[KeyName],
+        mode: DeliveryMode,
+    ) -> CoreResult<()> {
         self.begin(FakeMethod::KeyChord)?;
         self.input_gate(target, mode)?;
         self.press_check(FakeMethod::KeyChord)?;
@@ -198,16 +239,34 @@ impl Backend for FakeBackend {
         Ok(())
     }
 
+    fn bring_to_current_space(
+        &mut self,
+        id: &str,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
+        self.begin(FakeMethod::BringToCurrentSpace)?;
+        self.window(id)?;
+        check_stop()?;
+        self.record(SinkOp::BringToCurrentSpace { id: id.to_string() });
+        Ok(())
+    }
+
     fn hold_keys(
-        &mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode,
+        &mut self,
+        target: &Target,
+        keys: &[KeyName],
+        mode: DeliveryMode,
         control: &senpi_desktop_core::holds::HoldControl<'_>,
     ) -> CoreResult<()> {
         self.hold_keys_impl(target, keys, mode, control)
     }
 
     fn hold_mouse(
-        &mut self, target: &Target, hold: &senpi_desktop_core::holds::MouseHold<'_>,
-        mode: DeliveryMode, control: &senpi_desktop_core::holds::HoldControl<'_>,
+        &mut self,
+        target: &Target,
+        hold: &senpi_desktop_core::holds::MouseHold<'_>,
+        mode: DeliveryMode,
+        control: &senpi_desktop_core::holds::HoldControl<'_>,
     ) -> CoreResult<()> {
         self.hold_mouse_impl(target, hold, mode, control)
     }
@@ -245,7 +304,9 @@ impl Backend for FakeBackend {
         Ok(())
     }
 
-    fn emergency_release(&self) -> Option<std::sync::Arc<dyn senpi_desktop_core::backend::EmergencyRelease>> {
+    fn emergency_release(
+        &self,
+    ) -> Option<std::sync::Arc<dyn senpi_desktop_core::backend::EmergencyRelease>> {
         Some(std::sync::Arc::new(self.sink.clone()))
     }
 
@@ -298,7 +359,9 @@ impl Backend for FakeBackend {
         Ok(self.capabilities.screen_locked)
     }
 
-    fn user_input_feed(&mut self) -> Option<std::sync::Arc<dyn senpi_desktop_core::user_input::UserInputFeed>> {
+    fn user_input_feed(
+        &mut self,
+    ) -> Option<std::sync::Arc<dyn senpi_desktop_core::user_input::UserInputFeed>> {
         if !self.user_input_feed {
             return None;
         }

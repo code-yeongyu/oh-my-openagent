@@ -1,5 +1,5 @@
-//! QA failure-path scenarios: the canary receipt roundtrip, the multi-window
-//! keyboard refusal, and the `SENPI_DESKTOP_DISABLE_SKYLIGHT` test hook.
+//! QA scenarios: the canary receipt roundtrip, background text into one of
+//! two windows, and the `SENPI_DESKTOP_DISABLE_SKYLIGHT` test hook.
 
 use std::process::Command;
 
@@ -13,6 +13,10 @@ use super::setup::{
     assert_no_windows, bring_terminal_front, close_focused_window, open_textedit_document, wait_listed,
 };
 use super::{backend, center, click};
+
+/// Lowercase on purpose: TextEdit capitalizes a sentence's first word typed
+/// as keys, so only AX insertion leaves this exact text (W1b E-7).
+const TWO_WINDOW_TEXT: &str = "parity e7";
 use crate::backend::MacosBackend;
 
 #[test]
@@ -39,46 +43,35 @@ fn canary_receipt_roundtrip() {
 
 #[test]
 #[ignore = "live: needs Accessibility + Screen Recording grants and a TextEdit-free desktop"]
-fn multi_window_background_keys_refused_without_delivery() {
+fn multi_window_background_type_inserts_into_the_focused_document() {
     assert_no_windows("com.apple.TextEdit");
     let dir = tempfile::tempdir().unwrap();
     let first = format!("senpi-multi-a-{}.txt", std::process::id());
     let second = format!("senpi-multi-b-{}.txt", std::process::id());
     let window_a = open_textedit_document(&dir, &first);
+    // Opened last, the second document's text area holds TextEdit's focus.
     let window_b = open_textedit_document(&dir, &second);
     let (terminal_pid, opened_terminal) = bring_terminal_front();
     let mut backend = backend();
     wait_listed(&mut backend, &window_a.id);
     wait_listed(&mut backend, &window_b.id);
+    let before = frontmost().expect("observer");
 
-    // Background clicks stay deliverable (they carry a window id); the plan's
-    // refusal is the keyboard rule, so the click runs first and changes nothing.
     backend
-        .pointer(
-            &Target::Window(window_a.id.clone()),
-            click(center(&window_a).0, center(&window_a).1),
-            &FrameGeometry::identity_global(),
-            DeliveryMode::Background,
-        )
-        .expect("background click into a multi-window app");
-    let error = backend
         .type_text(
-            &Target::Window(window_a.id.clone()),
-            "x",
+            &Target::Window(window_b.id.clone()),
+            TWO_WINDOW_TEXT,
             DeliveryMode::Background,
         )
-        .expect_err("multi-window background keys must be refused");
+        .expect("background type into one of two TextEdit windows");
+    let after = frontmost().expect("observer");
     let value_a = crate::ax::text_area_value(&window_a).unwrap_or_default();
     let value_b = crate::ax::text_area_value(&window_b).unwrap_or_default();
-    println!("code={} message={}", error.code.as_str(), error.message);
+    println!("frontmost_before={} frontmost_after={}", before.pid, after.pid);
     println!("multi_value_a={value_a:?} multi_value_b={value_b:?}");
-    assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
-    assert!(
-        error.message.contains("one of 2 windows"),
-        "unexpected refusal message"
-    );
-    assert_eq!(value_a, "", "input leaked into the first document");
-    assert_eq!(value_b, "", "input leaked into the second document");
+    assert_eq!(before.pid, after.pid, "the frontmost app changed");
+    assert_eq!(value_b, TWO_WINDOW_TEXT, "the text did not land exactly by insertion");
+    assert_eq!(value_a, "", "input leaked into the other document");
     crate::ax::close_window(&window_a).expect("TextEdit teardown a");
     crate::ax::close_window(&window_b).expect("TextEdit teardown b");
     let _ = terminal_pid;

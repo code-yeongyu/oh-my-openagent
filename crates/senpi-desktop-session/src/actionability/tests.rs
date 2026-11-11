@@ -43,20 +43,36 @@ fn button(extra: &Value) -> Value {
 }
 
 fn opened(overlay: &Value, report_mode: ReportMode) -> Harness {
-    let options = DesktopSessionOptions { report_mode, trace: true, ..DesktopSessionOptions::default() };
+    let options = DesktopSessionOptions {
+        report_mode,
+        trace: true,
+        ..DesktopSessionOptions::default()
+    };
     harness_opened(overlay, crate::grant::ControlSlot::new(), options)
 }
 
 fn press(harness: &mut Harness, reference: String) -> Result<Response, DesktopError> {
-    harness.process(Op::AxPerform(AxPerformParams { ref_: reference, action: "press".to_owned() }))
+    harness.process(Op::AxPerform(AxPerformParams {
+        ref_: reference,
+        action: "press".to_owned(),
+        menu: None,
+    }))
 }
 
 fn pressed(harness: &Harness) -> usize {
-    harness.sink.ops().iter().filter(|op| matches!(op, SinkOp::AxPerform { .. })).count()
+    harness
+        .sink
+        .ops()
+        .iter()
+        .filter(|op| matches!(op, SinkOp::AxPerform { .. }))
+        .count()
 }
 
 fn report(error: &DesktopError) -> ErrorReport {
-    *error.report.clone().expect("object-mode errors carry a report")
+    *error
+        .report
+        .clone()
+        .expect("object-mode errors carry a report")
 }
 
 fn action(response: Response) -> ActionReport {
@@ -71,13 +87,20 @@ fn refused_fast(error: &DesktopError, started: Instant, reason: &str) {
     let report = report(error);
     assert_eq!(report.reason.as_deref(), Some(reason));
     assert_eq!(report.disposition, Some(Disposition::NOT_DELIVERED_SAFE));
-    assert!(started.elapsed() < Duration::from_secs(1), "refused after {:?}", started.elapsed());
+    assert!(
+        started.elapsed() < Duration::from_secs(1),
+        "refused after {:?}",
+        started.elapsed()
+    );
 }
 
 #[test]
 fn the_battery_refuses_a_disabled_element_at_once_and_sends_nothing() {
     // Given: a visible, still, disabled button.
-    let mut harness = opened(&scene(button(&json!({"enabled": false})), &[]), ReportMode::Object);
+    let mut harness = opened(
+        &scene(button(&json!({"enabled": false})), &[]),
+        ReportMode::Object,
+    );
     let reference = harness.focused_ref();
     // When
     let started = Instant::now();
@@ -90,12 +113,19 @@ fn the_battery_refuses_a_disabled_element_at_once_and_sends_nothing() {
 #[test]
 fn the_battery_refuses_an_action_the_element_does_not_offer_at_once() {
     // Given: a button that offers only `click`.
-    let mut harness = opened(&scene(button(&json!({"actions": ["click"]})), &[]), ReportMode::Object);
+    let mut harness = opened(
+        &scene(button(&json!({"actions": ["click"]})), &[]),
+        ReportMode::Object,
+    );
     let reference = harness.focused_ref();
     // When
     let started = Instant::now();
     let error = harness
-        .process(Op::AxPerform(AxPerformParams { ref_: reference, action: "increment".to_owned() }))
+        .process(Op::AxPerform(AxPerformParams {
+            ref_: reference,
+            action: "increment".to_owned(),
+            menu: None,
+        }))
         .expect_err("refused");
     // Then
     refused_fast(&error, started, "action_unsupported");
@@ -115,22 +145,39 @@ fn press_is_supported_by_any_listed_action_and_other_actions_need_their_name() {
     for (offered, action, expected) in cases {
         let offered: Vec<String> = offered.iter().map(|name| (*name).to_owned()).collect();
         // When / Then
-        assert_eq!(super::supports(&offered, action), expected, "{offered:?} + {action}");
+        assert_eq!(
+            super::supports(&offered, action),
+            expected,
+            "{offered:?} + {action}"
+        );
     }
 }
 
 #[test]
 fn the_battery_waits_for_an_element_that_appears_enabled_after_500_ms() {
     // Given: hidden and disabled until 500 ms after its first read.
-    let mut harness = opened(&scene(button(&json!({"ready_after_ms": 500})), &[]), ReportMode::Object);
+    let mut harness = opened(
+        &scene(button(&json!({"ready_after_ms": 500})), &[]),
+        ReportMode::Object,
+    );
     let reference = harness.focused_ref();
     // When
     let started = Instant::now();
     let report = action(press(&mut harness, reference).expect("delivered after the wait"));
     // Then: the wait shows in the axResolve stage.
-    assert!(started.elapsed() >= Duration::from_millis(400), "{:?}", started.elapsed());
-    let waited = report.timings.and_then(|timings| timings.ax_resolve).expect("axResolve timed");
-    assert!((400_000..5_000_000).contains(&waited), "axResolve {waited} us");
+    assert!(
+        started.elapsed() >= Duration::from_millis(400),
+        "{:?}",
+        started.elapsed()
+    );
+    let waited = report
+        .timings
+        .and_then(|timings| timings.ax_resolve)
+        .expect("axResolve timed");
+    assert!(
+        (400_000..5_000_000).contains(&waited),
+        "axResolve {waited} us"
+    );
     assert_eq!(report.disposition, Disposition::DELIVERED_UNVERIFIED);
     assert_eq!(pressed(&harness), 1);
 }
@@ -138,7 +185,10 @@ fn the_battery_waits_for_an_element_that_appears_enabled_after_500_ms() {
 #[test]
 fn the_battery_waits_until_the_bounds_hold_still_across_two_reads() {
     // Given: the first three reads move the button.
-    let mut harness = opened(&scene(button(&json!({"moving_reads": 3})), &[]), ReportMode::Object);
+    let mut harness = opened(
+        &scene(button(&json!({"moving_reads": 3})), &[]),
+        ReportMode::Object,
+    );
     let reference = harness.focused_ref();
     // When
     let result = press(&mut harness, reference);
@@ -165,19 +215,24 @@ fn an_occlusion_hit_test_that_cannot_name_the_owner_passes() {
 #[test]
 fn a_null_mode_session_presses_a_disabled_element_at_once() {
     // Given: protocol 1 behavior, no battery.
-    let mut harness = opened(&scene(button(&json!({"enabled": false})), &[]), ReportMode::Null);
+    let mut harness = opened(
+        &scene(button(&json!({"enabled": false})), &[]),
+        ReportMode::Null,
+    );
     let reference = harness.focused_ref();
     // When
     let result = press(&mut harness, reference);
     // Then
-    assert!(matches!(result, Ok(Response::Unit)), "{result:?}");
+    assert!(matches!(result, Ok(Response::MenuOutcome(None))), "{result:?}");
     assert_eq!(pressed(&harness), 1);
 }
 
 fn opening(secure_in_target: bool) -> Value {
     let siblings = if secure_in_target {
-        vec![json!({"role": "textfield", "native_role": "AXSecureTextField", "title": "Password", "value": "s",
-                    "bounds": {"x": 200, "y": 300, "width": 200, "height": 24}})]
+        vec![
+            json!({"role": "textfield", "native_role": "AXSecureTextField", "title": "Password", "value": "s",
+                    "bounds": {"x": 200, "y": 300, "width": 200, "height": 24}}),
+        ]
     } else {
         Vec::new()
     };
@@ -197,12 +252,20 @@ fn opened_surfaces_list_a_new_sheet_with_its_ref() {
     // When
     let report = action(press(&mut harness, reference).expect("delivered"));
     // Then
-    assert_eq!(report.opened_surfaces.len(), 1, "{:?}", report.opened_surfaces);
+    assert_eq!(
+        report.opened_surfaces.len(),
+        1,
+        "{:?}",
+        report.opened_surfaces
+    );
     let sheet = &report.opened_surfaces[0];
     assert_eq!(sheet.kind, "sheet");
     assert_eq!(sheet.title.as_deref(), Some("Save changes?"));
     assert_eq!(sheet.window_id.as_deref(), Some("202"));
-    assert!(sheet.ref_.as_deref().is_some_and(|reference| reference.starts_with('e')));
+    assert!(sheet
+        .ref_
+        .as_deref()
+        .is_some_and(|reference| reference.starts_with('e')));
 }
 
 #[test]
@@ -224,15 +287,25 @@ fn a_null_mode_session_reports_nothing_about_opened_surfaces() {
     let mut harness = opened(&opening(false), ReportMode::Null);
     let reference = harness.focused_ref();
     // When / Then
-    assert!(matches!(press(&mut harness, reference), Ok(Response::Unit)));
+    assert!(matches!(press(&mut harness, reference), Ok(Response::MenuOutcome(None))));
 }
 
 fn chord(keys: &str, force: bool) -> Op {
-    Op::KeyChord(KeyChordParams { target: "101".to_owned(), keys: vec![keys.to_owned()], opts: None, force })
+    Op::KeyChord(KeyChordParams {
+        target: "101".to_owned(),
+        keys: vec![keys.to_owned()],
+        opts: None,
+        force,
+    })
 }
 
 fn chords_sent(harness: &Harness) -> usize {
-    harness.sink.ops().iter().filter(|op| matches!(op, SinkOp::KeyChord { .. })).count()
+    harness
+        .sink
+        .ops()
+        .iter()
+        .filter(|op| matches!(op, SinkOp::KeyChord { .. }))
+        .count()
 }
 
 #[test]
@@ -275,10 +348,14 @@ fn a_background_unavailable_chord_suggests_the_foreground_rung() {
     // Given: this host cannot deliver background window input.
     let mut harness = opened(&no_background_input(), ReportMode::Object);
     // When
-    let error = harness.process(chord("ctrl+s", false)).expect_err("refused");
+    let error = harness
+        .process(chord("ctrl+s", false))
+        .expect_err("refused");
     // Then
     assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
-    let next = report(&error).next_call.expect("nextCall on BackgroundUnavailable");
+    let next = report(&error)
+        .next_call
+        .expect("nextCall on BackgroundUnavailable");
     assert_eq!(next.method, Method::KeyChord);
     assert_eq!(next.args["keys"], json!(["ctrl+s"]));
     assert_eq!(next.args["opts"]["deliveryMode"], json!("foreground"));
@@ -290,12 +367,20 @@ fn background_unavailable_typing_suggests_reading_the_target_windows_tree_withou
     let mut harness = opened(&no_background_input(), ReportMode::Object);
     // When
     let error = harness
-        .process(Op::TypeText(TypeTextParams { target: "101".to_owned(), text: "hunter2".to_owned(), opts: None }))
+        .process(Op::TypeText(TypeTextParams {
+            target: "101".to_owned(),
+            text: "hunter2".to_owned(),
+            opts: None,
+        }))
         .expect_err("refused");
     // Then
-    let next = report(&error).next_call.expect("nextCall on BackgroundUnavailable");
+    let next = report(&error)
+        .next_call
+        .expect("nextCall on BackgroundUnavailable");
     // The target window's tree, never the system-wide `ax.focused` (the frontmost app's field).
     assert_eq!(next.method, Method::AxSnapshot);
     assert_eq!(next.args["target"], json!("101"));
-    assert!(!serde_json::to_string(&next).expect("serializes").contains("hunter2"));
+    assert!(!serde_json::to_string(&next)
+        .expect("serializes")
+        .contains("hunter2"));
 }

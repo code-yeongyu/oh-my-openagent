@@ -128,22 +128,36 @@ pub(super) fn parent(element: &AXUIElement) -> Option<Element> {
 
 pub(super) fn element_at(x: f64, y: f64) -> CoreResult<Option<Element>> {
     element::ensure_trusted()?;
+    let system = element::create_system_wide();
+    set_timeout(&system)?;
+    hit_test(&system, x, y)
+}
+
+/// The element of process `pid` at global point `(x, y)`: unlike
+/// [`element_at`], a window of another application over the point does not
+/// hide it.
+pub(super) fn element_at_in(pid: libc::pid_t, x: f64, y: f64) -> CoreResult<Option<Element>> {
+    element::ensure_trusted()?;
+    let app = element::create_application(pid)?;
+    set_timeout(&app)?;
+    hit_test(&app, x, y)
+}
+
+fn hit_test(root: &AXUIElement, x: f64, y: f64) -> CoreResult<Option<Element>> {
     let in_range = |value: f64| value.is_finite() && value.abs() <= f64::from(f32::MAX);
     if !in_range(x) || !in_range(y) {
         return Err(DesktopError::ax_failed(format!(
             "AX hit-test point ({x}, {y}) is outside the platform range"
         )));
     }
-    let system = element::create_system_wide();
-    set_timeout(&system)?;
     let mut output: *const AXUIElement = ptr::null();
     let slot = NonNull::from(&mut output);
     // Range-checked above; the AX hit-test API takes f32 points and std has no
     // lossless f64 -> f32 conversion.
     let (x32, y32) = (x as f32, y as f32);
-    // SAFETY: `slot` is writable and the system-wide element stays retained
+    // SAFETY: `slot` is writable and the retained root element stays valid
     // through the synchronous hit-test.
-    let error = unsafe { system.copy_element_at_position(x32, y32, slot) };
+    let error = unsafe { root.copy_element_at_position(x32, y32, slot) };
     if error == AXError::NoValue {
         return Ok(None);
     }

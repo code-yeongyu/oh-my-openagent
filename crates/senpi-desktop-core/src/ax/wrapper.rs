@@ -69,7 +69,11 @@ mod tests {
     fn anonymous_containers_whose_only_action_scrolls_are_wrappers() {
         // Given
         let mut scrolls = container();
-        scrolls.actions = vec!["AXScrollToVisible".into(), "scroll-into-view".into(), "ScrollIntoView".into()];
+        scrolls.actions = vec![
+            "AXScrollToVisible".into(),
+            "scroll-into-view".into(),
+            "ScrollIntoView".into(),
+        ];
         // When / Then
         assert!(is_wrapper(&container(), None, || None));
         assert!(is_wrapper(&scrolls, None, || Some("  ".into())));

@@ -12,85 +12,88 @@ type MethodPolicies = Readonly<Record<string, ComputerCallPolicy>>
 // <generated:facade> from facade-manifest.json by scripts/generate-assets.ts; edit CHAIN_BINDINGS there, then `bun run generate`
 /** Helpers callable on the `desktop` root; `window` and `ref` also anchor one-hop handle chains. */
 export const DESKTOP_METHODS: MethodPolicies = {
-  capabilities: "read", // Computer.capabilities
-  displays: "read", // Computer.displays
-  display: "read", // kernel-only: no SDK facade method yet
-  windows: "read", // Computer.windows
-  window: "read", // Computer.window
-  focusedWindow: "read", // kernel-only: no SDK facade method yet
-  screenshot: "read", // Target.screenshot
-  zoom: "read", // Frame.zoom
-  click: "exec", // Pointer.click
-  doubleClick: "exec", // Pointer.click
-  move: "exec", // Pointer.move
-  drag: "exec", // Pointer.drag
-  scroll: "exec", // Pointer.scroll
-  type: "exec", // Keyboard.type
-  press: "exec", // Keyboard.chord
-  holdKeys: "exec", // Keyboard.hold
-  holdMouse: "exec", // Pointer.hold
-  elementAt: "read", // kernel-only: no SDK facade method yet
-  focusedElement: "read", // kernel-only: no SDK facade method yet
-  ref: "read", // Window.element
-  "clipboard.read": "read", // kernel-only: no SDK facade method yet
-  "clipboard.write": "exec", // kernel-only: no SDK facade method yet
-  "control.acquire": "exec", // Control.acquire
-  "control.release": "exec", // Control.release
-  "control.state": "read", // Control.state
-}
+	capabilities: "read", // Computer.capabilities
+	displays: "read", // Computer.displays
+	display: "read", // kernel-only: no SDK facade method yet
+	windows: "read", // Computer.windows
+	window: "read", // Computer.window
+	focusedWindow: "read", // kernel-only: no SDK facade method yet
+	screenshot: "read", // Target.screenshot
+	zoom: "read", // Frame.zoom
+	click: "exec", // Pointer.click
+	doubleClick: "exec", // Pointer.click
+	move: "exec", // Pointer.move
+	drag: "exec", // Pointer.drag
+	scroll: "exec", // Pointer.scroll
+	type: "exec", // Keyboard.type
+	press: "exec", // Keyboard.chord
+	holdKeys: "exec", // Keyboard.hold
+	holdMouse: "exec", // Pointer.hold
+	elementAt: "read", // kernel-only: no SDK facade method yet
+	focusedElement: "read", // kernel-only: no SDK facade method yet
+	ref: "read", // Window.element
+	"clipboard.read": "read", // kernel-only: no SDK facade method yet
+	"clipboard.write": "exec", // kernel-only: no SDK facade method yet
+	"control.acquire": "exec", // Control.acquire
+	"control.release": "exec", // Control.release
+	"control.state": "read", // Control.state
+};
 
 /** Helpers callable on a display handle resolved through `desktop.display(selector)`. */
 export const DISPLAY_METHODS: MethodPolicies = {
-  screenshot: "read", // Target.screenshot
-  zoom: "read", // Frame.zoom
-  click: "exec", // Pointer.click
-  doubleClick: "exec", // Pointer.click
-  move: "exec", // Pointer.move
-  drag: "exec", // Pointer.drag
-  scroll: "exec", // Pointer.scroll
-  type: "exec", // Keyboard.type
-  press: "exec", // Keyboard.chord
-  holdKeys: "exec", // Keyboard.hold
-  holdMouse: "exec", // Pointer.hold
-}
+	screenshot: "read", // Target.screenshot
+	zoom: "read", // Frame.zoom
+	click: "exec", // Pointer.click
+	doubleClick: "exec", // Pointer.click
+	move: "exec", // Pointer.move
+	drag: "exec", // Pointer.drag
+	scroll: "exec", // Pointer.scroll
+	type: "exec", // Keyboard.type
+	press: "exec", // Keyboard.chord
+	holdKeys: "exec", // Keyboard.hold
+	holdMouse: "exec", // Pointer.hold
+};
 
 /** Helpers callable on a window handle resolved through `desktop.window(id)`. */
 export const WINDOW_METHODS: MethodPolicies = {
-  screenshot: "read", // Target.screenshot
-  observe: "read", // Target.observe
-  zoom: "read", // Frame.zoom
-  click: "exec", // Pointer.click
-  doubleClick: "exec", // Pointer.click
-  move: "exec", // Pointer.move
-  drag: "exec", // Pointer.drag
-  scroll: "exec", // Pointer.scroll
-  type: "exec", // Keyboard.type
-  press: "exec", // Keyboard.chord
-  holdKeys: "exec", // Keyboard.hold
-  holdMouse: "exec", // Pointer.hold
-  raise: "exec", // Window.raise
-  ax: "read", // Target.ax
-  find: "read", // Window.find
-  ref: "read", // Window.element
-  "menu.items": "read", // Menus.items
-  "menu.select": "exec", // Menus.select
-}
+	screenshot: "read", // Target.screenshot
+	observe: "read", // Target.observe
+	zoom: "read", // Frame.zoom
+	click: "exec", // Pointer.click
+	doubleClick: "exec", // Pointer.click
+	move: "exec", // Pointer.move
+	drag: "exec", // Pointer.drag
+	scroll: "exec", // Pointer.scroll
+	type: "exec", // Keyboard.type
+	press: "exec", // Keyboard.chord
+	holdKeys: "exec", // Keyboard.hold
+	holdMouse: "exec", // Pointer.hold
+	raise: "exec", // Window.raise
+	bringToCurrentSpace: "exec", // kernel-only: no SDK facade method yet
+	ax: "read", // Target.ax
+	find: "read", // Window.find
+	ref: "read", // Window.element
+	"menu.items": "read", // Menus.items
+	"menu.select": "exec", // Menus.select
+};
 
 /** Helpers callable on an AX element handle resolved through `desktop.ref(ref)`. */
 export const ELEMENT_METHODS: MethodPolicies = {
-  value: "read", // Element.read
-  setValue: "exec", // Element.setValue
-  bounds: "read", // Element.read
-  attributes: "read", // Element.attributes
-  actions: "read", // Element.read
-  perform: "exec", // Element.perform
-  press: "exec", // Element.press
-  click: "exec", // Element.click
-  type: "exec", // Element.type
-  focus: "exec", // Element.focus
-  parent: "read", // Element.read
-  children: "read", // Element.read
-}
+	value: "read", // Element.read
+	setValue: "exec", // Element.setValue
+	bounds: "read", // Element.read
+	attributes: "read", // Element.attributes
+	actions: "read", // Element.read
+	perform: "exec", // Element.perform
+	press: "exec", // Element.press
+	click: "exec", // Element.click
+	doubleClick: "exec", // Pointer.click
+	type: "exec", // Element.type
+	selectText: "exec", // kernel-only: no SDK facade method yet
+	focus: "exec", // Element.focus
+	parent: "read", // Element.read
+	children: "read", // Element.read
+};
 // </generated:facade>
 
 /** Root methods whose result accepts one chained handle call, mapped to the handle's method table. */

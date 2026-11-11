@@ -12,12 +12,14 @@ use senpi_desktop_core::backend::{Backend, DeliveryMode, EpochSource, PointerEve
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode, ErrorReport};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
-use senpi_desktop_core::protocol_params::{AxRefParams, CaptureParams, PointParams, TypeTextParams};
+use senpi_desktop_core::protocol_params::{
+    AxRefParams, CaptureParams, PointParams, TypeTextParams,
+};
 use senpi_desktop_core::protocol_results::{EpochChanged, EpochReason};
 use senpi_desktop_core::report::{Delivered, Disposition, ReportMode};
 use senpi_desktop_core::types::{
-    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, DisplaySelector,
-    FrontWindow, ScreenState, Target,
+    CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow,
+    DisplaySelector, FrontWindow, ScreenState, Target,
 };
 use senpi_desktop_safety::{Clock, FakeClock, StopPathId, Supervisor};
 use serde_json::{json, Value};
@@ -28,8 +30,10 @@ use crate::request::{Op, Response};
 use crate::selection::BackendFactory;
 use crate::worker::Worker;
 
-const DISPLAY_CHANGE: &str = include_str!("../../../senpi-desktop-backend-fake/fixtures/v2-epoch-display.json");
-const MID_CALL: &str = include_str!("../../../senpi-desktop-backend-fake/fixtures/v2-epoch-mid-call.json");
+const DISPLAY_CHANGE: &str =
+    include_str!("../../../senpi-desktop-backend-fake/fixtures/v2-epoch-display.json");
+const MID_CALL: &str =
+    include_str!("../../../senpi-desktop-backend-fake/fixtures/v2-epoch-mid-call.json");
 
 /// The fake typing one scalar per call, as the macOS backend posts, with a
 /// screen whose lock state the test sets.
@@ -53,10 +57,21 @@ impl Backend for Scalar {
     fn windows(&mut self) -> CoreResult<Vec<DesktopWindow>> {
         self.0.windows()
     }
-    fn capture(&mut self, target: &Target, caps: &CaptureCaps, exclude: &[String]) -> CoreResult<(RgbaImage, FrameGeometry)> {
+    fn capture(
+        &mut self,
+        target: &Target,
+        caps: &CaptureCaps,
+        exclude: &[String],
+    ) -> CoreResult<(RgbaImage, FrameGeometry)> {
         self.0.capture(target, caps, exclude)
     }
-    fn pointer(&mut self, target: &Target, ev: PointerEvent, frame: &FrameGeometry, mode: DeliveryMode) -> CoreResult<()> {
+    fn pointer(
+        &mut self,
+        target: &Target,
+        ev: PointerEvent,
+        frame: &FrameGeometry,
+        mode: DeliveryMode,
+    ) -> CoreResult<()> {
         self.0.pointer(target, ev, frame, mode)
     }
     fn type_text(&mut self, target: &Target, text: &str, mode: DeliveryMode) -> CoreResult<()> {
@@ -77,7 +92,12 @@ impl Backend for Scalar {
         }
         Ok(())
     }
-    fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
+    fn key_chord(
+        &mut self,
+        target: &Target,
+        keys: &[KeyName],
+        mode: DeliveryMode,
+    ) -> CoreResult<()> {
         self.0.key_chord(target, keys, mode)
     }
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {
@@ -126,7 +146,9 @@ struct Session {
 
 fn open(scenario: &Value, report_mode: ReportMode) -> Session {
     let scenario = FakeScenario::from_json(&scenario.to_string()).expect("scenario parses");
-    let supervisor = Arc::new(Supervisor::new(Arc::new(FakeClock::new(0)) as Arc<dyn Clock>));
+    let supervisor = Arc::new(Supervisor::new(
+        Arc::new(FakeClock::new(0)) as Arc<dyn Clock>
+    ));
     supervisor.set_live(StopPathId::Global, true);
     let safety = SessionSafety {
         supervisor,
@@ -135,7 +157,11 @@ fn open(scenario: &Value, report_mode: ReportMode) -> Session {
     };
     let screen = Arc::new(Mutex::new(ScreenState::default()));
     let sink = Arc::new(Mutex::new(None));
-    let factory = Factory { scenario, screen: Arc::clone(&screen), sink: Arc::clone(&sink) };
+    let factory = Factory {
+        scenario,
+        screen: Arc::clone(&screen),
+        sink: Arc::clone(&sink),
+    };
     let mut worker = Worker::new(
         Box::new(factory),
         Arc::new(Mutex::new(DesktopCapabilities::unavailable())),
@@ -145,9 +171,17 @@ fn open(scenario: &Value, report_mode: ReportMode) -> Session {
     );
     let log = EpochLog::default();
     worker.epochs = super::Epochs::new(log.clone());
-    worker.open(DesktopSessionOptions { report_mode, ..DesktopSessionOptions::default() });
+    worker.open(DesktopSessionOptions {
+        report_mode,
+        ..DesktopSessionOptions::default()
+    });
     let sink = sink.lock().clone().expect("open built a backend");
-    Session { worker, sink, log, screen }
+    Session {
+        worker,
+        sink,
+        log,
+        screen,
+    }
 }
 
 impl Session {
@@ -156,7 +190,11 @@ impl Session {
     }
 
     fn capture(&mut self) -> String {
-        let params = CaptureParams { target: "101".to_owned(), caps: None, exclude_window_titles: None };
+        let params = CaptureParams {
+            target: "101".to_owned(),
+            caps: None,
+            exclude_window_titles: None,
+        };
         match self.process(Op::Capture(params)) {
             Ok(Response::Capture(capture)) => capture.frame_id,
             other => panic!("capture failed: {other:?}"),
@@ -170,6 +208,7 @@ impl Session {
             y: 20.0,
             frame_id: Some(frame.to_owned()),
             opts: None,
+            menu: None,
         }))
     }
 
@@ -181,7 +220,11 @@ impl Session {
     }
 
     fn clicks(&self) -> usize {
-        self.sink.ops().iter().filter(|op| matches!(op, SinkOp::Pointer { .. })).count()
+        self.sink
+            .ops()
+            .iter()
+            .filter(|op| matches!(op, SinkOp::Pointer { .. }))
+            .count()
     }
 
     fn typed(&self) -> String {
@@ -201,11 +244,18 @@ fn scenario(json: &str) -> Value {
 }
 
 fn report(error: &DesktopError) -> ErrorReport {
-    *error.report.clone().expect("object-mode errors carry a report")
+    *error
+        .report
+        .clone()
+        .expect("object-mode errors carry a report")
 }
 
 fn type_text(text: &str) -> Op {
-    Op::TypeText(TypeTextParams { target: "101".to_owned(), text: text.to_owned(), opts: None })
+    Op::TypeText(TypeTextParams {
+        target: "101".to_owned(),
+        text: text.to_owned(),
+        opts: None,
+    })
 }
 
 #[test]
@@ -218,13 +268,27 @@ fn a_display_change_supersedes_the_old_frame_and_announces_epoch_changed_display
     // When
     let error = session.click(&frame).expect_err("refused");
     // Then
-    println!("replay v2-epoch-display.json: {announced:?} then {}", serde_json::to_string(&error).expect("serializes"));
-    assert_eq!(announced, [EpochChanged { reason: EpochReason::Display }]);
+    println!(
+        "replay v2-epoch-display.json: {announced:?} then {}",
+        serde_json::to_string(&error).expect("serializes")
+    );
+    assert_eq!(
+        announced,
+        [EpochChanged {
+            reason: EpochReason::Display
+        }]
+    );
     assert_eq!(error.code, ErrorCode::InvalidCoordinateFrame);
     assert_eq!(report(&error).reason.as_deref(), Some("superseded"));
-    assert_eq!(report(&error).disposition, Some(Disposition::NOT_DELIVERED_SAFE));
+    assert_eq!(
+        report(&error).disposition,
+        Some(Disposition::NOT_DELIVERED_SAFE)
+    );
     assert_eq!(session.clicks(), 0);
-    assert!(session.log.take_announcements().is_empty(), "each move is announced once");
+    assert!(
+        session.log.take_announcements().is_empty(),
+        "each move is announced once"
+    );
 }
 
 #[test]
@@ -241,7 +305,10 @@ fn a_new_capture_after_the_move_takes_input_again() {
 fn without_a_move_the_same_frame_stays_valid() {
     // Given: the scenario scripts no epoch move.
     let mut quiet = scenario(DISPLAY_CHANGE);
-    quiet.as_object_mut().expect("object").remove("displays_change");
+    quiet
+        .as_object_mut()
+        .expect("object")
+        .remove("displays_change");
     let mut session = open(&quiet, ReportMode::Object);
     let frame = session.capture();
     session.process(Op::Windows).expect("windows");
@@ -258,7 +325,11 @@ fn a_ref_from_before_the_move_is_stale() {
     session.capture();
     session.process(Op::Windows).expect("windows");
     // When
-    let error = session.process(Op::AxNode(AxRefParams { ref_: reference.clone() })).expect_err("expired");
+    let error = session
+        .process(Op::AxNode(AxRefParams {
+            ref_: reference.clone(),
+        }))
+        .expect_err("expired");
     // Then
     assert_eq!(error.code, ErrorCode::StaleRef, "{reference}: {error:?}");
 }
@@ -274,8 +345,10 @@ fn a_null_mode_session_keeps_frames_and_refs_and_announces_nothing() {
     let clicked = session.click(&frame);
     // Then
     println!("replay v2-epoch-display.json (null mode): {clicked:?}");
-    assert!(matches!(clicked, Ok(Response::Unit)), "{clicked:?}");
-    assert!(session.process(Op::AxNode(AxRefParams { ref_: reference })).is_ok());
+    assert!(matches!(clicked, Ok(Response::MenuOutcome(None))), "{clicked:?}");
+    assert!(session
+        .process(Op::AxNode(AxRefParams { ref_: reference }))
+        .is_ok());
     assert!(session.log.take_announcements().is_empty());
 }
 
@@ -286,16 +359,26 @@ fn a_move_after_char_3_of_10_ends_unknown_with_delivered_3_of_10() {
     mid["epoch_events"] = json!([{"after_call": "type_text", "nth": 2, "reason": "display"}]);
     let mut session = open(&mid, ReportMode::Object);
     // When
-    let error = session.process(type_text("abcdefghij")).expect_err("interrupted");
+    let error = session
+        .process(type_text("abcdefghij"))
+        .expect_err("interrupted");
     // Then
     let report = report(&error);
-    println!("replay v2-epoch-mid-call.json: {}", serde_json::to_string(&error).expect("serializes"));
+    println!(
+        "replay v2-epoch-mid-call.json: {}",
+        serde_json::to_string(&error).expect("serializes")
+    );
     assert_eq!(error.code, ErrorCode::InvalidCoordinateFrame);
     assert_eq!(report.reason.as_deref(), Some("superseded"));
     assert_eq!(report.disposition, Some(Disposition::UNKNOWN));
     assert_eq!(report.delivered, Some(Delivered { count: 3, of: 10 }));
     assert_eq!(session.typed(), "abc");
-    assert_eq!(session.log.take_announcements(), [EpochChanged { reason: EpochReason::Display }]);
+    assert_eq!(
+        session.log.take_announcements(),
+        [EpochChanged {
+            reason: EpochReason::Display
+        }]
+    );
 }
 
 #[test]
@@ -306,7 +389,10 @@ fn a_move_before_the_first_char_refuses_with_nothing_sent() {
     session.worker.epochs.arm(
         true,
         None,
-        Some(Arc::new(LocksOnSecondRead { screen, reads: Mutex::new(0) })),
+        Some(Arc::new(LocksOnSecondRead {
+            screen,
+            reads: Mutex::new(0),
+        })),
     );
     // When
     let error = session.process(type_text("abc")).expect_err("refused");
@@ -316,7 +402,12 @@ fn a_move_before_the_first_char_refuses_with_nothing_sent() {
     assert_eq!(report.reason.as_deref(), Some("superseded"));
     assert_eq!(report.disposition, Some(Disposition::NOT_DELIVERED_SAFE));
     assert_eq!(session.typed(), "");
-    assert_eq!(session.log.take_announcements(), [EpochChanged { reason: EpochReason::Lock }]);
+    assert_eq!(
+        session.log.take_announcements(),
+        [EpochChanged {
+            reason: EpochReason::Lock
+        }]
+    );
 }
 
 /// Reads unlocked at arming and at the request's start, locked after.
@@ -346,7 +437,12 @@ fn a_lock_between_requests_supersedes_frames_with_reason_lock() {
     // Then
     assert_eq!(error.code, ErrorCode::InvalidCoordinateFrame, "{error:?}");
     assert_eq!(report(&error).reason.as_deref(), Some("superseded"));
-    assert_eq!(session.log.take_announcements(), [EpochChanged { reason: EpochReason::Lock }]);
+    assert_eq!(
+        session.log.take_announcements(),
+        [EpochChanged {
+            reason: EpochReason::Lock
+        }]
+    );
 }
 
 #[test]
@@ -362,5 +458,10 @@ fn a_space_unsupported_refusal_moves_the_epoch() {
     let error = session.click(&frame).expect_err("superseded");
     // Then
     assert_eq!(report(&error).reason.as_deref(), Some("superseded"));
-    assert_eq!(session.log.take_announcements(), [EpochChanged { reason: EpochReason::Space }]);
+    assert_eq!(
+        session.log.take_announcements(),
+        [EpochChanged {
+            reason: EpochReason::Space
+        }]
+    );
 }

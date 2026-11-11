@@ -1,6 +1,6 @@
 import type { EngineMethod } from "@oh-my-opencode/senpi-desktop-protocol"
 import { ComputerRunError, type FacadeMethod, facadeMethod, type MethodTiers, type RunScope } from "./context"
-import { type CaptureRegion, expectResult, isExecResult } from "./engine-results"
+import { type CaptureRegion, expectResult, isExecResult, isMenuReport, type MenuReport } from "./engine-results"
 import { callHold } from "./hold-call"
 import { captureScreenshot, type ScreenshotOptions, type ScreenshotResult } from "./screenshot"
 
@@ -9,7 +9,16 @@ export interface DeliveryOptions {
   readonly delivery?: string
 }
 
-export interface ClickOptions extends DeliveryOptions {
+/**
+ * The path of item labels to choose in the menu a press opens (a context menu, or a menu button's or popup
+ * button's menu); the menu is closed before the call returns, chosen or not. Labels match like
+ * `win.menu.select`: case-insensitively, a trailing ellipsis ignored, each label naming exactly one item.
+ */
+export interface MenuOptions {
+  readonly menu?: readonly string[]
+}
+
+export interface ClickOptions extends DeliveryOptions, MenuOptions {
   readonly button?: string
   readonly count?: number
   readonly modifiers?: readonly string[]
@@ -43,7 +52,17 @@ export function pointerOptions(options: ClickOptions = {}): object {
   return { button, count, modifiers, deliveryMode: delivery }
 }
 
-function chordKeys(chord: string | readonly string[]): readonly string[] {
+/** The engine `menu` param of a press that opens a menu; absent when no path was given. */
+export function menuParam(options: MenuOptions = {}): { readonly menu?: readonly string[] } {
+  return options.menu === undefined ? {} : { menu: [...options.menu] }
+}
+
+/** True for a key chord (`"cmd+a"` or `["cmd", "a"]`), false for an options object or nothing. */
+export function isChord(value: string | readonly string[] | object | undefined): value is string | readonly string[] {
+  return typeof value === "string" || Array.isArray(value)
+}
+
+export function chordKeys(chord: string | readonly string[]): readonly string[] {
   if (typeof chord !== "string") return chord
   return chord
     .split("+")
@@ -55,6 +74,20 @@ function chordKeys(chord: string | readonly string[]): readonly string[] {
 function send(method: FacadeMethod, name: string, engineMethod: EngineMethod, params: object): Promise<void> {
   return method(name, async ({ call }) => {
     expectResult(engineMethod, await call(engineMethod, params), isExecResult)
+  })
+}
+
+function sendPress(
+  method: FacadeMethod,
+  name: string,
+  engineMethod: EngineMethod,
+  params: object,
+): Promise<MenuReport | null> {
+  return method(name, async ({ call }) => {
+    const value = (await call(engineMethod, params)) ?? null
+    // Null mode and an object-mode action with no menu both mean "no menu report".
+    if (isExecResult(value)) return null
+    return expectResult(engineMethod, value, isMenuReport)
   })
 }
 
@@ -82,22 +115,39 @@ export class InputTarget {
     return this.#method("zoom", (scope) => captureScreenshot(scope, this.#target, options, region))
   }
 
-  click(x: number, y: number, options?: ClickOptions): Promise<void> {
-    return send(this.#method, "click", "click", { target: this.#target, x, y, opts: pointerOptions(options) })
+  click(x: number, y: number, options?: ClickOptions): Promise<MenuReport | null> {
+    return sendPress(this.#method, "click", "click", {
+      target: this.#target,
+      x,
+      y,
+      opts: pointerOptions(options),
+      ...menuParam(options),
+    })
   }
 
-  doubleClick(x: number, y: number, options?: ClickOptions): Promise<void> {
+  doubleClick(x: number, y: number, options?: ClickOptions): Promise<MenuReport | null> {
     const opts = pointerOptions({ ...options, count: 2 })
-    return send(this.#method, "doubleClick", "click", { target: this.#target, x, y, opts })
+    return sendPress(this.#method, "doubleClick", "click", {
+      target: this.#target,
+      x,
+      y,
+      opts,
+      ...menuParam(options),
+    })
   }
 
   move(x: number, y: number): Promise<void> {
     return send(this.#method, "move", "moveMouse", { target: this.#target, x, y })
   }
 
-  drag(points: readonly (readonly [number, number])[], options?: ClickOptions): Promise<void> {
+  drag(points: readonly (readonly [number, number])[], options?: ClickOptions): Promise<MenuReport | null> {
     const path = points.map(([x, y]) => ({ x, y }))
-    return send(this.#method, "drag", "drag", { target: this.#target, path, opts: pointerOptions(options) })
+    return sendPress(this.#method, "drag", "drag", {
+      target: this.#target,
+      path,
+      opts: pointerOptions(options),
+      ...menuParam(options),
+    })
   }
 
   scroll(x: number, y: number, options: ScrollOptions = {}): Promise<void> {

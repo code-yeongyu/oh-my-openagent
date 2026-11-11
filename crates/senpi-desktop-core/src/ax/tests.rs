@@ -171,7 +171,11 @@ fn truncation_sets_flag_and_trailer() {
 #[test]
 fn unreadable_subtree_is_skipped_with_trailer() {
     let mut m = Mock {
-        props: [(1, p("window", Some("Title"))), (3, p("button", Some("Ready")))].into(),
+        props: [
+            (1, p("window", Some("Title"))),
+            (3, p("button", Some("Ready"))),
+        ]
+        .into(),
         children: [(1, vec![2, 3])].into(),
     };
     let s = snapshot(
@@ -221,7 +225,10 @@ fn bounds_center_hit_test_is_global_and_frameless() {
         children: HashMap::new(),
     };
     let mut registry = AxRegistry::default();
-    let (x, y) = (bounds.x + bounds.width / 2.0, bounds.y + bounds.height / 2.0);
+    let (x, y) = (
+        bounds.x + bounds.width / 2.0,
+        bounds.y + bounds.height / 2.0,
+    );
     let node = element_at_node(&mut m, &mut registry, "desktop", x, y)
         .unwrap()
         .unwrap();
@@ -257,14 +264,26 @@ fn an_object_mode_depth_clamp_keeps_the_node_and_counts_its_children() {
     };
     // A menu action keeps the group off the web-wrapper rule.
     let mut tree = clamped_tree();
-    tree.props.get_mut(&2).unwrap().actions.push("AXShowMenu".into());
+    tree.props
+        .get_mut(&2)
+        .unwrap()
+        .actions
+        .push("AXShowMenu".into());
     // When
     let s = snapshot(&mut tree, &mut registry, &window(), &options).unwrap();
     // Then: the group stays as the cut, rendered with its count.
-    assert_eq!((s.complete, s.truncated, s.nodes_observed), (Some(false), true, Some(2)));
+    assert_eq!(
+        (s.complete, s.truncated, s.nodes_observed),
+        (Some(false), true, Some(2))
+    );
     assert_eq!(s.cuts.len(), 1);
     assert_eq!(s.cuts[0].child_count, 1);
-    assert!(s.text.contains(&format!("- group [ref={}] [... 1 more]", s.cuts[0].ref_)), "{}", s.text);
+    assert!(
+        s.text
+            .contains(&format!("- group [ref={}] [... 1 more]", s.cuts[0].ref_)),
+        "{}",
+        s.text
+    );
     assert!(registry.subtree_truncated(&s.cuts[0].ref_));
 }
 
@@ -292,10 +311,18 @@ fn a_cut_under_an_anonymous_non_structural_parent_stays_listed() {
     // When
     let s = snapshot(&mut m, &mut registry, &window(), &options).unwrap();
     // Then: the group is still the listed, marked cut with its two buttons.
-    assert_eq!((s.complete, s.truncated, s.nodes_observed), (Some(false), true, Some(4)));
+    assert_eq!(
+        (s.complete, s.truncated, s.nodes_observed),
+        (Some(false), true, Some(4))
+    );
     assert_eq!(s.cuts.len(), 1, "{}", s.text);
     assert_eq!(s.cuts[0].child_count, 2);
-    assert!(s.text.contains(&format!("- group [ref={}] [... 2 more]", s.cuts[0].ref_)), "{}", s.text);
+    assert!(
+        s.text
+            .contains(&format!("- group [ref={}] [... 2 more]", s.cuts[0].ref_)),
+        "{}",
+        s.text
+    );
     assert!(s.text.contains("- button \"A\""), "{}", s.text);
     assert!(registry.subtree_truncated(&s.cuts[0].ref_));
 }
@@ -307,11 +334,23 @@ fn a_null_mode_depth_clamp_keeps_todays_reply() {
         max_depth: Some(1),
         ..AxSnapshotOptions::default()
     };
-    let s = snapshot(&mut clamped_tree(), &mut AxRegistry::default(), &window(), &options).unwrap();
+    let s = snapshot(
+        &mut clamped_tree(),
+        &mut AxRegistry::default(),
+        &window(),
+        &options,
+    )
+    .unwrap();
     // Then: no partial members, no cut marker, the empty group filtered out.
-    assert_eq!((s.complete, s.nodes_observed, s.cuts.len()), (None, None, 0));
+    assert_eq!(
+        (s.complete, s.nodes_observed, s.cuts.len()),
+        (None, None, 0)
+    );
     assert!(s.truncated);
-    assert_eq!(s.text, "- window \"Title\" [ref=e1] app=Safari (focused)\n… truncated (2 nodes)");
+    assert_eq!(
+        s.text,
+        "- window \"Title\" [ref=e1] app=Safari (focused)\n… truncated (2 nodes)"
+    );
 }
 
 /// `parents` lists (node, children); every node gets `child_count` from it.
@@ -357,10 +396,25 @@ fn a_wrapper_chain_of_twelve_anonymous_groups_consumes_no_logical_depth() {
         ..AxSnapshotOptions::default()
     };
     // When
-    let object = snapshot(&mut wrapper_chain(), &mut object_registry(), &window(), &options).unwrap();
-    let null = snapshot(&mut wrapper_chain(), &mut AxRegistry::default(), &window(), &options).unwrap();
+    let object = snapshot(
+        &mut wrapper_chain(),
+        &mut object_registry(),
+        &window(),
+        &options,
+    )
+    .unwrap();
+    let null = snapshot(
+        &mut wrapper_chain(),
+        &mut AxRegistry::default(),
+        &window(),
+        &options,
+    )
+    .unwrap();
     // Then: the object walk reaches the button through all 12 wrappers; null mode keeps today's raw cut.
-    assert_eq!((object.complete, object.nodes_observed, object.cuts.len()), (Some(true), Some(14), 0));
+    assert_eq!(
+        (object.complete, object.nodes_observed, object.cuts.len()),
+        (Some(true), Some(14), 0)
+    );
     assert_eq!(
         object.text,
         "- window \"Title\" [ref=e1] app=Safari (focused)\n  - button \"Go\" [ref=e2]"
@@ -402,16 +456,28 @@ fn skeleton_clamps_logical_depth_to_three_and_counts_the_cut_children() {
         max_depth: Some(2),
         ..skeleton()
     };
-    let two = snapshot(&mut titled_levels(), &mut object_registry(), &window(), &shallower).unwrap();
+    let two = snapshot(
+        &mut titled_levels(),
+        &mut object_registry(),
+        &window(),
+        &shallower,
+    )
+    .unwrap();
     // Then: "C" sits at logical depth 3 and carries its two children as the cut.
     assert_eq!(
         s.text,
         "- window \"Title\" [ref=e1] app=Safari (focused)\n  - group \"A\" [ref=e2]\n    - group \"B\" \
          [ref=e3]\n      - group \"C\" [ref=e4] [... 2 more]\n… truncated (4 nodes)"
     );
-    assert_eq!((s.complete, s.generation, s.parent), (Some(false), Some(1), None));
+    assert_eq!(
+        (s.complete, s.generation, s.parent),
+        (Some(false), Some(1), None)
+    );
     assert_eq!((s.cuts[0].ref_.as_str(), s.cuts[0].child_count), ("e4", 2));
-    assert_eq!((two.cuts[0].ref_.as_str(), two.cuts[0].child_count), ("e3", 1));
+    assert_eq!(
+        (two.cuts[0].ref_.as_str(), two.cuts[0].child_count),
+        ("e3", 1)
+    );
 }
 
 #[test]
@@ -427,7 +493,10 @@ fn a_drill_reads_one_subtree_in_a_sub_generation_and_keeps_parent_refs() {
     };
     let drill = snapshot(&mut m, &mut registry, &window(), &options).unwrap();
     // Then
-    assert_eq!((drill.generation, drill.parent), (Some(2), first.generation));
+    assert_eq!(
+        (drill.generation, drill.parent),
+        (Some(2), first.generation)
+    );
     assert_eq!(
         drill.text,
         "- group \"C\" [ref=e5]\n  - button \"x\" [ref=e6]\n  - button \"y\" [ref=e7]"
@@ -452,7 +521,9 @@ fn a_drill_on_a_stale_ref_fails_stale_ref_and_starts_no_generation() {
         ..AxSnapshotOptions::default()
     };
     // When
-    let error = snapshot(&mut m, &mut registry, &window(), &options).err().map(|error| error.code);
+    let error = snapshot(&mut m, &mut registry, &window(), &options)
+        .err()
+        .map(|error| error.code);
     // Then
     assert_eq!(error, Some(crate::error::ErrorCode::StaleRef));
     assert_eq!(registry.current_generation("7"), 9);
@@ -473,7 +544,9 @@ fn a_drill_on_a_ref_of_another_window_is_an_invalid_target() {
         ..AxSnapshotOptions::default()
     };
     // When
-    let error = snapshot(&mut m, &mut registry, &other, &options).err().map(|error| error.code);
+    let error = snapshot(&mut m, &mut registry, &other, &options)
+        .err()
+        .map(|error| error.code);
     // Then
     assert_eq!(error, Some(crate::error::ErrorCode::InvalidTarget));
 }
@@ -483,7 +556,13 @@ fn null_mode_ignores_skeleton_and_root_and_fills_no_generation() {
     // Given: two null-mode registries that each read the window once.
     let second = |options: &AxSnapshotOptions| {
         let mut registry = AxRegistry::default();
-        snapshot(&mut titled_levels(), &mut registry, &window(), &AxSnapshotOptions::default()).unwrap();
+        snapshot(
+            &mut titled_levels(),
+            &mut registry,
+            &window(),
+            &AxSnapshotOptions::default(),
+        )
+        .unwrap();
         snapshot(&mut titled_levels(), &mut registry, &window(), options).unwrap()
     };
     let options = AxSnapshotOptions {
@@ -495,5 +574,8 @@ fn null_mode_ignores_skeleton_and_root_and_fills_no_generation() {
     let ignored = second(&options);
     // Then
     assert_eq!(ignored, plain);
-    assert_eq!((ignored.generation, ignored.parent, ignored.complete), (None, None, None));
+    assert_eq!(
+        (ignored.generation, ignored.parent, ignored.complete),
+        (None, None, None)
+    );
 }

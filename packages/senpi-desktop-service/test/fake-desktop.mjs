@@ -53,11 +53,13 @@ const NULL_METHODS = new Set([
   "keyChord",
   "holdKeys",
   "raiseWindow",
+  "window.bringToCurrentSpace",
   "menus.select",
   "ax.perform",
   "ax.setValue",
   "ax.focus",
   "ax.click",
+  "ax.keyChord",
 ])
 
 const MENU_TREE = [
@@ -266,6 +268,8 @@ export function createDesktop() {
         return { result: [["AXRole", "AXButton"]] }
       case "ax.typeText":
         return { result: { method: "inserted" } }
+      case "ax.selectText":
+        return { result: { start: 10, length: 0, text: "", focused: true } }
       default:
         return undefined
     }

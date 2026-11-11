@@ -186,6 +186,9 @@ function reportingService(service: ComputerHandle["service"], reports: ActionRep
     onAudit: (listener) => service.onAudit(listener),
     revokeControl: () => service.revokeControl(),
     reportError: (error) => service.reportError(error),
+    foregroundAllowed: () => service.foregroundAllowed?.() ?? false,
+    possiblyLive: () => service.possiblyLive?.() ?? false,
+    grantForFullAccess: (signal) => service.grantForFullAccess?.(signal) ?? Promise.resolve(false),
   }
 }
 

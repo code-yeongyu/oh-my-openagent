@@ -1,4 +1,4 @@
-use senpi_desktop_core::protocol_params::CaptureParams;
+use senpi_desktop_core::protocol_params::{BringToCurrentSpaceParams, CaptureParams, RaiseWindowParams};
 use senpi_desktop_core::types::DesktopSessionOptions;
 use serde_json::json;
 
@@ -21,6 +21,8 @@ fn only_requests_aimed_at_a_window_an_element_or_a_menu_read_or_act_on_an_app() 
         (capture("desktop"), false),
         (capture("display:active"), false),
         (Op::AxFocused, true),
+        (Op::RaiseWindow(RaiseWindowParams { window_id: "101".to_owned() }), true),
+        (Op::BringToCurrentSpace(BringToCurrentSpaceParams { window_id: "101".to_owned() }), true),
         (Op::Displays, false),
         (Op::Windows, false),
         (Op::ClipboardRead, false),

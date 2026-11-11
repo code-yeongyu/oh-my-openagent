@@ -2,10 +2,11 @@
 //! latest capture and map through its frame to global logical points.
 
 use senpi_desktop_core::ax::AxOwner;
-use senpi_desktop_core::backend::{DeliveryMode, PointerEvent};
+use senpi_desktop_core::backend::{DeliveryMode, MenuChoice, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode, ErrorReport};
 use senpi_desktop_core::frame::{FrameGeometry, PointHit};
 use senpi_desktop_core::keys::{dangerous_chord, parse_keys, ChordHost, KeyName};
+use senpi_desktop_core::menus::validate_path;
 use senpi_desktop_core::methods::Method;
 use senpi_desktop_core::protocol_params::{
     DragParams, KeyChordParams, PointParams, ScrollParams, TypeTextParams,
@@ -66,9 +67,14 @@ impl Worker {
                 ParsedPointerOptions::requested_mode(params.opts.as_ref()),
             )
         };
+        let supervisor = self.safety.supervisor.clone();
+        let policy = self.stop_policy();
         let baseline = std::cell::Cell::new(None);
         let audited = self.mutate(&mutation, cancelled, |worker| {
             let options = ParsedPointerOptions::parse(params.opts.as_ref())?;
+            if let Some(path) = &params.menu {
+                validate_path(path, false)?;
+            }
             let (frame, current) = worker.frame_for(&target, params.frame_id.as_deref())?;
             let (x, y) = frame.map_point(params.x, params.y, current.as_ref())?;
             worker.read_hit(x, y);
@@ -80,13 +86,20 @@ impl Worker {
                 count: options.count,
                 modifiers: options.modifiers,
             };
-            let response = worker
-                .pointer(&target, event, &frame, options.mode)
+            let check_stop =
+                || interrupted(&supervisor, &policy, cancelled, "choosing a menu item");
+            let choice = MenuChoice {
+                path: params.menu.as_deref(),
+                check_stop: &check_stop,
+            };
+            let report = worker
+                .backend()?
+                .pointer_menu(&target, event, &frame, options.mode, choice)
                 .map_err(|error| with_next_call(error, || element_at(&target, x, y)))?;
             if options.count > 1 {
                 worker.judge(&target, &frame)?;
             }
-            Ok(response)
+            Ok(Response::MenuOutcome(report))
         })?;
         self.report_opened_surfaces(baseline.take());
         Ok(audited)
@@ -116,7 +129,11 @@ impl Worker {
         })
     }
 
-    pub(crate) fn drag(&mut self, params: &DragParams, cancelled: &dyn Fn() -> bool) -> CoreResult<Audited> {
+    pub(crate) fn drag(
+        &mut self,
+        params: &DragParams,
+        cancelled: &dyn Fn() -> bool,
+    ) -> CoreResult<Audited> {
         let target = Target::parse(&params.target);
         let mutation = Mutation {
             frame_id: params.frame_id.as_deref(),
@@ -127,6 +144,8 @@ impl Worker {
                 ParsedPointerOptions::requested_mode(params.opts.as_ref()),
             )
         };
+        let supervisor = self.safety.supervisor.clone();
+        let policy = self.stop_policy();
         self.mutate(&mutation, cancelled, |worker| {
             let options = ParsedPointerOptions::parse(params.opts.as_ref())?;
             let (frame, current) = worker.frame_for(&target, params.frame_id.as_deref())?;
@@ -143,9 +162,19 @@ impl Worker {
                 button: options.button,
                 modifiers: options.modifiers,
             };
-            let response = worker.pointer(&target, event, &frame, options.mode)?;
+            // A drag that starts on a menu control is one press that opens the
+            // menu (D1): the backend lists and closes it.
+            let check_stop = || interrupted(&supervisor, &policy, cancelled, "dragging");
+            let choice = MenuChoice {
+                path: None,
+                check_stop: &check_stop,
+            };
+            let report =
+                worker
+                    .backend()?
+                    .pointer_menu(&target, event, &frame, options.mode, choice)?;
             worker.judge(&target, &frame)?;
-            Ok(response)
+            Ok(Response::MenuOutcome(report))
         })
     }
 
@@ -207,13 +236,11 @@ impl Worker {
             };
             worker
                 .backend()?
-                .type_text_interruptible(
-                    &target,
-                    &params.text,
-                    mode,
-                    &check_stop,
-                    &mut || mutation.text_delivered.set(mutation.text_delivered.get().saturating_add(1)),
-                )
+                .type_text_interruptible(&target, &params.text, mode, &check_stop, &mut || {
+                    mutation
+                        .text_delivered
+                        .set(mutation.text_delivered.get().saturating_add(1))
+                })
                 .map_err(|error| with_next_call(error, || target_tree(&target)))?;
             Ok(Response::Unit)
         })?;
@@ -241,7 +268,11 @@ impl Worker {
         {
             return Ok(());
         }
-        let Some(window) = self.window(target).ok().filter(|window| window.pid.is_some()) else {
+        let Some(window) = self
+            .window(target)
+            .ok()
+            .filter(|window| window.pid.is_some())
+        else {
             return Ok(());
         };
         let front = self.backend()?.front_window().ok().flatten();
@@ -271,30 +302,50 @@ impl Worker {
     /// own role says so or the hit at its center does. A read that fails says
     /// no.
     fn typing_into_secure_field(&mut self, target: &Target) -> bool {
-        let Target::Window(id) = target else { return false };
+        let Target::Window(id) = target else {
+            return false;
+        };
         if self.registry.report_mode() != ReportMode::Object {
             return false;
         }
-        let Ok(backend) = self.backend() else { return false };
-        let Ok(windows) = backend.windows() else { return false };
-        let pid = windows.iter().find(|window| window.id == *id).and_then(|window| window.pid);
+        let Ok(backend) = self.backend() else {
+            return false;
+        };
+        let Ok(windows) = backend.windows() else {
+            return false;
+        };
+        let pid = windows
+            .iter()
+            .find(|window| window.id == *id)
+            .and_then(|window| window.pid);
         let center = {
             let Some(ax) = backend.ax() else { return false };
             let focused = match pid {
                 Some(pid) => ax.app_focused_element(pid),
                 None => ax.focused_element(),
             };
-            let Ok(Some(element)) = focused else { return false };
+            let Ok(Some(element)) = focused else {
+                return false;
+            };
             if !matches!(ax.owner(&element, &windows), Ok(AxOwner::Window(owner)) if owner == *id) {
                 return false;
             }
             if ax.is_secure_text_field(&element).unwrap_or(false) {
                 return true;
             }
-            let Some(bounds) = ax.props(&element).ok().and_then(|props| props.bounds) else { return false };
-            (bounds.x + bounds.width / 2.0, bounds.y + bounds.height / 2.0)
+            let Some(bounds) = ax.props(&element).ok().and_then(|props| props.bounds) else {
+                return false;
+            };
+            (
+                bounds.x + bounds.width / 2.0,
+                bounds.y + bounds.height / 2.0,
+            )
         };
-        backend.hit_at(center.0, center.1).ok().flatten().is_some_and(|hit| hit.secure)
+        backend
+            .hit_at(center.0, center.1)
+            .ok()
+            .flatten()
+            .is_some_and(|hit| hit.secure)
     }
 
     pub(crate) fn key_chord(
@@ -317,7 +368,11 @@ impl Worker {
         let audited = self.mutate(&mutation, cancelled, |worker| {
             let keys = parse_keys(&params.keys)?;
             let mode = delivery(params.opts.as_ref())?;
-            worker.refuse_dangerous_chord(&keys, params.force, "it is sent only with force: true")?;
+            worker.refuse_dangerous_chord(
+                &keys,
+                params.force,
+                "it is sent only with force: true",
+            )?;
             worker.takeover_gate(&target, mode)?;
             baseline.set(worker.surface_baseline(&target));
             let epoch = worker.epochs.probe();
@@ -330,7 +385,9 @@ impl Worker {
                 .backend()?
                 .key_chord_interruptible(&target, &keys, mode, &check_stop)
                 .map_err(|error| match mode {
-                    DeliveryMode::Background => with_next_call(error, || chord_in_foreground(params)),
+                    DeliveryMode::Background => {
+                        with_next_call(error, || chord_in_foreground(params))
+                    }
                     DeliveryMode::Foreground => error,
                 })?;
             Ok(Response::Unit)
@@ -343,7 +400,12 @@ impl Worker {
     /// only with `force: true`; without it nothing is sent. `remedy` says
     /// how the request could send it (a hold has no `force` and points to
     /// `keyChord`).
-    pub(crate) fn refuse_dangerous_chord(&self, keys: &[KeyName], force: bool, remedy: &str) -> CoreResult<()> {
+    pub(crate) fn refuse_dangerous_chord(
+        &self,
+        keys: &[KeyName],
+        force: bool,
+        remedy: &str,
+    ) -> CoreResult<()> {
         if force || self.registry.report_mode() != ReportMode::Object {
             return Ok(());
         }
@@ -367,8 +429,16 @@ impl Worker {
         if self.registry.report_mode() != ReportMode::Object {
             return;
         }
-        let hit = self.backend().and_then(|backend| backend.hit_at(x, y)).ok().flatten().map(action_hit);
-        self.report_extras.set(Some(ReportExtras { hit, ..ReportExtras::default() }));
+        let hit = self
+            .backend()
+            .and_then(|backend| backend.hit_at(x, y))
+            .ok()
+            .flatten()
+            .map(action_hit);
+        self.report_extras.set(Some(ReportExtras {
+            hit,
+            ..ReportExtras::default()
+        }));
     }
 
     /// Object mode, window targets, input of several events (a drag, a
@@ -378,11 +448,15 @@ impl Worker {
     /// single event is never judged: a click that closes its dialog or hands
     /// its window to another process has already landed where it was aimed.
     pub(crate) fn judge(&mut self, target: &Target, frame: &FrameGeometry) -> CoreResult<()> {
-        if self.registry.report_mode() != ReportMode::Object || !matches!(target, Target::Window(_)) {
+        if self.registry.report_mode() != ReportMode::Object || !matches!(target, Target::Window(_))
+        {
             return Ok(());
         }
         let current = self.window(target).map_err(uncertain)?;
-        if frame.identity().is_some_and(|captured| current.identity.as_ref() != Some(captured)) {
+        if frame
+            .identity()
+            .is_some_and(|captured| current.identity.as_ref() != Some(captured))
+        {
             return Err(uncertain(DesktopError::from(GateError::IdentityChanged)));
         }
         frame.check_size(&current).map_err(uncertain)
@@ -418,11 +492,17 @@ pub(crate) fn interrupted(
 ) -> CoreResult<()> {
     let is_cancelled = cancelled();
     if supervisor.is_suspended() {
-        Err(DesktopError::new(ErrorCode::Suspended, format!("input was suspended while {doing}")))
+        Err(DesktopError::new(
+            ErrorCode::Suspended,
+            format!("input was suspended while {doing}"),
+        ))
     } else if let Some(stopped) = crate::mutate::interruption(supervisor, policy) {
         Err(stopped)
     } else if is_cancelled {
-        Err(DesktopError::new(ErrorCode::Cancelled, format!("the request was cancelled while {doing}")))
+        Err(DesktopError::new(
+            ErrorCode::Cancelled,
+            format!("the request was cancelled while {doing}"),
+        ))
     } else {
         Ok(())
     }
@@ -453,22 +533,35 @@ const MAX_LABEL_CHARS: usize = 256;
 fn action_hit(hit: PointHit) -> ActionHit {
     let label = hit.label.filter(|_| !hit.secure).map(|label| {
         if label.chars().count() > MAX_LABEL_CHARS {
-            format!("{}[truncated]", label.chars().take(MAX_LABEL_CHARS).collect::<String>())
+            format!(
+                "{}[truncated]",
+                label.chars().take(MAX_LABEL_CHARS).collect::<String>()
+            )
         } else {
             label
         }
     });
-    ActionHit { role: hit.role, label }
+    ActionHit {
+        role: hit.role,
+        label,
+    }
 }
 
 /// Adds the next rung of the refusal ladder (element action, keyboard,
 /// foreground) to a `BackgroundUnavailable` refusal. A refusal that waits
 /// for the user (`user_active_in_target`) has no rung to suggest.
-pub(crate) fn with_next_call(mut error: DesktopError, next: impl FnOnce() -> NextCall) -> DesktopError {
+pub(crate) fn with_next_call(
+    mut error: DesktopError,
+    next: impl FnOnce() -> NextCall,
+) -> DesktopError {
     if error.code != ErrorCode::BackgroundUnavailable {
         return error;
     }
-    let mut report = error.report.take().map(|report| *report).unwrap_or_default();
+    let mut report = error
+        .report
+        .take()
+        .map(|report| *report)
+        .unwrap_or_default();
     if report.reason.as_deref() != Some("user_active_in_target") {
         report.next_call = Some(next());
     }
@@ -484,7 +577,10 @@ fn element_at(target: &Target, x: f64, y: f64) -> NextCall {
     args.insert("target".to_owned(), Value::from(target.key()));
     args.insert("x".to_owned(), Value::from(x));
     args.insert("y".to_owned(), Value::from(y));
-    NextCall { method: Method::AxElementAt, args }
+    NextCall {
+        method: Method::AxElementAt,
+        args,
+    }
 }
 
 /// The element-action rung below background typing: read the target
@@ -495,7 +591,10 @@ fn element_at(target: &Target, x: f64, y: f64) -> NextCall {
 fn target_tree(target: &Target) -> NextCall {
     let mut args = Map::new();
     args.insert("target".to_owned(), Value::from(target.key()));
-    NextCall { method: Method::AxSnapshot, args }
+    NextCall {
+        method: Method::AxSnapshot,
+        args,
+    }
 }
 
 /// The foreground rung above background keys: the same chord, delivered in
@@ -511,13 +610,20 @@ fn chord_in_foreground(params: &KeyChordParams) -> NextCall {
     };
     opts.insert("deliveryMode".to_owned(), Value::from("foreground"));
     args.insert("opts".to_owned(), Value::Object(opts));
-    NextCall { method: Method::KeyChord, args }
+    NextCall {
+        method: Method::KeyChord,
+        args,
+    }
 }
 
 /// An error judged after input was sent: whatever reason it carries, the
 /// input may have landed, and sending it again may duplicate it.
 fn uncertain(mut error: DesktopError) -> DesktopError {
-    let mut report = error.report.take().map(|report| *report).unwrap_or_default();
+    let mut report = error
+        .report
+        .take()
+        .map(|report| *report)
+        .unwrap_or_default();
     report.disposition = Some(Disposition::UNCERTAIN_UNSAFE);
     error.with_report(report)
 }

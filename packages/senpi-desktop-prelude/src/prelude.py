@@ -11,8 +11,8 @@ def _make_computer():
     # <generated:facade> from facade-manifest.json by scripts/generate-assets.ts; edit CHAIN_BINDINGS there, then `bun run generate`
     _DESKTOP_METHODS = ("displays", "windows", "screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse")
     _DISPLAY_METHODS = ("screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse")
-    _WINDOW_METHODS = ("screenshot", "observe", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse", "raise", "ax")
-    _ELEMENT_METHODS = ("value", "setValue", "bounds", "attributes", "actions", "perform", "press", "click", "type", "focus")
+    _WINDOW_METHODS = ("screenshot", "observe", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse", "raise", "bringToCurrentSpace", "ax")
+    _ELEMENT_METHODS = ("value", "setValue", "bounds", "attributes", "actions", "perform", "press", "click", "doubleClick", "type", "selectText", "focus")
     # </generated:facade>
 
     def _arguments(args, kwargs):

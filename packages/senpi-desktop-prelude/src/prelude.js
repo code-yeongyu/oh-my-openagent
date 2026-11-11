@@ -68,64 +68,12 @@
     }
   }
 
-  // <generated:facade> from facade-manifest.json by scripts/generate-assets.ts; edit CHAIN_BINDINGS there, then `bun run generate`
-  const desktopValueMethods = [
-    "displays",
-    "windows",
-    "screenshot",
-    "zoom",
-    "click",
-    "doubleClick",
-    "move",
-    "drag",
-    "scroll",
-    "type",
-    "press",
-    "holdKeys",
-    "holdMouse",
-  ]
-  const displayValueMethods = [
-    "screenshot",
-    "zoom",
-    "click",
-    "doubleClick",
-    "move",
-    "drag",
-    "scroll",
-    "type",
-    "press",
-    "holdKeys",
-    "holdMouse",
-  ]
-  const windowValueMethods = [
-    "screenshot",
-    "observe",
-    "zoom",
-    "click",
-    "doubleClick",
-    "move",
-    "drag",
-    "scroll",
-    "type",
-    "press",
-    "holdKeys",
-    "holdMouse",
-    "raise",
-    "ax",
-  ]
-  const elementValueMethods = [
-    "value",
-    "setValue",
-    "bounds",
-    "attributes",
-    "actions",
-    "perform",
-    "press",
-    "click",
-    "type",
-    "focus",
-  ]
-  // </generated:facade>
+	// <generated:facade> from facade-manifest.json by scripts/generate-assets.ts; edit CHAIN_BINDINGS there, then `bun run generate`
+	const desktopValueMethods = ["displays", "windows", "screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse"];
+	const displayValueMethods = ["screenshot", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse"];
+	const windowValueMethods = ["screenshot", "observe", "zoom", "click", "doubleClick", "move", "drag", "scroll", "type", "press", "holdKeys", "holdMouse", "raise", "bringToCurrentSpace", "ax"];
+	const elementValueMethods = ["value", "setValue", "bounds", "attributes", "actions", "perform", "press", "click", "doubleClick", "type", "selectText", "focus"];
+	// </generated:facade>
   const windowFields = ["id", "app", "title", "pid", "bounds", "focused"]
   const elementFields = ["ref", "role", "nativeRole", "title", "description", "enabled", "focused", "childCount"]
 

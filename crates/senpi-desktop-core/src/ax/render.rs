@@ -13,7 +13,9 @@ fn escaped_truncated(value: &str, max: usize) -> String {
     if value.chars().count() > max {
         out.push('…');
     }
-    out.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', " ")
+    out.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', " ")
 }
 
 fn push_line(text: &mut String, line: &str) {
@@ -51,7 +53,12 @@ impl TreeWriter<'_> {
         if window_root {
             line.push_str(&format!(" app={}", self.window.app));
         }
-        if let Some(value) = node.props.value.as_deref().filter(|value| !value.is_empty()) {
+        if let Some(value) = node
+            .props
+            .value
+            .as_deref()
+            .filter(|value| !value.is_empty())
+        {
             line.push_str(&format!(": \"{}\"", escaped_truncated(value, 80)));
         }
         if !node.props.enabled {
@@ -93,7 +100,9 @@ pub fn snapshot(
     let timeout = Duration::from_millis(options.timeout_ms.unwrap_or(DEFAULT_DEADLINE_MS));
     // Measured from the request, so the root lookup counts against it; a
     // deadline past what `Instant` can hold never stops the walk.
-    let deadline = object.then(|| Instant::now().checked_add(timeout)).flatten();
+    let deadline = object
+        .then(|| Instant::now().checked_add(timeout))
+        .flatten();
     // Object mode only: a null-mode reply ignores `root` and `skeleton`.
     let drill = options.root.as_deref().filter(|_| object);
     let (generation, parent, root) = if let Some(reference) = drill {
@@ -117,8 +126,8 @@ pub fn snapshot(
     } else {
         max_depth
     };
-    let mut state = WalkState::new(options.max_nodes.unwrap_or(800).max(1), max_depth)
-        .with_deadline(deadline);
+    let mut state =
+        WalkState::new(options.max_nodes.unwrap_or(800).max(1), max_depth).with_deadline(deadline);
     let root = if object {
         walk_observed(backend, root, 0, 0, &mut state)?
     } else {
@@ -147,7 +156,10 @@ pub fn snapshot(
         push_line(&mut text, &format!("… truncated ({} nodes)", state.visited));
     }
     if state.deadline_hit {
-        push_line(&mut text, &format!("… deadline {} ms reached", timeout.as_millis()));
+        push_line(
+            &mut text,
+            &format!("… deadline {} ms reached", timeout.as_millis()),
+        );
     }
     if state.skipped > 0 {
         push_line(

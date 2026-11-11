@@ -6,9 +6,10 @@
 use std::cell::Cell;
 
 use senpi_desktop_core::ax::{AxHandle, AxOwner};
-use senpi_desktop_core::backend::PointerEvent;
+use senpi_desktop_core::backend::{MenuChoice, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::frame::FrameGeometry;
+use senpi_desktop_core::menus::validate_path;
 use senpi_desktop_core::methods::Method;
 use senpi_desktop_core::protocol_params::AxClickParams;
 use senpi_desktop_core::report::NextCall;
@@ -20,7 +21,7 @@ use crate::mutate::Mutation;
 use crate::pointer::ParsedPointerOptions;
 use crate::request::Response;
 use crate::worker::{Audited, Worker};
-use crate::worker_input::with_next_call;
+use crate::worker_input::{interrupted, with_next_call};
 
 impl Worker {
     /// Clicks the centre of the element's bounds in the window that owns it.
@@ -30,28 +31,38 @@ impl Worker {
         cancelled: &dyn Fn() -> bool,
     ) -> CoreResult<Audited> {
         let mode = ParsedPointerOptions::requested_mode(params.opts.as_ref());
-        let mut mutation = Mutation::new(MutatingAction::AxClick, self.ref_target(&params.ref_), mode);
+        let mut mutation =
+            Mutation::new(MutatingAction::AxClick, self.ref_target(&params.ref_), mode);
         mutation.ax_actionability = Some((&params.ref_, None));
         let baseline = Cell::new(None);
+        let supervisor = self.safety.supervisor.clone();
+        let policy = self.stop_policy();
         let audited = self.mutate(&mutation, cancelled, |worker| {
+            if let Some(path) = &params.menu {
+                validate_path(path, false)?;
+            }
             let handle: AxHandle = worker.registry.resolve(&params.ref_)?;
             baseline.set(worker.element_surface_baseline(&handle));
+            let check_stop =
+                || interrupted(&supervisor, &policy, cancelled, "choosing a menu item");
             worker
-                .ax_click_now(params, &handle)
+                .ax_click_now(params, &handle, &check_stop)
                 .map_err(|error| with_next_call(error, || press_instead(&params.ref_)))
         })?;
         self.report_opened_surfaces(baseline.take());
         Ok(audited)
     }
 
-    fn ax_click_now(&mut self, params: &AxClickParams, handle: &AxHandle) -> CoreResult<Response> {
+    fn ax_click_now(
+        &mut self,
+        params: &AxClickParams,
+        handle: &AxHandle,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<Response> {
         let options = ParsedPointerOptions::parse(params.opts.as_ref())?;
-        let bounds = self
-            .ax_parts()?
-            .0
-            .props(handle)?
-            .bounds
-            .ok_or_else(|| DesktopError::ax_failed(format!("{} has no clickable bounds", params.ref_)))?;
+        let bounds = self.ax_parts()?.0.props(handle)?.bounds.ok_or_else(|| {
+            DesktopError::ax_failed(format!("{} has no clickable bounds", params.ref_))
+        })?;
         let x = bounds.x + bounds.width / 2.0;
         let y = bounds.y + bounds.height / 2.0;
         let window = self.owner_window(&params.ref_, handle, x, y)?;
@@ -62,18 +73,27 @@ impl Worker {
             count: options.count,
             modifiers: options.modifiers,
         };
-        self.backend()?.pointer(
-            &Target::Window(window),
-            event,
-            &FrameGeometry::identity_global(),
-            options.mode,
-        )?;
-        Ok(Response::Unit)
+        let target = Target::Window(window);
+        let frame = FrameGeometry::identity_global();
+        let choice = MenuChoice {
+            path: params.menu.as_deref(),
+            check_stop,
+        };
+        let report = self
+            .backend()?
+            .pointer_menu(&target, event, &frame, options.mode, choice)?;
+        Ok(Response::MenuOutcome(report))
     }
 
     /// The id of the window that owns `handle`, named in the live window
     /// list: it must be listed and still contain (`x`, `y`).
-    fn owner_window(&mut self, reference: &str, handle: &AxHandle, x: f64, y: f64) -> CoreResult<String> {
+    fn owner_window(
+        &mut self,
+        reference: &str,
+        handle: &AxHandle,
+        x: f64,
+        y: f64,
+    ) -> CoreResult<String> {
         let windows = self.backend()?.windows()?;
         let AxOwner::Window(id) = self.ax_parts()?.0.owner(handle, &windows)? else {
             return Err(refuse_unknown_owner(reference));
@@ -101,7 +121,10 @@ fn press_instead(reference: &str) -> NextCall {
     let mut args = Map::new();
     args.insert("ref".to_owned(), Value::from(reference));
     args.insert("action".to_owned(), Value::from("press"));
-    NextCall { method: Method::AxPerform, args }
+    NextCall {
+        method: Method::AxPerform,
+        args,
+    }
 }
 
 /// The ownership policy for AX coordinate clicks: an element whose window
@@ -117,5 +140,6 @@ fn refuse_unknown_owner(reference: &str) -> DesktopError {
 
 fn contains(window: &DesktopWindow, x: f64, y: f64) -> bool {
     let (left, top) = (f64::from(window.x), f64::from(window.y));
-    (left..left + f64::from(window.width)).contains(&x) && (top..top + f64::from(window.height)).contains(&y)
+    (left..left + f64::from(window.width)).contains(&x)
+        && (top..top + f64::from(window.height)).contains(&y)
 }

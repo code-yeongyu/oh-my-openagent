@@ -16,8 +16,8 @@ use senpi_desktop_core::types::{DesktopPoint, DesktopSessionOptions, PointerOpti
 use senpi_desktop_safety::StopPathId;
 use serde_json::{json, Value};
 
-use crate::request::{Op, Response};
 use crate::grant::ControlSlot;
+use crate::request::{Op, Response};
 use crate::test_support::{click_window, delivery, harness, harness_opened, Harness};
 
 /// Window `101` (pid 4242) with a scripted process start, and a labelled
@@ -57,7 +57,9 @@ fn pointer_posts(harness: &Harness) -> usize {
         .count()
 }
 
-fn refusal(result: Result<Response, DesktopError>) -> (ErrorCode, Option<String>, Option<Disposition>) {
+fn refusal(
+    result: Result<Response, DesktopError>,
+) -> (ErrorCode, Option<String>, Option<Disposition>) {
     let error = result.expect_err("refused");
     let report = error.report.map(|report| *report).unwrap_or_default();
     (error.code, report.reason, report.disposition)
@@ -66,7 +68,10 @@ fn refusal(result: Result<Response, DesktopError>) -> (ErrorCode, Option<String>
 fn drag(frame_id: &str, opts: Option<PointerOptions>) -> Op {
     Op::Drag(DragParams {
         target: "101".to_owned(),
-        path: vec![DesktopPoint { x: 10.0, y: 10.0 }, DesktopPoint { x: 40.0, y: 40.0 }],
+        path: vec![
+            DesktopPoint { x: 10.0, y: 10.0 },
+            DesktopPoint { x: 40.0, y: 40.0 },
+        ],
         frame_id: Some(frame_id.to_owned()),
         opts,
     })
@@ -105,7 +110,10 @@ fn a_refused_consuming_click_leaves_its_frame_usable() {
     harness.pass_ms(0);
     let retried = harness.process(click_window(&frame, None));
     // Then
-    assert_eq!(refused.expect_err("refused").code, ErrorCode::StopPathUnavailable);
+    assert_eq!(
+        refused.expect_err("refused").code,
+        ErrorCode::StopPathUnavailable
+    );
     assert!(matches!(retried, Ok(Response::Action(_))), "{retried:?}");
     assert_eq!(pointer_posts(&harness), 1);
 }
@@ -143,7 +151,11 @@ fn a_window_whose_owner_changed_since_capture_is_refused_before_any_post() {
             Some(Disposition::NOT_DELIVERED_SAFE)
         )
     );
-    assert_eq!(refusal(again).1.as_deref(), Some("identity_changed"), "the refusal consumed nothing");
+    assert_eq!(
+        refusal(again).1.as_deref(),
+        Some("identity_changed"),
+        "the refusal consumed nothing"
+    );
     assert_eq!(pointer_posts(&harness), 0);
 }
 
@@ -157,7 +169,7 @@ fn a_null_mode_session_keeps_todays_gate_when_the_owner_changes() {
     // When
     let clicked = harness.process(click_window(&frame, None));
     // Then
-    assert!(matches!(clicked, Ok(Response::Unit)), "{clicked:?}");
+    assert!(matches!(clicked, Ok(Response::MenuOutcome(None))), "{clicked:?}");
     assert_eq!(pointer_posts(&harness), 1);
 }
 
@@ -180,14 +192,20 @@ fn a_drag_judged_after_the_owner_changed_is_delivery_uncertain() {
             Some(Disposition::UNCERTAIN_UNSAFE)
         )
     );
-    assert_eq!(refusal(after).1.as_deref(), Some("consumed"), "input was sent, so the frame is spent");
+    assert_eq!(
+        refusal(after).1.as_deref(),
+        Some("consumed"),
+        "input was sent, so the frame is spent"
+    );
     assert_eq!(pointer_posts(&harness), 1);
 }
 
 #[test]
 fn a_window_resized_since_capture_is_refused_with_its_reason() {
     // Given
-    let mut harness = object(&identified(&json!({"resize_window": {"id": "101", "width": 640, "height": 480}})));
+    let mut harness = object(&identified(
+        &json!({"resize_window": {"id": "101", "width": 640, "height": 480}}),
+    ));
     let frame = harness.capture("101");
     // When
     let refused = harness.process(click_window(&frame, None));
@@ -231,16 +249,26 @@ fn the_report_names_the_route_and_the_element_hit_before_the_click() {
     let plain_report = plain.process(click_window(&plain_frame, None));
     let hidden_report = hidden.process(click_window(&hidden_frame, None));
     // Then
-    let Ok(Response::Action(plain_report)) = plain_report else { panic!("{plain_report:?}") };
-    let Ok(Response::Action(hidden_report)) = hidden_report else { panic!("{hidden_report:?}") };
+    let Ok(Response::Action(plain_report)) = plain_report else {
+        panic!("{plain_report:?}")
+    };
+    let Ok(Response::Action(hidden_report)) = hidden_report else {
+        panic!("{hidden_report:?}")
+    };
     assert_eq!(plain_report.route, Some(ActionRoute::BackgroundWindow));
     assert_eq!(
         plain_report.hit,
-        Some(ActionHit { role: "button".to_owned(), label: Some("Delete".to_owned()) })
+        Some(ActionHit {
+            role: "button".to_owned(),
+            label: Some("Delete".to_owned())
+        })
     );
     assert_eq!(
         hidden_report.hit,
-        Some(ActionHit { role: "textfield".to_owned(), label: None }),
+        Some(ActionHit {
+            role: "textfield".to_owned(),
+            label: None
+        }),
         "a secure field's label never leaves the engine"
     );
 }
@@ -270,8 +298,14 @@ fn a_single_click_whose_window_then_closes_or_changes_owner_is_delivered() {
     let closed_reply = closed.process(click_window(&closed_frame, consuming()));
     let reowned_reply = reowned.process(click_window(&reowned_frame, None));
     // Then: one event went out, so nothing is judged after it.
-    assert!(matches!(closed_reply, Ok(Response::Action(_))), "{closed_reply:?}");
-    assert!(matches!(reowned_reply, Ok(Response::Action(_))), "{reowned_reply:?}");
+    assert!(
+        matches!(closed_reply, Ok(Response::Action(_))),
+        "{closed_reply:?}"
+    );
+    assert!(
+        matches!(reowned_reply, Ok(Response::Action(_))),
+        "{reowned_reply:?}"
+    );
     assert_eq!((pointer_posts(&closed), pointer_posts(&reowned)), (1, 1));
 }
 
@@ -286,7 +320,11 @@ fn a_double_click_whose_window_then_closes_is_delivery_uncertain() {
     // Then
     assert_eq!(
         refusal(judged),
-        (ErrorCode::WindowNotFound, None, Some(Disposition::UNCERTAIN_UNSAFE))
+        (
+            ErrorCode::WindowNotFound,
+            None,
+            Some(Disposition::UNCERTAIN_UNSAFE)
+        )
     );
     assert_eq!(pointer_posts(&harness), 1);
 }
@@ -296,7 +334,10 @@ fn a_drag_judged_after_its_window_resized_is_delivery_uncertain() {
     // Given
     let mut harness = object(&identified(&json!({})));
     harness.after_pointer.edit_windows(|windows| {
-        windows.iter_mut().filter(|window| window.id == "101").for_each(|window| window.width = 640);
+        windows
+            .iter_mut()
+            .filter(|window| window.id == "101")
+            .for_each(|window| window.width = 640);
     });
     let frame = harness.capture("101");
     // When
@@ -318,7 +359,9 @@ fn a_consuming_drag_stopped_once_its_events_went_out_still_consumes_its_frame() 
     // Given: the stop lands while the drag is being sent.
     let mut harness = object(&identified(&json!({})));
     let supervisor = Arc::clone(&harness.supervisor);
-    harness.faults.on_next(FakeMethod::Drag, move || supervisor.suspend_input());
+    harness
+        .faults
+        .on_next(FakeMethod::Drag, move || supervisor.suspend_input());
     let frame = harness.capture("101");
     // When
     let stopped = harness.process(drag(&frame, consuming()));
@@ -327,7 +370,11 @@ fn a_consuming_drag_stopped_once_its_events_went_out_still_consumes_its_frame() 
     let after = harness.process(click_window(&frame, None));
     // Then
     assert_eq!(refusal(stopped).0, ErrorCode::Suspended);
-    assert_eq!(refusal(after).1.as_deref(), Some("consumed"), "input was sent, so the frame is spent");
+    assert_eq!(
+        refusal(after).1.as_deref(),
+        Some("consumed"),
+        "input was sent, so the frame is spent"
+    );
     assert_eq!(pointer_posts(&harness), 1);
 }
 
@@ -349,8 +396,17 @@ fn element(harness: &mut Harness, role: &str) -> String {
         role: Some(role.to_owned()),
         ..AxQuery::default()
     };
-    match harness.process(Op::AxQuery(AxQueryParams { target: "101".to_owned(), query })) {
-        Ok(Response::Nodes(nodes)) => nodes.into_iter().next().unwrap_or_else(|| panic!("a {role}")).ref_,
+    match harness.process(Op::AxQuery(AxQueryParams {
+        target: "101".to_owned(),
+        query,
+    })) {
+        Ok(Response::Nodes(nodes)) => {
+            nodes
+                .into_iter()
+                .next()
+                .unwrap_or_else(|| panic!("a {role}"))
+                .ref_
+        }
         other => panic!("ax.query failed: {other:?}"),
     }
 }
@@ -358,7 +414,10 @@ fn element(harness: &mut Harness, role: &str) -> String {
 fn route_of(reply: Result<Response, DesktopError>) -> Option<ActionRoute> {
     match reply {
         Ok(Response::Action(report)) => report.route,
-        Ok(Response::AxInput(AxInputResult { report: Some(report), .. })) => report.route,
+        Ok(Response::AxInput(AxInputResult {
+            report: Some(report),
+            ..
+        })) => report.route,
         other => panic!("{other:?}"),
     }
 }
@@ -369,9 +428,19 @@ fn the_route_names_the_channel_the_input_events_took() {
     let mut harness = object(&identified(&json!({})));
     let button = element(&mut harness, "button");
     let textarea = element(&mut harness, "textarea");
-    let ax_click = |reference: &str, opts| Op::AxClick(AxClickParams { ref_: reference.to_owned(), opts });
+    let ax_click = |reference: &str, opts| {
+        Op::AxClick(AxClickParams {
+            ref_: reference.to_owned(),
+            opts,
+            menu: None,
+        })
+    };
     let ax_type = |reference: &str| {
-        Op::AxTypeText(AxTypeTextParams { ref_: reference.to_owned(), text: "ok".to_owned(), opts: None })
+        Op::AxTypeText(AxTypeTextParams {
+            ref_: reference.to_owned(),
+            text: "ok".to_owned(),
+            opts: None,
+        })
     };
     // When
     let background_click = route_of(harness.process(ax_click(&button, None)));
@@ -379,7 +448,9 @@ fn the_route_names_the_channel_the_input_events_took() {
     let inserted = route_of(harness.process(ax_type(&textarea)));
     harness.grant("click in front");
     let foreground_click = route_of(harness.process(ax_click(&button, delivery("foreground"))));
-    let raised = route_of(harness.process(Op::RaiseWindow(RaiseWindowParams { window_id: "101".to_owned() })));
+    let raised = route_of(harness.process(Op::RaiseWindow(RaiseWindowParams {
+        window_id: "101".to_owned(),
+    })));
     // Then: ax.click and typed keys are input events; an inserted value and a
     // raise send none.
     assert_eq!(
@@ -408,12 +479,22 @@ fn identity_reaches_capture_and_window_replies_in_object_mode_only() {
         other => panic!("{other:?}"),
     };
     let windows = |harness: &mut Harness| match harness.process(Op::Windows) {
-        Ok(Response::Windows(windows)) => windows.into_iter().map(|window| window.identity).collect::<Vec<_>>(),
+        Ok(Response::Windows(windows)) => windows
+            .into_iter()
+            .map(|window| window.identity)
+            .collect::<Vec<_>>(),
         other => panic!("{other:?}"),
     };
     // When / Then
     let identity = capture(&mut object).expect("object capture names its window's owner");
-    assert_eq!((identity.window_number.as_str(), identity.pid, identity.process_start), ("101", 4242, Some(1_700_000_000)));
+    assert_eq!(
+        (
+            identity.window_number.as_str(),
+            identity.pid,
+            identity.process_start
+        ),
+        ("101", 4242, Some(1_700_000_000))
+    );
     assert_eq!(windows(&mut object), vec![Some(identity)]);
     assert_eq!(capture(&mut null), None);
     assert_eq!(windows(&mut null), vec![None]);

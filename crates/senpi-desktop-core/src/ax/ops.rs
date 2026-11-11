@@ -65,9 +65,11 @@ pub fn query(
     let role = query.role.as_deref().map(str::to_lowercase);
     let title = query.title.as_deref().map(str::to_lowercase);
     let value = query.value.as_deref().map(str::to_lowercase);
-    let limit = usize::try_from(query.limit.unwrap_or(100).min(QUERY_MAX_NODES)).unwrap_or(usize::MAX);
+    let limit =
+        usize::try_from(query.limit.unwrap_or(100).min(QUERY_MAX_NODES)).unwrap_or(usize::MAX);
     let contains = |actual: Option<&str>, expected: Option<&String>| {
-        expected.is_none_or(|needle| actual.is_some_and(|text| text.to_lowercase().contains(needle)))
+        expected
+            .is_none_or(|needle| actual.is_some_and(|text| text.to_lowercase().contains(needle)))
     };
     let mut result = Vec::new();
     let mut stack = vec![root];
@@ -106,7 +108,11 @@ pub fn register_node(
 
 /// Reads `handle` as the session's report mode asks: with evidence in object
 /// mode, plain props otherwise.
-pub fn observe(backend: &mut dyn AxBackend, registry: &AxRegistry, handle: &AxHandle) -> CoreResult<AxObserved> {
+pub fn observe(
+    backend: &mut dyn AxBackend,
+    registry: &AxRegistry,
+    handle: &AxHandle,
+) -> CoreResult<AxObserved> {
     if registry.report_mode() == ReportMode::Object {
         backend.observe(handle)
     } else {
@@ -130,4 +136,15 @@ pub fn element_at_node(
 
 pub fn ax_press(backend: &mut dyn AxBackend, handle: &AxHandle) -> CoreResult<()> {
     backend.perform(handle, "press")
+}
+
+/// Model-facing action names (`press`, `show_menu`) -> native `AX*` names.
+pub fn native_action_name(action: &str) -> String {
+    match action.trim().to_ascii_lowercase().as_str() {
+        "press" => "AXPress".to_string(),
+        "raise" => "AXRaise".to_string(),
+        "showmenu" | "show_menu" => "AXShowMenu".to_string(),
+        _ if action.starts_with("AX") => action.to_string(),
+        _ => format!("AX{action}"),
+    }
 }

@@ -153,8 +153,7 @@ pub(super) fn walk_observed(
     } else {
         logical
     };
-    if logical >= state.max_depth
-        || depth >= state.max_depth.saturating_add(WRAPPER_RAW_ALLOWANCE)
+    if logical >= state.max_depth || depth >= state.max_depth.saturating_add(WRAPPER_RAW_ALLOWANCE)
     {
         node.left_out = node.props.child_count;
         state.truncated |= node.left_out > 0;
@@ -203,7 +202,10 @@ pub(super) fn label(props: &AxProps) -> Option<&str> {
 /// `object` reads a scroll-into-view-only action list as no action (the
 /// web-wrapper rule); null mode keeps today's filter.
 fn interactable(props: &AxProps, object: bool) -> bool {
-    props.actions.iter().any(|action| !object || !scroll_into_view(action))
+    props
+        .actions
+        .iter()
+        .any(|action| !object || !scroll_into_view(action))
         || matches!(
             props.role.as_str(),
             "button"

@@ -4,10 +4,12 @@
 
 use senpi_desktop_core::error::{ErrorCode, ErrorReport};
 use senpi_desktop_core::methods::Method;
-use senpi_desktop_core::protocol_results::{AuditEvent, AxInputResult};
+use senpi_desktop_core::protocol_results::{
+    AuditEvent, AxInputResult, AxTextSelection, MenuReport,
+};
 use senpi_desktop_core::report::{
-    ActionEffect, ActionHit, ActionReport, ActionRoute, End, FocusRestoration, OpenedSurface, Progress, ReportMode,
-    Settled, StageTimings,
+    ActionEffect, ActionHit, ActionReport, ActionRoute, End, FocusRestoration, OpenedSurface,
+    Progress, ReportMode, Settled, StageTimings,
 };
 
 use crate::request::Response;
@@ -200,10 +202,20 @@ pub(crate) fn respond(
         return response;
     }
     match response {
-        Response::Unit => Response::Action(Box::new(success_report(event, extras))),
+        Response::Unit | Response::MenuOutcome(None) => {
+            Response::Action(Box::new(success_report(event, extras)))
+        }
+        Response::MenuOutcome(Some(menu)) => Response::MenuOutcome(Some(MenuReport {
+            report: Some(Box::new(success_report(event, extras))),
+            ..menu
+        })),
         Response::AxInput(AxInputResult { method, .. }) => Response::AxInput(AxInputResult {
             method,
             report: Some(Box::new(success_report(event, extras))),
+        }),
+        Response::TextSelection(selection) => Response::TextSelection(AxTextSelection {
+            report: Some(Box::new(success_report(event, extras))),
+            ..selection
         }),
         other => other,
     }

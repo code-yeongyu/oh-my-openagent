@@ -18,6 +18,7 @@ import {
   RunOutput,
 } from "./context"
 import { createDesktopFacade } from "./facade"
+import { withForegroundRerun } from "./foreground-rerun"
 import { runQuickJsCode } from "./sandbox/quickjs"
 import { createWait, type WaitOptions } from "./wait"
 
@@ -45,7 +46,10 @@ export interface ComputerRunRequest {
 
 /** `DesktopService` surface used by the run facade; `control.grant`/`revoke` stay host-only. */
 export interface ComputerRunHost {
-  readonly service: Pick<DesktopService, "call" | "onAudit" | "revokeControl" | "reportError">
+  readonly service: Pick<
+    DesktopService,
+    "call" | "onAudit" | "revokeControl" | "reportError" | "foregroundAllowed" | "possiblyLive" | "grantForFullAccess"
+  >
   readonly executeTool: ExecuteTool
   /** Human confirmation behind `desktop.control.acquire`; absent: headless, never grants (#9651 B5b). */
   readonly confirmControl?: ConfirmControl
@@ -155,7 +159,19 @@ async function runInVm(request: ComputerRunRequest, host: ComputerRunHost): Prom
     promise.then(schedule, schedule)
     return promise
   }
-  const call: EngineCall = (method, params) => host.service.call(method, params, { signal })
+  const engineCall: EngineCall = (method, params) => host.service.call(method, params, { signal })
+  // One wrapper on the run's channel, so window handles and element handles are covered too.
+  const call = withForegroundRerun(
+    engineCall,
+    {
+      // A host that never grew the accessors cannot rerun; it keeps the engine's refusal.
+      foregroundAllowed: () => host.service.foregroundAllowed?.() ?? false,
+      possiblyLive: () => host.service.possiblyLive?.() ?? false,
+      grantForFullAccess: (abort) => host.service.grantForFullAccess?.(abort) ?? Promise.resolve(false),
+    },
+    context.output,
+    signal,
+  )
   const wait = createWait(signal, timeoutMs)
   const print = (...values: readonly unknown[]) => context.output.text(format(...values))
   const sandbox = vm.createContext(

@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 
 use senpi_desktop_core::ax::{AxBounds, AxHandle, AxProps};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
+use senpi_desktop_core::text_range::{replace_utf16_selection, utf16_byte_range, Utf16Range};
 
 use crate::scenario::FakeAxNode;
 
@@ -15,6 +16,9 @@ struct AxEntry {
     secure: bool,
     parent: Option<u64>,
     children: Vec<u64>,
+    /// The selected range of a text value, in UTF-16 units; `None` is a caret
+    /// at the end of the value.
+    selection: Option<Utf16Range>,
     ready_after: Option<Duration>,
     first_read: Cell<Option<Instant>>,
     moving_reads: Cell<u32>,
@@ -50,7 +54,10 @@ impl AxTree {
             .collect();
         let props = AxProps {
             role: node.role.clone(),
-            native_role: node.native_role.clone().unwrap_or_else(|| node.role.clone()),
+            native_role: node
+                .native_role
+                .clone()
+                .unwrap_or_else(|| node.role.clone()),
             title: node.title.clone(),
             value: node.value.clone(),
             description: node.description.clone(),
@@ -73,6 +80,7 @@ impl AxTree {
                 secure: node.secure,
                 parent,
                 children,
+                selection: None,
                 ready_after: node.ready_after_ms.map(Duration::from_millis),
                 first_read: Cell::new(None),
                 moving_reads: Cell::new(node.moving_reads),
@@ -84,12 +92,19 @@ impl AxTree {
     /// Appends leaf nodes under `window_id`'s root until its tree holds
     /// `total` nodes; a tree already that large is left as scripted.
     pub(crate) fn pad(&mut self, window_id: &str, total: u32) {
-        let Some(root) = self.roots.get(window_id).copied() else { return };
+        let Some(root) = self.roots.get(window_id).copied() else {
+            return;
+        };
         let mut count: u64 = 0;
         let mut stack = vec![root];
         while let Some(id) = stack.pop() {
             count += 1;
-            stack.extend(self.nodes.get(&id).map(|entry| entry.children.clone()).unwrap_or_default());
+            stack.extend(
+                self.nodes
+                    .get(&id)
+                    .map(|entry| entry.children.clone())
+                    .unwrap_or_default(),
+            );
         }
         for index in count..u64::from(total) {
             let leaf = FakeAxNode {
@@ -118,7 +133,9 @@ impl AxTree {
 
     pub(crate) fn root(&self, window_id: &str) -> CoreResult<u64> {
         self.roots.get(window_id).copied().ok_or_else(|| {
-            DesktopError::ax_failed(format!("no accessibility tree scripted for window {window_id}"))
+            DesktopError::ax_failed(format!(
+                "no accessibility tree scripted for window {window_id}"
+            ))
         })
     }
 
@@ -171,7 +188,13 @@ impl AxTree {
 
     /// Fails with `AxFailed` unless the node advertises `action`.
     pub(crate) fn check_action(&self, id: u64, action: &str) -> CoreResult<()> {
-        if self.entry(id)?.props.actions.iter().any(|known| known == action) {
+        if self
+            .entry(id)?
+            .props
+            .actions
+            .iter()
+            .any(|known| known == action)
+        {
             Ok(())
         } else {
             Err(DesktopError::ax_failed(format!(
@@ -186,18 +209,61 @@ impl AxTree {
             .get_mut(&id)
             .ok_or_else(|| DesktopError::ax_failed(format!("unknown fake AX node {id}")))?;
         entry.props.value = Some(value.to_string());
+        // A replaced value puts the caret after it, as a field does: the next
+        // insertion appends instead of landing at the old caret.
+        entry.selection = None;
         Ok(())
     }
 
-    /// Appends `text` to the node's value, as an insertion at the end of its
-    /// selection does.
-    pub(crate) fn append_value(&mut self, id: u64, text: &str) -> CoreResult<()> {
+    /// Inserts `text` at the node's selection (a caret at the end of the
+    /// value unless one was selected), replacing the selected text; the caret
+    /// then sits after the inserted text.
+    pub(crate) fn insert_text(&mut self, id: u64, text: &str) -> CoreResult<()> {
         let entry = self
             .nodes
             .get_mut(&id)
             .ok_or_else(|| DesktopError::ax_failed(format!("unknown fake AX node {id}")))?;
-        entry.props.value.get_or_insert_with(String::new).push_str(text);
+        let value = entry.props.value.get_or_insert_with(String::new);
+        let selection = entry.selection.unwrap_or(Utf16Range {
+            start: value.encode_utf16().count(),
+            length: 0,
+        });
+        *value = replace_utf16_selection(value, selection, text)?;
+        entry.selection = Some(Utf16Range {
+            start: selection.start + text.encode_utf16().count(),
+            length: 0,
+        });
         Ok(())
+    }
+
+    /// Selects the node's whole value, as `cmd+a` does in a text field.
+    pub(crate) fn select_all(&mut self, id: u64) -> CoreResult<()> {
+        let length = self
+            .value(id)?
+            .map_or(0, |value| value.encode_utf16().count());
+        self.select(id, Utf16Range { start: 0, length })
+    }
+
+    /// Selects `range` of the node's value; the range must lie inside it.
+    pub(crate) fn select(&mut self, id: u64, range: Utf16Range) -> CoreResult<()> {
+        let entry = self
+            .nodes
+            .get_mut(&id)
+            .ok_or_else(|| DesktopError::ax_failed(format!("unknown fake AX node {id}")))?;
+        let value = entry.props.value.as_deref().unwrap_or_default();
+        if utf16_byte_range(value, range).is_none() {
+            return Err(DesktopError::ax_failed(format!(
+                "selection {}+{} is outside fake AX node {id}'s value",
+                range.start, range.length
+            )));
+        }
+        entry.selection = Some(range);
+        Ok(())
+    }
+
+    /// The node's value, for locating text to select.
+    pub(crate) fn value(&self, id: u64) -> CoreResult<Option<String>> {
+        self.entry(id).map(|entry| entry.props.value.clone())
     }
 
     /// Moves AX focus to `id`, clearing it everywhere else.
@@ -280,7 +346,11 @@ impl AxTree {
             ("nativeRole", Some(&props.native_role)),
         ]
         .into_iter()
-        .chain(optional.into_iter().map(|(name, value)| (name, value.as_ref())))
+        .chain(
+            optional
+                .into_iter()
+                .map(|(name, value)| (name, value.as_ref())),
+        )
         .filter_map(|(name, value)| value.map(|value| (name.to_string(), value.clone())))
         .collect())
     }

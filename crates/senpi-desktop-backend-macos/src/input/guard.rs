@@ -1,5 +1,6 @@
-//! Background-delivery policy: the app guard and the sole-window keyboard
-//! rule. Decisions only - no event posting happens here.
+//! Background-delivery policy: the app guard. Decisions only - no event
+//! posting happens here. Keyboard routing to one window lives in
+//! [`super::key_window`].
 
 use std::cell::Cell;
 use std::time::{Duration, Instant};

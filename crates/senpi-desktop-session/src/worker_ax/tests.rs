@@ -1,6 +1,8 @@
 use senpi_desktop_backend_fake::{FakeMethod, SinkOp};
 use senpi_desktop_core::error::ErrorCode;
-use senpi_desktop_core::protocol_params::{AxClickParams, AxElementAtParams, AxRefParams, AxSnapshotParams};
+use senpi_desktop_core::protocol_params::{
+    AxClickParams, AxElementAtParams, AxRefParams, AxSnapshotParams,
+};
 use senpi_desktop_core::types::{AxSnapshot, AxSnapshotOptions, Target};
 use serde_json::{json, Value};
 
@@ -21,6 +23,7 @@ fn click(harness: &mut Harness, reference: String) -> Result<Response, ErrorCode
         .process(Op::AxClick(AxClickParams {
             ref_: reference,
             opts: None,
+            menu: None,
         }))
         .map_err(|error| error.code)
 }
@@ -46,6 +49,7 @@ fn focused_ax_click_targets_owner_not_first_overlapping_window() {
     let result = harness.process(Op::AxClick(AxClickParams {
         ref_: reference,
         opts: None,
+        menu: None,
     }));
     // Then: only A receives coordinate input.
     assert!(result.is_ok(), "{result:?}");
@@ -68,6 +72,7 @@ fn ax_click_ignores_unrelated_hit_test_target_provenance() {
     let result = harness.process(Op::AxClick(AxClickParams {
         ref_: reference,
         opts: None,
+        menu: None,
     }));
     // Then: snapshot provenance is not evidence of element ownership.
     assert!(result.is_ok(), "{result:?}");
@@ -86,6 +91,7 @@ fn ax_click_window_enumeration_failure_posts_no_input() {
     let result = harness.process(Op::AxClick(AxClickParams {
         ref_: reference,
         opts: None,
+        menu: None,
     }));
     // Then: no pointer is delivered.
     assert_eq!(
@@ -112,7 +118,8 @@ fn ax_click_refuses_an_unknown_owner_without_geometric_fallback() {
 #[test]
 fn ax_click_refuses_when_the_owner_no_longer_contains_the_centre() {
     // Given: A has moved off its element's centre, which B still covers.
-    let mut harness = harness(&json!({"windows": [window("202", 8, 100), window("101", 4242, 1000)]}));
+    let mut harness =
+        harness(&json!({"windows": [window("202", 8, 100), window("101", 4242, 1000)]}));
     let reference = harness.focused_ref();
     // When
     let result = click(&mut harness, reference);
@@ -122,8 +129,10 @@ fn ax_click_refuses_when_the_owner_no_longer_contains_the_centre() {
 }
 
 fn dense_object_harness() -> Harness {
-    let scenario: Value = serde_json::from_str(include_str!("../../../senpi-desktop-backend-fake/fixtures/v2-ax-dense.json"))
-        .expect("scenario is JSON");
+    let scenario: Value = serde_json::from_str(include_str!(
+        "../../../senpi-desktop-backend-fake/fixtures/v2-ax-dense.json"
+    ))
+    .expect("scenario is JSON");
     let options = senpi_desktop_core::types::DesktopSessionOptions {
         report_mode: senpi_desktop_core::report::ReportMode::Object,
         ..Default::default()
@@ -159,8 +168,12 @@ fn a_dense_object_mode_snapshot_past_its_deadline_is_partial_and_marks_every_cut
     assert!(!snapshot.cuts.is_empty());
     for cut in &snapshot.cuts {
         assert!(snapshot.text.contains(&format!("[ref={}]", cut.ref_)));
-        assert!(snapshot.text.contains(&format!("[... {} more]", cut.child_count)));
-        match harness.process(Op::AxNode(AxRefParams { ref_: cut.ref_.clone() })) {
+        assert!(snapshot
+            .text
+            .contains(&format!("[... {} more]", cut.child_count)));
+        match harness.process(Op::AxNode(AxRefParams {
+            ref_: cut.ref_.clone(),
+        })) {
             Ok(Response::Node(node)) => assert!(node.subtree_truncated, "{} is cut", cut.ref_),
             other => panic!("ax.node {} failed: {other:?}", cut.ref_),
         }
