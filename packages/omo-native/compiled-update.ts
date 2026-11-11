@@ -1,7 +1,13 @@
 import { spawnSync } from "node:child_process"
 import { realpathSync } from "node:fs"
-import { updateUsageAnswer } from "./bin/lib/update-args.js"
+import { rm } from "node:fs/promises"
+import { isPrintOnlyUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 import { isProvisionedExecutable } from "./compile-runtime"
+import { join } from "node:path"
+import { runtimeHome } from "./bin/lib/agent-dir.js"
+import { UpdateStore } from "./update-store"
+import { classifyInstallOwnership, updateFlag } from "./update-policy"
+import { downloadGeneration, preflightGeneration } from "./compiled-update-download"
 
 export const RELEASES_URL = "https://github.com/code-yeongyu/oh-my-openagent/releases"
 const RELEASES_API = "https://api.github.com/repos/code-yeongyu/oh-my-openagent/releases?per_page=100"
@@ -118,7 +124,12 @@ export const fetchGitHubReleases: FetchReleases = async () => {
     headers: { Accept: "application/vnd.github+json", "User-Agent": "omo" },
     signal: AbortSignal.timeout(15_000),
   })
-  if (!response.ok) throw new Error(`GitHub answered ${response.status}`)
+  if (!response.ok) {
+    const retryAfter = response.headers.get("retry-after")
+    const retryAfterMs = retryAfter === null ? 0
+      : /^\d+$/.test(retryAfter) ? Number(retryAfter) * 1000 : Math.max(0, Date.parse(retryAfter) - Date.now())
+    throw Object.assign(new Error(`GitHub answered ${response.status}`), { retryAfterMs })
+  }
   return response.json()
 }
 
@@ -133,6 +144,10 @@ export async function compiledUpdate(options: {
   readonly fetchReleases: FetchReleases
   readonly args?: readonly string[]
   readonly probeOwner?: ProbeOwner
+  readonly store?: UpdateStore
+  readonly download?: typeof downloadGeneration
+  readonly preflight?: typeof preflightGeneration
+  readonly env?: NodeJS.ProcessEnv
 }): Promise<CompiledUpdateResult> {
   const usage = options.args === undefined ? undefined : updateUsageAnswer(options.args)
   if (usage !== undefined) return { output: usage.text, exitCode: usage.exitCode, stream: usage.stream }
@@ -140,8 +155,49 @@ export async function compiledUpdate(options: {
   // root-owned path or leaves the manager tracking a file it no longer installed.
   const owner = options.probeOwner?.(options.destination, options.platform)
   if (owner !== undefined) return { output: ownedUpdateLine(owner), exitCode: 1, stream: "stderr" }
+  const env = options.env ?? process.env
+  if (updateFlag("OFFLINE", env)) return { output: "omo update: OFFLINE forbids a network update", exitCode: 1, stream: "stderr" }
+  const printOnly = options.args !== undefined && isPrintOnlyUpdate(options.args)
   const asset = releaseAssetName(options.releaseTarget, options.platform, options.arch)
   const current = releaseVersionOf(options.omoAiVersion)
+  if (!printOnly) {
+    const ownership = await classifyInstallOwnership(options.destination, { platform: options.platform })
+    if (ownership.kind !== "standalone") return {
+      output: ownership.kind === "manager-owned" ? `omo: ${ownership.command}` : `omo update: ${ownership.reason}; installation was not changed`,
+      exitCode: 1, stream: "stderr",
+    }
+    const store = options.store ?? new UpdateStore(join(runtimeHome(env), ".omo", "updates"), ownership.path)
+    try {
+      return await store.transaction(async (tx) => {
+        const record = await tx.record()
+        if (record.selected === undefined) throw new Error("No verified current generation; launch the installed omo first")
+        const effective = await store.generation(record.selected)
+        const target = pickUpdateVersion(effective.version, await options.fetchReleases(), asset)
+        if (target === undefined) return { output: `omo ${effective.version} is the newest release`, exitCode: 0 }
+        const candidate = await (options.download ?? downloadGeneration)({
+          store, version: target, asset, platform: options.platform, arch: options.arch, retry: true,
+        })
+        try {
+          // A manager can acquire this path while the network is in flight.
+          const rechecked = await classifyInstallOwnership(options.destination, { platform: options.platform })
+          if (rechecked.kind !== "standalone" || rechecked.path !== ownership.path || updateFlag("OFFLINE", env)) {
+            throw new Error("Installation ownership or network policy changed")
+          }
+          await tx.publish(candidate.staging, candidate.generation, true)
+          await tx.select(async (directory, generation) => {
+            await (options.preflight ?? preflightGeneration)(directory, generation)
+            const ownerAfterProbe = await classifyInstallOwnership(options.destination, { platform: options.platform })
+            if (ownerAfterProbe.kind !== "standalone" || ownerAfterProbe.path !== ownership.path || updateFlag("OFFLINE", env)) {
+              throw new Error("Installation ownership or network policy changed during preflight")
+            }
+          })
+          return { output: `omo updated ${effective.version} -> ${target}. Future launches use the selected generation.`, exitCode: 0 }
+        } finally { await rm(candidate.staging, { recursive: true, force: true }) }
+      }, { waitTimeoutMs: 30_000 })
+    } catch (error) {
+      return { output: `omo update: ${error instanceof Error ? error.message : String(error)}; current selection retained`, exitCode: 1, stream: "stderr" }
+    }
+  }
   let target: string | undefined
   try {
     target = pickUpdateVersion(current, await options.fetchReleases(), asset)
@@ -159,6 +215,9 @@ export async function compiledUpdate(options: {
       stream: "stderr",
     }
   }
-  const command = replaceCommand(`${RELEASES_URL}/download/v${target}/${asset}`, options.destination, options.platform)
-  return { output: `omo ${target} is available (running ${current}). Replace this binary with:\n${command}`, exitCode: 0 }
+  const url = `${RELEASES_URL}/download/v${target}/${asset}`
+  return {
+    output: `omo ${target} is available (running ${current}).\nSource: ${url}\nRun omo update to verify and select this runtime for ${options.destination}.`,
+    exitCode: 0,
+  }
 }
