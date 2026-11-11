@@ -46,10 +46,10 @@ fn receipt_requires_a_delivered_verified_disposition() {
     let unverified = Disposition::ALL.into_iter().filter(|pair| {
         matches!(
             pair.delivery(),
-            Delivery::NotDelivered | Delivery::DeliveredUnverified
+            Delivery::NotDelivered | Delivery::DeliveredUnverified | Delivery::Unknown
         )
     });
-    let (mut refused, mut wire) = (0, 0);
+    let (mut refused, mut wire, mut unknown) = (0, 0, 0);
     for disposition in unverified {
         for effect in Effect::ALL {
             for verb in [None, Some(VerbClass::Action), Some(VerbClass::Value)] {
@@ -78,6 +78,7 @@ fn receipt_requires_a_delivered_verified_disposition() {
                     );
                     refused += 1;
                     wire += usize::from(verb.is_none());
+                    unknown += usize::from(disposition.delivery() == Delivery::Unknown);
                 }
             }
         }
@@ -87,6 +88,7 @@ fn receipt_requires_a_delivered_verified_disposition() {
         refused >= 30 && wire >= 10,
         "the case list shrank: {refused}/{wire}"
     );
+    assert!(unknown >= 10, "unknown/unknown is swept: {unknown} cases");
 }
 
 /// The acceptance side, per LEAD ruling 2026-11-11 (receipts record observation; disposition
