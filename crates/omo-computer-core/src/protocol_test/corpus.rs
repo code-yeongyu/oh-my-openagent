@@ -131,6 +131,41 @@ fn missing_members(schema: &Value, method: &str, reply: &Value) -> Vec<String> {
         .collect()
 }
 
+/// The check of one imported reply: `Ok(true)` when it lacks only ledgered additive
+/// members, `Ok(false)` when it lacks none, and the problem otherwise.
+fn reply_problem(
+    schema: &Value,
+    method: Method,
+    path: &str,
+    result: &Value,
+    additions: &[(String, String)],
+) -> Result<bool, String> {
+    let missing = missing_members(schema, method.spec().name, result);
+    let unledgered: Vec<&str> = missing
+        .iter()
+        .filter(|member| {
+            !additions
+                .iter()
+                .any(|(file, added)| file == path && added == *member)
+        })
+        .map(String::as_str)
+        .collect();
+    if !unledgered.is_empty() {
+        return Err(format!(
+            "result lacks {} member(s) no additive ledger line names: {}",
+            unledgered.len(),
+            unledgered.join(", ")
+        ));
+    }
+    if !missing.is_empty() {
+        return Ok(true);
+    }
+    method
+        .validate_result(result.clone())
+        .map(|()| false)
+        .map_err(|error| format!("result: {error}"))
+}
+
 fn error_code(expect: &[Value]) -> Option<i64> {
     expect
         .iter()
@@ -198,28 +233,10 @@ fn corpus_requests_name_table_methods_and_fit_their_types() {
                         *slot = v3.clone();
                     }
                 }
-                let result = &result;
-                let missing = missing_members(&schema, method.spec().name, result);
-                let unledgered: Vec<&str> = missing
-                    .iter()
-                    .filter(|member| {
-                        !additions
-                            .iter()
-                            .any(|(file, added)| *file == case.path && added == *member)
-                    })
-                    .map(String::as_str)
-                    .collect();
-                if !unledgered.is_empty() {
-                    problems.push(format!(
-                        "{}: {name} result lacks {} member(s) no additive ledger line names: {}",
-                        case.name,
-                        unledgered.len(),
-                        unledgered.join(", ")
-                    ));
-                } else if !missing.is_empty() {
-                    ledgered += 1;
-                } else if let Err(error) = method.validate_result(result.clone()) {
-                    problems.push(format!("{}: {name} result: {error}", case.name));
+                match reply_problem(&schema, method, &case.path, &result, &additions) {
+                    Ok(true) => ledgered += 1,
+                    Ok(false) => {}
+                    Err(problem) => problems.push(format!("{}: {name} {problem}", case.name)),
                 }
             }
         }
@@ -234,5 +251,35 @@ fn corpus_requests_name_table_methods_and_fit_their_types() {
         "{} corpus mismatches:\n{}",
         problems.len(),
         problems.join("\n")
+    );
+}
+
+/// A reply that lacks a ledgered member is still type-checked on every other member.
+#[test]
+fn a_ledgered_reply_is_still_type_checked() {
+    let schema = engine_schema();
+    let additions = ledgered_additions();
+    let hello = cases()
+        .into_iter()
+        .find(|case| case.name == "hello.json")
+        .expect("the hello case");
+    let mut reply = hello
+        .steps
+        .iter()
+        .flat_map(|step| step["expect"].as_array().cloned().unwrap_or_default())
+        .find_map(|entry| entry["message"].get("result").cloned())
+        .expect("the hello reply");
+    assert!(
+        matches!(
+            reply_problem(&schema, Method::EngineHello, &hello.path, &reply, &additions),
+            Ok(true)
+        ),
+        "the imported hello reply lacks only ledgered members and fits"
+    );
+    reply["protocolVersion"] = serde_json::json!(7);
+    let checked = reply_problem(&schema, Method::EngineHello, &hello.path, &reply, &additions);
+    assert!(
+        checked.is_err(),
+        "a hello reply with a numeric protocolVersion passed: {checked:?}"
     );
 }
