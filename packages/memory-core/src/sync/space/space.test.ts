@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -168,7 +168,28 @@ describe("joinSpaces (insert-only join, absorbed_into tombstone)", () => {
 
 describe("resolveSpaceInRepo / git-backed config", () => {
   const dirs: string[] = []
+  // The code under test and the git helper both spawn git with process.env, so these tests own their git
+  // config: no system config, an empty global file and a temp HOME. A machine whose gitconfig rewrites
+  // github.com (url.<x>.insteadOf) would otherwise change the repository identity this suite asserts.
+  const GIT_ENV_NAMES = ["GIT_CONFIG_NOSYSTEM", "GIT_CONFIG_GLOBAL", "HOME", "USERPROFILE"] as const
+  const savedEnv = new Map<string, string | undefined>()
+  beforeEach(() => {
+    for (const name of GIT_ENV_NAMES) savedEnv.set(name, process.env[name])
+    const home = mkdtempSync(join(tmpdir(), "omo-space-home-"))
+    dirs.push(home)
+    const globalConfig = join(home, "empty-gitconfig")
+    writeFileSync(globalConfig, "")
+    process.env.GIT_CONFIG_NOSYSTEM = "1"
+    process.env.GIT_CONFIG_GLOBAL = globalConfig
+    process.env.HOME = home
+    process.env.USERPROFILE = home
+  })
   afterEach(() => {
+    for (const [name, value] of savedEnv) {
+      if (value === undefined) delete process.env[name]
+      else process.env[name] = value
+    }
+    savedEnv.clear()
     for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true })
   })
 
