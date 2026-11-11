@@ -11,7 +11,7 @@ use serde_json::Value;
 
 use super::{
     from_wire, lookup, rows, ComputerCode, DispositionRule, EngineCode, FailureKey, LayerFailure,
-    NothingSent, Reason, Source, UnknownFailure,
+    NextCall, NothingSent, Reason, Recovery, Source, UnknownFailure,
 };
 use crate::report::{Delivery, Retry};
 
@@ -196,5 +196,44 @@ fn imported_engine_errors_name_the_closed_codes() {
         seen.len(),
         31,
         "the imported corpus pins the 31 numbered codes"
+    );
+}
+
+/// Every row names its next call: a call, or - only where the design says nothing follows -
+/// `Nothing` citing the design file and section that says so. A row whose recovery is a
+/// retry (inspect state, refresh snapshot) always names a real call.
+#[test]
+fn every_row_has_an_explicit_next_call() {
+    let mut problems = Vec::new();
+    let (mut calls, mut cited) = (0, 0);
+    for row in rows() {
+        let retries = matches!(
+            row.recovery,
+            Some(Recovery::InspectStateThenRetry | Recovery::RefreshSnapshotThenRetry)
+        );
+        match row.next_call {
+            NextCall::Call(call) if !call.trim().is_empty() => calls += 1,
+            NextCall::Call(_) => problems.push(format!("{:?}: an empty next call", row.key)),
+            NextCall::Nothing { .. } if retries => {
+                problems.push(format!(
+                    "{:?}: retries, so it needs a real next call",
+                    row.key
+                ));
+            }
+            NextCall::Nothing { cite } if cite.starts_with("design/") && cite.contains("'## ") => {
+                cited += 1;
+            }
+            NextCall::Nothing { cite } => problems.push(format!(
+                "{:?}: no next call and no design citation ({cite:?})",
+                row.key
+            )),
+        }
+    }
+    println!("{calls} rows name a call, {cited} cite the design for nothing following");
+    assert!(
+        problems.is_empty(),
+        "{} rows:\n{}",
+        problems.len(),
+        problems.join("\n")
     );
 }
