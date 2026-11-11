@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { chmod, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
+import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, readlink, realpath, rm, stat, symlink, unlink, utimes, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { compiledUpdate } from "../compiled-update"
@@ -12,7 +12,7 @@ afterEach(async () => {
 })
 
 async function fixture() {
-  const root = await mkdtemp(join(tmpdir(), "omo-update-test-"))
+  const root = await realpath(await mkdtemp(join(tmpdir(), "omo-update-test-")))
   roots.push(root)
   const destination = join(root, "omo")
   await writeFile(destination, "old executable", { mode: 0o755 })
@@ -41,6 +41,116 @@ async function fixture() {
 }
 
 describe("verified standalone binary installation", () => {
+  const staleRecord = (pid: number, startedAt = Date.now()) => `omo-update fixture\n${pid}\n${startedAt}\nfixture-incarnation\nunavailable\n`
+
+  for (const kind of ["dead holder", "expired live holder", "aged empty legacy lock"]) {
+    test(`#given a leftover lock with ${kind} #then the updater reclaims it and finishes without manual repair`, async () => {
+      const f = await fixture()
+      const lockPath = `${f.destination}.update-lock`
+      const old = Date.now() - 60 * 60_000
+      await writeFile(lockPath, kind === "aged empty legacy lock" ? "" : staleRecord(kind === "dead holder" ? 2_147_483_647 : process.pid, kind === "expired live holder" ? old : Date.now()))
+      if (kind === "aged empty legacy lock") await utimes(lockPath, old / 1000, old / 1000)
+      await installReleaseBinary(f.options)
+      expect(await readFile(f.destination, "utf8")).toBe("new executable")
+      expect(await readdir(f.root)).toEqual(["omo"])
+    })
+  }
+
+  test("#given two simultaneous stale-lock reclaimers #then exactly one updater enters and the other cannot delete its lock", async () => {
+    const f = await fixture()
+    await writeFile(`${f.destination}.update-lock`, staleRecord(2_147_483_647))
+    const entered = Promise.withResolvers<void>()
+    const proceed = Promise.withResolvers<void>()
+    const options = {
+      ...f.options,
+      fetchAsset: async (url: string) => {
+        entered.resolve()
+        await proceed.promise
+        return f.options.fetchAsset(url)
+      },
+    }
+    const attempts = [0, 1].map(() => installReleaseBinary(options).catch((error: unknown) => error))
+    try {
+      expect(await Promise.race([entered.promise.then(() => true), Promise.all(attempts).then(() => false)])).toBe(true)
+      expect((await Promise.race(attempts) as BinaryUpdateError).code).toBe("update_in_progress")
+      expect(await readFile(f.destination, "utf8")).toBe("old executable")
+    } finally {
+      proceed.resolve()
+      await Promise.all(attempts)
+    }
+    expect(f.probes).toHaveLength(1)
+    expect(await readdir(f.root)).toEqual(["omo"])
+  })
+
+  test("#given a replaced expired lease #then its old downloader cannot swap the binary or remove the successor lock", async () => {
+    const f = await fixture()
+    const firstEntered = Promise.withResolvers<void>()
+    const secondEntered = Promise.withResolvers<void>()
+    const firstProceed = Promise.withResolvers<void>()
+    const secondProceed = Promise.withResolvers<void>()
+    const first = installReleaseBinary({
+      ...f.options,
+      fetchAsset: async (url) => {
+        firstEntered.resolve()
+        await firstProceed.promise
+        return f.options.fetchAsset(url)
+      },
+    }).catch((error: unknown) => error)
+    await firstEntered.promise
+    await writeFile(`${f.destination}.update-lock`, staleRecord(process.pid, Date.now() - 60 * 60_000))
+    const second = installReleaseBinary({
+      ...f.options,
+      fetchAsset: async (url) => {
+        secondEntered.resolve()
+        await secondProceed.promise
+        return f.options.fetchAsset(url)
+      },
+    }).catch((error: unknown) => error)
+    try {
+      expect(await Promise.race([secondEntered.promise.then(() => true), second.then(() => false)])).toBe(true)
+      const successor = await readFile(`${f.destination}.update-lock`, "utf8")
+      firstProceed.resolve()
+      expect((await first as BinaryUpdateError).code).toBe("update_in_progress")
+      expect(await readFile(`${f.destination}.update-lock`, "utf8")).toBe(successor)
+      expect(await readFile(f.destination, "utf8")).toBe("old executable")
+    } finally {
+      firstProceed.resolve()
+      secondProceed.resolve()
+      await Promise.all([first, second])
+    }
+    expect(f.probes).toHaveLength(1)
+    expect(await readdir(f.root)).toEqual(["omo"])
+  })
+
+  test.skipIf(process.platform === "win32")("#given a symlink launcher #then the target is updated and the managed link is preserved", async () => {
+    const f = await fixture()
+    const alias = join(f.root, "omo-link")
+    await symlink(f.destination, alias)
+    await installReleaseBinary({ ...f.options, destination: alias })
+    expect((await lstat(alias)).isSymbolicLink()).toBe(true)
+    expect(await readlink(alias)).toBe(f.destination)
+    expect(await readFile(alias, "utf8")).toBe("new executable")
+    expect(f.probes).toEqual([f.destination])
+    expect((await readdir(f.root)).sort()).toEqual(["omo", "omo-link"])
+  })
+
+  test("#given rollback-file cleanup fails #then the install lock is still released", async () => {
+    const f = await fixture()
+    const error = await installReleaseBinary({
+      ...f.options,
+      run: async (file, args) => {
+        const result = await f.options.run(file, args)
+        const previous = (await readdir(f.root)).find((name) => name.includes(".old-"))!
+        await unlink(join(f.root, previous))
+        await mkdir(join(f.root, previous))
+        return result
+      },
+    }).catch((value: unknown) => value)
+    expect(error).toBeInstanceOf(Error)
+    expect((await readdir(f.root)).includes("omo.update-lock")).toBe(false)
+    expect(await readFile(f.destination, "utf8")).toBe("new executable")
+  })
+
   test("#given a valid mirror release #when installed #then checksums precede bytes and the installed path is probed before rollback cleanup", async () => {
     const f = await fixture()
     await installReleaseBinary(f.options)
@@ -139,6 +249,9 @@ describe("verified standalone binary installation", () => {
     })
     await entered.promise
     try {
+      const record = (await readFile(`${f.destination}.update-lock`, "utf8")).split("\n")
+      expect(Number(record[1])).toBe(process.pid)
+      expect(Number(record[2])).toBeGreaterThan(Date.now() - 10_000)
       const error = await installReleaseBinary(f.options).catch((value: unknown) => value)
       expect((error as BinaryUpdateError).code).toBe("update_in_progress")
       expect(await readFile(f.destination, "utf8")).toBe("old executable")

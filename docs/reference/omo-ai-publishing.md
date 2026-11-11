@@ -92,8 +92,17 @@ installed `--version` reports the target version; a failed probe restores it. An
 directory returns `directory_not_writable` without downloading or leaving partial files.
 `--dry-run` and `--print` only print the replacement command.
 
+Symlink launchers retain their link: the updater stages and replaces the resolved target.
+Install locks record the owner's PID, process-start identity and acquisition time. A dead
+owner or a lease older than 15 minutes can be reclaimed under an ownership guard; a
+superseded downloader cannot replace the executable or remove its successor's lock.
+The lock is released even if staging or rollback-file cleanup fails.
+
 Interactive standalone release launches also install updates asynchronously through that same
-verified path. Set `OMO_SKIP_VERSION_CHECK=1` or `OMO_OFFLINE=1` to disable the startup check;
+verified path, at most once per UTC day for each canonical agent directory. Concurrent launches
+share one daily scheduling marker; explicit `omo update` always bypasses this throttle.
+Background diagnostics go to `auto-update.log` in the canonical agent directory rather than
+the active terminal. Set `OMO_SKIP_VERSION_CHECK=1` or `OMO_OFFLINE=1` to disable the startup check;
 the legacy `SENPI_` and `PI_` equivalents are honored too. Maintainer builds, noninteractive
 commands and directly invoked provisioned runtime copies do not auto-update. An already-running
 session keeps its provisioned runtime; the new launcher takes effect on the next launch.

@@ -463,7 +463,6 @@ async function main(): Promise<void> {
     release: parseBuildInfo(manifest.buildInfo) === undefined,
     launcher: launch.launcher,
     env: process.env,
-    report: (line) => process.stderr.write(`${line}\n`),
   })
   if (shouldPrintCompiledBanner(process.argv.slice(2), process.stderr.isTTY === true)) {
     // Not console.error: Bun renders that red, and the banner is not an error (#8442).

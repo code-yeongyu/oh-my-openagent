@@ -1,8 +1,9 @@
 import { execFile } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
-import { access, chmod, constants, link, open, rename, rm } from "node:fs/promises"
+import { access, chmod, constants, link, open, realpath, rename, rm } from "node:fs/promises"
 import { dirname } from "node:path"
 import { promisify } from "node:util"
+import { acquireBinaryUpdateLock, BINARY_UPDATE_TIMEOUT_MS } from "./compiled-update-lock"
 
 // omo-ai publishes `5.0.0-0.beta.90` while its GitHub release is tagged `v5.0.0-beta.90`.
 export function releaseVersionOf(omoAiVersion: string): string {
@@ -36,9 +37,9 @@ const run: Run = async (file, args) => {
   return { code: 0, stdout: result.stdout }
 }
 
-const fetchAsset: FetchAsset = (url) => fetch(url, {
+const fetchAsset = (url: string, deadline: AbortSignal): Promise<Response> => fetch(url, {
   headers: { "User-Agent": "omo" },
-  signal: AbortSignal.timeout(600_000),
+  signal: AbortSignal.any([deadline, AbortSignal.timeout(600_000)]),
 })
 
 async function download(version: string, asset: string, fetchAsset: FetchAsset): Promise<Response> {
@@ -63,8 +64,10 @@ export async function installReleaseBinary(options: BinaryInstallRequest & {
   readonly fetchAsset?: FetchAsset
   readonly run?: Run
 }): Promise<void> {
-  const { destination, asset, version, platform } = options
-  const fetch = options.fetchAsset ?? fetchAsset
+  const { asset, version, platform } = options
+  const destination = await realpath(options.destination)
+  const deadline = AbortSignal.timeout(BINARY_UPDATE_TIMEOUT_MS)
+  const fetch = options.fetchAsset ?? ((url: string) => fetchAsset(url, deadline))
   const probe = options.run ?? run
   try {
     await access(dirname(destination), constants.W_OK)
@@ -74,12 +77,11 @@ export async function installReleaseBinary(options: BinaryInstallRequest & {
   const lockPath = `${destination}.update-lock`
   let lock
   try {
-    lock = await open(lockPath, "wx", 0o600)
+    lock = await acquireBinaryUpdateLock(lockPath)
   } catch (cause) {
-    const code = (cause as NodeJS.ErrnoException).code
-    throw new BinaryUpdateError(code === "EEXIST" ? "update_in_progress" : "directory_not_writable",
-      code === "EEXIST" ? "another binary update holds the install lock" : "the install directory is not writable", { cause })
+    throw new BinaryUpdateError("directory_not_writable", "the install lock could not be written", { cause })
   }
+  if (lock === undefined) throw new BinaryUpdateError("update_in_progress", `another binary update holds ${JSON.stringify(lockPath)}`)
   const next = `${destination}.new-${randomUUID()}`
   const previous = `${destination}.old-${randomUUID()}`
   let backedUp = false
@@ -113,45 +115,54 @@ export async function installReleaseBinary(options: BinaryInstallRequest & {
         throw new BinaryUpdateError("verification_failed", "the macOS release signature could not be verified", { cause })
       }
     }
-    // POSIX keeps the old inode linked until verification, with no gap at the installed pathname.
-    if (platform === "win32") await rename(destination, previous)
-    else await link(destination, previous)
-    backedUp = true
-    await rename(next, destination)
-    swapped = true
-    try {
-      const result = await probe(destination, ["--version"])
-      const reported = /^omo ([^\s]+)(?:\s|$)/.exec(result.stdout.trim())?.[1]
-      if (result.code !== 0 || reported === undefined || releaseVersionOf(reported) !== version) {
-        throw new Error(`the installed executable did not report omo ${version}`)
-      }
-    } catch (cause) {
-      throw new BinaryUpdateError("verification_failed", `the installed executable did not report omo ${version}`, { cause })
-    }
-  } catch (cause) {
-    if (backedUp && (swapped || platform === "win32")) {
+    const installed = await lock.run(async () => {
       try {
-        if (platform === "win32" && swapped) await rename(destination, next)
-        await rename(previous, destination)
-        backedUp = false
-      } catch (rollbackCause) {
-        preserveBackup = true
-        throw new BinaryUpdateError("rollback_failed", `restore the previous executable from ${previous}`, { cause: rollbackCause })
+        // POSIX keeps the old inode linked until verification, with no gap at the installed pathname.
+        if (platform === "win32") await rename(destination, previous)
+        else await link(destination, previous)
+        backedUp = true
+        await rename(next, destination)
+        swapped = true
+        try {
+          const result = await probe(destination, ["--version"])
+          const reported = /^omo ([^\s]+)(?:\s|$)/.exec(result.stdout.trim())?.[1]
+          if (result.code !== 0 || reported === undefined || releaseVersionOf(reported) !== version) {
+            throw new Error(`the installed executable did not report omo ${version}`)
+          }
+        } catch (cause) {
+          throw new BinaryUpdateError("verification_failed", `the installed executable did not report omo ${version}`, { cause })
+        }
+      } catch (cause) {
+        if (backedUp && (swapped || platform === "win32")) {
+          try {
+            if (platform === "win32" && swapped) await rename(destination, next)
+            await rename(previous, destination)
+            backedUp = false
+          } catch (rollbackCause) {
+            preserveBackup = true
+            throw new BinaryUpdateError("rollback_failed", `restore the previous executable from ${previous}`, { cause: rollbackCause })
+          }
+        }
+        throw cause
       }
-    }
+    })
+    if (!installed) throw new BinaryUpdateError("update_in_progress", `the update lease expired or changed at ${JSON.stringify(lockPath)}`)
+  } catch (cause) {
     if (cause instanceof BinaryUpdateError) throw cause
     throw new BinaryUpdateError("install_failed", cause instanceof Error ? cause.message : String(cause), { cause })
   } finally {
-    await rm(next, { force: true })
-    if (backedUp && !preserveBackup) {
-      try {
-        await rm(previous, { force: true })
-      } catch (cause) {
-        // Windows can rename a loaded image but cannot delete it until its processes exit.
-        if (platform !== "win32" || !["EPERM", "EBUSY", "EACCES"].includes((cause as NodeJS.ErrnoException).code ?? "")) throw cause
+    try {
+      await rm(next, { force: true })
+      if (backedUp && !preserveBackup) {
+        try {
+          await rm(previous, { force: true })
+        } catch (cause) {
+          // Windows can rename a loaded image but cannot delete it until its processes exit.
+          if (platform !== "win32" || !["EPERM", "EBUSY", "EACCES"].includes((cause as NodeJS.ErrnoException).code ?? "")) throw cause
+        }
       }
+    } finally {
+      await lock.release()
     }
-    await lock.close()
-    await rm(lockPath)
   }
 }
