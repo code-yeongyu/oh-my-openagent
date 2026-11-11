@@ -16,7 +16,10 @@ pub(super) struct Shape<'a> {
     pub evidence: &'a [Evidence],
 }
 
-pub(super) fn check(shape: &Shape<'_>, context: Option<ReportContext>) -> Result<(), ReportRejection> {
+pub(super) fn check(
+    shape: &Shape<'_>,
+    context: Option<ReportContext>,
+) -> Result<(), ReportRejection> {
     if let Some(context) = context {
         check_entries(shape.evidence, context)?;
     }

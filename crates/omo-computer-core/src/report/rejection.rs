@@ -21,7 +21,10 @@ pub enum ReportRejection {
     /// `event` missing on `ax_notification`, or present on another kind.
     EventMismatch { kind: EvidenceKind },
     /// A receipt kind this platform cannot produce.
-    ReceiptOffPlatform { kind: EvidenceKind, platform: Platform },
+    ReceiptOffPlatform {
+        kind: EvidenceKind,
+        platform: Platform,
+    },
     /// A value read-back carrying `intended` on a pointer or key verb, which requests no value.
     IntendedOnActionVerb,
     /// `confirmed` with no receipt-class entry at all.

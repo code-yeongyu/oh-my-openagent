@@ -232,7 +232,8 @@ impl TryFrom<WireEvidence> for Evidence {
     type Error = ReportRejection;
 
     fn try_from(wire: WireEvidence) -> Result<Self, Self::Error> {
-        let derived = Self::derived_class(wire.kind, wire.intended.as_deref(), wire.value.as_deref());
+        let derived =
+            Self::derived_class(wire.kind, wire.intended.as_deref(), wire.value.as_deref());
         if wire.class != derived {
             return Err(ReportRejection::ClassMismatch {
                 kind: wire.kind,

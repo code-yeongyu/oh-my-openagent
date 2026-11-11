@@ -6,7 +6,7 @@
 
 closed_names! {
     /// Every `data.reason` any stage, gate, backend default or layer emits.
-    Reason [141] {
+    Reason [144] {
         NotInteractive = "not_interactive",
         PromptPending = "prompt_pending",
         Revoked = "revoked",
@@ -148,6 +148,9 @@ closed_names! {
         AbiMismatch = "abi_mismatch",
         HostGlobal = "host_global",
         BodyThrew = "body_threw",
+        ConcealedClipboard = "concealed_clipboard",
+        SecretNoClipboardRoute = "secret_no_clipboard_route",
+        Unmeasured = "unmeasured",
     }
 }
 

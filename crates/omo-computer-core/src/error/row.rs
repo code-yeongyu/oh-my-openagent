@@ -44,7 +44,11 @@ impl DispositionRule {
     #[must_use]
     pub const fn retryable(self) -> bool {
         match self {
-            Self::Fixed(disposition) | Self::BySent { nothing: disposition, .. } => {
+            Self::Fixed(disposition)
+            | Self::BySent {
+                nothing: disposition,
+                ..
+            } => {
                 matches!(disposition.retry(), Retry::Safe)
             }
             Self::OfInnerCode | Self::LastReport => false,
@@ -125,7 +129,10 @@ pub fn from_wire(number: i64, reason: Option<&str>) -> Result<&'static ErrorRow,
 /// # Errors
 /// `UnknownFailure` when the refusal's reason has no row under its engine code.
 pub fn from_refusal(refusal: &Refusal) -> Result<&'static ErrorRow, UnknownFailure> {
-    keyed(Source::Engine(engine_code_of(refusal.code)), Some(refusal.reason))
+    keyed(
+        Source::Engine(engine_code_of(refusal.code)),
+        Some(refusal.reason),
+    )
 }
 
 /// The closed engine code a backend refusal is raised under. The backend's
@@ -146,10 +153,12 @@ pub const fn engine_code_of(code: RefusalCode) -> EngineCode {
 fn keyed(source: Source, reason: Option<&str>) -> Result<&'static ErrorRow, UnknownFailure> {
     let reason = match reason {
         None => None,
-        Some(token) => Some(Reason::from_wire(token).ok_or_else(|| UnknownFailure::Reason {
-            source,
-            token: token.to_owned(),
-        })?),
+        Some(token) => Some(
+            Reason::from_wire(token).ok_or_else(|| UnknownFailure::Reason {
+                source,
+                token: token.to_owned(),
+            })?,
+        ),
     };
     lookup(FailureKey { source, reason })
 }

@@ -3,6 +3,7 @@
 
 mod imported;
 mod receipts;
+mod shape_cases;
 mod shapes;
 
 use serde_json::{json, Value};
@@ -41,7 +42,9 @@ fn wire_check(report: &Value, context: Option<ReportContext>) -> Result<ActionRe
     let parsed: ActionReport =
         serde_json::from_value(report.clone()).map_err(|error| error.to_string())?;
     if let Some(context) = context {
-        parsed.validate(context).map_err(|error| error.to_string())?;
+        parsed
+            .validate(context)
+            .map_err(|error| error.to_string())?;
     }
     Ok(parsed)
 }
@@ -50,7 +53,12 @@ fn wire_check(report: &Value, context: Option<ReportContext>) -> Result<ActionRe
 fn every_exec_reply_method_has_a_verb_class() {
     for spec in crate::methods::METHODS {
         let classed = VerbClass::of(spec.method).is_some();
-        assert_eq!(classed, spec.result == "ExecReply", "{}: verb class", spec.name);
+        assert_eq!(
+            classed,
+            spec.result == "ExecReply",
+            "{}: verb class",
+            spec.name
+        );
     }
 }
 
@@ -61,8 +69,9 @@ fn disposition_table_accepts_7_rejects_13() {
         for retry in Retry::ALL {
             let label = format!("{}/{}", delivery.wire(), retry.wire());
             let built = Disposition::new(delivery, retry);
-            let parsed: Result<Disposition, _> =
-                serde_json::from_value(json!({ "delivery": delivery.wire(), "retry": retry.wire() }));
+            let parsed: Result<Disposition, _> = serde_json::from_value(
+                json!({ "delivery": delivery.wire(), "retry": retry.wire() }),
+            );
             assert_eq!(
                 built.is_ok(),
                 parsed.is_ok(),
@@ -84,10 +93,15 @@ fn disposition_table_accepts_7_rejects_13() {
     }
     assert_eq!(accepted.len(), 7, "accepted: {accepted:?}");
     assert_eq!(rejected.len(), 13, "rejected: {rejected:?}");
-    assert!(rejected.iter().any(|label| label == "delivered_unverified/after_user"));
+    assert!(rejected
+        .iter()
+        .any(|label| label == "delivered_unverified/after_user"));
     let schema = schemars::schema_for!(Disposition);
     let pairs = schema.as_value()["oneOf"].as_array().map_or(0, Vec::len);
-    assert_eq!(pairs, 7, "the schema's oneOf lists every valid pair and no other");
+    assert_eq!(
+        pairs, 7,
+        "the schema's oneOf lists every valid pair and no other"
+    );
 }
 
 #[test]
@@ -118,7 +132,10 @@ fn action_report_confirmed_requires_receipt() {
     });
     let parsed = wire_check(&wire, None);
     println!("wire parse of the same shape: {parsed:?}");
-    assert!(parsed.is_err(), "the wire parse must refuse it as the constructor does");
+    assert!(
+        parsed.is_err(),
+        "the wire parse must refuse it as the constructor does"
+    );
     let barrier = ActionReport::new(
         context(VerbClass::Action, Platform::Windows),
         parts(
@@ -127,5 +144,8 @@ fn action_report_confirmed_requires_receipt() {
             vec![Evidence::barrier_consumed()],
         ),
     );
-    assert!(barrier.is_ok(), "a Windows click with its barrier receipt: {barrier:?}");
+    assert!(
+        barrier.is_ok(),
+        "a Windows click with its barrier receipt: {barrier:?}"
+    );
 }

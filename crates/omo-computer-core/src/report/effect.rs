@@ -70,7 +70,12 @@ pub enum FocusRestoration {
 }
 
 impl FocusRestoration {
-    pub const ALL: [Self; 4] = [Self::Untouched, Self::Restored, Self::UserMovedOn, Self::Failed];
+    pub const ALL: [Self; 4] = [
+        Self::Untouched,
+        Self::Restored,
+        Self::UserMovedOn,
+        Self::Failed,
+    ];
 }
 
 /// The element read under the point before the send.

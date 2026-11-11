@@ -18,6 +18,7 @@ pub(super) static ROWS: &[ErrorRow] = &[
     e!(Internal, WaylandActivationToken => Unavailable, NDS, Yes, INSPECT, "computer.apps.open(target)"),
     e!(Internal, Clipboard => Unavailable, NDS, Yes, INSPECT, "win.type(text)"),
     e!(Internal, NoClipboardRoute => Unavailable, NDS, Yes, INSPECT, "win.type(text)"),
+    e!(Internal, SecretNoClipboardRoute => Unavailable, NDAU, Yes, ASK, _),
     e!(Internal, WindowsUnsupported => Unavailable, NDS, Yes, INSPECT, "computer.capabilities()"),
     e!(Internal, DisplaysUnsupported => Unavailable, NDS, Yes, INSPECT, "computer.capabilities()"),
     e!(Internal, InputUnsupported => Unavailable, NDS, Yes, INSPECT, "computer.capabilities()"),

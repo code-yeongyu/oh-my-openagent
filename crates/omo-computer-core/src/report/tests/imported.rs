@@ -14,7 +14,9 @@ use crate::report::{
 use crate::untrusted::UntrustedText;
 
 fn repo_path(relative: &str) -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join(relative)
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(relative)
 }
 
 fn fits<T: DeserializeOwned>(value: &Value) -> bool {
@@ -48,8 +50,10 @@ struct Replaced {
 }
 
 fn replaced_lines() -> Vec<Replaced> {
-    let ledger = std::fs::read_to_string(repo_path("crates/omo-computer-core/parity/ORACLE-DELTAS.tsv"))
-        .expect("ORACLE-DELTAS.tsv");
+    let ledger = std::fs::read_to_string(repo_path(
+        "crates/omo-computer-core/parity/ORACLE-DELTAS.tsv",
+    ))
+    .expect("ORACLE-DELTAS.tsv");
     ledger
         .lines()
         .skip(1)
@@ -67,8 +71,10 @@ fn replaced_lines() -> Vec<Replaced> {
 }
 
 fn imported_cases() -> Vec<(String, Value)> {
-    let manifest = std::fs::read_to_string(repo_path("crates/omo-computer-core/parity/ORACLE-PROVENANCE.tsv"))
-        .expect("ORACLE-PROVENANCE.tsv");
+    let manifest = std::fs::read_to_string(repo_path(
+        "crates/omo-computer-core/parity/ORACLE-PROVENANCE.tsv",
+    ))
+    .expect("ORACLE-PROVENANCE.tsv");
     manifest
         .lines()
         .skip(1)
@@ -93,7 +99,11 @@ fn report_members(method: Option<Method>, message: &Value) -> Vec<(String, Strin
         }
     }
     if let Some(disposition) = message["error"]["data"].get("disposition") {
-        found.push(("/error/data/disposition".to_owned(), "disposition".to_owned(), disposition.clone()));
+        found.push((
+            "/error/data/disposition".to_owned(),
+            "disposition".to_owned(),
+            disposition.clone(),
+        ));
     }
     found
 }
@@ -106,7 +116,11 @@ fn imported_action_report_values_are_all_inside_the_contract_types_or_carry_a_re
         let oneshot = case["transport"].as_str() == Some("oneshot");
         for step in case["steps"].as_array().into_iter().flatten() {
             let name = step["send"]["method"].as_str().unwrap_or_default();
-            let method = if oneshot { Method::from_oneshot(name) } else { Method::from_name(name) };
+            let method = if oneshot {
+                Method::from_oneshot(name)
+            } else {
+                Method::from_name(name)
+            };
             for expect in step["expect"].as_array().into_iter().flatten() {
                 for (pointer, member, value) in report_members(method, &expect["message"]) {
                     compared += 1;
@@ -114,7 +128,9 @@ fn imported_action_report_values_are_all_inside_the_contract_types_or_carry_a_re
                         Some(true) => "inside the contract type".to_owned(),
                         fits => {
                             let line = replaced.iter().find(|line| {
-                                line.file == file && pointer.ends_with(&line.pointer) && line.imported == value
+                                line.file == file
+                                    && pointer.ends_with(&line.pointer)
+                                    && line.imported == value
                             });
                             match line {
                                 Some(line) if member_fits(&member, &line.v3) == Some(true) => {
@@ -122,8 +138,14 @@ fn imported_action_report_values_are_all_inside_the_contract_types_or_carry_a_re
                                     format!("replaced by {} (ORACLE-DELTAS)", line.v3)
                                 }
                                 _ => {
-                                    let why = if fits.is_none() { "not a member of ActionReport" } else { "outside the contract type" };
-                                    problems.push(format!("{file} {pointer} = {value}: {why}, no replaced line"));
+                                    let why = if fits.is_none() {
+                                        "not a member of ActionReport"
+                                    } else {
+                                        "outside the contract type"
+                                    };
+                                    problems.push(format!(
+                                        "{file} {pointer} = {value}: {why}, no replaced line"
+                                    ));
                                     format!("{why}: NO LINE")
                                 }
                             }

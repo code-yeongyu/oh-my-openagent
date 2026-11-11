@@ -5,8 +5,8 @@ use serde_json::json;
 
 use super::{context, parts};
 use crate::report::{
-    completed_effect, ActionReport, Disposition, Effect, Evidence, EvidenceClass,
-    FocusRestoration, Platform, ReportContext, ReportRejection, Settle, VerbClass,
+    completed_effect, ActionReport, Disposition, Effect, Evidence, EvidenceClass, FocusRestoration,
+    Platform, ReportContext, ReportRejection, Settle, VerbClass,
 };
 
 fn owned(text: &str) -> Option<String> {
@@ -27,28 +27,55 @@ fn value_verb_readback_equality_is_the_receipt() {
         let value = context(VerbClass::Value, platform);
         for receipt in [&equal, &typed] {
             let evidence = vec![receipt.clone()];
-            assert_eq!(completed_effect(value, &evidence, Settle::NotQuiet), Effect::Confirmed);
+            assert_eq!(
+                completed_effect(value, &evidence, Settle::NotQuiet),
+                Effect::Confirmed
+            );
             let built = ActionReport::new(
                 value,
                 parts(Disposition::DELIVERED_VERIFIED, Effect::Confirmed, evidence),
             );
-            assert!(built.is_ok(), "{platform:?}: read-back equal to intended confirms: {built:?}");
+            assert!(
+                built.is_ok(),
+                "{platform:?}: read-back equal to intended confirms: {built:?}"
+            );
         }
         let evidence = vec![differs.clone()];
-        assert_eq!(completed_effect(value, &evidence, Settle::NotQuiet), Effect::Observed);
+        assert_eq!(
+            completed_effect(value, &evidence, Settle::NotQuiet),
+            Effect::Observed
+        );
         let confirmed = ActionReport::new(
             value,
-            parts(Disposition::DELIVERED_VERIFIED, Effect::Confirmed, evidence.clone()),
+            parts(
+                Disposition::DELIVERED_VERIFIED,
+                Effect::Confirmed,
+                evidence.clone(),
+            ),
         );
-        assert_eq!(confirmed.err(), Some(ReportRejection::ConfirmedWithoutReceipt));
+        assert_eq!(
+            confirmed.err(),
+            Some(ReportRejection::ConfirmedWithoutReceipt)
+        );
         let observed = ActionReport::new(
             value,
-            parts(Disposition::DELIVERED_UNVERIFIED, Effect::Observed, evidence),
+            parts(
+                Disposition::DELIVERED_UNVERIFIED,
+                Effect::Observed,
+                evidence,
+            ),
         );
-        assert!(observed.is_ok(), "{platform:?}: a differing read-back is observed: {observed:?}");
+        assert!(
+            observed.is_ok(),
+            "{platform:?}: a differing read-back is observed: {observed:?}"
+        );
         let on_click = ActionReport::new(
             context(VerbClass::Action, platform),
-            parts(Disposition::DELIVERED_VERIFIED, Effect::Confirmed, vec![equal.clone()]),
+            parts(
+                Disposition::DELIVERED_VERIFIED,
+                Effect::Confirmed,
+                vec![equal.clone()],
+            ),
         );
         assert_eq!(on_click.err(), Some(ReportRejection::IntendedOnActionVerb));
     }
@@ -61,16 +88,29 @@ fn value_verb_readback_equality_is_the_receipt() {
     );
     let verified = ActionReport::new(
         windows,
-        parts(Disposition::DELIVERED_VERIFIED, Effect::Observed, barrier_and_differs),
+        parts(
+            Disposition::DELIVERED_VERIFIED,
+            Effect::Observed,
+            barrier_and_differs,
+        ),
     );
     assert!(verified.is_ok(), "{verified:?}");
     for (tagged, label) in [
-        (json!({ "kind": "value_readback", "class": "receipt", "value": "x", "baseline": "" }), "no intended"),
-        (json!({ "kind": "value_readback", "class": "receipt", "intended": "x", "value": "x!", "baseline": "" }), "value differs"),
+        (
+            json!({ "kind": "value_readback", "class": "receipt", "value": "x", "baseline": "" }),
+            "no intended",
+        ),
+        (
+            json!({ "kind": "value_readback", "class": "receipt", "intended": "x", "value": "x!", "baseline": "" }),
+            "value differs",
+        ),
     ] {
         let parsed: Result<Evidence, _> = serde_json::from_value(tagged);
         println!("value_readback tagged receipt with {label}: {parsed:?}");
-        assert!(parsed.is_err(), "{label}: a read-back that is not equal to intended is no receipt");
+        assert!(
+            parsed.is_err(),
+            "{label}: a read-back that is not equal to intended is no receipt"
+        );
     }
 }
 
@@ -98,8 +138,16 @@ fn no_change_vs_suspected_noop_split() {
         for verb in [VerbClass::Action, VerbClass::Value] {
             for platform in Platform::ALL {
                 for settle in [Settle::NotQuiet, Settle::QuietSuspect] {
-                    let effect = completed_effect(ReportContext::new(verb, Some(platform)), &evidence, settle);
-                    assert_ne!(effect, Effect::NoChange, "no_change is never produced: {evidence:?}");
+                    let effect = completed_effect(
+                        ReportContext::new(verb, Some(platform)),
+                        &evidence,
+                        settle,
+                    );
+                    assert_ne!(
+                        effect,
+                        Effect::NoChange,
+                        "no_change is never produced: {evidence:?}"
+                    );
                     derived += 1;
                 }
             }
@@ -108,11 +156,24 @@ fn no_change_vs_suspected_noop_split() {
     println!("{derived} derivations, none no_change");
     let click = context(VerbClass::Action, Platform::Macos);
     let unchanged = vec![Evidence::value_readback(None, owned("same"), owned("same"))];
-    assert_eq!(completed_effect(click, &unchanged, Settle::QuietSuspect), Effect::Observed);
-    assert_eq!(completed_effect(click, &[], Settle::QuietSuspect), Effect::SuspectedNoop);
-    assert_eq!(completed_effect(click, &[], Settle::NotQuiet), Effect::Unverifiable);
     assert_eq!(
-        completed_effect(click, &[Evidence::settle_frame_diff()], Settle::QuietSuspect),
+        completed_effect(click, &unchanged, Settle::QuietSuspect),
+        Effect::Observed
+    );
+    assert_eq!(
+        completed_effect(click, &[], Settle::QuietSuspect),
+        Effect::SuspectedNoop
+    );
+    assert_eq!(
+        completed_effect(click, &[], Settle::NotQuiet),
+        Effect::Unverifiable
+    );
+    assert_eq!(
+        completed_effect(
+            click,
+            &[Evidence::settle_frame_diff()],
+            Settle::QuietSuspect
+        ),
         Effect::Unverifiable
     );
     let x11 = context(VerbClass::Action, Platform::X11);
@@ -121,27 +182,64 @@ fn no_change_vs_suspected_noop_split() {
         Effect::SuspectedNoop,
         "the raw XI2 confirmation raises delivery only"
     );
-    let suspected = ActionReport::new(click, parts(Disposition::DELIVERED_UNVERIFIED, Effect::SuspectedNoop, Vec::new()));
-    assert!(suspected.as_ref().is_ok_and(|report| Disposition::ALL.contains(&report.disposition())));
-    let observed_in_noop = ActionReport::new(click, parts(Disposition::DELIVERED_UNVERIFIED, Effect::SuspectedNoop, unchanged));
-    assert_eq!(observed_in_noop.err(), Some(ReportRejection::SuspectedNoopWithObservation));
+    let suspected = ActionReport::new(
+        click,
+        parts(
+            Disposition::DELIVERED_UNVERIFIED,
+            Effect::SuspectedNoop,
+            Vec::new(),
+        ),
+    );
+    assert!(suspected
+        .as_ref()
+        .is_ok_and(|report| Disposition::ALL.contains(&report.disposition())));
+    let observed_in_noop = ActionReport::new(
+        click,
+        parts(
+            Disposition::DELIVERED_UNVERIFIED,
+            Effect::SuspectedNoop,
+            unchanged,
+        ),
+    );
+    assert_eq!(
+        observed_in_noop.err(),
+        Some(ReportRejection::SuspectedNoopWithObservation)
+    );
     let kept_in_union: Result<Effect, _> = serde_json::from_value(json!("no_change"));
-    assert_eq!(kept_in_union.ok(), Some(Effect::NoChange), "no_change still parses");
+    assert_eq!(
+        kept_in_union.ok(),
+        Some(Effect::NoChange),
+        "no_change still parses"
+    );
 }
 
 #[test]
 fn focus_restoration_never_serialises_not_needed() {
     let spelled: Vec<String> = FocusRestoration::ALL
         .iter()
-        .map(|value| serde_json::to_value(value).ok().and_then(|value| value.as_str().map(str::to_owned)).unwrap_or_default())
+        .map(|value| {
+            serde_json::to_value(value)
+                .ok()
+                .and_then(|value| value.as_str().map(str::to_owned))
+                .unwrap_or_default()
+        })
         .collect();
     println!("focusRestoration values: {spelled:?}");
-    assert_eq!(spelled, ["untouched", "restored", "user_moved_on", "failed"]);
+    assert_eq!(
+        spelled,
+        ["untouched", "restored", "user_moved_on", "failed"]
+    );
     let not_needed: Result<FocusRestoration, _> = serde_json::from_value(json!("not_needed"));
-    assert!(not_needed.is_err(), "not_needed is outside the contract's type");
+    assert!(
+        not_needed.is_err(),
+        "not_needed is outside the contract's type"
+    );
     let schema = schemars::schema_for!(FocusRestoration);
     let listed = serde_json::to_string(schema.as_value()).unwrap_or_default();
-    assert!(!listed.contains("not_needed"), "the schema never lists not_needed: {listed}");
+    assert!(
+        !listed.contains("not_needed"),
+        "the schema never lists not_needed: {listed}"
+    );
     for value in ["untouched", "restored", "user_moved_on", "failed"] {
         assert!(listed.contains(value), "the schema lists {value}");
     }
