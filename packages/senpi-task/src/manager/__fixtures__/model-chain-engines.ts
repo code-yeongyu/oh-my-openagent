@@ -2,6 +2,7 @@ import { type ChildProcess, spawn } from "node:child_process"
 import { copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { Transform } from "node:stream"
+import { StringDecoder } from "node:string_decoder"
 import { fileURLToPath } from "node:url"
 
 import { RpcHostRunner } from "../../runners/rpc-host"
@@ -107,8 +108,9 @@ function processEngine(env: Readonly<Record<string, string>>, hiddenCapabilities
 }
 
 /** Rewrites each `get_protocol_info` response line without `hidden`; every other line passes unchanged. */
-function withoutCapabilities(hidden: readonly string[]): Transform {
+export function withoutCapabilities(hidden: readonly string[]): Transform {
   let pending = ""
+  const decoder = new StringDecoder("utf8")
   const rewrite = (line: string): string => {
     try {
       const frame: unknown = JSON.parse(line)
@@ -124,13 +126,14 @@ function withoutCapabilities(hidden: readonly string[]): Transform {
   }
   return new Transform({
     transform(chunk: Buffer, _encoding, done) {
-      pending += chunk.toString()
+      pending += decoder.write(chunk)
       const lines = pending.split("\n")
       pending = lines.pop() ?? ""
       done(null, lines.map((line) => `${rewrite(line)}\n`).join(""))
     },
     flush(done) {
-      done(null, pending.length > 0 ? rewrite(pending) : "")
+      const rest = pending + decoder.end()
+      done(null, rest.length > 0 ? rewrite(rest) : "")
     },
   })
 }
