@@ -6,6 +6,7 @@ const ASSET = releaseAssetName(undefined, "linux", "x64")
 async function updateWith(owner: PackageOwner | undefined) {
   let lookups = 0
   const probed: string[] = []
+  const installed: string[] = []
   const result = await compiledUpdate({
     omoAiVersion: "9.9.9",
     releaseTarget: undefined,
@@ -17,12 +18,13 @@ async function updateWith(owner: PackageOwner | undefined) {
       return [{ tag_name: "v9.9.10", assets: [{ name: ASSET }] }]
     },
     args: ["update"],
+    install: async (request) => { installed.push(request.destination) },
     probeOwner: (path) => {
       probed.push(path)
       return owner
     },
   })
-  return { result, lookups, probed }
+  return { result, lookups, probed, installed }
 }
 
 function queries(answers: Record<string, string>): { run: RunOwnerQuery; asked: string[] } {
@@ -42,7 +44,7 @@ describe("compiled omo update on a package-manager install", () => {
     const owner: PackageOwner = { manager: "pacman", pkg: "omo-bin" }
 
     // when
-    const { result, lookups, probed } = await updateWith(owner)
+    const { result, lookups, probed, installed } = await updateWith(owner)
 
     // then
     expect(probed).toEqual(["/usr/bin/omo"])
@@ -51,15 +53,17 @@ describe("compiled omo update on a package-manager install", () => {
     expect(result.output).toBe("omo: installed via pacman (omo-bin); update it with pacman or your AUR helper, e.g. `yay -Syu omo-bin`")
     expect(result.output).not.toContain("curl")
     expect(lookups).toBe(0)
+    expect(installed).toEqual([])
   })
 
-  test("#given no manager owns the binary #when omo update runs #then it keeps today's replace command", async () => {
+  test("#given no manager owns the binary #when omo update runs #then it installs the standalone release", async () => {
     // given / when
-    const { result, lookups } = await updateWith(undefined)
+    const { result, lookups, installed } = await updateWith(undefined)
 
     // then
     expect(result.exitCode).toBe(0)
-    expect(result.output).toStartWith("omo 9.9.10 is available (running 9.9.9). Replace this binary with:\ncurl ")
+    expect(result.output).toBe("omo updated 9.9.9 -> 9.9.10")
+    expect(installed).toEqual(["/usr/bin/omo"])
     expect(lookups).toBe(1)
   })
 
