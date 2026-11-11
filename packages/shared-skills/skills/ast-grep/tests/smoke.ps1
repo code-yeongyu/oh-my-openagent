@@ -73,7 +73,7 @@ try {
     Pass 'doctor produces output'
 
     # 9. search w/o binary
-    $r = Run @('-q', 'search', 'foo()', '--lang', 'ts', 'C:/nonexistent-path-xyzzy')
+    $r = Run @('-q', 'search', 'foo()', 'C:/nonexistent-path-xyzzy', '--lang', 'ts')
     switch ($r.ExitCode) {
         { $_ -in 0,1,4 } { Pass "search runs (rc=$($r.ExitCode), ast-grep available)" }
         3 {

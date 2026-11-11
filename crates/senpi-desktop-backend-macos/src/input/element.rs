@@ -228,19 +228,44 @@ fn holds_keyboard_focus(pid: libc::pid_t, element: &AXUIElement, within: Duratio
 }
 
 /// Key priming's read of `pid`: its `AXFocusedWindow` and the window of its
-/// `AXFocusedUIElement`, each waiting at most `within` for the application;
-/// `None` when the application cannot be addressed.
+/// `AXFocusedUIElement`, every read (the focused element's own included)
+/// waiting at most `within`; `None` when the application cannot be addressed
+/// or any read did not answer (a timeout), never an empty read.
 pub(super) fn focus_read(pid: libc::pid_t, within: Duration) -> Option<super::priming::FocusRead> {
     let app = element::create_application(pid).ok()?;
     // A zero timeout restores the system default, so the bound stays positive.
     let timeout = within.as_secs_f32().clamp(0.001, PROBE_TIMEOUT_SECONDS);
     // SAFETY: The retained application element is valid for the timeout update.
     let _ = unsafe { app.set_messaging_timeout(timeout) };
-    Some(super::priming::FocusRead {
-        focused_window: element::copy_element(&app, "AXFocusedWindow").and_then(|window| element::window_id(&window)),
-        element_window: element::copy_element(&app, "AXFocusedUIElement")
-            .and_then(|focused| element::owner_window_id(&focused)),
-    })
+    let focused_window = element::copy_answered(&app, "AXFocusedWindow")?
+        .and_then(|value| value.downcast::<AXUIElement>().ok())
+        .and_then(|window| element::window_id(&window));
+    let element_window = match element::copy_answered(&app, "AXFocusedUIElement")?
+        .and_then(|value| value.downcast::<AXUIElement>().ok())
+    {
+        None => None,
+        Some(focused) => {
+            // A child element keeps the system default timeout unless it gets its own.
+            // SAFETY: The retained focused element is valid for the timeout update.
+            let _ = unsafe { focused.set_messaging_timeout(timeout) };
+            focused_element_window(&focused)?
+        }
+    };
+    Some(super::priming::FocusRead { focused_window, element_window })
+}
+
+/// The window owning the focused element (the element itself when it is a
+/// window); `None` when a read did not answer.
+fn focused_element_window(focused: &AXUIElement) -> Option<Option<u32>> {
+    let role = element::copy_answered(focused, "AXRole")?.and_then(|value| value.downcast::<CFString>().ok());
+    if role.is_some_and(|role| role.to_string() == "AXWindow") {
+        return Some(element::window_id(focused));
+    }
+    Some(
+        element::copy_answered(focused, "AXWindow")?
+            .and_then(|value| value.downcast::<AXUIElement>().ok())
+            .and_then(|window| element::window_id(&window)),
+    )
 }
 
 /// Where `pid` has keyboard focus now: its focused window, else the window

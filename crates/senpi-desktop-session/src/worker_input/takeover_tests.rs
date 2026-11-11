@@ -2,11 +2,12 @@
 //! typing, and the secure-field warning, replayed over the
 //! `v2-user-active-in-target.json` and `typetext-interrupted.json` scenarios.
 
+use std::cell::Cell;
 use std::sync::Arc;
 
 use image::RgbaImage;
 use parking_lot::Mutex;
-use senpi_desktop_backend_fake::{FakeBackend, FakeScenario, RecordingSink, SinkOp};
+use senpi_desktop_backend_fake::{FakeBackend, FakeScenario, FakeUserInput, RecordingSink, SinkOp};
 use senpi_desktop_core::ax::AxBackend;
 use senpi_desktop_core::backend::{Backend, DeliveryMode, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError, ErrorCode};
@@ -17,6 +18,7 @@ use senpi_desktop_core::report::{ActionReport, Delivered, Disposition, ReportMod
 use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopSessionOptions, DesktopWindow, FrontWindow, Target,
 };
+use senpi_desktop_core::user_input::UserPressKind;
 use senpi_desktop_safety::{Clock, FakeClock, StopPathId, StopSource, Supervisor};
 use serde_json::{json, Value};
 
@@ -171,6 +173,53 @@ fn typing_into_a_plain_field_carries_no_warning() {
     assert_eq!(report.warning, None);
 }
 
+/// `typetext-interrupted.json` with Notes' window 101 (pid 4242) behind the
+/// frontmost Terminal window 202 (pid 77), which covers it. Each app keeps
+/// its own focus: Notes' is its text field (`secure` as given), Terminal's
+/// a plain text area, and the point at Notes' field center shows Terminal's.
+fn behind_terminal(secure: bool) -> Value {
+    let mut overlay = fixture(INTERRUPTED);
+    let bounds = json!({"x": 110, "y": 160, "width": 780, "height": 500});
+    overlay["windows"][0]["focused"] = json!(false);
+    overlay["windows"].as_array_mut().expect("windows").push(json!({
+        "id": "202", "title": "Terminal", "app": "Terminal", "pid": 77, "x": 100, "y": 120,
+        "width": 800, "height": 600, "focused": true, "elevated": null
+    }));
+    overlay["frontmost_pid"] = json!(77);
+    overlay["ax"]["101"]["children"][0] = json!({
+        "role": "textfield", "native_role": "AXTextField", "title": "Password", "focused": true,
+        "secure": secure, "bounds": bounds
+    });
+    overlay["ax"]["202"] = json!({
+        "role": "window", "native_role": "AXWindow", "title": "Terminal",
+        "bounds": {"x": 100, "y": 120, "width": 800, "height": 600},
+        "children": [{"role": "textarea", "native_role": "AXTextArea", "value": "", "focused": true, "bounds": bounds}]
+    });
+    overlay["hit_at"] = json!([{"x": 500.0, "y": 410.0, "role": "textarea", "label": "Terminal", "secure": false}]);
+    overlay
+}
+
+#[test]
+fn background_typing_into_a_secure_field_behind_another_app_reports_the_warning() {
+    // Given: Notes' own focus is a secure field while Terminal is frontmost
+    let mut harness = opened(&behind_terminal(true), ReportMode::Object);
+    // When
+    let report = action(harness.process(type_text("hunter2")).expect("typed"));
+    // Then: the keys went to Notes, and the write is flagged and unverifiable
+    assert_eq!(typed(&harness.sink), "hunter2");
+    assert_eq!(report.warning.as_deref(), Some("secure_field"));
+    assert_eq!(report.effect, senpi_desktop_core::report::ActionEffect::Unverifiable);
+    assert_eq!(report.disposition, Disposition::DELIVERED_UNVERIFIED);
+}
+
+#[test]
+fn background_typing_into_a_plain_field_behind_another_app_carries_no_warning() {
+    let mut harness = opened(&behind_terminal(false), ReportMode::Object);
+    let report = action(harness.process(type_text("hello")).expect("typed"));
+    assert_eq!(typed(&harness.sink), "hello");
+    assert_eq!(report.warning, None);
+}
+
 /// The fake with per-scalar typing, as the macOS backend posts: the fake
 /// itself sends typed text in chunks of eight scalars.
 struct ScalarTyping(FakeBackend);
@@ -238,22 +287,25 @@ impl Backend for ScalarTyping {
     }
 }
 
+/// The op log and the press feed of the backend `open` built.
+type BuiltBackend = Arc<Mutex<Option<(RecordingSink, Arc<FakeUserInput>)>>>;
+
 struct ScalarFactory {
     scenario: FakeScenario,
-    sink: Arc<Mutex<Option<RecordingSink>>>,
+    sink: BuiltBackend,
 }
 
 impl BackendFactory for ScalarFactory {
     fn create(&self, _options: &DesktopSessionOptions) -> CoreResult<Box<dyn Backend>> {
         let backend = FakeBackend::new(self.scenario.clone());
-        *self.sink.lock() = Some(backend.sink());
+        *self.sink.lock() = Some((backend.sink(), backend.user_input()));
         Ok(Box::new(ScalarTyping(backend)))
     }
 }
 
 /// An object-mode session over `typetext-interrupted.json` with per-scalar
-/// typing and a live global stop path.
-fn scalar_session() -> (Worker, RecordingSink, Arc<Supervisor>) {
+/// typing and a live global stop path; the feed takes the user's presses.
+fn scalar_session() -> (Worker, RecordingSink, Arc<Supervisor>, Arc<FakeUserInput>) {
     let scenario = FakeScenario::from_json(INTERRUPTED).expect("scenario parses");
     let sink = Arc::new(Mutex::new(None));
     let clock = Arc::new(FakeClock::new(0));
@@ -270,14 +322,14 @@ fn scalar_session() -> (Worker, RecordingSink, Arc<Supervisor>) {
     let display = (Arc::default(), crate::screen_notes::ScreenNotes::default());
     let mut worker = Worker::new(Box::new(factory), capabilities, report_mode, safety, display);
     worker.open(options(ReportMode::Object));
-    let sink = sink.lock().clone().expect("open built a backend");
-    (worker, sink, supervisor)
+    let (sink, feed) = sink.lock().clone().expect("open built a backend");
+    (worker, sink, supervisor, feed)
 }
 
 #[test]
 fn type_text_of_10_cancelled_after_4_reports_delivered_4_of_10_unverified_unsafe() {
     // Given
-    let (mut worker, sink, _supervisor) = scalar_session();
+    let (mut worker, sink, _supervisor, _feed) = scalar_session();
     let probe = sink.clone();
     let cancelled = move || typed(&probe).chars().count() >= 4;
     // When
@@ -293,7 +345,7 @@ fn type_text_of_10_cancelled_after_4_reports_delivered_4_of_10_unverified_unsafe
 
 #[test]
 fn type_text_of_10_stopped_after_4_reports_delivered_4_of_10_unverified_unsafe() {
-    let (mut worker, sink, supervisor) = scalar_session();
+    let (mut worker, sink, supervisor, _feed) = scalar_session();
     let probe = sink.clone();
     let stop = move || {
         if typed(&probe).chars().count() >= 4 {
@@ -304,6 +356,29 @@ fn type_text_of_10_stopped_after_4_reports_delivered_4_of_10_unverified_unsafe()
     let error = worker.process(type_text("abcdefghij"), &stop).expect_err("suspended");
     let report = report(&error);
     assert_eq!(error.code, ErrorCode::Suspended);
+    assert_eq!(report.delivered, Some(Delivered { count: 4, of: 10 }));
+    assert_eq!(report.disposition, Some(Disposition::DELIVERED_UNVERIFIED));
+    assert_eq!(typed(&sink), "abcd");
+}
+
+#[test]
+fn type_text_of_10_with_a_user_press_after_4_reports_delivered_4_of_10_unverified() {
+    // Given: the user presses a key in Notes (pid 4242) once 4 scalars are out
+    let (mut worker, sink, _supervisor, feed) = scalar_session();
+    let probe = sink.clone();
+    let pressed = Cell::new(false);
+    let press_after_4 = move || {
+        if !pressed.get() && typed(&probe).chars().count() >= 4 {
+            pressed.set(true);
+            feed.press(4242, UserPressKind::Key);
+        }
+        false
+    };
+    // When
+    let error = worker.process(type_text("abcdefghij"), &press_after_4).expect_err("intervened");
+    // Then: the press check refuses the 5th scalar and the report counts the 4 sent
+    let report = report(&error);
+    assert_eq!(error.code, ErrorCode::UserIntervened);
     assert_eq!(report.delivered, Some(Delivered { count: 4, of: 10 }));
     assert_eq!(report.disposition, Some(Disposition::DELIVERED_UNVERIFIED));
     assert_eq!(typed(&sink), "abcd");

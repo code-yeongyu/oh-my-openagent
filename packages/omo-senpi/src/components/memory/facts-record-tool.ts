@@ -1,23 +1,42 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import { appendFile } from "@oh-my-opencode/memory-core/fs"
-import { FactsExtractionValidationError, parseFactsExtractionRecord, resolveClaimReceipt, USER_QUOTE_RULE, type ConsentExchange, type FactsPayload, type TranscriptEntry } from "@oh-my-opencode/memory-core"
+import {
+  FactsExtractionValidationError,
+  parseFactsExtractionRecord,
+  resolveClaimReceipt,
+  USER_QUOTE_RULE,
+  type ConsentExchange,
+  type FactsPayload,
+  type TranscriptEntry,
+} from "@oh-my-opencode/memory-core"
 import { Type, type Static } from "typebox"
 
 export const FACTS_RECORD_TOOL_NAME = "record_fact"
 
-const FactsRecordParams = Type.Object({
-  scope: Type.Union([Type.Literal("person"), Type.Literal("project")]),
-  person: Type.Optional(Type.Object({
-    name: Type.String(),
-    aliases: Type.Array(Type.String()),
-  }, { additionalProperties: false, description: "Only for scope person. Omit this field for scope project." })),
-  text: Type.String(),
-  date: Type.String(),
-  source: Type.Optional(Type.Union([Type.Literal("user"), Type.Literal("agent"), Type.Literal("inferred")], {
-    description: "Who the fact came from: user (the user said it), agent (an assistant suggestion or statement), inferred (a conclusion drawn from the conversation). Omitted means inferred.",
-  })),
-  user_quote: Type.Optional(Type.String({ description: USER_QUOTE_RULE })),
-}, { additionalProperties: false })
+const FactsRecordParams = Type.Object(
+  {
+    scope: Type.Union([Type.Literal("person"), Type.Literal("project")]),
+    person: Type.Optional(
+      Type.Object(
+        {
+          name: Type.String(),
+          aliases: Type.Array(Type.String()),
+        },
+        { additionalProperties: false, description: "Only for scope person. Omit this field for scope project." },
+      ),
+    ),
+    text: Type.String(),
+    date: Type.String(),
+    source: Type.Optional(
+      Type.Union([Type.Literal("user"), Type.Literal("agent"), Type.Literal("inferred")], {
+        description:
+          "Who the fact came from: user (the user said it), agent (an assistant suggestion or statement), inferred (a conclusion drawn from the conversation). Omitted means inferred.",
+      }),
+    ),
+    user_quote: Type.Optional(Type.String({ description: USER_QUOTE_RULE })),
+  },
+  { additionalProperties: false },
+)
 
 type FactsRecordParams = Static<typeof FactsRecordParams>
 export const factsRecordContract = {
@@ -26,7 +45,10 @@ export const factsRecordContract = {
   parameters: FactsRecordParams,
 }
 export type FactsRecordToolResult = AgentToolResult<undefined> & { readonly isError?: boolean }
-export type FactsRecordTool = Omit<ToolDefinition<typeof FactsRecordParams, undefined>, "execute" | "renderCall" | "renderResult"> & {
+export type FactsRecordTool = Omit<
+  ToolDefinition<typeof FactsRecordParams, undefined>,
+  "execute" | "renderCall" | "renderResult"
+> & {
   readonly execute: (toolCallId: string, params: FactsRecordParams) => Promise<FactsRecordToolResult>
   readonly deactivate: () => void
 }
@@ -60,7 +82,9 @@ export function createFactsRecordTool(input: FactsRecordToolInput): FactsRecordT
   return {
     ...factsRecordContract,
     label: "Record fact",
-    deactivate: () => { active = false },
+    deactivate: () => {
+      active = false
+    },
     execute: async (_toolCallId, params) => {
       if (!active || input.state?.cancelled === true) return errorResult("the facts run is no longer active")
       if (ended) return { ...errorResult("the facts run has ended; stop calling record_fact"), terminate: true }
@@ -99,7 +123,12 @@ export function createFactsRecordTool(input: FactsRecordToolInput): FactsRecordT
           return reject(`${reason}. Fix this call or skip this fact; the same call will not be accepted`)
         }
         ended = true
-        return { ...reject(`${reason}. This exact call was already refused, so the facts run ends here; facts recorded so far are kept`), terminate: true }
+        return {
+          ...reject(
+            `${reason}. This exact call was already refused, so the facts run ends here; facts recorded so far are kept`,
+          ),
+          terminate: true,
+        }
       }
     },
   }
@@ -115,7 +144,8 @@ export function payloadExchanges(payload: FactsPayload): ConsentExchange[] {
     let proposal = proposalText(entry.lead)
     for (const item of entry.entries) {
       if (item.kind === "reasoning") continue
-      if (item.kind === "user" && proposal !== undefined && item.text.trim().length > 0) exchanges.push({ proposal, reply: item.text })
+      if (item.kind === "user" && proposal !== undefined && item.text.trim().length > 0)
+        exchanges.push({ proposal, reply: item.text })
       proposal = proposalText(item)
     }
     return exchanges

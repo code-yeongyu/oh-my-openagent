@@ -1,6 +1,17 @@
 import { spawnSync } from "node:child_process"
 import { randomBytes } from "node:crypto"
-import { closeSync, existsSync, lstatSync, openSync, readdirSync, readFileSync, rmSync, type Stats, symlinkSync, writeFileSync } from "node:fs"
+import {
+  closeSync,
+  existsSync,
+  lstatSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  type Stats,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { join } from "node:path"
 
 import type { DenyLivePlan } from "./plan"
@@ -8,8 +19,7 @@ import { probeScript, type ProbeCheck } from "./preflight-script"
 import { wrapDenyLive } from "./wrap"
 
 export type PreflightResult =
-  | { readonly ok: true; readonly checks: number }
-  | { readonly ok: false; readonly reason: string }
+  { readonly ok: true; readonly checks: number } | { readonly ok: false; readonly reason: string }
 
 const PROBE_TIMEOUT_MS = 15_000
 const SENTINEL = "sentinel\n"
@@ -44,7 +54,9 @@ export function preflightDenyLive(plan: DenyLivePlan, seccompFile: string | unde
       { kind: "deny-append", id: "live root", target: live },
       { kind: "deny-append", id: "view link", target: linked },
       { kind: "deny-append", id: "home", target: sentinel(home, "home") },
-      ...plan.projectControl.filter(isDir).map((dir): ProbeCheck => ({ kind: "deny-append", id: `project ${dir}`, target: sentinel(dir, "ctl") })),
+      ...plan.projectControl
+        .filter(isDir)
+        .map((dir): ProbeCheck => ({ kind: "deny-append", id: `project ${dir}`, target: sentinel(dir, "ctl") })),
       { kind: "deny-hardlink", id: "hard link", target: live, link: hardLink },
       ...[plan.stateDir, plan.cwd, plan.artifactDir].map((dir): ProbeCheck => {
         const target = join(dir, `${PROBE_PREFIX}${nonce}-w`)
@@ -61,7 +73,9 @@ export function preflightDenyLive(plan: DenyLivePlan, seccompFile: string | unde
     const run = (() => {
       try {
         return spawnSync(wrapped.command, [...wrapped.args], {
-          encoding: "utf8", timeout: PROBE_TIMEOUT_MS, cwd: plan.cwd,
+          encoding: "utf8",
+          timeout: PROBE_TIMEOUT_MS,
+          cwd: plan.cwd,
           env: { PATH: "/usr/bin:/bin", LC_ALL: "C", TMPDIR: plan.tmpDir },
           stdio: fd === undefined ? ["ignore", "pipe", "pipe"] : ["ignore", "pipe", "pipe", fd],
         })
@@ -69,7 +83,11 @@ export function preflightDenyLive(plan: DenyLivePlan, seccompFile: string | unde
         if (fd !== undefined) closeSync(fd)
       }
     })()
-    if (run.status !== 0) return { ok: false, reason: `the sandbox wrapper failed to run the probe (exit ${run.status ?? run.signal}): ${(run.stderr ?? "").trim().slice(0, 300)}` }
+    if (run.status !== 0)
+      return {
+        ok: false,
+        reason: `the sandbox wrapper failed to run the probe (exit ${run.status ?? run.signal}): ${(run.stderr ?? "").trim().slice(0, 300)}`,
+      }
     return verdict(checks, run.stdout ?? "")
   } catch (error) {
     return { ok: false, reason: `preflight failed: ${error instanceof Error ? error.message : String(error)}` }
@@ -94,15 +112,23 @@ function openProbeListener(nonce: string): { readonly path: string; readonly clo
 }
 
 function verdict(checks: readonly ProbeCheck[], stdout: string): PreflightResult {
-  const lines = new Map(stdout.trim().split("\n").map((line) => {
-    const [index, word] = line.split(" ")
-    return [Number(index), word] as const
-  }))
+  const lines = new Map(
+    stdout
+      .trim()
+      .split("\n")
+      .map((line) => {
+        const [index, word] = line.split(" ")
+        return [Number(index), word] as const
+      }),
+  )
   for (const [index, check] of checks.entries()) {
     const word = lines.get(index)
     if (word === undefined) return { ok: false, reason: `the probe printed nothing for ${check.id}` }
     if (word !== "pass") return { ok: false, reason: `${check.id}: ${failure(check)}` }
-    if ((check.kind === "deny-append" || check.kind === "deny-hardlink") && readFileSync(check.target, "utf8") !== SENTINEL) {
+    if (
+      (check.kind === "deny-append" || check.kind === "deny-hardlink") &&
+      readFileSync(check.target, "utf8") !== SENTINEL
+    ) {
       return { ok: false, reason: `${check.id}: the sentinel changed` }
     }
   }
@@ -111,10 +137,15 @@ function verdict(checks: readonly ProbeCheck[], stdout: string): PreflightResult
 
 function failure(check: ProbeCheck): string {
   switch (check.kind) {
-    case "allow-write": return "a write the child needs was denied"
-    case "deny-unix-socket": return "a unix socket could be created"
-    case "pid-hidden": return "the parent process is visible"
-    case "deny-append": case "deny-hardlink": return "a write that must be denied succeeded"
+    case "allow-write":
+      return "a write the child needs was denied"
+    case "deny-unix-socket":
+      return "a unix socket could be created"
+    case "pid-hidden":
+      return "the parent process is visible"
+    case "deny-append":
+    case "deny-hardlink":
+      return "a write that must be denied succeeded"
   }
 }
 
@@ -145,4 +176,3 @@ function statOrUndefined(path: string): Stats | undefined {
 function isDir(path: string): boolean {
   return existsSync(path) && lstatSync(path).isDirectory()
 }
-

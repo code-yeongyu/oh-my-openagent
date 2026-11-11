@@ -56,7 +56,11 @@ describe("ulw-execute continuation hidden delivery", () => {
       config: { getFlag: () => false },
     })
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, eventCtx(root))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      eventCtx(root),
+    )
 
     expect(pi.userMessages).toEqual([])
     expect(pi.messages).toEqual([

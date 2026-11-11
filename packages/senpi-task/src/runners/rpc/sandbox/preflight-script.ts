@@ -11,16 +11,23 @@ export type ProbeCheck =
 export function probeScript(checks: readonly ProbeCheck[]): string | undefined {
   const socketProbe = unixSocketProbe()
   if (socketProbe === undefined && checks.some((check) => check.kind === "deny-unix-socket")) return undefined
-  return checks.map((check, index) => `${line(check, socketProbe ?? "false")} && echo "${index} pass" || echo "${index} fail"`).join("\n")
+  return checks
+    .map((check, index) => `${line(check, socketProbe ?? "false")} && echo "${index} pass" || echo "${index} fail"`)
+    .join("\n")
 }
 
 function line(check: ProbeCheck, socketProbe: string): string {
   switch (check.kind) {
-    case "deny-append": return `! (printf x >> ${q(check.target)}) 2>/dev/null`
-    case "deny-hardlink": return `! (ln ${q(check.target)} ${q(check.link)} && printf x >> ${q(check.link)}) 2>/dev/null`
-    case "allow-write": return `(printf x > ${q(check.target)}) 2>/dev/null`
-    case "deny-unix-socket": return `{ ${socketProbe} ${q(check.socketPath)} 2>/dev/null; test $? -eq 1; }`
-    case "pid-hidden": return `! test -e /proc/${check.pid}/root`
+    case "deny-append":
+      return `! (printf x >> ${q(check.target)}) 2>/dev/null`
+    case "deny-hardlink":
+      return `! (ln ${q(check.target)} ${q(check.link)} && printf x >> ${q(check.link)}) 2>/dev/null`
+    case "allow-write":
+      return `(printf x > ${q(check.target)}) 2>/dev/null`
+    case "deny-unix-socket":
+      return `{ ${socketProbe} ${q(check.socketPath)} 2>/dev/null; test $? -eq 1; }`
+    case "pid-hidden":
+      return `! test -e /proc/${check.pid}/root`
   }
 }
 

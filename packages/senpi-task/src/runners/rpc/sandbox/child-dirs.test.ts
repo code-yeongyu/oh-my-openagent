@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readlinkSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -16,14 +26,20 @@ function fixture(): { plan: DenyLivePlan; agent: string; cwd: string } {
   const root = mkdtempSync(join(tmpdir(), "child-dirs-"))
   roots.push(root)
   const agent = join(root, ".omo/agent")
-  for (const dir of ["extensions", "rpc/keys", "cache", "gateway", "projects/p/senpi-task/children/st_x"]) mkdirSync(join(agent, dir), { recursive: true })
+  for (const dir of ["extensions", "rpc/keys", "cache", "gateway", "projects/p/senpi-task/children/st_x"])
+    mkdirSync(join(agent, dir), { recursive: true })
   writeFileSync(join(agent, "settings.json"), "{}\n")
   writeFileSync(join(agent, "extensions/diff.js"), "live\n")
   const cwd = join(root, "project")
   mkdirSync(join(cwd, ".claude"), { recursive: true })
   const decision = planDenyLive({
-    platform: "linux", home: root, agentDir: agent, stateDir: join(agent, "projects/p/senpi-task/children/st_x"),
-    cwd, codeRoots: [], which: () => "/usr/bin/bwrap",
+    platform: "linux",
+    home: root,
+    agentDir: agent,
+    stateDir: join(agent, "projects/p/senpi-task/children/st_x"),
+    cwd,
+    codeRoots: [],
+    which: () => "/usr/bin/bwrap",
   })
   if (decision.kind !== "confined") throw new Error(decision.reason)
   return { plan: decision.plan, agent, cwd }
@@ -94,10 +110,21 @@ describe("prepareChildDirs", () => {
 describe("confinedEnv", () => {
   test("#given a parent that already sets git config entries #when the child env is built #then the fsmonitor override is appended after them and the agent dir is the view", () => {
     const { plan } = fixture()
-    const env = confinedEnv(plan, { GIT_CONFIG_COUNT: "1", GIT_CONFIG_KEY_0: "user.name", GIT_CONFIG_VALUE_0: "x", OMO_CODING_AGENT_DIR: "/live" })
+    const env = confinedEnv(plan, {
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "user.name",
+      GIT_CONFIG_VALUE_0: "x",
+      OMO_CODING_AGENT_DIR: "/live",
+    })
     expect(env).toMatchObject({
-      GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: "user.name", GIT_CONFIG_KEY_1: "core.fsmonitor", GIT_CONFIG_VALUE_1: "false",
-      OMO_CODING_AGENT_DIR: plan.viewDir, SENPI_CODING_AGENT_DIR: plan.viewDir, TMPDIR: plan.tmpDir, OMO_SANDBOX: "deny-live",
+      GIT_CONFIG_COUNT: "2",
+      GIT_CONFIG_KEY_0: "user.name",
+      GIT_CONFIG_KEY_1: "core.fsmonitor",
+      GIT_CONFIG_VALUE_1: "false",
+      OMO_CODING_AGENT_DIR: plan.viewDir,
+      SENPI_CODING_AGENT_DIR: plan.viewDir,
+      TMPDIR: plan.tmpDir,
+      OMO_SANDBOX: "deny-live",
     })
   })
 })

@@ -5,7 +5,11 @@ import { resolveSession } from "./session-resolver"
 import { executeOnCompleteHook } from "./on-complete-hook"
 import * as spawnWithWindowsHideModule from "../../shared/spawn-with-windows-hide"
 import type { OpencodeClient } from "./types"
-import { createServerConnectionWithDeps, type ServerConnectionDeps, type ServerConnectionOptions } from "./server-connection"
+import {
+  createServerConnectionWithDeps,
+  type ServerConnectionDeps,
+  type ServerConnectionOptions,
+} from "./server-connection"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 type TestClient = { session: Record<string, unknown> }
@@ -14,7 +18,7 @@ const mockCreateOpencode = mock(() =>
   Promise.resolve({
     client: { session: {} },
     server: { url: "http://127.0.0.1:9999", close: mockServerClose },
-  })
+  }),
 )
 const mockCreateOpencodeClient = mock(() => ({ session: {} }))
 const mockIsPortAvailable = mock(() => Promise.resolve(true))
@@ -62,16 +66,13 @@ function requireWrite(stream: MockWriteStream, index: number): string {
   return value
 }
 
-const createMockClient = (
-  getResult?: { error?: unknown; data?: { id: string } }
-): OpencodeClient => (unsafeTestValue<OpencodeClient>({
-  session: {
-    get: mock((opts: { path: { id: string } }) =>
-      Promise.resolve(getResult ?? { data: { id: opts.path.id } })
-    ),
-    create: mock(() => Promise.resolve({ data: { id: "new-session-id" } })),
-  },
-}))
+const createMockClient = (getResult?: { error?: unknown; data?: { id: string } }): OpencodeClient =>
+  unsafeTestValue<OpencodeClient>({
+    session: {
+      get: mock((opts: { path: { id: string } }) => Promise.resolve(getResult ?? { data: { id: opts.path.id } })),
+      create: mock(() => Promise.resolve({ data: { id: "new-session-id" } })),
+    },
+  })
 
 describe("integration: --json mode", () => {
   it("emits valid RunResult JSON to stdout", () => {
@@ -207,16 +208,19 @@ describe("integration: --on-complete", () => {
     spawnSpy.mockClear()
 
     // when
-    await executeOnCompleteHook({
-      command: "echo test",
-      sessionId: "session-123",
-      exitCode: 0,
-      durationMs: 5000,
-      messageCount: 10,
-    }, {
-      spawnWithWindowsHide: spawnWithWindowsHideModule.spawnWithWindowsHide,
-      log: () => {},
-    })
+    await executeOnCompleteHook(
+      {
+        command: "echo test",
+        sessionId: "session-123",
+        exitCode: 0,
+        durationMs: 5000,
+        messageCount: 10,
+      },
+      {
+        spawnWithWindowsHide: spawnWithWindowsHideModule.spawnWithWindowsHide,
+        log: () => {},
+      },
+    )
 
     // then
     expect(spawnSpy).toHaveBeenCalledTimes(1)
@@ -291,16 +295,19 @@ describe("integration: option combinations", () => {
 
     // when - both are invoked sequentially (as runner would)
     jsonManager.emitResult(result)
-    await executeOnCompleteHook({
-      command: "echo done",
-      sessionId: result.sessionId,
-      exitCode: result.success ? 0 : 1,
-      durationMs: result.durationMs,
-      messageCount: result.messageCount,
-    }, {
-      spawnWithWindowsHide: spawnWithWindowsHideModule.spawnWithWindowsHide,
-      log: () => {},
-    })
+    await executeOnCompleteHook(
+      {
+        command: "echo done",
+        sessionId: result.sessionId,
+        exitCode: result.success ? 0 : 1,
+        durationMs: result.durationMs,
+        messageCount: result.messageCount,
+      },
+      {
+        spawnWithWindowsHide: spawnWithWindowsHideModule.spawnWithWindowsHide,
+        log: () => {},
+      },
+    )
 
     // then - json emits result AND on-complete hook runs
     expect(mockStdout.writes).toHaveLength(1)

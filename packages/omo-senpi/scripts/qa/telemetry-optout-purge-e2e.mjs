@@ -44,7 +44,9 @@ const LANES = {
 
 /** The seeded dead owner's window and pending file names, sorted, so a lane's before and after compare exactly. */
 function seedFiles(names) {
-  return names.filter((name) => !name.startsWith("owners") && (name.includes(SEEDED) || name.includes(SEED_PENDING_UUID))).sort()
+  return names
+    .filter((name) => !name.startsWith("owners") && (name.includes(SEEDED) || name.includes(SEED_PENDING_UUID)))
+    .sort()
 }
 
 async function main() {
@@ -68,14 +70,17 @@ async function main() {
   const checks = {
     controlRecoversTheSeedWindow: controlWindow?.properties?.ended_by === "recovered",
     // A recovered window starts a new summary epoch, so its (epoch, seq) pair never repeats the dead owner's.
-    controlRecoveredWindowStartsANewEpoch: /^[0-9a-f]{16}$/.test(String(controlWindow?.properties?.summary_epoch))
-      && controlWindow?.properties?.summary_epoch !== SEED_EPOCH,
+    controlRecoveredWindowStartsANewEpoch:
+      /^[0-9a-f]{16}$/.test(String(controlWindow?.properties?.summary_epoch)) &&
+      controlWindow?.properties?.summary_epoch !== SEED_EPOCH,
     controlResendsTheSeedPending: lanes.control.summaries.some((event) => event.uuid === SEED_PENDING_UUID),
     optoutEnvSentNothing: lanes["optout-env"].events.length === 0,
     // Only the persisted setting purges (lead ruling 2026-10-20/24): an env-only opt-out is this process's own,
     // so the dead consented owner's seeded window and pending event stay for a consented process to send.
-    optoutEnvLeftTheSeedQueueIntact: seedFiles(lanes["optout-env"].filesBefore).length >= 2
-      && JSON.stringify(seedFiles(lanes["optout-env"].filesAfter)) === JSON.stringify(seedFiles(lanes["optout-env"].filesBefore)),
+    optoutEnvLeftTheSeedQueueIntact:
+      seedFiles(lanes["optout-env"].filesBefore).length >= 2 &&
+      JSON.stringify(seedFiles(lanes["optout-env"].filesAfter)) ===
+        JSON.stringify(seedFiles(lanes["optout-env"].filesBefore)),
     optoutConfigSentNoSummary: lanes["optout-config"].summaries.length === 0,
     optoutConfigSentNoSeed: seededSent("optout-config").length === 0,
     // The seeded window, claim AND pending event (named by its uuid) are all gone.
@@ -92,7 +97,9 @@ async function main() {
     sandboxesRemoved: Object.values(lanes).every((lane) => lane.sandboxRemoved),
     realSenpiUntouched,
   }
-  const failed = Object.entries(checks).filter(([, ok]) => ok !== true).map(([name]) => name)
+  const failed = Object.entries(checks)
+    .filter(([, ok]) => ok !== true)
+    .map(([name]) => name)
   const verdict = { result: failed.length === 0 ? "PASS" : "FAIL", failed, checks }
   writeFileSync(join(evidenceDir, "optout-purge-lanes.json"), `${JSON.stringify(summarize(lanes), null, 2)}\n`)
   writeFileSync(join(evidenceDir, "optout-purge-verdict.json"), `${JSON.stringify(verdict, null, 2)}\n`)
@@ -124,7 +131,10 @@ async function runLane(senpiBin, name, lane) {
   try {
     seedSandbox(sandbox)
     mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true })
-    writeFileSync(join(sandbox.cwd, ".omo", "omo.json"), `${JSON.stringify({ telemetry: { enabled: lane.telemetryConfig } })}\n`)
+    writeFileSync(
+      join(sandbox.cwd, ".omo", "omo.json"),
+      `${JSON.stringify({ telemetry: { enabled: lane.telemetryConfig } })}\n`,
+    )
     seedDeadOwnerQueue(summaryRoot, lane.scope === "cwd" ? { cwd: sandbox.cwd } : {})
     filesBefore = listFiles(summaryRoot)
     const sinkUrl = await sink.ready
@@ -177,22 +187,50 @@ async function runLane(senpiBin, name, lane) {
 function seedDeadOwnerQueue(root, scope) {
   const at = Date.now() - STALE_MS
   const window = {
-    startedAt: at, lastAt: at, firstTurnIndex: 0, lastTurnIndex: 0, totals: [40],
+    startedAt: at,
+    lastAt: at,
+    firstTurnIndex: 0,
+    lastTurnIndex: 0,
+    totals: [40],
     sums: { input_tokens: 11, output_tokens: 22, total_tokens: 40, cost_1e4: 1235 },
     models: [{ provider: "openai", model: "gpt-5.5", sums: { turns: 1, total_tokens: 40, cost_1e4: 1235 } }],
   }
   const record = {
-    v: 2, consent: "enabled", scope, sessionHash: SEEDED, sessionRole: "root", owner: DEAD, heartbeatAt: at,
-    epoch: SEED_EPOCH, seq: 0, sampleRate: 0, windowId: "0395eae0-1111-4222-8333-944455556661", window,
+    v: 2,
+    consent: "enabled",
+    scope,
+    sessionHash: SEEDED,
+    sessionRole: "root",
+    owner: DEAD,
+    heartbeatAt: at,
+    epoch: SEED_EPOCH,
+    seq: 0,
+    sampleRate: 0,
+    windowId: "0395eae0-1111-4222-8333-944455556661",
+    window,
   }
   mkdirSync(join(root, "pending"), { recursive: true })
   mkdirSync(join(root, "owners"), { recursive: true })
   writeFileSync(join(root, `${SEEDED}.json`), JSON.stringify(record), { mode: 0o600 })
-  writeFileSync(join(root, "pending", "0395eae0-1111-4222-8333-944455556662.json"), JSON.stringify({
-    v: 2, consent: "enabled", scope, uuid: "0395eae0-1111-4222-8333-944455556662", sessionHash: `${SEEDED}-pending`,
-    owner: DEAD, createdAt: at, properties: { $session_id: `${SEEDED}-pending`, summary_seq: 0, turns: 1 },
-  }), { mode: 0o600 })
-  writeFileSync(join(root, `${SEEDED}-claimed.json.claimed-${DEAD.pid}-${DEAD.bootId}`), JSON.stringify({ ...record, sessionHash: `${SEEDED}-claimed` }), { mode: 0o600 })
+  writeFileSync(
+    join(root, "pending", "0395eae0-1111-4222-8333-944455556662.json"),
+    JSON.stringify({
+      v: 2,
+      consent: "enabled",
+      scope,
+      uuid: "0395eae0-1111-4222-8333-944455556662",
+      sessionHash: `${SEEDED}-pending`,
+      owner: DEAD,
+      createdAt: at,
+      properties: { $session_id: `${SEEDED}-pending`, summary_seq: 0, turns: 1 },
+    }),
+    { mode: 0o600 },
+  )
+  writeFileSync(
+    join(root, `${SEEDED}-claimed.json.claimed-${DEAD.pid}-${DEAD.bootId}`),
+    JSON.stringify({ ...record, sessionHash: `${SEEDED}-claimed` }),
+    { mode: 0o600 },
+  )
   writeFileSync(join(root, "owners", `${DEAD.pid}.json`), JSON.stringify(DEAD), { mode: 0o600 })
 }
 
@@ -235,7 +273,9 @@ function removeSandboxRpcDirs(root) {
     for (const name of safeList(base)) {
       if (!name.startsWith("omo-rpc-")) continue
       const dir = join(base, name)
-      const owned = safeList(dir).some((file) => file.endsWith(".meta.json") && readText(join(dir, file)).includes(root))
+      const owned = safeList(dir).some(
+        (file) => file.endsWith(".meta.json") && readText(join(dir, file)).includes(root),
+      )
       if (!owned) continue
       rmSync(dir, { recursive: true, force: true })
       if (existsSync(dir)) left += 1
@@ -301,24 +341,34 @@ function startPosthogSink() {
 }
 
 function summarize(lanes) {
-  return Object.fromEntries(Object.entries(lanes).map(([name, lane]) => [name, {
-    status: lane.status,
-    filesBefore: lane.filesBefore,
-    filesAfter: lane.filesAfter,
-    eventNames: lane.events.map((event) => event?.event),
-    summaries: lane.summaries.map((event) => ({
-      origin: event.uuid === SEED_WINDOW_UUID ? "seeded-window" : event.uuid === SEED_PENDING_UUID ? "seeded-pending" : "this-run",
-      uuid: event.uuid,
-      summary_epoch: event.properties?.summary_epoch,
-      summary_seq: event.properties?.summary_seq,
-      ended_by: event.properties?.ended_by,
-    })),
-    leakedPids: lane.leakedPids,
-    sandboxProcessesLeft: lane.sandboxProcessesLeft,
-    rpcDirsLeft: lane.rpcDirsLeft,
-    sandboxRemoved: lane.sandboxRemoved,
-    stderrTail: lane.status === 0 ? "" : lane.stderrTail,
-  }]))
+  return Object.fromEntries(
+    Object.entries(lanes).map(([name, lane]) => [
+      name,
+      {
+        status: lane.status,
+        filesBefore: lane.filesBefore,
+        filesAfter: lane.filesAfter,
+        eventNames: lane.events.map((event) => event?.event),
+        summaries: lane.summaries.map((event) => ({
+          origin:
+            event.uuid === SEED_WINDOW_UUID
+              ? "seeded-window"
+              : event.uuid === SEED_PENDING_UUID
+                ? "seeded-pending"
+                : "this-run",
+          uuid: event.uuid,
+          summary_epoch: event.properties?.summary_epoch,
+          summary_seq: event.properties?.summary_seq,
+          ended_by: event.properties?.ended_by,
+        })),
+        leakedPids: lane.leakedPids,
+        sandboxProcessesLeft: lane.sandboxProcessesLeft,
+        rpcDirsLeft: lane.rpcDirsLeft,
+        sandboxRemoved: lane.sandboxRemoved,
+        stderrTail: lane.status === 0 ? "" : lane.stderrTail,
+      },
+    ]),
+  )
 }
 
 function parseJson(text) {

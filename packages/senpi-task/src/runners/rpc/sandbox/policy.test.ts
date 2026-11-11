@@ -15,16 +15,19 @@ const neverStarts: InProcessRunnerLike = {
 }
 
 function legacyReviewerRecord(agentType: string) {
-  const record = createTaskRecord({
-    parent_session_id: "parent-1",
-    root_session_id: "parent-1",
-    depth: 1,
-    agent_type: agentType,
-    // Written before senpi#6287: the review trio was pinned in-process and carried no sandbox field.
-    execution_mode: "in-process",
-    model: "anthropic/claude",
-    notify_on_terminal: false,
-  }, Date.parse("2026-11-10T00:00:00.000Z"))
+  const record = createTaskRecord(
+    {
+      parent_session_id: "parent-1",
+      root_session_id: "parent-1",
+      depth: 1,
+      agent_type: agentType,
+      // Written before senpi#6287: the review trio was pinned in-process and carried no sandbox field.
+      execution_mode: "in-process",
+      model: "anthropic/claude",
+      notify_on_terminal: false,
+    },
+    Date.parse("2026-11-10T00:00:00.000Z"),
+  )
   return { ...record, spawn_spec: { version: 1 as const, cwd: "/tmp/project", prompt: "review the diff" } }
 }
 
@@ -46,10 +49,17 @@ describe("deny-live policy at the launch boundary", () => {
 
     const started = runner.start(rebuilt.spec)
     await expect(started).rejects.toBeInstanceOf(RunnerError)
-    const resumed = await runner.resume?.(rebuilt.spec, "/tmp/session.jsonl").then(() => undefined, (error: unknown) => error)
+    const resumed = await runner.resume?.(rebuilt.spec, "/tmp/session.jsonl").then(
+      () => undefined,
+      (error: unknown) => error,
+    )
 
     expect(RunnerError.is(resumed) && resumed.failure.kind).toBe("sandbox_required")
-    expect(classifyResumeFailure(resumed)).toMatchObject({ ok: false, disposition: "unrecoverable", code: "sandbox_required" })
+    expect(classifyResumeFailure(resumed)).toMatchObject({
+      ok: false,
+      disposition: "unrecoverable",
+      code: "sandbox_required",
+    })
   })
 })
 
@@ -58,9 +68,19 @@ describe("deny-live policy on the task-daemon runner", () => {
     const fallback = fakeFallbackRunner()
     const daemonAsks: string[] = []
     const runner = new RpcHostRunner({
-      policy: "upgrade", agentDir: "/tmp/agent", storeDir: "/tmp/store",
-      shardResolver: () => ({ socket: "/tmp/host.sock", shard: { kind: "p", key: "0000000000000000", ownerSessionId: "parent", inherited: false }, root: "primary" }),
-      ownHostSocket: () => undefined, insideHost: () => false, onNotice: () => undefined, shardEvents: {}, env: {},
+      policy: "upgrade",
+      agentDir: "/tmp/agent",
+      storeDir: "/tmp/store",
+      shardResolver: () => ({
+        socket: "/tmp/host.sock",
+        shard: { kind: "p", key: "0000000000000000", ownerSessionId: "parent", inherited: false },
+        root: "primary",
+      }),
+      ownHostSocket: () => undefined,
+      insideHost: () => false,
+      onNotice: () => undefined,
+      shardEvents: {},
+      env: {},
       ensureDaemon: () => {
         daemonAsks.push("ensure")
         return Promise.reject(new Error("the daemon must never be asked to host a sandboxed child"))
@@ -70,7 +90,13 @@ describe("deny-live policy on the task-daemon runner", () => {
     })
     return { runner, fallback, daemonAsks }
   }
-  const spec: RpcRunnerSpec = { task_id: "st_r", cwd: "/tmp/project", state_dir: "/tmp/store/children/st_r", prompt: "review", sandbox: "deny-live" }
+  const spec: RpcRunnerSpec = {
+    task_id: "st_r",
+    cwd: "/tmp/project",
+    state_dir: "/tmp/store/children/st_r",
+    prompt: "review",
+    sandbox: "deny-live",
+  }
 
   test("#given a fresh sandboxed spec #when the daemon runner starts it #then it runs on the per-child runner and the daemon is never asked", async () => {
     const { runner, fallback, daemonAsks } = hostRunner()
@@ -81,7 +107,12 @@ describe("deny-live policy on the task-daemon runner", () => {
 
   test("#given a review child recorded on a daemon session #when it is resumed #then the resume is refused so no second writer opens its transcript", async () => {
     const { runner, fallback, daemonAsks } = hostRunner()
-    const resumed = await runner.start({ ...spec, hostSocket: "/tmp/host.sock", resumeSessionPath: "/tmp/s.jsonl" }).then(() => undefined, (error: unknown) => error)
+    const resumed = await runner
+      .start({ ...spec, hostSocket: "/tmp/host.sock", resumeSessionPath: "/tmp/s.jsonl" })
+      .then(
+        () => undefined,
+        (error: unknown) => error,
+      )
     expect(RunnerError.is(resumed) && resumed.failure.kind).toBe("sandbox_required")
     expect(fallback.starts).toEqual([])
     expect(daemonAsks).toEqual([])

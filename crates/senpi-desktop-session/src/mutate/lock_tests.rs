@@ -1,15 +1,19 @@
 //! The machine-wide interaction lock around a transaction: a foreground
-//! transaction holds it from the capture through the restore, background
-//! exec only around the dispatch, and a lock another process holds refuses
-//! the request before any input.
+//! transaction, or background keys that hand key focus back, holds it from
+//! the capture through the restore, other background exec only around the
+//! dispatch (and its release on failure), and a lock another process holds
+//! refuses the request before any input.
 
 use std::sync::Arc;
 
 use parking_lot::Mutex;
+use senpi_desktop_backend_fake::FakeMethod;
 use senpi_desktop_core::error::ErrorCode;
+use senpi_desktop_core::protocol_params::TypeTextParams;
 
 use crate::grant::ControlSlot;
 use crate::lock::InteractionLock;
+use crate::request::Op;
 use crate::test_support::{click_window, delivery, grant_control, harness_with_slot, op_names, two_windows, Harness};
 
 /// Each take (`true`) and release (`false`) with the sink's op count then.
@@ -51,6 +55,41 @@ fn background_exec_holds_the_lock_only_around_the_dispatch() {
     assert!(reply.is_ok(), "{reply:?}");
     assert_eq!(op_names(&harness), ["pointer"]);
     assert_eq!(*seen.lock(), [(true, 0), (false, 1)]);
+}
+
+#[test]
+fn a_background_key_transaction_holds_the_lock_from_focus_capture_through_its_hand_back() {
+    // Given
+    let dir = tempfile::tempdir().expect("temp dir");
+    let (mut harness, seen) = observed(dir.path());
+    // When: background typing captures the front window and hands key focus back
+    let reply = harness.process(Op::TypeText(TypeTextParams {
+        target: "101".to_owned(),
+        text: "hi".to_owned(),
+        opts: None,
+    }));
+    // Then: taken before the capture, released after the hand-back
+    assert!(reply.is_ok(), "{reply:?}");
+    let names = op_names(&harness);
+    assert_eq!(names.first(), Some(&"front"), "{names:?}");
+    assert_eq!(names.last(), Some(&"restore-key-focus"), "{names:?}");
+    assert_eq!(*seen.lock(), [(true, 0), (false, names.len())]);
+}
+
+#[test]
+fn a_failed_background_dispatch_releases_held_input_before_the_lock() {
+    // Given
+    let dir = tempfile::tempdir().expect("temp dir");
+    let (mut harness, seen) = observed(dir.path());
+    let frame = harness.capture("101");
+    harness.faults.fail_next(FakeMethod::Click, ErrorCode::InputFailed);
+    // When
+    let reply = harness.process(click_window(&frame, None));
+    // Then: the release is sent while the dispatch still holds the lock
+    assert_eq!(reply.map_err(|error| error.code), Err(ErrorCode::InputFailed));
+    let names = op_names(&harness);
+    assert_eq!(names.last(), Some(&"release"), "{names:?}");
+    assert_eq!(*seen.lock(), [(true, 0), (false, names.len())]);
 }
 
 #[test]

@@ -24,9 +24,13 @@ describe("per-run finalization claim", () => {
     const runDir = join(identity.paths.reflection, "runs", "run-1")
     await mkdir(runDir, { recursive: true })
     let releaseFirst: (() => void) | undefined
-    const released = new Promise<void>((resolve) => { releaseFirst = resolve })
+    const released = new Promise<void>((resolve) => {
+      releaseFirst = resolve
+    })
     let signalClaimed: (() => void) | undefined
-    const claimed = new Promise<void>((resolve) => { signalClaimed = resolve })
+    const claimed = new Promise<void>((resolve) => {
+      signalClaimed = resolve
+    })
     let operations = 0
     const first = withRunFinalizationClaim(identity, runDir, "run-1", async () => {
       operations += 1

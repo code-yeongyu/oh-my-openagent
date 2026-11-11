@@ -37,10 +37,12 @@ export async function reconcileOnSessionStart(
     groups.set(key, group)
   }
   // Admission leases cover only local claims. A host's probe/respawn never holds up another host.
-  const results = await Promise.all([...groups.values()].map(records => reconcileRecords(context, parentSessionId, records)))
+  const results = await Promise.all(
+    [...groups.values()].map((records) => reconcileRecords(context, parentSessionId, records)),
+  )
   if (!reconciliationActive(context)) return { outcomes: [] }
   await reclaimIsolations(context)
-  return { outcomes: results.flatMap(result => result.outcomes) }
+  return { outcomes: results.flatMap((result) => result.outcomes) }
 }
 
 async function reconcileRecords(
@@ -60,9 +62,15 @@ async function reconcileRecords(
     if (!reconciliationActive(context)) return { outcomes }
     // The probe says nothing about a claim installed while it was in flight, even at the same pid.
     const fresh = context.store.load(record.task_id)
-    if (fresh === null || fresh.host_pid !== record.host_pid || fresh.residency_claim !== record.residency_claim
-      || fresh.notification.run_epoch !== record.notification.run_epoch || fresh.updated_at !== record.updated_at
-      || fresh.residency_state !== record.residency_state || fresh.status !== record.status) {
+    if (
+      fresh === null ||
+      fresh.host_pid !== record.host_pid ||
+      fresh.residency_claim !== record.residency_claim ||
+      fresh.notification.run_epoch !== record.notification.run_epoch ||
+      fresh.updated_at !== record.updated_at ||
+      fresh.residency_state !== record.residency_state ||
+      fresh.status !== record.status
+    ) {
       excludedFromRevival.add(record.task_id)
       outcomes.push(ownedElsewhere(record.task_id, parentSessionId, "ownership changed during probe"))
       continue
@@ -71,20 +79,33 @@ async function reconcileRecords(
       // Scoped admission re-reads the store rather than this candidate array. Carry the
       // ownership exclusion into that selector too, or a suspended live-owner child is claimed.
       excludedFromRevival.add(record.task_id)
-      outcomes.push(ownedElsewhere(record.task_id, parentSessionId, `child owned by live process pid=${record.host_pid}`))
+      outcomes.push(
+        ownedElsewhere(record.task_id, parentSessionId, `child owned by live process pid=${record.host_pid}`),
+      )
       continue
     }
     if (hasLiveResidentHandle(context, record.task_id)) {
       // Each retry can wait out a full request deadline; never hold session start on it.
       if (record.uncertain_inputs !== undefined) {
-        void context.registry.get(record.task_id)?.reconcileInputs?.()
-          ?.catch((error: unknown) => log("senpi-task uncertain input reconcile failed", { taskId: record.task_id, error: String(error) }))
+        void context.registry
+          .get(record.task_id)
+          ?.reconcileInputs?.()
+          ?.catch((error: unknown) =>
+            log("senpi-task uncertain input reconcile failed", { taskId: record.task_id, error: String(error) }),
+          )
       }
       outcomes.push({ task_id: record.task_id, kind: "resumed", reason: "owned by this process" })
       continue
     }
-    if (record.provisional_exit !== undefined && !TERMINAL_STATUSES.has(record.status)
-      && !(parentSessionId !== undefined && record.parent_session_id !== parentSessionId && isSameProcessSibling(context, record))) {
+    if (
+      record.provisional_exit !== undefined &&
+      !TERMINAL_STATUSES.has(record.status) &&
+      !(
+        parentSessionId !== undefined &&
+        record.parent_session_id !== parentSessionId &&
+        isSameProcessSibling(context, record)
+      )
+    ) {
       outcomes.push(await reconcileProvisionalExit(context, record))
       if (!reconciliationActive(context)) return { outcomes }
       excludedFromRevival.add(record.task_id)
@@ -120,21 +141,24 @@ async function reconcileRecords(
     if (!reconciliationActive(context)) return { outcomes }
   }
 
-  const approved = new Set(candidates.map(record => record.task_id))
-  outcomes.push(...await reconcileScopedRevival(
-    {
-      ...context,
-      deferUnresumable: context.registry.ownsRecord?.({ parent_session_id: parentSessionId }) === true || context.deferUnresumable,
-      reconcileAdmission: {
-        ...context.reconcileAdmission,
-        excludeTaskIds: excludedFromRevival,
-        canClaim: (fresh) => approved.has(fresh.task_id) && context.reconcileAdmission.canClaim?.(fresh) !== false,
+  const approved = new Set(candidates.map((record) => record.task_id))
+  outcomes.push(
+    ...(await reconcileScopedRevival(
+      {
+        ...context,
+        deferUnresumable:
+          context.registry.ownsRecord?.({ parent_session_id: parentSessionId }) === true || context.deferUnresumable,
+        reconcileAdmission: {
+          ...context.reconcileAdmission,
+          excludeTaskIds: excludedFromRevival,
+          canClaim: (fresh) => approved.has(fresh.task_id) && context.reconcileAdmission.canClaim?.(fresh) !== false,
+        },
       },
-    },
-    parentSessionId,
-    candidates.filter((record) => record.parent_session_id === parentSessionId),
-    (taskId) => newestSessionPath(context, taskId),
-  ))
+      parentSessionId,
+      candidates.filter((record) => record.parent_session_id === parentSessionId),
+      (taskId) => newestSessionPath(context, taskId),
+    )),
+  )
   return { outcomes }
 }
 
@@ -146,8 +170,12 @@ function ownedElsewhere(taskId: string, parentSessionId: string | undefined, leg
     : { task_id: taskId, kind: "deferred", reason: "foreign_live_owner" }
 }
 
-export async function reconcileLegacyRecord(context: LifecycleContext, observed: TaskRecord): Promise<ReconcileOutcome> {
-  if (!reconciliationActive(context)) return { task_id: observed.task_id, kind: "deferred", reason: "session_unavailable" }
+export async function reconcileLegacyRecord(
+  context: LifecycleContext,
+  observed: TaskRecord,
+): Promise<ReconcileOutcome> {
+  if (!reconciliationActive(context))
+    return { task_id: observed.task_id, kind: "deferred", reason: "session_unavailable" }
   if (observed.residency_state !== "resident") return reconcileLegacyRecordExclusive(context, observed)
   // Same-process sweeps cannot distinguish "our claim is in flight" from a switched-session orphan
   // using host_pid alone. This marker never waits or spans records: a loser defers immediately while
@@ -163,7 +191,10 @@ export async function reconcileLegacyRecord(context: LifecycleContext, observed:
   }
 }
 
-async function reconcileLegacyRecordExclusive(context: LifecycleContext, observed: TaskRecord): Promise<ReconcileOutcome> {
+async function reconcileLegacyRecordExclusive(
+  context: LifecycleContext,
+  observed: TaskRecord,
+): Promise<ReconcileOutcome> {
   let record = observed
   if (record.residency_state === "resident") {
     try {
@@ -231,9 +262,11 @@ async function reconcileLegacyRecordExclusive(context: LifecycleContext, observe
 
   const heartbeat = heartbeatState(context, record)
   const terminated = await terminateClaimedPid(context, record)
-  if (!reconciliationActive(context)) return rollbackOrDeferred(context, record.task_id, "rpc_detached", "session_unavailable", record)
+  if (!reconciliationActive(context))
+    return rollbackOrDeferred(context, record.task_id, "rpc_detached", "session_unavailable", record)
   const fresh = context.store.load(record.task_id)
-  if (fresh === null || !holdsClaim(context, fresh, record)) return { task_id: record.task_id, kind: "deferred", reason: "foreign_live_owner" }
+  if (fresh === null || !holdsClaim(context, fresh, record))
+    return { task_id: record.task_id, kind: "deferred", reason: "foreign_live_owner" }
   if (!terminated) {
     await markLost(context, record.task_id, `rpc orphan pid=${pid} could not be terminated`)
     return { task_id: record.task_id, kind: "lost_and_terminated", reason: `live orphan, heartbeat=${heartbeat}` }
@@ -283,10 +316,16 @@ async function reattachLegacyRecord(
     reservation.release()
     if (respawned.ok) {
       const handle = respawned.handle
-      await suspendHandle(context, {
-        ...handle, kind: handle.kind ?? "rpc",
-        terminate: () => handle.terminate?.() ?? Promise.resolve(),
-      }, "revived_after_shutdown", owns)
+      await suspendHandle(
+        context,
+        {
+          ...handle,
+          kind: handle.kind ?? "rpc",
+          terminate: () => handle.terminate?.() ?? Promise.resolve(),
+        },
+        "revived_after_shutdown",
+        owns,
+      )
     }
     return rollbackOrDeferred(context, record.task_id, "rpc_detached", "session_unavailable", record)
   }
@@ -308,10 +347,16 @@ async function reattachLegacyRecord(
     reservation.release()
     if (reattached.ok) {
       const handle = respawned.handle
-      await suspendHandle(context, {
-        ...handle, kind: handle.kind ?? "rpc",
-        terminate: () => handle.terminate?.() ?? Promise.resolve(),
-      }, "revived_after_shutdown", owns)
+      await suspendHandle(
+        context,
+        {
+          ...handle,
+          kind: handle.kind ?? "rpc",
+          terminate: () => handle.terminate?.() ?? Promise.resolve(),
+        },
+        "revived_after_shutdown",
+        owns,
+      )
     }
     return rollbackOrDeferred(context, record.task_id, "rpc_detached", "session_unavailable", record)
   }
@@ -335,7 +380,9 @@ function isSameProcessSibling(context: LifecycleContext, record: TaskRecord): bo
 }
 
 function hasLiveResidentHandle(context: LifecycleContext, taskId: string): boolean {
-  return context.registry.get(taskId) !== undefined || context.registry.entries().some((handle) => handle.task_id === taskId)
+  return (
+    context.registry.get(taskId) !== undefined || context.registry.entries().some((handle) => handle.task_id === taskId)
+  )
 }
 
 function isSuspended(record: TaskRecord): boolean {

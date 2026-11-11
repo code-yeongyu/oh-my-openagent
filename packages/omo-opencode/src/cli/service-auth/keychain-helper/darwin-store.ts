@@ -32,7 +32,10 @@ const OLD_SLOTS_FULL_MESSAGE =
   'The macOS keychain holds 8 earlier OmO sign-ins that cannot be removed automatically. Open Keychain Access, delete the items whose account name ends in ".old" or ".old.1" to ".old.7" for OmO, then sign in again.'
 
 const failed = (reply: HelperReply, verb: string) =>
-  new HelperReadError(reply.error === "locked" ? "locked" : "store", `The keychain helper could not ${verb} the sign-in (${reply.error ?? "no answer"}).`)
+  new HelperReadError(
+    reply.error === "locked" ? "locked" : "store",
+    `The keychain helper could not ${verb} the sign-in (${reply.error ?? "no answer"}).`,
+  )
 
 /**
  * The session-lock view (design 3.3, 3.4, 3.6): every helper mutation is handed the lease; reads never prompt (an
@@ -59,8 +62,12 @@ export function lockedDarwinStore(deps: DarwinStoreDeps, lease: HelperLease): Lo
     async settle() {
       if (lastRead === null) return
       const outcome = await migrate(deps.account, lastRead.value, lastRead.source, helper, deleteOwnOld)
-      if (outcome.kind === "skipped" && outcome.reason === "old-slots-full") deps.notice(`omo: ${OLD_SLOTS_FULL_MESSAGE}`)
-      if (outcome.kind === "failed") deps.notice(`omo: the macOS keychain item could not be moved to OmO's keychain helper (${outcome.step}); it keeps working as before.`)
+      if (outcome.kind === "skipped" && outcome.reason === "old-slots-full")
+        deps.notice(`omo: ${OLD_SLOTS_FULL_MESSAGE}`)
+      if (outcome.kind === "failed")
+        deps.notice(
+          `omo: the macOS keychain item could not be moved to OmO's keychain helper (${outcome.step}); it keeps working as before.`,
+        )
     },
     async write(value, intent, beforeRetire) {
       const state = await deps.access.call({ verb: "read", account: deps.account })
@@ -68,14 +75,20 @@ export function lockedDarwinStore(deps: DarwinStoreDeps, lease: HelperLease): Lo
       if (state.owned === false) {
         // Row 8b applies only to an item nobody here can read: not one this process read, not one its own identity reads
         // silently, and not one a still-valid approval in this process covers.
-        const approved = state.cdat !== undefined && state.mdat !== undefined && deps.cache.consume({ cdat: state.cdat, mdat: state.mdat }) !== null
-        const readable = lastRead !== null || approved || (await deps.ownSilentGet().catch(() => undefined)) !== undefined
+        const approved =
+          state.cdat !== undefined &&
+          state.mdat !== undefined &&
+          deps.cache.consume({ cdat: state.cdat, mdat: state.mdat }) !== null
+        const readable =
+          lastRead !== null || approved || (await deps.ownSilentGet().catch(() => undefined)) !== undefined
         if (readable || intent !== "fresh-sign-in") {
           await deps.ownOverwrite(value)
           if (lastRead?.source === "approved")
             await deps.cache.afterOwnWrite(value, async () => {
               const after = await deps.access.call({ verb: "read", account: deps.account })
-              return after.cdat === undefined || after.mdat === undefined ? null : { cdat: after.cdat, mdat: after.mdat }
+              return after.cdat === undefined || after.mdat === undefined
+                ? null
+                : { cdat: after.cdat, mdat: after.mdat }
             })
           return
         }
@@ -83,7 +96,8 @@ export function lockedDarwinStore(deps: DarwinStoreDeps, lease: HelperLease): Lo
         // item aside by rename (no approval needed, m10) so the fresh sign-in gets an item this machine can read.
         await beforeRetire?.()
         const retired = await helper({ verb: "retire", account: deps.account })
-        if (retired.reason === "old-slots-full" || (retired.ok === true && retired.skipped === true)) throw new HelperOldSlotsFull(OLD_SLOTS_FULL_MESSAGE)
+        if (retired.reason === "old-slots-full" || (retired.ok === true && retired.skipped === true))
+          throw new HelperOldSlotsFull(OLD_SLOTS_FULL_MESSAGE)
         if (retired.ok !== true) throw failed(retired, "replace")
       }
       const written = await helper({ verb: "write", account: deps.account, value })

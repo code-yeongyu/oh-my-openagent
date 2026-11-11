@@ -11,12 +11,21 @@ export type WrappedCommand = {
   readonly seccompFile?: string
 }
 
-export function wrapDenyLive(plan: DenyLivePlan, command: string, args: readonly string[], seccompFile?: string): WrappedCommand {
+export function wrapDenyLive(
+  plan: DenyLivePlan,
+  command: string,
+  args: readonly string[],
+  seccompFile?: string,
+): WrappedCommand {
   if (plan.platform === "darwin") {
     return { command: plan.backend, args: ["-p", seatbeltProfile(plan), "--", command, ...args] }
   }
   if (seccompFile === undefined) throw new Error("the Linux deny-live wrapper needs its seccomp program")
-  return { command: plan.backend, args: [...bwrapArgs(plan), "--seccomp", String(SECCOMP_FD), "--", command, ...args], seccompFile }
+  return {
+    command: plan.backend,
+    args: [...bwrapArgs(plan), "--seccomp", String(SECCOMP_FD), "--", command, ...args],
+    seccompFile,
+  }
 }
 
 /**
@@ -28,9 +37,13 @@ export function bwrapArgs(plan: DenyLivePlan): readonly string[] {
   const roBind = (path: string) => ["--ro-bind", path, path]
   const bind = (path: string) => ["--bind", path, path]
   return [
-    "--ro-bind", "/", "/",
-    "--dev", "/dev",
-    "--proc", "/proc",
+    "--ro-bind",
+    "/",
+    "/",
+    "--dev",
+    "/dev",
+    "--proc",
+    "/proc",
     "--unshare-pid",
     "--unshare-ipc",
     "--die-with-parent",
@@ -40,7 +53,8 @@ export function bwrapArgs(plan: DenyLivePlan): readonly string[] {
     ...plan.projectControl.filter(existsSync).flatMap(roBind),
     ...bind(plan.artifactDir),
     ...bind(plan.stateDir),
-    "--chdir", plan.cwd,
+    "--chdir",
+    plan.cwd,
   ]
 }
 

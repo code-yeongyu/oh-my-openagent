@@ -104,11 +104,17 @@ export function createSessionShardRouting(input: SessionShardRoutingInput): Sess
   // `omo daemon run` and a child-triggered ensure cannot drift.
   const idleExitMs = input.settings.host_idle_exit_ms
   const ensureDaemon: EnsureTaskDaemonPort =
-    idleExitMs === undefined ? baseEnsure : (request) => baseEnsure({ ...request, ports: { ...request.ports, idleExitMs } })
+    idleExitMs === undefined
+      ? baseEnsure
+      : (request) => baseEnsure({ ...request, ports: { ...request.ports, idleExitMs } })
   return {
     ensureDaemon,
     shardResolver: () =>
-      resolveShardSocket({ agentDir: input.agentDir, env: input.env, identity: sessionShardIdentity(input.runtime, input.pi) }),
+      resolveShardSocket({
+        agentDir: input.agentDir,
+        env: input.env,
+        identity: sessionShardIdentity(input.runtime, input.pi),
+      }),
     ownHostSocket: () => readOwnHostSocket(input.pi),
     insideHost: () => inheritedShardKey(input.pi) !== undefined,
     probeHost: input.probeHost ?? probeWithEngine,

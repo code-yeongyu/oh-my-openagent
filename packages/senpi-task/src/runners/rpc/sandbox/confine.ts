@@ -33,7 +33,11 @@ export type ConfinedSpawn = {
  * backend, code loaded from the child's writable tree, or a preflight that could not prove the
  * confinement. There is no unsandboxed fallback.
  */
-export function confineRpcSpawn(descriptor: RpcSpawnDescriptor, spec: RpcRunnerSpec, options: ConfineOptions = {}): ConfinedSpawn {
+export function confineRpcSpawn(
+  descriptor: RpcSpawnDescriptor,
+  spec: RpcRunnerSpec,
+  options: ConfineOptions = {},
+): ConfinedSpawn {
   const env = descriptor.env
   const home = env.HOME ?? homedir()
   const decision = planDenyLive({
@@ -54,7 +58,9 @@ export function confineRpcSpawn(descriptor: RpcSpawnDescriptor, spec: RpcRunnerS
   try {
     const seccompFile = plan.platform === "linux" ? writeUnixSocketFilter(plan.tmpDir, options.arch) : undefined
     if (plan.platform === "linux" && seccompFile === undefined) {
-      throw sandboxRequired(`review-role child refused: no unix-socket filter exists for ${options.arch ?? process.arch}`)
+      throw sandboxRequired(
+        `review-role child refused: no unix-socket filter exists for ${options.arch ?? process.arch}`,
+      )
     }
     prove(plan, seccompFile, home, options.now ?? Date.now)
     const wrapped = wrapDenyLive(plan, descriptor.command, descriptor.args, seccompFile)

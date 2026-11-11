@@ -41,8 +41,7 @@ export type DenyLivePlan = {
 }
 
 export type DenyLiveDecision =
-  | { readonly kind: "confined"; readonly plan: DenyLivePlan }
-  | { readonly kind: "unavailable"; readonly reason: string }
+  { readonly kind: "confined"; readonly plan: DenyLivePlan } | { readonly kind: "unavailable"; readonly reason: string }
 
 // What the engine and git load from a project: project-local extensions, skills, settings and MCP
 // servers (senpi package-manager / mcp config, the legacy `.pi` dir), and the repository config/hooks.
@@ -61,13 +60,17 @@ export function planDenyLive(input: DenyLiveInput): DenyLiveDecision {
     return { kind: "unavailable", reason: input.platform === "darwin" ? "sandbox-exec not found" : "bwrap not found" }
   }
   const liveRootLiteral = input.liveRoot ?? join(input.home, ".omo")
-  if (!existsSync(liveRootLiteral)) return { kind: "unavailable", reason: `the live engine root ${liveRootLiteral} does not exist` }
+  if (!existsSync(liveRootLiteral))
+    return { kind: "unavailable", reason: `the live engine root ${liveRootLiteral} does not exist` }
   const cwd = realOrSelf(input.cwd)
   const stateDir = realOrSelf(input.stateDir)
   const codeRoots = input.codeRoots.map(realOrSelf)
   const inside = codeRoots.find((root) => sameOrInside(cwd, root) || sameOrInside(stateDir, root))
   if (inside !== undefined) {
-    return { kind: "unavailable", reason: `the engine loads code from ${inside}, inside the child's writable tree; run the reviewer in an isolated checkout` }
+    return {
+      kind: "unavailable",
+      reason: `the engine loads code from ${inside}, inside the child's writable tree; run the reviewer in an isolated checkout`,
+    }
   }
   const runUser = input.uid === undefined ? undefined : join("/run/user", String(input.uid))
   return {
@@ -85,7 +88,8 @@ export function planDenyLive(input: DenyLiveInput): DenyLiveDecision {
       viewDir: join(stateDir, "agent-view"),
       tmpDir: join(stateDir, "sandbox-tmp"),
       codeRoots,
-      privateDirs: input.platform === "linux" ? ["/tmp", ...(runUser !== undefined && existsSync(runUser) ? [runUser] : [])] : [],
+      privateDirs:
+        input.platform === "linux" ? ["/tmp", ...(runUser !== undefined && existsSync(runUser) ? [runUser] : [])] : [],
     },
   }
 }

@@ -13,7 +13,10 @@ const saved = { hint: process.env.HERDR_AGENT, marker: process.env[MARKER] }
 
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
-  for (const [key, value] of [["HERDR_AGENT", saved.hint], [MARKER, saved.marker]] as const) {
+  for (const [key, value] of [
+    ["HERDR_AGENT", saved.hint],
+    [MARKER, saved.marker],
+  ] as const) {
     if (value === undefined) delete process.env[key]
     else process.env[key] = value
   }
@@ -50,11 +53,15 @@ describe("releaseHerdrAgentHint (#10448)", () => {
   // herdr reads the hint from the process's exec'd environment (/proc/<pid>/environ on Linux,
   // KERN_PROCARGS2 on macOS, which \`ps eww\` shows). Releasing it must keep it there for herdr and
   // keep it away from every child.
-  test.skipIf(process.platform === "win32")("#given an engine started with the launcher's hint #when it releases it #then herdr still sees it on the engine and no child inherits it", () => {
-    const root = mkdtempSync(join(tmpdir(), "omo-herdr-hint-"))
-    roots.push(root)
-    const script = join(root, "engine.ts")
-    writeFileSync(script, `import { readFileSync } from "node:fs"
+  test.skipIf(process.platform === "win32")(
+    "#given an engine started with the launcher's hint #when it releases it #then herdr still sees it on the engine and no child inherits it",
+    () => {
+      const root = mkdtempSync(join(tmpdir(), "omo-herdr-hint-"))
+      roots.push(root)
+      const script = join(root, "engine.ts")
+      writeFileSync(
+        script,
+        `import { readFileSync } from "node:fs"
 import { spawnSync } from "node:child_process"
 import { releaseHerdrAgentHint } from ${JSON.stringify(join(import.meta.dir, "herdr-agent-hint.ts"))}
 releaseHerdrAgentHint()
@@ -63,9 +70,14 @@ const own = process.platform === "linux"
   : spawnSync("ps", ["eww", "-o", "command=", "-p", String(process.pid)], { encoding: "utf8" }).stdout
 const child = spawnSync("sh", ["-c", "printf %s \\"\${HERDR_AGENT-unset}\\""], { encoding: "utf8" }).stdout
 console.log(JSON.stringify({ own: own.includes("HERDR_AGENT=pi"), child }))
-`)
-    const result = spawnSync(process.execPath, [script], { encoding: "utf8", env: { ...process.env, HERDR_AGENT: "pi", [MARKER]: "pi" } })
-    expect(result.status).toBe(0)
-    expect(JSON.parse(result.stdout.trim())).toEqual({ own: true, child: "unset" })
-  })
+`,
+      )
+      const result = spawnSync(process.execPath, [script], {
+        encoding: "utf8",
+        env: { ...process.env, HERDR_AGENT: "pi", [MARKER]: "pi" },
+      })
+      expect(result.status).toBe(0)
+      expect(JSON.parse(result.stdout.trim())).toEqual({ own: true, child: "unset" })
+    },
+  )
 })

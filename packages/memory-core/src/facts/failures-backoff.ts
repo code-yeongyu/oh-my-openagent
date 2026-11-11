@@ -1,11 +1,7 @@
 // Pure failure-streak arithmetic. No IO: the store owns durability, this owns the curve so
 // eligibility instants are testable against an injected clock instead of wall time.
 
-import {
-  sortFailureRecords,
-  type FactsFailureReason,
-  type FactsFailureRecord,
-} from "./failures-schema"
+import { sortFailureRecords, type FactsFailureReason, type FactsFailureRecord } from "./failures-schema"
 
 /** Delay after failure N (1-indexed). A fifth failure parks instead of scheduling. */
 const BACKOFF_MS = [60_000, 5 * 60_000, 30 * 60_000, 120 * 60_000] as const
@@ -82,10 +78,10 @@ function nextRecord(
   // it), because a later failure with a different reason is not evidence the cause was fixed.
   // The streak still grows while parked, so `/facts` can show how long an endpoint has been dead.
   const parks =
-    previous?.state === "parked"
-    || input.reason === "payload_entry_oversize"
-    || input.reason === "secret_like_content"
-    || streak >= PARK_AT_STREAK
+    previous?.state === "parked" ||
+    input.reason === "payload_entry_oversize" ||
+    input.reason === "secret_like_content" ||
+    streak >= PARK_AT_STREAK
   const base: FactsFailureRecord = {
     conversationId: target.conversationId,
     end_message_id: target.endMessageId,
