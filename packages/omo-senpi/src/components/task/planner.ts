@@ -138,7 +138,7 @@ function resolveAgentTarget(
       kind: "error",
       error: {
         code: "model_unavailable",
-        message: agentModelFailureText(agentName, resolution, agents),
+        message: agentModelFailureText(agentName, resolution, agents, omoConfig.exclude_models),
         availableAgents: resolution.availableAgents,
         ...(resolution.attempted_chain !== undefined && { attempted_chain: resolution.attempted_chain }),
         ...(resolution.missing_providers !== undefined && { missing_providers: resolution.missing_providers }),

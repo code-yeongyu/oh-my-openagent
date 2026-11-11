@@ -1,5 +1,5 @@
 import type { DelegateFallbackEntry } from "@oh-my-opencode/delegate-core"
-import type { OmoConfig } from "@oh-my-opencode/omo-config-core"
+import { isExcludedModel, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 import type { AgentDefinition, PlanResolutionError } from "@oh-my-opencode/senpi-task"
 
 export type ChainFailureTarget = { readonly category: string } | { readonly agent: string }
@@ -41,8 +41,31 @@ function unlistedOptInText(unlistedModel: string | undefined, target: ChainFailu
 }
 
 /**
+ * The resolver computes `missing_providers` from the registry AFTER `exclude_models`, so a provider
+ * the user excluded looks exactly like one with no credential (#12637). A provider counts as
+ * excluded here when `exclude_models` keeps out every chain model it would serve; it is then named as
+ * excluded, and only the rest are reported as not connected.
+ */
+function splitExcludedProviders(
+  chain: readonly DelegateFallbackEntry[],
+  missingProviders: readonly string[],
+  excludeModels: readonly string[] | undefined,
+): { readonly excluded: readonly string[]; readonly notConnected: readonly string[] } {
+  const excluded: string[] = []
+  const notConnected: string[] = []
+  for (const provider of missingProviders) {
+    const served = chain.filter((rung) => rung.providers.includes(provider))
+    const allExcluded = served.length > 0
+      && served.every((rung) => isExcludedModel(`${provider}/${rung.model}`, excludeModels))
+    if (allExcluded) excluded.push(provider)
+    else notConnected.push(provider)
+  }
+  return { excluded, notConnected }
+}
+
+/**
  * The spawn-time refusal for a target whose whole chain needs providers this machine has not
- * connected. It names EVERY model in the chain, the providers each one needs, and both fixes:
+ * connected, or that `exclude_models` keeps out. It names EVERY model in the chain, the providers each one needs, and both fixes:
  * connect a provider, or point the target at a model the machine already runs. Nothing is
  * substituted and no child is spawned (Q's standing model rule: a chain ends in a typed failure
  * that names each model).
@@ -52,14 +75,23 @@ export function chainUnavailableText(
   chain: readonly DelegateFallbackEntry[],
   missingProviders: readonly string[],
   unlistedModel: string | undefined,
+  excludeModels?: readonly string[],
 ): string {
   const models = chain.length === 0 ? "none" : chainEntriesText(chain)
-  const reason = missingProviders.length === 0
+  const { excluded, notConnected } = splitExcludedProviders(chain, missingProviders, excludeModels)
+  const reasons: string[] = []
+  if (notConnected.length > 0) reasons.push(`its chain needs providers this machine has not connected (${notConnected.join(", ")})`)
+  if (excluded.length > 0) reasons.push(`exclude_models in omo.json keeps out every chain model from ${excluded.join(", ")}`)
+  const reason = reasons.length === 0
     ? "its chain's providers are connected but none of them lists these model ids"
-    : `its chain needs providers this machine has not connected (${missingProviders.join(", ")})`
-  const fix = missingProviders.length === 0
-    ? `set ${chainFixKey(target)} in Settings to a model you already run`
-    : `connect one of those providers, or set ${chainFixKey(target)} in Settings to a model you already run`
+    : reasons.join(", and ")
+  const fixes: string[] = []
+  if (notConnected.length > 0) fixes.push("connect one of those providers")
+  if (excluded.length > 0) fixes.push("remove the matching exclude_models entry")
+  fixes.push(`set ${chainFixKey(target)} in Settings to a model you already run`)
+  const fix = fixes.length === 1
+    ? fixes[0]
+    : `${fixes.slice(0, -1).join(", ")}, or ${fixes[fixes.length - 1]}`
   return `${targetKind(target)} "${targetName(target)}" has no usable model: ${reason}. Chain, in order: ${models}.${unlistedOptInText(unlistedModel, target)} Fix: ${fix}. No child was spawned.`
 }
 
@@ -95,7 +127,13 @@ export function categoryModelFailureText(
   const category = canonicalCategory ?? error.category
   if (category === undefined) return undefined
   if (error.attempted_chain !== undefined) {
-    return chainUnavailableText({ category }, error.attempted_chain, error.missing_providers ?? [], error.unlisted_provider_model)
+    return chainUnavailableText(
+      { category },
+      error.attempted_chain,
+      error.missing_providers ?? [],
+      error.unlisted_provider_model,
+      omoConfig.exclude_models,
+    )
   }
   // A pin can be written either way the schema allows: a scalar model or a models list.
   const pin = firstConfiguredPin(omoConfig.categories?.[category])
@@ -119,6 +157,7 @@ export function agentModelFailureText(
   agentName: string,
   resolution: AgentUnavailable,
   agents: Readonly<Record<string, AgentDefinition>>,
+  excludeModels?: readonly string[],
 ): string {
   // The resolver canonicalizes a retired alias, so the pin and the Settings key live under that
   // name; keying the lookup on the requested alias missed the pin entirely.
@@ -129,7 +168,7 @@ export function agentModelFailureText(
   const pinned = firstConfiguredPin(definition)
   if (pinned !== undefined) return pinnedModelUnavailableText({ agent }, pinned.model, pinned.key)
   if (resolution.attempted_chain !== undefined) {
-    return chainUnavailableText({ agent }, resolution.attempted_chain, resolution.missing_providers ?? [], undefined)
+    return chainUnavailableText({ agent }, resolution.attempted_chain, resolution.missing_providers ?? [], undefined, excludeModels)
   }
   return `No available model for agent "${agent}" (attempted ${resolution.attemptedModel ?? "none"}).`
 }
