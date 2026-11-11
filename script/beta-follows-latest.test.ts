@@ -78,7 +78,7 @@ describe("betaMustFollowLatestFromDistTags", () => {
 })
 
 describe("verifyBetaAfterMove", () => {
-  const tags = (value: Record<string, string>): string => JSON.stringify(value)
+  const tags = (value: object): string => JSON.stringify(value)
   const before = tags({ latest: "5.1.66", beta: "5.1.0" })
 
   test.each([
@@ -114,8 +114,11 @@ describe("verifyBetaAfterMove", () => {
   test("the newest prerelease seen in either read is a floor for beta", () => {
     const earlier = tags({ latest: "5.1.66", beta: "5.1.0", next: "5.3.0-0.next.1" })
     const result = verifyBetaAfterMove("5.1.66", earlier, tags({ latest: "5.1.66", beta: "5.1.66" }))
-    expect(result).toMatchObject({ status: "behind", floor: "5.3.0-0.next.1" })
-    expect(result.command).toBe("npm dist-tag add omo-ai@5.3.0-0.next.1 beta")
+    expect(result).toMatchObject({
+      status: "behind",
+      floor: "5.3.0-0.next.1",
+      command: "npm dist-tag add omo-ai@5.3.0-0.next.1 beta",
+    })
   })
 
   test("a prerelease only in the second read counts too", () => {
