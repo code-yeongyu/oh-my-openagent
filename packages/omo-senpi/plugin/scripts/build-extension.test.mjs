@@ -15,6 +15,7 @@ import {
   resolveBunExecutable,
   toPortableBuildPath,
 } from "./build-extension.mjs"
+import { COMPUTER_RUN_WASM_NAME } from "./build-extension-core.mjs"
 import { npmPackStage, runBoundedStage, systemTar } from "./bounded-stage.test-support.mjs"
 import { createBuildFixture, outputPathsIn } from "./build-extension.test-support.mjs"
 import { SENPI_ASTRA_ULTRAWORK_DIRECTIVE, SENPI_ULTRAWORK_DIRECTIVE } from "../../src/components/ultrawork/generated-directive.ts"
@@ -368,6 +369,12 @@ describe("checkExtensionCurrent", () => {
       "packages/omo-senpi/src/components/memory/commands/facts.ts",
       // A dream fire loads its conversation selection from this sidecar (keeps omo.js inside its byte budget).
       "packages/omo-senpi/src/components/memory/dream-selector.ts",
+      // The maintenance pass loads runtime retention and the host sweep from this sidecar when one is due (keeps omo.js inside its byte budget).
+      "packages/omo-senpi/src/components/memory/memory-retention-pass.ts",
+      // A finalized dream or reflection run loads the archive link repair (#12642) from this sidecar (keeps omo.js inside its byte budget).
+      "packages/memory-core/src/reflection/completion-links.ts",
+      "packages/memory-core/src/reflection/link-removals.ts",
+      "packages/memory-core/src/reflection/link-rewrite.ts",
     ]) {
       expect(mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(false)
       expect(memoryCommandsInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)), suffix).toBe(true)
@@ -499,14 +506,16 @@ describe("checkExtensionCurrent", () => {
   })
 
   test("#given the sync sidecar build #when its output dir is listed #then every emitted asset is a declared sidecar asset", async () => {
-    const { memorySyncOutputPath } = await sharedOutputs()
+    const { memorySyncOutputPath, computerUseOutputPath } = await sharedOutputs()
+    // The computer.run QuickJS wasm is the computer-use sidecar's asset, emitted into the same dir.
+    expect(await readFile(computerUseOutputPath, "utf8")).toContain(COMPUTER_RUN_WASM_NAME)
     const syncText = await readFile(memorySyncOutputPath, "utf8")
     const referenced = MEMORY_SYNC_ASSET_NAMES.filter((name) => syncText.includes(name))
     expect(referenced).toEqual([...MEMORY_SYNC_ASSET_NAMES])
     const emitted = (await readdir(dirname(memorySyncOutputPath), { withFileTypes: true }))
       .filter((entry) => entry.isFile() && !/\.(?:m?js|json|md)$/.test(entry.name))
       .map((entry) => entry.name)
-    expect(emitted.sort()).toEqual([...MEMORY_SYNC_ASSET_NAMES].sort())
+    expect(emitted.sort()).toEqual([...MEMORY_SYNC_ASSET_NAMES, COMPUTER_RUN_WASM_NAME].sort())
   })
 
   test("#given the sync sidecar packed with npm pack #when the installed package imports #omo-memory-sync-runtime under Node #then Loro initializes from the packed wasm", async () => {
@@ -556,6 +565,7 @@ describe("checkExtensionCurrent", () => {
     expect(main).toContain('import("#omo-memory-memfs-runtime")')
     expect(main).toContain('import("#omo-memory-palace-runtime")')
     expect(main).toContain('import("#omo-memory-commands-runtime")')
+    expect(main).toContain('import("#memory-completion-links")')
     expect(main).toContain('import("#omo-device-account-runtime")')
     expect(main).toContain('import("#omo-session-history-runtime")')
     expect(main).toContain('import("#omo-recall-store-runtime")')
@@ -581,6 +591,7 @@ describe("checkExtensionCurrent", () => {
       "#omo-memory-memfs-runtime": "./extensions/omo-memory-memfs.js",
       "#omo-memory-palace-runtime": "./extensions/omo-memory-palace.js",
       "#omo-memory-commands-runtime": "./extensions/omo-memory-commands.js",
+      "#memory-completion-links": "./extensions/omo-memory-commands.js",
       "#omo-device-account-runtime": "./extensions/omo-device-account.js",
       "#omo-session-history-runtime": "./extensions/omo-session-history.js",
       "#omo-recall-store-runtime": "./extensions/omo-recall-store.js",

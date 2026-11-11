@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { fakeHostTransport } from "../../../../senpi-task/src/runners/rpc-host/__fixtures__/fake-host-transport"
 import { askHost } from "../../../../senpi-task/src/runners/rpc-host/host-request"
 import { createLiveThreadSurface } from "./live-surface"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 // Released senpi's own classifier (modes/rpc/host-client-occupancy.ts): the host decides idle exit by it, so the
 // occupancy a client causes is pinned against the real class, not a copy of its rule.
@@ -48,7 +49,7 @@ async function releasedHost(exercise: (socket: string, root: string) => Promise<
       }
     })
   }))
-  const listening = once(server, "listening", { signal: AbortSignal.timeout(2000) })
+  const listening = once(server, "listening", { signal: testBudgetSignal("server to emit 'listening'") })
   server.listen(transport.listenAddress)
   await listening
   try {

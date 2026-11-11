@@ -42,30 +42,18 @@ export interface HostSessionOpener {
 /** Open a daemon session, wire its recoverable handle, and deliver only a fresh child's first turn. */
 export function createHostSessionOpener(input: HostSessionOpenerInput): HostSessionOpener {
   const pendingTeardowns = new Set<Promise<void>>()
-  let fallbackProfileUnsupportedNoticed = false
-  const noticeFallbackProfileUnsupported = (opened: OpenedHostSession): void => {
-    if (opened.retryFallbackDropped !== true || fallbackProfileUnsupportedNoticed) return
-    fallbackProfileUnsupportedNoticed = true
-    input.onWarning(
-      `the task host (engine ${opened.engineVersion}) does not advertise retry_fallback_profile, so daemon-hosted ` +
-        "children are not held to their designated models (the host's own fallback settings apply) until the host is upgraded",
-    )
-  }
-  const openAdmitted = async (
+  const openAdmitted = (
     client: ReturnType<CreateHostSessionChannel>,
     spec: RpcRunnerSpec,
     sessionPath: string,
-  ): Promise<OpenedHostSession> => {
-    const opened = await openHostSessionWithAdmission({
+  ): Promise<OpenedHostSession> =>
+    openHostSessionWithAdmission({
       open: () => openTaskHostSession({ client, spec, sessionPath }),
       now: input.now,
       sleep: input.sleep,
       admissionWaitMs: input.admissionWaitMs,
       onWarning: input.onWarning,
     })
-    noticeFallbackProfileUnsupported(opened)
-    return opened
-  }
 
   const startTurn = async (handle: ReturnType<typeof createHostSessionHandle>, spec: RpcRunnerSpec): Promise<void> => {
     try {
@@ -94,7 +82,7 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
   return {
     settleTeardowns: async () => { await Promise.all(pendingTeardowns) },
     openChild: async (spec, socket, sessionPath) => {
-      const client = input.createClient(socket)
+      const client = input.createClient(socket, spec.task_id)
       if (spec.resumeSessionPath === undefined) await mkdir(dirname(sessionPath), { recursive: true })
       const opened = await openAdmitted(client, spec, sessionPath)
       const handle = createHostSessionHandle({
@@ -116,7 +104,7 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
           spec,
           delaysMs: input.reattachDelaysMs,
           sleep: input.sleep,
-          createClient: input.createClient,
+          createClient: (port) => input.createClient(port, spec.task_id),
           open: (port, path) => openAdmitted(port, spec, path),
         }),
       })

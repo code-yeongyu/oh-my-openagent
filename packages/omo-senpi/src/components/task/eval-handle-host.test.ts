@@ -9,6 +9,7 @@ import type { EvalHandleHost } from "@code-yeongyu/senpi"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { createCompletionObservingStore } from "./completion-bridge"
 import { registerEvalHandleHost, type EvalHandleEngine } from "./eval-handle-host"
+import { testBudgetSignal } from "../../../../../test-support/test-deadline"
 
 function fakePi(provide?: (host: EvalHandleHost) => void): SenpiExtensionAPI {
   return {
@@ -95,7 +96,7 @@ describe("eval handle host beside completion notifications", () => {
     const seen: string[] = []
     const drained = (async () => { for await (const snapshot of watch.updates) seen.push(snapshot.phase) })()
 
-    const terminal = manager.waitFor(started.task_id, { signal: AbortSignal.timeout(5000) })
+    const terminal = manager.waitFor(started.task_id, { signal: testBudgetSignal("manager.waitFor to settle") })
     complete("done")
     await terminal
     watch.close()

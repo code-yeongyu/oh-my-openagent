@@ -28,7 +28,9 @@ async function run(entry: string, args: readonly string[], extraEnv: Record<stri
       cwd: home,
       env: {
         PATH: process.env.PATH, HOME: home, USERPROFILE: home, OMO_RUNTIME: "bun", BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
-        OMO_SERVICE_API_URL: api, OMO_SERVICE_ACCOUNTS_URL: api, ...extraEnv,
+        OMO_SERVICE_API_URL: api, OMO_SERVICE_ACCOUNTS_URL: api,
+        // The child's own lock home: the test preload's account seam does not reach a child process (#12978).
+        OMO_TEST_CREDENTIAL_LOCK_HOME: home, ...extraEnv,
       },
       stdin: "ignore", stdout: "pipe", stderr: "pipe",
     },

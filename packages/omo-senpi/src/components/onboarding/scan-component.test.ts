@@ -23,11 +23,10 @@ import {
   type OnboardingScanResponse,
   type OnboardingScanStore,
 } from "./scan-component"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const roots: string[] = []
 const SECRET = "SK-SENTINEL-ONBOARDING-SCAN"
-const EVENT_TIMEOUT_MS = 20_000
-
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
@@ -112,8 +111,8 @@ function fakeHost() {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         listeners.delete(listener)
-        reject(new Error(`waited ${EVENT_TIMEOUT_MS}ms for the done event of scan ${scanId}, never fired`))
-      }, EVENT_TIMEOUT_MS)
+        reject(new Error(`waited out the test budget for the done event of scan ${scanId}, never fired`))
+      }, remainingTestTime())
       const listener = (event: OnboardingScanEvent) => {
         if (event.scanId !== scanId || event.kind !== "done") return
         clearTimeout(timer)
@@ -365,6 +364,27 @@ describe("onboarding scan RPC", () => {
     const host = register(profile)
     expect(await host.apply({ scanId: "missing", stages: ["credentials"] })).toEqual(expect.objectContaining({ kind: "unavailable" }))
     expect(existsSync(profile.agentDir)).toBe(false)
+  })
+})
+
+describe("onboarding retained-scan cap (#12527)", () => {
+  test("#given eight retained scans, the two oldest applied #when more scans run #then the oldest scan leaves first, applied or not, and applied scans count toward the cap", async () => {
+    // given: since #12509 an applied scan stays retained for understanding, so it holds one of the eight slots
+    const profile = emptyProfile()
+    const store = createOnboardingScanStore()
+    const host = registerSession(profile, store)
+    const ids: string[] = []
+    for (let index = 0; index < 8; index += 1) ids.push((await host.scan({})).scanId)
+    for (const scanId of ids.slice(0, 2)) expect(await host.apply({ scanId, stages: [] })).toEqual(expect.objectContaining({ scanId }))
+
+    // when / then: each new scan evicts exactly the oldest retained one
+    ids.push((await host.scan({})).scanId)
+    expect([...store.scans.keys()]).toEqual(ids.slice(1))
+    ids.push((await host.scan({})).scanId)
+    expect([...store.scans.keys()]).toEqual(ids.slice(2))
+    ids.push((await host.scan({})).scanId)
+    expect([...store.scans.keys()]).toEqual(ids.slice(3))
+    expect(store.scans.get(ids[3] ?? "")?.applied).toBe(false)
   })
 })
 

@@ -7,6 +7,7 @@ import { createOnboardingComponent, type OnboardingComponentDependencies } from 
 import { nodeSessionHistoryFs, type SessionHistoryFile, type SessionHistoryFileStats, type SessionHistoryFs } from "./session-history"
 import * as state from "./state"
 import { createOnboardingHarness } from "./test-harness"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 // Contract (#10505 review HIGH): the TUI onboarding's first prompt never waits on the session-history
 // scan. The scan runs in the background, bounded, and its summary reaches the context afterwards;
@@ -84,7 +85,7 @@ function harness(overrides: Partial<OnboardingComponentDependencies> = {}) {
 
 function nextSentMessage(h: ReturnType<typeof harness>): Promise<{ message: Record<string, unknown>; options?: Record<string, unknown> }> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`waited ${WAIT_MS}ms for the background history message, never sent`)), WAIT_MS)
+    const timer = setTimeout(() => reject(new Error(`waited out the test budget for the background history message, never sent`)), remainingTestTime())
     const send = h.pi.sendMessage.bind(h.pi)
     h.pi.sendMessage = (message, options) => {
       send(message, options)
@@ -118,11 +119,12 @@ describe("onboarding session history in the background", () => {
 
     const { ms, content } = await timedPrompt(h)
 
-    expect(content).toContain("onboarding/SKILL.md")
+    expect(content).toContain("built-in `onboarding` skill")
     expect(ms).toBeLessThan(FIRST_PROMPT_BUDGET_MS)
   }, WAIT_MS)
 
   test("#given a large history #when the first prompt has returned #then the bounded history summary arrives afterwards for the next turn", async () => {
+    useTestTimeout(WAIT_MS)
     const h = harness()
     await h.start()
     const arrived = nextSentMessage(h)
@@ -155,7 +157,7 @@ describe("onboarding session history in the background", () => {
 
     const { ms, content } = await timedPrompt(h)
 
-    expect(content).toContain("onboarding/SKILL.md")
+    expect(content).toContain("built-in `onboarding` skill")
     expect(ms).toBeLessThan(FIRST_PROMPT_BUDGET_MS)
     expect(scans).toBe(1)
     expect(h.pi.messages).toEqual([])
@@ -170,7 +172,7 @@ describe("onboarding session history in the background", () => {
     await h.start()
 
     const { content } = await timedPrompt(h)
-    expect(content).toContain("onboarding/SKILL.md")
+    expect(content).toContain("built-in `onboarding` skill")
     await failure?.catch(() => undefined)
     await new Promise((resolve) => setImmediate(resolve))
 

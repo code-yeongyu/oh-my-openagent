@@ -11,7 +11,13 @@ export {
 export type { AxNode, CaptureRegion, CaptureResult, DesktopDisplay, DesktopWindow } from "./run/engine-results";
 export { type ControlState, createDesktopFacade, type DesktopFacade, type WindowFilter } from "./run/facade";
 export { ElementHandle, WindowHandle } from "./run/handles";
-export { type ComputerRunHost, type ComputerRunRequest, type ExecuteTool, runComputerCode } from "./run/runtime";
+export {
+	type ComputerRunHost,
+	type ComputerRunRequest,
+	type ComputerRunSandbox,
+	type ExecuteTool,
+	runComputerCode,
+} from "./run/runtime";
 export type { ScreenshotOptions, ScreenshotResult } from "./run/screenshot";
 export type { ObserveOptions, ObservationResult } from "./run/observe";
 export type { HoldOptions, HoldMouseOptions } from "./run/input-target";

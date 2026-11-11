@@ -51,6 +51,8 @@ async function logoutHarness(reply: () => Response | Promise<Response>, override
     const env = {
       PATH: process.env.PATH, HOME: home, USERPROFILE: home, OMO_RUNTIME: "bun",
       OMO_SERVICE_API_URL: overrideApi ?? api, OMO_TEST_KEYSTORE_URL: `${api}/fake-keystore`,
+      // The child's own lock home: the test preload's account seam does not reach a child process (#12978).
+      OMO_TEST_CREDENTIAL_LOCK_HOME: home,
       OMO_TEST_FETCH_FAILURE: failure,
     }
     const child = Bun.spawn(command, { cwd: home, env, stdout: "pipe", stderr: "pipe" })

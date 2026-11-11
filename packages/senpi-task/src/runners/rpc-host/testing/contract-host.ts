@@ -36,6 +36,8 @@ export type ContractHostOptions = {
   readonly rejectProof?: boolean
   /** A session with no file yet: unload_session refuses it `unsupported` (senpi session-unload.ts `loaded`). */
   readonly unwritten?: boolean
+  /** unload_session answers `{outcome: "refused", reason}` with this reason, as data, whatever else is set. */
+  readonly unloadRefusal?: string
 }
 export type ContractHost = {
   readonly socket: string
@@ -207,6 +209,7 @@ export async function withContractHost(options: ContractHostOptions, exercise: (
         // unload_session answers its refusals as data (senpi session-unload.ts): a session with no file is unsupported,
         // other holders refuse it unless force; otherwise every attachment is drained and the session ends for all.
         if (frame.type === "unload_session") {
+          if (options.unloadRefusal !== undefined) { respond(frame, { outcome: "refused", reason: options.unloadRefusal, detail: `refused: ${options.unloadRefusal}` }); continue }
           if (options.unwritten) { respond(frame, { outcome: "refused", reason: "unsupported", detail: "the session has no file to reopen it by" }); continue }
           if (options.otherAttachments && frame.force !== true) { respond(frame, { outcome: "refused", reason: "attached", detail: `${options.otherAttachments} other client(s) attached` }); continue }
           mutations.push(frame)

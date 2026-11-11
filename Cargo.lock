@@ -1978,6 +1978,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "omo-git-job-helper"
+version = "0.0.0"
+dependencies = [
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2507,6 +2514,8 @@ dependencies = [
  "senpi-desktop-backend-atspi",
  "senpi-desktop-core",
  "senpi-desktop-safety",
+ "serde",
+ "serde_json",
  "tempfile",
  "tokio",
  "xkeysym",
@@ -2603,6 +2612,7 @@ version = "0.0.0"
 dependencies = [
  "flume",
  "image",
+ "libc",
  "parking_lot",
  "senpi-desktop-backend-fake",
  "senpi-desktop-backend-macos",
@@ -2618,6 +2628,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "ulid",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

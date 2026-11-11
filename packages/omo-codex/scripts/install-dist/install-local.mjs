@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:b837866f052aeaebdb29434aa060c717e1588680ac2d27dd6470c3aa46bf6ce0:339b2606b7d2b32746534d242fc03fa67d973e14ef9d15e8669dbf08c420dba7
+// omo-codex-install:3de1861d4356427076256fb804c904de24c2c806ff63cc03c60e6a9ac87b937b:8fb5d4c0154aef7762f007e369829059241a15d2449329189bf850f6327a9ac4
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10205,7 +10205,7 @@ var package_default;
 var init_package = __esm(() => {
   package_default = {
     name: "@oh-my-opencode/omo-codex",
-    version: "5.1.62",
+    version: "5.1.69",
     type: "module",
     private: true,
     description: "Codex harness adapter for oh-my-openagent. Vendored Codex plugin namespace (omo) + TypeScript installer + telemetry.",
@@ -13154,7 +13154,7 @@ var LATEST_MODEL_BY_FAMILY = {
   claudeOpus: "claude-opus-5-5",
   claudeSonnet: "claude-sonnet-5-5",
   claudeHaiku: "claude-haiku-5-5",
-  claudeFable: "claude-fable-5-1",
+  claudeFable: "claude-fable-5-2",
   gptAstra: "gpt-6-astra",
   gptSol: "gpt-6.1-sol",
   gptSolFast: "gpt-6.1-sol-fast",
@@ -19716,7 +19716,11 @@ var OmoComputerSettingsLayerSchema = object({
   audit_log: object({ enabled: boolean2() }).partial().strict(),
   screenshot_gc: object({ enabled: boolean2(), stale_ms: nonNegativeInteger, scan_interval_ms: nonNegativeInteger }).partial().strict(),
   engine_path: string2().min(1),
-  cua_adapter: boolean2()
+  cua_adapter: boolean2(),
+  run_sandbox: _enum(["vm", "quickjs"]).describe("Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"),
+  intervention: _enum(["continue", "pause"]).describe("What a background action does while the user uses the target app (default: continue)"),
+  macos_key_priming: _enum(["on", "off"]).describe("macOS background keys first make the target window key (default: off)"),
+  trace: boolean2().describe("Per-request timing traces (default: false)")
 }).partial().strict().describe("Experimental computer use in OmO Native: screenshots, windows, accessibility trees and native mouse and keyboard input. Every key is optional; defaults depend on the host.");
 var OmoComputerSettingsSchema = OmoComputerSettingsLayerSchema;
 
@@ -19902,6 +19906,22 @@ var OmoMemoryProjectionLayerSchema = object({
   max_entries_per_directory: number2().int().min(0).optional(),
   max_bytes: number2().int().min(0).optional()
 }).strict();
+var OmoMemoryRuntimeSchema = object({
+  retention_days: number2().int().min(1).default(7),
+  abandoned_journal_days: number2().int().min(1).default(14),
+  completions_days: number2().int().min(1).default(30),
+  pass_budget_ms: number2().int().min(1).default(60000),
+  discard_unreflected_journals: boolean2().default(false),
+  max_bytes: number2().int().min(0).default(2 * 1024 * 1024 * 1024)
+}).strict();
+var OmoMemoryRuntimeLayerSchema = object({
+  retention_days: number2().int().min(1).optional(),
+  abandoned_journal_days: number2().int().min(1).optional(),
+  completions_days: number2().int().min(1).optional(),
+  pass_budget_ms: number2().int().min(1).optional(),
+  discard_unreflected_journals: boolean2().optional(),
+  max_bytes: number2().int().min(0).optional()
+}).strict();
 var OmoMemoryAgentOverridesSchema = object({
   enabled: boolean2().optional(),
   agent: string2().min(1).optional(),
@@ -19917,6 +19937,7 @@ var OmoMemoryAgentOverridesSchema = object({
   search: OmoMemorySearchLayerSchema.optional(),
   recall: OmoMemoryRecallLayerSchema.optional(),
   projection: OmoMemoryProjectionLayerSchema.optional(),
+  runtime: OmoMemoryRuntimeLayerSchema.optional(),
   compile_warn_tokens: number2().int().positive().optional()
 }).strict();
 var OmoMemoryAutoIdentitySchema = _enum(["path", "git"]);
@@ -19961,6 +19982,7 @@ var OmoMemorySettingsSchema = object({
   }),
   project_scope: OmoMemoryProjectScopeSchema.default({ nudge: true, recall: true }),
   projection: OmoMemoryProjectionSchema.default({ max_entries_per_directory: 0, max_bytes: 40960 }),
+  runtime: OmoMemoryRuntimeSchema.default({ retention_days: 7, abandoned_journal_days: 14, completions_days: 30, pass_budget_ms: 60000, discard_unreflected_journals: false, max_bytes: 2 * 1024 * 1024 * 1024 }),
   compile_warn_tokens: number2().int().positive().default(30000),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).default({})
 }).strict();
@@ -19981,6 +20003,7 @@ var OmoMemorySettingsLayerSchema = object({
   recall: OmoMemoryRecallLayerSchema.optional(),
   project_scope: OmoMemoryProjectScopeLayerSchema.optional(),
   projection: OmoMemoryProjectionLayerSchema.optional(),
+  runtime: OmoMemoryRuntimeLayerSchema.optional(),
   compile_warn_tokens: number2().int().positive().optional(),
   agents: record(string2(), OmoMemoryAgentOverridesSchema).optional()
 }).strict();

@@ -8,6 +8,7 @@
 
 import type { LoroDoc } from "../../crdt/loro-runtime"
 
+import { updateBodyText } from "./line-update"
 import { BODY_NAME, cidRoot } from "./state"
 import { newTag } from "./tag"
 
@@ -25,7 +26,7 @@ export function transplantContent(target: LoroDoc, merged: LoroDoc): void {
 function transplantText(target: LoroDoc, merged: LoroDoc, name: string): void {
   const want = merged.getText(name).toString()
   const have = target.hasContainer(cidRoot(name, "Text")) ? target.getText(name).toString() : ""
-  if (want !== have) target.getText(name).update(want)
+  if (want !== have) updateBodyText(target.getText(name), want)
 }
 
 function transplantMap(target: LoroDoc, merged: LoroDoc, name: string): void {
