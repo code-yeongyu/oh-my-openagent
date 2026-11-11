@@ -461,6 +461,56 @@ After`
       expect(results[0].command).toBe("real-cmd")
       expect(results[0].args).toBe("arg")
     })
+
+    it("should ignore candidates inside tilde fences", () => {
+      // given slash command inside a ~~~ fence and another outside
+      const text = "~~~\n/ignore-me\n~~~\nthen /real-cmd arg"
+
+      // when parsing all
+      const results = parseAllSlashCommands(text)
+
+      // then only the candidate outside the fence is returned
+      expect(results).toHaveLength(1)
+      expect(results[0].command).toBe("real-cmd")
+      expect(results[0].args).toBe("arg")
+    })
+
+    it("should ignore candidates inside double-backtick spans", () => {
+      // given slash command inside a `` span and another outside
+      const text = "run ``/ignore-me`` and then /real-cmd arg"
+
+      // when parsing all
+      const results = parseAllSlashCommands(text)
+
+      // then only the candidate outside the span is returned
+      expect(results).toHaveLength(1)
+      expect(results[0].command).toBe("real-cmd")
+      expect(results[0].args).toBe("arg")
+    })
+
+    it("should ignore candidates after an unclosed fence", () => {
+      // given an unclosed ``` fence: the rest of the text is code
+      const text = "run /real-cmd first\n```\n/ignore-me"
+
+      // when parsing all
+      const results = parseAllSlashCommands(text)
+
+      // then only the candidate before the fence is returned
+      expect(results).toHaveLength(1)
+      expect(results[0].command).toBe("real-cmd")
+    })
+
+    it("should not include a trailing period in the command name", () => {
+      // given a command at the end of a sentence
+      const text = "please run /my-skill."
+
+      // when parsing all
+      const results = parseAllSlashCommands(text)
+
+      // then the command name excludes the sentence period
+      expect(results).toHaveLength(1)
+      expect(results[0].command).toBe("my-skill")
+    })
   })
 
   describe("findMatchingSlashCommandPartIndex", () => {
