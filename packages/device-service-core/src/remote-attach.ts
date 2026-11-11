@@ -92,7 +92,11 @@ const attachEvent = (event: LocalEvent): AttachEvent | undefined => {
 const ENDED_COMMAND_WAIT_MS = 30_000
 
 // The sender ledger's progress states (local API command_state): every other state ends the command.
-export const PROGRESS_STATES: ReadonlySet<CommandStateEvent["state"]> = new Set(["queued", "transport_confirmed", "engine_dispatched"])
+export const PROGRESS_STATES: ReadonlySet<CommandStateEvent["state"]> = new Set([
+  "queued",
+  "transport_confirmed",
+  "engine_dispatched",
+])
 
 const toRemote = (event: AttachEvent): RemoteAttachEvent => {
   switch (event.kind) {
@@ -123,7 +127,7 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
   })
   snapshot.catch(() => {})
   let resolveDetached!: (reason: AttachEnd) => void
-  const detached = new Promise<AttachEnd>(resolve => {
+  const detached = new Promise<AttachEnd>((resolve) => {
     resolveDetached = resolve
   })
   let ended = false
@@ -173,7 +177,7 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
     }
     if (remote.kind === "detached") finish(remote.reason)
   }
-  const stop = client.onEvent(event => {
+  const stop = client.onEvent((event) => {
     channel?.accept(event)
     const mine = attachEvent(event)
     if (mine === undefined) return
@@ -197,15 +201,15 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
         handle: attach,
         snapshot,
         detached,
-        onEvent: listener => {
+        onEvent: (listener) => {
           for (const event of history) listener(event)
           if (!ended) listeners.add(listener)
           return () => listeners.delete(listener)
         },
         failure: () => failure,
-        onFrame: listener => delegated.onFrame(listener),
-        onChannelLoss: listener => delegated.onLoss(listener),
-        command: rpc =>
+        onFrame: (listener) => delegated.onFrame(listener),
+        onChannelLoss: (listener) => delegated.onLoss(listener),
+        command: (rpc) =>
           new Promise<CommandResult>((resolve, reject) => {
             if (ended) return reject(new Error("the attach has ended"))
             // Minted here, before sending, so a state that arrives ahead of the answer is not missed.
@@ -219,7 +223,7 @@ export function openAttach(client: LocalApiClient, device: string, sessionId: st
               settle()
               reject(new Error(`the attach ended before the command settled: ${reason}`))
             }
-            const stopState = client.onEvent(event => {
+            const stopState = client.onEvent((event) => {
               if (event.kind !== "session.command_state" || event.command_id !== commandId) return
               if (PROGRESS_STATES.has(event.state)) return
               // Taken before settling: the last command of an ended attach releases the channel that holds the reply.

@@ -52,6 +52,8 @@ export type ManagedStartSpec = {
   // Names of tools the child must NOT get (the agent definition's disallowedTools), applied through
   // senpi's excludeTools so a resumed child never comes back with a wider tool surface.
   readonly toolDenylist?: readonly string[]
+  // senpi#6287: the child runs only as a sandboxed process (runners/rpc/sandbox/policy.ts).
+  readonly sandbox?: "deny-live"
   readonly includeTaskTools?: boolean
   // Names of the member-scoped ToolDefinitions, persisted on spawn_spec so a respawn can re-resolve
   // the executable definitions against the live parent registries.
@@ -235,13 +237,17 @@ export type ContinueResult =
       readonly status: TaskStatus
       readonly delivered: ContinueDelivery
     }
-  | { readonly kind: "not_continuable"; readonly task_id?: string; readonly reason: string; readonly suggestion: string }
+  | {
+      readonly kind: "not_continuable"
+      readonly task_id?: string
+      readonly reason: string
+      readonly suggestion: string
+    }
 
-export type ForgetOptions = { readonly path: "park" | "evict" } | { readonly path: "end"; readonly reason?: "target_gone" }
+export type ForgetOptions =
+  { readonly path: "park" | "evict" } | { readonly path: "end"; readonly reason?: "target_gone" }
 
-export type ListScope =
-  | { readonly scope: "parent-session"; readonly session_id: string }
-  | { readonly scope: "all" }
+export type ListScope = { readonly scope: "parent-session"; readonly session_id: string } | { readonly scope: "all" }
 
 export type ListedTask = {
   readonly record: TaskRecord

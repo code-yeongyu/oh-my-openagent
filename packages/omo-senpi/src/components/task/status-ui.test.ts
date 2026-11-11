@@ -3,12 +3,7 @@ import { describe, expect, it } from "bun:test"
 import type { ListedTask, TaskRecord, TaskStatus } from "@oh-my-opencode/senpi-task"
 
 import type { CapturedUi } from "./runtime-context"
-import {
-  createTaskStatusUi,
-  type StatusUiManager,
-  type StatusUiRuntime,
-  type StatusUiTimers,
-} from "./status-ui"
+import { createTaskStatusUi, type StatusUiManager, type StatusUiRuntime, type StatusUiTimers } from "./status-ui"
 
 function listed(records: readonly TaskRecord[]): readonly ListedTask[] {
   return records.map((entry) => ({ record: entry }))
@@ -49,7 +44,9 @@ function fakeUi(): FakeUi {
   }
 }
 
-function fakeManager(records: readonly TaskRecord[]): StatusUiManager & { scopes: Array<{ scope: string; session_id: string }> } {
+function fakeManager(
+  records: readonly TaskRecord[],
+): StatusUiManager & { scopes: Array<{ scope: string; session_id: string }> } {
   const scopes: Array<{ scope: string; session_id: string }> = []
   return {
     scopes,
@@ -79,7 +76,9 @@ describe("createTaskStatusUi.syncNow", () => {
         active.set(handle, callback)
         return handle
       },
-      clear: (handle) => { if (typeof handle === "number") active.delete(handle) },
+      clear: (handle) => {
+        if (typeof handle === "number") active.delete(handle)
+      },
     }
     const statusUi = createTaskStatusUi({
       manager: fakeManager([record({ task_id: "st_static", status: "running" })]),
@@ -94,7 +93,12 @@ describe("createTaskStatusUi.syncNow", () => {
 
   it("#given two running tasks in the current session #when syncing #then footer and two widget rows render scoped to the session", () => {
     const mine = [record({ task_id: "st_1", status: "running" }), record({ task_id: "st_2", status: "running" })]
-    const other = record({ task_id: "st_other", status: "running", parent_session_id: "session-b", root_session_id: "session-b" })
+    const other = record({
+      task_id: "st_other",
+      status: "running",
+      parent_session_id: "session-b",
+      root_session_id: "session-b",
+    })
     const manager = fakeManager([...mine, other])
     const ui = fakeUi()
     const statusUi = createTaskStatusUi({ manager, runtime: runtimeOf(ui) })
@@ -157,11 +161,13 @@ describe("createTaskStatusUi.syncNow", () => {
   it("#given a completed team record whose handle is still resident #when syncing #then the widget is cleared", () => {
     const ui = fakeUi()
     const manager = {
-      ...fakeManager([record({
-        task_id: "st_stale",
-        name: "team:12345678-1234-1234-1234-123456789abc:stale",
-        status: "completed",
-      })]),
+      ...fakeManager([
+        record({
+          task_id: "st_stale",
+          name: "team:12345678-1234-1234-1234-123456789abc:stale",
+          status: "completed",
+        }),
+      ]),
       residentTaskIds: () => ["st_stale"],
     }
     createTaskStatusUi({ manager, runtime: runtimeOf(ui) }).syncNow()
@@ -177,7 +183,9 @@ describe("createTaskStatusUi.scheduleSync", () => {
         active.set(1, callback)
         return 1
       },
-      clear: (handle) => { if (typeof handle === "number") active.delete(handle) },
+      clear: (handle) => {
+        if (typeof handle === "number") active.delete(handle)
+      },
     }
     const listeners = new Map<string, (event: { readonly type: string }) => void>()
     const manager: StatusUiManager = {

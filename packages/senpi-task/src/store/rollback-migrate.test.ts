@@ -165,7 +165,9 @@ describe("rollback host-session migration", () => {
     expect(store.load("st_00000001")?.host_session?.socket).toBe(target)
     expect(store.load("st_00000001")?.suspension_reason).toBeUndefined()
     expect(store.load("st_00000002")?.host_session?.socket).toBe(target)
-    const events = readFileSync(join(storeDir, "logs", "st_00000001.jsonl"), "utf8").trim().split("\n")
+    const events = readFileSync(join(storeDir, "logs", "st_00000001.jsonl"), "utf8")
+      .trim()
+      .split("\n")
     expect(events).toHaveLength(1)
     expect(JSON.parse(events[0] ?? "{}")).toEqual({
       type: "host_session_migrated",
@@ -183,8 +185,9 @@ describe("rollback host-session migration", () => {
       host_session: { socket: shard, routing_id: "r3", session_path: "/tmp/s3.jsonl", instance_id: "i3" },
     })
 
-    expect(() => migrateHostSessionSockets(storeDir, { to: "/tmp/rpc.sock", deadEndpoints: new Set() }))
-      .toThrow("live or unverified endpoint")
+    expect(() => migrateHostSessionSockets(storeDir, { to: "/tmp/rpc.sock", deadEndpoints: new Set() })).toThrow(
+      "live or unverified endpoint",
+    )
     expect(store.load("st_00000003")?.host_session?.socket).toBe(shard)
   })
 
@@ -265,9 +268,8 @@ describe("rollback host-session migration", () => {
     expect(PRODUCTION_R0_FAILURE_REASONS).toEqual(R0_TASK_START_FAILURE_REASONS)
     expect(result.sockets).toEqual([])
     expect(result.migrated).toBeGreaterThan(0)
-    const taskFiles = Array.from(
-      { length: ordinal - 16 },
-      (_, index) => join(storeDir, "tasks", `st_${(index + 16).toString(16).padStart(8, "0")}.json`),
+    const taskFiles = Array.from({ length: ordinal - 16 }, (_, index) =>
+      join(storeDir, "tasks", `st_${(index + 16).toString(16).padStart(8, "0")}.json`),
     )
     for (const path of taskFiles) {
       const record = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>

@@ -25,6 +25,8 @@ export type ReconcileDeferredReason =
   | "rollback_failed"
   // A previous daemon generation still holds this session path; the child waits, it is never lost.
   | "host_draining"
+  // A review-role child that cannot be sandboxed here (senpi#6287); it is never resumed unsandboxed.
+  | "sandbox_required"
   // The daemon hosting this child did not answer; the record stays parked until it does.
   | "host_unreachable"
   // The recorded host answers, but incompatibly; the session is never reopened on another endpoint.

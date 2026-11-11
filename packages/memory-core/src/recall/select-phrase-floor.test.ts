@@ -12,7 +12,11 @@ const paths = (candidates: readonly { path: string }[]): string[] => candidates.
 describe("selectRecallCandidates hybrid phrase floor", () => {
   // The phrase note says "status updates" once; the noise notes repeat the lone words, so bm25 ranks
   // them first and the flat substring vote cannot tell the phrase hit from a lone-word hit.
-  const phrase = doc("people/dana.md", "Dana", "Dana wants weekly status updates on Friday with the release date first.")
+  const phrase = doc(
+    "people/dana.md",
+    "Dana",
+    "Dana wants weekly status updates on Friday with the release date first.",
+  )
   const noise = [
     doc("archive/a.md", "updates written", "updates written updates written"),
     doc("archive/b.md", "written updates", "written updates written"),

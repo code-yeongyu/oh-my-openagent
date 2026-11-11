@@ -13,9 +13,14 @@ export function resolveTaskAgents(config: OmoConfig): Readonly<Record<string, Ag
   for (const [name, definition] of Object.entries(mapOmoConfigAgents(config))) {
     merged[name] = { ...merged[name], ...definition }
   }
-  for (const name of [...CURATED_READONLY_AGENT_NAMES, ...ULW_REVIEWER_AGENT_NAMES]) {
+  for (const name of CURATED_READONLY_AGENT_NAMES) {
     const definition = merged[name]
     if (definition !== undefined) merged[name] = { ...definition, executionMode: "in-process" }
+  }
+  // The review-role trio runs only as a sandboxed process child (senpi#6287), whatever omo.json says.
+  for (const name of ULW_REVIEWER_AGENT_NAMES) {
+    const definition = merged[name]
+    if (definition !== undefined) merged[name] = { ...definition, executionMode: "process" }
   }
   return merged
 }

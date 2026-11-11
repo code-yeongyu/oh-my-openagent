@@ -59,7 +59,12 @@ function listTree(root: string, relativePath = relative): Map<string, string> {
 
 type PythonEntry = { cwd: string; argv: string[] }
 
-function moduleEntry(path: string, tree: Map<string, string>, root: string, relativePath: typeof relative): PythonEntry | undefined {
+function moduleEntry(
+  path: string,
+  tree: Map<string, string>,
+  root: string,
+  relativePath: typeof relative,
+): PythonEntry | undefined {
   const parts = [basename(path, ".py")]
   let dir = dirname(path)
   while (tree.has(relativePath(root, join(dir, "__init__.py")).replaceAll("\\", "/"))) {
@@ -71,7 +76,12 @@ function moduleEntry(path: string, tree: Map<string, string>, root: string, rela
   return { cwd: dir, argv: ["-B", "-m", parts.join("."), "--help"] }
 }
 
-function loadsSiblingCode(path: string, tree: Map<string, string>, root: string, relativePath: typeof relative): boolean {
+function loadsSiblingCode(
+  path: string,
+  tree: Map<string, string>,
+  root: string,
+  relativePath: typeof relative,
+): boolean {
   const dir = relativePath(root, dirname(path)).replaceAll("\\", "/")
   const source = readFileSync(path, "utf8")
   for (const match of source.matchAll(/^\s*(?:from|import)\s+(\w+)|run_module\(\s*["'](\w+)/gm)) {
@@ -87,11 +97,13 @@ function pythonEntries(root: string, relativePath = relative): PythonEntry[] {
   for (const [key] of tree) {
     if (!key.endsWith(".py") || key.split("/").includes("tests")) continue
     const path = join(root, key)
-    if (!/__name__\s*==\s*["']__main__["']/.test(readFileSync(path, "utf8")) && basename(path) !== "__main__.py") continue
+    if (!/__name__\s*==\s*["']__main__["']/.test(readFileSync(path, "utf8")) && basename(path) !== "__main__.py")
+      continue
     const skillDir = join(root, key.split("/")[0] ?? "")
     const asModule = moduleEntry(path, tree, root, relativePath)
     if (asModule) found.push(asModule)
-    else if (loadsSiblingCode(path, tree, root, relativePath)) found.push({ cwd: skillDir, argv: [relativePath(skillDir, path).replaceAll("\\", "/"), "--help"] })
+    else if (loadsSiblingCode(path, tree, root, relativePath))
+      found.push({ cwd: skillDir, argv: [relativePath(skillDir, path).replaceAll("\\", "/"), "--help"] })
   }
   return found
 }
@@ -117,8 +129,15 @@ describe("bundled skill scripts", () => {
 
     // then
     expect([...tree.keys()].sort()).toEqual([
-      "fixture/", "fixture/pkg/", "fixture/pkg/__init__.py", "fixture/pkg/__main__.py",
-      "fixture/scripts/", "fixture/scripts/entry.mjs", "fixture/scripts/entry.py", "fixture/scripts/entry.sh", "fixture/scripts/helper.py",
+      "fixture/",
+      "fixture/pkg/",
+      "fixture/pkg/__init__.py",
+      "fixture/pkg/__main__.py",
+      "fixture/scripts/",
+      "fixture/scripts/entry.mjs",
+      "fixture/scripts/entry.py",
+      "fixture/scripts/entry.sh",
+      "fixture/scripts/helper.py",
     ])
     expect(entries.sort((left, right) => left.argv.join(" ").localeCompare(right.argv.join(" ")))).toEqual([
       { cwd: join(root, "fixture"), argv: ["-B", "-m", "pkg", "--help"] },
@@ -127,7 +146,10 @@ describe("bundled skill scripts", () => {
   })
 
   test("#given the test interpreter #when checked #then it meets the bundled scripts' Python 3.11 floor", async () => {
-    const child = Bun.spawn([python, "-c", "import sys; print(sys.version_info >= (3, 11))"], { stdout: "pipe", stderr: "ignore" })
+    const child = Bun.spawn([python, "-c", "import sys; print(sys.version_info >= (3, 11))"], {
+      stdout: "pipe",
+      stderr: "ignore",
+    })
     expect((await new Response(child.stdout).text()).trim()).toBe("True")
   })
 
@@ -140,7 +162,13 @@ describe("bundled skill scripts", () => {
     // when
     const exits = await Promise.all(
       entries.map(async (entry) => {
-        const child = Bun.spawn([python, ...entry.argv], { cwd: entry.cwd, env: pythonEnv, stdout: "ignore", stderr: "pipe", timeout: 30_000 })
+        const child = Bun.spawn([python, ...entry.argv], {
+          cwd: entry.cwd,
+          env: pythonEnv,
+          stdout: "ignore",
+          stderr: "pipe",
+          timeout: 30_000,
+        })
         const [stderr, code] = await Promise.all([new Response(child.stderr).text(), child.exited])
         return { entry: entry.argv.join(" "), code, stderr: code === 0 ? "" : stderr.slice(-400) }
       }),
@@ -155,19 +183,35 @@ describe("bundled skill scripts", () => {
     // given
     const home = join(workRoot, "home")
     mkdirSync(join(home, ".claude", "transcripts"), { recursive: true })
-    const row = { sessionId: "fixture-11373", type: "user", timestamp: "2026-10-26T00:00:00Z", cwd: home, content: "needle-11373 bundle check" }
+    const row = {
+      sessionId: "fixture-11373",
+      type: "user",
+      timestamp: "2026-10-26T00:00:00Z",
+      cwd: home,
+      content: "needle-11373 bundle check",
+    }
     writeFileSync(join(home, ".claude", "transcripts", "fixture-11373.jsonl"), `${JSON.stringify(row)}\n`)
-    const env = { ...pythonEnv, HOME: home, USERPROFILE: home, XDG_CACHE_HOME: join(home, ".cache"), XDG_CONFIG_HOME: join(home, ".config"), XDG_DATA_HOME: join(home, ".local", "share") }
+    const env = {
+      ...pythonEnv,
+      HOME: home,
+      USERPROFILE: home,
+      XDG_CACHE_HOME: join(home, ".cache"),
+      XDG_CONFIG_HOME: join(home, ".config"),
+      XDG_DATA_HOME: join(home, ".local", "share"),
+    }
     const before = listTree(shippedRoot)
 
     // when
-    const child = Bun.spawn([python, "scripts/find-agent-sessions.py", "find", "needle-11373", "--platform", "claude", "--limit", "5"], {
-      cwd: join(shippedRoot, "coding-agent-sessions"),
-      env,
-      stdout: "pipe",
-      stderr: "pipe",
-      timeout: 60_000,
-    })
+    const child = Bun.spawn(
+      [python, "scripts/find-agent-sessions.py", "find", "needle-11373", "--platform", "claude", "--limit", "5"],
+      {
+        cwd: join(shippedRoot, "coding-agent-sessions"),
+        env,
+        stdout: "pipe",
+        stderr: "pipe",
+        timeout: 60_000,
+      },
+    )
     const [stdout, exitCode] = await Promise.all([new Response(child.stdout).text(), child.exited])
 
     // then

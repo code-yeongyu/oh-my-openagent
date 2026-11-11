@@ -4,6 +4,7 @@ import { RunnerError } from "../runners/in-process/runner-error"
 export function classifyResumeFailure(error: unknown): RespawnResult {
   if (RunnerError.is(error)) {
     const { kind, message } = error.failure
+    if (kind === "sandbox_required") return failure("unrecoverable", kind, message)
     if (kind === "model_unavailable" || kind === "tools_unavailable" || kind === "session_unavailable") {
       return failure("retryable", kind, message)
     }
@@ -22,8 +23,12 @@ export function hostRefusal(error: unknown): RespawnResult | undefined {
 
 export function isTeamRuntimeUnavailable(error: unknown): boolean {
   if (!(error instanceof Error) || error.name !== "TeamMemberRespawnLaunchError" || !("code" in error)) return false
-  return error.code === "runtime_unavailable" || error.code === "runtime_inactive" ||
-    error.code === "member_missing" || error.code === "task_mapping_mismatch"
+  return (
+    error.code === "runtime_unavailable" ||
+    error.code === "runtime_inactive" ||
+    error.code === "member_missing" ||
+    error.code === "task_mapping_mismatch"
+  )
 }
 
 export function failure(

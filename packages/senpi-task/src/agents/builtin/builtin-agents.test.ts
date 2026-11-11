@@ -29,7 +29,6 @@ const EXPECTED_LIBRARIAN_TOOL_ALLOWLIST = [...EXPECTED_TOOL_ALLOWLIST, "x_search
 
 const EXPECTED_REVIEWER_TOOL_ALLOWLIST = [...EXPECTED_TOOL_ALLOWLIST, "write"] as const
 
-
 describe("builtin curated agents", () => {
   test("#given the builtin defaults #when listing names sorted #then the 4 curated and 3 reviewer agents are present", () => {
     const names = BUILTIN_AGENT_DEFAULTS.map((definition) => definition.name).sort()
@@ -62,13 +61,12 @@ describe("builtin curated agents", () => {
     }
   })
 
-  test("#given every builtin definition #when inspecting shape #then mode is subagent and executionMode is pinned in-process", () => {
+  test("#given every builtin definition #when inspecting shape #then curated agents run in-process and the review-role trio as sandboxed processes", () => {
     for (const definition of BUILTIN_AGENT_DEFAULTS) {
       expect(definition.mode).toBe("subagent")
-      expect(definition.executionMode).toBe("in-process")
+      expect(definition.executionMode).toBe(ULW_REVIEWER_AGENT_NAMES.has(definition.name) ? "process" : "in-process")
     }
   })
-
 
   test("#given every curated definition #when inspecting tool rules #then the expected literal allow-true rules are present", () => {
     for (const definition of CURATED_READONLY_AGENT_DEFAULTS) {

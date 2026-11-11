@@ -53,12 +53,25 @@ function write(setup: Awaited<ReturnType<typeof memoryRepoWithPipeHoldingHook>>,
   return runMemoryTool({
     repo: setup.repo,
     lock: setup.lock,
-    params: { command: "create", reason: `write ${file}`, file_path: file, description: "Fact", file_text: "a fact", author: AUTHOR },
+    params: {
+      command: "create",
+      reason: `write ${file}`,
+      file_path: file,
+      description: "Fact",
+      file_text: "a fact",
+      author: AUTHOR,
+    },
   })
 }
 
 async function trackHolders(holderPids: string, count: number): Promise<void> {
-  expect(await probeUntil(async () => (await readFile(holderPids, "utf8").catch(() => "")).trim().split("\n").filter(Boolean).length >= count, 20_000)).toBe(true)
+  expect(
+    await probeUntil(
+      async () =>
+        (await readFile(holderPids, "utf8").catch(() => "")).trim().split("\n").filter(Boolean).length >= count,
+      20_000,
+    ),
+  ).toBe(true)
   for (const line of (await readFile(holderPids, "utf8")).trim().split("\n")) {
     const pid = Number(line)
     if (!holders.includes(pid)) holders.push(pid)
@@ -66,22 +79,26 @@ async function trackHolders(holderPids: string, count: number): Promise<void> {
 }
 
 describe("a memory write whose post-commit hook leaves a child holding git's pipe (omo #10199)", () => {
-  test.skipIf(process.platform === "win32")("#given the hook child still holds the pipe #when a memory write commits #then it returns, releases the writer lock, and the next write gets the lock", async () => {
-    // #given
-    const setup = await memoryRepoWithPipeHoldingHook()
+  test.skipIf(process.platform === "win32")(
+    "#given the hook child still holds the pipe #when a memory write commits #then it returns, releases the writer lock, and the next write gets the lock",
+    async () => {
+      // #given
+      const setup = await memoryRepoWithPipeHoldingHook()
 
-    // #when
-    const first = await settlesWithin(write(setup, "system/first.md"), 30_000)
-    await trackHolders(setup.holderPids, 1)
+      // #when
+      const first = await settlesWithin(write(setup, "system/first.md"), 30_000)
+      await trackHolders(setup.holderPids, 1)
 
-    // #then
-    expect(first.kind).toBe("settled")
-    if (first.kind === "settled") expect(first.value.commit?.affectedPaths).toEqual(["system/first.md"])
-    expect(existsSync(setup.writerLock)).toBe(false)
-    const second = await settlesWithin(write(setup, "system/second.md"), 30_000)
-    await trackHolders(setup.holderPids, 2)
-    expect(second.kind).toBe("settled")
-    if (second.kind === "settled") expect(second.value.commit?.affectedPaths).toEqual(["system/second.md"])
-    expect(await setup.repo.status()).toBe("")
-  }, 90_000)
+      // #then
+      expect(first.kind).toBe("settled")
+      if (first.kind === "settled") expect(first.value.commit?.affectedPaths).toEqual(["system/first.md"])
+      expect(existsSync(setup.writerLock)).toBe(false)
+      const second = await settlesWithin(write(setup, "system/second.md"), 30_000)
+      await trackHolders(setup.holderPids, 2)
+      expect(second.kind).toBe("settled")
+      if (second.kind === "settled") expect(second.value.commit?.affectedPaths).toEqual(["system/second.md"])
+      expect(await setup.repo.status()).toBe("")
+    },
+    90_000,
+  )
 })

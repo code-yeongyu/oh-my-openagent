@@ -34,12 +34,19 @@ describe("Argon in the plan-reviewer chain (#10180)", () => {
   })
 
   test("#given a Google-only machine that serves Argon #when plan-reviewer resolves #then it gets Argon high", () => {
-    expect(resolvedModel([{ provider: "google", id: "gemini-4-argon" }, { provider: "google", id: "gemini-3.1-pro" }]))
-      .toEqual(["google/gemini-4-argon", "high"])
+    expect(
+      resolvedModel([
+        { provider: "google", id: "gemini-4-argon" },
+        { provider: "google", id: "gemini-3.1-pro" },
+      ]),
+    ).toEqual(["google/gemini-4-argon", "high"])
   })
 
   test("#given a Vertex-only machine that serves Argon #when plan-reviewer resolves #then it gets Argon high on Vertex", () => {
-    expect(resolvedModel([{ provider: "google-vertex", id: "gemini-4-argon" }])).toEqual(["google-vertex/gemini-4-argon", "high"])
+    expect(resolvedModel([{ provider: "google-vertex", id: "gemini-4-argon" }])).toEqual([
+      "google-vertex/gemini-4-argon",
+      "high",
+    ])
   })
 
   test("#given an engine catalog without the Argon row #when plan-reviewer resolves #then it keeps the previous pro rung", () => {
@@ -47,7 +54,11 @@ describe("Argon in the plan-reviewer chain (#10180)", () => {
   })
 
   test("#given a Copilot-only machine that lists Argon #when plan-reviewer resolves #then it lands on the previous pro rung, not Argon", () => {
-    expect(resolvedModel([{ provider: "github-copilot", id: "gemini-4-argon" }, { provider: "github-copilot", id: "gemini-3.1-pro" }]))
-      .toEqual(["github-copilot/gemini-3.1-pro", "high"])
+    expect(
+      resolvedModel([
+        { provider: "github-copilot", id: "gemini-4-argon" },
+        { provider: "github-copilot", id: "gemini-3.1-pro" },
+      ]),
+    ).toEqual(["github-copilot/gemini-3.1-pro", "high"])
   })
 })

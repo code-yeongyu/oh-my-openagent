@@ -10,12 +10,20 @@ import { REAL_AGENT_DIRS, sandboxEnv } from "./task-host-e2e-sandbox.mjs"
 import { daemonStderrTail, generationHostRecord } from "./task-host-e2e-daemon-state.mjs"
 
 export function runBin(sandbox, args, { timeoutMs = 120_000, env = {}, cwd = sandbox.cwd } = {}) {
-  const result = spawnSync(sandbox.bin, args, { cwd, env: sandboxEnv(sandbox, env), encoding: "utf8", timeout: timeoutMs })
+  const result = spawnSync(sandbox.bin, args, {
+    cwd,
+    env: sandboxEnv(sandbox, env),
+    encoding: "utf8",
+    timeout: timeoutMs,
+  })
   return { status: result.status, signal: result.signal, stdout: result.stdout ?? "", stderr: result.stderr ?? "" }
 }
 
 export function lastJsonLine(text) {
-  const lines = text.trim().split("\n").filter((line) => line.trim().length > 0)
+  const lines = text
+    .trim()
+    .split("\n")
+    .filter((line) => line.trim().length > 0)
   for (let index = lines.length - 1; index >= 0; index -= 1) {
     try {
       return JSON.parse(lines[index])
@@ -77,7 +85,20 @@ export async function observeDaemon(sandbox, done, { timeoutMs = 180_000, interv
 }
 
 export function parentArgv(sandbox, mockEntry, prompt) {
-  return ["-e", mockEntry, "-p", "--mode", "json", "--provider", "omo-mock", "--model", "mock-1", "--session-dir", sandbox.sessionDir, prompt]
+  return [
+    "-e",
+    mockEntry,
+    "-p",
+    "--mode",
+    "json",
+    "--provider",
+    "omo-mock",
+    "--model",
+    "mock-1",
+    "--session-dir",
+    sandbox.sessionDir,
+    prompt,
+  ]
 }
 
 export function spawnParent(sandbox, mockEntry, prompt, { env = {}, capture = false, session } = {}) {
@@ -93,8 +114,12 @@ export function spawnParent(sandbox, mockEntry, prompt, { env = {}, capture = fa
   if (capture) {
     child.stdout?.setEncoding("utf8")
     child.stderr?.setEncoding("utf8")
-    child.stdout?.on("data", (chunk) => { chunks.stdout += chunk })
-    child.stderr?.on("data", (chunk) => { chunks.stderr += chunk })
+    child.stdout?.on("data", (chunk) => {
+      chunks.stdout += chunk
+    })
+    child.stderr?.on("data", (chunk) => {
+      chunks.stderr += chunk
+    })
   }
   const closed = new Promise((resolve) => {
     child.once("close", (code, signal) => resolve({ status: code, signal }))
@@ -147,11 +172,17 @@ export function sandboxProcesses(sandbox) {
  * another HOME and are absent from this store, are never counted.
  */
 export function perChildRpcProcesses(sandbox) {
-  const owned = new Set(readTaskRecords(sandbox).filter((record) => typeof record.pid === "number").map((record) => record.pid))
-  return psSnapshot().filter((entry) =>
-    entry.args.includes("--mode rpc") &&
-    !entry.args.includes("--multi-session") &&
-    (owned.has(entry.pid) || entry.args.includes(sandbox.home) || entry.args.includes(sandbox.root)))
+  const owned = new Set(
+    readTaskRecords(sandbox)
+      .filter((record) => typeof record.pid === "number")
+      .map((record) => record.pid),
+  )
+  return psSnapshot().filter(
+    (entry) =>
+      entry.args.includes("--mode rpc") &&
+      !entry.args.includes("--multi-session") &&
+      (owned.has(entry.pid) || entry.args.includes(sandbox.home) || entry.args.includes(sandbox.root)),
+  )
 }
 
 export function globalModeRpcCount() {

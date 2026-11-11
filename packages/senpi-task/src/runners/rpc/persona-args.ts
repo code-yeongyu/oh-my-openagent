@@ -17,15 +17,6 @@ export class PersonaTooLargeError extends Error {
   }
 }
 
-/** Whether a spec carries a persona a child must get: instructions or any tool policy. */
-export function hasPersona(persona: RpcPersona): boolean {
-  return (
-    (persona.instructions !== undefined && persona.instructions.length > 0) ||
-    persona.toolAllowlist !== undefined ||
-    (persona.toolDenylist !== undefined && persona.toolDenylist.length > 0)
-  )
-}
-
 /**
  * The persona an in-process child gets from `buildChildSessionOptions` (instructions as the appended
  * system prompt, the allowlist as `tools`, the denylist as `excludeTools`), as senpi CLI flags for a
@@ -39,7 +30,8 @@ export function personaArgs(persona: RpcPersona, platform: NodeJS.Platform = pro
   }
   const allow = persona.toolAllowlist
   if (allow !== undefined) {
-    const yieldTool = persona.memberScopedToolNames?.includes(WORKPOOL_YIELD_TOOL_NAME) === true ? [WORKPOOL_YIELD_TOOL_NAME] : []
+    const yieldTool =
+      persona.memberScopedToolNames?.includes(WORKPOOL_YIELD_TOOL_NAME) === true ? [WORKPOOL_YIELD_TOOL_NAME] : []
     const tools = [...new Set([...allow, ...yieldTool])]
     if (tools.length === 0) args.push("--no-tools")
     else args.push("--tools", tools.join(","))
@@ -52,7 +44,8 @@ export function personaArgs(persona: RpcPersona, platform: NodeJS.Platform = pro
 
 function assertInstructionsFit(instructions: string, platform: NodeJS.Platform): void {
   if (platform === "win32") {
-    if (instructions.length > MAX_INSTRUCTIONS_WIN32_UNITS) throw new PersonaTooLargeError(instructions.length, MAX_INSTRUCTIONS_WIN32_UNITS, "UTF-16 units")
+    if (instructions.length > MAX_INSTRUCTIONS_WIN32_UNITS)
+      throw new PersonaTooLargeError(instructions.length, MAX_INSTRUCTIONS_WIN32_UNITS, "UTF-16 units")
     return
   }
   const bytes = Buffer.byteLength(instructions, "utf8")

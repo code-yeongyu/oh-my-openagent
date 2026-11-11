@@ -26,6 +26,7 @@ export type RpcPersona = {
   readonly toolAllowlist?: readonly string[]
   readonly toolDenylist?: readonly string[]
   readonly memberScopedToolNames?: readonly string[]
+  readonly sandbox?: "deny-live"
 }
 
 export type RpcRunnerSpec = RpcPersona & {

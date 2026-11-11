@@ -18,7 +18,11 @@ const ACTION: Partial<Record<Frozen["reason"], string>> = {
 }
 
 /** The TUI notice's failure: a kind per code (each code is its own notice), a reason and an action. */
-export function freezeFailure(status: Frozen): { readonly kind: string; readonly reason: string; readonly action: string } {
+export function freezeFailure(status: Frozen): {
+  readonly kind: string
+  readonly reason: string
+  readonly action: string
+} {
   return {
     kind: `frozen:${status.reason}`,
     reason: `Memory sync is paused until the memory key changes after a device was removed (${status.reason}).`,
@@ -33,9 +37,13 @@ export function freezeFailure(status: Frozen): { readonly kind: string; readonly
 export function failureRpcSync(status: Failing | Frozen | Paused): MemoryRpcSync {
   if (status.kind === "frozen") {
     const { reason, action } = freezeFailure(status)
-    return { state: "failing", failure: { kind: "unknown", reason, action, sinceISO: new Date(status.since).toISOString(), attempts: 1 } }
+    return {
+      state: "failing",
+      failure: { kind: "unknown", reason, action, sinceISO: new Date(status.since).toISOString(), attempts: 1 },
+    }
   }
-  if (status.kind === "paused") return status.held === undefined ? { state: "paused" } : { state: "paused", failure: rpcFailure(status.held) }
+  if (status.kind === "paused")
+    return status.held === undefined ? { state: "paused" } : { state: "paused", failure: rpcFailure(status.held) }
   return { state: "failing", failure: rpcFailure(status) }
 }
 
@@ -47,6 +55,8 @@ function rpcFailure({ failure, since, attempts }: Omit<Failing, "kind">): NonNul
     sinceISO: new Date(since).toISOString(),
     attempts,
     ...(failure.kind === "stranded_lock" ? { paths: failure.paths } : {}),
-    ...(failure.kind === "oversized_item" ? { keys: failure.keys, stuckKeys: failure.stuck, limitBytes: failure.limitBytes } : {}),
+    ...(failure.kind === "oversized_item"
+      ? { keys: failure.keys, stuckKeys: failure.stuck, limitBytes: failure.limitBytes }
+      : {}),
   }
 }

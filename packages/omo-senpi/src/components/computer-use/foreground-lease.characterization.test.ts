@@ -65,12 +65,14 @@ interface Received {
 
 function received(line: string): Received | undefined {
   const message: unknown = JSON.parse(line)
-  if (typeof message !== "object" || message === null || !("method" in message) || message.method !== "engine.log") return undefined
+  if (typeof message !== "object" || message === null || !("method" in message) || message.method !== "engine.log")
+    return undefined
   if (!("params" in message) || typeof message.params !== "object" || message.params === null) return undefined
   const text = "message" in message.params ? message.params.message : undefined
   if (typeof text !== "string" || !text.startsWith(RECEIVED)) return undefined
   const request: unknown = JSON.parse(text.slice(RECEIVED.length))
-  if (typeof request !== "object" || request === null || !("method" in request) || typeof request.method !== "string") return undefined
+  if (typeof request !== "object" || request === null || !("method" in request) || typeof request.method !== "string")
+    return undefined
   return { method: request.method, params: "params" in request ? request.params : undefined }
 }
 
@@ -141,7 +143,13 @@ function register(engineEnv: Record<string, string> = {}) {
   async function call(method: string, args: unknown[] = [], hasUI = true): Promise<ToolResult> {
     const execute = pi.tools.find((candidate) => candidate.name === "computer")?.execute
     if (typeof execute !== "function") throw new Error("the computer tool is not registered")
-    return (await execute("call-1", { action: "call", chain: [{ method, args }] }, undefined, undefined, uiContext(hasUI))) as ToolResult
+    return (await execute(
+      "call-1",
+      { action: "call", chain: [{ method, args }] },
+      undefined,
+      undefined,
+      uiContext(hasUI),
+    )) as ToolResult
   }
 
   async function command(args: string): Promise<string[]> {
@@ -327,7 +335,9 @@ describe("foreground-control lease in fused computer use (X16 characterization)"
 
       // then
       expect(stopNotes).toEqual([expect.stringMatching(/^Computer input stopped:/)])
-      expect(session.engine.wire.find((request) => request.method === "stopPath.stop")?.params).toEqual({ source: "host-relay" })
+      expect(session.engine.wire.find((request) => request.method === "stopPath.stop")?.params).toEqual({
+        source: "host-relay",
+      })
       expect(stopped.details?.value).toEqual({ active: false })
       expect(refused.isError).toBe(true)
       expect(refused.details?.value).toMatchObject({ code: "COMPUTER_SUSPENDED" })

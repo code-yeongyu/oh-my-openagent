@@ -9,11 +9,7 @@ import { type ModelCatalogProbeResult, parseModelCatalog, probeModelCatalog } fr
 import { buildRpcModelCatalogSpawn, type RpcSpawnDescriptor } from "./spawn"
 
 export { parseModelCatalog, probeModelCatalog, PROBE_TIMEOUT_MS } from "./model-catalog-probe"
-export type {
-  ModelCatalogProbeOptions,
-  ModelCatalogProbeResult,
-  ModelCatalogSpawnOptions,
-} from "./model-catalog-probe"
+export type { ModelCatalogProbeOptions, ModelCatalogProbeResult, ModelCatalogSpawnOptions } from "./model-catalog-probe"
 
 /**
  * A successful catalog is cached only briefly: `senpi auth login` or an edit to the child-visible
@@ -63,9 +59,7 @@ type ProbedCatalog = {
   readonly stderrTail: string
 }
 
-type ProbeOutcome =
-  | { readonly kind: "catalog"; readonly catalog: ProbedCatalog }
-  | { readonly kind: "inconclusive" }
+type ProbeOutcome = { readonly kind: "catalog"; readonly catalog: ProbedCatalog } | { readonly kind: "inconclusive" }
 
 type CachedCatalog = {
   readonly catalog: Promise<ProbeOutcome>
@@ -91,12 +85,7 @@ function profileKey(descriptor: RpcSpawnDescriptor): string {
   ])
 }
 
-function admissionFailure(
-  model: string,
-  reason: RunnerFailureReason,
-  message: string,
-  cause?: unknown,
-): RunnerError {
+function admissionFailure(model: string, reason: RunnerFailureReason, message: string, cause?: unknown): RunnerError {
   return new RunnerError({
     kind: "model_unavailable",
     reason,
@@ -205,7 +194,8 @@ export function createRpcModelAdmission(options: RpcModelAdmissionOptions = {}):
     const key = profileKey(descriptor)
     const cached = catalogs.get(key)
     // Concurrent starts for one profile share the in-flight probe: it is cached before it settles.
-    let catalog = cached !== undefined && now() - cached.cachedAt < MODEL_CATALOG_CACHE_TTL_MS ? cached.catalog : undefined
+    let catalog =
+      cached !== undefined && now() - cached.cachedAt < MODEL_CATALOG_CACHE_TTL_MS ? cached.catalog : undefined
     if (catalog === undefined) {
       catalog = probeCatalog(descriptor, model, key)
       catalogs.set(key, { catalog, cachedAt: now() })
