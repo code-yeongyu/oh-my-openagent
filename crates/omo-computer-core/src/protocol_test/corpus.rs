@@ -77,14 +77,46 @@ fn ledgered_additions() -> Vec<(String, String)> {
         .collect()
 }
 
-/// Every member the method's result definition requires that the reply does not carry.
+/// `(file, member, v3 value)` for every `replaced` ledger line on a top-level result member:
+/// the reply is compared with the v3 value the ledger names, not the imported one.
+fn ledgered_replacements() -> Vec<(String, String, Value)> {
+    let ledger =
+        std::fs::read_to_string(crate_path("parity/ORACLE-DELTAS.tsv")).expect("ORACLE-DELTAS.tsv");
+    ledger
+        .lines()
+        .skip(1)
+        .map(|line| line.split('\t').map(str::to_owned).collect::<Vec<_>>())
+        .filter(|cells| cells.get(2).map(String::as_str) == Some("replaced"))
+        .filter_map(|cells| {
+            Some((
+                cells.first()?.clone(),
+                cells.get(1)?.strip_prefix("/result/")?.to_owned(),
+                serde_json::from_str(cells.get(6)?).ok()?,
+            ))
+        })
+        .collect()
+}
+
+fn definition_name(reference: &Value) -> Option<&str> {
+    reference.as_str()?.strip_prefix("#/$defs/")
+}
+
+/// Every member the method's result definition requires that the reply does not carry. A
+/// nullable result (`anyOf: [null, $ref]`, the exec reply) is read through its object branch.
 fn missing_members(schema: &Value, method: &str, reply: &Value) -> Vec<String> {
-    let Some(name) = schema["methods"][method]["result"]["$ref"]
-        .as_str()
-        .and_then(|reference| reference.strip_prefix("#/$defs/"))
-    else {
+    let Some(mut name) = definition_name(&schema["methods"][method]["result"]["$ref"]) else {
         return Vec::new();
     };
+    if let Some(branch) = schema["$defs"][name]["anyOf"]
+        .as_array()
+        .and_then(|branches| {
+            branches
+                .iter()
+                .find_map(|branch| definition_name(&branch["$ref"]))
+        })
+    {
+        name = branch;
+    }
     let (Some(required), Some(present)) = (
         schema["$defs"][name]["required"].as_array(),
         reply.as_object(),
@@ -112,6 +144,7 @@ fn corpus_requests_name_table_methods_and_fit_their_types() {
         .map(|(name, _)| name)
         .collect();
     let additions = ledgered_additions();
+    let replacements = ledgered_replacements();
     let schema = engine_schema();
     let (mut requests, mut replies, mut pushed, mut ledgered) = (0, 0, 0, 0);
     let mut problems = Vec::new();
@@ -154,11 +187,18 @@ fn corpus_requests_name_table_methods_and_fit_their_types() {
                     problems.push(format!("{}: {name} params: {error}", case.name));
                 }
             }
-            for result in expect
+            for imported in expect
                 .iter()
                 .filter_map(|entry| entry["message"].get("result"))
             {
                 replies += 1;
+                let mut result = imported.clone();
+                for (_, member, v3) in replacements.iter().filter(|(file, ..)| *file == case.path) {
+                    if let Some(slot) = result.get_mut(member.as_str()) {
+                        *slot = v3.clone();
+                    }
+                }
+                let result = &result;
                 let missing = missing_members(&schema, method.spec().name, result);
                 let unledgered: Vec<&str> = missing
                     .iter()

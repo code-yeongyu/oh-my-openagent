@@ -1096,6 +1096,118 @@
     }
   ],
   "$defs": {
+    "ActionReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "disposition": {
+          "$ref": "#/$defs/Disposition"
+        },
+        "delivered": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Delivered"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "effect": {
+          "$ref": "#/$defs/Effect"
+        },
+        "route": {
+          "$ref": "#/$defs/Route"
+        },
+        "hit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Hit"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "focusRestoration": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FocusRestoration"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "openedSurfaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Surface"
+          },
+          "default": []
+        },
+        "nextCall": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "warning": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "auditIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "timings": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Timings"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Evidence"
+          }
+        },
+        "observation": {
+          "$ref": "#/$defs/UntrustedText",
+          "description": "Required on the wire: a report without `{untrustedText: true}` does not parse."
+        }
+      },
+      "required": [
+        "disposition",
+        "effect",
+        "route",
+        "evidence",
+        "observation"
+      ],
+      "description": "Everything a report says, before validation."
+    },
     "AdvanceClockParams": {
       "type": "object",
       "additionalProperties": false,
@@ -2481,6 +2593,27 @@
         "foreground_lease_first"
       ]
     },
+    "Delivered": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "of": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "count",
+        "of"
+      ],
+      "description": "How many units of an interrupted send went out."
+    },
     "Delivery": {
       "type": "string",
       "enum": [
@@ -2659,6 +2792,123 @@
         "primary"
       ]
     },
+    "Disposition": {
+      "description": "Whether input reached the target and whether the same request may be sent again: exactly one of the seven valid (delivery, retry) pairs.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "const": "not_delivered"
+            },
+            "retry": {
+              "const": "safe"
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "const": "not_delivered"
+            },
+            "retry": {
+              "const": "after_user"
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "const": "delivery_uncertain"
+            },
+            "retry": {
+              "const": "unsafe"
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "const": "delivery_uncertain"
+            },
+            "retry": {
+              "const": "unknown"
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "const": "delivered_unverified"
+            },
+            "retry": {
+              "const": "unsafe"
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "const": "delivered_verified"
+            },
+            "retry": {
+              "const": "unsafe"
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "delivery": {
+              "const": "unknown"
+            },
+            "retry": {
+              "const": "unknown"
+            }
+          },
+          "required": [
+            "delivery",
+            "retry"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
     "DragParams": {
       "type": "object",
       "additionalProperties": false,
@@ -2756,6 +3006,46 @@
       "required": [
         "ref"
       ]
+    },
+    "Effect": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "confirmed",
+          "description": "A receipt for this verb proves the requested effect."
+        },
+        {
+          "type": "string",
+          "const": "observed",
+          "description": "The engine read the target after the send; the read is not proof the input caused it."
+        },
+        {
+          "type": "string",
+          "const": "partial",
+          "description": "Part of the request landed; `delivered` carries the counts."
+        },
+        {
+          "type": "string",
+          "const": "unverifiable",
+          "description": "Nothing proves or reads the effect."
+        },
+        {
+          "type": "string",
+          "const": "suspected_noop",
+          "description": "Sent exactly once into a childless hit in a suspect viewport, and nothing changed."
+        },
+        {
+          "type": "string",
+          "const": "no_change",
+          "description": "Kept in the union so older shapes still parse; the engine never produces it."
+        },
+        {
+          "type": "string",
+          "const": "refused",
+          "description": "Nothing was sent."
+        }
+      ],
+      "description": "What the engine can say the action did."
     },
     "ElementAtParams": {
       "type": "object",
@@ -2933,11 +3223,112 @@
         "kind"
       ]
     },
+    "Evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/EvidenceKind"
+        },
+        "class": {
+          "$ref": "#/$defs/EvidenceClass"
+        },
+        "intended": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "baseline": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "event": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "kind",
+        "class"
+      ]
+    },
+    "EvidenceClass": {
+      "type": "string",
+      "enum": [
+        "receipt",
+        "observation"
+      ],
+      "description": "Receipt or observation."
+    },
+    "EvidenceKind": {
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "barrier_consumed",
+          "description": "Windows hook-free barrier: the target dequeued the input."
+        },
+        {
+          "type": "string",
+          "const": "xi2_raw_confirm",
+          "description": "X11 MPX raw XI2 event: the server consumed and re-emitted the input."
+        },
+        {
+          "type": "string",
+          "const": "value_readback",
+          "description": "The target's value read back after the send."
+        },
+        {
+          "type": "string",
+          "const": "focus_readback",
+          "description": "The focused element read back after the send."
+        },
+        {
+          "type": "string",
+          "const": "menu_readback",
+          "description": "The menu state read back after the send."
+        },
+        {
+          "type": "string",
+          "const": "ax_notification",
+          "description": "An event from an observer registered on the target window before the send."
+        },
+        {
+          "type": "string",
+          "const": "settle_frame_diff",
+          "description": "Pixels changed in the hit region or the window during the settle window."
+        },
+        {
+          "type": "string",
+          "const": "ax_change",
+          "description": "A window-wide accessibility change during the settle window."
+        }
+      ],
+      "description": "What an evidence entry read."
+    },
     "ExecReply": {
-      "description": "null in a null-mode session; the ActionReport object in an object-mode session.",
-      "type": [
-        "object",
-        "null"
+      "description": "null in a null-mode session; the ActionReport in an object-mode session.",
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/ActionReport"
+        }
       ]
     },
     "FleetSettings": {
@@ -2978,6 +3369,16 @@
         }
       },
       "description": "`fleet`: the brain-side fanout budgets. `maxInFlight` is the fanout concurrency."
+    },
+    "FocusRestoration": {
+      "type": "string",
+      "enum": [
+        "untouched",
+        "restored",
+        "user_moved_on",
+        "failed"
+      ],
+      "description": "Where focus ended after the action. A background action touches no focus: `untouched`."
     },
     "ForegroundConsent": {
       "type": "string",
@@ -3235,6 +3636,25 @@
         "machineId"
       ],
       "description": "The `engine.hello` reply."
+    },
+    "Hit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "type": "string"
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "description": "The element read under the point before the send."
     },
     "HoldKeysParams": {
       "type": "object",
@@ -4894,6 +5314,16 @@
       ],
       "description": "A JSON-RPC request id: a number or a string, echoed verbatim."
     },
+    "Route": {
+      "type": "string",
+      "enum": [
+        "ax",
+        "background_window",
+        "background_pid",
+        "foreground_hid"
+      ],
+      "description": "The delivery route the input took."
+    },
     "RouteRung": {
       "type": "string",
       "enum": [
@@ -6139,6 +6569,61 @@
         "exec"
       ],
       "description": "The tool tier the `--mcp` shim grants."
+    },
+    "Timings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "axResolve": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "capture": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "prime": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "dispatch": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "verify": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "restore": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "description": "Stage timings in microseconds; a stage that did not run is absent."
     },
     "ToolkitClass": {
       "type": "string",

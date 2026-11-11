@@ -1,7 +1,7 @@
-//! Row 12's backend default refusals through the table: each maps to the COMPUTER_* member
-//! its RefusalCode names, and nothing was sent.
+//! Row 12's backend default refusals through the table: each is a closed engine code with a
+//! reason that has a row, maps to the COMPUTER_* member the design names for it, and sent nothing.
 
-use super::super::{from_refusal, NothingSent};
+use super::super::NothingSent;
 use crate::backend::{
     AxBackend, Backend, CaptureOptions, InputEvent, Ref, Refusal, Route, Semantic, SnapshotRequest,
     TaggedInput, Target, WindowFilter, PRESENCE_UNAVAILABLE,
@@ -48,20 +48,31 @@ fn backend_refusals_map_through_the_table() {
     .flatten()
     .collect();
     assert_eq!(refusals.len(), 11, "every default refuses");
-    for refusal in &refusals {
-        let row = from_refusal(refusal).unwrap_or_else(|error| panic!("{refusal:?}: {error}"));
+    let expected = [
+        "COMPUTER_UNAVAILABLE",
+        "COMPUTER_UNAVAILABLE",
+        "COMPUTER_CAPTURE_UNAVAILABLE",
+        "COMPUTER_UNAVAILABLE",
+        "COMPUTER_SUPERVISOR_NOT_LIVE",
+        "COMPUTER_UNAVAILABLE",
+        "COMPUTER_AX_UNAVAILABLE",
+        "COMPUTER_AX_UNAVAILABLE",
+        "COMPUTER_AX_UNAVAILABLE",
+        "COMPUTER_AX_UNAVAILABLE",
+        "COMPUTER_PRESENCE_UNAVAILABLE",
+    ];
+    for (refusal, computer) in refusals.iter().zip(expected) {
+        let row = refusal
+            .row()
+            .unwrap_or_else(|error| panic!("{refusal:?}: {error}"));
         println!(
-            "{:?}{{{}}} -> {:?} -> {}",
-            refusal.code,
+            "{}{{{}}} -> {:?} -> {}",
+            refusal.code.wire(),
             refusal.reason,
             row.key,
             row.computer.wire()
         );
-        assert_eq!(
-            row.computer.wire(),
-            refusal.code.computer_code(),
-            "{refusal:?}"
-        );
+        assert_eq!(row.computer.wire(), computer, "{refusal:?}");
         assert_eq!(
             row.nothing_sent,
             NothingSent::Yes,

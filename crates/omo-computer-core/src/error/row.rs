@@ -2,7 +2,6 @@
 
 use std::fmt;
 
-use crate::backend::{Refusal, RefusalCode};
 use crate::report::{Disposition, Retry};
 
 use super::code::{ComputerCode, EngineCode};
@@ -122,32 +121,6 @@ pub fn lookup(key: FailureKey) -> Result<&'static ErrorRow, UnknownFailure> {
 pub fn from_wire(number: i64, reason: Option<&str>) -> Result<&'static ErrorRow, UnknownFailure> {
     let code = EngineCode::from_number(number).ok_or(UnknownFailure::Code(number))?;
     keyed(Source::Engine(code), reason)
-}
-
-/// The row of a backend's typed refusal.
-///
-/// # Errors
-/// `UnknownFailure` when the refusal's reason has no row under its engine code.
-pub fn from_refusal(refusal: &Refusal) -> Result<&'static ErrorRow, UnknownFailure> {
-    keyed(
-        Source::Engine(engine_code_of(refusal.code)),
-        Some(refusal.reason),
-    )
-}
-
-/// The closed engine code a backend refusal is raised under. The backend's
-/// `Unavailable` and `AxUnavailable` spellings are not codes of the closed table: their
-/// reasons sit under `Internal` and `AxUnsupported`; a missing presence surface is a
-/// reason of `ControlRequired` (the foreground-lease stage).
-#[must_use]
-pub const fn engine_code_of(code: RefusalCode) -> EngineCode {
-    match code {
-        RefusalCode::Unavailable => EngineCode::Internal,
-        RefusalCode::CaptureUnavailable => EngineCode::CaptureUnavailable,
-        RefusalCode::AxUnavailable => EngineCode::AxUnsupported,
-        RefusalCode::StopPathUnavailable => EngineCode::StopPathUnavailable,
-        RefusalCode::PresenceUnavailable => EngineCode::ControlRequired,
-    }
 }
 
 fn keyed(source: Source, reason: Option<&str>) -> Result<&'static ErrorRow, UnknownFailure> {
