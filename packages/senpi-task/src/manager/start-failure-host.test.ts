@@ -4,6 +4,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { RunnerError } from "../runners/in-process"
 import type { RunnerFailure } from "../runners/in-process/child-handle"
+import { HostUnavailableError } from "../runners/rpc-host/daemon-contract"
 import { cleanupProjects, FakeRunner, makeManager } from "./__fixtures__/manager-fakes"
 
 const PRIVATE_DETAIL = "Timeout waiting for response to open_session. Stderr: api_key=sk-private"
@@ -171,5 +172,76 @@ describe("TaskManager host start failures", () => {
     const record = store.load(result.task_id)
     const eventLog = readFileSync(join(store.stateDir, "logs", `${result.task_id}.jsonl`), "utf8")
     expect(JSON.stringify({ result, record, eventLog })).not.toContain(PRIVATE_DETAIL)
+  })
+
+  test("#given a host that refuses a designated child for a missing capability #when start fails #then the result and record name the designated models", async () => {
+    // given: the host path today returns the fixed "The task host is unavailable
+    // (capability)." and the designated chain in the refusal never reaches the record (#12778)
+    const runner = new FakeRunner()
+    const refusal = new HostUnavailableError("capability", {
+      fallbackAllowed: true,
+      detail: "missing retry_fallback_profile; the child's designated models (anthropic/claude-sonnet-4-5 -> openai/gpt-5.6-sol) cannot be held to on this host",
+      designatedChain: "anthropic/claude-sonnet-4-5 -> openai/gpt-5.6-sol",
+    })
+    runner.startError = new RunnerError({
+      kind: "host_unavailable",
+      reason: "capability",
+      message: refusal.message,
+      cause: refusal,
+    })
+    const { manager, store } = makeManager({ process: runner })
+
+    // when
+    const result = await manager.start({
+      prompt: "work",
+      parent_session_id: "parent-1",
+      depth: 1,
+      category: "quick",
+      execution_mode: "process",
+    })
+
+    // then
+    if (result.kind !== "start_failed") throw new Error("expected start_failed")
+    expect(result.error_message).toBe(
+      "The task host is unavailable (capability). Designated models: anthropic/claude-sonnet-4-5 -> openai/gpt-5.6-sol.",
+    )
+    expect(result.failure_kind).toBe("host_unavailable")
+    expect(result.failure_reason).toBe("capability")
+    const record = store.load(result.task_id)
+    expect(record?.failure_kind).toBe("host_unavailable")
+    expect(record?.failure_reason).toBe("capability")
+    expect(record?.error_message).toBe(result.error_message)
+  })
+
+  test("#given a host refusal without a designated chain #when start fails #then the fixed host message stands unchanged", async () => {
+    // given
+    const runner = new FakeRunner()
+    const refusal = new HostUnavailableError("capability", {
+      fallbackAllowed: true,
+      detail: "missing retry_fallback_profile",
+    })
+    runner.startError = new RunnerError({
+      kind: "host_unavailable",
+      reason: "capability",
+      message: refusal.message,
+      cause: refusal,
+    })
+    const { manager, store } = makeManager({ process: runner })
+
+    // when
+    const result = await manager.start({
+      prompt: "work",
+      parent_session_id: "parent-1",
+      depth: 1,
+      category: "quick",
+      execution_mode: "process",
+    })
+
+    // then
+    if (result.kind !== "start_failed") throw new Error("expected start_failed")
+    expect(result.error_message).toBe("The task host is unavailable (capability).")
+    const record = store.load(result.task_id)
+    expect(record?.error_message).toBe(result.error_message)
+    expect(record?.failure_kind).toBe("host_unavailable")
   })
 })

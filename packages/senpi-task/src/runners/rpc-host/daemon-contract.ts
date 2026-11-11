@@ -64,15 +64,20 @@ export class HostUnavailableError extends Error {
   // The refused spec's path, computed by omo itself (never child output), so the public start
   // failure can name the file and its fix.
   readonly launchSpecPath?: string
+  // The child's designated models, computed by omo itself from the retry fallback profile (never
+  // child output), so the public start failure can name them when this host cannot hold the child
+  // to them (#12778). Absent unless the refusal is about the designated chain.
+  readonly designatedChain?: string
 
   constructor(
     reason: HostUnavailableReason,
-    options: { readonly fallbackAllowed: boolean; readonly detail?: string; readonly launchSpecPath?: string },
+    options: { readonly fallbackAllowed: boolean; readonly detail?: string; readonly launchSpecPath?: string; readonly designatedChain?: string },
   ) {
     super(`task daemon unavailable (${reason})${options.detail === undefined ? "" : `: ${options.detail}`}`)
     this.reason = reason
     this.fallbackAllowed = options.fallbackAllowed
     if (options.launchSpecPath !== undefined) this.launchSpecPath = options.launchSpecPath
+    if (options.designatedChain !== undefined) this.designatedChain = options.designatedChain
   }
 }
 
