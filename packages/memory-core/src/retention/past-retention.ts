@@ -91,7 +91,12 @@ export async function countRuntimePastRetention(input: {
     if (verdict === undefined) continue
     if (typeof verdict !== "string") {
       journals += 1
-      await charge(join(input.paths.transcripts, sessionId))
+      // Fully and partly reflected journals lose transcript.jsonl only; a never-reflected one loses the directory.
+      const freed =
+        verdict.kind === "never"
+          ? join(input.paths.transcripts, sessionId)
+          : join(input.paths.transcripts, sessionId, "transcript.jsonl")
+      await charge(freed)
     } else if (verdict === "unclassified") unclassifiedJournals += 1
   }
 

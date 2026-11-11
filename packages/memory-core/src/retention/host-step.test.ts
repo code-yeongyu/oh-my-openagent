@@ -253,6 +253,36 @@ describe("retention as a host-sweep step (6b driver 2 / --fix; A34, A38 driver h
     expect(existsSync(join(paths.reflection, "runs", "reflection-run-9"))).toBe(true)
   })
 
+  test("#given a fully-reflected journal whose kept files dwarf its transcript #when --dry-run runs #then the size-cap line stays (#12959)", async () => {
+    const memoryRoot = await mkdtemp(join(tmpdir(), "memory-host-dry-cap-journal-"))
+    roots.push(memoryRoot)
+    const paths = buildIdentityPaths(memoryRoot, "id-journal")
+    await mkdir(paths.repo, { recursive: true })
+    const dir = await journal(paths, "j-full", "fully", daysAgo(8))
+    // Retention unlinks transcript.jsonl and leaves the rest of the directory (journals.ts).
+    await writeFile(join(dir, "kept.bin"), Buffer.alloc(256 * 1024))
+    await ageTree(dir, daysAgo(8))
+    const transcript = join(dir, "transcript.jsonl")
+    const measured = await measureTreeBytes(paths.runtime)
+    const transcriptBytes = await measureTreeBytes(transcript)
+    const maxBytes = measured - transcriptBytes - 1
+    const settings = { runtime: { max_bytes: maxBytes } }
+
+    const dry = await sweepHostIdentities({
+      memoryRoot,
+      steps: [createRetentionHostSweepStep({ settings, now, dryRun: true })],
+      dryRun: true,
+      now,
+    })
+
+    if (dry.status !== "swept") throw new Error("expected a sweep")
+    expect(dry.lines[0]).toBe(
+      "WOULD FIX id-journal retention would remove 1 (runs 0, completions 0, journals 1, sidecars 0, ledgers 0, legacy 0)",
+    )
+    expect(dry.lines[1]).toStartWith("WOULD FIX id-journal size cap: cap exceeded by ")
+    expect(dry.lines).toHaveLength(2)
+  })
+
   test("#given global retention_days 30 and an agent override of 3 #when the host sweep step visits #then each identity keeps the windows its global layer sets (REVIEW-5 M1)", async () => {
     const memoryRoot = await mkdtemp(join(tmpdir(), "memory-host-windows-"))
     roots.push(memoryRoot)
