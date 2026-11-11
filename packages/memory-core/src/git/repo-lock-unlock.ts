@@ -2,7 +2,14 @@ import { hostname } from "node:os"
 import { join, resolve } from "node:path"
 
 import { lstat, readFile, unlink, type BigIntStats } from "../fs/resilient"
-import { LockContentionError, acquireLock, createLockRecord, getPidLiveness, parseLockRecord, releaseLock } from "../locks"
+import {
+  LockContentionError,
+  acquireLock,
+  createLockRecord,
+  getPidLiveness,
+  parseLockRecord,
+  releaseLock,
+} from "../locks"
 import { PRODUCTION_LOCK_SCANS, type GitLockScans } from "./lock-scans"
 import { presentLockFiles, writerLockPathForRepo } from "./repo-lock-sweep"
 
@@ -29,7 +36,8 @@ export interface UnlockFindings {
 // What the identity's memory-write lock says about a writer: none recorded (or proven dead), one
 // visibly alive on this host (this process included), or unknown (unreadable record, another host,
 // or liveness that cannot be read). Unknown is never shown or treated as none.
-export type WriterState = { readonly kind: "none" } | { readonly kind: "alive"; readonly pid: number } | { readonly kind: "unknown" }
+export type WriterState =
+  { readonly kind: "none" } | { readonly kind: "alive"; readonly pid: number } | { readonly kind: "unknown" }
 
 export type UnlockInspection = { readonly kind: "not-a-git-lock" } | { readonly kind: "missing" } | UnlockFindings
 
@@ -64,7 +72,12 @@ function fileIdentity(status: BigIntStats): string {
   return [status.dev, status.ino, status.size, status.mtimeNs, status.ctimeNs, status.birthtimeNs].join(":")
 }
 
-export async function inspectStrandedGitLock(repoDir: string, lockPath: string, scans: UnlockScans = PRODUCTION_SCANS, ownWriterNonce?: string): Promise<UnlockInspection> {
+export async function inspectStrandedGitLock(
+  repoDir: string,
+  lockPath: string,
+  scans: UnlockScans = PRODUCTION_SCANS,
+  ownWriterNonce?: string,
+): Promise<UnlockInspection> {
   const target = resolve(lockPath)
   const present = await presentLockFiles(join(resolve(repoDir), ".git"))
   if (!present.has(target)) {
@@ -101,7 +114,11 @@ export async function inspectStrandedGitLock(repoDir: string, lockPath: string, 
 // The memory-write lock is held (without waiting) across the re-inspection and the unlink, so no
 // memory writer - one in this very process included - can start a git operation in between; a
 // writer already holding it means a write is in progress, and the unlock refuses.
-export async function unlockStrandedGitLock(repoDir: string, confirmed: UnlockFindings, scans: UnlockScans = PRODUCTION_SCANS): Promise<UnlockOutcome> {
+export async function unlockStrandedGitLock(
+  repoDir: string,
+  confirmed: UnlockFindings,
+  scans: UnlockScans = PRODUCTION_SCANS,
+): Promise<UnlockOutcome> {
   const writerLockPath = writerLockPathForRepo(repoDir)
   if (writerLockPath === null) return removeIfUnchanged(repoDir, confirmed, scans)
   const record = await createLockRecord("memory-write")
@@ -110,7 +127,14 @@ export async function unlockStrandedGitLock(repoDir: string, confirmed: UnlockFi
   } catch (error) {
     if (!(error instanceof LockContentionError)) throw error
     const pid = error.owner?.pid
-    return { kind: "refused", inspection: { ...confirmed, writer: pid === undefined ? { kind: "unknown" } : { kind: "alive", pid }, verdict: "refuse" } }
+    return {
+      kind: "refused",
+      inspection: {
+        ...confirmed,
+        writer: pid === undefined ? { kind: "unknown" } : { kind: "alive", pid },
+        verdict: "refuse",
+      },
+    }
   }
   try {
     return await removeIfUnchanged(repoDir, confirmed, scans, record.nonce)
@@ -119,7 +143,12 @@ export async function unlockStrandedGitLock(repoDir: string, confirmed: UnlockFi
   }
 }
 
-async function removeIfUnchanged(repoDir: string, confirmed: UnlockFindings, scans: UnlockScans, ownWriterNonce?: string): Promise<UnlockOutcome> {
+async function removeIfUnchanged(
+  repoDir: string,
+  confirmed: UnlockFindings,
+  scans: UnlockScans,
+  ownWriterNonce?: string,
+): Promise<UnlockOutcome> {
   const fresh = await inspectStrandedGitLock(repoDir, confirmed.lockPath, scans, ownWriterNonce)
   if (fresh.kind !== "found") return { kind: fresh.kind }
   if (fresh.identity !== confirmed.identity) return { kind: "changed", lockPath: fresh.lockPath }
@@ -128,6 +157,10 @@ async function removeIfUnchanged(repoDir: string, confirmed: UnlockFindings, sca
     await unlink(fresh.lockPath)
     return { kind: "removed", lockPath: fresh.lockPath }
   } catch (error) {
-    return { kind: "unlink-failed", lockPath: fresh.lockPath, message: error instanceof Error ? error.message : String(error) }
+    return {
+      kind: "unlink-failed",
+      lockPath: fresh.lockPath,
+      message: error instanceof Error ? error.message : String(error),
+    }
   }
 }

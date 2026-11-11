@@ -26,7 +26,9 @@ describe("builtin fallback lane policy", () => {
     for (const [name, requirement] of Object.entries(CATEGORY_MODEL_REQUIREMENTS)) {
       for (const rung of requirement.fallbackChain) {
         if (rung.providers.includes("openai")) {
-          expect(rung.providers, `${name} rung ${rung.model} lists openai without chatgpt-subscription`).toContain("chatgpt-subscription")
+          expect(rung.providers, `${name} rung ${rung.model} lists openai without chatgpt-subscription`).toContain(
+            "chatgpt-subscription",
+          )
         }
       }
     }
@@ -52,7 +54,9 @@ describe("builtin fallback lane policy", () => {
     for (const [name, requirement] of Object.entries(AGENT_MODEL_REQUIREMENTS)) {
       for (const rung of requirement.fallbackChain) {
         if (rung.providers.includes("openai")) {
-          expect(rung.providers, `${name} rung ${rung.model} lists openai without chatgpt-subscription`).toContain("chatgpt-subscription")
+          expect(rung.providers, `${name} rung ${rung.model} lists openai without chatgpt-subscription`).toContain(
+            "chatgpt-subscription",
+          )
         }
       }
     }

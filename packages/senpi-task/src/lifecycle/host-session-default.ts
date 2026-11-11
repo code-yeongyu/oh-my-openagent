@@ -17,5 +17,6 @@ export function defaultHostSessionProbe(): HostSessionProbe {
 export const defaultHostSessionCloser: HostSessionCloser = async (request) => {
   const { closeHostSession } = await import("../runners/rpc-host/close")
   const outcome = await closeHostSession(request)
-  if (outcome !== "closed") throw new Error(`host session close was not confirmed (${outcome}): ${request.hostSession.session_path}`)
+  if (outcome !== "closed")
+    throw new Error(`host session close was not confirmed (${outcome}): ${request.hostSession.session_path}`)
 }

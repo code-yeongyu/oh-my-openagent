@@ -61,10 +61,7 @@ async function requeuePendingLiveDeliveries(
   }
 }
 
-async function shouldKeepPendingLiveDeliveries(
-  deps: TeamMemberErrorHandlerDeps,
-  sessionID: string,
-): Promise<boolean> {
+async function shouldKeepPendingLiveDeliveries(deps: TeamMemberErrorHandlerDeps, sessionID: string): Promise<boolean> {
   if (typeof deps.client?.session?.status !== "function") {
     return false
   }
@@ -120,10 +117,7 @@ async function sessionHistoryContainsPendingMessage(
   }
 }
 
-export function createTeamMemberErrorHandler(
-  config: TeamModeConfig,
-  deps: TeamMemberErrorHandlerDeps = {},
-): HookImpl {
+export function createTeamMemberErrorHandler(config: TeamModeConfig, deps: TeamMemberErrorHandlerDeps = {}): HookImpl {
   return async ({ event }: HookInput): Promise<void> => {
     if (event.type !== "session.error") return
 
@@ -164,21 +158,25 @@ export function createTeamMemberErrorHandler(
 
       let memberWasMarkedErrored = false
       let messageIdsToRequeue: readonly string[] = []
-      const nextRuntimeState = await transitionRuntimeState(runtimeState.teamRunId, (currentRuntimeState) => ({
-        ...currentRuntimeState,
-        members: currentRuntimeState.members.map((member) => {
-          if (member.name !== runtimeMember.memberName) {
-            return member
-          }
-          if (member.sessionId !== undefined && member.sessionId !== erroredSessionID) {
-            return member
-          }
+      const nextRuntimeState = await transitionRuntimeState(
+        runtimeState.teamRunId,
+        (currentRuntimeState) => ({
+          ...currentRuntimeState,
+          members: currentRuntimeState.members.map((member) => {
+            if (member.name !== runtimeMember.memberName) {
+              return member
+            }
+            if (member.sessionId !== undefined && member.sessionId !== erroredSessionID) {
+              return member
+            }
 
-          memberWasMarkedErrored = true
-          messageIdsToRequeue = member.pendingInjectedMessageIds ?? []
-          return { ...member, status: "errored", pendingInjectedMessageIds: [] }
+            memberWasMarkedErrored = true
+            messageIdsToRequeue = member.pendingInjectedMessageIds ?? []
+            return { ...member, status: "errored", pendingInjectedMessageIds: [] }
+          }),
         }),
-      }), config)
+        config,
+      )
 
       if (!memberWasMarkedErrored) {
         const currentMember = nextRuntimeState.members.find((member) => member.name === runtimeMember.memberName)

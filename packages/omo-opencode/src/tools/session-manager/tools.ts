@@ -8,7 +8,15 @@ import {
   SESSION_INFO_DESCRIPTION,
 } from "./constants"
 import { getServerBasicAuthHeader } from "../../shared"
-import { getAllSessions, getMainSessions, getSessionInfo, readSessionMessages, readSessionTodos, sessionExists, setStorageClient } from "./storage"
+import {
+  getAllSessions,
+  getMainSessions,
+  getSessionInfo,
+  readSessionMessages,
+  readSessionTodos,
+  sessionExists,
+  setStorageClient,
+} from "./storage"
 import {
   filterSessionsByDate,
   formatSessionInfo,
@@ -110,7 +118,10 @@ export function createSessionManagerTools(
       limit: tool.schema.number().optional().describe("Maximum number of sessions to return"),
       from_date: tool.schema.string().optional().describe("Filter sessions from this date (ISO 8601 format)"),
       to_date: tool.schema.string().optional().describe("Filter sessions until this date (ISO 8601 format)"),
-      project_path: tool.schema.string().optional().describe("Filter sessions by project path (default: current working directory)"),
+      project_path: tool.schema
+        .string()
+        .optional()
+        .describe("Filter sessions by project path (default: current working directory)"),
     },
     execute: async (args: SessionListArgs, _context) => {
       try {
@@ -139,9 +150,17 @@ export function createSessionManagerTools(
     args: {
       session_id: tool.schema.string().describe("Session ID to read"),
       include_todos: tool.schema.boolean().optional().describe("Include todo list if available (default: false)"),
-      include_transcript: tool.schema.boolean().optional().describe("Include transcript log if available (default: false)"),
+      include_transcript: tool.schema
+        .boolean()
+        .optional()
+        .describe("Include transcript log if available (default: false)"),
       limit: tool.schema.number().optional().describe("Maximum number of messages to return (default: all messages)"),
-      from_end: tool.schema.boolean().optional().describe("Read messages from the END of the session (default: false). Pass true to get the most-recent / final assistant message in the output. Recommended when you want the result of a completed task."),
+      from_end: tool.schema
+        .boolean()
+        .optional()
+        .describe(
+          "Read messages from the END of the session (default: false). Pass true to get the most-recent / final assistant message in the output. Recommended when you want the result of a completed task.",
+        ),
     },
     execute: async (args: SessionReadArgs, _context) => {
       try {
@@ -172,7 +191,10 @@ export function createSessionManagerTools(
     description: SESSION_SEARCH_DESCRIPTION,
     args: {
       query: tool.schema.string().describe("Search query string"),
-      session_id: tool.schema.string().optional().describe("Search within specific session only (default: all sessions)"),
+      session_id: tool.schema
+        .string()
+        .optional()
+        .describe("Search within specific session only (default: all sessions)"),
       case_sensitive: tool.schema.boolean().optional().describe("Case-sensitive search (default: false)"),
       limit: tool.schema.number().optional().describe("Maximum number of results to return (default: 20)"),
     },
@@ -196,7 +218,13 @@ export function createSessionManagerTools(
 
             const remaining = resultLimit - allResults.length
             try {
-              const sessionResults = await resolvedDeps.searchInSession(sid, args.query, args.case_sensitive, remaining, signal)
+              const sessionResults = await resolvedDeps.searchInSession(
+                sid,
+                args.query,
+                args.case_sensitive,
+                remaining,
+                signal,
+              )
               allResults.push(...sessionResults)
             } catch (error) {
               signal.throwIfAborted()

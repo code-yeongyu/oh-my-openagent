@@ -23,7 +23,11 @@ describe("run stats tracker", () => {
     nowMs = 10_000
     tracker.accept({
       type: "message_end",
-      message: { role: "assistant", content: [{ type: "text", text: "done" }], usage: { output: 50, totalTokens: 600 } },
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "done" }],
+        usage: { output: 50, totalTokens: 600 },
+      },
     })
 
     // then
@@ -106,7 +110,11 @@ describe("run stats tracker", () => {
     nowMs = 13_000
     tracker.accept({
       type: "message_end",
-      message: { role: "assistant", content: [{ type: "text", text: "done" }], usage: { output: 300, totalTokens: 600 } },
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "done" }],
+        usage: { output: 300, totalTokens: 600 },
+      },
     })
 
     // then
@@ -123,7 +131,11 @@ describe("run stats tracker", () => {
     // when: message_end arrives at the same millisecond as spawn (post-hoc burst)
     tracker.accept({
       type: "message_end",
-      message: { role: "assistant", content: [{ type: "text", text: "done" }], usage: { output: 400, totalTokens: 900 } },
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "done" }],
+        usage: { output: 400, totalTokens: 900 },
+      },
     })
 
     // then: the single token-bearing generation window collapsed to zero measured duration, so
@@ -230,9 +242,7 @@ describe("run stats tracker", () => {
       message: {
         role: "assistant",
         content: [],
-        usage: JSON.parse(
-          '{"input":-10,"output":5,"cacheRead":30,"cacheWrite":-5,"totalTokens":20,"cost":1e400}',
-        ),
+        usage: JSON.parse('{"input":-10,"output":5,"cacheRead":30,"cacheWrite":-5,"totalTokens":20,"cost":1e400}'),
       },
     })
 

@@ -12,12 +12,18 @@ interface CloneSymbols {
   strerror(errno: number): string
 }
 class CloneError extends Error {
-  constructor(readonly errno: number, message: string) { super(message) }
+  constructor(
+    readonly errno: number,
+    message: string,
+  ) {
+    super(message)
+  }
 }
 
 export async function cloneWithSymbols(symbols: CloneSymbols, source: string, destination: string): Promise<void> {
   const { toArrayBuffer } = await import("bun:ffi")
-  const src = Buffer.from(`${source}\0`), dst = Buffer.from(`${destination}\0`)
+  const src = Buffer.from(`${source}\0`),
+    dst = Buffer.from(`${destination}\0`)
   if (symbols.clonefile(src, dst, CLONE_NOFOLLOW) === 0) return
   // Nothing may call into foreign code between clonefile and reading thread-local errno.
   const errno = new Int32Array(toArrayBuffer(symbols.__error(), 0, 4))[0]!
@@ -54,8 +60,16 @@ export class ApfsBackend implements IsolationBackend {
       } catch (cause) {
         // A missing bun:ffi module is an unavailable capability; anything else
         // (a failed dlopen, for example) is an operational failure that propagates.
-        if (cause instanceof Error && "code" in cause
-          && ["ERR_UNSUPPORTED_ESM_URL_SCHEME", "ERR_UNKNOWN_BUILTIN_MODULE", "MODULE_NOT_FOUND", "ERR_MODULE_NOT_FOUND"].includes(String(cause.code))) {
+        if (
+          cause instanceof Error &&
+          "code" in cause &&
+          [
+            "ERR_UNSUPPORTED_ESM_URL_SCHEME",
+            "ERR_UNKNOWN_BUILTIN_MODULE",
+            "MODULE_NOT_FOUND",
+            "ERR_MODULE_NOT_FOUND",
+          ].includes(String(cause.code))
+        ) {
           throw new IsolationUnavailableError(`APFS clonefile unavailable: ${String(cause)}`)
         }
         throw cause
@@ -69,14 +83,16 @@ export class ApfsBackend implements IsolationBackend {
     const probe = await this.probe(lower)
     if (!probe.available) throw new IsolationUnavailableError(probe.reason)
     await mkdir(dirname(merged), { recursive: true })
-    if ((await stat(lower)).dev !== (await stat(dirname(merged))).dev) throw new IsolationUnavailableError("APFS requires the same device")
+    if ((await stat(lower)).dev !== (await stat(dirname(merged))).dev)
+      throw new IsolationUnavailableError("APFS requires the same device")
     const clone = (src: string, dst: string) => cloneWithSymbols(this.symbols!, src, dst)
     // Some Darwin versions clone special entries instead of rejecting them. Inspect the
     // completed snapshot, not the source, so the fast path still starts with one syscall.
     const hasSpecialEntries = async (dir: string): Promise<boolean> => {
       for (const entry of await readdir(dir, { withFileTypes: true })) {
-        if (entry.isDirectory()) { if (await hasSpecialEntries(join(dir, entry.name))) return true }
-        else if (!entry.isFile() && !entry.isSymbolicLink()) return true
+        if (entry.isDirectory()) {
+          if (await hasSpecialEntries(join(dir, entry.name))) return true
+        } else if (!entry.isFile() && !entry.isSymbolicLink()) return true
       }
       return false
     }
@@ -104,5 +120,7 @@ export class ApfsBackend implements IsolationBackend {
     return { strategy_detail: "clone_tree" }
   }
 
-  async stop(merged: string) { await rm(merged, { recursive: true, force: true }) }
+  async stop(merged: string) {
+    await rm(merged, { recursive: true, force: true })
+  }
 }

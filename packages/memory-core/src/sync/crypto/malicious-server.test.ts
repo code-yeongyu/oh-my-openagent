@@ -7,7 +7,19 @@ import { type BatchBinding, openBatch } from "./open.ts"
 import { receiverRefusal } from "./receiver.ts"
 import { createRejectionCounter } from "./rejection.ts"
 import { buildFork } from "./testing/fork.ts"
-import { ACCOUNT, appendBatch, chain, deviceId, epochKey, keyringFor, mainChain, objects, readBytes, record, fixtureAnchor } from "./testing/sync-v1.test-support.ts"
+import {
+  ACCOUNT,
+  appendBatch,
+  chain,
+  deviceId,
+  epochKey,
+  keyringFor,
+  mainChain,
+  objects,
+  readBytes,
+  record,
+  fixtureAnchor,
+} from "./testing/sync-v1.test-support.ts"
 import { compareWrapEntries } from "./vendor/sync-format/canonical.ts"
 
 // Each test plays a malicious server: it takes genuine, correctly signed material and changes
@@ -58,7 +70,9 @@ describe("HIGH 1: a fork-resolution carries no wraps, whatever the server attach
     const forgedWrap: WrapEntry = { epoch: 3, id: `device:${deviceId("recovered")}`, wrap: "Z".repeat(43) }
     const result = await run([{ ...resolution, wraps: [forgedWrap] }], state)
     expectRefusedOnce(result, state, { seq: resolution.seq, reason: "unexpected_wraps" })
-    expect(result.outcome.state.received.some((entry) => entry.wraps.length > 0 && entry.seq === resolution.seq)).toBe(false)
+    expect(result.outcome.state.received.some((entry) => entry.wraps.length > 0 && entry.seq === resolution.seq)).toBe(
+      false,
+    )
   })
 })
 
@@ -78,7 +92,10 @@ describe("HIGH 2: each security check has a malicious-server test that fails wit
     const state = await verified(mainUntil("recovery_key_removed"))
     const removal = record("recovery_key_removed")
     const bootstrap: unknown = record("genesis").body["bootstrap"]
-    const otherCredential: unknown = Reflect.get(Object(Reflect.get(Object(bootstrap), "recovery_key")), "credential_id")
+    const otherCredential: unknown = Reflect.get(
+      Object(Reflect.get(Object(bootstrap), "recovery_key")),
+      "credential_id",
+    )
     if (typeof otherCredential !== "string") throw new Error("fixture genesis names no recovery credential")
     expect(otherCredential).not.toBe(removal.body["credential_id"])
     const swapped = { ...removal, body: { ...removal.body, credential_id: otherCredential } }
@@ -89,7 +106,10 @@ describe("HIGH 2: each security check has a malicious-server test that fails wit
   test("approval wrap set: server-forged wraps on a genuine approval are refused", async () => {
     const state = await verified(mainUntil("approval"))
     const approval = record("approval")
-    const added = [...approval.wraps, { epoch: approval.epoch, id: `device:${deviceId("owner")}`, wrap: "Z".repeat(43) }].sort(compareWrapEntries)
+    const added = [
+      ...approval.wraps,
+      { epoch: approval.epoch, id: `device:${deviceId("owner")}`, wrap: "Z".repeat(43) },
+    ].sort(compareWrapEntries)
     const replaced = approval.wraps.map((wrap) => ({ ...wrap, wrap: "Z".repeat(43) }))
     for (const wraps of [added, replaced]) {
       const result = await run([{ ...approval, wraps }], state)
@@ -119,14 +139,21 @@ describe("HIGH 2: each security check has a malicious-server test that fails wit
       const logged: string[] = []
       const rejections = createRejectionCounter((line) => logged.push(line))
       const bytes = readBytes(`objects/${entry.file}`)
-      const opened = await openBatch(bytes, bindingOf(entry, override), epochKey(entry.epoch) ?? new Uint8Array(32), rejections)
+      const opened = await openBatch(
+        bytes,
+        bindingOf(entry, override),
+        epochKey(entry.epoch) ?? new Uint8Array(32),
+        rejections,
+      )
       expect(opened).toEqual({ ok: false, reason: "kind_mismatch" })
       expect(logged).toEqual(["sync.batch.rejected kind_mismatch"])
     }
     const unchunked = { ...bindingOf(chunk, {}) }
     delete (unchunked as { chunk?: unknown }).chunk
     const rejections = createRejectionCounter()
-    expect(await openBatch(readBytes(`objects/${chunk.file}`), unchunked, epochKey(3) ?? new Uint8Array(32), rejections)).toEqual({ ok: false, reason: "kind_mismatch" })
+    expect(
+      await openBatch(readBytes(`objects/${chunk.file}`), unchunked, epochKey(3) ?? new Uint8Array(32), rejections),
+    ).toEqual({ ok: false, reason: "kind_mismatch" })
   })
 })
 
@@ -145,7 +172,12 @@ describe("HIGH (lead): the receiver refusing at another seq fails closed", () =>
 describe("MEDIUM 3: vetoed-epoch batches are fully verified before the veto applies", () => {
   test("an unsigned batch in the vetoed epoch is refused", async () => {
     const state = await verified(mainChain())
-    const genuine = await appendBatch(headOf(state), objectNamed("batch-d-epoch3-recovered.omob").sha256, 2, keyringFor("recovered"))
+    const genuine = await appendBatch(
+      headOf(state),
+      objectNamed("batch-d-epoch3-recovered.omob").sha256,
+      2,
+      keyringFor("recovered"),
+    )
     const result = await run([{ ...genuine, record_sig: "A".repeat(86) }], state)
     expectRefusedOnce(result, state, { seq: genuine.seq, reason: "bad_signature" })
   })
@@ -161,7 +193,12 @@ describe("MEDIUM 3: vetoed-epoch batches are fully verified before the veto appl
 
   test("a genuine vetoed-epoch batch by its epoch's member is still skipped, not applied", async () => {
     const state = await verified(mainChain())
-    const genuine = await appendBatch(headOf(state), objectNamed("batch-d-epoch3-recovered.omob").sha256, 2, keyringFor("recovered"))
+    const genuine = await appendBatch(
+      headOf(state),
+      objectNamed("batch-d-epoch3-recovered.omob").sha256,
+      2,
+      keyringFor("recovered"),
+    )
     const { outcome, rejections } = await run([genuine], state)
     expect(outcome.ok && outcome.steps).toEqual([{ kind: "vetoed", seq: genuine.seq }])
     expect(rejections.count()).toBe(0)
@@ -181,14 +218,17 @@ describe("MEDIUM 4: the SyncEntry envelope is a closed schema", () => {
     expectRefusedOnce(result, empty, { seq: 1, reason: "bad_envelope" })
   })
 
-  test.each([["null", null], ["an array", []], ["a number", 7], ["a string", "row"], ["a boolean", true]] as const)(
-    "a served row that is %s is refused and counted before any field is read",
-    async (_shape, row) => {
-      const state = await verified(mainChain())
-      const result = await run([served(row)], state)
-      expectRefusedOnce(result, state, { seq: headOf(state).seq + 1, reason: "bad_envelope" })
-    },
-  )
+  test.each([
+    ["null", null],
+    ["an array", []],
+    ["a number", 7],
+    ["a string", "row"],
+    ["a boolean", true],
+  ] as const)("a served row that is %s is refused and counted before any field is read", async (_shape, row) => {
+    const state = await verified(mainChain())
+    const result = await run([served(row)], state)
+    expectRefusedOnce(result, state, { seq: headOf(state).seq + 1, reason: "bad_envelope" })
+  })
 
   test("a keyring row missing wraps is a counted bad_envelope, not a TypeError", async () => {
     const { wraps: _dropped, ...withoutWraps } = record("genesis")
@@ -218,5 +258,4 @@ describe("MEDIUM 4: the SyncEntry envelope is a closed schema", () => {
     const result = await run([served({ ...approval, wraps: wrapRow })], approvalState)
     expectRefusedOnce(result, approvalState, { seq: approval.seq, reason: "bad_envelope" })
   })
-
 })

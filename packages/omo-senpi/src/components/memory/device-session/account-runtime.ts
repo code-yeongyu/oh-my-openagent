@@ -6,9 +6,21 @@
 // order every entry (the desktop's included) follows.
 
 import { sessionWorkerData } from "@code-yeongyu/senpi/session-worker-data"
-import { connectDeviceService, type DeviceService, deviceServiceStateDir, forgetDeviceService, handDeviceKeys } from "@oh-my-opencode/device-service-core"
+import {
+  connectDeviceService,
+  type DeviceService,
+  deviceServiceStateDir,
+  forgetDeviceService,
+  handDeviceKeys,
+} from "@oh-my-opencode/device-service-core"
 import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core"
-import { createCredentialStore, createSession, quietNotice, retireSyncPinOnDiscard, serviceOrigin } from "@oh-my-opencode/omo-opencode/service-auth"
+import {
+  createCredentialStore,
+  createSession,
+  quietNotice,
+  retireSyncPinOnDiscard,
+  serviceOrigin,
+} from "@oh-my-opencode/omo-opencode/service-auth"
 import { createOmoNativeProductConfig } from "../../telemetry/product-identity"
 import { MEMORY_SYNC_WORKER_DATA, type MemorySyncSelection } from "../desktop-sync/hostSelection"
 import { launchCarriedPrivateTable } from "../desktop-sync/launchClassification"
@@ -28,11 +40,13 @@ export { serveWorkerPort } from "../desktop-sync/workerPort"
  */
 export function engineDeviceService(
   stateDir: string = deviceServiceStateDir(),
-  connect: () => Promise<DeviceService> = () => connectDeviceService({ version: createOmoNativeProductConfig().packageVersion, stateDir, background: true }),
+  connect: () => Promise<DeviceService> = () =>
+    connectDeviceService({ version: createOmoNativeProductConfig().packageVersion, stateDir, background: true }),
   log?: (line: string) => void,
 ): HeldCredentialRelay {
   return {
-    readopt: async credential => (await handDeviceKeys({ stateDir, connect, credential, when: "not_adopted", log })) !== "not_running",
+    readopt: async (credential) =>
+      (await handDeviceKeys({ stateDir, connect, credential, when: "not_adopted", log })) !== "not_running",
     forget: async () => {
       await forgetDeviceService({ stateDir, connect, log })
     },
@@ -44,7 +58,18 @@ export function selectedAccountSource(
   selection: () => Promise<MemorySyncSelection>,
   options: Parameters<typeof createCliAccountSource>[0],
 ): DeviceAccountSource {
-  return accountSourceFromSelection({ selection, cli: () => createCliAccountSource({ relay: engineDeviceService(undefined, undefined, options.logger === undefined ? undefined : line => options.logger?.warn(line)), ...options }) })
+  return accountSourceFromSelection({
+    selection,
+    cli: () =>
+      createCliAccountSource({
+        relay: engineDeviceService(
+          undefined,
+          undefined,
+          options.logger === undefined ? undefined : (line) => options.logger?.warn(line),
+        ),
+        ...options,
+      }),
+  })
 }
 
 /**
@@ -53,19 +78,37 @@ export function selectedAccountSource(
  * (trust-pin retirement, device-service forget) as the CLI account source. A desktop launch never reads the CLI
  * credential store (account-transport-api v9 section 7.3), so there every token request is refused.
  */
-export function cliServiceAccess(options: { readonly env: Readonly<Record<string, string | undefined>>; readonly cwd: string; readonly log?: (line: string) => void }): { readonly origin: string; readonly accessToken: () => Promise<string> } {
+export function cliServiceAccess(options: {
+  readonly env: Readonly<Record<string, string | undefined>>
+  readonly cwd: string
+  readonly log?: (line: string) => void
+}): { readonly origin: string; readonly accessToken: () => Promise<string> } {
   const warn = (line: string): void => options.log?.(line)
   const origin = serviceOrigin(options.env["OMO_SERVICE_API_URL"] ?? DEFAULT_SERVICE_API)
   let session: ReturnType<typeof createSession> | undefined
   return {
     origin,
     accessToken: async () => {
-      if (launchCarriedPrivateTable()) throw new Error("a desktop launch uses the desktop's own sign-in, not the CLI credential store")
+      if (launchCarriedPrivateTable())
+        throw new Error("a desktop launch uses the desktop's own sign-in, not the CLI credential store")
       session ??= createSession({
         api: origin,
         store: createCredentialStore(origin, { notice: quietNotice }),
-        beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir: () => syncPinDir(resolveMemoryRoot({ ...options.env }, options.cwd)), log: warn }),
-        deviceService: { adopt: async () => undefined, forget: () => engineDeviceService(undefined, undefined, warn).forget().catch((error: unknown) => warn(`thread aliases: the device service forget failed (${error instanceof Error ? error.message : String(error)})`)) },
+        beforeKeysDiscarded: retireSyncPinOnDiscard({
+          pinDir: () => syncPinDir(resolveMemoryRoot({ ...options.env }, options.cwd)),
+          log: warn,
+        }),
+        deviceService: {
+          adopt: async () => undefined,
+          forget: () =>
+            engineDeviceService(undefined, undefined, warn)
+              .forget()
+              .catch((error: unknown) =>
+                warn(
+                  `thread aliases: the device service forget failed (${error instanceof Error ? error.message : String(error)})`,
+                ),
+              ),
+        },
       })
       return await session.accessToken()
     },

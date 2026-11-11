@@ -54,7 +54,7 @@ const toolFactories: NonNullable<Parameters<typeof createToolRegistry>[0]["toolF
   createGrepTools: mock(() => ({})),
   createGlobTools: mock(() => ({})),
   createSessionManagerTools: mock(() => ({})),
-  createDelegateTask: mock((options: { onSyncSessionCreated?: typeof syncSessionCreatedCallbacks[number] }) => {
+  createDelegateTask: mock((options: { onSyncSessionCreated?: (typeof syncSessionCreatedCallbacks)[number] }) => {
     syncSessionCreatedCallbacks.push(options.onSyncSessionCreated)
     return delegateTaskTool
   }),

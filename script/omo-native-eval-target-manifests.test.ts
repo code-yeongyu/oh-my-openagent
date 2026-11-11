@@ -18,9 +18,9 @@ describe("compiled eval target manifests", () => {
     // Given: discover the platform packages independently of the release target list.
     const manifests = readdirSync(join(repoRoot, "packages"))
       .filter((name) => name.startsWith("oh-my-opencode-"))
-      .map((name) => packageSchema.parse(JSON.parse(
-        readFileSync(join(repoRoot, "packages", name, "package.json"), "utf8"),
-      )))
+      .map((name) =>
+        packageSchema.parse(JSON.parse(readFileSync(join(repoRoot, "packages", name, "package.json"), "utf8"))),
+      )
     const codemodeRoot = "node_modules/@code-yeongyu/senpi-codemode"
     const expected = new Set<string>()
     for (const source of engineSidecarSources().filter((entry) => entry.to.startsWith(codemodeRoot))) {
@@ -68,24 +68,33 @@ describe("compiled eval target manifests", () => {
     ]) {
       expect(native.match(pattern)?.[1]).toContain('bun script/qa/omo-native-eval-smoke.mjs "$BIN"')
     }
-    const musl = workflow.slice(workflow.indexOf("          musl_smoke()"), workflow.indexOf("          verify_checksum"))
-    expect(musl).toContain('node script/qa/omo-native-eval-smoke.mjs ${BIN}')
+    const musl = workflow.slice(
+      workflow.indexOf("          musl_smoke()"),
+      workflow.indexOf("          verify_checksum"),
+    )
+    expect(musl).toContain("node script/qa/omo-native-eval-smoke.mjs ${BIN}")
     expect(arm64).toContain("bun script/qa/omo-native-eval-smoke.mjs .omo/release-binaries/omo-linux-arm64")
     expect(arm64).toContain("node script/qa/omo-native-eval-smoke.mjs .omo/release-binaries/omo-linux-arm64-musl")
   })
 
   test("provisions the eval driver prerequisites inside each Alpine musl leg's own container", () => {
     // Given: shell continuations joined so one docker invocation is one line.
-    const workflow = readFileSync(join(repoRoot, ".github/workflows/publish-platform.yml"), "utf8")
-      .replace(/\\\n\s*/g, " ")
+    const workflow = readFileSync(join(repoRoot, ".github/workflows/publish-platform.yml"), "utf8").replace(
+      /\\\n\s*/g,
+      " ",
+    )
     const native = workflow.slice(workflow.indexOf('case "$TARGET" in'), workflow.indexOf("  publish:"))
-    const muslSmoke = workflow.slice(workflow.indexOf("          musl_smoke()"), workflow.indexOf("          verify_checksum"))
+    const muslSmoke = workflow.slice(
+      workflow.indexOf("          musl_smoke()"),
+      workflow.indexOf("          verify_checksum"),
+    )
     const arm64 = workflow.slice(workflow.indexOf("  smoke-linux-arm64:"))
     const arm64Musl = arm64.slice(arm64.indexOf('if [ "$MUSL_EXISTS" != "true" ]'))
     // An x64 musl leg reaches its container through the case branch that names it.
     const x64MuslSmoke = (leg: string) => {
-      const branch = [...native.matchAll(/^\s+([a-z0-9|-]+)\)\n([\s\S]*?);;/gm)]
-        .find((match) => match[1]?.split("|").includes(leg))
+      const branch = [...native.matchAll(/^\s+([a-z0-9|-]+)\)\n([\s\S]*?);;/gm)].find((match) =>
+        match[1]?.split("|").includes(leg),
+      )
       expect(branch?.[2], `${leg} case branch`).toContain("musl_smoke")
       return muslSmoke
     }
@@ -97,8 +106,14 @@ describe("compiled eval target manifests", () => {
 
     for (const { leg, body, binary } of legs) {
       // When: find the container command that runs this leg's eval driver.
-      const command = body.split("\n").find((line) => line.includes(`node script/qa/omo-native-eval-smoke.mjs ${binary}`))
-      const packages = command?.match(/apk add --no-cache ([^&>"]+)/)?.[1]?.trim().split(/\s+/) ?? []
+      const command = body
+        .split("\n")
+        .find((line) => line.includes(`node script/qa/omo-native-eval-smoke.mjs ${binary}`))
+      const packages =
+        command
+          ?.match(/apk add --no-cache ([^&>"]+)/)?.[1]
+          ?.trim()
+          .split(/\s+/) ?? []
 
       // Then: the driver's own runtime and process tools exist in that leg's container.
       expect(command, leg).toContain("alpine:")

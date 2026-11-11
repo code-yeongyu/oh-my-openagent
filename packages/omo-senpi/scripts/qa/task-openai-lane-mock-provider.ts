@@ -30,7 +30,12 @@ interface MockModel {
   readonly name: string
   readonly reasoning: boolean
   readonly input: readonly ["text"]
-  readonly cost: { readonly input: number; readonly output: number; readonly cacheRead: number; readonly cacheWrite: number }
+  readonly cost: {
+    readonly input: number
+    readonly output: number
+    readonly cacheRead: number
+    readonly cacheWrite: number
+  }
   readonly contextWindow: number
   readonly maxTokens: number
 }
@@ -39,7 +44,12 @@ interface AssistantMessage {
   readonly role: "assistant"
   readonly content: readonly (
     | { readonly type: "text"; readonly text: string }
-    | { readonly type: "toolCall"; readonly id: string; readonly name: string; readonly arguments: Readonly<Record<string, unknown>> }
+    | {
+        readonly type: "toolCall"
+        readonly id: string
+        readonly name: string
+        readonly arguments: Readonly<Record<string, unknown>>
+      }
   )[]
   readonly api: "openai-completions"
   readonly provider: string
@@ -92,7 +102,11 @@ const LANE_PROVIDERS: Readonly<Record<string, readonly string[]>> = {
   "subscription-only": ["chatgpt-subscription"],
 }
 const EXPLORE_FALLBACK_SCENARIO = "explore-kimi-fails-api-key-only"
-const EXPLORE_FALLBACK_FIXTURES: readonly { readonly provider: string; readonly modelId: string; readonly dies: boolean }[] = [
+const EXPLORE_FALLBACK_FIXTURES: readonly {
+  readonly provider: string
+  readonly modelId: string
+  readonly dies: boolean
+}[] = [
   { provider: "kimi-coding", modelId: "kimi-for-coding-highspeed", dies: true },
   { provider: "openai", modelId: "gpt-6-luna-fast", dies: false },
   { provider: "anthropic", modelId: "claude-haiku-5-5", dies: false },
@@ -113,19 +127,23 @@ export default function registerOpenAiLaneMockProvider(pi: ExtensionAPI): void {
       // text keeps the run finite and the driver's resolved_model check still records the miss.
       if (isChild(context)) return streamMessage(finalReply(PARENT_PROVIDER, model.id))
       parentCalls += 1
-      return streamMessage(parentCalls === 1
-        ? assistant(PARENT_PROVIDER, model.id, "toolUse", [{
-            type: "toolCall",
-            id: "openai-lane-task-call",
-            name: "task",
-            arguments: {
-              ...(SCENARIO === EXPLORE_FALLBACK_SCENARIO ? { subagent_type: "explore" } : { category: CATEGORY }),
-              prompt: "answer with your final text and stop",
-              run_in_background: false,
-              name: "lane-child",
-            },
-          }])
-        : assistant(PARENT_PROVIDER, model.id, "stop", [{ type: "text", text: "parent observed the lane child" }]))
+      return streamMessage(
+        parentCalls === 1
+          ? assistant(PARENT_PROVIDER, model.id, "toolUse", [
+              {
+                type: "toolCall",
+                id: "openai-lane-task-call",
+                name: "task",
+                arguments: {
+                  ...(SCENARIO === EXPLORE_FALLBACK_SCENARIO ? { subagent_type: "explore" } : { category: CATEGORY }),
+                  prompt: "answer with your final text and stop",
+                  run_in_background: false,
+                  name: "lane-child",
+                },
+              },
+            ])
+          : assistant(PARENT_PROVIDER, model.id, "stop", [{ type: "text", text: "parent observed the lane child" }]),
+      )
     },
   })
 
@@ -138,9 +156,11 @@ export default function registerOpenAiLaneMockProvider(pi: ExtensionAPI): void {
         api: "openai-completions",
         models: [{ ...laneModel(fixture.modelId, `Explore rung (${fixture.provider})`), reasoning: true }],
         streamSimple(model) {
-          return streamMessage(fixture.dies
-            ? assistant(fixture.provider, model.id, "error", [], QUOTA_ERROR)
-            : finalReply(fixture.provider, model.id))
+          return streamMessage(
+            fixture.dies
+              ? assistant(fixture.provider, model.id, "error", [], QUOTA_ERROR)
+              : finalReply(fixture.provider, model.id),
+          )
         },
       })
     }
@@ -257,13 +277,16 @@ if (process.argv[1]?.endsWith("task-openai-lane-mock-provider.ts") && process.ar
   if (JSON.stringify(laneProviders("both-lanes")) !== JSON.stringify(["openai", "openai-codex"])) {
     throw new Error("both-lanes must register the API lane and the subscription lane")
   }
-  if (JSON.stringify(laneProviders("api-key-only")) !== JSON.stringify(["openai"])) throw new Error("api-key-only lane set wrong")
-  if (JSON.stringify(laneProviders("codex-only")) !== JSON.stringify(["openai-codex"])) throw new Error("codex-only lane set wrong")
+  if (JSON.stringify(laneProviders("api-key-only")) !== JSON.stringify(["openai"]))
+    throw new Error("api-key-only lane set wrong")
+  if (JSON.stringify(laneProviders("codex-only")) !== JSON.stringify(["openai-codex"]))
+    throw new Error("codex-only lane set wrong")
   if (JSON.stringify(laneProviders("nonsense")) !== JSON.stringify(laneProviders("both-lanes"))) {
     throw new Error("unknown scenario must fall back to both lanes")
   }
   const reply = finalReply("openai-codex", LANE_MODEL_ID)
-  if (reply.provider !== "openai-codex" || reply.model !== LANE_MODEL_ID) throw new Error("child reply must name the serving lane")
+  if (reply.provider !== "openai-codex" || reply.model !== LANE_MODEL_ID)
+    throw new Error("child reply must name the serving lane")
   if (reply.stopReason !== "stop" || JSON.stringify(reply.content).includes(FINAL_TEXT) === false) {
     throw new Error("child reply must stop with the fixed final text")
   }

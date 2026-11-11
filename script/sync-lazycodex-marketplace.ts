@@ -247,8 +247,6 @@ export function shouldCopyPluginPath(path: string, root: string): boolean {
   return name !== ".gitignore"
 }
 
-
-
 if (import.meta.main) {
   const args = process.argv.slice(2)
   const positional = args.filter((a) => !a.startsWith("--"))
@@ -257,5 +255,9 @@ if (import.meta.main) {
   if (lazycodexRoot === undefined) {
     throw new Error("Usage: bun run script/sync-lazycodex-marketplace.ts <source-root> <lazycodex-root>")
   }
-  await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot, allowMissingBundledDists: args.includes("--previous-payload") })
+  await syncLazycodexMarketplace({
+    sourceRoot,
+    lazycodexRoot,
+    allowMissingBundledDists: args.includes("--previous-payload"),
+  })
 }

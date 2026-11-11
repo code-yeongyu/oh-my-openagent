@@ -13,10 +13,7 @@ function createDeferred<T>() {
 describe("createBtwParentValidator", () => {
   it("#given a persisted side #when its parent is remote or deleted during lookup #then only an existing parent validates", async () => {
     // given
-    const remoteResults: Array<"retry" | "exists"> = [
-      "retry",
-      "exists",
-    ]
+    const remoteResults: Array<"retry" | "exists"> = ["retry", "exists"]
     const fetchStatus = mock(async () => remoteResults.shift() ?? "missing")
     const validator = createBtwParentValidator({
       fetchStatus,
