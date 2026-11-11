@@ -125,7 +125,7 @@ Put the `computer` block in `~/.omo/omo.jsonc` (or `~/.omo/omo.json`) for your a
 | `engine_path` | unset | Use this engine binary instead of locating or downloading one |
 | `cua_adapter` | `false` | Also register `computer_actions`, OpenAI computer-use actions over the same permissions, audit and stop path |
 | `run_sandbox` | `"vm"` | Where the agent's `run` code executes; `"quickjs"` runs it in an isolated QuickJS cell (see [Run code in the QuickJS sandbox](#run-code-in-the-quickjs-sandbox)) |
-| `intervention` | `"pause"` | What background input does while you use the target app; `"continue"` is accepted but has no effect until the engine supports it (see [When you use the same app](#when-you-use-the-same-app)) |
+| `intervention` | `"continue"` | What background input does while you use the target app: `"continue"` keeps going past your input, `"pause"` waits for you to stop (see [When you use the same app](#when-you-use-the-same-app)) |
 | `macos_key_priming` | `"off"` | `"on"` lets background typing reach one window of a macOS app that has several (see [Type into an app with several windows](#type-into-an-app-with-several-windows)) |
 | `trace` | `false` | Write a redacted per-request timing trace beside the audit log, for diagnosing slow actions |
 
@@ -166,7 +166,7 @@ If you pressed a key or clicked in that app within the last 1.5 seconds while it
 
 ### When you use the same app
 
-While you type or click in an app the agent is working in, its input there waits for you to pause and then stops with `UserIntervened`, nothing sent. Input already in progress stops at your first key or click and reports how much was delivered, so the agent reads the window again and sends only what is left. Using apps the agent is not working in does not stop it. The `computer.intervention` setting reserves `"continue"` for an engine that keeps going past your input; this release's engine does not support it, so OmO does not send the setting and input always pauses.
+By default (`computer.intervention: "continue"`), the agent's input in an app you are typing or clicking in keeps going: your keys and clicks there are recorded, but nothing waits for you and input already in progress is not stopped. The 1.5-second rule above still applies, so background keys into the frontmost app you just used are refused until you pause. With `"pause"`, its input there waits for you to pause and then stops with `UserIntervened`, nothing sent, and input already in progress stops at your first key or click and reports how much was delivered, so the agent reads the window again and sends only what is left. Using apps the agent is not working in does not stop it. OmO sends the setting only to an engine that advertises `intervention-policy`; an older engine is not sent it and always pauses.
 
 ### Run code in the QuickJS sandbox
 
