@@ -46,7 +46,16 @@ export async function planMemoryCleanup(
     }
     const archives = draft.actions.filter((action) => action.kind === "archive").map((action) => action.path)
     if (archives.some((path) => claimed.has(path))) return
-    for (const path of archives) claimed.add(path)
+    const touches = touchedPaths(draft, corpus)
+    const provisional: MemoryCleanupFinding = {
+      ...draft,
+      id: `${draft.class}:${draft.subject}${draft.related === undefined ? "" : `:${draft.related}`}`,
+      touches,
+    }
+    // A held finding is not applied, so it must not look like the note was archived to a later class.
+    if (holdReason(provisional, corpus, resolved) === undefined) {
+      for (const path of archives) claimed.add(path)
+    }
     drafts.push(draft)
   }
 

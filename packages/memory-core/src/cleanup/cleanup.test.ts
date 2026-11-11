@@ -323,6 +323,37 @@ describe("memory cleanup", () => {
     expect(await read(dir, "system/human.md")).toContain("[[reference/old-20261101.md]]")
   })
 
+  it("#given a supersession held because system/human.md links the old note #when that note also declares a conflict #then the conflict is still marked and the old note stays", async () => {
+    // given
+    const { dir, repo } = await repoWith([
+      { relativePath: "system/human.md", content: memory("Human", "Standing rule: [[reference/old.md]].") },
+      {
+        relativePath: "reference/old.md",
+        content: memory("Old", "The port is 443. This contradicts [[reference/other.md]]."),
+      },
+      {
+        relativePath: "reference/new.md",
+        content: memory("New", "The port is 443 still. Supersedes [[reference/old.md]]."),
+      },
+      { relativePath: "reference/other.md", content: memory("Other", "The port is 8443 for every receipt row.") },
+    ])
+
+    // when
+    const plan = await planMemoryCleanup(dir, { now: NOW })
+    const applied = await applyMemoryCleanup({ repo, lock, plan, author })
+
+    // then
+    expect(plan.held.map((finding) => finding.class)).toEqual(["superseded"])
+    expect(plan.findings.map((finding) => finding.class)).toEqual(["conflict"])
+    expect(plan.kept.map((note) => note.kind)).not.toContain("party-archived")
+    expect(applied.applied).toBe(true)
+    if (applied.applied) expect(applied.removed).toEqual([])
+    expect(await read(dir, "reference/old.md")).toContain("conflicts_with: reference/other.md")
+    expect(await read(dir, "reference/other.md")).toContain("conflicts_with: reference/old.md")
+    expect(await exists(dir, "ARCHIVE.md")).toBe(false)
+    expect(await read(dir, "system/human.md")).toContain("[[reference/old.md]]")
+  })
+
   it("#given only the load-bearing link #when planned with and without the flag #then the hold names system/human.md and the flag releases it", async () => {
     // given
     const { dir } = await repoWith([
