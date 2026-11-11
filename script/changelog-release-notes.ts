@@ -69,13 +69,58 @@ export function extractReleaseNotes(changelog: string, version: string): string 
 }
 
 // Release notes are published the moment the release is created, so a reference to a repository that is
-// not public must never reach them. References to these repositories stay clickable.
-const PUBLIC_REFERENCE_REPOS = new Set(["senpi", "omo", "oh-my-openagent", "oh-my-opencode", "doriterm", "lazycodex"])
-const CROSS_REPO_REFERENCE = /\b(?:[\w.-]+\/)?([A-Za-z][\w.-]*)#\d+\b/g
+// not public must never reach them.
+//
+// Decision: this is an ALLOWLIST, so anything not listed is neutralized. That deliberately includes
+// public third-party repositories (e.g. SawyerHood/dev-browser#146): a public repo cannot be told from a
+// private one by name, and leaking a private reference is worse than hiding a public one.
+// An owner-qualified reference or URL is public only when the owner/repo PAIR is listed; an unqualified
+// repo#N reference is public only when the repo name is listed.
+const PUBLIC_QUALIFIED_REPOS = new Set([
+  "code-yeongyu/senpi",
+  "code-yeongyu/oh-my-openagent",
+  "code-yeongyu/oh-my-opencode",
+  "code-yeongyu/lazycodex",
+  "sisyphuslabs/doriterm",
+])
+const PUBLIC_UNQUALIFIED_REPOS = new Set(["senpi", "omo", "oh-my-openagent", "oh-my-opencode", "doriterm", "lazycodex"])
+// Same-repo shorthand such as PR#123 or GH#123 names no repository.
+const NON_REPO_TOKENS = new Set(["pr", "gh", "issue", "issues"])
+const NEUTRALIZED = "tracked internally"
+
+// One pass, so the inside of a kept public URL is never rewritten again. Alternatives, in order: a markdown
+// link to a GitHub issue/pull/commit/compare URL, a bare such URL, an (optionally owner-qualified) repo#N.
+const CROSS_REPO_PATTERN =
+  /\[([^\]]*)\]\((https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/(?:issues|pull|commit|compare)\/[^\s)]*)\)|https?:\/\/github\.com\/([\w.-]+)\/([\w.-]+)\/(?:issues|pull|commit|compare)\/[^\s)\]>]*[^\s)\]>.,;:!?]|\b(?:([\w.-]+)\/)?([A-Za-z][\w.-]*)#\d+\b/g
+
+function isPublicPair(owner: string, repo: string): boolean {
+  return PUBLIC_QUALIFIED_REPOS.has((owner + "/" + repo).toLowerCase())
+}
 
 export function neutralizeCrossRepoReferences(text: string): string {
-  return text.replace(CROSS_REPO_REFERENCE, (reference, repo: string) =>
-    PUBLIC_REFERENCE_REPOS.has(repo.toLowerCase()) ? reference : "tracked internally",
+  return text.replace(
+    CROSS_REPO_PATTERN,
+    (
+      match: string,
+      linkText: string | undefined,
+      linkUrl: string | undefined,
+      linkOwner: string | undefined,
+      linkRepo: string | undefined,
+      urlOwner: string | undefined,
+      urlRepo: string | undefined,
+      refOwner: string | undefined,
+      refRepo: string | undefined,
+    ) => {
+      if (linkOwner !== undefined && linkRepo !== undefined) {
+        if (!isPublicPair(linkOwner, linkRepo)) return NEUTRALIZED
+        return "[" + neutralizeCrossRepoReferences(linkText ?? "") + "](" + linkUrl + ")"
+      }
+      if (urlOwner !== undefined && urlRepo !== undefined) return isPublicPair(urlOwner, urlRepo) ? match : NEUTRALIZED
+      if (refRepo === undefined || /[-.]$/.test(refRepo) || NON_REPO_TOKENS.has(refRepo.toLowerCase())) return match
+      const isPublic =
+        refOwner === undefined ? PUBLIC_UNQUALIFIED_REPOS.has(refRepo.toLowerCase()) : isPublicPair(refOwner, refRepo)
+      return isPublic ? match : NEUTRALIZED
+    },
   )
 }
 
