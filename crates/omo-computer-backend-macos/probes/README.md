@@ -22,9 +22,11 @@ bun crates/omo-computer-backend-macos/probes/probe-sp-m.ts --pending-only --out 
 `--pending-only` measures nothing and needs no host; it is how the ledger is written while neither host exists.
 
 `--measure` replaces the rows of the host's own major and keeps the other major's rows (or writes them as
-`UNMEASURED` with the `--pending` reason). `--verify` measures every row of the host's major again and exits 0 only
-when the verdict column is identical on every row; other columns may differ (rects are bucketed to 8 px, timings
-vary).
+`UNMEASURED` with the `--pending` reason); it refuses to write anything but every question on both majors, and
+refuses a `--pending` with an empty reason. `--verify` measures every row of the host's major again and exits 0 only
+when the verdict column is identical on every row AND at least one row was measured (its summary prints the
+`unmeasured` count); other columns may differ (rects are bucketed to 8 px, timings vary). A symbol found only in
+another loaded image than the one the design names reads `elsewhere` in `measured`, not `no`.
 
 The probe raises no dialog, posts no input, moves no window and adds no Space. A question that needs one of those, a
 grant the host does not have, or a fixture a later row builds is recorded `UNMEASURED` with the reason.

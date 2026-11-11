@@ -142,10 +142,16 @@ function openNative() {
     if (!handles.has(path)) handles.set(path, sys.symbols.dlopen(cstr(path), 1) as Pointer | null)
     return handles.get(path) ?? null
   }
-  const sym = (path: string, name: string): Pointer | null => {
+  // symIn: only the named image (and what it re-exports). symAnywhere: every loaded image (RTLD_DEFAULT, (void *)-2).
+  const symIn = (path: string, name: string): Pointer | null => {
     const h = handle(path)
     return h ? (sys.symbols.dlsym(h, cstr(name)) as Pointer | null) : null
   }
+  const symAnywhere = (name: string): Pointer | null => sys.symbols.dlsym(RTLD_DEFAULT, cstr(name)) as Pointer | null
+  // sym: the named image first, then any loaded image, so a symbol exported from another framework still resolves.
+  const sym = (path: string, name: string): Pointer | null => symIn(path, name) ?? symAnywhere(name)
+  const locate = (path: string, name: string): SymbolLocation =>
+    symbolLocation(symIn(path, name) !== null, symAnywhere(name) !== null)
   const taskSelfPtr = sym(PATHS.system, "mach_task_self_")
   const taskSelf = taskSelfPtr ? read.u32(taskSelfPtr, 0) : 0
   const cf = dlopen(PATHS.cf, {
@@ -190,7 +196,18 @@ function openNative() {
     sel_registerName: { args: [cstring], returns: P },
     class_getClassMethod: { args: [P, P], returns: P },
   })
-  return { sys, sym, taskSelf, cf: cf.symbols, cg: cg.symbols, ax: ax.symbols, objc: objc.symbols }
+  return { sys, sym, locate, taskSelf, cf: cf.symbols, cg: cg.symbols, ax: ax.symbols, objc: objc.symbols }
+}
+
+// RTLD_DEFAULT is the pointer value -2; bun:ffi takes it as an unsigned 64-bit bigint.
+const RTLD_DEFAULT = 0xfffffffffffffffen
+
+// Where a symbol was found: in the image the design names (`yes`), only in another loaded image (`elsewhere`),
+// or nowhere (`no`). `elsewhere` counts as resolved: the ledger reads it differently from absent.
+type SymbolLocation = "yes" | "elsewhere" | "no"
+function symbolLocation(inImage: boolean, anywhere: boolean): SymbolLocation {
+  if (inImage) return "yes"
+  return anywhere ? "elsewhere" : "no"
 }
 
 const kCFStringEncodingUTF8 = 0x08000100
@@ -348,10 +365,10 @@ const yesNo = (v: unknown): string => (v ? "yes" : "no")
 
 function resolveAll(path: string, names: string[]): { all: boolean; detail: string } {
   const n = native()
-  const found = names.map((name) => [name, n.sym(path, name)] as const)
+  const found = names.map((name) => [name, n.locate(path, name)] as const)
   return {
-    all: found.every(([, a]) => a !== null),
-    detail: found.map(([name, a]) => `${name}=${a ? "yes" : "no"}`).join(","),
+    all: found.every(([, where]) => where !== "no"),
+    detail: found.map(([name, where]) => `${name}=${where}`).join(","),
   }
 }
 
@@ -548,19 +565,27 @@ function qRemoteToken(host: Host): Outcome {
   }
 }
 
+// An on-screen window is on its display's current Space: the Space list SLSCopySpacesForWindows returns for it must
+// contain that id. A zero id (no current Space read) never matches.
+function onCurrentSpace(spaces: ReadonlyArray<number | undefined>, currentSpace: number): boolean {
+  return currentSpace !== 0 && spaces.includes(currentSpace)
+}
+
 function qCopySpaces(): Outcome {
   const n = native()
   const r = resolveAll(PATHS.skylight, [
     "SLSCopySpacesForWindows",
-    "SLSGetActiveSpace",
+    "SLSCopyManagedDisplayForWindow",
+    "SLSManagedDisplayGetCurrentSpace",
     "SLSSpaceGetType",
     "SLSMainConnectionID",
   ])
   const copy = fn(n.sym(PATHS.skylight, "SLSCopySpacesForWindows"), [i32, i32, P], P)
-  const active = fn(n.sym(PATHS.skylight, "SLSGetActiveSpace"), [i32], u64)
+  const displayFor = fn(n.sym(PATHS.skylight, "SLSCopyManagedDisplayForWindow"), [i32, u32], P)
+  const currentSpace = fn(n.sym(PATHS.skylight, "SLSManagedDisplayGetCurrentSpace"), [i32, P], u64)
   const spaceType = fn(n.sym(PATHS.skylight, "SLSSpaceGetType"), [i32, u64], i32)
   const mainCid = fn(n.sym(PATHS.skylight, "SLSMainConnectionID"), [], i32)
-  if (!copy || !active || !mainCid)
+  if (!copy || !displayFor || !currentSpace || !mainCid)
     return {
       verdict: "CONTRADICTS",
       resolves: "no",
@@ -579,16 +604,21 @@ function qCopySpaces(): Outcome {
   if (spaces) n.cf.CFRelease(spaces)
   if (ids) n.cf.CFRelease(ids)
   n.cf.CFRelease(num)
-  const activeId = Number(active(cid))
-  const type = spaceType ? Number(spaceType(cid, BigInt(activeId))) : -1
-  const ok = list.length >= 1 && list.includes(activeId)
+  // Compare with the current Space of the window's OWN display, not the focused display's active Space: on a
+  // multi-display host a foreign window on the other display is on that display's current Space.
+  const display = displayFor(cid, win.id) as Pointer | null
+  if (!display) return unmeasured("SLSCopyManagedDisplayForWindow returned no display", "yes", r.detail)
+  const currentId = Number(currentSpace(cid, display))
+  n.cf.CFRelease(display)
+  const type = spaceType ? Number(spaceType(cid, BigInt(currentId))) : -1
+  const ok = onCurrentSpace(list, currentId)
   return {
     verdict: ok ? "CONFIRMS" : "CONTRADICTS",
     resolves: "yes",
     behaves: ok
-      ? "on-screen foreign window reports the active Space"
-      : `spaces=${list.length}, active Space not among them`,
-    measured: `${r.detail};spaces_for_window=${list.length};active_space_type=${type};owner=${win.owner}`,
+      ? "on-screen foreign window reports its display's current Space"
+      : `spaces=${list.length}, its display's current Space not among them`,
+    measured: `${r.detail};spaces_for_window=${list.length};current_space_type=${type};owner=${win.owner}`,
     reason: ok ? "-" : "Space membership unreliable: space:unknown",
   }
 }
@@ -719,7 +749,6 @@ function qAuthOffsets(): Outcome {
   n.cg.CGEventSetIntegerValueField(event, 9, 0x2e)
   const hits: number[] = []
   const positions: number[] = []
-  const keycodeSeen: number[] = []
   for (const offset of [24, 32, 16]) {
     const slot = safeRead(Number(event) + offset, 8)
     if (!slot) continue
@@ -732,14 +761,15 @@ function qAuthOffsets(): Outcome {
       if (view.getBigUint64(at, true) === sentinel) {
         hits.push(offset)
         positions.push(at)
-        if (record.includes(0x2e)) keycodeSeen.push(offset)
         break
       }
     }
   }
   n.cf.CFRelease(event)
   if (source) n.cf.CFRelease(source)
-  const measured = `hits=[${hits.join(",")}];sentinelAt=[${positions.join(",")}];keycode_corroborates=[${keycodeSeen.join(",")}]`
+  // Only the sentinel decides. A keycode byte is not recorded: one 0x2e byte somewhere in 512 bytes of
+  // pointer-filled memory proves nothing about where the keycode field sits.
+  const measured = `hits=[${hits.join(",")}];sentinelAt=[${positions.join(",")}]`
   if (hits.length === 1)
     return {
       verdict: "CONFIRMS",
@@ -1165,14 +1195,42 @@ function argValue(args: string[], flag: string): string | undefined {
   return i >= 0 ? args[i + 1] : undefined
 }
 
-function pendingReasons(args: string[]): Map<number, string> {
+// Every `--pending <major>=<reason>` pair. A pair with an unsupported major or an empty reason is refused: an empty
+// reason would write UNMEASURED rows that say nothing about why.
+function parsePending(args: string[]): { pending: Map<number, string>; error?: string } {
   const pending = new Map<number, string>()
   for (let i = 0; i < args.length; i++) {
     if (args[i] !== "--pending") continue
-    const [major, ...rest] = (args[i + 1] ?? "").split("=")
-    pending.set(Number(major), rest.join("="))
+    const pair = args[i + 1] ?? ""
+    const eq = pair.indexOf("=")
+    const major = Number(eq >= 0 ? pair.slice(0, eq) : pair)
+    const reason = eq >= 0 ? pair.slice(eq + 1).trim() : ""
+    if (!SUPPORTED_MAJORS.includes(major as 15 | 26))
+      return { pending, error: `--pending '${pair}' names no supported macOS major (15, 26)` }
+    if (reason === "") return { pending, error: `--pending '${pair}' has an empty reason` }
+    pending.set(major, reason)
   }
-  return pending
+  return { pending }
+}
+
+// A major is covered when it has a --pending reason or the existing ledger already holds a row for every question
+// on it. The ledger grammar is every question on every supported major (32 x 2), never fewer.
+function uncoveredMajors(pending: ReadonlyMap<number, string>, existing: ReadonlyArray<LedgerRow>): number[] {
+  return SUPPORTED_MAJORS.filter((major) => {
+    if (pending.has(major)) return false
+    const ids = new Set(existing.filter((r) => r.macos === String(major)).map((r) => r.id))
+    return !QUESTIONS.every((q) => ids.has(q.id))
+  })
+}
+
+// --verify passes only when no verdict changed AND at least one row was actually measured: a ledger whose rows are
+// all UNMEASURED, re-run on a host that still measures nothing, is identical but proves nothing.
+function verifySummary(compared: number, unmeasuredNow: number, differ: number): { line: string; pass: boolean } {
+  const measured = compared - unmeasuredNow
+  return {
+    line: `VERIFY compared=${compared} measured=${measured} unmeasured=${unmeasuredNow} differ=${differ}`,
+    pass: differ === 0 && measured > 0,
+  }
 }
 
 function writeLedger(out: string, rows: LedgerRow[]): void {
@@ -1185,7 +1243,11 @@ function writeLedger(out: string, rows: LedgerRow[]): void {
 // row of every supported major is written UNMEASURED with that major's --pending reason.
 function writePendingOnly(args: string[]): number {
   const out = argValue(args, "--out")
-  const pending = pendingReasons(args)
+  const { pending, error } = parsePending(args)
+  if (error) {
+    console.error(`SP-M: ${error}`)
+    return 2
+  }
   const absent = SUPPORTED_MAJORS.filter((m) => !pending.get(m))
   if (!out || absent.length > 0) {
     console.error(
@@ -1214,6 +1276,23 @@ function main(args: string[]): number {
     console.error(`SP-M: ledger not found: ${verifyPath ?? "(missing path)"}`)
     return 2
   }
+  // --measure arguments are checked before the host: at most ONE major (the host's own) may be left uncovered.
+  const measureOut = argValue(args, "--out")
+  const { pending, error } = parsePending(args)
+  const existing = measureOut && existsSync(measureOut) ? parseLedger(measureOut) : []
+  if (args.includes("--measure")) {
+    if (!measureOut || error) {
+      console.error(`SP-M: ${error ?? "--measure needs --out <tsv>"}`)
+      return 2
+    }
+    const uncovered = uncoveredMajors(pending, existing)
+    if (uncovered.length > 1) {
+      console.error(
+        `SP-M: --measure covers one major (the host's); macOS ${uncovered.join(" and ")} lack ledger rows and a --pending reason`,
+      )
+      return 2
+    }
+  }
   const host = buildHost()
   printSession(host)
 
@@ -1234,13 +1313,13 @@ function main(args: string[]): number {
   }
 
   if (args.includes("--measure")) {
-    const out = argValue(args, "--out")
-    if (!out) {
-      console.error("SP-M: --measure needs --out <tsv>")
+    const out = measureOut ?? ""
+    const uncovered = uncoveredMajors(pending, existing).filter((m) => m !== host.major)
+    if (uncovered.length > 0) {
+      console.error(`SP-M: macOS ${uncovered.join(", ")} lacks ledger rows and a --pending reason`)
       return 2
     }
-    const pending = pendingReasons(args)
-    const kept = existsSync(out) ? parseLedger(out).filter((r) => r.macos !== String(host.major)) : []
+    const kept = existing.filter((r) => r.macos !== String(host.major))
     const rows: LedgerRow[] = []
     for (const major of SUPPORTED_MAJORS) {
       if (major === host.major) {
@@ -1251,6 +1330,10 @@ function main(args: string[]): number {
         rows.push(...kept.filter((r) => r.macos === String(major)))
       }
     }
+    if (rows.length !== SUPPORTED_MAJORS.length * QUESTIONS.length) {
+      console.error(`SP-M: refusing a ledger of ${rows.length} rows; the grammar is ${QUESTIONS.length} x 2`)
+      return 2
+    }
     writeLedger(out, rows)
     return 0
   }
@@ -1258,6 +1341,7 @@ function main(args: string[]): number {
   // --verify: re-measure every row the ledger records for this host's macOS major; the verdict column must match.
   const ledger = parseLedger(verifyPath as string)
   let compared = 0
+  let unmeasuredNow = 0
   let differ = 0
   for (const row of ledger) {
     if (row.macos !== String(host.major)) {
@@ -1272,6 +1356,7 @@ function main(args: string[]): number {
     }
     const now = measureRow(q, host)
     compared++
+    if (now.verdict === "UNMEASURED") unmeasuredNow++
     const same = now.verdict === row.verdict
     if (!same) differ++
     console.log(
@@ -1285,8 +1370,10 @@ function main(args: string[]): number {
       differ++
     }
   }
-  console.log(`VERIFY compared=${compared} differ=${differ}`)
-  return compared > 0 && differ === 0 ? 0 : 1
+  const summary = verifySummary(compared, unmeasuredNow, differ)
+  console.log(summary.line)
+  return summary.pass ? 0 : 1
 }
 
-process.exit(main(Bun.argv.slice(2)))
+// Run only as a script; the exported decision helpers above stay importable without starting a probe.
+if (import.meta.main) process.exit(main(Bun.argv.slice(2)))
