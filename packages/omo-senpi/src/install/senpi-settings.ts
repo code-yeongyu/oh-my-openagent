@@ -8,10 +8,7 @@ const OMO_SENPI_PACKAGE_NAME = "@code-yeongyu/omo-senpi"
 const GENERATED_PLUGIN_BASENAME = /^omo-senpi-cli-plugin-[A-Za-z0-9]{6}$/
 
 // Keep removing stale installed copies; these workspaces are gone.
-const LEGACY_BUILTIN_SHADOW_PACKAGES = [
-  join("packages", "pi-goal"),
-  join("packages", "pi-webfetch"),
-] as const
+const LEGACY_BUILTIN_SHADOW_PACKAGES = [join("packages", "pi-goal"), join("packages", "pi-webfetch")] as const
 
 export async function readSettings(settingsPath: string): Promise<SettingsRecord> {
   let raw: string
@@ -40,11 +37,7 @@ export function dedupePackages(packages: readonly string[]): string[] {
   return [...new Set(packages)]
 }
 
-export function removeLegacyBuiltinShadows(
-  packages: readonly string[],
-  repoRoot: string,
-  agentDir: string,
-): string[] {
+export function removeLegacyBuiltinShadows(packages: readonly string[], repoRoot: string, agentDir: string): string[] {
   const shadowPaths = new Set(LEGACY_BUILTIN_SHADOW_PACKAGES.map((path) => resolve(repoRoot, path)))
   return packages.filter((entry) => !shadowPaths.has(resolve(agentDir, entry)))
 }
@@ -67,10 +60,7 @@ export async function removeSupersededOmoPackages(
   return entries.filter((entry): entry is string => entry !== undefined)
 }
 
-export async function writeSettingsAtomically(
-  settingsPath: string,
-  settings: SettingsRecord,
-): Promise<string> {
+export async function writeSettingsAtomically(settingsPath: string, settings: SettingsRecord): Promise<string> {
   await mkdir(dirname(settingsPath), { recursive: true })
   const backupPath = await nextBackupPath(settingsPath)
   if (await fileExists(settingsPath)) {

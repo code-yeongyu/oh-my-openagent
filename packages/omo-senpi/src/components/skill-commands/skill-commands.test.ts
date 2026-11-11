@@ -47,7 +47,12 @@ async function submit(
   let current = text
   let images: unknown = options.images
   for (const registration of pi.handlers.filter((entry) => entry.event === "input")) {
-    const event = { type: "input", text: current, source: options.source ?? "interactive", ...(images === undefined ? {} : { images }) }
+    const event = {
+      type: "input",
+      text: current,
+      source: options.source ?? "interactive",
+      ...(images === undefined ? {} : { images }),
+    }
     const result: unknown = await registration.handler(event, options.eventCtx)
     if (typeof result !== "object" || result === null) continue
     const action = Reflect.get(result, "action")
@@ -106,7 +111,14 @@ describe("skill-commands input rewrite", () => {
       const pi = hostWith(LOADED)
       await registerSkillCommands(pi, fixture.dir)
 
-      for (const text of ["/ulw-executex plan", "/foo bar", " /ulw-execute plan", "run /ulw-execute plan", "/skill:ulw-execute plan", "/tasks"]) {
+      for (const text of [
+        "/ulw-executex plan",
+        "/foo bar",
+        " /ulw-execute plan",
+        "run /ulw-execute plan",
+        "/skill:ulw-execute plan",
+        "/tasks",
+      ]) {
         expect(await submit(pi, text)).toEqual({ text, handled: false, images: undefined })
       }
       expect((await submit(pi, "/ulw-execute plan", { source: "extension" })).text).toBe("/ulw-execute plan")
@@ -118,7 +130,11 @@ describe("skill-commands input rewrite", () => {
   test("#given a user prompt template or another command owns the name #when submitted #then the alias steps aside", async () => {
     const fixture = skillsFixture(["refactor"])
     try {
-      const pi = hostWith([...LOADED, { name: "refactor", source: "prompt" }, { name: "skill:refactor", source: "skill" }])
+      const pi = hostWith([
+        ...LOADED,
+        { name: "refactor", source: "prompt" },
+        { name: "skill:refactor", source: "skill" },
+      ])
       await registerSkillCommands(pi, fixture.dir)
 
       expect((await submit(pi, "/refactor src")).text).toBe("/refactor src")
@@ -138,7 +154,9 @@ describe("skill-commands input rewrite", () => {
       const result = await submit(pi, "/ulw-research why", { eventCtx })
 
       expect(result.handled).toBe(true)
-      expect(notices).toEqual([{ message: expect.stringContaining("the ulw-research skill is disabled"), type: "warning" }])
+      expect(notices).toEqual([
+        { message: expect.stringContaining("the ulw-research skill is disabled"), type: "warning" },
+      ])
     } finally {
       fixture.cleanup()
     }
@@ -194,21 +212,39 @@ describe("skill-commands ahead of the keyword components", () => {
     const fixture = skillsFixture(["mass-ulw", "ulw-research"])
     try {
       for (const [text, expected] of [
-        ["/mass-ulw research the gateway options", ["omo-mass-ulw-mode", "omo-ulw-research-mode", "omo-browser-pointer", "omo-ultimate-browsing-pointer"]],
-        ["/ulw-research the gateway options", ["omo-ulw-research-mode", "omo-browser-pointer", "omo-ultimate-browsing-pointer"]],
+        [
+          "/mass-ulw research the gateway options",
+          ["omo-mass-ulw-mode", "omo-ulw-research-mode", "omo-browser-pointer", "omo-ultimate-browsing-pointer"],
+        ],
+        [
+          "/ulw-research the gateway options",
+          ["omo-ulw-research-mode", "omo-browser-pointer", "omo-ultimate-browsing-pointer"],
+        ],
         ["/mass-ulw split the docs refresh", ["omo-mass-ulw-mode"]],
         ["/mass-ulw is this the right tool?", []],
       ] as const) {
-        const pi = hostWith([...LOADED, { name: "skill:mass-ulw", description: "Mass.", source: "skill" }, { name: "skill:ulw-research", description: "Research.", source: "skill" }])
+        const pi = hostWith([
+          ...LOADED,
+          { name: "skill:mass-ulw", description: "Mass.", source: "skill" },
+          { name: "skill:ulw-research", description: "Research.", source: "skill" },
+        ])
         await registerSkillCommands(pi, fixture.dir)
         await createSkillPointersComponent().register(pi, context(pi))
 
         const submitted = await submit(pi, text)
 
         const contents = pi.messages.map((call) => String(call.message["content"]))
-        expect({ text, rewritten: submitted.text.startsWith("/skill:"), tags: contents.map((content) => /^<([a-z-]+)>/.exec(content)?.[1]) }).toEqual({ text, rewritten: true, tags: [...expected] })
+        expect({
+          text,
+          rewritten: submitted.text.startsWith("/skill:"),
+          tags: contents.map((content) => /^<([a-z-]+)>/.exec(content)?.[1]),
+        }).toEqual({ text, rewritten: true, tags: [...expected] })
         // A companion of a bound parent carries no "if the user is asking" condition.
-        for (const content of contents) expect({ text, conditional: content.includes("If the user of this session is asking") }).toEqual({ text, conditional: false })
+        for (const content of contents)
+          expect({ text, conditional: content.includes("If the user of this session is asking") }).toEqual({
+            text,
+            conditional: false,
+          })
       }
     } finally {
       fixture.cleanup()

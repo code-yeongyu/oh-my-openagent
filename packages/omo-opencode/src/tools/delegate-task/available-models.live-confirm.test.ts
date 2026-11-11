@@ -6,7 +6,11 @@ import { join } from "node:path"
 import { confirmRequestedModels } from "./available-models"
 import { resolveCategoryExecution } from "./category-resolver"
 import { resolveSubagentModel } from "./subagent-model-resolution"
-import { _resetMemCacheForTesting, readProviderModelsCache, writeProviderModelsCache } from "../../shared/connected-providers-cache"
+import {
+  _resetMemCacheForTesting,
+  readProviderModelsCache,
+  writeProviderModelsCache,
+} from "../../shared/connected-providers-cache"
 import { getOmoOpenCodeCacheDir } from "../../shared/data-path"
 
 const originalCacheHome = process.env.XDG_CACHE_HOME
@@ -26,16 +30,32 @@ afterEach(() => {
   cacheHome = undefined
 })
 
-const client = (rows: Array<{ provider: string; id: string }>, calls: { n: number }) => ({
-  model: { list: async () => { calls.n++; return { data: rows } } },
-}) as never
+const client = (rows: Array<{ provider: string; id: string }>, calls: { n: number }) =>
+  ({
+    model: {
+      list: async () => {
+        calls.n++
+        return { data: rows }
+      },
+    },
+  }) as never
 
 describe("a partial cached catalog does not hide a requested model", () => {
   const cached = new Set(["fixture/model-a", "fixture/model-b", "fixture/model-c"])
 
   test("a requested model the cache lacks is confirmed against the live catalog", async () => {
     const calls = { n: 0 }
-    const out = await confirmRequestedModels(client([{ provider: "fixture", id: "model-d" }, { provider: "other", id: "x" }], calls), cached, ["fixture/model-d"])
+    const out = await confirmRequestedModels(
+      client(
+        [
+          { provider: "fixture", id: "model-d" },
+          { provider: "other", id: "x" },
+        ],
+        calls,
+      ),
+      cached,
+      ["fixture/model-d"],
+    )
     expect(out.has("fixture/model-d")).toBe(true)
     expect(out.has("other/x")).toBe(false)
     expect(calls.n).toBe(1)
@@ -43,7 +63,9 @@ describe("a partial cached catalog does not hide a requested model", () => {
 
   test("a model the live catalog also lacks stays missing (fallback still applies)", async () => {
     const calls = { n: 0 }
-    const out = await confirmRequestedModels(client([{ provider: "fixture", id: "model-a" }], calls), cached, ["fixture/model-z"])
+    const out = await confirmRequestedModels(client([{ provider: "fixture", id: "model-a" }], calls), cached, [
+      "fixture/model-z",
+    ])
     expect(out.has("fixture/model-z")).toBe(false)
     expect(calls.n).toBe(1)
   })
@@ -58,7 +80,13 @@ describe("a partial cached catalog does not hide a requested model", () => {
   })
 
   test("a failing live read keeps the cached catalog", async () => {
-    const failing = { model: { list: async () => { throw new Error("offline") } } } as never
+    const failing = {
+      model: {
+        list: async () => {
+          throw new Error("offline")
+        },
+      },
+    } as never
     expect(await confirmRequestedModels(failing, cached, ["fixture/model-d"])).toBe(cached)
   })
 })
@@ -75,11 +103,15 @@ function resolutionFixture(rows: Array<{ provider: string; id: string }>, fail =
   const cacheFile = join(getOmoOpenCodeCacheDir(), "provider-models.json")
   const before = readFileSync(cacheFile, "utf8")
   const calls = { n: 0 }
-  const core = { model: { list: async () => {
-    calls.n++
-    if (fail) throw new Error("catalog offline")
-    return { data: rows }
-  } } }
+  const core = {
+    model: {
+      list: async () => {
+        calls.n++
+        if (fail) throw new Error("catalog offline")
+        return { data: rows }
+      },
+    },
+  }
   const resolve = async (path: ResolutionPath, requested = "fixture/model-d") => {
     const configured = { model: requested, variant: "high", fallback_models: ["fixture/model-c"] }
     if (path === "category") {
@@ -102,7 +134,10 @@ function resolutionFixture(rows: Array<{ provider: string; id: string }>, fail =
 describe("live confirmation through production delegate resolution", () => {
   for (const path of ["category", "subagent"] as const) {
     test(`${path}: an exact live hit is used and persisted, so the next resolution needs no live read`, async () => {
-      const fixture = resolutionFixture([{ provider: "fixture", id: "model-d" }, { provider: "unconnected", id: "model-new" }])
+      const fixture = resolutionFixture([
+        { provider: "fixture", id: "model-d" },
+        { provider: "unconnected", id: "model-new" },
+      ])
 
       const first = await fixture.resolve(path)
       expect(first.categoryModel).toMatchObject({ providerID: "fixture", modelID: "model-d", variant: "high" })
@@ -190,7 +225,10 @@ describe("live confirmation through production delegate resolution", () => {
     const fixture = resolutionFixture([{ provider: "fixture", id: "model-d" }])
     const result = await resolveCategoryExecution(
       { category: "unspecified-high" } as never,
-      { client: fixture.core, userCategories: { "unspecified-high": { models: ["fixture/model-z", "fixture/model-d"] } } } as never,
+      {
+        client: fixture.core,
+        userCategories: { "unspecified-high": { models: ["fixture/model-z", "fixture/model-d"] } },
+      } as never,
       undefined,
       undefined,
     )
@@ -216,7 +254,10 @@ describe("live confirmation through production delegate resolution", () => {
     fixture.core.model.list = async () => {
       const result = await list()
       writeProviderModelsCache({
-        models: { fixture: [fixture.metadata, { id: "model-c" }, { id: "model-e", name: "Arrived during read" }], other: fixture.other },
+        models: {
+          fixture: [fixture.metadata, { id: "model-c" }, { id: "model-e", name: "Arrived during read" }],
+          other: fixture.other,
+        },
         connected: ["fixture", "other"],
       })
       return result

@@ -24,7 +24,7 @@ function extractModelRows(result: unknown): Array<{ provider: string; id: string
 function addFromProviderModels(
   out: Set<string>,
   providerID: string,
-  models: Array<string | { id?: string }> | undefined
+  models: Array<string | { id?: string }> | undefined,
 ): void {
   if (!models) return
   for (const item of models) {
@@ -48,11 +48,17 @@ function rememberConfirmedModels(confirmed: readonly string[]): void {
     const provider = fullModel.slice(0, slash)
     const id = fullModel.slice(slash + 1)
     const entries = models[provider]
-    if (!connected.has(provider) || !entries || entries.some((entry) => (typeof entry === "string" ? entry : entry.id) === id)) continue
+    if (
+      !connected.has(provider) ||
+      !entries ||
+      entries.some((entry) => (typeof entry === "string" ? entry : entry.id) === id)
+    )
+      continue
     const strings = entries.filter((entry): entry is string => typeof entry === "string")
-    models[provider] = strings.length === entries.length
-      ? [...strings, id]
-      : [...entries.map((entry) => typeof entry === "string" ? { id: entry } : entry), { id }]
+    models[provider] =
+      strings.length === entries.length
+        ? [...strings, id]
+        : [...entries.map((entry) => (typeof entry === "string" ? { id: entry } : entry)), { id }]
     changed = true
   }
   if (changed) connectedProvidersCache.writeProviderModelsCache({ models, connected: cached.connected })
@@ -74,19 +80,26 @@ export async function confirmRequestedModels(
     const parsed = model ? parseModelString(model) : null
     return parsed ? [`${parsed.providerID}/${parsed.modelID}`] : []
   })
-  const missing = requestedModels.filter((model) => providers.has(model.split("/")[0]!) && !known.has(model.toLowerCase()))
+  const missing = requestedModels.filter((model) => {
+    const provider = model.split("/")[0]
+    return provider !== undefined && providers.has(provider) && !known.has(model.toLowerCase())
+  })
   if (missing.length === 0 || !hasModelList(client)) return available
   try {
     const rows = extractModelRows(await client.model.list())
     const out = new Set(available)
     for (const row of rows) if (providers.has(row.provider)) out.add(`${row.provider}/${row.id}`)
     const live = new Map([...out].map((model) => [model.toLowerCase(), model]))
-    const confirmed = missing.map((model) => live.get(model.toLowerCase())).filter((model): model is string => model !== undefined)
+    const confirmed = missing
+      .map((model) => live.get(model.toLowerCase()))
+      .filter((model): model is string => model !== undefined)
     try {
       rememberConfirmedModels(confirmed)
     } catch (err) {
       // A cache I/O failure must not discard the model Core just confirmed live.
-      log("[delegate-task] confirmed model cache refresh failed", { error: err instanceof Error ? err.message : String(err) })
+      log("[delegate-task] confirmed model cache refresh failed", {
+        error: err instanceof Error ? err.message : String(err),
+      })
     }
     log("[delegate-task] requested model missing from the cached catalog; checked the live catalog", {
       missing,
@@ -94,7 +107,10 @@ export async function confirmRequestedModels(
     })
     return out
   } catch (err) {
-    log("[delegate-task] live catalog check failed; keeping the cached catalog", { missing, error: err instanceof Error ? err.message : String(err) })
+    log("[delegate-task] live catalog check failed; keeping the cached catalog", {
+      missing,
+      error: err instanceof Error ? err.message : String(err),
+    })
     return available
   }
 }

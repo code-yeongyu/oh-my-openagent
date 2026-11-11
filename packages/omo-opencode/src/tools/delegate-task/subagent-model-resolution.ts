@@ -17,8 +17,10 @@ import type { ResolvedSubagentModel } from "./subagent-resolution-types"
 import { distributeTaskModels } from "./models-distribution"
 
 function findAgentOverride(agentOverrides: AgentOverrides | undefined, agentConfigKey: string) {
-  return agentOverrides?.[agentConfigKey]
-    ?? Object.entries(agentOverrides ?? {}).find(([key]) => key.toLowerCase() === agentConfigKey)?.[1]
+  return (
+    agentOverrides?.[agentConfigKey] ??
+    Object.entries(agentOverrides ?? {}).find(([key]) => key.toLowerCase() === agentConfigKey)?.[1]
+  )
 }
 
 export async function resolveSubagentModel(
@@ -32,27 +34,30 @@ export async function resolveSubagentModel(
   const agentConfigKey = getAgentConfigKey(agentToUse)
   const agentOverride = findAgentOverride(executorCtx.agentOverrides, agentConfigKey)
   const agentRequirement = AGENT_MODEL_REQUIREMENTS[agentConfigKey]
-  const agentCategoryConfig = agentOverride?.category
-    ? executorCtx.userCategories?.[agentOverride.category]
-    : undefined
+  const agentCategoryConfig = agentOverride?.category ? executorCtx.userCategories?.[agentOverride.category] : undefined
   const chainConfig = agentOverride?.models?.length
     ? agentOverride
-    : !agentOverride?.model ? agentCategoryConfig : undefined
-  const canonicalModels = chainConfig?.models_distribution === "round_robin" && chainConfig.models?.length
-    ? [...distributeTaskModels(
-        chainConfig === agentOverride ? `agent:${agentConfigKey}` : `category:${agentOverride?.category}`,
-        chainConfig.models,
-        "round_robin",
-      )]
-    : undefined
+    : !agentOverride?.model
+      ? agentCategoryConfig
+      : undefined
+  const canonicalModels =
+    chainConfig?.models_distribution === "round_robin" && chainConfig.models?.length
+      ? [
+          ...distributeTaskModels(
+            chainConfig === agentOverride ? `agent:${agentConfigKey}` : `category:${agentOverride?.category}`,
+            chainConfig.models,
+            "round_robin",
+          ),
+        ]
+      : undefined
   const firstEntry = canonicalModels?.[0]
-  const explicitModel = (typeof firstEntry === "string" ? firstEntry : firstEntry?.model)
-    ?? agentOverride?.model ?? agentCategoryConfig?.model
+  const explicitModel =
+    (typeof firstEntry === "string" ? firstEntry : firstEntry?.model) ??
+    agentOverride?.model ??
+    agentCategoryConfig?.model
   const hasExplicitUserModel = Boolean(explicitModel)
   const normalizedAgentFallbackModels = normalizeFallbackModels(
-    canonicalModels?.slice(1)
-    ?? agentOverride?.fallback_models
-    ?? agentCategoryConfig?.fallback_models
+    canonicalModels?.slice(1) ?? agentOverride?.fallback_models ?? agentCategoryConfig?.fallback_models,
   )
 
   const availableModels = await confirmRequestedModels(
@@ -60,9 +65,7 @@ export async function resolveSubagentModel(
     await getAvailableModelsForDelegateTask(executorCtx.client),
     [explicitModel],
   )
-  const normalizedMatchedModel = matchedAgent.model
-    ? normalizeModelFormat(matchedAgent.model)
-    : undefined
+  const normalizedMatchedModel = matchedAgent.model ? normalizeModelFormat(matchedAgent.model) : undefined
   const matchedAgentModelStr = normalizedMatchedModel
     ? `${normalizedMatchedModel.providerID}/${normalizedMatchedModel.modelID}`
     : undefined
@@ -99,27 +102,26 @@ export async function resolveSubagentModel(
       }
     }
 
-    const defaultProviderID = categoryModel?.providerID
-      ?? normalizedMatchedModel?.providerID
-      ?? "opencode"
-    const configuredFallbackChain = buildFallbackChainFromModels(
-      normalizedAgentFallbackModels,
-      defaultProviderID,
-    )
+    const defaultProviderID = categoryModel?.providerID ?? normalizedMatchedModel?.providerID ?? "opencode"
+    const configuredFallbackChain = buildFallbackChainFromModels(normalizedAgentFallbackModels, defaultProviderID)
     const canonicalChain = buildFallbackChainFromModels(canonicalModels, defaultProviderID)
-    const canonicalEntry = categoryModel && canonicalChain
-      ? findMostSpecificFallbackEntry(categoryModel.providerID, categoryModel.modelID, canonicalChain)
-      : undefined
-    fallbackChain = configuredFallbackChain
-      ?? ((resolutionSkipped || hasExplicitUserModel) ? undefined : agentRequirement?.fallbackChain)
+    const canonicalEntry =
+      categoryModel && canonicalChain
+        ? findMostSpecificFallbackEntry(categoryModel.providerID, categoryModel.modelID, canonicalChain)
+        : undefined
+    fallbackChain =
+      configuredFallbackChain ??
+      (resolutionSkipped || hasExplicitUserModel ? undefined : agentRequirement?.fallbackChain)
     if (canonicalChain && canonicalEntry) {
       fallbackChain = canonicalChain.slice(canonicalChain.indexOf(canonicalEntry) + 1)
     }
-    const effectiveEntry = canonicalEntry ?? resolveEffectiveFallbackEntry({
-      categoryModel,
-      configuredFallbackChain,
-      resolution,
-    })
+    const effectiveEntry =
+      canonicalEntry ??
+      resolveEffectiveFallbackEntry({
+        categoryModel,
+        configuredFallbackChain,
+        resolution,
+      })
 
     if (categoryModel && effectiveEntry) {
       categoryModel = applyFallbackEntrySettings({
@@ -132,7 +134,10 @@ export async function resolveSubagentModel(
 
   if (!categoryModel && normalizedMatchedModel) {
     const fullModel = `${normalizedMatchedModel.providerID}/${normalizedMatchedModel.modelID}`
-    if (availableModels.size === 0 || fuzzyMatchModel(fullModel, availableModels, [normalizedMatchedModel.providerID])) {
+    if (
+      availableModels.size === 0 ||
+      fuzzyMatchModel(fullModel, availableModels, [normalizedMatchedModel.providerID])
+    ) {
       categoryModel = normalizedMatchedModel
     } else {
       log("[delegate-task] Skipping unavailable agent default model", {

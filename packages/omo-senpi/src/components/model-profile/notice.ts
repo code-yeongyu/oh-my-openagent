@@ -3,7 +3,11 @@ import type { ModelProfileResolution, ModelProfileSummary } from "./resolve"
 
 const MID_SESSION_NOTE = "mid-session fallback follows senpi's retry chains"
 
-export type AuthFailedDetail = { readonly provider: string; readonly model: string; readonly reason: AuthFailure["reason"] }
+export type AuthFailedDetail = {
+  readonly provider: string
+  readonly model: string
+  readonly reason: AuthFailure["reason"]
+}
 
 export function authFailedDetails(failures: readonly AuthFailure[]): { authFailed?: AuthFailedDetail[] } {
   return failures.length === 0

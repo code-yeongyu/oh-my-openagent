@@ -59,10 +59,7 @@ function reminderTextOf(transform: ToolResultTransform): string {
   return typeof last?.text === "string" ? last.text : ""
 }
 
-async function registerComponent(
-  pi: FakeExtensionAPI,
-  arming: SessionArming,
-): Promise<void> {
+async function registerComponent(pi: FakeExtensionAPI, arming: SessionArming): Promise<void> {
   await createTodoFanoutReminderComponent(arming).register(pi, createTestContext(pi))
 }
 

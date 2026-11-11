@@ -195,8 +195,10 @@ export function resolveSenpiLauncher(runtime: RpcSpawnRuntime): SenpiLauncher | 
  * manifest, read the same way for SENPI_BIN, sibling, PATH and Windows shim targets.
  */
 export function resolveSenpiLaunchTarget(runtime: RpcSpawnRuntime): SenpiLaunchTarget {
-  const fromManifest = (launcher: SenpiLauncher): SenpiLaunchTarget =>
-    ({ launcher, engineVersion: readCandidateSenpiVersion(launcher.prefixArgs[0] ?? launcher.command) })
+  const fromManifest = (launcher: SenpiLauncher): SenpiLaunchTarget => ({
+    launcher,
+    engineVersion: readCandidateSenpiVersion(launcher.prefixArgs[0] ?? launcher.command),
+  })
   const executable = (runtime.resolveSenpiExecutable ?? resolveSenpiExecutable)(runtime)
   if (executable !== null) {
     if (isRunningCompiledEngine(executable, runtime)) {

@@ -1,9 +1,24 @@
-import { type AnchorRejection, anchorStep, type ChainAnchor, isBootstrapAnchor, isPinCandidate, isTrustAnchor, type PinCandidate } from "./anchor.ts"
+import {
+  type AnchorRejection,
+  anchorStep,
+  type ChainAnchor,
+  isBootstrapAnchor,
+  isPinCandidate,
+  isTrustAnchor,
+  type PinCandidate,
+} from "./anchor.ts"
 import type { BatchEntry, Head, KeyringEntry, SyncEntry, VerifiedKeyringEntry, VerifiedWrap } from "./entry.ts"
 import { type EnvelopeRejection, envelopeRefusal } from "./envelope.ts"
 import { frozenCopy } from "./frozen.ts"
 import { type Authority, applyRecord, type FoldedRecord, isCancelledAdmission, isVetoedEpoch } from "./fold.ts"
-import { expectedEpoch, forcedRotationRefusal, keyWithinEpoch, type LinkMode, linksHold, signerKey } from "./chain-checks.ts"
+import {
+  expectedEpoch,
+  forcedRotationRefusal,
+  keyWithinEpoch,
+  type LinkMode,
+  linksHold,
+  signerKey,
+} from "./chain-checks.ts"
 import { type ParsedBody, parseBody } from "./parse.ts"
 import type { RejectionCounter } from "./rejection.ts"
 import { holdReceiver, passReceiver, type ReceiverCheck, takeReceiver } from "./receiver.ts"
@@ -55,11 +70,13 @@ export type ChainState = ChainFields & { readonly [chainStateBrand]: true }
 
 const states = new WeakSet<object>()
 
-export const isChainState = (value: unknown): value is ChainState => typeof value === "object" && value !== null && states.has(value)
+export const isChainState = (value: unknown): value is ChainState =>
+  typeof value === "object" && value !== null && states.has(value)
 
 const isState = (value: object): value is ChainState => states.has(value)
 
-const branded = (value: object): boolean => isVerifiedWrap(value) || isTrustAnchor(value) || isBootstrapAnchor(value) || isPinCandidate(value)
+const branded = (value: object): boolean =>
+  isVerifiedWrap(value) || isTrustAnchor(value) || isBootstrapAnchor(value) || isPinCandidate(value)
 
 const mintState = (fields: ChainFields): ChainState => {
   const state = frozenCopy({ ...fields }, branded)
@@ -112,17 +129,17 @@ export type AppendOutcome =
 
 export const emptyChain = (account: string, anchor: ChainAnchor): ChainState =>
   mintState({
-  account,
-  head: null,
-  authority: null,
-  history: [],
-  received: [],
-  anchor,
-  anchored: false,
-  unanchored: [],
-  genesisDigest: null,
-  pin: null,
-  forcedRotationAfter: null,
+    account,
+    head: null,
+    authority: null,
+    history: [],
+    received: [],
+    anchor,
+    anchored: false,
+    unanchored: [],
+    genesisDigest: null,
+    pin: null,
+    forcedRotationAfter: null,
   })
 
 /**
@@ -154,7 +171,11 @@ type StepResult =
  * record it refuses is never folded here either. The receiver moves from state to state with the
  * walk, so checking one new entry does not re-fold the verified chain before it.
  */
-export const verifyKeyringEntry = async (state: ChainState, entry: KeyringEntry, mode: LinkMode): Promise<StepResult> => {
+export const verifyKeyringEntry = async (
+  state: ChainState,
+  entry: KeyringEntry,
+  mode: LinkMode,
+): Promise<StepResult> => {
   const malformed = envelopeRefusal(entry)
   if (malformed !== null) return { ok: false, reason: malformed }
   if (!isChainState(state)) return { ok: false, reason: "untrusted_state" }
@@ -239,13 +260,21 @@ const batchStep = async (state: ChainState, entry: BatchEntry, refused: Receiver
   const next = mintState({ ...state, head: { seq: entry.seq, link: entry.link, keyring_link: head.keyring_link } })
   const authorId = entry.author.id
   const vetoed = isVetoedEpoch(authority, entry.epoch) || isCancelledAdmission(authority, authorId)
-  const key = vetoed ? keyWithinEpoch(state.history, state.authority, entry.author, entry.epoch) : authorSigningKey(authority, entry.author)
+  const key = vetoed
+    ? keyWithinEpoch(state.history, state.authority, entry.author, entry.epoch)
+    : authorSigningKey(authority, entry.author)
   if (key === null) return { ok: false, reason: "not_member" }
   if (!(await verifyRecordSig(key, entry))) return { ok: false, reason: "bad_signature" }
   if (entry.account !== state.account) return { ok: false, reason: "account_mismatch" }
   if (vetoed) return { ok: true, state: next, step: { kind: "vetoed", seq: entry.seq } }
   if (entry.epoch !== authority.epoch) return { ok: false, reason: "epoch_mismatch" }
-  const batch: AcceptedBatch = { seq: entry.seq, digest: entry.digest, epoch: entry.epoch, authorId, signingPublicKey: key }
+  const batch: AcceptedBatch = {
+    seq: entry.seq,
+    digest: entry.digest,
+    epoch: entry.epoch,
+    authorId,
+    signingPublicKey: key,
+  }
   return { ok: true, state: next, step: { kind: "batch", batch } }
 }
 

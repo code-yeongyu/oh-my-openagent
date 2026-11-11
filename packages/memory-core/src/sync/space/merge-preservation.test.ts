@@ -16,17 +16,19 @@ for (const seed of [20261016, 0x1a2b3c4d]) {
     const rand = mulberry32(seed)
     const make = () => {
       const eol = pick(rand, ["\n", "\r\n"])
-      const content = Array.from({ length: 1 + Math.floor(rand() * 5) }, () => pick(rand, [
-        "Prefers dark mode in every editor.",
-        "Prefers short commit messages.",
-        "- likes tea",
-        "- likes coffee",
-        "",
-        `note ${Math.floor(rand() * 20)}: alpha beta`,
-        "韓国語の行を保持する",
-        "한글 줄 그대로",
-        "emoji line 🙂🚀",
-      ])).join(eol)
+      const content = Array.from({ length: 1 + Math.floor(rand() * 5) }, () =>
+        pick(rand, [
+          "Prefers dark mode in every editor.",
+          "Prefers short commit messages.",
+          "- likes tea",
+          "- likes coffee",
+          "",
+          `note ${Math.floor(rand() * 20)}: alpha beta`,
+          "韓国語の行を保持する",
+          "한글 줄 그대로",
+          "emoji line 🙂🚀",
+        ]),
+      ).join(eol)
       return content + (rand() < 0.5 ? eol : "")
     }
     for (let iteration = 0; iteration < 2000; iteration++) {

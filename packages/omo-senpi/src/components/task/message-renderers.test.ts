@@ -99,18 +99,25 @@ function expectSanitizedLines(lines: readonly string[]): void {
 describe("task-family custom message renderers", () => {
   test("#given terminal control injection #when rendering task completion #then structured CJK details are sanitized", () => {
     // given
-    const details = [{
-      task_id: "st_1",
-      name: "작업자",
-      status: "completed" as const,
-      model: "chatgpt-subscription/gpt-5.6-luna-fast",
-      duration_ms: 10,
-      final_response: ADVERSARIAL_CONTENT,
-      continuation_hint: "task_send로 계속",
-    }]
+    const details = [
+      {
+        task_id: "st_1",
+        name: "작업자",
+        status: "completed" as const,
+        model: "chatgpt-subscription/gpt-5.6-luna-fast",
+        duration_ms: 10,
+        final_response: ADVERSARIAL_CONTENT,
+        continuation_hint: "task_send로 계속",
+      },
+    ]
 
     // when
-    const lines = renderContentLines(renderTaskCompletion, "senpi-task.completion", "<task-notification>raw</task-notification>", details)
+    const lines = renderContentLines(
+      renderTaskCompletion,
+      "senpi-task.completion",
+      "<task-notification>raw</task-notification>",
+      details,
+    )
 
     // then
     expectSanitizedLines(lines)
@@ -120,23 +127,25 @@ describe("task-family custom message renderers", () => {
 
   test("#given structured completion details #when rendering #then user-facing task facts replace protocol tags", () => {
     // given
-    const details = [{
-      task_id: "st_done",
-      name: "worker",
-      status: "completed" as const,
-      category: "quick",
-      model: "requested/model",
-      resolved_model: {
-        source: "category" as const,
-        provider: "chatgpt-subscription",
-        model_id: "gpt-5.6-luna-fast",
-        display: "chatgpt-subscription/gpt-5.6-luna-fast",
+    const details = [
+      {
+        task_id: "st_done",
+        name: "worker",
+        status: "completed" as const,
+        category: "quick",
+        model: "requested/model",
+        resolved_model: {
+          source: "category" as const,
+          provider: "chatgpt-subscription",
+          model_id: "gpt-5.6-luna-fast",
+          display: "chatgpt-subscription/gpt-5.6-luna-fast",
+        },
+        duration_ms: 1250,
+        tokens: 321,
+        final_response: "검증 작업을 완료했습니다.",
+        continuation_hint: 'Use task_send({ to: "st_done", message: "..." }) to continue.',
       },
-      duration_ms: 1250,
-      tokens: 321,
-      final_response: "검증 작업을 완료했습니다.",
-      continuation_hint: 'Use task_send({ to: "st_done", message: "..." }) to continue.',
-    }]
+    ]
 
     // when
     const lines = renderContentLines(
@@ -186,23 +195,25 @@ describe("task-family custom message renderers", () => {
 
   test("#given a completed team member with a long target #when rendering at 140 cells #then minute duration tools and tps remain visible", () => {
     // given
-    const details = [{
-      task_id: "st_team_member",
-      name: "stats-member",
-      status: "completed" as const,
-      category: "quick",
-      model: "apitopia/z-ai/glm-5.2-ultrafast-unlocked",
-      duration_ms: 65_000,
-      run_stats: {
-        runtime_ms: 65_000,
-        turns: 3,
-        tool_calls: 4,
-        output_tokens: 840,
-        tokens_per_second: 250,
+    const details = [
+      {
+        task_id: "st_team_member",
+        name: "stats-member",
+        status: "completed" as const,
+        category: "quick",
+        model: "apitopia/z-ai/glm-5.2-ultrafast-unlocked",
+        duration_ms: 65_000,
+        run_stats: {
+          runtime_ms: 65_000,
+          turns: 3,
+          tool_calls: 4,
+          output_tokens: 840,
+          tokens_per_second: 250,
+        },
+        final_response: "team statistics member complete",
+        continuation_hint: 'Use task_send({ to: "stats-member", message: "..." }) to continue.',
       },
-      final_response: "team statistics member complete",
-      continuation_hint: 'Use task_send({ to: "stats-member", message: "..." }) to continue.',
-    }]
+    ]
 
     // when
     const lines = renderContentLines(
@@ -224,18 +235,28 @@ describe("task-family custom message renderers", () => {
 
   test("#given a long completion continuation #when rendering at 54 cells #then the actual-width excerpt preserves English word boundaries", () => {
     // given
-    const details = [{
-      task_id: "st_done",
-      name: "worker",
-      status: "completed" as const,
-      model: "chatgpt-subscription/gpt-5.6-luna-fast",
-      duration_ms: 1250,
-      final_response: "검증 작업을 완료했습니다.",
-      continuation_hint: 'Use task_send({ to: "st_done", message: "continue with the remaining evidence and report the result" }) to continue.',
-    }]
+    const details = [
+      {
+        task_id: "st_done",
+        name: "worker",
+        status: "completed" as const,
+        model: "chatgpt-subscription/gpt-5.6-luna-fast",
+        duration_ms: 1250,
+        final_response: "검증 작업을 완료했습니다.",
+        continuation_hint:
+          'Use task_send({ to: "st_done", message: "continue with the remaining evidence and report the result" }) to continue.',
+      },
+    ]
 
     // when
-    const lines = renderContentLines(renderTaskCompletion, "senpi-task.completion", "<task-notification>raw</task-notification>", details, 54, true)
+    const lines = renderContentLines(
+      renderTaskCompletion,
+      "senpi-task.completion",
+      "<task-notification>raw</task-notification>",
+      details,
+      54,
+      true,
+    )
     const normalizedLines = lines.map(normalizeRendererText)
     const continuationLine = normalizedLines.find((line) => line.includes("task_send")) ?? ""
 
