@@ -10,10 +10,7 @@ import {
   type ComputerUseTelemetryObservers,
   registerOmoNativeComputerUseTelemetry,
 } from "./omo-native-computer-use"
-import {
-  OMO_NATIVE_PROPERTY_ALLOWLISTS,
-  type OmoNativeEventName,
-} from "./product-identity"
+import { OMO_NATIVE_PROPERTY_ALLOWLISTS, type OmoNativeEventName } from "./product-identity"
 
 type Captured = {
   readonly name: OmoNativeEventName
@@ -87,12 +84,10 @@ describe("OmO Native computer-use telemetry", () => {
       "computer_use_engine_error",
     ])
     for (const event of captured) {
-      expect(Object.keys(event.properties).sort()).toEqual(
-        [...OMO_NATIVE_PROPERTY_ALLOWLISTS[event.name]].sort(),
-      )
+      expect(Object.keys(event.properties).sort()).toEqual([...OMO_NATIVE_PROPERTY_ALLOWLISTS[event.name]].sort())
       expect(event.properties["$session_id"]).toBe("hashed:private-session")
     }
-    expect(JSON.stringify(captured)).not.toContain("\"private-session\"")
+    expect(JSON.stringify(captured)).not.toContain('"private-session"')
 
     // and: session teardown detaches the process-shared observer
     await pi.dispatch("session_shutdown", {}, {})

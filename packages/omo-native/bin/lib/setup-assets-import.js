@@ -5,7 +5,17 @@
  * `planAssets` only reads; `applyAssets` is the one writer.
  */
 
-import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { dirname, join } from "node:path"
 import { packageRoot } from "./package-paths.js"
 import { planOpencodeAssets } from "./setup-opencode-assets.js"
@@ -27,7 +37,8 @@ function readMcpTarget(path) {
     // A non-object `mcpServers` is a file the engine already rejects; merging into it would spread an
     // array into "0", "1" keys, so it is left alone like any other malformed file.
     const servers = document.mcpServers
-    if (servers !== undefined && (servers === null || typeof servers !== "object" || Array.isArray(servers))) throw new Error("expected mcpServers object")
+    if (servers !== undefined && (servers === null || typeof servers !== "object" || Array.isArray(servers)))
+      throw new Error("expected mcpServers object")
     return { document, bytes }
   } catch {
     return { malformed: true, bytes }
@@ -88,9 +99,15 @@ function list(label, ids) {
 
 export function assetPlanLines({ result }) {
   return [
-    list("planned-mcp", result.servers.added.map((server) => server.name)),
+    list(
+      "planned-mcp",
+      result.servers.added.map((server) => server.name),
+    ),
     list("mcp-skipped-existing", result.servers.skippedExisting),
-    list("planned-skills", result.skills.added.map((skill) => skill.name)),
+    list(
+      "planned-skills",
+      result.skills.added.map((skill) => skill.name),
+    ),
     list("skills-skipped-existing", result.skills.skippedExisting),
     list("skills-skipped-bundled", result.skills.skippedBundled),
   ]
@@ -121,7 +138,10 @@ export function planAssets({ runtime, agentDir }) {
   const paths = { mcp: join(agentDir, "mcp.json"), skills: join(agentDir, "skills") }
   const pluginRoot = runtime.pluginRoot ?? join(packageRoot, "plugin")
   const result = classifyAssets(source, paths, bundledSkillNames(join(pluginRoot, "skills")))
-  if (result.servers.blocked.length > 0) notices.push(`WARN senpi: malformed mcp.json; these servers were not imported: ${result.servers.blocked.join(", ")}`)
+  if (result.servers.blocked.length > 0)
+    notices.push(
+      `WARN senpi: malformed mcp.json; these servers were not imported: ${result.servers.blocked.join(", ")}`,
+    )
   return {
     agentDir,
     paths,

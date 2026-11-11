@@ -5,11 +5,7 @@ import { homedir } from "node:os"
 import { basename, join, resolve } from "node:path"
 
 import { defaultIsProcessAlive } from "./exec"
-import {
-  attestLspDaemonOwner,
-  parseLspDaemonOwner,
-  type LspDaemonOwnerTarget,
-} from "./lsp-daemon-owner-attestation"
+import { attestLspDaemonOwner, parseLspDaemonOwner, type LspDaemonOwnerTarget } from "./lsp-daemon-owner-attestation"
 
 /**
  * Stale old-version lsp-daemon family.
@@ -167,8 +163,9 @@ export async function planStaleLspDaemonVersionSweep(
 ): Promise<StaleLspDaemonVersionSweepPlan> {
   const platform = options.platform ?? process.platform
   const isAlive = options.isAlive ?? defaultIsProcessAlive
-  const attestTarget = options.attestTarget
-    ?? (options.attest === undefined
+  const attestTarget =
+    options.attestTarget ??
+    (options.attest === undefined
       ? (target: StaleLspDaemonVersionTarget) => attestLspDaemonOwner(target)
       : (target: StaleLspDaemonVersionTarget) => options.attest!(target.pid, platform))
   const targets: StaleLspDaemonVersionTarget[] = []
@@ -228,12 +225,17 @@ function defaultReadProcFile(path: string): Promise<Buffer> {
 
 function defaultExecuteForStdout(file: string, args: readonly string[]): Promise<string | null> {
   return new Promise<string | null>((resolvePromise) => {
-    execFile(file, [...args], { encoding: "utf8", maxBuffer: 1024 * 1024, timeout: 1_000, windowsHide: true }, (error, stdout) => {
-      if (error !== null) {
-        resolvePromise(null)
-        return
-      }
-      resolvePromise(stdout)
-    })
+    execFile(
+      file,
+      [...args],
+      { encoding: "utf8", maxBuffer: 1024 * 1024, timeout: 1_000, windowsHide: true },
+      (error, stdout) => {
+        if (error !== null) {
+          resolvePromise(null)
+          return
+        }
+        resolvePromise(stdout)
+      },
+    )
   })
 }

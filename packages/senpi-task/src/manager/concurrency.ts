@@ -40,7 +40,8 @@ export class TaskConcurrency {
   tryAcquire(model: string, taskId: string, runEpoch: number): boolean {
     const laneKey = this.getKey(model)
     if (this.leaseState(taskId, runEpoch) !== undefined) return false
-    if (this.#queues.has(laneKey) && (this.#granting?.taskId !== taskId || this.#granting.runEpoch !== runEpoch)) return false
+    if (this.#queues.has(laneKey) && (this.#granting?.taskId !== taskId || this.#granting.runEpoch !== runEpoch))
+      return false
     if (!this.#laneHasRoom(model, laneKey) || !this.#globalHasRoom()) return false
     this.#recordLease(model, { laneKey, taskId, runEpoch })
     return true
@@ -54,12 +55,7 @@ export class TaskConcurrency {
 
   enqueue(model: string, taskId: string, grant: () => void): number
   enqueue(model: string, taskId: string, runEpoch: number, grant: () => void): number
-  enqueue(
-    model: string,
-    taskId: string,
-    runEpochOrGrant: number | (() => void),
-    suppliedGrant?: () => void,
-  ): number {
+  enqueue(model: string, taskId: string, runEpochOrGrant: number | (() => void), suppliedGrant?: () => void): number {
     let runEpoch: number
     let grant: () => void
     if (typeof runEpochOrGrant === "number") {
@@ -90,7 +86,10 @@ export class TaskConcurrency {
     return this.#queues.enqueue({ ...admission, grant })
   }
 
-  admission(taskId: string, runEpoch: number): (QueuedTaskAdmission & { readonly phase: "pre_grant" | "post_grant" | "parked" }) | undefined {
+  admission(
+    taskId: string,
+    runEpoch: number,
+  ): (QueuedTaskAdmission & { readonly phase: "pre_grant" | "post_grant" | "parked" }) | undefined {
     const key = leaseKeyOf(taskId, runEpoch)
     const lease = this.#leases.get(key)
     if (lease !== undefined) return { ...lease, phase: "post_grant" }
@@ -119,7 +118,11 @@ export class TaskConcurrency {
     return lease
   }
 
-  unpark(lease: ParkedLease | undefined, signal?: AbortSignal, options: { readonly overflow?: boolean } = {}): Promise<void> {
+  unpark(
+    lease: ParkedLease | undefined,
+    signal?: AbortSignal,
+    options: { readonly overflow?: boolean } = {},
+  ): Promise<void> {
     if (lease === undefined) return Promise.resolve()
     const entry = this.#parked.get(lease.laneKey)?.get(leaseKeyOf(lease.taskId, lease.runEpoch))
     // A stale token cannot resurrect a released task or resume a later parking of the same epoch.
@@ -136,7 +139,9 @@ export class TaskConcurrency {
     return entry.resumed.finally(() => signal?.removeEventListener("abort", abort))
   }
 
-  suspendUnpark(lease: ParkedLease): void { this.#parked.suspend(lease) }
+  suspendUnpark(lease: ParkedLease): void {
+    this.#parked.suspend(lease)
+  }
 
   releaseLease(taskId: string, runEpoch: number): void {
     const key = leaseKeyOf(taskId, runEpoch)
@@ -177,8 +182,9 @@ export class TaskConcurrency {
 
   release(model: string): void {
     const laneKey = this.getKey(model)
-    const lease = this.#leases.values().find((candidate) => candidate.laneKey === laneKey)
-      ?? this.#parked.get(laneKey)?.values().next().value?.lease
+    const lease =
+      this.#leases.values().find((candidate) => candidate.laneKey === laneKey) ??
+      this.#parked.get(laneKey)?.values().next().value?.lease
     if (lease !== undefined) this.releaseLease(lease.taskId, lease.runEpoch)
   }
 
@@ -191,12 +197,18 @@ export class TaskConcurrency {
   }
 
   // Workpool pushes schedule this only after returning their durable item IDs.
-  drain(): void { this.#dispatch() }
+  drain(): void {
+    this.#dispatch()
+  }
 
   #dispatch(): void {
     if (this.#dispatching) return
     this.#dispatching = true
-    try { this.#drainEligible() } finally { this.#dispatching = false }
+    try {
+      this.#drainEligible()
+    } finally {
+      this.#dispatching = false
+    }
   }
 
   #drainEligible(): void {
@@ -227,8 +239,11 @@ export class TaskConcurrency {
       if (queue === undefined) continue
       this.#granting = selected
       let acquired: boolean
-      try { acquired = this.tryAcquire(selected.model, selected.taskId, selected.runEpoch) }
-      finally { this.#granting = undefined }
+      try {
+        acquired = this.tryAcquire(selected.model, selected.taskId, selected.runEpoch)
+      } finally {
+        this.#granting = undefined
+      }
       // An advisory capacity observation is not a lease. Leave this waiter in place exactly
       // once when the atomic acquisition loses; a release will drain it, never a retry loop.
       if (!acquired) return

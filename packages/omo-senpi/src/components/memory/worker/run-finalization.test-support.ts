@@ -40,10 +40,12 @@ export async function finalizationFixture(integrate = true, dream?: TargetedDrea
     paths: buildIdentityPaths(root, "agent-test"),
   }
   const repo = new GitMemoryRepo({ dir: identity.paths.repo, agentId: identity.id })
-  await repo.init({ seedFiles: [
-    { relativePath: "system/base.md", content: "---\ndescription: Base\n---\nbase\n" },
-    ...Object.entries(dream?.seedFiles ?? {}).map(([relativePath, content]) => ({ relativePath, content })),
-  ] })
+  await repo.init({
+    seedFiles: [
+      { relativePath: "system/base.md", content: "---\ndescription: Base\n---\nbase\n" },
+      ...Object.entries(dream?.seedFiles ?? {}).map(([relativePath, content]) => ({ relativePath, content })),
+    ],
+  })
   const journal = new TranscriptJournal({ journalDir: join(identity.paths.transcripts, "conversation-a") })
   await journal.reconcile([{ kind: "assistant", messageId: "assistant-1", textBlocks: ["remember"] }])
   const store = new ReflectionReservationStore({

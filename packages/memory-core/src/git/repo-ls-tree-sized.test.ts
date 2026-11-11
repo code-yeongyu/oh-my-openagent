@@ -55,9 +55,7 @@ describe("GitMemoryRepo.lsTreeSized", () => {
       { path: "system/nested/guide.md", bytes: Buffer.byteLength(guide, "utf8") },
       { path: "system/persona.md", bytes: Buffer.byteLength(persona, "utf8") },
     ])
-    expect(calls.filter((argv) => argv[0] === "ls-tree")).toEqual([
-      ["ls-tree", "-r", "-l", "-z", "HEAD"],
-    ])
+    expect(calls.filter((argv) => argv[0] === "ls-tree")).toEqual([["ls-tree", "-r", "-l", "-z", "HEAD"]])
   })
 
   it("#given an empty commit #when lsTreeSized runs #then the listing is empty", async () => {
@@ -74,11 +72,12 @@ describe("GitMemoryRepo.lsTreeSized", () => {
 
   it("#given tree and gitlink records with dash sizes #when lsTreeSized parses #then only blob entries remain", async () => {
     // given
-    const stdout = [
-      "100644 blob 0123456789abcdef0123456789abcdef01234567       5\tkeep.md",
-      "040000 tree 0123456789abcdef0123456789abcdef01234567       -\tsubdir",
-      "160000 commit 0123456789abcdef0123456789abcdef01234567       -\tvendor/lib",
-    ].join("\0") + "\0"
+    const stdout =
+      [
+        "100644 blob 0123456789abcdef0123456789abcdef01234567       5\tkeep.md",
+        "040000 tree 0123456789abcdef0123456789abcdef01234567       -\tsubdir",
+        "160000 commit 0123456789abcdef0123456789abcdef01234567       -\tvendor/lib",
+      ].join("\0") + "\0"
     const repo = new GitMemoryRepo({
       dir: "/tmp/memory-ls-tree-sized-unused",
       agentId: "agent-one",

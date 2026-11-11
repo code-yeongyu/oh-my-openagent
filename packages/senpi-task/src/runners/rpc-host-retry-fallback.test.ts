@@ -23,9 +23,7 @@ describe("a daemon-hosted child's own fallback chain (#9512)", () => {
     const runner = runnerOver(host)
 
     // when
-    const handle = await runner.start(
-      childSpec({ fallbackModels: ["openai/gpt-5.6-sol:high", "zai/glm-5.3"] }),
-    )
+    const handle = await runner.start(childSpec({ fallbackModels: ["openai/gpt-5.6-sol:high", "zai/glm-5.3"] }))
 
     // then
     expect(openPayloads(host.commands)[0]?.["retryFallback"]).toEqual({
@@ -89,7 +87,10 @@ describe("a daemon-hosted child's own fallback chain (#9512)", () => {
     // then
     const opens = openPayloads(host.commands)
     expect(opens).toHaveLength(2)
-    const profile = { modelFallback: true, fallbackChains: { "anthropic/claude-sonnet-4-5": ["openai/gpt-5.6-sol"], "openai/gpt-5.6-sol": [] } }
+    const profile = {
+      modelFallback: true,
+      fallbackChains: { "anthropic/claude-sonnet-4-5": ["openai/gpt-5.6-sol"], "openai/gpt-5.6-sol": [] },
+    }
     expect(opens.map((payload) => payload["retryFallback"])).toEqual([profile, profile])
     await resumed.terminate()
   })

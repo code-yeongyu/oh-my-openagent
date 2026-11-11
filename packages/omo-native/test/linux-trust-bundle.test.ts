@@ -39,8 +39,11 @@ describe("selectLinuxBundle", () => {
   )
 
   test("#given opensuse-* only as an ID_LIKE token #when selecting #then it is not a SUSE match", () => {
-    expect(selectLinuxBundle("ID=other\nID_LIKE=opensuse-leap", null, (path) => path === "/etc/ssl/cert.pem"))
-      .toEqual({ kind: "unknown", family: "unknown", path: "/etc/ssl/cert.pem" })
+    expect(selectLinuxBundle("ID=other\nID_LIKE=opensuse-leap", null, (path) => path === "/etc/ssl/cert.pem")).toEqual({
+      kind: "unknown",
+      family: "unknown",
+      path: "/etc/ssl/cert.pem",
+    })
   })
 
   test.each([
@@ -48,13 +51,20 @@ describe("selectLinuxBundle", () => {
     ["an odd trailing backslash continues the line", "ID=fed\\\nora"],
     ["trailing whitespace after the value", "ID=fedora \t"],
   ])("#given %s #when selecting #then parses like systemd", (_case, release) => {
-    expect(selectLinuxBundle(release, null, () => true))
-      .toEqual({ kind: "known", family: "fedora", path: "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem" })
+    expect(selectLinuxBundle(release, null, () => true)).toEqual({
+      kind: "known",
+      family: "fedora",
+      path: "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+    })
   })
 
   test("#given ID and conflicting ID_LIKE #when selecting #then ID wins", () => {
     const result = selectLinuxBundle("ID=fedora\nID_LIKE=debian", null, () => true)
-    expect(result).toEqual({ kind: "known", family: "fedora", path: "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem" })
+    expect(result).toEqual({
+      kind: "known",
+      family: "fedora",
+      path: "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+    })
   })
 
   test("#given ordered ID_LIKE #when selecting #then first recognized token wins", () => {
@@ -77,28 +87,43 @@ describe("selectLinuxBundle", () => {
       "/etc/ssl/cert.pem",
     ]
     const existing = paths.slice(paths.indexOf(path))
-    expect(selectLinuxBundle("ID=other", null, (candidate) => existing.includes(candidate)))
-      .toEqual({ kind: "unknown", family: "unknown", path })
+    expect(selectLinuxBundle("ID=other", null, (candidate) => existing.includes(candidate))).toEqual({
+      kind: "unknown",
+      family: "unknown",
+      path,
+    })
   })
 
   test("#given unknown ID and no bundle #when selecting #then returns unknown absence", () => {
-    expect(selectLinuxBundle("ID=other", null, () => false))
-      .toEqual({ kind: "linux-bundle-absent", family: "unknown", path: null })
+    expect(selectLinuxBundle("ID=other", null, () => false)).toEqual({
+      kind: "linux-bundle-absent",
+      family: "unknown",
+      path: null,
+    })
   })
 
   test("#given absent known bundle and another family present #when selecting #then never falls back", () => {
-    expect(selectLinuxBundle("ID=fedora", null, (path) => path === "/etc/ssl/certs/ca-certificates.crt"))
-      .toEqual({ kind: "linux-bundle-absent", family: "fedora", path: "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem" })
+    expect(selectLinuxBundle("ID=fedora", null, (path) => path === "/etc/ssl/certs/ca-certificates.crt")).toEqual({
+      kind: "linux-bundle-absent",
+      family: "fedora",
+      path: "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+    })
   })
 
   test("#given missing primary os-release #when selecting #then uses fallback text", () => {
-    expect(selectLinuxBundle(null, "ID=sles", () => true))
-      .toEqual({ kind: "known", family: "suse", path: "/etc/ssl/ca-bundle.pem" })
+    expect(selectLinuxBundle(null, "ID=sles", () => true)).toEqual({
+      kind: "known",
+      family: "suse",
+      path: "/etc/ssl/ca-bundle.pem",
+    })
   })
 
   test("#given empty primary os-release #when selecting #then does not merge fallback", () => {
-    expect(selectLinuxBundle("", "ID=sles", (path) => path === "/etc/ssl/cert.pem"))
-      .toEqual({ kind: "unknown", family: "unknown", path: "/etc/ssl/cert.pem" })
+    expect(selectLinuxBundle("", "ID=sles", (path) => path === "/etc/ssl/cert.pem")).toEqual({
+      kind: "unknown",
+      family: "unknown",
+      path: "/etc/ssl/cert.pem",
+    })
   })
 
   test.each(["ID='debian'", 'ID="debian"', "ID=debi\\an", '# ignored\nID="other"\nID_LIKE="unknown debian"'])(
@@ -109,15 +134,21 @@ describe("selectLinuxBundle", () => {
   )
 
   test("#given duplicate assignments #when selecting #then last assignment wins", () => {
-    expect(selectLinuxBundle("ID=fedora\nID=ubuntu", null, () => true))
-      .toEqual({ kind: "known", family: "debian", path: "/etc/ssl/certs/ca-certificates.crt" })
+    expect(selectLinuxBundle("ID=fedora\nID=ubuntu", null, () => true)).toEqual({
+      kind: "known",
+      family: "debian",
+      path: "/etc/ssl/certs/ca-certificates.crt",
+    })
   })
 
   test.each(['ID="debi\\$an"', 'ID="debi\\"an"', "ID='debi\\an'", 'ID="debi\\an"'])(
     "#given non-family escaped value %s #when selecting #then does not misdecode a known family",
     (release) => {
-      expect(selectLinuxBundle(release, null, (path) => path === "/etc/ssl/cert.pem"))
-        .toEqual({ kind: "unknown", family: "unknown", path: "/etc/ssl/cert.pem" })
+      expect(selectLinuxBundle(release, null, (path) => path === "/etc/ssl/cert.pem")).toEqual({
+        kind: "unknown",
+        family: "unknown",
+        path: "/etc/ssl/cert.pem",
+      })
     },
   )
 })
@@ -141,7 +172,7 @@ function fixture(options: {
     async stat() {
       if (options.unreadable) throw new TypeError("permission denied")
       stats += 1
-      return stats === 1 ? options.before ?? metadata : options.after ?? metadata
+      return stats === 1 ? (options.before ?? metadata) : (options.after ?? metadata)
     },
     async open() {
       opened = true
@@ -152,8 +183,12 @@ function fixture(options: {
           offset += length
           return { bytesRead: length }
         },
-        async stat() { return options.held ?? options.before ?? metadata },
-        async close() { closed = true },
+        async stat() {
+          return options.held ?? options.before ?? metadata
+        },
+        async close() {
+          closed = true
+        },
       }
     },
   }
@@ -223,17 +258,20 @@ describe("readLinuxBundle", () => {
   })
 
   // Linux-only module; Windows symlinks need a privilege CI runners do not grant.
-  test.skipIf(process.platform === "win32")("#given normal symlink in a temp directory #when reading #then follows target bytes", async () => {
-    const dir = await fs.mkdtemp(join(tmpdir(), "linux-trust-bundle-"))
-    try {
-      const target = join(dir, "bundle.pem")
-      const link = join(dir, "selected.pem")
-      await fs.writeFile(target, "bundle bytes")
-      await fs.symlink(target, link)
-      const result = await readLinuxBundle(link, fs)
-      expect(result).toEqual({ kind: "success", path: link, bytes: new TextEncoder().encode("bundle bytes") })
-    } finally {
-      await fs.rm(dir, { recursive: true, force: true })
-    }
-  })
+  test.skipIf(process.platform === "win32")(
+    "#given normal symlink in a temp directory #when reading #then follows target bytes",
+    async () => {
+      const dir = await fs.mkdtemp(join(tmpdir(), "linux-trust-bundle-"))
+      try {
+        const target = join(dir, "bundle.pem")
+        const link = join(dir, "selected.pem")
+        await fs.writeFile(target, "bundle bytes")
+        await fs.symlink(target, link)
+        const result = await readLinuxBundle(link, fs)
+        expect(result).toEqual({ kind: "success", path: link, bytes: new TextEncoder().encode("bundle bytes") })
+      } finally {
+        await fs.rm(dir, { recursive: true, force: true })
+      }
+    },
+  )
 })

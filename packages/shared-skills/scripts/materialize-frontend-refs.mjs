@@ -1,82 +1,87 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { frontendSkillRoot, thirdPartyMaterializeMap, uiUxDbScripts, upstreamsRoot } from "./frontend-refs-manifest.mjs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath, pathToFileURL } from "node:url"
+import { frontendSkillRoot, thirdPartyMaterializeMap, uiUxDbScripts, upstreamsRoot } from "./frontend-refs-manifest.mjs"
 
 function upstreamPopulated(name) {
-	const dir = join(upstreamsRoot, name);
-	if (!existsSync(dir)) return false;
-	const entries = readdirSync(dir).filter((entry) => entry !== ".git");
-	return entries.length > 0;
+  const dir = join(upstreamsRoot, name)
+  if (!existsSync(dir)) return false
+  const entries = readdirSync(dir).filter((entry) => entry !== ".git")
+  return entries.length > 0
 }
 
 function quoteYamlScalar(value) {
-	return JSON.stringify(value);
+  return JSON.stringify(value)
 }
 
 export function normalizeSkillFrontmatter(content) {
-	return content.replace(/^description:\s+([^"'\[{\|>][^\r\n]*)$/m, (_match, description) => {
-		return `description: ${quoteYamlScalar(description.trim())}`;
-	});
+  return content.replace(/^description:\s+([^"'\[{\|>][^\r\n]*)$/m, (_match, description) => {
+    return `description: ${quoteYamlScalar(description.trim())}`
+  })
 }
 
 export function isSkillMarkdownSourcePath(sourcePath) {
-	const normalizedPath = sourcePath.replaceAll("\\", "/");
-	return normalizedPath === "SKILL.md" || normalizedPath.endsWith("/SKILL.md");
+  const normalizedPath = sourcePath.replaceAll("\\", "/")
+  return normalizedPath === "SKILL.md" || normalizedPath.endsWith("/SKILL.md")
 }
 
-const uiUxDbSiblingImport = new RegExp(`^(?:from|import) (?:${uiUxDbScripts.map((name) => name.replace(/\.py$/, "")).join("|")})\\b`, "m");
+const uiUxDbSiblingImport = new RegExp(
+  `^(?:from|import) (?:${uiUxDbScripts.map((name) => name.replace(/\.py$/, "")).join("|")})\\b`,
+  "m",
+)
 
 // The skill tree ships inside the signed desktop bundle (#11373): a sibling import must not leave __pycache__ next to it.
 function disableSiblingBytecodeWrites(content) {
-	return content.replace(uiUxDbSiblingImport, (line) => `import sys\nsys.dont_write_bytecode = True\n${line}`);
+  return content.replace(uiUxDbSiblingImport, (line) => `import sys\nsys.dont_write_bytecode = True\n${line}`)
 }
 
 function materializedContent(relTarget, sourcePath) {
-	const content = readFileSync(sourcePath, "utf8");
-	if (relTarget.startsWith("references/ui-ux-db/scripts/")) return disableSiblingBytecodeWrites(content);
-	const isDesignpowersSkillReference = relTarget.startsWith("references/designpowers/vendor/skills/")
-		&& relTarget.endsWith("/reference.md")
-		&& isSkillMarkdownSourcePath(sourcePath);
-	if (relTarget.endsWith("/SKILL.md") || isDesignpowersSkillReference) return normalizeSkillFrontmatter(content);
-	return content;
+  const content = readFileSync(sourcePath, "utf8")
+  if (relTarget.startsWith("references/ui-ux-db/scripts/")) return disableSiblingBytecodeWrites(content)
+  const isDesignpowersSkillReference =
+    relTarget.startsWith("references/designpowers/vendor/skills/") &&
+    relTarget.endsWith("/reference.md") &&
+    isSkillMarkdownSourcePath(sourcePath)
+  if (relTarget.endsWith("/SKILL.md") || isDesignpowersSkillReference) return normalizeSkillFrontmatter(content)
+  return content
 }
 
 export function materializeFrontendRefs({ strict = false, targetRoot = frontendSkillRoot } = {}) {
-	const map = thirdPartyMaterializeMap();
-	const requiredUpstreams = new Set(Object.values(map).map((entry) => entry.upstream));
+  const map = thirdPartyMaterializeMap()
+  const requiredUpstreams = new Set(Object.values(map).map((entry) => entry.upstream))
 
-	for (const upstream of requiredUpstreams) {
-		if (upstreamPopulated(upstream)) continue;
-		const message = `[materialize] upstream submodule not initialized: ${upstream}`;
-		if (strict) throw new Error(`${message} (run: git submodule update --init packages/shared-skills/upstreams/${upstream})`);
-		process.stderr.write(`${message} - skipping frontend ref materialization\n`);
-		return { materialized: 0, skipped: true };
-	}
+  for (const upstream of requiredUpstreams) {
+    if (upstreamPopulated(upstream)) continue
+    const message = `[materialize] upstream submodule not initialized: ${upstream}`
+    if (strict)
+      throw new Error(`${message} (run: git submodule update --init packages/shared-skills/upstreams/${upstream})`)
+    process.stderr.write(`${message} - skipping frontend ref materialization\n`)
+    return { materialized: 0, skipped: true }
+  }
 
-	rmSync(join(targetRoot, "references", "ui-ux-db"), { recursive: true, force: true });
-	rmSync(join(targetRoot, "references", "designpowers", "vendor"), { recursive: true, force: true });
+  rmSync(join(targetRoot, "references", "ui-ux-db"), { recursive: true, force: true })
+  rmSync(join(targetRoot, "references", "designpowers", "vendor"), { recursive: true, force: true })
 
-	let materialized = 0;
-	for (const [relTarget, { upstream, source }] of Object.entries(map)) {
-		const sourcePath = join(upstreamsRoot, upstream, source);
-		if (!existsSync(sourcePath)) {
-			throw new Error(`[materialize] missing upstream source: ${upstream}/${source} for ${relTarget}`);
-		}
-		const targetPath = join(targetRoot, relTarget);
-		mkdirSync(dirname(targetPath), { recursive: true });
-		writeFileSync(targetPath, materializedContent(relTarget, sourcePath));
-		materialized += 1;
-	}
+  let materialized = 0
+  for (const [relTarget, { upstream, source }] of Object.entries(map)) {
+    const sourcePath = join(upstreamsRoot, upstream, source)
+    if (!existsSync(sourcePath)) {
+      throw new Error(`[materialize] missing upstream source: ${upstream}/${source} for ${relTarget}`)
+    }
+    const targetPath = join(targetRoot, relTarget)
+    mkdirSync(dirname(targetPath), { recursive: true })
+    writeFileSync(targetPath, materializedContent(relTarget, sourcePath))
+    materialized += 1
+  }
 
-	process.stdout.write(`[materialize] wrote ${materialized} frontend reference files from submodules\n`);
-	return { materialized, skipped: false };
+  process.stdout.write(`[materialize] wrote ${materialized} frontend reference files from submodules\n`)
+  return { materialized, skipped: false }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-	const strict = process.argv.includes("--strict");
-	const result = materializeFrontendRefs({ strict });
-	if (result.skipped && strict) process.exit(1);
+  const strict = process.argv.includes("--strict")
+  const result = materializeFrontendRefs({ strict })
+  if (result.skipped && strict) process.exit(1)
 }
 
-export const __scriptPath = fileURLToPath(import.meta.url);
+export const __scriptPath = fileURLToPath(import.meta.url)

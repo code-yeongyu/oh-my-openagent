@@ -8,7 +8,11 @@ test("the real HTTP adapter retries the same POST with its authorization and bod
   const server = createServer(async (request, response) => {
     const chunks = []
     for await (const chunk of request) chunks.push(chunk)
-    requests.push({ method: request.method, authorization: request.headers.authorization, body: Buffer.concat(chunks).toString() })
+    requests.push({
+      method: request.method,
+      authorization: request.headers.authorization,
+      body: Buffer.concat(chunks).toString(),
+    })
     response.writeHead(requests.length === 1 ? 503 : 201, { "Content-Type": "application/json" })
     response.end(requests.length === 1 ? '{"error":"propagating"}' : '{"token":"issued-secret"}')
   })
@@ -19,12 +23,26 @@ test("the real HTTP adapter retries the same POST with its authorization and bod
     const address = server.address()
     if (!address || typeof address === "string") throw new Error("Missing TCP address")
     const waits: number[] = []
-    const response = await requestWithRetry("lazycodex-ai", `http://127.0.0.1:${address.port}/exchange`, {
-      method: "POST", headers: { Authorization: "Bearer fixture-token" }, body: "{}",
-    }, { sleep: async (ms: number) => { waits.push(ms) }, log: () => {} })
+    const response = await requestWithRetry(
+      "lazycodex-ai",
+      `http://127.0.0.1:${address.port}/exchange`,
+      {
+        method: "POST",
+        headers: { Authorization: "Bearer fixture-token" },
+        body: "{}",
+      },
+      {
+        sleep: async (ms: number) => {
+          waits.push(ms)
+        },
+        log: () => {},
+      },
+    )
     expect(response.status).toBe(201)
     await response.body?.cancel()
-    expect(requests).toEqual(Array.from({ length: 2 }, () => ({ method: "POST", authorization: "Bearer fixture-token", body: "{}" })))
+    expect(requests).toEqual(
+      Array.from({ length: 2 }, () => ({ method: "POST", authorization: "Bearer fixture-token", body: "{}" })),
+    )
     expect(waits).toEqual([1000])
   } finally {
     const closed = once(server, "close", { signal: AbortSignal.timeout(5000) })
@@ -39,8 +57,11 @@ function fixture(responses: Array<Response | Error>) {
   const logs: string[] = []
   let calls = 0
   return {
-    waits, logs,
-    get calls() { return calls },
+    waits,
+    logs,
+    get calls() {
+      return calls
+    },
     options: {
       request: async () => {
         const value = responses[calls++]
@@ -48,14 +69,23 @@ function fixture(responses: Array<Response | Error>) {
         if (!value) throw new Error("Unexpected request")
         return value
       },
-      sleep: async (ms: number) => { waits.push(ms) },
-      log: (line: string) => { logs.push(line) },
+      sleep: async (ms: number) => {
+        waits.push(ms)
+      },
+      log: (line: string) => {
+        logs.push(line)
+      },
     },
   }
 }
 
 test("TLS failures, rate limits and server errors recover automatically with bounded backoff", async () => {
-  const f = fixture([Object.assign(new Error("TLS handshake failed"), { code: "ECONNRESET" }), new Response("rate limited", { status: 429 }), new Response("unavailable", { status: 503 }), new Response('{"token":"secret"}', { status: 201 })])
+  const f = fixture([
+    Object.assign(new Error("TLS handshake failed"), { code: "ECONNRESET" }),
+    new Response("rate limited", { status: 429 }),
+    new Response("unavailable", { status: 503 }),
+    new Response('{"token":"secret"}', { status: 201 }),
+  ])
   await verifyPublisher("oh-my-opencode-windows-x64", "oidc-secret", f.options)
   expect(f.calls).toBe(4)
   expect(f.waits).toEqual([1000, 2000, 4000])
@@ -99,13 +129,18 @@ test("an explicit missing publisher mapping fails fast even on HTTP 404", async 
 })
 
 test("error diagnostics redact credential fields and JWTs", async () => {
-  const f = fixture([new Response('{"error":"denied","token":"private-token","value":"private-oidc"}', { status: 403 })])
+  const f = fixture([
+    new Response('{"error":"denied","token":"private-token","value":"private-oidc"}', { status: 403 }),
+  ])
   await expect(verifyPublisher("omo-ai", "token", f.options)).rejects.toThrow("HTTP 403")
   expect(f.logs.join("\n")).not.toContain("private-")
 })
 
 test("unknown HTTP failures fail closed and Retry-After is capped", async () => {
-  const f = fixture([new Response("busy", { status: 429, headers: { "retry-after": "99999" } }), new Response("bad redirect", { status: 302 })])
+  const f = fixture([
+    new Response("busy", { status: 429, headers: { "retry-after": "99999" } }),
+    new Response("bad redirect", { status: 302 }),
+  ])
   await expect(requestWithRetry("npm", "https://registry.npmjs.org", {}, f.options)).rejects.toThrow("HTTP 302")
   expect(f.waits).toEqual([30000])
 })

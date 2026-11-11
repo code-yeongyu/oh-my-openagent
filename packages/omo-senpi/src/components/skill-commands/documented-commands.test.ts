@@ -19,7 +19,9 @@ const { BUILTIN_SLASH_COMMANDS } = (await import(pathToFileURL(join(senpiDistDir
 }
 
 const NATIVE_SKILL_ROOTS = [join(packageRoot, "skills"), join(repoRoot, "packages/shared-skills/skills")]
-const NATIVE_GUIDES = ["docs/guide/overview.md", "docs/guide/orchestration.md", "README.md"].map((path) => join(repoRoot, path))
+const NATIVE_GUIDES = ["docs/guide/overview.md", "docs/guide/orchestration.md", "README.md"].map((path) =>
+  join(repoRoot, path),
+)
 
 // An opening inline-code span that starts with a command token: `/ulw-execute`, `/ulw-execute plan`.
 const DOCUMENTED_COMMAND = /(?:^|[\s(|"'>])`\/([a-z][a-z0-9-]*)(?=[\s`])/gm
@@ -47,9 +49,9 @@ function nativeSurfaceFiles(): string[] {
 
 function engineCommandNames(): Set<string> {
   const builtin = BUILTIN_SLASH_COMMANDS.map((command) => command.name)
-  const extensionCommands = walkFiles(join(senpiDistDir, "core/extensions/builtin"), (path) => path.endsWith(".js")).flatMap((path) =>
-    matchesOf(/registerCommand\("([a-z-]+)"/g, readFileSync(path, "utf8")),
-  )
+  const extensionCommands = walkFiles(join(senpiDistDir, "core/extensions/builtin"), (path) =>
+    path.endsWith(".js"),
+  ).flatMap((path) => matchesOf(/registerCommand\("([a-z-]+)"/g, readFileSync(path, "utf8")))
   return new Set([...builtin, ...extensionCommands])
 }
 
@@ -88,7 +90,16 @@ describe("documented slash commands on OmO Native", () => {
     const aliasIndex = names.indexOf("skill-commands")
 
     expect(aliasIndex).toBeGreaterThanOrEqual(0)
-    for (const reader of ["telemetry", "ultrawork", "skill-pointers", "ulw-execute-continuation", "ulw-loop", "fallback-architect", "task", "memory"]) {
+    for (const reader of [
+      "telemetry",
+      "ultrawork",
+      "skill-pointers",
+      "ulw-execute-continuation",
+      "ulw-loop",
+      "fallback-architect",
+      "task",
+      "memory",
+    ]) {
       expect({ reader, before: aliasIndex < names.indexOf(reader) }).toEqual({ reader, before: true })
     }
   })

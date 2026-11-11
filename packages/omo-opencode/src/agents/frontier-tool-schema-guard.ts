@@ -15,7 +15,7 @@ export function applyFrontierToolSchemaPermission(
   permission: AgentConfig["permission"] | undefined,
   model: string,
   explicitPermission?: AgentConfig["permission"],
-  explicitTools?: Record<string, boolean>
+  explicitTools?: Record<string, boolean>,
 ): AgentConfig["permission"] | undefined {
   if (!permission) return permission
 

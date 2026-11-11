@@ -8,7 +8,13 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 import { RECALL_OPENERS } from "./recall-openers"
 import { registerMemoryReadClassifier } from "./read-classifier-wiring"
 import { createMemoryComponent, memoryModuleSupervisor } from "./index"
-import { componentContext, loadedMemoryConfig, memorySettings, MemoryFakeExtensionAPI, sessionContext } from "./memory.test-support"
+import {
+  componentContext,
+  loadedMemoryConfig,
+  memorySettings,
+  MemoryFakeExtensionAPI,
+  sessionContext,
+} from "./memory.test-support"
 import { AUTOMOUNT_TRIGGER_CASES, withAutomountTrap } from "../../automount-trap.test-support"
 
 type ReadClassifier = Parameters<NonNullable<SenpiExtensionAPI["registerReadClassifier"]>>[0]
@@ -50,7 +56,14 @@ function fixture() {
   const unregister = registerMemoryReadClassifier(pi, { resolveRepos: () => repos })
   const classifier = pi.classifiers[0]
   if (classifier === undefined) throw new Error("classifier was not registered")
-  return { root, repo, pi, repos, unregister, classify: (absolutePath: string) => classifier({ absolutePath, cwd: root }) }
+  return {
+    root,
+    repo,
+    pi,
+    repos,
+    unregister,
+    classify: (absolutePath: string) => classifier({ absolutePath, cwd: root }),
+  }
 }
 
 describe("registerMemoryReadClassifier", () => {
@@ -163,7 +176,9 @@ describe("memory read classifier component lifecycle", () => {
       env,
       resolveCwd: () => root,
       loadConfig: () => loadedMemoryConfig(memorySettings({ agent: "test" })),
-      createRuntime: () => { throw new Error("bind-only fixture: runtime unavailable") },
+      createRuntime: () => {
+        throw new Error("bind-only fixture: runtime unavailable")
+      },
     }).register(pi, componentContext())
     const classify = pi.classifiers[0]
     if (classify === undefined) throw new Error("classifier was not registered")
@@ -180,20 +195,25 @@ describe("memory read classifier component lifecycle", () => {
 
   test("#given a legacy host #when the component registers #then it remains usable without the classifier API", () => {
     const pi = new MemoryFakeExtensionAPI()
-    expect(() => createMemoryComponent({
-      env: { OMO_MEMORY_HOME: hermeticMemoryHome() },
-      loadConfig: () => loadedMemoryConfig(memorySettings()),
-    }).register(pi, componentContext())).not.toThrow()
+    expect(() =>
+      createMemoryComponent({
+        env: { OMO_MEMORY_HOME: hermeticMemoryHome() },
+        loadConfig: () => loadedMemoryConfig(memorySettings()),
+      }).register(pi, componentContext()),
+    ).not.toThrow()
     expect(pi.tools.length).toBeGreaterThan(0)
   })
 })
 
 describe("read classifier never resolves a macOS automount trigger (#11545)", () => {
-  test.each([...AUTOMOUNT_TRIGGER_CASES])("#given a read of %s on darwin #when classified #then it is not memory and the trigger is never resolved", async (path) => {
-    const { classify } = fixture()
-    const touched = await withAutomountTrap(() => {
-      expect(classify(path)).toBeUndefined()
-    })
-    expect(touched).toEqual([])
-  })
+  test.each([...AUTOMOUNT_TRIGGER_CASES])(
+    "#given a read of %s on darwin #when classified #then it is not memory and the trigger is never resolved",
+    async (path) => {
+      const { classify } = fixture()
+      const touched = await withAutomountTrap(() => {
+        expect(classify(path)).toBeUndefined()
+      })
+      expect(touched).toEqual([])
+    },
+  )
 })

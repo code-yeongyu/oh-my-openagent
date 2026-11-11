@@ -7,10 +7,23 @@ import type { MemorySyncSelection } from "../desktop-sync/hostSelection"
 
 const account = (accountId: string): CliDeviceAccount => ({
   kind: "cli",
-  descriptor: { genesis: "unsupported", rpId: null, userName: null, serviceOrigin: "http://127.0.0.1:9", accountId, serviceDeviceId: "service-device", syncPrincipalId: "principal", publicKeys: { signing: "signing", sealing: "sealing" }, generation: "fixture", incarnation: "cli" },
+  descriptor: {
+    genesis: "unsupported",
+    rpId: null,
+    userName: null,
+    serviceOrigin: "http://127.0.0.1:9",
+    accountId,
+    serviceDeviceId: "service-device",
+    syncPrincipalId: "principal",
+    publicKeys: { signing: "signing", sealing: "sealing" },
+    generation: "fixture",
+    incarnation: "cli",
+  },
   signal: new AbortController().signal,
-  boundary: async dispatch => dispatch(),
-  forOperation: async () => { throw new Error("unused") },
+  boundary: async (dispatch) => dispatch(),
+  forOperation: async () => {
+    throw new Error("unused")
+  },
   serviceDeviceId: "service-device",
   isCurrent: async () => true,
   api: "http://127.0.0.1:9",
@@ -21,7 +34,9 @@ const account = (accountId: string): CliDeviceAccount => ({
 })
 
 // An undeclared launch (no inherited table in this process) selects the CLI source, so only createCliAccountSource runs.
-const cliRuntime = (create: (options: Parameters<DeviceAccountRuntimeModule["selectedAccountSource"]>[1]) => DeviceAccountSource): DeviceAccountRuntimeModule => ({
+const cliRuntime = (
+  create: (options: Parameters<DeviceAccountRuntimeModule["selectedAccountSource"]>[1]) => DeviceAccountSource,
+): DeviceAccountRuntimeModule => ({
   selectedAccountSource: (selection, options) => {
     let built: DeviceAccountSource | undefined
     return async () => {
@@ -32,11 +47,14 @@ const cliRuntime = (create: (options: Parameters<DeviceAccountRuntimeModule["sel
     }
   },
   claimInheritedDesktopSync: () => Promise.reject(new Error("an undeclared launch never claims")),
-  serveWorkerPort: () => { throw new Error("the main thread spawned no session Worker here") },
+  serveWorkerPort: () => {
+    throw new Error("the main thread spawned no session Worker here")
+  },
   workerMemorySyncSelection: () => Promise.reject(new Error("the main thread reads no Worker port")),
 })
 
-const accountIdOf = (resolved: DeviceAccount | null): string | undefined => resolved?.kind === "cli" ? resolved.accountId : undefined
+const accountIdOf = (resolved: DeviceAccount | null): string | undefined =>
+  resolved?.kind === "cli" ? resolved.accountId : undefined
 
 describe("selectedDeviceAccountSource", () => {
   test("#given a lazy account source #when it is built and then resolved twice #then the sidecar loads once, on the first resolve, and each resolve reads the account again", async () => {
@@ -74,7 +92,10 @@ describe("selectedDeviceAccountSource", () => {
       return cliRuntime(() => async () => account("acct_2"))
     })
 
-    const failure = await source().then(() => undefined, (error: unknown) => error)
+    const failure = await source().then(
+      () => undefined,
+      (error: unknown) => error,
+    )
     expect(failure).toBeInstanceOf(SyncSidecarUnavailableError)
     expect(String(failure)).toContain("Cannot find module '#omo-device-account-runtime'")
     const [first, second] = await Promise.all([source(), source()])
