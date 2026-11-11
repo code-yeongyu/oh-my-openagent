@@ -19,11 +19,7 @@ describe("resolveAgentDefinitionPaths", () => {
 
   describe("#given relative paths", () => {
     test("#then they are resolved against baseDir", () => {
-      const result = resolveAgentDefinitionPaths(
-        ["agents/my-agent.md"],
-        tempDir,
-        null,
-      )
+      const result = resolveAgentDefinitionPaths(["agents/my-agent.md"], tempDir, null)
 
       expect(result).toEqual([join(tempDir, "agents/my-agent.md")])
     })
@@ -33,11 +29,7 @@ describe("resolveAgentDefinitionPaths", () => {
     test("#then they are returned as-is", () => {
       const absPath = join(tempDir, "absolute-agent.md")
 
-      const result = resolveAgentDefinitionPaths(
-        [absPath],
-        "/some/other/base",
-        null,
-      )
+      const result = resolveAgentDefinitionPaths([absPath], "/some/other/base", null)
 
       expect(result).toEqual([absPath])
     })
@@ -45,11 +37,7 @@ describe("resolveAgentDefinitionPaths", () => {
 
   describe("#given tilde-prefixed paths", () => {
     test("#then ~ is expanded to homedir", () => {
-      const result = resolveAgentDefinitionPaths(
-        ["~/agents/test.md"],
-        tempDir,
-        null,
-      )
+      const result = resolveAgentDefinitionPaths(["~/agents/test.md"], tempDir, null)
 
       expect(result).toEqual([join(homedir(), "agents", "test.md")])
     })
@@ -60,11 +48,7 @@ describe("resolveAgentDefinitionPaths", () => {
       const projectDir = join(tempDir, "project")
       mkdirSync(projectDir, { recursive: true })
 
-      const result = resolveAgentDefinitionPaths(
-        ["/etc/passwd"],
-        projectDir,
-        projectDir,
-      )
+      const result = resolveAgentDefinitionPaths(["/etc/passwd"], projectDir, projectDir)
 
       expect(result).toEqual([])
     })
@@ -75,11 +59,7 @@ describe("resolveAgentDefinitionPaths", () => {
       mkdirSync(agentsDir, { recursive: true })
       writeFileSync(join(agentsDir, "a.md"), "test", "utf-8")
 
-      const result = resolveAgentDefinitionPaths(
-        ["agents/a.md"],
-        projectDir,
-        projectDir,
-      )
+      const result = resolveAgentDefinitionPaths(["agents/a.md"], projectDir, projectDir)
 
       expect(result).toEqual([join(projectDir, "agents/a.md")])
     })
@@ -87,11 +67,7 @@ describe("resolveAgentDefinitionPaths", () => {
 
   describe("#given containmentDir is null", () => {
     test("#then no boundary check is applied", () => {
-      const result = resolveAgentDefinitionPaths(
-        ["/some/outside/path/agent.md"],
-        tempDir,
-        null,
-      )
+      const result = resolveAgentDefinitionPaths(["/some/outside/path/agent.md"], tempDir, null)
 
       expect(result).toEqual(["/some/outside/path/agent.md"])
     })
@@ -110,11 +86,7 @@ describe("resolveAgentDefinitionPaths", () => {
       const projectDir = join(tempDir, "project")
       mkdirSync(projectDir, { recursive: true })
 
-      const result = resolveAgentDefinitionPaths(
-        ["./valid.md", "/outside/boundary.md"],
-        projectDir,
-        projectDir,
-      )
+      const result = resolveAgentDefinitionPaths(["./valid.md", "/outside/boundary.md"], projectDir, projectDir)
 
       expect(result).toEqual([join(projectDir, "valid.md")])
     })

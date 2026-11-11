@@ -26,12 +26,7 @@ import { isRefusalLikeMessage } from "../fallback-architect/detection"
  * (`dist/core/extensions/types.d.ts` `AgentSettledEvent`).
  */
 export type ContinuationBlockReason =
-  | "aborted"
-  | "host-retry"
-  | "missing-outcome"
-  | "refusal"
-  | "unfinished-turn"
-  | "aborted-tool-result"
+  "aborted" | "host-retry" | "missing-outcome" | "refusal" | "unfinished-turn" | "aborted-tool-result"
 
 export interface AgentEndOutcome {
   readonly stopReason: string | null
@@ -89,7 +84,10 @@ function isAbortedToolResult(message: unknown): boolean {
   if (!Array.isArray(content)) return false
   return content.some(
     (block: unknown) =>
-      isRecord(block) && block["type"] === "text" && typeof block["text"] === "string" && /\babort(?:ed)?\b/i.test(block["text"]),
+      isRecord(block) &&
+      block["type"] === "text" &&
+      typeof block["text"] === "string" &&
+      /\babort(?:ed)?\b/i.test(block["text"]),
   )
 }
 

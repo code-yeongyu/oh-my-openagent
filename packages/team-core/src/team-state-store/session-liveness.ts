@@ -8,10 +8,7 @@ export interface WorkerLiveness {
   readonly stillAlive: boolean
 }
 
-export async function sessionExists(
-  ctx: TeamSessionContext,
-  sessionId: string,
-): Promise<boolean> {
+export async function sessionExists(ctx: TeamSessionContext, sessionId: string): Promise<boolean> {
   try {
     const response = await ctx.client.session.get({ path: { id: sessionId } })
 
@@ -33,16 +30,18 @@ export async function inspectWorkerMembers(
 ): Promise<WorkerLiveness[]> {
   const workerMembers = runtimeState.members.filter((member) => member.agentType !== "leader")
 
-  return await Promise.all(workerMembers.map(async (member) => {
-    if (member.status === "errored") {
-      return { name: member.name, wasSpawned: true, stillAlive: false }
-    }
+  return await Promise.all(
+    workerMembers.map(async (member) => {
+      if (member.status === "errored") {
+        return { name: member.name, wasSpawned: true, stillAlive: false }
+      }
 
-    if (member.sessionId === undefined) {
-      return { name: member.name, wasSpawned: false, stillAlive: true }
-    }
+      if (member.sessionId === undefined) {
+        return { name: member.name, wasSpawned: false, stillAlive: true }
+      }
 
-    const stillAlive = await sessionExists(ctx, member.sessionId)
-    return { name: member.name, wasSpawned: true, stillAlive }
-  }))
+      const stillAlive = await sessionExists(ctx, member.sessionId)
+      return { name: member.name, wasSpawned: true, stillAlive }
+    }),
+  )
 }

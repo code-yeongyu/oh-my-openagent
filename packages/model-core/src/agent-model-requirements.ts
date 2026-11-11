@@ -1,4 +1,3 @@
-import { FABLE_55_LAUNCH, launchRungs } from "./fable-55-launch"
 import type { ModelRequirement } from "./model-requirement-types"
 import { LATEST_MODEL_BY_FAMILY } from "./latest-models"
 
@@ -24,7 +23,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "medium",
       },
       { providers: ["zai-coding-plan", "opencode", "bailian-coding-plan"], model: "glm-5.2" },
-      { providers: ["opencode"], model: "big-pickle" }
+      { providers: ["opencode"], model: "big-pickle" },
     ],
     requiresAnyModel: true,
   },
@@ -39,7 +38,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
         variant: "medium",
-      }
+      },
     ],
     requiresProvider: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
     requiresAnyModel: true,
@@ -63,7 +62,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: LATEST_MODEL_BY_FAMILY.claudeOpus,
         variant: "max",
       },
-      { providers: ["opencode-go"], model: "glm-5.2" }
+      { providers: ["opencode-go"], model: "glm-5.2" },
     ],
   },
   librarian: {
@@ -73,7 +72,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["anthropic", "github-copilot"], model: LATEST_MODEL_BY_FAMILY.claudeHaiku, variant: "medium" },
       { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
       { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
-      { providers: ["opencode-go"], model: "minimax-m2.7" }
+      { providers: ["opencode-go"], model: "minimax-m2.7" },
     ],
   },
   explore: {
@@ -83,7 +82,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["anthropic", "github-copilot"], model: LATEST_MODEL_BY_FAMILY.claudeHaiku, variant: "medium" },
       { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
       { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
-      { providers: ["opencode-go"], model: "minimax-m2.7" }
+      { providers: ["opencode-go"], model: "minimax-m2.7" },
     ],
   },
   "multimodal-looker": {
@@ -91,19 +90,19 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-5.6-sol", variant: "low" },
       { providers: ["opencode-go"], model: LATEST_MODEL_BY_FAMILY.kimi },
       { providers: ["zai-coding-plan"], model: "glm-4.6v" },
-      { providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"], model: "gpt-5-nano" }
+      { providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"], model: "gpt-5-nano" },
     ],
   },
   prometheus: {
-    fallbackChain: launchRungs([
+    fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: FABLE_55_LAUNCH.id,
+        model: LATEST_MODEL_BY_FAMILY.claudeFable,
         variant: "xhigh",
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: LATEST_MODEL_BY_FAMILY.claudeFable,
+        model: "claude-fable-5-1",
         variant: "xhigh",
       },
       {
@@ -116,19 +115,19 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: LATEST_MODEL_BY_FAMILY.kimi,
         variant: "max",
       },
-      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
-    ]),
+      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" },
+    ],
   },
   metis: {
-    fallbackChain: launchRungs([
+    fallbackChain: [
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: FABLE_55_LAUNCH.id,
+        model: LATEST_MODEL_BY_FAMILY.claudeFable,
         variant: "max",
       },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
-        model: LATEST_MODEL_BY_FAMILY.claudeFable,
+        model: "claude-fable-5-1",
         variant: "max",
       },
       {
@@ -141,14 +140,18 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: LATEST_MODEL_BY_FAMILY.kimi,
         variant: "max",
       },
-      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
-    ]),
+      { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" },
+    ],
   },
   momus: {
     fallbackChain: [
       { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "xhigh" },
       { providers: ["github-copilot"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
-      { providers: ["openai", "chatgpt-subscription", "opencode"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
+      {
+        providers: ["openai", "chatgpt-subscription", "opencode"],
+        model: LATEST_MODEL_BY_FAMILY.gptAstra,
+        variant: "high",
+      },
       {
         providers: ["anthropic", "github-copilot", "opencode"],
         model: LATEST_MODEL_BY_FAMILY.claudeOpus,
@@ -164,7 +167,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         model: "gemini-3.1-pro",
         variant: "high",
       },
-      { providers: ["opencode-go"], model: "glm-5.2" }
+      { providers: ["opencode-go"], model: "glm-5.2" },
     ],
   },
   atlas: {
@@ -178,7 +181,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       },
       { providers: ["opencode-go"], model: "minimax-m3" },
       { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
-      { providers: ["opencode-go"], model: "minimax-m2.7" }
+      { providers: ["opencode-go"], model: "minimax-m2.7" },
     ],
   },
   "sisyphus-junior": {
@@ -193,7 +196,7 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["opencode-go"], model: "minimax-m3" },
       { providers: ["minimax-coding-plan", "minimax-cn-coding-plan"], model: "MiniMax-M3" },
       { providers: ["opencode-go"], model: "minimax-m2.7" },
-      { providers: ["opencode"], model: "big-pickle" }
+      { providers: ["opencode"], model: "big-pickle" },
     ],
   },
 }

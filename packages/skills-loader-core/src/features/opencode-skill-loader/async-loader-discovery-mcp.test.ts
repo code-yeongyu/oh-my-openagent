@@ -40,7 +40,6 @@ describe("async-loader", () => {
   })
 
   describe("discoverSkillsInDirAsync MCP configs", () => {
-
     it("loads MCP config from frontmatter", async () => {
       // given
       const skillContent = `---
@@ -78,9 +77,9 @@ Skill body.
         mcpServers: {
           playwright: {
             command: "npx",
-            args: ["@playwright/mcp"]
-          }
-        }
+            args: ["@playwright/mcp"],
+          },
+        },
       }
       createTestSkill("json-mcp-skill", skillContent, mcpJson)
 
@@ -107,9 +106,9 @@ Skill.
       const mcpJson = {
         mcpServers: {
           "from-json": {
-            command: "json-cmd"
-          }
-        }
+            command: "json-cmd",
+          },
+        },
       }
       createTestSkill("priority-test", skillContent, mcpJson)
 

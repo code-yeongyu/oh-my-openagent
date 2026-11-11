@@ -13,17 +13,50 @@ export type WriterSite = {
 }
 
 const DISK = [
-  "writeFile", "writeFileSync", "appendFile", "appendFileSync", "writeSync", "write",
-  "mkdir", "mkdirSync", "mkdtemp", "mkdtempSync", "rename", "renameSync", "open", "openSync",
-  "copyFile", "copyFileSync", "cp", "cpSync", "createWriteStream", "symlink", "symlinkSync",
-  "link", "linkSync", "truncate", "truncateSync", "rm", "rmSync", "unlink", "unlinkSync",
+  "writeFile",
+  "writeFileSync",
+  "appendFile",
+  "appendFileSync",
+  "writeSync",
+  "write",
+  "mkdir",
+  "mkdirSync",
+  "mkdtemp",
+  "mkdtempSync",
+  "rename",
+  "renameSync",
+  "open",
+  "openSync",
+  "copyFile",
+  "copyFileSync",
+  "cp",
+  "cpSync",
+  "createWriteStream",
+  "symlink",
+  "symlinkSync",
+  "link",
+  "linkSync",
+  "truncate",
+  "truncateSync",
+  "rm",
+  "rmSync",
+  "unlink",
+  "unlinkSync",
 ]
 const NETWORK = ["fetch", "request", "get", "connect", "createConnection", "sendBeacon", "udpSocket"]
 const PROCESS = ["spawn", "spawnSync", "exec", "execSync", "execFile", "execFileSync", "fork"]
 const TRANSPORT = [
-  "createEventTelemetryClient", "createTelemetryClient", "createDefaultPostHogTransport", "createOtlpTelemetryTransport",
-  "recordDailyActive", "recordSenpiDailyActive", "getDailyActiveCaptureState",
-  "writeTelemetryDiagnostic", "cleanupTelemetryDiagnostics", "captureEvent", "capture",
+  "createEventTelemetryClient",
+  "createTelemetryClient",
+  "createDefaultPostHogTransport",
+  "createOtlpTelemetryTransport",
+  "recordDailyActive",
+  "recordSenpiDailyActive",
+  "getDailyActiveCaptureState",
+  "writeTelemetryDiagnostic",
+  "cleanupTelemetryDiagnostics",
+  "captureEvent",
+  "capture",
 ]
 const SINK_MODULES = /^(?:node:)?(?:fs|fs\/promises|http|https|http2|net|tls|dgram|child_process)$/u
 const NETWORK_OBJECTS = /^(?:http|https|http2|net|tls|dgram|Bun)$/u
@@ -33,7 +66,8 @@ const squash = (text: string): string => text.replace(/\s+/gu, " ").trim()
 
 function calleeName(expression: ts.Expression): { readonly name: string; readonly object: string } | undefined {
   if (ts.isIdentifier(expression)) return { name: expression.text, object: "" }
-  if (ts.isPropertyAccessExpression(expression)) return { name: expression.name.text, object: expression.expression.getText() }
+  if (ts.isPropertyAccessExpression(expression))
+    return { name: expression.name.text, object: expression.expression.getText() }
   if (ts.isElementAccessExpression(expression) && ts.isStringLiteralLike(expression.argumentExpression)) {
     return { name: expression.argumentExpression.text, object: expression.expression.getText() }
   }
@@ -60,8 +94,10 @@ function sinkImports(source: ts.SourceFile): SinkImports {
 
 function isSink(name: string, object: string, imports: SinkImports): boolean {
   const bare = object === ""
-  const resolved = bare ? imports.aliases.get(name) ?? name : name
-  const fromSinkModule = bare ? imports.aliases.has(name) : imports.namespaces.has(object) || NETWORK_OBJECTS.test(object)
+  const resolved = bare ? (imports.aliases.get(name) ?? name) : name
+  const fromSinkModule = bare
+    ? imports.aliases.has(name)
+    : imports.namespaces.has(object) || NETWORK_OBJECTS.test(object)
   if (TRANSPORT.includes(resolved) || resolved === "fetch") return true
   if (resolved === "write") return object === "Bun" || fromSinkModule
   if (NETWORK.includes(resolved)) return fromSinkModule
@@ -73,12 +109,22 @@ function functionName(node: ts.Node): string | undefined {
   if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node) || ts.isFunctionExpression(node)) {
     if (node.name !== undefined) return node.name.getText()
   }
-  if (!(ts.isArrowFunction(node) || ts.isFunctionExpression(node) || ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)
-    || ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node) || ts.isConstructorDeclaration(node))) return undefined
+  if (!(
+    ts.isArrowFunction(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isFunctionDeclaration(node) ||
+    ts.isMethodDeclaration(node) ||
+    ts.isGetAccessorDeclaration(node) ||
+    ts.isSetAccessorDeclaration(node) ||
+    ts.isConstructorDeclaration(node)
+  ))
+    return undefined
   if (ts.isConstructorDeclaration(node)) return "constructor"
-  if ((ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node)) && node.name !== undefined) return node.name.getText()
+  if ((ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node)) && node.name !== undefined)
+    return node.name.getText()
   const parent = node.parent
-  if (ts.isVariableDeclaration(parent) || ts.isPropertyAssignment(parent) || ts.isPropertyDeclaration(parent)) return parent.name.getText()
+  if (ts.isVariableDeclaration(parent) || ts.isPropertyAssignment(parent) || ts.isPropertyDeclaration(parent))
+    return parent.name.getText()
   if (ts.isCallExpression(parent)) {
     const callee = calleeName(parent.expression)
     return `${callee?.name ?? "call"}(=>)`
@@ -145,7 +191,11 @@ export function scanWriterSites(file: string, text: string): readonly WriterSite
     if (ts.isCallExpression(node)) {
       const callee = calleeName(node.expression)
       if (callee !== undefined && isSink(callee.name, callee.object, imports)) record(node, callText(node))
-    } else if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && CONSTRUCTED_SINKS.has(node.expression.text)) {
+    } else if (
+      ts.isNewExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      CONSTRUCTED_SINKS.has(node.expression.text)
+    ) {
       record(node, `new ${callText(node)}`)
     } else if (ts.isIdentifier(node) && isSinkAlias(node.text, imports) && !isCalleeOrBinding(node)) {
       sites.push({ file, fn: enclosingFunctions(node), guard: guardsOf(node), call: `ref ${node.text}` })
@@ -164,7 +214,7 @@ function isSinkAlias(name: string, imports: SinkImports): boolean {
 function isCalleeOrBinding(node: ts.Identifier): boolean {
   const parent = node.parent
   if (ts.isCallExpression(parent) && parent.expression === node) return true
-  return ts.isImportSpecifier(parent) || ts.isPropertyAccessExpression(parent) && parent.name === node
+  return ts.isImportSpecifier(parent) || (ts.isPropertyAccessExpression(parent) && parent.name === node)
 }
 
 export const siteKey = (site: WriterSite): string => `${site.fn} | ${site.guard} | ${site.call}`

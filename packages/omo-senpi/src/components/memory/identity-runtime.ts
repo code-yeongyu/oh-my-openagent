@@ -16,10 +16,7 @@ import { ensureIdentityRuntimeDirs, type MemoryIdentityContext } from "./context
 import { currentLaunchScope, withLaunchScope } from "./launch-facts"
 import { createReflectionRunIdFactory } from "./reflection-run-id"
 import { buildSandboxTransform, type SandboxPolicy, type SandboxTransform } from "./sandbox"
-import {
-  resolveAgentReflectionSettings,
-  resolveMemorySettings,
-} from "./reflection-settings"
+import { resolveAgentReflectionSettings, resolveMemorySettings } from "./reflection-settings"
 import { resolveReflectionTriggerConfig } from "./trigger-wiring"
 import {
   SenpiSubprocessRunner,
@@ -126,9 +123,13 @@ export function createIdentityRuntime(
     logger: deps.logger,
     resolveModelRegistry: deps.resolveModelRegistry,
     ...(deps.resolveSessionModel === undefined ? {} : { resolveSessionModel: deps.resolveSessionModel }),
-    ...(deps.resolveParentContextTokens === undefined ? {} : { resolveParentContextTokens: deps.resolveParentContextTokens }),
+    ...(deps.resolveParentContextTokens === undefined
+      ? {}
+      : { resolveParentContextTokens: deps.resolveParentContextTokens }),
     ...(deps.resolveParentSessionFile === undefined ? {} : { resolveParentSessionFile: deps.resolveParentSessionFile }),
-    ...(deps.resolveParentCacheReusable === undefined ? {} : { resolveParentCacheReusable: deps.resolveParentCacheReusable }),
+    ...(deps.resolveParentCacheReusable === undefined
+      ? {}
+      : { resolveParentCacheReusable: deps.resolveParentCacheReusable }),
     loadConfig: (options) => deps.loadConfig(options ?? {}),
     cwd: deps.cwd(),
     sandbox: lazySandbox,
@@ -159,7 +160,9 @@ export function createIdentityRuntime(
   const launch = (run: ReservedRun): Promise<void> => {
     const scope = currentLaunchScope()
     const owned = scope !== undefined && sameConversations(scope.conversationIds, run.request.conversationIds)
-    return owned ? launchInScope(run) : withLaunchScope({ conversationIds: run.request.conversationIds }, () => launchInScope(run))
+    return owned
+      ? launchInScope(run)
+      : withLaunchScope({ conversationIds: run.request.conversationIds }, () => launchInScope(run))
   }
   const launchInScope = (run: ReservedRun): Promise<void> => {
     const tracked: Promise<void> = ensureRuntimeDirsOnce()
@@ -189,8 +192,11 @@ export function createIdentityRuntime(
       // The per-turn pass never waits on a run's deadline, so it does not join or start the shared flight.
       if (options?.waitPolicy === "none") {
         await reconcileReflectionRuns({
-          identity: asMemoryIdentity(identity), reservation: store, launch,
-          deferOnSchedulerContention: true, waitPolicy: "none",
+          identity: asMemoryIdentity(identity),
+          reservation: store,
+          launch,
+          deferOnSchedulerContention: true,
+          waitPolicy: "none",
           ...(signal === undefined ? {} : { signal }),
         })
         return
@@ -200,19 +206,26 @@ export function createIdentityRuntime(
       // Never clear the flight on timeout alone: a committed transition may still be finishing.
       for (let attempt = 0; ; attempt += 1) {
         signal?.throwIfAborted()
-        const flight = reconciliation ??= {
+        const flight = (reconciliation ??= {
           signal,
           promise: reconcileReflectionRuns({
-            identity: asMemoryIdentity(identity), reservation: store, launch,
+            identity: asMemoryIdentity(identity),
+            reservation: store,
+            launch,
             deferOnSchedulerContention: true,
             ...(signal === undefined ? {} : { signal }),
-          }).then(() => undefined).finally(() => { reconciliation = undefined }),
-        }
+          })
+            .then(() => undefined)
+            .finally(() => {
+              reconciliation = undefined
+            }),
+        })
         try {
           await flight.promise
         } catch (error) {
           if (signal !== flight.signal) signal?.throwIfAborted()
-          if (attempt !== 0 || flight.signal === signal || !flight.signal?.aborted || error !== flight.signal.reason) throw error
+          if (attempt !== 0 || flight.signal === signal || !flight.signal?.aborted || error !== flight.signal.reason)
+            throw error
           continue
         }
         signal?.throwIfAborted()

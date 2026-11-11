@@ -88,7 +88,10 @@ function parseCanonicalRuntimeFallbackModel(model: string): { providerID: string
   }
 }
 
-export function areRuntimeFallbackModelsEquivalent(candidate: string | undefined, current: string | undefined): boolean {
+export function areRuntimeFallbackModelsEquivalent(
+  candidate: string | undefined,
+  current: string | undefined,
+): boolean {
   if (!candidate || !current) return false
 
   const parsedCandidate = parseCanonicalRuntimeFallbackModel(candidate)
@@ -98,8 +101,5 @@ export function areRuntimeFallbackModelsEquivalent(candidate: string | undefined
     return candidate.toLowerCase() === current.toLowerCase()
   }
 
-  return (
-    parsedCandidate.providerID === parsedCurrent.providerID &&
-    parsedCandidate.modelID === parsedCurrent.modelID
-  )
+  return parsedCandidate.providerID === parsedCurrent.providerID && parsedCandidate.modelID === parsedCurrent.modelID
 }

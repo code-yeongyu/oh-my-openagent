@@ -13,7 +13,7 @@ import { resolvePromptAppend } from "./resolve-file-uri"
 export function applyCategoryOverride(
   config: AgentConfig,
   categoryName: string,
-  mergedCategories: Record<string, CategoryConfig>
+  mergedCategories: Record<string, CategoryConfig>,
 ): AgentConfig {
   const categoryConfig = mergedCategories[categoryName]
   if (!categoryConfig) return config
@@ -36,11 +36,7 @@ export function applyCategoryOverride(
   return result
 }
 
-export function mergeAgentConfig(
-  base: AgentConfig,
-  override: AgentOverrideConfig,
-  directory?: string
-): AgentConfig {
+export function mergeAgentConfig(base: AgentConfig, override: AgentOverrideConfig, directory?: string): AgentConfig {
   const migratedOverride = migrateAgentConfig(override as Record<string, unknown>) as AgentOverrideConfig
   const { prompt_append, reasoning, ...rest } = migratedOverride
   const merged = deepMerge(base, rest as Partial<AgentConfig>)
@@ -53,7 +49,7 @@ export function mergeAgentConfig(
     merged.variant = reasoning
   }
 
-  if (merged.prompt && typeof merged.prompt === 'string' && merged.prompt.startsWith('file://')) {
+  if (merged.prompt && typeof merged.prompt === "string" && merged.prompt.startsWith("file://")) {
     merged.prompt = resolvePromptAppend(merged.prompt, directory)
   }
 
@@ -68,7 +64,7 @@ export function applyOverrides(
   config: AgentConfig,
   override: AgentOverrideConfig | undefined,
   mergedCategories: Record<string, CategoryConfig>,
-  directory?: string
+  directory?: string,
 ): AgentConfig {
   let result = config
   const overrideCategory = override?.category
