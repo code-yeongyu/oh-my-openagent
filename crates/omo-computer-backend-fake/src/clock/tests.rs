@@ -26,3 +26,18 @@ fn fake_clock_is_the_only_time_source() {
     assert!(FakeClock::from_seam(Some("soon")).is_err());
     assert_eq!(FakeClock::from_seam(None).expect("unset").now_ms(), 0);
 }
+
+#[test]
+fn the_fake_reads_no_environment() {
+    for probe in [
+        // Split like the needles, so the crate scan above stays clean.
+        concat!("let home = std", "::en", "v::var(\"HOME\");"),
+        concat!("use std", "::env;"),
+        concat!("let seam = env", "::var_os(\"OMO_COMPUTER_FAKE_CLOCK\");"),
+    ] {
+        assert!(
+            !scan_text("probe.rs", probe).is_empty(),
+            "the guard catches {probe}"
+        );
+    }
+}
