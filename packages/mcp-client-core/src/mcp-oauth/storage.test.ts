@@ -3,14 +3,7 @@ import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, mkdtempSync, rmSync, readFileSync, statSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import {
-  deleteToken,
-  getMcpOauthStoragePath,
-  listAllTokens,
-  listTokensByHost,
-  loadToken,
-  saveToken,
-} from "./storage"
+import { deleteToken, getMcpOauthStoragePath, listAllTokens, listTokensByHost, loadToken, saveToken } from "./storage"
 import type { OAuthTokenData } from "./storage"
 
 function expectedServerHash(serverHost: string, resource: string): string {
@@ -108,10 +101,7 @@ describe("mcp-oauth storage", () => {
     const entries = listTokensByHost("api.example.com:5555")
 
     // then
-    expect(Object.keys(entries).sort()).toEqual([
-      "api.example.com/resource-a",
-      "api.example.com/resource-b",
-    ])
+    expect(Object.keys(entries).sort()).toEqual(["api.example.com/resource-a", "api.example.com/resource-b"])
     expect(entries["api.example.com/resource-a"].accessToken).toBe("access-a")
   })
 

@@ -7,7 +7,15 @@ import path from "node:path"
 import { randomUUID } from "node:crypto"
 
 import { TeamModeConfigSchema } from "../config"
-import { discoverTeamSpecs, ensureBaseDirs, getInboxDir, getRuntimeStateDir, getTasksDir, getWorktreeDir, resolveBaseDir } from "./paths"
+import {
+  discoverTeamSpecs,
+  ensureBaseDirs,
+  getInboxDir,
+  getRuntimeStateDir,
+  getTasksDir,
+  getWorktreeDir,
+  resolveBaseDir,
+} from "./paths"
 
 const logCalls: Array<[string, unknown?]> = []
 
@@ -24,9 +32,11 @@ describe("paths", () => {
 
   afterEach(async () => {
     logCalls.splice(0)
-    await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
-      await rm(directoryPath, { recursive: true, force: true })
-    }))
+    await Promise.all(
+      temporaryDirectories.splice(0).map(async (directoryPath) => {
+        await rm(directoryPath, { recursive: true, force: true })
+      }),
+    )
   })
 
   test("resolveBaseDir defaults to ~/.omo", () => {
@@ -182,8 +192,8 @@ describe("paths", () => {
     // then: function does not throw, EPERM was reached, and one warning was logged.
     await expect(ensuredBaseDirectories).resolves.toBeUndefined()
     expect(chmodCalls).toBeGreaterThan(0)
-    const warnings = logCalls.filter(([message]) =>
-      message === "team-mode: chmod refused on base directory; continuing with existing permissions"
+    const warnings = logCalls.filter(
+      ([message]) => message === "team-mode: chmod refused on base directory; continuing with existing permissions",
     )
     expect(warnings.length).toBeGreaterThan(0)
     const firstWarning = warnings[0]?.[1]

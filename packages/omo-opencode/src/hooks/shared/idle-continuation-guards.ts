@@ -11,9 +11,7 @@ import type { MessageWithInfo } from "../todo-continuation-enforcer/types"
  * hooks cannot drift apart again (#12976).
  */
 export type TranscriptContinuationSkipReason =
-  | "last-assistant-aborted"
-  | "pending-question"
-  | "pending-internal-response"
+  "last-assistant-aborted" | "pending-question" | "pending-internal-response"
 
 export function getTranscriptContinuationSkipReason(
   messages: MessageWithInfo[],
@@ -32,7 +30,7 @@ export function getAbortWindowElapsedMs(abortDetectedAt: number | undefined, now
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === "object" && value !== null ? value as Record<string, unknown> : undefined
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : undefined
 }
 
 function getStringField(record: Record<string, unknown> | undefined, key: string): string | undefined {
@@ -52,10 +50,11 @@ export function extractSessionErrorInfo(error: unknown): { name?: string; messag
   const nestedError = asRecord(root.error)
   const dataError = asRecord(data?.error)
 
-  const name = getStringField(root, "name")
-    ?? getStringField(data, "name")
-    ?? getStringField(nestedError, "name")
-    ?? getStringField(dataError, "name")
+  const name =
+    getStringField(root, "name") ??
+    getStringField(data, "name") ??
+    getStringField(nestedError, "name") ??
+    getStringField(dataError, "name")
 
   const messageParts = [
     getStringField(root, "message"),

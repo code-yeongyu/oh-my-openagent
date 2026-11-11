@@ -3,18 +3,24 @@
 //! live AX lookup, never from window geometry, enumeration order, or the
 //! ref's snapshot target.
 
+use std::cell::Cell;
+
 use senpi_desktop_core::ax::{AxHandle, AxOwner};
 use senpi_desktop_core::backend::PointerEvent;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::frame::FrameGeometry;
+use senpi_desktop_core::methods::Method;
 use senpi_desktop_core::protocol_params::AxClickParams;
+use senpi_desktop_core::report::NextCall;
 use senpi_desktop_core::types::{DesktopWindow, Target};
 use senpi_desktop_safety::MutatingAction;
+use serde_json::{Map, Value};
 
 use crate::mutate::Mutation;
 use crate::pointer::ParsedPointerOptions;
 use crate::request::Response;
 use crate::worker::{Audited, Worker};
+use crate::worker_input::with_next_call;
 
 impl Worker {
     /// Clicks the centre of the element's bounds in the window that owns it.
@@ -24,22 +30,31 @@ impl Worker {
         cancelled: &dyn Fn() -> bool,
     ) -> CoreResult<Audited> {
         let mode = ParsedPointerOptions::requested_mode(params.opts.as_ref());
-        let mutation = Mutation::new(MutatingAction::AxClick, self.ref_target(&params.ref_), mode);
-        self.mutate(&mutation, cancelled, |worker| worker.ax_click_now(params))
+        let mut mutation = Mutation::new(MutatingAction::AxClick, self.ref_target(&params.ref_), mode);
+        mutation.ax_actionability = Some((&params.ref_, None));
+        let baseline = Cell::new(None);
+        let audited = self.mutate(&mutation, cancelled, |worker| {
+            let handle: AxHandle = worker.registry.resolve(&params.ref_)?;
+            baseline.set(worker.element_surface_baseline(&handle));
+            worker
+                .ax_click_now(params, &handle)
+                .map_err(|error| with_next_call(error, || press_instead(&params.ref_)))
+        })?;
+        self.report_opened_surfaces(baseline.take());
+        Ok(audited)
     }
 
-    fn ax_click_now(&mut self, params: &AxClickParams) -> CoreResult<Response> {
+    fn ax_click_now(&mut self, params: &AxClickParams, handle: &AxHandle) -> CoreResult<Response> {
         let options = ParsedPointerOptions::parse(params.opts.as_ref())?;
-        let handle: AxHandle = self.registry.resolve(&params.ref_)?;
         let bounds = self
             .ax_parts()?
             .0
-            .props(&handle)?
+            .props(handle)?
             .bounds
             .ok_or_else(|| DesktopError::ax_failed(format!("{} has no clickable bounds", params.ref_)))?;
         let x = bounds.x + bounds.width / 2.0;
         let y = bounds.y + bounds.height / 2.0;
-        let window = self.owner_window(&params.ref_, &handle, x, y)?;
+        let window = self.owner_window(&params.ref_, handle, x, y)?;
         let event = PointerEvent::Click {
             x,
             y,
@@ -78,6 +93,15 @@ impl Worker {
         }
         Ok(id)
     }
+}
+
+/// The element-action rung below a background coordinate click: press the
+/// element through accessibility instead.
+fn press_instead(reference: &str) -> NextCall {
+    let mut args = Map::new();
+    args.insert("ref".to_owned(), Value::from(reference));
+    args.insert("action".to_owned(), Value::from("press"));
+    NextCall { method: Method::AxPerform, args }
 }
 
 /// The ownership policy for AX coordinate clicks: an element whose window

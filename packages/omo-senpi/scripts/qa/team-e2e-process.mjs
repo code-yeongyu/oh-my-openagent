@@ -33,7 +33,13 @@ export async function terminateProcessTree(pid, operations = {}) {
     signal(-pid, "SIGKILL")
   } catch (error) {
     if (isMissingProcess(error)) return { kind: "already-exited", pid, platform }
-    return { kind: "failed", pid, platform, status: null, error: error instanceof Error ? error.message : String(error) }
+    return {
+      kind: "failed",
+      pid,
+      platform,
+      status: null,
+      error: error instanceof Error ? error.message : String(error),
+    }
   }
   const pause = operations.pause ?? delay
   const pollAttempts = operations.pollAttempts ?? 20
@@ -45,8 +51,7 @@ export async function terminateProcessTree(pid, operations = {}) {
 }
 
 export async function killProcessGroup(pid, operations = {}) {
-  const terminate = operations.terminateProcessTree
-    ?? ((targetPid) => terminateProcessTree(targetPid, operations))
+  const terminate = operations.terminateProcessTree ?? ((targetPid) => terminateProcessTree(targetPid, operations))
   return (await terminate(pid)).kind !== "failed"
 }
 
@@ -68,8 +73,7 @@ export function createOwnedProcessRegistry() {
 export async function cleanupProcessGroups(groupIds, operations = {}) {
   const platform = operations.platform ?? process.platform
   if (platform === "win32") {
-    const terminate = operations.terminateProcessTree
-      ?? ((targetPid) => terminateProcessTree(targetPid, operations))
+    const terminate = operations.terminateProcessTree ?? ((targetPid) => terminateProcessTree(targetPid, operations))
     let leaked = 0
     for (const groupId of groupIds) {
       if ((await terminate(groupId))?.kind === "failed") leaked += 1

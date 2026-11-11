@@ -2,9 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 
 import type { BackgroundManager } from "../../features/background-agent"
 import { handedBackSyncSessions } from "../../features/claude-code-session-state"
-import {
-  clearContinuationMarker,
-} from "../../features/run-continuation-state"
+import { clearContinuationMarker } from "../../features/run-continuation-state"
 import { log } from "../../shared/logger"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { extractSessionErrorInfo, isAbortSessionErrorName } from "../shared/idle-continuation-guards"
@@ -24,13 +22,7 @@ export function createTodoContinuationHandler(args: {
   skipAgents?: string[]
   isContinuationStopped?: (sessionID: string) => boolean
 }): (input: { event: { type: string; properties?: unknown } }) => Promise<void> {
-  const {
-    ctx,
-    sessionStateStore,
-    backgroundManager,
-    skipAgents = DEFAULT_SKIP_AGENTS,
-    isContinuationStopped,
-  } = args
+  const { ctx, sessionStateStore, backgroundManager, skipAgents = DEFAULT_SKIP_AGENTS, isContinuationStopped } = args
 
   return async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
     const props = event.properties as Record<string, unknown> | undefined
@@ -59,7 +51,11 @@ export function createTodoContinuationHandler(args: {
         const state = sessionStateStore.getState(sessionID)
         state.tokenLimitDetected = true
         shouldCancelCountdown = true
-        log(`[${HOOK_NAME}] Token limit error detected via session.error`, { sessionID, errorName: error?.name, errorMessage: error?.message })
+        log(`[${HOOK_NAME}] Token limit error detected via session.error`, {
+          sessionID,
+          errorName: error?.name,
+          errorMessage: error?.message,
+        })
       } else if (isUnrecoverableRequestError(props?.error)) {
         const state = sessionStateStore.getState(sessionID)
         state.unrecoverableErrorDetected = true

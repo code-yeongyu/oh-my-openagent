@@ -138,7 +138,9 @@ describe("createGoalHook idle continuation guards (#12976)", () => {
 
     // then
     expect(promptCalls).toEqual([])
-    expect(skipLogsFor(logSpy)).toEqual([expect.objectContaining({ sessionID: SESSION_ID, reason: "pending-question" })])
+    expect(skipLogsFor(logSpy)).toEqual([
+      expect.objectContaining({ sessionID: SESSION_ID, reason: "pending-question" }),
+    ])
   })
 
   test("#given a user abort skipped the goal continuation #when the user's next turn completes #then the goal continuation resumes", async () => {
@@ -154,7 +156,12 @@ describe("createGoalHook idle continuation guards (#12976)", () => {
     expect(promptCalls).toEqual([])
 
     // when
-    transcript = [userMessage, abortedAssistant, { ...userMessage, info: { ...userMessage.info, id: "msg_u2" } }, completedAssistant]
+    transcript = [
+      userMessage,
+      abortedAssistant,
+      { ...userMessage, info: { ...userMessage.info, id: "msg_u2" } },
+      completedAssistant,
+    ]
     await hook.event({ event: { type: "session.idle", properties: { sessionID: SESSION_ID } } })
 
     // then

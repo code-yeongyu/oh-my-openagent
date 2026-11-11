@@ -31,7 +31,8 @@ const isCommand = (code: string, at: number): boolean => COMMAND_CONTEXT.test(be
 const isCommandList = (code: string, at: number): boolean => isCommand(code, at) || NESTED_PAIR.test(before(code, at))
 const unquote = (literal: string): string => literal.replace(QUOTES, "").replace(INTERPOLATION, "X")
 const shellQuote = (word: string): string => `'${word.replaceAll("'", `'\\''`)}'`
-const checkKinds = (line: string): CellCheckKind[] => invokedKinds(line).filter((kind): kind is CellCheckKind => kind !== "lookup")
+const checkKinds = (line: string): CellCheckKind[] =>
+  invokedKinds(line).filter((kind): kind is CellCheckKind => kind !== "lookup")
 
 // A list such as ["gh", "pr", "checks", n] is one argv (subprocess.run, a Bun spawn call): non-literal elements stand in as X.
 function listWords(list: string): string[] {
@@ -40,7 +41,8 @@ function listWords(list: string): string[] {
     const trimmed = element.trim()
     if (trimmed === "") continue
     const literal = trimmed.match(STRING_LITERAL)?.[0]
-    const isLiteral = literal !== undefined && trimmed.endsWith(literal) && LITERAL_PREFIX.test(trimmed.slice(0, -literal.length))
+    const isLiteral =
+      literal !== undefined && trimmed.endsWith(literal) && LITERAL_PREFIX.test(trimmed.slice(0, -literal.length))
     words.push(isLiteral ? unquote(literal) : "X")
   }
   return words
@@ -54,7 +56,9 @@ function listKinds(list: string, nestedPair: boolean): CellCheckKind[] {
   const [first = "", second = ""] = words
   if (/\s/.test(first)) return words.flatMap(checkKinds)
   const argv = checkKinds(words.map(shellQuote).join(" "))
-  return nestedPair && words.length === 2 && /^[\w:.-]+$/.test(first) && /\s/.test(second) ? [...argv, ...checkKinds(second)] : argv
+  return nestedPair && words.length === 2 && /^[\w:.-]+$/.test(first) && /\s/.test(second)
+    ? [...argv, ...checkKinds(second)]
+    : argv
 }
 
 /**
@@ -73,7 +77,8 @@ export function cellInvokedKinds(code: string): { kinds: CellCheckKind[]; offset
   const inLists: Array<readonly [number, number]> = []
   for (const match of code.matchAll(LIST_OF_STRINGS)) {
     inLists.push([match.index, match.index + match[0].length])
-    if (isCommandList(code, match.index)) found(match.index, listKinds(match[0], NESTED_PAIR.test(before(code, match.index))))
+    if (isCommandList(code, match.index))
+      found(match.index, listKinds(match[0], NESTED_PAIR.test(before(code, match.index))))
   }
   for (const match of code.matchAll(STRING_LITERAL)) {
     if (inLists.some(([start, end]) => match.index >= start && match.index < end)) continue

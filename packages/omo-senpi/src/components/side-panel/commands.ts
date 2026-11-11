@@ -34,7 +34,8 @@ export interface PanelCommandDeps {
 }
 
 function fileOptionLabel(file: PanelGitEntry): string {
-  const delta = file.added === undefined && file.removed === undefined ? "" : `  +${file.added ?? 0}/-${file.removed ?? 0}`
+  const delta =
+    file.added === undefined && file.removed === undefined ? "" : `  +${file.added ?? 0}/-${file.removed ?? 0}`
   // The host's select list folds newlines only, and a git path may carry any byte.
   return sanitizeTerminalText(`${file.xy} ${file.path}${delta}`)
 }
@@ -75,7 +76,10 @@ export async function openFileDiff(
   // A generated or vendored file can diff to hundreds of thousands of lines; the viewer is for reading.
   const shown =
     rows.length > DIFF_VIEWER_ROW_CAP
-      ? [...rows.slice(0, DIFF_VIEWER_ROW_CAP), { text: `... ${rows.length - DIFF_VIEWER_ROW_CAP} more lines`, color: "dim" as const }]
+      ? [
+          ...rows.slice(0, DIFF_VIEWER_ROW_CAP),
+          { text: `... ${rows.length - DIFF_VIEWER_ROW_CAP} more lines`, color: "dim" as const },
+        ]
       : rows
   await openPanelViewer(ui, `${file.path}  (diff, read-only)`, shown)
 }
