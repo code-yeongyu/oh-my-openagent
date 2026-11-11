@@ -7,7 +7,7 @@ import type { SenpiHostProtocolInfo } from "../../../lazy/senpi-barrel"
 import { FakeSessionTable, type FakeDrainedSession, type FakeHostSession } from "./fake-host-sessions"
 import { fakeProtocolInfo, probeFakeHost, type FakeHostIdentityOptions } from "./fake-host-probe"
 import { fakeHostTransport, type FakeHostTransport } from "./fake-host-transport"
-import { handleWireLine, writeFrame, type FakeHostCommand, type FakeHostOpenFailure, type FakeHostWarmAnswer } from "./fake-host-wire"
+import { handleWireLine, writeFrame, type FakeHostCommand, type FakeHostOpenFailure, type FakeHostWarmAnswer, type FakeUnansweredRequest } from "./fake-host-wire"
 import { FakeInputAdmissions } from "./fake-input-admissions"
 
 /**
@@ -52,7 +52,7 @@ export interface FakeHost {
   peakAttachments(sessionPath: string): number
   probeProtocolInfo(): Promise<SenpiHostProtocolInfo | undefined>
   failOpen(failure: FakeHostOpenFailure | undefined): void
-  /** Record the named command but never answer it - the caller's request stays in flight. */
+  /** Record the named command but never answer it - the caller's request stays in flight until `stop`. */
   withholdReply(type: string): void
   /** Answer the named command again from now on; a reply already withheld stays unanswered. */
   allowReply(type: string): void
@@ -86,6 +86,13 @@ export interface FakeHost {
   waitForCommand(type: string, count?: number): Promise<FakeHostCommand>
   /** Resolve when exactly `count` connections are open - a detach observed, never polled for. */
   waitForConnections(count: number): Promise<void>
+  /**
+   * Answer every withheld request with a `host_stopped` refusal, end those connections gracefully so
+   * the refusal is delivered, destroy the rest, and close the listener. A client waiting on a reply
+   * learns the host is gone from that answer and hangs up itself: on win32 destroying the server end
+   * of a named pipe does not release the client's handle, so otherwise `server.close()` would wait
+   * for the client's own request deadline (#10814).
+   */
   stop(): Promise<void>
 }
 
@@ -107,6 +114,7 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
   const sockets = new Set<Socket>()
   const connectionWaiters: Array<{ readonly count: number; readonly resolve: () => void }> = []
   const withheld = new Set<string>()
+  const unanswered: FakeUnansweredRequest[] = []
   const held = new Map<string, Array<() => void>>()
   const failed = new Map<string, string>()
   let identity = fakeProtocolInfo(options)
@@ -125,7 +133,7 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
     }
   }
 
-  const ports = { table, admissions, warm: options.warm ?? { state: "warmed" as const }, identity: () => identity, openFailure: () => openFailure, enforceSessionDir: options.enforceSessionDir === true, withheld, held, failed, record }
+  const ports = { table, admissions, warm: options.warm ?? { state: "warmed" as const }, identity: () => identity, openFailure: () => openFailure, enforceSessionDir: options.enforceSessionDir === true, withheld, unanswered, held, failed, record }
 
   const settleConnectionWaiters = (): void => {
     for (let index = connectionWaiters.length - 1; index >= 0; index--) {
@@ -293,8 +301,17 @@ export async function startFakeHost(options: FakeHostOptions = {}): Promise<Fake
             connectionWaiters.push({ count, resolve })
           }),
     stop: async () => {
+      const refused = new Set<Socket>()
+      for (const request of unanswered.splice(0)) {
+        if (request.socket.destroyed) continue
+        writeFrame(request.socket, { type: "response", id: request.id, command: request.type, success: false, error: "host_stopped" })
+        refused.add(request.socket)
+      }
       table.clear()
-      dropConnections()
+      for (const socket of [...sockets]) {
+        if (refused.has(socket)) socket.end()
+        else socket.destroy()
+      }
       await closeServer()
       rmSync(dir, { recursive: true, force: true })
     },
