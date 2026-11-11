@@ -8,7 +8,10 @@
 // 2. The pin is swept for every `Name{...}` refusal form (the 33 engine codes, the names the
 //    interpretations map onto them, the layer failures, `refused{...}` and `COMPUTER_*{...}`);
 //    every (name, token) it finds must be an inventory pair or an exclusion, and every exclusion
-//    must still be found. Exit 1 names each failure.
+//    must still be found. An exclusion may not name a token the pin emits as a reason under that
+//    name (a `reason:"<token>"` value or a `refused{<token>}`) unless its why says
+//    `replaced by Code{reason}` (or a bare `Code`) and that pair is an inventory pair: a withdrawn
+//    spelling the pin still quotes. Exit 1 names each failure.
 
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs"
 import { join, dirname, relative } from "node:path"
@@ -69,7 +72,7 @@ const exclusions = tsv("design-exclusions.tsv").map(({ cells, number }) => {
   const [name, token, source, recorded, why] = cells
   if (!why) failures.push(`design-exclusions.tsv:${number}: no reason given`)
   failures.push(...checkCitation(`design-exclusions.tsv:${number} ${name}{${token}}`, source, recorded, token === "<bare>" ? name : token))
-  return `${name}\t${token}`
+  return { key: `${name}\t${token}`, why: why ?? "" }
 })
 
 const pairs = new Set(inventory.map(({ code, reason }) => `${code}\t${reason}`))
@@ -89,6 +92,8 @@ const files = []
 const walk = (dir) => { for (const entry of readdirSync(dir)) { const path = join(dir, entry); statSync(path).isDirectory() ? walk(path) : path.endsWith(".md") && files.push(path) } }
 walk(pin)
 const candidates = new Map()
+// (name, token) pairs the pin writes as an emitted reason, not as a bare member.
+const emitted = new Set()
 const otherForms = new Map()
 for (const path of files.sort()) {
   readFileSync(path, "utf8").split("\n").forEach((line, index) => {
@@ -97,9 +102,15 @@ for (const path of files.sort()) {
     }
     for (const match of line.matchAll(form)) {
       const tokens = new Set()
-      for (const reason of match[2].matchAll(/reason\s*:\s*((?:"[^"]+"\s*\|?\s*)+)/g)) for (const value of reason[1].matchAll(/"([^"]+)"/g)) tokens.add(value[1])
+      for (const reason of match[2].matchAll(/reason\s*:\s*((?:"[^"]+"\s*\|?\s*)+)/g)) {
+        for (const value of reason[1].matchAll(/"([^"]+)"/g)) {
+          tokens.add(value[1])
+          emitted.add(`${match[1]}\t${value[1]}`)
+        }
+      }
       const bare = match[2].replace(/[a-zA-Z_]+\s*:\s*(\{[^}]*\}|\[[^\]]*\]|"[^"]*"(\s*\|\s*"[^"]*")*|[^,}]*)/g, " ")
       for (const word of bare.split(/[\s,|/()]+/)) if (/^[a-z][a-z0-9_-]*$/.test(word) || /^[A-Z][A-Z0-9_]+$/.test(word)) tokens.add(word)
+      if (match[1] === "refused") for (const token of tokens) emitted.add(`refused\t${token}`)
       if (tokens.size === 0) tokens.add("<bare>")
       for (const token of tokens) {
         const key = `${match[1]}\t${token}`
@@ -108,11 +119,16 @@ for (const path of files.sort()) {
     }
   })
 }
-const excluded = new Set(exclusions)
+const excluded = new Set(exclusions.map(({ key }) => key))
+const replacedBy = (why) => {
+  const match = /replaced by ([A-Za-z]+)(?:\{([^}]+)\})?/.exec(why)
+  return match ? pairs.has(`${match[1]}\t${match[2] ?? "-"}`) : false
+}
 for (const [key, first] of candidates) {
   const [name, token] = key.split("\t")
   if (!covered(name, token) && !excluded.has(key)) failures.push(`unclassified design candidate ${name}{${token}} (first at ${first}): neither an inventory pair nor an exclusion`)
 }
+for (const { key, why } of exclusions) if (emitted.has(key) && !replacedBy(why)) failures.push(`exclusion ${key.replace("\t", "{")}} names a reason the pin emits: it needs a row, not an exclusion`)
 for (const key of excluded) if (!candidates.has(key)) failures.push(`stale exclusion ${key.replace("\t", "{")}}: the pin no longer writes it`)
 
 console.log(`pin: ${files.length} files; ${candidates.size} refusal candidates swept; ${inventory.length} inventory pairs; ${exclusions.length} exclusions`)
