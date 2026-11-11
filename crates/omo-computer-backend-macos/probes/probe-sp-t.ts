@@ -480,6 +480,44 @@ async function runLeg(
   return result
 }
 
+interface RunOut {
+  code: number
+  stdout: string
+  stderr: string
+}
+
+type Parsed<T> = { ok: true; value: T } | { ok: false; error: string }
+
+interface TccRow {
+  service: string
+  client: string
+  clientType: string
+  authValue: string
+}
+
+// pure: the tccd log lines that mention a needle (RED stub: keeps the old behaviour)
+function parseTccLog(out: RunOut, needles: string[]): Parsed<string[]> {
+  return { ok: true, value: out.stdout.split("\n").filter((line) => needles.some((n) => n && line.includes(n))) }
+}
+
+// pure: the TCC.db rows (RED stub: keeps the old behaviour)
+function parseTccDb(out: RunOut): Parsed<TccRow[]> {
+  const rows = out.stdout
+    .split("\n")
+    .filter((l) => l && !l.startsWith("#"))
+    .map((l) => {
+      const [service = "", client = "", clientType = "", authValue = ""] = l.split("\t")
+      return { service, client, clientType, authValue }
+    })
+  const unreadable = out.stdout.split("\n").filter((l) => l.includes("UNREADABLE"))
+  return unreadable.length < 2 ? { ok: true, value: rows } : { ok: false, error: unreadable.join(" | ") }
+}
+
+// pure: whether pgrep found a match (RED stub: keeps the old behaviour)
+function pgrepFound(out: RunOut): boolean {
+  return out.code === 0
+}
+
 async function tccLog(env: HostEnv, log: EvidenceLog, since: number, needles: string[]) {
   const out = await run([
     "log",
@@ -1236,6 +1274,53 @@ function selfTest(): number {
     ["evidence: measure file", evidenceFile("a.m26", "measure"), "a.m26.txt"],
     ["evidence: verify file", evidenceFile("a.m26", "verify"), "a.m26.verify.txt"],
     ["compact: separators stripped", compact({ a: "x;y\tz", b: 1 }), "a=x y z;b=1"],
+    [
+      "tcc log: matching lines",
+      parseTccLog({ code: 0, stdout: "a tccd x\nb other", stderr: "" }, ["tccd"]),
+      { ok: true, value: ["a tccd x"] },
+    ],
+    [
+      "tcc log: failed log show is an error, never 'no lines'",
+      parseTccLog({ code: 64, stdout: "", stderr: "log: bad predicate" }, ["tccd"]),
+      { ok: false, error: "log show exited 64: log: bad predicate" },
+    ],
+    [
+      "tcc db: both databases read",
+      parseTccDb({
+        code: 0,
+        stdout: "#db user direct\n#db system sudo\nkTCCServiceAccessibility\tai.x\t0\t2",
+        stderr: "",
+      }),
+      { ok: true, value: [{ service: "kTCCServiceAccessibility", client: "ai.x", clientType: "0", authValue: "2" }] },
+    ],
+    [
+      "tcc db: failed helper with empty stdout is an error, never 'no grant'",
+      parseTccDb({ code: 2, stdout: "", stderr: "sp-t-tccdb: missing precondition" }),
+      { ok: false, error: "sp-t-tccdb.sh exited 2: sp-t-tccdb: missing precondition" },
+    ],
+    [
+      "tcc db: system database unreadable is an error (Accessibility lives there)",
+      parseTccDb({ code: 3, stdout: "#db user direct\n#db system UNREADABLE authorization denied", stderr: "" }),
+      { ok: false, error: "sp-t-tccdb.sh exited 3: #db system UNREADABLE authorization denied" },
+    ],
+    [
+      "tcc db: a database header missing is an error",
+      parseTccDb({ code: 0, stdout: "#db user direct", stderr: "" }),
+      { ok: false, error: "TCC.db read-back is missing the system database header" },
+    ],
+    ["pgrep: match", pgrepFound({ code: 0, stdout: "12", stderr: "" }), true],
+    ["pgrep: no match", pgrepFound({ code: 1, stdout: "", stderr: "" }), false],
+    [
+      "pgrep: an error is thrown, never 'not running'",
+      (() => {
+        try {
+          return pgrepFound({ code: 3, stdout: "", stderr: "pgrep: fatal" })
+        } catch (error) {
+          return error instanceof Error ? error.message : String(error)
+        }
+      })(),
+      "pgrep exited 3: pgrep: fatal",
+    ],
   ]
   const vhid = rowOf("untagged.vhid")
   const vkbd = rowOf("untagged.hypervisor-vkbd")
