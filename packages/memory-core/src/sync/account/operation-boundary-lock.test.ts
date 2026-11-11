@@ -120,7 +120,7 @@ for (const change of ["replacement", "aba", "refresh", "signing", "sealing"] as 
       const step = stepsWithin(STEP_BUDGET_MS, () => writerState(child)())
       const f = await step("fixture", fixture())
       cleanup.push(f.close)
-      const verified = await walk(f.built.request, f.keyring)
+      const verified = await step("bootstrap walk", walk(f.built.request, f.keyring))
       if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
       const credentials = join(f.input.pinDir, "synthetic-credentials.json")
       writeFileSync(
@@ -191,7 +191,9 @@ for (const change of ["replacement", "aba", "refresh", "signing", "sealing"] as 
 test(
   "a writer that holds the lock and never writes fails the named step and leaves no writer running",
   async () => {
-    const f = await fixture()
+    let child: Subprocess | undefined
+    const step = stepsWithin(5_000, () => writerState(child)())
+    const f = await step("fixture", fixture())
     cleanup.push(f.close)
     const credentials = join(f.input.pinDir, "synthetic-credentials.json")
     writeFileSync(credentials, JSON.stringify({ identity: "A", generation: 1, token: 1 }))
@@ -201,7 +203,7 @@ test(
       if (message === "locked") locked.resolve()
       if (message === "written") written.resolve()
     })
-    const step = stepsWithin(5_000, writerState(writer))
+    child = writer
     await step("writer locked", Promise.race([locked.promise, exitedEarly(writer)]))
 
     // given: a writer that took the lock and stalls; when: the test waits for its write under a short budget
@@ -257,7 +259,7 @@ test(
     const step = stepsWithin(STEP_BUDGET_MS, () => writerState(child)())
     const f = await step("fixture", fixture())
     cleanup.push(f.close)
-    const verified = await walk(f.built.request, f.keyring)
+    const verified = await step("bootstrap walk", walk(f.built.request, f.keyring))
     if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
     const credentials = join(f.input.pinDir, "synthetic-credentials.json")
     writeFileSync(credentials, JSON.stringify({ identity: "A", generation: 1, token: 1 }))
@@ -296,7 +298,7 @@ test(
 
     // when: the writer is already contending for the lock while the publication proceeds,
     // and an unrelated file elsewhere in this process is renamed in the same window (#11963)
-    const unrelated = await mkdtemp(join(tmpdir(), "boundary-unrelated-"))
+    const unrelated = await step("unrelated dir", mkdtemp(join(tmpdir(), "boundary-unrelated-")))
     cleanup.push(() => rm(unrelated, { recursive: true, force: true }))
     writeFileSync(join(unrelated, "a.tmp"), "x")
     fs.renameSync(join(unrelated, "a.tmp"), join(unrelated, "a.json"))
@@ -323,7 +325,7 @@ test(
     const step = stepsWithin(STEP_BUDGET_MS, () => "no writer")
     const f = await step("fixture", fixture())
     cleanup.push(f.close)
-    const verified = await walk(f.built.request, f.keyring)
+    const verified = await step("bootstrap walk", walk(f.built.request, f.keyring))
     if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
     const credentials = join(f.input.pinDir, "synthetic-credentials.json")
     writeFileSync(credentials, JSON.stringify({ identity: "A", generation: 1, token: 1 }))
