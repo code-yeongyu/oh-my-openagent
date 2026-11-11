@@ -10,7 +10,7 @@ import type { LazyRetentionGuard } from "./guard"
 import { DAY_MS, StoreTally, listNames, type RetentionContext, type RetentionStoreResult } from "./policy"
 
 /** `readReflectionHealth` reads the latest records for its streak and last-success window. */
-const COMPLETIONS_KEEP_NEWEST = 50
+export const COMPLETIONS_KEEP_NEWEST = 50
 
 type Completion = { readonly runId: string; readonly finishedAt: number; readonly consumed: boolean }
 
@@ -62,7 +62,7 @@ async function keepByGuard(context: RetentionContext, lazyGuard: LazyRetentionGu
   return undefined
 }
 
-async function readCompletion(path: string, runId: string): Promise<Completion | undefined> {
+export async function readCompletion(path: string, runId: string): Promise<Completion | undefined> {
   try {
     const parsed: unknown = JSON.parse(await readFile(path, "utf8"))
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined

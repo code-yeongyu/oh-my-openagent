@@ -29,6 +29,11 @@ export function senderFacts(sender: GatewaySender, resolved: Provenance): Sender
       binding: null,
     }
   }
+  if (sender.kind === "person") {
+    // A person's own input carries no envelope; these facts only key its receipt and name the actor in a refusal.
+    const principal = `person:${sender.uid}`
+    return { provenance, principal, rate_principal: principal, node: principal, turn: null, cause: null, actor: sender.user, origin: (deliveryId) => ({ external: { platform: "cli", account_id: sender.user, chat_id: "@person", thread_id: "@chat", message_id: deliveryId } }), binding: null }
+  }
   if (sender.kind === "cli") {
     const principal = `cli:${sender.uid}`
     return {

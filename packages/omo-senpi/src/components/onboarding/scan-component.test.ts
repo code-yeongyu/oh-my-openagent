@@ -367,6 +367,27 @@ describe("onboarding scan RPC", () => {
   })
 })
 
+describe("onboarding retained-scan cap (#12527)", () => {
+  test("#given eight retained scans, the two oldest applied #when more scans run #then the oldest scan leaves first, applied or not, and applied scans count toward the cap", async () => {
+    // given: since #12509 an applied scan stays retained for understanding, so it holds one of the eight slots
+    const profile = emptyProfile()
+    const store = createOnboardingScanStore()
+    const host = registerSession(profile, store)
+    const ids: string[] = []
+    for (let index = 0; index < 8; index += 1) ids.push((await host.scan({})).scanId)
+    for (const scanId of ids.slice(0, 2)) expect(await host.apply({ scanId, stages: [] })).toEqual(expect.objectContaining({ scanId }))
+
+    // when / then: each new scan evicts exactly the oldest retained one
+    ids.push((await host.scan({})).scanId)
+    expect([...store.scans.keys()]).toEqual(ids.slice(1))
+    ids.push((await host.scan({})).scanId)
+    expect([...store.scans.keys()]).toEqual(ids.slice(2))
+    ids.push((await host.scan({})).scanId)
+    expect([...store.scans.keys()]).toEqual(ids.slice(3))
+    expect(store.scans.get(ids[3] ?? "")?.applied).toBe(false)
+  })
+})
+
 describe("onboarding apply staleness", () => {
   test("#given the engine's auth.json changed between scan and apply #when apply runs #then it answers stale, names the path and the edit survives", async () => {
     const profile = openCodeProfile()

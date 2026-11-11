@@ -104,7 +104,8 @@ describe("receipt_write_failures_leave_the_store_serving", () => {
         "two:send": "gateway_lock_wait_exceeded",
         "two:retry": "error:idempotency_in_progress",
         "one:after_admit": "started+dedup",
-        third: "queued",
+        // "two" steered into the turn "one" started (the default lane), so nothing waits when that turn ends: "three" starts the next.
+        third: "started",
       })
       expect(events.filter((kind) => kind === "lock_wait_exceeded").length).toBe(4)
       const rows = await b.store.list({ target_durable_id: "B" })

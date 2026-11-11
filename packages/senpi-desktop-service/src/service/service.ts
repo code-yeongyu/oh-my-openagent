@@ -208,7 +208,7 @@ export class DesktopService {
 				if (this.#connection?.rpc === rpc) this.#drop(this.#connection);
 			},
 		});
-		const connection: Connection = { rpc, resumeToken: "", armedChord: undefined, heartbeat: undefined };
+		const connection: Connection = { rpc, resumeToken: "", features: [], armedChord: undefined, heartbeat: undefined };
 		try {
 			const capabilities = await deadline(
 				this.#handshake(connection, desired),
@@ -229,8 +229,12 @@ export class DesktopService {
 		const hello = parseHello(await connection.rpc.request("engine.hello", {}));
 		if (hello === undefined) throw malformed("engine.hello");
 		if (hello.abi !== ENGINE_ABI || hello.protocolVersion !== PROTOCOL_VERSION) {
-			throw new DesktopEngineAbiMismatchError(connection.rpc.enginePath, hello);
+			throw new DesktopEngineAbiMismatchError(connection.rpc.enginePath, {
+				abi: hello.abi,
+				protocolVersion: hello.protocolVersion,
+			});
 		}
+		connection.features = hello.features;
 		const capabilities = await this.#openSession(connection, desired.params);
 		if (desired.chord !== undefined) {
 			await this.#stopPath(connection, "stopPath.start", { chord: desired.chord });
@@ -244,7 +248,8 @@ export class DesktopService {
 	}
 
 	async #openSession(connection: Connection, params: DesktopSessionOpenParams): Promise<DesktopCapabilities> {
-		const reply = await connection.rpc.request("session.open", params, { timeoutMs: START_TIMEOUT_MS });
+		const wire = sessionOpenWire(params, connection.features);
+		const reply = await connection.rpc.request("session.open", wire, { timeoutMs: START_TIMEOUT_MS });
 		const opened = parseSessionOpened(reply);
 		if (opened === undefined) throw malformed("session.open");
 		// The token stays inside the service: only `resume()` sends it back.
@@ -275,6 +280,27 @@ export class DesktopService {
 		clearInterval(connection.heartbeat);
 		if (this.#connection === connection) this.#connection = undefined;
 	}
+}
+
+/** Engine defaults of the feature-gated `session.open` keys; the engine never moves them. */
+const GATED_OPTION_DEFAULTS = { intervention: "pause", macosKeyPriming: "off", trace: false } as const;
+
+/**
+ * The `session.open` params this engine accepts. An engine rejects keys it does not know
+ * (`additionalProperties: false`), so each newer key goes out only when hello advertises its feature:
+ * `intervention`, `macosKeyPriming` and `trace` always (the caller's value, else the engine default),
+ * `reportMode` only when the caller asked for it.
+ */
+function sessionOpenWire(params: DesktopSessionOpenParams, features: readonly string[]): DesktopSessionOpenParams {
+	const { reportMode, intervention, macosKeyPriming, trace, ...base } = params;
+	const has = (feature: string) => features.includes(feature);
+	return {
+		...base,
+		...(reportMode !== undefined && has("action-report") ? { reportMode } : {}),
+		...(has("intervention-policy") ? { intervention: intervention ?? GATED_OPTION_DEFAULTS.intervention } : {}),
+		...(has("key-priming") ? { macosKeyPriming: macosKeyPriming ?? GATED_OPTION_DEFAULTS.macosKeyPriming } : {}),
+		...(has("trace") ? { trace: trace ?? GATED_OPTION_DEFAULTS.trace } : {}),
+	};
 }
 
 function malformed(method: string): DesktopServiceError {

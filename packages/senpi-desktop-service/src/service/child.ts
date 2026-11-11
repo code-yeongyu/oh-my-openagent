@@ -11,6 +11,7 @@ import {
 	launchDesktopEngine,
 	locateDesktopEngine,
 } from "@oh-my-opencode/senpi-desktop-engine";
+import { PermissionPreflight, probeFreshEngine } from "./permission-preflight";
 
 /**
  * Starts one engine child speaking NDJSON JSON-RPC on its stdio; injectable so tests run a script engine.
@@ -91,10 +92,14 @@ export class EngineChild {
 	#failure = "";
 	#alive = true;
 	readonly #refusal = new DesktopLaunchRefusal();
+	readonly #preflight: PermissionPreflight;
+	/** Set while a line waits on a permission probe, so later lines and the exit keep their order. */
+	#lines: Promise<void> | undefined;
 
 	constructor(process: ChildProcessWithoutNullStreams, events: EngineChildEvents) {
 		this.#process = process;
 		this.path = process.spawnfile;
+		this.#preflight = new PermissionPreflight(probeFreshEngine(process.spawnfile, process.spawnargs.slice(1)));
 		process.stderr.setEncoding("utf8");
 		// Drained so a chatty engine never blocks on a full stderr pipe.
 		process.stderr.on("data", (chunk: string) => {
@@ -106,14 +111,19 @@ export class EngineChild {
 			this.#refusal.disable();
 			this.#recordFailure(`spawn: ${error.message}`);
 		});
-		createInterface({ input: process.stdout }).on("line", events.onLine);
+		createInterface({ input: process.stdout }).on("line", (line) => this.#dispatch(line, events.onLine));
 		this.exited = new Promise((resolve) => {
 			// `close` fires after stdout ends, so every reply the engine wrote is dispatched first.
 			process.on("close", (code, signal) => {
 				this.#alive = false;
 				const reason = this.#exitReason(code, signal);
-				events.onExit(reason, this.#refusal.finish(code, signal, reason));
-				resolve();
+				const refusal = this.#refusal.finish(code, signal, reason);
+				const exit = () => {
+					events.onExit(reason, refusal);
+					resolve();
+				};
+				if (this.#lines === undefined) exit();
+				else void this.#lines.then(exit);
 			});
 		});
 	}
@@ -128,6 +138,7 @@ export class EngineChild {
 
 	write(message: object): void {
 		if (!this.#alive || this.#process.stdin.writableEnded) return;
+		this.#preflight.sent(message);
 		this.#process.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`);
 	}
 
@@ -141,6 +152,19 @@ export class EngineChild {
 		if (!this.#alive) return;
 		this.#alive = false;
 		this.#process.kill();
+	}
+
+	#dispatch(line: string, onLine: (line: string) => void): void {
+		const ready = this.#preflight.received(line);
+		if (this.#lines === undefined && typeof ready === "string") {
+			onLine(ready);
+			return;
+		}
+		const queued = (this.#lines ?? Promise.resolve()).then(() => ready).then(onLine);
+		this.#lines = queued;
+		void queued.then(() => {
+			if (this.#lines === queued) this.#lines = undefined;
+		});
 	}
 
 	#recordFailure(failure: string): void {

@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } fro
 import { createConnection } from "node:net"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
+import { systemAccountFacts, useAccountFacts } from "./packages/omo-opencode/src/cli/service-auth/account-home"
 import { markTestInfrastructureDir, runTestTempRootTeardown } from "./test-temp-root"
 
 const AGENT_DIR_ENV_NAMES = ["OMO_CODING_AGENT_DIR", "SENPI_CODING_AGENT_DIR", "PI_CODING_AGENT_DIR"] as const
@@ -24,6 +25,9 @@ export function installHermeticHome(): HermeticHome {
   markTestInfrastructureDir(home)
   process.env.HOME = home
   process.env.USERPROFILE = home
+  // The credential lock follows the OS user record, not HOME (#12978): a test that takes the lock without naming a home
+  // would otherwise lock in the runner's real home. The record and homedir() both answer the hermetic home here.
+  useAccountFacts({ ...systemAccountFacts, recordHome: () => home, homedir: () => home })
   // Both root and package-local preloads must override os.homedir()'s retained host memory root.
   process.env.OMO_MEMORY_HOME = join(home, ".omo", "memory")
   const agentDir = join(home, ".omo", "agent")
