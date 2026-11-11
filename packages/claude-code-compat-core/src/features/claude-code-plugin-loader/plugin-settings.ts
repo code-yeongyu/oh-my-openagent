@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "fs"
 import { log } from "../../shared/logger"
+import { stripBom } from "../../shared/jsonc-parser"
 import { getClaudeSettingsPath } from "./discovery-paths"
 import type { ClaudeSettings } from "./types"
 
@@ -11,7 +12,7 @@ export function loadClaudeSettings(): ClaudeSettings | null {
 
   try {
     const content = readFileSync(settingsPath, "utf-8")
-    return JSON.parse(content) as ClaudeSettings
+    return JSON.parse(stripBom(content)) as ClaudeSettings
   } catch (error) {
     if (error instanceof Error) {
       log("Failed to load Claude settings", error)

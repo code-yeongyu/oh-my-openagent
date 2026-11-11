@@ -91,4 +91,28 @@ describe("loadPluginMcpServers", () => {
       }
     })
   })
+
+  it("#given a plugin .mcp.json saved with a UTF-8 BOM #when servers load #then the server is kept (#12731)", async () => {
+    // given
+    writeFileSync(
+      mcpConfigPath,
+      `\uFEFF${JSON.stringify({ mcpServers: { bomServer: { command: "npx", args: ["bom-server"] } } })}`,
+      "utf-8",
+    )
+    const plugin: LoadedPlugin = {
+      name: "bom-plugin",
+      version: "1.0.0",
+      scope: "user",
+      installPath: pluginDir,
+      pluginKey: "bom-plugin@test",
+      mcpPath: mcpConfigPath,
+    }
+
+    // when
+    const { loadPluginMcpServers } = await import(`./mcp-server-loader?t=${Date.now()}-bom`)
+    const servers = await loadPluginMcpServers([plugin])
+
+    // then
+    expect(servers).toHaveProperty("bom-plugin:bomServer")
+  })
 })

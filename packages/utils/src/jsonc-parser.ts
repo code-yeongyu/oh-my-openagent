@@ -27,7 +27,8 @@ function getPluginConfigCacheKey(dir: string, options: DetectPluginConfigFileOpt
   return `${dir}::${basenames}::${legacyBasenames}`
 }
 
-function stripBom(content: string): string {
+/** Drops a leading UTF-8 byte order mark, which `readFileSync(path, "utf-8")` keeps and `JSON.parse` rejects. */
+export function stripBom(content: string): string {
   return content.charCodeAt(0) === 0xfeff ? content.slice(1) : content
 }
 

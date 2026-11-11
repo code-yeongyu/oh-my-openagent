@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "fs"
 import { log } from "../../shared/logger"
+import { stripBom } from "../../shared/jsonc-parser"
 import { getInstalledPluginsPath } from "./discovery-paths"
 import type { InstalledPluginEntryV3, InstalledPluginsDatabase, PluginInstallation } from "./types"
 
@@ -11,7 +12,7 @@ export function loadInstalledPlugins(pluginsBaseDir?: string): InstalledPluginsD
 
   try {
     const content = readFileSync(dbPath, "utf-8")
-    return JSON.parse(content) as InstalledPluginsDatabase
+    return JSON.parse(stripBom(content)) as InstalledPluginsDatabase
   } catch (error) {
     if (error instanceof Error) {
       log("Failed to load installed plugins database", error)

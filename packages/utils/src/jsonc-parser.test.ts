@@ -6,6 +6,7 @@ import {
   parseJsonc,
   parseJsoncSafe,
   readJsoncFile,
+  stripBom,
 } from "./jsonc-parser"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -430,5 +431,40 @@ describe("detectPluginConfigFile", () => {
     expect(result.format).toBe("jsonc")
     expect(result.path).toBe(join(testDir, "oh-my-openagent.jsonc"))
     expect(result.legacyPath).toBeUndefined()
+  })
+})
+
+describe("stripBom", () => {
+  test("#given content with no byte order mark #when stripped #then the string is unchanged", () => {
+    // given
+    const content = '{"ok":true}'
+
+    // when
+    const stripped = stripBom(content)
+
+    // then
+    expect(stripped).toBe(content)
+  })
+
+  test("#given a leading UTF-8 byte order mark #when stripped #then only that mark is removed", () => {
+    // given
+    const content = '\uFEFF{"ok":true}\uFEFF'
+
+    // when
+    const stripped = stripBom(content)
+
+    // then
+    expect(stripped).toBe('{"ok":true}\uFEFF')
+  })
+
+  test("#given an empty string #when stripped #then it stays empty", () => {
+    // given
+    const content = ""
+
+    // when
+    const stripped = stripBom(content)
+
+    // then
+    expect(stripped).toBe("")
   })
 })
