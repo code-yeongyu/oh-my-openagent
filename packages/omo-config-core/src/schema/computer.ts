@@ -36,7 +36,7 @@ export const OmoComputerSettingsLayerSchema = z
       .describe("Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"),
     intervention: z
       .enum(["continue", "pause"])
-      .describe("What a background action does while the user uses the target app (default: pause)"),
+      .describe("What a background action does while the user uses the target app (default: continue)"),
     macos_key_priming: z
       .enum(["on", "off"])
       .describe("macOS background keys first make the target window key (default: off)"),

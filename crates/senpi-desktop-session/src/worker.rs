@@ -173,6 +173,11 @@ impl Worker {
             .unwrap_or_else(|| std::env::temp_dir().join(DEFAULT_ARTIFACT_DIR))
     }
 
+    /// The `backend` name of the capabilities read last.
+    pub(crate) fn backend_name(&self) -> String {
+        self.capabilities.lock().backend.clone()
+    }
+
     pub(crate) fn refresh_capabilities(&mut self) -> DesktopCapabilities {
         let capabilities = match self.backend.as_mut() {
             Ok(backend) => backend.capabilities(),

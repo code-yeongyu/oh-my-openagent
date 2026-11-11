@@ -183,6 +183,18 @@ impl AxBackend for MacAx {
         tree::focused_element().map(|found| found.map(handle))
     }
 
+    fn app_focused_element(&mut self, pid: u32) -> CoreResult<Option<AxHandle>> {
+        tree::app_focused_element(pid).map(|found| found.map(handle))
+    }
+
+    /// `AXSecureTextField` as the role or the subrole; an unreadable or
+    /// malformed subrole counts as secure.
+    fn is_secure_text_field(&mut self, h: &AxHandle) -> CoreResult<bool> {
+        let element = element(h)?;
+        Ok(element::copy_string(element, "AXRole").as_deref() == Some("AXSecureTextField")
+            || text_input::is_secure(element))
+    }
+
     fn attributes(&mut self, h: &AxHandle) -> CoreResult<Vec<(String, String)>> {
         tree::attributes(element(h)?)
     }
