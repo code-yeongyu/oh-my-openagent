@@ -11,7 +11,7 @@ import { parseModelString } from "../../shared/model-string-parser"
 import { CATEGORY_MODEL_REQUIREMENTS } from "../../shared/model-requirements"
 import { normalizeFallbackModels, flattenToFallbackModelStrings } from "../../shared/model-resolver"
 import { buildFallbackChainFromModels, findMostSpecificFallbackEntry } from "../../shared/fallback-chain-from-models"
-import { getAvailableModelsForDelegateTask } from "./available-models"
+import { confirmRequestedModels, getAvailableModelsForDelegateTask } from "./available-models"
 import { resolveModelForDelegateTask } from "./model-selection"
 import type { DelegatedModelConfig } from "./types"
 import { applyCategoryParams } from "./delegated-model-config"
@@ -99,7 +99,12 @@ export async function resolveCategoryExecution(
     }
   }
 
-  const availableModels = await getAvailableModelsForDelegateTask(client)
+  const requestedConfig = userCategories?.[categoryName]
+  const requestedModels = requestedConfig?.disable
+    ? []
+    : requestedConfig?.models?.map(getConfiguredModel) ?? [requestedConfig?.model ?? sisyphusJuniorModel]
+  // Confirm before resolveCategoryConfig filters/rejects configured chains, and reuse this one live read.
+  const availableModels = await confirmRequestedModels(client, await getAvailableModelsForDelegateTask(client), requestedModels)
 
   const resolved = resolveCategoryConfig(categoryName, {
     userCategories,
