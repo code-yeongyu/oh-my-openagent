@@ -20,7 +20,7 @@ fn identity(entry: &str) -> Identity {
     }
 }
 
-fn run(
+pub(super) fn run(
     table: &'static ProtectedTable,
     set: &SelfSet,
     tier: Tier,
@@ -45,11 +45,11 @@ fn run(
     gate(&facts, &tables, || targets).err().map(|r| r.refusal)
 }
 
-fn wire(refusal: Option<Refusal>) -> Option<(&'static str, Option<&'static str>)> {
+pub(super) fn wire(refusal: Option<Refusal>) -> Option<(&'static str, Option<&'static str>)> {
     refusal.map(|r| (r.code.wire(), r.reason))
 }
 
-fn self_set(pid: u32, app: &str) -> SelfSet {
+pub(super) fn self_set(pid: u32, app: &str) -> SelfSet {
     SelfSet::compute(&SelfSetInputs {
         own_pid: 1,
         snapshot: &ProcessSnapshot::default(),

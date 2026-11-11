@@ -151,4 +151,6 @@ fn matches_any(entries: &[String], identity: &Identity, unnamed: Unnamed) -> boo
 }
 
 #[cfg(test)]
+mod design_tests;
+#[cfg(test)]
 mod tests;
