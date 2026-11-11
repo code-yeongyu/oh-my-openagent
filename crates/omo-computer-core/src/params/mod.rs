@@ -37,7 +37,8 @@ macro_rules! exec_params {
 
 /// An exec verb's params with two members that are given together or not at all (`x` and
 /// `y`): a lone one is refused when the params are decoded, never dropped by the reader.
-/// The members decode through `$wire`; the schema is still the params' own.
+/// The members decode through `$wire`; the schema is still the params' own, and publishes
+/// the pairing as `dependentRequired` so a schema-driven client cannot build a lone one.
 macro_rules! paired_exec_params {
     ($(#[$meta:meta])* $name:ident via $wire:ident = $wire_text:literal pairs ($first:ident, $second:ident) {
         $($(#[$ra:meta])* $req:ident: $rty:ty),* $(,)? ;
@@ -53,6 +54,10 @@ macro_rules! paired_exec_params {
         exec_params! {
             $(#[$meta])*
             #[serde(try_from = $wire_text)]
+            #[schemars(extend("dependentRequired" = {
+                (stringify!($first)): [stringify!($second)],
+                (stringify!($second)): [stringify!($first)],
+            }))]
             $name {
                 $($(#[$ra])* $req: $rty,)* ;
                 $($(#[$oa])* $opt: $oty,)*

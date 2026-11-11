@@ -2,7 +2,7 @@
 // Do not edit by hand; run `bun run --cwd packages/omo-computer-protocol generate`.
 
 /** sha256 of the schema file this module was generated from; the schema-drift test compares it. */
-export const SCHEMA_SHA256 = "43e724a023f9f2978d3fc1e09cc3c34404fa4335c374274922ca1d3fb0d7fbb6" as const
+export const SCHEMA_SHA256 = "41c141c212f24d84a9a49ad6bd068fbbad65df8895a58147d4715b629852eb54" as const
 
 /** The wire protocol version `engine.hello` reports. */
 export const PROTOCOL_VERSION = "1" as const
@@ -631,8 +631,6 @@ export type ChainRole = "host" | "launcher" | "engine" | "helper"
 
 export type ClickParams = {
 	target?: string | null
-	x?: number | null
-	y?: number | null
 	ref?: string | null
 	frameId?: string | null
 	button?: Button | null
@@ -644,7 +642,13 @@ export type ClickParams = {
 	callId?: string | null
 	runGeneration?: number | null
 	observeAfter?: ObserveOptions | null
-}
+} & ({
+	x: number
+	y: number
+} | {
+	x?: null
+	y?: null
+})
 
 export type ClipboardContent = {
 	text?: string | null
@@ -1097,13 +1101,17 @@ export type MenuSelectParams = {
 export type MouseDownParams = {
 	target: string
 	button?: Button | null
-	x?: number | null
-	y?: number | null
 	frameId?: string | null
 	callId?: string | null
 	runGeneration?: number | null
 	observeAfter?: ObserveOptions | null
-}
+} & ({
+	x: number
+	y: number
+} | {
+	x?: null
+	y?: null
+})
 
 export type MouseUpParams = {
 	target: string
