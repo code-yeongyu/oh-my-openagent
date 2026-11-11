@@ -28,36 +28,29 @@ export function hasInternalNoReplyMarker(text: string): boolean {
 }
 
 export function isTextPartLike(
-  part: InternalInitiatorTextPartLike
+  part: InternalInitiatorTextPartLike,
 ): part is InternalInitiatorTextPartLike & { type: "text"; text: string } {
   return part.type === "text" && typeof part.text === "string"
 }
 
-export function isSyntheticOrInternalTextPart(
-  part: InternalInitiatorTextPartLike
-): boolean {
-  return (
-    isTextPartLike(part) &&
-    (part.synthetic === true || hasInternalInitiatorMarker(part.text))
-  )
+export function isSyntheticOrInternalTextPart(part: InternalInitiatorTextPartLike): boolean {
+  return isTextPartLike(part) && (part.synthetic === true || hasInternalInitiatorMarker(part.text))
 }
 
 export function isRealUserTextPart(
-  part: InternalInitiatorTextPartLike
+  part: InternalInitiatorTextPartLike,
 ): part is InternalInitiatorTextPartLike & { type: "text"; text: string } {
   return isTextPartLike(part) && !isSyntheticOrInternalTextPart(part)
 }
 
 export function isSyntheticOrInternalOnlyTextParts(
-  parts: readonly InternalInitiatorTextPartLike[] | undefined
+  parts: readonly InternalInitiatorTextPartLike[] | undefined,
 ): boolean {
   const textParts = (parts ?? []).filter(isTextPartLike)
   return textParts.length > 0 && textParts.every(isSyntheticOrInternalTextPart)
 }
 
-export function isSyntheticOrInternalUserMessage(
-  message: InternalInitiatorMessageLike
-): boolean {
+export function isSyntheticOrInternalUserMessage(message: InternalInitiatorMessageLike): boolean {
   const role = message.info?.role ?? message.role
   return role === "user" && isSyntheticOrInternalOnlyTextParts(message.parts)
 }
@@ -66,9 +59,7 @@ function isNoReplyTextPart(part: InternalInitiatorTextPartLike): boolean {
   return isTextPartLike(part) && hasInternalNoReplyMarker(part.text)
 }
 
-export function isTerminalNoReplyUserMessage(
-  message: InternalInitiatorMessageLike
-): boolean {
+export function isTerminalNoReplyUserMessage(message: InternalInitiatorMessageLike): boolean {
   const role = message.info?.role ?? message.role
   if (role !== "user") {
     return false
@@ -77,18 +68,13 @@ export function isTerminalNoReplyUserMessage(
   return textParts.some(isNoReplyTextPart)
 }
 
-export function isRealUserMessage(
-  message: InternalInitiatorMessageLike
-): boolean {
+export function isRealUserMessage(message: InternalInitiatorMessageLike): boolean {
   const role = message.info?.role ?? message.role
   return role === "user" && !isSyntheticOrInternalUserMessage(message)
 }
 
 export function stripInternalInitiatorMarkers(text: string): string {
-  return text
-    .replace(INTERNAL_INITIATOR_MARKER_PATTERN, "")
-    .replace(INTERNAL_NOREPLY_MARKER_PATTERN, "")
-    .trimEnd()
+  return text.replace(INTERNAL_INITIATOR_MARKER_PATTERN, "").replace(INTERNAL_NOREPLY_MARKER_PATTERN, "").trimEnd()
 }
 
 export function createInternalAgentTextPart(text: string): {
@@ -115,9 +101,7 @@ export function createInternalAgentContinuationTextPart(text: string): {
   }
 }
 
-export function withInternalNoReplyMarker<T extends { type: "text"; text: string }>(
-  part: T
-): T {
+export function withInternalNoReplyMarker<T extends { type: "text"; text: string }>(part: T): T {
   if (hasInternalNoReplyMarker(part.text)) {
     return part
   }

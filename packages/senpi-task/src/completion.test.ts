@@ -50,9 +50,7 @@ describe("task completion fallback reporting", () => {
     const message = buildCompletionMessage([buildCompletionDetails(record)])
 
     // then
-    expect(message.content).toContain(
-      "fallback:vendor-a/primary-model->vendor-b/fallback-model",
-    )
+    expect(message.content).toContain("fallback:vendor-a/primary-model->vendor-b/fallback-model")
     expect(message.content.match(/fallback:/gu)).toHaveLength(1)
     expect(message.content).not.toContain("quota")
     expect(message.content).not.toContain("403")

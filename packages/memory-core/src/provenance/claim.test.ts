@@ -11,25 +11,41 @@ import {
 
 const PROPOSAL = "I suggest removing plugins X and Y."
 const USER_TEXTS = [
-  { proposal: "What should I look at?", reply: "Please look at the WordPress plugins and tell me which ones look unused." },
+  {
+    proposal: "What should I look at?",
+    reply: "Please look at the WordPress plugins and tell me which ones look unused.",
+  },
   { proposal: PROPOSAL, reply: "Yes delete it!" },
 ]
 
 describe("claim receipts", () => {
   test("#given a user claim quoting a whole consent message #when resolved #then it keeps the user source and the message as written", () => {
-    expect(resolveClaimReceipt({ source: "user", userQuote: "yes delete it" }, USER_TEXTS)).toEqual({ source: "user", userQuote: "Yes delete it!", approves: proposalId(PROPOSAL) })
+    expect(resolveClaimReceipt({ source: "user", userQuote: "yes delete it" }, USER_TEXTS)).toEqual({
+      source: "user",
+      userQuote: "Yes delete it!",
+      approves: proposalId(PROPOSAL),
+    })
   })
 
   test("#given the #10488 flip: a user claim quoting the agent's own suggestion #when resolved #then it is downgraded to an agent suggestion", () => {
-    expect(resolveClaimReceipt({ source: "user", userQuote: "remove plugins X and Y" }, USER_TEXTS)).toEqual({ source: "agent", downgraded: true })
+    expect(resolveClaimReceipt({ source: "user", userQuote: "remove plugins X and Y" }, USER_TEXTS)).toEqual({
+      source: "agent",
+      downgraded: true,
+    })
   })
 
   test("#given a whole user message that is not a listed consent phrase #when resolved #then it stays a suggestion", () => {
-    expect(resolveClaimReceipt({ source: "user", userQuote: USER_TEXTS[0]?.reply }, USER_TEXTS)).toEqual({ source: "agent", downgraded: true })
+    expect(resolveClaimReceipt({ source: "user", userQuote: USER_TEXTS[0]?.reply }, USER_TEXTS)).toEqual({
+      source: "agent",
+      downgraded: true,
+    })
   })
 
   test("#given a listed phrase the user never sent #when resolved #then it is downgraded", () => {
-    expect(resolveClaimReceipt({ source: "user", userQuote: "go ahead" }, USER_TEXTS)).toEqual({ source: "agent", downgraded: true })
+    expect(resolveClaimReceipt({ source: "user", userQuote: "go ahead" }, USER_TEXTS)).toEqual({
+      source: "agent",
+      downgraded: true,
+    })
   })
 
   test("#given a user claim with no quote #when resolved #then it is downgraded", () => {
@@ -41,7 +57,9 @@ describe("claim receipts", () => {
   })
 
   test("#given an agent or inferred claim #when resolved #then the source is kept and any quote is dropped", () => {
-    expect(resolveClaimReceipt({ source: "agent", userQuote: "yes delete it" }, USER_TEXTS)).toEqual({ source: "agent" })
+    expect(resolveClaimReceipt({ source: "agent", userQuote: "yes delete it" }, USER_TEXTS)).toEqual({
+      source: "agent",
+    })
     expect(resolveClaimReceipt({ source: "inferred" }, USER_TEXTS)).toEqual({ source: "inferred" })
   })
 
@@ -68,7 +86,9 @@ describe("claim receipts", () => {
   })
   test("#given a user receipt #when rendered and parsed #then it names the approved proposal, and one without a valid proposal id is rejected", () => {
     const receipt = { source: "user", userQuote: "ok", approves: proposalId(PROPOSAL) } as const
-    expect(renderClaimReceipt(receipt)).toBe(`user replied "ok" to proposal ${proposalId(PROPOSAL)}; a record, not the user's approval`)
+    expect(renderClaimReceipt(receipt)).toBe(
+      `user replied "ok" to proposal ${proposalId(PROPOSAL)}; a record, not the user's approval`,
+    )
     expect(parseClaimReceipt(receipt)).toEqual(receipt)
     expect(parseClaimReceipt({ source: "user", userQuote: "ok" })).toBeUndefined()
     expect(parseClaimReceipt({ source: "user", userQuote: "ok", approves: "not-a-hash" })).toBeUndefined()

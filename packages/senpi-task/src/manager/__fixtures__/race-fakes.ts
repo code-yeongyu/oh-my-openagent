@@ -75,7 +75,9 @@ class RaceRunner implements ManagedRunner {
   start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
     const handle =
       this.#flavor === "in-process"
-        ? adaptInProcessHandle(createChildHandle({ taskId: spec.taskId, session: oneIdleSession(), promptText: spec.prompt }))
+        ? adaptInProcessHandle(
+            createChildHandle({ taskId: spec.taskId, session: oneIdleSession(), promptText: spec.prompt }),
+          )
         : adaptRpcHandle(oneIdleRpc(spec.taskId))
     return Promise.resolve(handle)
   }

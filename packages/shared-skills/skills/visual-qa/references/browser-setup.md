@@ -65,9 +65,9 @@ cloning its profile:
 
 ```js
 const session = await omowright.connectBrowserSkill({ name: "visual-qa capture", focused: false })
-const sync = async () => (await session.cooperate("sync")).context_id   // BrowserSkill 0.4+: resize/emulate are gated
+const sync = async () => (await session.cooperate("sync")).context_id   // BrowserSkill 0.4: one context per page action
 try {
-  await session.navigate(url, { waitUntil: "load" })
+  await session.navigate(url, { waitUntil: "load", context: await sync() })
   await session.resize(1440, 900, { context: await sync() })     // desktop column of the matrix
   await Bun.write(`${outDir}/${route}-1440-top.png`, (await session.screenshot()).buffer)   // { buffer, width, height }
   await session.emulate({ overrides: { width: 390, mobile: true }, context: await sync() })  // phone column; `off: true` restores

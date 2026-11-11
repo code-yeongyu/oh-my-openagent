@@ -78,7 +78,7 @@ describe("Senpi category routing policy", () => {
         providers: ["xiaomi", "opencode-go"],
         model: "mimo-v2.5-pro",
         variant: "high",
-      }
+      },
     ])
   })
 })

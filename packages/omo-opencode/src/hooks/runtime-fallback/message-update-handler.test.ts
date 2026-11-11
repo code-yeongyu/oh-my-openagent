@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { createMessageUpdateHandler } from "./message-update-handler"
+import { createFallbackState } from "./fallback-state"
 import type { HookDeps, RuntimeFallbackPluginInput } from "./types"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
 import { extractAutoRetrySignal } from "./error-classifier"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
-import { createFallbackState } from "./fallback-state"
+import { clearAllCompactions, recordCompactionStart } from "../../shared/compaction-in-flight"
 
 function createContext(messagesResponse: unknown): RuntimeFallbackPluginInput {
   return {
@@ -100,6 +101,28 @@ describe("hasVisibleAssistantResponse", () => {
     // then
     expect(result).toBe(false)
   })
+
+  it("#given a compaction part with text but no summary metadata #when visibility is checked #then it is not visible", async () => {
+    const checkVisibleResponse = hasVisibleAssistantResponse(() => undefined)
+    const ctx = createContext({
+      data: [
+        { info: { role: "user" }, parts: [{ type: "text", text: "latest question" }] },
+        { info: { role: "assistant" }, parts: [{ type: "compaction" }, { type: "text", text: "summary text" }] },
+      ],
+    })
+
+    expect(await checkVisibleResponse(ctx, "session-compaction-part", undefined)).toBe(false)
+  })
+
+  it("#given a non-Error session message failure #when visibility is checked #then it returns false safely", async () => {
+    const checkVisibleResponse = hasVisibleAssistantResponse(() => undefined)
+    const ctx = createContext({ data: [] })
+    ctx.client.session.messages = async () => {
+      throw "non-error rejection"
+    }
+
+    expect(await checkVisibleResponse(ctx, "session-non-error-rejection", undefined)).toBe(false)
+  })
 })
 
 function createRuntimeFallbackContext(operations: string[]): RuntimeFallbackPluginInput {
@@ -172,6 +195,7 @@ function createRuntimeFallbackHelpers(deps: HookDeps, operations: string[]): Aut
 
 describe("createMessageUpdateHandler runtime fallback dispatch", () => {
   afterEach(() => {
+    clearAllCompactions()
     SessionCategoryRegistry.clear()
   })
 
@@ -209,52 +233,51 @@ describe("createMessageUpdateHandler runtime fallback dispatch", () => {
     expect(state.pendingFallbackModel).toBeUndefined()
   })
 
-  it.each([0, 30])("interrupts a real ContentFilterError during an active retry with timeout %i", async (timeoutSeconds) => {
-    const sessionID = "session-content-filter-signal"
-    const operations: string[] = []
-    const deps = createRuntimeFallbackDeps(operations)
-    deps.config.timeout_seconds = timeoutSeconds
-    deps.pluginConfig = {
-      categories: {
-        test: {
-          fallback_models: ["openai/primary", "openai/current", "openai/next"],
+  it.each([0, 30])(
+    "interrupts a real ContentFilterError during an active retry with timeout %i",
+    async (timeoutSeconds) => {
+      const sessionID = "session-content-filter-signal"
+      const operations: string[] = []
+      const deps = createRuntimeFallbackDeps(operations)
+      deps.config.timeout_seconds = timeoutSeconds
+      deps.pluginConfig = {
+        categories: {
+          test: {
+            fallback_models: ["openai/primary", "openai/current", "openai/next"],
+          },
         },
-      },
-    }
-    SessionCategoryRegistry.register(sessionID, "test")
-    const state = createFallbackState("openai/primary")
-    state.currentModel = "openai/current"
-    state.pendingFallbackModel = "openai/current"
-    state.fallbackIndex = 1
-    state.attemptCount = 1
-    deps.sessionStates.set(sessionID, state)
-    deps.sessionRetryInFlight.add(sessionID)
-    deps.sessionAwaitingFallbackResult.add(sessionID)
-    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+      }
+      SessionCategoryRegistry.register(sessionID, "test")
+      const state = createFallbackState("openai/primary")
+      state.currentModel = "openai/current"
+      state.pendingFallbackModel = "openai/current"
+      state.fallbackIndex = 1
+      state.attemptCount = 1
+      deps.sessionStates.set(sessionID, state)
+      deps.sessionRetryInFlight.add(sessionID)
+      deps.sessionAwaitingFallbackResult.add(sessionID)
+      const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
 
-    await handler({
-      sessionID,
-      info: {
-        role: "assistant",
-        model: "openai/current",
-        error: {
-          name: "ContentFilterError",
-          data: { message: "Blocked by the provider's content management policy." },
+      await handler({
+        sessionID,
+        info: {
+          role: "assistant",
+          model: "openai/current",
+          error: {
+            name: "ContentFilterError",
+            data: { message: "Blocked by the provider's content management policy." },
+          },
         },
-      },
-    })
+      })
 
-    expect(operations).toEqual([
-      "abort:message.updated.retry-signal",
-      "retry:openai/next",
-      "toast",
-    ])
-    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(false)
-    expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
-    expect(state.currentModel).toBe("openai/next")
-    expect(state.pendingFallbackModel).toBe("openai/next")
-    expect(state.attemptCount).toBe(2)
-  })
+      expect(operations).toEqual(["abort:message.updated.retry-signal", "retry:openai/next", "toast"])
+      expect(deps.sessionRetryInFlight.has(sessionID)).toBe(false)
+      expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(false)
+      expect(state.currentModel).toBe("openai/next")
+      expect(state.pendingFallbackModel).toBe("openai/next")
+      expect(state.attemptCount).toBe(2)
+    },
+  )
 
   it("ignores a stale ContentFilterError from an older model while a newer retry is active", async () => {
     const sessionID = "session-stale-content-filter-error"
@@ -310,29 +333,173 @@ describe("createMessageUpdateHandler runtime fallback dispatch", () => {
     })
 
     // then
-    expect(operations).toEqual([
-      "abort:message.updated.quota-fallback",
-      "retry:litellm/openai.eu.gpt-5.5",
-      "toast",
-    ])
+    expect(operations).toEqual(["abort:message.updated.quota-fallback", "retry:litellm/openai.eu.gpt-5.5", "toast"])
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
+  })
+
+  it("#given an exhausted quota fallback #when message update is handled #then it does not abort without a replacement", async () => {
+    const sessionID = "session-quota-fallback-exhausted"
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.config.max_fallback_attempts = 0
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        error: { name: "ProviderRateLimitError", statusCode: 402, message: "quota exhausted" },
+      },
+    })
+
+    expect(operations.filter((operation) => operation.startsWith("abort:"))).toEqual([])
+    expect(operations.filter((operation) => operation.startsWith("retry:"))).toEqual([])
+  })
+
+  it("#given info.agent is absent #when a retry signal is handled #then the resolved agent supplies both checks and dispatch", async () => {
+    const sessionID = "session-message-resolved-agent"
+    const operations: string[] = []
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.pluginConfig = { agents: { worker: { fallback_models: ["litellm/openai.eu.gpt-5.5"] } } }
+    const state = createFallbackState("openai/gpt-5.4")
+    deps.sessionStates.set(sessionID, state)
+    deps.sessionRetryInFlight.add(sessionID)
+    const helpers = createRuntimeFallbackHelpers(deps, operations)
+    let resolveCalls = 0
+    let dispatchedAgent: string | undefined
+    helpers.resolveAgentForSessionFromContext = async () => {
+      resolveCalls += 1
+      return "worker"
+    }
+    helpers.autoRetryWithFallback = async (_sessionID, model, resolvedAgent) => {
+      dispatchedAgent = resolvedAgent
+      operations.push(`retry:${model}`)
+      return { accepted: true, status: "dispatched" }
+    }
+    const handler = createMessageUpdateHandler(deps, helpers)
+
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        status: "retrying in 1s",
+        message: "retrying in 1s",
+        error: {
+          name: "ProviderRateLimitError",
+          message: "All credentials for model gpt are cooling down [retrying in 1s attempt #1]",
+        },
+      },
+    })
+
+    expect(resolveCalls).toBe(1)
+    expect(dispatchedAgent).toBe("worker")
+    expect(operations).toContain("retry:litellm/openai.eu.gpt-5.5")
+  })
+
+  // A real provider retry signal, so without the guard this update would override the in-flight retry
+  // (abort + dispatch); the guard must leave the compaction lane's native retry alone.
+  it("#given a provider retry signal while a registry-tracked compaction runs #when handled #then the primary chain is untouched", async () => {
+    // given
+    const sessionID = "session-message-compaction-registry"
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.sessionRetryInFlight.add(sessionID)
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+    recordCompactionStart(sessionID)
+
+    // when
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        status: "retrying in 1s",
+        message: "retrying in 1s",
+        error: {
+          name: "ProviderRateLimitError",
+          message: "All credentials for model gpt are cooling down [retrying in 1s attempt #1]",
+        },
+      },
+    })
+
+    // then
+    expect(operations).toEqual([])
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(true)
+  })
+
+  it("#given a provider retry signal and no fallback left #when the in-flight retry would be overridden #then it does not abort without a replacement", async () => {
+    // given
+    const sessionID = "session-message-override-exhausted"
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.config.max_fallback_attempts = 0
+    deps.sessionRetryInFlight.add(sessionID)
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    // when
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        status: "retrying in 1s",
+        message: "retrying in 1s",
+        error: {
+          name: "ProviderRateLimitError",
+          message: "All credentials for model gpt are cooling down [retrying in 1s attempt #1]",
+        },
+      },
+    })
+
+    // then
+    expect(operations.filter((operation) => operation.startsWith("abort:"))).toEqual([])
+    expect(operations.filter((operation) => operation.startsWith("retry:"))).toEqual([])
+    expect(deps.sessionRetryInFlight.has(sessionID)).toBe(true)
+  })
+
+  it("#given a retryable quota error and no fallback left #when message update is handled #then the quota retry is not aborted without a replacement", async () => {
+    // given
+    const sessionID = "session-message-quota-exhausted-retryable"
+    const operations: string[] = []
+    SessionCategoryRegistry.register(sessionID, "test")
+    const deps = createRuntimeFallbackDeps(operations)
+    deps.config.max_fallback_attempts = 0
+    const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
+
+    // when
+    await handler({
+      sessionID,
+      info: {
+        role: "assistant",
+        model: "openai/gpt-5.4",
+        error: { name: "ProviderRateLimitError", message: "The usage limit has been reached for this model." },
+      },
+    })
+
+    // then
+    expect(operations.filter((operation) => operation.startsWith("abort:"))).toEqual([])
+    expect(operations.filter((operation) => operation.startsWith("retry:"))).toEqual([])
   })
 })
 
-
-describe('Internal abort suppression guard (Layer-2)', () => {
-  it('#given assistant message with NO error while sessionRetryInFlight is set #when message update is handled #then guard returns early and PRESERVES sessionAwaitingFallbackResult (internal abort suppressed)', async () => {
+describe("Internal abort suppression guard (Layer-2)", () => {
+  it("#given assistant message with NO error while sessionRetryInFlight is set #when message update is handled #then guard returns early and PRESERVES sessionAwaitingFallbackResult (internal abort suppressed)", async () => {
     // given: omo fallback in flight; assistant message with no visible content (omo own abort)
-    const sessionID = 'session-internal-guard'
+    const sessionID = "session-internal-guard"
     const operations: string[] = []
-    SessionCategoryRegistry.register(sessionID, 'test')
+    SessionCategoryRegistry.register(sessionID, "test")
     const deps = createRuntimeFallbackDeps(operations)
     deps.sessionRetryInFlight.add(sessionID)
     deps.sessionAwaitingFallbackResult.add(sessionID) // fallback result pending
     const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
 
     // when: assistant message update with NO error (the abort omo itself caused)
-    await handler({ sessionID, info: { role: 'assistant', model: 'openai/gpt-5.4' } })
+    await handler({ sessionID, info: { role: "assistant", model: "openai/gpt-5.4" } })
 
     // then: sessionAwaitingFallbackResult is PRESERVED (guard returns early, doesn't clear it)
     // and no abort/dispatch happens — the internal abort is silently suppressed
@@ -341,25 +508,24 @@ describe('Internal abort suppression guard (Layer-2)', () => {
   })
 })
 
-
-describe('Internal abort suppression guard (Layer-2)', () => {
-  it('#given assistant message with NO error while sessionRetryInFlight is set #when message update is handled #then guard returns early PRESERVING sessionStatusRetryKeys (internal abort suppressed, visible-response path skipped)', async () => {
+describe("Internal abort suppression guard (Layer-2)", () => {
+  it("#given assistant message with NO error while sessionRetryInFlight is set #when message update is handled #then guard returns early PRESERVING sessionStatusRetryKeys (internal abort suppressed, visible-response path skipped)", async () => {
     // given: omo fallback in flight; assistant message with no visible content (omo own abort)
-    const sessionID = 'session-internal-guard'
+    const sessionID = "session-internal-guard"
     const operations: string[] = []
-    SessionCategoryRegistry.register(sessionID, 'test')
+    SessionCategoryRegistry.register(sessionID, "test")
     const deps = createRuntimeFallbackDeps(operations)
     deps.sessionRetryInFlight.add(sessionID)
     deps.sessionAwaitingFallbackResult.add(sessionID)
-    deps.sessionStatusRetryKeys.set(sessionID, 'retry-key-1') // marker that visible-path would clear
+    deps.sessionStatusRetryKeys.set(sessionID, "retry-key-1") // marker that visible-path would clear
     const handler = createMessageUpdateHandler(deps, createRuntimeFallbackHelpers(deps, operations))
 
     // when: assistant message update with NO error (the abort omo itself caused)
-    await handler({ sessionID, info: { role: 'assistant', model: 'openai/gpt-5.4' } })
+    await handler({ sessionID, info: { role: "assistant", model: "openai/gpt-5.4" } })
 
     // then: guard returns early — sessionStatusRetryKeys is PRESERVED (visible-path skipped)
     // sessionAwaitingFallbackResult is also PRESERVED
-    expect(deps.sessionStatusRetryKeys.get(sessionID)).toBe('retry-key-1')
+    expect(deps.sessionStatusRetryKeys.get(sessionID)).toBe("retry-key-1")
     expect(deps.sessionAwaitingFallbackResult.has(sessionID)).toBe(true)
     expect(operations).toEqual([])
   })

@@ -35,10 +35,13 @@ function isActiveSurface(path: string): boolean {
 describe("current model family references", () => {
   test("#given active repo surfaces #when scanned for legacy GPT models #then they use the GPT-5.5 family", async () => {
     // given
-    const grepResult = Bun.spawnSync(["git", "grep", "-l", "-I", "-i", "-E", LEGACY_GPT_MODEL_CANDIDATE_ERE, "--", "."], {
-      stdout: "pipe",
-      stderr: "pipe",
-    })
+    const grepResult = Bun.spawnSync(
+      ["git", "grep", "-l", "-I", "-i", "-E", LEGACY_GPT_MODEL_CANDIDATE_ERE, "--", "."],
+      {
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    )
     expect([0, 1]).toContain(grepResult.exitCode)
 
     // when

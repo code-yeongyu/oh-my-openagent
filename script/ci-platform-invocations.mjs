@@ -12,7 +12,8 @@ import { readFileSync } from "node:fs"
 // (`scheduler-frontier.ts` for `scheduler.test.ts`) stay covered while an
 // unrelated `schedulers.ts` does not.
 const platformCondition = /runner\.os == 'Windows'|runner\.os == 'macOS'|matrix\.suite == 'platform'/
-const pathToken = /(?<=(?:^|[^\w/.$-])(?:\$\{?\w+\}?\/|\}\}\/)?)(?:\.\/)?((?:packages|script|\.github|bin|crates)\/[A-Za-z0-9_.@/-]*[A-Za-z0-9_-]|bunfig[\w.-]*\.toml)/g
+const pathToken =
+  /(?<=(?:^|[^\w/.$-])(?:\$\{?\w+\}?\/|\}\}\/)?)(?:\.\/)?((?:packages|script|\.github|bin|crates)\/[A-Za-z0-9_.@/-]*[A-Za-z0-9_-]|bunfig[\w.-]*\.toml)/g
 const jobHeader = /^ {2}[A-Za-z0-9_-]+:\s*$/
 const literalPlatformRunner = /^ {4}runs-on:\s*["']?(?:macos|windows)[\w.-]*["']?\s*$/
 const ciScript = /^\.github\/scripts\/[\w.-]+\.sh$/
@@ -47,7 +48,8 @@ export function platformOnlyStepTexts(workflowText) {
   return splitBlocks(lines.slice(jobsAt + 1), jobHeader).flatMap((job) => {
     const oses = matrixOses(job)
     const jobIsPlatformOnly =
-      job.some((line) => literalPlatformRunner.test(line)) || (oses.length > 0 && oses.every((os) => /macos|windows/.test(os)))
+      job.some((line) => literalPlatformRunner.test(line)) ||
+      (oses.length > 0 && oses.every((os) => /macos|windows/.test(os)))
     return splitBlocks(job, stepStart)
       .filter((step) => stepStart.test(step[0] ?? ""))
       .filter((step) => jobIsPlatformOnly || step.some((line) => /^\s+if:/.test(line) && platformCondition.test(line)))
@@ -70,7 +72,9 @@ function namedPaths(text) {
 
 export function platformInvocationCoverage(workflowText, readScript = () => "") {
   const stepTokens = platformOnlyStepTexts(workflowText).flatMap(namedPaths)
-  const scriptTokens = stepTokens.filter((token) => ciScript.test(token)).flatMap((script) => namedPaths(readScript(script)))
+  const scriptTokens = stepTokens
+    .filter((token) => ciScript.test(token))
+    .flatMap((script) => namedPaths(readScript(script)))
   return [...new Set([...stepTokens, ...scriptTokens])].flatMap((token) => {
     const coverage = coverageOf(token)
     return coverage === null ? [] : [coverage]

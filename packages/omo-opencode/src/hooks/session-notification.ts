@@ -53,7 +53,12 @@ export function createSessionNotification(ctx: PluginInput, config: SessionNotif
     send: async (hookCtx, sessionID) => {
       const platform = ensureNotificationPlatform()
       if (typeof hookCtx.client.session.get !== "function" && typeof hookCtx.client.session.messages !== "function") {
-        await sessionNotificationSender.sendSessionNotification(hookCtx, platform, mergedConfig.title, mergedConfig.message)
+        await sessionNotificationSender.sendSessionNotification(
+          hookCtx,
+          platform,
+          mergedConfig.title,
+          mergedConfig.message,
+        )
         return
       }
 
@@ -72,7 +77,12 @@ export function createSessionNotification(ctx: PluginInput, config: SessionNotif
   })
 
   const QUESTION_TOOLS = new Set(["question", "ask_user_question", "askuserquestion"])
-  const PERMISSION_EVENTS = new Set(["permission.ask", "permission.asked", "permission.updated", "permission.requested"])
+  const PERMISSION_EVENTS = new Set([
+    "permission.ask",
+    "permission.asked",
+    "permission.updated",
+    "permission.requested",
+  ])
   const PERMISSION_HINT_PATTERN = /\b(permission|approve|approval|allow|deny|consent)\b/i
 
   const ensureNotificationPlatform = (): Platform => {
@@ -136,7 +146,12 @@ export function createSessionNotification(ctx: PluginInput, config: SessionNotif
       if (!shouldNotifyForSession(sessionID)) return
 
       scheduler.markSessionActivity(sessionID)
-      await sessionNotificationSender.sendSessionNotification(ctx, platform, mergedConfig.title, mergedConfig.permissionMessage)
+      await sessionNotificationSender.sendSessionNotification(
+        ctx,
+        platform,
+        mergedConfig.title,
+        mergedConfig.permissionMessage,
+      )
       if (mergedConfig.playSound && defaultSoundPath) {
         await sessionNotificationSender.playSessionNotificationSound(ctx, platform, defaultSoundPath)
       }
@@ -156,7 +171,9 @@ export function createSessionNotification(ctx: PluginInput, config: SessionNotif
             if (!shouldNotifyForSession(sessionID)) return
 
             const questionText = getQuestionText(props)
-            const message = PERMISSION_HINT_PATTERN.test(questionText) ? mergedConfig.permissionMessage : mergedConfig.questionMessage
+            const message = PERMISSION_HINT_PATTERN.test(questionText)
+              ? mergedConfig.permissionMessage
+              : mergedConfig.questionMessage
 
             await sessionNotificationSender.sendSessionNotification(ctx, platform, mergedConfig.title, message)
             if (mergedConfig.playSound && defaultSoundPath) {

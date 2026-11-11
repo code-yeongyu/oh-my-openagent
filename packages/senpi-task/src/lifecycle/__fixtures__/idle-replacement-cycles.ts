@@ -13,12 +13,24 @@ export async function idleReplacementCycles() {
   const project = tempProject()
   const store = createTaskRecordStore({ project_dir: project })
   const runner = new FakeRunner()
-  const config = settings({ resident_idle_timeout_ms: 37, residency_max_children: 4, default_concurrency: 4, global_concurrency: 4 })
+  const config = settings({
+    resident_idle_timeout_ms: 37,
+    residency_max_children: 4,
+    default_concurrency: 4,
+    global_concurrency: 4,
+  })
   let now = 1000
   let peakResidents = 0
-  const manager = createTaskManager({ store, config, cwd: project, now: () => now,
+  const manager = createTaskManager({
+    store,
+    config,
+    cwd: project,
+    now: () => now,
     planner: () => ({ kind: "resolved", plan: { model: "fixture/model" } }),
-    runners: { "in-process": { start: (spec) => runner.start(spec), resume: (spec) => runner.start(spec) }, process: runner },
+    runners: {
+      "in-process": { start: (spec) => runner.start(spec), resume: (spec) => runner.start(spec) },
+      process: runner,
+    },
     admit: async (parent) => {
       const result = await lifecycle.admitResident(parent)
       return result.kind === "rejected" ? { kind: "rejected", message: result.error.message } : result
@@ -26,7 +38,14 @@ export async function idleReplacementCycles() {
     destruction: { destroyResidentTask: (id, cause) => lifecycle.destroyResidentTask(id, cause) },
   })
   const registry = createManagerResidencyRegistry(() => manager)
-  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, config, registry, now: () => now, idleReclaimerScheduler: { setInterval: () => ({}), clearInterval: () => undefined } })
+  const lifecycle = createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
+    store,
+    config,
+    registry,
+    now: () => now,
+    idleReclaimerScheduler: { setInterval: () => ({}), clearInterval: () => undefined },
+  })
   const snapshots: unknown[] = []
   const observe = () => {
     const records = store.list().records
@@ -71,10 +90,18 @@ export async function idleReplacementCycles() {
       now += config.resident_idle_timeout_ms
       assert.deepEqual((await lifecycle.reclaimIdleResidents?.())?.toSorted(), replacements.toSorted())
       // Grant each admission once; all four turns remain active together before settlement.
-      for (const id of idle) assert.equal((await manager.sendToTask({ idOrName: id, callerSessionId: "parent", message: `cycle-${cycle}` })).kind, "revived")
+      for (const id of idle)
+        assert.equal(
+          (await manager.sendToTask({ idOrName: id, callerSessionId: "parent", message: `cycle-${cycle}` })).kind,
+          "revived",
+        )
       observe()
       await completeFour(idle)
-      snapshots.push({ cycle, idle: idle.map((id) => manager.get(id)), replacements: replacements.map((id) => manager.get(id)) })
+      snapshots.push({
+        cycle,
+        idle: idle.map((id) => manager.get(id)),
+        replacements: replacements.map((id) => manager.get(id)),
+      })
     }
     return { cycles: 4, concurrentTurns: 4, peakResidents, evicted: 0, nonContinuable: 0, snapshots }
   } finally {

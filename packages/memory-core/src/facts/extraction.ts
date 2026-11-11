@@ -18,7 +18,13 @@ export interface FactsPersonReference {
 
 // `receipt` is optional only for records written before #10488; the record tool always attaches one.
 export type FactsExtractionRecord =
-  | { readonly scope: "person"; readonly person: FactsPersonReference; readonly text: string; readonly date: string; readonly receipt?: ClaimReceipt }
+  | {
+      readonly scope: "person"
+      readonly person: FactsPersonReference
+      readonly text: string
+      readonly date: string
+      readonly receipt?: ClaimReceipt
+    }
   | { readonly scope: "project"; readonly text: string; readonly date: string; readonly receipt?: ClaimReceipt }
 
 export interface FactsBatch {
@@ -89,7 +95,9 @@ export async function applyFactsBatch(
     if (recovery.paths.length === 0) return { outcome: "no_facts", affectedPaths: [] }
     await options.publishRecovery?.(recovery)
     return applyFactsRecovery(repo, recovery, count, author, {
-      batch, agreementsPolicy: options.agreements, publishRecovery: options.publishRecovery,
+      batch,
+      agreementsPolicy: options.agreements,
+      publishRecovery: options.publishRecovery,
     })
   } catch (error) {
     if (error instanceof FactsPlanParentDirtyError) return { outcome: "parent_dirty" }
@@ -97,16 +105,15 @@ export async function applyFactsBatch(
   }
 }
 
-export function validateFactsRecovery(
-  recovery: FactsApplyRecovery,
-  batch: FactsBatch,
-): void {
+export function validateFactsRecovery(recovery: FactsApplyRecovery, batch: FactsBatch): void {
   validateFactsBatchId(batch.batchId)
-  if (recovery.version !== 1
-    || (recovery.agreementEventVersion !== undefined && recovery.agreementEventVersion !== 1)
-    || recovery.batchId !== batch.batchId
-    || recovery.recordsHash !== factsRecordsHash(batch.records, batch.agreements)
-    || recovery.paths.some((entry, index) => index > 0 && recovery.paths[index - 1]!.path >= entry.path)) {
+  if (
+    recovery.version !== 1 ||
+    (recovery.agreementEventVersion !== undefined && recovery.agreementEventVersion !== 1) ||
+    recovery.batchId !== batch.batchId ||
+    recovery.recordsHash !== factsRecordsHash(batch.records, batch.agreements) ||
+    recovery.paths.some((entry, index) => index > 0 && recovery.paths[index - 1]!.path >= entry.path)
+  ) {
     throw new TypeError("Invalid facts applyRecovery envelope")
   }
 }
@@ -128,7 +135,8 @@ export function parseFactsExtractionRecord(value: unknown, index: number): Facts
     // Models that fill every optional property (GPT through OpenAI-compatible proxies, #10918)
     // send an empty person on project facts. That carries no person, so it is dropped; a project
     // record naming a real person is still a contradiction and is refused.
-    if ("person" in value && !isPlaceholderPerson(value.person)) throw invalid(index, "project record must not carry person")
+    if ("person" in value && !isPlaceholderPerson(value.person))
+      throw invalid(index, "project record must not carry person")
     assertKeys(value, ["scope", "person", "text", "date", "receipt"], index)
     return { scope: "project", text, date, ...withReceipt }
   }
@@ -138,7 +146,8 @@ export function parseFactsExtractionRecord(value: unknown, index: number): Facts
   if (!isRecord(value.person)) throw invalid(index, "person must be an object")
   assertKeys(value.person, ["name", "aliases"], index)
   const name = nonEmpty(value.person.name)
-  if (name === undefined || !Array.isArray(value.person.aliases)) throw invalid(index, "person requires name and aliases")
+  if (name === undefined || !Array.isArray(value.person.aliases))
+    throw invalid(index, "person requires name and aliases")
   const aliases = value.person.aliases.map(nonEmpty)
   if (aliases.some((alias) => alias === undefined)) throw invalid(index, "person aliases must be non-empty strings")
   return { scope: "person", person: { name, aliases: aliases as string[] }, text, date, ...withReceipt }
@@ -157,8 +166,10 @@ function isPlaceholderPerson(value: unknown): boolean {
   if (!isRecord(value)) return isPlaceholderName(value)
   if (Object.keys(value).some((key) => key !== "name" && key !== "aliases")) return false
   const aliases = value.aliases
-  const emptyAliases = aliases === undefined || aliases === null
-    || (Array.isArray(aliases) && aliases.every((alias) => typeof alias === "string" && alias.trim().length === 0))
+  const emptyAliases =
+    aliases === undefined ||
+    aliases === null ||
+    (Array.isArray(aliases) && aliases.every((alias) => typeof alias === "string" && alias.trim().length === 0))
   return isPlaceholderName(value.name) && emptyAliases
 }
 

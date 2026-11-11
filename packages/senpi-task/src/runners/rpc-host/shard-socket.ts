@@ -33,7 +33,12 @@ type Env = Readonly<Record<string, string | undefined>>
 
 export interface AltRootFs {
   readonly mkdirSync: (path: string, options: { readonly mode: number }) => unknown
-  readonly lstatSync: (path: string) => { readonly uid: number; readonly mode: number; isDirectory(): boolean; isSymbolicLink(): boolean }
+  readonly lstatSync: (path: string) => {
+    readonly uid: number
+    readonly mode: number
+    isDirectory(): boolean
+    isSymbolicLink(): boolean
+  }
   readonly realpathSync: (path: string) => string
   readonly getuid: () => number
 }

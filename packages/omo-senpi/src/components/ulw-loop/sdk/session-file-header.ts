@@ -35,7 +35,8 @@ export function readSessionFileCwd(sessionFile: string | undefined): SessionFile
   } catch {
     return { problem: "PI_SESSION_FILE does not start with a JSON session header" }
   }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return { problem: "PI_SESSION_FILE header is not an object" }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+    return { problem: "PI_SESSION_FILE header is not an object" }
   const cwd = "cwd" in parsed && typeof parsed.cwd === "string" ? parsed.cwd.trim() : ""
   return cwd ? { cwd } : { problem: "PI_SESSION_FILE header records no cwd" }
 }

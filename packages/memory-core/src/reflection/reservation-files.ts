@@ -71,6 +71,30 @@ export async function writeOptionalRun(path: string, run: ReservedRun | undefine
   await writeJsonAtomic(path, run)
 }
 
+/**
+ * Moves a torn `active.lock` aside as `active.lock.torn-<time>`, bytes unchanged, never deleting it
+ * (#11976 case E). The caller holds the scheduler lock and has proven no run is live. Returns the
+ * new name, or undefined when the lock is gone or no longer the bytes the caller decided on.
+ */
+export async function moveTornReservationAside(
+  reflectionDir: string,
+  expected: string,
+  at: Date,
+): Promise<string | undefined> {
+  const activePath = join(reflectionDir, "active.lock")
+  let current: string
+  try {
+    current = await readFile(activePath, "utf8")
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return undefined
+    throw error
+  }
+  if (current !== expected) return undefined
+  const name = `active.lock.torn-${at.toISOString().replace(/[:.]/g, "-")}`
+  await rename(activePath, join(reflectionDir, name))
+  return name
+}
+
 export async function currentLauncherIdentity(): Promise<ReflectionLauncherIdentity> {
   return {
     pid: process.pid,
@@ -79,7 +103,7 @@ export async function currentLauncherIdentity(): Promise<ReflectionLauncherIdent
   }
 }
 
-function isReservedRun(value: unknown): value is ReservedRun {
+export function isReservedRun(value: unknown): value is ReservedRun {
   if (!value || typeof value !== "object") return false
   const run = value as Record<string, unknown>
   return typeof run.runId === "string" && run.runId.length > 0 && isReflectionRequest(run.request)
@@ -89,11 +113,18 @@ function isReflectionRequest(value: unknown): value is ReflectionRequest {
   if (!value || typeof value !== "object") return false
   const request = value as Record<string, unknown>
   return (
-    (request.trigger === "manual" || request.trigger === "compaction" || request.trigger === "step-count" || request.trigger === "dream") &&
+    (request.trigger === "manual" ||
+      request.trigger === "compaction" ||
+      request.trigger === "step-count" ||
+      request.trigger === "dream") &&
     (request.trigger === "dream"
-      ? request.origin === "manual" || request.origin === "idle" || request.origin === "shutdown" || request.origin === "pressure"
+      ? request.origin === "manual" ||
+        request.origin === "idle" ||
+        request.origin === "shutdown" ||
+        request.origin === "pressure"
       : request.origin === undefined) &&
-    Array.isArray(request.conversationIds) && request.conversationIds.every((id) => typeof id === "string") &&
+    Array.isArray(request.conversationIds) &&
+    request.conversationIds.every((id) => typeof id === "string") &&
     Array.isArray(request.snapshots) &&
     (request.targetDoc === undefined || (request.trigger === "dream" && typeof request.targetDoc === "string"))
   )

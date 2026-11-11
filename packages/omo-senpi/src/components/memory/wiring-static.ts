@@ -6,6 +6,7 @@ import type { MemoryBlockCache, ReservedRun, TranscriptProjection } from "@oh-my
 import type { ComponentContext, SenpiExtensionAPI, SettleObserver } from "../../extension/types"
 import { hasMemoryCapabilities } from "./capabilities"
 import { registerMemoryCommands } from "./commands/register"
+import { loadMemoryCommandsRuntime } from "./commands/runtime-loader"
 import type { MemoryCommandIdentity, MemoryCommandSettings } from "./commands/types"
 import type { DreamTriggerWiring } from "./dream-trigger"
 import type { MemoryFactsWiring } from "./facts-wiring"
@@ -76,10 +77,31 @@ export function registerMemoryStatic(input: {
   readonly onMemoryWrite?: (sessionId: string) => void | Promise<void>
 }): void {
   const {
-    pi, ctx, options, promptCache, promptPrebuild, nudgeWiring, noticeWiring, recallWiring, dreamTriggerWiring,
-    completionApi, resolveContext, journalWiringFor, factsWiringFor, runtimeFor,
-    triggerSessionFor, resolvePalacePeople, loadCommandSettings, lastEventCtx,
-    activeSession, skillsUsageTrackersRef, memoryUsageTrackersRef, onReflectionLaunch, onSettled, onJournalSettled, onMemoryWrite,
+    pi,
+    ctx,
+    options,
+    promptCache,
+    promptPrebuild,
+    nudgeWiring,
+    noticeWiring,
+    recallWiring,
+    dreamTriggerWiring,
+    completionApi,
+    resolveContext,
+    journalWiringFor,
+    factsWiringFor,
+    runtimeFor,
+    triggerSessionFor,
+    resolvePalacePeople,
+    loadCommandSettings,
+    lastEventCtx,
+    activeSession,
+    skillsUsageTrackersRef,
+    memoryUsageTrackersRef,
+    onReflectionLaunch,
+    onSettled,
+    onJournalSettled,
+    onMemoryWrite,
   } = input
   const api = completionApi(pi)
   if (api !== undefined) {
@@ -91,7 +113,9 @@ export function registerMemoryStatic(input: {
     nudgeWiring.register(pi)
     noticeWiring.register(pi)
   }
-  const projectionPins = createProjectionPins(options.deviceName === undefined ? {} : { deviceName: options.deviceName })
+  const projectionPins = createProjectionPins(
+    options.deviceName === undefined ? {} : { deviceName: options.deviceName },
+  )
   const entryApi = hasMemoryCapabilities(pi) ? pi : undefined
   const noticeInputs = createMemoryNoticeInputs({
     resolveContext,
@@ -103,7 +127,9 @@ export function registerMemoryStatic(input: {
     resolveContext,
     cache: promptCache,
     pins: projectionPins,
-    ...(entryApi === undefined ? {} : { recordPin: (record) => entryApi.appendEntry(PROJECTION_PIN_ENTRY_TYPE, record) }),
+    ...(entryApi === undefined
+      ? {}
+      : { recordPin: (record) => entryApi.appendEntry(PROJECTION_PIN_ENTRY_TYPE, record) }),
     onRepin: (sessionId, reason) => options.logger?.info("omo-senpi memory projection repinned", { sessionId, reason }),
     resolveCompileWarnTokens: () => loadCommandSettings().settings.compile_warn_tokens,
     resolveProjectionLimits: (identity) => projectionLimits(loadCommandSettings().settings, identity),
@@ -118,10 +144,14 @@ export function registerMemoryStatic(input: {
     ...noticeInputs,
   })
   promptPrebuild.current = (context) => promptHandler.prebuild(context)
-  pi.on("before_agent_start", (payload, eventCtx) => {
-    if (!isPreview(payload)) lastEventCtx.current = eventCtx
-    return promptHandler(payload, eventCtx)
-  }, { previewSafe: true })
+  pi.on(
+    "before_agent_start",
+    (payload, eventCtx) => {
+      if (!isPreview(payload)) lastEventCtx.current = eventCtx
+      return promptHandler(payload, eventCtx)
+    },
+    { previewSafe: true },
+  )
   // Recall owns a SEPARATE before_agent_start handler registered AFTER the projection handler:
   // senpi merges one message per handler in registration order, so the hint lands last and the
   // prompt handler stays the only writer of systemPrompt.
@@ -134,50 +164,66 @@ export function registerMemoryStatic(input: {
   pi.on("session_start", (_payload, eventCtx) => {
     if (eventCtx !== undefined) lastEventCtx.current = eventCtx
   })
-  registerJournalSettleDelivery(pi, { resolveContext, lastEventCtx, activeSession, ...(onJournalSettled === undefined ? {} : { deliver: onJournalSettled }) })
-  pi.on("agent_settled", async (_payload, eventCtx, observer) => {
-    lastEventCtx.current = eventCtx
-    const sessionId = sessionIdFrom(eventCtx)
-    if (sessionId === undefined) return undefined
-    const identity = resolveContext(sessionId)
-    if (identity === undefined) return undefined
-    activeSession.current = sessionId
-    if (branchEntryCount(eventCtx) === 0) {
-      await onSettled?.(sessionId, eventCtx, observer)
-      return undefined
-    }
-    // Read host getters while this event context is live, before journal or queue I/O.
-    const selection = input.hasUserActivity(sessionId) ? {
-      registry: resolveMemoryModelRegistry(eventCtx), sessionModel: resolveMemorySessionModel(eventCtx),
-    } : undefined
-    observer?.phase("onSettled.journal.reconcileSession")
-    const result = await journalWiringFor(identity).reconcileSession(eventCtx, observer?.signal)
-    observer?.signal.throwIfAborted()
-    if (resolveContext(sessionId) !== identity) return result
-    if (input.hasUserActivity(sessionId)) {
-      observer?.phase("onSettled.facts.enqueue")
-      await factsWiringFor(identity).onSettled(sessionId, selection, observer?.signal)
-    }
-    observer?.signal.throwIfAborted()
-    if (resolveContext(sessionId) !== identity) return result
-    await onSettled?.(sessionId, eventCtx, observer)
-    return result
-  }, { hookLabel: "onSettled" })
-  registerMemoryWriteListener(pi, options, onMemoryWrite)
-  registerMemoryToolSurface(pi, () => (activeSession.current === undefined ? undefined : resolveContext(activeSession.current)), {
-    onCommit: (commit) => {
-      const context = activeSession.current === undefined ? undefined : resolveContext(activeSession.current)
-      if (context !== undefined) noticeWiring.onCommit(context, commit)
-    },
-    // Read per call rather than latched at registration: the gate is presentation-only, so a
-    // config edit takes effect on the next write instead of at the next restart.
-    writeNotice: {
-      get enabled(): boolean {
-        return resolveWriteNoticeEnabled(loadCommandSettings, activeSession, resolveContext)
-      },
-      resolveSessionId: () => activeSession.current,
-    },
+  registerJournalSettleDelivery(pi, {
+    resolveContext,
+    lastEventCtx,
+    activeSession,
+    ...(onJournalSettled === undefined ? {} : { deliver: onJournalSettled }),
   })
+  pi.on(
+    "agent_settled",
+    async (_payload, eventCtx, observer) => {
+      lastEventCtx.current = eventCtx
+      const sessionId = sessionIdFrom(eventCtx)
+      if (sessionId === undefined) return undefined
+      const identity = resolveContext(sessionId)
+      if (identity === undefined) return undefined
+      activeSession.current = sessionId
+      if (branchEntryCount(eventCtx) === 0) {
+        await onSettled?.(sessionId, eventCtx, observer)
+        return undefined
+      }
+      // Read host getters while this event context is live, before journal or queue I/O.
+      const selection = input.hasUserActivity(sessionId)
+        ? {
+            registry: resolveMemoryModelRegistry(eventCtx),
+            sessionModel: resolveMemorySessionModel(eventCtx),
+          }
+        : undefined
+      observer?.phase("onSettled.journal.reconcileSession")
+      const result = await journalWiringFor(identity).reconcileSession(eventCtx, observer?.signal)
+      observer?.signal.throwIfAborted()
+      if (resolveContext(sessionId) !== identity) return result
+      if (input.hasUserActivity(sessionId)) {
+        observer?.phase("onSettled.facts.enqueue")
+        await factsWiringFor(identity).onSettled(sessionId, selection, observer?.signal)
+      }
+      observer?.signal.throwIfAborted()
+      if (resolveContext(sessionId) !== identity) return result
+      await onSettled?.(sessionId, eventCtx, observer)
+      return result
+    },
+    { hookLabel: "onSettled" },
+  )
+  registerMemoryWriteListener(pi, options, onMemoryWrite)
+  registerMemoryToolSurface(
+    pi,
+    () => (activeSession.current === undefined ? undefined : resolveContext(activeSession.current)),
+    {
+      onCommit: (commit) => {
+        const context = activeSession.current === undefined ? undefined : resolveContext(activeSession.current)
+        if (context !== undefined) noticeWiring.onCommit(context, commit)
+      },
+      // Read per call rather than latched at registration: the gate is presentation-only, so a
+      // config edit takes effect on the next write instead of at the next restart.
+      writeNotice: {
+        get enabled(): boolean {
+          return resolveWriteNoticeEnabled(loadCommandSettings, activeSession, resolveContext)
+        },
+        resolveSessionId: () => activeSession.current,
+      },
+    },
+  )
   registerMemoryGuard(pi, ctx, {
     getContext: (eventContext) => {
       const sessionId = sessionIdFrom(eventContext)
@@ -211,11 +257,27 @@ export function registerMemoryStatic(input: {
   )
   registerMemoryCommands(pi, {
     contextForSession: (sessionId) => asCommandIdentity(resolveContext(sessionId)),
-    resolveIdentity: () => (activeSession.current === undefined ? undefined : asCommandIdentity(resolveContext(activeSession.current))),
+    resolveIdentity: () =>
+      activeSession.current === undefined ? undefined : asCommandIdentity(resolveContext(activeSession.current)),
     loadSettings: loadCommandSettings,
     bustPromptCache: () => {
       promptCache.clear()
       projectionPins.requestRefresh()
+    },
+    reflectionLockFix: async (sessionId, { dryRun }) => {
+      const identity = resolveContext(sessionId)
+      if (identity === undefined) return []
+      const runtime = runtimeFor(identity)
+      const { formatStaleLockFixLines, reclaimDeadOwnerLocks, runStaleLockReaper } = await loadMemoryCommandsRuntime()
+      const report = await runStaleLockReaper({
+        runtimeDir: identity.identityPaths.runtime,
+        // Interactive: like the per-turn pass, never wait on another run's deadline here.
+        settle: () => runtime.reconcile(undefined, { waitPolicy: "none" }),
+        dryRun,
+        ...(options.reflectionHolderSeams === undefined ? {} : { probe: options.reflectionHolderSeams }),
+      })
+      const locks = dryRun ? undefined : await reclaimDeadOwnerLocks(identity.identityPaths.locks)
+      return formatStaleLockFixLines(identity.identity, report, locks)
     },
     reflectionSink: {
       request: async (request) => {
@@ -245,7 +307,7 @@ export function registerMemoryStatic(input: {
         return {
           disposition: "pending",
           runId: result.run.runId,
-          ...(recovery.verdict.state === "dead" && recovery.notice === undefined ? { recoveredRunId: recovery.verdict.runId } : {}),
+          ...(recovery.recoveredRunId === undefined ? {} : { recoveredRunId: recovery.recoveredRunId }),
           ...(recovery.notice === undefined ? {} : { stuck: recovery.notice }),
         }
       },
@@ -264,7 +326,8 @@ export function registerMemoryStatic(input: {
     resolveSession: triggerSessionFor,
     onLaunch: () => {},
     // A compaction rewrites the transcript the pending nudges were judged against, so they die with it.
-    onCompactionAccepted: (conversationId) => input.kibitzer.onCompactionAccepted(conversationId, resolveContext(conversationId)),
+    onCompactionAccepted: (conversationId) =>
+      input.kibitzer.onCompactionAccepted(conversationId, resolveContext(conversationId)),
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
   triggerWiring.register(pi)

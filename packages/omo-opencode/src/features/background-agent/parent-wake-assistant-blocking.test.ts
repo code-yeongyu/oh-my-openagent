@@ -2,10 +2,7 @@
 
 import { describe, expect, test } from "bun:test"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../hooks/shared/prompt-async-gate"
-import {
-  OMO_INTERNAL_INITIATOR_MARKER,
-  OMO_INTERNAL_NOREPLY_MARKER,
-} from "../../shared/internal-initiator-marker"
+import { OMO_INTERNAL_INITIATOR_MARKER, OMO_INTERNAL_NOREPLY_MARKER } from "../../shared/internal-initiator-marker"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { ParentWakeNotifier } from "./parent-wake-notifier"
 
@@ -70,12 +67,7 @@ describe("ParentWakeNotifier — assistant turn blocking", () => {
         userMessageInProgressWindowMs: 2_000,
       },
     )
-    notifier.queuePendingParentWake(
-      "parent-local-unknown",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-local-unknown", "task complete", { agent: "sisyphus" }, true)
 
     // when
     await notifier.flushPendingParentWake("parent-local-unknown")
@@ -145,12 +137,7 @@ describe("ParentWakeNotifier — assistant turn blocking", () => {
         userMessageInProgressWindowMs: 2_000,
       },
     )
-    notifier.queuePendingParentWake(
-      "parent-question-unanswered",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-question-unanswered", "task complete", { agent: "sisyphus" }, true)
     const pendingWake = notifier.getPendingParentWakes().get("parent-question-unanswered")
     expect(pendingWake).toBeDefined()
     if (!pendingWake) {
@@ -195,10 +182,7 @@ describe("ParentWakeNotifier — assistant turn blocking", () => {
                 finish: "unknown",
                 time: { created: 20_000, completed: 30_000 },
               },
-              parts: [
-                { type: "step-start" },
-                { type: "step-finish", reason: "unknown" },
-              ],
+              parts: [{ type: "step-start" }, { type: "step-finish", reason: "unknown" }],
             },
           ],
         }),
@@ -225,12 +209,7 @@ describe("ParentWakeNotifier — assistant turn blocking", () => {
         userMessageInProgressWindowMs: 2_000,
       },
     )
-    notifier.queuePendingParentWake(
-      "parent-completed-unknown",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-completed-unknown", "task complete", { agent: "sisyphus" }, true)
     const pendingWake = notifier.getPendingParentWakes().get("parent-completed-unknown")
     expect(pendingWake).toBeDefined()
     if (!pendingWake) {

@@ -11,14 +11,15 @@ import type { FreezeReason } from "../engine/ports.ts"
 import type { RevocationView } from "./revocation-view.ts"
 
 export type Gate =
-  | { readonly kind: "ok" }
-  | { readonly kind: "not_member" }
-  | { readonly kind: "frozen"; readonly reason: FreezeReason }
+  { readonly kind: "ok" } | { readonly kind: "not_member" } | { readonly kind: "frozen"; readonly reason: FreezeReason }
 
 /** Rule 2: the verified chain reached exactly the head the state route served. */
 export const atServedHead = (state: ChainState, served: Head): boolean =>
-  state.head !== null && state.authority !== null &&
-  state.head.seq === served.seq && state.head.link === served.link && state.head.keyring_link === served.keyring_link
+  state.head !== null &&
+  state.authority !== null &&
+  state.head.seq === served.seq &&
+  state.head.link === served.link &&
+  state.head.keyring_link === served.keyring_link
 
 const DEDICATED: Readonly<Record<string, FreezeReason>> = {
   "recovery-join": "waiting_recovery",
@@ -58,14 +59,20 @@ const sameSet = (left: ReadonlySet<string>, right: ReadonlySet<string>): boolean
  * moved since `memory`, or the revoked set changed. Neither can be forged by a service, so a flag
  * kept set after every rotation buys one append per genuine new record or revoke.
  */
-export const unchangedSince = (memory: SettleMemory | undefined, servedKeyringLink: string, revoked: ReadonlySet<string>): boolean =>
-  memory !== undefined && memory.keyringLink === servedKeyringLink && sameSet(memory.revoked, revoked)
+export const unchangedSince = (
+  memory: SettleMemory | undefined,
+  servedKeyringLink: string,
+  revoked: ReadonlySet<string>,
+): boolean => memory !== undefined && memory.keyringLink === servedKeyringLink && sameSet(memory.revoked, revoked)
 
 /**
  * The rotation's member list: the folded membership minus every member on a revoked row. A member no
  * row names is kept and counted; the service's own register refuses a rotation that keeps a revoked key.
  */
-export function rotationMembers(authority: Authority, view: RevocationView & { readonly kind: "usable" }): { readonly members: ReadonlyArray<Principal>; readonly unlisted: number } {
+export function rotationMembers(
+  authority: Authority,
+  view: RevocationView & { readonly kind: "usable" },
+): { readonly members: ReadonlyArray<Principal>; readonly unlisted: number } {
   const members = [...authority.members.values()].filter((member) => !view.revoked.has(member.id))
   return { members, unlisted: members.filter((member) => !view.listed.has(member.id)).length }
 }
