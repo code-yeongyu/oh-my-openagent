@@ -96,11 +96,11 @@ pub use reads::{
     WindowsParams, ZoomParams,
 };
 pub use v1::{
-    AdvanceClockParams, AxFocusParams, AxPerformParams, AxRefParams, AxSetValueParams, AxTargetParams,
-    AxTypeTextParams, CancelParams, CaptureParams, ClickParams, ControlGrantParams, HoldKeysParams,
-    HoldMouseParams, KeyChordParams, ObserveAx, ObserveParams, OnOff, RaiseWindowParams,
-    ReportMode, SessionOpenParams, StopPathResumeParams, StopPathStartParams, StopPathStopParams,
-    TypeTextParams,
+    AdvanceClockParams, AxFocusParams, AxPerformParams, AxRefParams, AxSetValueParams,
+    AxTargetParams, AxTypeTextParams, CancelParams, CaptureParams, ClickParams, ControlGrantParams,
+    HoldKeysParams, HoldMouseParams, KeyChordParams, ObserveAx, ObserveParams, OnOff,
+    RaiseWindowParams, ReportMode, SessionOpenParams, StopPathResumeParams, StopPathStartParams,
+    StopPathStopParams, TypeTextParams,
 };
 pub use verbs::{
     AppsOpenParams, AppsQuitParams, ClipboardWriteParams, DragParams, KeyDownParams, KeyUpParams,

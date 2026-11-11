@@ -181,7 +181,10 @@ fn reply_problem(
             if missing.is_empty() {
                 format!("result: {error}")
             } else {
-                format!("result (ledgered {} filled in): {error}", missing.join(", "))
+                format!(
+                    "result (ledgered {} filled in): {error}",
+                    missing.join(", ")
+                )
             }
         })
 }
@@ -345,13 +348,25 @@ fn a_ledgered_reply_is_still_type_checked() {
         .expect("the hello reply");
     assert!(
         matches!(
-            reply_problem(&schema, Method::EngineHello, &hello.path, &reply, &additions),
+            reply_problem(
+                &schema,
+                Method::EngineHello,
+                &hello.path,
+                &reply,
+                &additions
+            ),
             Ok(true)
         ),
         "the imported hello reply lacks only ledgered members and fits"
     );
     reply["protocolVersion"] = serde_json::json!(7);
-    let checked = reply_problem(&schema, Method::EngineHello, &hello.path, &reply, &additions);
+    let checked = reply_problem(
+        &schema,
+        Method::EngineHello,
+        &hello.path,
+        &reply,
+        &additions,
+    );
     assert!(
         checked.is_err(),
         "a hello reply with a numeric protocolVersion passed: {checked:?}"

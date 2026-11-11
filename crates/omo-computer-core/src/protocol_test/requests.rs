@@ -47,14 +47,20 @@ fn click_reads_force_into_the_send_policy() {
 #[test]
 fn a_lone_coordinate_is_refused_not_dropped() {
     for method in [Method::Click, Method::MouseDown] {
-        for lone in [json!({"target": "101", "x": 5}), json!({"target": "101", "y": 5})] {
+        for lone in [
+            json!({"target": "101", "x": 5}),
+            json!({"target": "101", "y": 5}),
+        ] {
             assert!(
                 method.validate_params(lone.clone()).is_err(),
                 "{} accepted the lone coordinate {lone}",
                 method.spec().name
             );
         }
-        for whole in [json!({"target": "101", "x": 5, "y": 6}), json!({"target": "101"})] {
+        for whole in [
+            json!({"target": "101", "x": 5, "y": 6}),
+            json!({"target": "101"}),
+        ] {
             method
                 .validate_params(whole.clone())
                 .unwrap_or_else(|error| panic!("{} refused {whole}: {error}", method.spec().name));
@@ -72,15 +78,24 @@ fn v1_exec_verbs_reach_the_exec_funnel_with_their_authority() {
             .extend(bound.as_object().expect("members").clone());
         params
     };
-    let focus = read_ax_focus(serde_json::from_value(with(json!({"ref": "s1:e4"}))).expect("exec params"));
+    let focus =
+        read_ax_focus(serde_json::from_value(with(json!({"ref": "s1:e4"}))).expect("exec params"));
     assert_eq!(focus.verb, Verb::V1(V1Verb::AxFocus));
     assert_eq!(focus.reference.as_deref(), Some("s1:e4"));
-    let perform = read_ax_perform(serde_json::from_value(with(json!({"ref": "s1:e4", "action": "AXPress"}))).expect("exec params"));
-    let typed = read_type_text(serde_json::from_value(with(json!({"target": "101", "text": "hi"}))).expect("exec params"));
+    let perform = read_ax_perform(
+        serde_json::from_value(with(json!({"ref": "s1:e4", "action": "AXPress"})))
+            .expect("exec params"),
+    );
+    let typed = read_type_text(
+        serde_json::from_value(with(json!({"target": "101", "text": "hi"}))).expect("exec params"),
+    );
     assert_eq!(typed.target.as_deref(), Some("101"));
     for request in [focus, perform, typed] {
         assert_eq!(request.authority.call_id.as_deref(), Some("c7"));
         assert_eq!(request.authority.run_generation, Some(3));
-        assert!(request.observe_after.is_some(), "{request:?} lost observeAfter");
+        assert!(
+            request.observe_after.is_some(),
+            "{request:?} lost observeAfter"
+        );
     }
 }
