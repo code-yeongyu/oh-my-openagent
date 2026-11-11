@@ -95,6 +95,11 @@ describe("category routing policy", () => {
         variant: "off",
       },
       {
+        providers: ["vertex-garden"],
+        model: "deepseek-v4.1-flash-maas",
+        variant: "off",
+      },
+      {
         providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan"],
         model: "qwen3.6-flash",
         variant: "low",
@@ -172,6 +177,11 @@ describe("category routing policy", () => {
         providers: ["deepseek", "opencode-go"],
         model: "deepseek-v4-pro",
         variant: "max",
+      },
+      {
+        providers: ["vertex-garden"],
+        model: "deepseek-v4.1-flash-maas",
+        variant: "medium",
       },
       {
         providers: ["xiaomi", "opencode-go"],

@@ -65,3 +65,14 @@ describe("provider model id transform", () => {
     }
   })
 })
+
+describe("vertex-garden model id transform", () => {
+  test("prefixes the bare DeepSeek MaaS id with its publisher namespace", () => {
+    // given / when
+    const transformed = transformModelForProvider("vertex-garden", "deepseek-v4.1-flash-maas")
+
+    // then
+    expect(transformed).toBe("deepseek-ai/deepseek-v4.1-flash-maas")
+    expect(transformModelForProvider("vertex-garden", "deepseek-flash")).toBe("deepseek-flash")
+  })
+})

@@ -103,6 +103,8 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "medium",
       },
       { providers: ["deepseek"], model: "deepseek-flash", variant: "off" },
+      // Vertex lane stays non-reasoning on the quick rung too (senpi#6270: off/medium only).
+      { providers: ["vertex-garden"], model: "deepseek-v4.1-flash-maas", variant: "off" },
       {
         providers: ["qwen-token-plan", "alibaba-token-plan", "bailian-coding-plan"],
         model: "qwen3.6-flash",
@@ -146,6 +148,9 @@ export const CATEGORY_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
         variant: "max",
       },
       { providers: ["deepseek", "opencode-go"], model: "deepseek-v4-pro", variant: "max" },
+      // Vertex Model Garden lane (ADC, no API key): same Flash tier, thinking capped at
+      // "medium" because the endpoint has no effort ladder (code-yeongyu/senpi#6270).
+      { providers: ["vertex-garden"], model: "deepseek-v4.1-flash-maas", variant: "medium" },
       { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.5-pro", variant: "max" },
     ],
   },

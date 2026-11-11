@@ -71,6 +71,9 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptLunaFast, variant: "low" },
       { providers: ["anthropic", "github-copilot"], model: LATEST_MODEL_BY_FAMILY.claudeHaiku, variant: "medium" },
       { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
+      // Vertex Model Garden lane (ADC, no API key): same Flash tier, thinking capped at
+      // "medium" because the endpoint has no effort ladder (code-yeongyu/senpi#6270).
+      { providers: ["vertex-garden"], model: "deepseek-v4.1-flash-maas", variant: "medium" },
       { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
       { providers: ["opencode-go"], model: "minimax-m2.7" },
     ],
@@ -81,6 +84,9 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
       { providers: ["openai", "chatgpt-subscription"], model: LATEST_MODEL_BY_FAMILY.gptLunaFast, variant: "low" },
       { providers: ["anthropic", "github-copilot"], model: LATEST_MODEL_BY_FAMILY.claudeHaiku, variant: "medium" },
       { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
+      // Vertex Model Garden lane (ADC, no API key): same Flash tier, thinking capped at
+      // "medium" because the endpoint has no effort ladder (code-yeongyu/senpi#6270).
+      { providers: ["vertex-garden"], model: "deepseek-v4.1-flash-maas", variant: "medium" },
       { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
       { providers: ["opencode-go"], model: "minimax-m2.7" },
     ],
