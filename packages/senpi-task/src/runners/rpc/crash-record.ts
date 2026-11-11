@@ -11,7 +11,7 @@ import type { ChildExitOutcome } from "../types"
  */
 
 /** Signals that mean the child died, as opposed to being asked to stop by a terminal or supervisor. */
-const FATAL_SIGNALS: ReadonlySet<string> = new Set([
+export const FATAL_SIGNALS: ReadonlySet<string> = new Set([
   "SIGSEGV", "SIGBUS", "SIGILL", "SIGTRAP", "SIGABRT", "SIGFPE", "SIGKILL", "SIGSYS", "SIGQUIT",
 ])
 /** Exit codes senpi's own SIGHUP / SIGINT / SIGTERM handlers finish with: a stop, not a crash. */
@@ -36,17 +36,21 @@ export function isUnexpectedChildDeath(outcome: ChildExitOutcome, terminationReq
 
 export function recordTaskChildDeath(input: RecordTaskChildDeathInput): void {
   if (!isUnexpectedChildDeath(input.outcome, input.terminationRequested)) return
-  const agentDir = input.env.OMO_CODING_AGENT_DIR ?? input.env.SENPI_CODING_AGENT_DIR ?? input.env.PI_CODING_AGENT_DIR
-  if (agentDir === undefined || agentDir.length === 0) return
   const { code, signal } = input.outcome.facts
-  const record = {
+  appendParentCrashRecord(input.env, {
     at: new Date(input.now).toISOString(),
     kind: "task-child",
     detection: "parent",
     ...(signal === null ? { code: code ?? undefined } : { signal }),
     uptimeMs: Math.max(0, input.now - input.startedAt),
     ...(process.versions.bun === undefined ? {} : { bunVersion: process.versions.bun }),
-  }
+  })
+}
+
+/** Append one parent-written record to the agent dir's `process-crashes/crashes.jsonl`; best-effort. */
+export function appendParentCrashRecord(env: NodeJS.ProcessEnv, record: Readonly<Record<string, unknown>>): void {
+  const agentDir = env.OMO_CODING_AGENT_DIR ?? env.SENPI_CODING_AGENT_DIR ?? env.PI_CODING_AGENT_DIR
+  if (agentDir === undefined || agentDir.length === 0) return
   try {
     const dir = join(agentDir, "process-crashes")
     const file = join(dir, "crashes.jsonl")

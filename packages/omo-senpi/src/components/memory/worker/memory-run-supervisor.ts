@@ -23,6 +23,7 @@ async function runSupervisor(runDir: string): Promise<void> {
   } = await import("./supervisor-process-identity")
   const { publishRunOutcome } = await import("./run-outcome-publication")
   const { admitSupervisor } = await import("./supervisor-admission")
+  const { recordMemoryChildDeath } = await import("./memory-child-death-record")
   const launchPath = join(runDir, "launch.json")
   const ledgerPath = join(runDir, "ledger.json")
   const { manifest, lease } = await admitSupervisor(runDir)
@@ -45,6 +46,7 @@ async function runSupervisor(runDir: string): Promise<void> {
 
   const stdoutFd = openSync(manifest.stdoutPath, "w")
   const stderrFd = openSync(manifest.stderrPath, "w")
+  const childStartedAt = Date.now()
   const bootstrap = spawn(process.execPath, [fileURLToPath(import.meta.url), "--child-bootstrap", runDir], {
     env: process.env,
     detached: true,
@@ -129,6 +131,13 @@ async function runSupervisor(runDir: string): Promise<void> {
     childExit: childExit ?? wrapperExit,
     timedOut: timedOut || (Number.isFinite(clockNow) && clockNow >= manifest.hardDeadlineAt),
   }
+  recordMemoryChildDeath({
+    env: process.env,
+    exit: outcome.childExit,
+    timedOut: outcome.timedOut,
+    startedAt: childStartedAt,
+    now: Date.now(),
+  })
   await lease.release()
   await publishRunOutcome(runDir, manifest, outcome)
   await unlinkRunArtifact(launchPath)
