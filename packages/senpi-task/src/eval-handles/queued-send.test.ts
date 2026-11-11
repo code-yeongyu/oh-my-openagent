@@ -14,10 +14,10 @@ test("#given a queued send #when cancellation ends the run before the reply #the
   const { manager } = makeManager({ store: h.store })
   const host = createEvalHandleHost({
     tasks: {
-      get: id => manager.get(id),
+      get: (id) => manager.get(id),
       waitFor: (id, options) => manager.waitFor(id, options),
       cancelTask: (id, reason, options) => manager.cancelTask(id, reason, options),
-      sendToTask: async input => {
+      sendToTask: async (input) => {
         const outcome = await manager.sendToTask(input)
         expect(outcome.kind).toBe("queued")
         await manager.cancelTask(input.idOrName, "cancel before host receipt")
@@ -25,15 +25,13 @@ test("#given a queued send #when cancellation ends the run before the reply #the
       },
     },
     workpools: manager.workpools,
-    poolCaller: sessionId => ({ sessionId, rootSessionId: sessionId, depth: 0, cwd: "/" }),
+    poolCaller: (sessionId) => ({ sessionId, rootSessionId: sessionId, depth: 0, cwd: "/" }),
     stateDir: h.store.stateDir,
   })
 
-  const reply = await host.send(
-    { kind: "agent", id: record.task_id, run_epoch: 0 },
-    "queued context",
-    { ownerSessionId: record.parent_session_id },
-  )
+  const reply = await host.send({ kind: "agent", id: record.task_id, run_epoch: 0 }, "queued context", {
+    ownerSessionId: record.parent_session_id,
+  })
 
   expect(reply.phase).toBe("cancelled")
   expect(reply.host_status).toBe("queued")

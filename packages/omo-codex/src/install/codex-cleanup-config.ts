@@ -33,7 +33,10 @@ export function cleanupCodexLightConfigText(config: string): string {
   return nextConfig.replace(/\n{3,}/g, "\n\n")
 }
 
-export async function cleanupCodexConfig(configPath: string, now: (() => Date) | undefined): Promise<{
+export async function cleanupCodexConfig(
+  configPath: string,
+  now: (() => Date) | undefined,
+): Promise<{
   readonly changed: boolean
   readonly backupPath?: string
 }> {

@@ -6,10 +6,7 @@ import path from "node:path"
 
 import { TeamModeConfigSchema } from "../../config/schema/team-mode"
 import { sendMessage } from "../../features/team-mode/team-mailbox/send"
-import {
-  clearTeamSessionRegistry,
-  registerTeamSession,
-} from "../../features/team-mode/team-session-registry"
+import { clearTeamSessionRegistry, registerTeamSession } from "../../features/team-mode/team-session-registry"
 import { saveRuntimeState } from "../../features/team-mode/team-state-store/store"
 import type { RuntimeState } from "../../features/team-mode/types"
 import { createTeamMailboxInjector } from "./hook"
@@ -55,10 +52,7 @@ async function seedRuntimeState(baseDir: string, runtimeState: RuntimeState): Pr
 }
 
 function createHook(baseDir: string) {
-  return createTeamMailboxInjector(
-    {},
-    TeamModeConfigSchema.parse({ enabled: true, base_dir: baseDir }),
-  )
+  return createTeamMailboxInjector({}, TeamModeConfigSchema.parse({ enabled: true, base_dir: baseDir }))
 }
 
 function createOutput(sessionID: string): {
@@ -85,7 +79,9 @@ describe("createTeamMailboxInjector", () => {
 
   afterEach(async () => {
     clearTeamSessionRegistry()
-    await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => rm(directoryPath, { recursive: true, force: true })))
+    await Promise.all(
+      temporaryDirectories.splice(0).map(async (directoryPath) => rm(directoryPath, { recursive: true, force: true })),
+    )
   })
 
   it("returns the input unchanged for a non-member session", async () => {
@@ -97,10 +93,7 @@ describe("createTeamMailboxInjector", () => {
     const originalMessages = structuredClone(output.messages)
 
     // when
-    await hook["experimental.chat.messages.transform"]?.(
-      { sessionID: "session-non-member" },
-      output,
-    )
+    await hook["experimental.chat.messages.transform"]?.({ sessionID: "session-non-member" }, output)
 
     // then
     expect(output.messages).toEqual(originalMessages)
@@ -113,22 +106,24 @@ describe("createTeamMailboxInjector", () => {
     const hook = createHook(baseDir)
     const runtimeState = createRuntimeState("session-member")
     await seedRuntimeState(baseDir, runtimeState)
-    await sendMessage({
-      version: 1,
-      messageId: randomUUID(),
-      from: "lead",
-      to: "member-a",
-      kind: "message",
-      body: "hello",
-      timestamp: 1,
-    }, runtimeState.teamRunId, TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true }), { isLead: true, activeMembers: ["lead", "member-a"] })
+    await sendMessage(
+      {
+        version: 1,
+        messageId: randomUUID(),
+        from: "lead",
+        to: "member-a",
+        kind: "message",
+        body: "hello",
+        timestamp: 1,
+      },
+      runtimeState.teamRunId,
+      TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true }),
+      { isLead: true, activeMembers: ["lead", "member-a"] },
+    )
     const output = createOutput("session-member")
 
     // when
-    await hook["experimental.chat.messages.transform"]?.(
-      { sessionID: "session-member" },
-      output,
-    )
+    await hook["experimental.chat.messages.transform"]?.({ sessionID: "session-member" }, output)
 
     // then
     expect(output.messages).toHaveLength(2)
@@ -154,28 +149,27 @@ describe("createTeamMailboxInjector", () => {
     const hook = createHook(baseDir)
     const runtimeState = createRuntimeState("session-member")
     await seedRuntimeState(baseDir, runtimeState)
-    await sendMessage({
-      version: 1,
-      messageId: randomUUID(),
-      from: "lead",
-      to: "member-a",
-      kind: "message",
-      body: "hello",
-      timestamp: 1,
-    }, runtimeState.teamRunId, TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true }), { isLead: true, activeMembers: ["lead", "member-a"] })
+    await sendMessage(
+      {
+        version: 1,
+        messageId: randomUUID(),
+        from: "lead",
+        to: "member-a",
+        kind: "message",
+        body: "hello",
+        timestamp: 1,
+      },
+      runtimeState.teamRunId,
+      TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true }),
+      { isLead: true, activeMembers: ["lead", "member-a"] },
+    )
     const firstOutput = createOutput("session-member")
     const secondOutput = createOutput("session-member")
     const originalSecondMessages = structuredClone(secondOutput.messages)
 
     // when
-    await hook["experimental.chat.messages.transform"]?.(
-      { sessionID: "session-member" },
-      firstOutput,
-    )
-    await hook["experimental.chat.messages.transform"]?.(
-      { sessionID: "session-member" },
-      secondOutput,
-    )
+    await hook["experimental.chat.messages.transform"]?.({ sessionID: "session-member" }, firstOutput)
+    await hook["experimental.chat.messages.transform"]?.({ sessionID: "session-member" }, secondOutput)
 
     // then
     expect(firstOutput.messages).toHaveLength(2)
@@ -189,15 +183,20 @@ describe("createTeamMailboxInjector", () => {
     const hook = createHook(baseDir)
     const runtimeState = createRuntimeState("session-member")
     await seedRuntimeState(baseDir, runtimeState)
-    await sendMessage({
-      version: 1,
-      messageId: randomUUID(),
-      from: "lead",
-      to: "member-a",
-      kind: "message",
-      body: "hello",
-      timestamp: 1,
-    }, runtimeState.teamRunId, TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true }), { isLead: true, activeMembers: ["lead", "member-a"] })
+    await sendMessage(
+      {
+        version: 1,
+        messageId: randomUUID(),
+        from: "lead",
+        to: "member-a",
+        kind: "message",
+        body: "hello",
+        timestamp: 1,
+      },
+      runtimeState.teamRunId,
+      TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true }),
+      { isLead: true, activeMembers: ["lead", "member-a"] },
+    )
     const firstOutput = createOutput("session-member")
     const secondOutput = createOutput("session-member")
     secondOutput.messages.unshift({
@@ -210,14 +209,8 @@ describe("createTeamMailboxInjector", () => {
     const originalSecondMessages = structuredClone(secondOutput.messages)
 
     // when
-    await hook["experimental.chat.messages.transform"]?.(
-      { sessionID: "session-member" },
-      firstOutput,
-    )
-    await hook["experimental.chat.messages.transform"]?.(
-      { sessionID: "session-member" },
-      secondOutput,
-    )
+    await hook["experimental.chat.messages.transform"]?.({ sessionID: "session-member" }, firstOutput)
+    await hook["experimental.chat.messages.transform"]?.({ sessionID: "session-member" }, secondOutput)
 
     // then
     expect(firstOutput.messages).toHaveLength(2)
@@ -243,15 +236,20 @@ describe("createTeamMailboxInjector", () => {
       ],
     }
     await seedRuntimeState(baseDir, staleRuntimeState)
-    await sendMessage({
-      version: 1,
-      messageId: randomUUID(),
-      from: "lead",
-      to: "member-a",
-      kind: "message",
-      body: "fresh registry hello",
-      timestamp: 1,
-    }, teamRunId, TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true }), { isLead: true, activeMembers: ["lead", "member-a"] })
+    await sendMessage(
+      {
+        version: 1,
+        messageId: randomUUID(),
+        from: "lead",
+        to: "member-a",
+        kind: "message",
+        body: "fresh registry hello",
+        timestamp: 1,
+      },
+      teamRunId,
+      TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true }),
+      { isLead: true, activeMembers: ["lead", "member-a"] },
+    )
     registerTeamSession("session-member", {
       teamRunId,
       memberName: "member-a",
@@ -260,10 +258,7 @@ describe("createTeamMailboxInjector", () => {
     const output = createOutput("session-member")
 
     // when
-    await hook["experimental.chat.messages.transform"]?.(
-      { sessionID: "session-member" },
-      output,
-    )
+    await hook["experimental.chat.messages.transform"]?.({ sessionID: "session-member" }, output)
 
     // then
     expect(output.messages).toHaveLength(2)
@@ -279,24 +274,34 @@ describe("createTeamMailboxInjector", () => {
     const wrongTeamRunId = randomUUID()
     await seedRuntimeState(baseDir, createRuntimeState("session-member", correctTeamRunId))
     await seedRuntimeState(baseDir, createRuntimeState("other-session", wrongTeamRunId))
-    await sendMessage({
-      version: 1,
-      messageId: randomUUID(),
-      from: "lead",
-      to: "member-a",
-      kind: "message",
-      body: "message for the correct team",
-      timestamp: 1,
-    }, correctTeamRunId, TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true }), { isLead: true, activeMembers: ["lead", "member-a"] })
-    await sendMessage({
-      version: 1,
-      messageId: randomUUID(),
-      from: "lead",
-      to: "member-a",
-      kind: "message",
-      body: "message for the wrong team",
-      timestamp: 2,
-    }, wrongTeamRunId, TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true }), { isLead: true, activeMembers: ["lead", "member-a"] })
+    await sendMessage(
+      {
+        version: 1,
+        messageId: randomUUID(),
+        from: "lead",
+        to: "member-a",
+        kind: "message",
+        body: "message for the correct team",
+        timestamp: 1,
+      },
+      correctTeamRunId,
+      TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true }),
+      { isLead: true, activeMembers: ["lead", "member-a"] },
+    )
+    await sendMessage(
+      {
+        version: 1,
+        messageId: randomUUID(),
+        from: "lead",
+        to: "member-a",
+        kind: "message",
+        body: "message for the wrong team",
+        timestamp: 2,
+      },
+      wrongTeamRunId,
+      TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true }),
+      { isLead: true, activeMembers: ["lead", "member-a"] },
+    )
     registerTeamSession("session-member", {
       teamRunId: wrongTeamRunId,
       memberName: "member-a",
@@ -305,10 +310,7 @@ describe("createTeamMailboxInjector", () => {
     const output = createOutput("session-member")
 
     // when
-    await hook["experimental.chat.messages.transform"]?.(
-      { sessionID: "session-member" },
-      output,
-    )
+    await hook["experimental.chat.messages.transform"]?.({ sessionID: "session-member" }, output)
 
     // then
     expect(output.messages).toHaveLength(2)

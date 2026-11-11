@@ -13,10 +13,7 @@ export const TASK_HOST_SOCKET_ENV_NAMES = [
 ] as const
 
 /** The ONE public socket of the machine-wide daemon: an override, else `<agentDir>/rpc/rpc.sock`. */
-export function resolveTaskHostSocket(
-  env: Readonly<Record<string, string | undefined>>,
-  agentDir: string,
-): string {
+export function resolveTaskHostSocket(env: Readonly<Record<string, string | undefined>>, agentDir: string): string {
   for (const name of TASK_HOST_SOCKET_ENV_NAMES) {
     const configured = env[name]?.trim()
     if (configured) return configured
@@ -24,12 +21,17 @@ export function resolveTaskHostSocket(
   return join(agentDir, "rpc", "rpc.sock")
 }
 
-/** Capabilities a daemon must advertise before omo will run task children as its sessions. */
+/**
+ * Capabilities a daemon must advertise before omo will run task children as its sessions.
+ * `retry_fallback_profile` holds each child to its designated models: a host without it builds the session
+ * from its own fallback settings, which can move a child to a model outside its chain (#12006).
+ */
 export const TASK_DAEMON_REQUIRED_CAPABILITIES = [
   "multi_session",
   "extension_events",
   "session_context",
   "session_kind",
+  "retry_fallback_profile",
 ] as const
 
 /** The protocol generation this omo build speaks (senpi `get_protocol_info.protocolVersion`). */

@@ -10,9 +10,7 @@ export function renderAgentHeader(
 
   const normalizedAgent = agent?.normalize("NFC") ?? null
   const normalizedModel = model?.normalize("NFC") ?? null
-  const agentLabel = agent
-    ? pc.bold(colorizeWithProfileColor(normalizedAgent ?? agent, agentColorsByName[agent]))
-    : ""
+  const agentLabel = agent ? pc.bold(colorizeWithProfileColor(normalizedAgent ?? agent, agentColorsByName[agent])) : ""
   const modelBase = normalizedModel ?? ""
   const variantSuffix = variant ? ` (${variant})` : ""
   const modelLabel = model ? pc.dim(`${modelBase}${variantSuffix}`) : ""
@@ -38,10 +36,7 @@ export function closeThinkBlock(): void {
   process.stdout.write("  \n\n")
 }
 
-export function writePaddedText(
-  text: string,
-  atLineStart: boolean,
-): { output: string; atLineStart: boolean } {
+export function writePaddedText(text: string, atLineStart: boolean): { output: string; atLineStart: boolean } {
   const isGitHubActions = process.env.GITHUB_ACTIONS === "true"
   if (isGitHubActions) {
     return { output: text, atLineStart: text.endsWith("\n") }

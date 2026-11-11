@@ -1,10 +1,7 @@
 import type { TurnEndEvent } from "@code-yeongyu/senpi"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
-import {
-  createConsentGatedFetch,
-  createEventTelemetryClient,
-} from "@oh-my-opencode/telemetry-core/injected"
+import { createConsentGatedFetch, createEventTelemetryClient } from "@oh-my-opencode/telemetry-core/injected"
 import { createSenpiTelemetryTransportFactory } from "./otlp"
 import type {
   EventTelemetryClient,
@@ -19,10 +16,7 @@ import type { OmoSenpiComponent } from "../../extension/types"
 import { readSessionTraceparent, resolveStateDir } from "@oh-my-opencode/senpi-task"
 
 import { sharedTaskTerminalObservers, type TaskTerminalObservers } from "../task/terminal-observers"
-import {
-  type ComputerUseTelemetryObservers,
-  registerOmoNativeComputerUseTelemetry,
-} from "./omo-native-computer-use"
+import { type ComputerUseTelemetryObservers, registerOmoNativeComputerUseTelemetry } from "./omo-native-computer-use"
 import { createOmoNativeDelegationCapture } from "./omo-native-delegation"
 import { registerOmoNativeHandoffHintTelemetry } from "./omo-native-handoff-hint"
 import { createOmoNativeNoticeRegistration } from "./omo-native-notice"
@@ -137,7 +131,11 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       const isScopeConsented = (scope: ConsentScope): boolean =>
         scope.config === undefined
           ? readConsent(scope.cwd)
-          : isOmoNativeTelemetryEnabled(consentOptions, scope.cwd === undefined ? {} : { cwd: scope.cwd }, withConfigSelection(env, scope.config))
+          : isOmoNativeTelemetryEnabled(
+              consentOptions,
+              scope.cwd === undefined ? {} : { cwd: scope.cwd },
+              withConfigSelection(env, scope.config),
+            )
       let consentCwd = typeof pi.cwd === "string" && pi.cwd.length > 0 ? pi.cwd : undefined
       const consentedAtRegistration = readConsent(consentCwd)
       // An opted-out process deletes what dead processes left for it at once, not only when it quits.
@@ -145,9 +143,19 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       // variable (DO_NOT_TRACK, OMO_DISABLE_TELEMETRY, CI, ...) is this process's own and must not delete what
       // consented sessions queued.
       const isQueueScopeConsented = (scope: ConsentScope): boolean =>
-        isOmoNativeTelemetryConfigEnabled(consentOptions, scope.cwd === undefined ? {} : { cwd: scope.cwd }, env, options.accountHomeDir, scope.config)
+        isOmoNativeTelemetryConfigEnabled(
+          consentOptions,
+          scope.cwd === undefined ? {} : { cwd: scope.cwd },
+          env,
+          options.accountHomeDir,
+          scope.config,
+        )
       const purgeQueue = (): Promise<void> => {
-        const persistedOptOut = !isQueueScopeConsented(consentCwd === undefined ? { config: configSelectionOf(env) } : { cwd: consentCwd, config: configSelectionOf(env) })
+        const persistedOptOut = !isQueueScopeConsented(
+          consentCwd === undefined
+            ? { config: configSelectionOf(env) }
+            : { cwd: consentCwd, config: configSelectionOf(env) },
+        )
         const load = options.loadRecovery ?? (() => import("#omo-telemetry-recovery-runtime"))
         const queue = startOptOutPurge({
           stateDir,
@@ -161,8 +169,16 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
         // No spool on disk means nothing to judge: the opted-out start loads no sidecar.
         if (!persistedOptOut || !existsSync(join(stateDir, "..", "otlp"))) return queue
         const spool = load()
-          .then(sidecar => sidecar.purgeSenpiOtlpSpoolOnOptOut?.({ env, isPidAlive: options.isPidAlive, diagnostics: options.diagnostics }))
-          .catch((error: unknown) => options.diagnostics?.({ event: "telemetry_spool_sweep_failed", source: "otlp", error }))
+          .then((sidecar) =>
+            sidecar.purgeSenpiOtlpSpoolOnOptOut?.({
+              env,
+              isPidAlive: options.isPidAlive,
+              diagnostics: options.diagnostics,
+            }),
+          )
+          .catch((error: unknown) =>
+            options.diagnostics?.({ event: "telemetry_spool_sweep_failed", source: "otlp", error }),
+          )
         return Promise.all([queue, spool]).then(() => undefined)
       }
       const startupPurge = consentedAtRegistration ? undefined : purgeQueue()
@@ -183,12 +199,13 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       state.isConsented = () => currentConsent(false)
       state.isSendAllowed = () => currentConsent(true)
       const transportFactory = sharedTransportFactory(
-        options.transportFactory ?? createSenpiTelemetryTransportFactory({
-          env,
-          consent: () => state.isSendAllowed?.() === true,
-          diagnostics: options.diagnostics,
-          source: "omo-native-component",
-        }),
+        options.transportFactory ??
+          createSenpiTelemetryTransportFactory({
+            env,
+            consent: () => state.isSendAllowed?.() === true,
+            diagnostics: options.diagnostics,
+            source: "omo-native-component",
+          }),
         state,
         options,
       )
@@ -239,22 +256,22 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
       // component's shutdown handler clears `state.capture`.
       const summary: SessionSummaryRecorder | undefined = consentedAtRegistration
         ? createNativeSummaryRecorder({
-          state,
-          consent: {
-            isConsented: () => currentConsent(true),
-            consentScope: () => (consentCwd === undefined ? {} : { cwd: consentCwd, config: configSelectionOf(env) }),
-            isScopeConsented,
-            scheduleConsentCheck: options.scheduleConsentCheck ?? scheduleUnrefInterval,
-          },
-          stateDir,
-          env,
-          cwd: typeof pi.cwd === "string" && pi.cwd.length > 0 ? pi.cwd : undefined,
-          sessionRole,
-          ...(options.rawTurnSampleRate === undefined ? {} : { rawTurnSampleRate: options.rawTurnSampleRate }),
-          ...(options.isPidAlive === undefined ? {} : { isPidAlive: options.isPidAlive }),
-          ...(options.diagnostics === undefined ? {} : { diagnostics: options.diagnostics }),
-          ...(options.loadRecovery === undefined ? {} : { loadRecovery: options.loadRecovery }),
-        })
+            state,
+            consent: {
+              isConsented: () => currentConsent(true),
+              consentScope: () => (consentCwd === undefined ? {} : { cwd: consentCwd, config: configSelectionOf(env) }),
+              isScopeConsented,
+              scheduleConsentCheck: options.scheduleConsentCheck ?? scheduleUnrefInterval,
+            },
+            stateDir,
+            env,
+            cwd: typeof pi.cwd === "string" && pi.cwd.length > 0 ? pi.cwd : undefined,
+            sessionRole,
+            ...(options.rawTurnSampleRate === undefined ? {} : { rawTurnSampleRate: options.rawTurnSampleRate }),
+            ...(options.isPidAlive === undefined ? {} : { isPidAlive: options.isPidAlive }),
+            ...(options.diagnostics === undefined ? {} : { diagnostics: options.diagnostics }),
+            ...(options.loadRecovery === undefined ? {} : { loadRecovery: options.loadRecovery }),
+          })
         : undefined
       // The first capture is when recovery runs: the capture path is installed by then.
       state.onCaptureReady = () => {
@@ -267,7 +284,10 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
           return
         }
         const reason = isRecord(payload) && typeof payload.reason === "string" ? payload.reason : undefined
-        await settleWithin(summary.finish(state.sessionHash ?? hashForContext(eventCtx, hashSession), reason), SUMMARY_SHUTDOWN_WAIT_MS)
+        await settleWithin(
+          summary.finish(state.sessionHash ?? hashForContext(eventCtx, hashSession), reason),
+          SUMMARY_SHUTDOWN_WAIT_MS,
+        )
         summary.dispose()
       })
 
@@ -328,20 +348,23 @@ export function createOmoNativeTelemetryComponent(options: OmoNativeTelemetryCom
           // The first turn waits for the summary sidecar, so its window is on disk when the turn ends.
           await summary.prepare?.()
           const sessionHash = state.sessionHash ?? hashForContext(eventCtx, hashSession)
-          turnSpans.run(() => createOmoNativeTurnHandler({
-            client: sessionClient,
-            diagnostics: options.diagnostics,
-            isConsented: () => currentConsent(false),
-            sessionId: sessionHash,
-            sessionRole,
-            summary,
-          })(payload))
+          turnSpans.run(() =>
+            createOmoNativeTurnHandler({
+              client: sessionClient,
+              diagnostics: options.diagnostics,
+              isConsented: () => currentConsent(false),
+              sessionId: sessionHash,
+              sessionRole,
+              summary,
+            })(payload),
+          )
         }
         const message = payload.message as Readonly<Record<string, unknown>>
         turnSpans.end({
-          response: typeof message["provider"] === "string" && typeof message["model"] === "string"
-            ? { provider: message["provider"], modelId: message["model"] }
-            : undefined,
+          response:
+            typeof message["provider"] === "string" && typeof message["model"] === "string"
+              ? { provider: message["provider"], modelId: message["model"] }
+              : undefined,
           responseModelId: typeof message["responseModel"] === "string" ? message["responseModel"] : undefined,
           failed: message["stopReason"] === "error",
         })
@@ -383,11 +406,12 @@ function sharedTransportFactory(
       ...transportOptions,
       fetch: createConsentGatedFetch({
         isSendAllowed: () => dropping === 0 && state.isSendAllowed?.() === true,
-        onDropped: (count) => options.diagnostics?.({
-          event: "telemetry_events_dropped_by_consent",
-          source: "omo-native-component",
-          count,
-        }),
+        onDropped: (count) =>
+          options.diagnostics?.({
+            event: "telemetry_events_dropped_by_consent",
+            source: "omo-native-component",
+            count,
+          }),
         ...(transportOptions.fetch === undefined ? {} : { fetch: transportOptions.fetch }),
       }),
     })
@@ -459,9 +483,10 @@ function installCaptureFacade(
   // ONLY the session-start event may teach this process which session it is in. A resumed task row
   // carries the hash of the session that OWNS it, and letting that hash win here would redirect every
   // later main-session event to a session the user is no longer in.
-  const sessionId = template.event === "daily_active" || template.event === "session_started"
-    ? template.properties?.$session_id
-    : undefined
+  const sessionId =
+    template.event === "daily_active" || template.event === "session_started"
+      ? template.properties?.$session_id
+      : undefined
   state.sessionHash = typeof sessionId === "string" ? sessionId : state.sessionHash
   const privacyClient = createEventTelemetryClient({
     diagnostics: options.diagnostics,
@@ -494,7 +519,10 @@ function installCaptureFacade(
 // source-scanning invariant precise and prevents native event producers from bypassing validation.
 // An ack-gated event (session_summary, carrying its uuid) is sent immediately and its promise returned, so
 // its pending file is retired only once the server accepted it; everything else is batched.
-function forwardValidatedCapture(transport: TelemetryTransport, message: TelemetryCaptureMessage): Promise<void> | undefined {
+function forwardValidatedCapture(
+  transport: TelemetryTransport,
+  message: TelemetryCaptureMessage,
+): Promise<void> | undefined {
   if (message.event === "session_summary" && message.uuid !== undefined && transport.captureImmediate !== undefined) {
     return transport.captureImmediate(message)
   }

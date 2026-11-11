@@ -38,7 +38,11 @@ export class IsolationExistsError extends Error {
   readonly code = "isolation_exists"
 }
 
-export async function relocateSandbox(backend: Pick<IsolationBackend, "relocate">, from: string, to: string): Promise<void> {
+export async function relocateSandbox(
+  backend: Pick<IsolationBackend, "relocate">,
+  from: string,
+  to: string,
+): Promise<void> {
   if (backend.relocate) await backend.relocate(from, to)
   else await rename(from, to)
 }
@@ -63,7 +67,12 @@ export async function ensureIsolation(options: EnsureIsolationOptions): Promise<
       continue
     }
     try {
-      const probe = await backend.probe(repoRoot, { id, baseDir: creating, crossDevice, maxCopyBytes: options.maxCopyBytes })
+      const probe = await backend.probe(repoRoot, {
+        id,
+        baseDir: creating,
+        crossDevice,
+        maxCopyBytes: options.maxCopyBytes,
+      })
       if (!probe.available) throw new IsolationUnavailableError(probe.reason ?? `${kind} is unavailable`)
       if (crossDevice && backend.clonesTree) throw new IsolationUnavailableError(`${kind} requires the same device`)
     } catch (error) {
@@ -81,11 +90,16 @@ export async function ensureIsolation(options: EnsureIsolationOptions): Promise<
       startAttempted = true
       let detail: void | { strategy_detail: string }
       let nested: NestedGitResult = { nested_git_rewritten: [], nested_git_skipped: [] }
-      const common = await exists(join(repoRoot, ".git"))
+      const common = (await exists(join(repoRoot, ".git")))
         ? (await git(repoRoot, ["rev-parse", "--path-format=absolute", "--git-common-dir"])).toString().trim()
         : join(repoRoot, ".git")
       for (let attempt = 0; attempt < 2; attempt++) {
-        detail = await backend.start(repoRoot, merged, { id, baseDir: creating, crossDevice, maxCopyBytes: options.maxCopyBytes })
+        detail = await backend.start(repoRoot, merged, {
+          id,
+          baseDir: creating,
+          crossDevice,
+          maxCopyBytes: options.maxCopyBytes,
+        })
         await markStarted(creating, kind)
         const detached = await detachGitDir(merged, common)
         nested = await scanNestedGitDirs(merged)
@@ -101,8 +115,13 @@ export async function ensureIsolation(options: EnsureIsolationOptions): Promise<
       }
       await relocateSandbox(backend, creating, baseDir)
       return {
-        baseDir, mergedDir: join(baseDir, "m"), backend: kind,
-        fellBack: index > 0, fallbackReason, strategy_detail: detail!?.strategy_detail, ...nested,
+        baseDir,
+        mergedDir: join(baseDir, "m"),
+        backend: kind,
+        fellBack: index > 0,
+        fallbackReason,
+        strategy_detail: detail!?.strategy_detail,
+        ...nested,
         stop: (path) => backend.stop(path),
         relocate: backend.relocate ? (from, to) => backend.relocate!(from, to) : undefined,
       }

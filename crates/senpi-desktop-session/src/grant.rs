@@ -27,6 +27,7 @@ use senpi_desktop_core::protocol_results::ControlStateResult;
 use senpi_desktop_core::types::Target;
 use senpi_desktop_safety::MutatingAction;
 
+use crate::lock::InteractionLock;
 use crate::request::Response;
 use crate::worker::Worker;
 
@@ -62,9 +63,14 @@ struct SlotOwner {
 /// session's grant is refused, never stolen. The engine shares one per
 /// process ([`ControlSlot::process_wide`]); tests give each harness its own,
 /// so parallel tests never contend for a global.
+///
+/// The slot carries the machine-wide [`InteractionLock`] its sessions' input
+/// takes: the process-wide slot uses the per-user runtime directory, a fresh
+/// slot only the process-wide transaction mutex.
 #[derive(Debug, Default)]
 pub struct ControlSlot {
     owner: Mutex<Option<SlotOwner>>,
+    interaction: InteractionLock,
 }
 
 impl ControlSlot {
@@ -74,11 +80,30 @@ impl ControlSlot {
         Arc::new(Self::default())
     }
 
-    /// The one slot every session of this process shares.
+    /// The one slot every session of this process shares; its input takes
+    /// the machine-wide lock in the per-user runtime directory.
     #[must_use]
     pub fn process_wide() -> Arc<Self> {
         static SLOT: OnceLock<Arc<ControlSlot>> = OnceLock::new();
-        Arc::clone(SLOT.get_or_init(ControlSlot::new))
+        Arc::clone(SLOT.get_or_init(|| {
+            Arc::new(Self {
+                owner: Mutex::default(),
+                interaction: InteractionLock::user_runtime(),
+            })
+        }))
+    }
+
+    /// A fresh slot whose input takes the machine-wide lock under `dir`.
+    #[cfg(test)]
+    pub(crate) fn with_lock_dir(dir: std::path::PathBuf) -> Arc<Self> {
+        Arc::new(Self {
+            owner: Mutex::default(),
+            interaction: InteractionLock::at(dir),
+        })
+    }
+
+    pub(crate) const fn interaction(&self) -> &InteractionLock {
+        &self.interaction
     }
 }
 

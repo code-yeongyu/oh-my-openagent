@@ -68,7 +68,12 @@ function streamMockResponse(options) {
       } else {
         const toolCall = message.content[0]
         stream.push({ type: "toolcall_start", contentIndex: 0, partial: { ...message, content: [] } })
-        stream.push({ type: "toolcall_delta", contentIndex: 0, delta: JSON.stringify(step.arguments), partial: message })
+        stream.push({
+          type: "toolcall_delta",
+          contentIndex: 0,
+          delta: JSON.stringify(step.arguments),
+          partial: message,
+        })
         stream.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: message })
       }
       stream.push({ type: "done", reason: message.stopReason, message })
@@ -100,7 +105,10 @@ export function waitForGoFile() {
       if (error === undefined) resolve()
       else reject(error)
     }
-    const timer = setTimeout(() => finish(new Error(`task-id race gate timed out after ${timeoutMs}ms waiting for ${goFile}`)), timeoutMs)
+    const timer = setTimeout(
+      () => finish(new Error(`task-id race gate timed out after ${timeoutMs}ms waiting for ${goFile}`)),
+      timeoutMs,
+    )
     try {
       watcher = watch(dirname(goFile), (_eventType, filename) => {
         if (filename === null || filename.toString() === goFile.split("/").at(-1)) {
@@ -134,13 +142,19 @@ function isMockScript(value) {
 function isMockStep(value) {
   if (typeof value !== "object" || value === null) return false
   if (value.type === "text") return typeof value.text === "string"
-  return value.type === "tool_call" && typeof value.name === "string" && typeof value.arguments === "object" && value.arguments !== null
+  return (
+    value.type === "tool_call" &&
+    typeof value.name === "string" &&
+    typeof value.arguments === "object" &&
+    value.arguments !== null
+  )
 }
 
 function stepToAssistantMessage(step, callNumber) {
-  const content = step.type === "text"
-    ? [{ type: "text", text: step.text }]
-    : [{ type: "toolCall", id: step.id ?? `omo-race-tool-${callNumber}`, name: step.name, arguments: step.arguments }]
+  const content =
+    step.type === "text"
+      ? [{ type: "text", text: step.text }]
+      : [{ type: "toolCall", id: step.id ?? `omo-race-tool-${callNumber}`, name: step.name, arguments: step.arguments }]
   return {
     role: "assistant",
     content,
@@ -159,7 +173,10 @@ function createStream() {
   let done = false
   let settleResult = () => {}
   let rejectResult = () => {}
-  const result = new Promise((resolve, reject) => { settleResult = resolve; rejectResult = reject })
+  const result = new Promise((resolve, reject) => {
+    settleResult = resolve
+    rejectResult = reject
+  })
   result.catch(() => {})
   const drain = () => {
     while (waiters.length > 0) waiters.shift()({ value: undefined, done: true })

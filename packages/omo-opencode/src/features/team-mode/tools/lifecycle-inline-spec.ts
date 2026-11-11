@@ -6,7 +6,8 @@ import { normalizeTeamSpecInput } from "@oh-my-opencode/team-core/team-registry/
 import { validateSpec } from "@oh-my-opencode/team-core/team-registry/validator"
 import { TeamSpecSchema, type TeamSpec } from "@oh-my-opencode/team-core/types"
 
-export const TEAM_CREATE_USAGE = "team_create requires exactly one of teamName or inline_spec. Use team_create({ teamName: \"existing-team\" }) or team_create({ inline_spec: { name: \"team-name\", members: [{ name: \"worker\", category: \"quick\", prompt: \"Do the assigned work.\" }] } })."
+export const TEAM_CREATE_USAGE =
+  'team_create requires exactly one of teamName or inline_spec. Use team_create({ teamName: "existing-team" }) or team_create({ inline_spec: { name: "team-name", members: [{ name: "worker", category: "quick", prompt: "Do the assigned work." }] } }).'
 
 function omitEmptyStringArgs(rawArgs: unknown): unknown {
   if (typeof rawArgs !== "object" || rawArgs === null || Array.isArray(rawArgs)) {
@@ -16,16 +17,21 @@ function omitEmptyStringArgs(rawArgs: unknown): unknown {
   return Object.fromEntries(Object.entries(rawArgs).filter(([, value]) => value !== ""))
 }
 
-export const TeamCreateArgsSchema = z.preprocess(omitEmptyStringArgs, z.object({
-  teamName: z.string().min(1).nullish(),
-  inline_spec: z.unknown().nullish(),
-  leadSessionId: z.string().nullish(),
-}).superRefine((value, ctx) => {
-  const optionCount = Number(value.teamName != null) + Number(value.inline_spec != null)
-  if (optionCount !== 1) {
-    ctx.addIssue({ code: "custom", message: "Provide exactly one of teamName or inline_spec." })
-  }
-}))
+export const TeamCreateArgsSchema = z.preprocess(
+  omitEmptyStringArgs,
+  z
+    .object({
+      teamName: z.string().min(1).nullish(),
+      inline_spec: z.unknown().nullish(),
+      leadSessionId: z.string().nullish(),
+    })
+    .superRefine((value, ctx) => {
+      const optionCount = Number(value.teamName != null) + Number(value.inline_spec != null)
+      if (optionCount !== 1) {
+        ctx.addIssue({ code: "custom", message: "Provide exactly one of teamName or inline_spec." })
+      }
+    }),
+)
 
 export type TeamCreateArgs = z.infer<typeof TeamCreateArgsSchema>
 
@@ -37,7 +43,9 @@ export type TeamCreateExecutorConfig = {
 }
 
 export function resolveDefaultInlineCategory(userCategories?: CategoriesConfig): string | undefined {
-  const userCategoryName = Object.entries(userCategories ?? {}).find(([, categoryConfig]) => categoryConfig.disable !== true)?.[0]
+  const userCategoryName = Object.entries(userCategories ?? {}).find(
+    ([, categoryConfig]) => categoryConfig.disable !== true,
+  )?.[0]
   if (userCategoryName !== undefined) {
     return userCategoryName
   }
@@ -81,7 +89,9 @@ export function parseInlineTeamSpec(
 
   const parsedSpecResult = TeamSpecSchema.safeParse(normalizeTeamSpecInput(specObject, options))
   if (!parsedSpecResult.success) {
-    throw new Error(`Invalid inline_spec for team_create: ${formatTeamSpecIssues(parsedSpecResult.error)}. Provide an object with name and members array. Example: team_create({ inline_spec: { name: "project-analysis-team", members: [{ name: "structure-analyst", category: "quick", prompt: "Analyze project structure." }] } }).`)
+    throw new Error(
+      `Invalid inline_spec for team_create: ${formatTeamSpecIssues(parsedSpecResult.error)}. Provide an object with name and members array. Example: team_create({ inline_spec: { name: "project-analysis-team", members: [{ name: "structure-analyst", category: "quick", prompt: "Analyze project structure." }] } }).`,
+    )
   }
 
   const parsedSpec = parsedSpecResult.data

@@ -61,7 +61,11 @@ export interface SessionEntriesPage {
 type SessionEntryCaps = Pick<KibitzerToolCaps, "sessionEntries" | "sessionEntryChars">
 
 /** Entries strictly after `since`, hidden types omitted, bounded to `sessionEntries` rows. */
-export function sessionEntriesSince(entries: readonly unknown[], since: number, caps: SessionEntryCaps): SessionEntriesPage {
+export function sessionEntriesSince(
+  entries: readonly unknown[],
+  since: number,
+  caps: SessionEntryCaps,
+): SessionEntriesPage {
   const rows: SessionEntryRow[] = []
   let hidden = 0
   let nextSince = since
@@ -116,7 +120,8 @@ function messageText(message: Record<string, unknown>): string {
       parts.push(`[tool ${name}] ${safeJson(block.arguments)}`)
     }
   }
-  if (message.role === "toolResult" && typeof message.toolName === "string") parts.unshift(`[result ${message.toolName}]`)
+  if (message.role === "toolResult" && typeof message.toolName === "string")
+    parts.unshift(`[result ${message.toolName}]`)
   return parts.join("\n")
 }
 
@@ -132,9 +137,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
-export const KibitzerSessionEntriesParams = Type.Object({
-  since: Type.Optional(Type.Integer({ minimum: -1, description: "Cursor of the last entry already seen; -1 (default) starts from the beginning." })),
-}, { additionalProperties: false })
+export const KibitzerSessionEntriesParams = Type.Object(
+  {
+    since: Type.Optional(
+      Type.Integer({
+        minimum: -1,
+        description: "Cursor of the last entry already seen; -1 (default) starts from the beginning.",
+      }),
+    ),
+  },
+  { additionalProperties: false },
+)
 
 export interface KibitzerSessionEntriesToolInput {
   readonly session: Pick<SessionBranchSnapshot, "entries">
@@ -151,6 +164,7 @@ export function createKibitzerSessionEntriesTool(
     description: `Read the primary agent's session entries after a cursor (at most ${input.caps.sessionEntries} per call).`,
     parameters: KibitzerSessionEntriesParams,
     execute: budgeted(input.budget, async (params: Static<typeof KibitzerSessionEntriesParams>) =>
-      okJson(sessionEntriesSince(input.session.entries(), params.since ?? -1, input.caps))),
+      okJson(sessionEntriesSince(input.session.entries(), params.since ?? -1, input.caps)),
+    ),
   }
 }

@@ -6,8 +6,7 @@ describe("runtime-fallback error classifier", () => {
   test("detects cooling-down auto-retry status signals", () => {
     //#given
     const info = {
-      status:
-        "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
+      status: "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
     }
 
     //#when
@@ -20,8 +19,7 @@ describe("runtime-fallback error classifier", () => {
   test("detects single-word cooldown auto-retry status signals", () => {
     //#given
     const info = {
-      status:
-        "All credentials for model claude-opus-4-7 are cooldown [retrying in 7m 56s attempt #1]",
+      status: "All credentials for model claude-opus-4-7 are cooldown [retrying in 7m 56s attempt #1]",
     }
 
     //#when
@@ -34,8 +32,7 @@ describe("runtime-fallback error classifier", () => {
   test("detects too-many-requests auto-retry status signals without countdown text", () => {
     //#given
     const info = {
-      status:
-        "Too Many Requests: Sorry, you've exhausted this model's rate limit. Please try a different model.",
+      status: "Too Many Requests: Sorry, you've exhausted this model's rate limit. Please try a different model.",
     }
 
     //#when
@@ -48,8 +45,7 @@ describe("runtime-fallback error classifier", () => {
   test("treats cooling-down retry messages as retryable", () => {
     //#given
     const error = {
-      message:
-        "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
+      message: "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
     }
 
     //#when
@@ -61,11 +57,7 @@ describe("runtime-fallback error classifier", () => {
 
   test("treats localized transient provider messages as retryable", () => {
     //#given
-    const errors = [
-      { message: "请求过于频繁，请稍后重试" },
-      { message: "服务暂时不可用" },
-      { message: "触发频率限制" },
-    ]
+    const errors = [{ message: "请求过于频繁，请稍后重试" }, { message: "服务暂时不可用" }, { message: "触发频率限制" }]
 
     //#when
     const retryable = errors.map((error) => isRetryableError(error, [429, 503, 529]))

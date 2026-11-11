@@ -6,7 +6,12 @@ import { FRONTMATTER_RE } from "../memfs/frontmatter-scalar"
 import { describeFrontmatterViolation } from "../memfs/frontmatter-validation"
 import { isMemoryContentPath } from "../memfs/paths"
 import { redactSecretLikeMaterial } from "../sync/redact"
-import { commitCount, readDroppedTrailers as readTrailersAt, squashWithoutPaths, type DroppedEntry } from "./completion-repair"
+import {
+  commitCount,
+  readDroppedTrailers as readTrailersAt,
+  squashWithoutPaths,
+  type DroppedEntry,
+} from "./completion-repair"
 import { findSecretLikeFailures } from "./completion-secret-scan"
 import type { ReflectionWorktree } from "./worktree"
 
@@ -16,7 +21,12 @@ export type { DroppedEntry }
 export { describeDroppedEntries } from "./completion-repair"
 
 /** The drop report a validated tip carries, read past the gate's own link-repair commit when one sits on top. */
-export async function readDroppedTrailers(exec: GitExec, dir: string, baseSha: string, tipSha: string): Promise<DroppedEntry[]> {
+export async function readDroppedTrailers(
+  exec: GitExec,
+  dir: string,
+  baseSha: string,
+  tipSha: string,
+): Promise<DroppedEntry[]> {
   const repair = await (await import("#memory-completion-links")).recognizeLinkRepair(exec, dir, baseSha, tipSha)
   return await readTrailersAt(exec, dir, baseSha, repair?.runTip ?? tipSha)
 }
@@ -26,7 +36,13 @@ export async function readDroppedTrailers(exec: GitExec, dir: string, baseSha: s
  * `linkRepairs` lists the changed paths only the gate's own link repair wrote (#12642); absent when there are none.
  */
 export type CompletionValidation =
-  | { status: "valid"; tipSha: string; changedPaths: readonly string[]; dropped?: readonly DroppedEntry[]; linkRepairs?: readonly string[] }
+  | {
+      status: "valid"
+      tipSha: string
+      changedPaths: readonly string[]
+      dropped?: readonly DroppedEntry[]
+      linkRepairs?: readonly string[]
+    }
   | { status: "no_changes"; tipSha: string; changedPaths: readonly []; dropped?: readonly DroppedEntry[] }
   | { status: "dirty_uncommitted"; detail: string }
   | { status: "failed"; detail: string }
@@ -88,7 +104,12 @@ export async function validateCompletion(
     const repair = await applyLinkRepair(exec, worktree.dir, recordedBase, screened.tipSha, dropped, prior)
     if (repair === undefined) return screened
     const changedPaths = await listReflectionChangedPaths(exec, worktree.dir, recordedBase, repair.tipSha)
-    return { ...screened, tipSha: repair.tipSha, changedPaths, ...(repair.linkRepairs.length === 0 ? {} : { linkRepairs: repair.linkRepairs }) }
+    return {
+      ...screened,
+      tipSha: repair.tipSha,
+      changedPaths,
+      ...(repair.linkRepairs.length === 0 ? {} : { linkRepairs: repair.linkRepairs }),
+    }
   } catch (error) {
     return { status: "failed", detail: errorMessage(error) }
   }
@@ -136,9 +157,20 @@ async function screenEntries(
       }
     }
     // Rename detection is off here on purpose: `git mv system/agreements.md elsewhere` must read as a deletion.
-    const ledger = await git(exec, dir, ["diff", "--no-renames", "--name-only", "-z", `${recordedBase}..${tipSha}`, "--", AGREEMENTS_PATH])
+    const ledger = await git(exec, dir, [
+      "diff",
+      "--no-renames",
+      "--name-only",
+      "-z",
+      `${recordedBase}..${tipSha}`,
+      "--",
+      AGREEMENTS_PATH,
+    ])
     if (ledger.stdout.split("\0").some(Boolean)) {
-      return { status: "failed", detail: `Reflection may not modify ${AGREEMENTS_PATH}; agreements change only through the facts lane and /agreements` }
+      return {
+        status: "failed",
+        detail: `Reflection may not modify ${AGREEMENTS_PATH}; agreements change only through the facts lane and /agreements`,
+      }
     }
     const secrets = await findSecretLikeFailures((argv, stdin) => run(exec, dir, argv, stdin), recordedBase, tipSha)
     const frontmatter = await findFrontmatterFailures(exec, dir, recordedBase, tipSha, changedPaths)
@@ -152,7 +184,10 @@ async function screenEntries(
       return { status: "valid", tipSha, changedPaths, ...droppedList() }
     }
     if (round >= MAX_REPAIR_ROUNDS) {
-      return { status: "failed", detail: secrets[0]?.detail ?? [...frontmatter.values()][0] ?? "completion validation failed" }
+      return {
+        status: "failed",
+        detail: secrets[0]?.detail ?? [...frontmatter.values()][0] ?? "completion validation failed",
+      }
     }
     // A secret in an earlier commit may be gone from the tip, so a multi-commit branch is first
     // squashed with only the tip-level frontmatter failures removed; the squashed commit is then

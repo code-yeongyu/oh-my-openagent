@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  GIT_MASTER_HARNESS_SUPPORT,
-  OmoConfigLayerSchema,
-  OmoConfigSchema,
-  OmoGitMasterSettingsSchema,
-} from "../index"
+import { GIT_MASTER_HARNESS_SUPPORT, OmoConfigLayerSchema, OmoConfigSchema, OmoGitMasterSettingsSchema } from "../index"
 
 describe("omo config git_master section", () => {
   test("#given an empty git_master section #when parsed #then the co-author is on and the footer is off", () => {

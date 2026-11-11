@@ -15,11 +15,7 @@ export const MEMORY_TEMPLATE_STRUCTURE_VERSION = "senpi-memory-v2"
 export const MEMORY_BLOCK_COMPILER_VERSION = 2
 
 export function hashMemoryTemplate(template: string): string {
-  return createHash("sha256")
-    .update(MEMORY_TEMPLATE_STRUCTURE_VERSION)
-    .update("\0")
-    .update(template)
-    .digest("hex")
+  return createHash("sha256").update(MEMORY_TEMPLATE_STRUCTURE_VERSION).update("\0").update(template).digest("hex")
 }
 
 export interface CompiledBlockStoreModule {
@@ -37,7 +33,11 @@ export interface MemoryBlockCacheOptions {
    * Called when a compile fell back after a failed git read. That block serves this turn only: it is never stored,
    * and the next process compiles the commit again.
    */
-  readonly onDegraded?: (degraded: { readonly dir: string; readonly revision: string; readonly reasons: readonly string[] }) => void
+  readonly onDegraded?: (degraded: {
+    readonly dir: string
+    readonly revision: string
+    readonly reasons: readonly string[]
+  }) => void
   /** Identifies the build serving blocks; part of every persisted key, so an upgrade never reads an older build's. */
   readonly build?: string
   /**
@@ -126,9 +126,10 @@ export class MemoryBlockCache {
     const existing = slot === undefined ? undefined : entry.blocks.get(slot)
     if (existing !== undefined) return existing
 
-    const pending = revision === null
-      ? compileMemoryBlockWithReads(repo, null, options, at)
-      : this.compileStored(repo, `block:${key}:${JSON.stringify(options)}`, revision, options, at)
+    const pending =
+      revision === null
+        ? compileMemoryBlockWithReads(repo, null, options, at)
+        : this.compileStored(repo, `block:${key}:${JSON.stringify(options)}`, revision, options, at)
     if (slot === undefined) entry.first = pending
     else entry.blocks.set(slot, pending)
     try {

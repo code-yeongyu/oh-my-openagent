@@ -24,7 +24,10 @@ export function findExecutable(name) {
 // win32 installs `bun` as `bun.exe`: a bare name resolves through PATHEXT, as the shell resolves it.
 function executableNames(name) {
   if (process.platform !== "win32" || extname(name) !== "") return [name]
-  return (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean).map((extension) => `${name}${extension.toLowerCase()}`)
+  return (process.env.PATHEXT ?? ".COM;.EXE;.BAT;.CMD")
+    .split(";")
+    .filter(Boolean)
+    .map((extension) => `${name}${extension.toLowerCase()}`)
 }
 
 export async function startCaptureServer() {
@@ -33,7 +36,10 @@ export async function startCaptureServer() {
   try {
     const capturePath = join(root, "requests.jsonl")
     const serverPath = join(root, "server.mjs")
-    writeFileSync(serverPath, `import { appendFileSync } from "node:fs"\nconst capturePath = process.argv[2]\nconst server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) { const encoded = new Uint8Array(await request.arrayBuffer()); const encoding = request.headers.get("content-encoding"); const decoded = encoding === "gzip" ? Bun.gunzipSync(encoded) : encoding === "deflate" ? Bun.inflateSync(encoded) : encoded; const raw = new TextDecoder().decode(decoded); if (request.method === "POST") appendFileSync(capturePath, JSON.stringify({ method: request.method, path: new URL(request.url).pathname, raw }) + "\\n"); return Response.json({ status: "ok" }) } })\nconsole.log(JSON.stringify({ pid: process.pid, port: server.port }))\n`)
+    writeFileSync(
+      serverPath,
+      `import { appendFileSync } from "node:fs"\nconst capturePath = process.argv[2]\nconst server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) { const encoded = new Uint8Array(await request.arrayBuffer()); const encoding = request.headers.get("content-encoding"); const decoded = encoding === "gzip" ? Bun.gunzipSync(encoded) : encoding === "deflate" ? Bun.inflateSync(encoded) : encoded; const raw = new TextDecoder().decode(decoded); if (request.method === "POST") appendFileSync(capturePath, JSON.stringify({ method: request.method, path: new URL(request.url).pathname, raw }) + "\\n"); return Response.json({ status: "ok" }) } })\nconsole.log(JSON.stringify({ pid: process.pid, port: server.port }))\n`,
+    )
     const bunBin = findExecutable("bun")
     if (bunBin === null) throw new Error("Bun executable is required for the capture server")
     child = spawn(bunBin, [serverPath, capturePath], { stdio: ["ignore", "pipe", "pipe"] })
@@ -42,17 +48,26 @@ export async function startCaptureServer() {
     const started = await new Promise((resolveStart, rejectStart) => {
       const timeout = setTimeout(() => rejectStart(new Error(`capture server startup timed out: ${stderr}`)), 10_000)
       child.once("error", rejectStart)
-      child.stderr.on("data", (chunk) => { stderr += chunk.toString("utf8") })
+      child.stderr.on("data", (chunk) => {
+        stderr += chunk.toString("utf8")
+      })
       child.stdout.on("data", (chunk) => {
         stdout += chunk.toString("utf8")
         const newline = stdout.indexOf("\n")
         if (newline === -1) return
         clearTimeout(timeout)
-        try { resolveStart(JSON.parse(stdout.slice(0, newline))) } catch (error) { rejectStart(error) }
+        try {
+          resolveStart(JSON.parse(stdout.slice(0, newline)))
+        } catch (error) {
+          rejectStart(error)
+        }
       })
-      child.once("exit", (code) => rejectStart(new Error(`capture server exited before startup with ${code}: ${stderr}`)))
+      child.once("exit", (code) =>
+        rejectStart(new Error(`capture server exited before startup with ${code}: ${stderr}`)),
+      )
     })
-    if (!isRecord(started) || typeof started.port !== "number" || typeof started.pid !== "number") throw new Error("capture server startup receipt was invalid")
+    if (!isRecord(started) || typeof started.port !== "number" || typeof started.pid !== "number")
+      throw new Error("capture server startup receipt was invalid")
     return { child, capturePath, root, port: started.port, pid: started.pid, stderr: () => stderr }
   } catch (error) {
     if (child !== null && child.exitCode === null) child.kill("SIGTERM")
@@ -63,18 +78,34 @@ export async function startCaptureServer() {
 
 export function readCaptureRequests(capture) {
   if (!existsSync(capture.capturePath)) return []
-  return readFileSync(capture.capturePath, "utf8").split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line))
+  return readFileSync(capture.capturePath, "utf8")
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
 }
 
 export async function closeCaptureServer(capture) {
   if (capture.child.exitCode === null) capture.child.kill("SIGTERM")
   await new Promise((resolveExit) => {
-    if (capture.child.exitCode !== null) { resolveExit(); return }
-    const timeout = setTimeout(() => { capture.child.kill("SIGKILL"); resolveExit() }, 5_000)
-    capture.child.once("exit", () => { clearTimeout(timeout); resolveExit() })
+    if (capture.child.exitCode !== null) {
+      resolveExit()
+      return
+    }
+    const timeout = setTimeout(() => {
+      capture.child.kill("SIGKILL")
+      resolveExit()
+    }, 5_000)
+    capture.child.once("exit", () => {
+      clearTimeout(timeout)
+      resolveExit()
+    })
   })
   let killZeroFails = false
-  try { process.kill(capture.pid, 0) } catch { killZeroFails = true }
+  try {
+    process.kill(capture.pid, 0)
+  } catch {
+    killZeroFails = true
+  }
   const portProbe = spawnSync("lsof", ["-nP", `-iTCP:${capture.port}`, "-sTCP:LISTEN"], { encoding: "utf8" })
   rmSync(capture.root, { recursive: true, force: true })
   return {
@@ -90,6 +121,9 @@ export async function closeCaptureServer(capture) {
 export function removeSandboxes(sandboxes) {
   return sandboxes.map((sandbox) => {
     rmSync(sandbox.root, { recursive: true, force: true })
-    return { path: `<temp-${basename(sandbox.root).split("-").at(-2) ?? "sandbox"}>`, removed: !existsSync(sandbox.root) }
+    return {
+      path: `<temp-${basename(sandbox.root).split("-").at(-2) ?? "sandbox"}>`,
+      removed: !existsSync(sandbox.root),
+    }
   })
 }
