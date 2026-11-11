@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, VecDeque};
 
 use omo_computer_core::backend::Refusal;
-use omo_computer_core::error::{EngineCode, Reason};
+use omo_computer_core::error::{self, EngineCode, FailureKey, Reason, Source, UnknownFailure};
 
 use crate::method::FakeMethod;
 
@@ -29,6 +29,21 @@ impl Fault {
     #[must_use]
     pub const fn fail(code: EngineCode) -> Self {
         Self::Fail { code, reason: None }
+    }
+
+    /// A `Fail` must name a pair with a row in the error table; every other fault holds.
+    ///
+    /// # Errors
+    /// The `Fail` pair has no row in the COMPUTER_* table.
+    pub fn check(&self) -> Result<(), UnknownFailure> {
+        match *self {
+            Self::Fail { code, reason } => error::lookup(FailureKey {
+                source: Source::Engine(code),
+                reason,
+            })
+            .map(|_| ()),
+            Self::Pass | Self::CannotComplete | Self::RefuseFocus | Self::Panic => Ok(()),
+        }
     }
 
     /// The refusal a `Fail` answers with: the scripted code and reason, unchanged.
