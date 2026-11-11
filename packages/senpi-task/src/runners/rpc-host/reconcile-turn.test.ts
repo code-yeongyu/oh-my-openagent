@@ -260,7 +260,8 @@ describe("host turn reconciliation authority", () => {
       expect(f.notices).toEqual([
         {
           kind: "interrupted",
-          reason: expect.any(String),
+          reason:
+            "The child stopped because its turn deadline expired. Action: inspect tool.task_output({ task_id }) in an eval cell, then use tool.task_send to continue it.",
           deadline: { kind: "inactivity" },
         },
       ])

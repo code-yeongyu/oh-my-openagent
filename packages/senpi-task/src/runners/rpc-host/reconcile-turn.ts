@@ -44,8 +44,9 @@ export interface ReconcileTurnPort {
 
 const INTERRUPTED_REASON = "The child's previous turn was interrupted; its continuation is being delivered."
 export const DEADLINE_REASON =
-  "The child stopped because its turn deadline expired. Action: inspect task_output, then use task_send to continue it."
-const QUEUED_REASON = "The child is idle with queued input. Action: use task_send to start its next turn."
+  "The child stopped because its turn deadline expired. Action: inspect tool.task_output({ task_id }) in an eval cell, then use tool.task_send to continue it."
+const QUEUED_REASON =
+  "The child is idle with queued input. Action: use tool.task_send in an eval cell to start its next turn."
 export const HOST_RESPAWN_CONTINUATION =
   "Your previous turn was interrupted by a host process restart. Resume your task from its current state and finish it - do not restart from scratch, and do not repeat work already recorded in this session."
 
@@ -106,7 +107,9 @@ export async function reconcileHostTurn(
       return "continued"
     case "error": {
       const reason = outcome?.detail ?? outcome?.reason ?? tail?.lastMessage.errorMessage ?? "The child turn failed."
-      const action = outcome?.action ?? "Inspect task_output, then use task_send to continue the child."
+      const action =
+        outcome?.action ??
+        "Inspect tool.task_output({ task_id }) in an eval cell, then use tool.task_send to continue the child."
       port.settle({ status: "error", failure: { kind: "child-turn-failed", message: `${reason} Action: ${action}` } })
       return "failed"
     }
@@ -137,7 +140,7 @@ export async function reconcileHostTurn(
     port.notify({
       kind: "interrupted",
       reason: "The child's delivered continuation was interrupted before it produced a response.",
-      action: "Inspect task_output, then use task_send to continue the child.",
+      action: "Inspect tool.task_output({ task_id }) in an eval cell, then use tool.task_send to continue the child.",
     })
     port.settle({ status: "cancelled" })
     return "interrupted"

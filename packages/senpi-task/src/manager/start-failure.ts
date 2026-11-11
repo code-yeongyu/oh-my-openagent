@@ -56,7 +56,7 @@ export function describeStartFailure(error: unknown): StartFailureDescription {
   const exited = trusted && cause === undefined && rejectedWhile === "exited" ? exit : undefined
   const errorMessage =
     trusted && error.failure.cause instanceof RpcRequestTimeout
-      ? `Child prompt failed to start: the child did not answer ${error.failure.cause.command} within ${error.failure.cause.deadlineMs} ms. Action: inspect task_output; run it again with task.`
+      ? `Child prompt failed to start: the child did not answer ${error.failure.cause.command} within ${error.failure.cause.deadlineMs} ms. Action: inspect tool.task_output({ task_id }) in an eval cell; run it again with tool.task.`
       : namedSpec !== undefined
         ? launchSpecInsecureMessage(namedSpec)
         : cause !== undefined
@@ -129,7 +129,7 @@ function publicMessage(kind: TaskStartFailureKind, reason: TaskStartFailureReaso
     case "child-turn-failed":
       return GENERIC_START_FAILURE_MESSAGE
     case "child-unresponsive":
-      return "The child stopped answering. Action: inspect task_output; run it again with task."
+      return "The child stopped answering. Action: inspect tool.task_output({ task_id }) in an eval cell; run it again with tool.task."
     case "suspended_unresumable":
       return "The child could not be resumed."
     case "model_chain_exhausted":

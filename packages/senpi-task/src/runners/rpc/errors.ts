@@ -34,7 +34,7 @@ export class RpcRequestTimeout extends Error {
     readonly deadlineMs: number,
   ) {
     super(
-      `The child did not answer ${command} within ${deadlineMs} ms. Action: inspect task_output; do not resend an input until its delivery is resolved.`,
+      `The child did not answer ${command} within ${deadlineMs} ms. Action: inspect tool.task_output({ task_id }) in an eval cell; do not resend an input until its delivery is resolved.`,
     )
     this.name = "RpcRequestTimeout"
   }
