@@ -5,8 +5,10 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use omo_computer_core::backend::{
     AxEvent, AxEventSource, BackendResult, EpochChange, EpochSource, Presence, Refusal,
-    RefusalCode, StopListener,
+    StopListener,
 };
+
+use omo_computer_core::error::{EngineCode, Reason};
 
 use crate::backend::StopPathScript;
 use crate::clock::FakeClock;
@@ -71,7 +73,10 @@ impl FakeStopListener {
 impl StopListener for FakeStopListener {
     fn poll_stop(&mut self) -> BackendResult<bool> {
         if self.script == StopPathScript::Deaf {
-            return Err(Refusal::new(RefusalCode::StopPathUnavailable, "deaf"));
+            return Err(Refusal::new(
+                EngineCode::StopPathUnavailable,
+                Reason::Deaf.wire(),
+            ));
         }
         Ok(std::mem::take(&mut lock(&self.shared).stop_pressed))
     }

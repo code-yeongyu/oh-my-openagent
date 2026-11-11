@@ -2,9 +2,10 @@
 //! ref resolution, semantic actions into the sink, and the observer-event timeline.
 
 use omo_computer_core::backend::{
-    AxBackend, AxEventSource, AxSnapshot, BackendResult, Delivered, Ref, Refusal, RefusalCode,
-    Resolved, Semantic, SnapshotRequest, Target,
+    AxBackend, AxEventSource, AxSnapshot, BackendResult, Delivered, Ref, Refusal, Resolved,
+    Semantic, SnapshotRequest, Target,
 };
+use omo_computer_core::error::{EngineCode, Reason};
 
 use crate::ax_tree::{element_info, flatten, parse_ref, render, NODES_PER_MS};
 use crate::backend::FakeBackend;
@@ -13,8 +14,8 @@ use crate::method::FakeMethod;
 use crate::scenario::FakeAxNode;
 use crate::state::{CallOutcome, FakeState};
 
-fn refuse(reason: &'static str) -> Refusal {
-    Refusal::new(RefusalCode::AxUnavailable, reason)
+fn stale() -> Refusal {
+    Refusal::bare(EngineCode::StaleRef)
 }
 
 /// The node a ref names and the window it lives in.
@@ -22,23 +23,17 @@ fn lookup<'a>(
     state: &'a FakeState,
     reference: &Ref,
 ) -> BackendResult<(&'a FakeAxNode, String, u64)> {
-    let (generation, index) = parse_ref(&reference.0).ok_or_else(|| refuse("ref_malformed"))?;
-    let window = state
-        .snapshots
-        .get(&generation)
-        .ok_or_else(|| refuse("ref_not_found"))?;
+    let (generation, index) = parse_ref(&reference.0)
+        .ok_or_else(|| Refusal::new(EngineCode::InvalidTarget, Reason::RefUnqualified.wire()))?;
+    let window = state.snapshots.get(&generation).ok_or_else(stale)?;
     if state.exited.contains(window) {
-        return Err(refuse("target_gone"));
+        return Err(Refusal::new(
+            EngineCode::StaleRef,
+            Reason::IdentityChanged.wire(),
+        ));
     }
-    let root = state
-        .scenario
-        .ax
-        .get(window)
-        .ok_or_else(|| refuse("ref_not_found"))?;
-    let (_, node) = flatten(root)
-        .get(index)
-        .copied()
-        .ok_or_else(|| refuse("ref_not_found"))?;
+    let root = state.scenario.ax.get(window).ok_or_else(stale)?;
+    let (_, node) = flatten(root).get(index).copied().ok_or_else(stale)?;
     Ok((node, window.clone(), generation))
 }
 
@@ -53,16 +48,16 @@ impl AxBackend for FakeBackend {
     fn snapshot(&mut self, request: &SnapshotRequest) -> BackendResult<AxSnapshot> {
         self.call(FakeMethod::AxSnapshot, |state, _| {
             let Target::Window(window) = &request.target else {
-                return Err(refuse("window_target_required"));
+                return Err(Refusal::bare(EngineCode::InvalidTarget));
             };
             if state.exited.contains(window) {
-                return Err(refuse("target_gone"));
+                return Err(Refusal::bare(EngineCode::WindowNotFound));
             }
             let root = state
                 .scenario
                 .ax
                 .get(window)
-                .ok_or_else(|| refuse("no_tree"))?;
+                .ok_or_else(|| Refusal::bare(EngineCode::AxFailed))?;
             let nodes = flatten(root);
             let padded = state
                 .scenario
@@ -110,16 +105,22 @@ impl AxBackend for FakeBackend {
         self.call(FakeMethod::of_action(&action.0), |state, outcome| {
             let (node, _, _) = lookup(state, reference)?;
             if !supports(node, &action.0) {
-                return Err(refuse("action_unsupported"));
+                return Err(Refusal::new(
+                    EngineCode::AxUnsupported,
+                    Reason::PerformUnsupported.wire(),
+                ));
             }
             let mut line = format!("ax_perform ref={} action={}", reference.0, action.0);
             if outcome == CallOutcome::CannotComplete {
                 line.push_str(" outcome=cannot_complete");
             }
             self.sink.record(line);
-            // A write left unanswered went out, but nothing confirms it completed.
-            let count = u32::from(outcome == CallOutcome::Proceed);
-            Ok(Delivered { count, of: 1 })
+            // An unanswered write went out and nothing confirms it: `AxUnconfirmed`, whose
+            // table row reads `delivery_uncertain/unsafe` with something sent.
+            if outcome == CallOutcome::CannotComplete {
+                return Err(Refusal::bare(EngineCode::AxUnconfirmed));
+            }
+            Ok(Delivered { count: 1, of: 1 })
         })
     }
 

@@ -2,6 +2,7 @@
 //! depth is a typed [`ScenarioInvalid`] naming its JSON pointer, and no backend is built.
 
 mod additions;
+mod closed;
 mod events;
 mod invalid;
 mod records;

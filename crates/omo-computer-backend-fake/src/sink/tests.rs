@@ -2,6 +2,8 @@ use omo_computer_core::backend::{
     AxBackend, Backend, InputEvent, Ref, Route, Semantic, TaggedInput,
 };
 
+use omo_computer_core::error::EngineCode;
+
 use crate::{FakeBackend, FakeMethod, Fault};
 
 const ONE_WINDOW: &str = r#"{"windows":[{"id":"101","title":"Notes","app":"Notes","pid":4242,"x":0,"y":0,"width":800,"height":600,"focused":true,"elevated":null}]}"#;
@@ -20,15 +22,14 @@ fn key_down() -> TaggedInput {
 fn recording_sink_is_empty_after_refusal() {
     let mut backend = FakeBackend::from_json(ONE_WINDOW).expect("the scenario loads");
     let sink = backend.sink();
-    backend.inject(FakeMethod::Key, Fault::fail("InputFailed"));
+    backend.inject(FakeMethod::Key, Fault::fail(EngineCode::InputFailed));
 
     let refused = backend.post_input(&key_down(), Route::BackgroundWindow);
-    assert!(
-        refused
-            .as_ref()
-            .is_err_and(|refusal| refusal.nothing_sent()),
-        "{refused:?}"
+    assert_eq!(
+        refused.map_err(|refusal| refusal.code),
+        Err(EngineCode::InputFailed)
     );
+    assert_eq!(sink.len(), 0, "the refusal added no sink line");
     assert!(
         sink.is_empty(),
         "a refusal sends nothing: {:?}",

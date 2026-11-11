@@ -1,7 +1,8 @@
 //! Scripted effects: each one that reaches the desktop is one sink line, and a refused one is
 //! none.
 
-use omo_computer_core::backend::{BackendResult, Refusal, RefusalCode};
+use omo_computer_core::backend::{BackendResult, Refusal};
+use omo_computer_core::error::EngineCode;
 use omo_computer_core::listing::Rect;
 
 use crate::backend::FakeBackend;
@@ -100,7 +101,7 @@ impl FakeBackend {
             let current = state
                 .live_window(window)
                 .map(crate::scenario::FakeWindow::bounds)
-                .ok_or(Refusal::new(RefusalCode::Unavailable, "target_gone"))?;
+                .ok_or(Refusal::bare(EngineCode::WindowNotFound))?;
             let policy = state.scenario.window_frame_policy.get(window);
             let kept: Vec<FrameAxis> = policy.map(|p| p.keep.clone()).unwrap_or_default();
             let immovable = policy.and_then(|p| p.settable) == Some(false);
@@ -148,15 +149,9 @@ impl FakeBackend {
                 let item = level
                     .iter()
                     .find(|item| item.title == *title)
-                    .ok_or(Refusal::new(
-                        RefusalCode::AxUnavailable,
-                        "menu_item_not_found",
-                    ))?;
+                    .ok_or(Refusal::bare(EngineCode::InvalidTarget))?;
                 if item.enabled == Some(false) {
-                    return Err(Refusal::new(
-                        RefusalCode::AxUnavailable,
-                        "menu_item_disabled",
-                    ));
+                    return Err(Refusal::bare(EngineCode::AxFailed));
                 }
                 level = &item.children;
             }

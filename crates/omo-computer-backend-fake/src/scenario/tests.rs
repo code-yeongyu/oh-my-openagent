@@ -128,3 +128,27 @@ fn zero_nth_and_unlisted_windows_are_reference_invalid() {
         );
     }
 }
+
+#[test]
+fn fail_next_is_typed_through_the_error_table() {
+    let unknown_code =
+        FakeScenario::from_json(r#"{"fail_next":[{"method":"capture","code":"Exploded"}]}"#)
+            .expect_err("a code outside the closed table");
+    assert_eq!(
+        (unknown_code.kind, unknown_code.pointer.as_str()),
+        (InvalidKind::Shape, "/fail_next/0/code")
+    );
+    let unknown_reason = FakeScenario::from_json(
+        r#"{"fail_next":[{"method":"capture","code":"CaptureUnavailable","reason":"melted"}]}"#,
+    )
+    .expect_err("a reason outside the vocabulary");
+    assert_eq!(unknown_reason.pointer, "/fail_next/0/reason");
+    let no_row = FakeScenario::from_json(
+        r#"{"fail_next":[{"method":"capture","code":"Closed","reason":"minimized"}]}"#,
+    )
+    .expect_err("a pair no stage emits");
+    assert_eq!(
+        (no_row.kind, no_row.pointer.as_str()),
+        (InvalidKind::Reference, "/fail_next/0")
+    );
+}
