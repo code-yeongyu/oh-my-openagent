@@ -26,7 +26,10 @@ export function* sqlTokens(sql: string): Generator<SqlToken> {
       i++
       while (i < sql.length) {
         if (sql[i++] !== end) continue
-        if (c !== "[" && sql[i] === end) { i++; continue }
+        if (c !== "[" && sql[i] === end) {
+          i++
+          continue
+        }
         break
       }
     } else if (c === "?" || c === ";") {

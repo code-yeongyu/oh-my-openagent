@@ -1,5 +1,11 @@
 import type { RemoteSessionRow } from "../remote/ports"
-import type { EffectiveLane, GatewayDeliveryDelivery, GatewayDeliveryMode, GatewayDeliveryResult, GatewaySender } from "./types"
+import type {
+  EffectiveLane,
+  GatewayDeliveryDelivery,
+  GatewayDeliveryMode,
+  GatewayDeliveryResult,
+  GatewaySender,
+} from "./types"
 
 /**
  * Where one delivery goes once its address is resolved: a session this device holds (its durable id, with the scope

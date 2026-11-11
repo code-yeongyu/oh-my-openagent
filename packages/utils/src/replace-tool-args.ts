@@ -9,13 +9,10 @@
  * read the replacement back to execute that patch; mutable arguments are
  * updated in place so subsequent hooks and execution share the same object.
  */
-export function replaceToolArgs(
-	output: { args: Record<string, unknown> },
-	patch: Record<string, unknown>,
-): void {
-	if (Object.isFrozen(output.args)) {
-		output.args = { ...output.args, ...patch }
-		return
-	}
-	Object.assign(output.args, patch)
+export function replaceToolArgs(output: { args: Record<string, unknown> }, patch: Record<string, unknown>): void {
+  if (Object.isFrozen(output.args)) {
+    output.args = { ...output.args, ...patch }
+    return
+  }
+  Object.assign(output.args, patch)
 }

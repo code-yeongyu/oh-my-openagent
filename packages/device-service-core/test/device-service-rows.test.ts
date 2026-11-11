@@ -38,7 +38,7 @@ async function serviceFor(world: World): Promise<{ owner: FakeOwner; service: De
   return { owner, service }
 }
 
-const listCalls = (owner: FakeOwner): number => owner.state.log.filter(type => type === "sessions.list").length
+const listCalls = (owner: FakeOwner): number => owner.state.log.filter((type) => type === "sessions.list").length
 
 describe("DeviceService.sessions asks the newest listing row version (#13045, part of #12996)", () => {
   test("#given a service that serves rows 3 #when sessions lists #then each row carries its durable_id", async () => {

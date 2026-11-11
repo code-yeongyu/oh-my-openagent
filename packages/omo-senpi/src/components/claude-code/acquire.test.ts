@@ -6,8 +6,14 @@ import { join } from "node:path"
 import { acquireClaudeCode, cachedExecutablePath, tarballUrl, type ClaudeCodePin } from "./acquire"
 
 const roots: string[] = []
-const temp = () => { const root = mkdtempSync(join(tmpdir(), "omo-claude-code-")); roots.push(root); return root }
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }) })
+const temp = () => {
+  const root = mkdtempSync(join(tmpdir(), "omo-claude-code-"))
+  roots.push(root)
+  return root
+}
+afterEach(() => {
+  for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+})
 
 async function packageTarball(files: Record<string, string>): Promise<Uint8Array> {
   return new Bun.Archive(files, { compress: "gzip" }).bytes()
@@ -36,7 +42,13 @@ describe("acquireClaudeCode", () => {
     const cacheRoot = temp()
     const requests: string[] = []
     const notices: string[] = []
-    const first = await acquireClaudeCode({ pin, cacheRoot, platform: "darwin", fetch: serving(bytes, requests), onDownloadStart: (line) => notices.push(line) })
+    const first = await acquireClaudeCode({
+      pin,
+      cacheRoot,
+      platform: "darwin",
+      fetch: serving(bytes, requests),
+      onDownloadStart: (line) => notices.push(line),
+    })
     expect(first).toEqual({ path: cachedExecutablePath(cacheRoot, pin, "darwin"), downloaded: true })
     expect(readFileSync(cachedExecutablePath(cacheRoot, pin, "darwin"), "utf8")).toContain("echo claude")
     expect(requests).toEqual([tarballUrl(pin)])
@@ -51,7 +63,12 @@ describe("acquireClaudeCode", () => {
     const good = await packageTarball({ "package/claude": "real" })
     const tampered = await packageTarball({ "package/claude": "tampered" })
     const cacheRoot = temp()
-    const result = await acquireClaudeCode({ pin: pinFor(good), cacheRoot, platform: "darwin", fetch: serving(tampered, []) })
+    const result = await acquireClaudeCode({
+      pin: pinFor(good),
+      cacheRoot,
+      platform: "darwin",
+      fetch: serving(tampered, []),
+    })
     expect(result.path).toBeNull()
     expect("error" in result && result.error).toContain("failed its integrity check")
     expect(existsSync(cachedExecutablePath(cacheRoot, pinFor(good), "darwin"))).toBe(false)
@@ -59,8 +76,15 @@ describe("acquireClaudeCode", () => {
 
   test("#given no network #when acquired #then the error names the offline cause and the alternatives", async () => {
     const bytes = await packageTarball({ "package/claude": "real" })
-    const offline = (async () => { throw new TypeError("Unable to connect. Is the computer able to access the url?") }) as unknown as typeof globalThis.fetch
-    const result = await acquireClaudeCode({ pin: pinFor(bytes), cacheRoot: temp(), platform: "darwin", fetch: offline })
+    const offline = (async () => {
+      throw new TypeError("Unable to connect. Is the computer able to access the url?")
+    }) as unknown as typeof globalThis.fetch
+    const result = await acquireClaudeCode({
+      pin: pinFor(bytes),
+      cacheRoot: temp(),
+      platform: "darwin",
+      fetch: offline,
+    })
     expect(result.path).toBeNull()
     const error = "error" in result ? result.error : ""
     expect(error).toContain("Unable to connect")

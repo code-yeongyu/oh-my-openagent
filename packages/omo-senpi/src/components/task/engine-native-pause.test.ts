@@ -15,7 +15,7 @@ for (const mode of ["in-process", "process"] as const) {
     const calls: RunPauseOwner[] = []
     const subscribed = Promise.withResolvers<void>()
     const runner: ManagedRunner = {
-      start: async spec => {
+      start: async (spec) => {
         const fake = makeHandle(spec.taskId)
         void fake.waitForSubscription().then(() => subscribed.resolve())
         return {
@@ -33,18 +33,26 @@ for (const mode of ["in-process", "process"] as const) {
       },
     }
     const engine = composeTaskEngine({
-      pi: new FakeExtensionAPI(), cwd, omoConfig: loadOmoConfig({ cwd }).config,
+      pi: new FakeExtensionAPI(),
+      cwd,
+      omoConfig: loadOmoConfig({ cwd }).config,
       sharedParentTools: () => [],
       runnerFactories: { inProcess: () => runner, process: () => runner },
     })
     engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry() })
     const started = await engine.manager.start({
-      prompt: "pause the native child", parent_session_id: "parent",
-      depth: 0, execution_mode: mode, model: "omo-mock/mock-1", run_in_background: true,
+      prompt: "pause the native child",
+      parent_session_id: "parent",
+      depth: 0,
+      execution_mode: mode,
+      model: "omo-mock/mock-1",
+      run_in_background: true,
     })
     if (started.kind !== "started") throw new Error(`unexpected start: ${started.kind}`)
     const owner: RunPauseOwner = {
-      parentSessionId: "parent", parentPauseSeq: 2, runRef: { kind: "task", id: started.task_id },
+      parentSessionId: "parent",
+      parentPauseSeq: 2,
+      runRef: { kind: "task", id: started.task_id },
     }
     try {
       await subscribed.promise

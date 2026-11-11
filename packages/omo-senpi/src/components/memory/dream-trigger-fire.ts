@@ -22,16 +22,16 @@ export async function fireDream(input: {
   const { session, origin, settings, request, now } = input
   const shouldLoadConversations = origin !== "pressure" && request.conversationIds === undefined
   const loadSelection = input.loadSelection ?? loadMemoryCommandsRuntime
-  const loadConversations = input.loadConversations ?? (async (transcriptsDir: string) =>
-    (await loadSelection()).loadConversations(transcriptsDir, Math.max(settings.autoSelectMax * 4, 8)))
+  const loadConversations =
+    input.loadConversations ??
+    (async (transcriptsDir: string) =>
+      (await loadSelection()).loadConversations(transcriptsDir, Math.max(settings.autoSelectMax * 4, 8)))
   let loadedConversations: readonly LoadedConversation[] | undefined
   const getLoadedConversations = async (): Promise<readonly LoadedConversation[]> => {
     loadedConversations ??= await loadConversations(session.identityPaths.transcripts)
     return loadedConversations
   }
-  const stopped = () =>
-    isAborted(request.signal)
-    || (request.deadlineAt !== undefined && now() >= request.deadlineAt)
+  const stopped = () => isAborted(request.signal) || (request.deadlineAt !== undefined && now() >= request.deadlineAt)
   const decision = await evaluateDreamGates(origin, settings, {
     nowMs: now(),
     lastDreamAtMs: () => readLastDreamAtMs(session.identityPaths.runtime),
@@ -48,17 +48,22 @@ export async function fireDream(input: {
   })
   if (!decision.allowed) return { fired: false, rejection: decision.rejection }
   if (stopped()) return { fired: false, rejection: "aborted" }
-  const selected = origin === "pressure"
-    ? []
-    : request.conversationIds === undefined
-      ? (await loadSelection()).selectLoadedConversations(await getLoadedConversations(), {
-          transcriptsDir: session.identityPaths.transcripts,
-          currentConversationId: session.conversationId,
-          autoSelectMax: settings.autoSelectMax,
-          autoSelectMaxBytes: settings.autoSelectMaxChars,
-          now: () => new Date(now()),
-        }, { ...(request.focus === undefined ? {} : { focus: request.focus }) }).conversationIds
-      : request.conversationIds
+  const selected =
+    origin === "pressure"
+      ? []
+      : request.conversationIds === undefined
+        ? (await loadSelection()).selectLoadedConversations(
+            await getLoadedConversations(),
+            {
+              transcriptsDir: session.identityPaths.transcripts,
+              currentConversationId: session.conversationId,
+              autoSelectMax: settings.autoSelectMax,
+              autoSelectMaxBytes: settings.autoSelectMaxChars,
+              now: () => new Date(now()),
+            },
+            { ...(request.focus === undefined ? {} : { focus: request.focus }) },
+          ).conversationIds
+        : request.conversationIds
   if (stopped()) return { fired: false, rejection: "aborted" }
   const conversationIds: string[] = []
   const snapshots: CapturedConversation[] = []
@@ -76,18 +81,22 @@ export async function fireDream(input: {
     conversationIds.push(conversationId)
     snapshots.push({ conversationId, snapshot })
   }
-  if (origin !== "pressure" && conversationIds.length === 0) return { fired: false, rejection: "no_unreflected_content" }
+  if (origin !== "pressure" && conversationIds.length === 0)
+    return { fired: false, rejection: "no_unreflected_content" }
   if (stopped()) return { fired: false, rejection: "aborted" }
   let result
   try {
-    result = await session.store.tryReserve({
-      trigger: "dream",
-      origin,
-      conversationIds,
-      snapshots,
-      ...(request.focus === undefined ? {} : { focus: request.focus }),
-      ...(request.targetDoc === undefined ? {} : { targetDoc: request.targetDoc }),
-    }, request.signal)
+    result = await session.store.tryReserve(
+      {
+        trigger: "dream",
+        origin,
+        conversationIds,
+        snapshots,
+        ...(request.focus === undefined ? {} : { focus: request.focus }),
+        ...(request.targetDoc === undefined ? {} : { targetDoc: request.targetDoc }),
+      },
+      request.signal,
+    )
   } catch (error) {
     if (stopped()) return { fired: false, rejection: "aborted" }
     throw error

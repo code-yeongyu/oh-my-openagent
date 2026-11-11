@@ -20,10 +20,14 @@ export type LazyRemoteOptions = {
  */
 export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThreadSurface {
   let port: Promise<RemoteSessionsPort> | undefined
-  const load = () => port ??= options.loadRuntime().then(
-    ({ createDeviceServiceSessions }) => createDeviceServiceSessions({ version: options.version }),
-    (error: unknown) => { port = undefined; throw error },
-  )
+  const load = () =>
+    (port ??= options.loadRuntime().then(
+      ({ createDeviceServiceSessions }) => createDeviceServiceSessions({ version: options.version }),
+      (error: unknown) => {
+        port = undefined
+        throw error
+      },
+    ))
   const sessions: RemoteSessionsPort = {
     status: async () => await (await load()).status(),
     thisDevice: async () => await (await load()).thisDevice(),
@@ -31,7 +35,8 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
     sessions: async () => await (await load()).sessions(),
     endpointCommand: async (device, rpc, options) => await (await load()).endpointCommand(device, rpc, options),
     locate: async (device, engineId, knownKey) => await (await load()).locate(device, engineId, knownKey),
-    sessionCommand: async (device, sessionId, rpc, options) => await (await load()).sessionCommand(device, sessionId, rpc, options),
+    sessionCommand: async (device, sessionId, rpc, options) =>
+      await (await load()).sessionCommand(device, sessionId, rpc, options),
     read: async (device, sessionId, tail) => await (await load()).read(device, sessionId, tail),
     watch: async (device, sessionId, listener) => await (await load()).watch(device, sessionId, listener),
     close: async () => {
@@ -47,9 +52,19 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
   const withRegistry = async <T>(use: (loaded: AliasRegistry) => Promise<AliasResult<T>>): Promise<AliasResult<T>> => {
     let loaded: AliasRegistry
     try {
-      loaded = await (registry ??= loadAliasRegistry().catch((error: unknown) => { registry = undefined; throw error }))
+      loaded = await (registry ??= loadAliasRegistry().catch((error: unknown) => {
+        registry = undefined
+        throw error
+      }))
     } catch (error) {
-      return { kind: "error", error: { code: "alias_registry_unavailable", message: `The account's alias registry could not be loaded: ${error instanceof Error ? error.message : String(error)}.`, details: { reason: "registry_unavailable" } } }
+      return {
+        kind: "error",
+        error: {
+          code: "alias_registry_unavailable",
+          message: `The account's alias registry could not be loaded: ${error instanceof Error ? error.message : String(error)}.`,
+          details: { reason: "registry_unavailable" },
+        },
+      }
     }
     return await use(loaded)
   }

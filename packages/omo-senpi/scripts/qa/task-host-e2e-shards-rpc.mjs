@@ -79,11 +79,7 @@ export class HostClient {
     const id = `${this.label}-${this.sequence}`
     const from = this.mark()
     this.socket.write(`${JSON.stringify({ id, ...command })}\n`)
-    const response = await this.waitFor(
-      (record) => record.type === "response" && record.id === id,
-      from,
-      timeoutMs,
-    )
+    const response = await this.waitFor((record) => record.type === "response" && record.id === id, from, timeoutMs)
     if (response.success !== true) {
       throw new Error(`${command.type} failed: ${JSON.stringify(response.error ?? response)}`)
     }
@@ -98,11 +94,7 @@ export class HostClient {
   async promptAndSettle(routingId, message, options = {}) {
     const from = this.mark()
     await this.request({ type: "prompt", sessionId: routingId, message, ...options })
-    await this.waitFor(
-      (record) => record.type === "agent_settled" && record.sessionId === routingId,
-      from,
-      120_000,
-    )
+    await this.waitFor((record) => record.type === "agent_settled" && record.sessionId === routingId, from, 120_000)
   }
 
   close() {

@@ -13,7 +13,11 @@ import { senpiCreateHostDaemonPaths } from "../../lazy/senpi-barrel"
 export function hostDaemonDir(agentDir: string, socket: string): string {
   const createHostDaemonPaths = senpiCreateHostDaemonPaths()
   if (createHostDaemonPaths !== undefined) return createHostDaemonPaths({ agentDir, socket }).dir
-  return join(agentDir, "rpc-host-daemon", directoryNameOf(process.platform === "win32" ? win32.normalize(socket).toLowerCase() : socket))
+  return join(
+    agentDir,
+    "rpc-host-daemon",
+    directoryNameOf(process.platform === "win32" ? win32.normalize(socket).toLowerCase() : socket),
+  )
 }
 
 /**
@@ -23,7 +27,10 @@ export function hostDaemonDir(agentDir: string, socket: string): string {
  */
 export function socketNamesHostDaemonDir(agentDir: string, socket: string, dir: string): boolean {
   const name = basename(dir)
-  return basename(hostDaemonDir(agentDir, socket)) === name || (process.platform !== "win32" && directoryNameOf(socket) === name)
+  return (
+    basename(hostDaemonDir(agentDir, socket)) === name ||
+    (process.platform !== "win32" && directoryNameOf(socket) === name)
+  )
 }
 
 function directoryNameOf(endpoint: string): string {

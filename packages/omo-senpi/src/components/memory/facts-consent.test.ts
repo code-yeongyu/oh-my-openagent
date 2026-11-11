@@ -19,8 +19,14 @@ import { writeRunJsonAtomic } from "./worker/run-artifacts"
 
 const PROPOSAL = "Shall I delete plugin X?"
 type RawMessage = { readonly role: "user" | "assistant"; readonly content: readonly Record<string, unknown>[] }
-const text = (role: RawMessage["role"], value: string): RawMessage => ({ role, content: [{ type: "text", text: value }] })
-const imageOnly: RawMessage = { role: "user", content: [{ type: "image", data: "iVBORw0KGgo=", mimeType: "image/png" }] }
+const text = (role: RawMessage["role"], value: string): RawMessage => ({
+  role,
+  content: [{ type: "text", text: value }],
+})
+const imageOnly: RawMessage = {
+  role: "user",
+  content: [{ type: "image", data: "iVBORw0KGgo=", mimeType: "image/png" }],
+}
 
 const prompts: string[] = []
 
@@ -28,7 +34,11 @@ async function recordedReceipt(after: readonly RawMessage[], quote: string): Pro
   const { root, identity, queue } = await fixture()
   const conversation = "conv-consent"
   const journal = createMemoryJournalWiring({ identityPaths: identity.paths })
-  const facts = createMemoryFactsWiring({ identity: identity.id, identityPaths: identity.paths, factsEnabled: () => true })
+  const facts = createMemoryFactsWiring({
+    identity: identity.id,
+    identityPaths: identity.paths,
+    factsEnabled: () => true,
+  })
   const branch: unknown[] = []
   const settle = async (messages: readonly RawMessage[]): Promise<void> => {
     for (const message of messages) branch.push({ type: "message", id: `e${branch.length + 1}`, message })
@@ -43,10 +53,25 @@ async function recordedReceipt(after: readonly RawMessage[], quote: string): Pro
   if (replyEntry === undefined) throw new Error("no reply entry")
 
   expect(replyEntry.lead).toBeDefined()
-  return launchAndRead({ version: 1, identity: identity.id, today: "2026-10-19", entries: [replyEntry], knownPeople: [], primaryHuman: { slug: "human", aliases: [] } }, quote, { root, identity, queue })
+  return launchAndRead(
+    {
+      version: 1,
+      identity: identity.id,
+      today: "2026-10-19",
+      entries: [replyEntry],
+      knownPeople: [],
+      primaryHuman: { slug: "human", aliases: [] },
+    },
+    quote,
+    { root, identity, queue },
+  )
 }
 
-async function launchAndRead(payload: Parameters<typeof launchFactsInProcess>[0]["payload"], quote: string, fx: Pick<Awaited<ReturnType<typeof fixture>>, "root" | "identity" | "queue">): Promise<unknown> {
+async function launchAndRead(
+  payload: Parameters<typeof launchFactsInProcess>[0]["payload"],
+  quote: string,
+  fx: Pick<Awaited<ReturnType<typeof fixture>>, "root" | "identity" | "queue">,
+): Promise<unknown> {
   const { root, identity, queue } = fx
   const runId = "facts-consent"
   const runDir = join(root, runId)
@@ -60,15 +85,27 @@ async function launchAndRead(payload: Parameters<typeof launchFactsInProcess>[0]
       sessionId: "facts-child",
       prompt: async (text: string) => {
         prompts.push(text)
-        await Reflect.apply(recordFact.execute, recordFact, ["fact-1", { scope: "project", text: "The user approved deleting plugin X.", date: "2026-10-19", source: "user", user_quote: quote }])
-        for (const listener of listeners) listener({ type: "message_end", message: { role: "assistant", content: [], stopReason: "stop" } })
+        await Reflect.apply(recordFact.execute, recordFact, [
+          "fact-1",
+          {
+            scope: "project",
+            text: "The user approved deleting plugin X.",
+            date: "2026-10-19",
+            source: "user",
+            user_quote: quote,
+          },
+        ])
+        for (const listener of listeners)
+          listener({ type: "message_end", message: { role: "assistant", content: [], stopReason: "stop" } })
       },
       steer: async () => "handled",
       followUp: async () => "handled",
       abort: async () => undefined,
       subscribe: (listener) => {
         listeners.add(listener)
-        return () => { listeners.delete(listener) }
+        return () => {
+          listeners.delete(listener)
+        }
       },
       getLastAssistantText: () => undefined,
       dispose: () => undefined,
@@ -89,14 +126,20 @@ async function launchAndRead(payload: Parameters<typeof launchFactsInProcess>[0]
     launchedAt: 0,
     deadlineMs: 10_000,
   })
-  const [record] = (await readFile(join(runDir, "extraction.jsonl"), "utf8")).trim().split("\n").map((text) => JSON.parse(text) as { readonly receipt?: unknown })
+  const [record] = (await readFile(join(runDir, "extraction.jsonl"), "utf8"))
+    .trim()
+    .split("\n")
+    .map((text) => JSON.parse(text) as { readonly receipt?: unknown })
   return record?.receipt
 }
 
 describe("facts consent end to end", () => {
   test("#given a deletion proposal #when the user replies 'yes delete it' in the next turn #then the recorded fact carries a user receipt naming that proposal", async () => {
-    expect(await recordedReceipt([text("user", "yes delete it")], "yes delete it"))
-      .toEqual({ source: "user", userQuote: "yes delete it", approves: proposalId(PROPOSAL) })
+    expect(await recordedReceipt([text("user", "yes delete it")], "yes delete it")).toEqual({
+      source: "user",
+      userQuote: "yes delete it",
+      approves: proposalId(PROPOSAL),
+    })
   }, 30_000)
 
   test("#given a queue entry with a lead #when the facts child is prompted #then the lead never reaches the model", async () => {
@@ -108,7 +151,9 @@ describe("facts consent end to end", () => {
 
   test("#given a plain-text payload (onboarding session digests) #when the facts child records a user claim #then it is stored as an agent suggestion", async () => {
     const fx = await fixture()
-    expect(await launchAndRead("Session digest: the user said yes delete it after the plugin review.", "yes delete it", fx)).toEqual({ source: "agent", downgraded: true })
+    expect(
+      await launchAndRead("Session digest: the user said yes delete it after the plugin review.", "yes delete it", fx),
+    ).toEqual({ source: "agent", downgraded: true })
   }, 30_000)
 
   test("#given a deletion proposal #when the user replies 'maybe' #then the fact is stored as an agent suggestion and the user must confirm", async () => {
@@ -116,6 +161,9 @@ describe("facts consent end to end", () => {
   }, 30_000)
 
   test("#given a deletion proposal #when an image-only message comes before the 'yes' #then the 'yes' no longer answers the proposal", async () => {
-    expect(await recordedReceipt([imageOnly, text("user", "yes")], "yes")).toEqual({ source: "agent", downgraded: true })
+    expect(await recordedReceipt([imageOnly, text("user", "yes")], "yes")).toEqual({
+      source: "agent",
+      downgraded: true,
+    })
   }, 30_000)
 })

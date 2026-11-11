@@ -17,18 +17,26 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
   explore: [
     { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
     { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptLunaFast, variant: "low" },
-    { providers: ["anthropic-subscription", "anthropic", "github-copilot"], model: LATEST_MODEL_BY_FAMILY.claudeHaiku, variant: "medium" },
+    {
+      providers: ["anthropic-subscription", "anthropic", "github-copilot"],
+      model: LATEST_MODEL_BY_FAMILY.claudeHaiku,
+      variant: "medium",
+    },
     { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
     { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
-    { providers: ["opencode-go"], model: "minimax-m2.7" }
+    { providers: ["opencode-go"], model: "minimax-m2.7" },
   ],
   librarian: [
     { providers: ["kimi-coding", "kimi-for-coding"], model: "kimi-for-coding-highspeed", variant: "off" },
     { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptLunaFast, variant: "low" },
-    { providers: ["anthropic-subscription", "anthropic", "github-copilot"], model: LATEST_MODEL_BY_FAMILY.claudeHaiku, variant: "medium" },
+    {
+      providers: ["anthropic-subscription", "anthropic", "github-copilot"],
+      model: LATEST_MODEL_BY_FAMILY.claudeHaiku,
+      variant: "medium",
+    },
     { providers: ["deepseek"], model: "deepseek-flash", variant: "max" },
     { providers: ["opencode-go", "bailian-coding-plan"], model: "qwen3.7-plus" },
-    { providers: ["opencode-go"], model: "minimax-m2.7" }
+    { providers: ["opencode-go"], model: "minimax-m2.7" },
   ],
   "plan-consultant": [
     {
@@ -51,12 +59,16 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
       model: LATEST_MODEL_BY_FAMILY.kimi,
       variant: "max",
     },
-    { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" }
+    { providers: ["opencode"], model: LATEST_MODEL_BY_FAMILY.kimiK3, variant: "max" },
   ],
   "plan-reviewer": [
     { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "xhigh" },
     { providers: ["github-copilot"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
-    { providers: ["chatgpt-subscription", "openai", "opencode"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
+    {
+      providers: ["chatgpt-subscription", "openai", "opencode"],
+      model: LATEST_MODEL_BY_FAMILY.gptAstra,
+      variant: "high",
+    },
     {
       providers: ["anthropic-subscription", "anthropic", "github-copilot", "opencode"],
       model: LATEST_MODEL_BY_FAMILY.claudeOpus,
@@ -72,6 +84,6 @@ export const AGENT_FALLBACK_CHAINS: Readonly<Record<string, readonly DelegateFal
       model: "gemini-3.1-pro",
       variant: "high",
     },
-    { providers: ["opencode-go"], model: "glm-5.2" }
+    { providers: ["opencode-go"], model: "glm-5.2" },
   ],
 }

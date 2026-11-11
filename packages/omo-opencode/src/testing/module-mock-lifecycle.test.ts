@@ -81,11 +81,7 @@ describe("installModuleMockLifecycle", () => {
     mockApi.restore()
 
     // then
-    expect(events).toEqual([
-      "module:./dependency:mocked",
-      "delegate:restore",
-      "module:resolved:./dependency:original",
-    ])
+    expect(events).toEqual(["module:./dependency:mocked", "delegate:restore", "module:resolved:./dependency:original"])
   })
 
   test("#given no active module mocks #when mock.restore runs #then it delegates to Bun restore", () => {
@@ -171,11 +167,7 @@ describe("installModuleMockLifecycle", () => {
     lifecycle.restoreModuleMocks()
 
     // then
-    expect(events).toEqual([
-      "module:node:fs/promises:mocked",
-      "delegate:restore",
-      "module:node:fs/promises:original",
-    ])
+    expect(events).toEqual(["module:node:fs/promises:mocked", "delegate:restore", "module:node:fs/promises:original"])
   })
 
   test("#given preserved active module mocks from two owners #when global test setup cleans up #then both owner mocks are replayed", () => {
@@ -244,11 +236,7 @@ describe("installModuleMockLifecycle", () => {
     lifecycle.restoreModuleMocks()
 
     // then
-    expect(events).toEqual([
-      "module:./dependency:mocked",
-      "delegate:restore",
-      "module:./dependency:mocked",
-    ])
+    expect(events).toEqual(["module:./dependency:mocked", "delegate:restore", "module:./dependency:mocked"])
   })
 
   test("#given two test files register module mocks #when one file restores scoped mocks #then the other mock stays active", () => {
@@ -416,11 +404,7 @@ describe("installModuleMockLifecycle", () => {
     mockApi.restore()
 
     // then
-    expect(events).toEqual([
-      "module:./dependency-a:mock-a",
-      "delegate:restore",
-      "module:./dependency-a:mock-a",
-    ])
+    expect(events).toEqual(["module:./dependency-a:mock-a", "delegate:restore", "module:./dependency-a:mock-a"])
   })
 
   test("#given owner is preserved #when owner calls mock.restore #then the owner mock is cleared", () => {
@@ -566,9 +550,6 @@ describe("installModuleMockLifecycle", () => {
     lifecycle.restoreModuleMocksForTestFile("file:///repo/tests/preserved.test.ts")
 
     // then
-    expect(events).toEqual([
-      "module:virtual:missing:mocked",
-      "delegate:restore",
-    ])
+    expect(events).toEqual(["module:virtual:missing:mocked", "delegate:restore"])
   })
 })
