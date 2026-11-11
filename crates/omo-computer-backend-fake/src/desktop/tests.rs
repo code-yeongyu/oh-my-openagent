@@ -3,7 +3,6 @@
 use omo_computer_core::backend::{
     Backend, CaptureOptions, InputEvent, Route, TaggedInput, Target, WindowFilter,
 };
-use omo_computer_core::listing::Rect;
 use omo_computer_core::params::Point;
 
 use omo_computer_core::error::{ComputerCode, EngineCode};

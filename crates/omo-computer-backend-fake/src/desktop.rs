@@ -168,9 +168,14 @@ impl Backend for FakeBackend {
         self.call(FakeMethod::Capture, |state, _| {
             let (rect, scale) = capture_rect(state, target)?;
             let rect = options.region.unwrap_or(rect);
+            // A scale that is not positive, or a negative size, refuses before the multiply:
+            // two negatives would otherwise make a positive extent.
+            if scale.is_nan() || scale <= 0.0 || rect.width < 0.0 || rect.height < 0.0 {
+                return Err(Refusal::bare(EngineCode::CaptureFailed));
+            }
             let (scaled_width, scaled_height) = (rect.width * scale, rect.height * scale);
-            // `pixels` maps a non-finite, zero or negative length to 0, which would report an
-            // empty success.
+            // `pixels` truncates to whole pixels and maps a non-finite length to 0, so a
+            // non-finite extent refuses here and any length under 1 px refuses as 0 below.
             if !scaled_width.is_finite() || !scaled_height.is_finite() {
                 return Err(Refusal::bare(EngineCode::CaptureFailed));
             }

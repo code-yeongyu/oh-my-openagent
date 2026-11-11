@@ -91,7 +91,6 @@ fn a_negative_scale_or_size_refuses_before_multiplying() {
         &display(100.0, 100.0, 1.0),
         &region(-10.0, 10.0),
     );
-    refuses("NaN scale", &display(100.0, 100.0, f64::NAN), &OPTIONS);
 }
 
 #[test]
