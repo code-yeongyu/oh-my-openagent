@@ -35,7 +35,7 @@ The ledger is tab-separated, with a header row. Its columns are:
 | 2 | `compositor` | `gnome`, `kde` or `sway` |
 | 3 | `question` | the binary question |
 | 4 | `condition` | the exact condition it was measured under |
-| 5 | `verdict` | `CONFIRMS` (the answer is yes), `CONTRADICTS` (the answer is no) or `UNMEASURED` |
+| 5 | `verdict` | `CONFIRMS` (the answer is yes), `CONTRADICTS` (the answer is no), `UNMEASURED`, or `INVALID` (the probe for the row was found unproven; the row waits for a re-measure) |
 | 6 | `rerun` | the command that measures this row again, from the repository root |
 | 7 | `observed` | what was measured; rectangles are in 8 px buckets |
 | 8 | `host_build` | measurement date, host kernel, Docker version, pinned base image digest, built image id, and package versions |
@@ -46,6 +46,8 @@ The verdict always answers the question in column 3, never a design expectation.
 A row is `UNMEASURED` only when the measurement itself could not run in the container, and its note names the cause. An answer is never guessed.
 
 ## How the questions are measured
+
+- **Interface presence.** `containers/common/iface_probe.py` introspects `/org/freedesktop/portal/desktop` on `org.freedesktop.portal.Desktop` and parses its `<interface name=...>` list. An interface is absent only when that list came back without it. A failed call is recorded as `UNMEASURED` with its error text, never as absent. Its tests run without D-Bus or a container: `python3 -m unittest crates/omo-computer-backend-wayland/probes/containers/common/test_iface_probe.py`.
 
 - **First grants.** A portal dialog is answered by `atspi.py approve`, an AT-SPI client acting as the person at the dialog: it picks every screen, ticks "remember" or "allow restore", and presses the accept button. This happens only for the first grant. Restore legs run with no approver, so a restore that succeeds was granted by the token alone.
   - On sway, the chooser of `xdg-desktop-portal-wlr` picks the output for the grant leg (`xdpw-grant.ini`). The restore leg swaps in a chooser that always fails (`xdpw-deny.ini`).

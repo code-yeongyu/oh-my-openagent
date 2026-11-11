@@ -2,7 +2,7 @@
 """SP-W portal client. Runs INSIDE a probe container session. Prints one JSON object on stdout.
 
 Subcommands
-  iface <Name>                        version of org.freedesktop.portal.<Name>, or absent
+  iface <Name>                        org.freedesktop.portal.<Name>: version, absent (with the enumerated list) or error
   screencast [--restore-file F] [--save-file F] [--timeout S]
   remote [--screencast] [--clipboard] [--restore-file F] [--save-file F] [--timeout S]
          [--eis-helper MODE] [--second-eis] [--hold-seconds S]
@@ -14,6 +14,8 @@ import argparse, json, os, subprocess, sys, time, uuid
 import gi
 gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib
+
+from iface_probe import probe_interface
 
 DEST = "org.freedesktop.portal.Desktop"
 PATH = "/org/freedesktop/portal/desktop"
@@ -39,14 +41,33 @@ def call(iface, method, args, sig, timeout_ms=30000, fdlist=False):
                          Gio.DBusCallFlags.NONE, timeout_ms, None)
 
 
-def iface_version(name):
-    try:
-        v = bus.call_sync(DEST, PATH, "org.freedesktop.DBus.Properties", "Get",
-                          GLib.Variant("(ss)", (f"org.freedesktop.portal.{name}", "version")),
-                          GLib.VariantType("(v)"), Gio.DBusCallFlags.NONE, 10000, None)
-        return v.unpack()[0]
-    except GLib.Error as e:
-        return None
+def introspect_frontend():
+    return bus.call_sync(DEST, PATH, "org.freedesktop.DBus.Introspectable", "Introspect", None,
+                         GLib.VariantType("(s)"), Gio.DBusCallFlags.NONE, 10000, None).unpack()[0]
+
+
+def read_version(full_name):
+    return bus.call_sync(DEST, PATH, "org.freedesktop.DBus.Properties", "Get",
+                         GLib.Variant("(ss)", (full_name, "version")), GLib.VariantType("(v)"),
+                         Gio.DBusCallFlags.NONE, 10000, None).unpack()[0]
+
+
+def iface(name):
+    """{"version"}, {"absent", "interfaces"} or {"error"} for org.freedesktop.portal.<name> (see iface_probe)."""
+    return probe_interface(name, introspect_frontend, read_version)
+
+
+def gate(rec, name, res):
+    """Records the presence check of the session's main interface; returns False when the run must stop here."""
+    rec["iface_name"] = "org.freedesktop.portal." + name
+    if "error" in res:
+        rec["result"], rec["iface_error"] = "interface_error", res["error"]
+        return False
+    if res.get("absent"):
+        rec["result"], rec["interfaces_enumerated"] = "interface_absent", len(res["interfaces"])
+        return False
+    rec["iface_version"] = res["version"]
+    return True
 
 
 def request(iface, method, build_args, timeout_s):
@@ -108,9 +129,9 @@ def create_session(iface, timeout_s):
 
 
 def screencast(a):
-    rec = {"iface_version": iface_version("ScreenCast")}
-    if rec["iface_version"] is None:
-        rec["result"] = "interface_absent"; return out(rec)
+    rec = {}
+    if not gate(rec, "ScreenCast", iface("ScreenCast")):
+        return out(rec)
     restore = read_token(a.restore_file)
     rec["restore_token_supplied"] = bool(restore)
     if restore:
@@ -142,14 +163,18 @@ def eis_helper(mode, fd, hold_seconds):
 
 
 def remote(a):
-    rec = {"iface_version": iface_version("RemoteDesktop"), "clipboard_iface_version": iface_version("Clipboard")}
-    if rec["iface_version"] is None:
-        rec["result"] = "interface_absent"; return out(rec)
+    rec = {}
+    if not gate(rec, "RemoteDesktop", iface("RemoteDesktop")):
+        return out(rec)
+    clip = iface("Clipboard") if a.clipboard else {}
+    rec["clipboard_iface_version"] = clip.get("version")
     restore = read_token(a.restore_file)
     rec["restore_token_supplied"] = bool(restore)
     s = create_session("org.freedesktop.portal.RemoteDesktop", a.timeout)
     if a.clipboard:
-        if rec["clipboard_iface_version"] is None:
+        if "error" in clip:
+            rec["clipboard_request"] = "interface_error:" + clip["error"]
+        elif clip.get("absent"):
             rec["clipboard_request"] = "interface_absent"
         else:
             try:
@@ -243,7 +268,9 @@ for name in ("screencast", "remote"):
         p.add_argument("--hold-seconds", type=float, default=30)
 a = ap.parse_args()
 if a.cmd == "iface":
-    out({"iface": a.name, "version": iface_version(a.name)})
+    res = iface(a.name)
+    out({"iface": "org.freedesktop.portal." + a.name, **res,
+         "interfaces_enumerated": len(res["interfaces"]) if "interfaces" in res else None})
 elif a.cmd == "mutter-key":
     mutter_key(a.keysym)
 elif a.cmd == "screencast":

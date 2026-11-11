@@ -161,9 +161,11 @@ if (inContainer) {
   for (const c of chosen) for (const r of await runContainer(c, ids(c))) lines.push((await toTsv(r)).join("\t"))
   if (!values.write) console.log(lines.join("\n"))
   else {
+    // replace exactly the rows just measured (a --question run keeps the compositor's other rows)
+    const fresh = new Set(lines.map((l) => l.split("\t")[0]))
     const keep = existsSync(values.write)
       ? readLedger(values.write)
-          .filter((f) => !chosen.some((c) => c === f[1]))
+          .filter((f) => !fresh.has(f[0] ?? ""))
           .map((f) => f.join("\t"))
       : []
     const order = (l: string) => {

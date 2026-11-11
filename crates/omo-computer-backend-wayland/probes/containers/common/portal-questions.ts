@@ -69,8 +69,28 @@ function backendComplaint(): string {
   }
 }
 
+// The interface presence check (iface_probe.py): absent ONLY when the frontend's interface list came back without
+// the name; a failed call is UNMEASURED with its error text, never CONTRADICTS.
+function presence(rec: Record<string, unknown>, nameKey = "iface_name"): Answer | null {
+  const name = String(rec[nameKey] ?? rec.iface ?? "?")
+  const err = rec.iface_error ?? rec.error
+  if (rec.result === "interface_error" || err !== undefined)
+    return {
+      answer: null,
+      observed: `call errored: ${String(err)}`,
+      reason: `the interface check for ${name} errored (${String(err)}), so presence was not measured`,
+    }
+  if (rec.result === "interface_absent" || rec.absent === true)
+    return {
+      answer: false,
+      observed: `enumerated ${String(rec.interfaces_enumerated)} interfaces, ${name} not among them`,
+    }
+  return null
+}
+
 function firstGrantFailed(rec: Record<string, unknown>, log: string): Answer | null {
-  if (rec.result === "interface_absent") return { answer: false, observed: "portal interface absent on this backend" }
+  const p = presence(rec)
+  if (p) return p
   if (rec.start_code === 0) return null
   const complaint = backendComplaint()
   if (/OpenGL compositing is required/.test(readLog())) {
@@ -133,14 +153,12 @@ export async function rdRestore(c: Compositor, across: "engine" | "session"): Pr
 export async function globalShortcuts(c: Compositor): Promise<Answer> {
   await freshSession(c, "gs-version", prep(c))
   const r = await portal(c, ["iface", "GlobalShortcuts"], false)
-  const v = r.rec.version
-  return {
-    answer: v !== null && v !== undefined,
-    observed:
-      v == null
-        ? "org.freedesktop.portal.GlobalShortcuts absent (no version property)"
-        : `org.freedesktop.portal.GlobalShortcuts version ${v}`,
-  }
+  return (
+    presence(r.rec, "iface") ?? {
+      answer: true,
+      observed: `enumerated ${String(r.rec.interfaces_enumerated)} interfaces, org.freedesktop.portal.GlobalShortcuts version ${String(r.rec.version)}`,
+    }
+  )
 }
 
 type Device = { event?: string; abs?: number; kbd?: number; regions?: { x: number; y: number; w: number; h: number }[] }
@@ -198,14 +216,12 @@ export async function secondConnect(c: Compositor): Promise<Answer> {
 export async function clipboardGrant(c: Compositor): Promise<Answer> {
   await freshSession(c, "clipboard-grant", prep(c))
   const v = await portal(c, ["iface", "Clipboard"], false)
-  if (v.rec.version == null)
-    return {
-      answer: false,
-      observed: "org.freedesktop.portal.Clipboard absent on this backend, so RequestClipboard cannot be granted",
-    }
+  const clip = presence(v.rec, "iface")
+  if (clip)
+    return clip.answer === false
+      ? { ...clip, observed: `${clip.observed}, so RequestClipboard cannot be granted` }
+      : clip
   const r = await portal(c, ["remote", "--screencast", "--clipboard", "--timeout", "30"], true)
-  if (r.rec.result === "interface_absent")
-    return { answer: false, observed: "RemoteDesktop absent, so no combined session to request the clipboard on" }
   const fail = firstGrantFailed(r.rec, r.approverLog)
   if (fail) return fail
   return {
