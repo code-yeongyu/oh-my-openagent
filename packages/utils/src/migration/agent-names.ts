@@ -39,6 +39,11 @@ export const AGENT_NAME_MAP: Record<string, string> = {
   "Sisyphus-Junior": "sisyphus-junior",
   "sisyphus-junior": "sisyphus-junior",
 
+  // Argus variants → "argus"
+  "Argus - Security Auditor": "argus",
+  "Argus (Security Auditor)": "argus",
+  argus: "argus",
+
   // Already lowercase - passthrough
   build: "build",
   oracle: "oracle",
@@ -58,6 +63,7 @@ export const BUILTIN_AGENT_NAMES = new Set([
   "prometheus", // was "Prometheus - Plan Builder"
   "atlas", // was "Atlas"
   "build",
+  "argus",
 ])
 
 export function migrateAgentNames(
